@@ -8,8 +8,7 @@ from typing import Any
 from contracts.state import TypedState
 from contracts.decision import StructuredDecision, Observation
 from contracts.result import ToolExecutionError
-from layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from layer1_cognitive.body.safe_executor import SimpleSafeExecutor
+from contracts.protocols import ToolRegistryP, SafeExecutorProtocol
 from contracts.role_team import RetryPolicy, CacheConfig
 
 
@@ -20,7 +19,7 @@ def _new_id(prefix: str) -> str:
 class SimpleBody:
     """ToolRegistry + SafeExecutor 组合。"""
 
-    def __init__(self, tool_registry: SimpleToolRegistry, safe_executor: SimpleSafeExecutor):
+    def __init__(self, tool_registry: ToolRegistryP, safe_executor: SafeExecutorProtocol):
         self.tool_registry = tool_registry
         self.safe_executor = safe_executor
 

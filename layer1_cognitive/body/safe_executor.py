@@ -11,7 +11,7 @@ from contracts.decision import Observation
 from contracts.role_team import ToolPermissionManifest, RetryPolicy, CacheConfig
 from contracts.result import ToolExecutionError
 from contracts.observability import TraceSpan
-from layer0_infra.observability.console_observability import ConsoleObservability
+from contracts.protocols import Observability, ToolProtocol
 
 
 def _now():
@@ -26,13 +26,13 @@ def _new_id(prefix: str) -> str:
 class SimpleSafeExecutor:
     """权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
 
-    def __init__(self, permission_manifest: ToolPermissionManifest, observability: ConsoleObservability):
+    def __init__(self, permission_manifest: ToolPermissionManifest, observability: Observability):
         self.permission_manifest = permission_manifest
         self.observability = observability
         self._cache: dict[str, Observation] = {}
 
     async def execute(
-        self, tool: Any, args: dict[str, Any], retry_policy: RetryPolicy, cache_config: CacheConfig
+        self, tool: ToolProtocol, args: dict[str, Any], retry_policy: RetryPolicy, cache_config: CacheConfig
     ) -> Observation:
         if tool.name not in self.permission_manifest.allowed_tools:
             raise ToolExecutionError(f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权")

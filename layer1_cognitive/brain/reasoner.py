@@ -6,6 +6,7 @@ from typing import Any
 
 from contracts.state import TypedState
 from contracts.role_team import RoleProfile
+from contracts.protocols import LLMAdapter, PromptManager
 
 
 DEFAULT_REACT_TEMPLATE = """\
@@ -26,8 +27,8 @@ class SimpleReasoner:
 
     def __init__(
         self,
-        llm: Any,
-        prompt_manager: Any,
+        llm: LLMAdapter,
+        prompt_manager: PromptManager,
         role_profile: RoleProfile,
         tools_desc: str,
     ):

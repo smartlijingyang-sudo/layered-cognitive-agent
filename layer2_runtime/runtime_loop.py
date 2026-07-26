@@ -8,12 +8,10 @@ from typing import Optional
 from contracts.state import TypedState, Budget, StateSnapshot
 from contracts.decision import StructuredDecision, Observation, Reflection
 from contracts.result import Result, ApprovalPendingError, BudgetExceededError
-from layer1_cognitive.brain.modular_brain import ModularBrain
-from layer1_cognitive.body.simple_body import SimpleBody
-from layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from layer1_cognitive.hook_registry import SimpleHookRegistry
-from layer1_cognitive.event_bus import SimpleEventBus
-from layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
+from contracts.protocols import (
+    BrainStrategy, Body, MemorySystem,
+    HookRegistryP, EventBus, StateStore,
+)
 
 
 def _new_id(prefix: str) -> str:
@@ -29,12 +27,12 @@ class CognitiveRuntime:
 
     def __init__(
         self,
-        brain: ModularBrain,
-        body: SimpleBody,
-        memory: SimpleMemorySystem,
-        hooks: SimpleHookRegistry,
-        event_bus: SimpleEventBus,
-        state_store: InMemoryStateStore,
+        brain: BrainStrategy,
+        body: Body,
+        memory: MemorySystem,
+        hooks: HookRegistryP,
+        event_bus: EventBus,
+        state_store: StateStore,
     ):
         self.brain = brain
         self.body = body

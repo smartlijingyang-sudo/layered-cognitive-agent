@@ -4,15 +4,10 @@ from __future__ import annotations
 
 from contracts.state import TypedState
 from contracts.decision import StructuredDecision, Observation, Reflection
-from layer1_cognitive.brain.reasoner import SimpleReasoner
-from layer1_cognitive.brain.critic import SimpleCritic
-from layer1_cognitive.brain.decision_parser import SimpleDecisionParser
-from layer1_cognitive.brain.map_modules import (
-    SimpleTaskDecomposer,
-    SimpleStatePredictor,
-    SimpleStateEvaluator,
-    SimpleConflictMonitor,
-    SimpleTaskCoordinator,
+from contracts.protocols import (
+    Reasoner, DecisionParser, Critic,
+    TaskDecomposer, StatePredictor, StateEvaluator,
+    ConflictMonitor, TaskCoordinator,
 )
 
 
@@ -26,14 +21,14 @@ class ModularBrain:
 
     def __init__(
         self,
-        reasoner: SimpleReasoner,
-        decision_parser: SimpleDecisionParser,
-        critic: SimpleCritic,
-        task_decomposer: SimpleTaskDecomposer,
-        state_predictor: SimpleStatePredictor,
-        state_evaluator: SimpleStateEvaluator,
-        conflict_monitor: SimpleConflictMonitor,
-        task_coordinator: SimpleTaskCoordinator,
+        reasoner: Reasoner,
+        decision_parser: DecisionParser,
+        critic: Critic,
+        task_decomposer: TaskDecomposer,
+        state_predictor: StatePredictor,
+        state_evaluator: StateEvaluator,
+        conflict_monitor: ConflictMonitor,
+        task_coordinator: TaskCoordinator,
     ):
         self.reasoner = reasoner
         self.decision_parser = decision_parser

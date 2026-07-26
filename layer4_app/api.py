@@ -1,33 +1,21 @@
-"""L4 极简开发者 API —— 三行创建 Agent，五行组建团队。"""
+"""L4 极简开发者 API —— 三行创建 Agent，五行组建团队。
+
+支持通过注册表名字字符串或自定义协议实例来选择组件实现，
+无需修改框架源码即可替换任何可插拔组件。
+"""
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from contracts.result import Result
-from layer0_infra.observability.console_observability import ConsoleObservability
-from layer1_cognitive.brain.modular_brain import ModularBrain
-from layer1_cognitive.brain.reasoner import SimpleReasoner, DEFAULT_REACT_TEMPLATE
-from layer1_cognitive.brain.critic import SimpleCritic
-from layer1_cognitive.brain.decision_parser import SimpleDecisionParser
-from layer1_cognitive.brain.map_modules import (
-    SimpleTaskDecomposer, SimpleStatePredictor, SimpleStateEvaluator,
-    SimpleConflictMonitor, SimpleTaskCoordinator,
-)
-from layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from layer1_cognitive.body.simple_body import SimpleBody
-from layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from layer1_cognitive.event_bus import SimpleEventBus
-from layer1_cognitive.prompt_manager import SimplePromptManager
-from layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
-from layer2_runtime.runtime_loop import CognitiveRuntime
-from layer2_runtime.hooks import HOOK_NAMES
-from layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
+from contracts.protocols import MemorySystem, Observability, StateStore
+from layer0_infra.registry import get_global_registry
 from layer3_agent.base_agent import BaseAgent
 from layer3_agent.supervisor import Supervisor
 from layer3_agent.team_orchestrator import TeamOrchestrator
+import layer4_app.defaults  # noqa: F401 — 触发默认注册
 
 
 class Agent:
@@ -37,6 +25,11 @@ class Agent:
     用法：
         agent = Agent(role="研究员", goal="产出分析报告", backstory="十年经验", tools=[...], llm=llm)
         result = await agent.run("分析新能源电池行业趋势")
+
+    可插拔参数（接受注册表名字字符串或满足协议的自定义实例）：
+        memory         — 默认 "simple"
+        observability  — 默认 "console"
+        state_store    — 默认 "memory"
     """
 
     def __init__(
@@ -47,50 +40,44 @@ class Agent:
         tools: list[Any],
         llm: Any,
         max_steps: int = 10,
+        memory: Union[str, MemorySystem] = "simple",
+        observability: Union[str, Observability] = "console",
+        state_store: Union[str, StateStore] = "memory",
     ):
+        reg = get_global_registry()
+
         permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
         role_profile = RoleProfile(
             role=role, goal=goal, backstory=backstory,
             tool_permission_manifest=permission_manifest,
         )
 
-        observability = ConsoleObservability()
-        prompt_manager = SimplePromptManager()
-        prompt_manager.register_template("react_prompt", DEFAULT_REACT_TEMPLATE)
+        obs = self._resolve(reg, "observability", observability)
+        mem = self._resolve(reg, "memory", memory)
+        ss = self._resolve(reg, "state_store", state_store)
 
-        tool_registry = SimpleToolRegistry()
-        for t in tools:
-            tool_registry.register(t)
-        tools_desc = ", ".join(f"{t.name}" for t in tools) or "(无可用工具)"
+        from layer4_app.defaults import _build_runtime
+        runtime_factory = reg.resolve("build_runtime", "default")
+        runtime = runtime_factory(llm, role_profile, tools, obs, mem, ss)
 
-        safe_executor = SimpleSafeExecutor(permission_manifest, observability)
-        body = SimpleBody(tool_registry, safe_executor)
-
-        reasoner = SimpleReasoner(llm, prompt_manager, role_profile, tools_desc)
-        brain = ModularBrain(
-            reasoner=reasoner,
-            decision_parser=SimpleDecisionParser(),
-            critic=SimpleCritic(),
-            task_decomposer=SimpleTaskDecomposer(),
-            state_predictor=SimpleStatePredictor(),
-            state_evaluator=SimpleStateEvaluator(),
-            conflict_monitor=SimpleConflictMonitor(),
-            task_coordinator=SimpleTaskCoordinator(),
-        )
-
-        memory = SimpleMemorySystem()
-        hooks = SimpleHookRegistry(observability)
-        for event_name in HOOK_NAMES:
-            hooks.register(event_name, default_logging_hook)
-
-        event_bus = SimpleEventBus()
-        state_store = InMemoryStateStore()
-
-        runtime = CognitiveRuntime(brain, body, memory, hooks, event_bus, state_store)
         self._base_agent = BaseAgent(runtime, role_profile, max_steps=max_steps)
+
+    @staticmethod
+    def _resolve(reg, category: str, value):
+        if isinstance(value, str):
+            impl = reg.resolve(category, value)
+            if impl is None:
+                raise ValueError(f"Unknown {category}: {value!r}. Available: {reg.list(category)}")
+            return impl()
+        return value
 
     async def run(self, task: str) -> Result:
         return await self._base_agent.execute(task)
+
+    def _as_supervisor(self) -> Supervisor:
+        rp = self._base_agent.role_profile
+        ms = self._base_agent.max_steps
+        return Supervisor(self._base_agent.runtime, rp, max_steps=max(ms, 20))
 
 
 class MultiAgentTeam:
@@ -101,7 +88,7 @@ class MultiAgentTeam:
         team = MultiAgentTeam(
             members=[researcher, writer, critic],
             process="hierarchical",
-            supervisor=Supervisor(role="项目负责人"),
+            supervisor=supervisor_agent,
         )
         result = await team.run("产出行业研究报告")
     """
@@ -118,9 +105,7 @@ class MultiAgentTeam:
             max_rounds=max_rounds,
         )
         base_members = [m._base_agent for m in members]
-        base_supervisor = supervisor._base_agent if supervisor else None
-        if base_supervisor:
-            base_supervisor.__class__ = Supervisor
+        base_supervisor = supervisor._as_supervisor() if supervisor else None
         self._orchestrator = TeamOrchestrator(base_members, config, base_supervisor)
 
     async def run(self, objective: str) -> Result:

@@ -8,7 +8,7 @@ from typing import Any, Callable, Awaitable
 
 from contracts.state import TypedState
 from contracts.observability import TraceSpan
-from layer0_infra.observability.console_observability import ConsoleObservability
+from contracts.protocols import Observability
 
 
 def _now() -> datetime:
@@ -22,7 +22,7 @@ def _new_id(prefix: str) -> str:
 class SimpleHookRegistry:
     """注册和触发生命周期钩子。"""
 
-    def __init__(self, observability: ConsoleObservability) -> None:
+    def __init__(self, observability: Observability) -> None:
         self._hooks: dict[str, list[Callable]] = {}
         self.observability = observability
 
