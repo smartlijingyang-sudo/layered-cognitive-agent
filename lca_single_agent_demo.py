@@ -350,6 +350,14 @@ class MockLLMAdapter:
 
     name = "mock-llm"
 
+    _WEATHER_CITIES = {
+        "东京": "Tokyo", "tokyo": "Tokyo",
+        "北京": "Beijing", "beijing": "Beijing",
+        "旧金山": "San Francisco", "san francisco": "San Francisco",
+        "纽约": "New York", "new york": "New York",
+        "伦敦": "London", "london": "London",
+    }
+
     async def complete(self, prompt: str, **kwargs: Any) -> str:
         await asyncio.sleep(0)  # 模拟异步I/O让出事件循环
         if "TOOL_RESULT:" in prompt:
@@ -360,8 +368,18 @@ class MockLLMAdapter:
             return json.dumps({
                 "action_type": "respond",
                 "response_text": f"「{q}」的答案是 {tool_result}。",
-                "rationale": "已从工具获得精确计算结果，直接向用户作答，无需进一步调用工具。",
+                "rationale": "已从工具获得结果，直接向用户作答，无需进一步调用工具。",
                 "confidence": 0.98,
+            }, ensure_ascii=False)
+
+        city = self._extract_weather_city(prompt)
+        if city:
+            return json.dumps({
+                "action_type": "use_tool",
+                "tool_name": "get_weather",
+                "arguments": {"city": city, "unit": "celsius"},
+                "rationale": f"用户询问天气，应调用 get_weather 工具查询 {city}。",
+                "confidence": 0.95,
             }, ensure_ascii=False)
 
         expr = self._extract_arithmetic_expression(prompt)
@@ -380,6 +398,19 @@ class MockLLMAdapter:
             "rationale": "未检测到需要调用工具的模式，直接生成回答。",
             "confidence": 0.6,
         }, ensure_ascii=False)
+
+    @classmethod
+    def _extract_weather_city(cls, prompt: str) -> Optional[str]:
+        m = re.search(r"USER_TASK:\s*([^\n]+)", prompt)
+        if not m:
+            return None
+        text = m.group(1)
+        if not re.search(r"天气|气温|温度|weather|temp", text, re.IGNORECASE):
+            return None
+        for keyword, city in cls._WEATHER_CITIES.items():
+            if keyword in text.lower():
+                return city
+        return None
 
     @staticmethod
     def _extract_arithmetic_expression(prompt: str) -> Optional[str]:
@@ -457,6 +488,80 @@ class CalculatorTool:
         if isinstance(node, ast.UnaryOp) and type(node.op) in self._OPS:
             return self._OPS[type(node.op)](self._eval_node(node.operand))
         raise ValueError(f"不支持的表达式片段: {ast.dump(node)}")
+
+
+class GetWeatherTool:
+    """实现 ToolProtocol 的天气查询工具（内置假数据，无需外部网络）。"""
+
+    name = "get_weather"
+    is_idempotent = True
+    default_timeout_s = 5
+
+    _FAKE_DB: dict[str, dict[str, Any]] = {
+        "tokyo": {"temp_c": 27, "condition": "cloudy"},
+        "beijing": {"temp_c": 31, "condition": "sunny"},
+        "san francisco": {"temp_c": 18, "condition": "foggy"},
+        "new york": {"temp_c": 24, "condition": "clear"},
+        "london": {"temp_c": 19, "condition": "rainy"},
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        city = str(args.get("city", "")).strip().lower()
+
+        if not city:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=new_id("obs"), success=False, payload=None,
+                error="missing required arg: city", latency_ms=latency_ms,
+            )
+
+        await asyncio.sleep(0.05)  # 模拟网络 IO
+
+        data = self._FAKE_DB.get(city)
+        if data is None:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=new_id("obs"), success=False, payload=None,
+                error=f"unknown city: {city}", latency_ms=latency_ms,
+            )
+
+        unit = str(args.get("unit", "celsius")).lower()
+        temp_c = data["temp_c"]
+        temp = temp_c if unit == "celsius" else temp_c * 9 / 5 + 32
+
+        result = {
+            "city": city,
+            "temperature": round(temp, 1),
+            "unit": unit,
+            "condition": data["condition"],
+        }
+        latency_ms = int((time.monotonic() - start) * 1000)
+        return Observation(
+            observation_id=new_id("obs"), success=True, payload=result,
+            latency_ms=latency_ms,
+        )
+
+
+class OpenAIResponsesAdapter:
+    """OpenAI Responses API 适配器（需 pip install "openai>=1.40" + OPENAI_API_KEY）。
+
+    接口签名与 MockLLMAdapter 完全一致，Brain 层无需感知差异。
+    本文件默认不调用，取消注释 main() 中对应行即可使用。
+    """
+
+    def __init__(self, model: str = "gpt-4.1", **kwargs: Any):
+        self.model = model
+        self._kwargs = kwargs
+
+    async def complete(self, prompt: str, **kwargs: Any) -> str:
+        # from openai import AsyncOpenAI
+        # client = AsyncOpenAI()
+        # response = await client.responses.create(
+        #     model=self.model, input=prompt, **kwargs,
+        # )
+        # return response.output_text
+        raise NotImplementedError("需要 OPENAI_API_KEY，本文件默认不调用")
 
 
 class InMemoryStateStore:
@@ -975,25 +1080,47 @@ class Agent:
 # 演示：一个 Agent 回答一个问题（L4 -> L3 -> L2 -> L1 -> L0 全链路串联）
 # ============================================================================
 
-async def main() -> None:
-    llm = MockLLMAdapter()
-    calculator = CalculatorTool()
-
-    researcher = Agent(
+def _make_agent() -> Agent:
+    return Agent(
         role="通用问答助手",
         goal="准确、简洁地回答用户提出的问题",
-        backstory="擅长借助工具进行精确计算，不臆测数值结果。",
-        tools=[calculator],
-        llm=llm,
+        backstory="擅长借助工具进行精确计算和天气查询，不臆测数值结果。",
+        tools=[CalculatorTool(), GetWeatherTool()],
+        llm=MockLLMAdapter(),
     )
 
-    print("=" * 70)
-    print("开始执行：agent.run('123 乘以 456 等于多少？')")
-    print("=" * 70)
-    result = await researcher.run("123 乘以 456 等于多少？")
 
+async def main() -> None:
+    # 场景 1：算术计算
     print("=" * 70)
-    print("Result:")
+    print("场景 1：agent.run('123 乘以 456 等于多少？')")
+    print("=" * 70)
+    result = await _make_agent().run("123 乘以 456 等于多少？")
+    _print_result(result)
+
+    # 场景 2：天气查询
+    print()
+    print("=" * 70)
+    print("场景 2：agent.run('东京现在天气怎么样？')")
+    print("=" * 70)
+    result = await _make_agent().run("东京现在天气怎么样？")
+    _print_result(result)
+
+    # 场景 3：直接并发跑两个工具，验证它们能在同一轮里被同时触发
+    print()
+    print("=" * 70)
+    print("场景 3：并发调用 get_weather + calculator（直接验证工具层）")
+    print("=" * 70)
+    weather_obs, calc_obs = await asyncio.gather(
+        GetWeatherTool().execute({"city": "Tokyo", "unit": "celsius"}),
+        CalculatorTool().execute({"expression": "240*0.15"}),
+    )
+    print(f"  get_weather  → success={weather_obs.success}  payload={weather_obs.payload}  latency={weather_obs.latency_ms}ms")
+    print(f"  calculator   → success={calc_obs.success}  payload={calc_obs.payload}  latency={calc_obs.latency_ms}ms")
+    print("=" * 70)
+
+
+def _print_result(result: Result) -> None:
     print(f"  status      = {result.status}")
     print(f"  output      = {result.output}")
     print(f"  total_steps = {result.total_steps}")
