@@ -31,10 +31,20 @@ class GetWeatherTool:
         "new york": {"temp_c": 24, "condition": "clear"},
         "london": {"temp_c": 19, "condition": "rainy"},
     }
+    _CITY_ALIASES: dict[str, str] = {
+        "东京": "tokyo", "東京": "tokyo",
+        "北京": "beijing",
+        "旧金山": "san francisco",
+        "纽约": "new york",
+        "伦敦": "london",
+    }
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
-        city = str(args.get("city", "")).strip().lower()
+        raw_city = str(
+            args.get("city") or args.get("location") or args.get("name") or ""
+        ).strip().lower()
+        city = self._CITY_ALIASES.get(raw_city, raw_city)
 
         if not city:
             latency_ms = int((time.monotonic() - start) * 1000)

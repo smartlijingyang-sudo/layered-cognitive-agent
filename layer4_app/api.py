@@ -10,7 +10,7 @@ from typing import Any, Optional, Union
 
 from contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from contracts.result import Result
-from contracts.protocols import MemorySystem, Observability, StateStore
+from contracts.protocols import MemorySystem, Observability, StateStore, LLMAdapter, ToolProtocol
 from layer0_infra.registry import get_global_registry
 from layer3_agent.base_agent import BaseAgent
 from layer3_agent.supervisor import Supervisor
@@ -37,8 +37,8 @@ class Agent:
         role: str,
         goal: str,
         backstory: str,
-        tools: list[Any],
-        llm: Any,
+        tools: list[ToolProtocol],
+        llm: LLMAdapter,
         max_steps: int = 10,
         memory: Union[str, MemorySystem] = "simple",
         observability: Union[str, Observability] = "console",

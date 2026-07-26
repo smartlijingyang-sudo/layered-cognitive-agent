@@ -97,7 +97,7 @@ class CognitiveRuntime:
                 break
 
             state.checkpoints.append(state.snapshot())
-            self.event_bus.emit("step_completed", state.trace_id, state.trace_id)
+            self.event_bus.emit("step_completed", {"step": state.step, "status": state.status}, state.trace_id)
 
             if state.budget.exceeded():
                 await self.hooks.trigger("on_error", state, error=BudgetExceededError())

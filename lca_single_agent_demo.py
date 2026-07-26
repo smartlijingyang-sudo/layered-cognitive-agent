@@ -25,6 +25,7 @@ import ast
 import asyncio
 import json
 import operator
+import os
 import re
 import time
 import uuid
@@ -341,6 +342,14 @@ class HookRegistryP(Protocol):
     async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any: ...
 
 
+class Observability(Protocol):
+    def emit_span(self, span: TraceSpan) -> None: ...
+
+
+class Runtime(Protocol):
+    async def run(self, task: str, max_steps: int) -> Result: ...
+
+
 # ============================================================================
 # L0 · 基础设施层
 # ============================================================================
@@ -426,25 +435,39 @@ class MockLLMAdapter:
         return None
 
 
-class AnthropicLLMAdapter:
-    """
-    真实厂商适配器示例（需要网络与 API Key，本文件默认不调用）。
-    生产环境按此模式接入 Anthropic / OpenAI / 开源模型，对上层暴露的
-    接口签名与 MockLLMAdapter 完全一致，Brain 层无需感知差异。
+class OpenAICompatAdapter:
+    """通用 OpenAI 兼容 LLM 适配器。
+
+    支持 OpenAI / DashScope / Ollama / vLLM 等所有 chat.completions 兼容 API。
+    只需配置环境变量即可切换，代码无需改动：
+        LLM_API_KEY   API Key
+        LLM_BASE_URL  基地址（默认 https://api.openai.com/v1）
+        LLM_MODEL     模型名（默认 gpt-4.1）
     """
 
-    def __init__(self, model: str = "claude-sonnet-5"):
-        self.model = model
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        *,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ):
+        from openai import AsyncOpenAI
+        self._model = model or os.getenv("LLM_MODEL", "gpt-4.1")
+        self._client = AsyncOpenAI(
+            api_key=api_key or os.getenv("LLM_API_KEY", ""),
+            base_url=base_url or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
+        )
 
     async def complete(self, prompt: str, **kwargs: Any) -> str:
-        # from anthropic import AsyncAnthropic
-        # client = AsyncAnthropic()
-        # resp = await client.messages.create(
-        #     model=self.model, max_tokens=1000,
-        #     messages=[{"role": "user", "content": prompt}],
-        # )
-        # return resp.content[0].text
-        raise NotImplementedError("示例中未实际联网调用，接口保留以展示L0可替换性")
+        response = await self._client.chat.completions.create(
+            model=kwargs.pop("model", self._model),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=kwargs.pop("temperature", 0.7),
+            max_tokens=kwargs.pop("max_tokens", 2048),
+            **kwargs,
+        )
+        return response.choices[0].message.content or ""
 
 
 class CalculatorTool:
@@ -504,10 +527,20 @@ class GetWeatherTool:
         "new york": {"temp_c": 24, "condition": "clear"},
         "london": {"temp_c": 19, "condition": "rainy"},
     }
+    _CITY_ALIASES: dict[str, str] = {
+        "东京": "tokyo", "東京": "tokyo",
+        "北京": "beijing",
+        "旧金山": "san francisco",
+        "纽约": "new york",
+        "伦敦": "london",
+    }
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
-        city = str(args.get("city", "")).strip().lower()
+        raw_city = str(
+            args.get("city") or args.get("location") or args.get("name") or ""
+        ).strip().lower()
+        city = self._CITY_ALIASES.get(raw_city, raw_city)
 
         if not city:
             latency_ms = int((time.monotonic() - start) * 1000)
@@ -542,26 +575,6 @@ class GetWeatherTool:
             latency_ms=latency_ms,
         )
 
-
-class OpenAIResponsesAdapter:
-    """OpenAI Responses API 适配器（需 pip install "openai>=1.40" + OPENAI_API_KEY）。
-
-    接口签名与 MockLLMAdapter 完全一致，Brain 层无需感知差异。
-    本文件默认不调用，取消注释 main() 中对应行即可使用。
-    """
-
-    def __init__(self, model: str = "gpt-4.1", **kwargs: Any):
-        self.model = model
-        self._kwargs = kwargs
-
-    async def complete(self, prompt: str, **kwargs: Any) -> str:
-        # from openai import AsyncOpenAI
-        # client = AsyncOpenAI()
-        # response = await client.responses.create(
-        #     model=self.model, input=prompt, **kwargs,
-        # )
-        # return response.output_text
-        raise NotImplementedError("需要 OPENAI_API_KEY，本文件默认不调用")
 
 
 class InMemoryStateStore:
@@ -628,7 +641,7 @@ class SimpleEventBus:
 
 
 class SimpleHookRegistry:
-    def __init__(self, observability: ConsoleObservability) -> None:
+    def __init__(self, observability: Observability) -> None:
         self._hooks: dict[str, list[Hook]] = {}
         self.observability = observability
 
@@ -663,7 +676,7 @@ class SimpleToolRegistry:
 class SimpleSafeExecutor:
     """权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行（第4.1/9节内部链路）。"""
 
-    def __init__(self, permission_manifest: ToolPermissionManifest, observability: ConsoleObservability):
+    def __init__(self, permission_manifest: ToolPermissionManifest, observability: Observability):
         self.permission_manifest = permission_manifest
         self.observability = observability
         self._cache: dict[str, Observation] = {}
@@ -701,7 +714,7 @@ class SimpleSafeExecutor:
 class SimpleBody:
     """L1 Body：ToolRegistry + SafeExecutor，对外只暴露 act()。"""
 
-    def __init__(self, tool_registry: SimpleToolRegistry, safe_executor: SimpleSafeExecutor):
+    def __init__(self, tool_registry: ToolRegistryP, safe_executor: SafeExecutorProtocol):
         self.tool_registry = tool_registry
         self.safe_executor = safe_executor
 
@@ -724,7 +737,7 @@ class SimpleBody:
 # ---- Brain 内部：MAP 五模块 + Reasoner + Critic + DecisionParser ----------
 
 class SimpleReasoner:
-    def __init__(self, llm: LLMAdapter, prompt_manager: SimplePromptManager, role_profile: RoleProfile, tools_desc: str):
+    def __init__(self, llm: LLMAdapter, prompt_manager: PromptManager, role_profile: RoleProfile, tools_desc: str):
         self.llm = llm
         self.prompt_manager = prompt_manager
         self.role_profile = role_profile
@@ -745,30 +758,75 @@ class SimpleReasoner:
 
 
 class SimpleDecisionParser:
+    _ACTION_ALIASES = {
+        "tool_call": "use_tool",
+        "call_tool": "use_tool",
+        "use_tool": "use_tool",
+        "respond": "respond",
+        "response": "respond",
+        "answer": "respond",
+        "reply": "respond",
+        "delegate": "delegate",
+        "stop": "stop",
+        "ask_human": "ask_human",
+    }
+
     def parse(self, raw_output: str, state: TypedState) -> StructuredDecision:
+        json_str = self._extract_json(raw_output)
         try:
-            data = json.loads(raw_output)
-            tool_call = None
-            if data.get("action_type") == "use_tool":
-                tool_call = ToolCall(
-                    call_id=new_id("call"),
-                    tool_name=data["tool_name"],
-                    arguments=data.get("arguments", {}),
-                )
-            return StructuredDecision(
-                decision_id=new_id("dec"),
-                action_type=data["action_type"],
-                tool_call=tool_call,
-                response_text=data.get("response_text"),
-                rationale=data.get("rationale", ""),
-                confidence=float(data.get("confidence", 0.5)),
-            )
-        except (json.JSONDecodeError, KeyError):
-            # 解析失败时的兜底：不向 Runtime 抛异常，退化为直接respond原始文本
+            data = json.loads(json_str)
+        except (json.JSONDecodeError, ValueError):
             return StructuredDecision(
                 decision_id=new_id("dec"), action_type="respond",
                 response_text=raw_output, rationale="解析失败兜底", confidence=0.1,
             )
+
+        raw_action = str(data.get("action_type", "respond")).lower().strip()
+        action_type = self._ACTION_ALIASES.get(raw_action, raw_action)
+
+        tool_call = None
+        if action_type == "use_tool":
+            tool_name = data.get("tool_name") or data.get("tool") or self._infer_tool_name(raw_output)
+            arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
+            if not isinstance(arguments, dict):
+                arguments = {"expression": str(arguments)}
+            if tool_name:
+                tool_call = ToolCall(
+                    call_id=new_id("call"),
+                    tool_name=tool_name,
+                    arguments=arguments,
+                )
+            else:
+                action_type = "respond"
+
+        return StructuredDecision(
+            decision_id=new_id("dec"),
+            action_type=action_type,  # type: ignore[arg-type]
+            tool_call=tool_call,
+            response_text=data.get("response_text") or data.get("response") or data.get("text"),
+            rationale=data.get("rationale", ""),
+            confidence=float(data.get("confidence", 0.5)),
+        )
+
+    @staticmethod
+    def _extract_json(text: str) -> str:
+        """从可能包含 markdown 代码块的文本中提取 JSON。"""
+        m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            return m.group(0)
+        return text.strip()
+
+    @staticmethod
+    def _infer_tool_name(text: str) -> Optional[str]:
+        """从 LLM 的 rationale 文本中推断工具名。"""
+        if re.search(r"calculator|计算|算术|表达式", text, re.IGNORECASE):
+            return "calculator"
+        if re.search(r"get_weather|weather|天气|气温", text, re.IGNORECASE):
+            return "get_weather"
+        return None
 
 
 class SimpleCritic:
@@ -821,14 +879,14 @@ class ModularBrain:
 
     def __init__(
         self,
-        reasoner: SimpleReasoner,
-        decision_parser: SimpleDecisionParser,
-        critic: SimpleCritic,
-        task_decomposer: SimpleTaskDecomposer,
-        state_predictor: SimpleStatePredictor,
-        state_evaluator: SimpleStateEvaluator,
-        conflict_monitor: SimpleConflictMonitor,
-        task_coordinator: SimpleTaskCoordinator,
+        reasoner: Reasoner,
+        decision_parser: DecisionParser,
+        critic: Critic,
+        task_decomposer: TaskDecomposer,
+        state_predictor: StatePredictor,
+        state_evaluator: StateEvaluator,
+        conflict_monitor: ConflictMonitor,
+        task_coordinator: TaskCoordinator,
     ):
         self.reasoner = reasoner
         self.decision_parser = decision_parser
@@ -900,12 +958,12 @@ class SimpleMemorySystem:
 class CognitiveRuntime:
     def __init__(
         self,
-        brain: ModularBrain,
-        body: SimpleBody,
-        memory: SimpleMemorySystem,
-        hooks: SimpleHookRegistry,
-        event_bus: SimpleEventBus,
-        state_store: InMemoryStateStore,
+        brain: BrainStrategy,
+        body: Body,
+        memory: MemorySystem,
+        hooks: HookRegistryP,
+        event_bus: EventBus,
+        state_store: StateStore,
     ):
         self.brain = brain
         self.body = body
@@ -969,7 +1027,7 @@ class CognitiveRuntime:
                 break
 
             state.checkpoints.append(state.snapshot())
-            self.event_bus.emit("step_completed", state.trace_id, state.trace_id)
+            self.event_bus.emit("step_completed", {"step": state.step, "status": state.status}, state.trace_id)
 
             if state.budget.exceeded():
                 await self.hooks.trigger("on_error", state, error=BudgetExceededError())
@@ -1006,7 +1064,7 @@ class CognitiveRuntime:
 # ============================================================================
 
 class BaseAgent:
-    def __init__(self, runtime: CognitiveRuntime, role_profile: RoleProfile, max_steps: int = 10):
+    def __init__(self, runtime: Runtime, role_profile: RoleProfile, max_steps: int = 10):
         self.runtime = runtime
         self.role_profile = role_profile
         self.max_steps = max_steps
@@ -1080,22 +1138,48 @@ class Agent:
 # 演示：一个 Agent 回答一个问题（L4 -> L3 -> L2 -> L1 -> L0 全链路串联）
 # ============================================================================
 
-def _make_agent() -> Agent:
+def _load_env() -> None:
+    """从 /home/lichao/zero-agent/.env 加载环境变量（不依赖 python-dotenv）。"""
+    env_path = "/home/lichao/zero-agent/.env"
+    if not os.path.isfile(env_path):
+        return
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip())
+
+
+def _make_agent(llm: Optional[LLMAdapter] = None) -> Agent:
+    if llm is None:
+        llm = MockLLMAdapter()
     return Agent(
         role="通用问答助手",
         goal="准确、简洁地回答用户提出的问题",
         backstory="擅长借助工具进行精确计算和天气查询，不臆测数值结果。",
         tools=[CalculatorTool(), GetWeatherTool()],
-        llm=MockLLMAdapter(),
+        llm=llm,
     )
 
 
 async def main() -> None:
+    _load_env()
+
+    api_key = os.getenv("LLM_API_KEY", "")
+    if api_key:
+        print(f"[配置] LLM={os.getenv('LLM_MODEL', 'gpt-4.1')} base_url={os.getenv('LLM_BASE_URL', 'https://api.openai.com/v1')}")
+        llm: LLMAdapter = OpenAICompatAdapter()
+    else:
+        print("[配置] 未检测到 LLM_API_KEY，降级使用 MockLLMAdapter")
+        llm = MockLLMAdapter()
+
     # 场景 1：算术计算
     print("=" * 70)
     print("场景 1：agent.run('123 乘以 456 等于多少？')")
     print("=" * 70)
-    result = await _make_agent().run("123 乘以 456 等于多少？")
+    result = await _make_agent(llm).run("123 乘以 456 等于多少？")
     _print_result(result)
 
     # 场景 2：天气查询
@@ -1103,7 +1187,7 @@ async def main() -> None:
     print("=" * 70)
     print("场景 2：agent.run('东京现在天气怎么样？')")
     print("=" * 70)
-    result = await _make_agent().run("东京现在天气怎么样？")
+    result = await _make_agent(llm).run("东京现在天气怎么样？")
     _print_result(result)
 
     # 场景 3：直接并发跑两个工具，验证它们能在同一轮里被同时触发
