@@ -13,9 +13,9 @@ from __future__ import annotations
 import asyncio
 import os
 
-from layer0_infra.llm_adapter import MockLLMAdapter, OpenAICompatAdapter
-from layer0_infra.tool_protocol import CalculatorTool, GetWeatherTool
-from layer4_app import Agent
+from lca.layer0_infra.llm_adapter import MockLLMAdapter, OpenAICompatAdapter
+from lca.layer0_infra.tool_protocol import CalculatorTool, GetWeatherTool
+from lca.layer4_app import Agent
 
 
 def _load_env() -> None:

@@ -1,0 +1,35 @@
+[project]
+name = "lca-framework"
+version = "0.1.0"
+description = "Layered Cognitive Agent Framework"
+requires-python = ">=3.10"
+
+[tool.importlinter]
+root_package = "lca"
+
+# ── 契约 1: L0→L1→L2→L3 + contracts 严格单向分层 ──
+# 每层只能 import 直接下方一层；contracts 是最底层
+[[tool.importlinter.contracts]]
+name = "严格分层: contracts → L0 → L1 → L2 → L3"
+type = "layers"
+layers = [
+    "lca.layer3_agent",
+    "lca.layer2_runtime",
+    "lca.layer1_cognitive",
+    "lca.layer0_infra",
+    "lca.contracts",
+]
+
+# ── 契约 2: L4 作为组合根，可依赖所有下层 ──
+# 但下层不得反向依赖 L4（用 forbidden 约束）
+[[tool.importlinter.contracts]]
+name = "L4 组合根: 下层禁止反向依赖"
+type = "forbidden"
+source_modules = [
+    "lca.contracts",
+    "lca.layer0_infra",
+    "lca.layer1_cognitive",
+    "lca.layer2_runtime",
+    "lca.layer3_agent",
+]
+forbidden_modules = ["lca.layer4_app"]

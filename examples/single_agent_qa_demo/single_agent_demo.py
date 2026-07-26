@@ -22,9 +22,9 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from layer0_infra.tool_protocol.calculator_tool import CalculatorTool
-from layer4_app.api import Agent
+from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from lca.layer4_app.api import Agent
 
 
 async def main() -> None:

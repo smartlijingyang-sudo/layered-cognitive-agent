@@ -9,16 +9,16 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from contracts.state import Budget, TypedState
-from contracts.decision import StructuredDecision, Observation, Reflection, ToolCall
-from contracts.memory import MemoryRecord
-from contracts.role_team import ToolPermissionManifest, RoleProfile
-from contracts.result import Result
-from layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from layer0_infra.tool_protocol.calculator_tool import CalculatorTool
-from layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
-from layer1_cognitive.brain.decision_parser import SimpleDecisionParser
-from layer1_cognitive.brain.critic import SimpleCritic
+from lca.contracts.state import Budget, TypedState
+from lca.contracts.decision import StructuredDecision, Observation, Reflection, ToolCall
+from lca.contracts.memory import MemoryRecord
+from lca.contracts.role_team import ToolPermissionManifest, RoleProfile
+from lca.contracts.result import Result
+from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
+from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
+from lca.layer1_cognitive.brain.critic import SimpleCritic
 
 
 class TestBudget(unittest.TestCase):
@@ -88,9 +88,9 @@ class TestDecisionParser(unittest.TestCase):
 
 class TestEndToEnd(unittest.TestCase):
     def test_single_agent_qa(self):
-        from layer4_app.api import Agent
-        from layer0_infra.tool_protocol.calculator_tool import CalculatorTool
-        from layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.layer4_app.api import Agent
+        from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 
         agent = Agent(
             role="测试助手",

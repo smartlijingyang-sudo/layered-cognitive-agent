@@ -20,15 +20,15 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from contracts.state import TypedState
-from contracts.decision import Observation, Reflection
-from contracts.observability import TraceSpan
-from contracts.protocols import MemorySystem, Observability
-from layer0_infra.registry import get_global_registry
-from layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from layer0_infra.tool_protocol.calculator_tool import CalculatorTool
-from layer4_app.api import Agent
+from lca.contracts.state import TypedState
+from lca.contracts.decision import Observation, Reflection
+from lca.contracts.observability import TraceSpan
+from lca.contracts.protocols import MemorySystem, Observability
+from lca.layer0_infra.registry import get_global_registry
+from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from lca.layer4_app.api import Agent
 
 
 class LoggingMemorySystem:
