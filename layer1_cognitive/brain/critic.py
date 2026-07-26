@@ -6,13 +6,14 @@ import uuid
 
 from contracts.state import TypedState
 from contracts.decision import Observation, Reflection
+from contracts.protocols import Critic
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class SimpleCritic:
+class SimpleCritic(Critic):
     """基于执行结果生成反思。"""
 
     async def critique(self, state: TypedState, observation: Observation) -> Reflection:

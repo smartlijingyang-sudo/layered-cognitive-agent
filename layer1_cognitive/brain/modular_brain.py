@@ -7,11 +7,11 @@ from contracts.decision import StructuredDecision, Observation, Reflection
 from contracts.protocols import (
     Reasoner, DecisionParser, Critic,
     TaskDecomposer, StatePredictor, StateEvaluator,
-    ConflictMonitor, TaskCoordinator,
+    ConflictMonitor, TaskCoordinator, BrainStrategy,
 )
 
 
-class ModularBrain:
+class ModularBrain(BrainStrategy):
     """
     think() 内部串联:
     Reasoner -> TaskDecomposer -> StatePredictor -> StateEvaluator -> ConflictMonitor -> TaskCoordinator -> DecisionParser

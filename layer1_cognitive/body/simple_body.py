@@ -8,7 +8,7 @@ from typing import Any
 from contracts.state import TypedState
 from contracts.decision import StructuredDecision, Observation
 from contracts.result import ToolExecutionError
-from contracts.protocols import ToolRegistryP, SafeExecutorProtocol
+from contracts.protocols import ToolRegistryP, SafeExecutorProtocol, Body
 from contracts.role_team import RetryPolicy, CacheConfig
 
 
@@ -16,7 +16,7 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class SimpleBody:
+class SimpleBody(Body):
     """ToolRegistry + SafeExecutor 组合。"""
 
     def __init__(self, tool_registry: ToolRegistryP, safe_executor: SafeExecutorProtocol):

@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from contracts.state import TypedState
+from contracts.protocols import StatePredictor
 
 
-class SimpleStatePredictor:
+class SimpleStatePredictor(StatePredictor):
     """最小实现：直接以候选动作描述作为预期效果。"""
 
     async def predict(self, state: TypedState, candidate_action: str) -> dict[str, Any]:

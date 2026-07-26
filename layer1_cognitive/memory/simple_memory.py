@@ -7,13 +7,14 @@ import uuid
 from contracts.state import TypedState
 from contracts.decision import Observation, Reflection
 from contracts.memory import MemoryRecord
+from contracts.protocols import MemorySystem
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class SimpleMemorySystem:
+class SimpleMemorySystem(MemorySystem):
     """Working / Semantic / Episodic / Procedural 四层记忆。"""
 
     def __init__(self) -> None:

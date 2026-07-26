@@ -7,8 +7,10 @@ import json
 import re
 from typing import Any, Optional
 
+from contracts.protocols import LLMAdapter
 
-class MockLLMAdapter:
+
+class MockLLMAdapter(LLMAdapter):
     """确定性假 LLM，用于测试与演示；接口与真实厂商适配器完全一致。"""
 
     name = "mock-llm"

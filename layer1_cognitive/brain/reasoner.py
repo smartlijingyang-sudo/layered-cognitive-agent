@@ -6,7 +6,7 @@ from typing import Any
 
 from contracts.state import TypedState
 from contracts.role_team import RoleProfile
-from contracts.protocols import LLMAdapter, PromptManager
+from contracts.protocols import LLMAdapter, PromptManager, Reasoner
 
 
 DEFAULT_REACT_TEMPLATE = """\
@@ -22,7 +22,7 @@ CONTEXT:
 """
 
 
-class SimpleReasoner:
+class SimpleReasoner(Reasoner):
     """调用 LLM 生成候选行动思路。"""
 
     def __init__(

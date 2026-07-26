@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from contracts.protocols import LLMAdapter
 
-class AnthropicLLMAdapter:
+
+class AnthropicLLMAdapter(LLMAdapter):
     """
     真实厂商适配器示例。接口签名与 MockLLMAdapter 完全一致，
     Brain 层无需感知差异。生产环境取消注释即可使用。

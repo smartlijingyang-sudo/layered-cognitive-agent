@@ -20,8 +20,10 @@ from typing import Any, Optional
 
 from openai import AsyncOpenAI
 
+from contracts.protocols import LLMAdapter
 
-class OpenAICompatAdapter:
+
+class OpenAICompatAdapter(LLMAdapter):
     """实现 LLMAdapter 协议。走 client.chat.completions.create()。"""
 
     def __init__(

@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from contracts.state import TypedState
+from contracts.protocols import StateEvaluator
 
 
-class SimpleStateEvaluator:
+class SimpleStateEvaluator(StateEvaluator):
     """单候选场景：评分仅用于保持 MAP 协作链路完整。"""
 
     async def score(self, state: TypedState, predicted_state: dict[str, Any]) -> float:

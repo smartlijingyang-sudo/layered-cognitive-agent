@@ -10,7 +10,7 @@ from contracts.decision import StructuredDecision, Observation, Reflection
 from contracts.result import Result, ApprovalPendingError, BudgetExceededError
 from contracts.protocols import (
     BrainStrategy, Body, MemorySystem,
-    HookRegistryP, EventBus, StateStore,
+    HookRegistryP, EventBus, StateStore, Runtime,
 )
 
 
@@ -18,7 +18,7 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class CognitiveRuntime:
+class CognitiveRuntime(Runtime):
     """
     核心 Loop: perceive -> think -> act -> observe -> reflect -> update
     所有 Prompt 模板、压缩策略、Strategy 切换、错误恢复、人工审批

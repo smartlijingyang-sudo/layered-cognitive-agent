@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from contracts.state import TypedState
 from contracts.decision import StructuredDecision
+from contracts.protocols import ConflictMonitor
 
 
-class SimpleConflictMonitor:
+class SimpleConflictMonitor(ConflictMonitor):
     """最小实现：不检测冲突。"""
 
     async def check(self, state: TypedState, candidates: list[StructuredDecision]) -> list[str]:

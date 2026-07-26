@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Awaitable, Callable
 
+from contracts.protocols import EventBus
 
-class SimpleEventBus:
+
+class SimpleEventBus(EventBus):
     """基于字典的简单事件总线。"""
 
     def __init__(self) -> None:

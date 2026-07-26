@@ -9,13 +9,14 @@ import uuid
 from typing import Any
 
 from contracts.decision import Observation
+from contracts.protocols import ToolProtocol
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class CalculatorTool:
+class CalculatorTool(ToolProtocol):
     """实现 ToolProtocol 的示例工具。"""
 
     name = "calculator"

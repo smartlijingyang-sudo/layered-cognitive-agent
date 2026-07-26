@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from contracts.protocols import ToolProtocol
+from contracts.protocols import ToolProtocol, ToolRegistryP
 
 
-class SimpleToolRegistry:
+class SimpleToolRegistry(ToolRegistryP):
     """按名称注册和查找工具。"""
 
     def __init__(self) -> None:

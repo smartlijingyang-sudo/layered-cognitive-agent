@@ -8,7 +8,7 @@ from typing import Any, Callable, Awaitable
 
 from contracts.state import TypedState
 from contracts.observability import TraceSpan
-from contracts.protocols import Observability
+from contracts.protocols import Observability, HookRegistryP, Hook
 
 
 def _now() -> datetime:
@@ -19,7 +19,7 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class SimpleHookRegistry:
+class SimpleHookRegistry(HookRegistryP):
     """注册和触发生命周期钩子。"""
 
     def __init__(self, observability: Observability) -> None:

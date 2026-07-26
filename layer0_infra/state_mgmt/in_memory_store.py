@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from contracts.state import TypedState
+from contracts.protocols import StateStore
 
 
-class InMemoryStateStore:
+class InMemoryStateStore(StateStore):
     """基于字典的内存状态存储。"""
 
     def __init__(self) -> None:

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from contracts.state import TypedState
 from contracts.decision import StructuredDecision
+from contracts.protocols import TaskCoordinator
 
 
-class SimpleTaskCoordinator:
+class SimpleTaskCoordinator(TaskCoordinator):
     """选择得分最高的候选方案。"""
 
     async def arbitrate(

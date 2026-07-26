@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from contracts.observability import TraceSpan
+from contracts.protocols import Observability
 
 
-class ConsoleObservability:
+class ConsoleObservability(Observability):
     """默认可观测实现：结构化 TraceSpan 输出到控制台。"""
 
     def emit_span(self, span: TraceSpan) -> None:

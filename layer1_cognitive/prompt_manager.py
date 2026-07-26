@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from contracts.protocols import PromptManager
 
-class SimplePromptManager:
+
+class SimplePromptManager(PromptManager):
     """基于 str.format() 的模板渲染器。"""
 
     def __init__(self) -> None:

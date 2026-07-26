@@ -8,13 +8,14 @@ import uuid
 from typing import Any
 
 from contracts.decision import Observation
+from contracts.protocols import ToolProtocol
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class GetWeatherTool:
+class GetWeatherTool(ToolProtocol):
     """实现 ToolProtocol 的天气查询工具。
 
     内置假数据，避免依赖外部网络，专注测试 tool 调度本身。

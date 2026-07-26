@@ -6,13 +6,14 @@ import uuid
 from typing import Any
 
 from contracts.decision import Observation
+from contracts.protocols import AgentTransport
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class InternalTransport:
+class InternalTransport(AgentTransport):
     """进程内 Agent 间通信传输实现。"""
 
     def __init__(self) -> None:

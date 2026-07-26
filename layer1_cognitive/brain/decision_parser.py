@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 from contracts.state import TypedState
 from contracts.decision import StructuredDecision, ToolCall
-from contracts.protocols import DecisionParser as DecisionParserProtocol
+from contracts.protocols import DecisionParser
 
 
 def _new_id(prefix: str) -> str:
@@ -30,7 +30,7 @@ _ACTION_ALIASES = {
 }
 
 
-class SimpleDecisionParser:
+class SimpleDecisionParser(DecisionParser):
     """稳健 JSON 解析器：别名归一化 + markdown 代码块提取 + 失败兜底。"""
 
     def parse(self, raw_output: str, state: TypedState) -> StructuredDecision:

@@ -11,7 +11,7 @@ from contracts.decision import Observation
 from contracts.role_team import ToolPermissionManifest, RetryPolicy, CacheConfig
 from contracts.result import ToolExecutionError
 from contracts.observability import TraceSpan
-from contracts.protocols import Observability, ToolProtocol
+from contracts.protocols import Observability, ToolProtocol, SafeExecutorProtocol
 
 
 def _now():
@@ -23,7 +23,7 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class SimpleSafeExecutor:
+class SimpleSafeExecutor(SafeExecutorProtocol):
     """权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
 
     def __init__(self, permission_manifest: ToolPermissionManifest, observability: Observability):
