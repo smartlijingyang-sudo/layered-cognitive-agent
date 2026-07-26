@@ -40,6 +40,10 @@ The content is organized as follows:
 </file_summary>
 
 <directory_structure>
+.hypothesis/
+  unicode_data/
+    9.0.0/
+      charmap.json.gz
 contracts/
   __init__.py
   approval.py
@@ -52,6 +56,9 @@ contracts/
   role_team.py
   state.py
 examples/
+  pluggability_demo/
+    __init__.py
+    pluggability_demo.py
   research_team/
     __init__.py
     team_demo.py
@@ -64,6 +71,7 @@ layer0_infra/
     __init__.py
     anthropic_llm.py
     mock_llm.py
+    openai_compat.py
   observability/
     __init__.py
     console_observability.py
@@ -73,10 +81,12 @@ layer0_infra/
   tool_protocol/
     __init__.py
     calculator_tool.py
+    weather_tool.py
   transport/
     __init__.py
     agent_transport.py
   __init__.py
+  registry.py
 layer1_cognitive/
   body/
     __init__.py
@@ -120,6 +130,7 @@ layer3_agent/
 layer4_app/
   __init__.py
   api.py
+  defaults.py
 tests/
   golden_traces/
     __init__.py
@@ -2703,121 +2714,6 @@ class Event:
     emitted_at: datetime = field(default_factory=_now)
 </file>
 
-<file path="contracts/protocols.py">
-"""第5.11节：所有核心 Protocol 接口定义。"""
-
-from __future__ import annotations
-
-from typing import Any, Awaitable, Callable, Optional, Protocol
-
-from contracts.state import TypedState
-from contracts.decision import StructuredDecision, Observation, Reflection
-from contracts.role_team import RetryPolicy, CacheConfig
-
-
-class LLMAdapter(Protocol):
-    async def complete(self, prompt: str, **kwargs: Any) -> str: ...
-
-
-class ToolProtocol(Protocol):
-    name: str
-    is_idempotent: bool
-    default_timeout_s: int
-
-    async def execute(self, args: dict[str, Any]) -> Observation: ...
-
-
-class Reasoner(Protocol):
-    async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]: ...
-
-
-class DecisionParser(Protocol):
-    def parse(self, raw_output: str, state: TypedState) -> StructuredDecision: ...
-
-
-class Critic(Protocol):
-    async def critique(self, state: TypedState, observation: Observation) -> Reflection: ...
-
-
-class TaskDecomposer(Protocol):
-    async def decompose(self, state: TypedState) -> list[str]: ...
-
-
-class StatePredictor(Protocol):
-    async def predict(self, state: TypedState, candidate_action: str) -> dict[str, Any]: ...
-
-
-class StateEvaluator(Protocol):
-    async def score(self, state: TypedState, predicted_state: dict[str, Any]) -> float: ...
-
-
-class ConflictMonitor(Protocol):
-    async def check(self, state: TypedState, candidates: list[StructuredDecision]) -> list[str]: ...
-
-
-class TaskCoordinator(Protocol):
-    async def arbitrate(
-        self, state: TypedState, candidates: list[StructuredDecision], scores: list[float]
-    ) -> StructuredDecision: ...
-
-
-class BrainStrategy(Protocol):
-    async def think(self, state: TypedState) -> StructuredDecision: ...
-    async def reflect(self, state: TypedState, observation: Observation) -> Reflection: ...
-
-
-class Body(Protocol):
-    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation: ...
-
-
-class MemorySystem(Protocol):
-    async def perceive_and_retrieve(self, state: TypedState) -> TypedState: ...
-    async def update_multi_level(
-        self, state: TypedState, observation: Observation, reflection: Reflection
-    ) -> None: ...
-
-
-class EventBus(Protocol):
-    def emit(self, event_name: str, payload: Any, trace_id: str) -> None: ...
-    def subscribe(self, event_name: str, handler: Callable[[Any], Awaitable[None]]) -> None: ...
-
-
-class PromptManager(Protocol):
-    def render(self, template_name: str, variables: dict[str, Any]) -> str: ...
-    def register_template(self, name: str, template: str, version: str = "1.0") -> None: ...
-
-
-class ToolRegistryP(Protocol):
-    def register(self, tool: ToolProtocol) -> None: ...
-    def get(self, name: str) -> Optional[ToolProtocol]: ...
-
-
-class SafeExecutorProtocol(Protocol):
-    async def execute(
-        self, tool: ToolProtocol, args: dict[str, Any], retry_policy: RetryPolicy, cache_config: CacheConfig
-    ) -> Observation: ...
-
-
-class StateStore(Protocol):
-    async def save(self, state: TypedState) -> str: ...
-    async def load(self, state_ref: str) -> TypedState: ...
-
-
-class Hook(Protocol):
-    async def __call__(self, event_name: str, state: TypedState, **kwargs: Any) -> None: ...
-
-
-class HookRegistryP(Protocol):
-    def register(self, event_name: str, hook: Hook) -> None: ...
-    async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any: ...
-
-
-class AgentTransport(Protocol):
-    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str: ...
-    async def poll_status(self, task_id: str) -> str: ...
-    async def receive_result(self, task_id: str) -> Observation: ...
-</file>
-
 <file path="contracts/result.py">
 """第5.10节：运行结果与异常契约。"""
 
@@ -2984,6 +2880,146 @@ class TypedState:
         return snap
 </file>
 
+<file path="examples/pluggability_demo/__init__.py">
+
+</file>
+
+<file path="examples/pluggability_demo/pluggability_demo.py">
+"""
+LCA Framework Demo —— 可插拔性验证
+====================================
+
+演示如何在不修改框架源码的情况下：
+1. 自定义 MemorySystem（装饰器模式，包一层日志）
+2. 自定义 Observability 实现
+3. 通过注册表名字或自定义实例注入 Agent
+
+运行方式：
+    cd layered-cognitive-agent
+    python3.11 -m examples.pluggability_demo.pluggability_demo
+"""
+
+from __future__ import annotations
+
+import asyncio
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from contracts.state import TypedState
+from contracts.decision import Observation, Reflection
+from contracts.observability import TraceSpan
+from contracts.protocols import MemorySystem, Observability
+from layer0_infra.registry import get_global_registry
+from layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+from layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from layer4_app.api import Agent
+
+
+class LoggingMemorySystem:
+    """装饰器模式的自定义 MemorySystem —— 在标准实现外包一层日志。"""
+
+    def __init__(self) -> None:
+        self._inner = SimpleMemorySystem()
+        self.perceive_count = 0
+        self.update_count = 0
+
+    async def perceive_and_retrieve(self, state: TypedState) -> TypedState:
+        self.perceive_count += 1
+        print(f"  [LoggingMemory] perceive_and_retrieve #{self.perceive_count}")
+        return await self._inner.perceive_and_retrieve(state)
+
+    async def update_multi_level(
+        self, state: TypedState, observation: Observation, reflection: Reflection
+    ) -> None:
+        self.update_count += 1
+        print(f"  [LoggingMemory] update_multi_level #{self.update_count} success={observation.success}")
+        await self._inner.update_multi_level(state, observation, reflection)
+
+
+class MinimalObservability:
+    """极简可观测实现 —— 只输出工具调用。"""
+
+    def emit_span(self, span) -> None:
+        if span.name.startswith("tool."):
+            dur = None
+            if span.ended_at:
+                dur = int((span.ended_at - span.started_at).total_seconds() * 1000)
+            print(f"  [MinObs] {span.name} dur_ms={dur}")
+
+
+async def main() -> None:
+    llm = MockLLMAdapter()
+    calculator = CalculatorTool()
+
+    # --- 方式 1: 通过注册表名字注入自定义 MemorySystem ---
+    reg = get_global_registry()
+    reg.register("memory", "logging", LoggingMemorySystem)
+
+    print("=" * 70)
+    print("Pluggability Demo: 自定义 MemorySystem (通过注册表名字)")
+    print("=" * 70)
+    print()
+
+    agent_with_logging_memory = Agent(
+        role="通用问答助手",
+        goal="准确、简洁地回答用户提出的问题",
+        backstory="擅长借助工具进行精确计算。",
+        tools=[calculator],
+        llm=llm,
+        memory="logging",
+    )
+
+    print("开始执行：agent.run('123 乘以 456 等于多少？')")
+    print("-" * 70)
+    result = await agent_with_logging_memory.run("123 乘以 456 等于多少？")
+
+    print()
+    print("=" * 70)
+    print(f"Result: status={result.status}, output={result.output}")
+    print(f"  total_steps={result.total_steps}")
+    print("=" * 70)
+
+    # --- 方式 2: 直接传入自定义 Observability 实例 ---
+    print()
+    print("=" * 70)
+    print("Pluggability Demo: 自定义 Observability (直接传实例)")
+    print("=" * 70)
+    print()
+
+    my_obs = MinimalObservability()
+
+    agent_with_custom_obs = Agent(
+        role="通用问答助手",
+        goal="准确、简洁地回答用户提出的问题",
+        backstory="擅长借助工具进行精确计算。",
+        tools=[calculator],
+        llm=llm,
+        observability=my_obs,
+    )
+
+    print("开始执行：agent.run('789 加 100 等于多少？')")
+    print("-" * 70)
+    result2 = await agent_with_custom_obs.run("789 加 100 等于多少？")
+
+    print()
+    print("=" * 70)
+    print(f"Result: status={result2.status}, output={result2.output}")
+    print(f"  total_steps={result2.total_steps}")
+    print("=" * 70)
+
+    # --- 验证注册表列表 ---
+    print()
+    print("已注册的 memory 实现:", reg.list("memory"))
+    print("已注册的 observability 实现:", reg.list("observability"))
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+</file>
+
 <file path="examples/research_team/__init__.py">
 
 </file>
@@ -3130,15 +3166,6 @@ if __name__ == "__main__":
 
 </file>
 
-<file path="layer0_infra/llm_adapter/__init__.py">
-"""L0 LLM 适配器 —— 统一多厂商模型调用。"""
-
-from layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from layer0_infra.llm_adapter.anthropic_llm import AnthropicLLMAdapter
-
-__all__ = ["MockLLMAdapter", "AnthropicLLMAdapter"]
-</file>
-
 <file path="layer0_infra/llm_adapter/anthropic_llm.py">
 """Anthropic 真实厂商适配器骨架（需网络与 API Key）。"""
 
@@ -3229,6 +3256,57 @@ class MockLLMAdapter:
         return None
 </file>
 
+<file path="layer0_infra/llm_adapter/openai_compat.py">
+"""通用 OpenAI 兼容 LLM 适配器。
+
+支持所有 OpenAI chat/completions 兼容 API：
+  - OpenAI (api.openai.com)
+  - DashScope / 通义千问 (dashscope.aliyuncs.com/compatible-mode)
+  - Ollama, vLLM, LiteLLM 等
+
+只需配置环境变量即可切换，代码无需改动：
+  LLM_API_KEY   API Key
+  LLM_BASE_URL  基地址（默认 https://api.openai.com/v1）
+  LLM_MODEL     模型名（默认 gpt-4.1）
+
+依赖: pip install "openai>=1.40"
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Any, Optional
+
+from openai import AsyncOpenAI
+
+
+class OpenAICompatAdapter:
+    """实现 LLMAdapter 协议。走 client.chat.completions.create()。"""
+
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        *,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ) -> None:
+        self._model = model or os.getenv("LLM_MODEL", "gpt-4.1")
+        self._client = AsyncOpenAI(
+            api_key=api_key or os.getenv("LLM_API_KEY", ""),
+            base_url=base_url or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
+        )
+
+    async def complete(self, prompt: str, **kwargs: Any) -> str:
+        response = await self._client.chat.completions.create(
+            model=kwargs.pop("model", self._model),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=kwargs.pop("temperature", 0.7),
+            max_tokens=kwargs.pop("max_tokens", 2048),
+            **kwargs,
+        )
+        return response.choices[0].message.content or ""
+</file>
+
 <file path="layer0_infra/observability/__init__.py">
 """L0 可观测性 —— 结构化 Trace + 日志。"""
 
@@ -3284,14 +3362,6 @@ class InMemoryStateStore:
 
     async def load(self, state_ref: str) -> TypedState:
         return self._store[state_ref]
-</file>
-
-<file path="layer0_infra/tool_protocol/__init__.py">
-"""L0 工具协议 —— 统一工具契约与执行器。"""
-
-from layer0_infra.tool_protocol.calculator_tool import CalculatorTool
-
-__all__ = ["CalculatorTool"]
 </file>
 
 <file path="layer0_infra/tool_protocol/calculator_tool.py">
@@ -3405,6 +3475,45 @@ class InternalTransport:
 """L0 基础设施层。"""
 </file>
 
+<file path="layer0_infra/registry.py">
+"""ComponentRegistry —— 通用组件注册表，按 (category, name) 注册/解析实现。"""
+
+from __future__ import annotations
+
+from typing import Any, Callable, Optional
+
+
+class ComponentRegistry:
+    """按 (category, name) 注册和解析组件实现。
+
+    category 例如 "observability"、"memory"、"state_store" 等；
+    name 是用户可见的实现名称，例如 "console"、"simple" 等。
+    值可以是类（无参构造）或工厂函数（接受上下文参数）。
+    """
+
+    def __init__(self) -> None:
+        self._registries: dict[str, dict[str, Any]] = {}
+
+    def register(self, category: str, name: str, impl: Any) -> None:
+        self._registries.setdefault(category, {})[name] = impl
+
+    def resolve(self, category: str, name: str) -> Optional[Any]:
+        return self._registries.get(category, {}).get(name)
+
+    def list(self, category: str) -> list[str]:
+        return list(self._registries.get(category, {}).keys())
+
+    def get_registry(self, category: str) -> dict[str, Any]:
+        return self._registries.get(category, {})
+
+
+_global_registry = ComponentRegistry()
+
+
+def get_global_registry() -> ComponentRegistry:
+    return _global_registry
+</file>
+
 <file path="layer1_cognitive/body/__init__.py">
 """L1 Body —— ToolRegistry + SafeExecutor。"""
 
@@ -3413,134 +3522,6 @@ from layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from layer1_cognitive.body.simple_body import SimpleBody
 
 __all__ = ["SimpleToolRegistry", "SimpleSafeExecutor", "SimpleBody"]
-</file>
-
-<file path="layer1_cognitive/body/safe_executor.py">
-"""SafeExecutor —— 权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
-
-from __future__ import annotations
-
-import asyncio
-import json
-import uuid
-from typing import Any, Optional
-
-from contracts.decision import Observation
-from contracts.role_team import ToolPermissionManifest, RetryPolicy, CacheConfig
-from contracts.result import ToolExecutionError
-from contracts.observability import TraceSpan
-from layer0_infra.observability.console_observability import ConsoleObservability
-
-
-def _now():
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc)
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
-
-
-class SimpleSafeExecutor:
-    """权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
-
-    def __init__(self, permission_manifest: ToolPermissionManifest, observability: ConsoleObservability):
-        self.permission_manifest = permission_manifest
-        self.observability = observability
-        self._cache: dict[str, Observation] = {}
-
-    async def execute(
-        self, tool: Any, args: dict[str, Any], retry_policy: RetryPolicy, cache_config: CacheConfig
-    ) -> Observation:
-        if tool.name not in self.permission_manifest.allowed_tools:
-            raise ToolExecutionError(f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权")
-
-        cache_key = f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
-        if cache_config.enabled and cache_key in self._cache:
-            return self._cache[cache_key]
-
-        last_obs: Optional[Observation] = None
-        delay = retry_policy.backoff_base_s
-        for attempt in range(retry_policy.max_retries + 1):
-            span = TraceSpan(span_id=_new_id("span"), trace_id="", name=f"tool.{tool.name}", started_at=_now())
-            obs = await tool.execute(args)
-            span.ended_at = _now()
-            span.status = "ok" if obs.success else "error"
-            self.observability.emit_span(span)
-            if obs.success:
-                if cache_config.enabled:
-                    self._cache[cache_key] = obs
-                return obs
-            last_obs = obs
-            if attempt < retry_policy.max_retries:
-                await asyncio.sleep(delay)
-                delay *= retry_policy.backoff_multiplier
-
-        raise ToolExecutionError(f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败", last_obs)
-</file>
-
-<file path="layer1_cognitive/body/simple_body.py">
-"""SimpleBody —— L1 Body 实现，对外只暴露 act()。"""
-
-from __future__ import annotations
-
-import uuid
-from typing import Any
-
-from contracts.state import TypedState
-from contracts.decision import StructuredDecision, Observation
-from contracts.result import ToolExecutionError
-from layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from contracts.role_team import RetryPolicy, CacheConfig
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
-
-
-class SimpleBody:
-    """ToolRegistry + SafeExecutor 组合。"""
-
-    def __init__(self, tool_registry: SimpleToolRegistry, safe_executor: SimpleSafeExecutor):
-        self.tool_registry = tool_registry
-        self.safe_executor = safe_executor
-
-    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
-        if decision.action_type == "respond":
-            return Observation(observation_id=_new_id("obs"), success=True, payload=decision.response_text)
-
-        if decision.action_type == "use_tool":
-            assert decision.tool_call is not None
-            tool = self.tool_registry.get(decision.tool_call.tool_name)
-            if tool is None:
-                raise ToolExecutionError(f"未注册工具: {decision.tool_call.tool_name}")
-            return await self.safe_executor.execute(
-                tool, decision.tool_call.arguments, RetryPolicy(), CacheConfig()
-            )
-
-        raise ToolExecutionError(f"本示例暂未处理的 action_type: {decision.action_type}")
-</file>
-
-<file path="layer1_cognitive/body/tool_registry.py">
-"""工具注册表 —— 策略模式管理工具集合。"""
-
-from __future__ import annotations
-
-from typing import Optional
-
-
-class SimpleToolRegistry:
-    """按名称注册和查找工具。"""
-
-    def __init__(self) -> None:
-        self._tools: dict[str, object] = {}
-
-    def register(self, tool: object) -> None:
-        self._tools[tool.name] = tool  # type: ignore[attr-defined]
-
-    def get(self, name: str) -> Optional[object]:
-        return self._tools.get(name)
 </file>
 
 <file path="layer1_cognitive/brain/map_modules/__init__.py">
@@ -3685,173 +3666,6 @@ class SimpleCritic:
         )
 </file>
 
-<file path="layer1_cognitive/brain/decision_parser.py">
-"""DecisionParser —— 将自由文本/工具调用稳健地解析为强类型 StructuredDecision。"""
-
-from __future__ import annotations
-
-import json
-import uuid
-from typing import Any
-
-from contracts.state import TypedState
-from contracts.decision import StructuredDecision, ToolCall
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
-
-
-class SimpleDecisionParser:
-    """JSON 解析器，失败时退化为直接 respond 原始文本。"""
-
-    def parse(self, raw_output: str, state: TypedState) -> StructuredDecision:
-        try:
-            data = json.loads(raw_output)
-            tool_call = None
-            if data.get("action_type") == "use_tool":
-                tool_call = ToolCall(
-                    call_id=_new_id("call"),
-                    tool_name=data["tool_name"],
-                    arguments=data.get("arguments", {}),
-                )
-            return StructuredDecision(
-                decision_id=_new_id("dec"),
-                action_type=data["action_type"],
-                tool_call=tool_call,
-                response_text=data.get("response_text"),
-                rationale=data.get("rationale", ""),
-                confidence=float(data.get("confidence", 0.5)),
-            )
-        except (json.JSONDecodeError, KeyError):
-            return StructuredDecision(
-                decision_id=_new_id("dec"),
-                action_type="respond",
-                response_text=raw_output,
-                rationale="解析失败兜底",
-                confidence=0.1,
-            )
-</file>
-
-<file path="layer1_cognitive/brain/modular_brain.py">
-"""ModularBrain —— 实现 BrainStrategy 协议，串联 MAP 五模块 + Reasoner + Critic + DecisionParser。"""
-
-from __future__ import annotations
-
-from contracts.state import TypedState
-from contracts.decision import StructuredDecision, Observation, Reflection
-from layer1_cognitive.brain.reasoner import SimpleReasoner
-from layer1_cognitive.brain.critic import SimpleCritic
-from layer1_cognitive.brain.decision_parser import SimpleDecisionParser
-from layer1_cognitive.brain.map_modules import (
-    SimpleTaskDecomposer,
-    SimpleStatePredictor,
-    SimpleStateEvaluator,
-    SimpleConflictMonitor,
-    SimpleTaskCoordinator,
-)
-
-
-class ModularBrain:
-    """
-    think() 内部串联:
-    Reasoner -> TaskDecomposer -> StatePredictor -> StateEvaluator -> ConflictMonitor -> TaskCoordinator -> DecisionParser
-
-    reflect() 内部调用 Critic。
-    """
-
-    def __init__(
-        self,
-        reasoner: SimpleReasoner,
-        decision_parser: SimpleDecisionParser,
-        critic: SimpleCritic,
-        task_decomposer: SimpleTaskDecomposer,
-        state_predictor: SimpleStatePredictor,
-        state_evaluator: SimpleStateEvaluator,
-        conflict_monitor: SimpleConflictMonitor,
-        task_coordinator: SimpleTaskCoordinator,
-    ):
-        self.reasoner = reasoner
-        self.decision_parser = decision_parser
-        self.critic = critic
-        self.task_decomposer = task_decomposer
-        self.state_predictor = state_predictor
-        self.state_evaluator = state_evaluator
-        self.conflict_monitor = conflict_monitor
-        self.task_coordinator = task_coordinator
-
-    async def think(self, state: TypedState) -> StructuredDecision:
-        _subtasks = await self.task_decomposer.decompose(state)
-        raw_candidates = await self.reasoner.generate_candidates(state, n=1)
-        candidates = [self.decision_parser.parse(rc, state) for rc in raw_candidates]
-
-        predicted = [await self.state_predictor.predict(state, c.rationale) for c in candidates]
-        scores = [await self.state_evaluator.score(state, p) for p in predicted]
-        conflicts = await self.conflict_monitor.check(state, candidates)
-        if conflicts:
-            print(f"  [ConflictMonitor] 检测到冲突: {conflicts}")
-
-        return await self.task_coordinator.arbitrate(state, candidates, scores)
-
-    async def reflect(self, state: TypedState, observation: Observation) -> Reflection:
-        return await self.critic.critique(state, observation)
-</file>
-
-<file path="layer1_cognitive/brain/reasoner.py">
-"""Reasoner —— 调用 LLM 生成候选思路。"""
-
-from __future__ import annotations
-
-from typing import Any
-
-from contracts.state import TypedState
-from contracts.role_team import RoleProfile
-
-
-DEFAULT_REACT_TEMPLATE = """\
-ROLE: {role}
-GOAL: {goal}
-BACKSTORY: {backstory}
-AVAILABLE_TOOLS: {tools}
-USER_TASK: {task}
-CONTEXT:
-{context}
-
-请以 JSON 输出下一步 StructuredDecision（字段：action_type/tool_name/arguments/response_text/rationale/confidence）。
-"""
-
-
-class SimpleReasoner:
-    """调用 LLM 生成候选行动思路。"""
-
-    def __init__(
-        self,
-        llm: Any,
-        prompt_manager: Any,
-        role_profile: RoleProfile,
-        tools_desc: str,
-    ):
-        self.llm = llm
-        self.prompt_manager = prompt_manager
-        self.role_profile = role_profile
-        self.tools_desc = tools_desc
-
-    async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]:
-        context_lines = "\n".join(
-            f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context
-        ) or "(无历史上下文)"
-        prompt = self.prompt_manager.render("react_prompt", {
-            "role": self.role_profile.role,
-            "goal": self.role_profile.goal,
-            "backstory": self.role_profile.backstory,
-            "tools": self.tools_desc,
-            "task": state.task,
-            "context": context_lines,
-        })
-        raw = await self.llm.complete(prompt)
-        return [raw]
-</file>
-
 <file path="layer1_cognitive/memory/__init__.py">
 """L1 MemorySystem —— 四类记忆 + 可选知识图谱。"""
 
@@ -3951,57 +3765,6 @@ class SimpleEventBus:
         self._subs.setdefault(event_name, []).append(handler)
 </file>
 
-<file path="layer1_cognitive/hook_registry.py">
-"""SimpleHookRegistry —— 生命周期钩子管理。"""
-
-from __future__ import annotations
-
-import uuid
-from datetime import datetime, timezone
-from typing import Any, Callable, Awaitable
-
-from contracts.state import TypedState
-from contracts.observability import TraceSpan
-from layer0_infra.observability.console_observability import ConsoleObservability
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
-
-
-class SimpleHookRegistry:
-    """注册和触发生命周期钩子。"""
-
-    def __init__(self, observability: ConsoleObservability) -> None:
-        self._hooks: dict[str, list[Callable]] = {}
-        self.observability = observability
-
-    def register(self, event_name: str, hook: Callable) -> None:
-        self._hooks.setdefault(event_name, []).append(hook)
-
-    async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any:
-        span = TraceSpan(
-            span_id=_new_id("span"),
-            trace_id=state.trace_id,
-            name=f"hook.{event_name}",
-            started_at=_now(),
-        )
-        for hook in self._hooks.get(event_name, []):
-            await hook(event_name, state, **kwargs)
-        span.ended_at = _now()
-        self.observability.emit_span(span)
-        return None
-
-
-async def default_logging_hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
-    extra = {k: v for k, v in kwargs.items() if k != "state"}
-    print(f"  [Hook] {event_name} @step={state.step} {extra if extra else ''}")
-</file>
-
 <file path="layer1_cognitive/prompt_manager.py">
 """SimplePromptManager —— Prompt 模板集中管理与版本化。"""
 
@@ -4048,166 +3811,6 @@ HOOK_NAMES = [
 ]
 </file>
 
-<file path="layer2_runtime/runtime_loop.py">
-"""CognitiveRuntime —— 核心认知循环（~25行 Loop，第6节参考实现的可运行版本）。"""
-
-from __future__ import annotations
-
-import uuid
-from typing import Optional
-
-from contracts.state import TypedState, Budget, StateSnapshot
-from contracts.decision import StructuredDecision, Observation, Reflection
-from contracts.result import Result, ApprovalPendingError, BudgetExceededError
-from layer1_cognitive.brain.modular_brain import ModularBrain
-from layer1_cognitive.body.simple_body import SimpleBody
-from layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from layer1_cognitive.hook_registry import SimpleHookRegistry
-from layer1_cognitive.event_bus import SimpleEventBus
-from layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
-
-
-class CognitiveRuntime:
-    """
-    核心 Loop: perceive -> think -> act -> observe -> reflect -> update
-    所有 Prompt 模板、压缩策略、Strategy 切换、错误恢复、人工审批
-    全部通过 Hook 与 Strategy 注册进来，Loop 本体保持稳定不变。
-    """
-
-    def __init__(
-        self,
-        brain: ModularBrain,
-        body: SimpleBody,
-        memory: SimpleMemorySystem,
-        hooks: SimpleHookRegistry,
-        event_bus: SimpleEventBus,
-        state_store: InMemoryStateStore,
-    ):
-        self.brain = brain
-        self.body = body
-        self.memory = memory
-        self.hooks = hooks
-        self.event_bus = event_bus
-        self.state_store = state_store
-
-    def default_budget(self) -> Budget:
-        return Budget(max_steps=10, max_wall_clock_seconds=30)
-
-    async def run(self, task: str, max_steps: int = 10) -> Result:
-        state = TypedState(trace_id=_new_id("trace"), task=task, budget=self.default_budget())
-        await self.hooks.trigger("on_start", state)
-        return await self._loop(state, max_steps)
-
-    async def resume(self, snapshot: StateSnapshot, max_steps: int = 10) -> Result:
-        """从任意 Checkpoint 恢复——挂起等待人工审批/暂停的任务由此续跑。"""
-        state = await self.state_store.load(snapshot.state_ref)
-        state.status = "running"
-        return await self._loop(state, max_steps)
-
-    async def _loop(self, state: TypedState, max_steps: int) -> Result:
-        decision: Optional[StructuredDecision] = None
-        reflection: Optional[Reflection] = None
-
-        for step in range(state.step, max_steps):
-            state.step = step
-            state.budget.used_steps = step
-            try:
-                await self.hooks.trigger("pre_perceive", state)
-                state = await self.memory.perceive_and_retrieve(state)
-
-                await self.hooks.trigger("pre_think", state)
-                decision = await self.brain.think(state)
-                await self.hooks.trigger("post_think", state, decision=decision)
-
-                await self.hooks.trigger("pre_act", state, decision=decision)
-                observation = await self.body.act(decision, state)
-                await self.hooks.trigger("post_act", state, observation=observation)
-
-                if decision.action_type == "respond":
-                    state.working_memory["final_output"] = decision.response_text
-
-                await self.hooks.trigger("pre_reflect", state, observation=observation)
-                reflection = await self.brain.reflect(state, observation)
-                await self.hooks.trigger("post_reflect", state, reflection=reflection)
-
-                await self.memory.update_multi_level(state, observation, reflection)
-
-            except ApprovalPendingError:
-                state.status = "waiting_human"
-                state.checkpoints.append(state.snapshot(reason="pre_approval"))
-                await self.hooks.trigger("on_pause", state)
-                return self._summarize(state)
-
-            except Exception as err:
-                await self.hooks.trigger("on_error", state, error=err)
-                state.status = "failed"
-                state.checkpoints.append(state.snapshot(reason="on_error"))
-                state.extra["error"] = str(err)
-                break
-
-            state.checkpoints.append(state.snapshot())
-            self.event_bus.emit("step_completed", state.trace_id, state.trace_id)
-
-            if state.budget.exceeded():
-                await self.hooks.trigger("on_error", state, error=BudgetExceededError())
-                state.status = "failed"
-                break
-
-            if self._should_stop(decision, reflection):
-                state.status = "completed"
-                break
-
-        await self.hooks.trigger("on_complete", state)
-        return self._summarize(state)
-
-    def _should_stop(
-        self, decision: Optional[StructuredDecision], reflection: Optional[Reflection]
-    ) -> bool:
-        if decision is None or reflection is None:
-            return False
-        return decision.action_type == "respond" and reflection.verdict != "needs_correction"
-
-    def _summarize(self, state: TypedState) -> Result:
-        final_ref = f"mem://{state.trace_id}/{state.step}"
-        return Result(
-            trace_id=state.trace_id,
-            status=state.status if state.status != "running" else "completed",  # type: ignore[arg-type]
-            output=state.working_memory.get("final_output"),
-            final_state_ref=final_ref,
-            total_steps=state.step + 1,
-            budget_used=state.budget,
-            error=state.extra.get("error"),
-        )
-</file>
-
-<file path="layer2_runtime/strategy_registry.py">
-"""StrategyRegistry —— 策略注册表，支持运行时动态切换 Brain 策略。"""
-
-from __future__ import annotations
-
-from typing import Optional
-
-
-class StrategyRegistry:
-    """按名称注册和查找 BrainStrategy 实现。"""
-
-    def __init__(self) -> None:
-        self._strategies: dict[str, object] = {}
-
-    def register(self, name: str, strategy: object) -> None:
-        self._strategies[name] = strategy
-
-    def resolve(self, name: str) -> Optional[object]:
-        return self._strategies.get(name)
-
-    def list_strategies(self) -> list[str]:
-        return list(self._strategies.keys())
-</file>
-
 <file path="layer3_agent/specialized_agents/__init__.py">
 """预置角色 Agent。"""
 </file>
@@ -4220,53 +3823,6 @@ from layer3_agent.supervisor import Supervisor
 from layer3_agent.team_orchestrator import TeamOrchestrator
 
 __all__ = ["BaseAgent", "Supervisor", "TeamOrchestrator"]
-</file>
-
-<file path="layer3_agent/base_agent.py">
-"""BaseAgent —— 持有 Runtime + Brain + Body + Memory 视图。"""
-
-from __future__ import annotations
-
-from contracts.role_team import RoleProfile
-from contracts.result import Result
-from layer2_runtime.runtime_loop import CognitiveRuntime
-
-
-class BaseAgent:
-    """单个 Agent 的运行时封装。"""
-
-    def __init__(self, runtime: CognitiveRuntime, role_profile: RoleProfile, max_steps: int = 10):
-        self.runtime = runtime
-        self.role_profile = role_profile
-        self.max_steps = max_steps
-
-    async def execute(self, task: str) -> Result:
-        return await self.runtime.run(task, max_steps=self.max_steps)
-</file>
-
-<file path="layer3_agent/supervisor.py">
-"""Supervisor —— 本质上是 BaseAgent，专责任务拆解与路由。"""
-
-from __future__ import annotations
-
-from contracts.role_team import RoleProfile
-from contracts.result import Result
-from layer3_agent.base_agent import BaseAgent
-from layer2_runtime.runtime_loop import CognitiveRuntime
-
-
-class Supervisor(BaseAgent):
-    """
-    Supervisor 本身就是一个 BaseAgent（复用同一套认知闭环），
-    区别是其 StructuredDecision 里携带 delegate_to（DelegationSpec）。
-    """
-
-    def __init__(self, runtime: CognitiveRuntime, role_profile: RoleProfile, max_steps: int = 20):
-        super().__init__(runtime, role_profile, max_steps=max_steps)
-
-    async def delegate(self, task: str) -> Result:
-        """委派任务给子 Agent。"""
-        return await self.execute(task)
 </file>
 
 <file path="layer3_agent/team_orchestrator.py">
@@ -4335,17 +3891,23 @@ from layer4_app.api import Agent, MultiAgentTeam
 __all__ = ["Agent", "MultiAgentTeam"]
 </file>
 
-<file path="layer4_app/api.py">
-"""L4 极简开发者 API —— 三行创建 Agent，五行组建团队。"""
+<file path="layer4_app/defaults.py">
+"""defaults.py —— 唯一允许 import 所有具体类的组装根。
+
+把框架内置的默认实现注册进全局 ComponentRegistry，
+使得 Agent(...) 可以通过名字字符串选择实现，
+也允许用户在调用 Agent 之前注册自己的实现。
+"""
 
 from __future__ import annotations
 
-from typing import Any, Optional
-
-from contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
-from contracts.result import Result
+from layer0_infra.registry import get_global_registry
 from layer0_infra.observability.console_observability import ConsoleObservability
-from layer1_cognitive.brain.modular_brain import ModularBrain
+from layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
+from layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+from layer1_cognitive.event_bus import SimpleEventBus
+from layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
+from layer1_cognitive.prompt_manager import SimplePromptManager
 from layer1_cognitive.brain.reasoner import SimpleReasoner, DEFAULT_REACT_TEMPLATE
 from layer1_cognitive.brain.critic import SimpleCritic
 from layer1_cognitive.brain.decision_parser import SimpleDecisionParser
@@ -4353,116 +3915,67 @@ from layer1_cognitive.brain.map_modules import (
     SimpleTaskDecomposer, SimpleStatePredictor, SimpleStateEvaluator,
     SimpleConflictMonitor, SimpleTaskCoordinator,
 )
+from layer1_cognitive.brain.modular_brain import ModularBrain
 from layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from layer1_cognitive.body.simple_body import SimpleBody
-from layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from layer1_cognitive.event_bus import SimpleEventBus
-from layer1_cognitive.prompt_manager import SimplePromptManager
-from layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from layer2_runtime.runtime_loop import CognitiveRuntime
 from layer2_runtime.hooks import HOOK_NAMES
-from layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
-from layer3_agent.base_agent import BaseAgent
-from layer3_agent.supervisor import Supervisor
-from layer3_agent.team_orchestrator import TeamOrchestrator
+from contracts.role_team import RoleProfile, ToolPermissionManifest
 
 
-class Agent:
-    """
-    三行上手的开发者入口：内部完成 L0-L3 全部对象的 DI 组装。
-
-    用法：
-        agent = Agent(role="研究员", goal="产出分析报告", backstory="十年经验", tools=[...], llm=llm)
-        result = await agent.run("分析新能源电池行业趋势")
-    """
-
-    def __init__(
-        self,
-        role: str,
-        goal: str,
-        backstory: str,
-        tools: list[Any],
-        llm: Any,
-        max_steps: int = 10,
-    ):
-        permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
-        role_profile = RoleProfile(
-            role=role, goal=goal, backstory=backstory,
-            tool_permission_manifest=permission_manifest,
-        )
-
-        observability = ConsoleObservability()
-        prompt_manager = SimplePromptManager()
-        prompt_manager.register_template("react_prompt", DEFAULT_REACT_TEMPLATE)
-
-        tool_registry = SimpleToolRegistry()
-        for t in tools:
-            tool_registry.register(t)
-        tools_desc = ", ".join(f"{t.name}" for t in tools) or "(无可用工具)"
-
-        safe_executor = SimpleSafeExecutor(permission_manifest, observability)
-        body = SimpleBody(tool_registry, safe_executor)
-
-        reasoner = SimpleReasoner(llm, prompt_manager, role_profile, tools_desc)
-        brain = ModularBrain(
-            reasoner=reasoner,
-            decision_parser=SimpleDecisionParser(),
-            critic=SimpleCritic(),
-            task_decomposer=SimpleTaskDecomposer(),
-            state_predictor=SimpleStatePredictor(),
-            state_evaluator=SimpleStateEvaluator(),
-            conflict_monitor=SimpleConflictMonitor(),
-            task_coordinator=SimpleTaskCoordinator(),
-        )
-
-        memory = SimpleMemorySystem()
-        hooks = SimpleHookRegistry(observability)
-        for event_name in HOOK_NAMES:
-            hooks.register(event_name, default_logging_hook)
-
-        event_bus = SimpleEventBus()
-        state_store = InMemoryStateStore()
-
-        runtime = CognitiveRuntime(brain, body, memory, hooks, event_bus, state_store)
-        self._base_agent = BaseAgent(runtime, role_profile, max_steps=max_steps)
-
-    async def run(self, task: str) -> Result:
-        return await self._base_agent.execute(task)
+def _build_hooks(observability):
+    hooks = SimpleHookRegistry(observability)
+    for event_name in HOOK_NAMES:
+        hooks.register(event_name, default_logging_hook)
+    return hooks
 
 
-class MultiAgentTeam:
-    """
-    五行组建团队。
+def _build_brain(llm, role_profile, tools_desc):
+    prompt_manager = SimplePromptManager()
+    prompt_manager.register_template("react_prompt", DEFAULT_REACT_TEMPLATE)
+    reasoner = SimpleReasoner(llm, prompt_manager, role_profile, tools_desc)
+    return ModularBrain(
+        reasoner=reasoner,
+        decision_parser=SimpleDecisionParser(),
+        critic=SimpleCritic(),
+        task_decomposer=SimpleTaskDecomposer(),
+        state_predictor=SimpleStatePredictor(),
+        state_evaluator=SimpleStateEvaluator(),
+        conflict_monitor=SimpleConflictMonitor(),
+        task_coordinator=SimpleTaskCoordinator(),
+    )
 
-    用法：
-        team = MultiAgentTeam(
-            members=[researcher, writer, critic],
-            process="hierarchical",
-            supervisor=Supervisor(role="项目负责人"),
-        )
-        result = await team.run("产出行业研究报告")
-    """
 
-    def __init__(
-        self,
-        members: list[Agent],
-        process: str = "hierarchical",
-        supervisor: Optional[Agent] = None,
-        max_rounds: Optional[int] = None,
-    ):
-        config = TeamConfig(
-            process=process,  # type: ignore[arg-type]
-            max_rounds=max_rounds,
-        )
-        base_members = [m._base_agent for m in members]
-        base_supervisor = supervisor._base_agent if supervisor else None
-        if base_supervisor:
-            base_supervisor.__class__ = Supervisor
-        self._orchestrator = TeamOrchestrator(base_members, config, base_supervisor)
+def _build_body(tools, observability):
+    permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
+    tool_registry = SimpleToolRegistry()
+    for t in tools:
+        tool_registry.register(t)
+    safe_executor = SimpleSafeExecutor(permission_manifest, observability)
+    return SimpleBody(tool_registry, safe_executor)
 
-    async def run(self, objective: str) -> Result:
-        return await self._orchestrator.run(objective)
+
+def _build_runtime(llm, role_profile, tools, observability, memory, state_store):
+    tools_desc = ", ".join(f"{t.name}" for t in tools) or "(无可用工具)"
+    brain = _build_brain(llm, role_profile, tools_desc)
+    body = _build_body(tools, observability)
+    hooks = _build_hooks(observability)
+    event_bus = SimpleEventBus()
+    return CognitiveRuntime(brain, body, memory, hooks, event_bus, state_store)
+
+
+def register_defaults() -> None:
+    """注册所有内置默认实现到全局 ComponentRegistry。"""
+    reg = get_global_registry()
+    reg.register("observability", "console", ConsoleObservability)
+    reg.register("state_store", "memory", InMemoryStateStore)
+    reg.register("memory", "simple", SimpleMemorySystem)
+    reg.register("event_bus", "simple", SimpleEventBus)
+    reg.register("build_runtime", "default", _build_runtime)
+
+
+register_defaults()
 </file>
 
 <file path="tests/golden_traces/__init__.py">
@@ -4604,6 +4117,939 @@ build/
 .ruff_cache/
 </file>
 
+<file path="contracts/protocols.py">
+"""第5.11节：所有核心 Protocol 接口定义。"""
+
+from __future__ import annotations
+
+from typing import Any, Awaitable, Callable, Optional, Protocol
+
+from contracts.state import TypedState
+from contracts.decision import StructuredDecision, Observation, Reflection
+from contracts.role_team import RetryPolicy, CacheConfig
+
+
+class LLMAdapter(Protocol):
+    async def complete(self, prompt: str, **kwargs: Any) -> str: ...
+
+
+class ToolProtocol(Protocol):
+    name: str
+    is_idempotent: bool
+    default_timeout_s: int
+
+    async def execute(self, args: dict[str, Any]) -> Observation: ...
+
+
+class Reasoner(Protocol):
+    async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]: ...
+
+
+class DecisionParser(Protocol):
+    def parse(self, raw_output: str, state: TypedState) -> StructuredDecision: ...
+
+
+class Critic(Protocol):
+    async def critique(self, state: TypedState, observation: Observation) -> Reflection: ...
+
+
+class TaskDecomposer(Protocol):
+    async def decompose(self, state: TypedState) -> list[str]: ...
+
+
+class StatePredictor(Protocol):
+    async def predict(self, state: TypedState, candidate_action: str) -> dict[str, Any]: ...
+
+
+class StateEvaluator(Protocol):
+    async def score(self, state: TypedState, predicted_state: dict[str, Any]) -> float: ...
+
+
+class ConflictMonitor(Protocol):
+    async def check(self, state: TypedState, candidates: list[StructuredDecision]) -> list[str]: ...
+
+
+class TaskCoordinator(Protocol):
+    async def arbitrate(
+        self, state: TypedState, candidates: list[StructuredDecision], scores: list[float]
+    ) -> StructuredDecision: ...
+
+
+class BrainStrategy(Protocol):
+    async def think(self, state: TypedState) -> StructuredDecision: ...
+    async def reflect(self, state: TypedState, observation: Observation) -> Reflection: ...
+
+
+class Body(Protocol):
+    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation: ...
+
+
+class MemorySystem(Protocol):
+    async def perceive_and_retrieve(self, state: TypedState) -> TypedState: ...
+    async def update_multi_level(
+        self, state: TypedState, observation: Observation, reflection: Reflection
+    ) -> None: ...
+
+
+class EventBus(Protocol):
+    def emit(self, event_name: str, payload: Any, trace_id: str) -> None: ...
+    def subscribe(self, event_name: str, handler: Callable[[Any], Awaitable[None]]) -> None: ...
+
+
+class PromptManager(Protocol):
+    def render(self, template_name: str, variables: dict[str, Any]) -> str: ...
+    def register_template(self, name: str, template: str, version: str = "1.0") -> None: ...
+
+
+class ToolRegistryP(Protocol):
+    def register(self, tool: ToolProtocol) -> None: ...
+    def get(self, name: str) -> Optional[ToolProtocol]: ...
+
+
+class SafeExecutorProtocol(Protocol):
+    async def execute(
+        self, tool: ToolProtocol, args: dict[str, Any], retry_policy: RetryPolicy, cache_config: CacheConfig
+    ) -> Observation: ...
+
+
+class StateStore(Protocol):
+    async def save(self, state: TypedState) -> str: ...
+    async def load(self, state_ref: str) -> TypedState: ...
+
+
+class Hook(Protocol):
+    async def __call__(self, event_name: str, state: TypedState, **kwargs: Any) -> None: ...
+
+
+class HookRegistryP(Protocol):
+    def register(self, event_name: str, hook: Hook) -> None: ...
+    async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any: ...
+
+
+class AgentTransport(Protocol):
+    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str: ...
+    async def poll_status(self, task_id: str) -> str: ...
+    async def receive_result(self, task_id: str) -> Observation: ...
+
+
+class Observability(Protocol):
+    def emit_span(self, span: Any) -> None: ...
+
+
+class Runtime(Protocol):
+    async def run(self, task: str, max_steps: int) -> Any: ...
+
+
+class AgentProtocol(Protocol):
+    async def execute(self, task: str) -> Any: ...
+</file>
+
+<file path="layer0_infra/tool_protocol/__init__.py">
+"""L0 工具协议 —— 统一工具契约与执行器。"""
+
+from layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from layer0_infra.tool_protocol.weather_tool import GetWeatherTool
+
+__all__ = ["CalculatorTool", "GetWeatherTool"]
+</file>
+
+<file path="layer0_infra/tool_protocol/weather_tool.py">
+"""GetWeatherTool —— 查询城市天气（内置假数据，无需外部网络）。"""
+
+from __future__ import annotations
+
+import asyncio
+import time
+import uuid
+from typing import Any
+
+from contracts.decision import Observation
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+class GetWeatherTool:
+    """实现 ToolProtocol 的天气查询工具。
+
+    内置假数据，避免依赖外部网络，专注测试 tool 调度本身。
+    """
+
+    name = "get_weather"
+    is_idempotent = True
+    default_timeout_s = 5
+
+    _FAKE_DB: dict[str, dict[str, Any]] = {
+        "tokyo": {"temp_c": 27, "condition": "cloudy"},
+        "beijing": {"temp_c": 31, "condition": "sunny"},
+        "san francisco": {"temp_c": 18, "condition": "foggy"},
+        "new york": {"temp_c": 24, "condition": "clear"},
+        "london": {"temp_c": 19, "condition": "rainy"},
+    }
+    _CITY_ALIASES: dict[str, str] = {
+        "东京": "tokyo", "東京": "tokyo",
+        "北京": "beijing",
+        "旧金山": "san francisco",
+        "纽约": "new york",
+        "伦敦": "london",
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        raw_city = str(
+            args.get("city") or args.get("location") or args.get("name") or ""
+        ).strip().lower()
+        city = self._CITY_ALIASES.get(raw_city, raw_city)
+
+        if not city:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=_new_id("obs"), success=False, payload=None,
+                error="missing required arg: city", latency_ms=latency_ms,
+            )
+
+        await asyncio.sleep(0.05)  # 模拟网络 IO
+
+        data = self._FAKE_DB.get(city)
+        if data is None:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=_new_id("obs"), success=False, payload=None,
+                error=f"unknown city: {city}", latency_ms=latency_ms,
+            )
+
+        unit = str(args.get("unit", "celsius")).lower()
+        temp_c = data["temp_c"]
+        temp = temp_c if unit == "celsius" else temp_c * 9 / 5 + 32
+
+        result = {
+            "city": city,
+            "temperature": round(temp, 1),
+            "unit": unit,
+            "condition": data["condition"],
+        }
+        latency_ms = int((time.monotonic() - start) * 1000)
+        return Observation(
+            observation_id=_new_id("obs"), success=True, payload=result,
+            latency_ms=latency_ms,
+        )
+</file>
+
+<file path="layer1_cognitive/body/safe_executor.py">
+"""SafeExecutor —— 权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import uuid
+from typing import Any, Optional
+
+from contracts.decision import Observation
+from contracts.role_team import ToolPermissionManifest, RetryPolicy, CacheConfig
+from contracts.result import ToolExecutionError
+from contracts.observability import TraceSpan
+from contracts.protocols import Observability, ToolProtocol
+
+
+def _now():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc)
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+class SimpleSafeExecutor:
+    """权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
+
+    def __init__(self, permission_manifest: ToolPermissionManifest, observability: Observability):
+        self.permission_manifest = permission_manifest
+        self.observability = observability
+        self._cache: dict[str, Observation] = {}
+
+    async def execute(
+        self, tool: ToolProtocol, args: dict[str, Any], retry_policy: RetryPolicy, cache_config: CacheConfig
+    ) -> Observation:
+        if tool.name not in self.permission_manifest.allowed_tools:
+            raise ToolExecutionError(f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权")
+
+        cache_key = f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
+        if cache_config.enabled and cache_key in self._cache:
+            return self._cache[cache_key]
+
+        last_obs: Optional[Observation] = None
+        delay = retry_policy.backoff_base_s
+        for attempt in range(retry_policy.max_retries + 1):
+            span = TraceSpan(span_id=_new_id("span"), trace_id="", name=f"tool.{tool.name}", started_at=_now())
+            obs = await tool.execute(args)
+            span.ended_at = _now()
+            span.status = "ok" if obs.success else "error"
+            self.observability.emit_span(span)
+            if obs.success:
+                if cache_config.enabled:
+                    self._cache[cache_key] = obs
+                return obs
+            last_obs = obs
+            if attempt < retry_policy.max_retries:
+                await asyncio.sleep(delay)
+                delay *= retry_policy.backoff_multiplier
+
+        raise ToolExecutionError(f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败", last_obs)
+</file>
+
+<file path="layer1_cognitive/body/simple_body.py">
+"""SimpleBody —— L1 Body 实现，对外只暴露 act()。"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from contracts.state import TypedState
+from contracts.decision import StructuredDecision, Observation
+from contracts.result import ToolExecutionError
+from contracts.protocols import ToolRegistryP, SafeExecutorProtocol
+from contracts.role_team import RetryPolicy, CacheConfig
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+class SimpleBody:
+    """ToolRegistry + SafeExecutor 组合。"""
+
+    def __init__(self, tool_registry: ToolRegistryP, safe_executor: SafeExecutorProtocol):
+        self.tool_registry = tool_registry
+        self.safe_executor = safe_executor
+
+    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
+        if decision.action_type == "respond":
+            return Observation(observation_id=_new_id("obs"), success=True, payload=decision.response_text)
+
+        if decision.action_type == "use_tool":
+            assert decision.tool_call is not None
+            tool = self.tool_registry.get(decision.tool_call.tool_name)
+            if tool is None:
+                raise ToolExecutionError(f"未注册工具: {decision.tool_call.tool_name}")
+            return await self.safe_executor.execute(
+                tool, decision.tool_call.arguments, RetryPolicy(), CacheConfig()
+            )
+
+        raise ToolExecutionError(f"本示例暂未处理的 action_type: {decision.action_type}")
+</file>
+
+<file path="layer1_cognitive/body/tool_registry.py">
+"""工具注册表 —— 策略模式管理工具集合。"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+from contracts.protocols import ToolProtocol
+
+
+class SimpleToolRegistry:
+    """按名称注册和查找工具。"""
+
+    def __init__(self) -> None:
+        self._tools: dict[str, ToolProtocol] = {}
+
+    def register(self, tool: ToolProtocol) -> None:
+        self._tools[tool.name] = tool
+
+    def get(self, name: str) -> Optional[ToolProtocol]:
+        return self._tools.get(name)
+</file>
+
+<file path="layer1_cognitive/brain/decision_parser.py">
+"""DecisionParser —— 将自由文本/工具调用稳健地解析为强类型 StructuredDecision。"""
+
+from __future__ import annotations
+
+import json
+import re
+import uuid
+from typing import Any, Optional
+
+from contracts.state import TypedState
+from contracts.decision import StructuredDecision, ToolCall
+from contracts.protocols import DecisionParser as DecisionParserProtocol
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+_ACTION_ALIASES = {
+    "tool_call": "use_tool",
+    "call_tool": "use_tool",
+    "use_tool": "use_tool",
+    "respond": "respond",
+    "response": "respond",
+    "answer": "respond",
+    "reply": "respond",
+    "delegate": "delegate",
+    "stop": "stop",
+    "ask_human": "ask_human",
+}
+
+
+class SimpleDecisionParser:
+    """稳健 JSON 解析器：别名归一化 + markdown 代码块提取 + 失败兜底。"""
+
+    def parse(self, raw_output: str, state: TypedState) -> StructuredDecision:
+        json_str = self._extract_json(raw_output)
+        try:
+            data = json.loads(json_str)
+        except (json.JSONDecodeError, ValueError):
+            return StructuredDecision(
+                decision_id=_new_id("dec"),
+                action_type="respond",
+                response_text=raw_output,
+                rationale="解析失败兜底",
+                confidence=0.1,
+            )
+
+        raw_action = str(data.get("action_type", "respond")).lower().strip()
+        action_type = _ACTION_ALIASES.get(raw_action, raw_action)
+
+        tool_call = None
+        if action_type == "use_tool":
+            tool_name = data.get("tool_name") or data.get("tool")
+            arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
+            if not isinstance(arguments, dict):
+                arguments = {"expression": str(arguments)}
+            if tool_name:
+                tool_call = ToolCall(
+                    call_id=_new_id("call"),
+                    tool_name=tool_name,
+                    arguments=arguments,
+                )
+            else:
+                action_type = "respond"
+
+        return StructuredDecision(
+            decision_id=_new_id("dec"),
+            action_type=action_type,  # type: ignore[arg-type]
+            tool_call=tool_call,
+            response_text=data.get("response_text") or data.get("response") or data.get("text"),
+            rationale=data.get("rationale", ""),
+            confidence=float(data.get("confidence", 0.5)),
+        )
+
+    @staticmethod
+    def _extract_json(text: str) -> str:
+        m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            return m.group(0)
+        return text.strip()
+</file>
+
+<file path="layer1_cognitive/brain/modular_brain.py">
+"""ModularBrain —— 实现 BrainStrategy 协议，串联 MAP 五模块 + Reasoner + Critic + DecisionParser。"""
+
+from __future__ import annotations
+
+from contracts.state import TypedState
+from contracts.decision import StructuredDecision, Observation, Reflection
+from contracts.protocols import (
+    Reasoner, DecisionParser, Critic,
+    TaskDecomposer, StatePredictor, StateEvaluator,
+    ConflictMonitor, TaskCoordinator,
+)
+
+
+class ModularBrain:
+    """
+    think() 内部串联:
+    Reasoner -> TaskDecomposer -> StatePredictor -> StateEvaluator -> ConflictMonitor -> TaskCoordinator -> DecisionParser
+
+    reflect() 内部调用 Critic。
+    """
+
+    def __init__(
+        self,
+        reasoner: Reasoner,
+        decision_parser: DecisionParser,
+        critic: Critic,
+        task_decomposer: TaskDecomposer,
+        state_predictor: StatePredictor,
+        state_evaluator: StateEvaluator,
+        conflict_monitor: ConflictMonitor,
+        task_coordinator: TaskCoordinator,
+    ):
+        self.reasoner = reasoner
+        self.decision_parser = decision_parser
+        self.critic = critic
+        self.task_decomposer = task_decomposer
+        self.state_predictor = state_predictor
+        self.state_evaluator = state_evaluator
+        self.conflict_monitor = conflict_monitor
+        self.task_coordinator = task_coordinator
+
+    async def think(self, state: TypedState) -> StructuredDecision:
+        _subtasks = await self.task_decomposer.decompose(state)
+        raw_candidates = await self.reasoner.generate_candidates(state, n=1)
+        candidates = [self.decision_parser.parse(rc, state) for rc in raw_candidates]
+
+        predicted = [await self.state_predictor.predict(state, c.rationale) for c in candidates]
+        scores = [await self.state_evaluator.score(state, p) for p in predicted]
+        conflicts = await self.conflict_monitor.check(state, candidates)
+        if conflicts:
+            print(f"  [ConflictMonitor] 检测到冲突: {conflicts}")
+
+        return await self.task_coordinator.arbitrate(state, candidates, scores)
+
+    async def reflect(self, state: TypedState, observation: Observation) -> Reflection:
+        return await self.critic.critique(state, observation)
+</file>
+
+<file path="layer1_cognitive/brain/reasoner.py">
+"""Reasoner —— 调用 LLM 生成候选思路。"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from contracts.state import TypedState
+from contracts.role_team import RoleProfile
+from contracts.protocols import LLMAdapter, PromptManager
+
+
+DEFAULT_REACT_TEMPLATE = """\
+ROLE: {role}
+GOAL: {goal}
+BACKSTORY: {backstory}
+AVAILABLE_TOOLS: {tools}
+USER_TASK: {task}
+CONTEXT:
+{context}
+
+请以 JSON 输出下一步 StructuredDecision（字段：action_type/tool_name/arguments/response_text/rationale/confidence）。
+"""
+
+
+class SimpleReasoner:
+    """调用 LLM 生成候选行动思路。"""
+
+    def __init__(
+        self,
+        llm: LLMAdapter,
+        prompt_manager: PromptManager,
+        role_profile: RoleProfile,
+        tools_desc: str,
+    ):
+        self.llm = llm
+        self.prompt_manager = prompt_manager
+        self.role_profile = role_profile
+        self.tools_desc = tools_desc
+
+    async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]:
+        context_lines = "\n".join(
+            f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context
+        ) or "(无历史上下文)"
+        prompt = self.prompt_manager.render("react_prompt", {
+            "role": self.role_profile.role,
+            "goal": self.role_profile.goal,
+            "backstory": self.role_profile.backstory,
+            "tools": self.tools_desc,
+            "task": state.task,
+            "context": context_lines,
+        })
+        raw = await self.llm.complete(prompt)
+        return [raw]
+</file>
+
+<file path="layer1_cognitive/hook_registry.py">
+"""SimpleHookRegistry —— 生命周期钩子管理。"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Callable, Awaitable
+
+from contracts.state import TypedState
+from contracts.observability import TraceSpan
+from contracts.protocols import Observability
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+class SimpleHookRegistry:
+    """注册和触发生命周期钩子。"""
+
+    def __init__(self, observability: Observability) -> None:
+        self._hooks: dict[str, list[Callable]] = {}
+        self.observability = observability
+
+    def register(self, event_name: str, hook: Callable) -> None:
+        self._hooks.setdefault(event_name, []).append(hook)
+
+    async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any:
+        span = TraceSpan(
+            span_id=_new_id("span"),
+            trace_id=state.trace_id,
+            name=f"hook.{event_name}",
+            started_at=_now(),
+        )
+        for hook in self._hooks.get(event_name, []):
+            await hook(event_name, state, **kwargs)
+        span.ended_at = _now()
+        self.observability.emit_span(span)
+        return None
+
+
+async def default_logging_hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
+    extra = {k: v for k, v in kwargs.items() if k != "state"}
+    print(f"  [Hook] {event_name} @step={state.step} {extra if extra else ''}")
+</file>
+
+<file path="layer2_runtime/strategy_registry.py">
+"""StrategyRegistry —— 策略注册表，支持运行时动态切换 Brain 策略。"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+from contracts.protocols import BrainStrategy
+
+
+class StrategyRegistry:
+    """按名称注册和查找 BrainStrategy 实现。"""
+
+    def __init__(self) -> None:
+        self._strategies: dict[str, BrainStrategy] = {}
+
+    def register(self, name: str, strategy: BrainStrategy) -> None:
+        self._strategies[name] = strategy
+
+    def resolve(self, name: str) -> Optional[BrainStrategy]:
+        return self._strategies.get(name)
+
+    def list_strategies(self) -> list[str]:
+        return list(self._strategies.keys())
+</file>
+
+<file path="layer3_agent/base_agent.py">
+"""BaseAgent —— 持有 Runtime + Brain + Body + Memory 视图。"""
+
+from __future__ import annotations
+
+from contracts.role_team import RoleProfile
+from contracts.result import Result
+from contracts.protocols import Runtime
+
+
+class BaseAgent:
+    """单个 Agent 的运行时封装。"""
+
+    def __init__(self, runtime: Runtime, role_profile: RoleProfile, max_steps: int = 10):
+        self.runtime = runtime
+        self.role_profile = role_profile
+        self.max_steps = max_steps
+
+    async def execute(self, task: str) -> Result:
+        return await self.runtime.run(task, max_steps=self.max_steps)
+</file>
+
+<file path="layer3_agent/supervisor.py">
+"""Supervisor —— 本质上是 BaseAgent，专责任务拆解与路由。"""
+
+from __future__ import annotations
+
+from contracts.role_team import RoleProfile
+from contracts.result import Result
+from contracts.protocols import Runtime
+from layer3_agent.base_agent import BaseAgent
+
+
+class Supervisor(BaseAgent):
+    """
+    Supervisor 本身就是一个 BaseAgent（复用同一套认知闭环），
+    区别是其 StructuredDecision 里携带 delegate_to（DelegationSpec）。
+    """
+
+    def __init__(self, runtime: Runtime, role_profile: RoleProfile, max_steps: int = 20):
+        super().__init__(runtime, role_profile, max_steps=max_steps)
+
+    async def delegate(self, task: str) -> Result:
+        """委派任务给子 Agent。"""
+        return await self.execute(task)
+</file>
+
+<file path="layer0_infra/llm_adapter/__init__.py">
+"""L0 LLM 适配器 —— 统一多厂商模型调用。"""
+
+from layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from layer0_infra.llm_adapter.anthropic_llm import AnthropicLLMAdapter
+from layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
+
+__all__ = ["MockLLMAdapter", "AnthropicLLMAdapter", "OpenAICompatAdapter"]
+</file>
+
+<file path="layer2_runtime/runtime_loop.py">
+"""CognitiveRuntime —— 核心认知循环（~25行 Loop，第6节参考实现的可运行版本）。"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Optional
+
+from contracts.state import TypedState, Budget, StateSnapshot
+from contracts.decision import StructuredDecision, Observation, Reflection
+from contracts.result import Result, ApprovalPendingError, BudgetExceededError
+from contracts.protocols import (
+    BrainStrategy, Body, MemorySystem,
+    HookRegistryP, EventBus, StateStore,
+)
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+class CognitiveRuntime:
+    """
+    核心 Loop: perceive -> think -> act -> observe -> reflect -> update
+    所有 Prompt 模板、压缩策略、Strategy 切换、错误恢复、人工审批
+    全部通过 Hook 与 Strategy 注册进来，Loop 本体保持稳定不变。
+    """
+
+    def __init__(
+        self,
+        brain: BrainStrategy,
+        body: Body,
+        memory: MemorySystem,
+        hooks: HookRegistryP,
+        event_bus: EventBus,
+        state_store: StateStore,
+    ):
+        self.brain = brain
+        self.body = body
+        self.memory = memory
+        self.hooks = hooks
+        self.event_bus = event_bus
+        self.state_store = state_store
+
+    def default_budget(self) -> Budget:
+        return Budget(max_steps=10, max_wall_clock_seconds=30)
+
+    async def run(self, task: str, max_steps: int = 10) -> Result:
+        state = TypedState(trace_id=_new_id("trace"), task=task, budget=self.default_budget())
+        await self.hooks.trigger("on_start", state)
+        return await self._loop(state, max_steps)
+
+    async def resume(self, snapshot: StateSnapshot, max_steps: int = 10) -> Result:
+        """从任意 Checkpoint 恢复——挂起等待人工审批/暂停的任务由此续跑。"""
+        state = await self.state_store.load(snapshot.state_ref)
+        state.status = "running"
+        return await self._loop(state, max_steps)
+
+    async def _loop(self, state: TypedState, max_steps: int) -> Result:
+        decision: Optional[StructuredDecision] = None
+        reflection: Optional[Reflection] = None
+
+        for step in range(state.step, max_steps):
+            state.step = step
+            state.budget.used_steps = step
+            try:
+                await self.hooks.trigger("pre_perceive", state)
+                state = await self.memory.perceive_and_retrieve(state)
+
+                await self.hooks.trigger("pre_think", state)
+                decision = await self.brain.think(state)
+                await self.hooks.trigger("post_think", state, decision=decision)
+
+                await self.hooks.trigger("pre_act", state, decision=decision)
+                observation = await self.body.act(decision, state)
+                await self.hooks.trigger("post_act", state, observation=observation)
+
+                if decision.action_type == "respond":
+                    state.working_memory["final_output"] = decision.response_text
+
+                await self.hooks.trigger("pre_reflect", state, observation=observation)
+                reflection = await self.brain.reflect(state, observation)
+                await self.hooks.trigger("post_reflect", state, reflection=reflection)
+
+                await self.memory.update_multi_level(state, observation, reflection)
+
+            except ApprovalPendingError:
+                state.status = "waiting_human"
+                state.checkpoints.append(state.snapshot(reason="pre_approval"))
+                await self.hooks.trigger("on_pause", state)
+                return self._summarize(state)
+
+            except Exception as err:
+                await self.hooks.trigger("on_error", state, error=err)
+                state.status = "failed"
+                state.checkpoints.append(state.snapshot(reason="on_error"))
+                state.extra["error"] = str(err)
+                break
+
+            state.checkpoints.append(state.snapshot())
+            self.event_bus.emit("step_completed", {"step": state.step, "status": state.status}, state.trace_id)
+
+            if state.budget.exceeded():
+                await self.hooks.trigger("on_error", state, error=BudgetExceededError())
+                state.status = "failed"
+                break
+
+            if self._should_stop(decision, reflection):
+                state.status = "completed"
+                break
+
+        await self.hooks.trigger("on_complete", state)
+        return self._summarize(state)
+
+    def _should_stop(
+        self, decision: Optional[StructuredDecision], reflection: Optional[Reflection]
+    ) -> bool:
+        if decision is None or reflection is None:
+            return False
+        return decision.action_type == "respond" and reflection.verdict != "needs_correction"
+
+    def _summarize(self, state: TypedState) -> Result:
+        final_ref = f"mem://{state.trace_id}/{state.step}"
+        return Result(
+            trace_id=state.trace_id,
+            status=state.status if state.status != "running" else "completed",  # type: ignore[arg-type]
+            output=state.working_memory.get("final_output"),
+            final_state_ref=final_ref,
+            total_steps=state.step + 1,
+            budget_used=state.budget,
+            error=state.extra.get("error"),
+        )
+</file>
+
+<file path="layer4_app/api.py">
+"""L4 极简开发者 API —— 三行创建 Agent，五行组建团队。
+
+支持通过注册表名字字符串或自定义协议实例来选择组件实现，
+无需修改框架源码即可替换任何可插拔组件。
+"""
+
+from __future__ import annotations
+
+from typing import Any, Optional, Union
+
+from contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
+from contracts.result import Result
+from contracts.protocols import MemorySystem, Observability, StateStore, LLMAdapter, ToolProtocol
+from layer0_infra.registry import get_global_registry
+from layer3_agent.base_agent import BaseAgent
+from layer3_agent.supervisor import Supervisor
+from layer3_agent.team_orchestrator import TeamOrchestrator
+import layer4_app.defaults  # noqa: F401 — 触发默认注册
+
+
+class Agent:
+    """
+    三行上手的开发者入口：内部完成 L0-L3 全部对象的 DI 组装。
+
+    用法：
+        agent = Agent(role="研究员", goal="产出分析报告", backstory="十年经验", tools=[...], llm=llm)
+        result = await agent.run("分析新能源电池行业趋势")
+
+    可插拔参数（接受注册表名字字符串或满足协议的自定义实例）：
+        memory         — 默认 "simple"
+        observability  — 默认 "console"
+        state_store    — 默认 "memory"
+    """
+
+    def __init__(
+        self,
+        role: str,
+        goal: str,
+        backstory: str,
+        tools: list[ToolProtocol],
+        llm: LLMAdapter,
+        max_steps: int = 10,
+        memory: Union[str, MemorySystem] = "simple",
+        observability: Union[str, Observability] = "console",
+        state_store: Union[str, StateStore] = "memory",
+    ):
+        reg = get_global_registry()
+
+        permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
+        role_profile = RoleProfile(
+            role=role, goal=goal, backstory=backstory,
+            tool_permission_manifest=permission_manifest,
+        )
+
+        obs = self._resolve(reg, "observability", observability)
+        mem = self._resolve(reg, "memory", memory)
+        ss = self._resolve(reg, "state_store", state_store)
+
+        from layer4_app.defaults import _build_runtime
+        runtime_factory = reg.resolve("build_runtime", "default")
+        runtime = runtime_factory(llm, role_profile, tools, obs, mem, ss)
+
+        self._base_agent = BaseAgent(runtime, role_profile, max_steps=max_steps)
+
+    @staticmethod
+    def _resolve(reg, category: str, value):
+        if isinstance(value, str):
+            impl = reg.resolve(category, value)
+            if impl is None:
+                raise ValueError(f"Unknown {category}: {value!r}. Available: {reg.list(category)}")
+            return impl()
+        return value
+
+    async def run(self, task: str) -> Result:
+        return await self._base_agent.execute(task)
+
+    def _as_supervisor(self) -> Supervisor:
+        rp = self._base_agent.role_profile
+        ms = self._base_agent.max_steps
+        return Supervisor(self._base_agent.runtime, rp, max_steps=max(ms, 20))
+
+
+class MultiAgentTeam:
+    """
+    五行组建团队。
+
+    用法：
+        team = MultiAgentTeam(
+            members=[researcher, writer, critic],
+            process="hierarchical",
+            supervisor=supervisor_agent,
+        )
+        result = await team.run("产出行业研究报告")
+    """
+
+    def __init__(
+        self,
+        members: list[Agent],
+        process: str = "hierarchical",
+        supervisor: Optional[Agent] = None,
+        max_rounds: Optional[int] = None,
+    ):
+        config = TeamConfig(
+            process=process,  # type: ignore[arg-type]
+            max_rounds=max_rounds,
+        )
+        base_members = [m._base_agent for m in members]
+        base_supervisor = supervisor._as_supervisor() if supervisor else None
+        self._orchestrator = TeamOrchestrator(base_members, config, base_supervisor)
+
+    async def run(self, objective: str) -> Result:
+        return await self._orchestrator.run(objective)
+</file>
+
 <file path="lca_single_agent_demo.py">
 """
 LCA Framework —— 单 Agent 回答单一问题：L0 → L4 端到端参考实现
@@ -4632,6 +5078,7 @@ import ast
 import asyncio
 import json
 import operator
+import os
 import re
 import time
 import uuid
@@ -4948,6 +5395,14 @@ class HookRegistryP(Protocol):
     async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any: ...
 
 
+class Observability(Protocol):
+    def emit_span(self, span: TraceSpan) -> None: ...
+
+
+class Runtime(Protocol):
+    async def run(self, task: str, max_steps: int) -> Result: ...
+
+
 # ============================================================================
 # L0 · 基础设施层
 # ============================================================================
@@ -4956,6 +5411,14 @@ class MockLLMAdapter:
     """离线可跑的确定性 Mock 实现，用于本示例；接口与真实厂商适配器完全一致。"""
 
     name = "mock-llm"
+
+    _WEATHER_CITIES = {
+        "东京": "Tokyo", "tokyo": "Tokyo",
+        "北京": "Beijing", "beijing": "Beijing",
+        "旧金山": "San Francisco", "san francisco": "San Francisco",
+        "纽约": "New York", "new york": "New York",
+        "伦敦": "London", "london": "London",
+    }
 
     async def complete(self, prompt: str, **kwargs: Any) -> str:
         await asyncio.sleep(0)  # 模拟异步I/O让出事件循环
@@ -4967,8 +5430,18 @@ class MockLLMAdapter:
             return json.dumps({
                 "action_type": "respond",
                 "response_text": f"「{q}」的答案是 {tool_result}。",
-                "rationale": "已从工具获得精确计算结果，直接向用户作答，无需进一步调用工具。",
+                "rationale": "已从工具获得结果，直接向用户作答，无需进一步调用工具。",
                 "confidence": 0.98,
+            }, ensure_ascii=False)
+
+        city = self._extract_weather_city(prompt)
+        if city:
+            return json.dumps({
+                "action_type": "use_tool",
+                "tool_name": "get_weather",
+                "arguments": {"city": city, "unit": "celsius"},
+                "rationale": f"用户询问天气，应调用 get_weather 工具查询 {city}。",
+                "confidence": 0.95,
             }, ensure_ascii=False)
 
         expr = self._extract_arithmetic_expression(prompt)
@@ -4988,6 +5461,19 @@ class MockLLMAdapter:
             "confidence": 0.6,
         }, ensure_ascii=False)
 
+    @classmethod
+    def _extract_weather_city(cls, prompt: str) -> Optional[str]:
+        m = re.search(r"USER_TASK:\s*([^\n]+)", prompt)
+        if not m:
+            return None
+        text = m.group(1)
+        if not re.search(r"天气|气温|温度|weather|temp", text, re.IGNORECASE):
+            return None
+        for keyword, city in cls._WEATHER_CITIES.items():
+            if keyword in text.lower():
+                return city
+        return None
+
     @staticmethod
     def _extract_arithmetic_expression(prompt: str) -> Optional[str]:
         m = re.search(r"USER_TASK:\s*([^\n]+)", prompt)
@@ -5002,25 +5488,39 @@ class MockLLMAdapter:
         return None
 
 
-class AnthropicLLMAdapter:
-    """
-    真实厂商适配器示例（需要网络与 API Key，本文件默认不调用）。
-    生产环境按此模式接入 Anthropic / OpenAI / 开源模型，对上层暴露的
-    接口签名与 MockLLMAdapter 完全一致，Brain 层无需感知差异。
+class OpenAICompatAdapter:
+    """通用 OpenAI 兼容 LLM 适配器。
+
+    支持 OpenAI / DashScope / Ollama / vLLM 等所有 chat.completions 兼容 API。
+    只需配置环境变量即可切换，代码无需改动：
+        LLM_API_KEY   API Key
+        LLM_BASE_URL  基地址（默认 https://api.openai.com/v1）
+        LLM_MODEL     模型名（默认 gpt-4.1）
     """
 
-    def __init__(self, model: str = "claude-sonnet-5"):
-        self.model = model
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        *,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ):
+        from openai import AsyncOpenAI
+        self._model = model or os.getenv("LLM_MODEL", "gpt-4.1")
+        self._client = AsyncOpenAI(
+            api_key=api_key or os.getenv("LLM_API_KEY", ""),
+            base_url=base_url or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
+        )
 
     async def complete(self, prompt: str, **kwargs: Any) -> str:
-        # from anthropic import AsyncAnthropic
-        # client = AsyncAnthropic()
-        # resp = await client.messages.create(
-        #     model=self.model, max_tokens=1000,
-        #     messages=[{"role": "user", "content": prompt}],
-        # )
-        # return resp.content[0].text
-        raise NotImplementedError("示例中未实际联网调用，接口保留以展示L0可替换性")
+        response = await self._client.chat.completions.create(
+            model=kwargs.pop("model", self._model),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=kwargs.pop("temperature", 0.7),
+            max_tokens=kwargs.pop("max_tokens", 2048),
+            **kwargs,
+        )
+        return response.choices[0].message.content or ""
 
 
 class CalculatorTool:
@@ -5064,6 +5564,70 @@ class CalculatorTool:
         if isinstance(node, ast.UnaryOp) and type(node.op) in self._OPS:
             return self._OPS[type(node.op)](self._eval_node(node.operand))
         raise ValueError(f"不支持的表达式片段: {ast.dump(node)}")
+
+
+class GetWeatherTool:
+    """实现 ToolProtocol 的天气查询工具（内置假数据，无需外部网络）。"""
+
+    name = "get_weather"
+    is_idempotent = True
+    default_timeout_s = 5
+
+    _FAKE_DB: dict[str, dict[str, Any]] = {
+        "tokyo": {"temp_c": 27, "condition": "cloudy"},
+        "beijing": {"temp_c": 31, "condition": "sunny"},
+        "san francisco": {"temp_c": 18, "condition": "foggy"},
+        "new york": {"temp_c": 24, "condition": "clear"},
+        "london": {"temp_c": 19, "condition": "rainy"},
+    }
+    _CITY_ALIASES: dict[str, str] = {
+        "东京": "tokyo", "東京": "tokyo",
+        "北京": "beijing",
+        "旧金山": "san francisco",
+        "纽约": "new york",
+        "伦敦": "london",
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        raw_city = str(
+            args.get("city") or args.get("location") or args.get("name") or ""
+        ).strip().lower()
+        city = self._CITY_ALIASES.get(raw_city, raw_city)
+
+        if not city:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=new_id("obs"), success=False, payload=None,
+                error="missing required arg: city", latency_ms=latency_ms,
+            )
+
+        await asyncio.sleep(0.05)  # 模拟网络 IO
+
+        data = self._FAKE_DB.get(city)
+        if data is None:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=new_id("obs"), success=False, payload=None,
+                error=f"unknown city: {city}", latency_ms=latency_ms,
+            )
+
+        unit = str(args.get("unit", "celsius")).lower()
+        temp_c = data["temp_c"]
+        temp = temp_c if unit == "celsius" else temp_c * 9 / 5 + 32
+
+        result = {
+            "city": city,
+            "temperature": round(temp, 1),
+            "unit": unit,
+            "condition": data["condition"],
+        }
+        latency_ms = int((time.monotonic() - start) * 1000)
+        return Observation(
+            observation_id=new_id("obs"), success=True, payload=result,
+            latency_ms=latency_ms,
+        )
+
 
 
 class InMemoryStateStore:
@@ -5130,7 +5694,7 @@ class SimpleEventBus:
 
 
 class SimpleHookRegistry:
-    def __init__(self, observability: ConsoleObservability) -> None:
+    def __init__(self, observability: Observability) -> None:
         self._hooks: dict[str, list[Hook]] = {}
         self.observability = observability
 
@@ -5165,7 +5729,7 @@ class SimpleToolRegistry:
 class SimpleSafeExecutor:
     """权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行（第4.1/9节内部链路）。"""
 
-    def __init__(self, permission_manifest: ToolPermissionManifest, observability: ConsoleObservability):
+    def __init__(self, permission_manifest: ToolPermissionManifest, observability: Observability):
         self.permission_manifest = permission_manifest
         self.observability = observability
         self._cache: dict[str, Observation] = {}
@@ -5203,7 +5767,7 @@ class SimpleSafeExecutor:
 class SimpleBody:
     """L1 Body：ToolRegistry + SafeExecutor，对外只暴露 act()。"""
 
-    def __init__(self, tool_registry: SimpleToolRegistry, safe_executor: SimpleSafeExecutor):
+    def __init__(self, tool_registry: ToolRegistryP, safe_executor: SafeExecutorProtocol):
         self.tool_registry = tool_registry
         self.safe_executor = safe_executor
 
@@ -5226,7 +5790,7 @@ class SimpleBody:
 # ---- Brain 内部：MAP 五模块 + Reasoner + Critic + DecisionParser ----------
 
 class SimpleReasoner:
-    def __init__(self, llm: LLMAdapter, prompt_manager: SimplePromptManager, role_profile: RoleProfile, tools_desc: str):
+    def __init__(self, llm: LLMAdapter, prompt_manager: PromptManager, role_profile: RoleProfile, tools_desc: str):
         self.llm = llm
         self.prompt_manager = prompt_manager
         self.role_profile = role_profile
@@ -5247,30 +5811,75 @@ class SimpleReasoner:
 
 
 class SimpleDecisionParser:
+    _ACTION_ALIASES = {
+        "tool_call": "use_tool",
+        "call_tool": "use_tool",
+        "use_tool": "use_tool",
+        "respond": "respond",
+        "response": "respond",
+        "answer": "respond",
+        "reply": "respond",
+        "delegate": "delegate",
+        "stop": "stop",
+        "ask_human": "ask_human",
+    }
+
     def parse(self, raw_output: str, state: TypedState) -> StructuredDecision:
+        json_str = self._extract_json(raw_output)
         try:
-            data = json.loads(raw_output)
-            tool_call = None
-            if data.get("action_type") == "use_tool":
-                tool_call = ToolCall(
-                    call_id=new_id("call"),
-                    tool_name=data["tool_name"],
-                    arguments=data.get("arguments", {}),
-                )
-            return StructuredDecision(
-                decision_id=new_id("dec"),
-                action_type=data["action_type"],
-                tool_call=tool_call,
-                response_text=data.get("response_text"),
-                rationale=data.get("rationale", ""),
-                confidence=float(data.get("confidence", 0.5)),
-            )
-        except (json.JSONDecodeError, KeyError):
-            # 解析失败时的兜底：不向 Runtime 抛异常，退化为直接respond原始文本
+            data = json.loads(json_str)
+        except (json.JSONDecodeError, ValueError):
             return StructuredDecision(
                 decision_id=new_id("dec"), action_type="respond",
                 response_text=raw_output, rationale="解析失败兜底", confidence=0.1,
             )
+
+        raw_action = str(data.get("action_type", "respond")).lower().strip()
+        action_type = self._ACTION_ALIASES.get(raw_action, raw_action)
+
+        tool_call = None
+        if action_type == "use_tool":
+            tool_name = data.get("tool_name") or data.get("tool") or self._infer_tool_name(raw_output)
+            arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
+            if not isinstance(arguments, dict):
+                arguments = {"expression": str(arguments)}
+            if tool_name:
+                tool_call = ToolCall(
+                    call_id=new_id("call"),
+                    tool_name=tool_name,
+                    arguments=arguments,
+                )
+            else:
+                action_type = "respond"
+
+        return StructuredDecision(
+            decision_id=new_id("dec"),
+            action_type=action_type,  # type: ignore[arg-type]
+            tool_call=tool_call,
+            response_text=data.get("response_text") or data.get("response") or data.get("text"),
+            rationale=data.get("rationale", ""),
+            confidence=float(data.get("confidence", 0.5)),
+        )
+
+    @staticmethod
+    def _extract_json(text: str) -> str:
+        """从可能包含 markdown 代码块的文本中提取 JSON。"""
+        m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            return m.group(0)
+        return text.strip()
+
+    @staticmethod
+    def _infer_tool_name(text: str) -> Optional[str]:
+        """从 LLM 的 rationale 文本中推断工具名。"""
+        if re.search(r"calculator|计算|算术|表达式", text, re.IGNORECASE):
+            return "calculator"
+        if re.search(r"get_weather|weather|天气|气温", text, re.IGNORECASE):
+            return "get_weather"
+        return None
 
 
 class SimpleCritic:
@@ -5323,14 +5932,14 @@ class ModularBrain:
 
     def __init__(
         self,
-        reasoner: SimpleReasoner,
-        decision_parser: SimpleDecisionParser,
-        critic: SimpleCritic,
-        task_decomposer: SimpleTaskDecomposer,
-        state_predictor: SimpleStatePredictor,
-        state_evaluator: SimpleStateEvaluator,
-        conflict_monitor: SimpleConflictMonitor,
-        task_coordinator: SimpleTaskCoordinator,
+        reasoner: Reasoner,
+        decision_parser: DecisionParser,
+        critic: Critic,
+        task_decomposer: TaskDecomposer,
+        state_predictor: StatePredictor,
+        state_evaluator: StateEvaluator,
+        conflict_monitor: ConflictMonitor,
+        task_coordinator: TaskCoordinator,
     ):
         self.reasoner = reasoner
         self.decision_parser = decision_parser
@@ -5402,12 +6011,12 @@ class SimpleMemorySystem:
 class CognitiveRuntime:
     def __init__(
         self,
-        brain: ModularBrain,
-        body: SimpleBody,
-        memory: SimpleMemorySystem,
-        hooks: SimpleHookRegistry,
-        event_bus: SimpleEventBus,
-        state_store: InMemoryStateStore,
+        brain: BrainStrategy,
+        body: Body,
+        memory: MemorySystem,
+        hooks: HookRegistryP,
+        event_bus: EventBus,
+        state_store: StateStore,
     ):
         self.brain = brain
         self.body = body
@@ -5471,7 +6080,7 @@ class CognitiveRuntime:
                 break
 
             state.checkpoints.append(state.snapshot())
-            self.event_bus.emit("step_completed", state.trace_id, state.trace_id)
+            self.event_bus.emit("step_completed", {"step": state.step, "status": state.status}, state.trace_id)
 
             if state.budget.exceeded():
                 await self.hooks.trigger("on_error", state, error=BudgetExceededError())
@@ -5508,7 +6117,7 @@ class CognitiveRuntime:
 # ============================================================================
 
 class BaseAgent:
-    def __init__(self, runtime: CognitiveRuntime, role_profile: RoleProfile, max_steps: int = 10):
+    def __init__(self, runtime: Runtime, role_profile: RoleProfile, max_steps: int = 10):
         self.runtime = runtime
         self.role_profile = role_profile
         self.max_steps = max_steps
@@ -5582,25 +6191,73 @@ class Agent:
 # 演示：一个 Agent 回答一个问题（L4 -> L3 -> L2 -> L1 -> L0 全链路串联）
 # ============================================================================
 
-async def main() -> None:
-    llm = MockLLMAdapter()
-    calculator = CalculatorTool()
+def _load_env() -> None:
+    """从 /home/lichao/zero-agent/.env 加载环境变量（不依赖 python-dotenv）。"""
+    env_path = "/home/lichao/zero-agent/.env"
+    if not os.path.isfile(env_path):
+        return
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip())
 
-    researcher = Agent(
+
+def _make_agent(llm: Optional[LLMAdapter] = None) -> Agent:
+    if llm is None:
+        llm = MockLLMAdapter()
+    return Agent(
         role="通用问答助手",
         goal="准确、简洁地回答用户提出的问题",
-        backstory="擅长借助工具进行精确计算，不臆测数值结果。",
-        tools=[calculator],
+        backstory="擅长借助工具进行精确计算和天气查询，不臆测数值结果。",
+        tools=[CalculatorTool(), GetWeatherTool()],
         llm=llm,
     )
 
-    print("=" * 70)
-    print("开始执行：agent.run('123 乘以 456 等于多少？')")
-    print("=" * 70)
-    result = await researcher.run("123 乘以 456 等于多少？")
 
+async def main() -> None:
+    _load_env()
+
+    api_key = os.getenv("LLM_API_KEY", "")
+    if api_key:
+        print(f"[配置] LLM={os.getenv('LLM_MODEL', 'gpt-4.1')} base_url={os.getenv('LLM_BASE_URL', 'https://api.openai.com/v1')}")
+        llm: LLMAdapter = OpenAICompatAdapter()
+    else:
+        print("[配置] 未检测到 LLM_API_KEY，降级使用 MockLLMAdapter")
+        llm = MockLLMAdapter()
+
+    # 场景 1：算术计算
     print("=" * 70)
-    print("Result:")
+    print("场景 1：agent.run('123 乘以 456 等于多少？')")
+    print("=" * 70)
+    result = await _make_agent(llm).run("123 乘以 456 等于多少？")
+    _print_result(result)
+
+    # 场景 2：天气查询
+    print()
+    print("=" * 70)
+    print("场景 2：agent.run('东京现在天气怎么样？')")
+    print("=" * 70)
+    result = await _make_agent(llm).run("东京现在天气怎么样？")
+    _print_result(result)
+
+    # 场景 3：直接并发跑两个工具，验证它们能在同一轮里被同时触发
+    print()
+    print("=" * 70)
+    print("场景 3：并发调用 get_weather + calculator（直接验证工具层）")
+    print("=" * 70)
+    weather_obs, calc_obs = await asyncio.gather(
+        GetWeatherTool().execute({"city": "Tokyo", "unit": "celsius"}),
+        CalculatorTool().execute({"expression": "240*0.15"}),
+    )
+    print(f"  get_weather  → success={weather_obs.success}  payload={weather_obs.payload}  latency={weather_obs.latency_ms}ms")
+    print(f"  calculator   → success={calc_obs.success}  payload={calc_obs.payload}  latency={calc_obs.latency_ms}ms")
+    print("=" * 70)
+
+
+def _print_result(result: Result) -> None:
     print(f"  status      = {result.status}")
     print(f"  output      = {result.output}")
     print(f"  total_steps = {result.total_steps}")
