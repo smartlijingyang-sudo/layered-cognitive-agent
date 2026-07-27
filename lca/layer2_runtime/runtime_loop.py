@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from lca.contracts.decision import Reflection, StructuredDecision
 from lca.contracts.protocols import (
@@ -44,6 +45,12 @@ class CognitiveRuntime(Runtime):
         self.hooks = hooks
         self.event_bus = event_bus
         self.state_store = state_store
+
+    def configure(self, **capabilities: Any) -> None:
+        if "transport" in capabilities and hasattr(self.body, "bind_transport"):
+            self.body.bind_transport(capabilities["transport"])
+        if "team_roster" in capabilities and hasattr(self.brain, "set_team_roster"):
+            self.brain.set_team_roster(capabilities["team_roster"])
 
     def default_budget(self) -> Budget:
         return Budget(max_steps=10, max_wall_clock_seconds=30)

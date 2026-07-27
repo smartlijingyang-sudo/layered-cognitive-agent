@@ -40,6 +40,9 @@ class SimpleBody(Body):
         else:
             self.transport_registry = TransportRegistry()
 
+    def bind_transport(self, transport: AgentTransport) -> None:
+        self.transport_registry.register(transport)
+
     async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
         if decision.action_type == "respond":
             return Observation(

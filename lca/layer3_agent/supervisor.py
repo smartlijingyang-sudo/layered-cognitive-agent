@@ -19,16 +19,7 @@ class Supervisor(BaseAgent):
     def bind_team(self, transport: AgentTransport, roster_desc: str) -> None:
         """团队组建完成后的最后一次接线。
 
-        把 transport 注册到 Body 的 TransportRegistry（delegate 分支按协议路由），
-        把 roster_desc 注入 Reasoner（Supervisor prompt 里看到队友列表）。
+        通过 Runtime.configure() 显式协议分发能力，
+        不再越层访问 L1 组件内部状态。
         """
-        body = self.runtime.body  # type: ignore[attr-defined]
-        if hasattr(body, "transport_registry"):
-            body.transport_registry.register(transport)
-        elif hasattr(body, "transport"):
-            body.transport = transport
-
-        brain = self.runtime.brain  # type: ignore[attr-defined]
-        reasoner = getattr(brain, "reasoner", None)
-        if reasoner is not None:
-            reasoner.team_roster = roster_desc
+        self.runtime.configure(transport=transport, team_roster=roster_desc)

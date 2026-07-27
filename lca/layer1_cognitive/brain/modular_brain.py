@@ -60,3 +60,9 @@ class ModularBrain(BrainStrategy):
 
     async def reflect(self, state: TypedState, observation: Observation) -> Reflection:
         return await self.critic.critique(state, observation)
+
+    def set_team_roster(self, roster_desc: str) -> None:
+        if hasattr(self.reasoner, "set_team_roster"):
+            self.reasoner.set_team_roster(roster_desc)
+        elif hasattr(self.reasoner, "team_roster"):
+            self.reasoner.team_roster = roster_desc

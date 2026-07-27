@@ -64,6 +64,9 @@ class SimpleReasoner(Reasoner):
         self.tools_desc = tools_desc
         self.team_roster = team_roster
 
+    def set_team_roster(self, roster_desc: str) -> None:
+        self.team_roster = roster_desc
+
     async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]:
         context_lines = (
             "\n".join(f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context)
