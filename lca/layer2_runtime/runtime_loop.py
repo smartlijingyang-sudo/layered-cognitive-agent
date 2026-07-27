@@ -51,6 +51,8 @@ class CognitiveRuntime(Runtime):
             self.body.bind_transport(capabilities["transport"])
         if "team_roster" in capabilities and hasattr(self.brain, "set_team_roster"):
             self.brain.set_team_roster(capabilities["team_roster"])
+        if "shared_memory" in capabilities and hasattr(self.memory, "bind_shared_store"):
+            self.memory.bind_shared_store(capabilities["shared_memory"])
 
     def default_budget(self) -> Budget:
         return Budget(max_steps=10, max_wall_clock_seconds=30)

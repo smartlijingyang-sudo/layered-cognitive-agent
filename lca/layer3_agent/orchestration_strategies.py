@@ -1,7 +1,8 @@
-"""编排策略实现 —— hierarchical / sequential / graph(占位) / debate(占位)。"""
+"""编排策略实现 —— hierarchical / sequential / parallel / graph(占位) / debate(占位)。"""
 
 from __future__ import annotations
 
+import asyncio
 from typing import cast
 
 from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy
@@ -37,6 +38,28 @@ class SequentialStrategy(OrchestrationStrategy):
             budget_used=None,  # type: ignore[arg-type]
             error="No members in team",
         )
+
+
+class ParallelStrategy(OrchestrationStrategy):
+    """scatter-gather 并行：同一任务分发给所有成员并发执行，取最后完成的结果。
+
+    本质是 GraphStrategy 的特例（"所有节点入边相同、无依赖"），
+    用 asyncio.gather 实现并发调度。
+    """
+
+    async def run(self, context: OrchestrationContext, objective: str) -> Result:
+        if not context.members:
+            return Result(
+                trace_id="",
+                status="failed",
+                final_state_ref="",
+                total_steps=0,
+                budget_used=None,  # type: ignore[arg-type]
+                error="No members in team",
+            )
+        tasks = [member.execute(objective) for member in context.members]
+        results: list[Result] = await asyncio.gather(*tasks)
+        return results[-1]
 
 
 class GraphStrategy(OrchestrationStrategy):

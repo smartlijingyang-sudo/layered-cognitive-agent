@@ -41,7 +41,7 @@ class RoleProfile:
 
 @dataclass
 class TeamConfig:
-    process: Literal["hierarchical", "sequential", "graph", "debate"]
+    process: Literal["hierarchical", "sequential", "parallel", "graph", "debate"]
     shared_memory_layers: list[Literal["semantic", "procedural"]] = field(default_factory=list)
     max_rounds: int | None = None
     graph_definition_ref: str | None = None
