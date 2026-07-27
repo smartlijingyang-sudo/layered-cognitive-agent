@@ -7,7 +7,18 @@
 
 from __future__ import annotations
 
-from lca.contracts.role_team import ToolPermissionManifest
+from lca.contracts.protocols import (
+    Body,
+    BrainStrategy,
+    EventBus,
+    HookRegistryP,
+    LLMAdapter,
+    MemorySystem,
+    Observability,
+    StateStore,
+    ToolProtocol,
+)
+from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.registry import get_global_registry
 from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
@@ -34,7 +45,7 @@ from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
 
 
-def _build_brain(llm, role_profile, tools_desc):
+def _build_brain(llm: LLMAdapter, role_profile: RoleProfile, tools_desc: str) -> ModularBrain:
     """默认 Brain 工厂：ModularBrain + MAP 五模块。"""
     prompt_manager = SimplePromptManager()
     prompt_manager.register_template("react_prompt", DEFAULT_REACT_TEMPLATE)
@@ -51,7 +62,7 @@ def _build_brain(llm, role_profile, tools_desc):
     )
 
 
-def build_body(tools, observability):
+def build_body(tools: list[ToolProtocol], observability: Observability) -> SimpleBody:
     """默认 Body 构建器。"""
     permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
     tool_registry = SimpleToolRegistry()
@@ -61,14 +72,21 @@ def build_body(tools, observability):
     return SimpleBody(tool_registry, safe_executor)
 
 
-def _build_hooks(observability):
+def _build_hooks(observability: Observability) -> SimpleHookRegistry:
     hooks = SimpleHookRegistry(observability)
     for event_name in HOOK_NAMES:
         hooks.register(event_name, default_logging_hook)
     return hooks
 
 
-def build_runtime(brain, body, memory, hooks, event_bus, state_store):
+def build_runtime(
+    brain: BrainStrategy,
+    body: Body,
+    memory: MemorySystem,
+    hooks: HookRegistryP,
+    event_bus: EventBus,
+    state_store: StateStore,
+) -> CognitiveRuntime:
     """默认 Runtime 构建器。"""
     return CognitiveRuntime(brain, body, memory, hooks, event_bus, state_store)
 

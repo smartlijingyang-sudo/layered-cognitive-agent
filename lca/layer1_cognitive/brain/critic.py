@@ -21,9 +21,7 @@ class SimpleCritic(Critic):
             return Reflection(
                 reflection_id=_new_id("refl"),
                 verdict="on_track",
-                lesson=f"步骤{state.step}成功完成"
-                if observation.payload is not None
-                else None,
+                lesson=f"步骤{state.step}成功完成" if observation.payload is not None else None,
             )
         return Reflection(
             reflection_id=_new_id("refl"),

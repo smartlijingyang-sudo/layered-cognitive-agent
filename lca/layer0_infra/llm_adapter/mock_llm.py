@@ -69,10 +69,7 @@ class MockLLMAdapter(LLMAdapter):
             return None
         text = m.group(1)
         text = (
-            text.replace("乘以", "*")
-            .replace("加上", "+")
-            .replace("减去", "-")
-            .replace("除以", "/")
+            text.replace("乘以", "*").replace("加上", "+").replace("减去", "-").replace("除以", "/")
         )
         text = text.replace("×", "*").replace("÷", "/")
         nums_ops = re.findall(r"[\d.]+|[+\-*/]", text)

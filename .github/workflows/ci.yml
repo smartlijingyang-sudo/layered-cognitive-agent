@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v8
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.10
+      - run: uv sync --all-groups --locked
+
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: 架构契约（import-linter）
+        run: uv run lint-imports
+      - name: mypy
+        run: uv run mypy lca
+      - name: pytest
+        run: uv run pytest --cov=lca --cov-report=xml
+      - name: 依赖漏洞扫描
+        run: uv run pip-audit
+      - name: 死代码扫描
+        run: uv run vulture --config pyproject.toml --min-confidence 80

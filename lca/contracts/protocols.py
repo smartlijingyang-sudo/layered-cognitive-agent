@@ -10,6 +10,7 @@ from typing import (
 )
 
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.result import Result
 from lca.contracts.role_team import CacheConfig, RetryPolicy
 from lca.contracts.state import TypedState
 
@@ -44,9 +45,7 @@ class DecisionParser(Protocol):
 
 @runtime_checkable
 class Critic(Protocol):
-    async def critique(
-        self, state: TypedState, observation: Observation
-    ) -> Reflection: ...
+    async def critique(self, state: TypedState, observation: Observation) -> Reflection: ...
 
 
 @runtime_checkable
@@ -56,23 +55,17 @@ class TaskDecomposer(Protocol):
 
 @runtime_checkable
 class StatePredictor(Protocol):
-    async def predict(
-        self, state: TypedState, candidate_action: str
-    ) -> dict[str, Any]: ...
+    async def predict(self, state: TypedState, candidate_action: str) -> dict[str, Any]: ...
 
 
 @runtime_checkable
 class StateEvaluator(Protocol):
-    async def score(
-        self, state: TypedState, predicted_state: dict[str, Any]
-    ) -> float: ...
+    async def score(self, state: TypedState, predicted_state: dict[str, Any]) -> float: ...
 
 
 @runtime_checkable
 class ConflictMonitor(Protocol):
-    async def check(
-        self, state: TypedState, candidates: list[StructuredDecision]
-    ) -> list[str]: ...
+    async def check(self, state: TypedState, candidates: list[StructuredDecision]) -> list[str]: ...
 
 
 @runtime_checkable
@@ -88,16 +81,12 @@ class TaskCoordinator(Protocol):
 @runtime_checkable
 class BrainStrategy(Protocol):
     async def think(self, state: TypedState) -> StructuredDecision: ...
-    async def reflect(
-        self, state: TypedState, observation: Observation
-    ) -> Reflection: ...
+    async def reflect(self, state: TypedState, observation: Observation) -> Reflection: ...
 
 
 @runtime_checkable
 class Body(Protocol):
-    async def act(
-        self, decision: StructuredDecision, state: TypedState
-    ) -> Observation: ...
+    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation: ...
 
 
 @runtime_checkable
@@ -111,17 +100,13 @@ class MemorySystem(Protocol):
 @runtime_checkable
 class EventBus(Protocol):
     def emit(self, event_name: str, payload: Any, trace_id: str) -> None: ...
-    def subscribe(
-        self, event_name: str, handler: Callable[[Any], Awaitable[None]]
-    ) -> None: ...
+    def subscribe(self, event_name: str, handler: Callable[[Any], Awaitable[None]]) -> None: ...
 
 
 @runtime_checkable
 class PromptManager(Protocol):
     def render(self, template_name: str, variables: dict[str, Any]) -> str: ...
-    def register_template(
-        self, name: str, template: str, version: str = "1.0"
-    ) -> None: ...
+    def register_template(self, name: str, template: str, version: str = "1.0") -> None: ...
 
 
 @runtime_checkable
@@ -149,24 +134,18 @@ class StateStore(Protocol):
 
 @runtime_checkable
 class Hook(Protocol):
-    async def __call__(
-        self, event_name: str, state: TypedState, **kwargs: Any
-    ) -> None: ...
+    async def __call__(self, event_name: str, state: TypedState, **kwargs: Any) -> None: ...
 
 
 @runtime_checkable
 class HookRegistryP(Protocol):
     def register(self, event_name: str, hook: Hook) -> None: ...
-    async def trigger(
-        self, event_name: str, state: TypedState, **kwargs: Any
-    ) -> Any: ...
+    async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any: ...
 
 
 @runtime_checkable
 class AgentTransport(Protocol):
-    async def send_task(
-        self, agent_card: Any, subtask: str, context_refs: list[str]
-    ) -> str: ...
+    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str: ...
     async def poll_status(self, task_id: str) -> str: ...
     async def receive_result(self, task_id: str) -> Observation: ...
 
@@ -178,9 +157,9 @@ class Observability(Protocol):
 
 @runtime_checkable
 class Runtime(Protocol):
-    async def run(self, task: str, max_steps: int) -> Any: ...
+    async def run(self, task: str, max_steps: int) -> Result: ...
 
 
 @runtime_checkable
 class AgentProtocol(Protocol):
-    async def execute(self, task: str) -> Any: ...
+    async def execute(self, task: str) -> Result: ...

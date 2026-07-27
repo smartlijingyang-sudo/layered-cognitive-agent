@@ -44,8 +44,6 @@ class SimpleHookRegistry(HookRegistryP):
         return None
 
 
-async def default_logging_hook(
-    event_name: str, state: TypedState, **kwargs: Any
-) -> None:
+async def default_logging_hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
     extra = {k: v for k, v in kwargs.items() if k != "state"}
     print(f"  [Hook] {event_name} @step={state.step} {extra if extra else ''}")

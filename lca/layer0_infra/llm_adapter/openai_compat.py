@@ -19,13 +19,13 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
-from openai import AsyncOpenAI
-
 from lca.contracts.protocols import LLMAdapter
 
 
 class OpenAICompatAdapter(LLMAdapter):
     """实现 LLMAdapter 协议。走 client.chat.completions.create()。"""
+
+    _client: Any
 
     def __init__(
         self,
@@ -34,6 +34,8 @@ class OpenAICompatAdapter(LLMAdapter):
         api_key: str | None = None,
         base_url: str | None = None,
     ) -> None:
+        from openai import AsyncOpenAI  # type: ignore[import-not-found]
+
         self._model = model or os.getenv("LLM_MODEL", "gpt-4.1")
         self._client = AsyncOpenAI(
             api_key=api_key or os.getenv("LLM_API_KEY", ""),
@@ -52,3 +54,4 @@ class OpenAICompatAdapter(LLMAdapter):
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
         raise NotImplementedError("流式输出暂未实现")
+        yield ""  # pragma: no cover

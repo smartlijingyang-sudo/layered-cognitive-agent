@@ -29,3 +29,4 @@ class AnthropicLLMAdapter(LLMAdapter):
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
         raise NotImplementedError("示例中未实际联网调用，接口保留以展示L0可替换性")
+        yield ""  # pragma: no cover

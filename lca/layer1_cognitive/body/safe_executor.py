@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from lca.contracts.decision import Observation
@@ -14,9 +15,7 @@ from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 
 
-def _now():
-    from datetime import datetime, timezone
-
+def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
@@ -27,9 +26,7 @@ def _new_id(prefix: str) -> str:
 class SimpleSafeExecutor(SafeExecutorProtocol):
     """权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
 
-    def __init__(
-        self, permission_manifest: ToolPermissionManifest, observability: Observability
-    ):
+    def __init__(self, permission_manifest: ToolPermissionManifest, observability: Observability):
         self.permission_manifest = permission_manifest
         self.observability = observability
         self._cache: dict[str, Observation] = {}
@@ -46,9 +43,7 @@ class SimpleSafeExecutor(SafeExecutorProtocol):
                 f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权"
             )
 
-        cache_key = (
-            f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
-        )
+        cache_key = f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
         if cache_config.enabled and cache_key in self._cache:
             return self._cache[cache_key]
 

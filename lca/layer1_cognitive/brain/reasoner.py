@@ -36,9 +36,7 @@ class SimpleReasoner(Reasoner):
 
     async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]:
         context_lines = (
-            "\n".join(
-                f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context
-            )
+            "\n".join(f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context)
             or "(无历史上下文)"
         )
         prompt = self.prompt_manager.render(

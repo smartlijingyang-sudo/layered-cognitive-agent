@@ -51,12 +51,7 @@ class SimpleDecisionParser(DecisionParser):
         tool_calls: list[ToolCall] = []
         if action_type == "use_tool":
             tool_name = data.get("tool_name") or data.get("tool")
-            arguments = (
-                data.get("arguments")
-                or data.get("args")
-                or data.get("parameters")
-                or {}
-            )
+            arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
             if not isinstance(arguments, dict):
                 arguments = {"expression": str(arguments)}
             if tool_name:
@@ -74,9 +69,7 @@ class SimpleDecisionParser(DecisionParser):
             decision_id=_new_id("dec"),
             action_type=action_type,  # type: ignore[arg-type]
             tool_calls=tool_calls,
-            response_text=data.get("response_text")
-            or data.get("response")
-            or data.get("text"),
+            response_text=data.get("response_text") or data.get("response") or data.get("text"),
             rationale=data.get("rationale", ""),
             confidence=float(data.get("confidence", 0.5)),
         )

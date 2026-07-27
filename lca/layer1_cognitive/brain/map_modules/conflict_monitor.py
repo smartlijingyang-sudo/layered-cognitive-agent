@@ -10,7 +10,5 @@ from lca.contracts.state import TypedState
 class SimpleConflictMonitor(ConflictMonitor):
     """最小实现：不检测冲突。"""
 
-    async def check(
-        self, state: TypedState, candidates: list[StructuredDecision]
-    ) -> list[str]:
+    async def check(self, state: TypedState, candidates: list[StructuredDecision]) -> list[str]:
         return []

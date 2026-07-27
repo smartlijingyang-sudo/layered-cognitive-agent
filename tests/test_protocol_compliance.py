@@ -83,14 +83,10 @@ class TestL0ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(MockLLMAdapter(), LLMAdapter)
 
     def test_openai_compat_is_llm_adapter(self):
-        self.assertIsInstance(
-            OpenAICompatAdapter.__new__(OpenAICompatAdapter), LLMAdapter
-        )
+        self.assertIsInstance(OpenAICompatAdapter.__new__(OpenAICompatAdapter), LLMAdapter)
 
     def test_anthropic_is_llm_adapter(self):
-        self.assertIsInstance(
-            AnthropicLLMAdapter.__new__(AnthropicLLMAdapter), LLMAdapter
-        )
+        self.assertIsInstance(AnthropicLLMAdapter.__new__(AnthropicLLMAdapter), LLMAdapter)
 
     def test_calculator_is_tool(self):
         self.assertIsInstance(CalculatorTool(), ToolProtocol)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from typing import Any
+from typing import Any, ClassVar
 
 from lca.contracts.decision import Observation
 from lca.contracts.protocols import ToolProtocol
@@ -25,14 +25,14 @@ class GetWeatherTool(ToolProtocol):
     is_idempotent = True
     default_timeout_s = 5
 
-    _FAKE_DB: dict[str, dict[str, Any]] = {
+    _FAKE_DB: ClassVar[dict[str, dict[str, Any]]] = {
         "tokyo": {"temp_c": 27, "condition": "cloudy"},
         "beijing": {"temp_c": 31, "condition": "sunny"},
         "san francisco": {"temp_c": 18, "condition": "foggy"},
         "new york": {"temp_c": 24, "condition": "clear"},
         "london": {"temp_c": 19, "condition": "rainy"},
     }
-    _CITY_ALIASES: dict[str, str] = {
+    _CITY_ALIASES: ClassVar[dict[str, str]] = {
         "东京": "tokyo",
         "東京": "tokyo",
         "北京": "beijing",
@@ -44,9 +44,7 @@ class GetWeatherTool(ToolProtocol):
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
         raw_city = (
-            str(args.get("city") or args.get("location") or args.get("name") or "")
-            .strip()
-            .lower()
+            str(args.get("city") or args.get("location") or args.get("name") or "").strip().lower()
         )
         city = self._CITY_ALIASES.get(raw_city, raw_city)
 

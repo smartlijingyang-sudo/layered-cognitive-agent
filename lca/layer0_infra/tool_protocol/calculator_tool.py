@@ -6,7 +6,7 @@ import ast
 import operator
 import time
 import uuid
-from typing import Any
+from typing import Any, ClassVar
 
 from lca.contracts.decision import Observation
 from lca.contracts.protocols import ToolProtocol
@@ -23,7 +23,7 @@ class CalculatorTool(ToolProtocol):
     is_idempotent = True
     default_timeout_s = 5
 
-    _OPS = {
+    _OPS: ClassVar[dict[type, Any]] = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
@@ -59,11 +59,11 @@ class CalculatorTool(ToolProtocol):
 
     def _eval_node(self, node: ast.AST) -> float:
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
-            return node.value
+            return float(node.value)
         if isinstance(node, ast.BinOp) and type(node.op) in self._OPS:
-            return self._OPS[type(node.op)](
-                self._eval_node(node.left), self._eval_node(node.right)
+            return float(
+                self._OPS[type(node.op)](self._eval_node(node.left), self._eval_node(node.right))
             )
         if isinstance(node, ast.UnaryOp) and type(node.op) in self._OPS:
-            return self._OPS[type(node.op)](self._eval_node(node.operand))
+            return float(self._OPS[type(node.op)](self._eval_node(node.operand)))
         raise ValueError(f"不支持的表达式片段: {ast.dump(node)}")

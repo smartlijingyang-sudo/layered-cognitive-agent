@@ -50,9 +50,7 @@ class ModularBrain(BrainStrategy):
         raw_candidates = await self.reasoner.generate_candidates(state, n=1)
         candidates = [self.decision_parser.parse(rc, state) for rc in raw_candidates]
 
-        predicted = [
-            await self.state_predictor.predict(state, c.rationale) for c in candidates
-        ]
+        predicted = [await self.state_predictor.predict(state, c.rationale) for c in candidates]
         scores = [await self.state_evaluator.score(state, p) for p in predicted]
         conflicts = await self.conflict_monitor.check(state, candidates)
         if conflicts:

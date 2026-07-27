@@ -49,9 +49,7 @@ class TestCalculatorTool(unittest.TestCase):
 class TestMockLLMAdapter(unittest.TestCase):
     def test_arithmetic_detection(self):
         llm = MockLLMAdapter()
-        result = asyncio.run(
-            llm.complete("ROLE: test\nUSER_TASK: 123 乘以 456 等于多少？\n")
-        )
+        result = asyncio.run(llm.complete("ROLE: test\nUSER_TASK: 123 乘以 456 等于多少？\n"))
         self.assertIn("use_tool", result)
         self.assertIn("calculator", result)
 

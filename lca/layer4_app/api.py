@@ -6,9 +6,12 @@
 
 from __future__ import annotations
 
+from typing import TypeVar, cast
+
 import lca.layer4_app.defaults  # noqa: F401 — 触发默认注册
 from lca.contracts.protocols import (
     BrainStrategy,
+    EventBus,
     LLMAdapter,
     MemorySystem,
     Observability,
@@ -17,11 +20,13 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
-from lca.layer0_infra.registry import get_global_registry
+from lca.layer0_infra.registry import ComponentRegistry, get_global_registry
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
 from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer3_agent.supervisor import Supervisor
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
+
+T = TypeVar("T")
 
 
 class Agent:
@@ -55,9 +60,7 @@ class Agent:
         reg = get_global_registry()
         strategy_reg = get_global_strategy_registry()
 
-        permission_manifest = ToolPermissionManifest(
-            allowed_tools=[t.name for t in tools]
-        )
+        permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
         role_profile = RoleProfile(
             role=role,
             goal=goal,
@@ -86,20 +89,18 @@ class Agent:
 
         body = build_body(tools, obs)
         hooks = _build_hooks(obs)
-        event_bus = self._resolve(reg, "event_bus", "simple")
+        event_bus: EventBus = self._resolve(reg, "event_bus", "simple")
 
         runtime = build_runtime(brain, body, mem, hooks, event_bus, ss)
         self._base_agent = BaseAgent(runtime, role_profile, max_steps=max_steps)
 
     @staticmethod
-    def _resolve(reg, category: str, value):
+    def _resolve(reg: ComponentRegistry, category: str, value: str | T) -> T:
         if isinstance(value, str):
             impl = reg.resolve(category, value)
             if impl is None:
-                raise ValueError(
-                    f"Unknown {category}: {value!r}. Available: {reg.list(category)}"
-                )
-            return impl()
+                raise ValueError(f"Unknown {category}: {value!r}. Available: {reg.list(category)}")
+            return cast("T", impl())
         return value
 
     async def run(self, task: str) -> Result:

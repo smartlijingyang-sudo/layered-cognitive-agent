@@ -57,9 +57,7 @@ class TypedState:
     retrieved_context: list[Any] = field(default_factory=list)
     step: int = 0
     checkpoints: list[StateSnapshot] = field(default_factory=list)
-    status: Literal["running", "paused", "waiting_human", "completed", "failed"] = (
-        "running"
-    )
+    status: Literal["running", "paused", "waiting_human", "completed", "failed"] = "running"
     extra: dict[str, Any] = field(default_factory=dict)
 
     def snapshot(self, reason: str = "periodic") -> StateSnapshot:

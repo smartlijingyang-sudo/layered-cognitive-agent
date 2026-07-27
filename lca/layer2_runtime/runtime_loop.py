@@ -49,9 +49,7 @@ class CognitiveRuntime(Runtime):
         return Budget(max_steps=10, max_wall_clock_seconds=30)
 
     async def run(self, task: str, max_steps: int = 10) -> Result:
-        state = TypedState(
-            trace_id=_new_id("trace"), task=task, budget=self.default_budget()
-        )
+        state = TypedState(trace_id=_new_id("trace"), task=task, budget=self.default_budget())
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
 
@@ -126,16 +124,14 @@ class CognitiveRuntime(Runtime):
     ) -> bool:
         if decision is None or reflection is None:
             return False
-        return (
-            decision.action_type == "respond"
-            and reflection.verdict != "needs_correction"
-        )
+        return decision.action_type == "respond" and reflection.verdict != "needs_correction"
 
     def _summarize(self, state: TypedState) -> Result:
         final_ref = f"mem://{state.trace_id}/{state.step}"
+        status = "completed" if state.status == "running" else state.status
         return Result(
             trace_id=state.trace_id,
-            status=state.status if state.status != "running" else "completed",  # type: ignore[arg-type]
+            status=status,
             output=state.working_memory.get("final_output"),
             final_state_ref=final_ref,
             total_steps=state.step + 1,
