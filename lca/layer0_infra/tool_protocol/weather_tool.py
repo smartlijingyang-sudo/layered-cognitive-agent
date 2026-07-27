@@ -8,15 +8,15 @@ import uuid
 from typing import Any, ClassVar
 
 from lca.contracts.decision import Observation
-from lca.contracts.protocols import ToolProtocol
+from lca.contracts.protocols import Tool
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class GetWeatherTool(ToolProtocol):
-    """实现 ToolProtocol 的天气查询工具。
+class GetWeatherTool(Tool):
+    """实现 Tool 的天气查询工具。
 
     内置假数据，避免依赖外部网络，专注测试 tool 调度本身。
     """

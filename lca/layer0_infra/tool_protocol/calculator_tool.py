@@ -9,15 +9,15 @@ import uuid
 from typing import Any, ClassVar
 
 from lca.contracts.decision import Observation
-from lca.contracts.protocols import ToolProtocol
+from lca.contracts.protocols import Tool
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class CalculatorTool(ToolProtocol):
-    """实现 ToolProtocol 的示例工具。"""
+class CalculatorTool(Tool):
+    """实现 Tool 的示例工具。"""
 
     name = "calculator"
     is_idempotent = True

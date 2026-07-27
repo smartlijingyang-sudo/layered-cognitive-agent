@@ -10,7 +10,7 @@ from typing import Any
 
 from lca.contracts.decision import Observation
 from lca.contracts.observability import TraceSpan
-from lca.contracts.protocols import Observability, SafeExecutorProtocol, ToolProtocol
+from lca.contracts.protocols import Observability, SafeExecutor, Tool
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 
@@ -23,7 +23,7 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class SimpleSafeExecutor(SafeExecutorProtocol):
+class SimpleSafeExecutor(SafeExecutor):
     """权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
 
     def __init__(self, permission_manifest: ToolPermissionManifest, observability: Observability):
@@ -33,7 +33,7 @@ class SimpleSafeExecutor(SafeExecutorProtocol):
 
     async def execute(
         self,
-        tool: ToolProtocol,
+        tool: Tool,
         args: dict[str, Any],
         retry_policy: RetryPolicy,
         cache_config: CacheConfig,

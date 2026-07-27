@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from lca.contracts.observability import TraceSpan
-from lca.contracts.protocols import HookRegistryP, Observability
+from lca.contracts.protocols import HookRegistry, Observability
 from lca.contracts.state import TypedState
 
 
@@ -20,7 +20,7 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class SimpleHookRegistry(HookRegistryP):
+class SimpleHookRegistry(HookRegistry):
     """注册和触发生命周期钩子。"""
 
     def __init__(self, observability: Observability) -> None:

@@ -10,7 +10,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.protocols import (
-    AgentProtocol,
+    AgentRuntime,
     AgentTransport,
     Body,
     BrainStrategy,
@@ -19,21 +19,22 @@ from lca.contracts.protocols import (
     DecisionParser,
     EventBus,
     Hook,
-    HookRegistryP,
+    HookRegistry,
     LLMAdapter,
     MemorySystem,
     Observability,
     PromptManager,
     Reasoner,
     Runtime,
-    SafeExecutorProtocol,
+    SafeExecutor,
     StateEvaluator,
     StatePredictor,
     StateStore,
     TaskCoordinator,
     TaskDecomposer,
-    ToolProtocol,
-    ToolRegistryP,
+    TeamRuntime,
+    Tool,
+    ToolRegistry,
 )
 from lca.layer0_infra.llm_adapter.anthropic_llm import AnthropicLLMAdapter
 
@@ -92,10 +93,10 @@ class TestL0ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(AnthropicLLMAdapter.__new__(AnthropicLLMAdapter), LLMAdapter)
 
     def test_calculator_is_tool(self):
-        self.assertIsInstance(CalculatorTool(), ToolProtocol)
+        self.assertIsInstance(CalculatorTool(), Tool)
 
     def test_weather_is_tool(self):
-        self.assertIsInstance(GetWeatherTool(), ToolProtocol)
+        self.assertIsInstance(GetWeatherTool(), Tool)
 
     def test_console_observability(self):
         self.assertIsInstance(ConsoleObservability(), Observability)
@@ -194,14 +195,14 @@ class TestL1ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(body, Body)
 
     def test_simple_tool_registry(self):
-        self.assertIsInstance(SimpleToolRegistry(), ToolRegistryP)
+        self.assertIsInstance(SimpleToolRegistry(), ToolRegistry)
 
     def test_simple_safe_executor(self):
         obs = ConsoleObservability()
         from lca.contracts.role_team import ToolPermissionManifest
 
         executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]), obs)
-        self.assertIsInstance(executor, SafeExecutorProtocol)
+        self.assertIsInstance(executor, SafeExecutor)
 
     def test_simple_memory_system(self):
         self.assertIsInstance(SimpleMemorySystem(), MemorySystem)
@@ -214,7 +215,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
 
     def test_simple_hook_registry(self):
         obs = ConsoleObservability()
-        self.assertIsInstance(SimpleHookRegistry(obs), HookRegistryP)
+        self.assertIsInstance(SimpleHookRegistry(obs), HookRegistry)
 
     def test_default_logging_hook_is_hook(self):
         self.assertIsInstance(default_logging_hook, Hook)
@@ -303,14 +304,23 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         )
         return BaseAgent(runtime, rp), rp, runtime
 
-    def test_base_agent_is_agent_protocol(self):
+    def test_base_agent_is_agent_runtime(self):
         agent, _, _ = self._build_base_agent()
-        self.assertIsInstance(agent, AgentProtocol)
+        self.assertIsInstance(agent, AgentRuntime)
 
-    def test_supervisor_is_agent_protocol(self):
+    def test_supervisor_is_agent_runtime(self):
         _, rp, runtime = self._build_base_agent()
         sup = Supervisor(runtime, rp)
-        self.assertIsInstance(sup, AgentProtocol)
+        self.assertIsInstance(sup, AgentRuntime)
+
+    def test_team_orchestrator_is_team_runtime(self):
+        from lca.contracts.role_team import TeamConfig
+        from lca.layer3_agent.team_orchestrator import TeamOrchestrator
+
+        agent, _rp, _runtime = self._build_base_agent()
+        config = TeamConfig(process="sequential")
+        orchestrator = TeamOrchestrator([agent], config)
+        self.assertIsInstance(orchestrator, TeamRuntime)
 
 
 class TestStrategyRegistryIntegration(unittest.TestCase):

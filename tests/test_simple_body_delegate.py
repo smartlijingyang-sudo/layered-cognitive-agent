@@ -278,7 +278,7 @@ class TestBackwardCompatTransport(unittest.IsolatedAsyncioTestCase):
 
 
 def _noop_executor():
-    """返回一个最小化的 SafeExecutorProtocol 桩件，delegate 分支不会用到它。"""
+    """返回一个最小化的 SafeExecutor 桩件，delegate 分支不会用到它。"""
     from unittest.mock import AsyncMock
 
     return AsyncMock()

@@ -26,7 +26,7 @@ class LLMAdapter(Protocol):
 
 
 @runtime_checkable
-class ToolProtocol(Protocol):
+class Tool(Protocol):
     name: str
     is_idempotent: bool
     default_timeout_s: int
@@ -113,16 +113,16 @@ class PromptManager(Protocol):
 
 
 @runtime_checkable
-class ToolRegistryP(Protocol):
-    def register(self, tool: ToolProtocol) -> None: ...
-    def get(self, name: str) -> ToolProtocol | None: ...
+class ToolRegistry(Protocol):
+    def register(self, tool: Tool) -> None: ...
+    def get(self, name: str) -> Tool | None: ...
 
 
 @runtime_checkable
-class SafeExecutorProtocol(Protocol):
+class SafeExecutor(Protocol):
     async def execute(
         self,
-        tool: ToolProtocol,
+        tool: Tool,
         args: dict[str, Any],
         retry_policy: RetryPolicy,
         cache_config: CacheConfig,
@@ -141,7 +141,7 @@ class Hook(Protocol):
 
 
 @runtime_checkable
-class HookRegistryP(Protocol):
+class HookRegistry(Protocol):
     def register(self, event_name: str, hook: Hook) -> None: ...
     async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any: ...
 
@@ -167,8 +167,19 @@ class Runtime(Protocol):
 
 
 @runtime_checkable
-class AgentProtocol(Protocol):
+class AgentRuntime(Protocol):
     async def execute(self, task: str) -> Result: ...
+
+
+@runtime_checkable
+class TeamRuntime(Protocol):
+    """团队级入口契约：接收 objective，跑完编排后返回 Result。
+
+    区别于 AgentRuntime.execute：语义单位是"团队"而非单个 Agent，
+    不携带 max_steps（预算下沉到各 BaseAgent 自身）。
+    """
+
+    async def run(self, objective: str) -> Result: ...
 
 
 @dataclass

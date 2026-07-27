@@ -10,7 +10,7 @@ from lca.contracts.protocols import (
     Body,
     BrainStrategy,
     EventBus,
-    HookRegistryP,
+    HookRegistry,
     MemorySystem,
     Runtime,
     StateStore,
@@ -35,7 +35,7 @@ class CognitiveRuntime(Runtime):
         brain: BrainStrategy,
         body: Body,
         memory: MemorySystem,
-        hooks: HookRegistryP,
+        hooks: HookRegistry,
         event_bus: EventBus,
         state_store: StateStore,
     ):

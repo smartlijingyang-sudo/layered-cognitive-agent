@@ -6,6 +6,7 @@ from lca.contracts.protocols import (
     AgentTransport,
     OrchestrationContext,
     OrchestrationStrategy,
+    TeamRuntime,
 )
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
@@ -15,7 +16,7 @@ from lca.layer3_agent.orchestration_registry import get_global_orchestration_reg
 from lca.layer3_agent.supervisor import Supervisor
 
 
-class TeamOrchestrator:
+class TeamOrchestrator(TeamRuntime):
     """
     支持多种组织形态（hierarchical / sequential / parallel / graph / debate），
     通过 OrchestrationStrategyRegistry 解析策略，不再 if/elif 硬编码。

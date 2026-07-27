@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols import AgentProtocol, Runtime
+from lca.contracts.protocols import AgentRuntime, Runtime
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile
 
 
-class BaseAgent(AgentProtocol):
+class BaseAgent(AgentRuntime):
     """单个 Agent 的运行时封装。"""
 
     def __init__(self, runtime: Runtime, role_profile: RoleProfile, max_steps: int = 10):

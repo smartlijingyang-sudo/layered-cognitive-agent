@@ -6,7 +6,7 @@ import asyncio
 import uuid
 
 from lca.contracts.decision import Observation, StructuredDecision
-from lca.contracts.protocols import AgentTransport, Body, SafeExecutorProtocol, ToolRegistryP
+from lca.contracts.protocols import AgentTransport, Body, SafeExecutor, ToolRegistry
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
 from lca.contracts.state import TypedState
@@ -24,8 +24,8 @@ class SimpleBody(Body):
 
     def __init__(
         self,
-        tool_registry: ToolRegistryP,
-        safe_executor: SafeExecutorProtocol,
+        tool_registry: ToolRegistry,
+        safe_executor: SafeExecutor,
         transport_registry: TransportRegistry | None = None,
         transport: AgentTransport | None = None,
     ):

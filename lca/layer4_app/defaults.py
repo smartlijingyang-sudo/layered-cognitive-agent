@@ -13,12 +13,12 @@ from lca.contracts.protocols import (
     Body,
     BrainStrategy,
     EventBus,
-    HookRegistryP,
+    HookRegistry,
     LLMAdapter,
     MemorySystem,
     Observability,
     StateStore,
-    ToolProtocol,
+    Tool,
 )
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
@@ -98,7 +98,7 @@ def build_default_transport_registry() -> TransportRegistry:
 
 
 def build_body(
-    tools: list[ToolProtocol],
+    tools: list[Tool],
     observability: Observability,
     transport_registry: TransportRegistry | None = None,
 ) -> SimpleBody:
@@ -123,7 +123,7 @@ def build_runtime(
     brain: BrainStrategy,
     body: Body,
     memory: MemorySystem,
-    hooks: HookRegistryP,
+    hooks: HookRegistry,
     event_bus: EventBus,
     state_store: StateStore,
 ) -> CognitiveRuntime:

@@ -16,7 +16,7 @@ from lca.contracts.protocols import (
     MemorySystem,
     Observability,
     StateStore,
-    ToolProtocol,
+    Tool,
 )
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
@@ -49,7 +49,7 @@ class Agent:
         role: str,
         goal: str,
         backstory: str,
-        tools: list[ToolProtocol],
+        tools: list[Tool],
         llm: LLMAdapter,
         max_steps: int = 10,
         memory: str | MemorySystem = "simple",
