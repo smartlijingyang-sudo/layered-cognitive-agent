@@ -120,8 +120,7 @@ warn_redundant_casts = true
 warn_return_any = true
 disallow_untyped_defs = true
 check_untyped_defs = true
-# contracts 迁移到 pydantic.BaseModel 之后打开下面这行：
-# plugins = ["pydantic.mypy"]
+# contracts 层使用 stdlib dataclass，不迁移到 Pydantic（ADR-0012）
 
 [[tool.mypy.overrides]]
 module = "tests.*"
