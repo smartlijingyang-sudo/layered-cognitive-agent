@@ -11,6 +11,7 @@
 | [0007](0007-interop-mcp-a2a.md) | 原生互操作协议 | L0 内置 MCP/A2A 适配，协议本身可插拔 |
 | [0008](0008-framework-positioning.md) | 框架定位 | 认知可解释性 + 生产级工程能力，同时优先 |
 | [0009](0009-code-quality-toolchain.md) | 代码质量工具链 | ruff + mypy + pytest + import-linter + pre-commit + CI |
+| [0010](0010-component-protocol-exemption.md) | 组件协议豁免规则 | L0-L3 默认必须声明 Protocol，仅 DI 基础设施和 L4 门面豁免 |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件
