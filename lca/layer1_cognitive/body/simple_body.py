@@ -54,7 +54,9 @@ class SimpleBody(Body):
         handler_name = _ACTION_HANDLERS.get(decision.action_type)
         if handler_name is None:
             raise ToolExecutionError(f"本示例暂未处理的 action_type: {decision.action_type}")
-        return await getattr(self, handler_name)(decision, state)
+        handler = getattr(self, handler_name)
+        result: Observation = await handler(decision, state)
+        return result
 
     async def _handle_respond(self, decision: StructuredDecision, state: TypedState) -> Observation:
         return Observation(
