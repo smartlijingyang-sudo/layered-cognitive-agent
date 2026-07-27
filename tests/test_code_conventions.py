@@ -39,10 +39,8 @@ _SCAN_PACKAGES = [
 # ── 文件行数上限 ─────────────────────────────────────────────────────────
 _MAX_FILE_LINES = 250
 
-# 已登记豁免（引用 ADR 或说明原因），在 PR-4 拆分后应移除 orchestration_strategies 条目
-_LINE_COUNT_EXEMPT: dict[str, str] = {
-    "lca/layer3_agent/orchestration_strategies.py": ("待 PR-4 拆分为包结构后移除 (ADR-0006)"),
-}
+# 已登记豁免（引用 ADR 或说明原因）
+_LINE_COUNT_EXEMPT: dict[str, str] = {}
 
 
 def _collect_all_concrete_classes() -> dict[str, type]:
