@@ -98,6 +98,16 @@ def _collect_concrete_classes() -> dict[str, type]:
 class TestArchitectureConformance(unittest.TestCase):
     """L0-L3 每个具体类必须显式声明 Protocol 基类，否则必须出现在 EXEMPT 中。"""
 
+    def test_protocol_count_regression(self) -> None:
+        """回归防护：Protocol 数量不得低于当前基线（28 个），防止重构意外删除协议。"""
+        protocol_bases = _collect_protocol_classes()
+        self.assertGreaterEqual(
+            len(protocol_bases),
+            28,
+            "Protocol 数量低于基线 28 —— 是否有协议被意外删除？"
+            " 如果确实需要减少协议数量，请同步更新此断言并附 ADR。",
+        )
+
     def test_every_l0_to_l3_class_declares_a_protocol(self) -> None:
         protocol_bases = _collect_protocol_classes()
         self.assertGreater(

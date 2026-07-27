@@ -37,6 +37,19 @@ source_modules = [
 ]
 forbidden_modules = ["lca.layer4_app"]
 
+# ── 契约 3: contracts 是纯数据契约层，不得 import 任何实现细节 ──
+[[tool.importlinter.contracts]]
+name = "contracts 纯净性: 不得依赖任何具体实现"
+type = "forbidden"
+source_modules = ["lca.contracts"]
+forbidden_modules = [
+    "lca.layer0_infra",
+    "lca.layer1_cognitive",
+    "lca.layer2_runtime",
+    "lca.layer3_agent",
+    "lca.layer4_app",
+]
+
 [dependency-groups]
 dev = [
     { include-group = "lint" },
