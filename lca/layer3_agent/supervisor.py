@@ -19,11 +19,13 @@ class Supervisor(BaseAgent):
     def bind_team(self, transport: AgentTransport, roster_desc: str) -> None:
         """团队组建完成后的最后一次接线。
 
-        把 transport 后置绑定到 Body（delegate 分支由此可用），
+        把 transport 注册到 Body 的 TransportRegistry（delegate 分支按协议路由），
         把 roster_desc 注入 Reasoner（Supervisor prompt 里看到队友列表）。
         """
         body = self.runtime.body  # type: ignore[attr-defined]
-        if hasattr(body, "transport"):
+        if hasattr(body, "transport_registry"):
+            body.transport_registry.register(transport)
+        elif hasattr(body, "transport"):
             body.transport = transport
 
         brain = self.runtime.brain  # type: ignore[attr-defined]

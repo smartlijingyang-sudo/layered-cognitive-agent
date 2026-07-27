@@ -35,6 +35,8 @@ class InternalTransport(AgentTransport):
     任务轮询模型一致。
     """
 
+    protocol_name: str = "internal"
+
     def __init__(
         self,
         agent_directory: dict[str, AgentHandler] | None = None,

@@ -10,6 +10,7 @@ from lca.contracts.protocols import AgentTransport, Body, SafeExecutorProtocol, 
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
 from lca.contracts.state import TypedState
+from lca.layer0_infra.transport.transport_registry import TransportRegistry
 
 _POLL_INTERVAL_S = 0.05
 
@@ -19,17 +20,25 @@ def _new_id(prefix: str) -> str:
 
 
 class SimpleBody(Body):
-    """ToolRegistry + SafeExecutor 组合，可选 AgentTransport 处理 delegate。"""
+    """ToolRegistry + SafeExecutor 组合，通过 TransportRegistry 按协议路由 delegate。"""
 
     def __init__(
         self,
         tool_registry: ToolRegistryP,
         safe_executor: SafeExecutorProtocol,
+        transport_registry: TransportRegistry | None = None,
         transport: AgentTransport | None = None,
     ):
         self.tool_registry = tool_registry
         self.safe_executor = safe_executor
-        self.transport = transport
+        if transport_registry is not None:
+            self.transport_registry = transport_registry
+        elif transport is not None:
+            registry = TransportRegistry()
+            registry.register(transport)
+            self.transport_registry = registry
+        else:
+            self.transport_registry = TransportRegistry()
 
     async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
         if decision.action_type == "respond":
@@ -56,23 +65,20 @@ class SimpleBody(Body):
         raise ToolExecutionError(f"本示例暂未处理的 action_type: {decision.action_type}")
 
     async def _handle_delegate(self, decision: StructuredDecision) -> Observation:
-        if self.transport is None:
-            raise ToolExecutionError(
-                "这个 Body 没有绑定团队通道（transport=None），无法执行 delegate 动作"
-            )
-
         spec = decision.delegate_to
         if spec is None:
             raise ToolExecutionError("delegate 动作缺少 delegate_to 规格")
 
+        transport = self.transport_registry.resolve(spec.protocol)
+
         agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
-        task_id = await self.transport.send_task(agent_card, spec.subtask, spec.context_refs)
+        task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
 
         timeout_s = (
             (spec.deadline.timestamp() - asyncio.get_event_loop().time()) if spec.deadline else 30.0
         )
         elapsed = 0.0
-        while (await self.transport.poll_status(task_id)) == "working":
+        while (await transport.poll_status(task_id)) == "working":
             if elapsed >= timeout_s:
                 return Observation(
                     observation_id=_new_id("obs"),
@@ -84,6 +90,6 @@ class SimpleBody(Body):
             await asyncio.sleep(_POLL_INTERVAL_S)
             elapsed += _POLL_INTERVAL_S
 
-        observation = await self.transport.receive_result(task_id)
+        observation = await transport.receive_result(task_id)
         observation.extra["task_id"] = task_id
         return observation

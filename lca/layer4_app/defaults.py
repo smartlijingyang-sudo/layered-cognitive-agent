@@ -25,6 +25,7 @@ from lca.layer0_infra.observability.console_observability import ConsoleObservab
 from lca.layer0_infra.registry import get_global_registry
 from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
 from lca.layer0_infra.transport.agent_transport import InternalTransport
+from lca.layer0_infra.transport.transport_registry import TransportRegistry, UnimplementedTransport
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
@@ -79,14 +80,28 @@ def _build_brain(
     )
 
 
-def build_body(tools: list[ToolProtocol], observability: Observability) -> SimpleBody:
+def build_default_transport_registry() -> TransportRegistry:
+    """构建默认 TransportRegistry：internal→InternalTransport, a2a/mcp→占位。"""
+    registry = TransportRegistry()
+    registry.register(InternalTransport())
+    registry.register(UnimplementedTransport("a2a"))
+    registry.register(UnimplementedTransport("mcp"))
+    return registry
+
+
+def build_body(
+    tools: list[ToolProtocol],
+    observability: Observability,
+    transport_registry: TransportRegistry | None = None,
+) -> SimpleBody:
     """默认 Body 构建器。"""
     permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
     tool_registry = SimpleToolRegistry()
     for t in tools:
         tool_registry.register(t)
     safe_executor = SimpleSafeExecutor(permission_manifest, observability)
-    return SimpleBody(tool_registry, safe_executor)
+    registry = transport_registry or build_default_transport_registry()
+    return SimpleBody(tool_registry, safe_executor, transport_registry=registry)
 
 
 def _build_hooks(observability: Observability) -> SimpleHookRegistry:

@@ -45,6 +45,9 @@ from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
 from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
 from lca.layer0_infra.tool_protocol.weather_tool import GetWeatherTool
 from lca.layer0_infra.transport.agent_transport import InternalTransport
+from lca.layer0_infra.transport.transport_registry import (
+    UnimplementedTransport,
+)
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
@@ -102,6 +105,25 @@ class TestL0ProtocolCompliance(unittest.TestCase):
 
     def test_internal_transport(self):
         self.assertIsInstance(InternalTransport(), AgentTransport)
+
+    def test_internal_transport_protocol_name(self):
+        self.assertEqual(InternalTransport().protocol_name, "internal")
+
+    def test_unimplemented_transport_is_agent_transport(self):
+        self.assertIsInstance(UnimplementedTransport("a2a"), AgentTransport)
+
+    def test_unimplemented_transport_protocol_name(self):
+        t = UnimplementedTransport("mcp")
+        self.assertEqual(t.protocol_name, "mcp")
+
+    def test_default_registry_resolves_all_delegation_protocols(self):
+        """DelegationSpec.protocol 的每个取值都能在默认 registry 中 resolve 到非空实现。"""
+        from lca.layer4_app.defaults import build_default_transport_registry
+
+        registry = build_default_transport_registry()
+        for protocol in ("internal", "a2a", "mcp"):
+            transport = registry.resolve(protocol)
+            self.assertIsNotNone(transport, f"protocol {protocol!r} 未注册")
 
 
 class TestL1ProtocolCompliance(unittest.TestCase):

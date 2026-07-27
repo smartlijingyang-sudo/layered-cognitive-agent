@@ -13,6 +13,7 @@ from lca.contracts.decision import Observation
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from lca.layer0_infra.transport.agent_transport import InternalTransport
+from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer3_agent.supervisor import Supervisor
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
@@ -51,7 +52,7 @@ def _make_member(role: str, return_output: str = "done") -> BaseAgent:
 def _make_supervisor_with_runtime() -> tuple[Supervisor, MagicMock, MagicMock, MagicMock]:
     """返回 (supervisor, mock_runtime, mock_body, mock_reasoner)。"""
     mock_body = MagicMock()
-    mock_body.transport = None
+    mock_body.transport_registry = TransportRegistry()
 
     mock_reasoner = MagicMock()
     mock_reasoner.team_roster = None
@@ -73,11 +74,12 @@ def _make_supervisor_with_runtime() -> tuple[Supervisor, MagicMock, MagicMock, M
 
 
 class TestSupervisorBindTeam(unittest.IsolatedAsyncioTestCase):
-    async def test_bind_team_sets_transport_on_body(self) -> None:
+    async def test_bind_team_registers_transport_in_registry(self) -> None:
         sup, _, mock_body, _ = _make_supervisor_with_runtime()
         transport = InternalTransport()
         sup.bind_team(transport, "roster text")
-        self.assertIs(mock_body.transport, transport)
+        resolved = mock_body.transport_registry.resolve("internal")
+        self.assertIs(resolved, transport)
 
     async def test_bind_team_sets_roster_on_reasoner(self) -> None:
         sup, _, _, mock_reasoner = _make_supervisor_with_runtime()
@@ -102,7 +104,7 @@ class TestSupervisorBindTeam(unittest.IsolatedAsyncioTestCase):
     async def test_bind_team_tolerates_brain_without_reasoner(self) -> None:
         """Brain 没有 reasoner 属性时不崩溃。"""
         mock_body = MagicMock()
-        mock_body.transport = None
+        mock_body.transport_registry = TransportRegistry()
         mock_brain = MagicMock(spec=[])  # 无 reasoner
         mock_runtime = MagicMock()
         mock_runtime.body = mock_body
@@ -197,8 +199,8 @@ class TestTeamOrchestratorHierarchical(unittest.IsolatedAsyncioTestCase):
         )
         result = await orchestrator.run("build feature")
 
-        # bind_team 应该被调用：body.transport 不再是 None
-        self.assertIsInstance(mock_body.transport, InternalTransport)
+        # bind_team 应该被调用：transport_registry 中有 internal 协议
+        self.assertIsInstance(mock_body.transport_registry.resolve("internal"), InternalTransport)
         # reasoner.team_roster 应该被设置
         self.assertIn("dev", mock_reasoner.team_roster)
         # execute 应该被调用
@@ -225,8 +227,8 @@ class TestTeamOrchestratorHierarchical(unittest.IsolatedAsyncioTestCase):
         orchestrator = TeamOrchestrator(members, config, supervisor=sup)
         await orchestrator.run("task")
 
-        # transport 应保持 None（没被 bind）
-        self.assertIsNone(mock_body.transport)
+        # transport_registry 应保持空（没被 bind）
+        self.assertEqual(mock_body.transport_registry.list_protocols(), [])
 
     async def test_hierarchical_requires_supervisor(self) -> None:
         config = TeamConfig(process="hierarchical")

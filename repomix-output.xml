@@ -155,7 +155,11 @@ tests/
     __init__.py
   __init__.py
   test_contracts.py
+  test_internal_transport.py
   test_protocol_compliance.py
+  test_simple_body_delegate.py
+  test_step3_reasoner_parser_delegate.py
+  test_step4_supervisor_bind_team.py
 .coverage
 .gitignore
 .pre-commit-config.yaml
@@ -3092,6 +3096,614 @@ __all__ = ["Agent", "MultiAgentTeam"]
 
 </file>
 
+<file path="tests/test_internal_transport.py">
+"""InternalTransport 单元测试 —— 验证 send_task → poll_status → receive_result 完整链路。"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+import sys
+import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from lca.contracts.decision import Observation
+from lca.contracts.lifecycle import AgentCard
+from lca.layer0_infra.transport.agent_transport import InternalTransport
+
+
+async def _echo_handler(subtask: str) -> Observation:
+    return Observation(
+        observation_id="echo",
+        success=True,
+        payload=f"echo: {subtask}",
+    )
+
+
+async def _slow_handler(subtask: str) -> Observation:
+    await asyncio.sleep(0.05)
+    return Observation(
+        observation_id="slow",
+        success=True,
+        payload="done",
+    )
+
+
+async def _failing_handler(subtask: str) -> Observation:
+    raise RuntimeError("boom")
+
+
+class TestInternalTransportHappyPath(unittest.IsolatedAsyncioTestCase):
+    """send_task → poll_status → receive_result 三步拿到正确结果。"""
+
+    async def test_string_key_round_trip(self) -> None:
+        transport = InternalTransport()
+        transport.register_agent("researcher", _echo_handler)
+
+        task_id = await transport.send_task("researcher", "分析数据", [])
+
+        # 等待后台任务完成
+        await transport._bg_tasks[task_id]
+
+        status = await transport.poll_status(task_id)
+        self.assertEqual(status, "completed")
+
+        result = await transport.receive_result(task_id)
+        self.assertTrue(result.success)
+        self.assertEqual(result.payload, "echo: 分析数据")
+
+    async def test_agent_card_by_agent_id(self) -> None:
+        transport = InternalTransport()
+        transport.register_agent("agent-007", _echo_handler)
+
+        card = AgentCard(agent_id="agent-007", role="spy", capabilities=["espionage"])
+        task_id = await transport.send_task(card, "秘密任务", [])
+        await transport._bg_tasks[task_id]
+
+        result = await transport.receive_result(task_id)
+        self.assertTrue(result.success)
+        self.assertEqual(result.payload, "echo: 秘密任务")
+
+    async def test_agent_card_fallback_to_role(self) -> None:
+        transport = InternalTransport()
+        transport.register_agent("analyst", _echo_handler)
+
+        card = AgentCard(agent_id="unknown-id", role="analyst", capabilities=[])
+        task_id = await transport.send_task(card, "分析", [])
+        await transport._bg_tasks[task_id]
+
+        result = await transport.receive_result(task_id)
+        self.assertTrue(result.success)
+
+    async def test_constructor_with_directory(self) -> None:
+        transport = InternalTransport(agent_directory={"worker": _echo_handler})
+
+        task_id = await transport.send_task("worker", "hello", [])
+        await transport._bg_tasks[task_id]
+
+        result = await transport.receive_result(task_id)
+        self.assertTrue(result.success)
+        self.assertEqual(result.payload, "echo: hello")
+
+
+class TestInternalTransportAsync(unittest.IsolatedAsyncioTestCase):
+    """验证异步调度语义：send_task 立即返回，handler 异步执行。"""
+
+    async def test_poll_working_before_completion(self) -> None:
+        transport = InternalTransport()
+        transport.register_agent("slow", _slow_handler)
+
+        task_id = await transport.send_task("slow", "耗时任务", [])
+
+        # 不给 event loop 机会执行后台任务
+        status = await transport.poll_status(task_id)
+        self.assertEqual(status, "working")
+
+        # 等待后台任务完成
+        await asyncio.sleep(0.1)
+        status = await transport.poll_status(task_id)
+        self.assertEqual(status, "completed")
+
+    async def test_concurrent_tasks(self) -> None:
+        transport = InternalTransport()
+        transport.register_agent("echo", _echo_handler)
+
+        ids = await asyncio.gather(
+            transport.send_task("echo", "任务A", []),
+            transport.send_task("echo", "任务B", []),
+            transport.send_task("echo", "任务C", []),
+        )
+        await asyncio.gather(*(transport._bg_tasks[tid] for tid in ids))
+
+        results = [await transport.receive_result(tid) for tid in ids]
+        payloads = sorted(r.payload for r in results)
+        self.assertEqual(payloads, ["echo: 任务A", "echo: 任务B", "echo: 任务C"])
+
+
+class TestInternalTransportErrors(unittest.IsolatedAsyncioTestCase):
+    """错误处理路径。"""
+
+    async def test_agent_not_found(self) -> None:
+        transport = InternalTransport()
+
+        task_id = await transport.send_task("nonexistent", "任务", [])
+        status = await transport.poll_status(task_id)
+        self.assertEqual(status, "failed")
+
+        result = await transport.receive_result(task_id)
+        self.assertFalse(result.success)
+        self.assertIn("not found", result.error)
+
+    async def test_handler_exception(self) -> None:
+        transport = InternalTransport()
+        transport.register_agent("broken", _failing_handler)
+
+        task_id = await transport.send_task("broken", "触发异常", [])
+        await transport._bg_tasks[task_id]
+
+        result = await transport.receive_result(task_id)
+        self.assertFalse(result.success)
+        self.assertIn("boom", result.error)
+
+    async def test_receive_unknown_task(self) -> None:
+        transport = InternalTransport()
+        result = await transport.receive_result("task_does_not_exist")
+        self.assertFalse(result.success)
+        self.assertIn("not found", result.error)
+
+
+if __name__ == "__main__":
+    unittest.main()
+</file>
+
+<file path="tests/test_simple_body_delegate.py">
+"""SimpleBody.delegate 分支单元测试 —— 验证 Body 通过 AgentTransport 委派任务的完整链路。"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+import sys
+import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from lca.contracts.decision import (
+    DelegationSpec,
+    Observation,
+    StructuredDecision,
+    ToolCall,
+)
+from lca.contracts.result import ToolExecutionError
+from lca.contracts.state import Budget, TypedState
+from lca.layer0_infra.transport.agent_transport import InternalTransport
+from lca.layer1_cognitive.body.simple_body import SimpleBody
+from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+
+
+def _make_state() -> TypedState:
+    return TypedState(trace_id="test-trace", task="test", budget=Budget())
+
+
+def _make_decision(
+    action_type: str = "delegate",
+    delegate_to: DelegationSpec | None = None,
+    tool_calls: list[ToolCall] | None = None,
+) -> StructuredDecision:
+    return StructuredDecision(
+        decision_id="dec-1",
+        action_type=action_type,  # type: ignore[arg-type]
+        rationale="test",
+        confidence=1.0,
+        tool_calls=tool_calls or [],
+        delegate_to=delegate_to,
+    )
+
+
+async def _echo_handler(subtask: str) -> Observation:
+    return Observation(observation_id="echo", success=True, payload=f"delegated: {subtask}")
+
+
+async def _slow_handler(subtask: str) -> Observation:
+    await asyncio.sleep(0.2)
+    return Observation(observation_id="slow", success=True, payload="slow done")
+
+
+async def _failing_handler(subtask: str) -> Observation:
+    raise RuntimeError("agent exploded")
+
+
+class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
+    """delegate 分支：send_task → poll → receive_result 正常返回。"""
+
+    async def test_delegate_by_agent_id(self) -> None:
+        transport = InternalTransport()
+        transport.register_agent("researcher", _echo_handler)
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport=transport)
+
+        spec = DelegationSpec(subtask="分析数据", target_agent_id="researcher")
+        decision = _make_decision(delegate_to=spec)
+
+        obs = await body.act(decision, _make_state())
+
+        self.assertTrue(obs.success)
+        self.assertEqual(obs.payload, "delegated: 分析数据")
+        self.assertIn("task_id", obs.extra)
+
+    async def test_delegate_by_role_fallback(self) -> None:
+        transport = InternalTransport()
+        transport.register_agent("analyst", _echo_handler)
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport=transport)
+
+        spec = DelegationSpec(subtask="分析", target_role="analyst")
+        decision = _make_decision(delegate_to=spec)
+
+        obs = await body.act(decision, _make_state())
+        self.assertTrue(obs.success)
+        self.assertEqual(obs.payload, "delegated: 分析")
+
+    async def test_delegate_by_string_key(self) -> None:
+        """target_agent_card 为字符串时直接作为 directory key。"""
+        transport = InternalTransport()
+        transport.register_agent("worker-key", _echo_handler)
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport=transport)
+
+        spec = DelegationSpec(subtask="执行", target_agent_card="worker-key")
+        decision = _make_decision(delegate_to=spec)
+
+        obs = await body.act(decision, _make_state())
+        self.assertTrue(obs.success)
+
+    async def test_delegate_passes_context_refs(self) -> None:
+        async def capture_handler(subtask: str) -> Observation:
+            return Observation(observation_id="cap", success=True, payload=subtask)
+
+        transport = InternalTransport()
+        transport.register_agent("worker", capture_handler)
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport=transport)
+
+        refs = ["ctx://doc/1", "ctx://doc/2"]
+        spec = DelegationSpec(subtask="处理", target_agent_id="worker", context_refs=refs)
+        decision = _make_decision(delegate_to=spec)
+
+        obs = await body.act(decision, _make_state())
+        self.assertTrue(obs.success)
+
+
+class TestDelegatePolling(unittest.IsolatedAsyncioTestCase):
+    """验证轮询语义：handler 异步执行期间 poll 返回 working，完成后拿到结果。"""
+
+    async def test_delegate_waits_for_slow_handler(self) -> None:
+        transport = InternalTransport()
+        transport.register_agent("slow", _slow_handler)
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport=transport)
+
+        spec = DelegationSpec(subtask="慢任务", target_agent_id="slow")
+        decision = _make_decision(delegate_to=spec)
+
+        obs = await body.act(decision, _make_state())
+        self.assertTrue(obs.success)
+        self.assertEqual(obs.payload, "slow done")
+
+
+class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
+    """delegate 分支的错误路径。"""
+
+    async def test_no_transport_raises_clear_error(self) -> None:
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor())  # transport=None
+
+        spec = DelegationSpec(subtask="任务", target_agent_id="someone")
+        decision = _make_decision(delegate_to=spec)
+
+        with self.assertRaises(ToolExecutionError) as ctx:
+            await body.act(decision, _make_state())
+        self.assertIn("团队通道", str(ctx.exception))
+
+    async def test_missing_delegate_spec_raises_error(self) -> None:
+        transport = InternalTransport()
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport=transport)
+
+        decision = _make_decision(action_type="delegate", delegate_to=None)
+
+        with self.assertRaises(ToolExecutionError) as ctx:
+            await body.act(decision, _make_state())
+        self.assertIn("delegate_to", str(ctx.exception))
+
+    async def test_agent_not_found_returns_failed_observation(self) -> None:
+        transport = InternalTransport()
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport=transport)
+
+        spec = DelegationSpec(subtask="任务", target_agent_id="ghost")
+        decision = _make_decision(delegate_to=spec)
+
+        obs = await body.act(decision, _make_state())
+        self.assertFalse(obs.success)
+        self.assertIn("not found", obs.error)  # type: ignore[arg-type]
+
+    async def test_handler_exception_returns_failed_observation(self) -> None:
+        transport = InternalTransport()
+        transport.register_agent("broken", _failing_handler)
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport=transport)
+
+        spec = DelegationSpec(subtask="触发异常", target_agent_id="broken")
+        decision = _make_decision(delegate_to=spec)
+
+        obs = await body.act(decision, _make_state())
+        self.assertFalse(obs.success)
+        self.assertIn("exploded", obs.error)  # type: ignore[arg-type]
+
+
+class TestDelegateDoesNotAffectOtherBranches(unittest.IsolatedAsyncioTestCase):
+    """确保新增 delegate 分支不影响 respond / use_tool 原有行为。"""
+
+    async def test_respond_still_works(self) -> None:
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor())
+        decision = _make_decision(action_type="respond")
+        decision.response_text = "hello"
+
+        obs = await body.act(decision, _make_state())
+        self.assertTrue(obs.success)
+        self.assertEqual(obs.payload, "hello")
+
+    async def test_unknown_action_still_raises(self) -> None:
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor())
+        decision = _make_decision(action_type="ask_human")  # type: ignore[arg-type]
+
+        with self.assertRaises(ToolExecutionError):
+            await body.act(decision, _make_state())
+
+
+def _noop_executor():
+    """返回一个最小化的 SafeExecutorProtocol 桩件，delegate 分支不会用到它。"""
+    from unittest.mock import AsyncMock
+
+    return AsyncMock()
+
+
+if __name__ == "__main__":
+    unittest.main()
+</file>
+
+<file path="tests/test_step3_reasoner_parser_delegate.py">
+"""Step 3 单元测试：Reasoner prompt 委派感知 + DecisionParser delegate 分支。"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.state import Budget, TypedState
+from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
+from lca.layer1_cognitive.brain.reasoner import (
+    HIERARCHICAL_DELEGATE_TEMPLATE,
+    SimpleReasoner,
+    build_team_roster,
+)
+from lca.layer1_cognitive.prompt_manager import SimplePromptManager
+
+
+def _make_state(task: str = "test task") -> TypedState:
+    return TypedState(trace_id="test-trace", task=task, budget=Budget())
+
+
+def _empty_manifest() -> ToolPermissionManifest:
+    return ToolPermissionManifest(allowed_tools=[])
+
+
+def _make_profile(role: str = "supervisor", goal: str = "coordinate") -> RoleProfile:
+    return RoleProfile(
+        role=role, goal=goal, backstory="test", tool_permission_manifest=_empty_manifest()
+    )
+
+
+class TestBuildTeamRoster(unittest.TestCase):
+    """build_team_roster 工具函数。"""
+
+    def test_empty_list(self) -> None:
+        self.assertEqual(build_team_roster([]), "(无可用队友)")
+
+    def test_single_profile(self) -> None:
+        profiles = [_make_profile("researcher", "research topics")]
+        result = build_team_roster(profiles)
+        self.assertIn("researcher", result)
+        self.assertIn("research topics", result)
+
+    def test_multiple_profiles(self) -> None:
+        profiles = [
+            _make_profile("researcher", "research"),
+            _make_profile("writer", "write reports"),
+        ]
+        result = build_team_roster(profiles)
+        self.assertIn("researcher", result)
+        self.assertIn("writer", result)
+        self.assertEqual(result.count("\n") + 1, 2)
+
+
+class TestDecisionParserDelegate(unittest.TestCase):
+    """SimpleDecisionParser.parse() 的 delegate 分支。"""
+
+    def setUp(self) -> None:
+        self.parser = SimpleDecisionParser()
+
+    def test_delegate_produces_delegation_spec(self) -> None:
+        raw = json.dumps(
+            {
+                "action_type": "delegate",
+                "target_role": "researcher",
+                "subtask": "分析竞品数据",
+                "rationale": "researcher 更擅长数据分析",
+                "confidence": 0.9,
+            }
+        )
+        decision = self.parser.parse(raw, _make_state())
+        self.assertEqual(decision.action_type, "delegate")
+        self.assertIsNotNone(decision.delegate_to)
+        self.assertEqual(decision.delegate_to.target_role, "researcher")
+        self.assertEqual(decision.delegate_to.subtask, "分析竞品数据")
+        self.assertEqual(decision.rationale, "researcher 更擅长数据分析")
+        self.assertAlmostEqual(decision.confidence, 0.9)
+
+    def test_delegate_with_context_refs(self) -> None:
+        raw = json.dumps(
+            {
+                "action_type": "delegate",
+                "target_role": "analyst",
+                "subtask": "总结文档",
+                "context_refs": ["ctx://doc/1", "ctx://doc/2"],
+                "rationale": "需要总结",
+                "confidence": 0.8,
+            }
+        )
+        decision = self.parser.parse(raw, _make_state())
+        self.assertEqual(decision.delegate_to.context_refs, ["ctx://doc/1", "ctx://doc/2"])
+
+    def test_delegate_without_target_role(self) -> None:
+        raw = json.dumps(
+            {
+                "action_type": "delegate",
+                "subtask": "做点什么",
+                "rationale": "test",
+                "confidence": 0.5,
+            }
+        )
+        decision = self.parser.parse(raw, _make_state())
+        self.assertEqual(decision.action_type, "delegate")
+        self.assertIsNone(decision.delegate_to.target_role)
+        self.assertEqual(decision.delegate_to.subtask, "做点什么")
+
+    def test_delegate_with_markdown_code_block(self) -> None:
+        raw = (
+            "```json\n"
+            + json.dumps(
+                {
+                    "action_type": "delegate",
+                    "target_role": "coder",
+                    "subtask": "写代码",
+                    "rationale": "coder 负责",
+                    "confidence": 0.7,
+                }
+            )
+            + "\n```"
+        )
+        decision = self.parser.parse(raw, _make_state())
+        self.assertEqual(decision.action_type, "delegate")
+        self.assertIsNotNone(decision.delegate_to)
+        self.assertEqual(decision.delegate_to.target_role, "coder")
+
+    def test_use_tool_still_works(self) -> None:
+        raw = json.dumps(
+            {
+                "action_type": "use_tool",
+                "tool_name": "search",
+                "arguments": {"query": "test"},
+                "rationale": "需要搜索",
+                "confidence": 0.8,
+            }
+        )
+        decision = self.parser.parse(raw, _make_state())
+        self.assertEqual(decision.action_type, "use_tool")
+        self.assertIsNone(decision.delegate_to)
+        self.assertEqual(len(decision.tool_calls), 1)
+        self.assertEqual(decision.tool_calls[0].tool_name, "search")
+
+    def test_respond_still_works(self) -> None:
+        raw = json.dumps(
+            {
+                "action_type": "respond",
+                "response_text": "这是回复",
+                "rationale": "直接回答",
+                "confidence": 1.0,
+            }
+        )
+        decision = self.parser.parse(raw, _make_state())
+        self.assertEqual(decision.action_type, "respond")
+        self.assertIsNone(decision.delegate_to)
+        self.assertEqual(decision.response_text, "这是回复")
+
+    def test_delegate_context_refs_non_list_coerced(self) -> None:
+        raw = json.dumps(
+            {
+                "action_type": "delegate",
+                "target_role": "worker",
+                "subtask": "处理",
+                "context_refs": "single-ref",
+                "rationale": "test",
+                "confidence": 0.5,
+            }
+        )
+        decision = self.parser.parse(raw, _make_state())
+        self.assertEqual(decision.delegate_to.context_refs, ["single-ref"])
+
+
+class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
+    """SimpleReasoner：team_roster 存在时使用 hierarchical_prompt 模板。"""
+
+    async def test_without_roster_uses_react_prompt(self) -> None:
+        captured_prompt: list[str] = []
+
+        class FakeLLM:
+            async def complete(self, prompt: str, **kwargs):
+                captured_prompt.append(prompt)
+                return '{"action_type": "respond", "response_text": "ok", "rationale": "", "confidence": 1.0}'
+
+        pm = SimplePromptManager()
+        pm.register_template(
+            "react_prompt", "ROLE: {role}\nTASK: {task}\nTOOLS: {tools}\nCONTEXT:\n{context}"
+        )
+
+        reasoner = SimpleReasoner(FakeLLM(), pm, _make_profile(), "search()", team_roster=None)
+        await reasoner.generate_candidates(_make_state())
+
+        self.assertEqual(len(captured_prompt), 1)
+        self.assertNotIn("TEAM_ROSTER", captured_prompt[0])
+        self.assertIn("ROLE: supervisor", captured_prompt[0])
+
+    async def test_with_roster_uses_hierarchical_prompt(self) -> None:
+        captured_prompt: list[str] = []
+
+        class FakeLLM:
+            async def complete(self, prompt: str, **kwargs):
+                captured_prompt.append(prompt)
+                return '{"action_type": "delegate", "target_role": "researcher", "subtask": "分析", "rationale": "test", "confidence": 0.8}'
+
+        pm = SimplePromptManager()
+        pm.register_template("react_prompt", "SHOULD NOT BE USED")
+        pm.register_template("hierarchical_prompt", HIERARCHICAL_DELEGATE_TEMPLATE)
+
+        roster = "- role: researcher | goal: research topics\n- role: writer | goal: write reports"
+        reasoner = SimpleReasoner(FakeLLM(), pm, _make_profile(), "search()", team_roster=roster)
+        await reasoner.generate_candidates(_make_state())
+
+        self.assertEqual(len(captured_prompt), 1)
+        prompt = captured_prompt[0]
+        self.assertIn("TEAM_ROSTER", prompt)
+        self.assertIn("researcher", prompt)
+        self.assertIn("writer", prompt)
+        self.assertIn("delegate", prompt)
+        self.assertIn("target_role", prompt)
+        self.assertIn("subtask", prompt)
+        self.assertNotIn("SHOULD NOT BE USED", prompt)
+
+    async def test_hierarchical_prompt_lists_all_action_types(self) -> None:
+        """确保 hierarchical 模板显式列出 delegate 作为合法 action_type。"""
+        self.assertIn("delegate", HIERARCHICAL_DELEGATE_TEMPLATE)
+        self.assertIn("use_tool", HIERARCHICAL_DELEGATE_TEMPLATE)
+        self.assertIn("respond", HIERARCHICAL_DELEGATE_TEMPLATE)
+        self.assertIn("stop", HIERARCHICAL_DELEGATE_TEMPLATE)
+        self.assertIn("target_role", HIERARCHICAL_DELEGATE_TEMPLATE)
+        self.assertIn("subtask", HIERARCHICAL_DELEGATE_TEMPLATE)
+
+
+if __name__ == "__main__":
+    unittest.main()
+</file>
+
 <file path=".gitignore">
 __pycache__/
 *.pyc
@@ -3283,36 +3895,6 @@ repos:
   "results": {},
   "generated_at": "2026-07-27T02:47:38Z"
 }
-</file>
-
-<file path="AGENTS.md">
-# AGENTS.md — LCA Framework
-
-## 架构约束（最容易被无意破坏，务必遵守）
-五层严格单向依赖：contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_agent，
-layer4_app 是组合根，可以依赖所有下层，但下层不能反向 import layer4_app。
-这个约束由 import-linter 强制执行，见 pyproject.toml 中 [[tool.importlinter.contracts]]。
-
-## 环境与依赖
-- 包管理器统一用 uv，不要直接用 pip 改环境
-- 安装依赖：uv sync --all-groups
-- 新增依赖：uv add --group <lint|typecheck|test|security> <package名>
-
-## 每次改完代码，必须依次跑完（顺序不能乱）
-1. uv run ruff check --fix .
-2. uv run ruff format .
-3. uv run lint-imports        # 检查五层架构契约，最容易被跳过但最重要
-4. uv run mypy lca
-5. uv run pytest
-
-## 代码风格
-- 公共函数/类必须有类型标注
-- lca/contracts 下的模型正在从 dataclass 迁移到 pydantic.BaseModel，迁移期间保持字段名和方法签名不变
-- 禁止硬编码 API Key / Token，一律用环境变量，通过 pydantic-settings 注入配置
-
-## 禁止事项
-- 不要在 --no-verify 情况下绕过 pre-commit 提交
-- 不要让 contracts / layer0~3 import layer4_app
 </file>
 
 <file path="CLAUDE.md">
@@ -3985,63 +4567,328 @@ def get_global_strategy_registry() -> StrategyRegistry:
     return _global_strategy_registry
 </file>
 
-<file path="lca/layer3_agent/team_orchestrator.py">
-"""TeamOrchestrator —— 管理团队的组织形态与通信信道。"""
+<file path="tests/test_step4_supervisor_bind_team.py">
+"""Step 4 单元测试 —— Supervisor.bind_team / build_team_transport / TeamOrchestrator 接线。"""
 
 from __future__ import annotations
 
+import os
+import sys
+import unittest
+from unittest.mock import AsyncMock, MagicMock
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from lca.contracts.decision import Observation
 from lca.contracts.result import Result
-from lca.contracts.role_team import TeamConfig
+from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
+from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer3_agent.base_agent import BaseAgent
+from lca.layer3_agent.supervisor import Supervisor
+from lca.layer3_agent.team_orchestrator import TeamOrchestrator
+from lca.layer4_app.defaults import build_team_transport
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
 
 
-class TeamOrchestrator:
-    """
-    支持四种组织形态（hierarchical / sequential / graph / debate），
-    均复用同一套底层 Runtime。
-    """
+def _make_role(role: str, goal: str = "") -> RoleProfile:
+    return RoleProfile(
+        role=role,
+        goal=goal or f"goal-{role}",
+        backstory=f"backstory-{role}",
+        tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+    )
 
-    def __init__(
-        self,
-        members: list[BaseAgent],
-        config: TeamConfig,
-        supervisor: BaseAgent | None = None,
-    ):
-        self.members = members
-        self.config = config
-        self.supervisor = supervisor
 
-    async def run(self, objective: str) -> Result:
-        """按 TeamConfig.process 类型选择组织形态执行。"""
-        if self.config.process == "hierarchical":
-            return await self._run_hierarchical(objective)
-        elif self.config.process == "sequential":
-            return await self._run_sequential(objective)
-        else:
-            return await self._run_hierarchical(objective)
-
-    async def _run_hierarchical(self, objective: str) -> Result:
-        """Supervisor 单向委派、汇总。"""
-        if self.supervisor is None:
-            raise ValueError("Hierarchical 模式需要 Supervisor")
-        return await self.supervisor.execute(objective)
-
-    async def _run_sequential(self, objective: str) -> Result:
-        """任务像流水线一样在成员间顺序传递。"""
-        current_task = objective
-        last_result: Result | None = None
-        for member in self.members:
-            last_result = await member.execute(current_task)
-            if last_result.output:
-                current_task = last_result.output
-        return last_result or Result(
-            trace_id="",
-            status="failed",
+def _make_member(role: str, return_output: str = "done") -> BaseAgent:
+    runtime = MagicMock()
+    member = BaseAgent(runtime, _make_role(role))
+    member.execute = AsyncMock(  # type: ignore[method-assign]
+        return_value=Result(
+            trace_id=f"trace-{role}",
+            status="completed",
+            output=return_output,
             final_state_ref="",
-            total_steps=0,
+            total_steps=1,
             budget_used=None,  # type: ignore[arg-type]
-            error="No members in team",
+        ),
+    )
+    return member
+
+
+def _make_supervisor_with_runtime() -> tuple[Supervisor, MagicMock, MagicMock, MagicMock]:
+    """返回 (supervisor, mock_runtime, mock_body, mock_reasoner)。"""
+    mock_body = MagicMock()
+    mock_body.transport = None
+
+    mock_reasoner = MagicMock()
+    mock_reasoner.team_roster = None
+
+    mock_brain = MagicMock()
+    mock_brain.reasoner = mock_reasoner
+
+    mock_runtime = MagicMock()
+    mock_runtime.body = mock_body
+    mock_runtime.brain = mock_brain
+
+    sup = Supervisor(mock_runtime, _make_role("supervisor"))
+    return sup, mock_runtime, mock_body, mock_reasoner
+
+
+# ---------------------------------------------------------------------------
+# Supervisor.bind_team
+# ---------------------------------------------------------------------------
+
+
+class TestSupervisorBindTeam(unittest.IsolatedAsyncioTestCase):
+    async def test_bind_team_sets_transport_on_body(self) -> None:
+        sup, _, mock_body, _ = _make_supervisor_with_runtime()
+        transport = InternalTransport()
+        sup.bind_team(transport, "roster text")
+        self.assertIs(mock_body.transport, transport)
+
+    async def test_bind_team_sets_roster_on_reasoner(self) -> None:
+        sup, _, _, mock_reasoner = _make_supervisor_with_runtime()
+        transport = InternalTransport()
+        sup.bind_team(transport, "- role: dev | goal: code")
+        self.assertEqual(mock_reasoner.team_roster, "- role: dev | goal: code")
+
+    async def test_bind_team_tolerates_body_without_transport_attr(self) -> None:
+        """Body 是纯 Protocol 实例（没有 transport 属性）时不崩溃。"""
+        mock_body = MagicMock(spec=[])  # 无任何属性
+        mock_brain = MagicMock()
+        mock_brain.reasoner = MagicMock()
+        mock_runtime = MagicMock()
+        mock_runtime.body = mock_body
+        mock_runtime.brain = mock_brain
+
+        sup = Supervisor(mock_runtime, _make_role("supervisor"))
+        transport = InternalTransport()
+        sup.bind_team(transport, "roster")
+        # 不抛异常即通过
+
+    async def test_bind_team_tolerates_brain_without_reasoner(self) -> None:
+        """Brain 没有 reasoner 属性时不崩溃。"""
+        mock_body = MagicMock()
+        mock_body.transport = None
+        mock_brain = MagicMock(spec=[])  # 无 reasoner
+        mock_runtime = MagicMock()
+        mock_runtime.body = mock_body
+        mock_runtime.brain = mock_brain
+
+        sup = Supervisor(mock_runtime, _make_role("supervisor"))
+        transport = InternalTransport()
+        sup.bind_team(transport, "roster")
+        # 不抛异常即通过
+
+
+# ---------------------------------------------------------------------------
+# Supervisor.delegate 已删除
+# ---------------------------------------------------------------------------
+
+
+class TestDelegateRemoved(unittest.TestCase):
+    def test_delegate_method_no_longer_exists(self) -> None:
+        self.assertFalse(hasattr(Supervisor, "delegate"))
+
+
+# ---------------------------------------------------------------------------
+# build_team_transport (L4 factory)
+# ---------------------------------------------------------------------------
+
+
+class TestBuildTeamTransport(unittest.IsolatedAsyncioTestCase):
+    async def test_registers_each_member_by_role(self) -> None:
+        members = [_make_member("researcher"), _make_member("writer")]
+        transport, _roster = build_team_transport(members)
+
+        self.assertIsInstance(transport, InternalTransport)
+        # 两个 role 都已注册
+        self.assertIn("researcher", transport._directory)
+        self.assertIn("writer", transport._directory)
+
+    async def test_roster_contains_all_roles(self) -> None:
+        members = [_make_member("dev"), _make_member("qa")]
+        _, roster = build_team_transport(members)
+
+        self.assertIn("dev", roster)
+        self.assertIn("qa", roster)
+        self.assertIn("goal-dev", roster)
+        self.assertIn("goal-qa", roster)
+
+    async def test_handler_returns_observation(self) -> None:
+        members = [_make_member("worker", "result-output")]
+        transport, _ = build_team_transport(members)
+
+        handler = transport._directory["worker"]
+        obs = await handler("do something")
+        self.assertIsInstance(obs, Observation)
+        self.assertTrue(obs.success)
+        self.assertEqual(obs.payload, "result-output")
+
+    async def test_empty_members(self) -> None:
+        transport, roster = build_team_transport([])
+        self.assertIsInstance(transport, InternalTransport)
+        self.assertEqual(len(transport._directory), 0)
+        self.assertIn("无可用队友", roster)
+
+
+# ---------------------------------------------------------------------------
+# TeamOrchestrator._run_hierarchical 集成
+# ---------------------------------------------------------------------------
+
+
+class TestTeamOrchestratorHierarchical(unittest.IsolatedAsyncioTestCase):
+    async def test_hierarchical_calls_bind_team_before_execute(self) -> None:
+        members = [_make_member("dev")]
+        config = TeamConfig(process="hierarchical")
+
+        sup, _, mock_body, mock_reasoner = _make_supervisor_with_runtime()
+        sup.execute = AsyncMock(  # type: ignore[method-assign]
+            return_value=Result(
+                trace_id="t",
+                status="completed",
+                output="ok",
+                final_state_ref="",
+                total_steps=1,
+                budget_used=None,  # type: ignore[arg-type]
+            ),
         )
+
+        transport, roster_desc = build_team_transport(members)
+        orchestrator = TeamOrchestrator(
+            members,
+            config,
+            supervisor=sup,
+            transport=transport,
+            roster_desc=roster_desc,
+        )
+        result = await orchestrator.run("build feature")
+
+        # bind_team 应该被调用：body.transport 不再是 None
+        self.assertIsInstance(mock_body.transport, InternalTransport)
+        # reasoner.team_roster 应该被设置
+        self.assertIn("dev", mock_reasoner.team_roster)
+        # execute 应该被调用
+        sup.execute.assert_awaited_once_with("build feature")
+        self.assertEqual(result.output, "ok")
+
+    async def test_hierarchical_without_transport_skips_bind(self) -> None:
+        """不传 transport 时不报错（向后兼容）。"""
+        members = [_make_member("dev")]
+        config = TeamConfig(process="hierarchical")
+
+        sup, _, mock_body, _ = _make_supervisor_with_runtime()
+        sup.execute = AsyncMock(  # type: ignore[method-assign]
+            return_value=Result(
+                trace_id="t",
+                status="completed",
+                output="ok",
+                final_state_ref="",
+                total_steps=1,
+                budget_used=None,  # type: ignore[arg-type]
+            ),
+        )
+
+        orchestrator = TeamOrchestrator(members, config, supervisor=sup)
+        await orchestrator.run("task")
+
+        # transport 应保持 None（没被 bind）
+        self.assertIsNone(mock_body.transport)
+
+    async def test_hierarchical_requires_supervisor(self) -> None:
+        config = TeamConfig(process="hierarchical")
+        orchestrator = TeamOrchestrator([], config, supervisor=None)
+        with self.assertRaises(ValueError):
+            await orchestrator.run("task")
+
+
+if __name__ == "__main__":
+    unittest.main()
+</file>
+
+<file path="AGENTS.md">
+# AGENTS.md — LCA Framework
+
+## 架构约束（最容易被无意破坏，务必遵守）
+五层严格单向依赖：contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_agent，
+layer4_app 是组合根，可以依赖所有下层，但下层不能反向 import layer4_app。
+这个约束由 import-linter 强制执行，见 pyproject.toml 中 [[tool.importlinter.contracts]]。
+
+## 环境与依赖
+- 包管理器统一用 uv，不要直接用 pip 改环境
+- 安装依赖：uv sync --all-groups
+- 新增依赖：uv add --group <lint|typecheck|test|security> <package名>
+
+## 每次改完代码，必须依次跑完（顺序不能乱）
+1. uv run ruff check --fix .
+2. uv run ruff format .
+3. uv run lint-imports        # 检查五层架构契约，最容易被跳过但最重要
+4. uv run mypy lca
+5. uv run pytest
+
+## 代码风格
+- 公共函数/类必须有类型标注
+- lca/contracts 下的模型正在从 dataclass 迁移到 pydantic.BaseModel，迁移期间保持字段名和方法签名不变
+- 禁止硬编码 API Key / Token，一律用环境变量，通过 pydantic-settings 注入配置
+
+## 代码设计约束（AI Coding 必须遵守）
+
+### 结构规模
+- 单个方法不超过 200 行（不含空行和注释），超过则拆分为子方法或提取到独立模块
+- 单个文件不超过 1500 行，超过则按职责拆分到同包下的新文件
+- 按模块/职责划分目录，每个包只暴露 `__init__.py` 中显式导出的公共接口
+
+### 内聚与耦合
+- 高内聚：一个类/模块只做一件事，相关数据和行为放在一起
+- 低耦合：模块间通过 Protocol / 接口通信，禁止直接依赖具体实现
+- 可复用：公共逻辑提取为工具函数或基类，禁止跨模块复制粘贴
+
+### 禁止魔数与硬编码
+- 禁止裸数字/字符串字面量出现在业务逻辑中，必须用命名常量（`MAX_RETRIES = 3`）或枚举
+- 配置项走 pydantic-settings / 环境变量，不要 `if env == "prod"` 硬编码
+- 禁止 if/else 链做类型/状态判断——用枚举、标签字段、注册表或策略模式替代：
+  ```python
+  # BAD
+  if provider == "openai":
+      ...
+  elif provider == "anthropic":
+      ...
+
+  # GOOD — 注册表 + 策略
+  _registry: dict[str, type[LLMAdapter]] = {}
+
+
+  def get_adapter(provider: str) -> LLMAdapter:
+      return _registry[provider]()
+  ```
+
+### 设计模式优先
+- 多种实现 → 策略模式（`Protocol` + 注册表）
+- 跨 provider 适配 → 适配器模式（统一接口包装差异）
+- 复杂构建 → Builder / Factory
+- 事件通知 → 观察者 / 发布-订阅
+- 处理链 → Chain-of-Responsibility（如 middleware、handler pipeline）
+- 优先用声明式/数据驱动分发，少用命令式分支
+
+### 接口解耦
+- 层间依赖只通过 contracts 层的 Protocol / BaseModel 传递
+- 同层模块间不直接 import，通过依赖注入（构造函数参数）获取协作方
+- 新增外部集成（LLM provider、向量库、消息队列等）必须走适配器，不允许业务代码直接调用第三方 SDK
+
+### AI Coding 额外约束
+- 生成的代码必须可测试：纯函数优先，副作用隔离到边界，便于单元测试
+- 不生成 TODO / FIXME 占位——要么实现，要么不写
+- 不在生成代码中引入 `# type: ignore` 除非有注释说明原因
+- 错误处理用显式的自定义异常类，不用裸 `except Exception`
+- 日志用 structlog 结构化输出，不用 `print`
+- 异步代码中不在热路径做同步阻塞调用，需要时显式标注并说明原因
+
+## 禁止事项
+- 不要在 --no-verify 情况下绕过 pre-commit 提交
+- 不要让 contracts / layer0~3 import layer4_app
 </file>
 
 <file path="lca/contracts/decision.py">
@@ -4431,49 +5278,6 @@ class GetWeatherTool(ToolProtocol):
         )
 </file>
 
-<file path="lca/layer0_infra/transport/agent_transport.py">
-"""Agent 传输层骨架 —— 内部传输实现。"""
-
-from __future__ import annotations
-
-import uuid
-from typing import Any
-
-from lca.contracts.decision import Observation
-from lca.contracts.protocols import AgentTransport
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
-
-
-class InternalTransport(AgentTransport):
-    """进程内 Agent 间通信传输实现。"""
-
-    def __init__(self) -> None:
-        self._results: dict[str, Observation] = {}
-
-    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str:
-        task_id = _new_id("task")
-        return task_id
-
-    async def poll_status(self, task_id: str) -> str:
-        if task_id in self._results:
-            return "completed"
-        return "working"
-
-    async def receive_result(self, task_id: str) -> Observation:
-        return self._results.get(
-            task_id,
-            Observation(
-                observation_id=_new_id("obs"),
-                success=False,
-                payload=None,
-                error="task not found",
-            ),
-        )
-</file>
-
 <file path="lca/layer1_cognitive/body/safe_executor.py">
 """SafeExecutor —— 权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
 
@@ -4664,63 +5468,6 @@ class ModularBrain(BrainStrategy):
 
     async def reflect(self, state: TypedState, observation: Observation) -> Reflection:
         return await self.critic.critique(state, observation)
-</file>
-
-<file path="lca/layer1_cognitive/brain/reasoner.py">
-"""Reasoner —— 调用 LLM 生成候选思路。"""
-
-from __future__ import annotations
-
-from lca.contracts.protocols import LLMAdapter, PromptManager, Reasoner
-from lca.contracts.role_team import RoleProfile
-from lca.contracts.state import TypedState
-
-DEFAULT_REACT_TEMPLATE = """\
-ROLE: {role}
-GOAL: {goal}
-BACKSTORY: {backstory}
-AVAILABLE_TOOLS: {tools}
-USER_TASK: {task}
-CONTEXT:
-{context}
-
-请以 JSON 输出下一步 StructuredDecision（字段：action_type/tool_name/arguments/response_text/rationale/confidence）。
-"""
-
-
-class SimpleReasoner(Reasoner):
-    """调用 LLM 生成候选行动思路。"""
-
-    def __init__(
-        self,
-        llm: LLMAdapter,
-        prompt_manager: PromptManager,
-        role_profile: RoleProfile,
-        tools_desc: str,
-    ):
-        self.llm = llm
-        self.prompt_manager = prompt_manager
-        self.role_profile = role_profile
-        self.tools_desc = tools_desc
-
-    async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]:
-        context_lines = (
-            "\n".join(f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context)
-            or "(无历史上下文)"
-        )
-        prompt = self.prompt_manager.render(
-            "react_prompt",
-            {
-                "role": self.role_profile.role,
-                "goal": self.role_profile.goal,
-                "backstory": self.role_profile.backstory,
-                "tools": self.tools_desc,
-                "task": state.task,
-                "context": context_lines,
-            },
-        )
-        raw = await self.llm.complete(prompt)
-        return [raw]
 </file>
 
 <file path="lca/layer1_cognitive/event_bus.py">
@@ -4977,287 +5724,6 @@ class BaseAgent(AgentProtocol):
 
     async def execute(self, task: str) -> Result:
         return await self.runtime.run(task, max_steps=self.max_steps)
-</file>
-
-<file path="lca/layer3_agent/supervisor.py">
-"""Supervisor —— 本质上是 BaseAgent，专责任务拆解与路由。"""
-
-from __future__ import annotations
-
-from lca.contracts.protocols import Runtime
-from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile
-from lca.layer3_agent.base_agent import BaseAgent
-
-
-class Supervisor(BaseAgent):
-    """
-    Supervisor 本身就是一个 BaseAgent（复用同一套认知闭环），
-    区别是其 StructuredDecision 里携带 delegate_to（DelegationSpec）。
-    """
-
-    def __init__(self, runtime: Runtime, role_profile: RoleProfile, max_steps: int = 20):
-        super().__init__(runtime, role_profile, max_steps=max_steps)
-
-    async def delegate(self, task: str) -> Result:
-        """委派任务给子 Agent。"""
-        return await self.execute(task)
-</file>
-
-<file path="lca/layer4_app/api.py">
-"""L4 极简开发者 API —— 三行创建 Agent，五行组建团队。
-
-支持通过注册表名字字符串或自定义协议实例来选择组件实现，
-无需修改框架源码即可替换任何可插拔组件。
-"""
-
-from __future__ import annotations
-
-from typing import TypeVar, cast
-
-import lca.layer4_app.defaults  # noqa: F401 — 触发默认注册
-from lca.contracts.protocols import (
-    BrainStrategy,
-    EventBus,
-    LLMAdapter,
-    MemorySystem,
-    Observability,
-    StateStore,
-    ToolProtocol,
-)
-from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
-from lca.layer0_infra.registry import ComponentRegistry, get_global_registry
-from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
-from lca.layer3_agent.base_agent import BaseAgent
-from lca.layer3_agent.supervisor import Supervisor
-from lca.layer3_agent.team_orchestrator import TeamOrchestrator
-
-T = TypeVar("T")
-
-
-class Agent:
-    """
-    三行上手的开发者入口：内部完成 L0-L3 全部对象的 DI 组装。
-
-    用法：
-        agent = Agent(role="研究员", goal="产出分析报告", backstory="十年经验", tools=[...], llm=llm)
-        result = await agent.run("分析新能源电池行业趋势")
-
-    可插拔参数（接受注册表名字字符串或满足协议的自定义实例）：
-        memory          — 默认 "simple"
-        observability   — 默认 "console"
-        state_store     — 默认 "memory"
-        brain_strategy  — 默认 "default"（ModularBrain + MAP 五模块）
-    """
-
-    def __init__(
-        self,
-        role: str,
-        goal: str,
-        backstory: str,
-        tools: list[ToolProtocol],
-        llm: LLMAdapter,
-        max_steps: int = 10,
-        memory: str | MemorySystem = "simple",
-        observability: str | Observability = "console",
-        state_store: str | StateStore = "memory",
-        brain_strategy: str | BrainStrategy = "default",
-    ):
-        reg = get_global_registry()
-        strategy_reg = get_global_strategy_registry()
-
-        permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
-        role_profile = RoleProfile(
-            role=role,
-            goal=goal,
-            backstory=backstory,
-            tool_permission_manifest=permission_manifest,
-        )
-
-        obs = self._resolve(reg, "observability", observability)
-        mem = self._resolve(reg, "memory", memory)
-        ss = self._resolve(reg, "state_store", state_store)
-
-        # 解析 BrainStrategy：字符串走 StrategyRegistry，实例直接使用
-        if isinstance(brain_strategy, str):
-            brain_factory = strategy_reg.resolve(brain_strategy)
-            if brain_factory is None:
-                raise ValueError(
-                    f"Unknown brain_strategy: {brain_strategy!r}. "
-                    f"Available: {strategy_reg.list_strategies()}"
-                )
-            tools_desc = ", ".join(t.name for t in tools) or "(无可用工具)"
-            brain = brain_factory(llm, role_profile, tools_desc)
-        else:
-            brain = brain_strategy
-
-        from lca.layer4_app.defaults import _build_hooks, build_body, build_runtime
-
-        body = build_body(tools, obs)
-        hooks = _build_hooks(obs)
-        event_bus: EventBus = self._resolve(reg, "event_bus", "simple")
-
-        runtime = build_runtime(brain, body, mem, hooks, event_bus, ss)
-        self._base_agent = BaseAgent(runtime, role_profile, max_steps=max_steps)
-
-    @staticmethod
-    def _resolve(reg: ComponentRegistry, category: str, value: str | T) -> T:
-        if isinstance(value, str):
-            impl = reg.resolve(category, value)
-            if impl is None:
-                raise ValueError(f"Unknown {category}: {value!r}. Available: {reg.list(category)}")
-            return cast("T", impl())
-        return value
-
-    async def run(self, task: str) -> Result:
-        return await self._base_agent.execute(task)
-
-    def _as_supervisor(self) -> Supervisor:
-        rp = self._base_agent.role_profile
-        ms = self._base_agent.max_steps
-        return Supervisor(self._base_agent.runtime, rp, max_steps=max(ms, 20))
-
-
-class MultiAgentTeam:
-    """
-    五行组建团队。
-
-    用法：
-        team = MultiAgentTeam(
-            members=[researcher, writer, critic],
-            process="hierarchical",
-            supervisor=supervisor_agent,
-        )
-        result = await team.run("产出行业研究报告")
-    """
-
-    def __init__(
-        self,
-        members: list[Agent],
-        process: str = "hierarchical",
-        supervisor: Agent | None = None,
-        max_rounds: int | None = None,
-    ):
-        config = TeamConfig(
-            process=process,  # type: ignore[arg-type]
-            max_rounds=max_rounds,
-        )
-        base_members = [m._base_agent for m in members]
-        base_supervisor = supervisor._as_supervisor() if supervisor else None
-        self._orchestrator = TeamOrchestrator(base_members, config, base_supervisor)
-
-    async def run(self, objective: str) -> Result:
-        return await self._orchestrator.run(objective)
-</file>
-
-<file path="lca/layer4_app/defaults.py">
-"""defaults.py —— 唯一允许 import 所有具体类的组装根。
-
-把框架内置的默认实现注册进全局 ComponentRegistry / StrategyRegistry，
-使得 Agent(...) 可以通过名字字符串选择实现，
-也允许用户在调用 Agent 之前注册自己的实现。
-"""
-
-from __future__ import annotations
-
-from lca.contracts.protocols import (
-    Body,
-    BrainStrategy,
-    EventBus,
-    HookRegistryP,
-    LLMAdapter,
-    MemorySystem,
-    Observability,
-    StateStore,
-    ToolProtocol,
-)
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.layer0_infra.observability.console_observability import ConsoleObservability
-from lca.layer0_infra.registry import get_global_registry
-from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer1_cognitive.brain.critic import SimpleCritic
-from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
-from lca.layer1_cognitive.brain.map_modules import (
-    SimpleConflictMonitor,
-    SimpleStateEvaluator,
-    SimpleStatePredictor,
-    SimpleTaskCoordinator,
-    SimpleTaskDecomposer,
-)
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.reasoner import DEFAULT_REACT_TEMPLATE, SimpleReasoner
-from lca.layer1_cognitive.event_bus import SimpleEventBus
-from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
-from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from lca.layer1_cognitive.prompt_manager import SimplePromptManager
-from lca.layer2_runtime.hooks import HOOK_NAMES
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime
-from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
-
-
-def _build_brain(llm: LLMAdapter, role_profile: RoleProfile, tools_desc: str) -> ModularBrain:
-    """默认 Brain 工厂：ModularBrain + MAP 五模块。"""
-    prompt_manager = SimplePromptManager()
-    prompt_manager.register_template("react_prompt", DEFAULT_REACT_TEMPLATE)
-    reasoner = SimpleReasoner(llm, prompt_manager, role_profile, tools_desc)
-    return ModularBrain(
-        reasoner=reasoner,
-        decision_parser=SimpleDecisionParser(),
-        critic=SimpleCritic(),
-        task_decomposer=SimpleTaskDecomposer(),
-        state_predictor=SimpleStatePredictor(),
-        state_evaluator=SimpleStateEvaluator(),
-        conflict_monitor=SimpleConflictMonitor(),
-        task_coordinator=SimpleTaskCoordinator(),
-    )
-
-
-def build_body(tools: list[ToolProtocol], observability: Observability) -> SimpleBody:
-    """默认 Body 构建器。"""
-    permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
-    tool_registry = SimpleToolRegistry()
-    for t in tools:
-        tool_registry.register(t)
-    safe_executor = SimpleSafeExecutor(permission_manifest, observability)
-    return SimpleBody(tool_registry, safe_executor)
-
-
-def _build_hooks(observability: Observability) -> SimpleHookRegistry:
-    hooks = SimpleHookRegistry(observability)
-    for event_name in HOOK_NAMES:
-        hooks.register(event_name, default_logging_hook)
-    return hooks
-
-
-def build_runtime(
-    brain: BrainStrategy,
-    body: Body,
-    memory: MemorySystem,
-    hooks: HookRegistryP,
-    event_bus: EventBus,
-    state_store: StateStore,
-) -> CognitiveRuntime:
-    """默认 Runtime 构建器。"""
-    return CognitiveRuntime(brain, body, memory, hooks, event_bus, state_store)
-
-
-def register_defaults() -> None:
-    """注册所有内置默认实现到全局注册表。"""
-    reg = get_global_registry()
-    reg.register("observability", "console", ConsoleObservability)
-    reg.register("state_store", "memory", InMemoryStateStore)
-    reg.register("memory", "simple", SimpleMemorySystem)
-    reg.register("event_bus", "simple", SimpleEventBus)
-
-    strategy_reg = get_global_strategy_registry()
-    strategy_reg.register("default", _build_brain)
-
-
-register_defaults()
 </file>
 
 <file path="pyproject.toml">
@@ -6007,139 +6473,299 @@ class OpenAICompatAdapter(LLMAdapter):
         yield ""  # pragma: no cover
 </file>
 
-<file path="lca/layer1_cognitive/body/simple_body.py">
-"""SimpleBody —— L1 Body 实现，对外只暴露 act()。"""
+<file path="lca/layer0_infra/transport/agent_transport.py">
+"""Agent 传输层 —— 进程内传输实现（对齐 A2A 异步任务模型）。"""
 
 from __future__ import annotations
 
+import asyncio
 import uuid
+from collections.abc import Awaitable, Callable
+from typing import Any
 
-from lca.contracts.decision import Observation, StructuredDecision
-from lca.contracts.protocols import Body, SafeExecutorProtocol, ToolRegistryP
-from lca.contracts.result import ToolExecutionError
-from lca.contracts.role_team import CacheConfig, RetryPolicy
-from lca.contracts.state import TypedState
+from lca.contracts.decision import Observation
+from lca.contracts.protocols import AgentTransport
+
+AgentHandler = Callable[[str], Awaitable[Observation]]
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class SimpleBody(Body):
-    """ToolRegistry + SafeExecutor 组合。"""
+def _fail_obsation(error: str) -> Observation:
+    return Observation(
+        observation_id=_new_id("obs"),
+        success=False,
+        payload=None,
+        error=error,
+    )
 
-    def __init__(self, tool_registry: ToolRegistryP, safe_executor: SafeExecutorProtocol):
-        self.tool_registry = tool_registry
-        self.safe_executor = safe_executor
 
-    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
-        if decision.action_type == "respond":
-            return Observation(
-                observation_id=_new_id("obs"),
-                success=True,
-                payload=decision.response_text,
-            )
+class InternalTransport(AgentTransport):
+    """进程内 Agent 间通信传输实现。
 
-        if decision.action_type == "use_tool":
-            if not decision.tool_calls:
-                raise ToolExecutionError("use_tool 需要至少一个 tool_call")
-            tc = decision.tool_calls[0]
-            tool = self.tool_registry.get(tc.tool_name)
-            if tool is None:
-                raise ToolExecutionError(f"未注册工具: {tc.tool_name}")
-            return await self.safe_executor.execute(
-                tool, tc.arguments, RetryPolicy(), CacheConfig()
-            )
+    维护一个 ``agent_directory``（key → async handler），``send_task`` 通过
+    ``asyncio.create_task`` 异步调度 handler，调用方随后用 ``poll_status`` /
+    ``receive_result`` 轮询结果 —— 与 Google A2A 的 AgentCard 注册表 + 异步
+    任务轮询模型一致。
+    """
 
-        raise ToolExecutionError(f"本示例暂未处理的 action_type: {decision.action_type}")
+    def __init__(
+        self,
+        agent_directory: dict[str, AgentHandler] | None = None,
+    ) -> None:
+        self._directory: dict[str, AgentHandler] = dict(agent_directory or {})
+        self._results: dict[str, Observation] = {}
+        self._statuses: dict[str, str] = {}
+        self._bg_tasks: dict[str, asyncio.Task[Observation]] = {}
+
+    # -- 注册 -----------------------------------------------------------
+
+    def register_agent(self, key: str, handler: AgentHandler) -> None:
+        """将一个 async handler 注册到 directory，key 通常为 agent_id 或 role。"""
+        self._directory[key] = handler
+
+    # -- 内部 -----------------------------------------------------------
+
+    def _resolve_handler(self, agent_card: Any) -> AgentHandler | None:
+        if isinstance(agent_card, str):
+            return self._directory.get(agent_card)
+        if hasattr(agent_card, "agent_id"):
+            handler = self._directory.get(agent_card.agent_id)
+            if handler is not None:
+                return handler
+        if hasattr(agent_card, "role"):
+            return self._directory.get(agent_card.role)
+        return None
+
+    # -- AgentTransport 协议 --------------------------------------------
+
+    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str:
+        task_id = _new_id("task")
+        handler = self._resolve_handler(agent_card)
+
+        if handler is None:
+            self._statuses[task_id] = "failed"
+            self._results[task_id] = _fail_obsation("agent not found in directory")
+            return task_id
+
+        async def _run() -> Observation:
+            try:
+                return await handler(subtask)
+            except Exception as exc:
+                return _fail_obsation(str(exc))
+
+        self._statuses[task_id] = "working"
+        bg = asyncio.create_task(_run(), name=f"transport-{task_id}")
+        self._bg_tasks[task_id] = bg
+
+        def _on_done(task: asyncio.Task[Observation]) -> None:
+            self._results[task_id] = task.result()
+            self._statuses[task_id] = "completed"
+
+        bg.add_done_callback(_on_done)
+        return task_id
+
+    async def poll_status(self, task_id: str) -> str:
+        return self._statuses.get(task_id, "working")
+
+    async def receive_result(self, task_id: str) -> Observation:
+        return self._results.get(task_id, _fail_obsation("task not found"))
 </file>
 
-<file path="lca/layer1_cognitive/brain/decision_parser.py">
-"""DecisionParser —— 将自由文本/工具调用稳健地解析为强类型 StructuredDecision。"""
+<file path="lca/layer1_cognitive/brain/reasoner.py">
+"""Reasoner —— 调用 LLM 生成候选思路。"""
 
 from __future__ import annotations
 
-import json
-import re
-import uuid
-
-from lca.contracts.decision import StructuredDecision, ToolCall
-from lca.contracts.protocols import DecisionParser
+from lca.contracts.protocols import LLMAdapter, PromptManager, Reasoner
+from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import TypedState
 
+DEFAULT_REACT_TEMPLATE = """\
+ROLE: {role}
+GOAL: {goal}
+BACKSTORY: {backstory}
+AVAILABLE_TOOLS: {tools}
+USER_TASK: {task}
+CONTEXT:
+{context}
 
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+请以 JSON 输出下一步 StructuredDecision（字段：action_type/tool_name/arguments/response_text/rationale/confidence）。
+"""
+
+HIERARCHICAL_DELEGATE_TEMPLATE = """\
+ROLE: {role}
+GOAL: {goal}
+BACKSTORY: {backstory}
+AVAILABLE_TOOLS: {tools}
+TEAM_ROSTER:
+{team_roster}
+USER_TASK: {task}
+CONTEXT:
+{context}
+
+你是团队 Supervisor。你可以选择以下行动之一：
+1. use_tool — 调用工具（需附带 tool_name / arguments）
+2. delegate — 将子任务委派给队友（需附带 target_role / subtask / rationale）
+3. respond — 直接回复用户（需附带 response_text）
+4. stop — 任务已完成
+
+请以 JSON 输出下一步 StructuredDecision，必须包含字段：action_type, rationale, confidence。
+当 action_type 为 "delegate" 时，还必须包含 target_role 和 subtask。
+"""
 
 
-_ACTION_ALIASES = {
-    "tool_call": "use_tool",
-    "call_tool": "use_tool",
-    "use_tool": "use_tool",
-    "respond": "respond",
-    "response": "respond",
-    "answer": "respond",
-    "reply": "respond",
-    "delegate": "delegate",
-    "stop": "stop",
-    "ask_human": "ask_human",
-}
+def build_team_roster(profiles: list[RoleProfile]) -> str:
+    """从 RoleProfile 列表拼接团队花名册文本，渲染进 Supervisor prompt。"""
+    if not profiles:
+        return "(无可用队友)"
+    return "\n".join(f"- role: {p.role} | goal: {p.goal}" for p in profiles)
 
 
-class SimpleDecisionParser(DecisionParser):
-    """稳健 JSON 解析器：别名归一化 + markdown 代码块提取 + 失败兜底。"""
+class SimpleReasoner(Reasoner):
+    """调用 LLM 生成候选行动思路。"""
 
-    def parse(self, raw_output: str, state: TypedState) -> StructuredDecision:
-        json_str = self._extract_json(raw_output)
-        try:
-            data = json.loads(json_str)
-        except (json.JSONDecodeError, ValueError):
-            return StructuredDecision(
-                decision_id=_new_id("dec"),
-                action_type="respond",
-                response_text=raw_output,
-                rationale="解析失败兜底",
-                confidence=0.1,
-            )
+    def __init__(
+        self,
+        llm: LLMAdapter,
+        prompt_manager: PromptManager,
+        role_profile: RoleProfile,
+        tools_desc: str,
+        team_roster: str | None = None,
+    ):
+        self.llm = llm
+        self.prompt_manager = prompt_manager
+        self.role_profile = role_profile
+        self.tools_desc = tools_desc
+        self.team_roster = team_roster
 
-        raw_action = str(data.get("action_type", "respond")).lower().strip()
-        action_type = _ACTION_ALIASES.get(raw_action, raw_action)
-
-        tool_calls: list[ToolCall] = []
-        if action_type == "use_tool":
-            tool_name = data.get("tool_name") or data.get("tool")
-            arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
-            if not isinstance(arguments, dict):
-                arguments = {"expression": str(arguments)}
-            if tool_name:
-                tool_calls.append(
-                    ToolCall(
-                        call_id=_new_id("call"),
-                        tool_name=tool_name,
-                        arguments=arguments,
-                    )
-                )
-            else:
-                action_type = "respond"
-
-        return StructuredDecision(
-            decision_id=_new_id("dec"),
-            action_type=action_type,  # type: ignore[arg-type]
-            tool_calls=tool_calls,
-            response_text=data.get("response_text") or data.get("response") or data.get("text"),
-            rationale=data.get("rationale", ""),
-            confidence=float(data.get("confidence", 0.5)),
+    async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]:
+        context_lines = (
+            "\n".join(f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context)
+            or "(无历史上下文)"
         )
+        base_vars: dict[str, str] = {
+            "role": self.role_profile.role,
+            "goal": self.role_profile.goal,
+            "backstory": self.role_profile.backstory,
+            "tools": self.tools_desc,
+            "task": state.task,
+            "context": context_lines,
+        }
 
-    @staticmethod
-    def _extract_json(text: str) -> str:
-        m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
-        if m:
-            return m.group(1).strip()
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        if m:
-            return m.group(0)
-        return text.strip()
+        if self.team_roster is not None:
+            template_name = "hierarchical_prompt"
+            base_vars["team_roster"] = self.team_roster
+        else:
+            template_name = "react_prompt"
+
+        prompt = self.prompt_manager.render(template_name, base_vars)
+        raw = await self.llm.complete(prompt)
+        return [raw]
+</file>
+
+<file path="lca/layer3_agent/supervisor.py">
+"""Supervisor —— 本质上是 BaseAgent，专责任务拆解与路由。"""
+
+from __future__ import annotations
+
+from lca.contracts.protocols import AgentTransport, Runtime
+from lca.contracts.role_team import RoleProfile
+from lca.layer3_agent.base_agent import BaseAgent
+
+
+class Supervisor(BaseAgent):
+    """
+    Supervisor 本身就是一个 BaseAgent（复用同一套认知闭环），
+    区别是其 StructuredDecision 里携带 delegate_to（DelegationSpec）。
+    """
+
+    def __init__(self, runtime: Runtime, role_profile: RoleProfile, max_steps: int = 20):
+        super().__init__(runtime, role_profile, max_steps=max_steps)
+
+    def bind_team(self, transport: AgentTransport, roster_desc: str) -> None:
+        """团队组建完成后的最后一次接线。
+
+        把 transport 后置绑定到 Body（delegate 分支由此可用），
+        把 roster_desc 注入 Reasoner（Supervisor prompt 里看到队友列表）。
+        """
+        body = self.runtime.body  # type: ignore[attr-defined]
+        if hasattr(body, "transport"):
+            body.transport = transport
+
+        brain = self.runtime.brain  # type: ignore[attr-defined]
+        reasoner = getattr(brain, "reasoner", None)
+        if reasoner is not None:
+            reasoner.team_roster = roster_desc
+</file>
+
+<file path="lca/layer3_agent/team_orchestrator.py">
+"""TeamOrchestrator —— 管理团队的组织形态与通信信道。"""
+
+from __future__ import annotations
+
+from lca.contracts.protocols import AgentTransport
+from lca.contracts.result import Result
+from lca.contracts.role_team import TeamConfig
+from lca.layer3_agent.base_agent import BaseAgent
+from lca.layer3_agent.supervisor import Supervisor
+
+
+class TeamOrchestrator:
+    """
+    支持四种组织形态（hierarchical / sequential / graph / debate），
+    均复用同一套底层 Runtime。
+    """
+
+    def __init__(
+        self,
+        members: list[BaseAgent],
+        config: TeamConfig,
+        supervisor: Supervisor | None = None,
+        transport: AgentTransport | None = None,
+        roster_desc: str = "",
+    ):
+        self.members = members
+        self.config = config
+        self.supervisor = supervisor
+        self.transport = transport
+        self.roster_desc = roster_desc
+
+    async def run(self, objective: str) -> Result:
+        """按 TeamConfig.process 类型选择组织形态执行。"""
+        if self.config.process == "hierarchical":
+            return await self._run_hierarchical(objective)
+        elif self.config.process == "sequential":
+            return await self._run_sequential(objective)
+        else:
+            return await self._run_hierarchical(objective)
+
+    async def _run_hierarchical(self, objective: str) -> Result:
+        """Supervisor 单向委派、汇总。"""
+        if self.supervisor is None:
+            raise ValueError("Hierarchical 模式需要 Supervisor")
+        if self.transport is not None:
+            self.supervisor.bind_team(self.transport, self.roster_desc)
+        return await self.supervisor.execute(objective)
+
+    async def _run_sequential(self, objective: str) -> Result:
+        """任务像流水线一样在成员间顺序传递。"""
+        current_task = objective
+        last_result: Result | None = None
+        for member in self.members:
+            last_result = await member.execute(current_task)
+            if last_result.output:
+                current_task = last_result.output
+        return last_result or Result(
+            trace_id="",
+            status="failed",
+            final_state_ref="",
+            total_steps=0,
+            budget_used=None,  # type: ignore[arg-type]
+            error="No members in team",
+        )
 </file>
 
 <file path="tests/test_protocol_compliance.py">
@@ -6503,6 +7129,508 @@ class TestStrategyRegistryIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+</file>
+
+<file path="lca/layer1_cognitive/body/simple_body.py">
+"""SimpleBody —— L1 Body 实现，对外只暴露 act()。"""
+
+from __future__ import annotations
+
+import asyncio
+import uuid
+
+from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.protocols import AgentTransport, Body, SafeExecutorProtocol, ToolRegistryP
+from lca.contracts.result import ToolExecutionError
+from lca.contracts.role_team import CacheConfig, RetryPolicy
+from lca.contracts.state import TypedState
+
+_POLL_INTERVAL_S = 0.05
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+class SimpleBody(Body):
+    """ToolRegistry + SafeExecutor 组合，可选 AgentTransport 处理 delegate。"""
+
+    def __init__(
+        self,
+        tool_registry: ToolRegistryP,
+        safe_executor: SafeExecutorProtocol,
+        transport: AgentTransport | None = None,
+    ):
+        self.tool_registry = tool_registry
+        self.safe_executor = safe_executor
+        self.transport = transport
+
+    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
+        if decision.action_type == "respond":
+            return Observation(
+                observation_id=_new_id("obs"),
+                success=True,
+                payload=decision.response_text,
+            )
+
+        if decision.action_type == "use_tool":
+            if not decision.tool_calls:
+                raise ToolExecutionError("use_tool 需要至少一个 tool_call")
+            tc = decision.tool_calls[0]
+            tool = self.tool_registry.get(tc.tool_name)
+            if tool is None:
+                raise ToolExecutionError(f"未注册工具: {tc.tool_name}")
+            return await self.safe_executor.execute(
+                tool, tc.arguments, RetryPolicy(), CacheConfig()
+            )
+
+        if decision.action_type == "delegate":
+            return await self._handle_delegate(decision)
+
+        raise ToolExecutionError(f"本示例暂未处理的 action_type: {decision.action_type}")
+
+    async def _handle_delegate(self, decision: StructuredDecision) -> Observation:
+        if self.transport is None:
+            raise ToolExecutionError(
+                "这个 Body 没有绑定团队通道（transport=None），无法执行 delegate 动作"
+            )
+
+        spec = decision.delegate_to
+        if spec is None:
+            raise ToolExecutionError("delegate 动作缺少 delegate_to 规格")
+
+        agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
+        task_id = await self.transport.send_task(agent_card, spec.subtask, spec.context_refs)
+
+        timeout_s = (
+            (spec.deadline.timestamp() - asyncio.get_event_loop().time()) if spec.deadline else 30.0
+        )
+        elapsed = 0.0
+        while (await self.transport.poll_status(task_id)) == "working":
+            if elapsed >= timeout_s:
+                return Observation(
+                    observation_id=_new_id("obs"),
+                    success=False,
+                    payload=None,
+                    error=f"delegate 超时: task_id={task_id}",
+                    extra={"task_id": task_id},
+                )
+            await asyncio.sleep(_POLL_INTERVAL_S)
+            elapsed += _POLL_INTERVAL_S
+
+        observation = await self.transport.receive_result(task_id)
+        observation.extra["task_id"] = task_id
+        return observation
+</file>
+
+<file path="lca/layer1_cognitive/brain/decision_parser.py">
+"""DecisionParser —— 将自由文本/工具调用稳健地解析为强类型 StructuredDecision。"""
+
+from __future__ import annotations
+
+import json
+import re
+import uuid
+
+from lca.contracts.decision import DelegationSpec, StructuredDecision, ToolCall
+from lca.contracts.protocols import DecisionParser
+from lca.contracts.state import TypedState
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+_ACTION_ALIASES = {
+    "tool_call": "use_tool",
+    "call_tool": "use_tool",
+    "use_tool": "use_tool",
+    "respond": "respond",
+    "response": "respond",
+    "answer": "respond",
+    "reply": "respond",
+    "delegate": "delegate",
+    "stop": "stop",
+    "ask_human": "ask_human",
+}
+
+
+class SimpleDecisionParser(DecisionParser):
+    """稳健 JSON 解析器：别名归一化 + markdown 代码块提取 + 失败兜底。"""
+
+    def parse(self, raw_output: str, state: TypedState) -> StructuredDecision:
+        json_str = self._extract_json(raw_output)
+        try:
+            data = json.loads(json_str)
+        except (json.JSONDecodeError, ValueError):
+            return StructuredDecision(
+                decision_id=_new_id("dec"),
+                action_type="respond",
+                response_text=raw_output,
+                rationale="解析失败兜底",
+                confidence=0.1,
+            )
+
+        raw_action = str(data.get("action_type", "respond")).lower().strip()
+        action_type = _ACTION_ALIASES.get(raw_action, raw_action)
+
+        tool_calls: list[ToolCall] = []
+        if action_type == "use_tool":
+            tool_name = data.get("tool_name") or data.get("tool")
+            arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
+            if not isinstance(arguments, dict):
+                arguments = {"expression": str(arguments)}
+            if tool_name:
+                tool_calls.append(
+                    ToolCall(
+                        call_id=_new_id("call"),
+                        tool_name=tool_name,
+                        arguments=arguments,
+                    )
+                )
+            else:
+                action_type = "respond"
+
+        delegate_to: DelegationSpec | None = None
+        if action_type == "delegate":
+            subtask = data.get("subtask", "")
+            target_role = data.get("target_role")
+            context_refs = data.get("context_refs") or data.get("context") or []
+            if not isinstance(context_refs, list):
+                context_refs = [str(context_refs)]
+            delegate_to = DelegationSpec(
+                subtask=subtask,
+                target_role=target_role,
+                context_refs=context_refs,
+            )
+
+        return StructuredDecision(
+            decision_id=_new_id("dec"),
+            action_type=action_type,  # type: ignore[arg-type]
+            tool_calls=tool_calls,
+            delegate_to=delegate_to,
+            response_text=data.get("response_text") or data.get("response") or data.get("text"),
+            rationale=data.get("rationale", ""),
+            confidence=float(data.get("confidence", 0.5)),
+        )
+
+    @staticmethod
+    def _extract_json(text: str) -> str:
+        m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            return m.group(0)
+        return text.strip()
+</file>
+
+<file path="lca/layer4_app/api.py">
+"""L4 极简开发者 API —— 三行创建 Agent，五行组建团队。
+
+支持通过注册表名字字符串或自定义协议实例来选择组件实现，
+无需修改框架源码即可替换任何可插拔组件。
+"""
+
+from __future__ import annotations
+
+from typing import TypeVar, cast
+
+import lca.layer4_app.defaults  # noqa: F401 — 触发默认注册
+from lca.contracts.protocols import (
+    BrainStrategy,
+    EventBus,
+    LLMAdapter,
+    MemorySystem,
+    Observability,
+    StateStore,
+    ToolProtocol,
+)
+from lca.contracts.result import Result
+from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
+from lca.layer0_infra.registry import ComponentRegistry, get_global_registry
+from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
+from lca.layer3_agent.base_agent import BaseAgent
+from lca.layer3_agent.supervisor import Supervisor
+from lca.layer3_agent.team_orchestrator import TeamOrchestrator
+
+T = TypeVar("T")
+
+
+class Agent:
+    """
+    三行上手的开发者入口：内部完成 L0-L3 全部对象的 DI 组装。
+
+    用法：
+        agent = Agent(role="研究员", goal="产出分析报告", backstory="十年经验", tools=[...], llm=llm)
+        result = await agent.run("分析新能源电池行业趋势")
+
+    可插拔参数（接受注册表名字字符串或满足协议的自定义实例）：
+        memory          — 默认 "simple"
+        observability   — 默认 "console"
+        state_store     — 默认 "memory"
+        brain_strategy  — 默认 "default"（ModularBrain + MAP 五模块）
+    """
+
+    def __init__(
+        self,
+        role: str,
+        goal: str,
+        backstory: str,
+        tools: list[ToolProtocol],
+        llm: LLMAdapter,
+        max_steps: int = 10,
+        memory: str | MemorySystem = "simple",
+        observability: str | Observability = "console",
+        state_store: str | StateStore = "memory",
+        brain_strategy: str | BrainStrategy = "default",
+    ):
+        reg = get_global_registry()
+        strategy_reg = get_global_strategy_registry()
+
+        permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
+        role_profile = RoleProfile(
+            role=role,
+            goal=goal,
+            backstory=backstory,
+            tool_permission_manifest=permission_manifest,
+        )
+
+        obs = self._resolve(reg, "observability", observability)
+        mem = self._resolve(reg, "memory", memory)
+        ss = self._resolve(reg, "state_store", state_store)
+
+        # 解析 BrainStrategy：字符串走 StrategyRegistry，实例直接使用
+        if isinstance(brain_strategy, str):
+            brain_factory = strategy_reg.resolve(brain_strategy)
+            if brain_factory is None:
+                raise ValueError(
+                    f"Unknown brain_strategy: {brain_strategy!r}. "
+                    f"Available: {strategy_reg.list_strategies()}"
+                )
+            tools_desc = ", ".join(t.name for t in tools) or "(无可用工具)"
+            brain = brain_factory(llm, role_profile, tools_desc)
+        else:
+            brain = brain_strategy
+
+        from lca.layer4_app.defaults import _build_hooks, build_body, build_runtime
+
+        body = build_body(tools, obs)
+        hooks = _build_hooks(obs)
+        event_bus: EventBus = self._resolve(reg, "event_bus", "simple")
+
+        runtime = build_runtime(brain, body, mem, hooks, event_bus, ss)
+        self._base_agent = BaseAgent(runtime, role_profile, max_steps=max_steps)
+
+    @staticmethod
+    def _resolve(reg: ComponentRegistry, category: str, value: str | T) -> T:
+        if isinstance(value, str):
+            impl = reg.resolve(category, value)
+            if impl is None:
+                raise ValueError(f"Unknown {category}: {value!r}. Available: {reg.list(category)}")
+            return cast("T", impl())
+        return value
+
+    async def run(self, task: str) -> Result:
+        return await self._base_agent.execute(task)
+
+    def _as_supervisor(self) -> Supervisor:
+        rp = self._base_agent.role_profile
+        ms = self._base_agent.max_steps
+        return Supervisor(self._base_agent.runtime, rp, max_steps=max(ms, 20))
+
+
+class MultiAgentTeam:
+    """
+    五行组建团队。
+
+    用法：
+        team = MultiAgentTeam(
+            members=[researcher, writer, critic],
+            process="hierarchical",
+            supervisor=supervisor_agent,
+        )
+        result = await team.run("产出行业研究报告")
+    """
+
+    def __init__(
+        self,
+        members: list[Agent],
+        process: str = "hierarchical",
+        supervisor: Agent | None = None,
+        max_rounds: int | None = None,
+    ):
+        config = TeamConfig(
+            process=process,  # type: ignore[arg-type]
+            max_rounds=max_rounds,
+        )
+        base_members = [m._base_agent for m in members]
+        base_supervisor = supervisor._as_supervisor() if supervisor else None
+        from lca.layer4_app.defaults import build_team_transport
+
+        transport, roster_desc = build_team_transport(base_members)
+        self._orchestrator = TeamOrchestrator(
+            base_members,
+            config,
+            base_supervisor,
+            transport=transport,
+            roster_desc=roster_desc,
+        )
+
+    async def run(self, objective: str) -> Result:
+        return await self._orchestrator.run(objective)
+</file>
+
+<file path="lca/layer4_app/defaults.py">
+"""defaults.py —— 唯一允许 import 所有具体类的组装根。
+
+把框架内置的默认实现注册进全局 ComponentRegistry / StrategyRegistry，
+使得 Agent(...) 可以通过名字字符串选择实现，
+也允许用户在调用 Agent 之前注册自己的实现。
+"""
+
+from __future__ import annotations
+
+from lca.contracts.decision import Observation
+from lca.contracts.protocols import (
+    AgentTransport,
+    Body,
+    BrainStrategy,
+    EventBus,
+    HookRegistryP,
+    LLMAdapter,
+    MemorySystem,
+    Observability,
+    StateStore,
+    ToolProtocol,
+)
+from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
+from lca.layer0_infra.observability.console_observability import ConsoleObservability
+from lca.layer0_infra.registry import get_global_registry
+from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
+from lca.layer0_infra.transport.agent_transport import InternalTransport
+from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
+from lca.layer1_cognitive.body.simple_body import SimpleBody
+from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+from lca.layer1_cognitive.brain.critic import SimpleCritic
+from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
+from lca.layer1_cognitive.brain.map_modules import (
+    SimpleConflictMonitor,
+    SimpleStateEvaluator,
+    SimpleStatePredictor,
+    SimpleTaskCoordinator,
+    SimpleTaskDecomposer,
+)
+from lca.layer1_cognitive.brain.modular_brain import ModularBrain
+from lca.layer1_cognitive.brain.reasoner import (
+    DEFAULT_REACT_TEMPLATE,
+    HIERARCHICAL_DELEGATE_TEMPLATE,
+    SimpleReasoner,
+    build_team_roster,
+)
+from lca.layer1_cognitive.event_bus import SimpleEventBus
+from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
+from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+from lca.layer1_cognitive.prompt_manager import SimplePromptManager
+from lca.layer2_runtime.hooks import HOOK_NAMES
+from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
+from lca.layer3_agent.base_agent import BaseAgent
+
+
+def _build_brain(
+    llm: LLMAdapter,
+    role_profile: RoleProfile,
+    tools_desc: str,
+    team_roster: str | None = None,
+) -> ModularBrain:
+    """默认 Brain 工厂：ModularBrain + MAP 五模块。"""
+    prompt_manager = SimplePromptManager()
+    prompt_manager.register_template("react_prompt", DEFAULT_REACT_TEMPLATE)
+    prompt_manager.register_template("hierarchical_prompt", HIERARCHICAL_DELEGATE_TEMPLATE)
+    reasoner = SimpleReasoner(
+        llm, prompt_manager, role_profile, tools_desc, team_roster=team_roster
+    )
+    return ModularBrain(
+        reasoner=reasoner,
+        decision_parser=SimpleDecisionParser(),
+        critic=SimpleCritic(),
+        task_decomposer=SimpleTaskDecomposer(),
+        state_predictor=SimpleStatePredictor(),
+        state_evaluator=SimpleStateEvaluator(),
+        conflict_monitor=SimpleConflictMonitor(),
+        task_coordinator=SimpleTaskCoordinator(),
+    )
+
+
+def build_body(tools: list[ToolProtocol], observability: Observability) -> SimpleBody:
+    """默认 Body 构建器。"""
+    permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
+    tool_registry = SimpleToolRegistry()
+    for t in tools:
+        tool_registry.register(t)
+    safe_executor = SimpleSafeExecutor(permission_manifest, observability)
+    return SimpleBody(tool_registry, safe_executor)
+
+
+def _build_hooks(observability: Observability) -> SimpleHookRegistry:
+    hooks = SimpleHookRegistry(observability)
+    for event_name in HOOK_NAMES:
+        hooks.register(event_name, default_logging_hook)
+    return hooks
+
+
+def build_runtime(
+    brain: BrainStrategy,
+    body: Body,
+    memory: MemorySystem,
+    hooks: HookRegistryP,
+    event_bus: EventBus,
+    state_store: StateStore,
+) -> CognitiveRuntime:
+    """默认 Runtime 构建器。"""
+    return CognitiveRuntime(brain, body, memory, hooks, event_bus, state_store)
+
+
+def build_team_transport(
+    members: list[BaseAgent],
+) -> tuple[AgentTransport, str]:
+    """为 hierarchical 团队构建进程内传输层和花名册。
+
+    把每个 member 的 execute 包装为 async handler（key = role），
+    Result → Observation 的适配在此完成；
+    同时拼接 roster_desc 供 Supervisor 的 Reasoner 感知队友。
+    """
+    transport = InternalTransport()
+    for member in members:
+
+        async def _handler(subtask: str, _m: BaseAgent = member) -> Observation:
+            result = await _m.execute(subtask)
+            return Observation(
+                observation_id=f"obs_{result.trace_id}",
+                success=result.status == "completed",
+                payload=result.output,
+                error=result.error,
+            )
+
+        transport.register_agent(member.role_profile.role, _handler)
+    roster_desc = build_team_roster([m.role_profile for m in members])
+    return transport, roster_desc
+
+
+def register_defaults() -> None:
+    """注册所有内置默认实现到全局注册表。"""
+    reg = get_global_registry()
+    reg.register("observability", "console", ConsoleObservability)
+    reg.register("state_store", "memory", InMemoryStateStore)
+    reg.register("memory", "simple", SimpleMemorySystem)
+    reg.register("event_bus", "simple", SimpleEventBus)
+
+    strategy_reg = get_global_strategy_registry()
+    strategy_reg.register("default", _build_brain)
+
+
+register_defaults()
 </file>
 
 <file path="tests/test_contracts.py">

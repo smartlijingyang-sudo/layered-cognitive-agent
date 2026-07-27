@@ -40,11 +40,15 @@ layer4_app 是组合根，可以依赖所有下层，但下层不能反向 impor
 - 禁止 if/else 链做类型/状态判断——用枚举、标签字段、注册表或策略模式替代：
   ```python
   # BAD
-  if provider == "openai": ...
-  elif provider == "anthropic": ...
+  if provider == "openai":
+      ...
+  elif provider == "anthropic":
+      ...
 
   # GOOD — 注册表 + 策略
   _registry: dict[str, type[LLMAdapter]] = {}
+
+
   def get_adapter(provider: str) -> LLMAdapter:
       return _registry[provider]()
   ```
