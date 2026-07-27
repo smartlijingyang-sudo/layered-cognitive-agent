@@ -24,8 +24,10 @@ from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.registry import get_global_registry
 from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
+from lca.layer0_infra.transport.a2a_transport import A2ATransport
 from lca.layer0_infra.transport.agent_transport import InternalTransport
-from lca.layer0_infra.transport.transport_registry import TransportRegistry, UnimplementedTransport
+from lca.layer0_infra.transport.mcp_transport import MCPTransport
+from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
@@ -58,6 +60,7 @@ from lca.layer3_agent.orchestration_registry import get_global_orchestration_reg
 from lca.layer3_agent.orchestration_strategies import (
     DebateStrategy,
     GraphStrategy,
+    HandoffStrategy,
     HierarchicalStrategy,
     ParallelStrategy,
     SequentialStrategy,
@@ -90,11 +93,11 @@ def _build_brain(
 
 
 def build_default_transport_registry() -> TransportRegistry:
-    """构建默认 TransportRegistry：internal→InternalTransport, a2a/mcp→占位。"""
+    """构建默认 TransportRegistry：internal→InternalTransport, a2a→A2ATransport, mcp→MCPTransport。"""
     registry = TransportRegistry()
     registry.register(InternalTransport())
-    registry.register(UnimplementedTransport("a2a"))
-    registry.register(UnimplementedTransport("mcp"))
+    registry.register(A2ATransport())
+    registry.register(MCPTransport())
     return registry
 
 
@@ -174,7 +177,15 @@ def register_defaults() -> None:
     orch_reg.register("sequential", SequentialStrategy)
     orch_reg.register("parallel", lambda: ParallelStrategy(synthesizer=ConcatSynthesizer()))
     orch_reg.register("graph", GraphStrategy)
-    orch_reg.register("debate", DebateStrategy)
+    orch_reg.register(
+        "debate",
+        lambda: DebateStrategy(
+            conflict_monitor=SimpleConflictMonitor(),
+            task_coordinator=SimpleTaskCoordinator(),
+            state_evaluator=SimpleStateEvaluator(),
+        ),
+    )
+    orch_reg.register("handoff", HandoffStrategy)
 
 
 register_defaults()

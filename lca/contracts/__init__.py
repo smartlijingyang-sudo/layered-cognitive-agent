@@ -8,6 +8,12 @@ from lca.contracts.decision import (
     StructuredDecision,
     ToolCall,
 )
+from lca.contracts.graph import (
+    ExecutionGraph,
+    GraphEdge,
+    GraphNode,
+    GraphValidationError,
+)
 from lca.contracts.lifecycle import AgentCard, TaskStatus, TeamMessage
 from lca.contracts.memory import KGTriple, MemoryRecord, SkillRecord
 from lca.contracts.observability import Event, TraceSpan
@@ -36,6 +42,10 @@ __all__ = [
     "CacheConfig",
     "DelegationSpec",
     "Event",
+    "ExecutionGraph",
+    "GraphEdge",
+    "GraphNode",
+    "GraphValidationError",
     "KGTriple",
     "MemoryRecord",
     "Observation",

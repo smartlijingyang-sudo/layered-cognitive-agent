@@ -133,6 +133,8 @@ class CognitiveRuntime(Runtime):
     ) -> bool:
         if decision is None or reflection is None:
             return False
+        if decision.action_type == "handoff":
+            return True
         return decision.action_type == "respond" and reflection.verdict != "needs_correction"
 
     def _summarize(self, state: TypedState) -> Result:

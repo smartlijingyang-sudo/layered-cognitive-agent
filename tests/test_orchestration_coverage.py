@@ -9,6 +9,7 @@ import os
 import sys
 import typing
 import unittest
+from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -52,25 +53,40 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
             registry.resolve("nonexistent_strategy")
         self.assertIn("nonexistent_strategy", str(ctx.exception))
 
-    async def test_graph_strategy_raises_not_implemented(self) -> None:
-        """GraphStrategy 是占位实现，run() 应抛 NotImplementedError。"""
+    async def test_graph_strategy_requires_execution_graph(self) -> None:
+        """GraphStrategy 已落地实现，无 ExecutionGraph 时抛 ValueError。"""
         from lca.contracts.protocols import OrchestrationContext
         from lca.layer3_agent.orchestration_strategies import GraphStrategy
 
         strategy = GraphStrategy()
         context = OrchestrationContext()
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(ValueError):
             await strategy.run(context, "test")
 
-    async def test_debate_strategy_raises_not_implemented(self) -> None:
-        """DebateStrategy 是占位实现，run() 应抛 NotImplementedError。"""
+    async def test_debate_strategy_is_functional(self) -> None:
+        """DebateStrategy 已落地实现，run() 不再抛 NotImplementedError。"""
         from lca.contracts.protocols import OrchestrationContext
+        from lca.contracts.result import Result
+        from lca.contracts.state import Budget
         from lca.layer3_agent.orchestration_strategies import DebateStrategy
 
         strategy = DebateStrategy()
-        context = OrchestrationContext()
-        with self.assertRaises(NotImplementedError):
-            await strategy.run(context, "test")
+        agent = MagicMock()
+
+        async def _execute(task: str) -> Result:
+            return Result(
+                trace_id="t1",
+                status="completed",
+                output="proposal",
+                final_state_ref="",
+                total_steps=1,
+                budget_used=Budget(),
+            )
+
+        agent.execute = AsyncMock(side_effect=_execute)
+        context = OrchestrationContext(members=[agent])
+        result = await strategy.run(context, "test")
+        self.assertEqual(result.status, "completed")
 
 
 if __name__ == "__main__":

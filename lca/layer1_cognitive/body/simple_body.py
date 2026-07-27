@@ -65,6 +65,9 @@ class SimpleBody(Body):
         if decision.action_type == "delegate":
             return await self._handle_delegate(decision)
 
+        if decision.action_type == "handoff":
+            return await self._handle_handoff(decision)
+
         raise ToolExecutionError(f"本示例暂未处理的 action_type: {decision.action_type}")
 
     async def _handle_delegate(self, decision: StructuredDecision) -> Observation:
@@ -96,3 +99,27 @@ class SimpleBody(Body):
         observation = await transport.receive_result(task_id)
         observation.extra["task_id"] = task_id
         return observation
+
+    async def _handle_handoff(self, decision: StructuredDecision) -> Observation:
+        """轻量控制权移交：把任务发给目标 Agent 后立即返回，不轮询等待。
+
+        与 delegate 的区别：
+        - delegate：阻塞式，等待目标 Agent 返回结果
+        - handoff：非阻塞，发完即退出当前 Agent 的 loop，由目标 Agent 接管
+        """
+        spec = decision.delegate_to
+        if spec is None:
+            raise ToolExecutionError("handoff 动作缺少 delegate_to 规格")
+
+        transport = self.transport_registry.resolve(spec.protocol)
+        task_id = await transport.send_task(
+            spec.target_agent_card or spec.target_agent_id or spec.target_role,
+            spec.subtask,
+            spec.context_refs,
+        )
+        return Observation(
+            observation_id=_new_id("obs"),
+            success=True,
+            payload=f"handoff to {spec.target_role or spec.target_agent_id}",
+            extra={"task_id": task_id, "handoff": True},
+        )

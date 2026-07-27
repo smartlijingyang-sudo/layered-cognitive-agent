@@ -9,6 +9,7 @@ from lca.contracts.protocols import (
     Critic,
     DecisionParser,
     Reasoner,
+    SkillRouter,
     StateEvaluator,
     StatePredictor,
     TaskCoordinator,
@@ -35,6 +36,7 @@ class ModularBrain(BrainStrategy):
         state_evaluator: StateEvaluator,
         conflict_monitor: ConflictMonitor,
         task_coordinator: TaskCoordinator,
+        skill_router: SkillRouter | None = None,
     ):
         self.reasoner = reasoner
         self.decision_parser = decision_parser
@@ -44,8 +46,13 @@ class ModularBrain(BrainStrategy):
         self.state_evaluator = state_evaluator
         self.conflict_monitor = conflict_monitor
         self.task_coordinator = task_coordinator
+        self.skill_router = skill_router
 
     async def think(self, state: TypedState) -> StructuredDecision:
+        if self.skill_router is not None:
+            template_name = await self.skill_router.route(state)
+            state.working_memory["active_template"] = template_name
+
         _subtasks = await self.task_decomposer.decompose(state)
         raw_candidates = await self.reasoner.generate_candidates(state, n=1)
         candidates = [self.decision_parser.parse(rc, state) for rc in raw_candidates]

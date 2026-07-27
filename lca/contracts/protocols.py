@@ -113,6 +113,18 @@ class PromptManager(Protocol):
 
 
 @runtime_checkable
+class SkillRouter(Protocol):
+    """运行时动态选择 Prompt 模板 / 工具子集。
+
+    挂在 BrainStrategy.think 前置钩子，根据当前 state 决定用哪个 template。
+    默认实现 KeywordSkillRouter（关键词匹配，零成本），
+    可选 LLMSkillRouter（小模型分类）。
+    """
+
+    async def route(self, state: TypedState) -> str: ...
+
+
+@runtime_checkable
 class ToolRegistry(Protocol):
     def register(self, tool: Tool) -> None: ...
     def get(self, name: str) -> Tool | None: ...

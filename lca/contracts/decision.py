@@ -39,7 +39,7 @@ class DelegationSpec:
 @dataclass
 class StructuredDecision:
     decision_id: str
-    action_type: Literal["use_tool", "delegate", "respond", "ask_human", "stop"]
+    action_type: Literal["use_tool", "delegate", "respond", "ask_human", "stop", "handoff"]
     rationale: str
     confidence: float
     tool_calls: list[ToolCall] = field(default_factory=list)
