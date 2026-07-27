@@ -35,7 +35,11 @@ from lca.layer1_cognitive.brain.map_modules import (
     SimpleTaskDecomposer,
 )
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.reasoner import DEFAULT_REACT_TEMPLATE, SimpleReasoner
+from lca.layer1_cognitive.brain.reasoner import (
+    DEFAULT_REACT_TEMPLATE,
+    HIERARCHICAL_DELEGATE_TEMPLATE,
+    SimpleReasoner,
+)
 from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
@@ -45,11 +49,19 @@ from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
 
 
-def _build_brain(llm: LLMAdapter, role_profile: RoleProfile, tools_desc: str) -> ModularBrain:
+def _build_brain(
+    llm: LLMAdapter,
+    role_profile: RoleProfile,
+    tools_desc: str,
+    team_roster: str | None = None,
+) -> ModularBrain:
     """默认 Brain 工厂：ModularBrain + MAP 五模块。"""
     prompt_manager = SimplePromptManager()
     prompt_manager.register_template("react_prompt", DEFAULT_REACT_TEMPLATE)
-    reasoner = SimpleReasoner(llm, prompt_manager, role_profile, tools_desc)
+    prompt_manager.register_template("hierarchical_prompt", HIERARCHICAL_DELEGATE_TEMPLATE)
+    reasoner = SimpleReasoner(
+        llm, prompt_manager, role_profile, tools_desc, team_roster=team_roster
+    )
     return ModularBrain(
         reasoner=reasoner,
         decision_parser=SimpleDecisionParser(),

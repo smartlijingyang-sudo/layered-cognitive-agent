@@ -6,7 +6,7 @@ import json
 import re
 import uuid
 
-from lca.contracts.decision import StructuredDecision, ToolCall
+from lca.contracts.decision import DelegationSpec, StructuredDecision, ToolCall
 from lca.contracts.protocols import DecisionParser
 from lca.contracts.state import TypedState
 
@@ -65,10 +65,24 @@ class SimpleDecisionParser(DecisionParser):
             else:
                 action_type = "respond"
 
+        delegate_to: DelegationSpec | None = None
+        if action_type == "delegate":
+            subtask = data.get("subtask", "")
+            target_role = data.get("target_role")
+            context_refs = data.get("context_refs") or data.get("context") or []
+            if not isinstance(context_refs, list):
+                context_refs = [str(context_refs)]
+            delegate_to = DelegationSpec(
+                subtask=subtask,
+                target_role=target_role,
+                context_refs=context_refs,
+            )
+
         return StructuredDecision(
             decision_id=_new_id("dec"),
             action_type=action_type,  # type: ignore[arg-type]
             tool_calls=tool_calls,
+            delegate_to=delegate_to,
             response_text=data.get("response_text") or data.get("response") or data.get("text"),
             rationale=data.get("rationale", ""),
             confidence=float(data.get("confidence", 0.5)),
