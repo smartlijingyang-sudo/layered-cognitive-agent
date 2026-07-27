@@ -5,37 +5,32 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from lca.contracts.protocols import OrchestrationStrategy
+from lca.layer0_infra.registry import NamedRegistry
 
 OrchestrationFactory = Callable[[], OrchestrationStrategy]
 
 _global_orchestration_registry: OrchestrationStrategyRegistry | None = None
 
 
-class OrchestrationStrategyRegistry:
+class OrchestrationStrategyRegistry(NamedRegistry[OrchestrationFactory]):
     """按名称注册和查找 OrchestrationStrategy 工厂。
 
     工厂签名: () -> OrchestrationStrategy
     策略实例在 run() 时通过 OrchestrationContext 获取运行时数据。
     """
 
-    def __init__(self) -> None:
-        self._factories: dict[str, OrchestrationFactory] = {}
+    _REGISTRY_KIND = "编排策略"
 
-    def register(self, name: str, factory: OrchestrationFactory) -> None:
-        self._factories[name] = factory
-
-    def resolve(self, name: str) -> OrchestrationStrategy:
-        factory = self._factories.get(name)
-        if factory is None:
-            available = self.list_strategies()
-            raise ValueError(f"未注册编排策略 {name!r}，可用策略: {available}")
+    def resolve(self, name: str) -> OrchestrationStrategy:  # type: ignore[override]
+        # 有意将返回类型从 Factory 变为 Strategy 实例
+        factory = super().resolve(name)
         return factory()
 
     def list_strategies(self) -> list[str]:
-        return list(self._factories.keys())
+        return self.list()
 
     def has(self, name: str) -> bool:
-        return name in self._factories
+        return name in self
 
 
 def get_global_orchestration_registry() -> OrchestrationStrategyRegistry:

@@ -76,11 +76,6 @@ class Agent:
         # 解析 BrainStrategy：字符串走 StrategyRegistry，实例直接使用
         if isinstance(brain_strategy, str):
             brain_factory = strategy_reg.resolve(brain_strategy)
-            if brain_factory is None:
-                raise ValueError(
-                    f"Unknown brain_strategy: {brain_strategy!r}. "
-                    f"Available: {strategy_reg.list_strategies()}"
-                )
             tools_desc = ", ".join(t.name for t in tools) or "(无可用工具)"
             brain = brain_factory(llm, role_profile, tools_desc)
         else:

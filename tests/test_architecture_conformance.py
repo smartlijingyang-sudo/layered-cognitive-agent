@@ -26,6 +26,10 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.registry.ComponentRegistry": (
         "DI 注册表本身，非可插拔组件 (ADR-0005/ADR-0010)"
     ),
+    "lca.layer0_infra.registry.NamedRegistry": (
+        "DI 注册表泛型基类，非可插拔组件 (ADR-0005/ADR-0010)"
+    ),
+    "lca.layer0_infra.registry.RegistryKeyError": ("异常类型，非可插拔组件 (ADR-0010)"),
     "lca.layer0_infra.transport.transport_registry.TransportRegistry": (
         "传输路由基础设施，非可插拔组件 (ADR-0010)"
     ),

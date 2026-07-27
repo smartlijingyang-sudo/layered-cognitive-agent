@@ -6,31 +6,29 @@ from typing import Any
 
 from lca.contracts.decision import Observation
 from lca.contracts.protocols import AgentTransport
+from lca.layer0_infra.registry import NamedRegistry, RegistryKeyError
 
 
-class TransportNotFoundError(Exception):
+class TransportNotFoundError(RegistryKeyError):
     """TransportRegistry 中找不到指定 protocol 的传输实现。"""
 
     def __init__(self, protocol: str, available: list[str]) -> None:
         self.protocol = protocol
-        self.available = available
-        super().__init__(f"未注册协议 {protocol!r} 的传输实现，可用协议: {available}")
+        super().__init__(protocol, "传输协议", available)
 
 
-class TransportRegistry:
+class TransportRegistry(NamedRegistry[AgentTransport]):
     """按 protocol_name 注册和解析 AgentTransport 实现。
 
     注册时校验 key 与实现自报的 protocol_name 一致，
     杜绝"注册表写的是 a2a，塞进去的其实是别的实现"这种手滑。
     """
 
-    def __init__(self) -> None:
-        self._transports: dict[str, AgentTransport] = {}
+    _REGISTRY_KIND = "传输协议"
 
-    def register(self, transport: AgentTransport) -> None:
+    def register(self, transport: AgentTransport) -> None:  # type: ignore[override]
         """注册一个 AgentTransport，key 取自 transport.protocol_name。"""
-        key = transport.protocol_name
-        self._transports[key] = transport
+        self._entries[transport.protocol_name] = transport
 
     def register_as(self, protocol_name: str, transport: AgentTransport) -> None:
         """显式指定 key 注册，校验 key 与 transport.protocol_name 一致。"""
@@ -39,20 +37,17 @@ class TransportRegistry:
                 f"protocol_name 不匹配: 注册 key={protocol_name!r}, "
                 f"但 transport 自报 protocol_name={transport.protocol_name!r}"
             )
-        self._transports[protocol_name] = transport
+        self._entries[protocol_name] = transport
 
     def resolve(self, protocol: str) -> AgentTransport:
         """按 protocol 名解析传输实现，找不到抛 TransportNotFoundError。"""
-        transport = self._transports.get(protocol)
-        if transport is None:
-            raise TransportNotFoundError(protocol, self.list_protocols())
-        return transport
+        try:
+            return super().resolve(protocol)
+        except RegistryKeyError as exc:
+            raise TransportNotFoundError(exc.key, exc.available) from None
 
     def list_protocols(self) -> list[str]:
-        return list(self._transports.keys())
-
-    def __contains__(self, protocol: str) -> bool:
-        return protocol in self._transports
+        return self.list()
 
 
 class UnimplementedTransport(AgentTransport):

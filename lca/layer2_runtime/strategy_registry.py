@@ -5,29 +5,23 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from lca.contracts.protocols import BrainStrategy
+from lca.layer0_infra.registry import NamedRegistry
 
 BrainFactory = Callable[..., BrainStrategy]
 
 _global_strategy_registry: StrategyRegistry | None = None
 
 
-class StrategyRegistry:
+class StrategyRegistry(NamedRegistry[BrainFactory]):
     """按名称注册和查找 BrainStrategy 工厂。
 
     工厂签名: (llm, role_profile, tools_desc) -> BrainStrategy
     """
 
-    def __init__(self) -> None:
-        self._factories: dict[str, BrainFactory] = {}
-
-    def register(self, name: str, factory: BrainFactory) -> None:
-        self._factories[name] = factory
-
-    def resolve(self, name: str) -> BrainFactory | None:
-        return self._factories.get(name)
+    _REGISTRY_KIND = "Brain 策略"
 
     def list_strategies(self) -> list[str]:
-        return list(self._factories.keys())
+        return self.list()
 
 
 def get_global_strategy_registry() -> StrategyRegistry:
