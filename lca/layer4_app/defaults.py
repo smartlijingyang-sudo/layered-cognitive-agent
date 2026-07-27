@@ -7,7 +7,9 @@
 
 from __future__ import annotations
 
+from lca.contracts.decision import Observation
 from lca.contracts.protocols import (
+    AgentTransport,
     Body,
     BrainStrategy,
     EventBus,
@@ -22,6 +24,7 @@ from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.registry import get_global_registry
 from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
+from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
@@ -39,6 +42,7 @@ from lca.layer1_cognitive.brain.reasoner import (
     DEFAULT_REACT_TEMPLATE,
     HIERARCHICAL_DELEGATE_TEMPLATE,
     SimpleReasoner,
+    build_team_roster,
 )
 from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
@@ -47,6 +51,7 @@ from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 from lca.layer2_runtime.hooks import HOOK_NAMES
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
+from lca.layer3_agent.base_agent import BaseAgent
 
 
 def _build_brain(
@@ -101,6 +106,32 @@ def build_runtime(
 ) -> CognitiveRuntime:
     """默认 Runtime 构建器。"""
     return CognitiveRuntime(brain, body, memory, hooks, event_bus, state_store)
+
+
+def build_team_transport(
+    members: list[BaseAgent],
+) -> tuple[AgentTransport, str]:
+    """为 hierarchical 团队构建进程内传输层和花名册。
+
+    把每个 member 的 execute 包装为 async handler（key = role），
+    Result → Observation 的适配在此完成；
+    同时拼接 roster_desc 供 Supervisor 的 Reasoner 感知队友。
+    """
+    transport = InternalTransport()
+    for member in members:
+
+        async def _handler(subtask: str, _m: BaseAgent = member) -> Observation:
+            result = await _m.execute(subtask)
+            return Observation(
+                observation_id=f"obs_{result.trace_id}",
+                success=result.status == "completed",
+                payload=result.output,
+                error=result.error,
+            )
+
+        transport.register_agent(member.role_profile.role, _handler)
+    roster_desc = build_team_roster([m.role_profile for m in members])
+    return transport, roster_desc
 
 
 def register_defaults() -> None:

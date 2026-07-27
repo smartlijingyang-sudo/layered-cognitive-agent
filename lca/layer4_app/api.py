@@ -138,7 +138,11 @@ class MultiAgentTeam:
         )
         base_members = [m._base_agent for m in members]
         base_supervisor = supervisor._as_supervisor() if supervisor else None
-        self._orchestrator = TeamOrchestrator(base_members, config, base_supervisor)
+        from lca.layer4_app.defaults import build_team_transport
+
+        self._orchestrator = TeamOrchestrator(
+            base_members, config, base_supervisor, transport_factory=build_team_transport
+        )
 
     async def run(self, objective: str) -> Result:
         return await self._orchestrator.run(objective)
