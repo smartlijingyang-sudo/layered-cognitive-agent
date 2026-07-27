@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from lca.contracts.protocols import AgentTransport
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer3_agent.supervisor import Supervisor
-
-TransportFactory = Callable[[list[BaseAgent]], tuple[AgentTransport, str]]
 
 
 class TeamOrchestrator:
@@ -24,12 +20,14 @@ class TeamOrchestrator:
         members: list[BaseAgent],
         config: TeamConfig,
         supervisor: Supervisor | None = None,
-        transport_factory: TransportFactory | None = None,
+        transport: AgentTransport | None = None,
+        roster_desc: str = "",
     ):
         self.members = members
         self.config = config
         self.supervisor = supervisor
-        self.transport_factory = transport_factory
+        self.transport = transport
+        self.roster_desc = roster_desc
 
     async def run(self, objective: str) -> Result:
         """按 TeamConfig.process 类型选择组织形态执行。"""
@@ -44,9 +42,8 @@ class TeamOrchestrator:
         """Supervisor 单向委派、汇总。"""
         if self.supervisor is None:
             raise ValueError("Hierarchical 模式需要 Supervisor")
-        if self.transport_factory is not None:
-            transport, roster_desc = self.transport_factory(self.members)
-            self.supervisor.bind_team(transport, roster_desc)
+        if self.transport is not None:
+            self.supervisor.bind_team(self.transport, self.roster_desc)
         return await self.supervisor.execute(objective)
 
     async def _run_sequential(self, objective: str) -> Result:

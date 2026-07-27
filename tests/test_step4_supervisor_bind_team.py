@@ -187,11 +187,13 @@ class TestTeamOrchestratorHierarchical(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
+        transport, roster_desc = build_team_transport(members)
         orchestrator = TeamOrchestrator(
             members,
             config,
             supervisor=sup,
-            transport_factory=build_team_transport,
+            transport=transport,
+            roster_desc=roster_desc,
         )
         result = await orchestrator.run("build feature")
 
@@ -203,8 +205,8 @@ class TestTeamOrchestratorHierarchical(unittest.IsolatedAsyncioTestCase):
         sup.execute.assert_awaited_once_with("build feature")
         self.assertEqual(result.output, "ok")
 
-    async def test_hierarchical_without_factory_skips_bind(self) -> None:
-        """不传 transport_factory 时不报错（向后兼容）。"""
+    async def test_hierarchical_without_transport_skips_bind(self) -> None:
+        """不传 transport 时不报错（向后兼容）。"""
         members = [_make_member("dev")]
         config = TeamConfig(process="hierarchical")
 

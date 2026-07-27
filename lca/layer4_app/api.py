@@ -140,8 +140,13 @@ class MultiAgentTeam:
         base_supervisor = supervisor._as_supervisor() if supervisor else None
         from lca.layer4_app.defaults import build_team_transport
 
+        transport, roster_desc = build_team_transport(base_members)
         self._orchestrator = TeamOrchestrator(
-            base_members, config, base_supervisor, transport_factory=build_team_transport
+            base_members,
+            config,
+            base_supervisor,
+            transport=transport,
+            roster_desc=roster_desc,
         )
 
     async def run(self, objective: str) -> Result:
