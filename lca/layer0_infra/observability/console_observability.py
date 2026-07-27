@@ -13,4 +13,6 @@ class ConsoleObservability(Observability):
         dur = None
         if span.ended_at:
             dur = int((span.ended_at - span.started_at).total_seconds() * 1000)
-        print(f"  [TraceSpan] {span.name:<28} status={span.status:<5} dur_ms={dur} attrs={span.attributes}")
+        print(
+            f"  [TraceSpan] {span.name:<28} status={span.status:<5} dur_ms={dur} attrs={span.attributes}"
+        )

@@ -16,7 +16,8 @@
 from __future__ import annotations
 
 import os
-from typing import Any, AsyncIterator, Optional
+from collections.abc import AsyncIterator
+from typing import Any
 
 from openai import AsyncOpenAI
 
@@ -28,10 +29,10 @@ class OpenAICompatAdapter(LLMAdapter):
 
     def __init__(
         self,
-        model: Optional[str] = None,
+        model: str | None = None,
         *,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
     ) -> None:
         self._model = model or os.getenv("LLM_MODEL", "gpt-4.1")
         self._client = AsyncOpenAI(

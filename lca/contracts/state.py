@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 
 def _now() -> datetime:
@@ -18,10 +18,10 @@ def _new_id(prefix: str) -> str:
 
 @dataclass
 class Budget:
-    max_tokens: Optional[int] = None
-    max_cost_usd: Optional[float] = None
-    max_steps: Optional[int] = None
-    max_wall_clock_seconds: Optional[int] = None
+    max_tokens: int | None = None
+    max_cost_usd: float | None = None
+    max_steps: int | None = None
+    max_wall_clock_seconds: int | None = None
     used_tokens: int = 0
     used_cost_usd: float = 0.0
     used_steps: int = 0
@@ -57,7 +57,9 @@ class TypedState:
     retrieved_context: list[Any] = field(default_factory=list)
     step: int = 0
     checkpoints: list[StateSnapshot] = field(default_factory=list)
-    status: Literal["running", "paused", "waiting_human", "completed", "failed"] = "running"
+    status: Literal["running", "paused", "waiting_human", "completed", "failed"] = (
+        "running"
+    )
     extra: dict[str, Any] = field(default_factory=dict)
 
     def snapshot(self, reason: str = "periodic") -> StateSnapshot:

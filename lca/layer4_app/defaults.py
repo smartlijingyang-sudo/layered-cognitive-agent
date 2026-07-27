@@ -7,28 +7,31 @@
 
 from __future__ import annotations
 
-from lca.layer0_infra.registry import get_global_registry
+from lca.contracts.role_team import ToolPermissionManifest
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
+from lca.layer0_infra.registry import get_global_registry
 from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
-from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from lca.layer1_cognitive.event_bus import SimpleEventBus
-from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
-from lca.layer1_cognitive.prompt_manager import SimplePromptManager
-from lca.layer1_cognitive.brain.reasoner import SimpleReasoner, DEFAULT_REACT_TEMPLATE
+from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
+from lca.layer1_cognitive.body.simple_body import SimpleBody
+from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.map_modules import (
-    SimpleTaskDecomposer, SimpleStatePredictor, SimpleStateEvaluator,
-    SimpleConflictMonitor, SimpleTaskCoordinator,
+    SimpleConflictMonitor,
+    SimpleStateEvaluator,
+    SimpleStatePredictor,
+    SimpleTaskCoordinator,
+    SimpleTaskDecomposer,
 )
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+from lca.layer1_cognitive.brain.reasoner import DEFAULT_REACT_TEMPLATE, SimpleReasoner
+from lca.layer1_cognitive.event_bus import SimpleEventBus
+from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
+from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 from lca.layer2_runtime.hooks import HOOK_NAMES
+from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
-from lca.contracts.role_team import ToolPermissionManifest
 
 
 def _build_brain(llm, role_profile, tools_desc):

@@ -5,17 +5,18 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from lca.contracts.decision import Observation
-from lca.contracts.role_team import ToolPermissionManifest, RetryPolicy, CacheConfig
-from lca.contracts.result import ToolExecutionError
 from lca.contracts.observability import TraceSpan
-from lca.contracts.protocols import Observability, ToolProtocol, SafeExecutorProtocol
+from lca.contracts.protocols import Observability, SafeExecutorProtocol, ToolProtocol
+from lca.contracts.result import ToolExecutionError
+from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 
 
 def _now():
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc)
 
 
@@ -26,25 +27,40 @@ def _new_id(prefix: str) -> str:
 class SimpleSafeExecutor(SafeExecutorProtocol):
     """权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
 
-    def __init__(self, permission_manifest: ToolPermissionManifest, observability: Observability):
+    def __init__(
+        self, permission_manifest: ToolPermissionManifest, observability: Observability
+    ):
         self.permission_manifest = permission_manifest
         self.observability = observability
         self._cache: dict[str, Observation] = {}
 
     async def execute(
-        self, tool: ToolProtocol, args: dict[str, Any], retry_policy: RetryPolicy, cache_config: CacheConfig
+        self,
+        tool: ToolProtocol,
+        args: dict[str, Any],
+        retry_policy: RetryPolicy,
+        cache_config: CacheConfig,
     ) -> Observation:
         if tool.name not in self.permission_manifest.allowed_tools:
-            raise ToolExecutionError(f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权")
+            raise ToolExecutionError(
+                f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权"
+            )
 
-        cache_key = f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
+        cache_key = (
+            f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
+        )
         if cache_config.enabled and cache_key in self._cache:
             return self._cache[cache_key]
 
-        last_obs: Optional[Observation] = None
+        last_obs: Observation | None = None
         delay = retry_policy.backoff_base_s
         for attempt in range(retry_policy.max_retries + 1):
-            span = TraceSpan(span_id=_new_id("span"), trace_id="", name=f"tool.{tool.name}", started_at=_now())
+            span = TraceSpan(
+                span_id=_new_id("span"),
+                trace_id="",
+                name=f"tool.{tool.name}",
+                started_at=_now(),
+            )
             obs = await tool.execute(args)
             span.ended_at = _now()
             span.status = "ok" if obs.success else "error"
@@ -58,4 +74,6 @@ class SimpleSafeExecutor(SafeExecutorProtocol):
                 await asyncio.sleep(delay)
                 delay *= retry_policy.backoff_multiplier
 
-        raise ToolExecutionError(f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败", last_obs)
+        raise ToolExecutionError(
+            f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败", last_obs
+        )

@@ -6,20 +6,22 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union
-
-from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
-from lca.contracts.result import Result
+import lca.layer4_app.defaults  # noqa: F401 — 触发默认注册
 from lca.contracts.protocols import (
-    MemorySystem, Observability, StateStore, LLMAdapter,
-    ToolProtocol, BrainStrategy,
+    BrainStrategy,
+    LLMAdapter,
+    MemorySystem,
+    Observability,
+    StateStore,
+    ToolProtocol,
 )
+from lca.contracts.result import Result
+from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from lca.layer0_infra.registry import get_global_registry
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
 from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer3_agent.supervisor import Supervisor
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
-import lca.layer4_app.defaults  # noqa: F401 — 触发默认注册
 
 
 class Agent:
@@ -45,17 +47,21 @@ class Agent:
         tools: list[ToolProtocol],
         llm: LLMAdapter,
         max_steps: int = 10,
-        memory: Union[str, MemorySystem] = "simple",
-        observability: Union[str, Observability] = "console",
-        state_store: Union[str, StateStore] = "memory",
-        brain_strategy: Union[str, BrainStrategy] = "default",
+        memory: str | MemorySystem = "simple",
+        observability: str | Observability = "console",
+        state_store: str | StateStore = "memory",
+        brain_strategy: str | BrainStrategy = "default",
     ):
         reg = get_global_registry()
         strategy_reg = get_global_strategy_registry()
 
-        permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
+        permission_manifest = ToolPermissionManifest(
+            allowed_tools=[t.name for t in tools]
+        )
         role_profile = RoleProfile(
-            role=role, goal=goal, backstory=backstory,
+            role=role,
+            goal=goal,
+            backstory=backstory,
             tool_permission_manifest=permission_manifest,
         )
 
@@ -76,7 +82,8 @@ class Agent:
         else:
             brain = brain_strategy
 
-        from lca.layer4_app.defaults import build_body, build_runtime, _build_hooks
+        from lca.layer4_app.defaults import _build_hooks, build_body, build_runtime
+
         body = build_body(tools, obs)
         hooks = _build_hooks(obs)
         event_bus = self._resolve(reg, "event_bus", "simple")
@@ -89,7 +96,9 @@ class Agent:
         if isinstance(value, str):
             impl = reg.resolve(category, value)
             if impl is None:
-                raise ValueError(f"Unknown {category}: {value!r}. Available: {reg.list(category)}")
+                raise ValueError(
+                    f"Unknown {category}: {value!r}. Available: {reg.list(category)}"
+                )
             return impl()
         return value
 
@@ -119,8 +128,8 @@ class MultiAgentTeam:
         self,
         members: list[Agent],
         process: str = "hierarchical",
-        supervisor: Optional[Agent] = None,
-        max_rounds: Optional[int] = None,
+        supervisor: Agent | None = None,
+        max_rounds: int | None = None,
     ):
         config = TeamConfig(
             process=process,  # type: ignore[arg-type]

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any, Callable, Awaitable
+from typing import Any
 
-from lca.contracts.state import TypedState
 from lca.contracts.observability import TraceSpan
-from lca.contracts.protocols import Observability, HookRegistryP, Hook
+from lca.contracts.protocols import HookRegistryP, Observability
+from lca.contracts.state import TypedState
 
 
 def _now() -> datetime:
@@ -43,6 +44,8 @@ class SimpleHookRegistry(HookRegistryP):
         return None
 
 
-async def default_logging_hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
+async def default_logging_hook(
+    event_name: str, state: TypedState, **kwargs: Any
+) -> None:
     extra = {k: v for k, v in kwargs.items() if k != "state"}
     print(f"  [Hook] {event_name} @step={state.step} {extra if extra else ''}")

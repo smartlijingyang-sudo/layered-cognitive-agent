@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lca.contracts.state import TypedState
 from lca.contracts.protocols import TaskDecomposer
+from lca.contracts.state import TypedState
 
 
 class SimpleTaskDecomposer(TaskDecomposer):

@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from lca.contracts.state import TypedState
-from lca.contracts.role_team import RoleProfile
 from lca.contracts.protocols import LLMAdapter, PromptManager, Reasoner
-
+from lca.contracts.role_team import RoleProfile
+from lca.contracts.state import TypedState
 
 DEFAULT_REACT_TEMPLATE = """\
 ROLE: {role}
@@ -38,16 +35,22 @@ class SimpleReasoner(Reasoner):
         self.tools_desc = tools_desc
 
     async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]:
-        context_lines = "\n".join(
-            f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context
-        ) or "(无历史上下文)"
-        prompt = self.prompt_manager.render("react_prompt", {
-            "role": self.role_profile.role,
-            "goal": self.role_profile.goal,
-            "backstory": self.role_profile.backstory,
-            "tools": self.tools_desc,
-            "task": state.task,
-            "context": context_lines,
-        })
+        context_lines = (
+            "\n".join(
+                f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context
+            )
+            or "(无历史上下文)"
+        )
+        prompt = self.prompt_manager.render(
+            "react_prompt",
+            {
+                "role": self.role_profile.role,
+                "goal": self.role_profile.goal,
+                "backstory": self.role_profile.backstory,
+                "tools": self.tools_desc,
+                "task": state.task,
+                "context": context_lines,
+            },
+        )
         raw = await self.llm.complete(prompt)
         return [raw]

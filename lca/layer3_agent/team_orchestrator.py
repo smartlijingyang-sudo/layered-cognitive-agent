@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
-from lca.contracts.role_team import TeamConfig
 from lca.contracts.result import Result
+from lca.contracts.role_team import TeamConfig
 from lca.layer3_agent.base_agent import BaseAgent
 
 
@@ -19,7 +17,7 @@ class TeamOrchestrator:
         self,
         members: list[BaseAgent],
         config: TeamConfig,
-        supervisor: Optional[BaseAgent] = None,
+        supervisor: BaseAgent | None = None,
     ):
         self.members = members
         self.config = config
@@ -43,13 +41,16 @@ class TeamOrchestrator:
     async def _run_sequential(self, objective: str) -> Result:
         """任务像流水线一样在成员间顺序传递。"""
         current_task = objective
-        last_result: Optional[Result] = None
+        last_result: Result | None = None
         for member in self.members:
             last_result = await member.execute(current_task)
             if last_result.output:
                 current_task = last_result.output
         return last_result or Result(
-            trace_id="", status="failed", final_state_ref="", total_steps=0,
+            trace_id="",
+            status="failed",
+            final_state_ref="",
+            total_steps=0,
             budget_used=None,  # type: ignore[arg-type]
             error="No members in team",
         )

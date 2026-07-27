@@ -360,16 +360,20 @@ class Budget(BaseModel):
     used_cost_usd: float = 0.0
     used_steps: int = 0
     started_at: datetime
-    extra: dict[str, Any] = {}       # 预留：未来新增计量维度（如工具调用次数上限）
+    extra: dict[str, Any] = {}  # 预留：未来新增计量维度（如工具调用次数上限）
 
     def exceeded(self) -> bool: ...
+
 
 class StateSnapshot(BaseModel):
     snapshot_id: str
     step: int
-    state_ref: str                    # 指向持久化后端的引用（内存Key/DB行/对象存储路径），而非内联整个State
+    state_ref: (
+        str  # 指向持久化后端的引用（内存Key/DB行/对象存储路径），而非内联整个State
+    )
     reason: Literal["periodic", "pre_approval", "manual", "on_error"]
     created_at: datetime
+
 
 class TypedState(BaseModel):
     schema_version: str = "1.0"
@@ -378,10 +382,12 @@ class TypedState(BaseModel):
     working_memory: dict[str, Any] = {}
     retrieved_context: list["MemoryRecord"] = []
     step: int = 0
-    budget: Budget                    # 见第13节成本治理
+    budget: Budget  # 见第13节成本治理
     checkpoints: list[StateSnapshot] = []
-    status: Literal["running", "paused", "waiting_human", "completed", "failed"] = "running"
-    extra: dict[str, Any] = {}        # 预留：业务方自定义字段，无需修改核心Schema即可挂载
+    status: Literal["running", "paused", "waiting_human", "completed", "failed"] = (
+        "running"
+    )
+    extra: dict[str, Any] = {}  # 预留：业务方自定义字段，无需修改核心Schema即可挂载
 
     def snapshot(self, reason: str = "periodic") -> StateSnapshot: ...
 ```
@@ -395,17 +401,21 @@ class RetryPolicy(BaseModel):
     max_retries: int = 3
     backoff_base_s: float = 1.0
     backoff_multiplier: float = 2.0
-    retryable_errors: list[str] = []      # 异常类型名列表；未列出的异常不重试，直接失败
+    retryable_errors: list[str] = []  # 异常类型名列表；未列出的异常不重试，直接失败
+
 
 class CacheConfig(BaseModel):
     enabled: bool = True
     ttl_s: int = 300
-    key_fields: list[str] = []             # 用哪些入参字段计算缓存Key；为空则对整个arguments做哈希
+    key_fields: list[str] = []  # 用哪些入参字段计算缓存Key；为空则对整个arguments做哈希
+
 
 class ToolPermissionManifest(BaseModel):
     allowed_tools: list[str]
-    max_calls_per_task: dict[str, int] = {}     # tool_name -> 单次任务内调用次数上限
-    requires_approval: list[str] = []            # 即使在allowed_tools中，调用前仍强制走pre_act审批门
+    max_calls_per_task: dict[str, int] = {}  # tool_name -> 单次任务内调用次数上限
+    requires_approval: list[
+        str
+    ] = []  # 即使在allowed_tools中，调用前仍强制走pre_act审批门
 ```
 
 `SafeExecutor.execute()` 在真正调用工具前，会依次读取 `ToolPermissionManifest`（是否越权/超频）、`CacheConfig`（是否命中缓存）、`RetryPolicy`（失败后如何退避重试）——三者任一校验未通过都不会把请求下发到 L0 `ToolProtocol.Executor`。
@@ -420,14 +430,18 @@ class ToolCall(BaseModel):
     idempotency_key: Optional[str] = None
     timeout_s: Optional[int] = None
 
+
 class DelegationSpec(BaseModel):
-    target_role: Optional[str] = None              # 内部委派：按角色路由（如 "researcher"）
-    target_agent_id: Optional[str] = None           # 内部委派：按具体Agent实例路由
-    target_agent_card: Optional["AgentCard"] = None # 外部委派：A2A远程Agent的能力名片
+    target_role: Optional[str] = None  # 内部委派：按角色路由（如 "researcher"）
+    target_agent_id: Optional[str] = None  # 内部委派：按具体Agent实例路由
+    target_agent_card: Optional["AgentCard"] = None  # 外部委派：A2A远程Agent的能力名片
     subtask: str
     context_refs: list[str] = []
     deadline: Optional[datetime] = None
-    protocol: Literal["internal", "a2a", "mcp"] = "internal"   # 预留位：新增协议只需扩展此Literal并实现对应AgentTransport
+    protocol: Literal["internal", "a2a", "mcp"] = (
+        "internal"  # 预留位：新增协议只需扩展此Literal并实现对应AgentTransport
+    )
+
 
 class StructuredDecision(BaseModel):
     schema_version: str = "1.0"
@@ -436,10 +450,11 @@ class StructuredDecision(BaseModel):
     tool_call: Optional[ToolCall] = None
     delegate_to: Optional[DelegationSpec] = None
     response_text: Optional[str] = None
-    rationale: str                    # 可解释性：为什么做这个决策
+    rationale: str  # 可解释性：为什么做这个决策
     confidence: float
     created_at: datetime
     extra: dict[str, Any] = {}
+
 
 class Observation(BaseModel):
     observation_id: str
@@ -451,10 +466,11 @@ class Observation(BaseModel):
     latency_ms: int
     extra: dict[str, Any] = {}
 
+
 class Reflection(BaseModel):
     reflection_id: str
     verdict: Literal["on_track", "needs_correction", "blocked"]
-    lesson: Optional[str] = None      # 沉淀进 Procedural Memory 的经验
+    lesson: Optional[str] = None  # 沉淀进 Procedural Memory 的经验
     correction: Optional[StructuredDecision] = None
     extra: dict[str, Any] = {}
 ```
@@ -470,23 +486,27 @@ class MemoryRecord(BaseModel):
     recency_score: Optional[float] = None
     embedding: Optional[list[float]] = None
     source_trace_id: Optional[str] = None
-    ttl: Optional[int] = None         # 秒；None表示永不过期，交由compress()策略统一治理
+    ttl: Optional[int] = None  # 秒；None表示永不过期，交由compress()策略统一治理
     metadata: dict[str, Any] = {}
+
 
 class SkillRecord(BaseModel):
     """Procedural Memory 的专用契约——比通用 MemoryRecord 多出可执行与可度量属性。"""
+
     skill_id: str
     name: str
     description: str
-    trigger_pattern: str                 # 何种任务模式应召回此技能（用于检索匹配）
-    workflow_ref: str                    # 指向具体工作流定义（Prompt模板ID/子图ID/脚本路径）
+    trigger_pattern: str  # 何种任务模式应召回此技能（用于检索匹配）
+    workflow_ref: str  # 指向具体工作流定义（Prompt模板ID/子图ID/脚本路径）
     success_rate: float = 0.0
     usage_count: int = 0
     last_used_at: Optional[datetime] = None
     extra: dict[str, Any] = {}
 
+
 class KGTriple(BaseModel):
     """可选 KnowledgeGraph 层的最小存储单元。"""
+
     triple_id: str
     subject: str
     predicate: str
@@ -494,7 +514,7 @@ class KGTriple(BaseModel):
     confidence: float = 1.0
     source_trace_id: Optional[str] = None
     valid_from: Optional[datetime] = None
-    valid_until: Optional[datetime] = None    # 支持时序知识失效（如"某负责人已离职"）
+    valid_until: Optional[datetime] = None  # 支持时序知识失效（如"某负责人已离职"）
 ```
 
 ### 5.6 角色与团队配置契约
@@ -511,10 +531,11 @@ class RoleProfile(BaseModel):
     tool_permission_manifest: ToolPermissionManifest
     extra: dict[str, Any] = {}
 
+
 class TeamConfig(BaseModel):
     process: Literal["hierarchical", "sequential", "graph", "debate"]
     shared_memory_layers: list[Literal["semantic", "procedural"]] = []
-    max_rounds: Optional[int] = None            # Debate 场景的最大交锋轮数
+    max_rounds: Optional[int] = None  # Debate 场景的最大交锋轮数
     graph_definition_ref: Optional[str] = None  # process="graph" 时指向节点/边定义
 ```
 
@@ -526,10 +547,11 @@ class TeamConfig(BaseModel):
 class TaskStatus(str, Enum):
     SUBMITTED = "submitted"
     WORKING = "working"
-    INPUT_REQUIRED = "input-required"   # 对应HITL审批门/需要额外输入
+    INPUT_REQUIRED = "input-required"  # 对应HITL审批门/需要额外输入
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELED = "canceled"
+
 
 class AgentCard(BaseModel):
     agent_id: str
@@ -537,13 +559,14 @@ class AgentCard(BaseModel):
     capabilities: list[str]
     tools_exposed: list[str] = []
     protocols_supported: list[Literal["internal", "a2a", "mcp"]] = ["internal"]
-    endpoint: Optional[str] = None       # 外部Agent的可达地址（A2A场景）
-    extra: dict[str, Any] = {}           # 预留：未来协议附加的能力描述字段
+    endpoint: Optional[str] = None  # 外部Agent的可达地址（A2A场景）
+    extra: dict[str, Any] = {}  # 预留：未来协议附加的能力描述字段
+
 
 class TeamMessage(BaseModel):
     message_id: str
     from_agent_id: str
-    to_agent_id: Optional[str] = None    # None 表示广播（走 EventBus）
+    to_agent_id: Optional[str] = None  # None 表示广播（走 EventBus）
     task_id: str
     status: TaskStatus
     payload: Any
@@ -574,10 +597,11 @@ class ApprovalRequest(BaseModel):
     request_id: str
     trace_id: str
     step: int
-    risk_reason: str                    # 为什么被判定为高风险（如"涉及转账""删除生产数据""对外发布"）
+    risk_reason: str  # 为什么被判定为高风险（如"涉及转账""删除生产数据""对外发布"）
     pending_decision: StructuredDecision
     created_at: datetime
     extra: dict[str, Any] = {}
+
 
 class ApprovalDecision(BaseModel):
     request_id: str
@@ -598,11 +622,12 @@ class TraceSpan(BaseModel):
     span_id: str
     trace_id: str
     parent_span_id: Optional[str] = None
-    name: str                           # 如 "brain.think" / "body.act" / "memory.retrieve"
+    name: str  # 如 "brain.think" / "body.act" / "memory.retrieve"
     started_at: datetime
     ended_at: Optional[datetime] = None
     status: Literal["ok", "error"] = "ok"
     attributes: dict[str, Any] = {}
+
 
 class Event(BaseModel):
     event_id: str
@@ -624,23 +649,28 @@ class Result(BaseModel):
     trace_id: str
     status: Literal["completed", "failed", "paused", "waiting_human"]
     output: Optional[str] = None
-    final_state_ref: str                # 指向最终 TypedState 持久化位置的引用
-    lessons: list[str] = []             # 本次运行沉淀的经验摘要，可直接转化为 SkillRecord
+    final_state_ref: str  # 指向最终 TypedState 持久化位置的引用
+    lessons: list[str] = []  # 本次运行沉淀的经验摘要，可直接转化为 SkillRecord
     total_steps: int
     budget_used: Budget
-    trace_url: Optional[str] = None     # 关联的可观测性平台链接
+    trace_url: Optional[str] = None  # 关联的可观测性平台链接
     error: Optional[str] = None
     extra: dict[str, Any] = {}
 
+
 class ApprovalPendingError(Exception):
     """pre_act/pre_reflect Hook 判定需人工确认时抛出；Runtime捕获后状态转为 waiting_human。"""
+
     def __init__(self, approval_request: ApprovalRequest): ...
+
 
 class BudgetExceededError(Exception):
     """Budget.exceeded() 为真时抛出，触发 on_error Hook 后优雅终止（不再重试）。"""
 
+
 class ToolExecutionError(Exception):
     """SafeExecutor 按 RetryPolicy 重试耗尽后仍失败时抛出，携带最后一次 Observation。"""
+
 
 class ProtocolNotSupportedError(Exception):
     """DelegationSpec.protocol 指定的协议未在 transport_registry 中注册时抛出。"""
@@ -654,15 +684,26 @@ class ProtocolNotSupportedError(Exception):
 class BrainStrategy(Protocol):
     name: str
     version: str
+
     async def think(self, state: TypedState) -> StructuredDecision: ...
-    async def reflect(self, state: TypedState, observation: Observation) -> Reflection: ...
+    async def reflect(
+        self, state: TypedState, observation: Observation
+    ) -> Reflection: ...
+
 
 class MemoryLayer(Protocol):
     """单一记忆层（Working/Semantic/Episodic/Procedural/KnowledgeGraph之一）的契约。"""
-    layer_name: Literal["working", "semantic", "episodic", "procedural", "knowledge_graph"]
-    async def retrieve(self, query: str, state: TypedState, top_k: int = 10) -> list[MemoryRecord]: ...
+
+    layer_name: Literal[
+        "working", "semantic", "episodic", "procedural", "knowledge_graph"
+    ]
+
+    async def retrieve(
+        self, query: str, state: TypedState, top_k: int = 10
+    ) -> list[MemoryRecord]: ...
     async def store(self, record: MemoryRecord) -> None: ...
     async def compress(self, records: list[MemoryRecord]) -> list[MemoryRecord]: ...
+
 
 class ToolProtocol(Protocol):
     name: str
@@ -670,90 +711,145 @@ class ToolProtocol(Protocol):
     output_schema: type[BaseModel]
     is_idempotent: bool
     default_timeout_s: int
+
     async def execute(self, args: BaseModel) -> Observation: ...
 
+
 class AgentTransport(Protocol):
-    protocol_name: str                                                  # "internal" / "a2a" / "mcp" / 未来新协议
+    protocol_name: str  # "internal" / "a2a" / "mcp" / 未来新协议
+
     async def discover(self) -> list[AgentCard]: ...
-    async def send_task(self, target: AgentCard, task: str, context_refs: list[str]) -> str: ...  # 返回 task_id
+    async def send_task(
+        self, target: AgentCard, task: str, context_refs: list[str]
+    ) -> str: ...  # 返回 task_id
     async def poll_status(self, task_id: str) -> TaskStatus: ...
     async def receive_result(self, task_id: str) -> Observation: ...
     async def cancel(self, task_id: str) -> None: ...
 
+
 class Hook(Protocol):
-    async def __call__(self, event_name: str, state: TypedState, **kwargs: Any) -> None: ...
+    async def __call__(
+        self, event_name: str, state: TypedState, **kwargs: Any
+    ) -> None: ...
+
 
 # —— Brain 内部协作组件的显式契约 ——
 
+
 class Reasoner(Protocol):
     """负责调用 L0.LLMAdapter 生成候选思路，是 Brain 中唯一直接触达 LLM 的组件。"""
+
     async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]: ...
+
 
 class Critic(Protocol):
     """负责事后自省与纠偏，被 BrainStrategy.reflect() 内部调用。"""
-    async def critique(self, state: TypedState, observation: Observation) -> Reflection: ...
+
+    async def critique(
+        self, state: TypedState, observation: Observation
+    ) -> Reflection: ...
+
 
 class DecisionParser(Protocol):
     """将 Reasoner 的自由文本输出稳健解析为强类型 Decision；解析失败应内部重试而非抛异常穿透到 Loop。"""
+
     def parse(self, raw_output: str, state: TypedState) -> StructuredDecision: ...
+
 
 class TaskDecomposer(Protocol):
     async def decompose(self, state: TypedState) -> list[str]: ...
 
+
 class StatePredictor(Protocol):
-    async def predict(self, state: TypedState, candidate_action: str) -> dict[str, Any]: ...
+    async def predict(
+        self, state: TypedState, candidate_action: str
+    ) -> dict[str, Any]: ...
+
 
 class StateEvaluator(Protocol):
-    async def score(self, state: TypedState, predicted_state: dict[str, Any]) -> float: ...
+    async def score(
+        self, state: TypedState, predicted_state: dict[str, Any]
+    ) -> float: ...
+
 
 class ConflictMonitor(Protocol):
-    async def check(self, state: TypedState, candidates: list[StructuredDecision]) -> list[str]: ...
+    async def check(
+        self, state: TypedState, candidates: list[StructuredDecision]
+    ) -> list[str]: ...
+
 
 class TaskCoordinator(Protocol):
     async def arbitrate(
-        self, state: TypedState, candidates: list[StructuredDecision], scores: list[float]
+        self,
+        state: TypedState,
+        candidates: list[StructuredDecision],
+        scores: list[float],
     ) -> StructuredDecision: ...
+
 
 # —— L1 复合组件契约：Runtime 只依赖这两个复合接口，不感知内部子模块 ——
 
+
 class Body(Protocol):
     """Body 对 L2 暴露的唯一入口，内部封装 ToolRegistry + SafeExecutor 的完整调用链路（见4.1节）。"""
-    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation: ...
+
+    async def act(
+        self, decision: StructuredDecision, state: TypedState
+    ) -> Observation: ...
+
 
 class MemorySystem(Protocol):
     """MemorySystem 对 L2 暴露的复合入口，内部按需扇出到具体 MemoryLayer 实现（见4.1节）。"""
+
     async def perceive_and_retrieve(self, state: TypedState) -> TypedState: ...
     async def update_multi_level(
         self, state: TypedState, observation: Observation, reflection: Reflection
     ) -> None: ...
 
+
 # —— L1/L2 基础设施组件的显式契约 ——
+
 
 class EventBus(Protocol):
     def emit(self, event_name: str, payload: Any, trace_id: str) -> None: ...
-    def subscribe(self, event_name: str, handler: Callable[[Event], Awaitable[None]]) -> None: ...
+    def subscribe(
+        self, event_name: str, handler: Callable[[Event], Awaitable[None]]
+    ) -> None: ...
+
 
 class PromptManager(Protocol):
     def render(self, template_name: str, variables: dict[str, Any]) -> str: ...
-    def register_template(self, name: str, template: str, version: str = "1.0") -> None: ...
+    def register_template(
+        self, name: str, template: str, version: str = "1.0"
+    ) -> None: ...
+
 
 class ToolRegistry(Protocol):
     def register(self, tool: ToolProtocol) -> None: ...
     def get(self, name: str) -> Optional[ToolProtocol]: ...
     def list_allowed(self, manifest: ToolPermissionManifest) -> list[ToolProtocol]: ...
 
+
 class SafeExecutorProtocol(Protocol):
     async def execute(
-        self, tool: ToolProtocol, args: BaseModel, retry_policy: RetryPolicy, cache_config: CacheConfig
+        self,
+        tool: ToolProtocol,
+        args: BaseModel,
+        retry_policy: RetryPolicy,
+        cache_config: CacheConfig,
     ) -> Observation: ...
 
+
 class StateStore(Protocol):
-    async def save(self, state: TypedState) -> str: ...     # 返回 state_ref
+    async def save(self, state: TypedState) -> str: ...  # 返回 state_ref
     async def load(self, state_ref: str) -> TypedState: ...
+
 
 class HookRegistry(Protocol):
     def register(self, event_name: str, hook: Hook) -> None: ...
-    async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any: ...
+    async def trigger(
+        self, event_name: str, state: TypedState, **kwargs: Any
+    ) -> Any: ...
 ```
 
 ### 5.12 扩展点索引表
@@ -818,7 +914,9 @@ class CognitiveRuntime:
                 decision = await self.brain.think(state)
                 await self.hooks.trigger("post_think", state, decision)
 
-                await self.hooks.trigger("pre_act", state, decision)   # 审批门/权限校验挂在此处
+                await self.hooks.trigger(
+                    "pre_act", state, decision
+                )  # 审批门/权限校验挂在此处
                 observation = await self.body.act(decision, state)
                 await self.hooks.trigger("post_act", state, observation)
 
@@ -836,7 +934,9 @@ class CognitiveRuntime:
                 return self.summarize(state)
 
             except Exception as err:
-                handled = await self.hooks.trigger("on_error", state, err)   # 降级/重试策略挂在此处
+                handled = await self.hooks.trigger(
+                    "on_error", state, err
+                )  # 降级/重试策略挂在此处
                 if not handled:
                     state.status = "failed"
                     state.checkpoints.append(state.snapshot(reason="on_error"))
@@ -1268,6 +1368,7 @@ def new_id(prefix: str) -> str:
 # 第5节：核心数据结构（dataclass 版契约；生产环境替换为 pydantic.BaseModel）
 # ============================================================================
 
+
 @dataclass
 class Budget:
     max_tokens: Optional[int] = None
@@ -1320,7 +1421,9 @@ class TypedState:
     retrieved_context: list[MemoryRecord] = field(default_factory=list)
     step: int = 0
     checkpoints: list[StateSnapshot] = field(default_factory=list)
-    status: Literal["running", "paused", "waiting_human", "completed", "failed"] = "running"
+    status: Literal["running", "paused", "waiting_human", "completed", "failed"] = (
+        "running"
+    )
     extra: dict[str, Any] = field(default_factory=dict)
 
     def snapshot(self, reason: str = "periodic") -> StateSnapshot:
@@ -1467,6 +1570,7 @@ class ToolExecutionError(Exception):
 # 第5.11节：关键协议接口（Protocol）—— dataclass 版契约对应的行为契约
 # ============================================================================
 
+
 class LLMAdapter(Protocol):
     async def complete(self, prompt: str, **kwargs: Any) -> str: ...
 
@@ -1488,7 +1592,9 @@ class DecisionParser(Protocol):
 
 
 class Critic(Protocol):
-    async def critique(self, state: TypedState, observation: Observation) -> Reflection: ...
+    async def critique(
+        self, state: TypedState, observation: Observation
+    ) -> Reflection: ...
 
 
 class TaskDecomposer(Protocol):
@@ -1496,30 +1602,43 @@ class TaskDecomposer(Protocol):
 
 
 class StatePredictor(Protocol):
-    async def predict(self, state: TypedState, candidate_action: str) -> dict[str, Any]: ...
+    async def predict(
+        self, state: TypedState, candidate_action: str
+    ) -> dict[str, Any]: ...
 
 
 class StateEvaluator(Protocol):
-    async def score(self, state: TypedState, predicted_state: dict[str, Any]) -> float: ...
+    async def score(
+        self, state: TypedState, predicted_state: dict[str, Any]
+    ) -> float: ...
 
 
 class ConflictMonitor(Protocol):
-    async def check(self, state: TypedState, candidates: list[StructuredDecision]) -> list[str]: ...
+    async def check(
+        self, state: TypedState, candidates: list[StructuredDecision]
+    ) -> list[str]: ...
 
 
 class TaskCoordinator(Protocol):
     async def arbitrate(
-        self, state: TypedState, candidates: list[StructuredDecision], scores: list[float]
+        self,
+        state: TypedState,
+        candidates: list[StructuredDecision],
+        scores: list[float],
     ) -> StructuredDecision: ...
 
 
 class BrainStrategy(Protocol):
     async def think(self, state: TypedState) -> StructuredDecision: ...
-    async def reflect(self, state: TypedState, observation: Observation) -> Reflection: ...
+    async def reflect(
+        self, state: TypedState, observation: Observation
+    ) -> Reflection: ...
 
 
 class Body(Protocol):
-    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation: ...
+    async def act(
+        self, decision: StructuredDecision, state: TypedState
+    ) -> Observation: ...
 
 
 class MemorySystem(Protocol):
@@ -1531,12 +1650,16 @@ class MemorySystem(Protocol):
 
 class EventBus(Protocol):
     def emit(self, event_name: str, payload: Any, trace_id: str) -> None: ...
-    def subscribe(self, event_name: str, handler: Callable[[Any], Awaitable[None]]) -> None: ...
+    def subscribe(
+        self, event_name: str, handler: Callable[[Any], Awaitable[None]]
+    ) -> None: ...
 
 
 class PromptManager(Protocol):
     def render(self, template_name: str, variables: dict[str, Any]) -> str: ...
-    def register_template(self, name: str, template: str, version: str = "1.0") -> None: ...
+    def register_template(
+        self, name: str, template: str, version: str = "1.0"
+    ) -> None: ...
 
 
 class ToolRegistryP(Protocol):
@@ -1546,7 +1669,11 @@ class ToolRegistryP(Protocol):
 
 class SafeExecutorProtocol(Protocol):
     async def execute(
-        self, tool: ToolProtocol, args: dict[str, Any], retry_policy: RetryPolicy, cache_config: CacheConfig
+        self,
+        tool: ToolProtocol,
+        args: dict[str, Any],
+        retry_policy: RetryPolicy,
+        cache_config: CacheConfig,
     ) -> Observation: ...
 
 
@@ -1556,17 +1683,22 @@ class StateStore(Protocol):
 
 
 class Hook(Protocol):
-    async def __call__(self, event_name: str, state: TypedState, **kwargs: Any) -> None: ...
+    async def __call__(
+        self, event_name: str, state: TypedState, **kwargs: Any
+    ) -> None: ...
 
 
 class HookRegistryP(Protocol):
     def register(self, event_name: str, hook: Hook) -> None: ...
-    async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any: ...
+    async def trigger(
+        self, event_name: str, state: TypedState, **kwargs: Any
+    ) -> Any: ...
 
 
 # ============================================================================
 # L0 · 基础设施层
 # ============================================================================
+
 
 class MockLLMAdapter:
     """离线可跑的确定性 Mock 实现，用于本示例；接口与真实厂商适配器完全一致。"""
@@ -1580,29 +1712,38 @@ class MockLLMAdapter:
             tool_result = m.group(1).strip() if m else "未知"
             question = re.search(r"USER_TASK:\s*([^\n]+)", prompt)
             q = question.group(1).strip() if question else ""
-            return json.dumps({
-                "action_type": "respond",
-                "response_text": f"「{q}」的答案是 {tool_result}。",
-                "rationale": "已从工具获得精确计算结果，直接向用户作答，无需进一步调用工具。",
-                "confidence": 0.98,
-            }, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "action_type": "respond",
+                    "response_text": f"「{q}」的答案是 {tool_result}。",
+                    "rationale": "已从工具获得精确计算结果，直接向用户作答，无需进一步调用工具。",
+                    "confidence": 0.98,
+                },
+                ensure_ascii=False,
+            )
 
         expr = self._extract_arithmetic_expression(prompt)
         if expr:
-            return json.dumps({
-                "action_type": "use_tool",
-                "tool_name": "calculator",
-                "arguments": {"expression": expr},
-                "rationale": f"用户问题是纯算术计算（{expr}），应调用 calculator 工具求精确值而非直接臆测。",
-                "confidence": 0.95,
-            }, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "action_type": "use_tool",
+                    "tool_name": "calculator",
+                    "arguments": {"expression": expr},
+                    "rationale": f"用户问题是纯算术计算（{expr}），应调用 calculator 工具求精确值而非直接臆测。",
+                    "confidence": 0.95,
+                },
+                ensure_ascii=False,
+            )
 
-        return json.dumps({
-            "action_type": "respond",
-            "response_text": "这是一个通用问题，暂无可用工具，基于已有知识直接作答。",
-            "rationale": "未检测到需要调用工具的模式，直接生成回答。",
-            "confidence": 0.6,
-        }, ensure_ascii=False)
+        return json.dumps(
+            {
+                "action_type": "respond",
+                "response_text": "这是一个通用问题，暂无可用工具，基于已有知识直接作答。",
+                "rationale": "未检测到需要调用工具的模式，直接生成回答。",
+                "confidence": 0.6,
+            },
+            ensure_ascii=False,
+        )
 
     @staticmethod
     def _extract_arithmetic_expression(prompt: str) -> Optional[str]:
@@ -1610,7 +1751,12 @@ class MockLLMAdapter:
         if not m:
             return None
         text = m.group(1)
-        text = text.replace("乘以", "*").replace("加上", "+").replace("减去", "-").replace("除以", "/")
+        text = (
+            text.replace("乘以", "*")
+            .replace("加上", "+")
+            .replace("减去", "-")
+            .replace("除以", "/")
+        )
         text = text.replace("×", "*").replace("÷", "/")
         nums_ops = re.findall(r"[\d.]+|[+\-*/]", text)
         if len(nums_ops) >= 3:
@@ -1647,8 +1793,10 @@ class CalculatorTool:
     default_timeout_s = 5
 
     _OPS = {
-        ast.Add: operator.add, ast.Sub: operator.sub,
-        ast.Mult: operator.mul, ast.Div: operator.truediv,
+        ast.Add: operator.add,
+        ast.Sub: operator.sub,
+        ast.Mult: operator.mul,
+        ast.Div: operator.truediv,
         ast.USub: operator.neg,
     }
 
@@ -1659,13 +1807,19 @@ class CalculatorTool:
             value = self._safe_eval(expr)
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=new_id("obs"), success=True, payload=value, latency_ms=latency_ms
+                observation_id=new_id("obs"),
+                success=True,
+                payload=value,
+                latency_ms=latency_ms,
             )
         except Exception as e:  # noqa: BLE001
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=new_id("obs"), success=False, payload=None,
-                error=str(e), latency_ms=latency_ms,
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=str(e),
+                latency_ms=latency_ms,
             )
 
     def _safe_eval(self, expr: str) -> float:
@@ -1676,7 +1830,9 @@ class CalculatorTool:
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
             return node.value
         if isinstance(node, ast.BinOp) and type(node.op) in self._OPS:
-            return self._OPS[type(node.op)](self._eval_node(node.left), self._eval_node(node.right))
+            return self._OPS[type(node.op)](
+                self._eval_node(node.left), self._eval_node(node.right)
+            )
         if isinstance(node, ast.UnaryOp) and type(node.op) in self._OPS:
             return self._OPS[type(node.op)](self._eval_node(node.operand))
         raise ValueError(f"不支持的表达式片段: {ast.dump(node)}")
@@ -1702,12 +1858,15 @@ class ConsoleObservability:
         dur = None
         if span.ended_at:
             dur = int((span.ended_at - span.started_at).total_seconds() * 1000)
-        print(f"  [TraceSpan] {span.name:<28} status={span.status:<5} dur_ms={dur} attrs={span.attributes}")
+        print(
+            f"  [TraceSpan] {span.name:<28} status={span.status:<5} dur_ms={dur} attrs={span.attributes}"
+        )
 
 
 # ============================================================================
 # L1 · 认知组件层
 # ============================================================================
+
 
 class SimplePromptManager:
     def __init__(self) -> None:
@@ -1739,9 +1898,15 @@ class SimpleEventBus:
 
     def emit(self, event_name: str, payload: Any, trace_id: str) -> None:
         for handler in self._subs.get(event_name, []):
-            asyncio.create_task(handler({"event_name": event_name, "payload": payload, "trace_id": trace_id}))
+            asyncio.create_task(
+                handler(
+                    {"event_name": event_name, "payload": payload, "trace_id": trace_id}
+                )
+            )
 
-    def subscribe(self, event_name: str, handler: Callable[[Any], Awaitable[None]]) -> None:
+    def subscribe(
+        self, event_name: str, handler: Callable[[Any], Awaitable[None]]
+    ) -> None:
         self._subs.setdefault(event_name, []).append(handler)
 
 
@@ -1754,7 +1919,12 @@ class SimpleHookRegistry:
         self._hooks.setdefault(event_name, []).append(hook)
 
     async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any:
-        span = TraceSpan(span_id=new_id("span"), trace_id=state.trace_id, name=f"hook.{event_name}", started_at=now())
+        span = TraceSpan(
+            span_id=new_id("span"),
+            trace_id=state.trace_id,
+            name=f"hook.{event_name}",
+            started_at=now(),
+        )
         for hook in self._hooks.get(event_name, []):
             await hook(event_name, state, **kwargs)
         span.ended_at = now()
@@ -1762,7 +1932,9 @@ class SimpleHookRegistry:
         return None
 
 
-async def default_logging_hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
+async def default_logging_hook(
+    event_name: str, state: TypedState, **kwargs: Any
+) -> None:
     extra = {k: v for k, v in kwargs.items() if k != "state"}
     print(f"  [Hook] {event_name} @step={state.step} {extra if extra else ''}")
 
@@ -1781,25 +1953,42 @@ class SimpleToolRegistry:
 class SimpleSafeExecutor:
     """权限校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行（第4.1/9节内部链路）。"""
 
-    def __init__(self, permission_manifest: ToolPermissionManifest, observability: ConsoleObservability):
+    def __init__(
+        self,
+        permission_manifest: ToolPermissionManifest,
+        observability: ConsoleObservability,
+    ):
         self.permission_manifest = permission_manifest
         self.observability = observability
         self._cache: dict[str, Observation] = {}
 
     async def execute(
-        self, tool: ToolProtocol, args: dict[str, Any], retry_policy: RetryPolicy, cache_config: CacheConfig
+        self,
+        tool: ToolProtocol,
+        args: dict[str, Any],
+        retry_policy: RetryPolicy,
+        cache_config: CacheConfig,
     ) -> Observation:
         if tool.name not in self.permission_manifest.allowed_tools:
-            raise ToolExecutionError(f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权")
+            raise ToolExecutionError(
+                f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权"
+            )
 
-        cache_key = f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
+        cache_key = (
+            f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
+        )
         if cache_config.enabled and cache_key in self._cache:
             return self._cache[cache_key]
 
         last_obs: Optional[Observation] = None
         delay = retry_policy.backoff_base_s
         for attempt in range(retry_policy.max_retries + 1):
-            span = TraceSpan(span_id=new_id("span"), trace_id="", name=f"tool.{tool.name}", started_at=now())
+            span = TraceSpan(
+                span_id=new_id("span"),
+                trace_id="",
+                name=f"tool.{tool.name}",
+                started_at=now(),
+            )
             obs = await tool.execute(args)
             span.ended_at = now()
             span.status = "ok" if obs.success else "error"
@@ -1813,19 +2002,27 @@ class SimpleSafeExecutor:
                 await asyncio.sleep(delay)
                 delay *= retry_policy.backoff_multiplier
 
-        raise ToolExecutionError(f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败", last_obs)
+        raise ToolExecutionError(
+            f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败", last_obs
+        )
 
 
 class SimpleBody:
     """L1 Body：ToolRegistry + SafeExecutor，对外只暴露 act()。"""
 
-    def __init__(self, tool_registry: SimpleToolRegistry, safe_executor: SimpleSafeExecutor):
+    def __init__(
+        self, tool_registry: SimpleToolRegistry, safe_executor: SimpleSafeExecutor
+    ):
         self.tool_registry = tool_registry
         self.safe_executor = safe_executor
 
     async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
         if decision.action_type == "respond":
-            return Observation(observation_id=new_id("obs"), success=True, payload=decision.response_text)
+            return Observation(
+                observation_id=new_id("obs"),
+                success=True,
+                payload=decision.response_text,
+            )
 
         if decision.action_type == "use_tool":
             assert decision.tool_call is not None
@@ -1836,28 +2033,45 @@ class SimpleBody:
                 tool, decision.tool_call.arguments, RetryPolicy(), CacheConfig()
             )
 
-        raise ToolExecutionError(f"本示例暂未处理的 action_type: {decision.action_type}")
+        raise ToolExecutionError(
+            f"本示例暂未处理的 action_type: {decision.action_type}"
+        )
 
 
 # ---- Brain 内部：MAP 五模块 + Reasoner + Critic + DecisionParser ----------
 
+
 class SimpleReasoner:
-    def __init__(self, llm: LLMAdapter, prompt_manager: SimplePromptManager, role_profile: RoleProfile, tools_desc: str):
+    def __init__(
+        self,
+        llm: LLMAdapter,
+        prompt_manager: SimplePromptManager,
+        role_profile: RoleProfile,
+        tools_desc: str,
+    ):
         self.llm = llm
         self.prompt_manager = prompt_manager
         self.role_profile = role_profile
         self.tools_desc = tools_desc
 
     async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]:
-        context_lines = "\n".join(f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context) or "(无历史上下文)"
-        prompt = self.prompt_manager.render("react_prompt", {
-            "role": self.role_profile.role,
-            "goal": self.role_profile.goal,
-            "backstory": self.role_profile.backstory,
-            "tools": self.tools_desc,
-            "task": state.task,
-            "context": context_lines,
-        })
+        context_lines = (
+            "\n".join(
+                f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context
+            )
+            or "(无历史上下文)"
+        )
+        prompt = self.prompt_manager.render(
+            "react_prompt",
+            {
+                "role": self.role_profile.role,
+                "goal": self.role_profile.goal,
+                "backstory": self.role_profile.backstory,
+                "tools": self.tools_desc,
+                "task": state.task,
+                "context": context_lines,
+            },
+        )
         raw = await self.llm.complete(prompt)
         return [raw]
 
@@ -1884,8 +2098,11 @@ class SimpleDecisionParser:
         except (json.JSONDecodeError, KeyError):
             # 解析失败时的兜底：不向 Runtime 抛异常，退化为直接respond原始文本
             return StructuredDecision(
-                decision_id=new_id("dec"), action_type="respond",
-                response_text=raw_output, rationale="解析失败兜底", confidence=0.1,
+                decision_id=new_id("dec"),
+                action_type="respond",
+                response_text=raw_output,
+                rationale="解析失败兜底",
+                confidence=0.1,
             )
 
 
@@ -1893,11 +2110,15 @@ class SimpleCritic:
     async def critique(self, state: TypedState, observation: Observation) -> Reflection:
         if observation.success:
             return Reflection(
-                reflection_id=new_id("refl"), verdict="on_track",
-                lesson=f"步骤{state.step}成功完成" if observation.payload is not None else None,
+                reflection_id=new_id("refl"),
+                verdict="on_track",
+                lesson=f"步骤{state.step}成功完成"
+                if observation.payload is not None
+                else None,
             )
         return Reflection(
-            reflection_id=new_id("refl"), verdict="needs_correction",
+            reflection_id=new_id("refl"),
+            verdict="needs_correction",
             lesson=f"步骤{state.step}失败: {observation.error}",
         )
 
@@ -1918,13 +2139,18 @@ class SimpleStateEvaluator:
 
 
 class SimpleConflictMonitor:
-    async def check(self, state: TypedState, candidates: list[StructuredDecision]) -> list[str]:
+    async def check(
+        self, state: TypedState, candidates: list[StructuredDecision]
+    ) -> list[str]:
         return []
 
 
 class SimpleTaskCoordinator:
     async def arbitrate(
-        self, state: TypedState, candidates: list[StructuredDecision], scores: list[float]
+        self,
+        state: TypedState,
+        candidates: list[StructuredDecision],
+        scores: list[float],
     ) -> StructuredDecision:
         best_idx = max(range(len(candidates)), key=lambda i: scores[i])
         return candidates[best_idx]
@@ -1962,7 +2188,9 @@ class ModularBrain:
         raw_candidates = await self.reasoner.generate_candidates(state, n=1)
         candidates = [self.decision_parser.parse(rc, state) for rc in raw_candidates]
 
-        predicted = [await self.state_predictor.predict(state, c.rationale) for c in candidates]
+        predicted = [
+            await self.state_predictor.predict(state, c.rationale) for c in candidates
+        ]
         scores = [await self.state_evaluator.score(state, p) for p in predicted]
         conflicts = await self.conflict_monitor.check(state, candidates)
         if conflicts:
@@ -1979,7 +2207,10 @@ class SimpleMemorySystem:
 
     def __init__(self) -> None:
         self._layers: dict[str, list[MemoryRecord]] = {
-            "working": [], "semantic": [], "episodic": [], "procedural": [],
+            "working": [],
+            "semantic": [],
+            "episodic": [],
+            "procedural": [],
         }
 
     async def perceive_and_retrieve(self, state: TypedState) -> TypedState:
@@ -1993,16 +2224,24 @@ class SimpleMemorySystem:
         self, state: TypedState, observation: Observation, reflection: Reflection
     ) -> None:
         if observation.payload is not None and observation.success:
-            self._layers["working"] = [MemoryRecord(
+            self._layers["working"] = [
+                MemoryRecord(
+                    record_id=new_id("mem"),
+                    content=f"TOOL_RESULT: {observation.payload}",
+                    memory_type="working",
+                    importance=0.9,
+                    source_trace_id=state.trace_id,
+                )
+            ]
+        self._layers["episodic"].append(
+            MemoryRecord(
                 record_id=new_id("mem"),
-                content=f"TOOL_RESULT: {observation.payload}",
-                memory_type="working", importance=0.9, source_trace_id=state.trace_id,
-            )]
-        self._layers["episodic"].append(MemoryRecord(
-            record_id=new_id("mem"),
-            content=f"step={state.step} success={observation.success} verdict={reflection.verdict}",
-            memory_type="episodic", importance=0.5, source_trace_id=state.trace_id,
-        ))
+                content=f"step={state.step} success={observation.success} verdict={reflection.verdict}",
+                memory_type="episodic",
+                importance=0.5,
+                source_trace_id=state.trace_id,
+            )
+        )
         await self.compress()
 
     async def compress(self) -> None:
@@ -2014,6 +2253,7 @@ class SimpleMemorySystem:
 # ============================================================================
 # L2 · 认知运行时层 —— CognitiveRuntime（核心 Loop，第6节参考实现的可运行版本）
 # ============================================================================
+
 
 class CognitiveRuntime:
     def __init__(
@@ -2036,7 +2276,9 @@ class CognitiveRuntime:
         return Budget(max_steps=10, max_wall_clock_seconds=30)
 
     async def run(self, task: str, max_steps: int = 10) -> Result:
-        state = TypedState(trace_id=new_id("trace"), task=task, budget=self.default_budget())
+        state = TypedState(
+            trace_id=new_id("trace"), task=task, budget=self.default_budget()
+        )
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
 
@@ -2101,10 +2343,15 @@ class CognitiveRuntime:
         await self.hooks.trigger("on_complete", state)
         return self._summarize(state)
 
-    def _should_stop(self, decision: Optional[StructuredDecision], reflection: Optional[Reflection]) -> bool:
+    def _should_stop(
+        self, decision: Optional[StructuredDecision], reflection: Optional[Reflection]
+    ) -> bool:
         if decision is None or reflection is None:
             return False
-        return decision.action_type == "respond" and reflection.verdict != "needs_correction"
+        return (
+            decision.action_type == "respond"
+            and reflection.verdict != "needs_correction"
+        )
 
     def _summarize(self, state: TypedState) -> Result:
         final_ref = f"mem://{state.trace_id}/{state.step}"
@@ -2123,8 +2370,11 @@ class CognitiveRuntime:
 # L3 · Agent抽象层
 # ============================================================================
 
+
 class BaseAgent:
-    def __init__(self, runtime: CognitiveRuntime, role_profile: RoleProfile, max_steps: int = 10):
+    def __init__(
+        self, runtime: CognitiveRuntime, role_profile: RoleProfile, max_steps: int = 10
+    ):
         self.runtime = runtime
         self.role_profile = role_profile
         self.max_steps = max_steps
@@ -2136,6 +2386,7 @@ class BaseAgent:
 # ============================================================================
 # L4 · 应用/编排层 —— 极简开发者 API
 # ============================================================================
+
 
 class Agent:
     """三行上手的开发者入口：内部完成 L0-L3 全部对象的 DI 组装。"""
@@ -2149,8 +2400,15 @@ class Agent:
         llm: LLMAdapter,
         max_steps: int = 10,
     ):
-        permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
-        role_profile = RoleProfile(role=role, goal=goal, backstory=backstory, tool_permission_manifest=permission_manifest)
+        permission_manifest = ToolPermissionManifest(
+            allowed_tools=[t.name for t in tools]
+        )
+        role_profile = RoleProfile(
+            role=role,
+            goal=goal,
+            backstory=backstory,
+            tool_permission_manifest=permission_manifest,
+        )
 
         observability = ConsoleObservability()
         prompt_manager = SimplePromptManager()
@@ -2179,8 +2437,17 @@ class Agent:
         memory = SimpleMemorySystem()
         hooks = SimpleHookRegistry(observability)
         for event_name in [
-            "on_start", "pre_perceive", "pre_think", "post_think", "pre_act",
-            "post_act", "pre_reflect", "post_reflect", "on_error", "on_pause", "on_complete",
+            "on_start",
+            "pre_perceive",
+            "pre_think",
+            "post_think",
+            "pre_act",
+            "post_act",
+            "pre_reflect",
+            "post_reflect",
+            "on_error",
+            "on_pause",
+            "on_complete",
         ]:
             hooks.register(event_name, default_logging_hook)
 
@@ -2197,6 +2464,7 @@ class Agent:
 # ============================================================================
 # 演示：一个 Agent 回答一个问题（L4 -> L3 -> L2 -> L1 -> L0 全链路串联）
 # ============================================================================
+
 
 async def main() -> None:
     llm = MockLLMAdapter()

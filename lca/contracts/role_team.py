@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 
 @dataclass
@@ -34,7 +34,7 @@ class RoleProfile:
     goal: str
     backstory: str
     tool_permission_manifest: ToolPermissionManifest
-    tone: Optional[str] = None
+    tone: str | None = None
     values: list[str] = field(default_factory=list)
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -42,6 +42,8 @@ class RoleProfile:
 @dataclass
 class TeamConfig:
     process: Literal["hierarchical", "sequential", "graph", "debate"]
-    shared_memory_layers: list[Literal["semantic", "procedural"]] = field(default_factory=list)
-    max_rounds: Optional[int] = None
-    graph_definition_ref: Optional[str] = None
+    shared_memory_layers: list[Literal["semantic", "procedural"]] = field(
+        default_factory=list
+    )
+    max_rounds: int | None = None
+    graph_definition_ref: str | None = None

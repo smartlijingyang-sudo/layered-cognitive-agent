@@ -38,13 +38,19 @@ class CalculatorTool(ToolProtocol):
             value = self._safe_eval(expr)
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=_new_id("obs"), success=True, payload=value, latency_ms=latency_ms
+                observation_id=_new_id("obs"),
+                success=True,
+                payload=value,
+                latency_ms=latency_ms,
             )
         except Exception as e:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=_new_id("obs"), success=False, payload=None,
-                error=str(e), latency_ms=latency_ms,
+                observation_id=_new_id("obs"),
+                success=False,
+                payload=None,
+                error=str(e),
+                latency_ms=latency_ms,
             )
 
     def _safe_eval(self, expr: str) -> float:
@@ -55,7 +61,9 @@ class CalculatorTool(ToolProtocol):
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
             return node.value
         if isinstance(node, ast.BinOp) and type(node.op) in self._OPS:
-            return self._OPS[type(node.op)](self._eval_node(node.left), self._eval_node(node.right))
+            return self._OPS[type(node.op)](
+                self._eval_node(node.left), self._eval_node(node.right)
+            )
         if isinstance(node, ast.UnaryOp) and type(node.op) in self._OPS:
             return self._OPS[type(node.op)](self._eval_node(node.operand))
         raise ValueError(f"不支持的表达式片段: {ast.dump(node)}")

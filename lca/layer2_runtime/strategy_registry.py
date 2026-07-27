@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from collections.abc import Callable
 
 from lca.contracts.protocols import BrainStrategy
 
 BrainFactory = Callable[..., BrainStrategy]
 
-_global_strategy_registry: Optional[StrategyRegistry] = None
+_global_strategy_registry: StrategyRegistry | None = None
 
 
 class StrategyRegistry:
@@ -23,7 +23,7 @@ class StrategyRegistry:
     def register(self, name: str, factory: BrainFactory) -> None:
         self._factories[name] = factory
 
-    def resolve(self, name: str) -> Optional[BrainFactory]:
+    def resolve(self, name: str) -> BrainFactory | None:
         return self._factories.get(name)
 
     def list_strategies(self) -> list[str]:

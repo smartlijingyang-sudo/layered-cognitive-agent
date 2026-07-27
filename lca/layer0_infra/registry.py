@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from typing import Any
 
 
 class ComponentRegistry:
@@ -19,7 +19,7 @@ class ComponentRegistry:
     def register(self, category: str, name: str, impl: Any) -> None:
         self._registries.setdefault(category, {})[name] = impl
 
-    def resolve(self, category: str, name: str) -> Optional[Any]:
+    def resolve(self, category: str, name: str) -> Any | None:
         return self._registries.get(category, {}).get(name)
 
     def list(self, category: str) -> list[str]:

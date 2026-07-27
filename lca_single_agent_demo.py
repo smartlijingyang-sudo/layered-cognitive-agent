@@ -54,7 +54,9 @@ async def main() -> None:
 
     api_key = os.getenv("LLM_API_KEY", "")
     if api_key:
-        print(f"[配置] LLM={os.getenv('LLM_MODEL', 'gpt-4.1')} base_url={os.getenv('LLM_BASE_URL', 'https://api.openai.com/v1')}")
+        print(
+            f"[配置] LLM={os.getenv('LLM_MODEL', 'gpt-4.1')} base_url={os.getenv('LLM_BASE_URL', 'https://api.openai.com/v1')}"
+        )
         llm = OpenAICompatAdapter()
     else:
         print("[配置] 未检测到 LLM_API_KEY，降级使用 MockLLMAdapter")

@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
-from lca.contracts.state import TypedState
-from lca.contracts.decision import StructuredDecision, Observation
+from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.protocols import Body, SafeExecutorProtocol, ToolRegistryP
 from lca.contracts.result import ToolExecutionError
-from lca.contracts.protocols import ToolRegistryP, SafeExecutorProtocol, Body
-from lca.contracts.role_team import RetryPolicy, CacheConfig
+from lca.contracts.role_team import CacheConfig, RetryPolicy
+from lca.contracts.state import TypedState
 
 
 def _new_id(prefix: str) -> str:
@@ -19,13 +18,19 @@ def _new_id(prefix: str) -> str:
 class SimpleBody(Body):
     """ToolRegistry + SafeExecutor 组合。"""
 
-    def __init__(self, tool_registry: ToolRegistryP, safe_executor: SafeExecutorProtocol):
+    def __init__(
+        self, tool_registry: ToolRegistryP, safe_executor: SafeExecutorProtocol
+    ):
         self.tool_registry = tool_registry
         self.safe_executor = safe_executor
 
     async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
         if decision.action_type == "respond":
-            return Observation(observation_id=_new_id("obs"), success=True, payload=decision.response_text)
+            return Observation(
+                observation_id=_new_id("obs"),
+                success=True,
+                payload=decision.response_text,
+            )
 
         if decision.action_type == "use_tool":
             assert decision.tool_calls, "use_tool 需要至少一个 tool_call"
@@ -37,4 +42,6 @@ class SimpleBody(Body):
                 tool, tc.arguments, RetryPolicy(), CacheConfig()
             )
 
-        raise ToolExecutionError(f"本示例暂未处理的 action_type: {decision.action_type}")
+        raise ToolExecutionError(
+            f"本示例暂未处理的 action_type: {decision.action_type}"
+        )

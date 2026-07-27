@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from lca.contracts.decision import StructuredDecision
 
@@ -33,6 +33,6 @@ class ApprovalRequest:
 class ApprovalDecision:
     request_id: str
     approved: bool
-    approver: Optional[str] = None
-    comment: Optional[str] = None
+    approver: str | None = None
+    comment: str | None = None
     decided_at: datetime = field(default_factory=_now)

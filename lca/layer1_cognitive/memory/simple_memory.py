@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import uuid
 
-from lca.contracts.state import TypedState
 from lca.contracts.decision import Observation, Reflection
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols import MemorySystem
+from lca.contracts.state import TypedState
 
 
 def _new_id(prefix: str) -> str:
@@ -36,20 +36,24 @@ class SimpleMemorySystem(MemorySystem):
         self, state: TypedState, observation: Observation, reflection: Reflection
     ) -> None:
         if observation.payload is not None and observation.success:
-            self._layers["working"] = [MemoryRecord(
+            self._layers["working"] = [
+                MemoryRecord(
+                    record_id=_new_id("mem"),
+                    content=f"TOOL_RESULT: {observation.payload}",
+                    memory_type="working",
+                    importance=0.9,
+                    source_trace_id=state.trace_id,
+                )
+            ]
+        self._layers["episodic"].append(
+            MemoryRecord(
                 record_id=_new_id("mem"),
-                content=f"TOOL_RESULT: {observation.payload}",
-                memory_type="working",
-                importance=0.9,
+                content=f"step={state.step} success={observation.success} verdict={reflection.verdict}",
+                memory_type="episodic",
+                importance=0.5,
                 source_trace_id=state.trace_id,
-            )]
-        self._layers["episodic"].append(MemoryRecord(
-            record_id=_new_id("mem"),
-            content=f"step={state.step} success={observation.success} verdict={reflection.verdict}",
-            memory_type="episodic",
-            importance=0.5,
-            source_trace_id=state.trace_id,
-        ))
+            )
+        )
         await self.compress()
 
     async def compress(self) -> None:

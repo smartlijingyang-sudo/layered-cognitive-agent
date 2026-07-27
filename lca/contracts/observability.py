@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 
 def _now() -> datetime:
@@ -22,8 +22,8 @@ class TraceSpan:
     trace_id: str
     name: str
     started_at: datetime
-    parent_span_id: Optional[str] = None
-    ended_at: Optional[datetime] = None
+    parent_span_id: str | None = None
+    ended_at: datetime | None = None
     status: Literal["ok", "error"] = "ok"
     attributes: dict[str, Any] = field(default_factory=dict)
 

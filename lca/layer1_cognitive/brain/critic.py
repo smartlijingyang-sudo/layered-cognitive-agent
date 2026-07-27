@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 
-from lca.contracts.state import TypedState
 from lca.contracts.decision import Observation, Reflection
 from lca.contracts.protocols import Critic
+from lca.contracts.state import TypedState
 
 
 def _new_id(prefix: str) -> str:
@@ -21,7 +21,9 @@ class SimpleCritic(Critic):
             return Reflection(
                 reflection_id=_new_id("refl"),
                 verdict="on_track",
-                lesson=f"步骤{state.step}成功完成" if observation.payload is not None else None,
+                lesson=f"步骤{state.step}成功完成"
+                if observation.payload is not None
+                else None,
             )
         return Reflection(
             reflection_id=_new_id("refl"),

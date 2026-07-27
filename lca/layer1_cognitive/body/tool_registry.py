@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from lca.contracts.protocols import ToolProtocol, ToolRegistryP
 
 
@@ -16,5 +14,5 @@ class SimpleToolRegistry(ToolRegistryP):
     def register(self, tool: ToolProtocol) -> None:
         self._tools[tool.name] = tool
 
-    def get(self, name: str) -> Optional[ToolProtocol]:
+    def get(self, name: str) -> ToolProtocol | None:
         return self._tools.get(name)

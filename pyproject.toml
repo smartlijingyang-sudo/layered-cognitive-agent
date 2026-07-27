@@ -33,3 +33,8 @@ source_modules = [
     "lca.layer3_agent",
 ]
 forbidden_modules = ["lca.layer4_app"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.0",
+]

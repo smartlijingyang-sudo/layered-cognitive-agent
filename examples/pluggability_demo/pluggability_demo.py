@@ -15,19 +15,19 @@ LCA Framework Demo —— 可插拔性验证
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
-from lca.contracts.state import TypedState
 from lca.contracts.decision import Observation, Reflection
-from lca.contracts.observability import TraceSpan
-from lca.contracts.protocols import MemorySystem, Observability
-from lca.layer0_infra.registry import get_global_registry
-from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+from lca.contracts.state import TypedState
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from lca.layer0_infra.registry import get_global_registry
 from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer4_app.api import Agent
 
 
@@ -48,7 +48,9 @@ class LoggingMemorySystem:
         self, state: TypedState, observation: Observation, reflection: Reflection
     ) -> None:
         self.update_count += 1
-        print(f"  [LoggingMemory] update_multi_level #{self.update_count} success={observation.success}")
+        print(
+            f"  [LoggingMemory] update_multi_level #{self.update_count} success={observation.success}"
+        )
         await self._inner.update_multi_level(state, observation, reflection)
 
 

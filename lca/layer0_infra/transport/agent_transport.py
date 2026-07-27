@@ -19,7 +19,9 @@ class InternalTransport(AgentTransport):
     def __init__(self) -> None:
         self._results: dict[str, Observation] = {}
 
-    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str:
+    async def send_task(
+        self, agent_card: Any, subtask: str, context_refs: list[str]
+    ) -> str:
         task_id = _new_id("task")
         return task_id
 
@@ -29,6 +31,12 @@ class InternalTransport(AgentTransport):
         return "working"
 
     async def receive_result(self, task_id: str) -> Observation:
-        return self._results.get(task_id, Observation(
-            observation_id=_new_id("obs"), success=False, payload=None, error="task not found"
-        ))
+        return self._results.get(
+            task_id,
+            Observation(
+                observation_id=_new_id("obs"),
+                success=False,
+                payload=None,
+                error="task not found",
+            ),
+        )

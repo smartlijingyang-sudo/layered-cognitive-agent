@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
-from lca.contracts.state import TypedState, Budget, StateSnapshot
-from lca.contracts.decision import StructuredDecision, Observation, Reflection
-from lca.contracts.result import Result, ApprovalPendingError, BudgetExceededError
+from lca.contracts.decision import Reflection, StructuredDecision
 from lca.contracts.protocols import (
-    BrainStrategy, Body, MemorySystem,
-    HookRegistryP, EventBus, StateStore, Runtime,
+    Body,
+    BrainStrategy,
+    EventBus,
+    HookRegistryP,
+    MemorySystem,
+    Runtime,
+    StateStore,
 )
+from lca.contracts.result import ApprovalPendingError, BudgetExceededError, Result
+from lca.contracts.state import Budget, StateSnapshot, TypedState
 
 
 def _new_id(prefix: str) -> str:
@@ -45,7 +49,9 @@ class CognitiveRuntime(Runtime):
         return Budget(max_steps=10, max_wall_clock_seconds=30)
 
     async def run(self, task: str, max_steps: int = 10) -> Result:
-        state = TypedState(trace_id=_new_id("trace"), task=task, budget=self.default_budget())
+        state = TypedState(
+            trace_id=_new_id("trace"), task=task, budget=self.default_budget()
+        )
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
 
@@ -56,8 +62,8 @@ class CognitiveRuntime(Runtime):
         return await self._loop(state, max_steps)
 
     async def _loop(self, state: TypedState, max_steps: int) -> Result:
-        decision: Optional[StructuredDecision] = None
-        reflection: Optional[Reflection] = None
+        decision: StructuredDecision | None = None
+        reflection: Reflection | None = None
 
         for step in range(state.step, max_steps):
             state.step = step
@@ -97,7 +103,11 @@ class CognitiveRuntime(Runtime):
                 break
 
             state.checkpoints.append(state.snapshot())
-            self.event_bus.emit("step_completed", {"step": state.step, "status": state.status}, state.trace_id)
+            self.event_bus.emit(
+                "step_completed",
+                {"step": state.step, "status": state.status},
+                state.trace_id,
+            )
 
             if state.budget.exceeded():
                 await self.hooks.trigger("on_error", state, error=BudgetExceededError())
@@ -112,11 +122,14 @@ class CognitiveRuntime(Runtime):
         return self._summarize(state)
 
     def _should_stop(
-        self, decision: Optional[StructuredDecision], reflection: Optional[Reflection]
+        self, decision: StructuredDecision | None, reflection: Reflection | None
     ) -> bool:
         if decision is None or reflection is None:
             return False
-        return decision.action_type == "respond" and reflection.verdict != "needs_correction"
+        return (
+            decision.action_type == "respond"
+            and reflection.verdict != "needs_correction"
+        )
 
     def _summarize(self, state: TypedState) -> Result:
         final_ref = f"mem://{state.trace_id}/{state.step}"

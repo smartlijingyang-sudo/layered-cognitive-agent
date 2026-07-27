@@ -10,10 +10,12 @@ LCA Framework Demo —— Multi-Agent Team 协作
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool

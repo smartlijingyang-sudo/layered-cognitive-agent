@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from lca.contracts.protocols import EventBus
 
@@ -16,7 +17,13 @@ class SimpleEventBus(EventBus):
 
     def emit(self, event_name: str, payload: Any, trace_id: str) -> None:
         for handler in self._subs.get(event_name, []):
-            asyncio.create_task(handler({"event_name": event_name, "payload": payload, "trace_id": trace_id}))
+            asyncio.create_task(
+                handler(
+                    {"event_name": event_name, "payload": payload, "trace_id": trace_id}
+                )
+            )
 
-    def subscribe(self, event_name: str, handler: Callable[[Any], Awaitable[None]]) -> None:
+    def subscribe(
+        self, event_name: str, handler: Callable[[Any], Awaitable[None]]
+    ) -> None:
         self._subs.setdefault(event_name, []).append(handler)

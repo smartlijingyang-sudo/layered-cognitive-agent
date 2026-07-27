@@ -3,22 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.state import Budget, TypedState
-from lca.contracts.decision import StructuredDecision, Observation, Reflection, ToolCall
-from lca.contracts.memory import MemoryRecord
-from lca.contracts.role_team import ToolPermissionManifest, RoleProfile
-from lca.contracts.result import Result
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
-from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
-from lca.layer1_cognitive.brain.critic import SimpleCritic
 
 
 class TestBudget(unittest.TestCase):
@@ -55,15 +49,17 @@ class TestCalculatorTool(unittest.TestCase):
 class TestMockLLMAdapter(unittest.TestCase):
     def test_arithmetic_detection(self):
         llm = MockLLMAdapter()
-        result = asyncio.run(llm.complete("ROLE: test\nUSER_TASK: 123 乘以 456 等于多少？\n"))
+        result = asyncio.run(
+            llm.complete("ROLE: test\nUSER_TASK: 123 乘以 456 等于多少？\n")
+        )
         self.assertIn("use_tool", result)
         self.assertIn("calculator", result)
 
     def test_tool_result_response(self):
         llm = MockLLMAdapter()
-        result = asyncio.run(llm.complete(
-            "USER_TASK: 123 乘以 456\nCONTEXT:\nTOOL_RESULT: 56088\n"
-        ))
+        result = asyncio.run(
+            llm.complete("USER_TASK: 123 乘以 456\nCONTEXT:\nTOOL_RESULT: 56088\n")
+        )
         self.assertIn("respond", result)
         self.assertIn("56088", result)
 
@@ -88,9 +84,9 @@ class TestDecisionParser(unittest.TestCase):
 
 class TestEndToEnd(unittest.TestCase):
     def test_single_agent_qa(self):
-        from lca.layer4_app.api import Agent
-        from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+        from lca.layer4_app.api import Agent
 
         agent = Agent(
             role="测试助手",

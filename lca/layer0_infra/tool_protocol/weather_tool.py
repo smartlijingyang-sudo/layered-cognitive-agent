@@ -33,7 +33,8 @@ class GetWeatherTool(ToolProtocol):
         "london": {"temp_c": 19, "condition": "rainy"},
     }
     _CITY_ALIASES: dict[str, str] = {
-        "东京": "tokyo", "東京": "tokyo",
+        "东京": "tokyo",
+        "東京": "tokyo",
         "北京": "beijing",
         "旧金山": "san francisco",
         "纽约": "new york",
@@ -42,16 +43,21 @@ class GetWeatherTool(ToolProtocol):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
-        raw_city = str(
-            args.get("city") or args.get("location") or args.get("name") or ""
-        ).strip().lower()
+        raw_city = (
+            str(args.get("city") or args.get("location") or args.get("name") or "")
+            .strip()
+            .lower()
+        )
         city = self._CITY_ALIASES.get(raw_city, raw_city)
 
         if not city:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=_new_id("obs"), success=False, payload=None,
-                error="missing required arg: city", latency_ms=latency_ms,
+                observation_id=_new_id("obs"),
+                success=False,
+                payload=None,
+                error="missing required arg: city",
+                latency_ms=latency_ms,
             )
 
         await asyncio.sleep(0.05)  # 模拟网络 IO
@@ -60,8 +66,11 @@ class GetWeatherTool(ToolProtocol):
         if data is None:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=_new_id("obs"), success=False, payload=None,
-                error=f"unknown city: {city}", latency_ms=latency_ms,
+                observation_id=_new_id("obs"),
+                success=False,
+                payload=None,
+                error=f"unknown city: {city}",
+                latency_ms=latency_ms,
             )
 
         unit = str(args.get("unit", "celsius")).lower()
@@ -76,6 +85,8 @@ class GetWeatherTool(ToolProtocol):
         }
         latency_ms = int((time.monotonic() - start) * 1000)
         return Observation(
-            observation_id=_new_id("obs"), success=True, payload=result,
+            observation_id=_new_id("obs"),
+            success=True,
+            payload=result,
             latency_ms=latency_ms,
         )
