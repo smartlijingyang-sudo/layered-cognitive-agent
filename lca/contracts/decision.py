@@ -42,7 +42,7 @@ class StructuredDecision:
     action_type: Literal["use_tool", "delegate", "respond", "ask_human", "stop"]
     rationale: str
     confidence: float
-    tool_call: Optional[ToolCall] = None
+    tool_calls: list[ToolCall] = field(default_factory=list)
     delegate_to: Optional[DelegationSpec] = None
     response_text: Optional[str] = None
     schema_version: str = "1.0"
@@ -55,6 +55,7 @@ class Observation:
     observation_id: str
     success: bool
     payload: Any
+    content_type: Literal["text", "image", "audio", "structured"] = "text"
     tool_call_id: Optional[str] = None
     error: Optional[str] = None
     retries_used: int = 0

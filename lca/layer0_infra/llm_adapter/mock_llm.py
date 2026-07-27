@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 
 from lca.contracts.protocols import LLMAdapter
 
@@ -46,6 +46,11 @@ class MockLLMAdapter(LLMAdapter):
             "rationale": "未检测到需要调用工具的模式，直接生成回答。",
             "confidence": 0.6,
         }, ensure_ascii=False)
+
+    async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
+        text = await self.complete(prompt, **kwargs)
+        for char in text:
+            yield char
 
     @staticmethod
     def _extract_arithmetic_expression(prompt: str) -> Optional[str]:

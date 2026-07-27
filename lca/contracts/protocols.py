@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Optional, Protocol, runtime_checkable
+from typing import Any, AsyncIterator, Awaitable, Callable, Optional, Protocol, runtime_checkable
 
 from lca.contracts.state import TypedState
 from lca.contracts.decision import StructuredDecision, Observation, Reflection
@@ -12,6 +12,10 @@ from lca.contracts.role_team import RetryPolicy, CacheConfig
 @runtime_checkable
 class LLMAdapter(Protocol):
     async def complete(self, prompt: str, **kwargs: Any) -> str: ...
+    async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
+        """流式输出，逐 chunk 返回文本。子类按需覆写。"""
+        ...
+        yield ""  # pragma: no cover
 
 
 @runtime_checkable

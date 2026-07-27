@@ -75,8 +75,8 @@ class TestDecisionParser(unittest.TestCase):
         raw = '{"action_type": "use_tool", "tool_name": "calculator", "arguments": {"expression": "1+1"}, "rationale": "calc", "confidence": 0.9}'
         decision = parser.parse(raw, state)
         self.assertEqual(decision.action_type, "use_tool")
-        self.assertIsNotNone(decision.tool_call)
-        self.assertEqual(decision.tool_call.tool_name, "calculator")
+        self.assertEqual(len(decision.tool_calls), 1)
+        self.assertEqual(decision.tool_calls[0].tool_name, "calculator")
 
     def test_parse_fallback(self):
         parser = SimpleDecisionParser()

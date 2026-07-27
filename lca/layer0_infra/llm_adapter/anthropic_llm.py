@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, AsyncIterator
 
 from lca.contracts.protocols import LLMAdapter
 
@@ -24,4 +24,7 @@ class AnthropicLLMAdapter(LLMAdapter):
         #     messages=[{"role": "user", "content": prompt}],
         # )
         # return resp.content[0].text
+        raise NotImplementedError("示例中未实际联网调用，接口保留以展示L0可替换性")
+
+    async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
         raise NotImplementedError("示例中未实际联网调用，接口保留以展示L0可替换性")

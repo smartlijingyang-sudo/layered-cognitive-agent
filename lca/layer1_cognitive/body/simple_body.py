@@ -28,12 +28,13 @@ class SimpleBody(Body):
             return Observation(observation_id=_new_id("obs"), success=True, payload=decision.response_text)
 
         if decision.action_type == "use_tool":
-            assert decision.tool_call is not None
-            tool = self.tool_registry.get(decision.tool_call.tool_name)
+            assert decision.tool_calls, "use_tool 需要至少一个 tool_call"
+            tc = decision.tool_calls[0]
+            tool = self.tool_registry.get(tc.tool_name)
             if tool is None:
-                raise ToolExecutionError(f"未注册工具: {decision.tool_call.tool_name}")
+                raise ToolExecutionError(f"未注册工具: {tc.tool_name}")
             return await self.safe_executor.execute(
-                tool, decision.tool_call.arguments, RetryPolicy(), CacheConfig()
+                tool, tc.arguments, RetryPolicy(), CacheConfig()
             )
 
         raise ToolExecutionError(f"本示例暂未处理的 action_type: {decision.action_type}")

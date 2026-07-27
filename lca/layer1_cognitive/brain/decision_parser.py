@@ -49,25 +49,25 @@ class SimpleDecisionParser(DecisionParser):
         raw_action = str(data.get("action_type", "respond")).lower().strip()
         action_type = _ACTION_ALIASES.get(raw_action, raw_action)
 
-        tool_call = None
+        tool_calls: list[ToolCall] = []
         if action_type == "use_tool":
             tool_name = data.get("tool_name") or data.get("tool")
             arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
             if not isinstance(arguments, dict):
                 arguments = {"expression": str(arguments)}
             if tool_name:
-                tool_call = ToolCall(
+                tool_calls.append(ToolCall(
                     call_id=_new_id("call"),
                     tool_name=tool_name,
                     arguments=arguments,
-                )
+                ))
             else:
                 action_type = "respond"
 
         return StructuredDecision(
             decision_id=_new_id("dec"),
             action_type=action_type,  # type: ignore[arg-type]
-            tool_call=tool_call,
+            tool_calls=tool_calls,
             response_text=data.get("response_text") or data.get("response") or data.get("text"),
             rationale=data.get("rationale", ""),
             confidence=float(data.get("confidence", 0.5)),

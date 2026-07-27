@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 
 from openai import AsyncOpenAI
 
@@ -48,3 +48,6 @@ class OpenAICompatAdapter(LLMAdapter):
             **kwargs,
         )
         return response.choices[0].message.content or ""
+
+    async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
+        raise NotImplementedError("流式输出暂未实现")
