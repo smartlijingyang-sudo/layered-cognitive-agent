@@ -22,6 +22,18 @@ class Result:
     error: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
+    @classmethod
+    def failed(cls, reason: str) -> Result:
+        """构造失败 Result 的工厂方法，消除重复的构造代码块。"""
+        return cls(
+            trace_id="",
+            status="failed",
+            final_state_ref="",
+            total_steps=0,
+            budget_used=None,  # type: ignore[arg-type]
+            error=reason,
+        )
+
 
 class ApprovalPendingError(Exception):
     def __init__(self, approval_request: Any):

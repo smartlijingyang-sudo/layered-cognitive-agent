@@ -16,11 +16,4 @@ class SequentialStrategy(OrchestrationStrategy):
             last_result = await member.execute(current_task)
             if last_result.output:
                 current_task = last_result.output
-        return last_result or Result(
-            trace_id="",
-            status="failed",
-            final_state_ref="",
-            total_steps=0,
-            budget_used=None,  # type: ignore[arg-type]
-            error="No members in team",
-        )
+        return last_result or Result.failed("No members in team")

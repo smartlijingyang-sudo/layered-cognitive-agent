@@ -19,14 +19,7 @@ class ConcatSynthesizer(Synthesizer):
 
     async def synthesize(self, objective: str, candidates: list[Result]) -> Result:
         if not candidates:
-            return Result(
-                trace_id="",
-                status="failed",
-                final_state_ref="",
-                total_steps=0,
-                budget_used=Budget(),
-                error="No candidates to synthesize",
-            )
+            return Result.failed("No candidates to synthesize")
 
         outputs: list[str] = []
         total_steps = 0

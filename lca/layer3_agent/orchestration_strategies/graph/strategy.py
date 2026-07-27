@@ -112,14 +112,7 @@ class GraphStrategy(OrchestrationStrategy):
             else:
                 enqueue_ready_targets(fixed_targets, remaining, executed, queue)
 
-        return last_result or Result(
-            trace_id="",
-            status="failed",
-            final_state_ref="",
-            total_steps=0,
-            budget_used=None,  # type: ignore[arg-type]
-            error="Graph execution produced no results",
-        )
+        return last_result or Result.failed("Graph execution produced no results")
 
     async def _execute_parallel_branches(
         self,

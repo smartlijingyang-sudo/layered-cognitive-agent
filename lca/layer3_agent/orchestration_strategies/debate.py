@@ -42,14 +42,7 @@ class DebateStrategy(OrchestrationStrategy):
 
     async def run(self, context: OrchestrationContext, objective: str) -> Result:
         if not context.members:
-            return Result(
-                trace_id="",
-                status="failed",
-                final_state_ref="",
-                total_steps=0,
-                budget_used=None,  # type: ignore[arg-type]
-                error="No members in team",
-            )
+            return Result.failed("No members in team")
 
         max_rounds = (
             context.config.max_rounds
@@ -86,18 +79,7 @@ class DebateStrategy(OrchestrationStrategy):
 
     async def _arbitrate(self, objective: str, results: list[Result]) -> Result:
         if self._task_coordinator is None or self._state_evaluator is None:
-            return (
-                results[0]
-                if results
-                else Result(
-                    trace_id="",
-                    status="failed",
-                    final_state_ref="",
-                    total_steps=0,
-                    budget_used=None,  # type: ignore[arg-type]
-                    error="No results to arbitrate",
-                )
-            )
+            return results[0] if results else Result.failed("No results to arbitrate")
         state = TypedState(trace_id="debate", task=objective, budget=Budget())
         decisions = [_result_to_decision(r, i) for i, r in enumerate(results)]
         scores = [
