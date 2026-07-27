@@ -198,3 +198,16 @@ class OrchestrationStrategy(Protocol):
     """编排策略接口：每种 process 模式对应一个实现。"""
 
     async def run(self, context: OrchestrationContext, objective: str) -> Result: ...
+
+
+@runtime_checkable
+class Synthesizer(Protocol):
+    """MoA 聚合器：将多个并行候选结果合成为一个最终结果。
+
+    用于 ParallelStrategy 的 fan-in 阶段。不同实现对应不同聚合策略：
+    - ConcatSynthesizer: 简单拼接所有候选输出
+    - LLMSynthesizer: 调用 LLM 做 Layer-2 提炼（MoA 核心）
+    - BestOfSynthesizer: 复用 TaskCoordinator.arbitrate 选优
+    """
+
+    async def synthesize(self, objective: str, candidates: list[Result]) -> Result: ...

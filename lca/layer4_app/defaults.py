@@ -45,6 +45,7 @@ from lca.layer1_cognitive.brain.reasoner import (
     SimpleReasoner,
     build_team_roster,
 )
+from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
 from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
@@ -171,7 +172,7 @@ def register_defaults() -> None:
     orch_reg = get_global_orchestration_registry()
     orch_reg.register("hierarchical", HierarchicalStrategy)
     orch_reg.register("sequential", SequentialStrategy)
-    orch_reg.register("parallel", ParallelStrategy)
+    orch_reg.register("parallel", lambda: ParallelStrategy(synthesizer=ConcatSynthesizer()))
     orch_reg.register("graph", GraphStrategy)
     orch_reg.register("debate", DebateStrategy)
 
