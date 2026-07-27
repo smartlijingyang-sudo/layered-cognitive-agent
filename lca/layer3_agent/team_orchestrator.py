@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols import AgentTransport
+from lca.contracts.protocols import (
+    AgentTransport,
+    OrchestrationContext,
+    OrchestrationStrategy,
+)
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.layer3_agent.base_agent import BaseAgent
+from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer3_agent.supervisor import Supervisor
 
 
 class TeamOrchestrator:
     """
     支持四种组织形态（hierarchical / sequential / graph / debate），
-    均复用同一套底层 Runtime。
+    通过 OrchestrationStrategyRegistry 解析策略，不再 if/elif 硬编码。
     """
 
     def __init__(
@@ -22,6 +27,7 @@ class TeamOrchestrator:
         supervisor: Supervisor | None = None,
         transport: AgentTransport | None = None,
         roster_desc: str = "",
+        strategy: OrchestrationStrategy | None = None,
     ):
         self.members = members
         self.config = config
@@ -29,36 +35,20 @@ class TeamOrchestrator:
         self.transport = transport
         self.roster_desc = roster_desc
 
+        if strategy is not None:
+            self._strategy = strategy
+        else:
+            registry = get_global_orchestration_registry()
+            self._strategy = registry.resolve(config.process)
+
+        self._context = OrchestrationContext(
+            members=members,
+            config=config,
+            supervisor=supervisor,
+            transport=transport,
+            roster_desc=roster_desc,
+        )
+
     async def run(self, objective: str) -> Result:
         """按 TeamConfig.process 类型选择组织形态执行。"""
-        if self.config.process == "hierarchical":
-            return await self._run_hierarchical(objective)
-        elif self.config.process == "sequential":
-            return await self._run_sequential(objective)
-        else:
-            return await self._run_hierarchical(objective)
-
-    async def _run_hierarchical(self, objective: str) -> Result:
-        """Supervisor 单向委派、汇总。"""
-        if self.supervisor is None:
-            raise ValueError("Hierarchical 模式需要 Supervisor")
-        if self.transport is not None:
-            self.supervisor.bind_team(self.transport, self.roster_desc)
-        return await self.supervisor.execute(objective)
-
-    async def _run_sequential(self, objective: str) -> Result:
-        """任务像流水线一样在成员间顺序传递。"""
-        current_task = objective
-        last_result: Result | None = None
-        for member in self.members:
-            last_result = await member.execute(current_task)
-            if last_result.output:
-                current_task = last_result.output
-        return last_result or Result(
-            trace_id="",
-            status="failed",
-            final_state_ref="",
-            total_steps=0,
-            budget_used=None,  # type: ignore[arg-type]
-            error="No members in team",
-        )
+        return await self._strategy.run(self._context, objective)

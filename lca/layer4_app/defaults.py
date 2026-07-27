@@ -53,6 +53,13 @@ from lca.layer2_runtime.hooks import HOOK_NAMES
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
 from lca.layer3_agent.base_agent import BaseAgent
+from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
+from lca.layer3_agent.orchestration_strategies import (
+    DebateStrategy,
+    GraphStrategy,
+    HierarchicalStrategy,
+    SequentialStrategy,
+)
 
 
 def _build_brain(
@@ -159,6 +166,12 @@ def register_defaults() -> None:
 
     strategy_reg = get_global_strategy_registry()
     strategy_reg.register("default", _build_brain)
+
+    orch_reg = get_global_orchestration_registry()
+    orch_reg.register("hierarchical", HierarchicalStrategy)
+    orch_reg.register("sequential", SequentialStrategy)
+    orch_reg.register("graph", GraphStrategy)
+    orch_reg.register("debate", DebateStrategy)
 
 
 register_defaults()

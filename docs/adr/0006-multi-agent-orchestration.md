@@ -16,7 +16,9 @@ Accepted
 | `graph` | 预留：基于 DAG 的自定义工作流 |
 | `debate` | 预留：多 Agent 辩论达成共识 |
 
-`TeamOrchestrator` 根据 `process` 字段选择编排策略。新增编排模式只需在 Orchestrator 里加一个私有方法分支（不改已有分支），契合开闭原则。
+`TeamOrchestrator` 通过 `OrchestrationStrategyRegistry` 按 `process` 字段解析编排策略实例，不再使用 if/elif 分支。新增编排模式只需实现 `OrchestrationStrategy` 协议并注册到 registry，契合开闭原则。
+
+`graph` 和 `debate` 模式已挂载可插拔入口（`GraphStrategy` / `DebateStrategy` 占位实现），具体实现见子 PR #3a / #3b。覆盖测试 `test_orchestration_coverage.py` 保证 `TeamConfig.process` 的 Literal 值集合恒等于 registry 的 key 集合——声明与实现永不脱节。
 
 Agent 间委派通过 `DelegationSpec`，支持 `internal`（框架内直接调用）、`a2a`（跨框架 A2A 协议）、`mcp`（MCP 协议）三种通信方式。
 

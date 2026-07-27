@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass, field
 from typing import (
     Any,
     Protocol,
@@ -11,7 +12,7 @@ from typing import (
 
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
 from lca.contracts.result import Result
-from lca.contracts.role_team import CacheConfig, RetryPolicy
+from lca.contracts.role_team import CacheConfig, RetryPolicy, TeamConfig
 from lca.contracts.state import TypedState
 
 
@@ -168,3 +169,21 @@ class Runtime(Protocol):
 @runtime_checkable
 class AgentProtocol(Protocol):
     async def execute(self, task: str) -> Result: ...
+
+
+@dataclass
+class OrchestrationContext:
+    """编排策略的运行时上下文，由 TeamOrchestrator 构造并传给策略实例。"""
+
+    members: list[Any] = field(default_factory=list)
+    config: TeamConfig | None = None
+    supervisor: Any | None = None
+    transport: AgentTransport | None = None
+    roster_desc: str = ""
+
+
+@runtime_checkable
+class OrchestrationStrategy(Protocol):
+    """编排策略接口：每种 process 模式对应一个实现。"""
+
+    async def run(self, context: OrchestrationContext, objective: str) -> Result: ...
