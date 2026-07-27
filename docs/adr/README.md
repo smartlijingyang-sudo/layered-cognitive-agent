@@ -12,6 +12,7 @@
 | [0008](0008-framework-positioning.md) | 框架定位 | 认知可解释性 + 生产级工程能力，同时优先 |
 | [0009](0009-code-quality-toolchain.md) | 代码质量工具链 | ruff + mypy + pytest + import-linter + pre-commit + CI |
 | [0010](0010-component-protocol-exemption.md) | 组件协议豁免规则 | L0-L3 默认必须声明 Protocol，仅 DI 基础设施和 L4 门面豁免 |
+| [0011](0011-simple-prefix-convention.md) | Simple 前缀命名约定 | `Simple<Protocol>` = 最小可行参考实现，docstring 须声明能力边界 |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件
