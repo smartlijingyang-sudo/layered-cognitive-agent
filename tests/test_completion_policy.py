@@ -7,7 +7,6 @@ import pytest
 from lca.contracts.decision import DelegationSpec, StructuredDecision
 from lca.contracts.state import Budget, TypedState
 from lca.contracts.team_progress import (
-    DelegationLedger,
     ledger_tracking_hook,
     progress_injection_hook,
 )
@@ -15,6 +14,7 @@ from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
     RosterCoveragePolicy,
 )
 from lca.layer1_cognitive.brain.guarded_coordinator import GuardedTaskCoordinator
+from lca.layer1_cognitive.team_progress import DelegationLedger
 
 # ── helpers ──
 

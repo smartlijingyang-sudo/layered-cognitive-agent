@@ -56,6 +56,7 @@ from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.prompt_manager import SimplePromptManager
+from lca.layer1_cognitive.team_progress import DelegationLedger
 from lca.layer2_runtime.fallback_handler import FallbackActionHandler
 from lca.layer2_runtime.hooks import HOOK_NAMES, make_event_emitting_hook
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
@@ -218,6 +219,7 @@ def register_defaults() -> None:
     reg.register("state_store", "memory", InMemoryStateStore)
     reg.register("memory", "simple", SimpleMemorySystem)
     reg.register("event_bus", "simple", SimpleEventBus)
+    reg.register("delegation_ledger", "default", DelegationLedger)
 
     strategy_reg = get_global_strategy_registry()
     strategy_reg.register("default", _build_brain)

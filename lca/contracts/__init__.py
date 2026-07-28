@@ -39,7 +39,7 @@ from lca.contracts.role_team import (
     ToolPermissionManifest,
 )
 from lca.contracts.state import Budget, StateSnapshot, TypedState
-from lca.contracts.team_progress import DelegationLedger, DelegationLedgerProtocol
+from lca.contracts.team_progress import DelegationLedgerProtocol
 
 __all__ = [
     "ActionHandler",
@@ -53,7 +53,6 @@ __all__ = [
     "BudgetExceededError",
     "CacheConfig",
     "CompletionPolicy",
-    "DelegationLedger",
     "DelegationLedgerProtocol",
     "DelegationSpec",
     "Event",

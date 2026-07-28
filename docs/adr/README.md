@@ -14,6 +14,9 @@
 | [0010](0010-component-protocol-exemption.md) | 组件协议豁免规则 | L0-L3 默认必须声明 Protocol，仅 DI 基础设施和 L4 门面豁免 |
 | [0011](0011-simple-prefix-convention.md) | Simple 前缀命名约定 | `Simple<Protocol>` = 最小可行参考实现，docstring 须声明能力边界 |
 | [0012](0012-pydantic-migration-assessment.md) | 维持 dataclass 不迁移 Pydantic | contracts 层纯数据容器，mypy 静态检查已足够，运行时验证冗余 |
+| [0013](0013-real-llm-e2e-and-scenario-config.md) | 真实 LLM E2E 与场景配置 | `pytest -m real_llm` 独立标记，YAML 驱动团队场景 |
+| [0014](0014-error-classification-and-retry-semantics.md) | 错误分类与重试语义 | 工具错误分类 + 结构化重试策略 |
+| [0015](0015-contracts-no-behavior-classes.md) | contracts/ 不含行为类 | 具体实现必须放实现层，contracts/ 仅保留 Protocol + dataclass |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

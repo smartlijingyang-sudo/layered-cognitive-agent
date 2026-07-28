@@ -44,6 +44,9 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.body.action_handlers.HandoffHandler": (
         "ActionHandler 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
     ),
+    "lca.layer1_cognitive.team_progress.delegation_ledger.DelegationLedger": (
+        "DelegationLedgerProtocol 实现，Protocol 定义在 contracts.team_progress 而非 contracts.protocols (ADR-0015)"
+    ),
 }
 
 _SCAN_PACKAGES = [

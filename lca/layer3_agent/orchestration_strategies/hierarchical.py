@@ -7,17 +7,28 @@ from typing import cast
 from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy
 from lca.contracts.result import Result
 from lca.contracts.team_progress import (
-    DelegationLedger,
+    DelegationLedgerProtocol,
     ledger_tracking_hook,
     progress_injection_hook,
 )
+
+
+def _default_ledger_factory(roles: frozenset[str]) -> DelegationLedgerProtocol:
+    """从全局注册表解析 DelegationLedger 并实例化。"""
+    from lca.layer0_infra.registry import get_global_registry
+
+    reg = get_global_registry()
+    ledger_cls = reg.resolve("delegation_ledger", "default")
+    if ledger_cls is None:
+        raise ValueError("未注册 delegation_ledger 'default'，请在 register_defaults() 后使用")
+    return ledger_cls(mandatory_roles=roles)  # type: ignore[no-any-return]
 
 
 class HierarchicalStrategy(OrchestrationStrategy):
     """Supervisor 单向委派、汇总。
 
     自动装配 CompletionPolicy guardrail：
-    1. 初始化 DelegationLedger（所有成员角色 → pending）
+    1. 通过 ledger_factory 创建 DelegationLedger（所有成员角色 → pending）
     2. 用 GuardedTaskCoordinator 包装 supervisor 的 task_coordinator
     3. 注册 post_act 记账 hook + pre_think 进度注入 hook
     """
@@ -30,10 +41,8 @@ class HierarchicalStrategy(OrchestrationStrategy):
 
         # ── 装配确定性收尾 guardrail ──
         mandatory_roles = frozenset(m.role_profile.role for m in context.members)
-        ledger = DelegationLedger(
-            mandatory_roles=mandatory_roles,
-            status=dict.fromkeys(mandatory_roles, "pending"),
-        )
+        factory = context.ledger_factory or _default_ledger_factory
+        ledger = factory(mandatory_roles)
 
         runtime = context.supervisor.runtime
         runtime.configure(team_progress=ledger)
