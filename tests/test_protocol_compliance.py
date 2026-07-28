@@ -257,7 +257,6 @@ class TestL2ProtocolCompliance(unittest.TestCase):
             body,
             SimpleMemorySystem(),
             SimpleHookRegistry(obs),
-            SimpleEventBus(),
             InMemoryStateStore(),
         )
         self.assertIsInstance(runtime, Runtime)
@@ -299,7 +298,6 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             body,
             SimpleMemorySystem(),
             SimpleHookRegistry(obs),
-            SimpleEventBus(),
             InMemoryStateStore(),
         )
         return BaseAgent(runtime, rp), rp, runtime

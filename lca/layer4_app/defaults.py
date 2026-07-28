@@ -19,6 +19,7 @@ from lca.contracts.protocols import (
     MemorySystem,
     Observability,
     StateStore,
+    StepOutcomePolicy,
     Tool,
     TransportRegistryProtocol,
 )
@@ -31,6 +32,7 @@ from lca.layer0_infra.transport.a2a_transport import A2ATransport
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.mcp_transport import MCPTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
+from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
@@ -54,7 +56,8 @@ from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.prompt_manager import SimplePromptManager
-from lca.layer2_runtime.hooks import HOOK_NAMES
+from lca.layer2_runtime.fallback_handler import FallbackActionHandler
+from lca.layer2_runtime.hooks import HOOK_NAMES, make_event_emitting_hook
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
 from lca.layer3_agent.base_agent import BaseAgent
@@ -133,26 +136,36 @@ def build_body(
     observability: Observability,
     transport_registry: TransportRegistryProtocol | None = None,
     action_registry: ActionRegistryProtocol | None = None,
-) -> SimpleBody:
-    """默认 Body 构建器。"""
+    enable_fallback: bool = True,
+) -> Body:
+    """默认 Body 构建器。
+
+    enable_fallback=True 时用 FallbackDecoratedBody 包裹 SimpleBody，
+    使未知 action_type 自动降级，Loop 不感知降级逻辑。
+    """
     permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
     tool_registry = SimpleToolRegistry()
     for t in tools:
         tool_registry.register(t)
     safe_executor = SimpleSafeExecutor(permission_manifest, observability)
     registry = transport_registry or build_default_transport_registry()
-    return SimpleBody(
+    simple_body = SimpleBody(
         tool_registry=tool_registry,
         safe_executor=safe_executor,
         transport_registry=registry,
         action_registry=action_registry,
     )
+    if enable_fallback:
+        return FallbackDecoratedBody(inner=simple_body, fallback_handler=FallbackActionHandler())
+    return simple_body
 
 
-def _build_hooks(observability: Observability) -> SimpleHookRegistry:
+def _build_hooks(observability: Observability, event_bus: EventBus) -> SimpleHookRegistry:
     hooks = SimpleHookRegistry(observability)
+    event_hook = make_event_emitting_hook(event_bus)
     for event_name in HOOK_NAMES:
         hooks.register(event_name, default_logging_hook)
+        hooks.register(event_name, event_hook)
     return hooks
 
 
@@ -161,11 +174,11 @@ def build_runtime(
     body: Body,
     memory: MemorySystem,
     hooks: HookRegistry,
-    event_bus: EventBus,
     state_store: StateStore,
+    outcome_policy: StepOutcomePolicy | None = None,
 ) -> CognitiveRuntime:
     """默认 Runtime 构建器。"""
-    return CognitiveRuntime(brain, body, memory, hooks, event_bus, state_store)
+    return CognitiveRuntime(brain, body, memory, hooks, state_store, outcome_policy=outcome_policy)
 
 
 def build_team_transport(

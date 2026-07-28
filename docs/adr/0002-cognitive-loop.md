@@ -33,3 +33,22 @@ Loop 本体保持稳定不变（<25 行），所有策略切换、Prompt 模板�
 ## 后果
 - 正面：认知可解释性内建于循环；策略可切换（ReAct/Plan-Execute/ToT/Reflexion 都是 `BrainStrategy` 的不同实现）。
 - 负面：MAP 五模块协作增加单步延迟与 Token 消耗——因此设为可配置，简单任务可用轻量 Strategy 直出决策。
+
+## 补充约束（2026-07-28）
+
+### 横切关注点的接入方式
+
+以下横切关注点**必须**通过可替换组件接入，**不得**直接修改 `_loop` 方法：
+
+| 关注点 | 接入方式 | 组件位置 |
+|---|---|---|
+| 终止判定 / 输出提取 | `StepOutcomePolicy` 协议 | `lca/contracts/protocols.py` |
+| 降级（未知 action → respond/use_tool） | `FallbackDecoratedBody`（Body 装饰器） | `lca/layer1_cognitive/body/` |
+| 事件发布（step_completed / action_degraded） | Hook（`make_event_emitting_hook`） | `lca/layer2_runtime/hooks.py` |
+| Checkpoint 写入 | `_checkpoint` 私有方法 | `lca/layer2_runtime/runtime_loop.py` |
+
+### CI 门禁
+
+- `_loop` 方法 AST 语句数 ≤ 30（`test_architecture_conformance.py::TestCognitiveLoopSkeleton`）
+- `runtime_loop.py` 禁止 import `fallback_handler`、`event_bus` 实现、`contracts.action`（import 白名单测试）
+- `HOOK_NAMES` 作为 Loop 唯一对外开放的挂载点，新特性只能以注册 Hook 或实现 `StepOutcomePolicy` / Body 装饰器的方式接入

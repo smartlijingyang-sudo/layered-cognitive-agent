@@ -105,15 +105,24 @@ class Agent:
         else:
             brain = brain_strategy
 
-        from lca.layer4_app.defaults import _build_hooks, build_body, build_runtime
+        from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
+            DefaultStepOutcomePolicy,
+        )
+        from lca.layer4_app.defaults import (
+            _build_hooks,
+            build_body,
+            build_runtime,
+        )
 
         body = build_body(
             tools, obs, transport_registry=transport_reg, action_registry=action_registry
         )
-        hooks = _build_hooks(obs)
         event_bus: EventBus = self._resolve(reg, "event_bus", "simple")
+        hooks = _build_hooks(obs, event_bus)
 
-        runtime = build_runtime(brain, body, mem, hooks, event_bus, ss)
+        runtime = build_runtime(
+            brain, body, mem, hooks, ss, outcome_policy=DefaultStepOutcomePolicy()
+        )
         self._base_agent = BaseAgent(
             runtime,
             role_profile,

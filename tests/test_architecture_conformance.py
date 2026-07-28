@@ -9,10 +9,12 @@
 
 from __future__ import annotations
 
+import ast
 import importlib
 import inspect
 import pkgutil
 import unittest
+from pathlib import Path
 
 # ── 豁免清单 ──────────────────────────────────────────────────────────
 # 键: 类的全限定名 (qualname)
@@ -41,9 +43,6 @@ EXEMPT: dict[str, str] = {
     ),
     "lca.layer1_cognitive.body.action_handlers.HandoffHandler": (
         "ActionHandler 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
-    ),
-    "lca.layer2_runtime.fallback_handler.FallbackActionHandler": (
-        "韧性层降级处理器，Chain-of-Responsibility 兜底节点，非 ActionHandler Protocol 实现"
     ),
 }
 
@@ -147,6 +146,70 @@ class TestArchitectureConformance(unittest.TestCase):
             stale,
             "EXEMPT 中包含不存在的类（已删除或重命名），请清理：\n"
             + "\n".join(f"  - {q}" for q in stale),
+        )
+
+
+class TestCognitiveLoopSkeleton(unittest.TestCase):
+    """ADR-0002 保障：Loop 本体必须保持精简（<30 条 AST 语句），禁止回渗业务逻辑。"""
+
+    _LOOP_FILE = (
+        Path(__file__).resolve().parent.parent / "lca" / "layer2_runtime" / "runtime_loop.py"
+    )
+    _MAX_LOOP_STATEMENTS = 30
+
+    def test_loop_body_statement_count(self) -> None:
+        """_loop 方法的 AST 语句数不得超过阈值，防止业务判定逻辑重新泄漏进 Loop。"""
+        source = self._LOOP_FILE.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+
+        loop_func = None
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "_loop":
+                loop_func = node
+                break
+
+        self.assertIsNotNone(loop_func, "未找到 _loop 方法——CognitiveRuntime 结构可能已变更")
+        stmt_count = len(loop_func.body)  # type: ignore[arg-type]
+        self.assertLessEqual(
+            stmt_count,
+            self._MAX_LOOP_STATEMENTS,
+            f"_loop 方法体包含 {stmt_count} 条 AST 语句，"
+            f"超过 ADR-0002 上限 {self._MAX_LOOP_STATEMENTS}。"
+            "请将业务判定逻辑提取到 StepOutcomePolicy / Hook / Body 装饰器中。",
+        )
+
+    def test_runtime_loop_import_whitelist(self) -> None:
+        """runtime_loop.py 只允许 import contracts 协议类型，禁止 import 具体策略实现。
+
+        防止降级逻辑、事件总线实现等具体概念重新泄漏进 Loop。
+        """
+        source = self._LOOP_FILE.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+
+        forbidden_modules = {
+            "lca.layer2_runtime.fallback_handler",
+            "lca.layer1_cognitive.event_bus",
+            "lca.contracts.action",
+        }
+        violations: list[str] = []
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name in forbidden_modules:
+                        violations.append(f"import {alias.name} (line {node.lineno})")
+            elif (
+                isinstance(node, ast.ImportFrom)
+                and node.module is not None
+                and node.module in forbidden_modules
+            ):
+                names = ", ".join(a.name for a in node.names)
+                violations.append(f"from {node.module} import {names} (line {node.lineno})")
+
+        self.assertFalse(
+            violations,
+            "runtime_loop.py 包含禁止的 import——Loop 不应直接依赖具体策略实现：\n"
+            + "\n".join(f"  - {v}" for v in violations),
         )
 
 

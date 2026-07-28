@@ -1,4 +1,9 @@
-"""CognitiveRuntime —— 核心认知循环（~25行 Loop，第6节参考实现的可运行版本）。"""
+"""CognitiveRuntime —— 核心认知循环（~25行 Loop，ADR-0002）。
+
+Loop 本体只负责六步骨架串联 + 循环控制，
+所有业务判定（降级、输出提取、终止条件）通过 StepOutcomePolicy 注入，
+所有可观测事件通过 Hook 发布，Loop 不直接持有 EventBus。
+"""
 
 from __future__ import annotations
 
@@ -6,28 +11,27 @@ import uuid
 from typing import Any
 
 from lca.contracts.budget import create_budget
-from lca.contracts.decision import Reflection, StructuredDecision
+from lca.contracts.decision import Observation, Reflection, StructuredDecision
 from lca.contracts.protocols import (
     Body,
     BrainStrategy,
-    EventBus,
     HookRegistry,
     MemorySystem,
     Runtime,
     StateStore,
+    StepOutcome,
+    StepOutcomePolicy,
 )
 from lca.contracts.result import (
     ApprovalPendingError,
     BudgetExceededError,
     Result,
-    ToolExecutionError,
 )
 from lca.contracts.state import StateSnapshot, TypedState
-from lca.layer2_runtime.fallback_handler import FALLBACK_DEGRADATION_KEY, FallbackActionHandler
 
 
 def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+    return f"{prefix}-{uuid.uuid4().hex[:12]}"
 
 
 class CognitiveRuntime(Runtime):
@@ -43,17 +47,15 @@ class CognitiveRuntime(Runtime):
         body: Body,
         memory: MemorySystem,
         hooks: HookRegistry,
-        event_bus: EventBus,
         state_store: StateStore,
-        fallback_handler: FallbackActionHandler | None = None,
+        outcome_policy: StepOutcomePolicy | None = None,
     ):
         self.brain = brain
         self.body = body
         self.memory = memory
         self.hooks = hooks
-        self.event_bus = event_bus
         self.state_store = state_store
-        self.fallback_handler = fallback_handler or FallbackActionHandler()
+        self.outcome_policy = outcome_policy or _DefaultOutcomePolicy()
         self._team_progress: Any = None
 
     def configure(self, **capabilities: Any) -> None:
@@ -95,6 +97,7 @@ class CognitiveRuntime(Runtime):
 
     async def _loop(self, state: TypedState, max_steps: int) -> Result:
         decision: StructuredDecision | None = None
+        observation: Observation | None = None
         reflection: Reflection | None = None
 
         for step in range(state.step, max_steps):
@@ -109,28 +112,10 @@ class CognitiveRuntime(Runtime):
                 await self.hooks.trigger("post_think", state, decision=decision)
 
                 await self.hooks.trigger("pre_act", state, decision=decision)
-                observation = await self._act_with_fallback(decision, state)
+                observation = await self.body.act(decision, state)
                 await self.hooks.trigger(
                     "post_act", state, decision=decision, observation=observation
                 )
-
-                # 降级为 respond 等价时，保存最终输出 + 发出可观测事件
-                if FALLBACK_DEGRADATION_KEY in observation.extra and observation.success:
-                    original = observation.extra[FALLBACK_DEGRADATION_KEY]
-                    if decision and decision.response_text:
-                        state.working_memory["final_output"] = decision.response_text
-                    self.event_bus.emit(
-                        "action_degraded",
-                        {
-                            "original_action_type": original,
-                            "degraded_to": "respond",
-                            "step": state.step,
-                        },
-                        state.trace_id,
-                    )
-
-                if decision and decision.action_type == "respond":
-                    state.working_memory["final_output"] = decision.response_text
 
                 await self.hooks.trigger("pre_reflect", state, observation=observation)
                 reflection = await self.brain.reflect(state, observation)
@@ -139,78 +124,40 @@ class CognitiveRuntime(Runtime):
                 await self.memory.update_multi_level(state, observation, reflection)
 
             except ApprovalPendingError:
+                self._checkpoint(state, reason="pre_approval")
                 state.status = "waiting_human"
-                state.checkpoints.append(state.snapshot(reason="pre_approval"))
                 await self.hooks.trigger("on_pause", state)
                 return self._summarize(state)
 
             except Exception as err:
                 await self.hooks.trigger("on_error", state, error=err)
                 state.status = "failed"
-                state.checkpoints.append(state.snapshot(reason="on_error"))
+                self._checkpoint(state, reason="on_error")
                 state.extra["error"] = str(err)
                 break
 
-            state.checkpoints.append(state.snapshot())
-            self.event_bus.emit(
-                "step_completed",
-                {"step": state.step, "status": state.status},
-                state.trace_id,
-            )
+            self._checkpoint(state)
+            outcome = self.outcome_policy.resolve(state, decision, observation, reflection)
+            if outcome.final_output is not None:
+                state.working_memory["final_output"] = outcome.final_output
 
             if state.budget.exceeded():
                 await self.hooks.trigger("on_error", state, error=BudgetExceededError())
-                # 预算耗尽时，若最后一步成功，视为自然终止（agent 已产出有效工作）
-                last_ok = observation is not None and getattr(observation, "success", False)
-                state.status = "completed" if last_ok else "failed"
-                # 若 agent 从未显式 respond，用最后一次 observation 的 payload 兜底
-                if last_ok and "final_output" not in state.working_memory:
-                    payload = getattr(observation, "payload", None)
-                    if isinstance(payload, str):
-                        state.working_memory["final_output"] = payload
+                budget_outcome = self.outcome_policy.resolve_budget_exceeded(observation, state)
+                if budget_outcome.final_output is not None:
+                    state.working_memory["final_output"] = budget_outcome.final_output
+                state.status = budget_outcome.status or state.status  # type: ignore[assignment]
                 break
 
-            if self._should_stop(decision, reflection, observation):
-                state.status = "completed"
+            if outcome.should_stop:
+                state.status = outcome.status or "completed"  # type: ignore[assignment]
                 break
 
         await self.hooks.trigger("on_complete", state)
         return self._summarize(state)
 
-    async def _act_with_fallback(self, decision: StructuredDecision, state: TypedState) -> Any:
-        """执行 action，未知 action_type 时走 FallbackActionHandler 降级。"""
-        from lca.contracts.action import ActionRegistryProtocol
-
-        try:
-            return await self.body.act(decision, state)
-        except ToolExecutionError as err:
-            if not str(err).startswith("未注册的 action_type:"):
-                raise
-            # 从 body 中提取 action_registry 供降级使用
-            registry = getattr(self.body, "action_registry", None)
-            if registry is None or not isinstance(registry, ActionRegistryProtocol):
-                raise
-            return await self.fallback_handler.handle(decision, state, registry)
-
-    def _should_stop(
-        self,
-        decision: StructuredDecision | None,
-        reflection: Reflection | None,
-        observation: Any = None,
-    ) -> bool:
-        if decision is None or reflection is None:
-            return False
-        if decision.action_type == "handoff":
-            return True
-        # 降级成功且 observation 为 success → 视为等价于 respond 完成
-        is_degraded_success = (
-            observation is not None
-            and getattr(observation, "success", False)
-            and FALLBACK_DEGRADATION_KEY in getattr(observation, "extra", {})
-        )
-        if decision.action_type == "respond" or is_degraded_success:
-            return reflection.verdict != "needs_correction"
-        return False
+    def _checkpoint(self, state: TypedState, reason: str = "periodic") -> None:
+        state.checkpoints.append(state.snapshot(reason=reason))
 
     def _summarize(self, state: TypedState) -> Result:
         final_ref = f"mem://{state.trace_id}/{state.step}"
@@ -224,3 +171,28 @@ class CognitiveRuntime(Runtime):
             budget_used=state.budget,
             error=state.extra.get("error"),
         )
+
+
+class _DefaultOutcomePolicy(StepOutcomePolicy):
+    """最小内置 OutcomePolicy——无终止条件，仅用于 Loop 在无外部注入时的兜底。
+
+    实际部署时应使用 layer2_runtime.outcome_policies.DefaultStepOutcomePolicy，
+    它包含 respond/handoff/降级 等完整业务判定。
+    """
+
+    def resolve(
+        self,
+        state: TypedState,
+        decision: StructuredDecision | None,
+        observation: Observation | None,
+        reflection: Reflection | None,
+    ) -> StepOutcome:
+        return StepOutcome()
+
+    def resolve_budget_exceeded(
+        self,
+        observation: Observation | None,
+        state: TypedState,
+    ) -> StepOutcome:
+        last_ok = observation is not None and getattr(observation, "success", False)
+        return StepOutcome(should_stop=True, status="completed" if last_ok else "failed")

@@ -10,6 +10,7 @@ from typing import (
     runtime_checkable,
 )
 
+from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.result import Result
@@ -33,6 +34,15 @@ class Tool(Protocol):
     default_timeout_s: int
 
     async def execute(self, args: dict[str, Any]) -> Observation: ...
+
+    def validate(self, args: dict[str, Any]) -> str | None:
+        """可选前置校验：返回 None 表示合法，返回错误字符串表示非法。
+
+        SafeExecutor 在执行前调用此方法（若工具实现了它）。
+        校验失败直接构造失败 Observation，不进入重试循环。
+        未实现此方法的工具跳过校验（hasattr 检查）。
+        """
+        return None  # pragma: no cover
 
 
 @runtime_checkable
@@ -289,3 +299,56 @@ class TransportRegistryProtocol(Protocol):
     def resolve(self, protocol_name: str) -> AgentTransport: ...
 
     def list_protocols(self) -> list[str]: ...
+
+
+@dataclass
+class StepOutcome:
+    """单步结果判定——Loop 唯一需要的"是否继续 + 如何收尾"信号。
+
+    由 StepOutcomePolicy 产出，Loop 只消费结果，不参与推导。
+    """
+
+    should_stop: bool = False
+    final_output: str | None = None
+    status: str | None = None
+
+
+@runtime_checkable
+class StepOutcomePolicy(Protocol):
+    """单步结果判定策略：决定 Loop 是否继续、最终输出和状态。
+
+    取代散落在 _loop / _should_stop 中的判断逻辑，
+    将"降级成功"、"respond 完成"、"handoff 结束"等业务判定
+    封装到可替换的策略实现中。
+    """
+
+    def resolve(
+        self,
+        state: TypedState,
+        decision: StructuredDecision | None,
+        observation: Observation | None,
+        reflection: Reflection | None,
+    ) -> StepOutcome: ...
+
+    def resolve_budget_exceeded(
+        self,
+        observation: Observation | None,
+        state: TypedState,
+    ) -> StepOutcome: ...
+
+
+@runtime_checkable
+class FallbackHandler(Protocol):
+    """未知 action_type 的降级处理器接口。
+
+    由 Body 装饰器（FallbackDecoratedBody）在捕获到
+    ToolExecutionError("未注册的 action_type") 时调用，
+    将降级语义从 Loop / Runtime 层下沉到 Body 层。
+    """
+
+    async def handle(
+        self,
+        decision: StructuredDecision,
+        state: TypedState,
+        action_registry: ActionRegistryProtocol | None = None,
+    ) -> Observation: ...

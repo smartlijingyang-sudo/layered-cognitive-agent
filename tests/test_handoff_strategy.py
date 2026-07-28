@@ -186,14 +186,16 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
     """CognitiveRuntime 在 handoff 时应停止循环。"""
 
     async def test_runtime_stops_on_handoff(self) -> None:
-        """handoff action 应触发 _should_stop 返回 True。"""
+        """handoff action 应触发 StepOutcomePolicy 返回 should_stop=True。"""
+        from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
+            DefaultStepOutcomePolicy,
+        )
         from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
         brain = MagicMock()
         body = MagicMock()
         memory = MagicMock()
         hooks = MagicMock()
-        event_bus = MagicMock()
         state_store = MagicMock()
 
         hooks.trigger = AsyncMock()
@@ -218,7 +220,14 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
 
         state_store.save = AsyncMock(return_value="ref")
 
-        runtime = CognitiveRuntime(brain, body, memory, hooks, event_bus, state_store)
+        runtime = CognitiveRuntime(
+            brain,
+            body,
+            memory,
+            hooks,
+            state_store,
+            outcome_policy=DefaultStepOutcomePolicy(),
+        )
         result = await runtime.run("test task", max_steps=10)
 
         self.assertEqual(result.status, "completed")

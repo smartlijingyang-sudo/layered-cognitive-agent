@@ -15,6 +15,7 @@ import uuid
 
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.protocols import FallbackHandler
 from lca.contracts.state import TypedState
 
 FALLBACK_DEGRADATION_KEY = "degraded_from_action_type"
@@ -24,24 +25,34 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class FallbackActionHandler:
+class FallbackActionHandler(FallbackHandler):
     """未知 action_type 的兜底处理器。
 
     本身不注册到 ActionRegistry 中（Registry 是无状态纯路由），
-    而是由 Body 在 resolve 返回 None 时显式调用。
+    而是由 Body 装饰器（FallbackDecoratedBody）在捕获到
+    "未注册的 action_type" 错误时显式调用。
     """
 
     async def handle(
         self,
         decision: StructuredDecision,
         state: TypedState,
-        registry: ActionRegistryProtocol,
+        action_registry: ActionRegistryProtocol | None = None,
     ) -> Observation:
         original_action_type = decision.action_type
 
+        if action_registry is None:
+            return Observation(
+                observation_id=_new_id("obs"),
+                success=False,
+                payload=None,
+                error=f"无法识别的 action_type '{original_action_type}' 且无可用的 ActionRegistry",
+                extra={FALLBACK_DEGRADATION_KEY: original_action_type},
+            )
+
         # 策略 1：有 response_text → 降级为 respond
         if decision.response_text:
-            respond_handler = registry.resolve("respond")
+            respond_handler = action_registry.resolve("respond")
             if respond_handler is not None:
                 observation = await respond_handler.execute(decision, state)
                 observation.extra[FALLBACK_DEGRADATION_KEY] = original_action_type
@@ -49,7 +60,7 @@ class FallbackActionHandler:
 
         # 策略 2：有 tool_calls → 降级为 use_tool
         if decision.tool_calls:
-            use_tool_handler = registry.resolve("use_tool")
+            use_tool_handler = action_registry.resolve("use_tool")
             if use_tool_handler is not None:
                 observation = await use_tool_handler.execute(decision, state)
                 observation.extra[FALLBACK_DEGRADATION_KEY] = original_action_type
