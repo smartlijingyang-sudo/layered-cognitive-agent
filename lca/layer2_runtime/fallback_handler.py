@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import uuid
 
-from lca.contracts.action import ActionRegistry
+from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Observation, StructuredDecision
 from lca.contracts.state import TypedState
 
@@ -35,7 +35,7 @@ class FallbackActionHandler:
         self,
         decision: StructuredDecision,
         state: TypedState,
-        registry: ActionRegistry,
+        registry: ActionRegistryProtocol,
     ) -> Observation:
         original_action_type = decision.action_type
 

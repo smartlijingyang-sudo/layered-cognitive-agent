@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.action import ActionRegistry
+from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Observation
 from lca.contracts.protocols import (
     AgentTransport,
@@ -20,6 +20,7 @@ from lca.contracts.protocols import (
     Observability,
     StateStore,
     Tool,
+    TransportRegistryProtocol,
 )
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
@@ -73,7 +74,7 @@ def _build_brain(
     role_profile: RoleProfile,
     tools_desc: str,
     team_roster: str | None = None,
-    action_registry: ActionRegistry | None = None,
+    action_registry: ActionRegistryProtocol | None = None,
 ) -> ModularBrain:
     """默认 Brain 工厂：ModularBrain + MAP 五模块。"""
     prompt_manager = SimplePromptManager()
@@ -130,8 +131,8 @@ def build_default_transport_registry() -> TransportRegistry:
 def build_body(
     tools: list[Tool],
     observability: Observability,
-    transport_registry: TransportRegistry | None = None,
-    action_registry: ActionRegistry | None = None,
+    transport_registry: TransportRegistryProtocol | None = None,
+    action_registry: ActionRegistryProtocol | None = None,
 ) -> SimpleBody:
     """默认 Body 构建器。"""
     permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])

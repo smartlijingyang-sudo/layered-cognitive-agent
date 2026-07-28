@@ -6,6 +6,7 @@ from lca.contracts.protocols import (
     AgentTransport,
     OrchestrationContext,
     OrchestrationStrategy,
+    SharedMemoryStore,
     TeamRuntime,
 )
 from lca.contracts.result import Result
@@ -45,7 +46,7 @@ class TeamOrchestrator(TeamRuntime):
             registry = get_global_orchestration_registry()
             self._strategy = registry.resolve(config.process)
 
-        self._shared_store: TeamSharedMemoryStore | None = None
+        self._shared_store: SharedMemoryStore | None = None
         if config.shared_memory_layers:
             self._shared_store = TeamSharedMemoryStore(config.shared_memory_layers)
             self._inject_shared_memory()

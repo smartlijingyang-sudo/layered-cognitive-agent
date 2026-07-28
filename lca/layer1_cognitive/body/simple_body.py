@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
-from lca.contracts.action import ActionRegistry
+from lca.contracts.action import ActionRegistry, ActionRegistryProtocol
 from lca.contracts.decision import Observation, StructuredDecision
-from lca.contracts.protocols import AgentTransport, Body, SafeExecutor, ToolRegistry
+from lca.contracts.protocols import (
+    AgentTransport,
+    Body,
+    SafeExecutor,
+    ToolRegistry,
+    TransportRegistryProtocol,
+)
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.state import TypedState
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
@@ -22,9 +28,9 @@ class SimpleBody(Body):
         self,
         tool_registry: ToolRegistry | None = None,
         safe_executor: SafeExecutor | None = None,
-        transport_registry: TransportRegistry | None = None,
+        transport_registry: TransportRegistryProtocol | None = None,
         transport: AgentTransport | None = None,
-        action_registry: ActionRegistry | None = None,
+        action_registry: ActionRegistryProtocol | None = None,
     ):
         # 解析 transport_registry
         if transport_registry is not None:

@@ -11,11 +11,15 @@ import uuid
 
 from lca.contracts.action import ActionHandler, ActionRegistry
 from lca.contracts.decision import Observation, StructuredDecision
-from lca.contracts.protocols import AgentTransport, SafeExecutor, ToolRegistry
+from lca.contracts.protocols import (
+    AgentTransport,
+    SafeExecutor,
+    ToolRegistry,
+    TransportRegistryProtocol,
+)
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
 from lca.contracts.state import TypedState, _current_delegator
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
 
 _POLL_INTERVAL_S = 0.05
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
@@ -56,7 +60,7 @@ class UseToolHandler(ActionHandler):
 class DelegateHandler(ActionHandler):
     """处理 delegate 动作：阻塞式委派，等待目标 Agent 返回结果。"""
 
-    def __init__(self, transport_registry: TransportRegistry) -> None:
+    def __init__(self, transport_registry: TransportRegistryProtocol) -> None:
         self._transport_registry = transport_registry
 
     async def execute(self, decision: StructuredDecision, state: TypedState) -> Observation:
@@ -100,7 +104,7 @@ class DelegateHandler(ActionHandler):
 class HandoffHandler(ActionHandler):
     """处理 handoff 动作：非阻塞控制权移交，发完即返回。"""
 
-    def __init__(self, transport_registry: TransportRegistry) -> None:
+    def __init__(self, transport_registry: TransportRegistryProtocol) -> None:
         self._transport_registry = transport_registry
 
     async def execute(self, decision: StructuredDecision, state: TypedState) -> Observation:
@@ -122,7 +126,7 @@ class HandoffHandler(ActionHandler):
 def build_default_action_registry(
     tool_registry: ToolRegistry,
     safe_executor: SafeExecutor,
-    transport_registry: TransportRegistry,
+    transport_registry: TransportRegistryProtocol,
 ) -> ActionRegistry:
     """构建包含所有内置 ActionHandler 的默认注册表。"""
     registry = ActionRegistry()

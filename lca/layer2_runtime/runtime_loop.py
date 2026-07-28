@@ -179,7 +179,7 @@ class CognitiveRuntime(Runtime):
 
     async def _act_with_fallback(self, decision: StructuredDecision, state: TypedState) -> Any:
         """执行 action，未知 action_type 时走 FallbackActionHandler 降级。"""
-        from lca.contracts.action import ActionRegistry
+        from lca.contracts.action import ActionRegistryProtocol
 
         try:
             return await self.body.act(decision, state)
@@ -188,7 +188,7 @@ class CognitiveRuntime(Runtime):
                 raise
             # 从 body 中提取 action_registry 供降级使用
             registry = getattr(self.body, "action_registry", None)
-            if registry is None or not isinstance(registry, ActionRegistry):
+            if registry is None or not isinstance(registry, ActionRegistryProtocol):
                 raise
             return await self.fallback_handler.handle(decision, state, registry)
 

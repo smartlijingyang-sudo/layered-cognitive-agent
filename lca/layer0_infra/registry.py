@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Generic, TypeVar
 
+from lca.contracts.protocols import RegistryProtocol
+
 _T = TypeVar("_T")
 
 
@@ -20,7 +22,7 @@ class RegistryKeyError(ValueError):
         super().__init__(f"未注册{registry_kind} {key!r}，可用: {available}")
 
 
-class NamedRegistry(Generic[_T]):
+class NamedRegistry(RegistryProtocol, Generic[_T]):
     """按名称注册和解析实体的泛型基类。
 
     子类通过 ``_REGISTRY_KIND`` 声明种类名（用于错误消息），

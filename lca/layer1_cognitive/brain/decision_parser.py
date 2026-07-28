@@ -10,7 +10,7 @@ import json
 import re
 import uuid
 
-from lca.contracts.action import ActionRegistry
+from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import DelegationSpec, StructuredDecision, ToolCall
 from lca.contracts.protocols import DecisionParser
 from lca.contracts.state import TypedState
@@ -48,7 +48,7 @@ class SimpleDecisionParser(DecisionParser):
     交由韧性层（FallbackActionHandler）决定降级策略。
     """
 
-    def __init__(self, action_registry: ActionRegistry | None = None) -> None:
+    def __init__(self, action_registry: ActionRegistryProtocol | None = None) -> None:
         self._action_registry = action_registry
 
     def parse(self, raw_output: str, state: TypedState) -> StructuredDecision:

@@ -7,9 +7,8 @@ from typing import Any
 
 from lca.contracts.decision import Observation, Reflection
 from lca.contracts.memory import MemoryRecord
-from lca.contracts.protocols import MemorySystem
+from lca.contracts.protocols import MemorySystem, SharedMemoryStore
 from lca.contracts.state import TypedState
-from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 
 
 def _new_id(prefix: str) -> str:
@@ -19,12 +18,12 @@ def _new_id(prefix: str) -> str:
 class SimpleMemorySystem(MemorySystem):
     """Working / Semantic / Episodic / Procedural 四层记忆。
 
-    可选绑定 TeamSharedMemoryStore：对声明共享的层（semantic/procedural），
+    可选绑定 SharedMemoryStore：对声明共享的层（semantic/procedural），
     读写直接走共享 store，实现跨 Agent 记忆共享；未声明共享的层保持私有。
     """
 
     def __init__(self) -> None:
-        self._shared_store: TeamSharedMemoryStore | None = None
+        self._shared_store: SharedMemoryStore | None = None
         self._private_layers: dict[str, list[MemoryRecord]] = {
             "working": [],
             "semantic": [],
@@ -32,7 +31,7 @@ class SimpleMemorySystem(MemorySystem):
             "procedural": [],
         }
 
-    def bind_shared_store(self, store: TeamSharedMemoryStore) -> None:
+    def bind_shared_store(self, store: SharedMemoryStore) -> None:
         """绑定团队共享记忆存储。共享层的数据读写委托给 store。"""
         self._shared_store = store
 

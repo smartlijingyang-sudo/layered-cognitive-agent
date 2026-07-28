@@ -9,13 +9,14 @@ from __future__ import annotations
 from typing import Literal
 
 from lca.contracts.memory import MemoryRecord
+from lca.contracts.protocols import SharedMemoryStore
 
 SharedLayerName = Literal["semantic", "procedural"]
 
 _VALID_SHARED_LAYERS: frozenset[str] = frozenset({"semantic", "procedural"})
 
 
-class TeamSharedMemoryStore:
+class TeamSharedMemoryStore(SharedMemoryStore):
     """跨 Agent 共享的记忆存储，按 layer 分流。
 
     每个 layer 维护独立的记录列表，多个 SimpleMemorySystem 实例

@@ -7,14 +7,35 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, Protocol, runtime_checkable
 
 RoleStatus = Literal["pending", "in_progress", "done", "failed"]
 
 
+@runtime_checkable
+class DelegationLedgerProtocol(Protocol):
+    """团队委派进度台账接口。
+
+    消费方（TypedState、CompletionPolicy 等）依赖此 Protocol，
+    不直接依赖具体实现。
+    """
+
+    @property
+    def mandatory_roles(self) -> frozenset[str]: ...
+
+    @property
+    def status(self) -> dict[str, RoleStatus]: ...
+
+    def mark(self, role: str, new_status: RoleStatus) -> DelegationLedgerProtocol: ...
+
+    def is_covered(self) -> bool: ...
+
+    def pending_roles(self) -> list[str]: ...
+
+
 @dataclass(frozen=True)
 class DelegationLedger:
-    """不可变团队委派进度台账。
+    """不可变团队委派进度台账（DelegationLedgerProtocol 的默认实现）。
 
     ``mark()`` 返回新实例（frozen dataclass），保证状态更新显式且可追溯。
     """

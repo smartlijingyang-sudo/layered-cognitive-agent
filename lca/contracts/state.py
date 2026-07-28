@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from lca.contracts.team_progress import DelegationLedger
+from lca.contracts.team_progress import DelegationLedgerProtocol
 
 # 跨异步链路传递当前委派者角色：A delegate → B 时，A 的 role 写入此 var，
 # B 的 handler 读取后注入到 TypedState.delegated_by。
@@ -68,7 +68,7 @@ class TypedState:
     extra: dict[str, Any] = field(default_factory=dict)
     agent_role: str = ""
     delegated_by: str = ""
-    team_progress: DelegationLedger | None = None
+    team_progress: DelegationLedgerProtocol | None = None
 
     def snapshot(self, reason: str = "periodic") -> StateSnapshot:
         snap = StateSnapshot(

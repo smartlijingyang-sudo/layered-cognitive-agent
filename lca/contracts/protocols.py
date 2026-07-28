@@ -11,6 +11,7 @@ from typing import (
 )
 
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.memory import MemoryRecord
 from lca.contracts.result import Result
 from lca.contracts.role_team import CacheConfig, RetryPolicy, TeamConfig
 from lca.contracts.state import TypedState
@@ -98,6 +99,18 @@ class MemorySystem(Protocol):
     async def update_multi_level(
         self, state: TypedState, observation: Observation, reflection: Reflection
     ) -> None: ...
+
+
+@runtime_checkable
+class SharedMemoryStore(Protocol):
+    """跨 Agent 共享记忆存储接口。
+
+    按 layer 分流读写，由 TeamOrchestrator 构造并注入各 MemorySystem 实例。
+    """
+
+    def is_shared(self, layer: str) -> bool: ...
+    def add_record(self, layer: str, record: MemoryRecord) -> None: ...
+    def get_records(self, layer: str) -> list[MemoryRecord]: ...
 
 
 @runtime_checkable
@@ -244,3 +257,35 @@ class Synthesizer(Protocol):
     """
 
     async def synthesize(self, objective: str, candidates: list[Result]) -> Result: ...
+
+
+@runtime_checkable
+class RegistryProtocol(Protocol):
+    """按名称注册和解析实体的通用注册表接口。
+
+    具体实现（如 NamedRegistry）提供泛型基类继承，
+    消费方依赖此 Protocol 进行跨层解耦。
+    """
+
+    def register(self, name: str, impl: Any) -> None: ...
+
+    def resolve(self, name: str) -> Any: ...
+
+    def list(self) -> list[str]: ...
+
+    def __contains__(self, name: str) -> bool: ...
+
+
+@runtime_checkable
+class TransportRegistryProtocol(Protocol):
+    """传输注册表接口：按 protocol_name 路由 AgentTransport 实现。
+
+    具体实现（如 TransportRegistry）在 layer0 提供，
+    layer1 Body 和 ActionHandler 依赖此 Protocol 进行解耦。
+    """
+
+    def register(self, transport: AgentTransport) -> None: ...
+
+    def resolve(self, protocol_name: str) -> AgentTransport: ...
+
+    def list_protocols(self) -> list[str]: ...

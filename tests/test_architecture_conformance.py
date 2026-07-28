@@ -26,24 +26,9 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.registry.ComponentRegistry": (
         "DI 注册表本身，非可插拔组件 (ADR-0005/ADR-0010)"
     ),
-    "lca.layer0_infra.registry.NamedRegistry": (
-        "DI 注册表泛型基类，非可插拔组件 (ADR-0005/ADR-0010)"
-    ),
     "lca.layer0_infra.registry.RegistryKeyError": ("异常类型，非可插拔组件 (ADR-0010)"),
-    "lca.layer0_infra.transport.transport_registry.TransportRegistry": (
-        "传输路由基础设施，非可插拔组件 (ADR-0010)"
-    ),
     "lca.layer0_infra.transport.transport_registry.TransportNotFoundError": (
         "异常类型，非可插拔组件 (ADR-0010)"
-    ),
-    "lca.layer1_cognitive.memory.team_shared_memory.TeamSharedMemoryStore": (
-        "跨 Agent 共享记忆数据存储，不需要 Protocol 多态 (ADR-0010)"
-    ),
-    "lca.layer2_runtime.strategy_registry.StrategyRegistry": (
-        "DI 注册表本身，非可插拔组件 (ADR-0005/ADR-0010)"
-    ),
-    "lca.layer3_agent.orchestration_registry.OrchestrationStrategyRegistry": (
-        "编排策略注册表，DI 基础设施 (ADR-0010)"
     ),
     "lca.layer1_cognitive.body.action_handlers.RespondHandler": (
         "ActionHandler 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
@@ -114,12 +99,12 @@ class TestArchitectureConformance(unittest.TestCase):
     """L0-L3 每个具体类必须显式声明 Protocol 基类，否则必须出现在 EXEMPT 中。"""
 
     def test_protocol_count_regression(self) -> None:
-        """回归防护：Protocol 数量不得低于当前基线（28 个），防止重构意外删除协议。"""
+        """回归防护：Protocol 数量不得低于当前基线（32 个），防止重构意外删除协议。"""
         protocol_bases = _collect_protocol_classes()
         self.assertGreaterEqual(
             len(protocol_bases),
-            28,
-            "Protocol 数量低于基线 28 —— 是否有协议被意外删除？"
+            32,
+            "Protocol 数量低于基线 32 —— 是否有协议被意外删除？"
             " 如果确实需要减少协议数量，请同步更新此断言并附 ADR。",
         )
 
