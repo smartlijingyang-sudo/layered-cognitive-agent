@@ -54,6 +54,7 @@ class CognitiveRuntime(Runtime):
         self.event_bus = event_bus
         self.state_store = state_store
         self.fallback_handler = fallback_handler or FallbackActionHandler()
+        self._team_progress: Any = None
 
     def configure(self, **capabilities: Any) -> None:
         if "transport" in capabilities and hasattr(self.body, "bind_transport"):
@@ -62,6 +63,8 @@ class CognitiveRuntime(Runtime):
             self.brain.set_team_roster(capabilities["team_roster"])
         if "shared_memory" in capabilities and hasattr(self.memory, "bind_shared_store"):
             self.memory.bind_shared_store(capabilities["shared_memory"])
+        if "team_progress" in capabilities:
+            self._team_progress = capabilities["team_progress"]
 
     async def run(
         self,
@@ -79,6 +82,7 @@ class CognitiveRuntime(Runtime):
             ),
             agent_role=context.get("agent_role", ""),
             delegated_by=context.get("delegated_by", ""),
+            team_progress=self._team_progress,
         )
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
@@ -106,7 +110,9 @@ class CognitiveRuntime(Runtime):
 
                 await self.hooks.trigger("pre_act", state, decision=decision)
                 observation = await self._act_with_fallback(decision, state)
-                await self.hooks.trigger("post_act", state, observation=observation)
+                await self.hooks.trigger(
+                    "post_act", state, decision=decision, observation=observation
+                )
 
                 # 降级为 respond 等价时，保存最终输出 + 发出可观测事件
                 if FALLBACK_DEGRADATION_KEY in observation.extra and observation.success:

@@ -4,6 +4,8 @@ BACKSTORY: {backstory}
 AVAILABLE_TOOLS: {tools}
 TEAM_ROSTER:
 {team_roster}
+TEAM_PROGRESS:
+{team_progress}
 USER_TASK: {task}
 CONTEXT:
 {context}

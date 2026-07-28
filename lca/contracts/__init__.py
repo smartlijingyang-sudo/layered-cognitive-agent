@@ -19,6 +19,7 @@ from lca.contracts.graph import (
 from lca.contracts.lifecycle import AgentCard, TaskStatus, TeamMessage
 from lca.contracts.memory import KGTriple, MemoryRecord, SkillRecord
 from lca.contracts.observability import Event, TraceSpan
+from lca.contracts.protocols import CompletionPolicy
 from lca.contracts.result import (
     ApprovalPendingError,
     BudgetExceededError,
@@ -33,6 +34,7 @@ from lca.contracts.role_team import (
     ToolPermissionManifest,
 )
 from lca.contracts.state import Budget, StateSnapshot, TypedState
+from lca.contracts.team_progress import DelegationLedger
 
 __all__ = [
     "ActionHandler",
@@ -44,6 +46,8 @@ __all__ = [
     "Budget",
     "BudgetExceededError",
     "CacheConfig",
+    "CompletionPolicy",
+    "DelegationLedger",
     "DelegationSpec",
     "Event",
     "ExecutionGraph",

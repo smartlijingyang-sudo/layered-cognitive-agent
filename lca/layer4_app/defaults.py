@@ -223,5 +223,12 @@ def register_defaults() -> None:
     )
     orch_reg.register("handoff", HandoffStrategy)
 
+    # CompletionPolicy 注册
+    from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
+        RosterCoveragePolicy,
+    )
+
+    reg.register("completion_policy", "roster_coverage", RosterCoveragePolicy)
+
 
 register_defaults()

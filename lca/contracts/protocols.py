@@ -219,6 +219,21 @@ class OrchestrationStrategy(Protocol):
 
 
 @runtime_checkable
+class CompletionPolicy(Protocol):
+    """确定性收尾策略：校验候选决策是否可被采纳。
+
+    与 TaskCoordinator 平级，但职责不同：
+    TaskCoordinator 在多候选间仲裁，CompletionPolicy 对仲裁结果做 guardrail。
+    """
+
+    async def enforce(
+        self,
+        state: TypedState,
+        decision: StructuredDecision,
+    ) -> StructuredDecision: ...
+
+
+@runtime_checkable
 class Synthesizer(Protocol):
     """MoA 聚合器：将多个并行候选结果合成为一个最终结果。
 
