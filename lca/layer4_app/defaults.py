@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Observation
 from lca.contracts.protocols import (
     AgentTransport,
@@ -24,14 +23,15 @@ from lca.contracts.protocols import (
     TransportRegistryProtocol,
 )
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
+from lca.layer0_infra.component_registry import get_global_registry
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.observability.jsonl_file_observability import JSONLFileObservability
-from lca.layer0_infra.registry import get_global_registry
-from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
+from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer0_infra.transport.a2a_transport import A2ATransport
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.mcp_transport import MCPTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
+from lca.layer1_cognitive.body.action_registry import ActionRegistryProtocol
 from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
@@ -57,7 +57,7 @@ from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_loggi
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 from lca.layer1_cognitive.team_progress import DelegationLedger
-from lca.layer2_runtime.fallback_handler import FallbackActionHandler
+from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
 from lca.layer2_runtime.hooks import HOOK_NAMES, make_event_emitting_hook
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
@@ -157,7 +157,7 @@ def build_body(
         action_registry=action_registry,
     )
     if enable_fallback:
-        return FallbackDecoratedBody(inner=simple_body, fallback_handler=FallbackActionHandler())
+        return FallbackDecoratedBody(inner=simple_body, fallback_handler=FallbackActionPolicy())
     return simple_body
 
 

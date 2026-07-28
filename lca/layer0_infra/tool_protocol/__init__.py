@@ -1,6 +1,6 @@
-"""L0 工具协议 —— 统一工具契约与执行器。"""
+"""兼容 shim —— 请改用 ``lca.layer0_infra.tools``（ADR-0016）。"""
 
-from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
-from lca.layer0_infra.tool_protocol.weather_tool import GetWeatherTool
+from lca.layer0_infra.tools.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.weather_tool import GetWeatherTool
 
 __all__ = ["CalculatorTool", "GetWeatherTool"]

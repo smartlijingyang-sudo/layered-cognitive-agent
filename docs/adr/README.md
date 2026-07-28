@@ -17,6 +17,7 @@
 | [0013](0013-real-llm-e2e-and-scenario-config.md) | 真实 LLM E2E 与场景配置 | `pytest -m real_llm` 独立标记，YAML 驱动团队场景 |
 | [0014](0014-error-classification-and-retry-semantics.md) | 错误分类与重试语义 | 工具错误分类 + 结构化重试策略 |
 | [0015](0015-contracts-no-behavior-classes.md) | contracts/ 不含行为类 | 具体实现必须放实现层，contracts/ 仅保留 Protocol + dataclass |
+| [0016](0016-contracts-package-v3.md) | 契约层拆包 v3 | protocols/ 按层拆分 + mechanisms/types + SharedMemoryTool；保留 layerN 与 ADR-0002 闭环 |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

@@ -113,7 +113,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
-"lca/contracts/protocols.py" = ["ARG002"]
+"lca/contracts/protocols/**/*.py" = ["ARG002"]
+"lca/contracts/mechanisms.py" = ["ARG002"]
+"lca/contracts/action.py" = ["ARG002"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -150,7 +152,7 @@ markers = [
 [tool.vulture]
 paths = ["lca"]
 exclude = [
-    "lca/contracts/protocols.py",
+    "lca/contracts/protocols",
     "lca/layer0_infra/llm_adapter/anthropic_llm.py",
     "lca/layer0_infra/llm_adapter/openai_compat.py",
 ]

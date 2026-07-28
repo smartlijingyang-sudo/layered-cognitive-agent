@@ -1,5 +1,5 @@
-"""L0 状态管理 —— TypedState CRUD + Checkpoint。"""
+"""兼容 shim —— 请改用 ``lca.layer0_infra.state_store``（ADR-0016）。"""
 
-from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
+from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 
 __all__ = ["InMemoryStateStore"]

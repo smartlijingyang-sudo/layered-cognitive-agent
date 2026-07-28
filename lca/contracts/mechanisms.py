@@ -1,0 +1,54 @@
+"""跨层机制契约 —— 不产生业务认知语义，只负责挂载 / 触发 / 查找。
+
+边界判定（三者 vs 业务协议）：
+- EventBus / Hook / HookRegistry：观察与横切副作用，不改变决策语义
+- NamedRegistryProtocol / TransportRegistryProtocol：按名解析实现，无业务规则
+- 业务协议（Brain / Body / Memory / Runtime / Team…）→ 放 protocols/
+
+protocols/ 包内不应再定义 Registry / EventBus / Hook 类。
+"""
+
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
+from typing import Any, Protocol, runtime_checkable
+
+from lca.contracts.state import TypedState
+
+
+@runtime_checkable
+class EventBus(Protocol):
+    def emit(self, event_name: str, payload: Any, trace_id: str) -> None: ...
+    def subscribe(self, event_name: str, handler: Callable[[Any], Awaitable[None]]) -> None: ...
+
+
+@runtime_checkable
+class Hook(Protocol):
+    async def __call__(self, event_name: str, state: TypedState, **kwargs: Any) -> None: ...
+
+
+@runtime_checkable
+class HookRegistry(Protocol):
+    def register(self, event_name: str, hook: Hook) -> None: ...
+    async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any: ...
+
+
+@runtime_checkable
+class NamedRegistryProtocol(Protocol):
+    """按名称注册和解析实体的通用注册表接口。
+
+    具体实现（如 NamedRegistry）在 layer0 提供，
+    消费方依赖此 Protocol 进行跨层解耦。
+    """
+
+    def register(self, name: str, impl: Any) -> None: ...
+
+    def resolve(self, name: str) -> Any: ...
+
+    def list(self) -> list[str]: ...
+
+    def __contains__(self, name: str) -> bool: ...
+
+
+# 过渡期 alias —— 下一主版本删除
+RegistryProtocol = NamedRegistryProtocol

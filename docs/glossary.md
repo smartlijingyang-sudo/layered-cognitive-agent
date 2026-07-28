@@ -37,3 +37,13 @@
 | **ExecutionGraph / GraphNode / GraphEdge** | 图编排策略的节点/边定义，支持条件分支与循环 |
 | **OrchestrationContext** | 编排过程中传递的上下文对象 |
 | **CoALA** | 语言智能体记忆分类参考框架：工作记忆 / 语义记忆 / 情景记忆 / 程序性记忆 |
+| **ActionOperation** | 单一 action_type 的可插拔操作协议（原 ActionHandler），Strategy 模式落地 |
+| **FallbackPolicy** | 未知 action_type 的降级策略协议（原 FallbackHandler） |
+| **NamedRegistryProtocol** | 按名称注册/解析实体的通用注册表协议 |
+| **Turn** | 单步认知闭环记录：decision + observation + reflection |
+| **TeamAssignment** | 团队级分工单元，与单体内部计划项语义分离 |
+| **SharedMemoryTool** | 将 SharedMemoryStore 包装为普通 Tool，成员经 use_tool 访问共享层 |
+| **StepOutcome / StepOutcomePolicy** | 单步结果判定信号与策略，Loop 只消费 should_stop / final_output |
+| **ComponentRegistry** | L0 按 (category, name) 注册组件实现的 DI 注册表 |
+| **Respond / UseTool / Delegate / Handoff** | 内置 action_type 及对应 ActionOperation 实现 |
+| **Operation** | 行动能力实现的命名后缀（替代 Handler），表示无状态策略对象 |

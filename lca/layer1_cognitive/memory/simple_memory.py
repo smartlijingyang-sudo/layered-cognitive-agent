@@ -53,6 +53,10 @@ class SimpleMemorySystem(MemorySystem):
         state.retrieved_context = records
         return state
 
+    async def perceive(self, state: TypedState) -> TypedState:
+        """两阶段 API：think 之前的感知检索。"""
+        return await self.perceive_and_retrieve(state)
+
     async def update_multi_level(
         self, state: TypedState, observation: Observation, reflection: Reflection
     ) -> None:
@@ -82,6 +86,12 @@ class SimpleMemorySystem(MemorySystem):
             ),
         )
         await self.compress()
+
+    async def update(
+        self, state: TypedState, observation: Observation, reflection: Reflection
+    ) -> None:
+        """两阶段 API：reflect 之后的多级记忆写入。"""
+        await self.update_multi_level(state, observation, reflection)
 
     async def compress(self) -> None:
         max_episodic = 50

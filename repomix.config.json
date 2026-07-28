@@ -1,0 +1,31 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "removeComments": false,
+    "removeEmptyLines": true,
+    "topFilesLength": 10,
+    "showLineNumbers": true
+  },
+  "include": [
+    "lca/**/*.py",
+    "docs/adr/**/*.md",
+    "docs/glossary.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "pyproject.toml"
+  ],
+  "ignore": {
+    "customPatterns": [
+      "tests/**",
+      "traces/**",
+      "examples/**",
+      ".github/**",
+      "uv.lock",
+      "repomix-output.xml",
+      ".secrets.baseline",
+      ".pre-commit-config.yaml",
+      "docs/protocol-refactor-context.md"
+    ]
+  }
+}

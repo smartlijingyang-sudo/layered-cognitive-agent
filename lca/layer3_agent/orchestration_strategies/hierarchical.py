@@ -15,7 +15,7 @@ from lca.contracts.team_progress import (
 
 def _default_ledger_factory(roles: frozenset[str]) -> DelegationLedgerProtocol:
     """从全局注册表解析 DelegationLedger 并实例化。"""
-    from lca.layer0_infra.registry import get_global_registry
+    from lca.layer0_infra.component_registry import get_global_registry
 
     reg = get_global_registry()
     ledger_cls = reg.resolve("delegation_ledger", "default")
@@ -53,7 +53,7 @@ class HierarchicalStrategy(OrchestrationStrategy):
             policy_name = context.config.completion_policy
 
         if policy_name != "none":
-            from lca.layer0_infra.registry import get_global_registry
+            from lca.layer0_infra.component_registry import get_global_registry
             from lca.layer1_cognitive.brain.guarded_coordinator import (
                 GuardedTaskCoordinator,
             )

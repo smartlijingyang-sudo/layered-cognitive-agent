@@ -6,7 +6,7 @@ from typing import Any
 
 from lca.contracts.decision import Observation
 from lca.contracts.protocols import AgentTransport
-from lca.layer0_infra.registry import NamedRegistry, RegistryKeyError
+from lca.layer0_infra.component_registry import NamedRegistry, RegistryKeyError
 
 
 class TransportNotFoundError(RegistryKeyError):

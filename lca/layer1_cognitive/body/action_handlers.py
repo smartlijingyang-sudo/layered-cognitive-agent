@@ -1,7 +1,7 @@
-"""内置 ActionHandler 实现 —— 从 SimpleBody 提取的独立策略类。
+"""内置 ActionOperation 实现 —— 从 SimpleBody 提取的独立策略类。
 
-L3 执行调度层：每种 action_type 对应一个独立 Handler，
-彼此零依赖、零共享可变状态。新增行动能力 = 新增一个 Handler + 一条注册。
+每种 action_type 对应一个独立 Operation，彼此零依赖、零共享可变状态。
+新增行动能力 = 新增一个 Operation + 一条注册。
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 
-from lca.contracts.action import ActionHandler, ActionRegistry
+from lca.contracts.action import ActionOperation
 from lca.contracts.decision import Observation, StructuredDecision
 from lca.contracts.protocols import (
     AgentTransport,
@@ -20,6 +20,7 @@ from lca.contracts.protocols import (
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
 from lca.contracts.state import TypedState, _current_delegator
+from lca.layer1_cognitive.body.action_registry import ActionRegistry
 
 _POLL_INTERVAL_S = 0.05
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
@@ -29,7 +30,7 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-class RespondHandler(ActionHandler):
+class RespondOperation(ActionOperation):
     """处理 respond 动作：直接返回文本响应。"""
 
     async def execute(self, decision: StructuredDecision, state: TypedState) -> Observation:
@@ -40,7 +41,7 @@ class RespondHandler(ActionHandler):
         )
 
 
-class UseToolHandler(ActionHandler):
+class UseToolOperation(ActionOperation):
     """处理 use_tool 动作：查找工具 → 权限校验 → 执行。"""
 
     def __init__(self, tool_registry: ToolRegistry, safe_executor: SafeExecutor) -> None:
@@ -57,7 +58,7 @@ class UseToolHandler(ActionHandler):
         return await self._safe_executor.execute(tool, tc.arguments, RetryPolicy(), CacheConfig())
 
 
-class DelegateHandler(ActionHandler):
+class DelegateOperation(ActionOperation):
     """处理 delegate 动作：阻塞式委派，等待目标 Agent 返回结果。"""
 
     def __init__(self, transport_registry: TransportRegistryProtocol) -> None:
@@ -101,7 +102,7 @@ class DelegateHandler(ActionHandler):
         return transport, task_id
 
 
-class HandoffHandler(ActionHandler):
+class HandoffOperation(ActionOperation):
     """处理 handoff 动作：非阻塞控制权移交，发完即返回。"""
 
     def __init__(self, transport_registry: TransportRegistryProtocol) -> None:
@@ -123,15 +124,22 @@ class HandoffHandler(ActionHandler):
         )
 
 
+# 过渡期 alias
+RespondHandler = RespondOperation
+UseToolHandler = UseToolOperation
+DelegateHandler = DelegateOperation
+HandoffHandler = HandoffOperation
+
+
 def build_default_action_registry(
     tool_registry: ToolRegistry,
     safe_executor: SafeExecutor,
     transport_registry: TransportRegistryProtocol,
 ) -> ActionRegistry:
-    """构建包含所有内置 ActionHandler 的默认注册表。"""
+    """构建包含所有内置 ActionOperation 的默认注册表。"""
     registry = ActionRegistry()
-    registry.register("respond", RespondHandler())
-    registry.register("use_tool", UseToolHandler(tool_registry, safe_executor))
-    registry.register("delegate", DelegateHandler(transport_registry))
-    registry.register("handoff", HandoffHandler(transport_registry))
+    registry.register("respond", RespondOperation())
+    registry.register("use_tool", UseToolOperation(tool_registry, safe_executor))
+    registry.register("delegate", DelegateOperation(transport_registry))
+    registry.register("handoff", HandoffOperation(transport_registry))
     return registry

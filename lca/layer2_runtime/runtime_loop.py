@@ -12,14 +12,13 @@ from typing import Any
 
 from lca.contracts.budget import create_budget
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.protocols import (
     Body,
     BrainStrategy,
-    HookRegistry,
     MemorySystem,
     Runtime,
     StateStore,
-    StepOutcome,
     StepOutcomePolicy,
 )
 from lca.contracts.result import (
@@ -28,6 +27,7 @@ from lca.contracts.result import (
     Result,
 )
 from lca.contracts.state import StateSnapshot, TypedState
+from lca.contracts.types import StepOutcome, Turn
 
 
 def _new_id(prefix: str) -> str:
@@ -121,6 +121,10 @@ class CognitiveRuntime(Runtime):
                 reflection = await self.brain.reflect(state, observation)
                 await self.hooks.trigger("post_reflect", state, reflection=reflection)
 
+                # 两阶段历史：先记 decision+observation，reflect 后补齐 reflection
+                state.history.append(
+                    Turn(decision=decision, observation=observation, reflection=reflection)
+                )
                 await self.memory.update_multi_level(state, observation, reflection)
 
             except ApprovalPendingError:

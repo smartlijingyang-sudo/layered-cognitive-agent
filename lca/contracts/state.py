@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 
 from lca.contracts.team_progress import DelegationLedgerProtocol
+from lca.contracts.types import Turn
 
 # 跨异步链路传递当前委派者角色：A delegate → B 时，A 的 role 写入此 var，
 # B 的 handler 读取后注入到 TypedState.delegated_by。
@@ -69,6 +70,8 @@ class TypedState:
     agent_role: str = ""
     delegated_by: str = ""
     team_progress: DelegationLedgerProtocol | None = None
+    # 认知闭环历史：每步 Turn(decision, observation, reflection)
+    history: list[Turn] = field(default_factory=list)
 
     def snapshot(self, reason: str = "periodic") -> StateSnapshot:
         snap = StateSnapshot(

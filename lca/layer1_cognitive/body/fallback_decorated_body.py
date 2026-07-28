@@ -9,21 +9,21 @@
 
 from __future__ import annotations
 
-from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Observation, StructuredDecision
-from lca.contracts.protocols import AgentTransport, Body, FallbackHandler
+from lca.contracts.protocols import AgentTransport, Body, FallbackPolicy
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.state import TypedState
+from lca.layer1_cognitive.body.action_registry import ActionRegistryProtocol
 
 
 class FallbackDecoratedBody(Body):
-    """Body 装饰器：捕获"未注册的 action_type"错误并委托给 FallbackHandler。
+    """Body 装饰器：捕获"未注册的 action_type"错误并委托给 FallbackPolicy。
 
     Loop 里只剩 ``await self.body.act(decision, state)``，
     不再出现 _act_with_fallback、局部 import、字符串前缀判断。
     """
 
-    def __init__(self, inner: Body, fallback_handler: FallbackHandler) -> None:
+    def __init__(self, inner: Body, fallback_handler: FallbackPolicy) -> None:
         self._inner = inner
         self._fallback_handler = fallback_handler
 

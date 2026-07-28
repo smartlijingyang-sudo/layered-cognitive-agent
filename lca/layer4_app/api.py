@@ -21,7 +21,7 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
-from lca.layer0_infra.registry import ComponentRegistry, get_global_registry
+from lca.layer0_infra.component_registry import ComponentRegistry, get_global_registry
 from lca.layer1_cognitive.body.action_handlers import build_default_action_registry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry

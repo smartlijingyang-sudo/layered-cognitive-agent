@@ -6,12 +6,12 @@ L6 治理层：新增 action_type 必须同时满足 Registry 注册 + Prompt �
 
 from __future__ import annotations
 
-from lca.contracts.action import ActionRegistry
 from lca.contracts.role_team import ToolPermissionManifest
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_handlers import build_default_action_registry
+from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt

@@ -10,10 +10,10 @@ import json
 import re
 import uuid
 
-from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import DelegationSpec, StructuredDecision, ToolCall
 from lca.contracts.protocols import DecisionParser
 from lca.contracts.state import TypedState
+from lca.layer1_cognitive.body.action_registry import ActionRegistryProtocol
 
 
 def _new_id(prefix: str) -> str:

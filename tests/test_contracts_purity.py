@@ -55,11 +55,8 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
 
 # 已存在的非 dataclass / 非 Protocol / 非异常 / 非枚举类——
 # 在 ADR-0015 之前就已存在，显式列举以防止新增类似违规。
-_GRANDFATHERED_CLASSES: frozenset[str] = frozenset(
-    {
-        "ActionRegistry",  # ActionRegistryProtocol 的参考实现，与 Protocol 同文件
-    }
-)
+# ActionRegistry 已迁至 layer1（ADR-0015/0016），不再需要 grandfather
+_GRANDFATHERED_CLASSES: frozenset[str] = frozenset()
 
 # 标准异常基类——用于识别异常类（跳过检查）
 _STD_EXCEPTION_BASES = frozenset(

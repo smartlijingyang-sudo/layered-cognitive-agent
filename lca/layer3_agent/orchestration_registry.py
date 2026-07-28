@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from lca.contracts.protocols import OrchestrationStrategy
-from lca.layer0_infra.registry import NamedRegistry
+from lca.layer0_infra.component_registry import NamedRegistry
 
 OrchestrationFactory = Callable[[], OrchestrationStrategy]
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from lca.contracts.action import ActionRegistry, ActionRegistryProtocol
 from lca.contracts.decision import Observation, StructuredDecision
 from lca.contracts.protocols import (
     AgentTransport,
@@ -15,12 +14,13 @@ from lca.contracts.result import ToolExecutionError
 from lca.contracts.state import TypedState
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_handlers import build_default_action_registry
+from lca.layer1_cognitive.body.action_registry import ActionRegistry, ActionRegistryProtocol
 
 
 class SimpleBody(Body):
-    """通过 ActionRegistry 路由 action_type 到对应 Handler。
+    """通过 ActionRegistry 路由 action_type 到对应 ActionOperation。
 
-    新增行动能力只需注册新 Handler 到 ActionRegistry，
+    新增行动能力只需注册新 Operation 到 ActionRegistry，
     SimpleBody 本身不感知具体 action_type 集合。
     """
 

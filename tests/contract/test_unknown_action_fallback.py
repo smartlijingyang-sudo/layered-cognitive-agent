@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.action import ActionRegistry
 from lca.contracts.decision import StructuredDecision, ToolCall
 from lca.contracts.role_team import ToolPermissionManifest
 from lca.contracts.state import Budget, TypedState
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer1_cognitive.body.action_handlers import RespondHandler, UseToolHandler
+from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer2_runtime.fallback_handler import FALLBACK_DEGRADATION_KEY, FallbackActionHandler
