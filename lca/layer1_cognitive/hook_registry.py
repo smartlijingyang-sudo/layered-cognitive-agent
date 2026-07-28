@@ -48,13 +48,28 @@ class SimpleHookRegistry(HookRegistry):
 
 async def default_logging_hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
     extra = {k: v for k, v in kwargs.items() if k != "state"}
-    print(f"  [Hook] {event_name} @step={state.step} {extra if extra else ''}")
+    role_info = f"role={state.agent_role}" if state.agent_role else ""
+    delegator_info = f"delegated_by={state.delegated_by}" if state.delegated_by else ""
+    context_parts = [p for p in [role_info, delegator_info] if p]
+    context_str = " ".join(context_parts)
+    prefix = f"[{context_str}] " if context_str else ""
+    print(f"  [Hook] {prefix}{event_name} @step={state.step} {extra if extra else ''}")
 
 
 def _extract_span_attributes(event_name: str, kwargs: dict[str, Any]) -> dict[str, Any]:
     """从 hook kwargs 中提取可观测属性，脱敏后放入 TraceSpan.attributes。"""
 
     attrs: dict[str, Any] = {"event": event_name}
+
+    # 从 state 中提取角色和委派信息
+    state = kwargs.get("state")
+    if state is not None:
+        if hasattr(state, "agent_role") and state.agent_role:
+            attrs["agent_role"] = state.agent_role
+        if hasattr(state, "delegated_by") and state.delegated_by:
+            attrs["delegated_by"] = state.delegated_by
+        if hasattr(state, "task") and state.task:
+            attrs["task_preview"] = _truncate(_sanitize(str(state.task)))
 
     # post_think: 记录决策摘要
     decision = kwargs.get("decision")
@@ -65,6 +80,14 @@ def _extract_span_attributes(event_name: str, kwargs: dict[str, Any]) -> dict[st
             attrs["response_preview"] = _truncate(_sanitize(str(decision.response_text)))
         if hasattr(decision, "tool_name") and decision.tool_name:
             attrs["tool_name"] = decision.tool_name
+        # 委派目标
+        delegate_to = getattr(decision, "delegate_to", None)
+        if delegate_to is not None:
+            target = getattr(delegate_to, "target_role", None) or getattr(
+                delegate_to, "target_agent_id", None
+            )
+            if target:
+                attrs["delegate_to"] = target
 
     # on_error: 记录错误信息
     error = kwargs.get("error")

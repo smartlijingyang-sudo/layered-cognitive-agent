@@ -35,12 +35,40 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.graph import ExecutionGraph, GraphEdge, GraphNode
-from lca.contracts.protocols import OrchestrationContext
+from lca.contracts.protocols import LLMAdapter, OrchestrationContext
 from lca.contracts.role_team import TeamConfig
 from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
 from lca.layer4_app.api import Agent
-from tests.scenario_llm import ScenarioLLM
+
+
+class _GraphTestLLM(LLMAdapter):
+    """角色感知确定性 LLM，返回特定标记以验证框架行为。"""
+
+    name = "graph-test-mock"
+
+    async def complete(self, prompt: str, **kwargs):
+        import json
+        import re
+
+        role_m = re.search(r"ROLE:\s*([^\n]+)", prompt)
+        role = role_m.group(1).strip() if role_m else ""
+
+        if "市场分析" in role:
+            response = "MARKET_ANALYSIS: 市场需求增长，建议进入"
+        elif "定价" in role:
+            response = "PRICE_RECOMMENDATION: 建议零售价 $46.8"
+        elif "风控" in role or "风险" in role:
+            response = "RISK_REVIEW: 合规风险低，需关注认证周期"
+        else:
+            response = "OK"
+
+        return json.dumps({"action_type": "respond", "response_text": response, "confidence": 0.8})
+
+    async def stream(self, prompt: str, **kwargs):
+        text = await self.complete(prompt, **kwargs)
+        for ch in text:
+            yield ch
 
 
 def _build_fanout_fanin_graph() -> ExecutionGraph:
@@ -61,7 +89,7 @@ def _build_fanout_fanin_graph() -> ExecutionGraph:
 
 class TestGraphStrategyFanInGap(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        self.llm = ScenarioLLM()
+        self.llm = _GraphTestLLM()
         self.calculator = CalculatorTool()
         self.market_analyst = Agent(
             role="市场分析师", goal="", backstory="", tools=[], llm=self.llm

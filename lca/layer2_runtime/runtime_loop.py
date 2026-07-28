@@ -57,8 +57,14 @@ class CognitiveRuntime(Runtime):
     def default_budget(self) -> Budget:
         return Budget(max_steps=10, max_wall_clock_seconds=30)
 
-    async def run(self, task: str, max_steps: int = 10) -> Result:
-        state = TypedState(trace_id=_new_id("trace"), task=task, budget=self.default_budget())
+    async def run(self, task: str, max_steps: int = 10, **context: str) -> Result:
+        state = TypedState(
+            trace_id=_new_id("trace"),
+            task=task,
+            budget=self.default_budget(),
+            agent_role=context.get("agent_role", ""),
+            delegated_by=context.get("delegated_by", ""),
+        )
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
 

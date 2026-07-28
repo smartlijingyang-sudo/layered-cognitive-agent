@@ -4,9 +4,9 @@
 Accepted
 
 ## 背景
-项目早期定位文档（`LCA_Framework_完整实施规范.md`）提到 "Pydantic v2 + Protocol"，`pyproject.toml` 的 `[tool.mypy]` 中也留了一行注释 `# contracts 迁移到 pydantic.BaseModel 之后打开下面这行`。但截至目前，`lca/contracts/` 下的 27 个数据模型全部使用 stdlib `@dataclass`，没有任何 Pydantic 依赖。
+项目早期设计文档曾提出 "Pydantic v2 + Protocol"，`pyproject.toml` 的 `[tool.mypy]` 中也留了一行注释 `# contracts 迁移到 pydantic.BaseModel 之后打开下面这行`。但截至目前，`lca/contracts/` 下的 27 个数据模型全部使用 stdlib `@dataclass`，没有任何 Pydantic 依赖。
 
-这构成了"规范与代码的漂移"——新贡献者可能误以为 dataclass 是临时方案，或者反过来，误以为项目已经放弃了 Pydantic。需要显式记录决策。
+这构成了"规范与代码的漂移"——新贡献者可能误以为 dataclass 是临时方案。需要显式记录决策。
 
 ## 决定
 
@@ -21,7 +21,7 @@ Accepted
 
 ### 后续行动
 
-- 更新 `LCA_Framework_完整实施规范.md`，将 "Pydantic v2 + Protocol" 改为 "stdlib dataclass + Protocol"
+- ~~更新早期设计文档~~（文档已清理删除）
 - 移除 `pyproject.toml` 中注释掉的 `pydantic.mypy` 插件行，避免误导
 - `pyproject.toml` 的 `[tool.mypy]` 中 `pydantic>=2.9` 保留在 `typecheck` 依赖组（用于 `isinstance` 类型推断的辅助，不影响运行时）
 

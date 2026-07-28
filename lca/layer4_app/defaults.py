@@ -146,11 +146,14 @@ def build_team_transport(
     Result → Observation 的适配在此完成；
     同时拼接 roster_desc 供 Supervisor 的 Reasoner 感知队友。
     """
+    from lca.contracts.state import _current_delegator
+
     transport = InternalTransport()
     for member in members:
 
         async def _handler(subtask: str, _m: BaseAgent = member) -> Observation:
-            result = await _m.execute(subtask)
+            delegated_by = _current_delegator.get()
+            result = await _m.execute(subtask, delegated_by=delegated_by)
             return Observation(
                 observation_id=f"obs_{result.trace_id}",
                 success=result.status == "completed",

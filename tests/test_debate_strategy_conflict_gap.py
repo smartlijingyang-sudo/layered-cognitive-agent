@@ -33,12 +33,75 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import lca.layer4_app.defaults  # noqa: F401 — 触发 register_defaults()
-from lca.contracts.protocols import OrchestrationContext
+from lca.contracts.protocols import LLMAdapter, OrchestrationContext
 from lca.contracts.role_team import TeamConfig
 from lca.layer1_cognitive.brain.map_modules import SimpleStateEvaluator, SimpleTaskCoordinator
 from lca.layer3_agent.orchestration_strategies import DebateStrategy
 from lca.layer4_app.api import Agent, MultiAgentTeam
-from tests.scenario_llm import DebatePricingLLM, PriceConflictMonitor
+
+
+def _extract(prompt: str, field: str) -> str:
+    import re
+
+    m = re.search(rf"{field}:\s*([^\n]+)", prompt)
+    return m.group(1).strip() if m else ""
+
+
+def _decision(**kwargs):
+    import json
+
+    return json.dumps(kwargs, ensure_ascii=False)
+
+
+class DebatePricingLLM(LLMAdapter):
+    """辩论场景：两位定价策略师首轮观点冲突，第二轮收敛。"""
+
+    name = "debate-pricing-mock-llm"
+
+    async def complete(self, prompt: str, **kwargs):
+        role = _extract(prompt, "ROLE")
+        converging = "Previous proposals" in prompt
+        if not converging:
+            price = 39.9 if "保守" in role else 59.9
+            stance = "保守定价，优先走量" if "保守" in role else "激进定价，优先毛利"
+            return _decision(
+                action_type="respond",
+                response_text=f"PROPOSAL: ${price}（{stance}）",
+                rationale=stance,
+                confidence=0.7,
+            )
+        return _decision(
+            action_type="respond",
+            response_text="PROPOSAL: $49.9（综合双方意见后的折衷定价）",
+            rationale="参考上一轮对方提案，收敛到折衷价格",
+            confidence=0.9,
+        )
+
+    async def stream(self, prompt: str, **kwargs):
+        text = await self.complete(prompt, **kwargs)
+        for ch in text:
+            yield ch
+
+
+def _extract_proposal_price(text):
+    import re
+
+    m = re.search(r"PROPOSAL:\s*\$([\d.]+)", text or "")
+    return float(m.group(1)) if m else None
+
+
+class PriceConflictMonitor:
+    """真正"会干活"的 ConflictMonitor：价格分歧超过阈值才判定为冲突。"""
+
+    async def check(self, state, candidates):
+        prices = [
+            p for c in candidates if (p := _extract_proposal_price(c.response_text)) is not None
+        ]
+        if len(prices) < 2:
+            return []
+        if max(prices) - min(prices) > 5.0:
+            return ["price_disagreement"]
+        return []
 
 
 class TestDebateStrategyConflictGap(unittest.IsolatedAsyncioTestCase):

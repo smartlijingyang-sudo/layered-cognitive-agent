@@ -13,6 +13,23 @@ class ConsoleObservability(Observability):
         dur = None
         if span.ended_at:
             dur = int((span.ended_at - span.started_at).total_seconds() * 1000)
+
+        # 构建角色链信息
+        role = span.attributes.get("agent_role", "")
+        delegated_by = span.attributes.get("delegated_by", "")
+        role_prefix = (
+            f"[{delegated_by} → {role}] " if delegated_by else f"[{role}] " if role else ""
+        )
+
+        # 构建关键属性摘要
+        key_attrs = {}
+        for k in ("action_type", "delegate_to", "tool_name", "task_preview"):
+            v = span.attributes.get(k)
+            if v is not None:
+                key_attrs[k] = v
+
+        attrs_str = str(key_attrs) if key_attrs else str(span.attributes)
         print(
-            f"  [TraceSpan] {span.name:<28} status={span.status:<5} dur_ms={dur} attrs={span.attributes}"
+            f"  [TraceSpan] {role_prefix}{span.name:<28} status={span.status:<5} "
+            f"dur_ms={dur} attrs={attrs_str}"
         )

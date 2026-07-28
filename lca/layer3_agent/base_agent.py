@@ -15,5 +15,10 @@ class BaseAgent(AgentRuntime):
         self.role_profile = role_profile
         self.max_steps = max_steps
 
-    async def execute(self, task: str) -> Result:
-        return await self.runtime.run(task, max_steps=self.max_steps)
+    async def execute(self, task: str, **context: str) -> Result:
+        return await self.runtime.run(
+            task,
+            max_steps=self.max_steps,
+            agent_role=self.role_profile.role,
+            **context,
+        )

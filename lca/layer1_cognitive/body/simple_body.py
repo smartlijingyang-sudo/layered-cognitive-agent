@@ -9,7 +9,7 @@ from lca.contracts.decision import Observation, StructuredDecision
 from lca.contracts.protocols import AgentTransport, Body, SafeExecutor, ToolRegistry
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
-from lca.contracts.state import TypedState
+from lca.contracts.state import TypedState, _current_delegator
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 
 _POLL_INTERVAL_S = 0.05
@@ -79,7 +79,7 @@ class SimpleBody(Body):
     async def _handle_delegate(
         self, decision: StructuredDecision, state: TypedState
     ) -> Observation:
-        transport, task_id = await self._send_to_transport(decision)
+        transport, task_id = await self._send_to_transport(decision, state)
 
         timeout_s = (
             (spec.deadline.timestamp() - asyncio.get_event_loop().time())
@@ -110,7 +110,7 @@ class SimpleBody(Body):
         - delegate：阻塞式，等待目标 Agent 返回结果
         - handoff：非阻塞，发完即退出当前 Agent 的 loop，由目标 Agent 接管
         """
-        _transport, task_id = await self._send_to_transport(decision)
+        _transport, task_id = await self._send_to_transport(decision, state)
         spec = decision.delegate_to
         return Observation(
             observation_id=_new_id("obs"),
@@ -119,7 +119,9 @@ class SimpleBody(Body):
             extra={"task_id": task_id, "handoff": True},
         )
 
-    async def _send_to_transport(self, decision: StructuredDecision) -> tuple[AgentTransport, str]:
+    async def _send_to_transport(
+        self, decision: StructuredDecision, state: TypedState
+    ) -> tuple[AgentTransport, str]:
         """resolve transport + 拼装 agent_card + send_task 的共用逻辑。"""
         spec = decision.delegate_to
         if spec is None:
@@ -127,5 +129,7 @@ class SimpleBody(Body):
 
         transport = self.transport_registry.resolve(spec.protocol)
         agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
+        # 设置当前委派者，让目标 Agent 的 handler 能读取
+        _current_delegator.set(state.agent_role)
         task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         return transport, task_id

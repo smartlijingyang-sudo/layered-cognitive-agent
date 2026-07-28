@@ -40,19 +40,35 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.protocols import OrchestrationContext
+from lca.contracts.protocols import LLMAdapter, OrchestrationContext
 from lca.contracts.role_team import TeamConfig
 from lca.layer3_agent.group_chat import build_group_chat_graph
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
 from lca.layer4_app.api import Agent
-from tests.scenario_llm import ScenarioLLM
+
+
+class _MinimalLLM(LLMAdapter):
+    """极简确定性 LLM，只返回 respond 动作。"""
+
+    name = "minimal-mock"
+
+    async def complete(self, prompt: str, **kwargs):
+        import json
+
+        return json.dumps({"action_type": "respond", "response_text": "OK", "confidence": 0.5})
+
+    async def stream(self, prompt: str, **kwargs):
+        text = await self.complete(prompt, **kwargs)
+        for ch in text:
+            yield ch
+
 
 _SAFETY_TIMEOUT_S = 5.0
 
 
 class TestGroupChatMeshGraphDeadlock(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        self.llm = ScenarioLLM()
+        self.llm = _MinimalLLM()
         self.market_analyst = Agent(
             role="市场分析师", goal="", backstory="", tools=[], llm=self.llm
         )
