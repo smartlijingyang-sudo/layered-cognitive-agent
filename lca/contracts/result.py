@@ -46,6 +46,25 @@ class BudgetExceededError(Exception):
 
 
 class ToolExecutionError(Exception):
+    """工具执行失败基类。
+
+    ``retryable`` 信号供 SafeExecutor 决定是否重试：
+    - ``True``（默认）：瞬时性错误，指数退避重试可能恢复
+    - ``False``：确定性错误，重试不会改变结果，应 fail-fast
+    """
+
+    retryable: bool = True
+
     def __init__(self, message: str, last_observation: Any | None = None):
         self.last_observation = last_observation
         super().__init__(message)
+
+
+class ToolInputError(ToolExecutionError):
+    """工具输入校验失败——确定性错误，重试无意义。
+
+    典型场景：必填参数缺失、类型错误、表达式语法非法。
+    SafeExecutor 遇到此异常应立即返回失败 Observation，不进入退避循环。
+    """
+
+    retryable = False

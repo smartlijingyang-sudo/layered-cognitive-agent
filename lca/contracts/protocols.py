@@ -232,6 +232,7 @@ class OrchestrationContext:
     supervisor: Any | None = None
     transport: AgentTransport | None = None
     roster_desc: str = ""
+    ledger_factory: Callable[[frozenset[str]], Any] | None = None
 
 
 @runtime_checkable

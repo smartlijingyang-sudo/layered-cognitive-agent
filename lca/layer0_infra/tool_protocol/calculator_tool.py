@@ -10,6 +10,7 @@ from typing import Any, ClassVar
 
 from lca.contracts.decision import Observation
 from lca.contracts.protocols import Tool
+from lca.contracts.result import ToolInputError
 
 
 def _new_id(prefix: str) -> str:
@@ -35,6 +36,14 @@ class CalculatorTool(Tool):
         ast.UAdd: operator.pos,
     }
 
+    def validate(self, args: dict[str, Any]) -> str | None:
+        expr = args.get("expression")
+        if expr is None or (isinstance(expr, str) and not expr.strip()):
+            return "表达式不能为空，请提供纯算术表达式，如 '26 * 1.5 + 3'"
+        if not isinstance(expr, str):
+            return f"表达式必须是字符串，实际类型: {type(expr).__name__}"
+        return None
+
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
         expr = args.get("expression", "")
@@ -46,6 +55,16 @@ class CalculatorTool(Tool):
                 success=True,
                 payload=value,
                 latency_ms=latency_ms,
+            )
+        except ToolInputError as e:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=_new_id("obs"),
+                success=False,
+                payload=None,
+                error=str(e),
+                latency_ms=latency_ms,
+                extra={"failure_kind": "validation"},
             )
         except Exception as e:
             latency_ms = int((time.monotonic() - start) * 1000)
@@ -61,7 +80,7 @@ class CalculatorTool(Tool):
         try:
             tree = ast.parse(expr, mode="eval")
         except SyntaxError as e:
-            raise ValueError(
+            raise ToolInputError(
                 f"表达式语法错误 '{expr}': {e}。请提供纯算术表达式，如 '26 * 1.5 + 3'"
             ) from e
         return self._eval_node(tree.body)
