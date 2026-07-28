@@ -222,12 +222,10 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
         self.assertIn("subtask", prompt)
         self.assertNotIn("SHOULD NOT BE USED", prompt)
 
-    async def test_hierarchical_prompt_lists_all_action_types(self) -> None:
-        """确保 hierarchical 模板显式列出 delegate 作为合法 action_type。"""
+    async def test_hierarchical_prompt_has_allowed_actions_placeholder(self) -> None:
+        """确保 hierarchical 模板包含 {allowed_actions} 占位符，由 Reasoner 从 Registry 动态注入。"""
+        self.assertIn("{allowed_actions}", HIERARCHICAL_DELEGATE_TEMPLATE)
         self.assertIn("delegate", HIERARCHICAL_DELEGATE_TEMPLATE)
-        self.assertIn("use_tool", HIERARCHICAL_DELEGATE_TEMPLATE)
-        self.assertIn("respond", HIERARCHICAL_DELEGATE_TEMPLATE)
-        self.assertIn("stop", HIERARCHICAL_DELEGATE_TEMPLATE)
         self.assertIn("target_role", HIERARCHICAL_DELEGATE_TEMPLATE)
         self.assertIn("subtask", HIERARCHICAL_DELEGATE_TEMPLATE)
 

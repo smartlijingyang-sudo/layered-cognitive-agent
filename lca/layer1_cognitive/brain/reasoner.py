@@ -30,12 +30,14 @@ class SimpleReasoner(Reasoner):
         role_profile: RoleProfile,
         tools_desc: str,
         team_roster: str | None = None,
+        allowed_actions_desc: str = "",
     ):
         self.llm = llm
         self.prompt_manager = prompt_manager
         self.role_profile = role_profile
         self.tools_desc = tools_desc
         self.team_roster = team_roster
+        self.allowed_actions_desc = allowed_actions_desc
 
     def set_team_roster(self, roster_desc: str) -> None:
         self.team_roster = roster_desc
@@ -52,6 +54,7 @@ class SimpleReasoner(Reasoner):
             "tools": self.tools_desc,
             "task": state.task,
             "context": context_lines,
+            "allowed_actions": self.allowed_actions_desc,
         }
 
         if self.team_roster is not None:

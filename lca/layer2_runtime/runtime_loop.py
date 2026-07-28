@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from lca.contracts.budget import create_budget
 from lca.contracts.decision import Reflection, StructuredDecision
 from lca.contracts.protocols import (
     Body,
@@ -15,8 +16,14 @@ from lca.contracts.protocols import (
     Runtime,
     StateStore,
 )
-from lca.contracts.result import ApprovalPendingError, BudgetExceededError, Result
-from lca.contracts.state import Budget, StateSnapshot, TypedState
+from lca.contracts.result import (
+    ApprovalPendingError,
+    BudgetExceededError,
+    Result,
+    ToolExecutionError,
+)
+from lca.contracts.state import StateSnapshot, TypedState
+from lca.layer2_runtime.fallback_handler import FALLBACK_DEGRADATION_KEY, FallbackActionHandler
 
 
 def _new_id(prefix: str) -> str:
@@ -38,6 +45,7 @@ class CognitiveRuntime(Runtime):
         hooks: HookRegistry,
         event_bus: EventBus,
         state_store: StateStore,
+        fallback_handler: FallbackActionHandler | None = None,
     ):
         self.brain = brain
         self.body = body
@@ -45,6 +53,7 @@ class CognitiveRuntime(Runtime):
         self.hooks = hooks
         self.event_bus = event_bus
         self.state_store = state_store
+        self.fallback_handler = fallback_handler or FallbackActionHandler()
 
     def configure(self, **capabilities: Any) -> None:
         if "transport" in capabilities and hasattr(self.body, "bind_transport"):
@@ -54,14 +63,11 @@ class CognitiveRuntime(Runtime):
         if "shared_memory" in capabilities and hasattr(self.memory, "bind_shared_store"):
             self.memory.bind_shared_store(capabilities["shared_memory"])
 
-    def default_budget(self) -> Budget:
-        return Budget(max_steps=10, max_wall_clock_seconds=30)
-
     async def run(self, task: str, max_steps: int = 10, **context: str) -> Result:
         state = TypedState(
             trace_id=_new_id("trace"),
             task=task,
-            budget=self.default_budget(),
+            budget=create_budget(max_steps=max_steps),
             agent_role=context.get("agent_role", ""),
             delegated_by=context.get("delegated_by", ""),
         )
@@ -90,10 +96,25 @@ class CognitiveRuntime(Runtime):
                 await self.hooks.trigger("post_think", state, decision=decision)
 
                 await self.hooks.trigger("pre_act", state, decision=decision)
-                observation = await self.body.act(decision, state)
+                observation = await self._act_with_fallback(decision, state)
                 await self.hooks.trigger("post_act", state, observation=observation)
 
-                if decision.action_type == "respond":
+                # 降级为 respond 等价时，保存最终输出 + 发出可观测事件
+                if FALLBACK_DEGRADATION_KEY in observation.extra and observation.success:
+                    original = observation.extra[FALLBACK_DEGRADATION_KEY]
+                    if decision and decision.response_text:
+                        state.working_memory["final_output"] = decision.response_text
+                    self.event_bus.emit(
+                        "action_degraded",
+                        {
+                            "original_action_type": original,
+                            "degraded_to": "respond",
+                            "step": state.step,
+                        },
+                        state.trace_id,
+                    )
+
+                if decision and decision.action_type == "respond":
                     state.working_memory["final_output"] = decision.response_text
 
                 await self.hooks.trigger("pre_reflect", state, observation=observation)
@@ -127,21 +148,47 @@ class CognitiveRuntime(Runtime):
                 state.status = "failed"
                 break
 
-            if self._should_stop(decision, reflection):
+            if self._should_stop(decision, reflection, observation):
                 state.status = "completed"
                 break
 
         await self.hooks.trigger("on_complete", state)
         return self._summarize(state)
 
+    async def _act_with_fallback(self, decision: StructuredDecision, state: TypedState) -> Any:
+        """执行 action，未知 action_type 时走 FallbackActionHandler 降级。"""
+        from lca.contracts.action import ActionRegistry
+
+        try:
+            return await self.body.act(decision, state)
+        except ToolExecutionError as err:
+            if not str(err).startswith("未注册的 action_type:"):
+                raise
+            # 从 body 中提取 action_registry 供降级使用
+            registry = getattr(self.body, "action_registry", None)
+            if registry is None or not isinstance(registry, ActionRegistry):
+                raise
+            return await self.fallback_handler.handle(decision, state, registry)
+
     def _should_stop(
-        self, decision: StructuredDecision | None, reflection: Reflection | None
+        self,
+        decision: StructuredDecision | None,
+        reflection: Reflection | None,
+        observation: Any = None,
     ) -> bool:
         if decision is None or reflection is None:
             return False
         if decision.action_type == "handoff":
             return True
-        return decision.action_type == "respond" and reflection.verdict != "needs_correction"
+        # 降级成功且 observation 为 success → 视为等价于 respond 完成
+        is_degraded_success = (
+            observation is not None
+            and getattr(observation, "success", False)
+            and FALLBACK_DEGRADATION_KEY in getattr(observation, "extra", {})
+        )
+        if decision.action_type == "respond" or is_degraded_success:
+            return reflection.verdict != "needs_correction"
+        return False
 
     def _summarize(self, state: TypedState) -> Result:
         final_ref = f"mem://{state.trace_id}/{state.step}"

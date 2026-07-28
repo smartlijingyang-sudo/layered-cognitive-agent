@@ -22,7 +22,9 @@ from lca.contracts.protocols import (
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from lca.layer0_infra.registry import ComponentRegistry, get_global_registry
-from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
+from lca.layer1_cognitive.body.action_handlers import build_default_action_registry
+from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
+from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer3_agent.supervisor import Supervisor
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
@@ -59,7 +61,6 @@ class Agent:
         brain_strategy: str | BrainStrategy = "default",
     ):
         reg = get_global_registry()
-        strategy_reg = get_global_strategy_registry()
 
         permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
         role_profile = RoleProfile(
@@ -73,17 +74,39 @@ class Agent:
         mem = self._resolve(reg, "memory", memory)
         ss = self._resolve(reg, "state_store", state_store)
 
-        # 解析 BrainStrategy：字符串走 StrategyRegistry，实例直接使用
+        # 构建 ActionRegistry —— Body 和 DecisionParser 共享同一实例，
+        # 保证"执行器支持什么"与"解析器校验什么"永远一致
+        tool_reg = SimpleToolRegistry()
+        for t in tools:
+            tool_reg.register(t)
+        safe_exec = SimpleSafeExecutor(
+            ToolPermissionManifest(allowed_tools=[t.name for t in tools]), obs
+        )
+        from lca.layer4_app.defaults import build_default_transport_registry
+
+        transport_reg = build_default_transport_registry()
+        action_registry = build_default_action_registry(tool_reg, safe_exec, transport_reg)
+
+        # 解析 BrainStrategy：字符串走 StrategyRegistry（验证存在性），实例直接使用
+        brain: BrainStrategy
         if isinstance(brain_strategy, str):
-            brain_factory = strategy_reg.resolve(brain_strategy)
+            from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
+
+            strategy_reg = get_global_strategy_registry()
+            if strategy_reg.resolve(brain_strategy) is None:
+                raise ValueError(
+                    f"Unknown brain_strategy: {brain_strategy!r}. Available: {strategy_reg.list()}"
+                )
             tools_desc = ", ".join(t.name for t in tools) or "(无可用工具)"
-            brain = brain_factory(llm, role_profile, tools_desc)
+            from lca.layer4_app.defaults import _build_brain
+
+            brain = _build_brain(llm, role_profile, tools_desc, action_registry=action_registry)
         else:
             brain = brain_strategy
 
         from lca.layer4_app.defaults import _build_hooks, build_body, build_runtime
 
-        body = build_body(tools, obs)
+        body = build_body(tools, obs, action_registry=action_registry)
         hooks = _build_hooks(obs)
         event_bus: EventBus = self._resolve(reg, "event_bus", "simple")
 

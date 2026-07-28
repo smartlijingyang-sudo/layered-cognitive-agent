@@ -39,7 +39,7 @@ class DelegationSpec:
 @dataclass
 class StructuredDecision:
     decision_id: str
-    action_type: Literal["use_tool", "delegate", "respond", "ask_human", "stop", "handoff"]
+    action_type: str
     rationale: str
     confidence: float
     tool_calls: list[ToolCall] = field(default_factory=list)
@@ -66,7 +66,7 @@ class Observation:
 @dataclass
 class Reflection:
     reflection_id: str
-    verdict: Literal["on_track", "needs_correction", "blocked"]
+    verdict: Literal["on_track", "needs_correction", "blocked", "degraded_but_completed"]
     lesson: str | None = None
     correction: StructuredDecision | None = None
     extra: dict[str, Any] = field(default_factory=dict)

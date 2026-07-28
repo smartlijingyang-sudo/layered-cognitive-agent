@@ -45,6 +45,21 @@ EXEMPT: dict[str, str] = {
     "lca.layer3_agent.orchestration_registry.OrchestrationStrategyRegistry": (
         "编排策略注册表，DI 基础设施 (ADR-0010)"
     ),
+    "lca.layer1_cognitive.body.action_handlers.RespondHandler": (
+        "ActionHandler 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+    ),
+    "lca.layer1_cognitive.body.action_handlers.UseToolHandler": (
+        "ActionHandler 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+    ),
+    "lca.layer1_cognitive.body.action_handlers.DelegateHandler": (
+        "ActionHandler 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+    ),
+    "lca.layer1_cognitive.body.action_handlers.HandoffHandler": (
+        "ActionHandler 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+    ),
+    "lca.layer2_runtime.fallback_handler.FallbackActionHandler": (
+        "韧性层降级处理器，Chain-of-Responsibility 兜底节点，非 ActionHandler Protocol 实现"
+    ),
 }
 
 _SCAN_PACKAGES = [

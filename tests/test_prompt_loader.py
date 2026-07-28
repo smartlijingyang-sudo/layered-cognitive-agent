@@ -24,8 +24,7 @@ class TestLoadBuiltinPrompt(unittest.TestCase):
         content = load_builtin_prompt("hierarchical_prompt")
         self.assertIn("{role}", content)
         self.assertIn("{team_roster}", content)
-        self.assertIn("delegate", content)
-        self.assertIn("respond", content)
+        self.assertIn("{allowed_actions}", content)
         self.assertIn("target_role", content)
 
     def test_nonexistent_prompt_raises_clear_error(self) -> None:

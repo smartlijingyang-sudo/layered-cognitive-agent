@@ -107,13 +107,24 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
 class TestHandoffActionType(unittest.TestCase):
     """handoff action_type 在 StructuredDecision 中可用。"""
 
-    def test_handoff_in_action_type_literal(self) -> None:
-        import typing
+    def test_handoff_in_action_registry(self) -> None:
+        """handoff 应在 ActionRegistry 的已注册集合中。"""
+        from lca.contracts.role_team import ToolPermissionManifest
+        from lca.layer0_infra.observability.console_observability import ConsoleObservability
+        from lca.layer0_infra.transport.agent_transport import InternalTransport
+        from lca.layer0_infra.transport.transport_registry import TransportRegistry
+        from lca.layer1_cognitive.body.action_handlers import build_default_action_registry
+        from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
+        from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 
-        hints = typing.get_type_hints(StructuredDecision)
-        action_type = hints["action_type"]
-        valid_values = set(typing.get_args(action_type))
-        self.assertIn("handoff", valid_values)
+        tool_reg = SimpleToolRegistry()
+        safe_exec = SimpleSafeExecutor(
+            ToolPermissionManifest(allowed_tools=[]), ConsoleObservability()
+        )
+        transport_reg = TransportRegistry()
+        transport_reg.register(InternalTransport())
+        registry = build_default_action_registry(tool_reg, safe_exec, transport_reg)
+        self.assertIn("handoff", registry.allowed_action_types())
 
 
 class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):

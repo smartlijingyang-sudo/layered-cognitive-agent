@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from lca.contracts.action import ActionRegistry
 from lca.contracts.decision import Observation
 from lca.contracts.protocols import (
     AgentTransport,
@@ -72,6 +73,7 @@ def _build_brain(
     role_profile: RoleProfile,
     tools_desc: str,
     team_roster: str | None = None,
+    action_registry: ActionRegistry | None = None,
 ) -> ModularBrain:
     """默认 Brain 工厂：ModularBrain + MAP 五模块。"""
     prompt_manager = SimplePromptManager()
@@ -79,12 +81,34 @@ def _build_brain(
     prompt_manager.register_template(
         "hierarchical_prompt", load_builtin_prompt("hierarchical_prompt")
     )
+
+    # 从 ActionRegistry 动态生成 Prompt 中的 action 枚举说明
+    allowed_actions_desc = ""
+    if action_registry is not None:
+        action_descs: dict[str, str] = {
+            "respond": "respond — 直接回复用户（需附带 response_text）",
+            "use_tool": "use_tool — 调用工具（需附带 tool_name / arguments）",
+            "delegate": "delegate — 将子任务委派给队友（需附带 target_role / subtask）",
+            "handoff": "handoff — 非阻塞移交控制权给其他 Agent",
+            "stop": "stop — 任务已完成",
+            "ask_human": "ask_human — 请求人工介入",
+        }
+        allowed_actions_desc = "\n".join(
+            f"{i + 1}. {action_descs.get(at, f'{at} — (自定义)')}"
+            for i, at in enumerate(action_registry.allowed_action_types())
+        )
+
     reasoner = SimpleReasoner(
-        llm, prompt_manager, role_profile, tools_desc, team_roster=team_roster
+        llm,
+        prompt_manager,
+        role_profile,
+        tools_desc,
+        team_roster=team_roster,
+        allowed_actions_desc=allowed_actions_desc,
     )
     return ModularBrain(
         reasoner=reasoner,
-        decision_parser=SimpleDecisionParser(),
+        decision_parser=SimpleDecisionParser(action_registry=action_registry),
         critic=SimpleCritic(),
         task_decomposer=SimpleTaskDecomposer(),
         state_predictor=SimpleStatePredictor(),
@@ -107,6 +131,7 @@ def build_body(
     tools: list[Tool],
     observability: Observability,
     transport_registry: TransportRegistry | None = None,
+    action_registry: ActionRegistry | None = None,
 ) -> SimpleBody:
     """默认 Body 构建器。"""
     permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
@@ -115,7 +140,12 @@ def build_body(
         tool_registry.register(t)
     safe_executor = SimpleSafeExecutor(permission_manifest, observability)
     registry = transport_registry or build_default_transport_registry()
-    return SimpleBody(tool_registry, safe_executor, transport_registry=registry)
+    return SimpleBody(
+        tool_registry=tool_registry,
+        safe_executor=safe_executor,
+        transport_registry=registry,
+        action_registry=action_registry,
+    )
 
 
 def _build_hooks(observability: Observability) -> SimpleHookRegistry:

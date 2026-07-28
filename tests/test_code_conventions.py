@@ -27,6 +27,12 @@ _BANNED_CLASS_PATTERN = re.compile(
 # 显式豁免清单（参照 docs/glossary.md "命名约定" 章节）
 _NAME_EXEMPT: dict[str, str] = {
     "PromptManager": "glossary 显式豁免: Prompt 模板注册与渲染缺少更精确的领域词",
+    "ActionHandler": "Action 能力 Protocol，开闭原则标准落地（Strategy Pattern）",
+    "RespondHandler": "ActionHandler 策略实现：respond 动作",
+    "UseToolHandler": "ActionHandler 策略实现：use_tool 动作",
+    "DelegateHandler": "ActionHandler 策略实现：delegate 动作",
+    "HandoffHandler": "ActionHandler 策略实现：handoff 动作",
+    "FallbackActionHandler": "韧性层 CoR 兜底节点，非普通 Handler",
 }
 
 _SCAN_PACKAGES = [

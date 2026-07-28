@@ -1,6 +1,8 @@
 """LCA Framework 核心契约层 —— 所有强类型数据模型与协议接口。"""
 
+from lca.contracts.action import ActionHandler, ActionRegistry
 from lca.contracts.approval import ApprovalDecision, ApprovalRequest
+from lca.contracts.budget import create_budget
 from lca.contracts.decision import (
     DelegationSpec,
     Observation,
@@ -33,6 +35,8 @@ from lca.contracts.role_team import (
 from lca.contracts.state import Budget, StateSnapshot, TypedState
 
 __all__ = [
+    "ActionHandler",
+    "ActionRegistry",
     "AgentCard",
     "ApprovalDecision",
     "ApprovalPendingError",
@@ -64,4 +68,5 @@ __all__ = [
     "ToolPermissionManifest",
     "TraceSpan",
     "TypedState",
+    "create_budget",
 ]
