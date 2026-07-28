@@ -12,8 +12,13 @@ class SequentialStrategy(OrchestrationStrategy):
     async def run(self, context: OrchestrationContext, objective: str) -> Result:
         current_task = objective
         last_result: Result | None = None
+        total_steps = 0
         for member in context.members:
             last_result = await member.execute(current_task)
+            total_steps += last_result.total_steps
             if last_result.output:
                 current_task = last_result.output
-        return last_result or Result.failed("No members in team")
+        if last_result is None:
+            return Result.failed("No members in team")
+        last_result.total_steps = total_steps
+        return last_result

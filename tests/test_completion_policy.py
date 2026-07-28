@@ -16,7 +16,6 @@ from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
 )
 from lca.layer1_cognitive.brain.guarded_coordinator import GuardedTaskCoordinator
 
-
 # ── helpers ──
 
 
@@ -37,7 +36,7 @@ def _decision(action_type: str = "respond", **kw) -> StructuredDecision:
 def _ledger(roles: set[str], status: dict[str, str] | None = None) -> DelegationLedger:
     return DelegationLedger(
         mandatory_roles=frozenset(roles),
-        status=status or {r: "pending" for r in roles},
+        status=status or dict.fromkeys(roles, "pending"),
     )
 
 

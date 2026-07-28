@@ -112,7 +112,10 @@ class GraphStrategy(OrchestrationStrategy):
             else:
                 enqueue_ready_targets(fixed_targets, remaining, executed, queue)
 
-        return last_result or Result.failed("Graph execution produced no results")
+        if last_result is None:
+            return Result.failed("Graph execution produced no results")
+        last_result.total_steps = sum(r.total_steps for r in results.values())
+        return last_result
 
     async def _execute_parallel_branches(
         self,

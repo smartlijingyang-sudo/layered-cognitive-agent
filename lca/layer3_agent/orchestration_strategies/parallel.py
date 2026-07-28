@@ -33,7 +33,13 @@ class ParallelStrategy(OrchestrationStrategy):
         tasks = [member.execute(objective) for member in context.members]
         results: list[Result] = await asyncio.gather(*tasks)
 
-        if self._synthesizer is not None:
-            return await self._synthesizer.synthesize(objective, results)
+        total_steps = sum(r.total_steps for r in results)
 
-        return results[-1]
+        if self._synthesizer is not None:
+            synthesized = await self._synthesizer.synthesize(objective, results)
+            synthesized.total_steps = total_steps
+            return synthesized
+
+        primary = results[-1]
+        primary.total_steps = total_steps
+        return primary
