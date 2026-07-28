@@ -48,6 +48,7 @@ class SimpleSafeExecutor(SafeExecutor):
             return self._cache[cache_key]
 
         last_obs: Observation | None = None
+        last_error: str = ""
         delay = retry_policy.backoff_base_s
         for attempt in range(retry_policy.max_retries + 1):
             span = TraceSpan(
@@ -55,20 +56,25 @@ class SimpleSafeExecutor(SafeExecutor):
                 trace_id="",
                 name=f"tool.{tool.name}",
                 started_at=_now(),
+                attributes={"args": args},
             )
             obs = await tool.execute(args)
             span.ended_at = _now()
             span.status = "ok" if obs.success else "error"
+            if not obs.success:
+                span.attributes["error"] = obs.error
             self.observability.emit_span(span)
             if obs.success:
                 if cache_config.enabled:
                     self._cache[cache_key] = obs
                 return obs
             last_obs = obs
+            last_error = obs.error or ""
             if attempt < retry_policy.max_retries:
                 await asyncio.sleep(delay)
                 delay *= retry_policy.backoff_multiplier
 
+        detail = f"，最后错误: {last_error}" if last_error else ""
         raise ToolExecutionError(
-            f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败", last_obs
+            f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败{detail}", last_obs
         )

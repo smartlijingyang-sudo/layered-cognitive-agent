@@ -28,7 +28,11 @@ class CalculatorTool(Tool):
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
         ast.Div: operator.truediv,
+        ast.FloorDiv: operator.floordiv,
+        ast.Mod: operator.mod,
+        ast.Pow: operator.pow,
         ast.USub: operator.neg,
+        ast.UAdd: operator.pos,
     }
 
     async def execute(self, args: dict[str, Any]) -> Observation:
@@ -54,8 +58,13 @@ class CalculatorTool(Tool):
             )
 
     def _safe_eval(self, expr: str) -> float:
-        node = ast.parse(expr, mode="eval").body
-        return self._eval_node(node)
+        try:
+            tree = ast.parse(expr, mode="eval")
+        except SyntaxError as e:
+            raise ValueError(
+                f"表达式语法错误 '{expr}': {e}。请提供纯算术表达式，如 '26 * 1.5 + 3'"
+            ) from e
+        return self._eval_node(tree.body)
 
     def _eval_node(self, node: ast.AST) -> float:
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
@@ -66,4 +75,9 @@ class CalculatorTool(Tool):
             )
         if isinstance(node, ast.UnaryOp) and type(node.op) in self._OPS:
             return float(self._OPS[type(node.op)](self._eval_node(node.operand)))
-        raise ValueError(f"不支持的表达式片段: {ast.dump(node)}")
+        node_type = type(node).__name__
+        supported = "+, -, *, /, //, %, ** 和一元 +/-"
+        raise ValueError(
+            f"不支持的运算 '{node_type}'。calculator 仅支持: {supported}。"
+            f"问题片段: {ast.dump(node)}"
+        )
