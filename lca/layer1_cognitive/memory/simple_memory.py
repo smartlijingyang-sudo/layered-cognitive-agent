@@ -58,7 +58,8 @@ class SimpleMemorySystem(MemorySystem):
         self, state: TypedState, observation: Observation, reflection: Reflection
     ) -> None:
         if observation.payload is not None and observation.success:
-            self._private_layers["working"] = [
+            # 追加到 working memory 而非覆盖，确保多步委派历史对 agent 可见
+            self._private_layers["working"].append(
                 MemoryRecord(
                     record_id=_new_id("mem"),
                     content=f"TOOL_RESULT: {observation.payload}",
@@ -66,7 +67,11 @@ class SimpleMemorySystem(MemorySystem):
                     importance=0.9,
                     source_trace_id=state.trace_id,
                 )
-            ]
+            )
+            # 防止 working memory 无限增长：保留最近 20 条
+            max_working = 20
+            if len(self._private_layers["working"]) > max_working:
+                self._private_layers["working"] = self._private_layers["working"][-max_working:]
         self._append_record(
             "episodic",
             MemoryRecord(

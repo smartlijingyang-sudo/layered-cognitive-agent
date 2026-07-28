@@ -174,7 +174,13 @@ class Observability(Protocol):
 
 @runtime_checkable
 class Runtime(Protocol):
-    async def run(self, task: str, max_steps: int, **context: str) -> Result: ...
+    async def run(
+        self,
+        task: str,
+        max_steps: int,
+        max_wall_clock_seconds: int | None = None,
+        **context: str,
+    ) -> Result: ...
     def configure(self, **capabilities: Any) -> None: ...
 
 

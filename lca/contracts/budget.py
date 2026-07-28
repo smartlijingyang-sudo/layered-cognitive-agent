@@ -16,7 +16,7 @@ _DEFAULT_MAX_WALL_CLOCK_SECONDS = 30
 
 def create_budget(
     max_steps: int = _DEFAULT_MAX_STEPS,
-    max_wall_clock_seconds: int = _DEFAULT_MAX_WALL_CLOCK_SECONDS,
+    max_wall_clock_seconds: int | None = _DEFAULT_MAX_WALL_CLOCK_SECONDS,
     max_tokens: int | None = None,
     max_cost_usd: float | None = None,
 ) -> Budget:
@@ -24,6 +24,8 @@ def create_budget(
 
     所有运行时 Budget 必须由此函数生成，确保 max_steps 等参数
     从 Agent 声明处一路透传，不会出现"声明 20 实际跑 10"的分叉。
+
+    ``max_wall_clock_seconds`` 传 ``None`` 表示不设墙钟超时（仅靠步数兜底）。
     """
     return Budget(
         max_steps=max_steps,

@@ -55,6 +55,7 @@ class Agent:
         tools: list[Tool],
         llm: LLMAdapter,
         max_steps: int = 10,
+        max_wall_clock_seconds: int | None = 300,
         memory: str | MemorySystem = "simple",
         observability: str | Observability = "console",
         state_store: str | StateStore = "memory",
@@ -106,12 +107,19 @@ class Agent:
 
         from lca.layer4_app.defaults import _build_hooks, build_body, build_runtime
 
-        body = build_body(tools, obs, action_registry=action_registry)
+        body = build_body(
+            tools, obs, transport_registry=transport_reg, action_registry=action_registry
+        )
         hooks = _build_hooks(obs)
         event_bus: EventBus = self._resolve(reg, "event_bus", "simple")
 
         runtime = build_runtime(brain, body, mem, hooks, event_bus, ss)
-        self._base_agent = BaseAgent(runtime, role_profile, max_steps=max_steps)
+        self._base_agent = BaseAgent(
+            runtime,
+            role_profile,
+            max_steps=max_steps,
+            max_wall_clock_seconds=max_wall_clock_seconds,
+        )
 
     @staticmethod
     def _resolve(reg: ComponentRegistry, category: str, value: str | T) -> T:
@@ -128,7 +136,13 @@ class Agent:
     def _as_supervisor(self) -> Supervisor:
         rp = self._base_agent.role_profile
         ms = self._base_agent.max_steps
-        return Supervisor(self._base_agent.runtime, rp, max_steps=max(ms, 20))
+        wc = self._base_agent.max_wall_clock_seconds
+        return Supervisor(
+            self._base_agent.runtime,
+            rp,
+            max_steps=max(ms, 20),
+            max_wall_clock_seconds=max(wc, 300) if wc else 300,
+        )
 
 
 class MultiAgentTeam:

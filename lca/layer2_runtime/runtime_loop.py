@@ -63,11 +63,20 @@ class CognitiveRuntime(Runtime):
         if "shared_memory" in capabilities and hasattr(self.memory, "bind_shared_store"):
             self.memory.bind_shared_store(capabilities["shared_memory"])
 
-    async def run(self, task: str, max_steps: int = 10, **context: str) -> Result:
+    async def run(
+        self,
+        task: str,
+        max_steps: int = 10,
+        max_wall_clock_seconds: int | None = None,
+        **context: str,
+    ) -> Result:
         state = TypedState(
             trace_id=_new_id("trace"),
             task=task,
-            budget=create_budget(max_steps=max_steps),
+            budget=create_budget(
+                max_steps=max_steps,
+                max_wall_clock_seconds=max_wall_clock_seconds,
+            ),
             agent_role=context.get("agent_role", ""),
             delegated_by=context.get("delegated_by", ""),
         )
@@ -145,7 +154,14 @@ class CognitiveRuntime(Runtime):
 
             if state.budget.exceeded():
                 await self.hooks.trigger("on_error", state, error=BudgetExceededError())
-                state.status = "failed"
+                # 预算耗尽时，若最后一步成功，视为自然终止（agent 已产出有效工作）
+                last_ok = observation is not None and getattr(observation, "success", False)
+                state.status = "completed" if last_ok else "failed"
+                # 若 agent 从未显式 respond，用最后一次 observation 的 payload 兜底
+                if last_ok and "final_output" not in state.working_memory:
+                    payload = getattr(observation, "payload", None)
+                    if isinstance(payload, str):
+                        state.working_memory["final_output"] = payload
                 break
 
             if self._should_stop(decision, reflection, observation):

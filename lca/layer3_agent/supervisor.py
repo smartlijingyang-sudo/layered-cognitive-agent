@@ -13,8 +13,19 @@ class Supervisor(BaseAgent):
     区别是其 StructuredDecision 里携带 delegate_to（DelegationSpec）。
     """
 
-    def __init__(self, runtime: Runtime, role_profile: RoleProfile, max_steps: int = 20):
-        super().__init__(runtime, role_profile, max_steps=max_steps)
+    def __init__(
+        self,
+        runtime: Runtime,
+        role_profile: RoleProfile,
+        max_steps: int = 20,
+        max_wall_clock_seconds: int | None = 300,
+    ):
+        super().__init__(
+            runtime,
+            role_profile,
+            max_steps=max_steps,
+            max_wall_clock_seconds=max_wall_clock_seconds,
+        )
 
     def bind_team(self, transport: AgentTransport, roster_desc: str) -> None:
         """团队组建完成后的最后一次接线。

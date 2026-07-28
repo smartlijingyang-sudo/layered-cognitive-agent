@@ -10,15 +10,23 @@ from lca.contracts.role_team import RoleProfile
 class BaseAgent(AgentRuntime):
     """单个 Agent 的运行时封装。"""
 
-    def __init__(self, runtime: Runtime, role_profile: RoleProfile, max_steps: int = 10):
+    def __init__(
+        self,
+        runtime: Runtime,
+        role_profile: RoleProfile,
+        max_steps: int = 10,
+        max_wall_clock_seconds: int | None = None,
+    ):
         self.runtime = runtime
         self.role_profile = role_profile
         self.max_steps = max_steps
+        self.max_wall_clock_seconds = max_wall_clock_seconds
 
     async def execute(self, task: str, **context: str) -> Result:
         return await self.runtime.run(
             task,
             max_steps=self.max_steps,
+            max_wall_clock_seconds=self.max_wall_clock_seconds,
             agent_role=self.role_profile.role,
             **context,
         )
