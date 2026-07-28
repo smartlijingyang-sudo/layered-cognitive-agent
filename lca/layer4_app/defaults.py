@@ -22,6 +22,7 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
+from lca.layer0_infra.observability.jsonl_file_observability import JSONLFileObservability
 from lca.layer0_infra.registry import get_global_registry
 from lca.layer0_infra.state_mgmt.in_memory_store import InMemoryStateStore
 from lca.layer0_infra.transport.a2a_transport import A2ATransport
@@ -41,9 +42,8 @@ from lca.layer1_cognitive.brain.map_modules import (
     SimpleTaskDecomposer,
 )
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
+from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import (
-    DEFAULT_REACT_TEMPLATE,
-    HIERARCHICAL_DELEGATE_TEMPLATE,
     SimpleReasoner,
     build_team_roster,
 )
@@ -75,8 +75,10 @@ def _build_brain(
 ) -> ModularBrain:
     """默认 Brain 工厂：ModularBrain + MAP 五模块。"""
     prompt_manager = SimplePromptManager()
-    prompt_manager.register_template("react_prompt", DEFAULT_REACT_TEMPLATE)
-    prompt_manager.register_template("hierarchical_prompt", HIERARCHICAL_DELEGATE_TEMPLATE)
+    prompt_manager.register_template("react_prompt", load_builtin_prompt("react_prompt"))
+    prompt_manager.register_template(
+        "hierarchical_prompt", load_builtin_prompt("hierarchical_prompt")
+    )
     reasoner = SimpleReasoner(
         llm, prompt_manager, role_profile, tools_desc, team_roster=team_roster
     )
@@ -165,6 +167,7 @@ def register_defaults() -> None:
     """注册所有内置默认实现到全局注册表。"""
     reg = get_global_registry()
     reg.register("observability", "console", ConsoleObservability)
+    reg.register("observability", "jsonl_file", JSONLFileObservability)
     reg.register("state_store", "memory", InMemoryStateStore)
     reg.register("memory", "simple", SimpleMemorySystem)
     reg.register("event_bus", "simple", SimpleEventBus)

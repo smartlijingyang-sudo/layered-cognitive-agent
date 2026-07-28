@@ -1,8 +1,15 @@
 """L0 LLM 适配器 —— 统一多厂商模型调用。"""
 
+from lca.layer0_infra.llm_adapter.factory import load_dotenv_if_present, resolve_llm_adapter
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 
-__all__ = ["AnthropicLLMAdapter", "MockLLMAdapter", "OpenAICompatAdapter"]
+__all__ = [
+    "AnthropicLLMAdapter",
+    "MockLLMAdapter",
+    "OpenAICompatAdapter",
+    "load_dotenv_if_present",
+    "resolve_llm_adapter",
+]
 
 
 from typing import Any

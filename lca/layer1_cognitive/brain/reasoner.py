@@ -5,39 +5,12 @@ from __future__ import annotations
 from lca.contracts.protocols import LLMAdapter, PromptManager, Reasoner
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import TypedState
+from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 
-DEFAULT_REACT_TEMPLATE = """\
-ROLE: {role}
-GOAL: {goal}
-BACKSTORY: {backstory}
-AVAILABLE_TOOLS: {tools}
-USER_TASK: {task}
-CONTEXT:
-{context}
-
-请以 JSON 输出下一步 StructuredDecision（字段：action_type/tool_name/arguments/response_text/rationale/confidence）。
-"""
-
-HIERARCHICAL_DELEGATE_TEMPLATE = """\
-ROLE: {role}
-GOAL: {goal}
-BACKSTORY: {backstory}
-AVAILABLE_TOOLS: {tools}
-TEAM_ROSTER:
-{team_roster}
-USER_TASK: {task}
-CONTEXT:
-{context}
-
-你是团队 Supervisor。你可以选择以下行动之一：
-1. use_tool — 调用工具（需附带 tool_name / arguments）
-2. delegate — 将子任务委派给队友（需附带 target_role / subtask / rationale）
-3. respond — 直接回复用户（需附带 response_text）
-4. stop — 任务已完成
-
-请以 JSON 输出下一步 StructuredDecision，必须包含字段：action_type, rationale, confidence。
-当 action_type 为 "delegate" 时，还必须包含 target_role 和 subtask。
-"""
+# Backward-compatible re-exports: templates are now loaded from external .md files
+# so that prompt iteration does not require touching core code paths.
+DEFAULT_REACT_TEMPLATE: str = load_builtin_prompt("react_prompt")
+HIERARCHICAL_DELEGATE_TEMPLATE: str = load_builtin_prompt("hierarchical_prompt")
 
 
 def build_team_roster(profiles: list[RoleProfile]) -> str:

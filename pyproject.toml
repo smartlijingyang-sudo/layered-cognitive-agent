@@ -68,6 +68,7 @@ test = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
+    "pyyaml>=6.0",
 ]
 security = [
     "import-linter>=2.1",
@@ -75,6 +76,10 @@ security = [
     "detect-secrets>=1.5",
     "vulture>=2.13",
     "interrogate>=1.7",
+]
+llm-openai = [
+    "openai>=1.40",
+    "python-dotenv>=1.0",
 ]
 
 [tool.ruff]
@@ -130,10 +135,17 @@ disallow_untyped_defs = false
 module = "lca.layer0_infra.llm_adapter.openai_compat"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["openai", "dotenv"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-addopts = "-ra --cov=lca --cov-report=term-missing"
+addopts = "-ra --cov=lca --cov-report=term-missing -m 'not real_llm'"
 testpaths = ["tests"]
+markers = [
+    "real_llm: 需要 LLM_API_KEY 才会执行的真实 LLM 集成测试",
+]
 
 [tool.vulture]
 paths = ["lca"]

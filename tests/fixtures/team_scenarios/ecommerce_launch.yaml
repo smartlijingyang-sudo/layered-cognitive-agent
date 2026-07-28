@@ -1,0 +1,117 @@
+# 跨境电商新品上市评估团队 —— 场景配置
+# 用于真实 LLM 端到端测试（PR4），与 mock 版 test_team_scenario_e2e.py 互补。
+
+roles:
+  - key: market_analyst
+    role: 市场分析师
+    goal: 评估新品市场潜力
+    backstory: 十年跨境电商选品经验
+    tools: []
+
+  - key: pricing_specialist
+    role: 定价专员
+    goal: 制定合理零售定价
+    backstory: 擅长成本加成定价
+    tools:
+      - calculator
+
+  - key: copywriter
+    role: 文案撰写
+    goal: 产出上市文案
+    backstory: 资深电商文案
+    tools: []
+
+  - key: project_lead
+    role: 项目负责人
+    goal: 统筹新品上市评估
+    backstory: 团队协调者
+    tools: []
+
+  - key: refund_specialist
+    role: 退款专员
+    goal: 处理退款申请
+    backstory: 熟悉退款流程
+    tools: []
+
+  - key: tech_support
+    role: 技术支持专员
+    goal: 诊断技术问题
+    backstory: 硬件故障排查专家
+    tools: []
+
+  # parallel 场景需要多个同构角色
+  - key: copywriter_a
+    role: 文案撰写A
+    goal: 产出上市文案
+    backstory: 擅长品牌调性
+    tools: []
+
+  - key: copywriter_b
+    role: 文案撰写B
+    goal: 产出上市文案
+    backstory: 擅长用户痛点
+    tools: []
+
+  - key: copywriter_c
+    role: 文案撰写C
+    goal: 产出上市文案
+    backstory: 擅长差异化卖点
+    tools: []
+
+teams:
+  hierarchical:
+    process: hierarchical
+    supervisor: project_lead
+    members:
+      - market_analyst
+      - pricing_specialist
+      - copywriter
+
+  sequential:
+    process: sequential
+    members:
+      - market_analyst
+      - pricing_specialist
+      - copywriter
+
+  parallel:
+    process: parallel
+    members:
+      - copywriter_a
+      - copywriter_b
+      - copywriter_c
+
+  handoff:
+    process: handoff
+    members:
+      - refund_specialist
+      - tech_support
+
+cases:
+  hierarchical_full_chain:
+    team: hierarchical
+    objective: "新品：无线降噪耳机，目标市场：东南亚，请给出是否上市的完整评估"
+    assertions:
+      min_steps: 4
+      status: completed
+
+  sequential_pipeline:
+    team: sequential
+    objective: "新品：机械键盘，目标市场：东南亚，成本价 26 美元"
+    assertions:
+      status: completed
+
+  parallel_scatter_gather:
+    team: parallel
+    objective: "为无线降噪耳机新品写一句上市文案"
+    assertions:
+      status: completed
+      extra:
+        candidate_count: 3
+        synthesis_method: concat
+
+  handoff_triage:
+    team: handoff
+    objective: "用户反馈耳机连接失败，怀疑是硬件故障还是需要退款，请分诊处理"
+    assertions:
+      status: completed

@@ -25,6 +25,7 @@ from lca.contracts.protocols import LLMAdapter
 class OpenAICompatAdapter(LLMAdapter):
     """实现 LLMAdapter 协议。走 client.chat.completions.create()。"""
 
+    name = "openai-compat"
     _client: Any
 
     def __init__(
@@ -34,7 +35,7 @@ class OpenAICompatAdapter(LLMAdapter):
         api_key: str | None = None,
         base_url: str | None = None,
     ) -> None:
-        from openai import AsyncOpenAI  # type: ignore[import-not-found]
+        from openai import AsyncOpenAI
 
         self._model = model or os.getenv("LLM_MODEL", "gpt-4.1")
         self._client = AsyncOpenAI(

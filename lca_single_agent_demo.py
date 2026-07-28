@@ -13,22 +13,9 @@ from __future__ import annotations
 import asyncio
 import os
 
-from lca.layer0_infra.llm_adapter import MockLLMAdapter, OpenAICompatAdapter
+from lca.layer0_infra.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
 from lca.layer0_infra.tool_protocol import CalculatorTool, GetWeatherTool
 from lca.layer4_app import Agent
-
-
-def _load_env() -> None:
-    env_path = "/home/lichao/zero-agent/.env"
-    if not os.path.isfile(env_path):
-        return
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip())
 
 
 def _make_agent(llm) -> Agent:
@@ -50,17 +37,16 @@ def _print_result(result) -> None:
 
 
 async def main() -> None:
-    _load_env()
+    load_dotenv_if_present()
 
-    api_key = os.getenv("LLM_API_KEY", "")
-    if api_key:
-        print(
-            f"[配置] LLM={os.getenv('LLM_MODEL', 'gpt-4.1')} base_url={os.getenv('LLM_BASE_URL', 'https://api.openai.com/v1')}"
-        )
-        llm = OpenAICompatAdapter()
-    else:
+    llm = resolve_llm_adapter()
+    if llm.name == "mock-llm":
         print("[配置] 未检测到 LLM_API_KEY，降级使用 MockLLMAdapter")
-        llm = MockLLMAdapter()
+    else:
+        print(
+            f"[配置] LLM={os.getenv('LLM_MODEL', 'gpt-4.1')} "
+            f"base_url={os.getenv('LLM_BASE_URL', 'https://api.openai.com/v1')}"
+        )
 
     # 场景 1：算术计算
     print("=" * 70)
