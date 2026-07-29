@@ -44,8 +44,7 @@ class HierarchicalStrategy(OrchestrationStrategy):
         factory = context.ledger_factory or _default_ledger_factory
         ledger = factory(mandatory_roles)
 
-        runtime = context.supervisor.runtime
-        runtime.configure(team_progress=ledger)
+        context.supervisor.configure_runtime(team_progress=ledger)
 
         # 解析 CompletionPolicy（默认 roster_coverage）
         policy_name = "roster_coverage"
@@ -54,8 +53,8 @@ class HierarchicalStrategy(OrchestrationStrategy):
 
         if policy_name != "none":
             from lca.layer0_infra.component_registry import get_global_registry
-            from lca.layer1_cognitive.brain.guarded_coordinator import (
-                GuardedTaskCoordinator,
+            from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
+                GuardedCandidateEvaluationPipeline,
             )
 
             reg = get_global_registry()
@@ -67,12 +66,12 @@ class HierarchicalStrategy(OrchestrationStrategy):
                 )
             policy = policy_factory()
 
-            brain = runtime.brain
-            if hasattr(brain, "task_coordinator"):
-                brain.task_coordinator = GuardedTaskCoordinator(brain.task_coordinator, policy)
+            context.supervisor.wrap_brain_component(
+                "evaluation_pipeline",
+                lambda old: GuardedCandidateEvaluationPipeline(old, policy),
+            )
 
-            # 注册 ledger 记账 hook（post_act）和进度注入 hook（pre_think）
-            runtime.hooks.register("post_act", ledger_tracking_hook)
-            runtime.hooks.register("pre_think", progress_injection_hook)
+            context.supervisor.register_hook("post_act", ledger_tracking_hook)
+            context.supervisor.register_hook("pre_think", progress_injection_hook)
 
         return cast("Result", await context.supervisor.execute(objective))

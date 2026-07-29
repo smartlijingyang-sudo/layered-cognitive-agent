@@ -4,15 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import time
-import uuid
 from typing import Any, ClassVar
 
 from lca.contracts.decision import Observation
+from lca.contracts.ids import new_id
 from lca.contracts.protocols import Tool
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
 class GetWeatherTool(Tool):
@@ -51,7 +47,7 @@ class GetWeatherTool(Tool):
         if not city:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error="missing required arg: city",
@@ -64,7 +60,7 @@ class GetWeatherTool(Tool):
         if data is None:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=f"unknown city: {city}",
@@ -83,7 +79,7 @@ class GetWeatherTool(Tool):
         }
         latency_ms = int((time.monotonic() - start) * 1000)
         return Observation(
-            observation_id=_new_id("obs"),
+            observation_id=new_id("obs"),
             success=True,
             payload=result,
             latency_ms=latency_ms,

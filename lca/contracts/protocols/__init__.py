@@ -18,6 +18,7 @@ from lca.contracts.protocols.agent import AgentEntrypoint, TeamEntrypoint
 from lca.contracts.protocols.capabilities import RosterAware, SharedStoreBindable, TransportBindable
 from lca.contracts.protocols.cognition import (
     BrainStrategy,
+    CandidateEvaluationPipeline,
     CompletionPolicy,
     ConflictMonitor,
     Critic,
@@ -56,6 +57,7 @@ __all__ = [
     "AgentTransport",
     "Body",
     "BrainStrategy",
+    "CandidateEvaluationPipeline",
     "CompletionPolicy",
     "ConflictMonitor",
     "Critic",

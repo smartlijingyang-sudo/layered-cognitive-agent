@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-# 过渡期 re-export，见 ADR-0017；新代码请直接 import lca.contracts.delegation_context
 from lca.contracts.delegation_context import _delegator as _current_delegator  # noqa: F401
+
+# 过渡期 re-export，见 ADR-0017；新代码请直接 import lca.contracts.delegation_context
+from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.team_progress import DelegationLedgerProtocol
 from lca.contracts.types import Turn
@@ -16,10 +17,6 @@ from lca.contracts.types import Turn
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
 @dataclass
@@ -78,7 +75,7 @@ class TypedState:
 
     def snapshot(self, reason: str = "periodic") -> StateSnapshot:
         snap = StateSnapshot(
-            snapshot_id=_new_id("snap"),
+            snapshot_id=new_id("snap"),
             step=self.step,
             state_ref=f"mem://{self.trace_id}/{self.step}",
             reason=reason,  # type: ignore[arg-type]

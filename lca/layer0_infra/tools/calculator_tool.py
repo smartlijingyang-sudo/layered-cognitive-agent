@@ -5,17 +5,13 @@ from __future__ import annotations
 import ast
 import operator
 import time
-import uuid
 from typing import Any, ClassVar
 
 from lca.contracts.decision import Observation
+from lca.contracts.ids import new_id
 from lca.contracts.protocols import Tool
 from lca.contracts.result import ToolInputError
 from lca.contracts.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
 class CalculatorTool(Tool):
@@ -52,7 +48,7 @@ class CalculatorTool(Tool):
             value = self._safe_eval(expr)
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=True,
                 payload=value,
                 latency_ms=latency_ms,
@@ -60,7 +56,7 @@ class CalculatorTool(Tool):
         except ToolInputError as e:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=str(e),
@@ -70,7 +66,7 @@ class CalculatorTool(Tool):
         except Exception as e:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=str(e),

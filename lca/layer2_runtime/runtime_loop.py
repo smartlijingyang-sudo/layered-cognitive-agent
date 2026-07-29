@@ -7,11 +7,11 @@ Loop 本体只负责六步骨架串联 + 循环控制，
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 from lca.contracts.budget import create_budget
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.protocols import (
@@ -25,22 +25,6 @@ from lca.contracts.protocols import (
     StepOutcomePolicy,
     TransportBindable,
 )
-
-
-class CognitiveRuntime(Runtime):
-    ...
-
-    def configure(self, **capabilities: Any) -> None:
-        if "transport" in capabilities and isinstance(self.body, TransportBindable):
-            self.body.bind_transport(capabilities["transport"])
-        if "team_roster" in capabilities and isinstance(self.brain, RosterAware):
-            self.brain.set_team_roster(capabilities["team_roster"])
-        if "shared_memory" in capabilities and isinstance(self.memory, SharedStoreBindable):
-            self.memory.bind_shared_store(capabilities["shared_memory"])
-        if "team_progress" in capabilities:
-            self._team_progress = capabilities["team_progress"]
-
-
 from lca.contracts.result import (
     ApprovalPendingError,
     BudgetExceededError,
@@ -50,15 +34,14 @@ from lca.contracts.state import StateSnapshot, TypedState
 from lca.contracts.types import StepOutcome, Turn
 
 
-def _new_id(prefix: str) -> str:
-    return f"{prefix}-{uuid.uuid4().hex[:12]}"
-
-
 class CognitiveRuntime(Runtime):
-    """
-    核心 Loop: perceive -> think -> act -> observe -> reflect -> update
+    """核心 Loop: perceive → think → act → observe → reflect → update。
+
     所有 Prompt 模板、压缩策略、Strategy 切换、错误恢复、人工审批
     全部通过 Hook 与 Strategy 注册进来，Loop 本体保持稳定不变。
+
+    ``configure()`` 通过 capability protocol（ADR-0017）注入能力，
+    使用 ``isinstance`` 检查而非 ``hasattr`` 字符串探测。
     """
 
     def __init__(
@@ -79,14 +62,29 @@ class CognitiveRuntime(Runtime):
         self._team_progress: Any = None
 
     def configure(self, **capabilities: Any) -> None:
-        if "transport" in capabilities and hasattr(self.body, "bind_transport"):
+        if "transport" in capabilities and isinstance(self.body, TransportBindable):
             self.body.bind_transport(capabilities["transport"])
-        if "team_roster" in capabilities and hasattr(self.brain, "set_team_roster"):
+        if "team_roster" in capabilities and isinstance(self.brain, RosterAware):
             self.brain.set_team_roster(capabilities["team_roster"])
-        if "shared_memory" in capabilities and hasattr(self.memory, "bind_shared_store"):
+        if "shared_memory" in capabilities and isinstance(self.memory, SharedStoreBindable):
             self.memory.bind_shared_store(capabilities["shared_memory"])
         if "team_progress" in capabilities:
             self._team_progress = capabilities["team_progress"]
+
+    def register_hook(self, hook_name: str, hook_fn: Any) -> None:
+        """通过 Runtime 协议注册 Hook，避免调用方直接访问 hooks 属性。"""
+        self.hooks.register(hook_name, hook_fn)
+
+    def replace_brain_component(self, name: str, replacement: Any) -> None:
+        """替换 Brain 的指定组件，避免调用方直接访问 brain 属性。"""
+        if hasattr(self.brain, name):
+            setattr(self.brain, name, replacement)
+
+    def wrap_brain_component(self, name: str, wrapper: Any) -> None:
+        """读取并包装 Brain 的指定组件（装饰器模式）。"""
+        if hasattr(self.brain, name):
+            old = getattr(self.brain, name)
+            setattr(self.brain, name, wrapper(old))
 
     async def run(
         self,
@@ -96,7 +94,7 @@ class CognitiveRuntime(Runtime):
         **context: str,
     ) -> Result:
         state = TypedState(
-            trace_id=_new_id("trace"),
+            trace_id=new_id("trace"),
             task=task,
             budget=create_budget(
                 max_steps=max_steps,

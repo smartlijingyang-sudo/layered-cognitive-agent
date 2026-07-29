@@ -103,4 +103,7 @@ def build_default_action_registry(
     registry.register("use_tool", UseToolOperation(tool_registry, safe_executor))
     registry.register("delegate", DelegateOperation(transport_registry))
     registry.register("handoff", HandoffOperation(transport_registry))
+    for spec in BUILTIN_ACTION_SPECS:
+        for alias in spec.aliases:
+            registry.register_alias(alias, spec.name)
     return registry

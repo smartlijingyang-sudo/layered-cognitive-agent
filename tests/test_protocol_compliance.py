@@ -52,6 +52,11 @@ from lca.layer0_infra.transport.transport_registry import (
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+
+# L1
+from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
+    SimpleCandidateEvaluationPipeline,
+)
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.map_modules.conflict_monitor import (
@@ -63,8 +68,6 @@ from lca.layer1_cognitive.brain.map_modules.task_coordinator import (
     SimpleTaskCoordinator,
 )
 from lca.layer1_cognitive.brain.map_modules.task_decomposer import SimpleTaskDecomposer
-
-# L1
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
 from lca.layer1_cognitive.event_bus import SimpleEventBus
@@ -152,11 +155,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
             reasoner=reasoner,
             decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
-            task_decomposer=SimpleTaskDecomposer(),
-            state_predictor=SimpleStatePredictor(),
-            state_evaluator=SimpleStateEvaluator(),
-            conflict_monitor=SimpleConflictMonitor(),
-            task_coordinator=SimpleTaskCoordinator(),
+            evaluation_pipeline=SimpleCandidateEvaluationPipeline(),
         )
         self.assertIsInstance(brain, BrainStrategy)
 
@@ -241,11 +240,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
             reasoner=reasoner,
             decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
-            task_decomposer=SimpleTaskDecomposer(),
-            state_predictor=SimpleStatePredictor(),
-            state_evaluator=SimpleStateEvaluator(),
-            conflict_monitor=SimpleConflictMonitor(),
-            task_coordinator=SimpleTaskCoordinator(),
+            evaluation_pipeline=SimpleCandidateEvaluationPipeline(),
         )
         obs = ConsoleObservability()
         body = SimpleBody(
@@ -282,11 +277,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             reasoner=reasoner,
             decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
-            task_decomposer=SimpleTaskDecomposer(),
-            state_predictor=SimpleStatePredictor(),
-            state_evaluator=SimpleStateEvaluator(),
-            conflict_monitor=SimpleConflictMonitor(),
-            task_coordinator=SimpleTaskCoordinator(),
+            evaluation_pipeline=SimpleCandidateEvaluationPipeline(),
         )
         obs = ConsoleObservability()
         body = SimpleBody(

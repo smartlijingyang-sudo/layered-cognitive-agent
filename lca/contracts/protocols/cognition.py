@@ -61,6 +61,23 @@ class BrainStrategy(Protocol):
 
 
 @runtime_checkable
+class CandidateEvaluationPipeline(Protocol):
+    """候选方案评估管线：封装 decompose → predict → score → conflict check → arbitrate。
+
+    将原本分散在 TaskDecomposer / StatePredictor / StateEvaluator /
+    ConflictMonitor / TaskCoordinator 五个浅模块中的认知评估步骤
+    收敛为一个有深度的模块（ADR-0003 的深化）。
+    """
+
+    async def decompose(self, state: TypedState) -> list[str]: ...
+    async def evaluate(
+        self,
+        state: TypedState,
+        candidates: list[StructuredDecision],
+    ) -> StructuredDecision: ...
+
+
+@runtime_checkable
 class CompletionPolicy(Protocol):
     """确定性收尾策略：校验候选决策是否可被采纳。"""
 

@@ -11,6 +11,7 @@ from typing import Any
 
 from lca.contracts.action import ActionOperation
 from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.delegation_context import delegator_scope
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import (
     AgentTransport,
@@ -21,8 +22,7 @@ from lca.contracts.protocols import (
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
 from lca.contracts.semantic_keys import OBS_HANDOFF, OBS_TASK_ID
-from lca.contracts.state import TypedState, _current_delegator
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
+from lca.contracts.state import TypedState
 
 _POLL_INTERVAL_S = 0.05
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
@@ -120,7 +120,6 @@ class DelegateOperation(ActionOperation):
         agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
         with delegator_scope(state.agent_role):
             task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
-        task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         return transport, task_id
 
 
@@ -138,7 +137,6 @@ class HandoffOperation(ActionOperation):
         agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
         with delegator_scope(state.agent_role):
             task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
-        task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         return Observation(
             observation_id=new_id("obs"),
             success=True,

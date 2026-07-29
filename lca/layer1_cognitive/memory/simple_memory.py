@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 from lca.contracts.decision import Observation, Reflection
+from lca.contracts.ids import new_id
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols import MemorySystem, SharedMemoryStore
 from lca.contracts.state import TypedState
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
 class SimpleMemorySystem(MemorySystem):
@@ -64,7 +60,7 @@ class SimpleMemorySystem(MemorySystem):
             # 追加到 working memory 而非覆盖，确保多步委派历史对 agent 可见
             self._private_layers["working"].append(
                 MemoryRecord(
-                    record_id=_new_id("mem"),
+                    record_id=new_id("mem"),
                     content=f"TOOL_RESULT: {observation.payload}",
                     memory_type="working",
                     importance=0.9,
@@ -78,7 +74,7 @@ class SimpleMemorySystem(MemorySystem):
         self._append_record(
             "episodic",
             MemoryRecord(
-                record_id=_new_id("mem"),
+                record_id=new_id("mem"),
                 content=f"step={state.step} success={observation.success} verdict={reflection.verdict}",
                 memory_type="episodic",
                 importance=0.5,

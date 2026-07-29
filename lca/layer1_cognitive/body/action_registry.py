@@ -17,10 +17,16 @@ class ActionRegistry(ActionRegistryProtocol):
 
     def __init__(self) -> None:
         self._handlers: dict[str, ActionOperation] = {}
+        self._aliases: dict[str, str] = {}
 
     def register(self, action_type: str, handler: ActionOperation) -> None:
         """注册一个 ActionOperation 到指定 action_type。"""
         self._handlers[action_type] = handler
+        self._aliases[action_type] = action_type
+
+    def register_alias(self, alias: str, canonical: str) -> None:
+        """注册别名映射：alias → canonical action_type。"""
+        self._aliases[alias] = canonical
 
     def resolve(self, action_type: str) -> ActionOperation | None:
         """解析 action_type 对应的 Operation；未注册时返回 None。"""
@@ -33,3 +39,7 @@ class ActionRegistry(ActionRegistryProtocol):
     def is_registered(self, action_type: str) -> bool:
         """判断 action_type 是否已注册。"""
         return action_type in self._handlers
+
+    def normalize_alias(self, name: str) -> str:
+        """将 LLM 输出的别名归一化为规范 action_type；未识别则原样返回。"""
+        return self._aliases.get(name, name)

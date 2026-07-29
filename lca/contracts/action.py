@@ -39,3 +39,10 @@ class ActionRegistryProtocol(Protocol):
     def allowed_action_types(self) -> list[str]: ...
 
     def is_registered(self, action_type: str) -> bool: ...
+
+    def normalize_alias(self, name: str) -> str:
+        """将 LLM 输出的别名归一化为规范 action_type。
+
+        未识别的名称原样返回，交由 FallbackActionPolicy 降级。
+        """
+        ...

@@ -13,9 +13,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import lca.layer4_app.defaults  # noqa: F401  — 触发 register_defaults() 填充全局注册表
 from lca.contracts.role_team import TeamConfig
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
+from lca.layer4_app.defaults import ensure_defaults
+
+ensure_defaults()
 
 
 def _get_process_literal_values() -> set[str]:

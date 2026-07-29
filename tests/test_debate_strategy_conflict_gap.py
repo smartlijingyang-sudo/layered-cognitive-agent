@@ -32,12 +32,14 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import lca.layer4_app.defaults  # noqa: F401 — 触发 register_defaults()
 from lca.contracts.protocols import LLMAdapter, OrchestrationContext
 from lca.contracts.role_team import TeamConfig
 from lca.layer1_cognitive.brain.map_modules import SimpleStateEvaluator, SimpleTaskCoordinator
 from lca.layer3_agent.orchestration_strategies import DebateStrategy
 from lca.layer4_app.api import Agent, MultiAgentTeam
+from lca.layer4_app.defaults import ensure_defaults
+
+ensure_defaults()
 
 
 def _extract(prompt: str, field: str) -> str:

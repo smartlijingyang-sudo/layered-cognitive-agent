@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import lca.layer4_app.defaults  # noqa: F401 — 触发默认注册
 from lca.contracts.protocols import (
     BrainStrategy,
     LLMAdapter,
@@ -103,6 +102,7 @@ class MultiAgentTeam:
         supervisor: Agent | None = None,
         max_rounds: int | None = None,
     ):
+        ensure_defaults()
         config = TeamConfig(
             process=process,  # type: ignore[arg-type]
             max_rounds=max_rounds,

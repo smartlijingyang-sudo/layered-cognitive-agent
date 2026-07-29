@@ -173,6 +173,7 @@ ActionCatalog (action_catalog.py)
 1. **`decision_parser.py` 消费 `build_action_alias_map()`**：
    ```python
    from lca.layer1_cognitive.body.action_catalog import build_action_alias_map
+
    _ACTION_ALIASES = build_action_alias_map()  # 从 catalog 生成，不再硬编码
    ```
    删除手写的 14 行 `_ACTION_ALIASES` dict。
@@ -415,8 +416,8 @@ class SimpleBody(Body):
         self,
         action_registry: ActionRegistryProtocol,
         transport_registry: TransportRegistryProtocol,
-        tool_registry: ToolRegistry | None = None,      # 保留引用供外部访问
-        safe_executor: SafeExecutor | None = None,       # 保留引用供外部访问
+        tool_registry: ToolRegistry | None = None,  # 保留引用供外部访问
+        safe_executor: SafeExecutor | None = None,  # 保留引用供外部访问
     ):
         self.action_registry = action_registry
         self.transport_registry = transport_registry

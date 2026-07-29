@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import re
-import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
+from lca.contracts.ids import new_id
 from lca.contracts.observability import TraceSpan
 from lca.contracts.protocols import HookRegistry, Observability
 from lca.contracts.state import TypedState
@@ -15,10 +15,6 @@ from lca.contracts.state import TypedState
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
 class SimpleHookRegistry(HookRegistry):
@@ -33,7 +29,7 @@ class SimpleHookRegistry(HookRegistry):
 
     async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any:
         span = TraceSpan(
-            span_id=_new_id("span"),
+            span_id=new_id("span"),
             trace_id=state.trace_id,
             name=f"hook.{event_name}",
             started_at=_now(),

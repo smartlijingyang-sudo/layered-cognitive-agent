@@ -12,17 +12,13 @@ A2A 协议核心流程：
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 import httpx
 
 from lca.contracts.decision import Observation
+from lca.contracts.ids import new_id
 from lca.contracts.protocols import AgentTransport
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
 class A2ATransport(AgentTransport):
@@ -63,7 +59,7 @@ class A2ATransport(AgentTransport):
 
     async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str:
         endpoint = self._resolve_endpoint(agent_card)
-        task_id = _new_id("a2a_task")
+        task_id = new_id("a2a_task")
         self._task_endpoints[task_id] = endpoint
 
         client = await self._get_client()
@@ -120,7 +116,7 @@ class A2ATransport(AgentTransport):
         endpoint_info = self._task_endpoints.get(task_id, "")
         if endpoint_info.startswith("error:"):
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=endpoint_info[6:],
@@ -135,7 +131,7 @@ class A2ATransport(AgentTransport):
             status = data.get("status", {})
             if status.get("state") != "completed":
                 return Observation(
-                    observation_id=_new_id("obs"),
+                    observation_id=new_id("obs"),
                     success=False,
                     payload=None,
                     error=f"Task not completed: state={status.get('state')}",
@@ -149,14 +145,14 @@ class A2ATransport(AgentTransport):
                         output_parts.append(part.get("text", ""))
 
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=True,
                 payload="\n".join(output_parts) if output_parts else None,
                 extra={"a2a_task_id": task_id, "raw_response": data},
             )
         except httpx.HTTPError as exc:
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=f"A2A receive_result failed: {exc}",

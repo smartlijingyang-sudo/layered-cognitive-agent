@@ -12,18 +12,14 @@ ops:
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 from lca.contracts.decision import Observation
+from lca.contracts.ids import new_id
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols import SharedMemoryStore, Tool
 
 _VALID_OPS = frozenset({"read", "write", "list"})
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
 class SharedMemoryTool(Tool):
@@ -61,7 +57,7 @@ class SharedMemoryTool(Tool):
         err = self.validate(args)
         if err is not None:
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=err,
@@ -73,7 +69,7 @@ class SharedMemoryTool(Tool):
         if op == "read":
             records = self._store.get_records(layer)
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=True,
                 payload=[r.content for r in records],
                 extra={"team_id": self._team_id, "layer": layer, "op": op},
@@ -82,7 +78,7 @@ class SharedMemoryTool(Tool):
         if op == "list":
             records = self._store.get_records(layer)
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=True,
                 payload={"count": len(records), "contents": [r.content for r in records]},
                 extra={"team_id": self._team_id, "layer": layer, "op": op},
@@ -91,7 +87,7 @@ class SharedMemoryTool(Tool):
         # write
         content = str(args["content"])
         record = MemoryRecord(
-            record_id=_new_id("mem"),
+            record_id=new_id("mem"),
             content=content,
             memory_type=layer,  # type: ignore[arg-type]
             importance=float(args.get("importance", 0.8)),
@@ -99,7 +95,7 @@ class SharedMemoryTool(Tool):
         )
         self._store.add_record(layer, record)
         return Observation(
-            observation_id=_new_id("obs"),
+            observation_id=new_id("obs"),
             success=True,
             payload={"written": content, "record_id": record.record_id},
             extra={"team_id": self._team_id, "layer": layer, "op": "write"},

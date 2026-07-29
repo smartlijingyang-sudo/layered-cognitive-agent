@@ -14,10 +14,7 @@ from lca.contracts.ids import new_id
 from lca.contracts.protocols import DecisionParser
 from lca.contracts.semantic_keys import ORIGINAL_ACTION_TYPE
 from lca.contracts.state import TypedState
-from lca.layer1_cognitive.body.action_catalog import build_action_alias_map
 from lca.layer1_cognitive.body.action_registry import ActionRegistryProtocol
-
-_ACTION_ALIASES: dict[str, str] = build_action_alias_map()
 
 
 class SimpleDecisionParser(DecisionParser):
@@ -45,7 +42,11 @@ class SimpleDecisionParser(DecisionParser):
             )
 
         raw_action = str(data.get("action_type", "respond")).lower().strip()
-        action_type = _ACTION_ALIASES.get(raw_action, raw_action)
+        action_type = (
+            self._action_registry.normalize_alias(raw_action)
+            if self._action_registry is not None
+            else raw_action
+        )
 
         extra: dict[str, str] = {}
         if self._action_registry is not None and not self._action_registry.is_registered(

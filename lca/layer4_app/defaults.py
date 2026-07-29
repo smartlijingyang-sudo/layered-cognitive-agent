@@ -158,13 +158,9 @@ def register_defaults() -> None:
 
 
 def ensure_defaults() -> None:
-    """幂等：仅首次注册默认实现。"""
+    """幂等：仅首次注册默认实现。由 Agent / MultiAgentTeam 构造时显式调用。"""
     if not defaults_registered():
         register_defaults()
-
-
-# 导入本模块即注册，保持历史行为；亦可显式 ensure_defaults()
-ensure_defaults()
 
 
 def __getattr__(name: str) -> object:

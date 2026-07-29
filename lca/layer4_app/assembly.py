@@ -29,15 +29,11 @@ from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedB
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
+    SimpleCandidateEvaluationPipeline,
+)
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
-from lca.layer1_cognitive.brain.map_modules import (
-    SimpleConflictMonitor,
-    SimpleStateEvaluator,
-    SimpleStatePredictor,
-    SimpleTaskCoordinator,
-    SimpleTaskDecomposer,
-)
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
@@ -87,11 +83,7 @@ def build_default_brain(
         reasoner=reasoner,
         decision_parser=SimpleDecisionParser(action_registry=action_registry),
         critic=SimpleCritic(),
-        task_decomposer=SimpleTaskDecomposer(),
-        state_predictor=SimpleStatePredictor(),
-        state_evaluator=SimpleStateEvaluator(),
-        conflict_monitor=SimpleConflictMonitor(),
-        task_coordinator=SimpleTaskCoordinator(),
+        evaluation_pipeline=SimpleCandidateEvaluationPipeline(),
     )
 
 

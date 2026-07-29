@@ -9,16 +9,11 @@ MCP 主要用于工具调用场景，此处将 Agent 任务映射为 MCP 工具�
 from __future__ import annotations
 
 import contextlib
-import uuid
 from typing import Any
 
 from lca.contracts.decision import Observation
+from lca.contracts.ids import new_id
 from lca.contracts.protocols import AgentTransport
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
-
 
 _MCP_SDK_MISSING_MSG = "MCP Python SDK 未安装。请运行: pip install mcp 或 uv add mcp"
 
@@ -81,7 +76,7 @@ class MCPTransport(AgentTransport):
         return session
 
     async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str:
-        task_id = _new_id("mcp_task")
+        task_id = new_id("mcp_task")
         server_url, tool_name = self._resolve_config(agent_card)
 
         try:
@@ -99,7 +94,7 @@ class MCPTransport(AgentTransport):
 
             is_error = getattr(result, "isError", False)
             self._task_results[task_id] = Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=not is_error,
                 payload=output_text or None,
                 error=output_text if is_error else None,
@@ -111,7 +106,7 @@ class MCPTransport(AgentTransport):
             raise
         except Exception as exc:
             self._task_results[task_id] = Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=f"MCP send_task failed: {exc}",
@@ -127,7 +122,7 @@ class MCPTransport(AgentTransport):
         return self._task_results.get(
             task_id,
             Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=f"MCP task not found: {task_id}",
