@@ -1,4 +1,11 @@
-"""hooks."""
+"""认知循环生命周期 Hook 定义与事件发射工厂。
+
+L2 层职责：
+    定义所有合法的 Hook 事件名（HOOK_NAMES），
+    并提供 make_event_emitting_hook 工厂函数，
+    将认知循环的关键事件（action_degraded、step_completed）
+    发射到 EventBus，实现横切可观测性。
+"""
 
 from __future__ import annotations
 

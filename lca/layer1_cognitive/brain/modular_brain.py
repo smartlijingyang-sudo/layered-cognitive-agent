@@ -17,6 +17,18 @@ from lca.contracts.state import TypedState
 
 
 class ModularBrain(BrainStrategy):
+    """Default ``BrainStrategy``: a modular MAP-style cognitive pipeline.
+
+    Orchestrates five stages:
+    1. **Skill routing** (optional) — select an active prompt template.
+    2. **Task decomposition** — break the task into subtasks.
+    3. **Candidate generation** — call the Reasoner (LLM) for candidate decisions.
+    4. **Decision parsing** — parse raw LLM output into ``StructuredDecision``.
+    5. **Candidate evaluation** — score and select the best candidate.
+
+    Reflection is delegated to the ``Critic`` component.
+    """
+
     def __init__(
         self,
         reasoner: Reasoner,

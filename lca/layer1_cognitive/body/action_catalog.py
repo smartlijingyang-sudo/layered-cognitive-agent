@@ -19,6 +19,13 @@ from lca.layer1_cognitive.body.action_registry import ActionRegistry
 
 @dataclass(frozen=True)
 class ActionSpec:
+    """Declarative specification of a built-in action type.
+
+    Defines the canonical name, human-readable description, accepted aliases,
+    and whether the action is directly executable (vs. a control signal like
+    ``stop`` or ``ask_human``).
+    """
+
     name: str
     description: str
     aliases: tuple[str, ...] = ()

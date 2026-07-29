@@ -5,7 +5,7 @@ L0 配置层：确保 Agent 声明的 max_steps 与最终生效的 Budget.max_st
 
 from __future__ import annotations
 
-from lca.contracts.budget import _DEFAULT_MAX_STEPS, create_budget
+from lca.contracts.budget import DEFAULT_MAX_STEPS, create_budget
 
 
 class TestBudgetFactory:
@@ -13,7 +13,7 @@ class TestBudgetFactory:
 
     def test_default_max_steps(self) -> None:
         budget = create_budget()
-        assert budget.max_steps == _DEFAULT_MAX_STEPS
+        assert budget.max_steps == DEFAULT_MAX_STEPS
 
     def test_explicit_max_steps(self) -> None:
         budget = create_budget(max_steps=20)

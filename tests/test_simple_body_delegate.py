@@ -44,7 +44,7 @@ def _make_decision(
 ) -> StructuredDecision:
     return StructuredDecision(
         decision_id="dec-1",
-        action_type=action_type,  # type: ignore[arg-type]
+        action_type=action_type,  # type: ignore[arg-type]  # 测试便利：str 与 ActionType(str Enum) 值相等
         rationale="test",
         confidence=1.0,
         tool_calls=tool_calls or [],
@@ -184,7 +184,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
 
         obs = await body.act(decision, _make_state())
         self.assertFalse(obs.success)
-        self.assertIn("not found", obs.error)  # type: ignore[arg-type]
+        self.assertIn("not found", obs.error or "")
 
     async def test_handler_exception_returns_failed_observation(self) -> None:
         transport = InternalTransport()
@@ -198,7 +198,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
 
         obs = await body.act(decision, _make_state())
         self.assertFalse(obs.success)
-        self.assertIn("exploded", obs.error)  # type: ignore[arg-type]
+        self.assertIn("exploded", obs.error or "")
 
 
 class TestDelegateDoesNotAffectOtherBranches(unittest.IsolatedAsyncioTestCase):
@@ -215,7 +215,7 @@ class TestDelegateDoesNotAffectOtherBranches(unittest.IsolatedAsyncioTestCase):
 
     async def test_unknown_action_still_raises(self) -> None:
         body = SimpleBody(SimpleToolRegistry(), _noop_executor())
-        decision = _make_decision(action_type="ask_human")  # type: ignore[arg-type]
+        decision = _make_decision(action_type="ask_human")  # type: ignore[arg-type]  # 故意传未注册类型触发异常
 
         with self.assertRaises(ToolExecutionError):
             await body.act(decision, _make_state())

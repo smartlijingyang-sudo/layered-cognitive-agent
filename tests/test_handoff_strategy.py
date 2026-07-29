@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.decision import DelegationSpec, StructuredDecision
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import OrchestrationContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
@@ -21,10 +22,10 @@ from lca.layer4_app.defaults import ensure_defaults
 ensure_defaults()
 
 
-def _make_result(trace_id: str, output: str, status: str = "completed") -> Result:
+def _make_result(trace_id: str, output: str, status: TaskStatus = TaskStatus.COMPLETED) -> Result:
     return Result(
         trace_id=trace_id,
-        status=status,  # type: ignore[arg-type]
+        status=status,
         final_state_ref=f"mem://{trace_id}/0",
         total_steps=1,
         budget_used=Budget(),
@@ -32,7 +33,7 @@ def _make_result(trace_id: str, output: str, status: str = "completed") -> Resul
     )
 
 
-def _make_agent(role: str, output: str, status: str = "completed") -> MagicMock:
+def _make_agent(role: str, output: str, status: TaskStatus = TaskStatus.COMPLETED) -> MagicMock:
     agent = MagicMock()
     agent.role_profile = MagicMock()
     agent.role_profile.role = role
@@ -64,7 +65,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
     async def test_fallback_to_next_agent_on_failure(self) -> None:
         """第一个 Agent 失败时，继续尝试下一个。"""
-        agent_a = _make_agent("triage", "", status="failed")
+        agent_a = _make_agent("triage", "", status=TaskStatus.FAILED)
         agent_b = _make_agent("expert", "handled by expert")
 
         strategy = HandoffStrategy()
@@ -77,8 +78,8 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
     async def test_all_agents_fail(self) -> None:
         """所有 Agent 都失败时返回最后一个失败结果。"""
-        agent_a = _make_agent("a", "", status="failed")
-        agent_b = _make_agent("b", "", status="failed")
+        agent_a = _make_agent("a", "", status=TaskStatus.FAILED)
+        agent_b = _make_agent("b", "", status=TaskStatus.FAILED)
 
         strategy = HandoffStrategy()
         context = OrchestrationContext(members=[agent_a, agent_b])
@@ -94,7 +95,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         result = await strategy.run(context, "task")
 
         self.assertEqual(result.status, "failed")
-        self.assertIn("No members", result.error)  # type: ignore[arg-type]
+        self.assertIn("No members", result.error or "")
 
     async def test_single_member(self) -> None:
         agent = _make_agent("solo", "solo result")

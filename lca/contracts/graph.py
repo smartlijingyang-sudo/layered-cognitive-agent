@@ -17,6 +17,8 @@ from lca.contracts.state import TypedState
 
 
 class NodeType(str, Enum):
+    """DAG 节点类型。"""
+
     ENTRY = "entry"
     EXIT = "exit"
     AGENT = "agent"
@@ -25,6 +27,8 @@ class NodeType(str, Enum):
 
 
 class EdgeType(str, Enum):
+    """DAG 边类型。"""
+
     FIXED = "fixed"
     CONDITIONAL = "conditional"
     PARALLEL = "parallel"
@@ -39,6 +43,8 @@ class GraphValidationError(Exception):
 
 @dataclass
 class GraphNode:
+    """图中的单个节点：id + 类型 + 配置字典。"""
+
     id: str
     type: NodeType
     config: dict[str, Any] = field(default_factory=dict)
@@ -46,6 +52,8 @@ class GraphNode:
 
 @dataclass
 class GraphEdge:
+    """节点间的有向边：source → target + 类型 + 可选条件函数。"""
+
     source: str
     target: str
     type: EdgeType = EdgeType.FIXED

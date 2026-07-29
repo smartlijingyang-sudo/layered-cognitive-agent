@@ -1,4 +1,14 @@
-"""DefaultStepOutcomePolicy —— 默认单步结果判定策略。"""
+"""DefaultStepOutcomePolicy —— 默认单步结果判定策略。
+
+L2 层职责：
+    根据当前 step 的 decision / observation / reflection 判定：
+    - 是否应停止循环（should_stop）
+    - 最终输出（final_output）
+    - 任务状态（status）
+
+    与 LoopJudge 组合使用：LoopJudge 负责 budget 检查 + 调用本策略，
+    本策略只负责业务语义的判定（action_type、reflection_verdict）。
+"""
 
 from __future__ import annotations
 
@@ -10,6 +20,15 @@ from lca.contracts.state import TypedState
 
 
 class DefaultStepOutcomePolicy(StepOutcomePolicy):
+    """默认单步结果判定策略。
+
+    判定规则：
+    - HANDOFF 动作 → 立即停止（COMPLETED）
+    - RESPOND 动作或降级成功 → 提取 final_output，
+      除非 reflection 判定 NEEDS_CORRECTION 则继续循环
+    - 其他 → 继续循环
+    """
+
     def resolve(
         self,
         state: TypedState,

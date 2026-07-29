@@ -11,6 +11,12 @@ from lca.contracts.state import Budget
 
 @dataclass
 class Result:
+    """Agent / Team 运行的最终结果契约。
+
+    消费方应先检查 ``status``：非 COMPLETED 时 ``budget_used`` 为零值 Budget，
+    ``output`` / ``trace_url`` 等可能为 None。
+    """
+
     trace_id: str
     status: TaskStatus
     final_state_ref: str
@@ -31,18 +37,22 @@ class Result:
             status=TaskStatus.FAILED,
             final_state_ref="",
             total_steps=0,
-            budget_used=None,  # type: ignore[arg-type]
+            budget_used=Budget(),
             error=reason,
         )
 
 
 class ApprovalPendingError(Exception):
+    """Agent 需要人工审批时抛出，暂停执行等待 HITL 决策。"""
+
     def __init__(self, approval_request: Any):
         self.approval_request = approval_request
         super().__init__("waiting for human approval")
 
 
 class BudgetExceededError(Exception):
+    """Budget 超限（步数 / token / 费用 / 墙钟）时抛出。"""
+
     pass
 
 
@@ -72,6 +82,12 @@ class ToolInputError(ToolExecutionError):
 
 
 class UnregisteredActionError(ToolExecutionError):
+    """Raised when an ``action_type`` has no registered handler.
+
+    This is a deterministic error — retrying will not help because the
+    action catalog simply does not contain the requested type.
+    """
+
     retryable = False
 
     def __init__(self, action_type: str):

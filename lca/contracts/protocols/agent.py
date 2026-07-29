@@ -20,6 +20,8 @@ from lca.contracts.state import StateSnapshot
 
 @runtime_checkable
 class AgentEntrypoint(Protocol):
+    """单体 Agent 入口契约：接收 task / snapshot，返回 Result。"""
+
     role_profile: RoleProfile
 
     async def execute(

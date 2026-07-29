@@ -1,4 +1,15 @@
-"""GraphStrategy —— DAG workflow engine with fan-in visibility."""
+"""GraphStrategy —— DAG 工作流引擎。
+
+L3 层职责：
+    将 ExecutionGraph 编译为拓扑排序执行计划，支持：
+    - 顺序边（DEFAULT）：前驱完成后触发后继
+    - 条件边（CONDITIONAL）：运行时求值 condition，命中则通行，否则级联跳过
+    - 并行边（PARALLEL）：多分支 asyncio.gather 并发执行
+    - 聚合节点（AGGREGATOR）：汇合多个前驱的输出
+
+    执行核心：BFS 队列驱动拓扑排序，入度归零即入队。
+    仅接受严格 DAG（allow_cycle=False）。
+"""
 
 from __future__ import annotations
 
@@ -18,8 +29,17 @@ from lca.layer3_agent.orchestration_strategies.graph.topology import (
     enqueue_ready_targets,
 )
 
+_AGGREGATOR_TRACE_PREFIX = "graph-agg"
+_GRAPH_TRACE_ID = "graph"
+
 
 class GraphStrategy(OrchestrationStrategy):
+    """DAG 工作流引擎：拓扑排序 + fan-in/fan-out + 条件分支 + 并行分支。
+
+    构造时可选传入 ExecutionGraph 和 StateStore。
+    若未传入 graph，则从 OrchestrationContext 解析（当前要求构造时传入）。
+    """
+
     def __init__(
         self,
         execution_graph: ExecutionGraph | None = None,
@@ -34,7 +54,7 @@ class GraphStrategy(OrchestrationStrategy):
         if graph.allow_cycle:
             raise ValueError("GraphStrategy 仅支持严格 DAG（allow_cycle=False）。")
         member_map = {m.role_profile.role: m for m in context.members}
-        state = TypedState(trace_id="graph", task=objective, budget=Budget())
+        state = TypedState(trace_id=_GRAPH_TRACE_ID, task=objective, budget=Budget())
         in_degree, out_edge_indices = compute_in_degree_and_out_edges(graph)
         remaining: dict[str, int] = dict(in_degree)
         executed: set[str] = set()
@@ -110,7 +130,7 @@ class GraphStrategy(OrchestrationStrategy):
             parts = [str(results[p].output) for p in preds if p in results and results[p].output]
             total_steps = sum(results[p].total_steps for p in preds if p in results)
             results[node.id] = Result(
-                trace_id="graph-agg",
+                trace_id=_AGGREGATOR_TRACE_PREFIX,
                 status=TaskStatus.COMPLETED,
                 final_state_ref="",
                 total_steps=total_steps or 1,
@@ -223,7 +243,7 @@ class GraphStrategy(OrchestrationStrategy):
                     r.total_steps = total_steps
                     return r
         return Result(
-            trace_id="graph",
+            trace_id=_GRAPH_TRACE_ID,
             status=TaskStatus.COMPLETED,
             final_state_ref="",
             total_steps=total_steps,

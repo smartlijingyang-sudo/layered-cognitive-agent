@@ -1,18 +1,27 @@
-"""defaults.py —— 默认实现注册与可复用构建片段。
+"""Built-in default registrations for the LCA framework.
 
-完整 Agent 对象图组装见 ``assembly.assemble_base_agent``（唯一共享管线入口）。
-本模块负责：
-1. ``ensure_defaults()`` 幂等注册发现型组件
-2. Transport / Team 辅助构建
+Idempotent — ``ensure_defaults()`` is safe to call multiple times; it only
+registers on the first invocation.  This module also provides reusable
+builder helpers (transport registry, team transport) that the composition
+root (``assembly``) depends on.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
 
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Observation
 from lca.contracts.enums import CompletionPolicyName, TeamProcess
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import AgentTransport, Body, Tool, TransportRegistryProtocol
+from lca.contracts.protocols import (
+    AgentTransport,
+    Body,
+    Observability,
+    Tool,
+    TransportRegistryProtocol,
+)
 from lca.contracts.role_team import ToolPermissionManifest
 from lca.layer0_infra.component_registry import (
     defaults_registered,
@@ -52,7 +61,7 @@ from lca.layer3_agent.orchestration_strategies import (
 
 
 def build_default_transport_registry() -> TransportRegistry:
-    """构建默认 TransportRegistry：internal / a2a / mcp。"""
+    """Build the default TransportRegistry with internal / a2a / mcp transports."""
     registry = TransportRegistry()
     registry.register(InternalTransport())
     registry.register(A2ATransport())
@@ -62,25 +71,26 @@ def build_default_transport_registry() -> TransportRegistry:
 
 def build_body(
     tools: list[Tool],
-    observability: object,
+    observability: Observability,
     transport_registry: TransportRegistryProtocol | None = None,
     action_registry: ActionRegistryProtocol | None = None,
     enable_fallback: bool = True,
 ) -> Body:
-    """兼容构建器：创建**一份** ToolRegistry 并与 ActionRegistry 共享。
+    """Compatibility builder: creates a ToolRegistry shared with ActionRegistry.
 
-    新代码请优先用 ``assembly.build_body_from_shared`` / ``assemble_base_agent``。
-    若传入 action_registry，则不再为其重建 UseTool 依赖——调用方须保证
-    action_registry 已绑定同一 tool 管线；否则会用本函数新建的 registry 重建。
+    Prefer ``assembly.build_body_from_shared`` / ``assemble_base_agent`` for
+    new code.  If *action_registry* is passed the caller must guarantee it is
+    already bound to the same tool pipeline; otherwise a fresh one is built
+    internally.
     """
     from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
-    from lca.layer4_app.assembly import build_body_from_shared, build_default_brain  # noqa: F401
+    from lca.layer4_app.assembly import build_body_from_shared
 
     permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
     tool_registry = SimpleToolRegistry()
     for t in tools:
         tool_registry.register(t)
-    safe_executor = SimpleSafeExecutor(permission_manifest, observability)  # type: ignore[arg-type]
+    safe_executor = SimpleSafeExecutor(permission_manifest, observability)
     registry = transport_registry or build_default_transport_registry()
     if action_registry is None:
         action_registry = build_default_action_registry(tool_registry, safe_executor, registry)
@@ -96,7 +106,7 @@ def build_body(
 def build_team_transport(
     members: list[BaseAgent],
 ) -> tuple[AgentTransport, str]:
-    """为 hierarchical 团队构建进程内传输层和花名册。"""
+    """Build an in-process transport and roster description for a team."""
     from lca.contracts.state import _current_delegator
 
     transport = InternalTransport()
@@ -118,9 +128,12 @@ def build_team_transport(
 
 
 def register_defaults() -> None:
-    """注册所有内置默认实现到全局注册表（可重复调用，幂等）。"""
+    """Register all built-in default implementations into the global registry.
+
+    Idempotent — calling multiple times simply overwrites with the same
+    factories, which is harmless.
+    """
     global_reg = get_global_registry()
-    # 允许重复 register 覆盖同名实现
     global_reg.register("observability", "console", ConsoleObservability)
     global_reg.register("observability", "jsonl_file", JSONLFileObservability)
     global_reg.register("state_store", "memory", InMemoryStateStore)
@@ -128,7 +141,7 @@ def register_defaults() -> None:
     global_reg.register("event_bus", "simple", SimpleEventBus)
     global_reg.register("delegation_ledger", "default", DelegationLedger)
 
-    def _default_brain_factory(*args, **kwargs):  # type: ignore[no-untyped-def]
+    def _default_brain_factory(*args: Any, **kwargs: Any) -> Any:
         from lca.layer4_app.assembly import build_default_brain
 
         return build_default_brain(*args, **kwargs)
@@ -164,52 +177,76 @@ def register_defaults() -> None:
 
 
 def ensure_defaults() -> None:
-    """幂等：仅首次注册默认实现。由 Agent / MultiAgentTeam 构造时显式调用。"""
+    """Idempotent guard — registers defaults only on the first call.
+
+    Invoked explicitly by ``Agent`` / ``MultiAgentTeam`` constructors.
+    """
     if not defaults_registered():
         register_defaults()
 
 
-def __getattr__(name: str) -> object:
-    """兼容旧私有符号（_build_brain / _build_hooks / build_runtime）。"""
-    if name == "_build_brain":
-        from lca.layer4_app.assembly import build_default_brain
+# ── Backward-compat shims for former private symbols ─────────────────────
+# Each entry is a zero-arg factory that lazily imports and returns the shim.
 
-        return build_default_brain
-    if name == "_build_hooks":
-        from lca.layer4_app.assembly import build_hooks
 
-        return build_hooks
-    if name == "build_runtime":
-        from lca.contracts.protocols import (
-            BrainStrategy,
-            HookRegistry,
-            MemorySystem,
-            StateStore,
-            StepOutcomePolicy,
+def _make_build_runtime() -> Callable[..., Any]:
+    """Build the legacy ``build_runtime`` shim (lazy import)."""
+    from lca.contracts.protocols import (
+        BrainStrategy,
+        HookRegistry,
+        MemorySystem,
+        StateStore,
+        StepOutcomePolicy,
+    )
+    from lca.layer2_runtime.loop_judge import DefaultLoopJudge
+    from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
+        DefaultStepOutcomePolicy,
+    )
+    from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+
+    def build_runtime(
+        brain: BrainStrategy,
+        body: Body,
+        memory: MemorySystem,
+        hooks: HookRegistry,
+        state_store: StateStore,
+        outcome_policy: StepOutcomePolicy | None = None,
+    ) -> CognitiveRuntime:
+        policy = outcome_policy or DefaultStepOutcomePolicy()
+        return CognitiveRuntime(
+            brain,
+            body,
+            memory,
+            hooks,
+            state_store,
+            judge=DefaultLoopJudge(outcome_policy=policy),
         )
-        from lca.layer2_runtime.loop_judge import DefaultLoopJudge
-        from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
-            DefaultStepOutcomePolicy,
-        )
-        from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
-        def build_runtime(
-            brain: BrainStrategy,
-            body: Body,
-            memory: MemorySystem,
-            hooks: HookRegistry,
-            state_store: StateStore,
-            outcome_policy: StepOutcomePolicy | None = None,
-        ) -> CognitiveRuntime:
-            policy = outcome_policy or DefaultStepOutcomePolicy()
-            return CognitiveRuntime(
-                brain,
-                body,
-                memory,
-                hooks,
-                state_store,
-                judge=DefaultLoopJudge(outcome_policy=policy),
-            )
+    return build_runtime
 
-        return build_runtime
+
+_DEPRECATED_BUILDERS: dict[str, Callable[[], Any]] = {
+    "_build_brain": lambda: _lazy_import("lca.layer4_app.assembly", "build_default_brain"),
+    "_build_hooks": lambda: _lazy_import("lca.layer4_app.assembly", "build_hooks"),
+    "build_runtime": _make_build_runtime,
+}
+
+
+def _lazy_import(module_path: str, attr: str) -> Any:
+    """Import *module_path* and return *attr* from it."""
+    import importlib
+
+    mod = importlib.import_module(module_path)
+    return getattr(mod, attr)
+
+
+def __getattr__(name: str) -> Any:
+    """Backward-compat shim for former private symbols.
+
+    Resolves via ``_DEPRECATED_BUILDERS`` dispatch dict; raises
+    ``AttributeError`` for unknown names.
+    """
+    factory = _DEPRECATED_BUILDERS.get(name)
+    if factory is not None:
+        return factory()
     raise AttributeError(name)

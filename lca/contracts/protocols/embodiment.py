@@ -12,6 +12,8 @@ from lca.contracts.state import TypedState
 
 @runtime_checkable
 class Body(Protocol):
+    """行动执行体：将 StructuredDecision 转化为 Observation。"""
+
     async def act(self, decision: StructuredDecision, state: TypedState) -> Observation: ...
     def bind_transport(self, transport: AgentTransport) -> None: ...
 

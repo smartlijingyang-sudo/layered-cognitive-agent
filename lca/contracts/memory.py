@@ -9,6 +9,8 @@ from typing import Any, Literal
 
 @dataclass
 class MemoryRecord:
+    """多级记忆记录：支持 working / semantic / episodic / procedural 四种类型。"""
+
     record_id: str
     content: str
     memory_type: Literal["working", "semantic", "episodic", "procedural"]
@@ -22,6 +24,8 @@ class MemoryRecord:
 
 @dataclass
 class SkillRecord:
+    """程序性技能记录：触发模式 + 工作流引用 + 成功率统计。"""
+
     skill_id: str
     name: str
     description: str
@@ -35,6 +39,8 @@ class SkillRecord:
 
 @dataclass
 class KGTriple:
+    """知识图谱三元组：subject-predicate-object + 置信度 + 有效期。"""
+
     triple_id: str
     subject: str
     predicate: str

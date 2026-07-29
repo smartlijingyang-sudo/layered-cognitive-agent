@@ -5,6 +5,7 @@ description = "Layered Cognitive Agent Framework"
 requires-python = ">=3.10"
 dependencies = [
     "httpx>=0.28.1",
+    "structlog>=26.1.0",
 ]
 
 [tool.importlinter]

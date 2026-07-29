@@ -7,10 +7,14 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
+import structlog
+
 from lca.contracts.ids import new_id
 from lca.contracts.observability import TraceSpan
 from lca.contracts.protocols import HookRegistry, Observability
 from lca.contracts.state import TypedState
+
+_log = structlog.get_logger("lca.hook_registry")
 
 
 def _now() -> datetime:
@@ -48,8 +52,27 @@ async def default_logging_hook(event_name: str, state: TypedState, **kwargs: Any
     delegator_info = f"delegated_by={state.delegated_by}" if state.delegated_by else ""
     context_parts = [p for p in [role_info, delegator_info] if p]
     context_str = " ".join(context_parts)
-    prefix = f"[{context_str}] " if context_str else ""
-    print(f"  [Hook] {prefix}{event_name} @step={state.step} {extra if extra else ''}")
+    # Convert extra values to safe string representations for structlog
+    safe_extra = {k: _safe_repr(v) for k, v in extra.items()} if extra else None
+    _log.info(
+        "hook_triggered",
+        hook_event=event_name,
+        step=state.step,
+        context=context_str or None,
+        hook_extra=safe_extra,
+    )
+
+
+def _safe_repr(value: Any) -> Any:
+    """Convert a value to a safe string representation for logging.
+
+    Primitives (str, int, float, bool, None) are returned as-is so the
+    observability layer can format them natively; complex objects fall
+    back to ``repr()``.
+    """
+    if isinstance(value, (str, int, float, bool, type(None))):
+        return value
+    return repr(value)
 
 
 def _extract_span_attributes(event_name: str, kwargs: dict[str, Any]) -> dict[str, Any]:

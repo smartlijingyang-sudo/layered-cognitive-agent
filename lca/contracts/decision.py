@@ -25,6 +25,8 @@ def _now() -> datetime:
 
 @dataclass
 class ToolCall:
+    """单次工具调用请求：工具名 + 参数 + 幂等键。"""
+
     call_id: str
     tool_name: str
     arguments: dict[str, Any]
@@ -34,6 +36,8 @@ class ToolCall:
 
 @dataclass
 class DelegationSpec:
+    """委派规格：目标角色/Agent + 传输协议 + 截止时间。"""
+
     subtask: str
     target_role: str | None = None
     target_agent_id: str | None = None
@@ -45,6 +49,8 @@ class DelegationSpec:
 
 @dataclass
 class StructuredDecision:
+    """Agent 单步决策输出：行动类型 + 理由 + 工具调用 / 委派规格。"""
+
     decision_id: str
     action_type: str
     rationale: str
@@ -59,6 +65,8 @@ class StructuredDecision:
 
 @dataclass
 class Observation:
+    """工具执行 / 委派结果：成功标志 + 载荷 + 降级信息。"""
+
     observation_id: str
     success: bool
     payload: Any
@@ -73,6 +81,8 @@ class Observation:
 
 @dataclass
 class Reflection:
+    """Critic 自省输出：判定 + 教训 + 可选纠正决策。"""
+
     reflection_id: str
     verdict: ReflectionVerdict
     lesson: str | None = None

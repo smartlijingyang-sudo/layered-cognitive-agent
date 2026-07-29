@@ -10,18 +10,24 @@ from lca.contracts.enums import MessageKind, MessageRole
 
 @dataclass
 class TextPart:
+    """A plain-text content part within an ``AgentMessage``."""
+
     text: str
     kind: MessageKind = MessageKind.TEXT
 
 
 @dataclass
 class DataPart:
+    """A structured data (JSON-compatible) part within an ``AgentMessage``."""
+
     data: dict[str, Any]
     kind: MessageKind = MessageKind.DATA
 
 
 @dataclass
 class FileRefPart:
+    """A file reference part (URI + optional MIME type) within an ``AgentMessage``."""
+
     uri: str
     mime_type: str | None = None
     kind: MessageKind = MessageKind.FILE
@@ -32,6 +38,12 @@ Part = TextPart | DataPart | FileRefPart
 
 @dataclass
 class AgentMessage:
+    """Multi-modal message composed of one or more ``Part`` items.
+
+    Supports text, structured data, and file references in a single message,
+    following the A2A / multi-modal message convention.
+    """
+
     parts: list[Part]
     role: MessageRole = MessageRole.USER
 

@@ -19,6 +19,15 @@ from lca.layer1_cognitive.body.action_registry import ActionRegistry
 
 
 class SimpleBody(Body):
+    """Default ``Body`` implementation — dispatches actions via ``ActionRegistry``.
+
+    Resolves the ``action_type`` from a ``StructuredDecision`` through the
+    action registry and delegates execution to the registered
+    ``ActionOperation``.  Supports flexible construction: callers may inject
+    a pre-built ``ActionRegistry``, or provide ``ToolRegistry`` +
+    ``SafeExecutor`` and let the body build the registry automatically.
+    """
+
     def __init__(
         self,
         tool_registry: ToolRegistry | None = None,

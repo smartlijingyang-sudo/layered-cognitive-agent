@@ -13,16 +13,17 @@
 from __future__ import annotations
 
 import json
-import logging
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import structlog
+
 from lca.contracts.observability import TraceSpan
 from lca.contracts.protocols import Observability
 
-logger = logging.getLogger(__name__)
+_log = structlog.get_logger("lca.jsonl_observability")
 
 
 class JSONLFileObservability(Observability):
@@ -41,8 +42,8 @@ class JSONLFileObservability(Observability):
             line = json.dumps(record, ensure_ascii=False, default=str)
             with open(self._path, "a", encoding="utf-8") as f:
                 f.write(line + "\n")
-        except Exception:
-            logger.exception("Failed to write trace span to %s", self._path)
+        except (TypeError, ValueError, OSError) as exc:
+            _log.error("trace_write_failed", path=str(self._path), error=str(exc))
 
     def _serialize_span(self, span: TraceSpan) -> dict[str, Any]:
         """将 TraceSpan 转为可 JSON 序列化的 dict。"""

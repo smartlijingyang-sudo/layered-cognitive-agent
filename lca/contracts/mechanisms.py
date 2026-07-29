@@ -18,6 +18,8 @@ from lca.contracts.state import TypedState
 
 @runtime_checkable
 class EventBus(Protocol):
+    """事件总线：发布 / 订阅异步事件。"""
+
     def emit(self, event_name: str, payload: dict[str, Any], trace_id: str) -> None: ...
     def subscribe(
         self, event_name: str, handler: Callable[[dict[str, Any]], Awaitable[None]]
@@ -26,11 +28,15 @@ class EventBus(Protocol):
 
 @runtime_checkable
 class Hook(Protocol):
+    """生命周期钩子：接收事件名 + 当前状态，执行横切副作用。"""
+
     async def __call__(self, event_name: str, state: TypedState, **kwargs: Any) -> None: ...
 
 
 @runtime_checkable
 class HookRegistry(Protocol):
+    """钩子注册表：按事件名注册和触发 Hook。"""
+
     def register(self, event_name: str, hook: Hook) -> None: ...
     async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> None: ...
 

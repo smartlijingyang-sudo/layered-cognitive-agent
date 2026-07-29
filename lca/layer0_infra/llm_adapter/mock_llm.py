@@ -10,6 +10,9 @@ from typing import Any
 
 from lca.contracts.protocols import LLMAdapter
 
+# Minimum token count (numbers + operators) to qualify as an arithmetic expression.
+_MIN_ARITHMETIC_TOKENS = 3
+
 
 class MockLLMAdapter(LLMAdapter):
     """确定性假 LLM，用于测试与演示；接口与真实厂商适配器完全一致。"""
@@ -73,6 +76,6 @@ class MockLLMAdapter(LLMAdapter):
         )
         text = text.replace("×", "*").replace("÷", "/")
         nums_ops = re.findall(r"[\d.]+|[+\-*/]", text)
-        if len(nums_ops) >= 3:
+        if len(nums_ops) >= _MIN_ARITHMETIC_TOKENS:
             return "".join(nums_ops)
         return None

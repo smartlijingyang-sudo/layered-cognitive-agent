@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import OrchestrationContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
@@ -23,7 +24,7 @@ ensure_defaults()
 def _make_result(trace_id: str, output: str) -> Result:
     return Result(
         trace_id=trace_id,
-        status="completed",
+        status=TaskStatus.COMPLETED,
         output=output,
         final_state_ref=f"mem://{trace_id}/0",
         total_steps=1,
@@ -78,7 +79,7 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
         result = await strategy.run(context, "task")
         self.assertEqual(result.status, "failed")
-        self.assertIn("No members", result.error)  # type: ignore[arg-type]
+        self.assertIn("No members", result.error or "")
 
     async def test_parallel_single_member(self) -> None:
         agent = _make_agent("trace-only", "solo-result")

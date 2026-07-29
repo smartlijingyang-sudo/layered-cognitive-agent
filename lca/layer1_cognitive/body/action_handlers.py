@@ -66,7 +66,7 @@ class DelegateOperation(ActionOperation):
         transport, task_id = await self._send_to_transport(decision, state)
 
         timeout_s = (
-            (spec.deadline.timestamp() - asyncio.get_event_loop().time())
+            (spec.deadline.timestamp() - asyncio.get_running_loop().time())
             if (spec := decision.delegate_to) and spec.deadline
             else _DEFAULT_DELEGATE_TIMEOUT_S
         )

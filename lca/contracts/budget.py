@@ -10,12 +10,21 @@ from __future__ import annotations
 
 from lca.contracts.state import Budget
 
-_DEFAULT_MAX_STEPS = 10
-_DEFAULT_MAX_WALL_CLOCK_SECONDS = 30
+DEFAULT_MAX_STEPS: int = 10
+"""Default maximum reasoning steps per agent run."""
+
+DEFAULT_TOOL_TIMEOUT_S: int = 5
+"""Default timeout (seconds) for tool execution."""
+
+DEFAULT_A2A_TIMEOUT_S: float = 30.0
+"""Default HTTP timeout (seconds) for A2A transport."""
+
+_DEFAULT_MAX_WALL_CLOCK_SECONDS: int = 30
+"""Internal default wall-clock timeout for ``create_budget`` (seconds)."""
 
 
 def create_budget(
-    max_steps: int = _DEFAULT_MAX_STEPS,
+    max_steps: int = DEFAULT_MAX_STEPS,
     max_wall_clock_seconds: int | None = _DEFAULT_MAX_WALL_CLOCK_SECONDS,
     max_tokens: int | None = None,
     max_cost_usd: float | None = None,

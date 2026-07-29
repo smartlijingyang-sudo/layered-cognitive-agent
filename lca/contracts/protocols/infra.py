@@ -13,6 +13,8 @@ from lca.contracts.state import TypedState
 
 @runtime_checkable
 class LLMAdapter(Protocol):
+    """LLM 适配器接口：屏蔽 provider 差异。"""
+
     async def complete(self, prompt: str, **kwargs: Any) -> str: ...
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
         """流式输出，逐 chunk 返回文本。子类按需覆写。"""
@@ -22,6 +24,8 @@ class LLMAdapter(Protocol):
 
 @runtime_checkable
 class Tool(Protocol):
+    """工具能力接口：名称 + 幂等标志 + 执行 + 可选校验。"""
+
     name: str
     is_idempotent: bool
     default_timeout_s: int
@@ -35,12 +39,16 @@ class Tool(Protocol):
 
 @runtime_checkable
 class ToolRegistry(Protocol):
+    """工具注册表：按名称注册和查找 Tool。"""
+
     def register(self, tool: Tool) -> None: ...
     def get(self, name: str) -> Tool | None: ...
 
 
 @runtime_checkable
 class SafeExecutor(Protocol):
+    """安全执行器：带重试 + 缓存的工具执行包装。"""
+
     async def execute(
         self,
         tool: Tool,
@@ -52,12 +60,16 @@ class SafeExecutor(Protocol):
 
 @runtime_checkable
 class StateStore(Protocol):
+    """状态持久化：save / load TypedState。"""
+
     async def save(self, state: TypedState) -> str: ...
     async def load(self, state_ref: str) -> TypedState: ...
 
 
 @runtime_checkable
 class AgentTransport(Protocol):
+    """Agent 间通信传输抽象：send → poll → receive。"""
+
     protocol_name: str
 
     async def send_task(
@@ -88,4 +100,6 @@ class TransportRegistryProtocol(Protocol):
 
 @runtime_checkable
 class Observability(Protocol):
+    """可观测性后端：接收 TraceSpan 并输出。"""
+
     def emit_span(self, span: TraceSpan) -> None: ...

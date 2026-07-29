@@ -1,4 +1,10 @@
-"""FallbackActionPolicy."""
+"""FallbackActionPolicy —— 未识别 action_type 的降级策略。
+
+L2 层职责：
+    当 Brain 输出的 action_type 无法被 ActionRegistry 识别时，
+    按优先级尝试降级路径：RESPOND → USE_TOOL → 失败。
+    降级后的 Observation 携带 degraded_from 标记，供 hook 观测。
+"""
 
 from __future__ import annotations
 
@@ -14,6 +20,14 @@ FALLBACK_DEGRADATION_KEY = FALLBACK_DEGRADED_FROM
 
 
 class FallbackActionPolicy(FallbackPolicy):
+    """未识别 action_type 的降级策略。
+
+    降级优先级：
+    1. 有 response_text → 降级为 RESPOND
+    2. 有 tool_calls → 降级为 USE_TOOL
+    3. 均无 → 返回失败 Observation
+    """
+
     async def handle(
         self,
         decision: StructuredDecision,

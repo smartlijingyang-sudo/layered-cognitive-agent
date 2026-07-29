@@ -1,4 +1,12 @@
-"""TeamOrchestrator —— 管理团队的组织形态与通信信道。"""
+"""TeamOrchestrator —— 管理团队的组织形态与通信信道。
+
+L3 层职责：
+    作为团队级组合根，TeamOrchestrator 负责：
+    1. 通过 OrchestrationStrategyRegistry 解析编排策略（注册表模式，无 if/elif）
+    2. 注入共享记忆双路径（SharedStoreBindable + SharedMemoryTool）
+    3. 绑定 Supervisor 的 transport / roster 能力
+    所有策略分发委托给 OrchestrationStrategy 实现，L3 不含业务逻辑。
+"""
 
 from __future__ import annotations
 
@@ -42,7 +50,7 @@ class TeamOrchestrator(TeamEntrypoint):
         roster_desc: str = "",
         strategy: OrchestrationStrategy | None = None,
         team_id: str = "",
-    ):
+    ) -> None:
         self.members = members
         self.config = config
         self.supervisor = supervisor
@@ -98,13 +106,16 @@ class TeamOrchestrator(TeamEntrypoint):
 
     def _register_shared_memory_tool(self, member: BaseAgent) -> None:
         """若成员 Body 暴露 tool_registry，注册绑定同一 store 的 SharedMemoryTool。"""
+        store = self._shared_store
+        if store is None:
+            return
         body = getattr(member.runtime, "body", None)
         if body is None:
             return
         registry: ToolRegistry | None = getattr(body, "tool_registry", None)
         if registry is None:
             return
-        tool = SharedMemoryTool(self._shared_store, team_id=self.team_id)  # type: ignore[arg-type]
+        tool = SharedMemoryTool(store, team_id=self.team_id)
         registry.register(tool)
 
     async def run(

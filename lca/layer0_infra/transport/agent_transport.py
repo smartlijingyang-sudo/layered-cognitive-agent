@@ -77,6 +77,9 @@ class InternalTransport(AgentTransport):
             try:
                 obs = await handler(subtask)
             except Exception as exc:
+                # Broad catch: handler is user-supplied agent code that may
+                # raise any exception; convert to failed Observation so the
+                # transport layer never crashes the caller's event loop.
                 obs = _fail_observation(str(exc))
             self._results[task_id] = obs
             self._statuses[task_id] = TaskStatus.COMPLETED if obs.success else TaskStatus.FAILED

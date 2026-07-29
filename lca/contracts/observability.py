@@ -15,6 +15,8 @@ def _now() -> datetime:
 
 @dataclass
 class TraceSpan:
+    """OpenTelemetry 风格的追踪跨度。"""
+
     span_id: str
     trace_id: str
     name: str
@@ -27,6 +29,8 @@ class TraceSpan:
 
 @dataclass
 class Event:
+    """不可变事实事件：记录某时刻发生的领域事件。"""
+
     event_id: str
     event_name: str
     trace_id: str

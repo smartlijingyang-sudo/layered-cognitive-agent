@@ -1,6 +1,18 @@
-"""HierarchicalStrategy —— Supervisor 单向委派、汇总。"""
+"""HierarchicalStrategy —— Supervisor 单向委派、汇总。
+
+L3 层职责：
+    Hierarchical 是最常用的团队编排模式：
+    1. Supervisor 分析任务，拆解为子任务并委派给成员
+    2. 成员独立执行，通过 DelegationLedger 跟踪进度
+    3. Supervisor 汇总成员结果，生成最终输出
+
+    自动装配 CompletionPolicy guardrail（roster_coverage），
+    确保所有必选角色都完成委派后才结束。
+"""
 
 from __future__ import annotations
+
+from typing import cast
 
 from lca.contracts.enums import CompletionPolicyName, HookEvent
 from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy
@@ -20,7 +32,7 @@ def _default_ledger_factory(roles: frozenset[str]) -> DelegationLedgerProtocol:
     ledger_cls = reg.resolve("delegation_ledger", "default")
     if ledger_cls is None:
         raise ValueError("未注册 delegation_ledger 'default'，请在 register_defaults() 后使用")
-    return ledger_cls(mandatory_roles=roles)  # type: ignore[no-any-return]
+    return cast("DelegationLedgerProtocol", ledger_cls(mandatory_roles=roles))
 
 
 class HierarchicalStrategy(OrchestrationStrategy):

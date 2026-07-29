@@ -16,10 +16,13 @@ from typing import Any
 
 import httpx
 
+from lca.contracts.budget import DEFAULT_A2A_TIMEOUT_S
 from lca.contracts.decision import AgentCard, Observation
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
+
+_DEFAULT_POLL_INTERVAL_S = 0.1
 
 
 class A2ATransport(AgentTransport):
@@ -34,7 +37,7 @@ class A2ATransport(AgentTransport):
 
     def __init__(
         self,
-        timeout_s: float = 30.0,
+        timeout_s: float = DEFAULT_A2A_TIMEOUT_S,
         default_endpoint: str | None = None,
     ) -> None:
         self._timeout = timeout_s
@@ -89,7 +92,6 @@ class A2ATransport(AgentTransport):
         """HTTP 轮询等待任务完成。"""
         import asyncio
 
-        poll_interval = 0.1
         elapsed = 0.0
         while True:
             status = await self.poll_status(task_id)
@@ -97,8 +99,8 @@ class A2ATransport(AgentTransport):
                 return await self.receive_result(task_id)
             if timeout_s is not None and elapsed >= timeout_s:
                 raise TimeoutError(f"a2a wait_result 超时: {task_id}")
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
+            await asyncio.sleep(_DEFAULT_POLL_INTERVAL_S)
+            elapsed += _DEFAULT_POLL_INTERVAL_S
 
     async def poll_status(self, task_id: str) -> str:
         endpoint_info = self._task_endpoints.get(task_id, "")

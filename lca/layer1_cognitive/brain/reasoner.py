@@ -20,6 +20,14 @@ def build_team_roster(profiles: list[RoleProfile]) -> str:
 
 
 class SimpleReasoner(Reasoner):
+    """Default ``Reasoner`` — renders a prompt template and calls the LLM.
+
+    Builds the prompt from role profile, tool descriptions, team roster,
+    retrieved context, and the active template.  Supports both the
+    single-agent ``react_prompt`` and the team-aware
+    ``hierarchical_prompt`` templates.
+    """
+
     def __init__(
         self,
         llm: LLMAdapter,

@@ -7,6 +7,7 @@ infra / cognition / embodiment / memory / runtime / agent / orchestration
 
 from __future__ import annotations
 
+# ── 跨层机制（re-exported from mechanisms for convenience）──
 from lca.contracts.mechanisms import (
     EventBus,
     Hook,
@@ -14,8 +15,14 @@ from lca.contracts.mechanisms import (
     NamedRegistryProtocol,
     RegistryProtocol,
 )
+
+# ── L3 Agent / Team 入口 ──────────────────────────────────
 from lca.contracts.protocols.agent import AgentEntrypoint, TeamEntrypoint
+
+# ── 可选能力协议（ADR-0017）──────────────────────────────
 from lca.contracts.protocols.capabilities import RosterAware, SharedStoreBindable, TransportBindable
+
+# ── L1 认知 / Brain 协议 ─────────────────────────────────
 from lca.contracts.protocols.cognition import (
     BrainStrategy,
     CandidateEvaluationPipeline,
@@ -31,7 +38,11 @@ from lca.contracts.protocols.cognition import (
     TaskCoordinator,
     TaskDecomposer,
 )
+
+# ── L1 Body / 行动执行协议 ───────────────────────────────
 from lca.contracts.protocols.embodiment import Body, FallbackHandler, FallbackPolicy
+
+# ── L0 基础设施协议 ──────────────────────────────────────
 from lca.contracts.protocols.infra import (
     AgentTransport,
     LLMAdapter,
@@ -42,7 +53,11 @@ from lca.contracts.protocols.infra import (
     ToolRegistry,
     TransportRegistryProtocol,
 )
+
+# ── L1 Memory 协议 ───────────────────────────────────────
 from lca.contracts.protocols.memory import MemorySystem
+
+# ── L3 团队编排协议 ──────────────────────────────────────
 from lca.contracts.protocols.orchestration import (
     OrchestrationContext,
     OrchestrationStrategy,
@@ -50,7 +65,11 @@ from lca.contracts.protocols.orchestration import (
     SupervisorProtocol,
     Synthesizer,
 )
+
+# ── L2 Runtime 协议 ──────────────────────────────────────
 from lca.contracts.protocols.runtime import Runtime, StepOutcomePolicy
+
+# ── 纯数据类型 ───────────────────────────────────────────
 from lca.contracts.types import StepOutcome
 
 __all__ = [

@@ -14,6 +14,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.decision import Observation, Reflection
+from lca.contracts.enums import ReflectionVerdict
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.state import Budget, TypedState
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
@@ -28,10 +29,10 @@ def _make_observation(success: bool = True, payload: str = "ok") -> Observation:
     return Observation(observation_id="obs-1", success=success, payload=payload)
 
 
-def _make_reflection(verdict: str = "on_track") -> Reflection:
+def _make_reflection(verdict: ReflectionVerdict = ReflectionVerdict.ON_TRACK) -> Reflection:
     return Reflection(
         reflection_id="ref-1",
-        verdict=verdict,  # type: ignore[arg-type]
+        verdict=verdict,
         lesson="test",
     )
 
@@ -60,7 +61,8 @@ class TestTeamSharedMemoryStoreValidation(unittest.TestCase):
 
     def test_invalid_layer_rejected(self) -> None:
         with self.assertRaises(ValueError) as ctx:
-            TeamSharedMemoryStore(["episodic"])  # type: ignore[arg-type]
+            # 故意传入非法层名以触发校验异常
+            TeamSharedMemoryStore(["episodic"])  # type: ignore[list-item]
         self.assertIn("semantic/procedural", str(ctx.exception))
 
     def test_empty_layers_accepted(self) -> None:

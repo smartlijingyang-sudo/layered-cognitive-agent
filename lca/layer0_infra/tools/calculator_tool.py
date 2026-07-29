@@ -7,6 +7,7 @@ import operator
 import time
 from typing import Any, ClassVar
 
+from lca.contracts.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.decision import Observation
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import Tool
@@ -19,7 +20,7 @@ class CalculatorTool(Tool):
 
     name = "calculator"
     is_idempotent = True
-    default_timeout_s = 5
+    default_timeout_s = DEFAULT_TOOL_TIMEOUT_S
 
     _OPS: ClassVar[dict[type, Any]] = {
         ast.Add: operator.add,
@@ -63,7 +64,7 @@ class CalculatorTool(Tool):
                 latency_ms=latency_ms,
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
-        except Exception as e:
+        except (ValueError, OverflowError, ZeroDivisionError) as e:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
                 observation_id=new_id("obs"),

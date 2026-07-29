@@ -9,6 +9,14 @@ from lca.contracts.state import TypedState
 
 
 class FallbackDecoratedBody(Body):
+    """Decorator that catches ``UnregisteredActionError`` and delegates to a fallback policy.
+
+    Wraps an inner ``Body`` implementation.  When the inner body raises
+    ``UnregisteredActionError`` (action_type not found in the registry),
+    this decorator invokes the ``FallbackPolicy`` instead of propagating
+    the error, enabling graceful degradation for unknown actions.
+    """
+
     def __init__(self, inner: Body, fallback_handler: FallbackPolicy) -> None:
         self._inner = inner
         self._fallback_handler = fallback_handler

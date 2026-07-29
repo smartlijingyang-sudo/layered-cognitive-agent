@@ -10,6 +10,9 @@ from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols import MemorySystem, SharedMemoryStore
 from lca.contracts.state import TypedState
 
+_DEFAULT_MAX_WORKING = 20
+_DEFAULT_MAX_EPISODIC = 50
+
 
 class SimpleMemorySystem(MemorySystem):
     """Working / Semantic / Episodic / Procedural 四层记忆。
@@ -67,10 +70,11 @@ class SimpleMemorySystem(MemorySystem):
                     source_trace_id=state.trace_id,
                 )
             )
-            # 防止 working memory 无限增长：保留最近 20 条
-            max_working = 20
-            if len(self._private_layers["working"]) > max_working:
-                self._private_layers["working"] = self._private_layers["working"][-max_working:]
+            # 防止 working memory 无限增长
+            if len(self._private_layers["working"]) > _DEFAULT_MAX_WORKING:
+                self._private_layers["working"] = self._private_layers["working"][
+                    -_DEFAULT_MAX_WORKING:
+                ]
         self._append_record(
             "episodic",
             MemoryRecord(
@@ -90,13 +94,12 @@ class SimpleMemorySystem(MemorySystem):
         await self.update_multi_level(state, observation, reflection)
 
     async def compress(self) -> None:
-        max_episodic = 50
         episodic = self._get_layer_records("episodic")
-        if len(episodic) > max_episodic:
+        if len(episodic) > _DEFAULT_MAX_EPISODIC:
             if self._shared_store is not None and self._shared_store.is_shared("episodic"):
                 pass  # episodic 不应被共享，防御性跳过
             else:
-                self._private_layers["episodic"] = episodic[-max_episodic:]
+                self._private_layers["episodic"] = episodic[-_DEFAULT_MAX_EPISODIC:]
 
     def write_shared_record(self, layer: str, record: MemoryRecord) -> None:
         """显式向共享层写入记录（供外部策略/编排代码使用）。"""

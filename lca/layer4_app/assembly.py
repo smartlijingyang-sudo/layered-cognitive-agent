@@ -1,7 +1,18 @@
-"""AgentAssembly —— L4 唯一对象图工厂。
+"""Composition root — wires all layers into a working object graph.
 
-保证 ToolRegistry / SafeExecutor / ActionRegistry / TransportRegistry
-在 Brain（DecisionParser）与 Body（UseToolOperation）之间共享同一实例。
+This is the **only** module that assembles the full Agent / Team object
+graphs.  It guarantees that the shared pipeline components (ToolRegistry,
+SafeExecutor, ActionRegistry, TransportRegistry) are created once and
+injected into both Brain and Body, so they always operate on the same
+instances.
+
+High-level entry points:
+
+* ``assemble_base_agent`` — builds a single ``BaseAgent``.
+* ``assemble_team`` — builds a ``TeamEntrypoint`` from a list of members.
+
+Lower-level builders (``build_default_brain``, ``build_body_from_shared``,
+``build_hooks``) are exposed for advanced / test scenarios.
 """
 
 from __future__ import annotations
@@ -9,6 +20,8 @@ from __future__ import annotations
 from typing import cast
 
 from lca.contracts.action import ActionRegistryProtocol
+from lca.contracts.budget import DEFAULT_MAX_STEPS
+from lca.contracts.enums import TeamProcess
 from lca.contracts.protocols import (
     Body,
     BrainStrategy,
@@ -16,12 +29,13 @@ from lca.contracts.protocols import (
     LLMAdapter,
     MemorySystem,
     Observability,
+    OrchestrationStrategy,
     StateStore,
     TeamEntrypoint,
     Tool,
     TransportRegistryProtocol,
 )
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from lca.layer0_infra.component_registry import ComponentRegistry, get_global_registry
 from lca.layer1_cognitive.body.action_catalog import (
     build_default_action_registry,
@@ -49,8 +63,14 @@ from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
 from lca.layer3_agent.base_agent import BaseAgent
 
+# Default wall-clock timeout for agent assembly (seconds).
+_ASSEMBLY_MAX_WALL_CLOCK_SECONDS: int = 300
+# Minimum step budget when an agent is promoted to team supervisor.
+_SUPERVISOR_MIN_MAX_STEPS: int = 20
+
 
 def _resolve_component(reg: ComponentRegistry, category: str, value: str | object) -> object:
+    """Resolve *value* from *reg* if it is a string key, otherwise return as-is."""
     if isinstance(value, str):
         return reg.require(category, value)()
     return value
@@ -63,7 +83,12 @@ def build_default_brain(
     team_roster: str | None = None,
     action_registry: ActionRegistryProtocol | None = None,
 ) -> ModularBrain:
-    """默认 Brain 工厂：ModularBrain + MAP 五模块。"""
+    """Build the default Brain: ModularBrain with MAP five-module pipeline.
+
+    Wires together PromptManager → Reasoner → DecisionParser → Critic →
+    CandidateEvaluationPipeline, sharing *action_registry* with the Body so
+    that the allowed-action description stays consistent.
+    """
     prompt_manager = SimplePromptManager()
     prompt_manager.register_template("react_prompt", load_builtin_prompt("react_prompt"))
     prompt_manager.register_template(
@@ -98,7 +123,12 @@ def build_body_from_shared(
     *,
     enable_fallback: bool = True,
 ) -> Body:
-    """用**已共享**的依赖构建 Body，禁止内部再 new ToolRegistry。"""
+    """Build Body from *already-shared* pipeline components.
+
+    The caller must pass the **same** ToolRegistry / SafeExecutor /
+    TransportRegistry / ActionRegistry instances that are shared with the
+    Brain — never let Body create its own copies.
+    """
     simple_body = SimpleBody(
         tool_registry=tool_registry,
         safe_executor=safe_executor,
@@ -111,6 +141,7 @@ def build_body_from_shared(
 
 
 def build_hooks(observability: Observability, event_bus: EventBus) -> SimpleHookRegistry:
+    """Build the default HookRegistry with logging + event-emitting hooks."""
     hooks = SimpleHookRegistry(observability)
     event_hook = make_event_emitting_hook(event_bus)
     for event_name in HOOK_NAMES:
@@ -126,14 +157,21 @@ def assemble_base_agent(
     backstory: str,
     tools: list[Tool],
     llm: LLMAdapter,
-    max_steps: int = 10,
-    max_wall_clock_seconds: int | None = 300,
+    max_steps: int = DEFAULT_MAX_STEPS,
+    max_wall_clock_seconds: int | None = _ASSEMBLY_MAX_WALL_CLOCK_SECONDS,
     memory: str | MemorySystem = "simple",
     observability: str | Observability = "console",
     state_store: str | StateStore = "memory",
     brain_strategy: str | BrainStrategy = "default",
 ) -> BaseAgent:
-    """组装完整 BaseAgent；所有执行管线共享同一套 registry。"""
+    """Assemble a complete BaseAgent with a single shared pipeline.
+
+    Creates one set of ToolRegistry / SafeExecutor / TransportRegistry /
+    ActionRegistry and injects them into both Brain and Body, guaranteeing
+    they operate on the same instances.  All string-keyed components
+    (*memory*, *observability*, *state_store*) are resolved via the global
+    ComponentRegistry.
+    """
     from lca.layer4_app.defaults import build_default_transport_registry, ensure_defaults
 
     ensure_defaults()
@@ -151,7 +189,7 @@ def assemble_base_agent(
     mem = cast("MemorySystem", _resolve_component(reg, "memory", memory))
     ss = cast("StateStore", _resolve_component(reg, "state_store", state_store))
 
-    # ── 单一共享管线 ──────────────────────────────────────────────
+    # ── Single shared pipeline ────────────────────────────────────────────
     tool_registry = SimpleToolRegistry()
     for t in tools:
         tool_registry.register(t)
@@ -161,7 +199,7 @@ def assemble_base_agent(
         tool_registry, safe_executor, transport_registry
     )
 
-    # Brain
+    # Brain — resolve via strategy registry (unified path for all strategies)
     brain: BrainStrategy
     if isinstance(brain_strategy, str):
         strategy_reg = get_global_strategy_registry()
@@ -169,15 +207,9 @@ def assemble_base_agent(
             raise ValueError(
                 f"Unknown brain_strategy: {brain_strategy!r}. Available: {strategy_reg.list()}"
             )
-        tools_desc = ", ".join(t.name for t in tools) or "(无可用工具)"
-        # 默认工厂仍走 build_default_brain，确保 action_registry 共享
+        tools_desc = ", ".join(t.name for t in tools) or "(no tools available)"
         factory = strategy_reg.resolve(brain_strategy)
-        if brain_strategy == "default":
-            brain = build_default_brain(
-                llm, role_profile, tools_desc, action_registry=action_registry
-            )
-        else:
-            brain = factory(llm, role_profile, tools_desc, action_registry=action_registry)
+        brain = factory(llm, role_profile, tools_desc, action_registry=action_registry)
     else:
         brain = brain_strategy
 
@@ -208,16 +240,14 @@ def assemble_base_agent(
 def assemble_team(
     *,
     members: list[BaseAgent],
-    process: object | None = None,
+    process: TeamProcess | None = None,
     supervisor: BaseAgent | None = None,
     max_rounds: int | None = None,
     shared_memory_layers: list[str] | None = None,
     graph_definition_ref: str | None = None,
-    strategy: object | None = None,
+    strategy: OrchestrationStrategy | None = None,
 ) -> TeamEntrypoint:
-    """组装团队对象图。"""
-    from lca.contracts.enums import TeamProcess
-    from lca.contracts.role_team import TeamConfig
+    """Assemble a team object graph from *members* with the given *process*."""
     from lca.layer3_agent.supervisor import Supervisor as SupervisorImpl
     from lca.layer3_agent.team_orchestrator import TeamOrchestrator
     from lca.layer4_app.defaults import build_team_transport, ensure_defaults
@@ -225,7 +255,7 @@ def assemble_team(
     ensure_defaults()
     process_val = process if process is not None else TeamProcess.HIERARCHICAL
     config = TeamConfig(
-        process=process_val,  # type: ignore[arg-type]
+        process=process_val,
         max_rounds=max_rounds,
         shared_memory_layers=list(shared_memory_layers or []),
         graph_definition_ref=graph_definition_ref,
@@ -238,8 +268,10 @@ def assemble_team(
             base_supervisor = SupervisorImpl(
                 supervisor.runtime,
                 supervisor.role_profile,
-                max_steps=max(getattr(supervisor, "max_steps", 10), 20),
-                max_wall_clock_seconds=300,
+                max_steps=max(
+                    getattr(supervisor, "max_steps", DEFAULT_MAX_STEPS), _SUPERVISOR_MIN_MAX_STEPS
+                ),
+                max_wall_clock_seconds=_ASSEMBLY_MAX_WALL_CLOCK_SECONDS,
             )
     transport, roster_desc = build_team_transport(members)
     return TeamOrchestrator(
@@ -248,5 +280,5 @@ def assemble_team(
         base_supervisor,
         transport=transport,
         roster_desc=roster_desc,
-        strategy=strategy,  # type: ignore[arg-type]
+        strategy=strategy,
     )

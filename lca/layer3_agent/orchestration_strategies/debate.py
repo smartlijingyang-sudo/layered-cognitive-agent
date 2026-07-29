@@ -19,6 +19,8 @@ from lca.contracts.state import Budget, TypedState
 from lca.layer3_agent.member_invoke import invoke_member
 
 _DEFAULT_MAX_ROUNDS = 3
+_DEFAULT_CONFIDENCE = 0.5
+_ID_SUFFIX_LEN = 8  # hex digits from uuid4 for unique decision IDs (32 bits of randomness)
 
 
 class DebateStrategy(OrchestrationStrategy):
@@ -102,9 +104,9 @@ class DebateStrategy(OrchestrationStrategy):
 
 def _result_to_decision(result: Result, index: int) -> StructuredDecision:
     return StructuredDecision(
-        decision_id=f"debate_{index}_{uuid.uuid4().hex[:8]}",
+        decision_id=f"debate_{index}_{uuid.uuid4().hex[:_ID_SUFFIX_LEN]}",
         action_type=ActionType.RESPOND,
         rationale=result.output or "",
-        confidence=0.5,
+        confidence=_DEFAULT_CONFIDENCE,
         response_text=result.output,
     )

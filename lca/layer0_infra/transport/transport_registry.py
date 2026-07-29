@@ -24,6 +24,7 @@ class TransportRegistry(NamedRegistry[AgentTransport]):
 
     _REGISTRY_KIND = "传输协议"
 
+    # 收窄参数：接受 AgentTransport 而非基类的 (name, impl) 对
     def register(self, transport: AgentTransport) -> None:  # type: ignore[override]
         """注册一个 AgentTransport，key 取自 transport.protocol_name。"""
         self._entries[transport.protocol_name] = transport

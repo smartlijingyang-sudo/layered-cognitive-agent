@@ -21,6 +21,9 @@ from typing import Any
 
 from lca.contracts.protocols import LLMAdapter
 
+_DEFAULT_TEMPERATURE = 0.7
+_DEFAULT_MAX_TOKENS = 2048
+
 
 class OpenAICompatAdapter(LLMAdapter):
     """实现 LLMAdapter 协议。走 client.chat.completions.create()。"""
@@ -47,8 +50,8 @@ class OpenAICompatAdapter(LLMAdapter):
         response = await self._client.chat.completions.create(
             model=kwargs.pop("model", self._model),
             messages=[{"role": "user", "content": prompt}],
-            temperature=kwargs.pop("temperature", 0.7),
-            max_tokens=kwargs.pop("max_tokens", 2048),
+            temperature=kwargs.pop("temperature", _DEFAULT_TEMPERATURE),
+            max_tokens=kwargs.pop("max_tokens", _DEFAULT_MAX_TOKENS),
             **kwargs,
         )
         return response.choices[0].message.content or ""

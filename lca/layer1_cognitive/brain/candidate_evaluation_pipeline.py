@@ -9,12 +9,16 @@ from __future__ import annotations
 
 from typing import Any
 
+import structlog
+
 from lca.contracts.decision import StructuredDecision
 from lca.contracts.protocols import (
     CandidateEvaluationPipeline,
     CompletionPolicy,
 )
 from lca.contracts.state import TypedState
+
+_log = structlog.get_logger("lca.candidate_evaluation_pipeline")
 
 
 class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
@@ -39,7 +43,7 @@ class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
         scores = [self._score(p) for p in predicted]
         conflicts = self._check_conflicts(state, candidates)
         if conflicts:
-            print(f"  [ConflictMonitor] 检测到冲突: {conflicts}")
+            _log.warning("conflicts_detected", conflicts=conflicts)
         return self._arbitrate(candidates, scores)
 
     @staticmethod

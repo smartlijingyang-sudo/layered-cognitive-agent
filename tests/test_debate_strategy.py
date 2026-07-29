@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import OrchestrationContext
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
@@ -25,10 +26,10 @@ from lca.layer4_app.defaults import ensure_defaults
 ensure_defaults()
 
 
-def _make_result(trace_id: str, output: str, status: str = "completed") -> Result:
+def _make_result(trace_id: str, output: str, status: TaskStatus = TaskStatus.COMPLETED) -> Result:
     return Result(
         trace_id=trace_id,
-        status=status,  # type: ignore[arg-type]
+        status=status,
         final_state_ref=f"mem://{trace_id}/0",
         total_steps=1,
         budget_used=Budget(),
@@ -36,7 +37,9 @@ def _make_result(trace_id: str, output: str, status: str = "completed") -> Resul
     )
 
 
-def _make_agent(trace_id: str, outputs: list[str], status: str = "completed") -> MagicMock:
+def _make_agent(
+    trace_id: str, outputs: list[str], status: TaskStatus = TaskStatus.COMPLETED
+) -> MagicMock:
     """构建 Agent 桩件，按调用顺序返回不同 output。"""
     agent = MagicMock()
     call_count = 0
@@ -258,7 +261,7 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
         result = await strategy.run(context, "task")
 
         self.assertEqual(result.status, "failed")
-        self.assertIn("No members", result.error)  # type: ignore[arg-type]
+        self.assertIn("No members", result.error or "")
 
     async def test_no_components_still_works(self) -> None:
         """无 ConflictMonitor/Coordinator/Evaluator 时退化：跑满轮数返回首个结果。"""
@@ -276,8 +279,8 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
 
     async def test_failed_member_output(self) -> None:
         """成员返回 failed 状态时，debate 仍能继续。"""
-        agent_a = _make_agent("t-a", ["good"], status="completed")
-        agent_b = _make_agent("t-b", [""], status="failed")
+        agent_a = _make_agent("t-a", ["good"], status=TaskStatus.COMPLETED)
+        agent_b = _make_agent("t-b", [""], status=TaskStatus.FAILED)
 
         strategy = DebateStrategy(
             conflict_monitor=SimpleConflictMonitor(),

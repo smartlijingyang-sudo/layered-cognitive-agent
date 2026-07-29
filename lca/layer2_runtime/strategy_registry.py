@@ -1,4 +1,10 @@
-"""StrategyRegistry —— 策略注册表，支持运行时动态切换 Brain 策略。"""
+"""StrategyRegistry —— 策略注册表，支持运行时动态切换 Brain 策略。
+
+L2 层职责：
+    注册表模式（Registry Pattern）的实现。
+    将策略名称映射到 BrainFactory（``(llm, role_profile, tools_desc) -> BrainStrategy``），
+    由 CognitiveRuntime 在构造时从注册表解析具体策略，实现策略与运行时的解耦。
+"""
 
 from __future__ import annotations
 

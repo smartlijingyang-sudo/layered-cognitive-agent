@@ -8,6 +8,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import OrchestrationContext, Synthesizer
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
@@ -18,13 +19,13 @@ from lca.layer3_agent.orchestration_strategies import ParallelStrategy
 def _make_result(
     trace_id: str,
     output: str,
-    status: str = "completed",
+    status: TaskStatus = TaskStatus.COMPLETED,
     steps: int = 1,
     tokens: int = 10,
 ) -> Result:
     return Result(
         trace_id=trace_id,
-        status=status,  # type: ignore[arg-type]
+        status=status,
         final_state_ref="",
         total_steps=steps,
         budget_used=Budget(used_tokens=tokens, used_steps=steps),
@@ -88,8 +89,8 @@ class TestConcatSynthesizer(unittest.IsolatedAsyncioTestCase):
         """所有候选都失败时，聚合结果也应为 failed。"""
         synth = ConcatSynthesizer()
         candidates = [
-            _make_result("t1", "", status="failed"),
-            _make_result("t2", "", status="failed"),
+            _make_result("t1", "", status=TaskStatus.FAILED),
+            _make_result("t2", "", status=TaskStatus.FAILED),
         ]
 
         result = await synth.synthesize("obj", candidates)
@@ -100,8 +101,8 @@ class TestConcatSynthesizer(unittest.IsolatedAsyncioTestCase):
         """部分候选成功时，聚合结果应为 completed（至少有一个成功）。"""
         synth = ConcatSynthesizer()
         candidates = [
-            _make_result("t1", "good output", status="completed"),
-            _make_result("t2", "", status="failed"),
+            _make_result("t1", "good output", status=TaskStatus.COMPLETED),
+            _make_result("t2", "", status=TaskStatus.FAILED),
         ]
 
         result = await synth.synthesize("obj", candidates)
@@ -215,6 +216,7 @@ class TestSynthesizerProtocol(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t2", "Second")),
         ]
         context = OrchestrationContext(members=members)
+        # 测试用内部类满足 Synthesizer Protocol 但 mypy 无法推断结构子类型
         strategy = ParallelStrategy(synthesizer=first_synth)  # type: ignore[arg-type]
 
         result = await strategy.run(context, "test")

@@ -6,6 +6,8 @@ import asyncio
 import json
 from typing import Any
 
+import structlog
+
 from lca.contracts.decision import Observation
 from lca.contracts.enums import SpanStatus
 from lca.contracts.ids import new_id, utc_now
@@ -19,6 +21,8 @@ from lca.contracts.semantic_keys import (
     FAILURE_KIND_TRANSIENT,
     FAILURE_KIND_VALIDATION,
 )
+
+_log = structlog.get_logger("lca.safe_executor")
 
 
 class SimpleSafeExecutor(SafeExecutor):
@@ -90,6 +94,13 @@ class SimpleSafeExecutor(SafeExecutor):
                     self.observability.emit_span(span)
                     return obs
             except Exception as err:
+                _log.warning(
+                    "tool_execution_error",
+                    tool=tool.name,
+                    error_type=type(err).__name__,
+                    error=str(err),
+                    attempt=attempt,
+                )
                 obs = Observation(
                     observation_id=new_id("obs"),
                     success=False,

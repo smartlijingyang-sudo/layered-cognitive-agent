@@ -1,4 +1,10 @@
-"""团队成员统一调用路径。"""
+"""团队成员统一调用路径。
+
+L3 层职责：
+    提供 invoke_member 和 invoke_members_sequential 两个原子函数，
+    屏蔽 Transport 远程调用与直接 execute 的差异。
+    所有编排策略通过这两个函数调用成员，不直接依赖 BaseAgent 或 Transport。
+"""
 
 from __future__ import annotations
 

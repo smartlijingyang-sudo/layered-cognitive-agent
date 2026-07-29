@@ -126,9 +126,9 @@ class TestCheckpointResume:
                 return None
 
         rt = CognitiveRuntime(
-            brain=_Brain(),  # type: ignore[arg-type]
-            body=_Body(),  # type: ignore[arg-type]
-            memory=_Mem(),  # type: ignore[arg-type]
+            brain=_Brain(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
+            body=_Body(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
+            memory=_Mem(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
             hooks=SimpleHookRegistry(ConsoleObservability()),
             state_store=store,
             judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
@@ -152,7 +152,7 @@ class TestSkillRouterTemplate:
                     '"rationale":"r","confidence":0.9}'
                 )
 
-            async def stream(self, prompt: str, **kwargs: object):  # type: ignore[no-untyped-def]
+            async def stream(self, prompt: str, **kwargs: object):  # type: ignore[no-untyped-def]  # kwargs 类型由 Protocol 约束
                 yield await self.complete(prompt)
 
         pm = SimplePromptManager()
@@ -212,7 +212,7 @@ class TestDebateMultiRound:
                     }
                 )
 
-            async def stream(self, prompt: str, **kwargs: object):  # type: ignore[no-untyped-def]
+            async def stream(self, prompt: str, **kwargs: object):  # type: ignore[no-untyped-def]  # kwargs 类型由 Protocol 约束
                 yield await self.complete(prompt)
 
         llm = DebateLLM()

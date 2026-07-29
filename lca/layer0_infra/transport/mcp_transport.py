@@ -62,8 +62,9 @@ class MCPTransport(AgentTransport):
             return self._sessions[server_url]
 
         try:
-            from mcp import ClientSession  # type: ignore[import-not-found]
-            from mcp.client.streamable_http import (  # type: ignore[import-not-found]
+            # mcp 是可选依赖，未安装时由 except ImportError 处理
+            from mcp import ClientSession  # type: ignore[import-not-found]  # optional dep
+            from mcp.client.streamable_http import (  # type: ignore[import-not-found]  # optional dep
                 streamablehttp_client,
             )
         except ImportError as exc:
@@ -108,6 +109,8 @@ class MCPTransport(AgentTransport):
         except NotImplementedError:
             raise
         except Exception as exc:
+            # Broad catch: MCP SDK may raise arbitrary transport errors;
+            # convert to a failed Observation to avoid crashing the agent loop.
             self._task_results[task_id] = Observation(
                 observation_id=new_id("obs"),
                 success=False,

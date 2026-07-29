@@ -1,7 +1,14 @@
-"""BaseAgent —— 持有 Runtime + Brain + Body + Memory 视图。"""
+"""BaseAgent —— 单个 Agent 的运行时封装。
+
+L3 层职责：
+    BaseAgent 是 AgentEntrypoint 协议的默认实现，
+    将 Runtime（认知闭环）+ RoleProfile（角色配置）组合为
+    可调度的执行单元。支持 execute / resume / cancel 三种生命周期。
+"""
 
 from __future__ import annotations
 
+from lca.contracts.budget import DEFAULT_MAX_STEPS
 from lca.contracts.invocation import InvocationContext
 from lca.contracts.message import AgentMessage, agent_message_as_text, agent_message_text
 from lca.contracts.protocols import AgentEntrypoint, Runtime
@@ -18,15 +25,19 @@ def _task_as_text(task: str | AgentMessage) -> str:
 
 
 class BaseAgent(AgentEntrypoint):
-    """单个 Agent 的运行时封装。"""
+    """单个 Agent 的运行时封装。
+
+    持有 Runtime（认知闭环）和 RoleProfile（角色配置），
+    提供 execute / resume / cancel 三种生命周期方法。
+    """
 
     def __init__(
         self,
         runtime: Runtime,
         role_profile: RoleProfile,
-        max_steps: int = 10,
+        max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = None,
-    ):
+    ) -> None:
         self.runtime = runtime
         self.role_profile = role_profile
         self.max_steps = max_steps

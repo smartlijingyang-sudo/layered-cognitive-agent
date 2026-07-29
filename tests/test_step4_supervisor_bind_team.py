@@ -10,9 +10,11 @@ from unittest.mock import AsyncMock, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.decision import Observation
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols.capabilities import RosterAware, TransportBindable
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
+from lca.contracts.state import Budget
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer3_agent.base_agent import BaseAgent
@@ -37,14 +39,14 @@ def _make_role(role: str, goal: str = "") -> RoleProfile:
 def _make_member(role: str, return_output: str = "done") -> BaseAgent:
     runtime = MagicMock()
     member = BaseAgent(runtime, _make_role(role))
-    member.execute = AsyncMock(  # type: ignore[method-assign]
+    member.execute = AsyncMock(  # type: ignore[method-assign]  # 测试桩：替换实例方法
         return_value=Result(
             trace_id=f"trace-{role}",
-            status="completed",
+            status=TaskStatus.COMPLETED,
             output=return_output,
             final_state_ref="",
             total_steps=1,
-            budget_used=None,  # type: ignore[arg-type]
+            budget_used=Budget(),
         ),
     )
     return member
@@ -57,7 +59,8 @@ class _BindableBody(TransportBindable):
         self._registry = registry
 
     def bind_transport(self, transport: object) -> None:
-        self._registry.register(transport)  # type: ignore[arg-type]
+        # 测试桩：TransportRegistry.register 期望 AgentTransport，此处故意泛化
+        self._registry.register(transport)  # type: ignore[arg-type]  # 测试桩放宽类型
 
 
 class _RosterAwareBrain(RosterAware):
@@ -97,14 +100,14 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         config = TeamConfig(process="hierarchical")
 
         sup, _, registry, _ = _make_supervisor_with_runtime()
-        sup.execute = AsyncMock(  # type: ignore[method-assign]
+        sup.execute = AsyncMock(  # type: ignore[method-assign]  # 测试桩：替换实例方法
             return_value=Result(
                 trace_id="t",
-                status="completed",
+                status=TaskStatus.COMPLETED,
                 output="ok",
                 final_state_ref="",
                 total_steps=1,
-                budget_used=None,  # type: ignore[arg-type]
+                budget_used=Budget(),
             ),
         )
 
@@ -125,14 +128,14 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         config = TeamConfig(process="hierarchical")
 
         sup, _, _, mock_brain = _make_supervisor_with_runtime()
-        sup.execute = AsyncMock(  # type: ignore[method-assign]
+        sup.execute = AsyncMock(  # type: ignore[method-assign]  # 测试桩：替换实例方法
             return_value=Result(
                 trace_id="t",
-                status="completed",
+                status=TaskStatus.COMPLETED,
                 output="ok",
                 final_state_ref="",
                 total_steps=1,
-                budget_used=None,  # type: ignore[arg-type]
+                budget_used=Budget(),
             ),
         )
 
@@ -154,14 +157,14 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         config = TeamConfig(process="hierarchical")
 
         sup, _, registry, _ = _make_supervisor_with_runtime()
-        sup.execute = AsyncMock(  # type: ignore[method-assign]
+        sup.execute = AsyncMock(  # type: ignore[method-assign]  # 测试桩：替换实例方法
             return_value=Result(
                 trace_id="t",
-                status="completed",
+                status=TaskStatus.COMPLETED,
                 output="ok",
                 final_state_ref="",
                 total_steps=1,
-                budget_used=None,  # type: ignore[arg-type]
+                budget_used=Budget(),
             ),
         )
 

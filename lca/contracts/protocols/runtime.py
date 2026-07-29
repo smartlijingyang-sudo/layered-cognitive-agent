@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
+from lca.contracts.budget import DEFAULT_MAX_STEPS
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
 from lca.contracts.protocols.cognition import CandidateEvaluationPipeline
 from lca.contracts.result import Result
@@ -15,6 +16,8 @@ from lca.contracts.types import StepOutcome
 
 @runtime_checkable
 class Runtime(Protocol):
+    """认知循环入口：驱动 perceive → think → act → reflect 循环。"""
+
     async def run(
         self,
         task: str,
@@ -24,7 +27,10 @@ class Runtime(Protocol):
         **context: str,
     ) -> Result: ...
     async def resume(
-        self, snapshot: StateSnapshot, input: object | None = None, max_steps: int = 10
+        self,
+        snapshot: StateSnapshot,
+        input: object | None = None,
+        max_steps: int = DEFAULT_MAX_STEPS,
     ) -> Result: ...
     def wrap_evaluation_pipeline(
         self, wrapper: Callable[[CandidateEvaluationPipeline], CandidateEvaluationPipeline]

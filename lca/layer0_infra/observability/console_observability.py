@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import structlog
+
 from lca.contracts.observability import TraceSpan
 from lca.contracts.protocols import Observability
+
+_log = structlog.get_logger("lca.console")
 
 
 class ConsoleObservability(Observability):
@@ -29,7 +33,11 @@ class ConsoleObservability(Observability):
                 key_attrs[k] = v
 
         attrs_str = str(key_attrs) if key_attrs else str(span.attributes)
-        print(
-            f"  [TraceSpan] {role_prefix}{span.name:<28} status={span.status:<5} "
-            f"dur_ms={dur} attrs={attrs_str}"
+        _log.info(
+            "trace_span",
+            span_name=span.name,
+            role_prefix=role_prefix,
+            status=span.status,
+            dur_ms=dur,
+            attrs=attrs_str,
         )

@@ -1,7 +1,13 @@
 """DefaultLoopJudge —— 组合 StepOutcomePolicy + Budget 的默认终止裁判。
 
-将原先散落在 CognitiveRuntime._loop 中的三种终止判定
-（budget 超限 / outcome 策略 / 异常状态）收敛为单一内聚类。
+L2 层职责：
+    将原先散落在 CognitiveRuntime._loop 中的三种终止判定
+    （budget 超限 / outcome 策略 / 异常状态）收敛为单一内聚类。
+
+    判定流程：
+    1. 调用 StepOutcomePolicy.resolve() 获取业务判定
+    2. 检查 budget 是否超限（资源约束）
+    3. 综合输出 TerminationSignal
 """
 
 from __future__ import annotations

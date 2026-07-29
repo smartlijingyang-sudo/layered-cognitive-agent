@@ -44,7 +44,7 @@ from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
-from lca.layer0_infra.tools.weather_tool import GetWeatherTool
+from lca.layer0_infra.tools.weather_tool import WeatherTool
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import (
     UnimplementedTransport,
@@ -101,7 +101,7 @@ class TestL0ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(CalculatorTool(), Tool)
 
     def test_weather_is_tool(self):
-        self.assertIsInstance(GetWeatherTool(), Tool)
+        self.assertIsInstance(WeatherTool(), Tool)
 
     def test_console_observability(self):
         self.assertIsInstance(ConsoleObservability(), Observability)

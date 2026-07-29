@@ -10,41 +10,57 @@ from lca.contracts.state import TypedState
 
 @runtime_checkable
 class Reasoner(Protocol):
+    """候选方案生成器：基于当前状态产出 n 个候选 prompt。"""
+
     async def generate_candidates(self, state: TypedState, n: int = 1) -> list[str]: ...
 
 
 @runtime_checkable
 class DecisionParser(Protocol):
+    """LLM 原始输出 → StructuredDecision 解析器。"""
+
     def parse(self, raw_output: str, state: TypedState) -> StructuredDecision: ...
 
 
 @runtime_checkable
 class Critic(Protocol):
+    """自省评估器：根据 Observation 产出 Reflection。"""
+
     async def critique(self, state: TypedState, observation: Observation) -> Reflection: ...
 
 
 @runtime_checkable
 class TaskDecomposer(Protocol):
+    """任务分解器：将当前状态拆分为子任务列表。"""
+
     async def decompose(self, state: TypedState) -> list[str]: ...
 
 
 @runtime_checkable
 class StatePredictor(Protocol):
+    """状态预测器：预估执行某候选后的状态变化。"""
+
     async def predict(self, state: TypedState, candidate_action: str) -> dict[str, Any]: ...
 
 
 @runtime_checkable
 class StateEvaluator(Protocol):
+    """状态评估器：对预测状态打分。"""
+
     async def score(self, state: TypedState, predicted_state: dict[str, Any]) -> float: ...
 
 
 @runtime_checkable
 class ConflictMonitor(Protocol):
+    """冲突检测器：检查候选决策之间的矛盾。"""
+
     async def check(self, state: TypedState, candidates: list[StructuredDecision]) -> list[str]: ...
 
 
 @runtime_checkable
 class TaskCoordinator(Protocol):
+    """任务协调器：在多候选中仲裁选出最终决策。"""
+
     async def arbitrate(
         self,
         state: TypedState,
@@ -55,6 +71,8 @@ class TaskCoordinator(Protocol):
 
 @runtime_checkable
 class BrainStrategy(Protocol):
+    """Brain 顶层策略：think + reflect + 花名册设置。"""
+
     async def think(self, state: TypedState) -> StructuredDecision: ...
     async def reflect(self, state: TypedState, observation: Observation) -> Reflection: ...
     def set_team_roster(self, roster_desc: str) -> None: ...
@@ -90,6 +108,8 @@ class CompletionPolicy(Protocol):
 
 @runtime_checkable
 class PromptManager(Protocol):
+    """Prompt 模板管理：渲染 + 注册。"""
+
     def render(self, template_name: str, variables: dict[str, Any]) -> str: ...
     def register_template(self, name: str, template: str, version: str = "1.0") -> None: ...
 

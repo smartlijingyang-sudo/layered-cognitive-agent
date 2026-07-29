@@ -1,4 +1,4 @@
-"""GetWeatherTool —— 查询城市天气（内置假数据，无需外部网络）。"""
+"""WeatherTool —— 查询城市天气（内置假数据，无需外部网络）。"""
 
 from __future__ import annotations
 
@@ -6,12 +6,15 @@ import asyncio
 import time
 from typing import Any, ClassVar
 
+from lca.contracts.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.decision import Observation
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import Tool
 
+_SIMULATED_LATENCY_S = 0.05
 
-class GetWeatherTool(Tool):
+
+class WeatherTool(Tool):
     """实现 Tool 的天气查询工具。
 
     内置假数据，避免依赖外部网络，专注测试 tool 调度本身。
@@ -19,7 +22,7 @@ class GetWeatherTool(Tool):
 
     name = "get_weather"
     is_idempotent = True
-    default_timeout_s = 5
+    default_timeout_s = DEFAULT_TOOL_TIMEOUT_S
 
     _FAKE_DB: ClassVar[dict[str, dict[str, Any]]] = {
         "tokyo": {"temp_c": 27, "condition": "cloudy"},
@@ -54,7 +57,7 @@ class GetWeatherTool(Tool):
                 latency_ms=latency_ms,
             )
 
-        await asyncio.sleep(0.05)  # 模拟网络 IO
+        await asyncio.sleep(_SIMULATED_LATENCY_S)  # 模拟网络 IO
 
         data = self._FAKE_DB.get(city)
         if data is None:
@@ -84,3 +87,7 @@ class GetWeatherTool(Tool):
             payload=result,
             latency_ms=latency_ms,
         )
+
+
+# Backward compatibility alias
+GetWeatherTool = WeatherTool

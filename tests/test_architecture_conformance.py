@@ -189,6 +189,7 @@ class TestCognitiveLoopSkeleton(unittest.TestCase):
                 break
 
         self.assertIsNotNone(loop_func, "未找到 _loop 方法——CognitiveRuntime 结构可能已变更")
+        # mypy 无法将 assertIsNotNone 识别为类型收窄
         stmt_count = len(loop_func.body)  # type: ignore[arg-type]
         self.assertLessEqual(
             stmt_count,

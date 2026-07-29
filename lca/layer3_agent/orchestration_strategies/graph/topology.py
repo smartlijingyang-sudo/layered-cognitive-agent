@@ -1,4 +1,10 @@
-"""图算法私有细节 —— 入度计算、级联跳过等拓扑操作。"""
+"""图算法私有细节 —— 入度计算、级联跳过等拓扑操作。
+
+供 GraphStrategy 使用的纯函数工具集：
+- ``compute_in_degree_and_out_edges``: 一次遍历计算所有节点的入度和出边索引
+- ``cascade_skip``: 条件边未命中时级联跳过下游节点，防止 fan-in 死等
+- ``enqueue_ready_targets``: 将入度归零的节点加入 BFS 队列
+"""
 
 from __future__ import annotations
 

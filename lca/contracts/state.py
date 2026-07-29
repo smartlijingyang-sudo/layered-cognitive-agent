@@ -22,6 +22,8 @@ def _now() -> datetime:
 
 @dataclass
 class Budget:
+    """资源预算：步数 / token / 费用 / 墙钟四维约束。"""
+
     max_tokens: int | None = None
     max_cost_usd: float | None = None
     max_steps: int | None = None
@@ -33,6 +35,7 @@ class Budget:
     extra: dict[str, Any] = field(default_factory=dict)
 
     def exceeded(self) -> bool:
+        """判定预算是否已超限（步数或墙钟）。"""
         if self.max_steps is not None and self.used_steps > self.max_steps:
             return True
         if self.max_wall_clock_seconds is not None:
@@ -44,6 +47,8 @@ class Budget:
 
 @dataclass
 class StateSnapshot:
+    """状态快照引用：用于 checkpoint / resume。"""
+
     snapshot_id: str
     step: int
     state_ref: str
@@ -53,6 +58,8 @@ class StateSnapshot:
 
 @dataclass
 class TypedState:
+    """Agent 单步认知循环的完整状态容器。"""
+
     trace_id: str
     task: str
     budget: Budget
@@ -75,6 +82,7 @@ class TypedState:
     team_progress_text: str | None = None
 
     def snapshot(self, reason: SnapshotReason = SnapshotReason.PERIODIC) -> StateSnapshot:
+        """创建并追加一条状态快照，返回引用。"""
         snap = StateSnapshot(
             snapshot_id=new_id("snap"),
             step=self.step,

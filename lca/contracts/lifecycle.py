@@ -15,6 +15,8 @@ def _now() -> datetime:
 
 
 class TaskStatus(str, Enum):
+    """Agent / Team 任务生命周期状态（A2A 兼容）。"""
+
     SUBMITTED = "submitted"
     WORKING = "working"
     PAUSED = "paused"
@@ -26,6 +28,8 @@ class TaskStatus(str, Enum):
 
 @dataclass
 class AgentCard:
+    """Agent 能力名片：声明角色、工具、协议，供委派路由使用。"""
+
     agent_id: str
     role: str
     capabilities: list[str]
@@ -39,6 +43,8 @@ class AgentCard:
 
 @dataclass
 class TeamMessage:
+    """跨 Agent 通信消息载体。"""
+
     message_id: str
     from_agent_id: str
     to_agent_id: str | None

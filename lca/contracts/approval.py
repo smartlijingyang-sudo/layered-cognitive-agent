@@ -15,6 +15,8 @@ def _now() -> datetime:
 
 @dataclass
 class ApprovalRequest:
+    """人工审批请求：携带待审批的 StructuredDecision 及上下文。"""
+
     request_id: str
     trace_id: str
     step: int
@@ -26,6 +28,8 @@ class ApprovalRequest:
 
 @dataclass
 class ApprovalDecision:
+    """人工审批结果：approved + 可选批注。"""
+
     request_id: str
     approved: bool
     approver: str | None = None
