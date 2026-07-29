@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any
+
+from lca.contracts.enums import SpanStatus
 
 
 def _now() -> datetime:
@@ -19,7 +21,7 @@ class TraceSpan:
     started_at: datetime
     parent_span_id: str | None = None
     ended_at: datetime | None = None
-    status: Literal["ok", "error"] = "ok"
+    status: SpanStatus = SpanStatus.OK
     attributes: dict[str, Any] = field(default_factory=dict)
 
 

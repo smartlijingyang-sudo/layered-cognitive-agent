@@ -3,26 +3,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
+
+from lca.contracts.enums import MessageKind, MessageRole
 
 
 @dataclass
 class TextPart:
     text: str
-    kind: Literal["text"] = "text"
+    kind: MessageKind = MessageKind.TEXT
 
 
 @dataclass
 class DataPart:
     data: dict[str, Any]
-    kind: Literal["data"] = "data"
+    kind: MessageKind = MessageKind.DATA
 
 
 @dataclass
 class FileRefPart:
     uri: str
     mime_type: str | None = None
-    kind: Literal["file"] = "file"
+    kind: MessageKind = MessageKind.FILE
 
 
 Part = TextPart | DataPart | FileRefPart
@@ -31,7 +33,7 @@ Part = TextPart | DataPart | FileRefPart
 @dataclass
 class AgentMessage:
     parts: list[Part]
-    role: Literal["user", "agent"] = "user"
+    role: MessageRole = MessageRole.USER
 
 
 def agent_message_text(s: str) -> AgentMessage:

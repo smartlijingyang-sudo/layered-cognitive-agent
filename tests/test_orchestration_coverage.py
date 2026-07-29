@@ -1,37 +1,34 @@
-"""编排策略覆盖测试 —— 确保 TeamConfig.process 的每个 Literal 值都有对应策略注册。
+"""编排策略覆盖测试 —— 确保 TeamProcess 枚举的每个值都有对应策略注册。
 
-只要有人给 process 加新 Literal 值却忘了注册对应策略，这条测试当场失败。
+只要有人给 TeamProcess 加新枚举值却忘了注册对应策略，这条测试当场失败。
 """
 
 from __future__ import annotations
 
 import os
 import sys
-import typing
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.role_team import TeamConfig
+from lca.contracts.enums import TeamProcess
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer4_app.defaults import ensure_defaults
 
 ensure_defaults()
 
 
-def _get_process_literal_values() -> set[str]:
-    """从 TeamConfig.process 的 Literal 类型中提取所有合法值。"""
-    hints = typing.get_type_hints(TeamConfig)
-    process_type = hints["process"]
-    return set(typing.get_args(process_type))
+def _get_process_enum_values() -> set[str]:
+    """从 TeamProcess 枚举中提取所有合法值。"""
+    return {m.value for m in TeamProcess}
 
 
 class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
     """TeamConfig.process 声明值集合 恒等于 OrchestrationStrategyRegistry 的 key 集合。"""
 
     def test_literal_values_match_registered_strategies(self) -> None:
-        literal_values = _get_process_literal_values()
+        literal_values = _get_process_enum_values()
         registered = set(get_global_orchestration_registry().list_strategies())
 
         missing = literal_values - registered

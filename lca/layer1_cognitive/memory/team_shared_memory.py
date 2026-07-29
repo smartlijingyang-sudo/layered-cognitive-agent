@@ -23,7 +23,7 @@ class TeamSharedMemoryStore(SharedMemoryStore):
     持有同一 store 的引用，实现"共享即同一数据源"。
     """
 
-    def __init__(self, shared_layers: list[SharedLayerName]) -> None:
+    def __init__(self, shared_layers: list[str]) -> None:
         invalid = set(shared_layers) - _VALID_SHARED_LAYERS
         if invalid:
             raise ValueError(f"只有 semantic/procedural 层可以共享，非法层: {invalid}")

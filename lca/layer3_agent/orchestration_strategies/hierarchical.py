@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from lca.contracts.enums import CompletionPolicyName, HookEvent
 from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy
 from lca.contracts.result import Result
 from lca.contracts.team_progress import DelegationLedgerProtocol
@@ -47,11 +48,11 @@ class HierarchicalStrategy(OrchestrationStrategy):
         context.supervisor.configure_runtime(team_progress=ledger)
 
         # 解析 CompletionPolicy（默认 roster_coverage）
-        policy_name = "roster_coverage"
+        policy_name = CompletionPolicyName.ROSTER_COVERAGE
         if context.config is not None:
             policy_name = context.config.completion_policy
 
-        if policy_name != "none":
+        if policy_name != CompletionPolicyName.NONE:
             from lca.layer0_infra.component_registry import get_global_registry
             from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
                 GuardedCandidateEvaluationPipeline,
@@ -71,7 +72,7 @@ class HierarchicalStrategy(OrchestrationStrategy):
                 lambda old: GuardedCandidateEvaluationPipeline(old, policy),
             )
 
-            context.supervisor.register_hook("post_act", ledger_tracking_hook)
-            context.supervisor.register_hook("pre_think", progress_injection_hook)
+            context.supervisor.register_hook(HookEvent.POST_ACT, ledger_tracking_hook)
+            context.supervisor.register_hook(HookEvent.PRE_THINK, progress_injection_hook)
 
         return cast("Result", await context.supervisor.execute(objective))

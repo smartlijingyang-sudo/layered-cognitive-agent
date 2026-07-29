@@ -10,6 +10,7 @@ import json
 import re
 
 from lca.contracts.decision import DelegationSpec, StructuredDecision, ToolCall
+from lca.contracts.enums import ActionType
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import DecisionParser
 from lca.contracts.semantic_keys import ORIGINAL_ACTION_TYPE
@@ -35,7 +36,7 @@ class SimpleDecisionParser(DecisionParser):
         except (json.JSONDecodeError, ValueError):
             return StructuredDecision(
                 decision_id=new_id("dec"),
-                action_type="respond",
+                action_type=ActionType.RESPOND,
                 response_text=raw_output,
                 rationale="解析失败兜底",
                 confidence=0.1,
@@ -55,7 +56,7 @@ class SimpleDecisionParser(DecisionParser):
             extra[ORIGINAL_ACTION_TYPE] = action_type
 
         tool_calls: list[ToolCall] = []
-        if action_type == "use_tool":
+        if action_type == ActionType.USE_TOOL:
             tool_name = data.get("tool_name") or data.get("tool")
             arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
             if not isinstance(arguments, dict):
@@ -69,10 +70,10 @@ class SimpleDecisionParser(DecisionParser):
                     )
                 )
             else:
-                action_type = "respond"
+                action_type = ActionType.RESPOND
 
         delegate_to: DelegationSpec | None = None
-        if action_type in ("delegate", "handoff"):
+        if action_type in (ActionType.DELEGATE, ActionType.HANDOFF):
             subtask = data.get("subtask", "")
             target_role = data.get("target_role")
             context_refs = data.get("context_refs") or data.get("context") or []

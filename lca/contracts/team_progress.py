@@ -9,9 +9,9 @@ Hooks 位于 layer1_cognitive/team_progress/hooks.py（ADR-0015 行为不进 con
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
-RoleStatus = Literal["pending", "in_progress", "done", "failed"]
+from lca.contracts.enums import RoleStatus
 
 
 @runtime_checkable

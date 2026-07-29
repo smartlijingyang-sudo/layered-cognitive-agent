@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 
 from lca.contracts.decision import DelegationSpec, StructuredDecision
+from lca.contracts.enums import ActionType
 from lca.contracts.protocols import CompletionPolicy
 from lca.contracts.state import TypedState
 
@@ -35,12 +36,12 @@ class RosterCoveragePolicy(CompletionPolicy):
         if ledger is None:
             return decision
 
-        if decision.action_type == "respond" and not ledger.is_covered():
+        if decision.action_type == ActionType.RESPOND and not ledger.is_covered():
             pending = ledger.pending_roles()
             next_role = pending[0]
             return StructuredDecision(
                 decision_id=f"dec_{uuid.uuid4().hex[:12]}",
-                action_type="delegate",
+                action_type=ActionType.DELEGATE,
                 delegate_to=DelegationSpec(
                     target_role=next_role,
                     subtask=_infer_subtask(state.task, next_role),

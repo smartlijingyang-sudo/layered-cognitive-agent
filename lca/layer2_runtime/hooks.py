@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from lca.contracts.enums import HookEvent
 from lca.contracts.protocols import EventBus
 from lca.contracts.semantic_keys import FALLBACK_DEGRADED_FROM
 from lca.contracts.state import TypedState
@@ -35,7 +36,7 @@ def make_event_emitting_hook(
     """
 
     async def _event_emitting_hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
-        if event_name == "post_act":
+        if event_name == HookEvent.POST_ACT:
             observation = kwargs.get("observation")
             if (
                 observation is not None
@@ -51,7 +52,7 @@ def make_event_emitting_hook(
                     },
                     state.trace_id,
                 )
-        elif event_name == "post_reflect":
+        elif event_name == HookEvent.POST_REFLECT:
             event_bus.emit(
                 "step_completed",
                 {"step": state.step, "status": state.status},

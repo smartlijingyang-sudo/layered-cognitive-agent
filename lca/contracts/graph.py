@@ -10,12 +10,26 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from enum import Enum
+from typing import Any
 
 from lca.contracts.state import TypedState
 
-NodeType = Literal["entry", "exit", "agent", "router", "aggregator"]
-EdgeType = Literal["fixed", "conditional", "parallel"]
+
+class NodeType(str, Enum):
+    ENTRY = "entry"
+    EXIT = "exit"
+    AGENT = "agent"
+    ROUTER = "router"
+    AGGREGATOR = "aggregator"
+
+
+class EdgeType(str, Enum):
+    FIXED = "fixed"
+    CONDITIONAL = "conditional"
+    PARALLEL = "parallel"
+
+
 ConditionFn = Callable[[TypedState], bool]
 
 
@@ -34,7 +48,7 @@ class GraphNode:
 class GraphEdge:
     source: str
     target: str
-    type: EdgeType = "fixed"
+    type: EdgeType = EdgeType.FIXED
     condition: ConditionFn | None = None
 
 
@@ -70,9 +84,9 @@ class ExecutionGraph:
         2. 所有边的 source/target 必须引用已注册的节点
         3. 防环检测（除非 allow_cycle=True）
         """
-        if not any(n.type == "entry" for n in self.nodes.values()):
+        if not any(n.type == NodeType.ENTRY for n in self.nodes.values()):
             raise GraphValidationError("图必须有至少一个 entry 节点")
-        if not any(n.type == "exit" for n in self.nodes.values()):
+        if not any(n.type == NodeType.EXIT for n in self.nodes.values()):
             raise GraphValidationError("图必须有至少一个 exit 节点")
 
         for edge in self.edges:

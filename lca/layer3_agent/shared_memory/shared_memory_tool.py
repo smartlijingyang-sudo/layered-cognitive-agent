@@ -15,11 +15,12 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.decision import Observation
+from lca.contracts.enums import SharedMemoryOp
 from lca.contracts.ids import new_id
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols import SharedMemoryStore, Tool
 
-_VALID_OPS = frozenset({"read", "write", "list"})
+_VALID_OPS = frozenset(SharedMemoryOp)
 
 
 class SharedMemoryTool(Tool):
@@ -49,7 +50,7 @@ class SharedMemoryTool(Tool):
         layer = str(args.get("layer", self._default_layer))
         if not self._store.is_shared(layer):
             return f"层 {layer!r} 未配置为共享（team_id={self._team_id}）"
-        if op == "write" and not args.get("content"):
+        if op == SharedMemoryOp.WRITE and not args.get("content"):
             return "write 操作需要 content 字段"
         return None
 
@@ -66,7 +67,7 @@ class SharedMemoryTool(Tool):
         op = str(args["op"])
         layer = str(args.get("layer", self._default_layer))
 
-        if op == "read":
+        if op == SharedMemoryOp.READ:
             records = self._store.get_records(layer)
             return Observation(
                 observation_id=new_id("obs"),
@@ -75,7 +76,7 @@ class SharedMemoryTool(Tool):
                 extra={"team_id": self._team_id, "layer": layer, "op": op},
             )
 
-        if op == "list":
+        if op == SharedMemoryOp.LIST:
             records = self._store.get_records(layer)
             return Observation(
                 observation_id=new_id("obs"),
@@ -98,5 +99,5 @@ class SharedMemoryTool(Tool):
             observation_id=new_id("obs"),
             success=True,
             payload={"written": content, "record_id": record.record_id},
-            extra={"team_id": self._team_id, "layer": layer, "op": "write"},
+            extra={"team_id": self._team_id, "layer": layer, "op": SharedMemoryOp.WRITE.value},
         )

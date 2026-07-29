@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, Protocol, runtime_checkable
 
-from lca.contracts.decision import Observation
+from lca.contracts.decision import AgentCard, Observation
+from lca.contracts.observability import TraceSpan
 from lca.contracts.role_team import CacheConfig, RetryPolicy
 from lca.contracts.state import TypedState
 
@@ -59,7 +60,9 @@ class StateStore(Protocol):
 class AgentTransport(Protocol):
     protocol_name: str
 
-    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str: ...
+    async def send_task(
+        self, agent_card: AgentCard | str, subtask: str, context_refs: list[str]
+    ) -> str: ...
     async def poll_status(self, task_id: str) -> str: ...
     async def receive_result(self, task_id: str) -> Observation: ...
 
@@ -85,4 +88,4 @@ class TransportRegistryProtocol(Protocol):
 
 @runtime_checkable
 class Observability(Protocol):
-    def emit_span(self, span: Any) -> None: ...
+    def emit_span(self, span: TraceSpan) -> None: ...

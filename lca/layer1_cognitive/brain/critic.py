@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.decision import Observation, Reflection
+from lca.contracts.enums import ReflectionVerdict
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import Critic
 from lca.contracts.semantic_keys import (
@@ -29,7 +30,7 @@ class SimpleCritic(Critic):
         if observation.success:
             return Reflection(
                 reflection_id=new_id("refl"),
-                verdict="on_track",
+                verdict=ReflectionVerdict.ON_TRACK,
                 lesson=f"步骤{state.step}成功完成" if observation.payload is not None else None,
             )
         failure_kind = self._extract_failure_kind(observation)
@@ -37,7 +38,7 @@ class SimpleCritic(Critic):
         lesson = f"步骤{state.step}失败({hint}): {observation.error}"
         return Reflection(
             reflection_id=new_id("refl"),
-            verdict="needs_correction",
+            verdict=ReflectionVerdict.NEEDS_CORRECTION,
             lesson=lesson,
             extra={FAILURE_KIND: failure_kind},
         )

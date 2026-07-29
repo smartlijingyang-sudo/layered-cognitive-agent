@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.lifecycle import TaskStatus
 
 
 @dataclass
@@ -49,4 +50,4 @@ class StepOutcome:
 
     should_stop: bool = False
     final_output: str | None = None
-    status: str | None = None
+    status: TaskStatus | None = None

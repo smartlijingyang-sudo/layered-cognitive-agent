@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from lca.contracts.enums import TeamProcess
 from lca.contracts.protocols import (
     BrainStrategy,
     LLMAdapter,
@@ -98,13 +99,13 @@ class MultiAgentTeam:
     def __init__(
         self,
         members: list[Agent],
-        process: str = "hierarchical",
+        process: TeamProcess = TeamProcess.HIERARCHICAL,
         supervisor: Agent | None = None,
         max_rounds: int | None = None,
     ):
         ensure_defaults()
         config = TeamConfig(
-            process=process,  # type: ignore[arg-type]
+            process=process,
             max_rounds=max_rounds,
         )
         base_members = [m._base_agent for m in members]

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any
 
 from lca.contracts.delegation_context import _delegator as _current_delegator  # noqa: F401
 
 # 过渡期 re-export，见 ADR-0017；新代码请直接 import lca.contracts.delegation_context
+from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.team_progress import DelegationLedgerProtocol
@@ -46,7 +47,7 @@ class StateSnapshot:
     snapshot_id: str
     step: int
     state_ref: str
-    reason: Literal["periodic", "pre_approval", "manual", "on_error"]
+    reason: SnapshotReason = SnapshotReason.PERIODIC
     created_at: datetime = field(default_factory=_now)
 
 
@@ -73,12 +74,12 @@ class TypedState:
     active_template: str | None = None
     team_progress_text: str | None = None
 
-    def snapshot(self, reason: str = "periodic") -> StateSnapshot:
+    def snapshot(self, reason: SnapshotReason = SnapshotReason.PERIODIC) -> StateSnapshot:
         snap = StateSnapshot(
             snapshot_id=new_id("snap"),
             step=self.step,
             state_ref=f"mem://{self.trace_id}/{self.step}",
-            reason=reason,  # type: ignore[arg-type]
+            reason=reason,
         )
         self.checkpoints.append(snap)
         return snap

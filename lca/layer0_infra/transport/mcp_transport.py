@@ -11,8 +11,9 @@ from __future__ import annotations
 import contextlib
 from typing import Any
 
-from lca.contracts.decision import Observation
+from lca.contracts.decision import AgentCard, Observation
 from lca.contracts.ids import new_id
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
 
 _MCP_SDK_MISSING_MSG = "MCP Python SDK 未安装。请运行: pip install mcp 或 uv add mcp"
@@ -41,7 +42,7 @@ class MCPTransport(AgentTransport):
         self._task_statuses: dict[str, str] = {}
         self._sessions: dict[str, Any] = {}
 
-    def _resolve_config(self, agent_card: Any) -> tuple[str, str]:
+    def _resolve_config(self, agent_card: AgentCard | str) -> tuple[str, str]:
         """从 agent_card 解析 server_url 和 tool_name。"""
         if isinstance(agent_card, str):
             return agent_card, self._default_tool_name
@@ -75,7 +76,9 @@ class MCPTransport(AgentTransport):
         self._sessions[server_url] = session
         return session
 
-    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str:
+    async def send_task(
+        self, agent_card: AgentCard | str, subtask: str, context_refs: list[str]
+    ) -> str:
         task_id = new_id("mcp_task")
         server_url, tool_name = self._resolve_config(agent_card)
 
@@ -100,7 +103,7 @@ class MCPTransport(AgentTransport):
                 error=output_text if is_error else None,
                 extra={"mcp_tool": tool_name, "mcp_server": server_url},
             )
-            self._task_statuses[task_id] = "completed"
+            self._task_statuses[task_id] = TaskStatus.COMPLETED
 
         except NotImplementedError:
             raise
@@ -111,7 +114,7 @@ class MCPTransport(AgentTransport):
                 payload=None,
                 error=f"MCP send_task failed: {exc}",
             )
-            self._task_statuses[task_id] = "failed"
+            self._task_statuses[task_id] = TaskStatus.FAILED
 
         return task_id
 

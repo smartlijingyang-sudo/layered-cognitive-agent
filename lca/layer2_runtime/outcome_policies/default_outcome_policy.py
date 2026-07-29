@@ -11,6 +11,8 @@
 from __future__ import annotations
 
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.enums import ActionType, ReflectionVerdict
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import StepOutcome, StepOutcomePolicy
 from lca.contracts.semantic_keys import FALLBACK_DEGRADED_FROM
 from lca.contracts.state import TypedState
@@ -35,20 +37,20 @@ class DefaultStepOutcomePolicy(StepOutcomePolicy):
 
         is_degraded_success = self._is_degraded_success(observation)
 
-        if decision.action_type == "handoff":
-            return StepOutcome(should_stop=True, status="completed")
+        if decision.action_type == ActionType.HANDOFF:
+            return StepOutcome(should_stop=True, status=TaskStatus.COMPLETED)
 
-        if decision.action_type == "respond" or is_degraded_success:
+        if decision.action_type == ActionType.RESPOND or is_degraded_success:
             final_output = decision.response_text if decision.response_text else None
             if final_output is None and is_degraded_success and observation is not None:
                 payload = observation.payload
                 if isinstance(payload, str):
                     final_output = payload
-            should_stop = reflection.verdict != "needs_correction"
+            should_stop = reflection.verdict != ReflectionVerdict.NEEDS_CORRECTION
             return StepOutcome(
                 should_stop=should_stop,
                 final_output=final_output,
-                status="completed" if should_stop else None,
+                status=TaskStatus.COMPLETED if should_stop else None,
             )
 
         return StepOutcome()
@@ -77,5 +79,5 @@ class DefaultStepOutcomePolicy(StepOutcomePolicy):
         return StepOutcome(
             should_stop=True,
             final_output=final_output,
-            status="completed" if last_ok else "failed",
+            status=TaskStatus.COMPLETED if last_ok else TaskStatus.FAILED,
         )

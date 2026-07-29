@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from typing import Any
 
-from lca.contracts.decision import Observation
+from lca.contracts.decision import AgentCard, Observation
 from lca.contracts.ids import new_id
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
 
 AgentHandler = Callable[[str], Awaitable[Observation]]
@@ -46,7 +46,7 @@ class InternalTransport(AgentTransport):
         """将一个 async handler 注册到 directory，key 通常为 agent_id 或 role。"""
         self._directory[key] = handler
 
-    def _resolve_handler(self, agent_card: Any) -> AgentHandler | None:
+    def _resolve_handler(self, agent_card: AgentCard | str) -> AgentHandler | None:
         if isinstance(agent_card, str):
             return self._directory.get(agent_card)
         if hasattr(agent_card, "agent_id"):
@@ -57,7 +57,9 @@ class InternalTransport(AgentTransport):
             return self._directory.get(agent_card.role)
         return None
 
-    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str:
+    async def send_task(
+        self, agent_card: AgentCard | str, subtask: str, context_refs: list[str]
+    ) -> str:
         task_id = new_id("task")
         handler = self._resolve_handler(agent_card)
         loop = asyncio.get_running_loop()
@@ -66,7 +68,7 @@ class InternalTransport(AgentTransport):
 
         if handler is None:
             obs = _fail_observation("agent not found in directory")
-            self._statuses[task_id] = "failed"
+            self._statuses[task_id] = TaskStatus.FAILED
             self._results[task_id] = obs
             fut.set_result(obs)
             return task_id
@@ -77,16 +79,16 @@ class InternalTransport(AgentTransport):
             except Exception as exc:
                 obs = _fail_observation(str(exc))
             self._results[task_id] = obs
-            self._statuses[task_id] = "completed" if obs.success else "failed"
+            self._statuses[task_id] = TaskStatus.COMPLETED if obs.success else TaskStatus.FAILED
             if not fut.done():
                 fut.set_result(obs)
 
-        self._statuses[task_id] = "working"
+        self._statuses[task_id] = TaskStatus.WORKING
         self._bg_tasks[task_id] = asyncio.create_task(_run(), name=f"transport-{task_id}")
         return task_id
 
     async def poll_status(self, task_id: str) -> str:
-        return self._statuses.get(task_id, "working")
+        return self._statuses.get(task_id, TaskStatus.WORKING)
 
     async def receive_result(self, task_id: str) -> Observation:
         if task_id in self._results:

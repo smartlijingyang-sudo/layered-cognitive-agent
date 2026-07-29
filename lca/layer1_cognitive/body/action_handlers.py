@@ -13,6 +13,7 @@ from lca.contracts.action import ActionOperation
 from lca.contracts.decision import Observation, StructuredDecision
 from lca.contracts.delegation_context import delegator_scope
 from lca.contracts.ids import new_id
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import (
     AgentTransport,
     SafeExecutor,
@@ -97,7 +98,7 @@ class DelegateOperation(ActionOperation):
 
         # 回退：跨进程 / 旧 transport 轮询
         elapsed = 0.0
-        while (await transport.poll_status(task_id)) == "working":
+        while (await transport.poll_status(task_id)) != TaskStatus.WORKING:
             if elapsed >= timeout_s:
                 return Observation(
                     observation_id=new_id("obs"),
@@ -118,6 +119,8 @@ class DelegateOperation(ActionOperation):
             raise ToolExecutionError(f"{decision.action_type} 动作缺少 delegate_to 规格")
         transport = self._transport_registry.resolve(spec.protocol)
         agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
+        if agent_card is None:
+            raise ToolExecutionError("delegate 动作缺少目标（agent_card / agent_id / role 均为空）")
         with delegator_scope(state.agent_role):
             task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         return transport, task_id
@@ -135,6 +138,8 @@ class HandoffOperation(ActionOperation):
             raise ToolExecutionError("handoff 动作缺少 delegate_to 规格")
         transport = self._transport_registry.resolve(spec.protocol)
         agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
+        if agent_card is None:
+            raise ToolExecutionError("handoff 动作缺少目标（agent_card / agent_id / role 均为空）")
         with delegator_scope(state.agent_role):
             task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         return Observation(

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from lca.contracts.decision import Observation
+from lca.contracts.decision import AgentCard, Observation
 from lca.contracts.protocols import AgentTransport
 from lca.layer0_infra.component_registry import NamedRegistry, RegistryKeyError
 
@@ -68,7 +66,9 @@ class UnimplementedTransport(AgentTransport):
             msg += f" (tracked in {self._tracking_issue})"
         return msg
 
-    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str:
+    async def send_task(
+        self, agent_card: AgentCard | str, subtask: str, context_refs: list[str]
+    ) -> str:
         raise NotImplementedError(self._error_message)
 
     async def poll_status(self, task_id: str) -> str:

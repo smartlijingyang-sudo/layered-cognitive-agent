@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
+
+from lca.contracts.enums import CompletionPolicyName, TeamProcess
 
 
 @dataclass
@@ -41,8 +43,8 @@ class RoleProfile:
 
 @dataclass
 class TeamConfig:
-    process: Literal["hierarchical", "sequential", "parallel", "graph", "debate", "handoff"]
-    shared_memory_layers: list[Literal["semantic", "procedural"]] = field(default_factory=list)
+    process: TeamProcess
+    shared_memory_layers: list[str] = field(default_factory=list)
     max_rounds: int | None = None
     graph_definition_ref: str | None = None
-    completion_policy: str = "roster_coverage"
+    completion_policy: CompletionPolicyName = CompletionPolicyName.ROSTER_COVERAGE

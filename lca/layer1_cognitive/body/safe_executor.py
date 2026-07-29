@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 from lca.contracts.decision import Observation
+from lca.contracts.enums import SpanStatus
 from lca.contracts.ids import new_id, utc_now
 from lca.contracts.observability import TraceSpan
 from lca.contracts.protocols import Observability, SafeExecutor, Tool
@@ -82,7 +83,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 )
                 if not getattr(err, "retryable", True):
                     span.ended_at = utc_now()
-                    span.status = "error"
+                    span.status = SpanStatus.ERROR
                     span.attributes["error"] = obs.error
                     span.attributes[FAILURE_KIND] = FAILURE_KIND_EXECUTION
                     span.attributes["retryable"] = False
@@ -98,7 +99,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 )
 
             span.ended_at = utc_now()
-            span.status = "ok" if obs.success else "error"
+            span.status = SpanStatus.OK if obs.success else SpanStatus.ERROR
             if not obs.success:
                 span.attributes["error"] = obs.error
                 span.attributes[FAILURE_KIND] = obs.extra.get(FAILURE_KIND, FAILURE_KIND_EXECUTION)

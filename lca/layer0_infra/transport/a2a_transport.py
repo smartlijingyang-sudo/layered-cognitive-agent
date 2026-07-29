@@ -16,8 +16,9 @@ from typing import Any
 
 import httpx
 
-from lca.contracts.decision import Observation
+from lca.contracts.decision import AgentCard, Observation
 from lca.contracts.ids import new_id
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
 
 
@@ -46,7 +47,7 @@ class A2ATransport(AgentTransport):
             self._client = httpx.AsyncClient(timeout=self._timeout)
         return self._client
 
-    def _resolve_endpoint(self, agent_card: Any) -> str:
+    def _resolve_endpoint(self, agent_card: AgentCard | str) -> str:
         if isinstance(agent_card, str):
             return agent_card
         if hasattr(agent_card, "url"):
@@ -57,7 +58,9 @@ class A2ATransport(AgentTransport):
             return self._default_endpoint
         raise ValueError(f"无法从 AgentCard 解析 A2A 端点 URL: {agent_card!r}")
 
-    async def send_task(self, agent_card: Any, subtask: str, context_refs: list[str]) -> str:
+    async def send_task(
+        self, agent_card: AgentCard | str, subtask: str, context_refs: list[str]
+    ) -> str:
         endpoint = self._resolve_endpoint(agent_card)
         task_id = new_id("a2a_task")
         self._task_endpoints[task_id] = endpoint
@@ -90,7 +93,7 @@ class A2ATransport(AgentTransport):
         elapsed = 0.0
         while True:
             status = await self.poll_status(task_id)
-            if status != "working":
+            if status != TaskStatus.WORKING:
                 return await self.receive_result(task_id)
             if timeout_s is not None and elapsed >= timeout_s:
                 raise TimeoutError(f"a2a wait_result 超时: {task_id}")
@@ -129,7 +132,7 @@ class A2ATransport(AgentTransport):
             data = response.json()
 
             status = data.get("status", {})
-            if status.get("state") != "completed":
+            if status.get("state") != TaskStatus.COMPLETED:
                 return Observation(
                     observation_id=new_id("obs"),
                     success=False,

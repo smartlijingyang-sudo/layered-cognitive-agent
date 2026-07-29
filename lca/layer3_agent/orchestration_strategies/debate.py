@@ -6,6 +6,7 @@ import asyncio
 import uuid
 
 from lca.contracts.decision import StructuredDecision
+from lca.contracts.enums import ActionType
 from lca.contracts.protocols import (
     ConflictMonitor,
     OrchestrationContext,
@@ -93,7 +94,7 @@ class DebateStrategy(OrchestrationStrategy):
 def _result_to_decision(result: Result, index: int) -> StructuredDecision:
     return StructuredDecision(
         decision_id=f"debate_{index}_{uuid.uuid4().hex[:8]}",
-        action_type="respond",
+        action_type=ActionType.RESPOND,
         rationale=result.output or "",
         confidence=0.5,
         response_text=result.output,

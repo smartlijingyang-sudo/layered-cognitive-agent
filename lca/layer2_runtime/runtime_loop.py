@@ -11,6 +11,7 @@ from typing import Any
 
 from lca.contracts.budget import create_budget
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.mechanisms import HookRegistry
@@ -152,7 +153,7 @@ class CognitiveRuntime(Runtime):
                 await self.memory.update_multi_level(state, observation, reflection)
 
             except ApprovalPendingError:
-                self._checkpoint(state, reason="pre_approval")
+                self._checkpoint(state, reason=SnapshotReason.PRE_APPROVAL)
                 state.status = TaskStatus.INPUT_REQUIRED
                 await self.hooks.trigger("on_pause", state)
                 return self._summarize(state)
@@ -160,7 +161,7 @@ class CognitiveRuntime(Runtime):
             except Exception as err:
                 await self.hooks.trigger("on_error", state, error=err)
                 state.status = TaskStatus.FAILED
-                self._checkpoint(state, reason="on_error")
+                self._checkpoint(state, reason=SnapshotReason.ON_ERROR)
                 state.last_error = str(err)
                 break
 
@@ -184,7 +185,9 @@ class CognitiveRuntime(Runtime):
         await self.hooks.trigger("on_complete", state)
         return self._summarize(state)
 
-    def _checkpoint(self, state: TypedState, reason: str = "periodic") -> None:
+    def _checkpoint(
+        self, state: TypedState, reason: SnapshotReason = SnapshotReason.PERIODIC
+    ) -> None:
         state.checkpoints.append(state.snapshot(reason=reason))
 
     @staticmethod
@@ -243,4 +246,6 @@ class _DefaultOutcomePolicy(StepOutcomePolicy):
         state: TypedState,
     ) -> StepOutcome:
         last_ok = observation is not None and getattr(observation, "success", False)
-        return StepOutcome(should_stop=True, status="completed" if last_ok else "failed")
+        return StepOutcome(
+            should_stop=True, status=TaskStatus.COMPLETED if last_ok else TaskStatus.FAILED
+        )

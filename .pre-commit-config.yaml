@@ -38,6 +38,20 @@ repos:
         pass_filenames: false
         types: [python]
 
+      - id: check-no-any
+        name: 禁止裸 Any 类型标注（ADR-0017）
+        entry: python scripts/check_no_any.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-no-bare-strings
+        name: 禁止领域语义裸字符串（ADR-0017）
+        entry: python scripts/check_no_bare_strings.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:

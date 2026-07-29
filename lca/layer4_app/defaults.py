@@ -9,6 +9,8 @@
 from __future__ import annotations
 
 from lca.contracts.decision import Observation
+from lca.contracts.enums import CompletionPolicyName, TeamProcess
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport, Body, Tool, TransportRegistryProtocol
 from lca.contracts.role_team import ToolPermissionManifest
 from lca.layer0_infra.component_registry import (
@@ -105,7 +107,7 @@ def build_team_transport(
             result = await _m.execute(subtask, delegated_by=delegated_by)
             return Observation(
                 observation_id=f"obs_{result.trace_id}",
-                success=result.status == "completed",
+                success=result.status == TaskStatus.COMPLETED,
                 payload=result.output,
                 error=result.error,
             )
@@ -135,25 +137,29 @@ def register_defaults() -> None:
     strategy_reg.register("default", _default_brain_factory)
 
     orch_reg = get_global_orchestration_registry()
-    orch_reg.register("hierarchical", HierarchicalStrategy)
-    orch_reg.register("sequential", SequentialStrategy)
-    orch_reg.register("parallel", lambda: ParallelStrategy(synthesizer=ConcatSynthesizer()))
-    orch_reg.register("graph", GraphStrategy)
+    orch_reg.register(TeamProcess.HIERARCHICAL, HierarchicalStrategy)
+    orch_reg.register(TeamProcess.SEQUENTIAL, SequentialStrategy)
     orch_reg.register(
-        "debate",
+        TeamProcess.PARALLEL, lambda: ParallelStrategy(synthesizer=ConcatSynthesizer())
+    )
+    orch_reg.register(TeamProcess.GRAPH, GraphStrategy)
+    orch_reg.register(
+        TeamProcess.DEBATE,
         lambda: DebateStrategy(
             conflict_monitor=SimpleConflictMonitor(),
             task_coordinator=SimpleTaskCoordinator(),
             state_evaluator=SimpleStateEvaluator(),
         ),
     )
-    orch_reg.register("handoff", HandoffStrategy)
+    orch_reg.register(TeamProcess.HANDOFF, HandoffStrategy)
 
     from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
         RosterCoveragePolicy,
     )
 
-    global_reg.register("completion_policy", "roster_coverage", RosterCoveragePolicy)
+    global_reg.register(
+        "completion_policy", CompletionPolicyName.ROSTER_COVERAGE, RosterCoveragePolicy
+    )
     mark_defaults_registered()
 
 

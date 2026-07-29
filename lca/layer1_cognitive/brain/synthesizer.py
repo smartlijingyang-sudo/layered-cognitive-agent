@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import Synthesizer
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
@@ -36,12 +37,10 @@ class ConcatSynthesizer(Synthesizer):
                 aggregated_budget.used_cost_usd += candidate.budget_used.used_cost_usd
                 aggregated_budget.used_steps += candidate.budget_used.used_steps
             all_lessons.extend(candidate.lessons)
-            if candidate.status == "completed":
+            if candidate.status == TaskStatus.COMPLETED:
                 any_completed = True
 
         synthesized_output = self._separator.join(outputs) if outputs else None
-
-        from lca.contracts.lifecycle import TaskStatus
 
         return Result(
             trace_id=candidates[0].trace_id,

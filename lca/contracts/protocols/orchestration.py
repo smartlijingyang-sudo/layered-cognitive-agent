@@ -16,14 +16,14 @@ from lca.contracts.role_team import TeamConfig
 class OrchestrationContext:
     """编排策略的运行时上下文，由 TeamOrchestrator 构造并传给策略实例。"""
 
-    members: list[Any] = field(default_factory=list)
+    members: list[Any] = field(default_factory=list)  # list[AgentEntrypoint]
     config: TeamConfig | None = None
-    supervisor: Any | None = None
+    supervisor: Any | None = None  # Supervisor (L3)，contracts 不得反向依赖
     transport: AgentTransport | None = None
     roster_desc: str = ""
     ledger_factory: Callable[[frozenset[str]], Any] | None = None
     team_id: str = ""
-    shared_memory: Any | None = None
+    shared_memory: Any | None = None  # SharedMemoryStore (L3)
 
 
 @runtime_checkable

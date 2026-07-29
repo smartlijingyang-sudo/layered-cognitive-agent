@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy
 from lca.contracts.result import Result
 
@@ -24,7 +25,7 @@ class HandoffStrategy(OrchestrationStrategy):
         for member in context.members:
             result: Result = await member.execute(objective)
             last_result = result
-            if result.status == "completed":
+            if result.status == TaskStatus.COMPLETED:
                 return result
 
         return last_result or Result.failed("All members failed")

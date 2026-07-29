@@ -6,7 +6,7 @@ import asyncio
 from collections import deque
 from typing import Any
 
-from lca.contracts.graph import ExecutionGraph
+from lca.contracts.graph import EdgeType, ExecutionGraph, NodeType
 from lca.contracts.protocols import (
     OrchestrationContext,
     OrchestrationStrategy,
@@ -70,7 +70,7 @@ class GraphStrategy(OrchestrationStrategy):
 
             node = self._graph.nodes[nid]
 
-            if node.type == "agent":
+            if node.type == NodeType.AGENT:
                 role = node.config.get("role", "")
                 member = member_map.get(role)
                 if member:
@@ -87,12 +87,12 @@ class GraphStrategy(OrchestrationStrategy):
 
             for edge_idx in out_edge_indices[nid]:
                 edge = self._graph.edges[edge_idx]
-                if edge.type == "conditional":
+                if edge.type == EdgeType.CONDITIONAL:
                     if edge.condition is not None and edge.condition(state):
                         fixed_targets.append(edge.target)
                     else:
                         cascade_skip(self._graph, edge.target, remaining, skipped, executed, queue)
-                elif edge.type == "parallel":
+                elif edge.type == EdgeType.PARALLEL:
                     parallel_targets.append(edge.target)
                 else:
                     fixed_targets.append(edge.target)
@@ -136,7 +136,7 @@ class GraphStrategy(OrchestrationStrategy):
                 return
             node = self._graph.nodes[target_nid]  # type: ignore[union-attr]
 
-            if node.type == "agent":
+            if node.type == NodeType.AGENT:
                 role = node.config.get("role", "")
                 member = member_map.get(role)
                 if member:
@@ -147,9 +147,9 @@ class GraphStrategy(OrchestrationStrategy):
             sub_fixed: list[str] = []
             sub_parallel: list[str] = []
             for edge in self._graph.outgoing(target_nid):  # type: ignore[union-attr]
-                if edge.type == "parallel":
+                if edge.type == EdgeType.PARALLEL:
                     sub_parallel.append(edge.target)
-                elif edge.type == "conditional":
+                elif edge.type == EdgeType.CONDITIONAL:
                     if edge.condition is not None and edge.condition(state):
                         sub_fixed.append(edge.target)
                     else:

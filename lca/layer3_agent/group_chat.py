@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.graph import ExecutionGraph, GraphEdge, GraphNode
+from lca.contracts.graph import ExecutionGraph, GraphEdge, GraphNode, NodeType
 
 
 def build_group_chat_graph(
@@ -36,11 +36,11 @@ def build_group_chat_graph(
     """
     graph = ExecutionGraph(allow_cycle=True)
 
-    graph.add_node(GraphNode(id="entry", type="entry"))
-    graph.add_node(GraphNode(id="exit", type="exit"))
+    graph.add_node(GraphNode(id="entry", type=NodeType.ENTRY))
+    graph.add_node(GraphNode(id="exit", type=NodeType.EXIT))
 
     for role in roles:
-        graph.add_node(GraphNode(id=role, type="agent", config={"role": role}))
+        graph.add_node(GraphNode(id=role, type=NodeType.AGENT, config={"role": role}))
 
     # entry → 第一个 agent
     if roles:

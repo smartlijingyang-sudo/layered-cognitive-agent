@@ -19,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from lca.contracts.observability import TraceSpan
 from lca.contracts.protocols import Observability
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ class JSONLFileObservability(Observability):
         self._path = Path(output_path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
-    def emit_span(self, span: Any) -> None:
+    def emit_span(self, span: TraceSpan) -> None:
         """将 TraceSpan 序列化为一行 JSON 追加写入文件。"""
         try:
             record = self._serialize_span(span)
@@ -43,7 +44,7 @@ class JSONLFileObservability(Observability):
         except Exception:
             logger.exception("Failed to write trace span to %s", self._path)
 
-    def _serialize_span(self, span: Any) -> dict[str, Any]:
+    def _serialize_span(self, span: TraceSpan) -> dict[str, Any]:
         """将 TraceSpan 转为可 JSON 序列化的 dict。"""
         if hasattr(span, "__dataclass_fields__"):
             record = asdict(span)

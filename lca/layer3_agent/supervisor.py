@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from lca.contracts.mechanisms import Hook
 from lca.contracts.protocols import AgentTransport, Runtime
 from lca.contracts.role_team import RoleProfile
 from lca.layer3_agent.base_agent import BaseAgent
@@ -41,7 +42,7 @@ class Supervisor(BaseAgent):
         """通过 Runtime 协议配置能力（team_progress 等）。"""
         self.runtime.configure(**capabilities)
 
-    def register_hook(self, hook_name: str, hook_fn: Any) -> None:
+    def register_hook(self, hook_name: str, hook_fn: Hook) -> None:
         """通过 Runtime 协议注册 Hook。"""
         self.runtime.register_hook(hook_name, hook_fn)
 
