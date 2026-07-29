@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.protocols.infra import AgentTransport
 
 
@@ -34,3 +35,19 @@ class SharedStoreBindable(Protocol):
     """MemorySystem 若支持团队共享记忆（CoALA），实现此协议。"""
 
     def bind_shared_store(self, store: object) -> None: ...
+
+
+@runtime_checkable
+class ExposesComponents(Protocol):
+    """Runtime 若暴露 body / brain / memory 供组合期能力绑定，实现此协议。"""
+
+    body: object
+    brain: object
+    memory: object
+
+
+@runtime_checkable
+class HookRegistryHolder(Protocol):
+    """Runtime 若暴露 HookRegistry 供 Agent 注册生命周期钩子，实现此协议。"""
+
+    hooks: HookRegistry

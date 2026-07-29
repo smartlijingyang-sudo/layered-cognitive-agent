@@ -21,13 +21,18 @@ from lca.contracts.protocols import (
     TeamEntrypoint,
     ToolRegistry,
 )
-from lca.contracts.protocols.capabilities import RosterAware, SharedStoreBindable, TransportBindable
+from lca.contracts.protocols.capabilities import (
+    ExposesComponents,
+    RosterAware,
+    SharedStoreBindable,
+    TransportBindable,
+)
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.layer1_cognitive.memory.shared_memory_tool import SharedMemoryTool
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
-from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
+from lca.layer3_agent.simple_agent import SimpleAgent
 
 
 class TeamOrchestrator(TeamEntrypoint):
@@ -42,9 +47,9 @@ class TeamOrchestrator(TeamEntrypoint):
 
     def __init__(
         self,
-        members: list[BaseAgent],
+        members: list[SimpleAgent],
         config: TeamConfig,
-        supervisor: BaseAgent | None = None,
+        supervisor: SimpleAgent | None = None,
         transport: AgentTransport | None = None,
         roster_desc: str = "",
         strategy: OrchestrationStrategy | None = None,
@@ -86,31 +91,34 @@ class TeamOrchestrator(TeamEntrypoint):
         if self._shared_store is None:
             return
         for member in self.members:
-            memory = getattr(member.runtime, "memory", None)
-            if memory is not None and isinstance(memory, SharedStoreBindable):
-                memory.bind_shared_store(self._shared_store)
+            if isinstance(member.runtime, ExposesComponents):
+                memory = member.runtime.memory
+                if isinstance(memory, SharedStoreBindable):
+                    memory.bind_shared_store(self._shared_store)
             self._register_shared_memory_tool(member)
 
     @staticmethod
     def _bind_supervisor_capabilities(
-        supervisor: BaseAgent, transport: AgentTransport, roster_desc: str
+        supervisor: SimpleAgent, transport: AgentTransport, roster_desc: str
     ) -> None:
-        """在组合根完成 Supervisor 的 transport / roster 绑定，避免 L3 越层访问。"""
-        body = getattr(supervisor.runtime, "body", None)
-        if body is not None and isinstance(body, TransportBindable):
+        """在组合根完成 Supervisor 的 transport / roster 绑定。"""
+        if not isinstance(supervisor.runtime, ExposesComponents):
+            return
+        body = supervisor.runtime.body
+        if isinstance(body, TransportBindable):
             body.bind_transport(transport)
-        brain = getattr(supervisor.runtime, "brain", None)
-        if brain is not None and isinstance(brain, RosterAware):
+        brain = supervisor.runtime.brain
+        if isinstance(brain, RosterAware):
             brain.set_team_roster(roster_desc)
 
-    def _register_shared_memory_tool(self, member: BaseAgent) -> None:
+    def _register_shared_memory_tool(self, member: SimpleAgent) -> None:
         """若成员 Body 暴露 tool_registry，注册绑定同一 store 的 SharedMemoryTool。"""
         store = self._shared_store
         if store is None:
             return
-        body = getattr(member.runtime, "body", None)
-        if body is None:
+        if not isinstance(member.runtime, ExposesComponents):
             return
+        body = member.runtime.body
         registry: ToolRegistry | None = getattr(body, "tool_registry", None)
         if registry is None:
             return

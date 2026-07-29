@@ -35,6 +35,8 @@ Accepted
 | `SimpleEventBus` | asyncio.create_task pub/sub |
 | `SimpleHookRegistry` | 注册 + 触发 + 可观测性 |
 | `SimplePromptManager` | str.format 模板渲染 |
+| `SimpleAgent` | AgentEntrypoint 默认实现：Runtime + RoleProfile + 预算透传 |
+| `SimpleBrainFactory` | 默认 ModularBrain 组装工厂 |
 
 ### 禁用词补充
 

@@ -19,13 +19,16 @@ DEFAULT_TOOL_TIMEOUT_S: int = 5
 DEFAULT_A2A_TIMEOUT_S: float = 30.0
 """Default HTTP timeout (seconds) for A2A transport."""
 
-_DEFAULT_MAX_WALL_CLOCK_SECONDS: int = 30
-"""Internal default wall-clock timeout for ``create_budget`` (seconds)."""
+DEFAULT_MAX_WALL_CLOCK_SECONDS: int = 300
+"""Default wall-clock timeout for agent / team runs (seconds)."""
+
+# Minimum step budget when an agent is promoted to team supervisor.
+SUPERVISOR_MIN_MAX_STEPS: int = 20
 
 
 def create_budget(
     max_steps: int = DEFAULT_MAX_STEPS,
-    max_wall_clock_seconds: int | None = _DEFAULT_MAX_WALL_CLOCK_SECONDS,
+    max_wall_clock_seconds: int | None = DEFAULT_MAX_WALL_CLOCK_SECONDS,
     max_tokens: int | None = None,
     max_cost_usd: float | None = None,
 ) -> Budget:

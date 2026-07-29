@@ -38,7 +38,7 @@ class TeamEntrypoint(Protocol):
     """团队级入口契约：接收 objective，跑完编排后返回 Result。
 
     区别于 AgentEntrypoint.execute：语义单位是"团队"而非单个 Agent，
-    不携带 max_steps（预算下沉到各 BaseAgent 自身）。
+    不携带 max_steps（预算下沉到各 SimpleAgent 自身）。
     """
 
     async def run(

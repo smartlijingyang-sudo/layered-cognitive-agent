@@ -18,7 +18,7 @@ Example::
 
 from __future__ import annotations
 
-from lca.contracts.budget import DEFAULT_MAX_STEPS
+from lca.contracts.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
 from lca.contracts.enums import TeamProcess
 from lca.contracts.protocols import (
     BrainStrategy,
@@ -31,14 +31,8 @@ from lca.contracts.protocols import (
     Tool,
 )
 from lca.contracts.result import Result
-from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer4_app.assembly import assemble_base_agent, assemble_team
 from lca.layer4_app.defaults import ensure_defaults
-
-# Default wall-clock timeout for a single agent run (seconds).
-DEFAULT_MAX_WALL_CLOCK_SECONDS: int = 300
-# Minimum step budget when an Agent is promoted to team supervisor.
-_SUPERVISOR_MIN_MAX_STEPS: int = 20
 
 
 class Agent:
@@ -107,20 +101,6 @@ class Agent:
         """Execute *task* and return the result."""
         return await self._base_agent.execute(task)
 
-    def _as_supervisor(self) -> BaseAgent:
-        """Promote this agent to a team supervisor with a minimum step budget."""
-        rp = self._base_agent.role_profile
-        ms = self._base_agent.max_steps
-        wc = self._base_agent.max_wall_clock_seconds
-        return BaseAgent(
-            self._base_agent.runtime,
-            rp,
-            max_steps=max(ms, _SUPERVISOR_MIN_MAX_STEPS),
-            max_wall_clock_seconds=max(wc, DEFAULT_MAX_WALL_CLOCK_SECONDS)
-            if wc
-            else DEFAULT_MAX_WALL_CLOCK_SECONDS,
-        )
-
 
 class MultiAgentTeam:
     """A team of agents coordinated by a shared orchestration process.
@@ -155,7 +135,7 @@ class MultiAgentTeam:
     ) -> None:
         ensure_defaults()
         base_members = [m._base_agent for m in members]
-        base_supervisor = supervisor._as_supervisor() if supervisor else None
+        base_supervisor = supervisor._base_agent if supervisor else None
         self._orchestrator: TeamEntrypoint = assemble_team(
             members=base_members,
             process=process,

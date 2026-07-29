@@ -14,7 +14,7 @@ from lca.contracts.protocols import LLMAdapter, OrchestrationContext
 from lca.contracts.role_team import TeamConfig
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
 from lca.layer4_app.api import Agent
-from lca.layer4_app.defaults import build_team_transport
+from lca.layer4_app.assembly import build_team_transport
 
 
 class _LLM(LLMAdapter):

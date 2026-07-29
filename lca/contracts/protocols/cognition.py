@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
+from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.protocols.infra import LLMAdapter
+from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import TypedState
 
 
@@ -129,3 +132,18 @@ class SkillRouter(Protocol):
     """运行时动态选择 Prompt 模板 / 工具子集。"""
 
     async def route(self, state: TypedState) -> str: ...
+
+
+@runtime_checkable
+class BrainFactory(Protocol):
+    """BrainStrategy 工厂：由 StrategyRegistry 按名称解析。"""
+
+    def __call__(
+        self,
+        llm: LLMAdapter,
+        role_profile: RoleProfile,
+        tools_desc: str,
+        *,
+        action_registry: ActionRegistryProtocol | None = None,
+        **_: Any,
+    ) -> BrainStrategy: ...

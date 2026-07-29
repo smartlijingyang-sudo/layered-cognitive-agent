@@ -59,6 +59,9 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.memory.shared_memory_tool.SharedMemoryTool": (
         "Tool 协议实现，共享存储 Tool 包装 (ADR-0016)"
     ),
+    "lca.layer1_cognitive.brain.default_factory.SimpleBrainFactory": (
+        "BrainFactory Protocol 可调用实现 (ADR-0021)"
+    ),
 }
 
 _SCAN_PACKAGES = [

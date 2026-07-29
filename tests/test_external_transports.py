@@ -206,14 +206,14 @@ class TestTransportRegistration(unittest.TestCase):
     """A2A/MCP 已注册到默认 TransportRegistry。"""
 
     def test_a2a_registered(self) -> None:
-        from lca.layer4_app.defaults import build_default_transport_registry
+        from lca.layer4_app.assembly import build_default_transport_registry
 
         registry = build_default_transport_registry()
         transport = registry.resolve("a2a")
         self.assertIsInstance(transport, A2ATransport)
 
     def test_mcp_registered(self) -> None:
-        from lca.layer4_app.defaults import build_default_transport_registry
+        from lca.layer4_app.assembly import build_default_transport_registry
 
         registry = build_default_transport_registry()
         transport = registry.resolve("mcp")

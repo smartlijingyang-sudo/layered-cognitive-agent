@@ -2,18 +2,14 @@
 
 L2 层职责：
     注册表模式（Registry Pattern）的实现。
-    将策略名称映射到 BrainFactory（``(llm, role_profile, tools_desc) -> BrainStrategy``），
-    由 CognitiveRuntime 在构造时从注册表解析具体策略，实现策略与运行时的解耦。
+    将策略名称映射到 BrainFactory，由 CognitiveRuntime 在构造时从注册表
+    解析具体策略，实现策略与运行时的解耦。
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
-from lca.contracts.protocols import BrainStrategy
+from lca.contracts.protocols.cognition import BrainFactory
 from lca.layer0_infra.component_registry import NamedRegistry
-
-BrainFactory = Callable[..., BrainStrategy]
 
 _global_strategy_registry: StrategyRegistry | None = None
 

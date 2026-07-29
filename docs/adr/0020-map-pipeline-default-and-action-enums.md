@@ -1,4 +1,6 @@
-# ADR-0017: MAP 默认评估管线深化与领域枚举
+# ADR-0020: MAP 默认评估管线深化与领域枚举
+
+Formerly: ADR-0017（编号与 ADR-0017-no-bare-strings-no-any 冲突，重编号为 0020）
 
 ## 状态
 Accepted

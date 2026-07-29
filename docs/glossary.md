@@ -29,6 +29,9 @@
 | **Reflection / Observation** | 反思结果（on_track / needs_correction / blocked）与工具执行观测结果 |
 | **Result** | Runtime 最终输出契约，含 status / output / lessons / budget_used / trace |
 | **RoleProfile / TeamConfig** | 角色设定契约（role/goal/backstory/tool 权限）与团队编排契约（process 类型/共享记忆层） |
+| **SimpleAgent** | L3 单 Agent 运行时封装，``AgentEntrypoint`` 的默认实现（原 ``BaseAgent``）；持有 Runtime + RoleProfile + 预算字段 |
+| **Agent** | L4 开发者门面：薄包装 ``assemble_base_agent``，对外暴露 ``run(task)`` |
+| **MultiAgentTeam** | L4 团队门面：组合多个 ``Agent`` 成员，委托 ``assemble_team`` 构建 ``TeamOrchestrator`` |
 | **TeamOrchestrator / Supervisor** | 团队编排器（hierarchical/sequential/graph/debate）与单向上委派汇总角色 |
 | **TeamEntrypoint / TeamMessage** | 团队级运行时与跨 Agent 消息契约 |
 | **Budget** | 多维度预算控制对象（token / cost / steps / wall_clock），超限触发 BudgetExceededError |

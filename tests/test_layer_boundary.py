@@ -1,7 +1,8 @@
-"""分层通信铁律 —— AST 静态扫描，禁止 L3 越层访问 L1 组件内部状态。
+"""分层通信铁律 —— AST 静态扫描，禁止 L3 裸 getattr 穿透 Runtime。
 
-L3 (agent) 只能通过 Runtime Protocol 的显式方法（run）与 L1/L2 交互。
-直接访问 self.runtime.body / self.runtime.brain / getattr(self.runtime, ...) 全部违规。
+L3 (agent) 通过 Runtime Protocol 的显式方法与 L1/L2 交互。
+需要访问 body / brain / memory / hooks 时，须先 ``isinstance(runtime, ExposesComponents)``
+或 ``HookRegistryHolder``，禁止 ``getattr(x.runtime, ...)`` 穿透。
 """
 
 from __future__ import annotations
@@ -16,57 +17,42 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 _LAYER3_DIR = Path(__file__).resolve().parent.parent / "lca" / "layer3_agent"
 
-_FORBIDDEN_ATTRS = frozenset({"body", "brain"})
+_FORBIDDEN_GETATTR_ATTRS = frozenset({"body", "brain", "memory", "hooks"})
 
 
 class _LayerBoundaryVisitor(ast.NodeVisitor):
-    """扫描单个 AST 树，收集所有越层访问。"""
+    """扫描单个 AST 树，收集裸 getattr(runtime, ...) 越层访问。"""
 
     def __init__(self, filename: str) -> None:
         self.filename = filename
         self.violations: list[str] = []
 
-    def visit_Attribute(self, node: ast.Attribute) -> None:
-        # self.runtime.body / self.runtime.brain
-        if (
-            isinstance(node.value, ast.Attribute)
-            and node.value.attr == "runtime"
-            and isinstance(node.value.value, ast.Name)
-            and node.value.value.id == "self"
-            and node.attr in _FORBIDDEN_ATTRS
-        ):
-            self.violations.append(
-                f"{self.filename}:{node.lineno} — "
-                f"self.runtime.{node.attr} 越层访问，请通过协议接口交互"
-            )
-        self.generic_visit(node)
-
     def visit_Call(self, node: ast.Call) -> None:
-        # getattr(self.runtime, "body") / getattr(self.runtime, "brain")
         if isinstance(node.func, ast.Name) and node.func.id == "getattr" and len(node.args) >= 2:
             first_arg = node.args[0]
             second_arg = node.args[1]
             if (
                 isinstance(first_arg, ast.Attribute)
                 and first_arg.attr == "runtime"
-                and isinstance(first_arg.value, ast.Name)
-                and first_arg.value.id == "self"
                 and isinstance(second_arg, ast.Constant)
                 and isinstance(second_arg.value, str)
-                and second_arg.value in _FORBIDDEN_ATTRS
+                and second_arg.value in _FORBIDDEN_GETATTR_ATTRS
             ):
+                owner = "unknown"
+                if isinstance(first_arg.value, ast.Name):
+                    owner = first_arg.value.id
                 self.violations.append(
                     f"{self.filename}:{node.lineno} — "
-                    f"getattr(self.runtime, {second_arg.value!r}) 越层访问，"
-                    f"请通过协议接口交互"
+                    f"getattr({owner}.runtime, {second_arg.value!r}) 越层访问，"
+                    f"请用 ExposesComponents / HookRegistryHolder + isinstance"
                 )
         self.generic_visit(node)
 
 
 class TestLayerBoundary(unittest.TestCase):
-    """L3 agent 层不得直接访问 runtime.body / runtime.brain。"""
+    """L3 agent 层不得裸 getattr 穿透 runtime 访问内部组件。"""
 
-    def test_no_cross_layer_access_in_layer3(self) -> None:
+    def test_no_getattr_runtime_penetration_in_layer3(self) -> None:
         py_files = sorted(_LAYER3_DIR.rglob("*.py"))
         self.assertTrue(py_files, f"layer3_agent 目录下没有 .py 文件: {_LAYER3_DIR}")
 
@@ -81,7 +67,7 @@ class TestLayerBoundary(unittest.TestCase):
             all_violations.extend(visitor.violations)
 
         if all_violations:
-            msg = "L3 层存在越层访问 L1 组件的行为（请通过协议接口交互）:\n"
+            msg = "L3 层存在裸 getattr 穿透 runtime 的行为:\n"
             msg += "\n".join(f"  - {v}" for v in all_violations)
             self.fail(msg)
 

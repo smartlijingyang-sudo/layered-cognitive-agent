@@ -30,9 +30,6 @@ class ActionRegistry(NamedRegistry[ActionOperation], ActionRegistryProtocol):
     def get(self, action_type: str) -> ActionOperation | None:
         return self._entries.get(action_type)
 
-    def resolve(self, action_type: str) -> ActionOperation:
-        return NamedRegistry.resolve(self, action_type)
-
     def register_alias(self, alias: str, canonical: str) -> None:
         """注册别名映射：alias → canonical action_type。"""
         self._aliases[alias] = canonical

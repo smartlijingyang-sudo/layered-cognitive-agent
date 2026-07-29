@@ -1,8 +1,4 @@
-"""DefaultBrainFactory —— 默认 Brain 策略的自包含工厂。
-
-将 build_default_brain 的逻辑从 assembly.py 内聚到此处，
-消除 defaults.py → assembly.py 的反向依赖。
-"""
+"""SimpleBrainFactory —— 默认 Brain 策略的自包含工厂（L1 实现层）。"""
 
 from __future__ import annotations
 
@@ -23,7 +19,7 @@ from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
 
 
-class DefaultBrainFactory:
+class SimpleBrainFactory:
     """默认 Brain 策略工厂。
 
     组装 PromptManager → Reasoner → DecisionParser → Critic →

@@ -18,10 +18,17 @@ from lca.contracts.mechanisms import (
 from lca.contracts.protocols.agent import AgentEntrypoint, TeamEntrypoint
 
 # ── 可选能力协议（ADR-0017）──────────────────────────────
-from lca.contracts.protocols.capabilities import RosterAware, SharedStoreBindable, TransportBindable
+from lca.contracts.protocols.capabilities import (
+    ExposesComponents,
+    HookRegistryHolder,
+    RosterAware,
+    SharedStoreBindable,
+    TransportBindable,
+)
 
 # ── L1 认知 / Brain 协议 ─────────────────────────────────
 from lca.contracts.protocols.cognition import (
+    BrainFactory,
     BrainStrategy,
     CandidateEvaluationPipeline,
     CompletionPolicy,
@@ -75,6 +82,7 @@ __all__ = [
     "AgentEntrypoint",
     "AgentTransport",
     "Body",
+    "BrainFactory",
     "BrainStrategy",
     "CandidateEvaluationPipeline",
     "CompletionPolicy",
@@ -82,9 +90,11 @@ __all__ = [
     "Critic",
     "DecisionParser",
     "EventBus",
+    "ExposesComponents",
     "FallbackPolicy",
     "Hook",
     "HookRegistry",
+    "HookRegistryHolder",
     "LLMAdapter",
     "MemorySystem",
     "NamedRegistryProtocol",

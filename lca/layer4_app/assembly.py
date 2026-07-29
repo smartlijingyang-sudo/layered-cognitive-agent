@@ -8,11 +8,15 @@ instances.
 
 High-level entry points:
 
-* ``assemble_base_agent`` — builds a single ``BaseAgent``.
+* ``assemble_base_agent`` — builds a single ``SimpleAgent``.
 * ``assemble_team`` — builds a ``TeamEntrypoint`` from a list of members.
 
 Lower-level builders (``build_body_from_shared``, ``build_hooks``) are
 exposed for advanced / test scenarios.
+
+Known limitation: when the same ``SimpleAgent`` instance is reused as
+supervisor for multiple teams, those teams share one ``Runtime`` (including
+hooks).  Each team assembly does not clone the runtime.
 """
 
 from __future__ import annotations
@@ -20,9 +24,16 @@ from __future__ import annotations
 from typing import cast
 
 from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.budget import DEFAULT_MAX_STEPS
+from lca.contracts.budget import (
+    DEFAULT_MAX_STEPS,
+    DEFAULT_MAX_WALL_CLOCK_SECONDS,
+    SUPERVISOR_MIN_MAX_STEPS,
+)
+from lca.contracts.decision import Observation
 from lca.contracts.enums import TeamProcess
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import (
+    AgentTransport,
     Body,
     BrainStrategy,
     EventBus,
@@ -37,11 +48,16 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from lca.layer0_infra.component_registry import ComponentRegistry, get_global_registry
+from lca.layer0_infra.transport.a2a_transport import A2ATransport
+from lca.layer0_infra.transport.agent_transport import InternalTransport
+from lca.layer0_infra.transport.mcp_transport import MCPTransport
+from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+from lca.layer1_cognitive.brain.reasoner import build_team_roster
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer2_runtime.default_loop_judge import DefaultLoopJudge
 from lca.layer2_runtime.event_emission import HOOK_NAMES, make_event_emitting_hook
@@ -49,17 +65,8 @@ from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
-from lca.layer3_agent.base_agent import BaseAgent
-from lca.layer4_app.defaults import (
-    build_default_transport_registry,
-    build_team_transport,
-    ensure_defaults,
-)
-
-# Default wall-clock timeout for agent assembly (seconds).
-_ASSEMBLY_MAX_WALL_CLOCK_SECONDS: int = 300
-# Minimum step budget when an agent is promoted to team supervisor.
-_SUPERVISOR_MIN_MAX_STEPS: int = 20
+from lca.layer3_agent.simple_agent import SimpleAgent
+from lca.layer4_app.defaults import ensure_defaults
 
 
 def _resolve_component(reg: ComponentRegistry, category: str, value: str | object) -> object:
@@ -67,6 +74,39 @@ def _resolve_component(reg: ComponentRegistry, category: str, value: str | objec
     if isinstance(value, str):
         return reg.require(category, value)()
     return value
+
+
+def build_default_transport_registry() -> TransportRegistry:
+    """Build the default TransportRegistry with internal / a2a / mcp transports."""
+    registry = TransportRegistry()
+    registry.register(InternalTransport())
+    registry.register(A2ATransport())
+    registry.register(MCPTransport())
+    return registry
+
+
+def build_team_transport(
+    members: list[SimpleAgent],
+) -> tuple[AgentTransport, str]:
+    """Build an in-process transport and roster description for a team."""
+    from lca.contracts.delegation_context import get_current_delegator
+
+    transport = InternalTransport()
+    for member in members:
+
+        async def _handler(subtask: str, _m: SimpleAgent = member) -> Observation:
+            delegated_by = get_current_delegator()
+            result = await _m.execute(subtask, delegated_by=delegated_by)
+            return Observation(
+                observation_id=f"obs_{result.trace_id}",
+                success=result.status == TaskStatus.COMPLETED,
+                payload=result.output,
+                error=result.error,
+            )
+
+        transport.register_agent(member.role_profile.role, _handler)
+    roster_desc = build_team_roster([m.role_profile for m in members])
+    return transport, roster_desc
 
 
 def build_body_from_shared(
@@ -112,13 +152,13 @@ def assemble_base_agent(
     tools: list[Tool],
     llm: LLMAdapter,
     max_steps: int = DEFAULT_MAX_STEPS,
-    max_wall_clock_seconds: int | None = _ASSEMBLY_MAX_WALL_CLOCK_SECONDS,
+    max_wall_clock_seconds: int | None = DEFAULT_MAX_WALL_CLOCK_SECONDS,
     memory: str | MemorySystem = "simple",
     observability: str | Observability = "console",
     state_store: str | StateStore = "memory",
     brain_strategy: str | BrainStrategy = "default",
-) -> BaseAgent:
-    """Assemble a complete BaseAgent with a single shared pipeline.
+) -> SimpleAgent:
+    """Assemble a complete SimpleAgent with a single shared pipeline.
 
     Creates one set of ToolRegistry / SafeExecutor / TransportRegistry /
     ActionRegistry and injects them into both Brain and Body, guaranteeing
@@ -141,7 +181,6 @@ def assemble_base_agent(
     mem = cast("MemorySystem", _resolve_component(reg, "memory", memory))
     ss = cast("StateStore", _resolve_component(reg, "state_store", state_store))
 
-    # ── Single shared pipeline ────────────────────────────────────────────
     tool_registry = SimpleToolRegistry()
     for t in tools:
         tool_registry.register(t)
@@ -151,7 +190,6 @@ def assemble_base_agent(
         tool_registry, safe_executor, transport_registry
     )
 
-    # Brain — resolve via strategy registry (unified path for all strategies)
     brain: BrainStrategy
     if isinstance(brain_strategy, str):
         strategy_reg = get_global_strategy_registry()
@@ -181,7 +219,7 @@ def assemble_base_agent(
         ss,
         judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
     )
-    return BaseAgent(
+    return SimpleAgent(
         runtime,
         role_profile,
         max_steps=max_steps,
@@ -189,11 +227,27 @@ def assemble_base_agent(
     )
 
 
+def _promote_supervisor(supervisor: SimpleAgent) -> SimpleAgent:
+    """Apply supervisor budget floors — sole composition decision for team leads."""
+    wc = supervisor.max_wall_clock_seconds
+    effective_wc = (
+        max(wc, DEFAULT_MAX_WALL_CLOCK_SECONDS)
+        if wc is not None
+        else DEFAULT_MAX_WALL_CLOCK_SECONDS
+    )
+    return SimpleAgent(
+        supervisor.runtime,
+        supervisor.role_profile,
+        max_steps=max(supervisor.max_steps, SUPERVISOR_MIN_MAX_STEPS),
+        max_wall_clock_seconds=effective_wc,
+    )
+
+
 def assemble_team(
     *,
-    members: list[BaseAgent],
+    members: list[SimpleAgent],
     process: TeamProcess | None = None,
-    supervisor: BaseAgent | None = None,
+    supervisor: SimpleAgent | None = None,
     max_rounds: int | None = None,
     shared_memory_layers: list[str] | None = None,
     graph_definition_ref: str | None = None,
@@ -210,17 +264,7 @@ def assemble_team(
         shared_memory_layers=list(shared_memory_layers or []),
         graph_definition_ref=graph_definition_ref,
     )
-    base_supervisor: BaseAgent | None = None
-    if supervisor is not None:
-        base_supervisor = BaseAgent(
-            supervisor.runtime,
-            supervisor.role_profile,
-            max_steps=max(
-                getattr(supervisor, "max_steps", DEFAULT_MAX_STEPS),
-                _SUPERVISOR_MIN_MAX_STEPS,
-            ),
-            max_wall_clock_seconds=_ASSEMBLY_MAX_WALL_CLOCK_SECONDS,
-        )
+    base_supervisor = _promote_supervisor(supervisor) if supervisor is not None else None
     transport, roster_desc = build_team_transport(members)
     return TeamOrchestrator(
         members,

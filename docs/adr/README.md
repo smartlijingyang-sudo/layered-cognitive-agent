@@ -18,8 +18,13 @@
 | [0014](0014-error-classification-and-retry-semantics.md) | 错误分类与重试语义 | 工具错误分类 + 结构化重试策略 |
 | [0015](0015-contracts-no-behavior-classes.md) | contracts/ 不含行为类 | 具体实现必须放实现层，contracts/ 仅保留 Protocol + dataclass |
 | [0016](0016-contracts-package-v3.md) | 契约层拆包 v3 | protocols/ 按层拆分 + mechanisms/types + SharedMemoryTool；保留 layerN 与 ADR-0002 闭环 |
+| [0017](0017-no-bare-strings-no-any.md) | 禁止裸字符串与裸 Any | 业务逻辑用枚举/常量；公共 API 禁止裸 Any |
+| [0018](0018-composition-root-assembly.md) | L4 对象图工厂以 assembly 为准 | assembly 唯一对象图工厂；defaults 纯注册 |
 | [0019](0019-refactor-cleanup.md) | 架构审查清理 | 删 GroupChat/Supervisor 壳类；Registry resolve 语义统一；hooks 文件改名 |
+| [0020](0020-map-pipeline-default-and-action-enums.md) | MAP 默认评估管线深化 | 默认 MAP 管线 + 领域枚举（原 ADR-0017，重编号） |
+| [0021](0021-naming-convention-arbitration.md) | Simple/Default/领域名三分规则 | L1 Simple* / L2 Default* / L3 领域名或 Simple*；BaseAgent→SimpleAgent |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件
 - 这类文档的价值在于记录某一时刻的判断，不在于时刻反映最新状态
+- CI `tests/test_refactor_guards.py::test_adr_index_matches_filesystem` 断言本表与 `docs/adr/*.md` 编号集合一致

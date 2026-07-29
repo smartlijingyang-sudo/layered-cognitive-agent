@@ -1,7 +1,7 @@
-"""BaseAgent —— 单个 Agent 的运行时封装。
+"""SimpleAgent —— 单个 Agent 的运行时封装。
 
 L3 层职责：
-    BaseAgent 是 AgentEntrypoint 协议的默认实现，
+    SimpleAgent 是 AgentEntrypoint 协议的默认实现，
     将 Runtime（认知闭环）+ RoleProfile（角色配置）组合为
     可调度的执行单元。支持 execute / resume / cancel 三种生命周期。
 """
@@ -13,13 +13,11 @@ from lca.contracts.invocation import InvocationContext
 from lca.contracts.mechanisms import Hook
 from lca.contracts.message import AgentMessage, agent_message_as_text, agent_message_text
 from lca.contracts.protocols import AgentEntrypoint, CompletionPolicy, Runtime
+from lca.contracts.protocols.capabilities import HookRegistryHolder
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import StateSnapshot
 from lca.contracts.team_progress import DelegationLedgerProtocol
-
-DEFAULT_SUPERVISOR_MAX_STEPS = 20
-DEFAULT_SUPERVISOR_WALL_CLOCK_SECONDS = 300
 
 
 def _task_as_text(task: str | AgentMessage) -> str:
@@ -28,7 +26,7 @@ def _task_as_text(task: str | AgentMessage) -> str:
     return task
 
 
-class BaseAgent(AgentEntrypoint):
+class SimpleAgent(AgentEntrypoint):
     """单个 Agent 的运行时封装。
 
     持有 Runtime（认知闭环）和 RoleProfile（角色配置），
@@ -87,10 +85,14 @@ class BaseAgent(AgentEntrypoint):
 
     def register_hook(self, hook_name: str, hook_fn: Hook) -> None:
         """注册 Hook 到 Runtime 的 HookRegistry。"""
-        hooks = getattr(self.runtime, "hooks", None)
-        if hooks is not None:
-            hooks.register(hook_name, hook_fn)
+        runtime = self.runtime
+        if isinstance(runtime, HookRegistryHolder):
+            runtime.hooks.register(hook_name, hook_fn)
 
     def install_completion_guard(self, policy: CompletionPolicy) -> None:
         """通过 Runtime 协议安装确定性收尾 guardrail。"""
         self.runtime.install_completion_guard(policy)
+
+
+# Transitional alias — remove after one release cycle (ADR-0021).
+BaseAgent = SimpleAgent
