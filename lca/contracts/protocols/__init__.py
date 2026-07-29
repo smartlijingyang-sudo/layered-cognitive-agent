@@ -68,7 +68,6 @@ from lca.contracts.protocols.orchestration import (
     OrchestrationContext,
     OrchestrationStrategy,
     SharedMemoryStore,
-    SupervisorProtocol,
     Synthesizer,
 )
 
@@ -114,7 +113,6 @@ __all__ = [
     "StateStore",
     "StepOutcome",
     "StepOutcomePolicy",
-    "SupervisorProtocol",
     "SupportsCompletionGuard",
     "Synthesizer",
     "TaskCoordinator",

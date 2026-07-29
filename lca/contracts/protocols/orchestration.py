@@ -2,51 +2,33 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.invocation import InvocationContext
-from lca.contracts.mechanisms import Hook
 from lca.contracts.memory import MemoryRecord
-from lca.contracts.message import AgentMessage
 from lca.contracts.protocols.agent import AgentEntrypoint
-from lca.contracts.protocols.cognition import CompletionPolicy
 from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.contracts.team_progress import DelegationLedgerProtocol
 
 
-@runtime_checkable
-class SupervisorProtocol(Protocol):
-    """Supervisor 最小接口 —— contracts 层不依赖 L3 具体类。
-
-    签名与 SimpleAgent 对齐，通过结构类型（structural typing）自然满足，
-    无需显式子类。TeamOrchestrator 直接传入 SimpleAgent 即可。
-    """
-
-    async def execute(
-        self,
-        task: str | AgentMessage,
-        ctx: InvocationContext | None = None,
-        team_progress: DelegationLedgerProtocol | None = None,
-        **context: str,
-    ) -> Result: ...
-    def register_hook(self, hook_name: str, hook_fn: Hook) -> None: ...
-    def install_completion_guard(self, policy: CompletionPolicy) -> None: ...
-
-
 @dataclass
 class OrchestrationContext:
-    """编排策略的运行时上下文，由 TeamOrchestrator 构造并传给策略实例。"""
+    """编排策略的运行时上下文，由 TeamOrchestrator 构造并传给策略实例。
+
+    supervisor 是 AgentEntrypoint —— 组合期由 TeamOrchestrator
+    绑定 hooks / completion guard，策略只需调用 execute。
+    team_progress 是已创建好的 DelegationLedger，策略直接透传给 supervisor。
+    """
 
     members: Sequence[AgentEntrypoint] = field(default_factory=list)
     config: TeamConfig | None = None
-    supervisor: SupervisorProtocol | None = None
+    supervisor: AgentEntrypoint | None = None
     transport: AgentTransport | None = None
     roster_desc: str = ""
-    ledger_factory: Callable[[frozenset[str]], DelegationLedgerProtocol] | None = None
+    team_progress: DelegationLedgerProtocol | None = None
     team_id: str = ""
     shared_memory: SharedMemoryStore | None = None
 

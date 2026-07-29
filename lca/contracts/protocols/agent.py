@@ -16,6 +16,7 @@ from lca.contracts.message import AgentMessage
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import StateSnapshot
+from lca.contracts.team_progress import DelegationLedgerProtocol
 
 
 @runtime_checkable
@@ -25,7 +26,10 @@ class AgentEntrypoint(Protocol):
     role_profile: RoleProfile
 
     async def execute(
-        self, task: str | AgentMessage, ctx: InvocationContext | None = None
+        self,
+        task: str | AgentMessage,
+        ctx: InvocationContext | None = None,
+        team_progress: DelegationLedgerProtocol | None = None,
     ) -> Result: ...
     async def resume(
         self, snapshot: StateSnapshot, input: str | AgentMessage | None = None

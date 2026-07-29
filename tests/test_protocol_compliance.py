@@ -30,7 +30,6 @@ from lca.contracts.protocols import (
     StateEvaluator,
     StatePredictor,
     StateStore,
-    SupervisorProtocol,
     TaskCoordinator,
     TaskDecomposer,
     TeamEntrypoint,
@@ -305,11 +304,6 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         _, rp, runtime = self._build_base_agent()
         sup = BaseAgent(runtime, rp, max_steps=20, max_wall_clock_seconds=300)
         self.assertIsInstance(sup, AgentEntrypoint)
-
-    def test_supervisor_satisfies_supervisor_protocol(self):
-        _, rp, runtime = self._build_base_agent()
-        sup = BaseAgent(runtime, rp, max_steps=20, max_wall_clock_seconds=300)
-        self.assertIsInstance(sup, SupervisorProtocol)
 
     def test_team_orchestrator_is_team_runtime(self):
         from lca.contracts.role_team import TeamConfig
