@@ -8,6 +8,7 @@ from typing import Protocol, runtime_checkable
 
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols.agent import AgentEntrypoint
+from lca.contracts.protocols.cognition import CompletionPolicy
 from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
@@ -22,7 +23,7 @@ class SupervisorProtocol(Protocol):
         self, task: str, team_progress: DelegationLedgerProtocol | None = None
     ) -> Result: ...
     def register_hook(self, hook_name: str, hook_fn: object) -> None: ...
-    def wrap_evaluation_pipeline(self, wrapper: object) -> None: ...
+    def install_completion_guard(self, policy: CompletionPolicy) -> None: ...
 
 
 @dataclass
@@ -49,7 +50,6 @@ class OrchestrationStrategy(Protocol):
 @runtime_checkable
 class SharedMemoryStore(Protocol):
     """跨 Agent 共享记忆存储接口。
-
     按 layer 分流读写（CoALA：semantic/procedural 可共享，
     episodic/working 保持私有）。由 TeamOrchestrator 构造并注入。
     """

@@ -81,7 +81,6 @@ class BrainStrategy(Protocol):
 @runtime_checkable
 class CandidateEvaluationPipeline(Protocol):
     """候选方案评估管线：封装 decompose → predict → score → conflict check → arbitrate。
-
     将原本分散在 TaskDecomposer / StatePredictor / StateEvaluator /
     ConflictMonitor / TaskCoordinator 五个浅模块中的认知评估步骤
     收敛为一个有深度的模块（ADR-0003 的深化）。
@@ -104,6 +103,17 @@ class CompletionPolicy(Protocol):
         state: TypedState,
         decision: StructuredDecision,
     ) -> StructuredDecision: ...
+
+
+@runtime_checkable
+class SupportsCompletionGuard(Protocol):
+    """可选能力：允许在 Brain 决策链外挂一层确定性收尾校验。
+    不是所有 BrainStrategy 都需要支持此能力；调用方通过
+    ``isinstance(brain, SupportsCompletionGuard)`` 做结构化探测，
+    探测失败时应当报错，而不是静默跳过（区别于旧版 hasattr 的隐式降级）。
+    """
+
+    def install_completion_guard(self, policy: CompletionPolicy) -> None: ...
 
 
 @runtime_checkable

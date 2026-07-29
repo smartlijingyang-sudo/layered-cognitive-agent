@@ -2,30 +2,30 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
 from lca.contracts.protocols import (
     BrainStrategy,
     CandidateEvaluationPipeline,
+    CompletionPolicy,
     Critic,
     DecisionParser,
     Reasoner,
     SkillRouter,
 )
 from lca.contracts.state import TypedState
+from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
+    GuardedCandidateEvaluationPipeline,
+)
 
 
 class ModularBrain(BrainStrategy):
     """Default ``BrainStrategy``: a modular MAP-style cognitive pipeline.
-
     Orchestrates five stages:
     1. **Skill routing** (optional) — select an active prompt template.
     2. **Task decomposition** — break the task into subtasks.
     3. **Candidate generation** — call the Reasoner (LLM) for candidate decisions.
     4. **Decision parsing** — parse raw LLM output into ``StructuredDecision``.
     5. **Candidate evaluation** — score and select the best candidate.
-
     Reflection is delegated to the ``Critic`` component.
     """
 
@@ -65,9 +65,11 @@ class ModularBrain(BrainStrategy):
         elif hasattr(self.reasoner, "team_roster"):
             self.reasoner.team_roster = roster_desc
 
-    def wrap_evaluation_pipeline(
-        self,
-        wrapper: Callable[[CandidateEvaluationPipeline], CandidateEvaluationPipeline],
-    ) -> None:
-        """用装饰器包装内部评估管线（Brain 自管内省，外部不穿透）。"""
-        self.evaluation_pipeline = wrapper(self.evaluation_pipeline)
+    def install_completion_guard(self, policy: CompletionPolicy) -> None:
+        """在内部评估管线外挂一层确定性收尾 guardrail（Brain 自管内省，外部不穿透）。
+        装饰器的构造细节（``GuardedCandidateEvaluationPipeline``）留在 L1，
+        调用方只需要提供 policy，不需要知道内部是用管线实现的。
+        """
+        self.evaluation_pipeline = GuardedCandidateEvaluationPipeline(
+            self.evaluation_pipeline, policy
+        )

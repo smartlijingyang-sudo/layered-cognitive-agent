@@ -1,5 +1,4 @@
 """契约协议包 —— 全量 re-export，保持 ``from lca.contracts.protocols import X`` 兼容。
-
 子模块按层拆分（ADR-0016）：
 infra / cognition / embodiment / memory / runtime / agent / orchestration
 跨层机制见 ``lca.contracts.mechanisms``，跨层纯类型见 ``lca.contracts.types``。
@@ -35,6 +34,7 @@ from lca.contracts.protocols.cognition import (
     SkillRouter,
     StateEvaluator,
     StatePredictor,
+    SupportsCompletionGuard,
     TaskCoordinator,
     TaskDecomposer,
 )
@@ -108,6 +108,7 @@ __all__ = [
     "StepOutcome",
     "StepOutcomePolicy",
     "SupervisorProtocol",
+    "SupportsCompletionGuard",
     "Synthesizer",
     "TaskCoordinator",
     "TaskDecomposer",

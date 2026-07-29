@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
-from lca.contracts.protocols.cognition import CandidateEvaluationPipeline
+from lca.contracts.protocols.cognition import CompletionPolicy
 from lca.contracts.result import Result
 from lca.contracts.state import StateSnapshot, TypedState
 from lca.contracts.team_progress import DelegationLedgerProtocol
@@ -32,15 +31,17 @@ class Runtime(Protocol):
         input: object | None = None,
         max_steps: int = DEFAULT_MAX_STEPS,
     ) -> Result: ...
-    def wrap_evaluation_pipeline(
-        self, wrapper: Callable[[CandidateEvaluationPipeline], CandidateEvaluationPipeline]
-    ) -> None: ...
+    def install_completion_guard(self, policy: CompletionPolicy) -> None:
+        """为本轮认知循环安装一个确定性收尾 guardrail。
+        若底层 BrainStrategy 不支持该能力，实现方必须显式报错，
+        不得静默降级为无操作。
+        """
+        ...
 
 
 @runtime_checkable
 class StepOutcomePolicy(Protocol):
     """单步结果判定策略：决定 Loop 是否继续、最终输出和状态。
-
     由 LoopJudge 组合使用，不再直接被 Runtime 持有。
     """
 
@@ -51,7 +52,6 @@ class StepOutcomePolicy(Protocol):
         observation: Observation | None,
         reflection: Reflection | None,
     ) -> StepOutcome: ...
-
     def resolve_budget_exceeded(
         self,
         observation: Observation | None,

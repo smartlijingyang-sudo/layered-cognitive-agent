@@ -1,11 +1,9 @@
 """HierarchicalStrategy —— Supervisor 单向委派、汇总。
-
 L3 层职责：
     Hierarchical 是最常用的团队编排模式：
     1. Supervisor 分析任务，拆解为子任务并委派给成员
     2. 成员独立执行，通过 DelegationLedger 跟踪进度
     3. Supervisor 汇总成员结果，生成最终输出
-
     自动装配 CompletionPolicy guardrail（roster_coverage），
     确保所有必选角色都完成委派后才结束。
 """
@@ -37,32 +35,26 @@ def _default_ledger_factory(roles: frozenset[str]) -> DelegationLedgerProtocol:
 
 class HierarchicalStrategy(OrchestrationStrategy):
     """Supervisor 单向委派、汇总。
-
     自动装配 CompletionPolicy guardrail：
     1. 通过 ledger_factory 创建 DelegationLedger（所有成员角色 → pending）
-    2. 用 GuardedCandidateEvaluationPipeline 包装 supervisor 的 evaluation_pipeline
+    2. 委托 supervisor.install_completion_guard 安装 guardrail
+       （具体装饰器实现留在 L1，本层只表达"用哪个 policy"这一意图）
     3. 注册 post_act 记账 hook + pre_think 进度注入 hook
     """
 
     async def run(self, context: OrchestrationContext, objective: str) -> Result:
         if context.supervisor is None:
             raise ValueError("Hierarchical 模式需要 Supervisor")
-
         # ── 装配确定性收尾 guardrail ──
         mandatory_roles = frozenset(m.role_profile.role for m in context.members)
         factory = context.ledger_factory or _default_ledger_factory
         ledger = factory(mandatory_roles)
-
         # 解析 CompletionPolicy（默认 roster_coverage）
         policy_name = CompletionPolicyName.ROSTER_COVERAGE
         if context.config is not None:
             policy_name = context.config.completion_policy
-
         if policy_name != CompletionPolicyName.NONE:
             from lca.layer0_infra.component_registry import get_global_registry
-            from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
-                GuardedCandidateEvaluationPipeline,
-            )
 
             reg = get_global_registry()
             policy_factory = reg.resolve("completion_policy", policy_name)
@@ -72,12 +64,7 @@ class HierarchicalStrategy(OrchestrationStrategy):
                     f"可用: {reg.list('completion_policy')}"
                 )
             policy = policy_factory()
-
-            context.supervisor.wrap_evaluation_pipeline(
-                lambda old: GuardedCandidateEvaluationPipeline(old, policy),
-            )
-
+            context.supervisor.install_completion_guard(policy)
             context.supervisor.register_hook(HookEvent.POST_ACT, ledger_tracking_hook)
             context.supervisor.register_hook(HookEvent.PRE_THINK, progress_injection_hook)
-
         return await context.supervisor.execute(objective, team_progress=ledger)

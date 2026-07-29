@@ -1,8 +1,6 @@
 """CognitiveRuntime —— 核心认知循环（ADR-0002）。
-
 Loop 只做编排：perceive → think → act → reflect → record → checkpoint → judge。
 终止判定完全委托给 LoopJudge，业务逻辑零泄漏。
-
 L2 层职责：
     将 Brain（认知）、Body（执行）、Memory（记忆）三大能力
     串联为可中断、可恢复、可观测的闭环。所有横切关注点
@@ -12,7 +10,6 @@ L2 层职责：
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.enums import SnapshotReason
@@ -23,10 +20,11 @@ from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.protocols import (
     Body,
     BrainStrategy,
-    CandidateEvaluationPipeline,
+    CompletionPolicy,
     MemorySystem,
     Runtime,
     StateStore,
+    SupportsCompletionGuard,
 )
 from lca.contracts.result import ApprovalPendingError, BudgetExceededError, Result
 from lca.contracts.state import StateSnapshot, TypedState
@@ -38,7 +36,6 @@ _logger = logging.getLogger(__name__)
 
 class CognitiveRuntime(Runtime):
     """核心认知循环实现（ADR-0002）。
-
     将 Brain（认知）、Body（执行）、Memory（记忆）串联为
     perceive → think → act → reflect 闭环。
     终止判定完全委托给 LoopJudge，本类不含业务逻辑。
@@ -95,7 +92,6 @@ class CognitiveRuntime(Runtime):
 
     async def _loop(self, state: TypedState, max_steps: int) -> Result:
         """执行 perceive → think → act → reflect 认知主循环。
-
         循环流程：
             1. perceive — 感知环境、检索记忆
             2. think    — 结构化决策
@@ -113,24 +109,20 @@ class CognitiveRuntime(Runtime):
                 # ── Phase 1: Perceive ──
                 await self.hooks.trigger("pre_perceive", state)
                 state = await self.memory.perceive_and_retrieve(state)
-
                 # ── Phase 2: Think ──
                 await self.hooks.trigger("pre_think", state)
                 decision = await self.brain.think(state)
                 await self.hooks.trigger("post_think", state, decision=decision)
-
                 # ── Phase 3: Act ──
                 await self.hooks.trigger("pre_act", state, decision=decision)
                 observation = await self.body.act(decision, state)
                 await self.hooks.trigger(
                     "post_act", state, decision=decision, observation=observation
                 )
-
                 # ── Phase 4: Reflect ──
                 await self.hooks.trigger("pre_reflect", state, observation=observation)
                 reflection = await self.brain.reflect(state, observation)
                 await self.hooks.trigger("post_reflect", state, reflection=reflection)
-
                 # ── Phase 5: Record ──
                 state.history.append(
                     Turn(decision=decision, observation=observation, reflection=reflection)
@@ -156,10 +148,8 @@ class CognitiveRuntime(Runtime):
                 await self._checkpoint(state, reason=SnapshotReason.ON_ERROR)
                 state.last_error = str(err)
                 break
-
             # ── Phase 6: Checkpoint ──
             await self._checkpoint(state)
-
             # ── Phase 7: Judge ──
             signal = self.judge.judge(state, decision, observation, reflection)
             if signal.should_stop:
@@ -168,7 +158,6 @@ class CognitiveRuntime(Runtime):
                 if signal.status is not None:
                     state.status = signal.status
                 break
-
         await self.hooks.trigger("on_complete", state)
         return self._summarize(state)
 
@@ -195,10 +184,15 @@ class CognitiveRuntime(Runtime):
             error=state.last_error,
         )
 
-    def wrap_evaluation_pipeline(
-        self,
-        wrapper: Callable[[CandidateEvaluationPipeline], CandidateEvaluationPipeline],
-    ) -> None:
-        """委托 Brain 自管内部评估管线的装饰。"""
-        if hasattr(self.brain, "wrap_evaluation_pipeline"):
-            self.brain.wrap_evaluation_pipeline(wrapper)
+    def install_completion_guard(self, policy: CompletionPolicy) -> None:
+        """委托 Brain 自管内部评估管线，安装确定性收尾 guardrail。
+        通过结构化 isinstance 探测能力，而非 hasattr 字符串猜测：
+        不支持时必须显式报错，避免调用方以为 guardrail 已生效、
+        实际却被静默跳过。
+        """
+        if not isinstance(self.brain, SupportsCompletionGuard):
+            raise TypeError(
+                f"{type(self.brain).__name__} 未实现 SupportsCompletionGuard，"
+                "无法安装 completion guard"
+            )
+        self.brain.install_completion_guard(policy)

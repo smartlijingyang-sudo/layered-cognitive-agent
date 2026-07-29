@@ -1,5 +1,4 @@
 """Supervisor —— 本质上是 BaseAgent，专责任务拆解与路由。
-
 L3 层职责：
     Supervisor 是 Hierarchical 编排模式的核心角色，
     复用 BaseAgent 的认知闭环，但通过 DelegationSpec
@@ -8,10 +7,8 @@ L3 层职责：
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from lca.contracts.mechanisms import Hook
-from lca.contracts.protocols import CandidateEvaluationPipeline, Runtime
+from lca.contracts.protocols import CompletionPolicy, Runtime
 from lca.contracts.role_team import RoleProfile
 from lca.layer3_agent.base_agent import BaseAgent
 
@@ -21,7 +18,6 @@ _DEFAULT_SUPERVISOR_TIMEOUT_S = 300
 
 class Supervisor(BaseAgent):
     """Supervisor 本身就是一个 BaseAgent（复用同一套认知闭环）。
-
     区别是其 StructuredDecision 里携带 delegate_to（DelegationSpec），
     由 HierarchicalStrategy 装配 CompletionPolicy guardrail 后使用。
     """
@@ -46,9 +42,6 @@ class Supervisor(BaseAgent):
         if hooks is not None:
             hooks.register(hook_name, hook_fn)
 
-    def wrap_evaluation_pipeline(
-        self,
-        wrapper: Callable[[CandidateEvaluationPipeline], CandidateEvaluationPipeline],
-    ) -> None:
-        """通过 Runtime 协议装饰 Brain 内部评估管线。"""
-        self.runtime.wrap_evaluation_pipeline(wrapper)
+    def install_completion_guard(self, policy: CompletionPolicy) -> None:
+        """通过 Runtime 协议安装确定性收尾 guardrail。"""
+        self.runtime.install_completion_guard(policy)
