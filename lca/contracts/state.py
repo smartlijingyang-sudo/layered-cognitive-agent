@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.team_progress import DelegationLedgerProtocol
 from lca.contracts.types import Turn
 
@@ -65,7 +66,7 @@ class TypedState:
     retrieved_context: list[Any] = field(default_factory=list)
     step: int = 0
     checkpoints: list[StateSnapshot] = field(default_factory=list)
-    status: Literal["running", "paused", "waiting_human", "completed", "failed"] = "running"
+    status: TaskStatus = TaskStatus.WORKING
     extra: dict[str, Any] = field(default_factory=dict)
     agent_role: str = ""
     delegated_by: str = ""

@@ -20,7 +20,8 @@ def _new_id(prefix: str) -> str:
 class TaskStatus(str, Enum):
     SUBMITTED = "submitted"
     WORKING = "working"
-    INPUT_REQUIRED = "input-required"
+    PAUSED = "paused"  # 新增：系统级暂停（非人工审批），区别于 INPUT_REQUIRED
+    INPUT_REQUIRED = "input-required"  # 取代原来的 "waiting_human"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELED = "canceled"

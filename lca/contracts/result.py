@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
 
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.state import Budget
 
 
 @dataclass
 class Result:
     trace_id: str
-    status: Literal["completed", "failed", "paused", "waiting_human"]
+    status: TaskStatus
     final_state_ref: str
     total_steps: int
     budget_used: Budget
@@ -27,7 +28,7 @@ class Result:
         """构造失败 Result 的工厂方法，消除重复的构造代码块。"""
         return cls(
             trace_id="",
-            status="failed",
+            status=TaskStatus.FAILED,
             final_state_ref="",
             total_steps=0,
             budget_used=None,  # type: ignore[arg-type]
