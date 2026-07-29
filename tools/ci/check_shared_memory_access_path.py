@@ -21,8 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FORBIDDEN_IMPORTS = frozenset(
     {
         "lca.layer1_cognitive.memory.team_shared_memory",
-        "lca.layer3_agent.shared_memory.shared_memory_tool",
-        "lca.layer3_agent.shared_memory",
+        "lca.layer1_cognitive.memory.shared_memory_tool",
     }
 )
 # body/brain 不得直接依赖共享存储具体实现

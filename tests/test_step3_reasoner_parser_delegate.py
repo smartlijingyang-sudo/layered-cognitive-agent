@@ -12,12 +12,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import Budget, TypedState
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
+from lca.layer1_cognitive.brain.prompt_manager import SimplePromptManager
 from lca.layer1_cognitive.brain.reasoner import (
     HIERARCHICAL_DELEGATE_TEMPLATE,
     SimpleReasoner,
     build_team_roster,
 )
-from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 
 
 def _make_state(task: str = "test task") -> TypedState:

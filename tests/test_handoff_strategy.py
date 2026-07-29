@@ -203,8 +203,8 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
         state_store = MagicMock()
 
         hooks.trigger = AsyncMock()
-        memory.perceive_and_retrieve = AsyncMock(side_effect=lambda s: s)
-        memory.update_multi_level = AsyncMock()
+        memory.perceive = AsyncMock(side_effect=lambda s: s)
+        memory.update = AsyncMock()
 
         decision = StructuredDecision(
             decision_id="d1",

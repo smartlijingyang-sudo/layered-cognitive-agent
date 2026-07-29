@@ -4,25 +4,17 @@ Idempotent — ``ensure_defaults()`` is safe to call multiple times; it only
 registers on the first invocation.  This module also provides reusable
 builder helpers (transport registry, team transport) that the composition
 root (``assembly``) depends on.
+
+Design invariant: this module NEVER imports from ``assembly.py``.
+All brain/pipeline construction logic lives in ``brain_factory.py``.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
-
-from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Observation
 from lca.contracts.enums import CompletionPolicyName, TeamProcess
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import (
-    AgentTransport,
-    Body,
-    Observability,
-    Tool,
-    TransportRegistryProtocol,
-)
-from lca.contracts.role_team import ToolPermissionManifest
+from lca.contracts.protocols import AgentTransport
 from lca.layer0_infra.component_registry import (
     defaults_registered,
     get_global_registry,
@@ -35,8 +27,6 @@ from lca.layer0_infra.transport.a2a_transport import A2ATransport
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.mcp_transport import MCPTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.map_modules import (
     SimpleConflictMonitor,
     SimpleStateEvaluator,
@@ -58,6 +48,7 @@ from lca.layer3_agent.orchestration_strategies import (
     ParallelStrategy,
     SequentialStrategy,
 )
+from lca.layer4_app.brain_factory import DefaultBrainFactory
 
 
 def build_default_transport_registry() -> TransportRegistry:
@@ -67,40 +58,6 @@ def build_default_transport_registry() -> TransportRegistry:
     registry.register(A2ATransport())
     registry.register(MCPTransport())
     return registry
-
-
-def build_body(
-    tools: list[Tool],
-    observability: Observability,
-    transport_registry: TransportRegistryProtocol | None = None,
-    action_registry: ActionRegistryProtocol | None = None,
-    enable_fallback: bool = True,
-) -> Body:
-    """Compatibility builder: creates a ToolRegistry shared with ActionRegistry.
-
-    Prefer ``assembly.build_body_from_shared`` / ``assemble_base_agent`` for
-    new code.  If *action_registry* is passed the caller must guarantee it is
-    already bound to the same tool pipeline; otherwise a fresh one is built
-    internally.
-    """
-    from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
-    from lca.layer4_app.assembly import build_body_from_shared
-
-    permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
-    tool_registry = SimpleToolRegistry()
-    for t in tools:
-        tool_registry.register(t)
-    safe_executor = SimpleSafeExecutor(permission_manifest, observability)
-    registry = transport_registry or build_default_transport_registry()
-    if action_registry is None:
-        action_registry = build_default_action_registry(tool_registry, safe_executor, registry)
-    return build_body_from_shared(
-        tool_registry,
-        safe_executor,
-        registry,
-        action_registry,
-        enable_fallback=enable_fallback,
-    )
 
 
 def build_team_transport(
@@ -141,13 +98,8 @@ def register_defaults() -> None:
     global_reg.register("event_bus", "simple", SimpleEventBus)
     global_reg.register("delegation_ledger", "default", DelegationLedger)
 
-    def _default_brain_factory(*args: Any, **kwargs: Any) -> Any:
-        from lca.layer4_app.assembly import build_default_brain
-
-        return build_default_brain(*args, **kwargs)
-
     strategy_reg = get_global_strategy_registry()
-    strategy_reg.register("default", _default_brain_factory)
+    strategy_reg.register("default", DefaultBrainFactory())
 
     orch_reg = get_global_orchestration_registry()
     orch_reg.register(TeamProcess.HIERARCHICAL, HierarchicalStrategy)
@@ -183,70 +135,3 @@ def ensure_defaults() -> None:
     """
     if not defaults_registered():
         register_defaults()
-
-
-# ── Backward-compat shims for former private symbols ─────────────────────
-# Each entry is a zero-arg factory that lazily imports and returns the shim.
-
-
-def _make_build_runtime() -> Callable[..., Any]:
-    """Build the legacy ``build_runtime`` shim (lazy import)."""
-    from lca.contracts.protocols import (
-        BrainStrategy,
-        HookRegistry,
-        MemorySystem,
-        StateStore,
-        StepOutcomePolicy,
-    )
-    from lca.layer2_runtime.loop_judge import DefaultLoopJudge
-    from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
-        DefaultStepOutcomePolicy,
-    )
-    from lca.layer2_runtime.runtime_loop import CognitiveRuntime
-
-    def build_runtime(
-        brain: BrainStrategy,
-        body: Body,
-        memory: MemorySystem,
-        hooks: HookRegistry,
-        state_store: StateStore,
-        outcome_policy: StepOutcomePolicy | None = None,
-    ) -> CognitiveRuntime:
-        policy = outcome_policy or DefaultStepOutcomePolicy()
-        return CognitiveRuntime(
-            brain,
-            body,
-            memory,
-            hooks,
-            state_store,
-            judge=DefaultLoopJudge(outcome_policy=policy),
-        )
-
-    return build_runtime
-
-
-_DEPRECATED_BUILDERS: dict[str, Callable[[], Any]] = {
-    "_build_brain": lambda: _lazy_import("lca.layer4_app.assembly", "build_default_brain"),
-    "_build_hooks": lambda: _lazy_import("lca.layer4_app.assembly", "build_hooks"),
-    "build_runtime": _make_build_runtime,
-}
-
-
-def _lazy_import(module_path: str, attr: str) -> Any:
-    """Import *module_path* and return *attr* from it."""
-    import importlib
-
-    mod = importlib.import_module(module_path)
-    return getattr(mod, attr)
-
-
-def __getattr__(name: str) -> Any:
-    """Backward-compat shim for former private symbols.
-
-    Resolves via ``_DEPRECATED_BUILDERS`` dispatch dict; raises
-    ``AttributeError`` for unknown names.
-    """
-    factory = _DEPRECATED_BUILDERS.get(name)
-    if factory is not None:
-        return factory()
-    raise AttributeError(name)

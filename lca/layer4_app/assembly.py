@@ -11,8 +11,8 @@ High-level entry points:
 * ``assemble_base_agent`` — builds a single ``BaseAgent``.
 * ``assemble_team`` — builds a ``TeamEntrypoint`` from a list of members.
 
-Lower-level builders (``build_default_brain``, ``build_body_from_shared``,
-``build_hooks``) are exposed for advanced / test scenarios.
+Lower-level builders (``build_body_from_shared``, ``build_hooks``) are
+exposed for advanced / test scenarios.
 """
 
 from __future__ import annotations
@@ -37,24 +37,12 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from lca.layer0_infra.component_registry import ComponentRegistry, get_global_registry
-from lca.layer1_cognitive.body.action_catalog import (
-    build_default_action_registry,
-    format_allowed_actions_desc,
-)
+from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
-    SimpleCandidateEvaluationPipeline,
-)
-from lca.layer1_cognitive.brain.critic import SimpleCritic
-from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
-from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
-from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
 from lca.layer2_runtime.hooks import HOOK_NAMES, make_event_emitting_hook
 from lca.layer2_runtime.loop_judge import DefaultLoopJudge
@@ -62,6 +50,11 @@ from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultSt
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
 from lca.layer3_agent.base_agent import BaseAgent
+from lca.layer4_app.defaults import (
+    build_default_transport_registry,
+    build_team_transport,
+    ensure_defaults,
+)
 
 # Default wall-clock timeout for agent assembly (seconds).
 _ASSEMBLY_MAX_WALL_CLOCK_SECONDS: int = 300
@@ -74,45 +67,6 @@ def _resolve_component(reg: ComponentRegistry, category: str, value: str | objec
     if isinstance(value, str):
         return reg.require(category, value)()
     return value
-
-
-def build_default_brain(
-    llm: LLMAdapter,
-    role_profile: RoleProfile,
-    tools_desc: str,
-    team_roster: str | None = None,
-    action_registry: ActionRegistryProtocol | None = None,
-) -> ModularBrain:
-    """Build the default Brain: ModularBrain with MAP five-module pipeline.
-
-    Wires together PromptManager → Reasoner → DecisionParser → Critic →
-    CandidateEvaluationPipeline, sharing *action_registry* with the Body so
-    that the allowed-action description stays consistent.
-    """
-    prompt_manager = SimplePromptManager()
-    prompt_manager.register_template("react_prompt", load_builtin_prompt("react_prompt"))
-    prompt_manager.register_template(
-        "hierarchical_prompt", load_builtin_prompt("hierarchical_prompt")
-    )
-
-    allowed_actions_desc = ""
-    if action_registry is not None:
-        allowed_actions_desc = format_allowed_actions_desc(action_registry.allowed_action_types())
-
-    reasoner = SimpleReasoner(
-        llm,
-        prompt_manager,
-        role_profile,
-        tools_desc,
-        team_roster=team_roster,
-        allowed_actions_desc=allowed_actions_desc,
-    )
-    return ModularBrain(
-        reasoner=reasoner,
-        decision_parser=SimpleDecisionParser(action_registry=action_registry),
-        critic=SimpleCritic(),
-        evaluation_pipeline=SimpleCandidateEvaluationPipeline(),
-    )
 
 
 def build_body_from_shared(
@@ -172,8 +126,6 @@ def assemble_base_agent(
     (*memory*, *observability*, *state_store*) are resolved via the global
     ComponentRegistry.
     """
-    from lca.layer4_app.defaults import build_default_transport_registry, ensure_defaults
-
     ensure_defaults()
     reg = get_global_registry()
 
@@ -250,7 +202,6 @@ def assemble_team(
     """Assemble a team object graph from *members* with the given *process*."""
     from lca.layer3_agent.supervisor import Supervisor as SupervisorImpl
     from lca.layer3_agent.team_orchestrator import TeamOrchestrator
-    from lca.layer4_app.defaults import build_team_transport, ensure_defaults
 
     ensure_defaults()
     process_val = process if process is not None else TeamProcess.HIERARCHICAL

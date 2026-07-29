@@ -24,10 +24,10 @@ from lca.contracts.protocols import (
 from lca.contracts.protocols.capabilities import RosterAware, SharedStoreBindable, TransportBindable
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
+from lca.layer1_cognitive.memory.shared_memory_tool import SharedMemoryTool
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
-from lca.layer3_agent.shared_memory.shared_memory_tool import SharedMemoryTool
 from lca.layer3_agent.supervisor import Supervisor
 
 

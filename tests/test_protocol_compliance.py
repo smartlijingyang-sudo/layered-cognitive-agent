@@ -69,11 +69,11 @@ from lca.layer1_cognitive.brain.map_modules.task_coordinator import (
 )
 from lca.layer1_cognitive.brain.map_modules.task_decomposer import SimpleTaskDecomposer
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
+from lca.layer1_cognitive.brain.prompt_manager import SimplePromptManager
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
 from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 
 # L2
 from lca.layer2_runtime.loop_judge import DefaultLoopJudge

@@ -108,7 +108,7 @@ class CognitiveRuntime(Runtime):
             try:
                 # ── Phase 1: Perceive ──
                 await self.hooks.trigger("pre_perceive", state)
-                state = await self.memory.perceive_and_retrieve(state)
+                state = await self.memory.perceive(state)
                 # ── Phase 2: Think ──
                 await self.hooks.trigger("pre_think", state)
                 decision = await self.brain.think(state)
@@ -127,7 +127,7 @@ class CognitiveRuntime(Runtime):
                 state.history.append(
                     Turn(decision=decision, observation=observation, reflection=reflection)
                 )
-                await self.memory.update_multi_level(state, observation, reflection)
+                await self.memory.update(state, observation, reflection)
             except ApprovalPendingError:
                 # 人工审批中断：保存快照后暂停循环
                 await self._checkpoint(state, reason=SnapshotReason.PRE_APPROVAL)

@@ -86,8 +86,8 @@ class TestSharedMemoryIsolation(unittest.IsolatedAsyncioTestCase):
         record = _make_semantic_record("agent-a-private-knowledge")
         mem_a._private_layers["semantic"].append(record)
 
-        state_a = await mem_a.perceive_and_retrieve(_make_state("trace-a"))
-        state_b = await mem_b.perceive_and_retrieve(_make_state("trace-b"))
+        state_a = await mem_a.perceive(_make_state("trace-a"))
+        state_b = await mem_b.perceive(_make_state("trace-b"))
 
         a_contents = [r.content for r in state_a.retrieved_context]
         b_contents = [r.content for r in state_b.retrieved_context]
@@ -109,7 +109,7 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         record = _make_semantic_record("shared-knowledge")
         mem_a.write_shared_record("semantic", record)
 
-        state_b = await mem_b.perceive_and_retrieve(_make_state())
+        state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]
         self.assertIn("shared-knowledge", b_contents)
 
@@ -128,7 +128,7 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         )
         mem_a.write_shared_record("procedural", record)
 
-        state_b = await mem_b.perceive_and_retrieve(_make_state())
+        state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]
         self.assertIn("shared-skill: use_tool", b_contents)
 
@@ -150,7 +150,7 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        state_b = await mem_b.perceive_and_retrieve(_make_state())
+        state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]
         self.assertIn("fact-1", b_contents)
         self.assertIn("skill-1", b_contents)
@@ -166,13 +166,11 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
         mem_a.bind_shared_store(store)
         mem_b.bind_shared_store(store)
 
-        # 通过 update_multi_level 触发 episodic 写入
-        await mem_a.update_multi_level(
-            _make_state("trace-a"), _make_observation(), _make_reflection()
-        )
+        # 通过 update 触发 episodic 写入
+        await mem_a.update(_make_state("trace-a"), _make_observation(), _make_reflection())
 
-        state_a = await mem_a.perceive_and_retrieve(_make_state("trace-a"))
-        state_b = await mem_b.perceive_and_retrieve(_make_state("trace-b"))
+        state_a = await mem_a.perceive(_make_state("trace-a"))
+        state_b = await mem_b.perceive(_make_state("trace-b"))
 
         a_episodic = [r for r in state_a.retrieved_context if r.memory_type == "episodic"]
         b_episodic = [r for r in state_b.retrieved_context if r.memory_type == "episodic"]
@@ -187,13 +185,13 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
         mem_a.bind_shared_store(store)
         mem_b.bind_shared_store(store)
 
-        await mem_a.update_multi_level(
+        await mem_a.update(
             _make_state("trace-a"),
             _make_observation(success=True, payload="result-data"),
             _make_reflection(),
         )
 
-        state_b = await mem_b.perceive_and_retrieve(_make_state("trace-b"))
+        state_b = await mem_b.perceive(_make_state("trace-b"))
         b_working = [r for r in state_b.retrieved_context if r.memory_type == "working"]
         self.assertEqual(len(b_working), 0)
 
@@ -263,7 +261,7 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
         mem_a.write_shared_record("semantic", _make_semantic_record("orchestrator-shared-fact"))
 
         # agent_b 应该能看到这条记录
-        state_b = await mem_b.perceive_and_retrieve(_make_state())
+        state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]
         self.assertIn("orchestrator-shared-fact", b_contents)
 
@@ -304,7 +302,7 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
         # 两个成员的 semantic 层互不可见
         mem_a._private_layers["semantic"].append(_make_semantic_record("private-to-a"))
 
-        state_b = await mem_b.perceive_and_retrieve(_make_state())
+        state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]
         self.assertNotIn("private-to-a", b_contents)
 

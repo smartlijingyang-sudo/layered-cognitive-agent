@@ -84,11 +84,11 @@ class TestJSONLFileObservability(unittest.TestCase):
 
 
 class TestHookSpanAttributes(unittest.TestCase):
-    """Tests for _extract_span_attributes in hook_registry."""
+    """Tests for extract_span_attributes and redaction utilities."""
 
     def test_extract_decision_attributes(self) -> None:
         """post_think kwargs with decision extracts action_type and confidence."""
-        from lca.layer1_cognitive.hook_registry import _extract_span_attributes
+        from lca.layer0_infra.observability.span_attributes import extract_span_attributes
 
         class FakeDecision:
             action_type = "respond"
@@ -96,32 +96,32 @@ class TestHookSpanAttributes(unittest.TestCase):
             response_text = "这是回答"
             tool_name = None
 
-        attrs = _extract_span_attributes("post_think", {"decision": FakeDecision()})
+        attrs = extract_span_attributes("post_think", {"decision": FakeDecision()})
         self.assertEqual(attrs["action_type"], "respond")
         self.assertEqual(attrs["confidence"], 0.9)
         self.assertIn("这是回答", attrs["response_preview"])
 
     def test_extract_error_attributes(self) -> None:
         """on_error kwargs extracts error type and message."""
-        from lca.layer1_cognitive.hook_registry import _extract_span_attributes
+        from lca.layer0_infra.observability.span_attributes import extract_span_attributes
 
-        attrs = _extract_span_attributes("on_error", {"error": ValueError("bad input")})
+        attrs = extract_span_attributes("on_error", {"error": ValueError("bad input")})
         self.assertEqual(attrs["error_type"], "ValueError")
         self.assertEqual(attrs["error_message"], "bad input")
 
     def test_sanitize_secrets(self) -> None:
         """Secret-like patterns are redacted."""
-        from lca.layer1_cognitive.hook_registry import _sanitize
+        from lca.layer0_infra.observability.redaction import sanitize
 
-        self.assertNotIn("sk-1234567890abcdef", _sanitize("key=sk-1234567890abcdef"))
-        self.assertIn("[REDACTED]", _sanitize("key=sk-1234567890abcdef"))
+        self.assertNotIn("sk-1234567890abcdef", sanitize("key=sk-1234567890abcdef"))
+        self.assertIn("[REDACTED]", sanitize("key=sk-1234567890abcdef"))
 
     def test_truncate_long_text(self) -> None:
         """Long text is truncated."""
-        from lca.layer1_cognitive.hook_registry import _truncate
+        from lca.layer0_infra.observability.redaction import truncate
 
         long_text = "a" * 500
-        result = _truncate(long_text)
+        result = truncate(long_text)
         self.assertLessEqual(len(result), 203)  # 200 + "..."
         self.assertTrue(result.endswith("..."))
 

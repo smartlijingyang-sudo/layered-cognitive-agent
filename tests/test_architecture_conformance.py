@@ -56,7 +56,7 @@ EXEMPT: dict[str, str] = {
     "lca.layer2_runtime.fallback_handler.FallbackActionPolicy": (
         "FallbackPolicy 实现，Protocol 在 contracts.protocols.embodiment (ADR-0016)"
     ),
-    "lca.layer3_agent.shared_memory.shared_memory_tool.SharedMemoryTool": (
+    "lca.layer1_cognitive.memory.shared_memory_tool.SharedMemoryTool": (
         "Tool 协议实现，共享存储 Tool 包装 (ADR-0016)"
     ),
 }

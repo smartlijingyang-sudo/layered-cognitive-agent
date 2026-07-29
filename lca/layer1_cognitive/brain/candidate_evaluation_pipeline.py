@@ -1,8 +1,10 @@
 """CandidateEvaluationPipeline —— 将 MAP 四步评估收敛为一个有深度的模块。
 
-把 TaskDecomposer / StatePredictor / StateEvaluator / ConflictMonitor /
-TaskCoordinator 的默认实现内联为私有方法，对外只暴露 decompose + evaluate。
-当未来需要 LLM-based 实现时，可沿内部 seams 逐步替换。
+通过构造函数注入 MAP 五模块（TaskDecomposer / StatePredictor / StateEvaluator /
+ConflictMonitor / TaskCoordinator），对外只暴露 decompose + evaluate。
+未注入时使用 trivial 默认实现（单候选场景保持链路完整）。
+
+当未来需要 LLM-based 实现时，只需替换注入的模块实例。
 """
 
 from __future__ import annotations
@@ -15,6 +17,11 @@ from lca.contracts.decision import StructuredDecision
 from lca.contracts.protocols import (
     CandidateEvaluationPipeline,
     CompletionPolicy,
+    ConflictMonitor,
+    StateEvaluator,
+    StatePredictor,
+    TaskCoordinator,
+    TaskDecomposer,
 )
 from lca.contracts.state import TypedState
 
@@ -22,8 +29,9 @@ _log = structlog.get_logger("lca.candidate_evaluation_pipeline")
 
 
 class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
-    """默认评估管线：内联四步 MAP 评估逻辑。
+    """默认评估管线：组合 MAP 模块。
 
+    所有 MAP 模块均可选注入；未注入时使用 trivial 内联默认：
     - decompose: 返回原始任务（不分解）
     - predict: 以候选动作描述作为预期效果
     - score: 始终返回 1.0（单候选场景保持链路完整）
@@ -31,7 +39,23 @@ class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
     - arbitrate: 选择得分最高的候选方案
     """
 
+    def __init__(
+        self,
+        decomposer: TaskDecomposer | None = None,
+        predictor: StatePredictor | None = None,
+        evaluator: StateEvaluator | None = None,
+        conflict_monitor: ConflictMonitor | None = None,
+        coordinator: TaskCoordinator | None = None,
+    ) -> None:
+        self._decomposer = decomposer
+        self._predictor = predictor
+        self._evaluator = evaluator
+        self._conflict_monitor = conflict_monitor
+        self._coordinator = coordinator
+
     async def decompose(self, state: TypedState) -> list[str]:
+        if self._decomposer is not None:
+            return await self._decomposer.decompose(state)
         return [state.task]
 
     async def evaluate(
@@ -39,27 +63,38 @@ class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
         state: TypedState,
         candidates: list[StructuredDecision],
     ) -> StructuredDecision:
-        predicted = [self._predict(c.rationale) for c in candidates]
-        scores = [self._score(p) for p in predicted]
-        conflicts = self._check_conflicts(state, candidates)
+        predicted = [await self._predict(state, c.rationale) for c in candidates]
+        scores = [await self._score(state, p) for p in predicted]
+        conflicts = await self._check_conflicts(state, candidates)
         if conflicts:
             _log.warning("conflicts_detected", conflicts=conflicts)
-        return self._arbitrate(candidates, scores)
+        return await self._arbitrate(state, candidates, scores)
 
-    @staticmethod
-    def _predict(candidate_action: str) -> dict[str, Any]:
+    async def _predict(self, state: TypedState, candidate_action: str) -> dict[str, Any]:
+        if self._predictor is not None:
+            return await self._predictor.predict(state, candidate_action)
         return {"expected_effect": candidate_action}
 
-    @staticmethod
-    def _score(predicted_state: dict[str, Any]) -> float:
+    async def _score(self, state: TypedState, predicted_state: dict[str, Any]) -> float:
+        if self._evaluator is not None:
+            return await self._evaluator.score(state, predicted_state)
         return 1.0
 
-    @staticmethod
-    def _check_conflicts(state: TypedState, candidates: list[StructuredDecision]) -> list[str]:
+    async def _check_conflicts(
+        self, state: TypedState, candidates: list[StructuredDecision]
+    ) -> list[str]:
+        if self._conflict_monitor is not None:
+            return await self._conflict_monitor.check(state, candidates)
         return []
 
-    @staticmethod
-    def _arbitrate(candidates: list[StructuredDecision], scores: list[float]) -> StructuredDecision:
+    async def _arbitrate(
+        self,
+        state: TypedState,
+        candidates: list[StructuredDecision],
+        scores: list[float],
+    ) -> StructuredDecision:
+        if self._coordinator is not None:
+            return await self._coordinator.arbitrate(state, candidates, scores)
         best_idx = max(range(len(candidates)), key=lambda i: scores[i])
         return candidates[best_idx]
 

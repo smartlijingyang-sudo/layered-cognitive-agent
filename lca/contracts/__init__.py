@@ -47,7 +47,7 @@ from lca.contracts.mechanisms import (
 )
 
 # ── 记忆 ─────────────────────────────────────────────────
-from lca.contracts.memory import KGTriple, MemoryRecord, SkillRecord
+from lca.contracts.memory import MemoryRecord
 
 # ── 可观测性 ─────────────────────────────────────────────
 from lca.contracts.observability import Event, TraceSpan
@@ -106,7 +106,6 @@ __all__ = [
     "GraphValidationError",
     "Hook",
     "HookRegistry",
-    "KGTriple",
     "LoopJudge",
     "MemoryRecord",
     "NamedRegistryProtocol",
@@ -117,7 +116,6 @@ __all__ = [
     "RetryPolicy",
     "RoleProfile",
     "SharedMemoryStore",
-    "SkillRecord",
     "StateSnapshot",
     "StepOutcome",
     "StructuredDecision",

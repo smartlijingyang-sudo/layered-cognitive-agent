@@ -45,18 +45,14 @@ class SimpleMemorySystem(MemorySystem):
         else:
             self._private_layers[layer].append(record)
 
-    async def perceive_and_retrieve(self, state: TypedState) -> TypedState:
+    async def perceive(self, state: TypedState) -> TypedState:
         records: list[MemoryRecord] = []
         for layer_name in self._private_layers:
             records.extend(self._get_layer_records(layer_name))
         state.retrieved_context = records
         return state
 
-    async def perceive(self, state: TypedState) -> TypedState:
-        """两阶段 API：think 之前的感知检索。"""
-        return await self.perceive_and_retrieve(state)
-
-    async def update_multi_level(
+    async def update(
         self, state: TypedState, observation: Observation, reflection: Reflection
     ) -> None:
         if observation.payload is not None and observation.success:
@@ -86,12 +82,6 @@ class SimpleMemorySystem(MemorySystem):
             ),
         )
         await self.compress()
-
-    async def update(
-        self, state: TypedState, observation: Observation, reflection: Reflection
-    ) -> None:
-        """两阶段 API：reflect 之后的多级记忆写入。"""
-        await self.update_multi_level(state, observation, reflection)
 
     async def compress(self) -> None:
         episodic = self._get_layer_records("episodic")

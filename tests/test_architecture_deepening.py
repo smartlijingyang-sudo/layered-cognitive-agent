@@ -25,11 +25,11 @@ from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
+from lca.layer1_cognitive.brain.prompt_manager import SimplePromptManager
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
 from lca.layer1_cognitive.brain.skill_router import StaticSkillRouter
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
-from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
 from lca.layer2_runtime.loop_judge import DefaultLoopJudge
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
@@ -95,12 +95,10 @@ class TestCheckpointResume:
         store = InMemoryStateStore()
 
         class _Mem:
-            async def perceive_and_retrieve(self, s: TypedState) -> TypedState:
+            async def perceive(self, s: TypedState) -> TypedState:
                 return s
 
-            async def update_multi_level(
-                self, s: TypedState, o: Observation, r: Reflection
-            ) -> None:
+            async def update(self, s: TypedState, o: Observation, r: Reflection) -> None:
                 return None
 
         class _Brain:

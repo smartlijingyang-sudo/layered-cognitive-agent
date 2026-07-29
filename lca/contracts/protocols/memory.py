@@ -17,22 +17,12 @@ class MemorySystem(Protocol):
     """记忆系统：检索感知 + 多级写入。
 
     两阶段语义（ADR-0016）：
-    - perceive / perceive_and_retrieve：think 之前，刷新 retrieved_context
-    - update / update_multi_level：reflect 之后，写入 observation + reflection
+    - perceive：think 之前，刷新 retrieved_context
+    - update：reflect 之后，写入 observation + reflection
     """
 
-    async def perceive_and_retrieve(self, state: TypedState) -> TypedState: ...
-
-    async def update_multi_level(
-        self, state: TypedState, observation: Observation, reflection: Reflection
-    ) -> None: ...
-
-    async def perceive(self, state: TypedState) -> TypedState:
-        """perceive_and_retrieve 的语义别名（两阶段 API）。"""
-        return await self.perceive_and_retrieve(state)
+    async def perceive(self, state: TypedState) -> TypedState: ...
 
     async def update(
         self, state: TypedState, observation: Observation, reflection: Reflection
-    ) -> None:
-        """update_multi_level 的语义别名（两阶段 API）。"""
-        await self.update_multi_level(state, observation, reflection)
+    ) -> None: ...

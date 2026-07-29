@@ -11,8 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
 from lca.contracts.state import Budget, TypedState
 from lca.contracts.types import TeamAssignment, Turn
+from lca.layer1_cognitive.memory.shared_memory_tool import SharedMemoryTool
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
-from lca.layer3_agent.shared_memory.shared_memory_tool import SharedMemoryTool
 
 
 class TestSharedMemoryTool(unittest.IsolatedAsyncioTestCase):

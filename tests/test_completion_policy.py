@@ -1,4 +1,4 @@
-"""DelegationLedger + CompletionPolicy + GuardedTaskCoordinator 单元测试。"""
+"""DelegationLedger + CompletionPolicy 单元测试。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from lca.contracts.state import Budget, TypedState
 from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
     RosterCoveragePolicy,
 )
-from lca.layer1_cognitive.brain.guarded_coordinator import GuardedTaskCoordinator
 from lca.layer1_cognitive.team_progress import DelegationLedger
 from lca.layer1_cognitive.team_progress.hooks import (
     ledger_tracking_hook,
@@ -145,48 +144,6 @@ class TestRosterCoveragePolicy:
         assert result.delegate_to is not None
         assert "analyst" in result.delegate_to.subtask
         assert "launch product" in result.delegate_to.subtask
-
-
-# ── GuardedTaskCoordinator ──
-
-
-class TestGuardedTaskCoordinator:
-    @pytest.mark.asyncio
-    async def test_wraps_inner_coordinator(self) -> None:
-        from lca.layer1_cognitive.brain.map_modules import SimpleTaskCoordinator
-
-        inner = SimpleTaskCoordinator()
-        policy = RosterCoveragePolicy()
-        guarded = GuardedTaskCoordinator(inner, policy)
-
-        ledger = _ledger({"a"})  # all pending
-        state = _state(team_progress=ledger)
-
-        candidates = [_decision("respond")]
-        scores = [0.9]
-
-        result = await guarded.arbitrate(state, candidates, scores)
-
-        # Inner picks respond (best score), but policy overrides to delegate
-        assert result.action_type == "delegate"
-
-    @pytest.mark.asyncio
-    async def test_passes_through_when_covered(self) -> None:
-        from lca.layer1_cognitive.brain.map_modules import SimpleTaskCoordinator
-
-        inner = SimpleTaskCoordinator()
-        policy = RosterCoveragePolicy()
-        guarded = GuardedTaskCoordinator(inner, policy)
-
-        ledger = _ledger({"a"}, {"a": "done"})
-        state = _state(team_progress=ledger)
-
-        candidates = [_decision("respond")]
-        scores = [0.9]
-
-        result = await guarded.arbitrate(state, candidates, scores)
-
-        assert result.action_type == "respond"
 
 
 # ── Hooks ──
