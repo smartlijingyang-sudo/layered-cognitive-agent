@@ -6,7 +6,10 @@ L6 治理层：新增 action_type 必须同时满足 Registry 注册 + Prompt �
 
 from __future__ import annotations
 
+import pytest
+
 from lca.contracts.role_team import ToolPermissionManifest
+from lca.layer0_infra.component_registry import RegistryKeyError
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
@@ -40,10 +43,17 @@ class TestActionRegistryCompleteness:
             handler = registry.resolve(action_type)
             assert handler is not None, f"{action_type} 已注册但 resolve 返回 None"
 
-    def test_resolve_unknown_returns_none(self) -> None:
+    def test_resolve_unknown_raises(self) -> None:
         registry = _build_registry()
-        assert registry.resolve("research_plan") is None
-        assert registry.resolve("nonexistent") is None
+        with pytest.raises(RegistryKeyError):
+            registry.resolve("research_plan")
+        with pytest.raises(RegistryKeyError):
+            registry.resolve("nonexistent")
+
+    def test_get_unknown_returns_none(self) -> None:
+        registry = _build_registry()
+        assert registry.get("research_plan") is None
+        assert registry.get("nonexistent") is None
 
     def test_prompt_contains_allowed_actions_placeholder(self) -> None:
         """Prompt 模板包含 {allowed_actions} 占位符，由 Reasoner 从 Registry 动态注入。"""

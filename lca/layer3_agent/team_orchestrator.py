@@ -28,7 +28,6 @@ from lca.layer1_cognitive.memory.shared_memory_tool import SharedMemoryTool
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
-from lca.layer3_agent.supervisor import Supervisor
 
 
 class TeamOrchestrator(TeamEntrypoint):
@@ -45,7 +44,7 @@ class TeamOrchestrator(TeamEntrypoint):
         self,
         members: list[BaseAgent],
         config: TeamConfig,
-        supervisor: Supervisor | None = None,
+        supervisor: BaseAgent | None = None,
         transport: AgentTransport | None = None,
         roster_desc: str = "",
         strategy: OrchestrationStrategy | None = None,
@@ -94,7 +93,7 @@ class TeamOrchestrator(TeamEntrypoint):
 
     @staticmethod
     def _bind_supervisor_capabilities(
-        supervisor: Supervisor, transport: AgentTransport, roster_desc: str
+        supervisor: BaseAgent, transport: AgentTransport, roster_desc: str
     ) -> None:
         """在组合根完成 Supervisor 的 transport / roster 绑定，避免 L3 越层访问。"""
         body = getattr(supervisor.runtime, "body", None)

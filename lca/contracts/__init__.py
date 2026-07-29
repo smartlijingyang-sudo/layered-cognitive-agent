@@ -43,7 +43,6 @@ from lca.contracts.mechanisms import (
     Hook,
     HookRegistry,
     NamedRegistryProtocol,
-    RegistryProtocol,
 )
 
 # ── 记忆 ─────────────────────────────────────────────────
@@ -111,7 +110,6 @@ __all__ = [
     "NamedRegistryProtocol",
     "Observation",
     "Reflection",
-    "RegistryProtocol",
     "Result",
     "RetryPolicy",
     "RoleProfile",

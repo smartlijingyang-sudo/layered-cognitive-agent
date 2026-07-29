@@ -76,13 +76,12 @@ from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_loggi
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
 # L2
-from lca.layer2_runtime.loop_judge import DefaultLoopJudge
+from lca.layer2_runtime.default_loop_judge import DefaultLoopJudge
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
 # L3
 from lca.layer3_agent.base_agent import BaseAgent
-from lca.layer3_agent.supervisor import Supervisor
 
 
 class TestL0ProtocolCompliance(unittest.TestCase):
@@ -303,7 +302,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
 
     def test_supervisor_is_agent_runtime(self):
         _, rp, runtime = self._build_base_agent()
-        sup = Supervisor(runtime, rp)
+        sup = BaseAgent(runtime, rp, max_steps=20, max_wall_clock_seconds=300)
         self.assertIsInstance(sup, AgentEntrypoint)
 
     def test_team_orchestrator_is_team_runtime(self):

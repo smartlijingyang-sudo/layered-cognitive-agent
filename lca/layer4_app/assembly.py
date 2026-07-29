@@ -43,9 +43,9 @@ from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
+from lca.layer2_runtime.default_loop_judge import DefaultLoopJudge
+from lca.layer2_runtime.event_emission import HOOK_NAMES, make_event_emitting_hook
 from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
-from lca.layer2_runtime.hooks import HOOK_NAMES, make_event_emitting_hook
-from lca.layer2_runtime.loop_judge import DefaultLoopJudge
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
@@ -200,7 +200,6 @@ def assemble_team(
     strategy: OrchestrationStrategy | None = None,
 ) -> TeamEntrypoint:
     """Assemble a team object graph from *members* with the given *process*."""
-    from lca.layer3_agent.supervisor import Supervisor as SupervisorImpl
     from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 
     ensure_defaults()
@@ -211,19 +210,17 @@ def assemble_team(
         shared_memory_layers=list(shared_memory_layers or []),
         graph_definition_ref=graph_definition_ref,
     )
-    base_supervisor: SupervisorImpl | None = None
+    base_supervisor: BaseAgent | None = None
     if supervisor is not None:
-        if isinstance(supervisor, SupervisorImpl):
-            base_supervisor = supervisor
-        else:
-            base_supervisor = SupervisorImpl(
-                supervisor.runtime,
-                supervisor.role_profile,
-                max_steps=max(
-                    getattr(supervisor, "max_steps", DEFAULT_MAX_STEPS), _SUPERVISOR_MIN_MAX_STEPS
-                ),
-                max_wall_clock_seconds=_ASSEMBLY_MAX_WALL_CLOCK_SECONDS,
-            )
+        base_supervisor = BaseAgent(
+            supervisor.runtime,
+            supervisor.role_profile,
+            max_steps=max(
+                getattr(supervisor, "max_steps", DEFAULT_MAX_STEPS),
+                _SUPERVISOR_MIN_MAX_STEPS,
+            ),
+            max_wall_clock_seconds=_ASSEMBLY_MAX_WALL_CLOCK_SECONDS,
+        )
     transport, roster_desc = build_team_transport(members)
     return TeamOrchestrator(
         members,

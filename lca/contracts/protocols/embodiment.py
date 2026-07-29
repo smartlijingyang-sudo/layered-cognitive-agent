@@ -31,7 +31,3 @@ class FallbackPolicy(Protocol):
         state: TypedState,
         action_registry: ActionRegistryProtocol | None = None,
     ) -> Observation: ...
-
-
-# 过渡期 alias
-FallbackHandler = FallbackPolicy

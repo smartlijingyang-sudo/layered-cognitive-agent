@@ -6,9 +6,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from lca.contracts.delegation_context import _delegator as _current_delegator  # noqa: F401
-
-# 过渡期 re-export，见 ADR-0017；新代码请直接 import lca.contracts.delegation_context
 from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus

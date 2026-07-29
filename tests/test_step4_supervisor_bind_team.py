@@ -18,7 +18,6 @@ from lca.contracts.state import Budget
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer3_agent.base_agent import BaseAgent
-from lca.layer3_agent.supervisor import Supervisor
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 from lca.layer4_app.defaults import build_team_transport
 
@@ -74,7 +73,7 @@ class _RosterAwareBrain(RosterAware):
 
 
 def _make_supervisor_with_runtime() -> tuple[
-    Supervisor, MagicMock, TransportRegistry, _RosterAwareBrain
+    BaseAgent, MagicMock, TransportRegistry, _RosterAwareBrain
 ]:
     """返回 (supervisor, mock_runtime, transport_registry, brain)。"""
     registry = TransportRegistry()
@@ -85,7 +84,7 @@ def _make_supervisor_with_runtime() -> tuple[
     mock_runtime.body = mock_body
     mock_runtime.brain = mock_brain
 
-    sup = Supervisor(mock_runtime, _make_role("supervisor"))
+    sup = BaseAgent(mock_runtime, _make_role("supervisor"))
     return sup, mock_runtime, registry, mock_brain
 
 
@@ -181,7 +180,7 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
 
 class TestDelegateRemoved(unittest.TestCase):
     def test_delegate_method_no_longer_exists(self) -> None:
-        self.assertFalse(hasattr(Supervisor, "delegate"))
+        self.assertFalse(hasattr(BaseAgent, "delegate"))
 
 
 # ---------------------------------------------------------------------------

@@ -56,7 +56,3 @@ class NamedRegistryProtocol(Protocol):
     def list(self) -> list[str]: ...
 
     def __contains__(self, name: str) -> bool: ...
-
-
-# 过渡期 alias —— 下一主版本删除
-RegistryProtocol = NamedRegistryProtocol

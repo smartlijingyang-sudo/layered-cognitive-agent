@@ -12,7 +12,6 @@ from lca.contracts.mechanisms import (
     Hook,
     HookRegistry,
     NamedRegistryProtocol,
-    RegistryProtocol,
 )
 
 # ── L3 Agent / Team 入口 ──────────────────────────────────
@@ -40,7 +39,7 @@ from lca.contracts.protocols.cognition import (
 )
 
 # ── L1 Body / 行动执行协议 ───────────────────────────────
-from lca.contracts.protocols.embodiment import Body, FallbackHandler, FallbackPolicy
+from lca.contracts.protocols.embodiment import Body, FallbackPolicy
 
 # ── L0 基础设施协议 ──────────────────────────────────────
 from lca.contracts.protocols.infra import (
@@ -83,7 +82,6 @@ __all__ = [
     "Critic",
     "DecisionParser",
     "EventBus",
-    "FallbackHandler",
     "FallbackPolicy",
     "Hook",
     "HookRegistry",
@@ -95,7 +93,6 @@ __all__ = [
     "OrchestrationStrategy",
     "PromptManager",
     "Reasoner",
-    "RegistryProtocol",
     "RosterAware",
     "Runtime",
     "SafeExecutor",

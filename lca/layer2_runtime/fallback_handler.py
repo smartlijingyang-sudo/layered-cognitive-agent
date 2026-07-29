@@ -45,14 +45,14 @@ class FallbackActionPolicy(FallbackPolicy):
                 extra={FALLBACK_DEGRADED_FROM: original},
             )
         if decision.response_text:
-            op = action_registry.resolve(ActionType.RESPOND)
+            op = action_registry.get(ActionType.RESPOND)
             if op is not None:
                 obs = await op.execute(decision, state)
                 obs.degraded_from = original
                 obs.extra[FALLBACK_DEGRADED_FROM] = original
                 return obs
         if decision.tool_calls:
-            op = action_registry.resolve(ActionType.USE_TOOL)
+            op = action_registry.get(ActionType.USE_TOOL)
             if op is not None:
                 obs = await op.execute(decision, state)
                 obs.degraded_from = original

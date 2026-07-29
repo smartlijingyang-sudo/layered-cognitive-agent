@@ -10,12 +10,16 @@ from __future__ import annotations
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS
 from lca.contracts.invocation import InvocationContext
+from lca.contracts.mechanisms import Hook
 from lca.contracts.message import AgentMessage, agent_message_as_text, agent_message_text
-from lca.contracts.protocols import AgentEntrypoint, Runtime
+from lca.contracts.protocols import AgentEntrypoint, CompletionPolicy, Runtime
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import StateSnapshot
 from lca.contracts.team_progress import DelegationLedgerProtocol
+
+DEFAULT_SUPERVISOR_MAX_STEPS = 20
+DEFAULT_SUPERVISOR_WALL_CLOCK_SECONDS = 300
 
 
 def _task_as_text(task: str | AgentMessage) -> str:
@@ -80,3 +84,13 @@ class BaseAgent(AgentEntrypoint):
     async def cancel(self) -> None:
         """尽力取消；默认 Runtime 无全局 cancel 时为 no-op。"""
         return None
+
+    def register_hook(self, hook_name: str, hook_fn: Hook) -> None:
+        """注册 Hook 到 Runtime 的 HookRegistry。"""
+        hooks = getattr(self.runtime, "hooks", None)
+        if hooks is not None:
+            hooks.register(hook_name, hook_fn)
+
+    def install_completion_guard(self, policy: CompletionPolicy) -> None:
+        """通过 Runtime 协议安装确定性收尾 guardrail。"""
+        self.runtime.install_completion_guard(policy)

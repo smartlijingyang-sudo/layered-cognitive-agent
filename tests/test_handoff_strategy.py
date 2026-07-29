@@ -190,7 +190,7 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_stops_on_handoff(self) -> None:
         """handoff action 应触发 LoopJudge 返回 should_stop=True。"""
-        from lca.layer2_runtime.loop_judge import DefaultLoopJudge
+        from lca.layer2_runtime.default_loop_judge import DefaultLoopJudge
         from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
             DefaultStepOutcomePolicy,
         )

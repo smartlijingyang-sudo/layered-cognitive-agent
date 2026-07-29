@@ -1,10 +1,8 @@
 """注册表基础设施 —— ComponentRegistry + NamedRegistry 泛型基类。
 
-语义约定（PR-5）：
-- ``get`` / 软查询：找不到返回 None
-- ``resolve`` / ``require``：找不到 raise RegistryKeyError
-- NamedRegistry.resolve 始终 raise（历史行为）
-- ComponentRegistry.resolve 为兼容仍返回 None；新代码优先用 require
+语义约定（PR-5 / ADR-0019）：
+- ``get``：软查询，找不到返回 None
+- ``require`` / ``NamedRegistry.resolve``：硬查询，找不到 raise RegistryKeyError
 """
 
 from __future__ import annotations
@@ -82,10 +80,6 @@ class ComponentRegistry:
     def get(self, category: str, name: str) -> Any | None:
         """软查询：找不到返回 None。"""
         return self._registries.get(category, {}).get(name)
-
-    def resolve(self, category: str, name: str) -> Any | None:
-        """兼容别名：等同 get（历史调用方依赖 Optional 返回）。"""
-        return self.get(category, name)
 
     def require(self, category: str, name: str) -> Any:
         """硬查询：找不到 raise RegistryKeyError。"""

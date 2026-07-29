@@ -10,7 +10,7 @@ from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
     RosterCoveragePolicy,
 )
 from lca.layer1_cognitive.team_progress import DelegationLedger
-from lca.layer1_cognitive.team_progress.hooks import (
+from lca.layer1_cognitive.team_progress.progress_hooks import (
     ledger_tracking_hook,
     progress_injection_hook,
 )

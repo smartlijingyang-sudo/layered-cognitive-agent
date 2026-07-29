@@ -61,7 +61,7 @@ class SimpleBody(Body):
         self.transport_registry.register(transport)
 
     async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
-        handler = self.action_registry.resolve(decision.action_type)
+        handler = self.action_registry.get(decision.action_type)
         if handler is None:
             raise UnregisteredActionError(decision.action_type)
         result: Observation = await handler.execute(decision, state)

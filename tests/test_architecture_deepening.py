@@ -30,8 +30,8 @@ from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
 from lca.layer1_cognitive.brain.skill_router import StaticSkillRouter
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
+from lca.layer2_runtime.default_loop_judge import DefaultLoopJudge
 from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
-from lca.layer2_runtime.loop_judge import DefaultLoopJudge
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer4_app.api import Agent, MultiAgentTeam

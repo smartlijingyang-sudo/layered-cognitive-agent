@@ -16,7 +16,7 @@ from lca.contracts.enums import CompletionPolicyName, HookEvent
 from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy
 from lca.contracts.result import Result
 from lca.contracts.team_progress import DelegationLedgerProtocol
-from lca.layer1_cognitive.team_progress.hooks import (
+from lca.layer1_cognitive.team_progress.progress_hooks import (
     ledger_tracking_hook,
     progress_injection_hook,
 )
@@ -27,9 +27,7 @@ def _default_ledger_factory(roles: frozenset[str]) -> DelegationLedgerProtocol:
     from lca.layer0_infra.component_registry import get_global_registry
 
     reg = get_global_registry()
-    ledger_cls = reg.resolve("delegation_ledger", "default")
-    if ledger_cls is None:
-        raise ValueError("未注册 delegation_ledger 'default'，请在 register_defaults() 后使用")
+    ledger_cls = reg.require("delegation_ledger", "default")
     return cast("DelegationLedgerProtocol", ledger_cls(mandatory_roles=roles))
 
 
@@ -57,12 +55,7 @@ class HierarchicalStrategy(OrchestrationStrategy):
             from lca.layer0_infra.component_registry import get_global_registry
 
             reg = get_global_registry()
-            policy_factory = reg.resolve("completion_policy", policy_name)
-            if policy_factory is None:
-                raise ValueError(
-                    f"未注册的 completion_policy: {policy_name!r}，"
-                    f"可用: {reg.list('completion_policy')}"
-                )
+            policy_factory = reg.require("completion_policy", policy_name)
             policy = policy_factory()
             context.supervisor.install_completion_guard(policy)
             context.supervisor.register_hook(HookEvent.POST_ACT, ledger_tracking_hook)

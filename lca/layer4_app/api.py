@@ -31,7 +31,7 @@ from lca.contracts.protocols import (
     Tool,
 )
 from lca.contracts.result import Result
-from lca.layer3_agent.supervisor import Supervisor
+from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer4_app.assembly import assemble_base_agent, assemble_team
 from lca.layer4_app.defaults import ensure_defaults
 
@@ -107,12 +107,12 @@ class Agent:
         """Execute *task* and return the result."""
         return await self._base_agent.execute(task)
 
-    def _as_supervisor(self) -> Supervisor:
+    def _as_supervisor(self) -> BaseAgent:
         """Promote this agent to a team supervisor with a minimum step budget."""
         rp = self._base_agent.role_profile
         ms = self._base_agent.max_steps
         wc = self._base_agent.max_wall_clock_seconds
-        return Supervisor(
+        return BaseAgent(
             self._base_agent.runtime,
             rp,
             max_steps=max(ms, _SUPERVISOR_MIN_MAX_STEPS),

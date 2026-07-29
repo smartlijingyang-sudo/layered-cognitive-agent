@@ -64,13 +64,13 @@ def build_team_transport(
     members: list[BaseAgent],
 ) -> tuple[AgentTransport, str]:
     """Build an in-process transport and roster description for a team."""
-    from lca.contracts.state import _current_delegator
+    from lca.contracts.delegation_context import get_current_delegator
 
     transport = InternalTransport()
     for member in members:
 
         async def _handler(subtask: str, _m: BaseAgent = member) -> Observation:
-            delegated_by = _current_delegator.get()
+            delegated_by = get_current_delegator()
             result = await _m.execute(subtask, delegated_by=delegated_by)
             return Observation(
                 observation_id=f"obs_{result.trace_id}",
