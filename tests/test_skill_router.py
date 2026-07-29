@@ -129,7 +129,7 @@ class TestModularBrainWithSkillRouter(unittest.IsolatedAsyncioTestCase):
         state = _make_state("test task")
         await brain.think(state)
 
-        self.assertEqual(state.working_memory["active_template"], "custom_prompt")
+        self.assertEqual(state.active_template, "custom_prompt")
 
     async def test_think_without_router_no_template(self) -> None:
         """无 SkillRouter 时，working_memory 不设 active_template。"""

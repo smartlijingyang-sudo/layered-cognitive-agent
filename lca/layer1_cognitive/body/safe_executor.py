@@ -4,23 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import json
-import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from lca.contracts.decision import Observation
+from lca.contracts.ids import new_id, utc_now
 from lca.contracts.observability import TraceSpan
 from lca.contracts.protocols import Observability, SafeExecutor, Tool
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+from lca.contracts.semantic_keys import (
+    FAILURE_KIND,
+    FAILURE_KIND_EXECUTION,
+    FAILURE_KIND_TRANSIENT,
+    FAILURE_KIND_VALIDATION,
+)
 
 
 class SimpleSafeExecutor(SafeExecutor):
@@ -51,11 +48,11 @@ class SimpleSafeExecutor(SafeExecutor):
         validation_error = self._validate_args(tool, args)
         if validation_error is not None:
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=validation_error,
-                extra={"failure_kind": "validation"},
+                extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
 
         cache_key = f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
@@ -67,44 +64,44 @@ class SimpleSafeExecutor(SafeExecutor):
         delay = retry_policy.backoff_base_s
         for attempt in range(retry_policy.max_retries + 1):
             span = TraceSpan(
-                span_id=_new_id("span"),
+                span_id=new_id("span"),
                 trace_id="",
                 name=f"tool.{tool.name}",
-                started_at=_now(),
+                started_at=utc_now(),
                 attributes={"args": args, "attempt": attempt},
             )
             try:
                 obs = await tool.execute(args)
             except ToolExecutionError as err:
                 obs = Observation(
-                    observation_id=_new_id("obs"),
+                    observation_id=new_id("obs"),
                     success=False,
                     payload=None,
                     error=str(err),
-                    extra={"failure_kind": "execution"},
+                    extra={FAILURE_KIND: FAILURE_KIND_EXECUTION},
                 )
                 if not getattr(err, "retryable", True):
-                    span.ended_at = _now()
+                    span.ended_at = utc_now()
                     span.status = "error"
                     span.attributes["error"] = obs.error
-                    span.attributes["failure_kind"] = "execution"
+                    span.attributes[FAILURE_KIND] = FAILURE_KIND_EXECUTION
                     span.attributes["retryable"] = False
                     self.observability.emit_span(span)
                     return obs
             except Exception as err:
                 obs = Observation(
-                    observation_id=_new_id("obs"),
+                    observation_id=new_id("obs"),
                     success=False,
                     payload=None,
                     error=str(err),
-                    extra={"failure_kind": "transient"},
+                    extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
                 )
 
-            span.ended_at = _now()
+            span.ended_at = utc_now()
             span.status = "ok" if obs.success else "error"
             if not obs.success:
                 span.attributes["error"] = obs.error
-                span.attributes["failure_kind"] = obs.extra.get("failure_kind", "execution")
+                span.attributes[FAILURE_KIND] = obs.extra.get(FAILURE_KIND, FAILURE_KIND_EXECUTION)
             self.observability.emit_span(span)
 
             if obs.success:
@@ -112,7 +109,7 @@ class SimpleSafeExecutor(SafeExecutor):
                     self._cache[cache_key] = obs
                 return obs
 
-            if obs.extra.get("failure_kind") == "validation":
+            if obs.extra.get(FAILURE_KIND) == FAILURE_KIND_VALIDATION:
                 return obs
 
             last_obs = obs

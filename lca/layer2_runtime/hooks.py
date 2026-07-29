@@ -6,8 +6,8 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from lca.contracts.protocols import EventBus
+from lca.contracts.semantic_keys import FALLBACK_DEGRADED_FROM
 from lca.contracts.state import TypedState
-from lca.layer2_runtime.fallback_handler import FALLBACK_DEGRADATION_KEY
 
 HOOK_NAMES = [
     "on_start",
@@ -40,12 +40,12 @@ def make_event_emitting_hook(
             if (
                 observation is not None
                 and getattr(observation, "success", False)
-                and FALLBACK_DEGRADATION_KEY in getattr(observation, "extra", {})
+                and FALLBACK_DEGRADED_FROM in getattr(observation, "extra", {})
             ):
                 event_bus.emit(
                     "action_degraded",
                     {
-                        "original_action_type": observation.extra[FALLBACK_DEGRADATION_KEY],
+                        "original_action_type": observation.extra[FALLBACK_DEGRADED_FROM],
                         "degraded_to": "respond",
                         "step": state.step,
                     },

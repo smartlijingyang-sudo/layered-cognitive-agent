@@ -22,9 +22,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from lca.contracts.decision import Observation, Reflection
 from lca.contracts.state import TypedState
+from lca.layer0_infra.component_registry import get_global_registry
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer0_infra.registry import get_global_registry
-from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer4_app.api import Agent
 

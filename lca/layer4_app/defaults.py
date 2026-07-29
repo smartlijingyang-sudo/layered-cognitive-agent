@@ -1,29 +1,21 @@
-"""defaults.py —— 唯一允许 import 所有具体类的组装根。
+"""defaults.py —— 默认实现注册与可复用构建片段。
 
-把框架内置的默认实现注册进全局 ComponentRegistry / StrategyRegistry，
-使得 Agent(...) 可以通过名字字符串选择实现，
-也允许用户在调用 Agent 之前注册自己的实现。
+完整 Agent 对象图组装见 ``assembly.assemble_base_agent``（唯一共享管线入口）。
+本模块负责：
+1. ``ensure_defaults()`` 幂等注册发现型组件
+2. Transport / Team 辅助构建
 """
 
 from __future__ import annotations
 
 from lca.contracts.decision import Observation
-from lca.contracts.protocols import (
-    AgentTransport,
-    Body,
-    BrainStrategy,
-    EventBus,
-    HookRegistry,
-    LLMAdapter,
-    MemorySystem,
-    Observability,
-    StateStore,
-    StepOutcomePolicy,
-    Tool,
-    TransportRegistryProtocol,
+from lca.contracts.protocols import AgentTransport, Body, Tool, TransportRegistryProtocol
+from lca.contracts.role_team import ToolPermissionManifest
+from lca.layer0_infra.component_registry import (
+    defaults_registered,
+    get_global_registry,
+    mark_defaults_registered,
 )
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.layer0_infra.component_registry import get_global_registry
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.observability.jsonl_file_observability import JSONLFileObservability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
@@ -32,34 +24,18 @@ from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.mcp_transport import MCPTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_registry import ActionRegistryProtocol
-from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer1_cognitive.brain.critic import SimpleCritic
-from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.map_modules import (
     SimpleConflictMonitor,
     SimpleStateEvaluator,
-    SimpleStatePredictor,
     SimpleTaskCoordinator,
-    SimpleTaskDecomposer,
 )
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
-from lca.layer1_cognitive.brain.reasoner import (
-    SimpleReasoner,
-    build_team_roster,
-)
+from lca.layer1_cognitive.brain.reasoner import build_team_roster
 from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
 from lca.layer1_cognitive.event_bus import SimpleEventBus
-from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 from lca.layer1_cognitive.team_progress import DelegationLedger
-from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
-from lca.layer2_runtime.hooks import HOOK_NAMES, make_event_emitting_hook
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
 from lca.layer3_agent.base_agent import BaseAgent
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
@@ -73,58 +49,8 @@ from lca.layer3_agent.orchestration_strategies import (
 )
 
 
-def _build_brain(
-    llm: LLMAdapter,
-    role_profile: RoleProfile,
-    tools_desc: str,
-    team_roster: str | None = None,
-    action_registry: ActionRegistryProtocol | None = None,
-) -> ModularBrain:
-    """默认 Brain 工厂：ModularBrain + MAP 五模块。"""
-    prompt_manager = SimplePromptManager()
-    prompt_manager.register_template("react_prompt", load_builtin_prompt("react_prompt"))
-    prompt_manager.register_template(
-        "hierarchical_prompt", load_builtin_prompt("hierarchical_prompt")
-    )
-
-    # 从 ActionRegistry 动态生成 Prompt 中的 action 枚举说明
-    allowed_actions_desc = ""
-    if action_registry is not None:
-        action_descs: dict[str, str] = {
-            "respond": "respond — 直接回复用户（需附带 response_text）",
-            "use_tool": "use_tool — 调用工具（需附带 tool_name / arguments）",
-            "delegate": "delegate — 将子任务委派给队友（需附带 target_role / subtask）",
-            "handoff": "handoff — 非阻塞移交控制权给其他 Agent",
-            "stop": "stop — 任务已完成",
-            "ask_human": "ask_human — 请求人工介入",
-        }
-        allowed_actions_desc = "\n".join(
-            f"{i + 1}. {action_descs.get(at, f'{at} — (自定义)')}"
-            for i, at in enumerate(action_registry.allowed_action_types())
-        )
-
-    reasoner = SimpleReasoner(
-        llm,
-        prompt_manager,
-        role_profile,
-        tools_desc,
-        team_roster=team_roster,
-        allowed_actions_desc=allowed_actions_desc,
-    )
-    return ModularBrain(
-        reasoner=reasoner,
-        decision_parser=SimpleDecisionParser(action_registry=action_registry),
-        critic=SimpleCritic(),
-        task_decomposer=SimpleTaskDecomposer(),
-        state_predictor=SimpleStatePredictor(),
-        state_evaluator=SimpleStateEvaluator(),
-        conflict_monitor=SimpleConflictMonitor(),
-        task_coordinator=SimpleTaskCoordinator(),
-    )
-
-
 def build_default_transport_registry() -> TransportRegistry:
-    """构建默认 TransportRegistry：internal→InternalTransport, a2a→A2ATransport, mcp→MCPTransport。"""
+    """构建默认 TransportRegistry：internal / a2a / mcp。"""
     registry = TransportRegistry()
     registry.register(InternalTransport())
     registry.register(A2ATransport())
@@ -134,63 +60,41 @@ def build_default_transport_registry() -> TransportRegistry:
 
 def build_body(
     tools: list[Tool],
-    observability: Observability,
+    observability: object,
     transport_registry: TransportRegistryProtocol | None = None,
     action_registry: ActionRegistryProtocol | None = None,
     enable_fallback: bool = True,
 ) -> Body:
-    """默认 Body 构建器。
+    """兼容构建器：创建**一份** ToolRegistry 并与 ActionRegistry 共享。
 
-    enable_fallback=True 时用 FallbackDecoratedBody 包裹 SimpleBody，
-    使未知 action_type 自动降级，Loop 不感知降级逻辑。
+    新代码请优先用 ``assembly.build_body_from_shared`` / ``assemble_base_agent``。
+    若传入 action_registry，则不再为其重建 UseTool 依赖——调用方须保证
+    action_registry 已绑定同一 tool 管线；否则会用本函数新建的 registry 重建。
     """
+    from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
+    from lca.layer4_app.assembly import build_body_from_shared, build_default_brain  # noqa: F401
+
     permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
     tool_registry = SimpleToolRegistry()
     for t in tools:
         tool_registry.register(t)
-    safe_executor = SimpleSafeExecutor(permission_manifest, observability)
+    safe_executor = SimpleSafeExecutor(permission_manifest, observability)  # type: ignore[arg-type]
     registry = transport_registry or build_default_transport_registry()
-    simple_body = SimpleBody(
-        tool_registry=tool_registry,
-        safe_executor=safe_executor,
-        transport_registry=registry,
-        action_registry=action_registry,
+    if action_registry is None:
+        action_registry = build_default_action_registry(tool_registry, safe_executor, registry)
+    return build_body_from_shared(
+        tool_registry,
+        safe_executor,
+        registry,
+        action_registry,
+        enable_fallback=enable_fallback,
     )
-    if enable_fallback:
-        return FallbackDecoratedBody(inner=simple_body, fallback_handler=FallbackActionPolicy())
-    return simple_body
-
-
-def _build_hooks(observability: Observability, event_bus: EventBus) -> SimpleHookRegistry:
-    hooks = SimpleHookRegistry(observability)
-    event_hook = make_event_emitting_hook(event_bus)
-    for event_name in HOOK_NAMES:
-        hooks.register(event_name, default_logging_hook)
-        hooks.register(event_name, event_hook)
-    return hooks
-
-
-def build_runtime(
-    brain: BrainStrategy,
-    body: Body,
-    memory: MemorySystem,
-    hooks: HookRegistry,
-    state_store: StateStore,
-    outcome_policy: StepOutcomePolicy | None = None,
-) -> CognitiveRuntime:
-    """默认 Runtime 构建器。"""
-    return CognitiveRuntime(brain, body, memory, hooks, state_store, outcome_policy=outcome_policy)
 
 
 def build_team_transport(
     members: list[BaseAgent],
 ) -> tuple[AgentTransport, str]:
-    """为 hierarchical 团队构建进程内传输层和花名册。
-
-    把每个 member 的 execute 包装为 async handler（key = role），
-    Result → Observation 的适配在此完成；
-    同时拼接 roster_desc 供 Supervisor 的 Reasoner 感知队友。
-    """
+    """为 hierarchical 团队构建进程内传输层和花名册。"""
     from lca.contracts.state import _current_delegator
 
     transport = InternalTransport()
@@ -212,17 +116,23 @@ def build_team_transport(
 
 
 def register_defaults() -> None:
-    """注册所有内置默认实现到全局注册表。"""
-    reg = get_global_registry()
-    reg.register("observability", "console", ConsoleObservability)
-    reg.register("observability", "jsonl_file", JSONLFileObservability)
-    reg.register("state_store", "memory", InMemoryStateStore)
-    reg.register("memory", "simple", SimpleMemorySystem)
-    reg.register("event_bus", "simple", SimpleEventBus)
-    reg.register("delegation_ledger", "default", DelegationLedger)
+    """注册所有内置默认实现到全局注册表（可重复调用，幂等）。"""
+    global_reg = get_global_registry()
+    # 允许重复 register 覆盖同名实现
+    global_reg.register("observability", "console", ConsoleObservability)
+    global_reg.register("observability", "jsonl_file", JSONLFileObservability)
+    global_reg.register("state_store", "memory", InMemoryStateStore)
+    global_reg.register("memory", "simple", SimpleMemorySystem)
+    global_reg.register("event_bus", "simple", SimpleEventBus)
+    global_reg.register("delegation_ledger", "default", DelegationLedger)
+
+    def _default_brain_factory(*args, **kwargs):  # type: ignore[no-untyped-def]
+        from lca.layer4_app.assembly import build_default_brain
+
+        return build_default_brain(*args, **kwargs)
 
     strategy_reg = get_global_strategy_registry()
-    strategy_reg.register("default", _build_brain)
+    strategy_reg.register("default", _default_brain_factory)
 
     orch_reg = get_global_orchestration_registry()
     orch_reg.register("hierarchical", HierarchicalStrategy)
@@ -239,12 +149,55 @@ def register_defaults() -> None:
     )
     orch_reg.register("handoff", HandoffStrategy)
 
-    # CompletionPolicy 注册
     from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
         RosterCoveragePolicy,
     )
 
-    reg.register("completion_policy", "roster_coverage", RosterCoveragePolicy)
+    global_reg.register("completion_policy", "roster_coverage", RosterCoveragePolicy)
+    mark_defaults_registered()
 
 
-register_defaults()
+def ensure_defaults() -> None:
+    """幂等：仅首次注册默认实现。"""
+    if not defaults_registered():
+        register_defaults()
+
+
+# 导入本模块即注册，保持历史行为；亦可显式 ensure_defaults()
+ensure_defaults()
+
+
+def __getattr__(name: str) -> object:
+    """兼容旧私有符号（_build_brain / _build_hooks / build_runtime）。"""
+    if name == "_build_brain":
+        from lca.layer4_app.assembly import build_default_brain
+
+        return build_default_brain
+    if name == "_build_hooks":
+        from lca.layer4_app.assembly import build_hooks
+
+        return build_hooks
+    if name == "build_runtime":
+        from lca.contracts.protocols import (
+            BrainStrategy,
+            HookRegistry,
+            MemorySystem,
+            StateStore,
+            StepOutcomePolicy,
+        )
+        from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+
+        def build_runtime(
+            brain: BrainStrategy,
+            body: Body,
+            memory: MemorySystem,
+            hooks: HookRegistry,
+            state_store: StateStore,
+            outcome_policy: StepOutcomePolicy | None = None,
+        ) -> CognitiveRuntime:
+            return CognitiveRuntime(
+                brain, body, memory, hooks, state_store, outcome_policy=outcome_policy
+            )
+
+        return build_runtime
+    raise AttributeError(name)

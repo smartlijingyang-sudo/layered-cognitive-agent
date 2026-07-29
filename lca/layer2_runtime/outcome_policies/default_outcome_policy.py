@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
 from lca.contracts.protocols import StepOutcome, StepOutcomePolicy
+from lca.contracts.semantic_keys import FALLBACK_DEGRADED_FROM
 from lca.contracts.state import TypedState
-from lca.layer2_runtime.fallback_handler import FALLBACK_DEGRADATION_KEY
 
 
 class DefaultStepOutcomePolicy(StepOutcomePolicy):
@@ -58,7 +58,7 @@ class DefaultStepOutcomePolicy(StepOutcomePolicy):
         """判断 observation 是否代表"降级成功"。"""
         if observation is None:
             return False
-        return getattr(observation, "success", False) and FALLBACK_DEGRADATION_KEY in getattr(
+        return getattr(observation, "success", False) and FALLBACK_DEGRADED_FROM in getattr(
             observation, "extra", {}
         )
 
@@ -70,7 +70,7 @@ class DefaultStepOutcomePolicy(StepOutcomePolicy):
         """预算耗尽时的特殊判定：最后一步成功则视为自然终止。"""
         last_ok = observation is not None and getattr(observation, "success", False)
         final_output: str | None = None
-        if last_ok and "final_output" not in state.working_memory and observation is not None:
+        if last_ok and state.final_output is None and observation is not None:
             payload = observation.payload
             if isinstance(payload, str):
                 final_output = payload

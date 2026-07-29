@@ -60,7 +60,7 @@ class SimpleReasoner(Reasoner):
         if self.team_roster is not None:
             template_name = "hierarchical_prompt"
             base_vars["team_roster"] = self.team_roster
-            base_vars["team_progress"] = state.working_memory.get("team_progress_text", "")
+            base_vars["team_progress"] = state.team_progress_text or ""
         else:
             template_name = "react_prompt"
 

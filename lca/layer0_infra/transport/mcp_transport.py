@@ -134,6 +134,10 @@ class MCPTransport(AgentTransport):
             ),
         )
 
+    async def wait_result(self, task_id: str, timeout_s: float | None = None) -> Observation:
+        """MCP 任务在 send_task 阶段通常已同步完成，直接取结果。"""
+        return await self.receive_result(task_id)
+
     async def close(self) -> None:
         for session in self._sessions.values():
             with contextlib.suppress(Exception):

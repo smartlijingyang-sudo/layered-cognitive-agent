@@ -12,6 +12,7 @@ from typing import Any
 
 from lca.contracts.budget import create_budget
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.protocols import (
     Body,
@@ -108,10 +109,16 @@ class CognitiveRuntime(Runtime):
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
 
-    async def resume(self, snapshot: StateSnapshot, max_steps: int = 10) -> Result:
+    async def resume(
+        self,
+        snapshot: StateSnapshot,
+        input: object | None = None,
+        max_steps: int = 10,
+    ) -> Result:
         """从任意 Checkpoint 恢复——挂起等待人工审批/暂停的任务由此续跑。"""
+        del input  # 人工审批输入预留；当前恢复仅重载快照
         state = await self.state_store.load(snapshot.state_ref)
-        state.status = "running"
+        state.status = TaskStatus.WORKING
         return await self._loop(state, max_steps)
 
     async def _loop(self, state: TypedState, max_steps: int) -> Result:
@@ -148,32 +155,32 @@ class CognitiveRuntime(Runtime):
 
             except ApprovalPendingError:
                 self._checkpoint(state, reason="pre_approval")
-                state.status = "waiting_human"
+                state.status = TaskStatus.INPUT_REQUIRED
                 await self.hooks.trigger("on_pause", state)
                 return self._summarize(state)
 
             except Exception as err:
                 await self.hooks.trigger("on_error", state, error=err)
-                state.status = "failed"
+                state.status = TaskStatus.FAILED
                 self._checkpoint(state, reason="on_error")
-                state.extra["error"] = str(err)
+                state.last_error = str(err)
                 break
 
             self._checkpoint(state)
             outcome = self.outcome_policy.resolve(state, decision, observation, reflection)
             if outcome.final_output is not None:
-                state.working_memory["final_output"] = outcome.final_output
+                state.final_output = outcome.final_output
 
             if state.budget.exceeded():
                 await self.hooks.trigger("on_error", state, error=BudgetExceededError())
                 budget_outcome = self.outcome_policy.resolve_budget_exceeded(observation, state)
                 if budget_outcome.final_output is not None:
-                    state.working_memory["final_output"] = budget_outcome.final_output
-                state.status = budget_outcome.status or state.status  # type: ignore[assignment]
+                    state.final_output = budget_outcome.final_output
+                state.status = self._coerce_status(budget_outcome.status) or state.status
                 break
 
             if outcome.should_stop:
-                state.status = outcome.status or "completed"  # type: ignore[assignment]
+                state.status = self._coerce_status(outcome.status) or TaskStatus.COMPLETED
                 break
 
         await self.hooks.trigger("on_complete", state)
@@ -182,17 +189,37 @@ class CognitiveRuntime(Runtime):
     def _checkpoint(self, state: TypedState, reason: str = "periodic") -> None:
         state.checkpoints.append(state.snapshot(reason=reason))
 
+    @staticmethod
+    def _coerce_status(value: str | TaskStatus | None) -> TaskStatus | None:
+        if value is None:
+            return None
+        if isinstance(value, TaskStatus):
+            return value
+        mapping = {
+            "completed": TaskStatus.COMPLETED,
+            "failed": TaskStatus.FAILED,
+            "working": TaskStatus.WORKING,
+            "running": TaskStatus.WORKING,
+            "waiting_human": TaskStatus.INPUT_REQUIRED,
+            "input_required": TaskStatus.INPUT_REQUIRED,
+            "canceled": TaskStatus.CANCELED,
+            "cancelled": TaskStatus.CANCELED,
+        }
+        return mapping.get(str(value), TaskStatus.COMPLETED)
+
     def _summarize(self, state: TypedState) -> Result:
         final_ref = f"mem://{state.trace_id}/{state.step}"
-        status = "completed" if state.status == "running" else state.status
+        status = TaskStatus.COMPLETED if state.status == TaskStatus.WORKING else state.status
         return Result(
             trace_id=state.trace_id,
             status=status,
-            output=state.working_memory.get("final_output"),
+            output=state.final_output
+            if isinstance(state.final_output, str) or state.final_output is None
+            else str(state.final_output),
             final_state_ref=final_ref,
             total_steps=state.step + 1,
             budget_used=state.budget,
-            error=state.extra.get("error"),
+            error=state.last_error,
         )
 
 

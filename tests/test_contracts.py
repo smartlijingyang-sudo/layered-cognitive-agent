@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.state import Budget, TypedState
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 
 
@@ -83,7 +83,7 @@ class TestDecisionParser(unittest.TestCase):
 class TestEndToEnd(unittest.TestCase):
     def test_single_agent_qa(self):
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-        from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+        from lca.layer0_infra.tools.calculator_tool import CalculatorTool
         from lca.layer4_app.api import Agent
 
         agent = Agent(

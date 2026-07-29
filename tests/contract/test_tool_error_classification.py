@@ -14,7 +14,7 @@ from lca.contracts.result import ToolExecutionError, ToolInputError
 from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.state import Budget, TypedState
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
-from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 

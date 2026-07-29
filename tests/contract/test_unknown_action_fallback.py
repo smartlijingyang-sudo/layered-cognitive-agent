@@ -1,6 +1,6 @@
 """未知 action 降级测试 —— 使用真实 LLM 返回的 payload 做回归。
 
-L4 韧性层：验证 FallbackActionHandler 的链式降级逻辑。
+L4 韧性层：验证 FallbackActionPolicy 的链式降级逻辑。
 Golden Fixture 来自真实日志中 LLM "发明"的 action_type。
 """
 
@@ -12,11 +12,11 @@ from lca.contracts.decision import StructuredDecision, ToolCall
 from lca.contracts.role_team import ToolPermissionManifest
 from lca.contracts.state import Budget, TypedState
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
-from lca.layer1_cognitive.body.action_handlers import RespondHandler, UseToolHandler
+from lca.layer1_cognitive.body.action_handlers import RespondOperation, UseToolOperation
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer2_runtime.fallback_handler import FALLBACK_DEGRADATION_KEY, FallbackActionHandler
+from lca.layer2_runtime.fallback_handler import FALLBACK_DEGRADATION_KEY, FallbackActionPolicy
 
 
 def _make_state() -> TypedState:
@@ -25,7 +25,7 @@ def _make_state() -> TypedState:
 
 def _make_registry_with_respond() -> ActionRegistry:
     registry = ActionRegistry()
-    registry.register("respond", RespondHandler())
+    registry.register("respond", RespondOperation())
     return registry
 
 
@@ -46,7 +46,7 @@ class TestFallbackWithResponseText:
         )
         state = _make_state()
         registry = _make_registry_with_respond()
-        fallback = FallbackActionHandler()
+        fallback = FallbackActionPolicy()
 
         observation = await fallback.handle(decision, state, registry)
 
@@ -64,7 +64,7 @@ class TestFallbackWithResponseText:
         )
         state = _make_state()
         registry = _make_registry_with_respond()
-        fallback = FallbackActionHandler()
+        fallback = FallbackActionPolicy()
 
         observation = await fallback.handle(decision, state, registry)
 
@@ -75,7 +75,7 @@ class TestFallbackWithToolCalls:
     """策略 2：有 tool_calls 但无 response_text → 降级为 use_tool。"""
 
     async def test_degrades_to_use_tool(self) -> None:
-        from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+        from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 
         tool = CalculatorTool()
         tool_reg = SimpleToolRegistry()
@@ -85,7 +85,7 @@ class TestFallbackWithToolCalls:
         )
 
         registry = ActionRegistry()
-        registry.register("use_tool", UseToolHandler(tool_reg, safe_exec))
+        registry.register("use_tool", UseToolOperation(tool_reg, safe_exec))
 
         decision = StructuredDecision(
             decision_id="dec_test",
@@ -97,7 +97,7 @@ class TestFallbackWithToolCalls:
             ],
         )
         state = _make_state()
-        fallback = FallbackActionHandler()
+        fallback = FallbackActionPolicy()
 
         observation = await fallback.handle(decision, state, registry)
 
@@ -118,7 +118,7 @@ class TestFallbackNoDegradationPath:
         )
         state = _make_state()
         registry = ActionRegistry()
-        fallback = FallbackActionHandler()
+        fallback = FallbackActionPolicy()
 
         observation = await fallback.handle(decision, state, registry)
 

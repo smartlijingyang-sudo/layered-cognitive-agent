@@ -6,8 +6,8 @@ from typing import cast
 
 from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy
 from lca.contracts.result import Result
-from lca.contracts.team_progress import (
-    DelegationLedgerProtocol,
+from lca.contracts.team_progress import DelegationLedgerProtocol
+from lca.layer1_cognitive.team_progress.hooks import (
     ledger_tracking_hook,
     progress_injection_hook,
 )

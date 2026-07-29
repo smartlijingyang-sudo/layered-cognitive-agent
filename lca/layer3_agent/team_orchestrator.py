@@ -86,6 +86,18 @@ class TeamOrchestrator(TeamEntrypoint):
         tool = SharedMemoryTool(self._shared_store, team_id=self.team_id)  # type: ignore[arg-type]
         registry.register(tool)
 
-    async def run(self, objective: str) -> Result:
+    async def run(
+        self,
+        objective: str | object,
+        ctx: object | None = None,
+    ) -> Result:
         """按 TeamConfig.process 类型选择组织形态执行：dispatch 语义由 strategy 承担。"""
-        return await self._strategy.run(self._context, objective)
+        del ctx  # InvocationContext 预留
+        from lca.contracts.message import AgentMessage, agent_message_as_text
+
+        text = (
+            agent_message_as_text(objective)
+            if isinstance(objective, AgentMessage)
+            else str(objective)
+        )
+        return await self._strategy.run(self._context, text)

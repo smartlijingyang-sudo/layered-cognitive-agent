@@ -25,10 +25,6 @@ class ActionOperation(Protocol):
     async def execute(self, decision: StructuredDecision, state: TypedState) -> Observation: ...
 
 
-# 过渡期 alias —— 下一主版本删除
-ActionHandler = ActionOperation
-
-
 @runtime_checkable
 class ActionRegistryProtocol(Protocol):
     """Action 能力注册表接口。

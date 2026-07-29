@@ -6,15 +6,15 @@ import pytest
 
 from lca.contracts.decision import DelegationSpec, StructuredDecision
 from lca.contracts.state import Budget, TypedState
-from lca.contracts.team_progress import (
-    ledger_tracking_hook,
-    progress_injection_hook,
-)
 from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
     RosterCoveragePolicy,
 )
 from lca.layer1_cognitive.brain.guarded_coordinator import GuardedTaskCoordinator
 from lca.layer1_cognitive.team_progress import DelegationLedger
+from lca.layer1_cognitive.team_progress.hooks import (
+    ledger_tracking_hook,
+    progress_injection_hook,
+)
 
 # ── helpers ──
 
@@ -253,7 +253,7 @@ class TestProgressInjectionHook:
 
         await progress_injection_hook("pre_think", state)
 
-        assert "b" in state.working_memory["team_progress_text"]
+        assert "b" in state.team_progress_text
 
     @pytest.mark.asyncio
     async def test_injects_all_done(self) -> None:
@@ -262,7 +262,7 @@ class TestProgressInjectionHook:
 
         await progress_injection_hook("pre_think", state)
 
-        assert "完毕" in state.working_memory["team_progress_text"]
+        assert "完毕" in state.team_progress_text
 
     @pytest.mark.asyncio
     async def test_noop_when_no_ledger(self) -> None:

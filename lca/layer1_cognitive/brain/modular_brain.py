@@ -51,7 +51,7 @@ class ModularBrain(BrainStrategy):
     async def think(self, state: TypedState) -> StructuredDecision:
         if self.skill_router is not None:
             template_name = await self.skill_router.route(state)
-            state.working_memory["active_template"] = template_name
+            state.active_template = template_name
 
         _subtasks = await self.task_decomposer.decompose(state)
         raw_candidates = await self.reasoner.generate_candidates(state, n=1)

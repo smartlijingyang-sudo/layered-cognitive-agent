@@ -76,3 +76,6 @@ class UnimplementedTransport(AgentTransport):
 
     async def receive_result(self, task_id: str) -> Observation:
         raise NotImplementedError(self._error_message)
+
+    async def wait_result(self, task_id: str, timeout_s: float | None = None) -> Observation:
+        raise NotImplementedError(self._error_message)

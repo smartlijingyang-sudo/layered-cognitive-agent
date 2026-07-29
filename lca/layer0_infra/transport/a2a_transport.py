@@ -86,6 +86,21 @@ class A2ATransport(AgentTransport):
 
         return task_id
 
+    async def wait_result(self, task_id: str, timeout_s: float | None = None) -> Observation:
+        """HTTP 轮询等待任务完成。"""
+        import asyncio
+
+        poll_interval = 0.1
+        elapsed = 0.0
+        while True:
+            status = await self.poll_status(task_id)
+            if status != "working":
+                return await self.receive_result(task_id)
+            if timeout_s is not None and elapsed >= timeout_s:
+                raise TimeoutError(f"a2a wait_result 超时: {task_id}")
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+
     async def poll_status(self, task_id: str) -> str:
         endpoint_info = self._task_endpoints.get(task_id, "")
         if endpoint_info.startswith("error:"):

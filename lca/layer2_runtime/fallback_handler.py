@@ -11,18 +11,15 @@
 
 from __future__ import annotations
 
-import uuid
-
 from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.ids import new_id
 from lca.contracts.protocols import FallbackPolicy
+from lca.contracts.semantic_keys import FALLBACK_DEGRADED_FROM
 from lca.contracts.state import TypedState
 from lca.layer1_cognitive.body.action_registry import ActionRegistryProtocol
 
-FALLBACK_DEGRADATION_KEY = "degraded_from_action_type"
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+# 向后兼容导出
+FALLBACK_DEGRADATION_KEY = FALLBACK_DEGRADED_FROM
 
 
 class FallbackActionPolicy(FallbackPolicy):
@@ -43,38 +40,31 @@ class FallbackActionPolicy(FallbackPolicy):
 
         if action_registry is None:
             return Observation(
-                observation_id=_new_id("obs"),
+                observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=f"无法识别的 action_type '{original_action_type}' 且无可用的 ActionRegistry",
-                extra={FALLBACK_DEGRADATION_KEY: original_action_type},
+                extra={FALLBACK_DEGRADED_FROM: original_action_type},
             )
 
-        # 策略 1：有 response_text → 降级为 respond
         if decision.response_text:
             respond_op = action_registry.resolve("respond")
             if respond_op is not None:
                 observation = await respond_op.execute(decision, state)
-                observation.extra[FALLBACK_DEGRADATION_KEY] = original_action_type
+                observation.extra[FALLBACK_DEGRADED_FROM] = original_action_type
                 return observation
 
-        # 策略 2：有 tool_calls → 降级为 use_tool
         if decision.tool_calls:
             use_tool_op = action_registry.resolve("use_tool")
             if use_tool_op is not None:
                 observation = await use_tool_op.execute(decision, state)
-                observation.extra[FALLBACK_DEGRADATION_KEY] = original_action_type
+                observation.extra[FALLBACK_DEGRADED_FROM] = original_action_type
                 return observation
 
-        # 策略 3：不可恢复失败
         return Observation(
-            observation_id=_new_id("obs"),
+            observation_id=new_id("obs"),
             success=False,
             payload=None,
             error=f"无法识别的 action_type '{original_action_type}' 且无可用降级路径",
-            extra={FALLBACK_DEGRADATION_KEY: original_action_type},
+            extra={FALLBACK_DEGRADED_FROM: original_action_type},
         )
-
-
-# 过渡期 alias
-FallbackActionHandler = FallbackActionPolicy

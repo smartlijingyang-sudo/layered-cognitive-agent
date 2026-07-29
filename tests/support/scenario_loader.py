@@ -14,7 +14,7 @@ from typing import Any
 import yaml
 
 from lca.contracts.protocols import LLMAdapter, Tool
-from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer4_app.api import Agent, MultiAgentTeam
 
 # ── 工具注册表：YAML 里用字符串名引用工具 ──

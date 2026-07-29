@@ -2,22 +2,23 @@
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 from lca.contracts.decision import Observation, Reflection
+from lca.contracts.ids import new_id
 from lca.contracts.protocols import Critic
+from lca.contracts.semantic_keys import (
+    FAILURE_KIND,
+    FAILURE_KIND_EXECUTION,
+    FAILURE_KIND_TRANSIENT,
+    FAILURE_KIND_VALIDATION,
+)
 from lca.contracts.state import TypedState
 
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
-
-
 _FAILURE_KIND_HINT: dict[str, str] = {
-    "validation": "参数不合法，请重复同一动作，须修正参数后重新调用",
-    "execution": "工具执行失败",
-    "transient": "瞬时性错误，可重试",
+    FAILURE_KIND_VALIDATION: "参数不合法，请重复同一动作，须修正参数后重新调用",
+    FAILURE_KIND_EXECUTION: "工具执行失败",
+    FAILURE_KIND_TRANSIENT: "瞬时性错误，可重试",
 }
 
 
@@ -27,7 +28,7 @@ class SimpleCritic(Critic):
     async def critique(self, state: TypedState, observation: Observation) -> Reflection:
         if observation.success:
             return Reflection(
-                reflection_id=_new_id("refl"),
+                reflection_id=new_id("refl"),
                 verdict="on_track",
                 lesson=f"步骤{state.step}成功完成" if observation.payload is not None else None,
             )
@@ -35,15 +36,15 @@ class SimpleCritic(Critic):
         hint = _FAILURE_KIND_HINT.get(failure_kind, "步骤失败")
         lesson = f"步骤{state.step}失败({hint}): {observation.error}"
         return Reflection(
-            reflection_id=_new_id("refl"),
+            reflection_id=new_id("refl"),
             verdict="needs_correction",
             lesson=lesson,
-            extra={"failure_kind": failure_kind},
+            extra={FAILURE_KIND: failure_kind},
         )
 
     @staticmethod
     def _extract_failure_kind(observation: Observation) -> str:
-        kind: Any = observation.extra.get("failure_kind")
+        kind: Any = observation.extra.get(FAILURE_KIND)
         if isinstance(kind, str) and kind in _FAILURE_KIND_HINT:
             return kind
-        return "execution"
+        return FAILURE_KIND_EXECUTION

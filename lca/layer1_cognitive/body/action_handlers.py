@@ -1,16 +1,17 @@
 """内置 ActionOperation 实现 —— 从 SimpleBody 提取的独立策略类。
 
 每种 action_type 对应一个独立 Operation，彼此零依赖、零共享可变状态。
-新增行动能力 = 新增一个 Operation + 一条注册。
+新增行动能力 = ActionCatalog 加一条 spec + 本模块一个 Operation + 注册。
 """
 
 from __future__ import annotations
 
 import asyncio
-import uuid
+from typing import Any
 
 from lca.contracts.action import ActionOperation
 from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.ids import new_id
 from lca.contracts.protocols import (
     AgentTransport,
     SafeExecutor,
@@ -19,15 +20,12 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
-from lca.contracts.state import TypedState
+from lca.contracts.semantic_keys import OBS_HANDOFF, OBS_TASK_ID
+from lca.contracts.state import TypedState, _current_delegator
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 
 _POLL_INTERVAL_S = 0.05
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
-
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
 class RespondOperation(ActionOperation):
@@ -35,7 +33,7 @@ class RespondOperation(ActionOperation):
 
     async def execute(self, decision: StructuredDecision, state: TypedState) -> Observation:
         return Observation(
-            observation_id=_new_id("obs"),
+            observation_id=new_id("obs"),
             success=True,
             payload=decision.response_text,
         )
@@ -72,22 +70,45 @@ class DelegateOperation(ActionOperation):
             if (spec := decision.delegate_to) and spec.deadline
             else _DEFAULT_DELEGATE_TIMEOUT_S
         )
+
+        observation = await self._wait_for_result(transport, task_id, timeout_s)
+        observation.extra[OBS_TASK_ID] = task_id
+        return observation
+
+    async def _wait_for_result(
+        self,
+        transport: AgentTransport,
+        task_id: str,
+        timeout_s: float,
+    ) -> Observation:
+        wait = getattr(transport, "wait_result", None)
+        if wait is not None:
+            try:
+                result: Observation = await wait(task_id, timeout_s)
+                return result
+            except TimeoutError:
+                return Observation(
+                    observation_id=new_id("obs"),
+                    success=False,
+                    payload=None,
+                    error=f"delegate 超时: task_id={task_id}",
+                    extra={OBS_TASK_ID: task_id},
+                )
+
+        # 回退：跨进程 / 旧 transport 轮询
         elapsed = 0.0
         while (await transport.poll_status(task_id)) == "working":
             if elapsed >= timeout_s:
                 return Observation(
-                    observation_id=_new_id("obs"),
+                    observation_id=new_id("obs"),
                     success=False,
                     payload=None,
                     error=f"delegate 超时: task_id={task_id}",
-                    extra={"task_id": task_id},
+                    extra={OBS_TASK_ID: task_id},
                 )
             await asyncio.sleep(_POLL_INTERVAL_S)
             elapsed += _POLL_INTERVAL_S
-
-        observation = await transport.receive_result(task_id)
-        observation.extra["task_id"] = task_id
-        return observation
+        return await transport.receive_result(task_id)
 
     async def _send_to_transport(
         self, decision: StructuredDecision, state: TypedState
@@ -119,29 +140,21 @@ class HandoffOperation(ActionOperation):
             task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         return Observation(
-            observation_id=_new_id("obs"),
+            observation_id=new_id("obs"),
             success=True,
             payload=f"handoff to {spec.target_role or spec.target_agent_id}",
-            extra={"task_id": task_id, "handoff": True},
+            extra={OBS_TASK_ID: task_id, OBS_HANDOFF: True},
         )
-
-
-# 过渡期 alias
-RespondHandler = RespondOperation
-UseToolHandler = UseToolOperation
-DelegateHandler = DelegateOperation
-HandoffHandler = HandoffOperation
 
 
 def build_default_action_registry(
     tool_registry: ToolRegistry,
     safe_executor: SafeExecutor,
     transport_registry: TransportRegistryProtocol,
-) -> ActionRegistry:
-    """构建包含所有内置 ActionOperation 的默认注册表。"""
-    registry = ActionRegistry()
-    registry.register("respond", RespondOperation())
-    registry.register("use_tool", UseToolOperation(tool_registry, safe_executor))
-    registry.register("delegate", DelegateOperation(transport_registry))
-    registry.register("handoff", HandoffOperation(transport_registry))
-    return registry
+) -> Any:
+    """兼容入口：委托 ActionCatalog（单一事实源）。"""
+    from lca.layer1_cognitive.body.action_catalog import (
+        build_default_action_registry as _build,
+    )
+
+    return _build(tool_registry, safe_executor, transport_registry)

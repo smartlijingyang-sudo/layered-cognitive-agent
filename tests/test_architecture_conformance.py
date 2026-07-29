@@ -25,6 +25,9 @@ from pathlib import Path
 #   2. 内部数据结构——不跨越模块边界、不需要运行时多态
 #   3. 异常类型——错误信号，不是可插拔组件
 EXEMPT: dict[str, str] = {
+    "lca.layer1_cognitive.body.action_catalog.ActionSpec": (
+        "纯数据声明（action_type 元数据），非可插拔行为实现；见 ActionCatalog PR-4"
+    ),
     "lca.layer0_infra.component_registry.ComponentRegistry": (
         "DI 注册表本身，非可插拔组件 (ADR-0005/ADR-0010)"
     ),

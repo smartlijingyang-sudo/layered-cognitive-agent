@@ -33,7 +33,7 @@ from pathlib import Path
 import pytest
 
 from lca.layer0_infra.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
-from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer4_app.api import Agent, MultiAgentTeam
 
 # 加载 .env（如果存在）

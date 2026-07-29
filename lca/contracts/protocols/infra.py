@@ -63,6 +63,14 @@ class AgentTransport(Protocol):
     async def poll_status(self, task_id: str) -> str: ...
     async def receive_result(self, task_id: str) -> Observation: ...
 
+    async def wait_result(self, task_id: str, timeout_s: float | None = None) -> Observation:
+        """等待任务完成并返回结果。
+
+        默认实现可用 poll 循环；进程内传输应覆写为 Future/Event。
+        协议层声明此方法以便结构性检查；旧适配器可用 ``hasattr`` 兼容。
+        """
+        ...
+
 
 @runtime_checkable
 class TransportRegistryProtocol(Protocol):

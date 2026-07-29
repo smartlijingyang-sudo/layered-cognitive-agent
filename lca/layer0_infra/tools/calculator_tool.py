@@ -11,6 +11,7 @@ from typing import Any, ClassVar
 from lca.contracts.decision import Observation
 from lca.contracts.protocols import Tool
 from lca.contracts.result import ToolInputError
+from lca.contracts.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 
 
 def _new_id(prefix: str) -> str:
@@ -64,7 +65,7 @@ class CalculatorTool(Tool):
                 payload=None,
                 error=str(e),
                 latency_ms=latency_ms,
-                extra={"failure_kind": "validation"},
+                extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
         except Exception as e:
             latency_ms = int((time.monotonic() - start) * 1000)

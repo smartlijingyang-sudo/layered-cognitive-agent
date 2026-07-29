@@ -8,36 +8,16 @@ from __future__ import annotations
 
 import json
 import re
-import uuid
 
 from lca.contracts.decision import DelegationSpec, StructuredDecision, ToolCall
+from lca.contracts.ids import new_id
 from lca.contracts.protocols import DecisionParser
+from lca.contracts.semantic_keys import ORIGINAL_ACTION_TYPE
 from lca.contracts.state import TypedState
+from lca.layer1_cognitive.body.action_catalog import build_action_alias_map
 from lca.layer1_cognitive.body.action_registry import ActionRegistryProtocol
 
-
-def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
-
-
-_ACTION_ALIASES: dict[str, str] = {
-    "tool_call": "use_tool",
-    "call_tool": "use_tool",
-    "use_tool": "use_tool",
-    "respond": "respond",
-    "response": "respond",
-    "answer": "respond",
-    "reply": "respond",
-    "delegate": "delegate",
-    "delegation": "delegate",
-    "handoff": "handoff",
-    "hand_off": "handoff",
-    "stop": "stop",
-    "ask_human": "ask_human",
-    "hitl": "ask_human",
-}
-
-_UNRECOGNIZED_ACTION_KEY = "original_action_type"
+_ACTION_ALIASES: dict[str, str] = build_action_alias_map()
 
 
 class SimpleDecisionParser(DecisionParser):
@@ -45,7 +25,7 @@ class SimpleDecisionParser(DecisionParser):
 
     当提供 ActionRegistry 时，解析器会校验 action_type 是否已注册；
     未注册的 action_type 不会被强行改写，而是在 extra 中标记原始值，
-    交由韧性层（FallbackActionHandler）决定降级策略。
+    交由韧性层（FallbackActionPolicy）决定降级策略。
     """
 
     def __init__(self, action_registry: ActionRegistryProtocol | None = None) -> None:
@@ -57,7 +37,7 @@ class SimpleDecisionParser(DecisionParser):
             data = json.loads(json_str)
         except (json.JSONDecodeError, ValueError):
             return StructuredDecision(
-                decision_id=_new_id("dec"),
+                decision_id=new_id("dec"),
                 action_type="respond",
                 response_text=raw_output,
                 rationale="解析失败兜底",
@@ -67,12 +47,11 @@ class SimpleDecisionParser(DecisionParser):
         raw_action = str(data.get("action_type", "respond")).lower().strip()
         action_type = _ACTION_ALIASES.get(raw_action, raw_action)
 
-        # L2 防腐层：校验 action_type 是否在 Registry 已注册集合内
         extra: dict[str, str] = {}
         if self._action_registry is not None and not self._action_registry.is_registered(
             action_type
         ):
-            extra[_UNRECOGNIZED_ACTION_KEY] = action_type
+            extra[ORIGINAL_ACTION_TYPE] = action_type
 
         tool_calls: list[ToolCall] = []
         if action_type == "use_tool":
@@ -83,7 +62,7 @@ class SimpleDecisionParser(DecisionParser):
             if tool_name:
                 tool_calls.append(
                     ToolCall(
-                        call_id=_new_id("call"),
+                        call_id=new_id("call"),
                         tool_name=tool_name,
                         arguments=arguments,
                     )
@@ -105,7 +84,7 @@ class SimpleDecisionParser(DecisionParser):
             )
 
         return StructuredDecision(
-            decision_id=_new_id("dec"),
+            decision_id=new_id("dec"),
             action_type=action_type,
             tool_calls=tool_calls,
             delegate_to=delegate_to,

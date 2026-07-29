@@ -37,7 +37,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.contracts.graph import ExecutionGraph, GraphEdge, GraphNode
 from lca.contracts.protocols import LLMAdapter, OrchestrationContext
 from lca.contracts.role_team import TeamConfig
-from lca.layer0_infra.tool_protocol.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
 from lca.layer4_app.api import Agent
 

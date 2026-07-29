@@ -41,9 +41,11 @@ class ConcatSynthesizer(Synthesizer):
 
         synthesized_output = self._separator.join(outputs) if outputs else None
 
+        from lca.contracts.lifecycle import TaskStatus
+
         return Result(
             trace_id=candidates[0].trace_id,
-            status="completed" if any_completed else "failed",
+            status=TaskStatus.COMPLETED if any_completed else TaskStatus.FAILED,
             final_state_ref="",
             total_steps=total_steps,
             budget_used=aggregated_budget,

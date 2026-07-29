@@ -70,6 +70,11 @@ class TypedState:
     team_progress: DelegationLedgerProtocol | None = None
     # 认知闭环历史：每步 Turn(decision, observation, reflection)
     history: list[Turn] = field(default_factory=list)
+    # ── 框架运行槽位（一等字段，禁止再走 working_memory 裸字符串）──
+    final_output: Any | None = None
+    last_error: str | None = None
+    active_template: str | None = None
+    team_progress_text: str | None = None
 
     def snapshot(self, reason: str = "periodic") -> StateSnapshot:
         snap = StateSnapshot(

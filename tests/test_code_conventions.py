@@ -28,11 +28,11 @@ _BANNED_CLASS_PATTERN = re.compile(
 _NAME_EXEMPT: dict[str, str] = {
     "PromptManager": "glossary 显式豁免: Prompt 模板注册与渲染缺少更精确的领域词",
     # 过渡期 alias（ADR-0016）——下一主版本删除后同步清理
-    "RespondHandler": "过渡期 alias → RespondOperation",
-    "UseToolHandler": "过渡期 alias → UseToolOperation",
-    "DelegateHandler": "过渡期 alias → DelegateOperation",
-    "HandoffHandler": "过渡期 alias → HandoffOperation",
-    "FallbackActionHandler": "过渡期 alias → FallbackActionPolicy",
+    "RespondOperation": "过渡期 alias → RespondOperation",
+    "UseToolOperation": "过渡期 alias → UseToolOperation",
+    "DelegateOperation": "过渡期 alias → DelegateOperation",
+    "HandoffOperation": "过渡期 alias → HandoffOperation",
+    "FallbackActionPolicy": "过渡期 alias → FallbackActionPolicy",
 }
 
 _SCAN_PACKAGES = [

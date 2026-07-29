@@ -3,7 +3,7 @@
 将"未知 action_type 时降级"从 Runtime Loop 下沉到 Body 层，
 符合装饰器模式：Loop 只调用 body.act()，不感知降级逻辑。
 
-降级发生与否通过 Observation.extra[FALLBACK_DEGRADATION_KEY] 传递，
+降级发生与否通过 Observation.extra[FALLBACK_DEGRADED_FROM] 传递，
 由 StepOutcomePolicy 在 Loop 外层解读，Loop 本身不认识这个 key。
 """
 

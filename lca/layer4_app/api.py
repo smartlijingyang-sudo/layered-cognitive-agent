@@ -6,12 +6,9 @@
 
 from __future__ import annotations
 
-from typing import TypeVar, cast
-
 import lca.layer4_app.defaults  # noqa: F401 — 触发默认注册
 from lca.contracts.protocols import (
     BrainStrategy,
-    EventBus,
     LLMAdapter,
     MemorySystem,
     Observability,
@@ -20,16 +17,11 @@ from lca.contracts.protocols import (
     Tool,
 )
 from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
-from lca.layer0_infra.component_registry import ComponentRegistry, get_global_registry
-from lca.layer1_cognitive.body.action_handlers import build_default_action_registry
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer3_agent.base_agent import BaseAgent
+from lca.contracts.role_team import TeamConfig
 from lca.layer3_agent.supervisor import Supervisor
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
-
-T = TypeVar("T")
+from lca.layer4_app.assembly import assemble_base_agent
+from lca.layer4_app.defaults import build_team_transport, ensure_defaults
 
 
 class Agent:
@@ -61,83 +53,20 @@ class Agent:
         state_store: str | StateStore = "memory",
         brain_strategy: str | BrainStrategy = "default",
     ):
-        reg = get_global_registry()
-
-        permission_manifest = ToolPermissionManifest(allowed_tools=[t.name for t in tools])
-        role_profile = RoleProfile(
+        ensure_defaults()
+        self._base_agent = assemble_base_agent(
             role=role,
             goal=goal,
             backstory=backstory,
-            tool_permission_manifest=permission_manifest,
-        )
-
-        obs = self._resolve(reg, "observability", observability)
-        mem = self._resolve(reg, "memory", memory)
-        ss = self._resolve(reg, "state_store", state_store)
-
-        # 构建 ActionRegistry —— Body 和 DecisionParser 共享同一实例，
-        # 保证"执行器支持什么"与"解析器校验什么"永远一致
-        tool_reg = SimpleToolRegistry()
-        for t in tools:
-            tool_reg.register(t)
-        safe_exec = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=[t.name for t in tools]), obs
-        )
-        from lca.layer4_app.defaults import build_default_transport_registry
-
-        transport_reg = build_default_transport_registry()
-        action_registry = build_default_action_registry(tool_reg, safe_exec, transport_reg)
-
-        # 解析 BrainStrategy：字符串走 StrategyRegistry（验证存在性），实例直接使用
-        brain: BrainStrategy
-        if isinstance(brain_strategy, str):
-            from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
-
-            strategy_reg = get_global_strategy_registry()
-            if strategy_reg.resolve(brain_strategy) is None:
-                raise ValueError(
-                    f"Unknown brain_strategy: {brain_strategy!r}. Available: {strategy_reg.list()}"
-                )
-            tools_desc = ", ".join(t.name for t in tools) or "(无可用工具)"
-            from lca.layer4_app.defaults import _build_brain
-
-            brain = _build_brain(llm, role_profile, tools_desc, action_registry=action_registry)
-        else:
-            brain = brain_strategy
-
-        from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
-            DefaultStepOutcomePolicy,
-        )
-        from lca.layer4_app.defaults import (
-            _build_hooks,
-            build_body,
-            build_runtime,
-        )
-
-        body = build_body(
-            tools, obs, transport_registry=transport_reg, action_registry=action_registry
-        )
-        event_bus: EventBus = self._resolve(reg, "event_bus", "simple")
-        hooks = _build_hooks(obs, event_bus)
-
-        runtime = build_runtime(
-            brain, body, mem, hooks, ss, outcome_policy=DefaultStepOutcomePolicy()
-        )
-        self._base_agent = BaseAgent(
-            runtime,
-            role_profile,
+            tools=tools,
+            llm=llm,
             max_steps=max_steps,
             max_wall_clock_seconds=max_wall_clock_seconds,
+            memory=memory,
+            observability=observability,
+            state_store=state_store,
+            brain_strategy=brain_strategy,
         )
-
-    @staticmethod
-    def _resolve(reg: ComponentRegistry, category: str, value: str | T) -> T:
-        if isinstance(value, str):
-            impl = reg.resolve(category, value)
-            if impl is None:
-                raise ValueError(f"Unknown {category}: {value!r}. Available: {reg.list(category)}")
-            return cast("T", impl())
-        return value
 
     async def run(self, task: str) -> Result:
         return await self._base_agent.execute(task)
@@ -180,8 +109,6 @@ class MultiAgentTeam:
         )
         base_members = [m._base_agent for m in members]
         base_supervisor = supervisor._as_supervisor() if supervisor else None
-        from lca.layer4_app.defaults import build_team_transport
-
         transport, roster_desc = build_team_transport(base_members)
         self._orchestrator: TeamEntrypoint = TeamOrchestrator(
             base_members,
