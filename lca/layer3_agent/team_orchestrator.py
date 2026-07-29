@@ -10,14 +10,11 @@ L3 层职责：
 
 from __future__ import annotations
 
-from typing import cast
-
 from lca.contracts.protocols import (
     AgentTransport,
     OrchestrationContext,
     OrchestrationStrategy,
     SharedMemoryStore,
-    SupervisorProtocol,
     TeamEntrypoint,
     ToolRegistry,
 )
@@ -76,7 +73,7 @@ class TeamOrchestrator(TeamEntrypoint):
         self._context = OrchestrationContext(
             members=members,
             config=config,
-            supervisor=cast("SupervisorProtocol | None", supervisor),
+            supervisor=supervisor,
             transport=transport,
             roster_desc=roster_desc,
             team_id=self.team_id,

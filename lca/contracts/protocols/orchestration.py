@@ -6,7 +6,10 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from lca.contracts.invocation import InvocationContext
+from lca.contracts.mechanisms import Hook
 from lca.contracts.memory import MemoryRecord
+from lca.contracts.message import AgentMessage
 from lca.contracts.protocols.agent import AgentEntrypoint
 from lca.contracts.protocols.cognition import CompletionPolicy
 from lca.contracts.protocols.infra import AgentTransport
@@ -17,12 +20,20 @@ from lca.contracts.team_progress import DelegationLedgerProtocol
 
 @runtime_checkable
 class SupervisorProtocol(Protocol):
-    """Supervisor 最小接口 —— contracts 层不依赖 L3 具体类。"""
+    """Supervisor 最小接口 —— contracts 层不依赖 L3 具体类。
+
+    签名与 SimpleAgent 对齐，通过结构类型（structural typing）自然满足，
+    无需显式子类。TeamOrchestrator 直接传入 SimpleAgent 即可。
+    """
 
     async def execute(
-        self, task: str, team_progress: DelegationLedgerProtocol | None = None
+        self,
+        task: str | AgentMessage,
+        ctx: InvocationContext | None = None,
+        team_progress: DelegationLedgerProtocol | None = None,
+        **context: str,
     ) -> Result: ...
-    def register_hook(self, hook_name: str, hook_fn: object) -> None: ...
+    def register_hook(self, hook_name: str, hook_fn: Hook) -> None: ...
     def install_completion_guard(self, policy: CompletionPolicy) -> None: ...
 
 

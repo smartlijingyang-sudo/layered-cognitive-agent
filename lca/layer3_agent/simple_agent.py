@@ -14,6 +14,7 @@ from lca.contracts.mechanisms import Hook
 from lca.contracts.message import AgentMessage, agent_message_as_text, agent_message_text
 from lca.contracts.protocols import AgentEntrypoint, CompletionPolicy, Runtime
 from lca.contracts.protocols.capabilities import HookRegistryHolder
+from lca.contracts.protocols.orchestration import SupervisorProtocol
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import StateSnapshot
@@ -26,7 +27,7 @@ def _task_as_text(task: str | AgentMessage) -> str:
     return task
 
 
-class SimpleAgent(AgentEntrypoint):
+class SimpleAgent(AgentEntrypoint, SupervisorProtocol):
     """单个 Agent 的运行时封装。
 
     持有 Runtime（认知闭环）和 RoleProfile（角色配置），
