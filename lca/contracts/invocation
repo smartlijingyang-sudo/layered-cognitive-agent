@@ -8,7 +8,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class InvocationContext:
-    """一次调用的元数据：跨 AgentRuntime / TeamRuntime / Runtime 统一透传，
+    """一次调用的元数据：跨 AgentEntrypoint / TeamEntrypoint / Runtime 统一透传，
     取代原先隐式的 **context: str（任何调用方可以传任意 kwarg，无编译期保证）。
     """
 

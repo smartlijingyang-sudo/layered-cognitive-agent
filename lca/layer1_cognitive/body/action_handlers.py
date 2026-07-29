@@ -19,7 +19,7 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
-from lca.contracts.state import TypedState, _current_delegator
+from lca.contracts.state import TypedState
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 
 _POLL_INTERVAL_S = 0.05
@@ -97,7 +97,8 @@ class DelegateOperation(ActionOperation):
             raise ToolExecutionError(f"{decision.action_type} 动作缺少 delegate_to 规格")
         transport = self._transport_registry.resolve(spec.protocol)
         agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
-        _current_delegator.set(state.agent_role)
+        with delegator_scope(state.agent_role):
+            task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         return transport, task_id
 
@@ -114,7 +115,8 @@ class HandoffOperation(ActionOperation):
             raise ToolExecutionError("handoff 动作缺少 delegate_to 规格")
         transport = self._transport_registry.resolve(spec.protocol)
         agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
-        _current_delegator.set(state.agent_role)
+        with delegator_scope(state.agent_role):
+            task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
         return Observation(
             observation_id=_new_id("obs"),

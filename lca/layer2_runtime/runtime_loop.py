@@ -17,10 +17,29 @@ from lca.contracts.protocols import (
     Body,
     BrainStrategy,
     MemorySystem,
+    RosterAware,
     Runtime,
+    SharedStoreBindable,
     StateStore,
     StepOutcomePolicy,
+    TransportBindable,
 )
+
+
+class CognitiveRuntime(Runtime):
+    ...
+
+    def configure(self, **capabilities: Any) -> None:
+        if "transport" in capabilities and isinstance(self.body, TransportBindable):
+            self.body.bind_transport(capabilities["transport"])
+        if "team_roster" in capabilities and isinstance(self.brain, RosterAware):
+            self.brain.set_team_roster(capabilities["team_roster"])
+        if "shared_memory" in capabilities and isinstance(self.memory, SharedStoreBindable):
+            self.memory.bind_shared_store(capabilities["shared_memory"])
+        if "team_progress" in capabilities:
+            self._team_progress = capabilities["team_progress"]
+
+
 from lca.contracts.result import (
     ApprovalPendingError,
     BudgetExceededError,

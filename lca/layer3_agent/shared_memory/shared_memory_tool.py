@@ -2,7 +2,7 @@
 
 设计意图（ADR-0016）：
 团队成员在单体循环内通过 Body → use_tool → ToolRegistry 访问共享存储，
-与调用 calculator 等工具无区别。不改 Body / Runtime / AgentRuntime 协议。
+与调用 calculator 等工具无区别。不改 Body / Runtime / AgentEntrypoint 协议。
 
 ops:
   - read:  读取 layer 全部记录（payload=list[str content]）

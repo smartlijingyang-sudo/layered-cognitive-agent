@@ -7,7 +7,7 @@ from lca.contracts.protocols import (
     OrchestrationContext,
     OrchestrationStrategy,
     SharedMemoryStore,
-    TeamRuntime,
+    TeamEntrypoint,
     ToolRegistry,
 )
 from lca.contracts.result import Result
@@ -19,7 +19,7 @@ from lca.layer3_agent.shared_memory.shared_memory_tool import SharedMemoryTool
 from lca.layer3_agent.supervisor import Supervisor
 
 
-class TeamOrchestrator(TeamRuntime):
+class TeamOrchestrator(TeamEntrypoint):
     """
     支持多种组织形态（hierarchical / sequential / parallel / graph / debate），
     通过 OrchestrationStrategyRegistry 解析策略，不再 if/elif 硬编码。

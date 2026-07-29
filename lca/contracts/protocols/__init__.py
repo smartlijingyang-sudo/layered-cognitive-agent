@@ -14,7 +14,8 @@ from lca.contracts.mechanisms import (
     NamedRegistryProtocol,
     RegistryProtocol,
 )
-from lca.contracts.protocols.agent import AgentRuntime, TeamRuntime
+from lca.contracts.protocols.agent import AgentEntrypoint, TeamEntrypoint
+from lca.contracts.protocols.capabilities import RosterAware, SharedStoreBindable, TransportBindable
 from lca.contracts.protocols.cognition import (
     BrainStrategy,
     CompletionPolicy,
@@ -51,7 +52,7 @@ from lca.contracts.protocols.runtime import Runtime, StepOutcomePolicy
 from lca.contracts.types import StepOutcome
 
 __all__ = [
-    "AgentRuntime",
+    "AgentEntrypoint",
     "AgentTransport",
     "Body",
     "BrainStrategy",
@@ -73,9 +74,11 @@ __all__ = [
     "PromptManager",
     "Reasoner",
     "RegistryProtocol",
+    "RosterAware",
     "Runtime",
     "SafeExecutor",
     "SharedMemoryStore",
+    "SharedStoreBindable",
     "SkillRouter",
     "StateEvaluator",
     "StatePredictor",
@@ -85,8 +88,9 @@ __all__ = [
     "Synthesizer",
     "TaskCoordinator",
     "TaskDecomposer",
-    "TeamRuntime",
+    "TeamEntrypoint",
     "Tool",
     "ToolRegistry",
+    "TransportBindable",
     "TransportRegistryProtocol",
 ]

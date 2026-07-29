@@ -33,7 +33,7 @@ def _make_result(
 
 
 class _FakeMember:
-    """模拟 AgentRuntime，execute 返回预设 Result。"""
+    """模拟 AgentEntrypoint，execute 返回预设 Result。"""
 
     def __init__(self, result: Result) -> None:
         self._result = result

@@ -1812,7 +1812,7 @@ This section contains the contents of the repository's files.
 30: | **Result** | Runtime 最终输出契约，含 status / output / lessons / budget_used / trace |
 31: | **RoleProfile / TeamConfig** | 角色设定契约（role/goal/backstory/tool 权限）与团队编排契约（process 类型/共享记忆层） |
 32: | **TeamOrchestrator / Supervisor** | 团队编排器（hierarchical/sequential/graph/debate）与单向上委派汇总角色 |
-33: | **TeamRuntime / TeamMessage** | 团队级运行时与跨 Agent 消息契约 |
+33: | **TeamEntrypoint / TeamMessage** | 团队级运行时与跨 Agent 消息契约 |
 34: | **Budget** | 多维度预算控制对象（token / cost / steps / wall_clock），超限触发 BudgetExceededError |
 35: | **SkillRouter** | 技能路由协议，按 trigger_pattern 匹配任务并召回对应 SkillRecord |
 36: | **Synthesizer** | 将多步结果合成为最终输出的组件 |
@@ -2587,7 +2587,7 @@ This section contains the contents of the repository's files.
 16: | `graph` | 预留：基于 DAG 的自定义工作流 |
 17: | `debate` | 预留：多 Agent 辩论达成共识 |
 18: 
-19: `TeamOrchestrator` 通过 `OrchestrationStrategyRegistry` 按 `process` 字段解析编排策略实例，不再使用 if/elif 分支。新增编排模式必须新建一个实现 `OrchestrationStrategy` 协议的独立类并注册到 registry——不是在已有策略类里加分支，而是"一个新类 = 一种新策略"，契合开闭原则。`TeamOrchestrator` 自身显式声明 `class TeamOrchestrator(TeamRuntime)`，组合根 `MultiAgentTeam` 以 `self._orchestrator: TeamRuntime = ...` 持有它，mypy 在提交时自动校验签名兼容性（见 ADR-0010）。
+19: `TeamOrchestrator` 通过 `OrchestrationStrategyRegistry` 按 `process` 字段解析编排策略实例，不再使用 if/elif 分支。新增编排模式必须新建一个实现 `OrchestrationStrategy` 协议的独立类并注册到 registry——不是在已有策略类里加分支，而是"一个新类 = 一种新策略"，契合开闭原则。`TeamOrchestrator` 自身显式声明 `class TeamOrchestrator(TeamEntrypoint)`，组合根 `MultiAgentTeam` 以 `self._orchestrator: TeamEntrypoint = ...` 持有它，mypy 在提交时自动校验签名兼容性（见 ADR-0010）。
 20: 
 21: `graph` 和 `debate` 模式已挂载可插拔入口（`GraphStrategy` / `DebateStrategy` 占位实现），具体实现见子 PR #3a / #3b。覆盖测试 `test_orchestration_coverage.py` 保证 `TeamConfig.process` 的 Literal 值集合恒等于 registry 的 key 集合——声明与实现永不脱节。
 22: 
@@ -4480,10 +4480,10 @@ This section contains the contents of the repository's files.
 <file path="lca/layer3_agent/base_agent.py">
  1: """BaseAgent —— 持有 Runtime + Brain + Body + Memory 视图。"""
  2: from __future__ import annotations
- 3: from lca.contracts.protocols import AgentRuntime, Runtime
+ 3: from lca.contracts.protocols import AgentEntrypoint, Runtime
  4: from lca.contracts.result import Result
  5: from lca.contracts.role_team import RoleProfile
- 6: class BaseAgent(AgentRuntime):
+ 6: class BaseAgent(AgentEntrypoint):
  7:     """单个 Agent 的运行时封装。"""
  8:     def __init__(
  9:         self,
@@ -4961,7 +4961,7 @@ This section contains the contents of the repository's files.
  5:     OrchestrationContext,
  6:     OrchestrationStrategy,
  7:     SharedMemoryStore,
- 8:     TeamRuntime,
+ 8:     TeamEntrypoint,
  9: )
 10: from lca.contracts.result import Result
 11: from lca.contracts.role_team import TeamConfig
@@ -4969,7 +4969,7 @@ This section contains the contents of the repository's files.
 13: from lca.layer3_agent.base_agent import BaseAgent
 14: from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 15: from lca.layer3_agent.supervisor import Supervisor
-16: class TeamOrchestrator(TeamRuntime):
+16: class TeamOrchestrator(TeamEntrypoint):
 17:     """
 18:     支持多种组织形态（hierarchical / sequential / parallel / graph / debate），
 19:     通过 OrchestrationStrategyRegistry 解析策略，不再 if/elif 硬编码。
@@ -5032,7 +5032,7 @@ This section contains the contents of the repository's files.
  12:     MemorySystem,
  13:     Observability,
  14:     StateStore,
- 15:     TeamRuntime,
+ 15:     TeamEntrypoint,
  16:     Tool,
  17: )
  18: from lca.contracts.result import Result
@@ -5175,7 +5175,7 @@ This section contains the contents of the repository's files.
 155:         base_supervisor = supervisor._as_supervisor() if supervisor else None
 156:         from lca.layer4_app.defaults import build_team_transport
 157:         transport, roster_desc = build_team_transport(base_members)
-158:         self._orchestrator: TeamRuntime = TeamOrchestrator(
+158:         self._orchestrator: TeamEntrypoint = TeamOrchestrator(
 159:             base_members,
 160:             config,
 161:             base_supervisor,
@@ -5564,12 +5564,12 @@ This section contains the contents of the repository's files.
 145:     ) -> Result: ...
 146:     def configure(self, **capabilities: Any) -> None: ...
 147: @runtime_checkable
-148: class AgentRuntime(Protocol):
+148: class AgentEntrypoint(Protocol):
 149:     async def execute(self, task: str, **context: str) -> Result: ...
 150: @runtime_checkable
-151: class TeamRuntime(Protocol):
+151: class TeamEntrypoint(Protocol):
 152:     """团队级入口契约：接收 objective，跑完编排后返回 Result。
-153:     区别于 AgentRuntime.execute：语义单位是"团队"而非单个 Agent，
+153:     区别于 AgentEntrypoint.execute：语义单位是"团队"而非单个 Agent，
 154:     不携带 max_steps（预算下沉到各 BaseAgent 自身）。
 155:     """
 156:     async def run(self, objective: str) -> Result: ...

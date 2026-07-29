@@ -31,7 +31,7 @@ class TeamAssignment:
     """团队级分工单元 —— 与单体内部计划项语义分离。
 
     - SubTask / 计划项：单体 Brain 内部的任务分解结果（不跨 Agent）
-    - TeamAssignment：TeamRuntime / OrchestrationStrategy 对成员的分工
+    - TeamAssignment：TeamEntrypoint / OrchestrationStrategy 对成员的分工
     """
 
     member_id: str

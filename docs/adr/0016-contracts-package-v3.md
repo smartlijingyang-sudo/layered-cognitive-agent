@@ -31,7 +31,7 @@ lca/contracts/
 │   ├── embodiment.py     # L1 body：Body / FallbackPolicy
 │   ├── memory.py         # L1 memory：MemorySystem
 │   ├── runtime.py        # L2：Runtime / StepOutcomePolicy
-│   ├── agent.py          # L3：AgentRuntime / TeamRuntime
+│   ├── agent.py          # L3：AgentEntrypoint / TeamEntrypoint
 │   └── orchestration.py  # L3 团队：Orchestration* / Synthesizer / SharedMemoryStore
 └── …（既有 decision/state/result 等数据文件保留）
 ```

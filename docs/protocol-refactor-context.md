@@ -111,8 +111,8 @@ lca/contracts/
 | `AgentTransport` | attr: `protocol_name`; `send_task(agent_card, subtask, context_refs) -> str`, `poll_status(task_id) -> str`, `receive_result(task_id) -> Observation` | Agent 间传输 |
 | **运行时** | | |
 | `Runtime` | `run(task, max_steps, max_wall_clock_seconds, **context) -> Result`, `configure(**capabilities)` | Agent 运行时 |
-| `AgentRuntime` | `execute(task, **context) -> Result` | 单 Agent 运行时 |
-| `TeamRuntime` | `run(objective) -> Result` | 团队运行时 |
+| `AgentEntrypoint` | `execute(task, **context) -> Result` | 单 Agent 运行时 |
+| `TeamEntrypoint` | `run(objective) -> Result` | 团队运行时 |
 | `OrchestrationStrategy` | `run(context, objective) -> Result` | 团队编排策略 |
 | **注册表** | | |
 | `RegistryProtocol` | `register(name, impl)`, `resolve(name) -> Any`, `list() -> list[str]`, `__contains__(name) -> bool` | 通用命名注册表 |
@@ -321,7 +321,7 @@ decision.py ←── approval.py（imports StructuredDecision）
 | layer0_infra | 11 | ~18 | LLMAdapter, Tool, ToolRegistry, Observability, RegistryProtocol, StateStore, AgentTransport |
 | layer1_cognitive | 18 | ~45 | BrainStrategy, Body, MemorySystem, EventBus, HookRegistry, PromptManager, SkillRouter, ActionHandler |
 | layer2_runtime | 5 | ~15 | Runtime, StepOutcomePolicy, FallbackHandler, Hook, HookRegistry |
-| layer3_agent | 10 | ~22 | OrchestrationStrategy, TeamRuntime, AgentTransport, TransportRegistryProtocol |
+| layer3_agent | 10 | ~22 | OrchestrationStrategy, TeamEntrypoint, AgentTransport, TransportRegistryProtocol |
 | layer4_app | 2 | ~8 | 几乎所有符号（组装根） |
 
 **被 import 最多的 contracts 模块**：
@@ -350,7 +350,7 @@ decision.py ←── approval.py（imports StructuredDecision）
 |------|------|
 | **`Tool` Protocol vs `ToolCall` dataclass** | `protocols.py` 定义 `Tool` Protocol（工具接口），`decision.py` 定义 `ToolCall`（工具调用请求）。名字相近但一个是能力声明、一个是调用实例 |
 | **`ActionHandler` 出现两处** | `protocols.py` 和 `action.py` 都涉及 ActionHandler，需要确认是否有重复定义 |
-| **`Runtime` vs `AgentRuntime` vs `TeamRuntime`** | 三个运行时 Protocol，边界不清晰。`Runtime.configure()` vs `AgentRuntime.execute()` vs `TeamRuntime.run()` 职责重叠 |
+| **`Runtime` vs `AgentEntrypoint` vs `TeamEntrypoint`** | 三个运行时 Protocol，边界不清晰。`Runtime.configure()` vs `AgentEntrypoint.execute()` vs `TeamEntrypoint.run()` 职责重叠 |
 | **`RegistryProtocol` vs `ToolRegistry` vs `ActionRegistryProtocol` vs `TransportRegistryProtocol`** | 4 种注册表 Protocol，泛化程度不同。`RegistryProtocol` 是通用的，其他三个是特化的，是否有统一的可能？ |
 | **`EventBus` vs `Hook` vs `HookRegistry`** | 三套事件/钩子机制共存，边界不清 |
 
@@ -485,7 +485,7 @@ tests/
    - `protocols/execution.py` — Body, Tool, ToolRegistry, SafeExecutor, ActionHandler, FallbackHandler
    - `protocols/memory.py` — MemorySystem, SharedMemoryStore
    - `protocols/events.py` — EventBus, Hook, HookRegistry
-   - `protocols/runtime.py` — Runtime, AgentRuntime, TeamRuntime, OrchestrationStrategy
+   - `protocols/runtime.py` — Runtime, AgentEntrypoint, TeamEntrypoint, OrchestrationStrategy
    - `protocols/transport.py` — AgentTransport, TransportRegistryProtocol
    - `protocols/prompt.py` — PromptManager, SkillRouter
    - `protocols/state.py` — StateStore
@@ -604,9 +604,9 @@ tests/
 
 | 文件 | 实现的 Protocol | 消费的 contracts 符号 |
 |------|----------------|---------------------|
-| `base_agent.py` | `BaseAgent(AgentRuntime)` | `AgentRuntime`, `Runtime`, `Result`, `RoleProfile` |
+| `base_agent.py` | `BaseAgent(AgentEntrypoint)` | `AgentEntrypoint`, `Runtime`, `Result`, `RoleProfile` |
 | `supervisor.py` | `Supervisor(BaseAgent)` | `AgentTransport`, `Runtime`, `RoleProfile` |
-| `team_orchestrator.py` | `TeamOrchestrator(TeamRuntime)` | `TeamRuntime`, `OrchestrationStrategy`, `OrchestrationContext`, `AgentTransport`, `SharedMemoryStore`, `Result`, `TeamConfig` |
+| `team_orchestrator.py` | `TeamOrchestrator(TeamEntrypoint)` | `TeamEntrypoint`, `OrchestrationStrategy`, `OrchestrationContext`, `AgentTransport`, `SharedMemoryStore`, `Result`, `TeamConfig` |
 | `group_chat.py` | `build_group_chat_graph()` 工厂 | `ExecutionGraph`, `GraphEdge`, `GraphNode` |
 | `orchestration_registry.py` | `OrchestrationStrategyRegistry(NamedRegistry)` | `OrchestrationStrategy` |
 | `orchestration_strategies/hierarchical.py` | `HierarchicalStrategy(OrchestrationStrategy)` | `OrchestrationStrategy`, `OrchestrationContext`, `Result`, `DelegationLedgerProtocol`, hooks |
@@ -620,7 +620,7 @@ tests/
 
 | 文件 | 消费的 contracts 符号 |
 |------|---------------------|
-| `api.py` | `BrainStrategy`, `EventBus`, `LLMAdapter`, `MemorySystem`, `Observability`, `StateStore`, `TeamRuntime`, `Tool`, `Result`, `RoleProfile`, `TeamConfig`, `ToolPermissionManifest` |
+| `api.py` | `BrainStrategy`, `EventBus`, `LLMAdapter`, `MemorySystem`, `Observability`, `StateStore`, `TeamEntrypoint`, `Tool`, `Result`, `RoleProfile`, `TeamConfig`, `ToolPermissionManifest` |
 | `defaults.py` | `AgentTransport`, `Body`, `BrainStrategy`, `EventBus`, `HookRegistry`, `LLMAdapter`, `MemorySystem`, `Observability`, `StateStore`, `StepOutcomePolicy`, `Tool`, `TransportRegistryProtocol`, `ActionRegistryProtocol`, `Observation`, `RoleProfile`, `ToolPermissionManifest` |
 
 ---

@@ -25,7 +25,7 @@ PR-0 ADR定稿
        └─ PR-7 TeamAssignment/SharedMemoryStore归位
                 └─ PR-8 L1~L3实现层目录补齐 ── 依赖 PR-2/3/4/5/6/7
                      └─ PR-9 StepRuntime标准编排 + 15.4 CI + 单体集成测试
-                          └─ PR-10 SharedMemoryTool + DefaultTeamRuntime + 15.5/15.6 CI
+                          └─ PR-10 SharedMemoryTool + DefaultTeamEntrypoint + 15.5/15.6 CI
                                └─ PR-11 端到端多agent集成测试（第16节场景）
                                     └─ PR-12 全量验收清单核验与文档收口
 ```
@@ -40,7 +40,7 @@ PR-0 ADR定稿
 
 | 项目 | 内容 |
 |---|---|
-| **问题分析** | v2 遗留三处结构性缺口（团队编排算法缺失、共享存储访问路径未定义、DELEGATE 与 TeamRuntime 边界不清），若不先固化决策记录，后续 PR 评审时容易反复拉扯"为什么这么设计"，拖慢评审效率 |
+| **问题分析** | v2 遗留三处结构性缺口（团队编排算法缺失、共享存储访问路径未定义、DELEGATE 与 TeamEntrypoint 边界不清），若不先固化决策记录，后续 PR 评审时容易反复拉扯"为什么这么设计"，拖慢评审效率 |
 | **架构方案** | 仅新增 `docs/adr/ADR-0015-contracts-v3.md`，不改动任何代码。内容=本文档 v3 全文的浓缩版：五层依赖方向图、六条硬约束、v2→v3 变更摘要表（文档末尾附表）。作为后续所有 PR description 的引用锚点 |
 | **变更范围** | 仅新增 1 个 markdown 文件，零代码改动 |
 | **依赖** | 无 |
@@ -139,11 +139,11 @@ PR-0 ADR定稿
 | 项目 | 内容 |
 |---|---|
 | **问题分析** | v2 遗留缺口之一：团队级分工单元若与单体内部的 `SubTask` 共用同一类型，读者无法从类型本身分辨"这是单体内部计划还是团队分工"；`SharedMemoryStore` 若定义位置不对（比如误放在 L1 memory.py），会造成"单会话状态"和"团队共享状态"概念混淆 |
-| **架构方案** | 1) `types.py` 新增 `TeamAssignment(member_id, objective, depends_on)`，与 `SubTask` 语义分离并在 docstring 里写明区别；2) `protocols/orchestration.py` 新增 `SharedMemoryStore` Protocol（`read/write/delete`，按 `team_id` 分区）+ `OrchestrationContext`（team_id/members/shared_memory）+ `TeamRuntime`/`OrchestrationStrategy`/`Synthesizer` 三个协议 |
+| **架构方案** | 1) `types.py` 新增 `TeamAssignment(member_id, objective, depends_on)`，与 `SubTask` 语义分离并在 docstring 里写明区别；2) `protocols/orchestration.py` 新增 `SharedMemoryStore` Protocol（`read/write/delete`，按 `team_id` 分区）+ `OrchestrationContext`（team_id/members/shared_memory）+ `TeamEntrypoint`/`OrchestrationStrategy`/`Synthesizer` 三个协议 |
 | **变更范围** | `lca/contracts/types.py`、`lca/contracts/protocols/orchestration.py`（新增内容） |
 | **依赖** | PR-1、PR-6（`TeamAssignment` 与已迁移的 `Turn`/`SubTask` 处于同一文件，放在同一 PR 里改动面更小） |
 | **迁移验证** | 1) 全仓库搜索 `SharedMemoryStore` 定义，唯一命中位置应是 `orchestration.py`；2) 搜索 `TeamAssignment` 定义唯一命中 `types.py` 且与 `SubTask` 不共用同一个类（对应第 18 节验收标准）；3) 这一步只是契约定义，尚无实现，因此单测仅覆盖 Protocol 的 `isinstance`/类型检查层面，不涉及运行时行为 |
-| **效果** | 团队编排契约在 PR-1 时就已预留（`orchestration.py` 是七个协议文件之一），本 PR 第一次把内容填实，为 PR-10 的 `DefaultTeamRuntime` 实现提供类型基础 |
+| **效果** | 团队编排契约在 PR-1 时就已预留（`orchestration.py` 是七个协议文件之一），本 PR 第一次把内容填实，为 PR-10 的 `DefaultTeamEntrypoint` 实现提供类型基础 |
 | **风险与回滚** | 低风险（新增契约，无现有调用方）。回滚：删除新增类型定义即可 |
 
 ---
@@ -155,7 +155,7 @@ PR-0 ADR定稿
 | 项目 | 内容 |
 |---|---|
 | **问题分析** | PR-2 的 `import-linter` 分层规则引用了 `lca.cognition`/`lca.embodiment`/`lca.memory`/`lca.runtime`/`lca.agent`/`lca.orchestration` 六个包名，但如果这些实现包尚未按新命名规范创建，该规则实际上是"空转"——规则存在但没有对应实体去验证 |
-| **架构方案** | 按文档第 13 节新增六个实现包及各自 `__init__.py`（写入"协议→子包→内置实现"映射文档），骨架内容包括：`cognition/{reasoner,decision_parser,critic,conflict_monitor,task_coordinator,completion_policy,task_decomposer,skill_router,prompt,planning}/`、`embodiment/{actions,tool_registry,safe_executor,fallback}/`、`memory/`、`runtime/{step_outcome}/`、`agent/`、`orchestration/{shared_memory,strategy,synthesizer}/`。本 PR **只建骨架和已有实现的物理归位**，不包含 StepRuntime/TeamRuntime 的核心编排逻辑（留给 PR-9/PR-10） |
+| **架构方案** | 按文档第 13 节新增六个实现包及各自 `__init__.py`（写入"协议→子包→内置实现"映射文档），骨架内容包括：`cognition/{reasoner,decision_parser,critic,conflict_monitor,task_coordinator,completion_policy,task_decomposer,skill_router,prompt,planning}/`、`embodiment/{actions,tool_registry,safe_executor,fallback}/`、`memory/`、`runtime/{step_outcome}/`、`agent/`、`orchestration/{shared_memory,strategy,synthesizer}/`。本 PR **只建骨架和已有实现的物理归位**，不包含 StepRuntime/TeamEntrypoint 的核心编排逻辑（留给 PR-9/PR-10） |
 | **变更范围** | 六个顶级包的目录结构、`__init__.py` |
 | **依赖** | PR-3、PR-4、PR-5、PR-6、PR-7（需要契约层命名/结构先稳定，否则实现层归位后还要跟着契约层改名返工） |
 | **迁移验证** | 1) `import-linter` 的 `layered-architecture` 契约首次对六个真实包名转绿（此前该规则引用的包名可能不存在或结构不符）；2) 全量单测零失败；3) 人工核对每个 `__init__.py` 映射表与实际类文件逐行对应 |
@@ -180,17 +180,17 @@ PR-0 ADR定稿
 
 ## 阶段三：多智能体验收（v3 核心新增，本次修订的验收锚点）
 
-### PR-10：SharedMemoryTool + DefaultTeamRuntime + BroadcastOrchestrationStrategy 落地 + 15.5/15.6 CI
+### PR-10：SharedMemoryTool + DefaultTeamEntrypoint + BroadcastOrchestrationStrategy 落地 + 15.5/15.6 CI
 
 | 项目 | 内容 |
 |---|---|
-| **问题分析** | 这是 v2→v3 修复的两个最核心缺口：(1) `TeamRuntime`/`OrchestrationStrategy` 契约存在但从未有可执行编排算法；(2) `SharedMemoryStore` 契约存在但团队成员"如何在单体循环内部实际访问到它"从未定义，容易被后续实现绕过契约直接持有引用，破坏"团队协作对 Body/Runtime/AgentRuntime 三层协议零改动"这条设计初衷 |
-| **架构方案** | **核心设计决策**：共享存储不新增协议，而是包装成一个普通 `Tool`——团队成员看到的就是"多了一个叫 `shared_memory` 的工具"，走 `Body.act` 现有的第二级分发（`ToolCallOperation → ToolRegistry.get → SafeExecutor.execute`），与调用任何其他工具无区别。具体落地：1) `lca/orchestration/shared_memory/shared_memory_tool.py`——`SharedMemoryTool(Tool)`，`team_id` 构造期闭包绑定，`run(op, key, value)` 支持 read/write/delete；2) `lca/orchestration/team_runtime.py`——`DefaultTeamRuntime`，构造期绑定 `OrchestrationContext`/`strategy`/`synthesizer`，`run(objective)` 只做两步：`dispatch` → `synthesize`；3) `lca/orchestration/strategy/broadcast_strategy.py`——`BroadcastOrchestrationStrategy`，全员并发、无依赖拓扑，把 objective 按模板改写成每个成员的 `TeamAssignment` 后并发调用现成的 `AgentRuntime.execute()`，不重新发明单体循环；4) 落地 15.5（`dispatch`→`synthesize` 顺序检查）与 15.6（禁止 `cognition/`/`embodiment/` 目录下任何文件直接 import `orchestration.shared_memory` 具体实现类，保证共享内存只能作为 Tool 被访问） |
+| **问题分析** | 这是 v2→v3 修复的两个最核心缺口：(1) `TeamEntrypoint`/`OrchestrationStrategy` 契约存在但从未有可执行编排算法；(2) `SharedMemoryStore` 契约存在但团队成员"如何在单体循环内部实际访问到它"从未定义，容易被后续实现绕过契约直接持有引用，破坏"团队协作对 Body/Runtime/AgentEntrypoint 三层协议零改动"这条设计初衷 |
+| **架构方案** | **核心设计决策**：共享存储不新增协议，而是包装成一个普通 `Tool`——团队成员看到的就是"多了一个叫 `shared_memory` 的工具"，走 `Body.act` 现有的第二级分发（`ToolCallOperation → ToolRegistry.get → SafeExecutor.execute`），与调用任何其他工具无区别。具体落地：1) `lca/orchestration/shared_memory/shared_memory_tool.py`——`SharedMemoryTool(Tool)`，`team_id` 构造期闭包绑定，`run(op, key, value)` 支持 read/write/delete；2) `lca/orchestration/team_runtime.py`——`DefaultTeamEntrypoint`，构造期绑定 `OrchestrationContext`/`strategy`/`synthesizer`，`run(objective)` 只做两步：`dispatch` → `synthesize`；3) `lca/orchestration/strategy/broadcast_strategy.py`——`BroadcastOrchestrationStrategy`，全员并发、无依赖拓扑，把 objective 按模板改写成每个成员的 `TeamAssignment` 后并发调用现成的 `AgentEntrypoint.execute()`，不重新发明单体循环；4) 落地 15.5（`dispatch`→`synthesize` 顺序检查）与 15.6（禁止 `cognition/`/`embodiment/` 目录下任何文件直接 import `orchestration.shared_memory` 具体实现类，保证共享内存只能作为 Tool 被访问） |
 | **变更范围** | `lca/orchestration/{team_runtime.py, shared_memory/, strategy/, synthesizer/}`、`tools/ci/check_team_runtime_order.py`、`tools/ci/check_shared_memory_access_path.py` |
 | **依赖** | PR-9（必须等单体循环有集成测试兜底后再启动，避免两条链路同时出问题时难以定位问题源头——这是文档 17.10 明确写出的顺序约束）、PR-7（`SharedMemoryStore`/`TeamAssignment` 契约已就位）、PR-8（`orchestration/` 包骨架已存在） |
-| **迁移验证/验收** | 1) 15.5/15.6 两条 CI 转绿；2) 单测覆盖：`SharedMemoryTool` 的 read/write/delete 三个 op、`BroadcastOrchestrationStrategy.dispatch` 的并发调用（用 mock `AgentRuntime` 验证确实是并发而非串行）、`DefaultTeamRuntime.run` 确认 `dispatch` 返回值原样传给 `synthesize`（而非重新构造）；3) 组装期依赖注入的示例代码（文档 10.2 节"researcher + writer 两人团队"）需要有对应的构造函数级单测，验证每个成员的 `ToolRegistry` 确实被注入了绑定同一 `team_id` 的 `SharedMemoryTool` 实例 |
-| **效果** | 团队协作能力第一次做到"`AgentRuntime`/`Runtime`/`Body` 三层协议一个字不改"——完全通过组装期依赖注入实现，验证了文档"团队协作是纯粹的依赖注入问题，不是契约设计问题"这一核心论断 |
-| **风险与回滚** | **高风险**（新链路，无历史生产验证）。建议：1) 先在单一团队场景（两人团队）灰度；2) `SharedMemoryStore` 初期用 `InMemorySharedMemoryStore`，避免引入外部存储依赖增加排查复杂度；3) 回滚预案：`TeamRuntime` 是全新能力，未上生产前可以整体 feature-flag 关闭，不影响单体链路 |
+| **迁移验证/验收** | 1) 15.5/15.6 两条 CI 转绿；2) 单测覆盖：`SharedMemoryTool` 的 read/write/delete 三个 op、`BroadcastOrchestrationStrategy.dispatch` 的并发调用（用 mock `AgentEntrypoint` 验证确实是并发而非串行）、`DefaultTeamEntrypoint.run` 确认 `dispatch` 返回值原样传给 `synthesize`（而非重新构造）；3) 组装期依赖注入的示例代码（文档 10.2 节"researcher + writer 两人团队"）需要有对应的构造函数级单测，验证每个成员的 `ToolRegistry` 确实被注入了绑定同一 `team_id` 的 `SharedMemoryTool` 实例 |
+| **效果** | 团队协作能力第一次做到"`AgentEntrypoint`/`Runtime`/`Body` 三层协议一个字不改"——完全通过组装期依赖注入实现，验证了文档"团队协作是纯粹的依赖注入问题，不是契约设计问题"这一核心论断 |
+| **风险与回滚** | **高风险**（新链路，无历史生产验证）。建议：1) 先在单一团队场景（两人团队）灰度；2) `SharedMemoryStore` 初期用 `InMemorySharedMemoryStore`，避免引入外部存储依赖增加排查复杂度；3) 回滚预案：`TeamEntrypoint` 是全新能力，未上生产前可以整体 feature-flag 关闭，不影响单体链路 |
 
 ---
 
@@ -229,7 +229,7 @@ PR-0 ADR定稿
 | `AgentState` 方法首参数恒为 `state` | PR-2、PR-3 | CI 15.1 |
 | import-linter 分层契约全绿 | PR-2、PR-8 | CI 15.2 |
 | StepRuntime 九步顺序与文档一致 | PR-9 | CI 15.4 |
-| DefaultTeamRuntime dispatch→synthesize 顺序一致 | PR-10 | CI 15.5 |
+| DefaultTeamEntrypoint dispatch→synthesize 顺序一致 | PR-10 | CI 15.5 |
 | cognition/embodiment 不直接 import shared_memory 实现 | PR-10 | CI 15.6 |
 | SharedMemoryStore/TeamAssignment 定义位置唯一 | PR-7 | `grep` 定位 |
 | 第16节端到端场景集成测试通过 | PR-11 | 集成测试 job |

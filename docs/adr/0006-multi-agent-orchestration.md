@@ -16,7 +16,7 @@ Accepted
 | `graph` | 预留：基于 DAG 的自定义工作流 |
 | `debate` | 预留：多 Agent 辩论达成共识 |
 
-`TeamOrchestrator` 通过 `OrchestrationStrategyRegistry` 按 `process` 字段解析编排策略实例，不再使用 if/elif 分支。新增编排模式必须新建一个实现 `OrchestrationStrategy` 协议的独立类并注册到 registry——不是在已有策略类里加分支，而是"一个新类 = 一种新策略"，契合开闭原则。`TeamOrchestrator` 自身显式声明 `class TeamOrchestrator(TeamRuntime)`，组合根 `MultiAgentTeam` 以 `self._orchestrator: TeamRuntime = ...` 持有它，mypy 在提交时自动校验签名兼容性（见 ADR-0010）。
+`TeamOrchestrator` 通过 `OrchestrationStrategyRegistry` 按 `process` 字段解析编排策略实例，不再使用 if/elif 分支。新增编排模式必须新建一个实现 `OrchestrationStrategy` 协议的独立类并注册到 registry——不是在已有策略类里加分支，而是"一个新类 = 一种新策略"，契合开闭原则。`TeamOrchestrator` 自身显式声明 `class TeamOrchestrator(TeamEntrypoint)`，组合根 `MultiAgentTeam` 以 `self._orchestrator: TeamEntrypoint = ...` 持有它，mypy 在提交时自动校验签名兼容性（见 ADR-0010）。
 
 `graph` 和 `debate` 模式已挂载可插拔入口（`GraphStrategy` / `DebateStrategy` 占位实现），具体实现见子 PR #3a / #3b。覆盖测试 `test_orchestration_coverage.py` 保证 `TeamConfig.process` 的 Literal 值集合恒等于 registry 的 key 集合——声明与实现永不脱节。
 

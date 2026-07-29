@@ -3,18 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
+# 过渡期 re-export，见 ADR-0017；新代码请直接 import lca.contracts.delegation_context
+from lca.contracts.delegation_context import _delegator as _current_delegator  # noqa: F401
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.team_progress import DelegationLedgerProtocol
 from lca.contracts.types import Turn
-
-# 跨异步链路传递当前委派者角色：A delegate → B 时，A 的 role 写入此 var，
-# B 的 handler 读取后注入到 TypedState.delegated_by。
-_current_delegator: ContextVar[str] = ContextVar("current_delegator", default="")
 
 
 def _now() -> datetime:

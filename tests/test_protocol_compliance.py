@@ -10,7 +10,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.protocols import (
-    AgentRuntime,
+    AgentEntrypoint,
     AgentTransport,
     Body,
     BrainStrategy,
@@ -32,7 +32,7 @@ from lca.contracts.protocols import (
     StateStore,
     TaskCoordinator,
     TaskDecomposer,
-    TeamRuntime,
+    TeamEntrypoint,
     Tool,
     ToolRegistry,
 )
@@ -304,12 +304,12 @@ class TestL3ProtocolCompliance(unittest.TestCase):
 
     def test_base_agent_is_agent_runtime(self):
         agent, _, _ = self._build_base_agent()
-        self.assertIsInstance(agent, AgentRuntime)
+        self.assertIsInstance(agent, AgentEntrypoint)
 
     def test_supervisor_is_agent_runtime(self):
         _, rp, runtime = self._build_base_agent()
         sup = Supervisor(runtime, rp)
-        self.assertIsInstance(sup, AgentRuntime)
+        self.assertIsInstance(sup, AgentEntrypoint)
 
     def test_team_orchestrator_is_team_runtime(self):
         from lca.contracts.role_team import TeamConfig
@@ -318,7 +318,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         agent, _rp, _runtime = self._build_base_agent()
         config = TeamConfig(process="sequential")
         orchestrator = TeamOrchestrator([agent], config)
-        self.assertIsInstance(orchestrator, TeamRuntime)
+        self.assertIsInstance(orchestrator, TeamEntrypoint)
 
 
 class TestStrategyRegistryIntegration(unittest.TestCase):

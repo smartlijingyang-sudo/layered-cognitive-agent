@@ -16,7 +16,7 @@ from lca.contracts.protocols import (
     MemorySystem,
     Observability,
     StateStore,
-    TeamRuntime,
+    TeamEntrypoint,
     Tool,
 )
 from lca.contracts.result import Result
@@ -183,7 +183,7 @@ class MultiAgentTeam:
         from lca.layer4_app.defaults import build_team_transport
 
         transport, roster_desc = build_team_transport(base_members)
-        self._orchestrator: TeamRuntime = TeamOrchestrator(
+        self._orchestrator: TeamEntrypoint = TeamOrchestrator(
             base_members,
             config,
             base_supervisor,

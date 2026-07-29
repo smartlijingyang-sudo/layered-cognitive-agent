@@ -30,7 +30,7 @@
 | **Result** | Runtime 最终输出契约，含 status / output / lessons / budget_used / trace |
 | **RoleProfile / TeamConfig** | 角色设定契约（role/goal/backstory/tool 权限）与团队编排契约（process 类型/共享记忆层） |
 | **TeamOrchestrator / Supervisor** | 团队编排器（hierarchical/sequential/graph/debate）与单向上委派汇总角色 |
-| **TeamRuntime / TeamMessage** | 团队级运行时与跨 Agent 消息契约 |
+| **TeamEntrypoint / TeamMessage** | 团队级运行时与跨 Agent 消息契约 |
 | **Budget** | 多维度预算控制对象（token / cost / steps / wall_clock），超限触发 BudgetExceededError |
 | **SkillRouter** | 技能路由协议，按 trigger_pattern 匹配任务并召回对应 SkillRecord |
 | **Synthesizer** | 将多步结果合成为最终输出的组件 |
