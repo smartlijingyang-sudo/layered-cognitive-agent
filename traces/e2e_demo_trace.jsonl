@@ -1,5 +1,5 @@
-2026-07-28 20:15:57 [INFO] tests.test_e2e_real_llm_demo: ======================================================================
-2026-07-28 20:15:57 [INFO] tests.test_e2e_real_llm_demo:   Verify JSONL Trace Output
-2026-07-28 20:15:57 [INFO] tests.test_e2e_real_llm_demo: ======================================================================
-2026-07-28 20:15:59 [INFO] httpx: HTTP Request: POST https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions "HTTP/1.1 200 OK"
-2026-07-28 20:15:59 [INFO] tests.test_e2e_real_llm_demo: Trace file has 2394 lines
+2026-07-28 23:37:26 [INFO] tests.test_e2e_real_llm_demo: ======================================================================
+2026-07-28 23:37:26 [INFO] tests.test_e2e_real_llm_demo:   Verify JSONL Trace Output
+2026-07-28 23:37:26 [INFO] tests.test_e2e_real_llm_demo: ======================================================================
+2026-07-28 23:37:28 [INFO] httpx: HTTP Request: POST https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions "HTTP/1.1 200 OK"
+2026-07-28 23:37:28 [INFO] tests.test_e2e_real_llm_demo: Trace file has 2561 lines

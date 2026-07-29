@@ -1,8 +1,4 @@
-"""L4 极简开发者 API —— 三行创建 Agent，五行组建团队。
-
-支持通过注册表名字字符串或自定义协议实例来选择组件实现，
-无需修改框架源码即可替换任何可插拔组件。
-"""
+"""L4 极简开发者 API。"""
 
 from __future__ import annotations
 
@@ -17,28 +13,12 @@ from lca.contracts.protocols import (
     Tool,
 )
 from lca.contracts.result import Result
-from lca.contracts.role_team import TeamConfig
 from lca.layer3_agent.supervisor import Supervisor
-from lca.layer3_agent.team_orchestrator import TeamOrchestrator
-from lca.layer4_app.assembly import assemble_base_agent
-from lca.layer4_app.defaults import build_team_transport, ensure_defaults
+from lca.layer4_app.assembly import assemble_base_agent, assemble_team
+from lca.layer4_app.defaults import ensure_defaults
 
 
 class Agent:
-    """
-    三行上手的开发者入口：内部完成 L0-L3 全部对象的 DI 组装。
-
-    用法：
-        agent = Agent(role="研究员", goal="产出分析报告", backstory="十年经验", tools=[...], llm=llm)
-        result = await agent.run("分析新能源电池行业趋势")
-
-    可插拔参数（接受注册表名字字符串或满足协议的自定义实例）：
-        memory          — 默认 "simple"
-        observability   — 默认 "console"
-        state_store     — 默认 "memory"
-        brain_strategy  — 默认 "default"（ModularBrain + MAP 五模块）
-    """
-
     def __init__(
         self,
         role: str,
@@ -52,7 +32,7 @@ class Agent:
         observability: str | Observability = "console",
         state_store: str | StateStore = "memory",
         brain_strategy: str | BrainStrategy = "default",
-    ):
+    ) -> None:
         ensure_defaults()
         self._base_agent = assemble_base_agent(
             role=role,
@@ -84,39 +64,27 @@ class Agent:
 
 
 class MultiAgentTeam:
-    """
-    五行组建团队。
-
-    用法：
-        team = MultiAgentTeam(
-            members=[researcher, writer, critic],
-            process="hierarchical",
-            supervisor=supervisor_agent,
-        )
-        result = await team.run("产出行业研究报告")
-    """
-
     def __init__(
         self,
         members: list[Agent],
         process: TeamProcess = TeamProcess.HIERARCHICAL,
         supervisor: Agent | None = None,
         max_rounds: int | None = None,
-    ):
+        shared_memory_layers: list[str] | None = None,
+        graph_definition_ref: str | None = None,
+        strategy: object | None = None,
+    ) -> None:
         ensure_defaults()
-        config = TeamConfig(
-            process=process,
-            max_rounds=max_rounds,
-        )
         base_members = [m._base_agent for m in members]
         base_supervisor = supervisor._as_supervisor() if supervisor else None
-        transport, roster_desc = build_team_transport(base_members)
-        self._orchestrator: TeamEntrypoint = TeamOrchestrator(
-            base_members,
-            config,
-            base_supervisor,
-            transport=transport,
-            roster_desc=roster_desc,
+        self._orchestrator: TeamEntrypoint = assemble_team(
+            members=base_members,
+            process=process,
+            supervisor=base_supervisor,
+            max_rounds=max_rounds,
+            shared_memory_layers=shared_memory_layers,
+            graph_definition_ref=graph_definition_ref,
+            strategy=strategy,
         )
 
     async def run(self, objective: str) -> Result:

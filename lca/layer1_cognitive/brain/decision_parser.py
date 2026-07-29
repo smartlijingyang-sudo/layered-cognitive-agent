@@ -9,13 +9,13 @@ from __future__ import annotations
 import json
 import re
 
+from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import DelegationSpec, StructuredDecision, ToolCall
 from lca.contracts.enums import ActionType
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import DecisionParser
 from lca.contracts.semantic_keys import ORIGINAL_ACTION_TYPE
 from lca.contracts.state import TypedState
-from lca.layer1_cognitive.body.action_registry import ActionRegistryProtocol
 
 
 class SimpleDecisionParser(DecisionParser):

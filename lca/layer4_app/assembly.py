@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.protocols import (
     Body,
     BrainStrategy,
@@ -16,7 +17,9 @@ from lca.contracts.protocols import (
     MemorySystem,
     Observability,
     StateStore,
+    TeamEntrypoint,
     Tool,
+    TransportRegistryProtocol,
 )
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer0_infra.component_registry import ComponentRegistry, get_global_registry
@@ -24,7 +27,6 @@ from lca.layer1_cognitive.body.action_catalog import (
     build_default_action_registry,
     format_allowed_actions_desc,
 )
-from lca.layer1_cognitive.body.action_registry import ActionRegistryProtocol
 from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
@@ -99,7 +101,7 @@ def build_body_from_shared(
     simple_body = SimpleBody(
         tool_registry=tool_registry,
         safe_executor=safe_executor,
-        transport_registry=transport_registry,  # type: ignore[arg-type]
+        transport_registry=cast("TransportRegistryProtocol", transport_registry),
         action_registry=action_registry,
     )
     if enable_fallback:
@@ -199,4 +201,51 @@ def assemble_base_agent(
         role_profile,
         max_steps=max_steps,
         max_wall_clock_seconds=max_wall_clock_seconds,
+    )
+
+
+def assemble_team(
+    *,
+    members: list[BaseAgent],
+    process: object | None = None,
+    supervisor: BaseAgent | None = None,
+    max_rounds: int | None = None,
+    shared_memory_layers: list[str] | None = None,
+    graph_definition_ref: str | None = None,
+    strategy: object | None = None,
+) -> TeamEntrypoint:
+    """组装团队对象图。"""
+    from lca.contracts.enums import TeamProcess
+    from lca.contracts.role_team import TeamConfig
+    from lca.layer3_agent.supervisor import Supervisor as SupervisorImpl
+    from lca.layer3_agent.team_orchestrator import TeamOrchestrator
+    from lca.layer4_app.defaults import build_team_transport, ensure_defaults
+
+    ensure_defaults()
+    process_val = process if process is not None else TeamProcess.HIERARCHICAL
+    config = TeamConfig(
+        process=process_val,  # type: ignore[arg-type]
+        max_rounds=max_rounds,
+        shared_memory_layers=list(shared_memory_layers or []),
+        graph_definition_ref=graph_definition_ref,
+    )
+    base_supervisor: SupervisorImpl | None = None
+    if supervisor is not None:
+        if isinstance(supervisor, SupervisorImpl):
+            base_supervisor = supervisor
+        else:
+            base_supervisor = SupervisorImpl(
+                supervisor.runtime,
+                supervisor.role_profile,
+                max_steps=max(getattr(supervisor, "max_steps", 10), 20),
+                max_wall_clock_seconds=300,
+            )
+    transport, roster_desc = build_team_transport(members)
+    return TeamOrchestrator(
+        members,
+        config,
+        base_supervisor,
+        transport=transport,
+        roster_desc=roster_desc,
+        strategy=strategy,  # type: ignore[arg-type]
     )

@@ -1,12 +1,4 @@
-"""DefaultStepOutcomePolicy —— 默认单步结果判定策略。
-
-封装原 _loop / _should_stop 中散落的全部终止判定逻辑：
-- respond 动作 → 提取 final_output + 判定是否停止
-- handoff 动作 → 直接停止
-- 降级成功（FALLBACK_DEGRADATION_KEY + success）→ 等价于 respond
-- reflection verdict == needs_correction → 即使 respond 也不停止
-- 预算耗尽 → 根据最后一步成功与否决定 completed / failed
-"""
+"""DefaultStepOutcomePolicy —— 默认单步结果判定策略。"""
 
 from __future__ import annotations
 
@@ -14,17 +6,10 @@ from lca.contracts.decision import Observation, Reflection, StructuredDecision
 from lca.contracts.enums import ActionType, ReflectionVerdict
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import StepOutcome, StepOutcomePolicy
-from lca.contracts.semantic_keys import FALLBACK_DEGRADED_FROM
 from lca.contracts.state import TypedState
 
 
 class DefaultStepOutcomePolicy(StepOutcomePolicy):
-    """框架内置的默认终止判定策略。
-
-    识别"降级为 respond"的业务语义——这是该策略的职责，
-    不是 Loop 的职责。
-    """
-
     def resolve(
         self,
         state: TypedState,
@@ -34,48 +19,40 @@ class DefaultStepOutcomePolicy(StepOutcomePolicy):
     ) -> StepOutcome:
         if decision is None or reflection is None:
             return StepOutcome()
-
-        is_degraded_success = self._is_degraded_success(observation)
-
+        degraded_ok = bool(
+            observation is not None and observation.success and observation.degraded_from
+        )
         if decision.action_type == ActionType.HANDOFF:
             return StepOutcome(should_stop=True, status=TaskStatus.COMPLETED)
-
-        if decision.action_type == ActionType.RESPOND or is_degraded_success:
+        if decision.action_type == ActionType.RESPOND or degraded_ok:
             final_output = decision.response_text if decision.response_text else None
-            if final_output is None and is_degraded_success and observation is not None:
-                payload = observation.payload
-                if isinstance(payload, str):
-                    final_output = payload
+            if (
+                final_output is None
+                and degraded_ok
+                and observation is not None
+                and isinstance(observation.payload, str)
+            ):
+                final_output = observation.payload
             should_stop = reflection.verdict != ReflectionVerdict.NEEDS_CORRECTION
             return StepOutcome(
                 should_stop=should_stop,
                 final_output=final_output,
                 status=TaskStatus.COMPLETED if should_stop else None,
             )
-
         return StepOutcome()
 
-    @staticmethod
-    def _is_degraded_success(observation: Observation | None) -> bool:
-        """判断 observation 是否代表"降级成功"。"""
-        if observation is None:
-            return False
-        return getattr(observation, "success", False) and FALLBACK_DEGRADED_FROM in getattr(
-            observation, "extra", {}
-        )
-
     def resolve_budget_exceeded(
-        self,
-        observation: Observation | None,
-        state: TypedState,
+        self, observation: Observation | None, state: TypedState
     ) -> StepOutcome:
-        """预算耗尽时的特殊判定：最后一步成功则视为自然终止。"""
-        last_ok = observation is not None and getattr(observation, "success", False)
-        final_output: str | None = None
-        if last_ok and state.final_output is None and observation is not None:
-            payload = observation.payload
-            if isinstance(payload, str):
-                final_output = payload
+        last_ok = observation is not None and observation.success
+        final_output = None
+        if (
+            last_ok
+            and state.final_output is None
+            and observation is not None
+            and isinstance(observation.payload, str)
+        ):
+            final_output = observation.payload
         return StepOutcome(
             should_stop=True,
             final_output=final_output,

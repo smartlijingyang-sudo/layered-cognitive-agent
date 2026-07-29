@@ -69,3 +69,11 @@ class ToolInputError(ToolExecutionError):
     """
 
     retryable = False
+
+
+class UnregisteredActionError(ToolExecutionError):
+    retryable = False
+
+    def __init__(self, action_type: str):
+        self.action_type = action_type
+        super().__init__(f"未注册的 action_type: {action_type}")

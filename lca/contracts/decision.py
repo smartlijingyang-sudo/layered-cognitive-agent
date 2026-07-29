@@ -1,49 +1,26 @@
-"""第5.4节：决策与执行契约 + 第5.7节：任务生命周期与跨 Agent 通信契约。"""
+"""decision contracts - no lifecycle twins."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any
 
 from lca.contracts.enums import ContentType, DelegationProtocol, ReflectionVerdict
+from lca.contracts.lifecycle import AgentCard
+
+__all__ = [
+    "AgentCard",
+    "DelegationSpec",
+    "Observation",
+    "Reflection",
+    "StructuredDecision",
+    "ToolCall",
+]
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-# ── 任务生命周期 ──────────────────────────────────────────────────
-
-
-class TaskStatus(str, Enum):
-    SUBMITTED = "submitted"
-    WORKING = "working"
-    PAUSED = "paused"
-    INPUT_REQUIRED = "input-required"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELED = "canceled"
-
-
-# ── Agent 身份卡 ──────────────────────────────────────────────────
-
-
-@dataclass
-class AgentCard:
-    agent_id: str
-    role: str
-    capabilities: list[str]
-    tools_exposed: list[str] = field(default_factory=list)
-    protocols_supported: list[DelegationProtocol] = field(
-        default_factory=lambda: [DelegationProtocol.INTERNAL]
-    )
-    endpoint: str | None = None
-    extra: dict[str, Any] = field(default_factory=dict)
-
-
-# ── 决策与执行 ────────────────────────────────────────────────────
 
 
 @dataclass
@@ -90,6 +67,7 @@ class Observation:
     error: str | None = None
     retries_used: int = 0
     latency_ms: int = 0
+    degraded_from: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -100,17 +78,3 @@ class Reflection:
     lesson: str | None = None
     correction: StructuredDecision | None = None
     extra: dict[str, Any] = field(default_factory=dict)
-
-
-# ── 团队消息 ──────────────────────────────────────────────────────
-
-
-@dataclass
-class TeamMessage:
-    message_id: str
-    from_agent_id: str
-    to_agent_id: str | None
-    task_id: str
-    status: TaskStatus
-    payload: Any
-    created_at: datetime = field(default_factory=_now)

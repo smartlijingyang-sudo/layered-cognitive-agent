@@ -1,4 +1,4 @@
-"""生命周期钩子清单与默认事件发布钩子。"""
+"""hooks."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from typing import Any
 
 from lca.contracts.enums import HookEvent
 from lca.contracts.protocols import EventBus
-from lca.contracts.semantic_keys import FALLBACK_DEGRADED_FROM
 from lca.contracts.state import TypedState
 
 HOOK_NAMES = [
@@ -26,27 +25,19 @@ HOOK_NAMES = [
 ]
 
 
-def make_event_emitting_hook(
-    event_bus: EventBus,
-) -> Callable[..., Awaitable[None]]:
-    """工厂：创建将 Loop 事件桥接到 EventBus 的钩子函数。
-
-    注册到 post_act（检测降级事件）和 post_reflect（发布 step_completed），
-    使 Loop 本体不再直接调用 event_bus.emit()。
-    """
-
-    async def _event_emitting_hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
+def make_event_emitting_hook(event_bus: EventBus) -> Callable[..., Awaitable[None]]:
+    async def _hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
         if event_name == HookEvent.POST_ACT:
             observation = kwargs.get("observation")
             if (
                 observation is not None
                 and getattr(observation, "success", False)
-                and FALLBACK_DEGRADED_FROM in getattr(observation, "extra", {})
+                and getattr(observation, "degraded_from", None)
             ):
                 event_bus.emit(
                     "action_degraded",
                     {
-                        "original_action_type": observation.extra[FALLBACK_DEGRADED_FROM],
+                        "original_action_type": observation.degraded_from,
                         "degraded_to": "respond",
                         "step": state.step,
                     },
@@ -54,9 +45,7 @@ def make_event_emitting_hook(
                 )
         elif event_name == HookEvent.POST_REFLECT:
             event_bus.emit(
-                "step_completed",
-                {"step": state.step, "status": state.status},
-                state.trace_id,
+                "step_completed", {"step": state.step, "status": state.status}, state.trace_id
             )
 
-    return _event_emitting_hook
+    return _hook

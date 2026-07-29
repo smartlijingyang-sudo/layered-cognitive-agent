@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Observation
 from lca.contracts.enums import CompletionPolicyName, TeamProcess
 from lca.contracts.lifecycle import TaskStatus
@@ -25,7 +26,6 @@ from lca.layer0_infra.transport.a2a_transport import A2ATransport
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.mcp_transport import MCPTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
-from lca.layer1_cognitive.body.action_registry import ActionRegistryProtocol
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.map_modules import (

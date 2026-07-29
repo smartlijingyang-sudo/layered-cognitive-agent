@@ -1,11 +1,13 @@
-"""第5.7节：任务生命周期与跨 Agent 通信契约。"""
+"""任务生命周期与跨 Agent 通信契约 —— TaskStatus / AgentCard / TeamMessage 唯一定义。"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Literal
+from typing import Any
+
+from lca.contracts.enums import DelegationProtocol
 
 
 def _now() -> datetime:
@@ -15,8 +17,8 @@ def _now() -> datetime:
 class TaskStatus(str, Enum):
     SUBMITTED = "submitted"
     WORKING = "working"
-    PAUSED = "paused"  # 新增：系统级暂停（非人工审批），区别于 INPUT_REQUIRED
-    INPUT_REQUIRED = "input-required"  # 取代原来的 "waiting_human"
+    PAUSED = "paused"
+    INPUT_REQUIRED = "input-required"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELED = "canceled"
@@ -28,8 +30,8 @@ class AgentCard:
     role: str
     capabilities: list[str]
     tools_exposed: list[str] = field(default_factory=list)
-    protocols_supported: list[Literal["internal", "a2a", "mcp"]] = field(
-        default_factory=lambda: ["internal"]
+    protocols_supported: list[DelegationProtocol] = field(
+        default_factory=lambda: [DelegationProtocol.INTERNAL]
     )
     endpoint: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)

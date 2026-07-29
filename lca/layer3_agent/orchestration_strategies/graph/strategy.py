@@ -1,4 +1,4 @@
-"""GraphStrategy —— 基于 DAG 的自定义工作流执行引擎。"""
+"""GraphStrategy —— DAG workflow engine with fan-in visibility."""
 
 from __future__ import annotations
 
@@ -7,13 +7,11 @@ from collections import deque
 from typing import Any
 
 from lca.contracts.graph import EdgeType, ExecutionGraph, NodeType
-from lca.contracts.protocols import (
-    OrchestrationContext,
-    OrchestrationStrategy,
-    StateStore,
-)
+from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy, StateStore
 from lca.contracts.result import Result
 from lca.contracts.state import Budget, TypedState
+from lca.layer3_agent.member_invoke import invoke_member
 from lca.layer3_agent.orchestration_strategies.graph.topology import (
     cascade_skip,
     compute_in_degree_and_out_edges,
@@ -22,20 +20,6 @@ from lca.layer3_agent.orchestration_strategies.graph.topology import (
 
 
 class GraphStrategy(OrchestrationStrategy):
-    """基于 DAG 的自定义工作流执行引擎。
-
-    支持三种边类型：
-    - fixed: 固定流转
-    - conditional: 条件分支（condition 函数返回 bool 决定是否走该边）
-    - parallel: 并行扇出，asyncio.gather 并发执行所有目标，全部完成后汇聚
-
-    执行模型：基于入度（in-degree）的拓扑排序驱动。
-    每个节点等待所有前驱完成（或跳过）后才执行，天然支持 fan-in 汇聚。
-    条件边跳过时级联通知下游，避免 join 节点死等。
-
-    可选注入 StateStore 做 checkpoint（on_error 回滚预留，复用已有 StateSnapshot.reason）。
-    """
-
     def __init__(
         self,
         execution_graph: ExecutionGraph | None = None,
@@ -45,61 +29,46 @@ class GraphStrategy(OrchestrationStrategy):
         self._state_store = state_store
 
     async def run(self, context: OrchestrationContext, objective: str) -> Result:
-        if self._graph is None:
-            raise ValueError("GraphStrategy 需要 ExecutionGraph，请在构造时传入 execution_graph")
-
-        self._graph.validate()
-
+        graph = self._resolve_graph(context)
+        graph.validate()
+        if graph.allow_cycle:
+            raise ValueError("GraphStrategy 仅支持严格 DAG（allow_cycle=False）。")
         member_map = {m.role_profile.role: m for m in context.members}
         state = TypedState(trace_id="graph", task=objective, budget=Budget())
-
-        in_degree, out_edge_indices = compute_in_degree_and_out_edges(self._graph)
-
+        in_degree, out_edge_indices = compute_in_degree_and_out_edges(graph)
         remaining: dict[str, int] = dict(in_degree)
         executed: set[str] = set()
         skipped: set[str] = set()
         results: dict[str, Result] = {}
-        last_result: Result | None = None
-
+        aggregator_ids: set[str] = set()
         queue: deque[str] = deque(nid for nid, deg in remaining.items() if deg == 0)
-
         while queue:
             nid = queue.popleft()
             if nid in executed or nid in skipped:
                 continue
-
-            node = self._graph.nodes[nid]
-
-            if node.type == NodeType.AGENT:
-                role = node.config.get("role", "")
-                member = member_map.get(role)
-                if member:
-                    result = await member.execute(objective)
-                    results[nid] = result
-                    last_result = result
-                    if self._state_store:
-                        await self._state_store.save(state)
-
+            node = graph.nodes[nid]
+            if node.type == NodeType.AGGREGATOR:
+                aggregator_ids.add(nid)
+            await self._execute_node(node, graph, context, member_map, objective, state, results)
             executed.add(nid)
-
             fixed_targets: list[str] = []
             parallel_targets: list[str] = []
-
             for edge_idx in out_edge_indices[nid]:
-                edge = self._graph.edges[edge_idx]
+                edge = graph.edges[edge_idx]
                 if edge.type == EdgeType.CONDITIONAL:
                     if edge.condition is not None and edge.condition(state):
                         fixed_targets.append(edge.target)
                     else:
-                        cascade_skip(self._graph, edge.target, remaining, skipped, executed, queue)
+                        cascade_skip(graph, edge.target, remaining, skipped, executed, queue)
                 elif edge.type == EdgeType.PARALLEL:
                     parallel_targets.append(edge.target)
                 else:
                     fixed_targets.append(edge.target)
-
             if parallel_targets:
                 await self._execute_parallel_branches(
                     parallel_targets,
+                    graph,
+                    context,
                     member_map,
                     objective,
                     state,
@@ -108,18 +77,52 @@ class GraphStrategy(OrchestrationStrategy):
                     executed,
                     skipped,
                     queue,
+                    aggregator_ids,
                 )
             else:
                 enqueue_ready_targets(fixed_targets, remaining, executed, queue)
+        return self._finalize(graph, results, aggregator_ids)
 
-        if last_result is None:
-            return Result.failed("Graph execution produced no results")
-        last_result.total_steps = sum(r.total_steps for r in results.values())
-        return last_result
+    def _resolve_graph(self, context: OrchestrationContext) -> ExecutionGraph:
+        if self._graph is not None:
+            return self._graph
+        raise ValueError("GraphStrategy 需要 ExecutionGraph：构造时传入 execution_graph")
+
+    async def _execute_node(
+        self,
+        node: Any,
+        graph: ExecutionGraph,
+        context: OrchestrationContext,
+        member_map: dict[str, Any],
+        objective: str,
+        state: TypedState,
+        results: dict[str, Result],
+    ) -> None:
+        if node.type == NodeType.AGENT:
+            role = node.config.get("role", "")
+            member = member_map.get(role)
+            if member:
+                results[node.id] = await invoke_member(context, member, objective)
+                if self._state_store:
+                    await self._state_store.save(state)
+        elif node.type == NodeType.AGGREGATOR:
+            preds = [e.source for e in graph.incoming(node.id)]
+            parts = [str(results[p].output) for p in preds if p in results and results[p].output]
+            total_steps = sum(results[p].total_steps for p in preds if p in results)
+            results[node.id] = Result(
+                trace_id="graph-agg",
+                status=TaskStatus.COMPLETED,
+                final_state_ref="",
+                total_steps=total_steps or 1,
+                budget_used=Budget(used_steps=total_steps or 1),
+                output="\n".join(parts),
+            )
 
     async def _execute_parallel_branches(
         self,
         targets: list[str],
+        graph: ExecutionGraph,
+        context: OrchestrationContext,
         member_map: dict[str, Any],
         objective: str,
         state: TypedState,
@@ -128,45 +131,33 @@ class GraphStrategy(OrchestrationStrategy):
         executed: set[str],
         skipped: set[str],
         queue: deque[str],
+        aggregator_ids: set[str],
     ) -> None:
-        """并行扇出：asyncio.gather 并发执行所有目标子图，全部完成后汇聚。"""
-
         async def _run_branch(target_nid: str) -> None:
             if target_nid in executed or target_nid in skipped:
                 return
-            node = self._graph.nodes[target_nid]  # type: ignore[union-attr]
-
-            if node.type == NodeType.AGENT:
-                role = node.config.get("role", "")
-                member = member_map.get(role)
-                if member:
-                    results[target_nid] = await member.execute(objective)
-
+            node = graph.nodes[target_nid]
+            if node.type == NodeType.AGGREGATOR:
+                aggregator_ids.add(target_nid)
+            await self._execute_node(node, graph, context, member_map, objective, state, results)
             executed.add(target_nid)
-
             sub_fixed: list[str] = []
             sub_parallel: list[str] = []
-            for edge in self._graph.outgoing(target_nid):  # type: ignore[union-attr]
+            for edge in graph.outgoing(target_nid):
                 if edge.type == EdgeType.PARALLEL:
                     sub_parallel.append(edge.target)
                 elif edge.type == EdgeType.CONDITIONAL:
                     if edge.condition is not None and edge.condition(state):
                         sub_fixed.append(edge.target)
                     else:
-                        cascade_skip(
-                            self._graph,  # type: ignore[arg-type]
-                            edge.target,
-                            remaining,
-                            skipped,
-                            executed,
-                            queue,
-                        )
+                        cascade_skip(graph, edge.target, remaining, skipped, executed, queue)
                 else:
                     sub_fixed.append(edge.target)
-
             if sub_parallel:
                 await self._execute_parallel_branches(
                     sub_parallel,
+                    graph,
+                    context,
                     member_map,
                     objective,
                     state,
@@ -175,6 +166,7 @@ class GraphStrategy(OrchestrationStrategy):
                     executed,
                     skipped,
                     queue,
+                    aggregator_ids,
                 )
             else:
                 for sub_target in sub_fixed:
@@ -183,10 +175,58 @@ class GraphStrategy(OrchestrationStrategy):
                         await _run_branch(sub_target)
 
         await asyncio.gather(*[_run_branch(t) for t in targets])
-
         for target in targets:
-            for edge in self._graph.outgoing(target):  # type: ignore[union-attr]
+            for edge in graph.outgoing(target):
                 next_nid = edge.target
                 remaining[next_nid] -= 1
                 if remaining[next_nid] <= 0 and next_nid not in executed:
                     queue.append(next_nid)
+
+    @staticmethod
+    def _finalize(
+        graph: ExecutionGraph, results: dict[str, Result], aggregator_ids: set[str]
+    ) -> Result:
+        if not results:
+            return Result.failed("Graph execution produced no results")
+        total_steps = sum(r.total_steps for r in results.values())
+        for agg_id in aggregator_ids:
+            if agg_id in results and results[agg_id].output is not None:
+                out = results[agg_id]
+                out.total_steps = total_steps
+                return out
+        agent_ids = [
+            nid
+            for nid, r in results.items()
+            if nid in graph.nodes and graph.nodes[nid].type == NodeType.AGENT and r.output
+        ]
+        terminal: list[str] = []
+        for nid in agent_ids:
+            outs = [
+                e.target
+                for e in graph.outgoing(nid)
+                if e.target in results
+                and e.target in graph.nodes
+                and graph.nodes[e.target].type == NodeType.AGENT
+            ]
+            if not outs:
+                terminal.append(nid)
+        chosen = terminal or agent_ids
+        parts = [str(results[nid].output) for nid in chosen if results[nid].output]
+        if not parts:
+            last = next(iter(results.values()))
+            last.total_steps = total_steps
+            return last
+        if len(parts) == 1:
+            for nid in chosen:
+                if str(results[nid].output) == parts[0]:
+                    r = results[nid]
+                    r.total_steps = total_steps
+                    return r
+        return Result(
+            trace_id="graph",
+            status=TaskStatus.COMPLETED,
+            final_state_ref="",
+            total_steps=total_steps,
+            budget_used=Budget(used_steps=total_steps),
+            output="\n".join(parts),
+        )

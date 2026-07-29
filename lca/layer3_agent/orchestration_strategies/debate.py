@@ -16,6 +16,7 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.result import Result
 from lca.contracts.state import Budget, TypedState
+from lca.layer3_agent.member_invoke import invoke_member
 
 _DEFAULT_MAX_ROUNDS = 3
 
@@ -53,15 +54,21 @@ class DebateStrategy(OrchestrationStrategy):
 
         current_objective = objective
         all_round_results: list[list[Result]] = []
+        total_steps = 0
 
         for _round in range(max_rounds):
-            tasks = [member.execute(current_objective) for member in context.members]
+            tasks = [
+                invoke_member(context, member, current_objective) for member in context.members
+            ]
             round_results: list[Result] = await asyncio.gather(*tasks)
+            total_steps += sum(r.total_steps for r in round_results)
             all_round_results.append(round_results)
 
             conflicts = await self._check_conflicts(objective, round_results)
             if not conflicts:
-                return await self._arbitrate(objective, round_results)
+                result = await self._arbitrate(objective, round_results)
+                result.total_steps = total_steps
+                return result
 
             proposals = "\n".join(
                 f"Agent {i}: {r.output or ''}" for i, r in enumerate(round_results)
@@ -69,7 +76,9 @@ class DebateStrategy(OrchestrationStrategy):
             current_objective = f"{objective}\n\nPrevious proposals:\n{proposals}"
 
         final_round = all_round_results[-1]
-        return await self._arbitrate(objective, final_round)
+        result = await self._arbitrate(objective, final_round)
+        result.total_steps = total_steps
+        return result
 
     async def _check_conflicts(self, objective: str, results: list[Result]) -> list[str]:
         if self._conflict_monitor is None:

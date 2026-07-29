@@ -7,22 +7,19 @@ from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import TypedState
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 
-# Backward-compatible re-exports: templates are now loaded from external .md files
-# so that prompt iteration does not require touching core code paths.
 DEFAULT_REACT_TEMPLATE: str = load_builtin_prompt("react_prompt")
 HIERARCHICAL_DELEGATE_TEMPLATE: str = load_builtin_prompt("hierarchical_prompt")
+_DEFAULT_TEMPLATE = "react_prompt"
+_HIERARCHICAL_TEMPLATE = "hierarchical_prompt"
 
 
 def build_team_roster(profiles: list[RoleProfile]) -> str:
-    """从 RoleProfile 列表拼接团队花名册文本，渲染进 Supervisor prompt。"""
     if not profiles:
         return "(无可用队友)"
     return "\n".join(f"- role: {p.role} | goal: {p.goal}" for p in profiles)
 
 
 class SimpleReasoner(Reasoner):
-    """调用 LLM 生成候选行动思路。"""
-
     def __init__(
         self,
         llm: LLMAdapter,
@@ -31,7 +28,7 @@ class SimpleReasoner(Reasoner):
         tools_desc: str,
         team_roster: str | None = None,
         allowed_actions_desc: str = "",
-    ):
+    ) -> None:
         self.llm = llm
         self.prompt_manager = prompt_manager
         self.role_profile = role_profile
@@ -47,7 +44,7 @@ class SimpleReasoner(Reasoner):
             "\n".join(f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context)
             or "(无历史上下文)"
         )
-        base_vars: dict[str, str] = {
+        base_vars = {
             "role": self.role_profile.role,
             "goal": self.role_profile.goal,
             "backstory": self.role_profile.backstory,
@@ -56,14 +53,24 @@ class SimpleReasoner(Reasoner):
             "context": context_lines,
             "allowed_actions": self.allowed_actions_desc,
         }
-
+        template_name = self._resolve_template(state)
         if self.team_roster is not None:
-            template_name = "hierarchical_prompt"
             base_vars["team_roster"] = self.team_roster
             base_vars["team_progress"] = state.team_progress_text or ""
-        else:
-            template_name = "react_prompt"
-
+        subtasks = state.working_memory.get("subtasks")
+        if subtasks:
+            base_vars["context"] = (
+                base_vars["context"] + "\n\nSubtasks:\n" + "\n".join(f"- {s}" for s in subtasks)
+            )
         prompt = self.prompt_manager.render(template_name, base_vars)
-        raw = await self.llm.complete(prompt)
-        return [raw]
+        candidates = []
+        for _ in range(max(1, n)):
+            candidates.append(await self.llm.complete(prompt))
+        return candidates
+
+    def _resolve_template(self, state: TypedState) -> str:
+        if state.active_template:
+            return state.active_template
+        if self.team_roster is not None:
+            return _HIERARCHICAL_TEMPLATE
+        return _DEFAULT_TEMPLATE

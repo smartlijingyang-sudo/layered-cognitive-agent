@@ -1,13 +1,12 @@
-"""ActionCatalog —— action_type 的单一事实源。
-
-注册表、Parser 别名、Prompt 文案均由此生成，避免四处硬编码漂移。
-"""
+"""ActionCatalog —— action_type 的单一事实源。"""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from lca.contracts.action import ActionOperation
+from lca.contracts.enums import ActionType
 from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.layer1_cognitive.body.action_handlers import (
     DelegateOperation,
@@ -20,47 +19,36 @@ from lca.layer1_cognitive.body.action_registry import ActionRegistry
 
 @dataclass(frozen=True)
 class ActionSpec:
-    """一种行动能力的声明。"""
-
     name: str
     description: str
     aliases: tuple[str, ...] = ()
-    """LLM 可能输出的别名；规范名自身也会自动加入 alias map。"""
-
     executable: bool = True
-    """False 表示仅解析/终止语义使用（如 stop），不注册到 ActionRegistry。"""
 
 
-# 内置行动能力 —— 扩展时优先改这里
 BUILTIN_ACTION_SPECS: tuple[ActionSpec, ...] = (
     ActionSpec(
-        name="respond",
+        name=ActionType.RESPOND,
         description="respond — 直接回复用户（需附带 response_text）",
         aliases=("response", "answer", "reply"),
     ),
     ActionSpec(
-        name="use_tool",
+        name=ActionType.USE_TOOL,
         description="use_tool — 调用工具（需附带 tool_name / arguments）",
         aliases=("tool_call", "call_tool"),
     ),
     ActionSpec(
-        name="delegate",
+        name=ActionType.DELEGATE,
         description="delegate — 将子任务委派给队友（需附带 target_role / subtask）",
         aliases=("delegation",),
     ),
     ActionSpec(
-        name="handoff",
+        name=ActionType.HANDOFF,
         description="handoff — 非阻塞移交控制权给其他 Agent",
         aliases=("hand_off",),
     ),
+    ActionSpec(name=ActionType.STOP, description="stop — 任务已完成", aliases=(), executable=False),
     ActionSpec(
-        name="stop",
-        description="stop — 任务已完成",
-        aliases=(),
-        executable=False,
-    ),
-    ActionSpec(
-        name="ask_human",
+        name=ActionType.ASK_HUMAN,
         description="ask_human — 请求人工介入",
         aliases=("hitl",),
         executable=False,
@@ -69,7 +57,6 @@ BUILTIN_ACTION_SPECS: tuple[ActionSpec, ...] = (
 
 
 def build_action_alias_map(specs: Sequence[ActionSpec] = BUILTIN_ACTION_SPECS) -> dict[str, str]:
-    """规范名 + 别名 → 规范名。"""
     mapping: dict[str, str] = {}
     for spec in specs:
         mapping[spec.name] = spec.name
@@ -82,7 +69,6 @@ def format_allowed_actions_desc(
     allowed_names: Sequence[str],
     specs: Sequence[ActionSpec] = BUILTIN_ACTION_SPECS,
 ) -> str:
-    """按已注册 action 列表生成 Prompt 段落。"""
     by_name = {s.name: s for s in specs}
     lines: list[str] = []
     for i, name in enumerate(allowed_names):
@@ -92,18 +78,36 @@ def format_allowed_actions_desc(
     return "\n".join(lines)
 
 
+def _operation_for(
+    name: str,
+    tool_registry: ToolRegistry,
+    safe_executor: SafeExecutor,
+    transport_registry: TransportRegistryProtocol,
+) -> ActionOperation | None:
+    if name == ActionType.RESPOND:
+        return RespondOperation()
+    if name == ActionType.USE_TOOL:
+        return UseToolOperation(tool_registry, safe_executor)
+    if name == ActionType.DELEGATE:
+        return DelegateOperation(transport_registry)
+    if name == ActionType.HANDOFF:
+        return HandoffOperation(transport_registry)
+    return None
+
+
 def build_default_action_registry(
     tool_registry: ToolRegistry,
     safe_executor: SafeExecutor,
     transport_registry: TransportRegistryProtocol,
 ) -> ActionRegistry:
-    """构建包含所有可执行内置 ActionOperation 的默认注册表。"""
     registry = ActionRegistry()
-    registry.register("respond", RespondOperation())
-    registry.register("use_tool", UseToolOperation(tool_registry, safe_executor))
-    registry.register("delegate", DelegateOperation(transport_registry))
-    registry.register("handoff", HandoffOperation(transport_registry))
     for spec in BUILTIN_ACTION_SPECS:
+        if not spec.executable:
+            continue
+        op = _operation_for(spec.name, tool_registry, safe_executor, transport_registry)
+        if op is None:
+            continue
+        registry.register(spec.name, op)
         for alias in spec.aliases:
             registry.register_alias(alias, spec.name)
     return registry

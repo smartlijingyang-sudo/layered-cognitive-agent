@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 from lca.contracts.action import ActionOperation
 from lca.contracts.decision import Observation, StructuredDecision
@@ -148,16 +147,3 @@ class HandoffOperation(ActionOperation):
             payload=f"handoff to {spec.target_role or spec.target_agent_id}",
             extra={OBS_TASK_ID: task_id, OBS_HANDOFF: True},
         )
-
-
-def build_default_action_registry(
-    tool_registry: ToolRegistry,
-    safe_executor: SafeExecutor,
-    transport_registry: TransportRegistryProtocol,
-) -> Any:
-    """兼容入口：委托 ActionCatalog（单一事实源）。"""
-    from lca.layer1_cognitive.body.action_catalog import (
-        build_default_action_registry as _build,
-    )
-
-    return _build(tool_registry, safe_executor, transport_registry)

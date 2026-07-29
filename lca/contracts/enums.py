@@ -16,6 +16,8 @@ class ActionType(str, Enum):
     USE_TOOL = "use_tool"
     DELEGATE = "delegate"
     HANDOFF = "handoff"
+    STOP = "stop"
+    ASK_HUMAN = "ask_human"
 
 
 class TeamProcess(str, Enum):

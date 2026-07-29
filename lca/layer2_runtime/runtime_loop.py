@@ -1,9 +1,4 @@
-"""CognitiveRuntime —— 核心认知循环（~25行 Loop，ADR-0002）。
-
-Loop 本体只负责六步骨架串联 + 循环控制，
-所有业务判定（降级、输出提取、终止条件）通过 StepOutcomePolicy 注入，
-所有可观测事件通过 Hook 发布，Loop 不直接持有 EventBus。
-"""
+"""CognitiveRuntime —— 核心认知循环（ADR-0002）。"""
 
 from __future__ import annotations
 
@@ -26,25 +21,12 @@ from lca.contracts.protocols import (
     StepOutcomePolicy,
     TransportBindable,
 )
-from lca.contracts.result import (
-    ApprovalPendingError,
-    BudgetExceededError,
-    Result,
-)
+from lca.contracts.result import ApprovalPendingError, BudgetExceededError, Result
 from lca.contracts.state import StateSnapshot, TypedState
 from lca.contracts.types import StepOutcome, Turn
 
 
 class CognitiveRuntime(Runtime):
-    """核心 Loop: perceive → think → act → observe → reflect → update。
-
-    所有 Prompt 模板、压缩策略、Strategy 切换、错误恢复、人工审批
-    全部通过 Hook 与 Strategy 注册进来，Loop 本体保持稳定不变。
-
-    ``configure()`` 通过 capability protocol（ADR-0017）注入能力，
-    使用 ``isinstance`` 检查而非 ``hasattr`` 字符串探测。
-    """
-
     def __init__(
         self,
         brain: BrainStrategy,
@@ -53,7 +35,7 @@ class CognitiveRuntime(Runtime):
         hooks: HookRegistry,
         state_store: StateStore,
         outcome_policy: StepOutcomePolicy | None = None,
-    ):
+    ) -> None:
         self.brain = brain
         self.body = body
         self.memory = memory
@@ -73,16 +55,13 @@ class CognitiveRuntime(Runtime):
             self._team_progress = capabilities["team_progress"]
 
     def register_hook(self, hook_name: str, hook_fn: Any) -> None:
-        """通过 Runtime 协议注册 Hook，避免调用方直接访问 hooks 属性。"""
         self.hooks.register(hook_name, hook_fn)
 
     def replace_brain_component(self, name: str, replacement: Any) -> None:
-        """替换 Brain 的指定组件，避免调用方直接访问 brain 属性。"""
         if hasattr(self.brain, name):
             setattr(self.brain, name, replacement)
 
     def wrap_brain_component(self, name: str, wrapper: Any) -> None:
-        """读取并包装 Brain 的指定组件（装饰器模式）。"""
         if hasattr(self.brain, name):
             old = getattr(self.brain, name)
             setattr(self.brain, name, wrapper(old))
@@ -98,8 +77,7 @@ class CognitiveRuntime(Runtime):
             trace_id=new_id("trace"),
             task=task,
             budget=create_budget(
-                max_steps=max_steps,
-                max_wall_clock_seconds=max_wall_clock_seconds,
+                max_steps=max_steps, max_wall_clock_seconds=max_wall_clock_seconds
             ),
             agent_role=context.get("agent_role", ""),
             delegated_by=context.get("delegated_by", ""),
@@ -109,67 +87,52 @@ class CognitiveRuntime(Runtime):
         return await self._loop(state, max_steps)
 
     async def resume(
-        self,
-        snapshot: StateSnapshot,
-        input: object | None = None,
-        max_steps: int = 10,
+        self, snapshot: StateSnapshot, input: object | None = None, max_steps: int = 10
     ) -> Result:
-        """从任意 Checkpoint 恢复——挂起等待人工审批/暂停的任务由此续跑。"""
-        del input  # 人工审批输入预留；当前恢复仅重载快照
         state = await self.state_store.load(snapshot.state_ref)
         state.status = TaskStatus.WORKING
+        if input is not None:
+            state.working_memory["resume_input"] = input
         return await self._loop(state, max_steps)
 
     async def _loop(self, state: TypedState, max_steps: int) -> Result:
-        decision: StructuredDecision | None = None
-        observation: Observation | None = None
-        reflection: Reflection | None = None
-
+        decision = observation = reflection = None
         for step in range(state.step, max_steps):
             state.step = step
             state.budget.used_steps = step
             try:
                 await self.hooks.trigger("pre_perceive", state)
                 state = await self.memory.perceive_and_retrieve(state)
-
                 await self.hooks.trigger("pre_think", state)
                 decision = await self.brain.think(state)
                 await self.hooks.trigger("post_think", state, decision=decision)
-
                 await self.hooks.trigger("pre_act", state, decision=decision)
                 observation = await self.body.act(decision, state)
                 await self.hooks.trigger(
                     "post_act", state, decision=decision, observation=observation
                 )
-
                 await self.hooks.trigger("pre_reflect", state, observation=observation)
                 reflection = await self.brain.reflect(state, observation)
                 await self.hooks.trigger("post_reflect", state, reflection=reflection)
-
-                # 两阶段历史：先记 decision+observation，reflect 后补齐 reflection
                 state.history.append(
                     Turn(decision=decision, observation=observation, reflection=reflection)
                 )
                 await self.memory.update_multi_level(state, observation, reflection)
-
             except ApprovalPendingError:
-                self._checkpoint(state, reason=SnapshotReason.PRE_APPROVAL)
+                await self._checkpoint(state, reason=SnapshotReason.PRE_APPROVAL)
                 state.status = TaskStatus.INPUT_REQUIRED
                 await self.hooks.trigger("on_pause", state)
                 return self._summarize(state)
-
             except Exception as err:
                 await self.hooks.trigger("on_error", state, error=err)
                 state.status = TaskStatus.FAILED
-                self._checkpoint(state, reason=SnapshotReason.ON_ERROR)
+                await self._checkpoint(state, reason=SnapshotReason.ON_ERROR)
                 state.last_error = str(err)
                 break
-
-            self._checkpoint(state)
+            await self._checkpoint(state)
             outcome = self.outcome_policy.resolve(state, decision, observation, reflection)
             if outcome.final_output is not None:
                 state.final_output = outcome.final_output
-
             if state.budget.exceeded():
                 await self.hooks.trigger("on_error", state, error=BudgetExceededError())
                 budget_outcome = self.outcome_policy.resolve_budget_exceeded(observation, state)
@@ -177,18 +140,19 @@ class CognitiveRuntime(Runtime):
                     state.final_output = budget_outcome.final_output
                 state.status = self._coerce_status(budget_outcome.status) or state.status
                 break
-
             if outcome.should_stop:
                 state.status = self._coerce_status(outcome.status) or TaskStatus.COMPLETED
                 break
-
         await self.hooks.trigger("on_complete", state)
         return self._summarize(state)
 
-    def _checkpoint(
+    async def _checkpoint(
         self, state: TypedState, reason: SnapshotReason = SnapshotReason.PERIODIC
-    ) -> None:
-        state.checkpoints.append(state.snapshot(reason=reason))
+    ) -> StateSnapshot:
+        snap = state.snapshot(reason=reason)
+        ref = await self.state_store.save(state)
+        snap.state_ref = ref
+        return snap
 
     @staticmethod
     def _coerce_status(value: str | TaskStatus | None) -> TaskStatus | None:
@@ -203,6 +167,7 @@ class CognitiveRuntime(Runtime):
             "running": TaskStatus.WORKING,
             "waiting_human": TaskStatus.INPUT_REQUIRED,
             "input_required": TaskStatus.INPUT_REQUIRED,
+            "input-required": TaskStatus.INPUT_REQUIRED,
             "canceled": TaskStatus.CANCELED,
             "cancelled": TaskStatus.CANCELED,
         }
@@ -225,12 +190,6 @@ class CognitiveRuntime(Runtime):
 
 
 class _DefaultOutcomePolicy(StepOutcomePolicy):
-    """最小内置 OutcomePolicy——无终止条件，仅用于 Loop 在无外部注入时的兜底。
-
-    实际部署时应使用 layer2_runtime.outcome_policies.DefaultStepOutcomePolicy，
-    它包含 respond/handoff/降级 等完整业务判定。
-    """
-
     def resolve(
         self,
         state: TypedState,
@@ -241,9 +200,7 @@ class _DefaultOutcomePolicy(StepOutcomePolicy):
         return StepOutcome()
 
     def resolve_budget_exceeded(
-        self,
-        observation: Observation | None,
-        state: TypedState,
+        self, observation: Observation | None, state: TypedState
     ) -> StepOutcome:
         last_ok = observation is not None and getattr(observation, "success", False)
         return StepOutcome(
