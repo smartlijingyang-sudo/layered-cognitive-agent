@@ -47,6 +47,7 @@ from lca.contracts.protocols.orchestration import (
     OrchestrationContext,
     OrchestrationStrategy,
     SharedMemoryStore,
+    SupervisorProtocol,
     Synthesizer,
 )
 from lca.contracts.protocols.runtime import Runtime, StepOutcomePolicy
@@ -87,6 +88,7 @@ __all__ = [
     "StateStore",
     "StepOutcome",
     "StepOutcomePolicy",
+    "SupervisorProtocol",
     "Synthesizer",
     "TaskCoordinator",
     "TaskDecomposer",

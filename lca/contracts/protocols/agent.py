@@ -14,11 +14,14 @@ from typing import Protocol, runtime_checkable
 from lca.contracts.invocation import InvocationContext
 from lca.contracts.message import AgentMessage
 from lca.contracts.result import Result
+from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import StateSnapshot
 
 
 @runtime_checkable
 class AgentEntrypoint(Protocol):
+    role_profile: RoleProfile
+
     async def execute(
         self, task: str | AgentMessage, ctx: InvocationContext | None = None
     ) -> Result: ...

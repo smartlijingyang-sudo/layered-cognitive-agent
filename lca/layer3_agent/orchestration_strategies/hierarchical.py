@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 from lca.contracts.enums import CompletionPolicyName, HookEvent
 from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy
 from lca.contracts.result import Result
@@ -75,4 +73,4 @@ class HierarchicalStrategy(OrchestrationStrategy):
             context.supervisor.register_hook(HookEvent.POST_ACT, ledger_tracking_hook)
             context.supervisor.register_hook(HookEvent.PRE_THINK, progress_injection_hook)
 
-        return cast("Result", await context.supervisor.execute(objective))
+        return await context.supervisor.execute(objective)

@@ -2,28 +2,41 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.memory import MemoryRecord
+from lca.contracts.protocols.agent import AgentEntrypoint
 from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
+from lca.contracts.team_progress import DelegationLedgerProtocol
+
+
+@runtime_checkable
+class SupervisorProtocol(Protocol):
+    """Supervisor 最小接口 —— contracts 层不依赖 L3 具体类。"""
+
+    async def execute(self, task: str) -> Result: ...
+    def bind_team(self, transport: AgentTransport, roster_desc: str) -> None: ...
+    def configure_runtime(self, **capabilities: Any) -> None: ...
+    def register_hook(self, hook_name: str, hook_fn: Any) -> None: ...
+    def wrap_brain_component(self, name: str, wrapper: Any) -> None: ...
 
 
 @dataclass
 class OrchestrationContext:
     """编排策略的运行时上下文，由 TeamOrchestrator 构造并传给策略实例。"""
 
-    members: list[Any] = field(default_factory=list)  # list[AgentEntrypoint]
+    members: Sequence[AgentEntrypoint] = field(default_factory=list)
     config: TeamConfig | None = None
-    supervisor: Any | None = None  # Supervisor (L3)，contracts 不得反向依赖
+    supervisor: SupervisorProtocol | None = None
     transport: AgentTransport | None = None
     roster_desc: str = ""
-    ledger_factory: Callable[[frozenset[str]], Any] | None = None
+    ledger_factory: Callable[[frozenset[str]], DelegationLedgerProtocol] | None = None
     team_id: str = ""
-    shared_memory: Any | None = None  # SharedMemoryStore (L3)
+    shared_memory: SharedMemoryStore | None = None
 
 
 @runtime_checkable
