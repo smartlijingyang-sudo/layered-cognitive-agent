@@ -43,6 +43,7 @@ from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_loggi
 from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
 from lca.layer2_runtime.hooks import HOOK_NAMES, make_event_emitting_hook
+from lca.layer2_runtime.loop_judge import DefaultLoopJudge
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
@@ -194,7 +195,7 @@ def assemble_base_agent(
         mem,
         hooks,
         ss,
-        outcome_policy=DefaultStepOutcomePolicy(),
+        judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
     )
     return BaseAgent(
         runtime,

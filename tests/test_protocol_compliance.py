@@ -76,6 +76,8 @@ from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 
 # L2
+from lca.layer2_runtime.loop_judge import DefaultLoopJudge
+from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
 # L3
@@ -253,6 +255,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
             SimpleMemorySystem(),
             SimpleHookRegistry(obs),
             InMemoryStateStore(),
+            judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
         )
         self.assertIsInstance(runtime, Runtime)
 
@@ -290,6 +293,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             SimpleMemorySystem(),
             SimpleHookRegistry(obs),
             InMemoryStateStore(),
+            judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
         )
         return BaseAgent(runtime, rp), rp, runtime
 

@@ -31,6 +31,7 @@ from lca.layer1_cognitive.brain.skill_router import StaticSkillRouter
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
 from lca.layer1_cognitive.prompt_manager import SimplePromptManager
 from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
+from lca.layer2_runtime.loop_judge import DefaultLoopJudge
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer4_app.api import Agent, MultiAgentTeam
@@ -130,7 +131,7 @@ class TestCheckpointResume:
             memory=_Mem(),  # type: ignore[arg-type]
             hooks=SimpleHookRegistry(ConsoleObservability()),
             state_store=store,
-            outcome_policy=DefaultStepOutcomePolicy(),
+            judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
         )
         result = await rt.run("checkpoint me", max_steps=3)
         assert result.status == TaskStatus.COMPLETED

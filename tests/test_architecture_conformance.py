@@ -76,12 +76,13 @@ def _collect_protocol_classes() -> set[type]:
     只匹配直接继承 Protocol 的接口定义，不会误匹配实现了 Protocol 的具体类。
     """
     import lca.contracts.action as action_mod
+    import lca.contracts.loop_judge as loop_judge_mod
     import lca.contracts.mechanisms as mechanisms_mod
     import lca.contracts.protocols as protocols_mod
     import lca.contracts.team_progress as team_progress_mod
 
     result: set[type] = set()
-    for mod in (protocols_mod, action_mod, mechanisms_mod, team_progress_mod):
+    for mod in (protocols_mod, action_mod, mechanisms_mod, team_progress_mod, loop_judge_mod):
         for _name, obj in inspect.getmembers(mod, inspect.isclass):
             if getattr(obj, "_is_protocol", False) and obj.__module__.startswith("lca.contracts"):
                 result.add(obj)

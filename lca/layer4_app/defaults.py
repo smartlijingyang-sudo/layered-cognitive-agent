@@ -187,6 +187,10 @@ def __getattr__(name: str) -> object:
             StateStore,
             StepOutcomePolicy,
         )
+        from lca.layer2_runtime.loop_judge import DefaultLoopJudge
+        from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
+            DefaultStepOutcomePolicy,
+        )
         from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
         def build_runtime(
@@ -197,8 +201,14 @@ def __getattr__(name: str) -> object:
             state_store: StateStore,
             outcome_policy: StepOutcomePolicy | None = None,
         ) -> CognitiveRuntime:
+            policy = outcome_policy or DefaultStepOutcomePolicy()
             return CognitiveRuntime(
-                brain, body, memory, hooks, state_store, outcome_policy=outcome_policy
+                brain,
+                body,
+                memory,
+                hooks,
+                state_store,
+                judge=DefaultLoopJudge(outcome_policy=policy),
             )
 
         return build_runtime

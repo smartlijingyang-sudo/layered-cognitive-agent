@@ -1,6 +1,11 @@
-"""L2 Runtime.configure() 所需的可选能力协议（ADR-0017）。
-把原先散落在 configure() 里的 hasattr 字符串探测收敛成具名、
-runtime_checkable 的 Protocol，使能力契约可被 mypy 校验、可被 grep 发现。
+"""可选能力协议（ADR-0017）。
+
+把组件的可选绑定能力（transport / roster / shared_memory）
+收敛成具名、runtime_checkable 的 Protocol，
+使能力契约可被 mypy 校验、可被 grep 发现。
+
+由组装层（TeamOrchestrator / Supervisor）通过 isinstance 检查直接调用，
+不再经过 Runtime.configure() 间接分发。
 """
 
 from __future__ import annotations

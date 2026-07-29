@@ -1,6 +1,6 @@
 """分层通信铁律 —— AST 静态扫描，禁止 L3 越层访问 L1 组件内部状态。
 
-L3 (agent) 只能通过 Runtime Protocol 的显式方法（run / configure）与 L1/L2 交互。
+L3 (agent) 只能通过 Runtime Protocol 的显式方法（run）与 L1/L2 交互。
 直接访问 self.runtime.body / self.runtime.brain / getattr(self.runtime, ...) 全部违规。
 """
 
@@ -37,7 +37,7 @@ class _LayerBoundaryVisitor(ast.NodeVisitor):
         ):
             self.violations.append(
                 f"{self.filename}:{node.lineno} — "
-                f"self.runtime.{node.attr} 越层访问，请改用 runtime.configure()"
+                f"self.runtime.{node.attr} 越层访问，请通过协议接口交互"
             )
         self.generic_visit(node)
 
@@ -58,7 +58,7 @@ class _LayerBoundaryVisitor(ast.NodeVisitor):
                 self.violations.append(
                     f"{self.filename}:{node.lineno} — "
                     f"getattr(self.runtime, {second_arg.value!r}) 越层访问，"
-                    f"请改用 runtime.configure()"
+                    f"请通过协议接口交互"
                 )
         self.generic_visit(node)
 
@@ -81,7 +81,7 @@ class TestLayerBoundary(unittest.TestCase):
             all_violations.extend(visitor.violations)
 
         if all_violations:
-            msg = "L3 层存在越层访问 L1 组件的行为（必须通过 runtime.configure() 协议）:\n"
+            msg = "L3 层存在越层访问 L1 组件的行为（请通过协议接口交互）:\n"
             msg += "\n".join(f"  - {v}" for v in all_violations)
             self.fail(msg)
 

@@ -8,6 +8,7 @@ from lca.contracts.protocols import AgentEntrypoint, Runtime
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import StateSnapshot
+from lca.contracts.team_progress import DelegationLedgerProtocol
 
 
 def _task_as_text(task: str | AgentMessage) -> str:
@@ -35,6 +36,7 @@ class BaseAgent(AgentEntrypoint):
         self,
         task: str | AgentMessage,
         ctx: InvocationContext | None = None,
+        team_progress: DelegationLedgerProtocol | None = None,
         **context: str,
     ) -> Result:
         text = _task_as_text(task)
@@ -47,6 +49,7 @@ class BaseAgent(AgentEntrypoint):
             text,
             max_steps=self.max_steps,
             max_wall_clock_seconds=self.max_wall_clock_seconds,
+            team_progress=team_progress,
             agent_role=self.role_profile.role,
             **context,
         )

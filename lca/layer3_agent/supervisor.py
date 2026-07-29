@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Callable
 
 from lca.contracts.mechanisms import Hook
-from lca.contracts.protocols import AgentTransport, Runtime
+from lca.contracts.protocols import CandidateEvaluationPipeline
 from lca.contracts.role_team import RoleProfile
 from lca.layer3_agent.base_agent import BaseAgent
 
@@ -18,34 +18,27 @@ class Supervisor(BaseAgent):
 
     def __init__(
         self,
-        runtime: Runtime,
+        runtime: object,
         role_profile: RoleProfile,
         max_steps: int = 20,
         max_wall_clock_seconds: int | None = 300,
     ):
         super().__init__(
-            runtime,
+            runtime,  # type: ignore[arg-type]
             role_profile,
             max_steps=max_steps,
             max_wall_clock_seconds=max_wall_clock_seconds,
         )
 
-    def bind_team(self, transport: AgentTransport, roster_desc: str) -> None:
-        """团队组建完成后的最后一次接线。
-
-        通过 Runtime.configure() 显式协议分发能力，
-        不再越层访问 L1 组件内部状态。
-        """
-        self.runtime.configure(transport=transport, team_roster=roster_desc)
-
-    def configure_runtime(self, **capabilities: Any) -> None:
-        """通过 Runtime 协议配置能力（team_progress 等）。"""
-        self.runtime.configure(**capabilities)
-
     def register_hook(self, hook_name: str, hook_fn: Hook) -> None:
-        """通过 Runtime 协议注册 Hook。"""
-        self.runtime.register_hook(hook_name, hook_fn)
+        """注册 Hook 到 Runtime 的 HookRegistry。"""
+        hooks = getattr(self.runtime, "hooks", None)
+        if hooks is not None:
+            hooks.register(hook_name, hook_fn)
 
-    def wrap_brain_component(self, name: str, wrapper: Any) -> None:
-        """通过 Runtime 协议包装 Brain 的指定组件（装饰器模式）。"""
-        self.runtime.wrap_brain_component(name, wrapper)
+    def wrap_evaluation_pipeline(
+        self,
+        wrapper: Callable[[CandidateEvaluationPipeline], CandidateEvaluationPipeline],
+    ) -> None:
+        """通过 Runtime 协议装饰 Brain 内部评估管线。"""
+        self.runtime.wrap_evaluation_pipeline(wrapper)

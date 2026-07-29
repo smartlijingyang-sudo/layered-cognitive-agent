@@ -308,7 +308,7 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
 
 
 def _make_minimal_runtime(memory: SimpleMemorySystem):
-    """构建最小化 Runtime 桩件，仅支持 configure() 和 run()。"""
+    """构建最小化 Runtime 桩件，仅支持 run()。"""
     from unittest.mock import AsyncMock, MagicMock
 
     from lca.contracts.result import Result
@@ -316,7 +316,6 @@ def _make_minimal_runtime(memory: SimpleMemorySystem):
 
     runtime = MagicMock()
     runtime.memory = memory
-    runtime.configure = MagicMock(side_effect=lambda **kw: _apply_configure(runtime, **kw))
     runtime.run = AsyncMock(
         return_value=Result(
             trace_id="mock",
@@ -328,12 +327,6 @@ def _make_minimal_runtime(memory: SimpleMemorySystem):
         )
     )
     return runtime
-
-
-def _apply_configure(runtime, **kw):
-    """模拟 CognitiveRuntime.configure() 的 shared_memory 分发逻辑。"""
-    if "shared_memory" in kw and hasattr(runtime.memory, "bind_shared_store"):
-        runtime.memory.bind_shared_store(kw["shared_memory"])
 
 
 if __name__ == "__main__":

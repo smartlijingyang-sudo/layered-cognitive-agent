@@ -17,6 +17,7 @@ from lca.contracts.graph import (
     GraphValidationError,
 )
 from lca.contracts.lifecycle import AgentCard, TaskStatus, TeamMessage
+from lca.contracts.loop_judge import LoopJudge, TerminationReason, TerminationSignal
 from lca.contracts.mechanisms import (
     EventBus,
     Hook,
@@ -70,6 +71,7 @@ __all__ = [
     "Hook",
     "HookRegistry",
     "KGTriple",
+    "LoopJudge",
     "MemoryRecord",
     "NamedRegistryProtocol",
     "Observation",
@@ -87,6 +89,8 @@ __all__ = [
     "TeamAssignment",
     "TeamConfig",
     "TeamMessage",
+    "TerminationReason",
+    "TerminationSignal",
     "ToolCall",
     "ToolExecutionError",
     "ToolPermissionManifest",

@@ -1,29 +1,31 @@
-"""CognitiveRuntime —— 核心认知循环（ADR-0002）。"""
+"""CognitiveRuntime —— 核心认知循环（ADR-0002）。
+
+Loop 只做编排：perceive → think → act → reflect → record → checkpoint → judge。
+终止判定完全委托给 LoopJudge，业务逻辑零泄漏。
+"""
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Callable
 
 from lca.contracts.budget import create_budget
-from lca.contracts.decision import Observation, Reflection, StructuredDecision
 from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.loop_judge import LoopJudge, TerminationReason
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.protocols import (
     Body,
     BrainStrategy,
+    CandidateEvaluationPipeline,
     MemorySystem,
-    RosterAware,
     Runtime,
-    SharedStoreBindable,
     StateStore,
-    StepOutcomePolicy,
-    TransportBindable,
 )
 from lca.contracts.result import ApprovalPendingError, BudgetExceededError, Result
 from lca.contracts.state import StateSnapshot, TypedState
-from lca.contracts.types import StepOutcome, Turn
+from lca.contracts.team_progress import DelegationLedgerProtocol
+from lca.contracts.types import Turn
 
 
 class CognitiveRuntime(Runtime):
@@ -34,43 +36,21 @@ class CognitiveRuntime(Runtime):
         memory: MemorySystem,
         hooks: HookRegistry,
         state_store: StateStore,
-        outcome_policy: StepOutcomePolicy | None = None,
+        judge: LoopJudge,
     ) -> None:
         self.brain = brain
         self.body = body
         self.memory = memory
         self.hooks = hooks
         self.state_store = state_store
-        self.outcome_policy = outcome_policy or _DefaultOutcomePolicy()
-        self._team_progress: Any = None
-
-    def configure(self, **capabilities: Any) -> None:
-        if "transport" in capabilities and isinstance(self.body, TransportBindable):
-            self.body.bind_transport(capabilities["transport"])
-        if "team_roster" in capabilities and isinstance(self.brain, RosterAware):
-            self.brain.set_team_roster(capabilities["team_roster"])
-        if "shared_memory" in capabilities and isinstance(self.memory, SharedStoreBindable):
-            self.memory.bind_shared_store(capabilities["shared_memory"])
-        if "team_progress" in capabilities:
-            self._team_progress = capabilities["team_progress"]
-
-    def register_hook(self, hook_name: str, hook_fn: Any) -> None:
-        self.hooks.register(hook_name, hook_fn)
-
-    def replace_brain_component(self, name: str, replacement: Any) -> None:
-        if hasattr(self.brain, name):
-            setattr(self.brain, name, replacement)
-
-    def wrap_brain_component(self, name: str, wrapper: Any) -> None:
-        if hasattr(self.brain, name):
-            old = getattr(self.brain, name)
-            setattr(self.brain, name, wrapper(old))
+        self.judge = judge
 
     async def run(
         self,
         task: str,
         max_steps: int = 10,
         max_wall_clock_seconds: int | None = None,
+        team_progress: DelegationLedgerProtocol | None = None,
         **context: str,
     ) -> Result:
         state = TypedState(
@@ -81,7 +61,7 @@ class CognitiveRuntime(Runtime):
             ),
             agent_role=context.get("agent_role", ""),
             delegated_by=context.get("delegated_by", ""),
-            team_progress=self._team_progress,
+            team_progress=team_progress,
         )
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
@@ -103,17 +83,21 @@ class CognitiveRuntime(Runtime):
             try:
                 await self.hooks.trigger("pre_perceive", state)
                 state = await self.memory.perceive_and_retrieve(state)
+
                 await self.hooks.trigger("pre_think", state)
                 decision = await self.brain.think(state)
                 await self.hooks.trigger("post_think", state, decision=decision)
+
                 await self.hooks.trigger("pre_act", state, decision=decision)
                 observation = await self.body.act(decision, state)
                 await self.hooks.trigger(
                     "post_act", state, decision=decision, observation=observation
                 )
+
                 await self.hooks.trigger("pre_reflect", state, observation=observation)
                 reflection = await self.brain.reflect(state, observation)
                 await self.hooks.trigger("post_reflect", state, reflection=reflection)
+
                 state.history.append(
                     Turn(decision=decision, observation=observation, reflection=reflection)
                 )
@@ -129,20 +113,17 @@ class CognitiveRuntime(Runtime):
                 await self._checkpoint(state, reason=SnapshotReason.ON_ERROR)
                 state.last_error = str(err)
                 break
+
             await self._checkpoint(state)
-            outcome = self.outcome_policy.resolve(state, decision, observation, reflection)
-            if outcome.final_output is not None:
-                state.final_output = outcome.final_output
-            if state.budget.exceeded():
-                await self.hooks.trigger("on_error", state, error=BudgetExceededError())
-                budget_outcome = self.outcome_policy.resolve_budget_exceeded(observation, state)
-                if budget_outcome.final_output is not None:
-                    state.final_output = budget_outcome.final_output
-                state.status = self._coerce_status(budget_outcome.status) or state.status
+
+            signal = self.judge.judge(state, decision, observation, reflection)
+            if signal.should_stop:
+                if signal.reason == TerminationReason.BUDGET_EXCEEDED:
+                    await self.hooks.trigger("on_error", state, error=BudgetExceededError())
+                if signal.status is not None:
+                    state.status = signal.status
                 break
-            if outcome.should_stop:
-                state.status = self._coerce_status(outcome.status) or TaskStatus.COMPLETED
-                break
+
         await self.hooks.trigger("on_complete", state)
         return self._summarize(state)
 
@@ -153,25 +134,6 @@ class CognitiveRuntime(Runtime):
         ref = await self.state_store.save(state)
         snap.state_ref = ref
         return snap
-
-    @staticmethod
-    def _coerce_status(value: str | TaskStatus | None) -> TaskStatus | None:
-        if value is None:
-            return None
-        if isinstance(value, TaskStatus):
-            return value
-        mapping = {
-            "completed": TaskStatus.COMPLETED,
-            "failed": TaskStatus.FAILED,
-            "working": TaskStatus.WORKING,
-            "running": TaskStatus.WORKING,
-            "waiting_human": TaskStatus.INPUT_REQUIRED,
-            "input_required": TaskStatus.INPUT_REQUIRED,
-            "input-required": TaskStatus.INPUT_REQUIRED,
-            "canceled": TaskStatus.CANCELED,
-            "cancelled": TaskStatus.CANCELED,
-        }
-        return mapping.get(str(value), TaskStatus.COMPLETED)
 
     def _summarize(self, state: TypedState) -> Result:
         final_ref = f"mem://{state.trace_id}/{state.step}"
@@ -188,21 +150,10 @@ class CognitiveRuntime(Runtime):
             error=state.last_error,
         )
 
-
-class _DefaultOutcomePolicy(StepOutcomePolicy):
-    def resolve(
+    def wrap_evaluation_pipeline(
         self,
-        state: TypedState,
-        decision: StructuredDecision | None,
-        observation: Observation | None,
-        reflection: Reflection | None,
-    ) -> StepOutcome:
-        return StepOutcome()
-
-    def resolve_budget_exceeded(
-        self, observation: Observation | None, state: TypedState
-    ) -> StepOutcome:
-        last_ok = observation is not None and getattr(observation, "success", False)
-        return StepOutcome(
-            should_stop=True, status=TaskStatus.COMPLETED if last_ok else TaskStatus.FAILED
-        )
+        wrapper: Callable[[CandidateEvaluationPipeline], CandidateEvaluationPipeline],
+    ) -> None:
+        """委托 Brain 自管内部评估管线的装饰。"""
+        if hasattr(self.brain, "wrap_evaluation_pipeline"):
+            self.brain.wrap_evaluation_pipeline(wrapper)

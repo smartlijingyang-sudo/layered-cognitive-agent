@@ -28,22 +28,18 @@ class HierarchicalStrategy(OrchestrationStrategy):
 
     自动装配 CompletionPolicy guardrail：
     1. 通过 ledger_factory 创建 DelegationLedger（所有成员角色 → pending）
-    2. 用 GuardedTaskCoordinator 包装 supervisor 的 task_coordinator
+    2. 用 GuardedCandidateEvaluationPipeline 包装 supervisor 的 evaluation_pipeline
     3. 注册 post_act 记账 hook + pre_think 进度注入 hook
     """
 
     async def run(self, context: OrchestrationContext, objective: str) -> Result:
         if context.supervisor is None:
             raise ValueError("Hierarchical 模式需要 Supervisor")
-        if context.transport is not None:
-            context.supervisor.bind_team(context.transport, context.roster_desc)
 
         # ── 装配确定性收尾 guardrail ──
         mandatory_roles = frozenset(m.role_profile.role for m in context.members)
         factory = context.ledger_factory or _default_ledger_factory
         ledger = factory(mandatory_roles)
-
-        context.supervisor.configure_runtime(team_progress=ledger)
 
         # 解析 CompletionPolicy（默认 roster_coverage）
         policy_name = CompletionPolicyName.ROSTER_COVERAGE
@@ -65,12 +61,11 @@ class HierarchicalStrategy(OrchestrationStrategy):
                 )
             policy = policy_factory()
 
-            context.supervisor.wrap_brain_component(
-                "evaluation_pipeline",
+            context.supervisor.wrap_evaluation_pipeline(
                 lambda old: GuardedCandidateEvaluationPipeline(old, policy),
             )
 
             context.supervisor.register_hook(HookEvent.POST_ACT, ledger_tracking_hook)
             context.supervisor.register_hook(HookEvent.PRE_THINK, progress_injection_hook)
 
-        return await context.supervisor.execute(objective)
+        return await context.supervisor.execute(objective, team_progress=ledger)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
 from lca.contracts.protocols import (
     BrainStrategy,
@@ -50,3 +52,10 @@ class ModularBrain(BrainStrategy):
             setter(roster_desc)
         elif hasattr(self.reasoner, "team_roster"):
             self.reasoner.team_roster = roster_desc
+
+    def wrap_evaluation_pipeline(
+        self,
+        wrapper: Callable[[CandidateEvaluationPipeline], CandidateEvaluationPipeline],
+    ) -> None:
+        """用装饰器包装内部评估管线（Brain 自管内省，外部不穿透）。"""
+        self.evaluation_pipeline = wrapper(self.evaluation_pipeline)

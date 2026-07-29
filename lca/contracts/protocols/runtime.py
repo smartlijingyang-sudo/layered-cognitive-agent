@@ -1,14 +1,15 @@
-"""L2 Runtime 协议 —— 认知循环入口与单步结果判定。"""
+"""L2 Runtime 协议 —— 认知循环入口。"""
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from collections.abc import Callable
+from typing import Protocol, runtime_checkable
 
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
-from lca.contracts.mechanisms import Hook
-from lca.contracts.message import AgentMessage
+from lca.contracts.protocols.cognition import CandidateEvaluationPipeline
 from lca.contracts.result import Result
 from lca.contracts.state import StateSnapshot, TypedState
+from lca.contracts.team_progress import DelegationLedgerProtocol
 from lca.contracts.types import StepOutcome
 
 
@@ -19,20 +20,23 @@ class Runtime(Protocol):
         task: str,
         max_steps: int,
         max_wall_clock_seconds: int | None = None,
+        team_progress: DelegationLedgerProtocol | None = None,
         **context: str,
     ) -> Result: ...
     async def resume(
-        self, snapshot: StateSnapshot, input: AgentMessage | None = None, max_steps: int = 10
+        self, snapshot: StateSnapshot, input: object | None = None, max_steps: int = 10
     ) -> Result: ...
-    def configure(self, **capabilities: Any) -> None: ...
-    def register_hook(self, hook_name: str, hook_fn: Hook) -> None: ...
-    def replace_brain_component(self, name: str, replacement: Any) -> None: ...
-    def wrap_brain_component(self, name: str, wrapper: Any) -> None: ...
+    def wrap_evaluation_pipeline(
+        self, wrapper: Callable[[CandidateEvaluationPipeline], CandidateEvaluationPipeline]
+    ) -> None: ...
 
 
 @runtime_checkable
 class StepOutcomePolicy(Protocol):
-    """单步结果判定策略：决定 Loop 是否继续、最终输出和状态。"""
+    """单步结果判定策略：决定 Loop 是否继续、最终输出和状态。
+
+    由 LoopJudge 组合使用，不再直接被 Runtime 持有。
+    """
 
     def resolve(
         self,

@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from lca.contracts.protocols import (
     AgentTransport,
     OrchestrationContext,
     OrchestrationStrategy,
     SharedMemoryStore,
+    SupervisorProtocol,
     TeamEntrypoint,
     ToolRegistry,
 )
+from lca.contracts.protocols.capabilities import RosterAware, SharedStoreBindable, TransportBindable
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
@@ -25,7 +29,7 @@ class TeamOrchestrator(TeamEntrypoint):
     通过 OrchestrationStrategyRegistry 解析策略，不再 if/elif 硬编码。
 
     共享记忆注入双路径（ADR-0016）：
-    1. Runtime.configure(shared_memory=...) —— MemorySystem 层级共享（CoALA）
+    1. SharedStoreBindable 协议绑定 —— MemorySystem 层级共享（CoALA）
     2. SharedMemoryTool 注入成员 ToolRegistry —— 单体循环内经 use_tool 访问
     """
 
@@ -60,20 +64,37 @@ class TeamOrchestrator(TeamEntrypoint):
         self._context = OrchestrationContext(
             members=members,
             config=config,
-            supervisor=supervisor,
+            supervisor=cast("SupervisorProtocol | None", supervisor),
             transport=transport,
             roster_desc=roster_desc,
             team_id=self.team_id,
             shared_memory=self._shared_store,
         )
 
+        if supervisor is not None and transport is not None:
+            self._bind_supervisor_capabilities(supervisor, transport, roster_desc)
+
     def _inject_shared_memory(self) -> None:
         """将共享记忆 store + SharedMemoryTool 分发给每个成员。"""
         if self._shared_store is None:
             return
         for member in self.members:
-            member.runtime.configure(shared_memory=self._shared_store)
+            memory = getattr(member.runtime, "memory", None)
+            if memory is not None and isinstance(memory, SharedStoreBindable):
+                memory.bind_shared_store(self._shared_store)
             self._register_shared_memory_tool(member)
+
+    @staticmethod
+    def _bind_supervisor_capabilities(
+        supervisor: Supervisor, transport: AgentTransport, roster_desc: str
+    ) -> None:
+        """在组合根完成 Supervisor 的 transport / roster 绑定，避免 L3 越层访问。"""
+        body = getattr(supervisor.runtime, "body", None)
+        if body is not None and isinstance(body, TransportBindable):
+            body.bind_transport(transport)
+        brain = getattr(supervisor.runtime, "brain", None)
+        if brain is not None and isinstance(brain, RosterAware):
+            brain.set_team_roster(roster_desc)
 
     def _register_shared_memory_tool(self, member: BaseAgent) -> None:
         """若成员 Body 暴露 tool_registry，注册绑定同一 store 的 SharedMemoryTool。"""
