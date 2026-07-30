@@ -1,4 +1,4 @@
-"""SharedMemoryTool + Turn history 契约测试（ADR-0016）。"""
+"""SharedMemory + Turn history 契约测试（ADR-0016 单路径统一后）。"""
 
 from __future__ import annotations
 
@@ -9,42 +9,48 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.memory import MemoryRecord
 from lca.contracts.state import Budget, TypedState
 from lca.contracts.types import TeamAssignment, Turn
-from lca.layer1_cognitive.memory.shared_memory_tool import SharedMemoryTool
+from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 
 
-class TestSharedMemoryTool(unittest.IsolatedAsyncioTestCase):
-    async def test_write_then_read_across_instances(self) -> None:
-        store = TeamSharedMemoryStore(["semantic"])
-        writer = SharedMemoryTool(store, team_id="team-1")
-        reader = SharedMemoryTool(store, team_id="team-1")
+class TestSharedMemorySinglePath(unittest.IsolatedAsyncioTestCase):
+    """共享记忆通过 MemorySystem 单路径访问（SharedStoreBindable）。"""
 
-        write_obs = await writer.execute(
-            {"op": "write", "layer": "semantic", "content": "research notes about X"}
+    async def test_shared_write_visible_across_agents(self) -> None:
+        store = TeamSharedMemoryStore(["semantic"])
+        agent_a = SimpleMemorySystem()
+        agent_b = SimpleMemorySystem()
+        agent_a.bind_shared_store(store)
+        agent_b.bind_shared_store(store)
+
+        agent_a.write_shared_record(
+            "semantic",
+            MemoryRecord(
+                record_id="m1",
+                content="research notes about X",
+                memory_type="semantic",
+                importance=0.8,
+                source_trace_id="team-1",
+            ),
         )
-        self.assertTrue(write_obs.success)
 
-        read_obs = await reader.execute({"op": "read", "layer": "semantic"})
-        self.assertTrue(read_obs.success)
-        self.assertIn("research notes about X", read_obs.payload)
+        results = agent_b.query("semantic")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].content, "research notes about X")
 
-    async def test_validate_rejects_private_layer(self) -> None:
+    async def test_query_private_layer(self) -> None:
+        mem = SimpleMemorySystem()
+        results = mem.query("working")
+        self.assertEqual(results, [])
+
+    async def test_query_shared_layer_returns_empty_initially(self) -> None:
         store = TeamSharedMemoryStore(["semantic"])
-        tool = SharedMemoryTool(store, team_id="team-1")
-        obs = await tool.execute({"op": "read", "layer": "episodic"})
-        self.assertFalse(obs.success)
-        self.assertIn("未配置为共享", obs.error or "")
-
-    async def test_list_op(self) -> None:
-        store = TeamSharedMemoryStore(["semantic"])
-        tool = SharedMemoryTool(store, team_id="t")
-        await tool.execute({"op": "write", "content": "a"})
-        await tool.execute({"op": "write", "content": "b"})
-        obs = await tool.execute({"op": "list"})
-        self.assertTrue(obs.success)
-        self.assertEqual(obs.payload["count"], 2)
+        mem = SimpleMemorySystem()
+        mem.bind_shared_store(store)
+        self.assertEqual(mem.query("semantic"), [])
 
 
 class TestTurnAndTeamAssignment(unittest.TestCase):

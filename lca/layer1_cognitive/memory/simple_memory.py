@@ -97,6 +97,10 @@ class SimpleMemorySystem(MemorySystem):
             raise KeyError(f"层 {layer!r} 未配置为共享")
         self._shared_store.add_record(layer, record)
 
+    def query(self, layer: str) -> list[MemoryRecord]:
+        """显式查询指定层的记录。共享层走 SharedStore，私有层走本地存储。"""
+        return list(self._get_layer_records(layer))
+
     def get_private_layer_snapshot(self) -> dict[str, Any]:
         """返回私有层的当前状态快照，用于测试和调试。"""
         return {k: list(v) for k, v in self._private_layers.items()}

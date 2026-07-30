@@ -53,11 +53,11 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.team_progress.delegation_ledger.DelegationLedger": (
         "DelegationLedgerProtocol 实现，Protocol 定义在 contracts.team_progress 而非 contracts.protocols (ADR-0015)"
     ),
+    "lca.layer3_agent.orchestration_strategies.graph.strategy.GraphExecutionState": (
+        "BFS 执行状态 dataclass，纯内部数据结构，非可插拔组件"
+    ),
     "lca.layer2_runtime.fallback_handler.FallbackActionPolicy": (
         "FallbackPolicy 实现，Protocol 在 contracts.protocols.embodiment (ADR-0016)"
-    ),
-    "lca.layer1_cognitive.memory.shared_memory_tool.SharedMemoryTool": (
-        "Tool 协议实现，共享存储 Tool 包装 (ADR-0016)"
     ),
     "lca.layer1_cognitive.brain.default_factory.SimpleBrainFactory": (
         "BrainFactory Protocol 可调用实现 (ADR-0021)"

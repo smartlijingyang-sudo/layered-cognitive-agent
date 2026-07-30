@@ -71,14 +71,6 @@ class SnapshotReason(str, Enum):
     ON_ERROR = "on_error"
 
 
-class SharedMemoryOp(str, Enum):
-    """共享记忆工具支持的操作。"""
-
-    READ = "read"
-    WRITE = "write"
-    LIST = "list"
-
-
 class DelegationProtocol(str, Enum):
     """委派传输协议。"""
 

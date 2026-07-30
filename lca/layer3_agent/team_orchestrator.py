@@ -3,7 +3,7 @@
 L3 层职责：
     作为团队级组合根，TeamOrchestrator 负责：
     1. 通过 OrchestrationStrategyRegistry 解析编排策略（注册表模式，无 if/elif）
-    2. 注入共享记忆双路径（SharedStoreBindable + SharedMemoryTool）
+    2. 注入共享记忆（SharedStoreBindable 单路径，ADR-0016）
     3. 绑定 Supervisor 的全部能力（transport / roster / hooks / guard）
        —— supervisor 是组合期角色，不是独立类型
     所有策略分发委托给 OrchestrationStrategy 实现，L3 不含业务逻辑。
@@ -20,7 +20,6 @@ from lca.contracts.protocols import (
     OrchestrationStrategy,
     SharedMemoryStore,
     TeamEntrypoint,
-    ToolRegistry,
 )
 from lca.contracts.protocols.capabilities import (
     ExposesComponents,
@@ -33,7 +32,6 @@ from lca.contracts.protocols.cognition import SupportsCompletionGuard
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.contracts.team_progress import DelegationLedgerProtocol
-from lca.layer1_cognitive.memory.shared_memory_tool import SharedMemoryTool
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.layer1_cognitive.team_progress.progress_hooks import (
     ledger_tracking_hook,
@@ -48,9 +46,8 @@ class TeamOrchestrator(TeamEntrypoint):
     支持多种组织形态（hierarchical / sequential / parallel / graph / debate），
     通过 OrchestrationStrategyRegistry 解析策略，不再 if/elif 硬编码。
 
-    共享记忆注入双路径（ADR-0016）：
-    1. SharedStoreBindable 协议绑定 —— MemorySystem 层级共享（CoALA）
-    2. SharedMemoryTool 注入成员 ToolRegistry —— 单体循环内经 use_tool 访问
+    共享记忆通过 SharedStoreBindable 单路径注入（ADR-0016）：
+    MemorySystem 层级共享，Agent 通过 perceive/update/query 统一访问。
     """
 
     def __init__(
@@ -79,7 +76,7 @@ class TeamOrchestrator(TeamEntrypoint):
         self._shared_store: SharedMemoryStore | None = None
         if config.shared_memory_layers:
             self._shared_store = TeamSharedMemoryStore(config.shared_memory_layers)
-            self._inject_shared_memory()
+            self._inject_shared_store()
 
         # ── 组合期：创建 ledger + 绑定 supervisor 全部能力 ──
         team_progress: DelegationLedgerProtocol | None = None
@@ -158,8 +155,8 @@ class TeamOrchestrator(TeamEntrypoint):
 
     # ── 共享记忆 ────────────────────────────────────────────
 
-    def _inject_shared_memory(self) -> None:
-        """将共享记忆 store + SharedMemoryTool 分发给每个成员。"""
+    def _inject_shared_store(self) -> None:
+        """将共享 store 通过 SharedStoreBindable 协议分发给每个成员。"""
         if self._shared_store is None:
             return
         for member in self.members:
@@ -167,21 +164,6 @@ class TeamOrchestrator(TeamEntrypoint):
                 memory = member.runtime.memory
                 if isinstance(memory, SharedStoreBindable):
                     memory.bind_shared_store(self._shared_store)
-            self._register_shared_memory_tool(member)
-
-    def _register_shared_memory_tool(self, member: SimpleAgent) -> None:
-        """若成员 Body 暴露 tool_registry，注册绑定同一 store 的 SharedMemoryTool。"""
-        store = self._shared_store
-        if store is None:
-            return
-        if not isinstance(member.runtime, ExposesComponents):
-            return
-        body = member.runtime.body
-        registry: ToolRegistry | None = getattr(body, "tool_registry", None)
-        if registry is None:
-            return
-        tool = SharedMemoryTool(store, team_id=self.team_id)
-        registry.register(tool)
 
     # ── 执行入口 ────────────────────────────────────────────
 

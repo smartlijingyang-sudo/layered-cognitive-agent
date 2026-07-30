@@ -42,9 +42,6 @@ _DOMAIN_STRINGS = {
     '"ok"': "SpanStatus.OK",
     '"error"': "SpanStatus.ERROR",
     '"roster_coverage"': "CompletionPolicyName.ROSTER_COVERAGE",
-    '"read"': "SharedMemoryOp.READ",
-    '"write"': "SharedMemoryOp.WRITE",
-    '"list"': "SharedMemoryOp.LIST",
 }
 
 # ── 文件级白名单 ──

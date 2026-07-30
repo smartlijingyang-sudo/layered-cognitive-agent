@@ -1,22 +1,8 @@
 """Composition root — wires all layers into a working object graph.
 
-This is the **only** module that assembles the full Agent / Team object
-graphs.  It guarantees that the shared pipeline components (ToolRegistry,
-SafeExecutor, ActionRegistry, TransportRegistry) are created once and
-injected into both Brain and Body, so they always operate on the same
-instances.
-
-High-level entry points:
-
-* ``assemble_base_agent`` — builds a single ``SimpleAgent``.
-* ``assemble_team`` — builds a ``TeamEntrypoint`` from a list of members.
-
-Lower-level builders (``build_body_from_shared``, ``build_hooks``) are
-exposed for advanced / test scenarios.
-
-Known limitation: when the same ``SimpleAgent`` instance is reused as
-supervisor for multiple teams, those teams share one ``Runtime`` (including
-hooks).  Each team assembly does not clone the runtime.
+Sole module that assembles the full Agent / Team object graphs.
+Entry points: ``assemble_base_agent`` (single agent), ``assemble_team`` (team).
+Lower-level builders: ``build_body_from_shared``, ``build_hooks``.
 """
 
 from __future__ import annotations
@@ -130,7 +116,11 @@ def build_body_from_shared(
         action_registry=action_registry,
     )
     if enable_fallback:
-        return FallbackDecoratedBody(inner=simple_body, fallback_handler=FallbackActionPolicy())
+        return FallbackDecoratedBody(
+            inner=simple_body,
+            fallback_handler=FallbackActionPolicy(),
+            action_registry=action_registry,
+        )
     return simple_body
 
 
@@ -266,6 +256,7 @@ def assemble_team(
     )
     base_supervisor = _promote_supervisor(supervisor) if supervisor is not None else None
     transport, roster_desc = build_team_transport(members)
+
     return TeamOrchestrator(
         members,
         config,
