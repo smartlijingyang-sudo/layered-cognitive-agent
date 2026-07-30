@@ -21,11 +21,6 @@ from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
     RosterCoveragePolicy,
 )
 from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
-from lca.layer1_cognitive.brain.map_modules import (
-    SimpleConflictMonitor,
-    SimpleStateEvaluator,
-    SimpleTaskCoordinator,
-)
 from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
 from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
@@ -66,14 +61,7 @@ def register_defaults() -> None:
         TeamProcess.PARALLEL, lambda: ParallelStrategy(synthesizer=ConcatSynthesizer())
     )
     orch_reg.register(TeamProcess.GRAPH, GraphStrategy)
-    orch_reg.register(
-        TeamProcess.DEBATE,
-        lambda: DebateStrategy(
-            conflict_monitor=SimpleConflictMonitor(),
-            task_coordinator=SimpleTaskCoordinator(),
-            state_evaluator=SimpleStateEvaluator(),
-        ),
-    )
+    orch_reg.register(TeamProcess.DEBATE, DebateStrategy)
     orch_reg.register(TeamProcess.HANDOFF, HandoffStrategy)
 
     global_reg.register(

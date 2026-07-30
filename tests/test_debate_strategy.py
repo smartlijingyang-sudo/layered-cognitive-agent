@@ -9,16 +9,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from lca.contracts.decision import StructuredDecision
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import OrchestrationContext
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.contracts.state import Budget
-from lca.layer1_cognitive.brain.map_modules import (
-    SimpleConflictMonitor,
-    SimpleStateEvaluator,
-    SimpleTaskCoordinator,
-)
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer3_agent.orchestration_strategies import DebateStrategy
 from lca.layer4_app.defaults import ensure_defaults
@@ -58,13 +54,9 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
     """验证多轮辩论收敛行为。"""
 
     async def test_single_member_converges_immediately(self) -> None:
-        """单成员时，ConflictMonitor 返回空 → 第 1 轮即退出。"""
+        """单成员时，第 1 轮即达成共识退出。"""
         agent = _make_agent("t1", ["only proposal"])
-        strategy = DebateStrategy(
-            conflict_monitor=SimpleConflictMonitor(),
-            task_coordinator=SimpleTaskCoordinator(),
-            state_evaluator=SimpleStateEvaluator(),
-        )
+        strategy = DebateStrategy()
         context = OrchestrationContext(members=[agent])
 
         result = await strategy.run(context, "task")
@@ -73,19 +65,12 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.output, "only proposal")
         self.assertEqual(agent.execute.call_count, 1)
 
-    async def test_early_exit_when_no_conflicts(self) -> None:
-        """ConflictMonitor 第 1 轮返回空 → 提前退出，不跑满 max_rounds。"""
-        agent_a = _make_agent("t-a", ["proposal-a"])
-        agent_b = _make_agent("t-b", ["proposal-b"])
+    async def test_early_exit_when_consensus(self) -> None:
+        """所有成员输出相同时 → 提前退出，不跑满 max_rounds。"""
+        agent_a = _make_agent("t-a", ["same proposal"])
+        agent_b = _make_agent("t-b", ["same proposal"])
 
-        monitor = MagicMock()
-        monitor.check = AsyncMock(return_value=[])
-
-        strategy = DebateStrategy(
-            conflict_monitor=monitor,
-            task_coordinator=SimpleTaskCoordinator(),
-            state_evaluator=SimpleStateEvaluator(),
-        )
+        strategy = DebateStrategy()
         context = OrchestrationContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=5),
@@ -102,20 +87,7 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["A1", "A2", "consensus"])
         agent_b = _make_agent("t-b", ["B1", "B2", "consensus"])
 
-        monitor = MagicMock()
-        monitor.check = AsyncMock(
-            side_effect=[
-                ["disagreement"],
-                ["disagreement"],
-                [],
-            ]
-        )
-
-        strategy = DebateStrategy(
-            conflict_monitor=monitor,
-            task_coordinator=SimpleTaskCoordinator(),
-            state_evaluator=SimpleStateEvaluator(),
-        )
+        strategy = DebateStrategy()
         context = OrchestrationContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=5),
@@ -133,17 +105,10 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
 
     async def test_max_rounds_limit(self) -> None:
         """始终有分歧时，跑满 max_rounds 后返回最后一轮结果。"""
-        agent_a = _make_agent("t-a", ["A1", "A2", "A3"])
-        agent_b = _make_agent("t-b", ["B1", "B2", "B3"])
+        agent_a = _make_agent("t-a", ["A1", "A2"])
+        agent_b = _make_agent("t-b", ["B1", "B2"])
 
-        monitor = MagicMock()
-        monitor.check = AsyncMock(return_value=["disagreement"])
-
-        strategy = DebateStrategy(
-            conflict_monitor=monitor,
-            task_coordinator=SimpleTaskCoordinator(),
-            state_evaluator=SimpleStateEvaluator(),
-        )
+        strategy = DebateStrategy()
         context = OrchestrationContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=2),
@@ -160,14 +125,7 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["A1", "A2", "A3"])
         agent_b = _make_agent("t-b", ["B1", "B2", "B3"])
 
-        monitor = MagicMock()
-        monitor.check = AsyncMock(return_value=["disagreement"])
-
-        strategy = DebateStrategy(
-            conflict_monitor=monitor,
-            task_coordinator=SimpleTaskCoordinator(),
-            state_evaluator=SimpleStateEvaluator(),
-        )
+        strategy = DebateStrategy()
         context = OrchestrationContext(members=[agent_a, agent_b])
 
         await strategy.run(context, "task")
@@ -191,14 +149,7 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_tracking_agent("t-a", "proposal-a")
         agent_b = _make_tracking_agent("t-b", "proposal-b")
 
-        monitor = MagicMock()
-        monitor.check = AsyncMock(side_effect=[["conflict"], []])
-
-        strategy = DebateStrategy(
-            conflict_monitor=monitor,
-            task_coordinator=SimpleTaskCoordinator(),
-            state_evaluator=SimpleStateEvaluator(),
-        )
+        strategy = DebateStrategy()
         context = OrchestrationContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=3),
@@ -215,36 +166,42 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
 class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
     """验证仲裁正确性。"""
 
-    async def test_arbitration_selects_best_score(self) -> None:
-        """TaskCoordinator 应选出 StateEvaluator 打分最高的候选。"""
+    async def test_arbitration_via_pipeline(self) -> None:
+        """pipeline.evaluate 返回的 winner 应被正确映射回 Result。"""
         agent_a = _make_agent("t-a", ["weak"])
         agent_b = _make_agent("t-b", ["strong"])
 
-        evaluator = MagicMock()
-        evaluator.score = AsyncMock(side_effect=[0.3, 0.9])
-
-        strategy = DebateStrategy(
-            conflict_monitor=SimpleConflictMonitor(),
-            task_coordinator=SimpleTaskCoordinator(),
-            state_evaluator=evaluator,
+        pipeline = MagicMock()
+        pipeline.evaluate = AsyncMock(
+            return_value=StructuredDecision(
+                decision_id="debate_1",
+                action_type="respond",
+                rationale="strong",
+                confidence=0.9,
+                response_text="strong",
+            )
         )
-        context = OrchestrationContext(members=[agent_a, agent_b])
+
+        strategy = DebateStrategy(evaluation_pipeline=pipeline)
+        context = OrchestrationContext(
+            members=[agent_a, agent_b],
+            config=TeamConfig(process="debate", max_rounds=1),
+        )
 
         result = await strategy.run(context, "task")
 
         self.assertEqual(result.output, "strong")
 
-    async def test_arbitration_with_uniform_scores(self) -> None:
-        """所有候选得分相同时，SimpleTaskCoordinator 选第一个（index 0）。"""
+    async def test_no_pipeline_returns_first_on_max_rounds(self) -> None:
+        """无 pipeline 时，跑满轮数后返回首个结果。"""
         agent_a = _make_agent("t-a", ["first"])
         agent_b = _make_agent("t-b", ["second"])
 
-        strategy = DebateStrategy(
-            conflict_monitor=SimpleConflictMonitor(),
-            task_coordinator=SimpleTaskCoordinator(),
-            state_evaluator=SimpleStateEvaluator(),
+        strategy = DebateStrategy()
+        context = OrchestrationContext(
+            members=[agent_a, agent_b],
+            config=TeamConfig(process="debate", max_rounds=1),
         )
-        context = OrchestrationContext(members=[agent_a, agent_b])
 
         result = await strategy.run(context, "task")
 
@@ -263,8 +220,8 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "failed")
         self.assertIn("No members", result.error or "")
 
-    async def test_no_components_still_works(self) -> None:
-        """无 ConflictMonitor/Coordinator/Evaluator 时退化：跑满轮数返回首个结果。"""
+    async def test_no_pipeline_still_works(self) -> None:
+        """无 pipeline 时退化：跑满轮数返回首个结果。"""
         agent = _make_agent("t1", ["solo"])
         strategy = DebateStrategy()
         context = OrchestrationContext(
@@ -282,11 +239,7 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["good"], status=TaskStatus.COMPLETED)
         agent_b = _make_agent("t-b", [""], status=TaskStatus.FAILED)
 
-        strategy = DebateStrategy(
-            conflict_monitor=SimpleConflictMonitor(),
-            task_coordinator=SimpleTaskCoordinator(),
-            state_evaluator=SimpleStateEvaluator(),
-        )
+        strategy = DebateStrategy()
         context = OrchestrationContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=1),
@@ -304,13 +257,10 @@ class TestDebateStrategyRegistration(unittest.TestCase):
         registry = get_global_orchestration_registry()
         self.assertTrue(registry.has("debate"))
 
-    def test_debate_resolves_with_components(self) -> None:
+    def test_debate_resolves_to_debate_strategy(self) -> None:
         registry = get_global_orchestration_registry()
         strategy = registry.resolve("debate")
         self.assertIsInstance(strategy, DebateStrategy)
-        self.assertIsNotNone(strategy._conflict_monitor)
-        self.assertIsNotNone(strategy._task_coordinator)
-        self.assertIsNotNone(strategy._state_evaluator)
 
 
 if __name__ == "__main__":

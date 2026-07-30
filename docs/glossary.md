@@ -3,7 +3,7 @@
 | 术语 | 定义 |
 |---|---|
 | **L0–L4** | 框架五层：基础设施层 / 认知组件层 / 认知运行时层 / Agent 抽象层 / 应用编排层 |
-| **MAP** | ModularBrain 内五模块协作：TaskDecomposer → StatePredictor → StateEvaluator → ConflictMonitor → TaskCoordinator |
+| **MAP** | ModularBrain 内候选评估管线：CandidateEvaluationPipeline 封装 decompose → evaluate（内含 predict / score / conflict check / arbitrate） |
 | **认知闭环** | perceive → think → act → observe → reflect → update，框架核心循环 |
 | **StructuredDecision** | Brain 输出的强类型决策对象，含 action_type / tool_call / delegate_to / rationale |
 | **TypedState** | 贯穿运行时的强类型状态对象，携带 Budget、Checkpoint、记忆上下文 |

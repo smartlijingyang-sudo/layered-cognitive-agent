@@ -14,7 +14,6 @@ from lca.contracts.protocols import (
     AgentTransport,
     Body,
     BrainStrategy,
-    ConflictMonitor,
     Critic,
     DecisionParser,
     EventBus,
@@ -27,11 +26,7 @@ from lca.contracts.protocols import (
     Reasoner,
     Runtime,
     SafeExecutor,
-    StateEvaluator,
-    StatePredictor,
     StateStore,
-    TaskCoordinator,
-    TaskDecomposer,
     TeamEntrypoint,
     Tool,
     ToolRegistry,
@@ -59,15 +54,6 @@ from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
 )
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
-from lca.layer1_cognitive.brain.map_modules.conflict_monitor import (
-    SimpleConflictMonitor,
-)
-from lca.layer1_cognitive.brain.map_modules.state_evaluator import SimpleStateEvaluator
-from lca.layer1_cognitive.brain.map_modules.state_predictor import SimpleStatePredictor
-from lca.layer1_cognitive.brain.map_modules.task_coordinator import (
-    SimpleTaskCoordinator,
-)
-from lca.layer1_cognitive.brain.map_modules.task_decomposer import SimpleTaskDecomposer
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.prompt_manager import SimplePromptManager
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
@@ -169,21 +155,6 @@ class TestL1ProtocolCompliance(unittest.TestCase):
 
     def test_simple_critic(self):
         self.assertIsInstance(SimpleCritic(), Critic)
-
-    def test_simple_task_decomposer(self):
-        self.assertIsInstance(SimpleTaskDecomposer(), TaskDecomposer)
-
-    def test_simple_state_predictor(self):
-        self.assertIsInstance(SimpleStatePredictor(), StatePredictor)
-
-    def test_simple_state_evaluator(self):
-        self.assertIsInstance(SimpleStateEvaluator(), StateEvaluator)
-
-    def test_simple_conflict_monitor(self):
-        self.assertIsInstance(SimpleConflictMonitor(), ConflictMonitor)
-
-    def test_simple_task_coordinator(self):
-        self.assertIsInstance(SimpleTaskCoordinator(), TaskCoordinator)
 
     def test_simple_body(self):
         tool_reg = SimpleToolRegistry()

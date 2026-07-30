@@ -33,46 +33,6 @@ class Critic(Protocol):
 
 
 @runtime_checkable
-class TaskDecomposer(Protocol):
-    """任务分解器：将当前状态拆分为子任务列表。"""
-
-    async def decompose(self, state: TypedState) -> list[str]: ...
-
-
-@runtime_checkable
-class StatePredictor(Protocol):
-    """状态预测器：预估执行某候选后的状态变化。"""
-
-    async def predict(self, state: TypedState, candidate_action: str) -> dict[str, Any]: ...
-
-
-@runtime_checkable
-class StateEvaluator(Protocol):
-    """状态评估器：对预测状态打分。"""
-
-    async def score(self, state: TypedState, predicted_state: dict[str, Any]) -> float: ...
-
-
-@runtime_checkable
-class ConflictMonitor(Protocol):
-    """冲突检测器：检查候选决策之间的矛盾。"""
-
-    async def check(self, state: TypedState, candidates: list[StructuredDecision]) -> list[str]: ...
-
-
-@runtime_checkable
-class TaskCoordinator(Protocol):
-    """任务协调器：在多候选中仲裁选出最终决策。"""
-
-    async def arbitrate(
-        self,
-        state: TypedState,
-        candidates: list[StructuredDecision],
-        scores: list[float],
-    ) -> StructuredDecision: ...
-
-
-@runtime_checkable
 class BrainStrategy(Protocol):
     """Brain 顶层策略：think + reflect + 花名册设置。"""
 
@@ -83,10 +43,11 @@ class BrainStrategy(Protocol):
 
 @runtime_checkable
 class CandidateEvaluationPipeline(Protocol):
-    """候选方案评估管线：封装 decompose → predict → score → conflict check → arbitrate。
-    将原本分散在 TaskDecomposer / StatePredictor / StateEvaluator /
-    ConflictMonitor / TaskCoordinator 五个浅模块中的认知评估步骤
-    收敛为一个有深度的模块（ADR-0003 的深化）。
+    """候选方案评估管线：封装 decompose → evaluate 两阶段认知评估。
+
+    decompose 将任务拆解为子任务列表；evaluate 对候选决策执行
+    predict → score → conflict check → arbitrate，返回最优决策。
+    所有评估步骤内联实现，不再依赖外部 MAP 子模块。
     """
 
     async def decompose(self, state: TypedState) -> list[str]: ...

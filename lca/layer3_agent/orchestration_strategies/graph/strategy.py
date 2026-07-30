@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
+from dataclasses import dataclass, field
 from typing import Any
 
 from lca.contracts.graph import EdgeType, ExecutionGraph, NodeType
@@ -31,6 +32,21 @@ from lca.layer3_agent.orchestration_strategies.graph.topology import (
 
 _AGGREGATOR_TRACE_PREFIX = "graph-agg"
 _GRAPH_TRACE_ID = "graph"
+
+
+@dataclass
+class GraphExecutionState:
+    """BFS 执行状态 —— 将原 12 参数递归收敛为一个可变状态对象。
+
+    每次 run() 创建新实例，无跨调用共享。
+    """
+
+    remaining: dict[str, int]
+    executed: set[str] = field(default_factory=set)
+    skipped: set[str] = field(default_factory=set)
+    results: dict[str, Result] = field(default_factory=dict)
+    aggregator_ids: set[str] = field(default_factory=set)
+    queue: deque[str] = field(default_factory=deque)
 
 
 class GraphStrategy(OrchestrationStrategy):
@@ -56,87 +72,60 @@ class GraphStrategy(OrchestrationStrategy):
         member_map = {m.role_profile.role: m for m in context.members}
         state = TypedState(trace_id=_GRAPH_TRACE_ID, task=objective, budget=Budget())
         in_degree, out_edge_indices = compute_in_degree_and_out_edges(graph)
-        remaining: dict[str, int] = dict(in_degree)
-        executed: set[str] = set()
-        skipped: set[str] = set()
-        results: dict[str, Result] = {}
-        aggregator_ids: set[str] = set()
-        queue: deque[str] = deque(nid for nid, deg in remaining.items() if deg == 0)
-        while queue:
-            nid = queue.popleft()
-            if nid in executed or nid in skipped:
+
+        es = GraphExecutionState(
+            remaining=dict(in_degree),
+            queue=deque(nid for nid, deg in in_degree.items() if deg == 0),
+        )
+
+        while es.queue:
+            nid = es.queue.popleft()
+            if nid in es.executed or nid in es.skipped:
                 continue
             node = graph.nodes[nid]
             if node.type == NodeType.AGGREGATOR:
-                aggregator_ids.add(nid)
-            await self._execute_node(node, graph, context, member_map, objective, state, results)
-            executed.add(nid)
-            fixed_targets: list[str] = []
-            parallel_targets: list[str] = []
-            for edge_idx in out_edge_indices[nid]:
-                edge = graph.edges[edge_idx]
-                if edge.type == EdgeType.CONDITIONAL:
-                    if edge.condition is not None and edge.condition(state):
-                        fixed_targets.append(edge.target)
-                    else:
-                        cascade_skip(graph, edge.target, remaining, skipped, executed, queue)
-                elif edge.type == EdgeType.PARALLEL:
-                    parallel_targets.append(edge.target)
-                else:
-                    fixed_targets.append(edge.target)
-            if parallel_targets:
-                await self._execute_parallel_branches(
-                    parallel_targets,
-                    graph,
-                    context,
-                    member_map,
-                    objective,
-                    state,
-                    results,
-                    remaining,
-                    executed,
-                    skipped,
-                    queue,
-                    aggregator_ids,
-                )
-            else:
-                enqueue_ready_targets(fixed_targets, remaining, executed, queue)
-        return self._finalize(graph, results, aggregator_ids)
+                es.aggregator_ids.add(nid)
+            await self._execute_node(node, graph, context, member_map, objective, state, es)
+            es.executed.add(nid)
+            await self._process_outgoing(
+                nid, graph, state, out_edge_indices, es, context, member_map, objective
+            )
 
-    def _resolve_graph(self, context: OrchestrationContext) -> ExecutionGraph:
-        if self._graph is not None:
-            return self._graph
-        raise ValueError("GraphStrategy 需要 ExecutionGraph：构造时传入 execution_graph")
+        return self._finalize(graph, es.results, es.aggregator_ids)
 
-    async def _execute_node(
+    async def _process_outgoing(
         self,
-        node: Any,
+        nid: str,
         graph: ExecutionGraph,
+        state: TypedState,
+        out_edge_indices: dict[str, list[int]],
+        es: GraphExecutionState,
         context: OrchestrationContext,
         member_map: dict[str, Any],
         objective: str,
-        state: TypedState,
-        results: dict[str, Result],
     ) -> None:
-        if node.type == NodeType.AGENT:
-            role = node.config.get("role", "")
-            member = member_map.get(role)
-            if member:
-                results[node.id] = await invoke_member(context, member, objective)
-                if self._state_store:
-                    await self._state_store.save(state)
-        elif node.type == NodeType.AGGREGATOR:
-            preds = [e.source for e in graph.incoming(node.id)]
-            parts = [str(results[p].output) for p in preds if p in results and results[p].output]
-            total_steps = sum(results[p].total_steps for p in preds if p in results)
-            results[node.id] = Result(
-                trace_id=_AGGREGATOR_TRACE_PREFIX,
-                status=TaskStatus.COMPLETED,
-                final_state_ref="",
-                total_steps=total_steps or 1,
-                budget_used=Budget(used_steps=total_steps or 1),
-                output="\n".join(parts),
+        """处理节点出边：分类为 fixed / parallel / conditional，驱动后续执行。"""
+        fixed_targets: list[str] = []
+        parallel_targets: list[str] = []
+        for edge_idx in out_edge_indices[nid]:
+            edge = graph.edges[edge_idx]
+            if edge.type == EdgeType.CONDITIONAL:
+                if edge.condition is not None and edge.condition(state):
+                    fixed_targets.append(edge.target)
+                else:
+                    cascade_skip(
+                        graph, edge.target, es.remaining, es.skipped, es.executed, es.queue
+                    )
+            elif edge.type == EdgeType.PARALLEL:
+                parallel_targets.append(edge.target)
+            else:
+                fixed_targets.append(edge.target)
+        if parallel_targets:
+            await self._execute_parallel_branches(
+                parallel_targets, graph, context, member_map, objective, state, es
             )
+        else:
+            enqueue_ready_targets(fixed_targets, es.remaining, es.executed, es.queue)
 
     async def _execute_parallel_branches(
         self,
@@ -146,21 +135,19 @@ class GraphStrategy(OrchestrationStrategy):
         member_map: dict[str, Any],
         objective: str,
         state: TypedState,
-        results: dict[str, Result],
-        remaining: dict[str, int],
-        executed: set[str],
-        skipped: set[str],
-        queue: deque[str],
-        aggregator_ids: set[str],
+        es: GraphExecutionState,
     ) -> None:
+        """并行执行多个分支（asyncio.gather），每个分支可递归触发子并行。"""
+
         async def _run_branch(target_nid: str) -> None:
-            if target_nid in executed or target_nid in skipped:
+            if target_nid in es.executed or target_nid in es.skipped:
                 return
             node = graph.nodes[target_nid]
             if node.type == NodeType.AGGREGATOR:
-                aggregator_ids.add(target_nid)
-            await self._execute_node(node, graph, context, member_map, objective, state, results)
-            executed.add(target_nid)
+                es.aggregator_ids.add(target_nid)
+            await self._execute_node(node, graph, context, member_map, objective, state, es)
+            es.executed.add(target_nid)
+
             sub_fixed: list[str] = []
             sub_parallel: list[str] = []
             for edge in graph.outgoing(target_nid):
@@ -170,37 +157,65 @@ class GraphStrategy(OrchestrationStrategy):
                     if edge.condition is not None and edge.condition(state):
                         sub_fixed.append(edge.target)
                     else:
-                        cascade_skip(graph, edge.target, remaining, skipped, executed, queue)
+                        cascade_skip(
+                            graph, edge.target, es.remaining, es.skipped, es.executed, es.queue
+                        )
                 else:
                     sub_fixed.append(edge.target)
             if sub_parallel:
                 await self._execute_parallel_branches(
-                    sub_parallel,
-                    graph,
-                    context,
-                    member_map,
-                    objective,
-                    state,
-                    results,
-                    remaining,
-                    executed,
-                    skipped,
-                    queue,
-                    aggregator_ids,
+                    sub_parallel, graph, context, member_map, objective, state, es
                 )
             else:
                 for sub_target in sub_fixed:
-                    remaining[sub_target] -= 1
-                    if remaining[sub_target] <= 0 and sub_target not in executed:
+                    es.remaining[sub_target] -= 1
+                    if es.remaining[sub_target] <= 0 and sub_target not in es.executed:
                         await _run_branch(sub_target)
 
         await asyncio.gather(*[_run_branch(t) for t in targets])
         for target in targets:
             for edge in graph.outgoing(target):
                 next_nid = edge.target
-                remaining[next_nid] -= 1
-                if remaining[next_nid] <= 0 and next_nid not in executed:
-                    queue.append(next_nid)
+                es.remaining[next_nid] -= 1
+                if es.remaining[next_nid] <= 0 and next_nid not in es.executed:
+                    es.queue.append(next_nid)
+
+    async def _execute_node(
+        self,
+        node: Any,
+        graph: ExecutionGraph,
+        context: OrchestrationContext,
+        member_map: dict[str, Any],
+        objective: str,
+        state: TypedState,
+        es: GraphExecutionState,
+    ) -> None:
+        if node.type == NodeType.AGENT:
+            role = node.config.get("role", "")
+            member = member_map.get(role)
+            if member:
+                es.results[node.id] = await invoke_member(context, member, objective)
+                if self._state_store:
+                    await self._state_store.save(state)
+        elif node.type == NodeType.AGGREGATOR:
+            preds = [e.source for e in graph.incoming(node.id)]
+            parts = [
+                str(es.results[p].output) for p in preds if p in es.results and es.results[p].output
+            ]
+            total_steps = sum(es.results[p].total_steps for p in preds if p in es.results)
+            es.results[node.id] = Result(
+                trace_id=_AGGREGATOR_TRACE_PREFIX,
+                status=TaskStatus.COMPLETED,
+                final_state_ref="",
+                total_steps=total_steps or 1,
+                budget_used=Budget(used_steps=total_steps or 1),
+                output="\n".join(parts),
+            )
+
+    def _resolve_graph(self, context: OrchestrationContext) -> ExecutionGraph:
+        if self._graph is not None:
+            return self._graph
+        raise ValueError("GraphStrategy 需要 ExecutionGraph：构造时传入 execution_graph")
 
     @staticmethod
     def _finalize(
