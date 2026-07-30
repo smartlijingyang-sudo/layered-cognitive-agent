@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from typing import cast
 
-from lca.contracts.enums import CompletionPolicyName, HookEvent
+from lca.contracts.enums import CompletionPolicyName
+from lca.contracts.message import AgentMessage, agent_message_as_text
 from lca.contracts.protocols import (
     AgentTransport,
     OrchestrationContext,
@@ -23,22 +24,17 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.protocols.capabilities import (
     ExposesComponents,
-    HookRegistryHolder,
-    RosterAware,
     SharedStoreBindable,
-    TransportBindable,
 )
-from lca.contracts.protocols.cognition import SupportsCompletionGuard
+from lca.contracts.protocols.cognition import CompletionPolicy
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.contracts.team_progress import DelegationLedgerProtocol
+from lca.layer0_infra.component_registry import get_global_registry
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
-from lca.layer1_cognitive.team_progress.progress_hooks import (
-    ledger_tracking_hook,
-    progress_injection_hook,
-)
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer3_agent.simple_agent import SimpleAgent
+from lca.layer3_agent.supervisor_role import SupervisionCapabilities, apply_supervision
 
 
 class TeamOrchestrator(TeamEntrypoint):
@@ -82,7 +78,14 @@ class TeamOrchestrator(TeamEntrypoint):
         team_progress: DelegationLedgerProtocol | None = None
         if supervisor is not None:
             team_progress = self._create_ledger(members)
-            self._bind_supervisor(supervisor, transport, roster_desc, team_progress, config)
+            policy = self._resolve_completion_policy(config)
+            caps = SupervisionCapabilities(
+                transport=transport,
+                roster_desc=roster_desc,
+                ledger=team_progress,
+                completion_policy=policy,
+            )
+            apply_supervision(supervisor, caps)
 
         self._context = OrchestrationContext(
             members=members,
@@ -100,58 +103,20 @@ class TeamOrchestrator(TeamEntrypoint):
     @staticmethod
     def _create_ledger(members: list[SimpleAgent]) -> DelegationLedgerProtocol:
         """从全局注册表解析 DelegationLedger 并实例化。"""
-        from lca.layer0_infra.component_registry import get_global_registry
-
         mandatory_roles = frozenset(m.role_profile.role for m in members)
         reg = get_global_registry()
         ledger_cls = reg.require("delegation_ledger", "default")
         return cast("DelegationLedgerProtocol", ledger_cls(mandatory_roles=mandatory_roles))
 
     @staticmethod
-    def _bind_supervisor(
-        supervisor: SimpleAgent,
-        transport: AgentTransport | None,
-        roster_desc: str,
-        ledger: DelegationLedgerProtocol,
-        config: TeamConfig,
-    ) -> None:
-        """在组合根完成 Supervisor 的全部能力绑定。
-
-        supervisor 是角色而非类型 —— 同一个 SimpleAgent 被放入
-        context.supervisor 即承担 supervisor 职责，此处一次性绑定：
-        1. transport / roster（让 supervisor 感知团队拓扑）
-        2. ledger tracking hook（POST_ACT 记账）
-        3. progress injection hook（PRE_THINK 注入进度）
-        4. completion guard（roster_coverage 确定性收尾）
-        """
-        rt = supervisor.runtime
-        if not isinstance(rt, ExposesComponents):
-            return
-
-        # 1. transport + roster
-        if transport is not None:
-            body = rt.body
-            if isinstance(body, TransportBindable):
-                body.bind_transport(transport)
-            brain = rt.brain
-            if isinstance(brain, RosterAware):
-                brain.set_team_roster(roster_desc)
-
-        # 2-3. hooks
+    def _resolve_completion_policy(config: TeamConfig) -> CompletionPolicy | None:
+        """从全局注册表解析 completion policy 工厂并实例化。"""
         policy_name = config.completion_policy if config else CompletionPolicyName.ROSTER_COVERAGE
-        if policy_name != CompletionPolicyName.NONE and isinstance(rt, HookRegistryHolder):
-            rt.hooks.register(HookEvent.POST_ACT, ledger_tracking_hook)
-            rt.hooks.register(HookEvent.PRE_THINK, progress_injection_hook)
-
-        # 4. completion guard
-        if policy_name != CompletionPolicyName.NONE:
-            from lca.layer0_infra.component_registry import get_global_registry
-
-            reg = get_global_registry()
-            policy_factory = reg.require("completion_policy", policy_name)
-            policy = policy_factory()
-            if isinstance(rt, SupportsCompletionGuard):
-                rt.install_completion_guard(policy)
+        if policy_name == CompletionPolicyName.NONE:
+            return None
+        reg = get_global_registry()
+        policy_factory = reg.require("completion_policy", policy_name)
+        return cast("CompletionPolicy", policy_factory())
 
     # ── 共享记忆 ────────────────────────────────────────────
 
@@ -174,8 +139,6 @@ class TeamOrchestrator(TeamEntrypoint):
     ) -> Result:
         """按 TeamConfig.process 类型选择组织形态执行：dispatch 语义由 strategy 承担。"""
         del ctx  # InvocationContext 预留
-        from lca.contracts.message import AgentMessage, agent_message_as_text
-
         text = (
             agent_message_as_text(objective)
             if isinstance(objective, AgentMessage)

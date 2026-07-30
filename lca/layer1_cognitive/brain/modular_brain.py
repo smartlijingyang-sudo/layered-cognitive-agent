@@ -12,6 +12,7 @@ from lca.contracts.protocols import (
     Reasoner,
     SkillRouter,
 )
+from lca.contracts.protocols.capabilities import RosterAware
 from lca.contracts.state import TypedState
 from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
     GuardedCandidateEvaluationPipeline,
@@ -59,11 +60,8 @@ class ModularBrain(BrainStrategy):
         return await self.critic.critique(state, observation)
 
     def set_team_roster(self, roster_desc: str) -> None:
-        setter = getattr(self.reasoner, "set_team_roster", None)
-        if callable(setter):
-            setter(roster_desc)
-        elif hasattr(self.reasoner, "team_roster"):
-            self.reasoner.team_roster = roster_desc
+        if isinstance(self.reasoner, RosterAware):
+            self.reasoner.set_team_roster(roster_desc)
 
     def install_completion_guard(self, policy: CompletionPolicy) -> None:
         """在内部评估管线外挂一层确定性收尾 guardrail（Brain 自管内省，外部不穿透）。
