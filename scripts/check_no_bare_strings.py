@@ -41,7 +41,7 @@ _DOMAIN_STRINGS = {
     '"on_complete"': "HookEvent.ON_COMPLETE",
     '"ok"': "SpanStatus.OK",
     '"error"': "SpanStatus.ERROR",
-    '"roster_coverage"': "CompletionPolicyName.ROSTER_COVERAGE",
+    '"must_consult_all"': "DecisionGateName.MUST_CONSULT_ALL",
 }
 
 # ── 文件级白名单 ──
