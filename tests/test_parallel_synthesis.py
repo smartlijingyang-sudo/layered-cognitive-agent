@@ -13,7 +13,7 @@ from lca.contracts.protocols import Synthesizer, TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
-from lca.layer3_agent.orchestration_strategies import ParallelStrategy
+from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
 
 
 def _make_result(
@@ -158,7 +158,7 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t3", "Result C")),
         ]
         context = TeamContext(members=members)
-        strategy = ParallelStrategy(synthesizer=ConcatSynthesizer())
+        strategy = ChoreographyStrategy("parallel", synthesizer=ConcatSynthesizer())
 
         result = await strategy.run(context, "test task")
 
@@ -175,7 +175,7 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t2", "Result B")),
         ]
         context = TeamContext(members=members)
-        strategy = ParallelStrategy()
+        strategy = ChoreographyStrategy("parallel")
 
         result = await strategy.run(context, "test task")
 
@@ -184,7 +184,7 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
     async def test_parallel_empty_members(self) -> None:
         """空成员列表应返回 failed。"""
         context = TeamContext(members=[])
-        strategy = ParallelStrategy(synthesizer=ConcatSynthesizer())
+        strategy = ChoreographyStrategy("parallel", synthesizer=ConcatSynthesizer())
 
         result = await strategy.run(context, "test task")
 
@@ -217,7 +217,7 @@ class TestSynthesizerProtocol(unittest.IsolatedAsyncioTestCase):
         ]
         context = TeamContext(members=members)
         # 测试用内部类满足 Synthesizer Protocol 但 mypy 无法推断结构子类型
-        strategy = ParallelStrategy(synthesizer=first_synth)  # type: ignore[arg-type]
+        strategy = ChoreographyStrategy("parallel", synthesizer=first_synth)  # type: ignore[arg-type]
 
         result = await strategy.run(context, "test")
 

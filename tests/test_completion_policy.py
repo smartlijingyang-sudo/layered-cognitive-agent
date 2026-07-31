@@ -11,7 +11,7 @@ from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
 )
 from lca.layer1_cognitive.member_status import (
     InMemoryMemberStatus,
-    track_member_status_hook,
+    update_member_status,
 )
 
 # ── helpers ──
@@ -148,7 +148,7 @@ class TestMustConsultAllMembers:
 # ── Hooks ──
 
 
-class TestLedgerTrackingHook:
+class TestUpdateMemberStatus:
     @pytest.mark.asyncio
     async def test_marks_done_on_success(self) -> None:
         ledger = _ledger({"analyst"})
@@ -162,7 +162,7 @@ class TestLedgerTrackingHook:
 
         obs = Observation(observation_id="o1", success=True, payload="ok")
 
-        await track_member_status_hook("post_act", state, decision=decision, observation=obs)
+        update_member_status(state, decision, obs)
 
         assert state.member_status is not None
         assert state.member_status.status["analyst"] == "done"
@@ -180,16 +180,19 @@ class TestLedgerTrackingHook:
 
         obs = Observation(observation_id="o1", success=False, payload=None, error="boom")
 
-        await track_member_status_hook("post_act", state, decision=decision, observation=obs)
+        update_member_status(state, decision, obs)
 
         assert state.member_status is not None
         assert state.member_status.status["analyst"] == "failed"
 
     @pytest.mark.asyncio
     async def test_noop_when_no_ledger(self) -> None:
-        state = _state()  # no team_progress
+        state = _state()  # no member_status
         decision = _decision("delegate")
-        await track_member_status_hook("post_act", state, decision=decision)
+        from lca.contracts.decision import Observation
+
+        obs = Observation(observation_id="o1", success=True, payload=None)
+        update_member_status(state, decision, obs)
         # Should not raise
 
     @pytest.mark.asyncio
@@ -197,7 +200,10 @@ class TestLedgerTrackingHook:
         ledger = _ledger({"analyst"})
         state = _state(member_status=ledger)
         decision = _decision("respond")
-        await track_member_status_hook("post_act", state, decision=decision)
+        from lca.contracts.decision import Observation
+
+        obs = Observation(observation_id="o1", success=True, payload=None)
+        update_member_status(state, decision, obs)
         assert state.member_status.status["analyst"] == "pending"
 
 

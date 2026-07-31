@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.state import Budget
+
+if TYPE_CHECKING:
+    from lca.contracts.decision import Observation
+    from lca.contracts.state import AgentState
 
 
 @dataclass
@@ -39,6 +44,47 @@ class Result:
             total_steps=0,
             budget_used=Budget(),
             error=reason,
+        )
+
+    @classmethod
+    def from_observation(cls, observation: Observation, task_id: str) -> Result:
+        """Bridge an Observation from the channel path into a Result."""
+        status = TaskStatus.COMPLETED if observation.success else TaskStatus.FAILED
+        payload = observation.payload
+        if isinstance(payload, str):
+            output: str | None = payload
+        elif payload is not None:
+            output = str(payload)
+        else:
+            output = None
+        return cls(
+            trace_id=new_id("trace"),
+            status=status,
+            final_state_ref=f"transport://{task_id}",
+            total_steps=1,
+            budget_used=Budget(used_steps=1),
+            output=output,
+            error=observation.error,
+        )
+
+    @classmethod
+    def from_state(cls, state: AgentState) -> Result:
+        """Summarize a final AgentState into a Result."""
+        status = TaskStatus.COMPLETED if state.status == TaskStatus.WORKING else state.status
+        final_output = state.final_output
+        output: str | None
+        if isinstance(final_output, str) or final_output is None:
+            output = final_output
+        else:
+            output = str(final_output)
+        return cls(
+            trace_id=state.trace_id,
+            status=status,
+            output=output,
+            final_state_ref=f"mem://{state.trace_id}/{state.step}",
+            total_steps=state.step + 1,
+            budget_used=state.budget,
+            error=state.last_error,
         )
 
 

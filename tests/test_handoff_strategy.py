@@ -16,7 +16,7 @@ from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
-from lca.layer3_agent.orchestration_strategies import HandoffStrategy
+from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
 from lca.layer4_app.defaults import ensure_defaults
 
 ensure_defaults()
@@ -53,7 +53,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("triage", "routed")
         agent_b = _make_agent("expert", "should not run")
 
-        strategy = HandoffStrategy()
+        strategy = ChoreographyStrategy("handoff")
         context = TeamContext(members=[agent_a, agent_b])
 
         result = await strategy.run(context, "customer question")
@@ -68,7 +68,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("triage", "", status=TaskStatus.FAILED)
         agent_b = _make_agent("expert", "handled by expert")
 
-        strategy = HandoffStrategy()
+        strategy = ChoreographyStrategy("handoff")
         context = TeamContext(members=[agent_a, agent_b])
 
         result = await strategy.run(context, "complex question")
@@ -81,7 +81,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("a", "", status=TaskStatus.FAILED)
         agent_b = _make_agent("b", "", status=TaskStatus.FAILED)
 
-        strategy = HandoffStrategy()
+        strategy = ChoreographyStrategy("handoff")
         context = TeamContext(members=[agent_a, agent_b])
 
         result = await strategy.run(context, "task")
@@ -89,7 +89,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "failed")
 
     async def test_empty_members_returns_failed(self) -> None:
-        strategy = HandoffStrategy()
+        strategy = ChoreographyStrategy("handoff")
         context = TeamContext(members=[])
 
         result = await strategy.run(context, "task")
@@ -99,7 +99,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
     async def test_single_member(self) -> None:
         agent = _make_agent("solo", "solo result")
-        strategy = HandoffStrategy()
+        strategy = ChoreographyStrategy("handoff")
         context = TeamContext(members=[agent])
 
         result = await strategy.run(context, "task")
@@ -248,7 +248,7 @@ class TestHandoffRegistration(unittest.TestCase):
     def test_handoff_resolves(self) -> None:
         registry = get_global_orchestration_registry()
         strategy = registry.resolve("handoff")
-        self.assertIsInstance(strategy, HandoffStrategy)
+        self.assertIsInstance(strategy, ChoreographyStrategy)
 
 
 if __name__ == "__main__":

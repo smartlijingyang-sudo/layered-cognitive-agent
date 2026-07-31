@@ -62,9 +62,6 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.brain.default_factory.SimpleBrainFactory": (
         "BrainFactory Protocol 可调用实现 (ADR-0021)"
     ),
-    "lca.layer3_agent.supervisor_role.SupervisorSetup": (
-        "Supervisor 能力清单 dataclass，纯值对象，非可插拔组件"
-    ),
     "lca.layer1_cognitive.brain.decision_gates.must_consult_all.MustConsultAllMembers": (
         "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0016)"
     ),

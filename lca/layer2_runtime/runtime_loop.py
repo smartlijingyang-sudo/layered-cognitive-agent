@@ -138,7 +138,7 @@ class CognitiveRuntime(Runtime):
                 await self._checkpoint(state, reason=SnapshotReason.PRE_APPROVAL)
                 state.status = TaskStatus.INPUT_REQUIRED
                 await self.hooks.trigger("on_pause", state)
-                return self._summarize(state)
+                return Result.from_state(state)
             except Exception as err:
                 # 信任边界处的兜底捕获（L2 是 Agent 最外层循环）：
                 # 任何未预料的异常都不能向上传播导致进程崩溃，
@@ -164,7 +164,7 @@ class CognitiveRuntime(Runtime):
                     state.status = signal.status
                 break
         await self.hooks.trigger("on_complete", state)
-        return self._summarize(state)
+        return Result.from_state(state)
 
     async def _checkpoint(
         self, state: AgentState, reason: SnapshotReason = SnapshotReason.PERIODIC
@@ -173,21 +173,6 @@ class CognitiveRuntime(Runtime):
         ref = await self.state_store.save(state)
         snap.state_ref = ref
         return snap
-
-    def _summarize(self, state: AgentState) -> Result:
-        final_ref = f"mem://{state.trace_id}/{state.step}"
-        status = TaskStatus.COMPLETED if state.status == TaskStatus.WORKING else state.status
-        return Result(
-            trace_id=state.trace_id,
-            status=status,
-            output=state.final_output
-            if isinstance(state.final_output, str) or state.final_output is None
-            else str(state.final_output),
-            final_state_ref=final_ref,
-            total_steps=state.step + 1,
-            budget_used=state.budget,
-            error=state.last_error,
-        )
 
     def install_decision_gate(self, policy: DecisionGate) -> None:
         """委托 Brain 自管内部评估管线，安装确定性收尾 guardrail。

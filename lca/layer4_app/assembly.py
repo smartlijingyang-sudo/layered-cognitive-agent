@@ -17,7 +17,6 @@ from lca.contracts.budget import (
 )
 from lca.contracts.decision import Observation
 from lca.contracts.enums import TeamProcess
-from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import (
     AgentTransport,
     Body,
@@ -75,12 +74,7 @@ async def _call_member_for_channel(member: CognitiveAgent, subtask: str) -> Obse
 
     from_role = get_current_delegator()
     result = await member.run(subtask, RunContext(from_role=from_role))
-    return Observation(
-        observation_id=f"obs_{result.trace_id}",
-        success=result.status == TaskStatus.COMPLETED,
-        payload=result.output,
-        error=result.error,
-    )
+    return Observation.from_result(result)
 
 
 def build_team_transport(

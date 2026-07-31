@@ -26,12 +26,9 @@ from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer2_runtime.strategy_registry import get_global_brain_factory_registry
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer3_agent.orchestration_strategies import (
-    DebateStrategy,
+    ChoreographyStrategy,
     GraphStrategy,
-    HandoffStrategy,
     HierarchicalStrategy,
-    ParallelStrategy,
-    SequentialStrategy,
 )
 
 
@@ -54,13 +51,14 @@ def register_defaults() -> None:
 
     orch_reg = get_global_orchestration_registry()
     orch_reg.register(TeamProcess.HIERARCHICAL, HierarchicalStrategy)
-    orch_reg.register(TeamProcess.SEQUENTIAL, SequentialStrategy)
+    orch_reg.register(TeamProcess.SEQUENTIAL, lambda: ChoreographyStrategy("sequential"))
     orch_reg.register(
-        TeamProcess.PARALLEL, lambda: ParallelStrategy(synthesizer=ConcatSynthesizer())
+        TeamProcess.PARALLEL,
+        lambda: ChoreographyStrategy("parallel", synthesizer=ConcatSynthesizer()),
     )
     orch_reg.register(TeamProcess.GRAPH, GraphStrategy)
-    orch_reg.register(TeamProcess.DEBATE, DebateStrategy)
-    orch_reg.register(TeamProcess.HANDOFF, HandoffStrategy)
+    orch_reg.register(TeamProcess.DEBATE, lambda: ChoreographyStrategy("debate"))
+    orch_reg.register(TeamProcess.HANDOFF, lambda: ChoreographyStrategy("handoff"))
 
     global_reg.register("decision_gate", DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers)
     mark_defaults_registered()

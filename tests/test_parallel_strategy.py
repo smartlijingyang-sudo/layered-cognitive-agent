@@ -15,7 +15,7 @@ from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
-from lca.layer3_agent.orchestration_strategies import ParallelStrategy
+from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
 from lca.layer4_app.defaults import ensure_defaults
 
 ensure_defaults()
@@ -52,7 +52,7 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("trace-a", "result-a", delay=0.05)
         agent_b = _make_agent("trace-b", "result-b", delay=0.05)
 
-        strategy = ParallelStrategy()
+        strategy = ChoreographyStrategy("parallel")
         context = TeamContext(members=[agent_a, agent_b])
 
         result = await strategy.run(context, "test objective")
@@ -67,14 +67,14 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("trace-b", "second")
         agent_c = _make_agent("trace-c", "third")
 
-        strategy = ParallelStrategy()
+        strategy = ChoreographyStrategy("parallel")
         context = TeamContext(members=[agent_a, agent_b, agent_c])
 
         result = await strategy.run(context, "task")
         self.assertEqual(result.output, "third")
 
     async def test_parallel_empty_members_returns_failed(self) -> None:
-        strategy = ParallelStrategy()
+        strategy = ChoreographyStrategy("parallel")
         context = TeamContext(members=[])
 
         result = await strategy.run(context, "task")
@@ -83,7 +83,7 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
     async def test_parallel_single_member(self) -> None:
         agent = _make_agent("trace-only", "solo-result")
-        strategy = ParallelStrategy()
+        strategy = ChoreographyStrategy("parallel")
         context = TeamContext(members=[agent])
 
         result = await strategy.run(context, "solo task")
@@ -99,7 +99,7 @@ class TestParallelStrategyConcurrency(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("trace-b", "b", delay=delay)
         agent_c = _make_agent("trace-c", "c", delay=delay)
 
-        strategy = ParallelStrategy()
+        strategy = ChoreographyStrategy("parallel")
         context = TeamContext(members=[agent_a, agent_b, agent_c])
 
         start = asyncio.get_event_loop().time()
@@ -120,7 +120,7 @@ class TestParallelStrategyRegistration(unittest.TestCase):
     def test_parallel_resolves_correctly(self) -> None:
         registry = get_global_orchestration_registry()
         strategy = registry.resolve("parallel")
-        self.assertIsInstance(strategy, ParallelStrategy)
+        self.assertIsInstance(strategy, ChoreographyStrategy)
 
 
 class TestParallelStrategyTraceIsolation(unittest.IsolatedAsyncioTestCase):
@@ -142,7 +142,7 @@ class TestParallelStrategyTraceIsolation(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_tracked_agent("trace-alpha")
         agent_b = _make_tracked_agent("trace-beta")
 
-        strategy = ParallelStrategy()
+        strategy = ChoreographyStrategy("parallel")
         context = TeamContext(members=[agent_a, agent_b])
         await strategy.run(context, "task")
 

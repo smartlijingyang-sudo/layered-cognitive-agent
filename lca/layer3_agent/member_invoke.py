@@ -2,35 +2,11 @@
 
 from __future__ import annotations
 
-from lca.contracts.decision import Observation
-from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentUnit, TeamContext
 from lca.contracts.result import Result
-from lca.contracts.state import Budget
 
 _DEFAULT_TIMEOUT_S = 300.0
-
-
-def observation_to_result(observation: Observation, task_id: str) -> Result:
-    """Convert Observation from a channel path into Result."""
-    status = TaskStatus.COMPLETED if observation.success else TaskStatus.FAILED
-    output: str | None
-    if isinstance(observation.payload, str):
-        output = observation.payload
-    elif observation.payload is not None:
-        output = str(observation.payload)
-    else:
-        output = None
-    return Result(
-        trace_id=new_id("trace"),
-        status=status,
-        final_state_ref=f"transport://{task_id}",
-        total_steps=1,
-        budget_used=Budget(used_steps=1),
-        output=output,
-        error=observation.error,
-    )
 
 
 async def _call_local(member: AgentUnit, objective: str) -> Result:
@@ -54,7 +30,7 @@ async def invoke_member(
                 observation = await wait(task_id, timeout_s)
             else:
                 observation = await transport.receive_result(task_id)
-            return observation_to_result(observation, task_id)
+            return Result.from_observation(observation, task_id)
     return await _call_local(member, objective)
 
 

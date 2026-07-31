@@ -45,7 +45,7 @@ class TestInternalTransportHappyPath(unittest.IsolatedAsyncioTestCase):
         task_id = await transport.send_task("researcher", "分析数据", [])
 
         # 等待后台任务完成
-        await transport._bg_tasks[task_id]
+        await transport._tasks[task_id]
 
         status = await transport.poll_status(task_id)
         self.assertEqual(status, "completed")
@@ -60,7 +60,7 @@ class TestInternalTransportHappyPath(unittest.IsolatedAsyncioTestCase):
 
         card = AgentCard(agent_id="agent-007", role="spy", capabilities=["espionage"])
         task_id = await transport.send_task(card, "秘密任务", [])
-        await transport._bg_tasks[task_id]
+        await transport._tasks[task_id]
 
         result = await transport.receive_result(task_id)
         self.assertTrue(result.success)
@@ -72,7 +72,7 @@ class TestInternalTransportHappyPath(unittest.IsolatedAsyncioTestCase):
 
         card = AgentCard(agent_id="unknown-id", role="analyst", capabilities=[])
         task_id = await transport.send_task(card, "分析", [])
-        await transport._bg_tasks[task_id]
+        await transport._tasks[task_id]
 
         result = await transport.receive_result(task_id)
         self.assertTrue(result.success)
@@ -81,7 +81,7 @@ class TestInternalTransportHappyPath(unittest.IsolatedAsyncioTestCase):
         transport = InternalTransport(agent_directory={"worker": _echo_handler})
 
         task_id = await transport.send_task("worker", "hello", [])
-        await transport._bg_tasks[task_id]
+        await transport._tasks[task_id]
 
         result = await transport.receive_result(task_id)
         self.assertTrue(result.success)
@@ -115,7 +115,7 @@ class TestInternalTransportAsync(unittest.IsolatedAsyncioTestCase):
             transport.send_task("echo", "任务B", []),
             transport.send_task("echo", "任务C", []),
         )
-        await asyncio.gather(*(transport._bg_tasks[tid] for tid in ids))
+        await asyncio.gather(*(transport._tasks[tid] for tid in ids))
 
         results = [await transport.receive_result(tid) for tid in ids]
         payloads = sorted(r.payload for r in results)
@@ -141,7 +141,7 @@ class TestInternalTransportErrors(unittest.IsolatedAsyncioTestCase):
         transport.register_agent("broken", _failing_handler)
 
         task_id = await transport.send_task("broken", "触发异常", [])
-        await transport._bg_tasks[task_id]
+        await transport._tasks[task_id]
 
         result = await transport.receive_result(task_id)
         self.assertFalse(result.success)

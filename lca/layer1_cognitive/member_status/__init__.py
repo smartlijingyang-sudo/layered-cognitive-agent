@@ -1,9 +1,9 @@
-"""Member consult status board and tracking hooks."""
+"""Member consult status board and tracking."""
 
-from lca.layer1_cognitive.member_status.hooks import track_member_status_hook
 from lca.layer1_cognitive.member_status.in_memory import InMemoryMemberStatus
+from lca.layer1_cognitive.member_status.tracking import update_member_status
 
 __all__ = [
     "InMemoryMemberStatus",
-    "track_member_status_hook",
+    "update_member_status",
 ]

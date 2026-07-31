@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from lca.contracts.enums import ContentType, DelegationProtocol, ReflectionVerdict
 from lca.contracts.lifecycle import AgentCard
+
+if TYPE_CHECKING:
+    from lca.contracts.result import Result
 
 __all__ = [
     "AgentCard",
@@ -85,6 +88,18 @@ class Observation:
     @property
     def data(self) -> Any:
         return self.payload
+
+    @classmethod
+    def from_result(cls, result: Result) -> Observation:
+        """Bridge a Result back into an Observation for channel return path."""
+        from lca.contracts.lifecycle import TaskStatus
+
+        return cls(
+            observation_id=f"obs_{result.trace_id}",
+            success=result.status == TaskStatus.COMPLETED,
+            payload=result.output,
+            error=result.error,
+        )
 
 
 @dataclass

@@ -26,7 +26,6 @@
 | **AgentChannel** / **AgentTransport** | 成员间任务通道；内置 Internal / A2A / MCP Transport |
 | **SharedMemory** / **SharedMemoryStore** / **TeamSharedMemory** | 团队共享记忆 |
 | **SharedMemoryTool** | 将共享记忆包装为普通 Tool |
-| **SupervisorSetup** | 把 Agent 配成 hierarchical 主管时绑定的能力包 |
 | **DecisionGate** | 决策出门硬规则 |
 | **MustConsultAllMembers** | 未咨询完所有必需角色时禁止 respond（原 RosterCoverage） |
 | **RunContext** | 一次 `run` 的类型化上下文（from_role / member_status / trace_id） |

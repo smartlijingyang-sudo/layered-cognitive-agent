@@ -23,6 +23,7 @@ from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
 from lca.contracts.semantic_keys import OBS_HANDOFF, OBS_TASK_ID
 from lca.contracts.state import AgentState
+from lca.layer1_cognitive.member_status.tracking import update_member_status
 
 _POLL_INTERVAL_S = 0.05
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
@@ -72,6 +73,7 @@ class DelegateOperation(Action):
         )
 
         observation = await self._wait_for_result(transport, task_id, timeout_s)
+        update_member_status(state, decision, observation)
         observation.extra[OBS_TASK_ID] = task_id
         return observation
 

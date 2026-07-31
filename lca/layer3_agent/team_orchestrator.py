@@ -14,15 +14,19 @@ from lca.contracts.protocols import (
     TeamProcessStrategy,
     TeamUnit,
 )
-from lca.contracts.protocols.capabilities import HasBrainBodyMemory, HasSharedMemory
-from lca.contracts.protocols.cognition import DecisionGate
+from lca.contracts.protocols.capabilities import (
+    AcceptsTeammates,
+    HasBrainBodyMemory,
+    HasChannel,
+    HasSharedMemory,
+)
+from lca.contracts.protocols.cognition import DecisionGate, SupportsDecisionGate
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.layer0_infra.component_registry import get_global_registry
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer3_agent.simple_agent import CognitiveAgent
-from lca.layer3_agent.supervisor_role import SupervisorSetup, apply_supervisor_setup
 
 
 class TeamOrchestrator(TeamUnit):
@@ -60,13 +64,7 @@ class TeamOrchestrator(TeamUnit):
         if supervisor is not None:
             member_status = self._create_member_status(members)
             policy = self._resolve_decision_gate(config)
-            setup = SupervisorSetup(
-                channel=transport,
-                teammates_text=teammates_text,
-                member_status=member_status,
-                decision_gate=policy,
-            )
-            apply_supervisor_setup(supervisor, setup)
+            self._bind_supervisor(supervisor, transport, teammates_text, policy)
 
         self._context = TeamContext(
             members=members,
@@ -103,6 +101,30 @@ class TeamOrchestrator(TeamUnit):
                 memory = member.runtime.memory
                 if isinstance(memory, HasSharedMemory):
                     memory.bind_shared_memory(self._shared_store)
+
+    @staticmethod
+    def _bind_supervisor(
+        supervisor: CognitiveAgent,
+        transport: AgentTransport | None,
+        teammates_text: str,
+        policy: DecisionGate | None,
+    ) -> None:
+        """Bind supervisor capabilities at composition time.
+
+        Reaches into the supervisor's runtime to wire channel, teammates
+        text, and decision gate — the three bindings that make an agent
+        act as a hierarchical supervisor. Member-status tracking is
+        handled directly by DelegateOperation, not via a hook.
+        """
+        rt = supervisor.runtime
+        if not isinstance(rt, HasBrainBodyMemory):
+            return
+        if transport is not None and isinstance(rt.body, HasChannel):
+            rt.body.bind_channel(transport)
+        if teammates_text and isinstance(rt.brain, AcceptsTeammates):
+            rt.brain.set_teammates(teammates_text)
+        if policy is not None and isinstance(rt, SupportsDecisionGate):
+            rt.install_decision_gate(policy)
 
     async def run(self, objective: str | object) -> Result:
         text = (

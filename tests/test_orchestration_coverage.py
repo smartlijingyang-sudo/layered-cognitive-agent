@@ -67,9 +67,9 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
         from lca.contracts.protocols import TeamContext
         from lca.contracts.result import Result
         from lca.contracts.state import Budget
-        from lca.layer3_agent.orchestration_strategies import DebateStrategy
+        from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
 
-        strategy = DebateStrategy()
+        strategy = ChoreographyStrategy("debate")
         agent = MagicMock()
 
         async def _execute(task: str) -> Result:
