@@ -13,7 +13,7 @@ class SimplePromptManager(PromptManager):
     def __init__(self) -> None:
         self._templates: dict[str, str] = {}
 
-    def register_template(self, name: str, template: str, version: str = "1.0") -> None:
+    def register_template(self, name: str, template: str) -> None:
         self._templates[name] = template
 
     def render(self, template_name: str, variables: dict[str, Any]) -> str:

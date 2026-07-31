@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
 from lca.contracts.enums import DelegationProtocol
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
+from lca.contracts.ids import utc_now
 
 
 class TaskStatus(str, Enum):
@@ -24,6 +21,28 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELED = "canceled"
+
+
+_STATUS_MAP: dict[str, TaskStatus] = {
+    "completed": TaskStatus.COMPLETED,
+    "failed": TaskStatus.FAILED,
+    "working": TaskStatus.WORKING,
+    "running": TaskStatus.WORKING,
+    "waiting_human": TaskStatus.INPUT_REQUIRED,
+    "input_required": TaskStatus.INPUT_REQUIRED,
+    "input-required": TaskStatus.INPUT_REQUIRED,
+    "canceled": TaskStatus.CANCELED,
+    "cancelled": TaskStatus.CANCELED,
+}
+
+
+def coerce_status(value: str | TaskStatus | None) -> TaskStatus | None:
+    """Normalise a string or TaskStatus into a TaskStatus, or None."""
+    if value is None:
+        return None
+    if isinstance(value, TaskStatus):
+        return value
+    return _STATUS_MAP.get(str(value), TaskStatus.COMPLETED)
 
 
 @dataclass
@@ -51,4 +70,4 @@ class TeamMessage:
     task_id: str
     status: TaskStatus
     payload: Any
-    created_at: datetime = field(default_factory=_now)
+    created_at: datetime = field(default_factory=utc_now)

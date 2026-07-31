@@ -10,13 +10,14 @@ import pytest
 
 from lca.contracts.decision import Decision, ToolCall
 from lca.contracts.role_team import ToolPermissionManifest
+from lca.contracts.semantic_keys import FALLBACK_DEGRADED_FROM
 from lca.contracts.state import AgentState, Budget
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer1_cognitive.body.action_handlers import RespondOperation, UseToolOperation
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
+from lca.layer1_cognitive.body.fallback_policy import FallbackActionPolicy
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer2_runtime.fallback_handler import FALLBACK_DEGRADATION_KEY, FallbackActionPolicy
 
 
 def _make_state() -> AgentState:
@@ -52,7 +53,7 @@ class TestFallbackWithResponseText:
 
         assert observation.success is True
         assert observation.payload == "这是 LLM 生成的有效回答内容"
-        assert observation.extra[FALLBACK_DEGRADATION_KEY] == unknown_action
+        assert observation.extra[FALLBACK_DEGRADED_FROM] == unknown_action
 
     async def test_original_action_type_preserved(self) -> None:
         decision = Decision(
@@ -68,7 +69,7 @@ class TestFallbackWithResponseText:
 
         observation = await fallback.handle(decision, state, registry)
 
-        assert observation.extra[FALLBACK_DEGRADATION_KEY] == "research_plan"
+        assert observation.extra[FALLBACK_DEGRADED_FROM] == "research_plan"
 
 
 class TestFallbackWithToolCalls:
@@ -103,7 +104,7 @@ class TestFallbackWithToolCalls:
 
         assert observation.success is True
         assert observation.payload == 5
-        assert observation.extra[FALLBACK_DEGRADATION_KEY] == "compute"
+        assert observation.extra[FALLBACK_DEGRADED_FROM] == "compute"
 
 
 class TestFallbackNoDegradationPath:
@@ -124,4 +125,4 @@ class TestFallbackNoDegradationPath:
 
         assert observation.success is False
         assert "无法识别" in (observation.error or "")
-        assert observation.extra[FALLBACK_DEGRADATION_KEY] == "unknown_action"
+        assert observation.extra[FALLBACK_DEGRADED_FROM] == "unknown_action"

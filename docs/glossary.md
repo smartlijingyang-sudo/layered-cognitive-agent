@@ -43,8 +43,8 @@
 | **Observation** | 行动结果（原 ActResult 类型名；字段仍可 success/payload） |
 | **Reflection** | 自省判定 |
 | **StopRule** / **StopDecision** / **StopReason** | 是否结束循环（合并原 LoopJudge / TerminationSignal / StepOutcome 对外双轨） |
-| **DefaultStopRule** | 默认终止裁判；内部可组合 StepOutcomePolicy |
-| **StepOutcome** / **StepOutcomePolicy** / **DefaultStepOutcomePolicy** | 单步结果判定（DefaultStopRule 内部使用） |
+| **DefaultStopRule** | 默认终止裁判；内部可组合 StopOutcomePolicy |
+| **StopOutcome** / **StopOutcomePolicy** / **DefaultStopOutcomePolicy** | 单步结果判定（DefaultStopRule 内部使用） |
 | **Brain** / **Body** / **Memory** | 想 / 做 / 记（Brain 原 BrainStrategy） |
 | **ModularBrain** / **MAP** | 默认 Brain；CandidateEvaluationPipeline 做 decompose → evaluate |
 | **Turn** | 单步记录：decision + act result + reflection |
@@ -63,7 +63,7 @@
 | **ToolRunner** / **SafeExecutor** | 权限 + 重试 + 缓存后执行工具 |
 | **ToolRegistry** / **Tool** / **ToolPermissionManifest** | 工具注册与权限 |
 | **RetryPolicy** / **CacheConfig** | 重试与缓存配置 |
-| **BrainFactory** / **BrainFactoryRegistry** / **SimpleBrainFactory** | Brain 工厂与注册表 |
+| **BrainFactory** / **SimpleBrainFactory** | Brain 工厂（注册表用 NamedRegistry） |
 | **MergeResults** / **Synthesizer** / **ConcatSynthesizer** | 并行结果聚合 |
 | **LLMAdapter** / **Anthropic** / **OpenAI** / **Mock** / **Adapter** | 多厂商 LLM 适配 |
 | **Transport** / **TransportRegistry** / **InternalTransport** / **A2ATransport** / **MCPTransport** | 传输实现与注册 |
@@ -95,8 +95,7 @@
 | **HandoffOperation** | handoff 行动实现 |
 | **RespondOperation** | respond 行动实现 |
 | **UseToolOperation** | use_tool 行动实现 |
-| **GuardedCandidateEvaluationPipeline** | 带 DecisionGate 的候选评估管线 |
-| **CandidateEvaluationPipeline** | 候选评估管线协议 |
+| **CandidateEvaluationPipeline** | 候选评估管线协议（默认逻辑内联在 ModularBrain） |
 | **KeywordSkillRouter** | SkillRouter 关键词实现 |
 | **FallbackDecoratedBody** | 带降级策略的 Body 装饰器 |
 | **OpenAICompatLLM** | OpenAI 兼容 LLMAdapter |

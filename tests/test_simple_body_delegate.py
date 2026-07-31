@@ -21,10 +21,10 @@ from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import (
     TransportNotFoundError,
     TransportRegistry,
-    UnimplementedTransport,
 )
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+from tests.support.unimplemented_transport import UnimplementedTransport
 
 
 def _make_registry(transport: InternalTransport) -> TransportRegistry:

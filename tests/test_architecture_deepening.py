@@ -18,21 +18,17 @@ from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer1_cognitive.body.action_handlers import RespondOperation
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
+from lca.layer1_cognitive.body.fallback_policy import FallbackActionPolicy
 from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
-    SimpleCandidateEvaluationPipeline,
-)
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.prompt_manager import SimplePromptManager
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
 from lca.layer1_cognitive.brain.skill_router import StaticSkillRouter
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
 from lca.layer2_runtime.default_loop_judge import DefaultStopRule
-from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
-from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
+from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer4_app.api import Agent, MultiAgentTeam
 
@@ -85,7 +81,7 @@ class TestDegradationFirstClass:
         assert obs.success is True
         assert obs.degraded_from == "research_plan"
         reflection = Reflection(reflection_id="r", verdict=ReflectionVerdict.ON_TRACK)
-        outcome = DefaultStepOutcomePolicy().resolve(state, decision, obs, reflection)
+        outcome = DefaultStopOutcomePolicy().resolve(state, decision, obs, reflection)
         assert outcome.should_stop is True
         assert outcome.final_output == "valid answer body"
 
@@ -129,7 +125,7 @@ class TestCheckpointResume:
             memory=_Mem(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
             hooks=SimpleHookRegistry(ConsoleObservability()),
             state_store=store,
-            judge=DefaultStopRule(outcome_policy=DefaultStepOutcomePolicy()),
+            judge=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         result = await rt.run("checkpoint me", max_steps=3)
         assert result.status == TaskStatus.COMPLETED
@@ -153,13 +149,6 @@ class TestSkillRouterTemplate:
             async def stream(self, prompt: str, **kwargs: object):  # type: ignore[no-untyped-def]  # kwargs 类型由 Protocol 约束
                 yield await self.complete(prompt)
 
-        pm = SimplePromptManager()
-        pm.register_template(
-            "custom_research",
-            "TEMPLATE_MARKER_RESEARCH\nROLE: {role}\nTASK: {task}\n"
-            "{tools}\n{context}\n{allowed_actions}\n{goal}\n{backstory}",
-        )
-        pm.register_template("react_prompt", load_builtin_prompt("react_prompt"))
         rp = RoleProfile(
             role="研究员",
             goal="g",
@@ -167,10 +156,18 @@ class TestSkillRouterTemplate:
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
         brain = ModularBrain(
-            reasoner=SimpleReasoner(CapturingLLM(), pm, rp, tools_desc="none"),
+            reasoner=SimpleReasoner(
+                CapturingLLM(),
+                rp,
+                tools_desc="none",
+                templates={
+                    "custom_research": "TEMPLATE_MARKER_RESEARCH\nROLE: {role}\nTASK: {task}\n"
+                    "{tools}\n{context}\n{allowed_actions}\n{goal}\n{backstory}",
+                    "react_prompt": load_builtin_prompt("react_prompt"),
+                },
+            ),
             decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
-            evaluation_pipeline=SimpleCandidateEvaluationPipeline(),
             skill_router=StaticSkillRouter("custom_research"),
         )
         state = _state()

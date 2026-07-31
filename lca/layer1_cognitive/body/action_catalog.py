@@ -63,15 +63,6 @@ BUILTIN_ACTION_SPECS: tuple[ActionSpec, ...] = (
 )
 
 
-def build_action_alias_map(specs: Sequence[ActionSpec] = BUILTIN_ACTION_SPECS) -> dict[str, str]:
-    mapping: dict[str, str] = {}
-    for spec in specs:
-        mapping[spec.name] = spec.name
-        for alias in spec.aliases:
-            mapping[alias] = spec.name
-    return mapping
-
-
 def format_allowed_actions_desc(
     allowed_names: Sequence[str],
     specs: Sequence[ActionSpec] = BUILTIN_ACTION_SPECS,

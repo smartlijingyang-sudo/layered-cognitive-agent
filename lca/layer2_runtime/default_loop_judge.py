@@ -1,11 +1,11 @@
-"""DefaultStopRule —— 组合 StepOutcomePolicy + Budget 的默认终止裁判。
+"""DefaultStopRule —— 组合 StopOutcomePolicy + Budget 的默认终止裁判。
 
 L2 层职责：
     将原先散落在 CognitiveRuntime._loop 中的三种终止判定
     （budget 超限 / outcome 策略 / 异常状态）收敛为单一内聚类。
 
     判定流程：
-    1. 调用 StepOutcomePolicy.resolve() 获取业务判定
+    1. 调用 StopOutcomePolicy.resolve() 获取业务判定
     2. 检查 budget 是否超限（资源约束）
     3. 综合输出 StopDecision
 """
@@ -13,20 +13,20 @@ L2 层职责：
 from __future__ import annotations
 
 from lca.contracts.decision import Decision, Observation, Reflection
-from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.loop_judge import StopDecision, StopReason, StopRule
-from lca.contracts.protocols import StepOutcomePolicy
+from lca.contracts.lifecycle import TaskStatus, coerce_status
+from lca.contracts.protocols import StopOutcomePolicy
 from lca.contracts.state import AgentState
+from lca.contracts.stop import StopDecision, StopReason, StopRule
 
 
 class DefaultStopRule(StopRule):
     """默认循环终止裁判。
 
-    组合 StepOutcomePolicy（业务判定）与 Budget 检查（资源约束），
+    组合 StopOutcomePolicy（业务判定）与 Budget 检查（资源约束），
     输出统一的 StopDecision。
     """
 
-    def __init__(self, outcome_policy: StepOutcomePolicy) -> None:
+    def __init__(self, outcome_policy: StopOutcomePolicy) -> None:
         self._outcome_policy = outcome_policy
 
     def decide(
@@ -48,26 +48,10 @@ class DefaultStopRule(StopRule):
                 should_stop=True,
                 reason=StopReason.TASK_COMPLETED,
                 final_output=state.final_output if isinstance(state.final_output, str) else None,
-                status=_coerce_status(outcome.status) or TaskStatus.COMPLETED,
+                status=coerce_status(outcome.status) or TaskStatus.COMPLETED,
             )
 
         return StopDecision()
-
-    def judge(
-        self,
-        state: AgentState,
-        decision: Decision | None,
-        observation: Observation | None,
-        reflection: Reflection | None,
-    ) -> StopDecision:
-        import warnings
-
-        warnings.warn(
-            "'judge()' is deprecated, use 'decide()'",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.decide(state, decision, observation, reflection)
 
     def _on_budget_exceeded(
         self,
@@ -81,29 +65,8 @@ class DefaultStopRule(StopRule):
             should_stop=True,
             reason=StopReason.BUDGET_EXCEEDED,
             final_output=state.final_output if isinstance(state.final_output, str) else None,
-            status=_coerce_status(budget_outcome.status) or TaskStatus.FAILED,
+            status=coerce_status(budget_outcome.status) or TaskStatus.FAILED,
         )
-
-
-_STATUS_MAP: dict[str, TaskStatus] = {
-    "completed": TaskStatus.COMPLETED,
-    "failed": TaskStatus.FAILED,
-    "working": TaskStatus.WORKING,
-    "running": TaskStatus.WORKING,
-    "waiting_human": TaskStatus.INPUT_REQUIRED,
-    "input_required": TaskStatus.INPUT_REQUIRED,
-    "input-required": TaskStatus.INPUT_REQUIRED,
-    "canceled": TaskStatus.CANCELED,
-    "cancelled": TaskStatus.CANCELED,
-}
-
-
-def _coerce_status(value: str | TaskStatus | None) -> TaskStatus | None:
-    if value is None:
-        return None
-    if isinstance(value, TaskStatus):
-        return value
-    return _STATUS_MAP.get(str(value), TaskStatus.COMPLETED)
 
 
 __all__ = ["DefaultStopRule"]

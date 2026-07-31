@@ -24,6 +24,7 @@
 | [0020](0020-map-pipeline-default-and-action-enums.md) | MAP 默认评估管线深化 | 默认 MAP 管线 + 领域枚举（原 ADR-0017，重编号） |
 | [0021](0021-naming-convention-arbitration.md) | Simple/Default/领域名三分规则 | L1 Simple* / L2 Default* / L3 领域名或 Simple*；BaseAgent→SimpleAgent |
 | [0022](0022-map-pipeline-consolidation.md) | MAP 管线收敛 | 五模块 → 单一 CandidateEvaluationPipeline；Supersedes ADR-0003 |
+| [0023](0023-architecture-deepening.md) | 架构深化 | 溶解浅模块 + 消除冗余概念 + 完成 rename + 迁层 |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

@@ -19,7 +19,6 @@ from lca.contracts.protocols.agent import AgentUnit, TeamUnit
 
 # ── 可选能力协议（ADR-0017）──────────────────────────────
 from lca.contracts.protocols.capabilities import (
-    AcceptsTeammates,
     HasBrainBodyMemory,
     HasChannel,
     HasHooks,
@@ -67,13 +66,12 @@ from lca.contracts.protocols.orchestration import (
 )
 
 # ── L2 Runtime 协议 ──────────────────────────────────────
-from lca.contracts.protocols.runtime import Runtime, StepOutcomePolicy
+from lca.contracts.protocols.runtime import Runtime, StopOutcomePolicy
 
 # ── 纯数据类型 ───────────────────────────────────────────
-from lca.contracts.types import StepOutcome
+from lca.contracts.types import StopOutcome
 
 __all__ = [
-    "AcceptsTeammates",
     "AgentTransport",
     "AgentUnit",
     "Body",
@@ -102,8 +100,8 @@ __all__ = [
     "SharedMemoryStore",
     "SkillRouter",
     "StateStore",
-    "StepOutcome",
-    "StepOutcomePolicy",
+    "StopOutcome",
+    "StopOutcomePolicy",
     "SupportsDecisionGate",
     "Synthesizer",
     "TeamContext",

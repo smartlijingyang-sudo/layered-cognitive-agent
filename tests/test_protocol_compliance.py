@@ -31,9 +31,6 @@ from lca.contracts.protocols import (
     Tool,
     ToolRegistry,
 )
-from lca.layer0_infra.llm_adapter.anthropic_llm import AnthropicLLMAdapter
-
-# L0
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
@@ -41,17 +38,11 @@ from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer0_infra.tools.weather_tool import WeatherTool
 from lca.layer0_infra.transport.agent_transport import InternalTransport
-from lca.layer0_infra.transport.transport_registry import (
-    UnimplementedTransport,
-)
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 
 # L1
-from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
-    SimpleCandidateEvaluationPipeline,
-)
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
@@ -63,11 +54,12 @@ from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
 # L2
 from lca.layer2_runtime.default_loop_judge import DefaultStopRule
-from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
+from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
 # L3
 from lca.layer3_agent.simple_agent import CognitiveAgent
+from tests.support.unimplemented_transport import UnimplementedTransport
 
 
 class TestL0ProtocolCompliance(unittest.TestCase):
@@ -78,9 +70,6 @@ class TestL0ProtocolCompliance(unittest.TestCase):
 
     def test_openai_compat_is_llm_adapter(self):
         self.assertIsInstance(OpenAICompatAdapter.__new__(OpenAICompatAdapter), LLMAdapter)
-
-    def test_anthropic_is_llm_adapter(self):
-        self.assertIsInstance(AnthropicLLMAdapter.__new__(AnthropicLLMAdapter), LLMAdapter)
 
     def test_calculator_is_tool(self):
         self.assertIsInstance(CalculatorTool(), Tool)
@@ -125,15 +114,13 @@ class TestL1ProtocolCompliance(unittest.TestCase):
         from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 
         llm = MockLLMAdapter()
-        pm = SimplePromptManager()
-        pm.register_template("react_prompt", "test")
         rp = RoleProfile(
             role="t",
             goal="t",
             backstory="t",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = SimpleReasoner(llm, pm, rp, "(无)")
+        reasoner = SimpleReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         return reasoner
 
     def test_modular_brain_is_brain_strategy(self):
@@ -142,7 +129,6 @@ class TestL1ProtocolCompliance(unittest.TestCase):
             reasoner=reasoner,
             decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
-            evaluation_pipeline=SimpleCandidateEvaluationPipeline(),
         )
         self.assertIsInstance(brain, Brain)
 
@@ -199,20 +185,17 @@ class TestL2ProtocolCompliance(unittest.TestCase):
         from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 
         llm = MockLLMAdapter()
-        pm = SimplePromptManager()
-        pm.register_template("react_prompt", "test")
         rp = RoleProfile(
             role="t",
             goal="t",
             backstory="t",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = SimpleReasoner(llm, pm, rp, "(无)")
+        reasoner = SimpleReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         brain = ModularBrain(
             reasoner=reasoner,
             decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
-            evaluation_pipeline=SimpleCandidateEvaluationPipeline(),
         )
         obs = ConsoleObservability()
         body = SimpleBody(
@@ -225,7 +208,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
             SimpleMemorySystem(),
             SimpleHookRegistry(obs),
             InMemoryStateStore(),
-            judge=DefaultStopRule(outcome_policy=DefaultStepOutcomePolicy()),
+            judge=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         self.assertIsInstance(runtime, Runtime)
 
@@ -237,20 +220,17 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 
         llm = MockLLMAdapter()
-        pm = SimplePromptManager()
-        pm.register_template("react_prompt", "test")
         rp = RoleProfile(
             role="t",
             goal="t",
             backstory="t",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = SimpleReasoner(llm, pm, rp, "(无)")
+        reasoner = SimpleReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         brain = ModularBrain(
             reasoner=reasoner,
             decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
-            evaluation_pipeline=SimpleCandidateEvaluationPipeline(),
         )
         obs = ConsoleObservability()
         body = SimpleBody(
@@ -263,7 +243,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             SimpleMemorySystem(),
             SimpleHookRegistry(obs),
             InMemoryStateStore(),
-            judge=DefaultStopRule(outcome_policy=DefaultStepOutcomePolicy()),
+            judge=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         return CognitiveAgent(runtime, rp), rp, runtime
 
@@ -287,13 +267,13 @@ class TestL3ProtocolCompliance(unittest.TestCase):
 
 
 class TestBrainFactoryRegistryIntegration(unittest.TestCase):
-    """验证 BrainFactoryRegistry 动态选择 Brain 策略。"""
+    """验证 Brain 工厂注册表动态选择 Brain 策略。"""
 
     def test_default_strategy_registered(self):
         from lca.layer2_runtime.strategy_registry import get_global_brain_factory_registry
 
         reg = get_global_brain_factory_registry()
-        self.assertIn("default", reg.list_strategies())
+        self.assertIn("default", reg)
 
     def test_agent_with_string_strategy(self):
         from lca.layer4_app.api import Agent

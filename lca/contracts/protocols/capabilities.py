@@ -1,6 +1,6 @@
 """可选能力协议（ADR-0017）。
 
-把组件的可选绑定能力（channel / teammates / shared_memory）
+把组件的可选绑定能力（channel / shared_memory）
 收敛成具名、runtime_checkable 的 Protocol，
 使能力契约可被 mypy 校验、可被 grep 发现。
 
@@ -21,13 +21,6 @@ class HasChannel(Protocol):
     """Body 若支持委派/handoff，需实现此协议以接收 Transport。"""
 
     def bind_channel(self, transport: AgentTransport) -> None: ...
-
-
-@runtime_checkable
-class AcceptsTeammates(Protocol):
-    """Brain 若需要感知队友花名册（hierarchical 编排），实现此协议。"""
-
-    def set_teammates(self, teammates_text: str) -> None: ...
 
 
 @runtime_checkable

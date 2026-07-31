@@ -1,6 +1,6 @@
 """FallbackActionPolicy —— 未识别 action_type 的降级策略。
 
-L2 层职责：
+L1 层职责：
     当 Brain 输出的 action_type 无法被 ActionRegistry 识别时，
     按优先级尝试降级路径：RESPOND → USE_TOOL → 失败。
     降级后的 Observation 携带 degraded_from 标记，供 hook 观测。
@@ -15,8 +15,6 @@ from lca.contracts.ids import new_id
 from lca.contracts.protocols import FallbackPolicy
 from lca.contracts.semantic_keys import FALLBACK_DEGRADED_FROM
 from lca.contracts.state import AgentState
-
-FALLBACK_DEGRADATION_KEY = FALLBACK_DEGRADED_FROM
 
 
 class FallbackActionPolicy(FallbackPolicy):

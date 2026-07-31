@@ -6,11 +6,11 @@ from typing import Protocol, runtime_checkable
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS
 from lca.contracts.decision import Decision, Observation, Reflection
-from lca.contracts.member_status import MemberStatus
 from lca.contracts.protocols.cognition import DecisionGate
 from lca.contracts.result import Result
+from lca.contracts.run_context import RunContext
 from lca.contracts.state import AgentState, StateSnapshot
-from lca.contracts.types import StepOutcome
+from lca.contracts.types import StopOutcome
 
 
 @runtime_checkable
@@ -20,10 +20,11 @@ class Runtime(Protocol):
     async def run(
         self,
         task: str,
-        max_steps: int,
+        ctx: RunContext | None = None,
+        *,
+        max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = None,
-        member_status: MemberStatus | None = None,
-        **context: str,
+        agent_role: str = "",
     ) -> Result: ...
     async def resume(
         self,
@@ -40,7 +41,7 @@ class Runtime(Protocol):
 
 
 @runtime_checkable
-class StepOutcomePolicy(Protocol):
+class StopOutcomePolicy(Protocol):
     """单步结果判定策略：决定 Loop 是否继续、最终输出和状态。
     由 StopRule 组合使用，不再直接被 Runtime 持有。
     """
@@ -51,9 +52,9 @@ class StepOutcomePolicy(Protocol):
         decision: Decision | None,
         observation: Observation | None,
         reflection: Reflection | None,
-    ) -> StepOutcome: ...
+    ) -> StopOutcome: ...
     def resolve_budget_exceeded(
         self,
         observation: Observation | None,
         state: AgentState,
-    ) -> StepOutcome: ...
+    ) -> StopOutcome: ...

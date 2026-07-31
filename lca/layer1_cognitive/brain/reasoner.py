@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols import LLMAdapter, PromptManager, Reasoner
+from lca.contracts.protocols import LLMAdapter, Reasoner
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import AgentState
-from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 
-DEFAULT_REACT_TEMPLATE: str = load_builtin_prompt("react_prompt")
-HIERARCHICAL_DELEGATE_TEMPLATE: str = load_builtin_prompt("hierarchical_prompt")
 _DEFAULT_TEMPLATE = "react_prompt"
 _HIERARCHICAL_TEMPLATE = "hierarchical_prompt"
 
@@ -20,26 +17,28 @@ def build_teammates_text(profiles: list[RoleProfile]) -> str:
 
 
 class SimpleReasoner(Reasoner):
-    """Default Reasoner: render prompt template and call the LLM."""
+    """Default Reasoner: render prompt template and call the LLM.
+
+    Manages prompt templates internally (dict + str.format) — no
+    external PromptManager dependency required.
+    """
 
     def __init__(
         self,
         llm: LLMAdapter,
-        prompt_manager: PromptManager,
         role_profile: RoleProfile,
         tools_desc: str,
-        teammates_text: str | None = None,
+        templates: dict[str, str] | None = None,
         allowed_actions_desc: str = "",
     ) -> None:
         self.llm = llm
-        self.prompt_manager = prompt_manager
         self.role_profile = role_profile
         self.tools_desc = tools_desc
-        self.teammates_text = teammates_text
+        self._templates: dict[str, str] = dict(templates or {})
         self.allowed_actions_desc = allowed_actions_desc
 
-    def set_teammates(self, teammates_text: str) -> None:
-        self.teammates_text = teammates_text
+    def register_template(self, name: str, template: str) -> None:
+        self._templates[name] = template
 
     async def generate_candidates(self, state: AgentState, n: int = 1) -> list[str]:
         context_lines = (
@@ -56,20 +55,19 @@ class SimpleReasoner(Reasoner):
             "allowed_actions": self.allowed_actions_desc,
         }
         template_name = self._resolve_template(state)
-        if self.teammates_text is not None:
+        if state.teammates_text:
             status_text = (
                 state.member_status.as_prompt_text() if state.member_status is not None else ""
             )
-            base_vars["teammates"] = self.teammates_text
+            base_vars["teammates"] = state.teammates_text
             base_vars["member_status_text"] = status_text
-            # Backward-compatible keys if custom templates still use old names
-            base_vars["teammates_text"] = self.teammates_text
+            base_vars["teammates_text"] = state.teammates_text
         subtasks = state.working_memory.get("subtasks")
         if subtasks:
             base_vars["context"] = (
                 base_vars["context"] + "\n\nSubtasks:\n" + "\n".join(f"- {s}" for s in subtasks)
             )
-        prompt = self.prompt_manager.render(template_name, base_vars)
+        prompt = self._templates[template_name].format(**base_vars)
         candidates = []
         for _ in range(max(1, n)):
             candidates.append(await self.llm.complete(prompt))
@@ -78,6 +76,6 @@ class SimpleReasoner(Reasoner):
     def _resolve_template(self, state: AgentState) -> str:
         if state.active_template:
             return state.active_template
-        if self.teammates_text is not None:
+        if state.teammates_text:
             return _HIERARCHICAL_TEMPLATE
         return _DEFAULT_TEMPLATE

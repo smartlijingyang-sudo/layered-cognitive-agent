@@ -1,11 +1,11 @@
-"""认知循环生命周期 Hook 定义与事件发射工厂。
+"""认知循环生命周期 Hook 事件发射工厂。
 
 L2 层职责：
-    定义所有合法的 Hook 事件名（HOOK_NAMES），
-    并提供 make_event_emitting_hook 工厂函数，
+    提供 make_event_emitting_hook 工厂函数，
     将认知循环的关键事件（action_degraded、step_completed）
     发射到 EventBus，实现横切可观测性。
 
+    Hook 事件名的单一事实源是 ``HookEvent`` 枚举（``lca.contracts.enums``）。
     新增对外事件只需：
     1. 写一个 _derive_xxx 函数
     2. 在 _DERIVATIONS 表中注册一行
@@ -17,24 +17,19 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from lca.contracts.enums import HookEvent
+from lca.contracts.enums import ActionType, HookEvent
 from lca.contracts.protocols import EventBus
 from lca.contracts.state import AgentState
 
-HOOK_NAMES = [
-    "on_start",
-    "pre_perceive",
-    "post_perceive",
-    "pre_think",
-    "post_think",
-    "pre_act",
-    "post_act",
-    "pre_reflect",
-    "post_reflect",
-    "on_error",
-    "on_pause",
-    "on_complete",
-]
+# ── 对外事件名（EventBus payload） ──
+EVENT_ACTION_DEGRADED = "action_degraded"
+EVENT_STEP_COMPLETED = "step_completed"
+
+# ── payload 键 ──
+_KEY_ORIGINAL_ACTION_TYPE = "original_action_type"
+_KEY_DEGRADED_TO = "degraded_to"
+_KEY_STEP = "step"
+_KEY_STATUS = "status"
 
 # ── 事件派生：hook 事件名 → (对外事件名, payload) 提取函数 ──
 
@@ -51,11 +46,11 @@ def _derive_action_degraded(
         and getattr(observation, "degraded_from", None)
     ):
         return (
-            "action_degraded",
+            EVENT_ACTION_DEGRADED,
             {
-                "original_action_type": observation.degraded_from,
-                "degraded_to": "respond",
-                "step": state.step,
+                _KEY_ORIGINAL_ACTION_TYPE: observation.degraded_from,
+                _KEY_DEGRADED_TO: ActionType.RESPOND.value,
+                _KEY_STEP: state.step,
             },
         )
     return None
@@ -64,7 +59,10 @@ def _derive_action_degraded(
 def _derive_step_completed(
     state: AgentState, kwargs: dict[str, Any]
 ) -> tuple[str, dict[str, Any]] | None:
-    return ("step_completed", {"step": state.step, "status": state.status})
+    return (
+        EVENT_STEP_COMPLETED,
+        {_KEY_STEP: state.step, _KEY_STATUS: state.status},
+    )
 
 
 _DERIVATIONS: dict[str, EventDerivation] = {

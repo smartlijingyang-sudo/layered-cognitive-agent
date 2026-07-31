@@ -7,7 +7,7 @@ Lower-level builders: ``build_body_from_shared``, ``build_hooks``.
 
 from __future__ import annotations
 
-from typing import cast
+from typing import TypeVar
 
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.budget import (
@@ -16,7 +16,7 @@ from lca.contracts.budget import (
     SUPERVISOR_MIN_MAX_STEPS,
 )
 from lca.contracts.decision import Observation
-from lca.contracts.enums import TeamProcess
+from lca.contracts.enums import HookEvent, TeamProcess
 from lca.contracts.protocols import (
     AgentTransport,
     Body,
@@ -39,25 +39,36 @@ from lca.layer0_infra.transport.mcp_transport import MCPTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
+from lca.layer1_cognitive.body.fallback_policy import FallbackActionPolicy
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.reasoner import build_teammates_text
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer2_runtime.default_loop_judge import DefaultStopRule
-from lca.layer2_runtime.event_emission import HOOK_NAMES, make_event_emitting_hook
-from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
-from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
+from lca.layer2_runtime.event_emission import make_event_emitting_hook
+from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer2_runtime.strategy_registry import get_global_brain_factory_registry
 from lca.layer3_agent.simple_agent import CognitiveAgent
 from lca.layer4_app.defaults import ensure_defaults
 
+T = TypeVar("T")
 
-def _resolve_component(reg: ComponentRegistry, category: str, value: str | object) -> object:
-    if isinstance(value, str):
-        return reg.require(category, value)()
-    return value
+
+def _resolve_component(
+    reg: ComponentRegistry,
+    category: str,
+    value: object,
+    expected_type: type[T],
+) -> T:
+    """Resolve a component from registry or use as-is, with runtime type check."""
+    result = reg.require(category, value)() if isinstance(value, str) else value
+    if not isinstance(result, expected_type):
+        raise TypeError(
+            f"{category} expected {expected_type.__name__}, got {type(result).__name__}"
+        )
+    return result
 
 
 def build_default_transport_registry() -> TransportRegistry:
@@ -94,7 +105,7 @@ def build_team_transport(
 def build_body_from_shared(
     tool_registry: SimpleToolRegistry,
     safe_executor: SimpleSafeExecutor,
-    transport_registry: object,
+    transport_registry: TransportRegistryProtocol,
     action_registry: ActionRegistryProtocol,
     *,
     enable_fallback: bool = True,
@@ -108,7 +119,7 @@ def build_body_from_shared(
     simple_body = SimpleBody(
         tool_registry=tool_registry,
         safe_executor=safe_executor,
-        transport_registry=cast("TransportRegistryProtocol", transport_registry),
+        transport_registry=transport_registry,
         action_registry=action_registry,
     )
     if enable_fallback:
@@ -124,7 +135,7 @@ def build_hooks(observability: Observability, event_bus: EventBus) -> SimpleHook
     """Build the default HookRegistry with logging + event-emitting hooks."""
     hooks = SimpleHookRegistry(observability)
     event_hook = make_event_emitting_hook(event_bus)
-    for event_name in HOOK_NAMES:
+    for event_name in HookEvent:
         hooks.register(event_name, default_logging_hook)
         hooks.register(event_name, event_hook)
     return hooks
@@ -163,9 +174,10 @@ def assemble_agent(
         tool_permission_manifest=permission_manifest,
     )
 
-    obs = cast("Observability", _resolve_component(reg, "observability", observability))
-    mem = cast("MemorySystem", _resolve_component(reg, "memory", memory))
-    ss = cast("StateStore", _resolve_component(reg, "state_store", state_store))
+    # runtime_checkable Protocols support isinstance at runtime; mypy limitation #9208
+    obs = _resolve_component(reg, "observability", observability, Observability)  # type: ignore[type-abstract]
+    mem = _resolve_component(reg, "memory", memory, MemorySystem)  # type: ignore[type-abstract]
+    ss = _resolve_component(reg, "state_store", state_store, StateStore)  # type: ignore[type-abstract]
 
     tool_registry = SimpleToolRegistry()
     for t in tools:
@@ -195,7 +207,7 @@ def assemble_agent(
         transport_registry,
         action_registry,
     )
-    event_bus = cast("EventBus", _resolve_component(reg, "event_bus", "simple"))
+    event_bus = _resolve_component(reg, "event_bus", "simple", EventBus)  # type: ignore[type-abstract]
     hooks = build_hooks(obs, event_bus)
     runtime = CognitiveRuntime(
         brain,
@@ -203,7 +215,7 @@ def assemble_agent(
         mem,
         hooks,
         ss,
-        judge=DefaultStopRule(outcome_policy=DefaultStepOutcomePolicy()),
+        judge=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
     )
     return CognitiveAgent(
         runtime,

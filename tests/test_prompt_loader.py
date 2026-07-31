@@ -36,19 +36,6 @@ class TestLoadBuiltinPrompt(unittest.TestCase):
         self.assertIn("nonexistent_prompt_xyz", error_msg)
         self.assertIn("Available templates", error_msg)
 
-    def test_loaded_prompt_matches_reasoner_reexport(self) -> None:
-        """Backward-compatible re-exports in reasoner.py return identical content."""
-        from lca.layer1_cognitive.brain.reasoner import (
-            DEFAULT_REACT_TEMPLATE,
-            HIERARCHICAL_DELEGATE_TEMPLATE,
-        )
-
-        self.assertEqual(DEFAULT_REACT_TEMPLATE, load_builtin_prompt("react_prompt"))
-        self.assertEqual(
-            HIERARCHICAL_DELEGATE_TEMPLATE,
-            load_builtin_prompt("hierarchical_prompt"),
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

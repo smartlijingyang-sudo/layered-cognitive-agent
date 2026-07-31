@@ -12,16 +12,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
-from lca.layer1_cognitive.brain.prompt_manager import SimplePromptManager
+from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import (
-    HIERARCHICAL_DELEGATE_TEMPLATE,
     SimpleReasoner,
     build_teammates_text,
 )
 
 
-def _make_state(task: str = "test task") -> AgentState:
-    return AgentState(trace_id="test-trace", task=task, budget=Budget())
+def _make_state(task: str = "test task", teammates_text: str = "") -> AgentState:
+    return AgentState(trace_id="test-trace", task=task, budget=Budget(), teammates_text=teammates_text)
 
 
 def _empty_manifest() -> ToolPermissionManifest:
@@ -184,12 +183,15 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 captured_prompt.append(prompt)
                 return '{"action_type": "respond", "response_text": "ok", "rationale": "", "confidence": 1.0}'
 
-        pm = SimplePromptManager()
-        pm.register_template(
-            "react_prompt", "ROLE: {role}\nTASK: {task}\nTOOLS: {tools}\nCONTEXT:\n{context}"
+        reasoner = SimpleReasoner(
+            FakeLLM(),
+            _make_profile(),
+            "search()",
+            teammates_text=None,
+            templates={
+                "react_prompt": "ROLE: {role}\nTASK: {task}\nTOOLS: {tools}\nCONTEXT:\n{context}"
+            },
         )
-
-        reasoner = SimpleReasoner(FakeLLM(), pm, _make_profile(), "search()", teammates_text=None)
         await reasoner.generate_candidates(_make_state())
 
         self.assertEqual(len(captured_prompt), 1)
@@ -204,12 +206,17 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 captured_prompt.append(prompt)
                 return '{"action_type": "delegate", "target_role": "researcher", "subtask": "分析", "rationale": "test", "confidence": 0.8}'
 
-        pm = SimplePromptManager()
-        pm.register_template("react_prompt", "SHOULD NOT BE USED")
-        pm.register_template("hierarchical_prompt", HIERARCHICAL_DELEGATE_TEMPLATE)
-
         roster = "- role: researcher | goal: research topics\n- role: writer | goal: write reports"
-        reasoner = SimpleReasoner(FakeLLM(), pm, _make_profile(), "search()", teammates_text=roster)
+        reasoner = SimpleReasoner(
+            FakeLLM(),
+            _make_profile(),
+            "search()",
+            teammates_text=roster,
+            templates={
+                "react_prompt": "SHOULD NOT BE USED",
+                "hierarchical_prompt": load_builtin_prompt("hierarchical_prompt"),
+            },
+        )
         await reasoner.generate_candidates(_make_state())
 
         self.assertEqual(len(captured_prompt), 1)
@@ -224,10 +231,11 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
 
     async def test_hierarchical_prompt_has_allowed_actions_placeholder(self) -> None:
         """确保 hierarchical 模板包含 {allowed_actions} 占位符，由 Reasoner 从 Registry 动态注入。"""
-        self.assertIn("{allowed_actions}", HIERARCHICAL_DELEGATE_TEMPLATE)
-        self.assertIn("delegate", HIERARCHICAL_DELEGATE_TEMPLATE)
-        self.assertIn("target_role", HIERARCHICAL_DELEGATE_TEMPLATE)
-        self.assertIn("subtask", HIERARCHICAL_DELEGATE_TEMPLATE)
+        template = load_builtin_prompt("hierarchical_prompt")
+        self.assertIn("{allowed_actions}", template)
+        self.assertIn("delegate", template)
+        self.assertIn("target_role", template)
+        self.assertIn("subtask", template)
 
 
 if __name__ == "__main__":

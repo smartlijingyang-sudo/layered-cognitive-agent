@@ -15,9 +15,7 @@ from lca.contracts.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.loop_judge import StopReason, StopRule
 from lca.contracts.mechanisms import HookRegistry
-from lca.contracts.member_status import MemberStatus
 from lca.contracts.protocols import (
     Body,
     Brain,
@@ -28,7 +26,9 @@ from lca.contracts.protocols import (
     SupportsDecisionGate,
 )
 from lca.contracts.result import ApprovalPendingError, BudgetExceededError, Result
+from lca.contracts.run_context import RunContext
 from lca.contracts.state import AgentState, StateSnapshot
+from lca.contracts.stop import StopReason, StopRule
 from lca.contracts.types import Turn
 
 _logger = logging.getLogger(__name__)
@@ -60,25 +60,22 @@ class CognitiveRuntime(Runtime):
     async def run(
         self,
         task: str,
+        ctx: RunContext | None = None,
+        *,
         max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = None,
-        member_status: MemberStatus | None = None,
-        *,
         agent_role: str = "",
-        from_role: str = "",
-        trace_id: str = "",
-        **_extra: str,
     ) -> Result:
-        del _extra
         state = AgentState(
-            trace_id=trace_id or new_id("trace"),
+            trace_id=(ctx.trace_id if ctx and ctx.trace_id else new_id("trace")),
             task=task,
             budget=create_budget(
                 max_steps=max_steps, max_wall_clock_seconds=max_wall_clock_seconds
             ),
             agent_role=agent_role,
-            from_role=from_role,
-            member_status=member_status,
+            from_role=(ctx.from_role if ctx else ""),
+            member_status=(ctx.member_status if ctx else None),
+            teammates_text=(ctx.teammates_text if ctx else ""),
         )
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
@@ -114,6 +111,7 @@ class CognitiveRuntime(Runtime):
                 # ── Phase 1: Perceive ──
                 await self.hooks.trigger("pre_perceive", state)
                 state = await self.memory.perceive(state)
+                await self.hooks.trigger("post_perceive", state)
                 # ── Phase 2: Think ──
                 await self.hooks.trigger("pre_think", state)
                 decision = await self.brain.think(state)

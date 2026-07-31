@@ -1,12 +1,11 @@
-"""CandidateEvaluationPipeline —— 候选评估的深度模块。
+"""CandidateEvaluationPipeline —— 候选评估的默认实现。
 
 将 MAP 五步评估（decompose → predict → score → conflict check → arbitrate）
-收敛为一个有深度的模块，对外只暴露 decompose + evaluate。
+收敛为单一 Protocol + 默认实现。
 
-冲突检测逻辑（原 SimpleConflictMonitor 的 content-aware 比较）内联为
-私有方法 _check_conflicts，不再需要独立的 ConflictMonitor 适配器。
-
-当未来需要 LLM-based 评估时，只需替换 CandidateEvaluationPipeline 的实现。
+``SimpleCandidateEvaluationPipeline`` 是评估逻辑的单一事实源：
+``ModularBrain`` 默认注入本实现（不再内联重复逻辑），自定义评估行为通过
+整体替换 ``CandidateEvaluationPipeline`` 实现注入。
 """
 
 from __future__ import annotations
@@ -14,7 +13,7 @@ from __future__ import annotations
 import structlog
 
 from lca.contracts.decision import Decision
-from lca.contracts.protocols import CandidateEvaluationPipeline, DecisionGate
+from lca.contracts.protocols import CandidateEvaluationPipeline
 from lca.contracts.semantic_keys import EVAL_CONFLICTS
 from lca.contracts.state import AgentState
 
@@ -25,7 +24,7 @@ class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
     """默认评估管线：内联所有 MAP 评估步骤。
 
     - decompose: 返回原始任务（不分解）
-    - evaluate: predict → score → conflict check → arbitrate 全内联
+    - evaluate: conflict check + max confidence 选优
     """
 
     async def decompose(self, state: AgentState) -> list[str]:
@@ -45,11 +44,7 @@ class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
 
     @staticmethod
     def _check_conflicts(candidates: list[Decision]) -> list[str]:
-        """Content-aware conflict detection among candidate decisions.
-
-        Detects disagreements by comparing response text/rationale and action types.
-        Returns conflict labels (e.g. ``content_disagreement``).
-        """
+        """Content-aware conflict detection among candidate decisions."""
         if len(candidates) < 2:
             return []
         texts = {
@@ -62,29 +57,3 @@ class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
         if len({c.action_type for c in candidates}) > 1:
             return ["action_type_disagreement"]
         return []
-
-
-class GuardedCandidateEvaluationPipeline(CandidateEvaluationPipeline):
-    """评估管线的装饰器：在 evaluate 结果上叠加 DecisionGate guardrail。
-
-    开闭原则应用——不修改内层管线，只在外部包裹策略校验。
-    """
-
-    def __init__(
-        self,
-        inner: CandidateEvaluationPipeline,
-        policy: DecisionGate,
-    ) -> None:
-        self._inner = inner
-        self._policy = policy
-
-    async def decompose(self, state: AgentState) -> list[str]:
-        return await self._inner.decompose(state)
-
-    async def evaluate(
-        self,
-        state: AgentState,
-        candidates: list[Decision],
-    ) -> Decision:
-        decision = await self._inner.evaluate(state, candidates)
-        return await self._policy.enforce(state, decision)

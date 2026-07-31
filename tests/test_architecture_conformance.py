@@ -56,7 +56,7 @@ EXEMPT: dict[str, str] = {
     "lca.layer3_agent.orchestration_strategies.graph.strategy.GraphExecutionState": (
         "BFS 执行状态 dataclass，纯内部数据结构，非可插拔组件"
     ),
-    "lca.layer2_runtime.fallback_handler.FallbackActionPolicy": (
+    "lca.layer1_cognitive.body.fallback_policy.FallbackActionPolicy": (
         "FallbackPolicy 实现，Protocol 在 contracts.protocols.embodiment (ADR-0016)"
     ),
     "lca.layer1_cognitive.brain.default_factory.SimpleBrainFactory": (
@@ -85,7 +85,6 @@ def _collect_protocol_classes() -> set[type]:
     只匹配直接继承 Protocol 的接口定义，不会误匹配实现了 Protocol 的具体类。
     """
     import lca.contracts.action as action_mod
-    import lca.contracts.loop_judge as loop_judge_mod
     import lca.contracts.mechanisms as mechanisms_mod
     import lca.contracts.member_status as member_status_mod
     import lca.contracts.protocols as protocols_mod
@@ -97,7 +96,6 @@ def _collect_protocol_classes() -> set[type]:
         action_mod,
         mechanisms_mod,
         member_status_mod,
-        loop_judge_mod,
         stop_mod,
     ):
         for _name, obj in inspect.getmembers(mod, inspect.isclass):
@@ -213,7 +211,7 @@ class TestCognitiveLoopSkeleton(unittest.TestCase):
             self._MAX_LOOP_STATEMENTS,
             f"_loop 方法体包含 {stmt_count} 条 AST 语句，"
             f"超过 ADR-0002 上限 {self._MAX_LOOP_STATEMENTS}。"
-            "请将业务判定逻辑提取到 StepOutcomePolicy / Hook / Body 装饰器中。",
+            "请将业务判定逻辑提取到 StopOutcomePolicy / Hook / Body 装饰器中。",
         )
 
     def test_runtime_loop_import_whitelist(self) -> None:
@@ -225,7 +223,7 @@ class TestCognitiveLoopSkeleton(unittest.TestCase):
         tree = ast.parse(source)
 
         forbidden_modules = {
-            "lca.layer2_runtime.fallback_handler",
+            "lca.layer1_cognitive.body.fallback_policy",
             "lca.layer1_cognitive.event_bus",
             "lca.contracts.action",
         }

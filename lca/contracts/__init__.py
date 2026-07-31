@@ -17,11 +17,6 @@ from lca.contracts.graph import (
     GraphValidationError,
 )
 from lca.contracts.lifecycle import AgentCard, TaskStatus, TeamMessage
-from lca.contracts.loop_judge import (
-    StopDecision,
-    StopReason,
-    StopRule,
-)
 from lca.contracts.mechanisms import (
     EventBus,
     Hook,
@@ -47,7 +42,12 @@ from lca.contracts.role_team import (
 )
 from lca.contracts.run_context import RunContext
 from lca.contracts.state import AgentState, Budget, StateSnapshot
-from lca.contracts.types import StepOutcome, Turn
+from lca.contracts.stop import (
+    StopDecision,
+    StopReason,
+    StopRule,
+)
+from lca.contracts.types import StopOutcome, Turn
 
 __all__ = [
     "Action",
@@ -82,8 +82,8 @@ __all__ = [
     "RunContext",
     "SharedMemoryStore",
     "StateSnapshot",
-    "StepOutcome",
     "StopDecision",
+    "StopOutcome",
     "StopReason",
     "StopRule",
     "TaskStatus",

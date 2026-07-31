@@ -1,4 +1,4 @@
-"""DefaultStepOutcomePolicy —— 默认单步结果判定策略。
+"""DefaultStopOutcomePolicy —— 默认单步结果判定策略。
 
 L2 层职责：
     根据当前 step 的 decision / observation / reflection 判定：
@@ -15,11 +15,11 @@ from __future__ import annotations
 from lca.contracts.decision import Decision, Observation, Reflection
 from lca.contracts.enums import ActionType, ReflectionVerdict
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import StepOutcome, StepOutcomePolicy
+from lca.contracts.protocols import StopOutcome, StopOutcomePolicy
 from lca.contracts.state import AgentState
 
 
-class DefaultStepOutcomePolicy(StepOutcomePolicy):
+class DefaultStopOutcomePolicy(StopOutcomePolicy):
     """默认单步结果判定策略。
 
     判定规则：
@@ -35,14 +35,14 @@ class DefaultStepOutcomePolicy(StepOutcomePolicy):
         decision: Decision | None,
         observation: Observation | None,
         reflection: Reflection | None,
-    ) -> StepOutcome:
+    ) -> StopOutcome:
         if decision is None or reflection is None:
-            return StepOutcome()
+            return StopOutcome()
         degraded_ok = bool(
             observation is not None and observation.success and observation.degraded_from
         )
         if decision.action_type == ActionType.HANDOFF:
-            return StepOutcome(should_stop=True, status=TaskStatus.COMPLETED)
+            return StopOutcome(should_stop=True, status=TaskStatus.COMPLETED)
         if decision.action_type == ActionType.RESPOND or degraded_ok:
             final_output = decision.response_text if decision.response_text else None
             if (
@@ -53,16 +53,16 @@ class DefaultStepOutcomePolicy(StepOutcomePolicy):
             ):
                 final_output = observation.payload
             should_stop = reflection.verdict != ReflectionVerdict.NEEDS_CORRECTION
-            return StepOutcome(
+            return StopOutcome(
                 should_stop=should_stop,
                 final_output=final_output,
                 status=TaskStatus.COMPLETED if should_stop else None,
             )
-        return StepOutcome()
+        return StopOutcome()
 
     def resolve_budget_exceeded(
         self, observation: Observation | None, state: AgentState
-    ) -> StepOutcome:
+    ) -> StopOutcome:
         last_ok = observation is not None and observation.success
         final_output = None
         if (
@@ -72,7 +72,7 @@ class DefaultStepOutcomePolicy(StepOutcomePolicy):
             and isinstance(observation.payload, str)
         ):
             final_output = observation.payload
-        return StepOutcome(
+        return StopOutcome(
             should_stop=True,
             final_output=final_output,
             status=TaskStatus.COMPLETED if last_ok else TaskStatus.FAILED,

@@ -12,8 +12,8 @@ from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import (
     TransportNotFoundError,
     TransportRegistry,
-    UnimplementedTransport,
 )
+from tests.support.unimplemented_transport import UnimplementedTransport
 
 
 class TestTransportRegistryRegister(unittest.TestCase):

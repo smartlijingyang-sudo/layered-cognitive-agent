@@ -34,11 +34,10 @@ class Critic(Protocol):
 
 @runtime_checkable
 class Brain(Protocol):
-    """Brain 顶层策略：think + reflect + 花名册设置。"""
+    """Brain 顶层策略：think + reflect。"""
 
     async def think(self, state: AgentState) -> Decision: ...
     async def reflect(self, state: AgentState, observation: Observation) -> Reflection: ...
-    def set_teammates(self, teammates_text: str) -> None: ...
 
 
 @runtime_checkable
@@ -85,7 +84,7 @@ class PromptManager(Protocol):
     """Prompt 模板管理：渲染 + 注册。"""
 
     def render(self, template_name: str, variables: dict[str, Any]) -> str: ...
-    def register_template(self, name: str, template: str, version: str = "1.0") -> None: ...
+    def register_template(self, name: str, template: str) -> None: ...
 
 
 @runtime_checkable
@@ -97,7 +96,7 @@ class SkillRouter(Protocol):
 
 @runtime_checkable
 class BrainFactory(Protocol):
-    """Brain 工厂：由 BrainFactoryRegistry 按名称解析。"""
+    """Brain 工厂：由 NamedRegistry 按名称解析。"""
 
     def __call__(
         self,

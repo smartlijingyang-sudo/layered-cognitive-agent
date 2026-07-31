@@ -87,7 +87,3 @@ class WeatherTool(Tool):
             payload=result,
             latency_ms=latency_ms,
         )
-
-
-# Backward compatibility alias
-GetWeatherTool = WeatherTool
