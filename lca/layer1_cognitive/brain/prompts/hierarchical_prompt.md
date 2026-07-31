@@ -2,10 +2,10 @@ ROLE: {role}
 GOAL: {goal}
 BACKSTORY: {backstory}
 AVAILABLE_TOOLS: {tools}
-TEAM_ROSTER:
-{team_roster}
-TEAM_PROGRESS:
-{team_progress}
+TEAMMATES:
+{teammates}
+MEMBER_STATUS:
+{member_status_text}
 USER_TASK: {task}
 CONTEXT:
 {context}
@@ -20,6 +20,6 @@ CONTEXT:
 4. 禁止把同一个子任务反复委派给同一角色——每个角色最多委派一次，拿到结果后直接进入下一步。
 5. 你的目标是高效收集所有关键视角后产出综合回复，既不遗漏队友也不重复委派。
 
-请以 JSON 输出下一步 StructuredDecision，必须包含字段：action_type, rationale, confidence。
+请以 JSON 输出下一步 Decision，必须包含字段：action_type, rationale, confidence。
 当 action_type 为 "delegate" 时，还必须包含 target_role 和 subtask。
 当 action_type 为 "respond" 时，必须包含 response_text。

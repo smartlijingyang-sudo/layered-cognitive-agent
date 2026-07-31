@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from lca.contracts.action import ActionOperation
+from lca.contracts.action import Action
 from lca.contracts.enums import ActionType
 from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.layer1_cognitive.body.action_handlers import (
@@ -90,7 +90,7 @@ def _operation_for(
     tool_registry: ToolRegistry,
     safe_executor: SafeExecutor,
     transport_registry: TransportRegistryProtocol,
-) -> ActionOperation | None:
+) -> Action | None:
     if name == ActionType.RESPOND:
         return RespondOperation()
     if name == ActionType.USE_TOOL:

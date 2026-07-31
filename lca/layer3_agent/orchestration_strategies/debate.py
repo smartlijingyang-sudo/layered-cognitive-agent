@@ -4,21 +4,21 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.decision import StructuredDecision
+from lca.contracts.decision import Decision
 from lca.contracts.enums import ActionType
 from lca.contracts.protocols import (
     CandidateEvaluationPipeline,
-    OrchestrationContext,
-    OrchestrationStrategy,
+    TeamContext,
+    TeamProcessStrategy,
 )
 from lca.contracts.result import Result
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.layer3_agent.member_invoke import invoke_member
 
 _DEFAULT_MAX_ROUNDS = 3
 
 
-class DebateStrategy(OrchestrationStrategy):
+class DebateStrategy(TeamProcessStrategy):
     """多 Agent 辩论达成共识。
 
     每轮用 asyncio.gather 并行收集各 Agent 对当前 objective 的表态，
@@ -35,7 +35,7 @@ class DebateStrategy(OrchestrationStrategy):
     ) -> None:
         self._pipeline = evaluation_pipeline
 
-    async def run(self, context: OrchestrationContext, objective: str) -> Result:
+    async def run(self, context: TeamContext, objective: str) -> Result:
         if not context.members:
             return Result.failed("No members in team")
 
@@ -89,9 +89,9 @@ class DebateStrategy(OrchestrationStrategy):
             return Result.failed("No results to arbitrate")
         if self._pipeline is None or len(results) == 1:
             return results[0]
-        state = TypedState(trace_id="debate", task=objective, budget=Budget())
+        state = AgentState(trace_id="debate", task=objective, budget=Budget())
         decisions = [
-            StructuredDecision(
+            Decision(
                 decision_id=f"debate_{i}",
                 action_type=ActionType.RESPOND,
                 rationale=r.output or "",

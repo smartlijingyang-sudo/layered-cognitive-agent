@@ -6,17 +6,17 @@ L2 层职责：
     - 最终输出（final_output）
     - 任务状态（status）
 
-    与 LoopJudge 组合使用：LoopJudge 负责 budget 检查 + 调用本策略，
+    与 StopRule 组合使用：StopRule 负责 budget 检查 + 调用本策略，
     本策略只负责业务语义的判定（action_type、reflection_verdict）。
 """
 
 from __future__ import annotations
 
-from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.decision import Decision, Observation, Reflection
 from lca.contracts.enums import ActionType, ReflectionVerdict
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import StepOutcome, StepOutcomePolicy
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 
 class DefaultStepOutcomePolicy(StepOutcomePolicy):
@@ -31,8 +31,8 @@ class DefaultStepOutcomePolicy(StepOutcomePolicy):
 
     def resolve(
         self,
-        state: TypedState,
-        decision: StructuredDecision | None,
+        state: AgentState,
+        decision: Decision | None,
         observation: Observation | None,
         reflection: Reflection | None,
     ) -> StepOutcome:
@@ -61,7 +61,7 @@ class DefaultStepOutcomePolicy(StepOutcomePolicy):
         return StepOutcome()
 
     def resolve_budget_exceeded(
-        self, observation: Observation | None, state: TypedState
+        self, observation: Observation | None, state: AgentState
     ) -> StepOutcome:
         last_ok = observation is not None and observation.success
         final_output = None

@@ -1,29 +1,28 @@
-"""DelegationLedger + CompletionPolicy 单元测试。"""
+"""InMemoryMemberStatus + DecisionGate 单元测试。"""
 
 from __future__ import annotations
 
 import pytest
 
-from lca.contracts.decision import DelegationSpec, StructuredDecision
-from lca.contracts.state import Budget, TypedState
-from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
-    RosterCoveragePolicy,
+from lca.contracts.decision import Decision, DelegationSpec
+from lca.contracts.state import AgentState, Budget
+from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
+    MustConsultAllMembers,
 )
-from lca.layer1_cognitive.team_progress import DelegationLedger
+from lca.layer1_cognitive.team_progress import InMemoryMemberStatus
 from lca.layer1_cognitive.team_progress.progress_hooks import (
     ledger_tracking_hook,
-    progress_injection_hook,
 )
 
 # ── helpers ──
 
 
-def _state(task: str = "test task", **kw) -> TypedState:
-    return TypedState(trace_id="t", task=task, budget=Budget(), **kw)
+def _state(task: str = "test task", **kw) -> AgentState:
+    return AgentState(trace_id="t", task=task, budget=Budget(), **kw)
 
 
-def _decision(action_type: str = "respond", **kw) -> StructuredDecision:
-    return StructuredDecision(
+def _decision(action_type: str = "respond", **kw) -> Decision:
+    return Decision(
         decision_id="d1",
         action_type=action_type,
         rationale="test",
@@ -32,17 +31,17 @@ def _decision(action_type: str = "respond", **kw) -> StructuredDecision:
     )
 
 
-def _ledger(roles: set[str], status: dict[str, str] | None = None) -> DelegationLedger:
-    return DelegationLedger(
-        mandatory_roles=frozenset(roles),
+def _ledger(roles: set[str], status: dict[str, str] | None = None) -> InMemoryMemberStatus:
+    return InMemoryMemberStatus(
+        required_roles=frozenset(roles),
         status=status or dict.fromkeys(roles, "pending"),
     )
 
 
-# ── DelegationLedger ──
+# ── InMemoryMemberStatus ──
 
 
-class TestDelegationLedger:
+class TestInMemoryMemberStatus:
     def test_auto_init_pending(self) -> None:
         ledger = _ledger({"a", "b"})
         assert ledger.status["a"] == "pending"
@@ -50,19 +49,19 @@ class TestDelegationLedger:
 
     def test_is_covered_false_when_pending(self) -> None:
         ledger = _ledger({"a", "b"})
-        assert ledger.is_covered() is False
+        assert ledger.all_done() is False
 
     def test_is_covered_true_when_all_done(self) -> None:
         ledger = _ledger({"a", "b"}, {"a": "done", "b": "done"})
-        assert ledger.is_covered() is True
+        assert ledger.all_done() is True
 
     def test_is_covered_partial(self) -> None:
         ledger = _ledger({"a", "b", "c"}, {"a": "done", "b": "done", "c": "pending"})
-        assert ledger.is_covered() is False
+        assert ledger.all_done() is False
 
     def test_pending_roles(self) -> None:
         ledger = _ledger({"a", "b", "c"}, {"a": "done", "b": "pending", "c": "failed"})
-        pending = ledger.pending_roles()
+        pending = ledger.waiting_roles()
         assert set(pending) == {"b", "c"}
 
     def test_mark_returns_new_instance(self) -> None:
@@ -75,18 +74,18 @@ class TestDelegationLedger:
     def test_mark_chain(self) -> None:
         ledger = _ledger({"a", "b"})
         ledger = ledger.mark("a", "done").mark("b", "done")
-        assert ledger.is_covered() is True
+        assert ledger.all_done() is True
 
 
-# ── RosterCoveragePolicy ──
+# ── MustConsultAllMembers ──
 
 
-class TestRosterCoveragePolicy:
+class TestMustConsultAllMembers:
     @pytest.mark.asyncio
     async def test_respond_blocked_when_not_covered(self) -> None:
         ledger = _ledger({"analyst", "reviewer"})
-        state = _state(team_progress=ledger)
-        policy = RosterCoveragePolicy()
+        state = _state(member_status=ledger)
+        policy = MustConsultAllMembers()
 
         decision = _decision("respond")
         result = await policy.enforce(state, decision)
@@ -100,8 +99,8 @@ class TestRosterCoveragePolicy:
     @pytest.mark.asyncio
     async def test_respond_allowed_when_covered(self) -> None:
         ledger = _ledger({"a"}, {"a": "done"})
-        state = _state(team_progress=ledger)
-        policy = RosterCoveragePolicy()
+        state = _state(member_status=ledger)
+        policy = MustConsultAllMembers()
 
         decision = _decision("respond")
         result = await policy.enforce(state, decision)
@@ -111,8 +110,8 @@ class TestRosterCoveragePolicy:
     @pytest.mark.asyncio
     async def test_delegate_passes_through(self) -> None:
         ledger = _ledger({"a", "b"})
-        state = _state(team_progress=ledger)
-        policy = RosterCoveragePolicy()
+        state = _state(member_status=ledger)
+        policy = MustConsultAllMembers()
 
         decision = _decision(
             "delegate",
@@ -125,8 +124,8 @@ class TestRosterCoveragePolicy:
 
     @pytest.mark.asyncio
     async def test_no_ledger_passes_through(self) -> None:
-        state = _state()  # team_progress=None
-        policy = RosterCoveragePolicy()
+        state = _state()  # member_status=None
+        policy = MustConsultAllMembers()
 
         decision = _decision("respond")
         result = await policy.enforce(state, decision)
@@ -136,8 +135,8 @@ class TestRosterCoveragePolicy:
     @pytest.mark.asyncio
     async def test_subtask_includes_role_and_task(self) -> None:
         ledger = _ledger({"analyst"})
-        state = _state(task="launch product", team_progress=ledger)
-        policy = RosterCoveragePolicy()
+        state = _state(task="launch product", member_status=ledger)
+        policy = MustConsultAllMembers()
 
         result = await policy.enforce(state, _decision("respond"))
 
@@ -153,7 +152,7 @@ class TestLedgerTrackingHook:
     @pytest.mark.asyncio
     async def test_marks_done_on_success(self) -> None:
         ledger = _ledger({"analyst"})
-        state = _state(team_progress=ledger)
+        state = _state(member_status=ledger)
 
         decision = _decision(
             "delegate",
@@ -165,13 +164,13 @@ class TestLedgerTrackingHook:
 
         await ledger_tracking_hook("post_act", state, decision=decision, observation=obs)
 
-        assert state.team_progress is not None
-        assert state.team_progress.status["analyst"] == "done"
+        assert state.member_status is not None
+        assert state.member_status.status["analyst"] == "done"
 
     @pytest.mark.asyncio
     async def test_marks_failed_on_error(self) -> None:
         ledger = _ledger({"analyst"})
-        state = _state(team_progress=ledger)
+        state = _state(member_status=ledger)
 
         decision = _decision(
             "delegate",
@@ -183,8 +182,8 @@ class TestLedgerTrackingHook:
 
         await ledger_tracking_hook("post_act", state, decision=decision, observation=obs)
 
-        assert state.team_progress is not None
-        assert state.team_progress.status["analyst"] == "failed"
+        assert state.member_status is not None
+        assert state.member_status.status["analyst"] == "failed"
 
     @pytest.mark.asyncio
     async def test_noop_when_no_ledger(self) -> None:
@@ -196,33 +195,25 @@ class TestLedgerTrackingHook:
     @pytest.mark.asyncio
     async def test_noop_for_respond(self) -> None:
         ledger = _ledger({"analyst"})
-        state = _state(team_progress=ledger)
+        state = _state(member_status=ledger)
         decision = _decision("respond")
         await ledger_tracking_hook("post_act", state, decision=decision)
-        assert state.team_progress.status["analyst"] == "pending"
+        assert state.member_status.status["analyst"] == "pending"
 
 
-class TestProgressInjectionHook:
-    @pytest.mark.asyncio
-    async def test_injects_pending_roles(self) -> None:
+class TestMemberStatusPromptText:
+    def test_waiting_roles_text(self) -> None:
         ledger = _ledger({"a", "b"}, {"a": "done", "b": "pending"})
-        state = _state(team_progress=ledger)
+        text = ledger.as_prompt_text()
+        assert "b" in text
 
-        await progress_injection_hook("pre_think", state)
-
-        assert "b" in state.team_progress_text
-
-    @pytest.mark.asyncio
-    async def test_injects_all_done(self) -> None:
+    def test_all_done_text(self) -> None:
         ledger = _ledger({"a"}, {"a": "done"})
-        state = _state(team_progress=ledger)
+        text = ledger.as_prompt_text()
+        assert "完毕" in text
 
-        await progress_injection_hook("pre_think", state)
-
-        assert "完毕" in state.team_progress_text
-
-    @pytest.mark.asyncio
-    async def test_noop_when_no_ledger(self) -> None:
+    def test_reasoner_uses_as_prompt_text_not_state_field(self) -> None:
+        """Prompt text is derived; AgentState has no cached progress field."""
         state = _state()
-        await progress_injection_hook("pre_think", state)
-        assert "team_progress_text" not in state.working_memory
+        assert not hasattr(state, "team_progress_text")
+        assert not hasattr(state, "MEMBER_STATUS_PROMPT_REMOVED")

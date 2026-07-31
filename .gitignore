@@ -12,3 +12,8 @@ build/
 .ruff_cache/
 .hypothesis/
 .coverage
+.import_linter_cache/
+traces/
+repomix-output.xml
+repomix.config.json
+.qwen/tmp/

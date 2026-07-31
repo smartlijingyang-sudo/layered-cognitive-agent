@@ -1,7 +1,7 @@
 """Composition root — wires all layers into a working object graph.
 
 Sole module that assembles the full Agent / Team object graphs.
-Entry points: ``assemble_base_agent`` (single agent), ``assemble_team`` (team).
+Entry points: ``assemble_agent`` (single agent), ``assemble_team`` (team).
 Lower-level builders: ``build_body_from_shared``, ``build_hooks``.
 """
 
@@ -21,14 +21,14 @@ from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import (
     AgentTransport,
     Body,
-    BrainStrategy,
+    Brain,
     EventBus,
     LLMAdapter,
     MemorySystem,
     Observability,
-    OrchestrationStrategy,
     StateStore,
-    TeamEntrypoint,
+    TeamProcessStrategy,
+    TeamUnit,
     Tool,
     TransportRegistryProtocol,
 )
@@ -43,56 +43,73 @@ from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedB
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer1_cognitive.brain.reasoner import build_team_roster
+from lca.layer1_cognitive.brain.reasoner import build_teammates_text
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
-from lca.layer2_runtime.default_loop_judge import DefaultLoopJudge
+from lca.layer2_runtime.default_loop_judge import DefaultStopRule
 from lca.layer2_runtime.event_emission import HOOK_NAMES, make_event_emitting_hook
 from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
-from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
-from lca.layer3_agent.simple_agent import SimpleAgent
+from lca.layer2_runtime.strategy_registry import get_global_brain_factory_registry
+from lca.layer3_agent.simple_agent import CognitiveAgent
 from lca.layer4_app.defaults import ensure_defaults
 
 
 def _resolve_component(reg: ComponentRegistry, category: str, value: str | object) -> object:
-    """Resolve *value* from *reg* if it is a string key, otherwise return as-is."""
     if isinstance(value, str):
         return reg.require(category, value)()
     return value
 
 
 def build_default_transport_registry() -> TransportRegistry:
-    """Build the default TransportRegistry with internal / a2a / mcp transports."""
     registry = TransportRegistry()
-    registry.register(InternalTransport())
-    registry.register(A2ATransport())
-    registry.register(MCPTransport())
+    for t in (InternalTransport(), A2ATransport(), MCPTransport()):
+        registry.register(t)
     return registry
 
 
-def build_team_transport(
-    members: list[SimpleAgent],
-) -> tuple[AgentTransport, str]:
-    """Build an in-process transport and roster description for a team."""
+async def _call_member_for_channel(member: CognitiveAgent, subtask: str) -> Observation:
+    """Invoke a member for InternalTransport; prefer awaitable run/execute."""
+    from collections.abc import Awaitable
+
     from lca.contracts.delegation_context import get_current_delegator
+    from lca.contracts.run_context import RunContext
 
-    transport = InternalTransport()
-    for member in members:
-
-        async def _handler(subtask: str, _m: SimpleAgent = member) -> Observation:
-            delegated_by = get_current_delegator()
-            result = await _m.execute(subtask, delegated_by=delegated_by)
+    from_role = get_current_delegator()
+    for name in ("run", "execute"):
+        fn = getattr(member, name, None)
+        if not callable(fn):
+            continue
+        cand = (
+            fn(subtask, RunContext(from_role=from_role))
+            if name == "run"
+            else fn(subtask, from_role=from_role)
+        )
+        if isinstance(cand, Awaitable):
+            result = await cand
             return Observation(
                 observation_id=f"obs_{result.trace_id}",
                 success=result.status == TaskStatus.COMPLETED,
                 payload=result.output,
                 error=result.error,
             )
+    return Observation(
+        observation_id="obs_failed", success=False, payload=None, error="no awaitable run"
+    )
+
+
+def build_team_transport(
+    members: list[CognitiveAgent],
+) -> tuple[AgentTransport, str]:
+    """Build in-process channel and teammates_text for a team."""
+    transport = InternalTransport()
+    for member in members:
+
+        async def _handler(subtask: str, _m: CognitiveAgent = member) -> Observation:
+            return await _call_member_for_channel(_m, subtask)
 
         transport.register_agent(member.role_profile.role, _handler)
-    roster_desc = build_team_roster([m.role_profile for m in members])
-    return transport, roster_desc
+    return transport, build_teammates_text([m.role_profile for m in members])
 
 
 def build_body_from_shared(
@@ -134,7 +151,7 @@ def build_hooks(observability: Observability, event_bus: EventBus) -> SimpleHook
     return hooks
 
 
-def assemble_base_agent(
+def assemble_agent(
     *,
     role: str,
     goal: str,
@@ -146,9 +163,9 @@ def assemble_base_agent(
     memory: str | MemorySystem = "simple",
     observability: str | Observability = "console",
     state_store: str | StateStore = "memory",
-    brain_strategy: str | BrainStrategy = "default",
-) -> SimpleAgent:
-    """Assemble a complete SimpleAgent with a single shared pipeline.
+    brain_strategy: str | Brain = "default",
+) -> CognitiveAgent:
+    """Assemble a complete CognitiveAgent with a single shared pipeline.
 
     Creates one set of ToolRegistry / SafeExecutor / TransportRegistry /
     ActionRegistry and injects them into both Brain and Body, guaranteeing
@@ -180,9 +197,9 @@ def assemble_base_agent(
         tool_registry, safe_executor, transport_registry
     )
 
-    brain: BrainStrategy
+    brain: Brain
     if isinstance(brain_strategy, str):
-        strategy_reg = get_global_strategy_registry()
+        strategy_reg = get_global_brain_factory_registry()
         if brain_strategy not in strategy_reg:
             raise ValueError(
                 f"Unknown brain_strategy: {brain_strategy!r}. Available: {strategy_reg.list()}"
@@ -207,9 +224,9 @@ def assemble_base_agent(
         mem,
         hooks,
         ss,
-        judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
+        judge=DefaultStopRule(outcome_policy=DefaultStepOutcomePolicy()),
     )
-    return SimpleAgent(
+    return CognitiveAgent(
         runtime,
         role_profile,
         max_steps=max_steps,
@@ -217,7 +234,7 @@ def assemble_base_agent(
     )
 
 
-def _promote_supervisor(supervisor: SimpleAgent) -> SimpleAgent:
+def _promote_supervisor(supervisor: CognitiveAgent) -> CognitiveAgent:
     """Apply supervisor budget floors — sole composition decision for team leads."""
     wc = supervisor.max_wall_clock_seconds
     effective_wc = (
@@ -225,7 +242,7 @@ def _promote_supervisor(supervisor: SimpleAgent) -> SimpleAgent:
         if wc is not None
         else DEFAULT_MAX_WALL_CLOCK_SECONDS
     )
-    return SimpleAgent(
+    return CognitiveAgent(
         supervisor.runtime,
         supervisor.role_profile,
         max_steps=max(supervisor.max_steps, SUPERVISOR_MIN_MAX_STEPS),
@@ -235,14 +252,14 @@ def _promote_supervisor(supervisor: SimpleAgent) -> SimpleAgent:
 
 def assemble_team(
     *,
-    members: list[SimpleAgent],
+    members: list[CognitiveAgent],
     process: TeamProcess | None = None,
-    supervisor: SimpleAgent | None = None,
+    supervisor: CognitiveAgent | None = None,
     max_rounds: int | None = None,
     shared_memory_layers: list[str] | None = None,
     graph_definition_ref: str | None = None,
-    strategy: OrchestrationStrategy | None = None,
-) -> TeamEntrypoint:
+    strategy: TeamProcessStrategy | None = None,
+) -> TeamUnit:
     """Assemble a team object graph from *members* with the given *process*."""
     from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 
@@ -255,13 +272,13 @@ def assemble_team(
         graph_definition_ref=graph_definition_ref,
     )
     base_supervisor = _promote_supervisor(supervisor) if supervisor is not None else None
-    transport, roster_desc = build_team_transport(members)
+    transport, teammates_text = build_team_transport(members)
 
     return TeamOrchestrator(
         members,
         config,
         base_supervisor,
         transport=transport,
-        roster_desc=roster_desc,
+        teammates_text=teammates_text,
         strategy=strategy,
     )

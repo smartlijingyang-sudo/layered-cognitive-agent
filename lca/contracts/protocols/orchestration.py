@@ -6,38 +6,38 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from lca.contracts.member_status import MemberStatus
 from lca.contracts.memory import MemoryRecord
-from lca.contracts.protocols.agent import AgentEntrypoint
+from lca.contracts.protocols.agent import AgentUnit
 from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
-from lca.contracts.team_progress import DelegationLedgerProtocol
 
 
 @dataclass
-class OrchestrationContext:
+class TeamContext:
     """编排策略的运行时上下文，由 TeamOrchestrator 构造并传给策略实例。
 
-    supervisor 是 AgentEntrypoint —— 组合期由 TeamOrchestrator
-    绑定 hooks / completion guard，策略只需调用 execute。
-    team_progress 是已创建好的 DelegationLedger，策略直接透传给 supervisor。
+    supervisor 是 AgentUnit —— 组合期由 TeamOrchestrator
+    binds hooks / decision gate; strategies only call run.
+    member_status is the MemberStatus board passed through to the supervisor.
     """
 
-    members: Sequence[AgentEntrypoint] = field(default_factory=list)
+    members: Sequence[AgentUnit] = field(default_factory=list)
     config: TeamConfig | None = None
-    supervisor: AgentEntrypoint | None = None
+    supervisor: AgentUnit | None = None
     transport: AgentTransport | None = None
-    roster_desc: str = ""
-    team_progress: DelegationLedgerProtocol | None = None
+    teammates_text: str = ""
+    member_status: MemberStatus | None = None
     team_id: str = ""
     shared_memory: SharedMemoryStore | None = None
 
 
 @runtime_checkable
-class OrchestrationStrategy(Protocol):
+class TeamProcessStrategy(Protocol):
     """编排策略接口：每种 process 模式对应一个实现。"""
 
-    async def run(self, context: OrchestrationContext, objective: str) -> Result: ...
+    async def run(self, context: TeamContext, objective: str) -> Result: ...
 
 
 @runtime_checkable

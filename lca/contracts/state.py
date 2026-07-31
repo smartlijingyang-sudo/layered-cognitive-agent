@@ -1,4 +1,4 @@
-"""第5.2节：State 与预算控制契约。"""
+"""AgentState and budget control contracts."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.team_progress import DelegationLedgerProtocol
+from lca.contracts.member_status import MemberStatus
 from lca.contracts.types import Turn
 
 
@@ -19,7 +19,7 @@ def _now() -> datetime:
 
 @dataclass
 class Budget:
-    """资源预算：步数 / token / 费用 / 墙钟四维约束。"""
+    """Resource budget: steps / tokens / cost / wall-clock."""
 
     max_tokens: int | None = None
     max_cost_usd: float | None = None
@@ -32,7 +32,7 @@ class Budget:
     extra: dict[str, Any] = field(default_factory=dict)
 
     def exceeded(self) -> bool:
-        """判定预算是否已超限（步数或墙钟）。"""
+        """True when step or wall-clock limits are exceeded."""
         if self.max_steps is not None and self.used_steps > self.max_steps:
             return True
         if self.max_wall_clock_seconds is not None:
@@ -44,7 +44,7 @@ class Budget:
 
 @dataclass
 class StateSnapshot:
-    """状态快照引用：用于 checkpoint / resume。"""
+    """Checkpoint reference for resume."""
 
     snapshot_id: str
     step: int
@@ -54,8 +54,8 @@ class StateSnapshot:
 
 
 @dataclass
-class TypedState:
-    """Agent 单步认知循环的完整状态容器。"""
+class AgentState:
+    """Full state for one agent cognitive loop."""
 
     trace_id: str
     task: str
@@ -68,18 +68,24 @@ class TypedState:
     status: TaskStatus = TaskStatus.WORKING
     extra: dict[str, Any] = field(default_factory=dict)
     agent_role: str = ""
-    delegated_by: str = ""
-    team_progress: DelegationLedgerProtocol | None = None
-    # 认知闭环历史：每步 Turn(decision, observation, reflection)
+    from_role: str = ""
+    member_status: MemberStatus | None = None
     history: list[Turn] = field(default_factory=list)
-    # ── 框架运行槽位（一等字段，禁止再走 working_memory 裸字符串）──
     final_output: Any | None = None
     last_error: str | None = None
     active_template: str | None = None
-    team_progress_text: str | None = None
+
+    # Transitional field aliases for one cycle.
+    @property
+    def delegated_by(self) -> str:
+        return self.from_role
+
+    @delegated_by.setter
+    def delegated_by(self, value: str) -> None:
+        self.from_role = value
 
     def snapshot(self, reason: SnapshotReason = SnapshotReason.PERIODIC) -> StateSnapshot:
-        """创建并追加一条状态快照，返回引用。"""
+        """Append a checkpoint and return its reference."""
         snap = StateSnapshot(
             snapshot_id=new_id("snap"),
             step=self.step,
@@ -88,3 +94,7 @@ class TypedState:
         )
         self.checkpoints.append(snap)
         return snap
+
+
+# Transitional alias — remove after one release cycle.
+TypedState = AgentState

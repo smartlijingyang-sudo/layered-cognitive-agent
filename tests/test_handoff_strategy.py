@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.decision import DelegationSpec, StructuredDecision
+from lca.contracts.decision import Decision, DelegationSpec
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import OrchestrationContext
+from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer1_cognitive.body.simple_body import SimpleBody
@@ -54,7 +54,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("expert", "should not run")
 
         strategy = HandoffStrategy()
-        context = OrchestrationContext(members=[agent_a, agent_b])
+        context = TeamContext(members=[agent_a, agent_b])
 
         result = await strategy.run(context, "customer question")
 
@@ -69,7 +69,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("expert", "handled by expert")
 
         strategy = HandoffStrategy()
-        context = OrchestrationContext(members=[agent_a, agent_b])
+        context = TeamContext(members=[agent_a, agent_b])
 
         result = await strategy.run(context, "complex question")
 
@@ -82,7 +82,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("b", "", status=TaskStatus.FAILED)
 
         strategy = HandoffStrategy()
-        context = OrchestrationContext(members=[agent_a, agent_b])
+        context = TeamContext(members=[agent_a, agent_b])
 
         result = await strategy.run(context, "task")
 
@@ -90,7 +90,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
     async def test_empty_members_returns_failed(self) -> None:
         strategy = HandoffStrategy()
-        context = OrchestrationContext(members=[])
+        context = TeamContext(members=[])
 
         result = await strategy.run(context, "task")
 
@@ -100,7 +100,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
     async def test_single_member(self) -> None:
         agent = _make_agent("solo", "solo result")
         strategy = HandoffStrategy()
-        context = OrchestrationContext(members=[agent])
+        context = TeamContext(members=[agent])
 
         result = await strategy.run(context, "task")
 
@@ -108,7 +108,7 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
 
 class TestHandoffActionType(unittest.TestCase):
-    """handoff action_type 在 StructuredDecision 中可用。"""
+    """handoff action_type 在 Decision 中可用。"""
 
     def test_handoff_in_action_registry(self) -> None:
         """handoff 应在 ActionRegistry 的已注册集合中。"""
@@ -150,7 +150,7 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
 
         body = SimpleBody(tool_registry, safe_executor, transport_registry=transport_registry)
 
-        decision = StructuredDecision(
+        decision = Decision(
             decision_id="d1",
             action_type="handoff",
             rationale="route to expert",
@@ -171,7 +171,7 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
         safe_executor = MagicMock()
         body = SimpleBody(tool_registry, safe_executor)
 
-        decision = StructuredDecision(
+        decision = Decision(
             decision_id="d1",
             action_type="handoff",
             rationale="route",
@@ -189,8 +189,8 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
     """CognitiveRuntime 在 handoff 时应停止循环。"""
 
     async def test_runtime_stops_on_handoff(self) -> None:
-        """handoff action 应触发 LoopJudge 返回 should_stop=True。"""
-        from lca.layer2_runtime.default_loop_judge import DefaultLoopJudge
+        """handoff action 应触发 StopRule 返回 should_stop=True。"""
+        from lca.layer2_runtime.default_loop_judge import DefaultStopRule
         from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
             DefaultStepOutcomePolicy,
         )
@@ -206,7 +206,7 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
         memory.perceive = AsyncMock(side_effect=lambda s: s)
         memory.update = AsyncMock()
 
-        decision = StructuredDecision(
+        decision = Decision(
             decision_id="d1",
             action_type="handoff",
             rationale="handoff to expert",
@@ -230,7 +230,7 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
             memory,
             hooks,
             state_store,
-            judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
+            judge=DefaultStopRule(outcome_policy=DefaultStepOutcomePolicy()),
         )
         result = await runtime.run("test task", max_steps=10)
 

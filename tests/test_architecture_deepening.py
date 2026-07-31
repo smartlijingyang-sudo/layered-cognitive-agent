@@ -5,14 +5,14 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.decision import Decision, Observation, Reflection
 from lca.contracts.enums import ActionType, ReflectionVerdict, TeamProcess
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import AgentCard, TaskStatus
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.result import UnregisteredActionError
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer1_cognitive.body.action_handlers import RespondOperation
@@ -30,15 +30,15 @@ from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
 from lca.layer1_cognitive.brain.skill_router import StaticSkillRouter
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
-from lca.layer2_runtime.default_loop_judge import DefaultLoopJudge
+from lca.layer2_runtime.default_loop_judge import DefaultStopRule
 from lca.layer2_runtime.fallback_handler import FallbackActionPolicy
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer4_app.api import Agent, MultiAgentTeam
 
 
-def _state() -> TypedState:
-    return TypedState(trace_id="t", task="task", budget=Budget())
+def _state() -> AgentState:
+    return AgentState(trace_id="t", task="task", budget=Budget())
 
 
 class TestLifecycleTwins:
@@ -55,7 +55,7 @@ class TestLifecycleTwins:
 class TestDegradationFirstClass:
     async def test_unregistered_raises_typed_error(self) -> None:
         body = SimpleBody(action_registry=ActionRegistry())
-        decision = StructuredDecision(
+        decision = Decision(
             decision_id="d",
             action_type="invented",
             rationale="x",
@@ -73,7 +73,7 @@ class TestDegradationFirstClass:
             inner=SimpleBody(action_registry=registry),
             fallback_handler=FallbackActionPolicy(),
         )
-        decision = StructuredDecision(
+        decision = Decision(
             decision_id="d",
             action_type="research_plan",
             rationale="llm invented",
@@ -95,15 +95,15 @@ class TestCheckpointResume:
         store = InMemoryStateStore()
 
         class _Mem:
-            async def perceive(self, s: TypedState) -> TypedState:
+            async def perceive(self, s: AgentState) -> AgentState:
                 return s
 
-            async def update(self, s: TypedState, o: Observation, r: Reflection) -> None:
+            async def update(self, s: AgentState, o: Observation, r: Reflection) -> None:
                 return None
 
         class _Brain:
-            async def think(self, s: TypedState) -> StructuredDecision:
-                return StructuredDecision(
+            async def think(self, s: AgentState) -> Decision:
+                return Decision(
                     decision_id=new_id("d"),
                     action_type=ActionType.RESPOND,
                     rationale="done",
@@ -111,16 +111,16 @@ class TestCheckpointResume:
                     response_text="DONE",
                 )
 
-            async def reflect(self, s: TypedState, o: Observation) -> Reflection:
+            async def reflect(self, s: AgentState, o: Observation) -> Reflection:
                 return Reflection(reflection_id=new_id("r"), verdict=ReflectionVerdict.ON_TRACK)
 
         class _Body:
-            async def act(self, d: StructuredDecision, s: TypedState) -> Observation:
+            async def act(self, d: Decision, s: AgentState) -> Observation:
                 return Observation(
                     observation_id=new_id("o"), success=True, payload=d.response_text
                 )
 
-            def bind_transport(self, t: object) -> None:
+            def bind_channel(self, t: object) -> None:
                 return None
 
         rt = CognitiveRuntime(
@@ -129,7 +129,7 @@ class TestCheckpointResume:
             memory=_Mem(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
             hooks=SimpleHookRegistry(ConsoleObservability()),
             state_store=store,
-            judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
+            judge=DefaultStopRule(outcome_policy=DefaultStepOutcomePolicy()),
         )
         result = await rt.run("checkpoint me", max_steps=3)
         assert result.status == TaskStatus.COMPLETED

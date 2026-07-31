@@ -15,29 +15,29 @@ from lca.contracts.mechanisms import (
 )
 
 # ── L3 Agent / Team 入口 ──────────────────────────────────
-from lca.contracts.protocols.agent import AgentEntrypoint, TeamEntrypoint
+from lca.contracts.protocols.agent import AgentUnit, TeamUnit
 
 # ── 可选能力协议（ADR-0017）──────────────────────────────
 from lca.contracts.protocols.capabilities import (
-    ExposesComponents,
-    HookRegistryHolder,
-    RosterAware,
-    SharedStoreBindable,
-    TransportBindable,
+    AcceptsTeammates,
+    HasBrainBodyMemory,
+    HasChannel,
+    HasHooks,
+    HasSharedMemory,
 )
 
 # ── L1 认知 / Brain 协议 ─────────────────────────────────
 from lca.contracts.protocols.cognition import (
+    Brain,
     BrainFactory,
-    BrainStrategy,
     CandidateEvaluationPipeline,
-    CompletionPolicy,
     Critic,
+    DecisionGate,
     DecisionParser,
     PromptManager,
     Reasoner,
     SkillRouter,
-    SupportsCompletionGuard,
+    SupportsDecisionGate,
 )
 
 # ── L1 Body / 行动执行协议 ───────────────────────────────
@@ -60,10 +60,10 @@ from lca.contracts.protocols.memory import MemorySystem
 
 # ── L3 团队编排协议 ──────────────────────────────────────
 from lca.contracts.protocols.orchestration import (
-    OrchestrationContext,
-    OrchestrationStrategy,
     SharedMemoryStore,
     Synthesizer,
+    TeamContext,
+    TeamProcessStrategy,
 )
 
 # ── L2 Runtime 协议 ──────────────────────────────────────
@@ -73,43 +73,43 @@ from lca.contracts.protocols.runtime import Runtime, StepOutcomePolicy
 from lca.contracts.types import StepOutcome
 
 __all__ = [
-    "AgentEntrypoint",
+    "AcceptsTeammates",
     "AgentTransport",
+    "AgentUnit",
     "Body",
+    "Brain",
     "BrainFactory",
-    "BrainStrategy",
     "CandidateEvaluationPipeline",
-    "CompletionPolicy",
     "Critic",
+    "DecisionGate",
     "DecisionParser",
     "EventBus",
-    "ExposesComponents",
     "FallbackPolicy",
+    "HasBrainBodyMemory",
+    "HasChannel",
+    "HasHooks",
+    "HasSharedMemory",
     "Hook",
     "HookRegistry",
-    "HookRegistryHolder",
     "LLMAdapter",
     "MemorySystem",
     "NamedRegistryProtocol",
     "Observability",
-    "OrchestrationContext",
-    "OrchestrationStrategy",
     "PromptManager",
     "Reasoner",
-    "RosterAware",
     "Runtime",
     "SafeExecutor",
     "SharedMemoryStore",
-    "SharedStoreBindable",
     "SkillRouter",
     "StateStore",
     "StepOutcome",
     "StepOutcomePolicy",
-    "SupportsCompletionGuard",
+    "SupportsDecisionGate",
     "Synthesizer",
-    "TeamEntrypoint",
+    "TeamContext",
+    "TeamProcessStrategy",
+    "TeamUnit",
     "Tool",
     "ToolRegistry",
-    "TransportBindable",
     "TransportRegistryProtocol",
 ]

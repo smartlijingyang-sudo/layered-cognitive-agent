@@ -39,19 +39,19 @@ EXEMPT: dict[str, str] = {
         "ActionRegistryProtocol 实现，Protocol 在 contracts.action (ADR-0015/0016)"
     ),
     "lca.layer1_cognitive.body.action_handlers.RespondOperation": (
-        "ActionOperation 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+        "Action 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
     ),
     "lca.layer1_cognitive.body.action_handlers.UseToolOperation": (
-        "ActionOperation 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+        "Action 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
     ),
     "lca.layer1_cognitive.body.action_handlers.DelegateOperation": (
-        "ActionOperation 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+        "Action 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
     ),
     "lca.layer1_cognitive.body.action_handlers.HandoffOperation": (
-        "ActionOperation 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+        "Action 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
     ),
-    "lca.layer1_cognitive.team_progress.delegation_ledger.DelegationLedger": (
-        "DelegationLedgerProtocol 实现，Protocol 定义在 contracts.team_progress 而非 contracts.protocols (ADR-0015)"
+    "lca.layer1_cognitive.member_status.in_memory.InMemoryMemberStatus": (
+        "MemberStatus 实现，Protocol 定义在 contracts.member_status 而非 contracts.protocols (ADR-0015)"
     ),
     "lca.layer3_agent.orchestration_strategies.graph.strategy.GraphExecutionState": (
         "BFS 执行状态 dataclass，纯内部数据结构，非可插拔组件"
@@ -62,8 +62,14 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.brain.default_factory.SimpleBrainFactory": (
         "BrainFactory Protocol 可调用实现 (ADR-0021)"
     ),
-    "lca.layer3_agent.supervisor_role.SupervisionCapabilities": (
+    "lca.layer3_agent.supervisor_role.SupervisorSetup": (
         "Supervisor 能力清单 dataclass，纯值对象，非可插拔组件"
+    ),
+    "lca.layer1_cognitive.brain.decision_gates.must_consult_all.MustConsultAllMembers": (
+        "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0016)"
+    ),
+    "lca.layer2_runtime.default_loop_judge.DefaultStopRule": (
+        "StopRule 实现，Protocol 在 contracts.stop (ADR-0015)"
     ),
 }
 
@@ -84,11 +90,21 @@ def _collect_protocol_classes() -> set[type]:
     import lca.contracts.action as action_mod
     import lca.contracts.loop_judge as loop_judge_mod
     import lca.contracts.mechanisms as mechanisms_mod
+    import lca.contracts.member_status as member_status_mod
     import lca.contracts.protocols as protocols_mod
+    import lca.contracts.stop as stop_mod
     import lca.contracts.team_progress as team_progress_mod
 
     result: set[type] = set()
-    for mod in (protocols_mod, action_mod, mechanisms_mod, team_progress_mod, loop_judge_mod):
+    for mod in (
+        protocols_mod,
+        action_mod,
+        mechanisms_mod,
+        team_progress_mod,
+        member_status_mod,
+        loop_judge_mod,
+        stop_mod,
+    ):
         for _name, obj in inspect.getmembers(mod, inspect.isclass):
             if getattr(obj, "_is_protocol", False) and obj.__module__.startswith("lca.contracts"):
                 result.add(obj)

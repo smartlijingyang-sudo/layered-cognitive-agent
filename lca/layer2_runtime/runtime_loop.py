@@ -1,6 +1,6 @@
 """CognitiveRuntime —— 核心认知循环（ADR-0002）。
 Loop 只做编排：perceive → think → act → reflect → record → checkpoint → judge。
-终止判定完全委托给 LoopJudge，业务逻辑零泄漏。
+终止判定完全委托给 StopRule，业务逻辑零泄漏。
 L2 层职责：
     将 Brain（认知）、Body（执行）、Memory（记忆）三大能力
     串联为可中断、可恢复、可观测的闭环。所有横切关注点
@@ -15,20 +15,20 @@ from lca.contracts.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.loop_judge import LoopJudge, TerminationReason
+from lca.contracts.loop_judge import StopReason, StopRule
 from lca.contracts.mechanisms import HookRegistry
+from lca.contracts.member_status import MemberStatus
 from lca.contracts.protocols import (
     Body,
-    BrainStrategy,
-    CompletionPolicy,
+    Brain,
+    DecisionGate,
     MemorySystem,
     Runtime,
     StateStore,
-    SupportsCompletionGuard,
+    SupportsDecisionGate,
 )
 from lca.contracts.result import ApprovalPendingError, BudgetExceededError, Result
-from lca.contracts.state import StateSnapshot, TypedState
-from lca.contracts.team_progress import DelegationLedgerProtocol
+from lca.contracts.state import AgentState, StateSnapshot
 from lca.contracts.types import Turn
 
 _logger = logging.getLogger(__name__)
@@ -38,17 +38,17 @@ class CognitiveRuntime(Runtime):
     """核心认知循环实现（ADR-0002）。
     将 Brain（认知）、Body（执行）、Memory（记忆）串联为
     perceive → think → act → reflect 闭环。
-    终止判定完全委托给 LoopJudge，本类不含业务逻辑。
+    终止判定完全委托给 StopRule，本类不含业务逻辑。
     """
 
     def __init__(
         self,
-        brain: BrainStrategy,
+        brain: Brain,
         body: Body,
         memory: MemorySystem,
         hooks: HookRegistry,
         state_store: StateStore,
-        judge: LoopJudge,
+        judge: StopRule,
     ) -> None:
         self.brain = brain
         self.body = body
@@ -62,18 +62,23 @@ class CognitiveRuntime(Runtime):
         task: str,
         max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = None,
-        team_progress: DelegationLedgerProtocol | None = None,
-        **context: str,
+        member_status: MemberStatus | None = None,
+        *,
+        agent_role: str = "",
+        from_role: str = "",
+        trace_id: str = "",
+        **_extra: str,
     ) -> Result:
-        state = TypedState(
-            trace_id=new_id("trace"),
+        del _extra
+        state = AgentState(
+            trace_id=trace_id or new_id("trace"),
             task=task,
             budget=create_budget(
                 max_steps=max_steps, max_wall_clock_seconds=max_wall_clock_seconds
             ),
-            agent_role=context.get("agent_role", ""),
-            delegated_by=context.get("delegated_by", ""),
-            team_progress=team_progress,
+            agent_role=agent_role,
+            from_role=from_role,
+            member_status=member_status,
         )
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
@@ -90,7 +95,7 @@ class CognitiveRuntime(Runtime):
             state.working_memory["resume_input"] = input
         return await self._loop(state, max_steps)
 
-    async def _loop(self, state: TypedState, max_steps: int) -> Result:
+    async def _loop(self, state: AgentState, max_steps: int) -> Result:
         """执行 perceive → think → act → reflect 认知主循环。
         循环流程：
             1. perceive — 感知环境、检索记忆
@@ -99,7 +104,7 @@ class CognitiveRuntime(Runtime):
             4. reflect  — 反思结果、判定质量
             5. record   — 追加 Turn 到历史、更新多层记忆
             6. checkpoint — 持久化状态快照
-            7. judge    — 委托 LoopJudge 决定是否终止
+            7. judge    — 委托 StopRule 决定是否终止
         """
         decision = observation = reflection = None
         for step in range(state.step, max_steps):
@@ -153,7 +158,7 @@ class CognitiveRuntime(Runtime):
             # ── Phase 7: Judge ──
             signal = self.judge.judge(state, decision, observation, reflection)
             if signal.should_stop:
-                if signal.reason == TerminationReason.BUDGET_EXCEEDED:
+                if signal.reason == StopReason.BUDGET_EXCEEDED:
                     await self.hooks.trigger("on_error", state, error=BudgetExceededError())
                 if signal.status is not None:
                     state.status = signal.status
@@ -162,14 +167,14 @@ class CognitiveRuntime(Runtime):
         return self._summarize(state)
 
     async def _checkpoint(
-        self, state: TypedState, reason: SnapshotReason = SnapshotReason.PERIODIC
+        self, state: AgentState, reason: SnapshotReason = SnapshotReason.PERIODIC
     ) -> StateSnapshot:
         snap = state.snapshot(reason=reason)
         ref = await self.state_store.save(state)
         snap.state_ref = ref
         return snap
 
-    def _summarize(self, state: TypedState) -> Result:
+    def _summarize(self, state: AgentState) -> Result:
         final_ref = f"mem://{state.trace_id}/{state.step}"
         status = TaskStatus.COMPLETED if state.status == TaskStatus.WORKING else state.status
         return Result(
@@ -184,15 +189,15 @@ class CognitiveRuntime(Runtime):
             error=state.last_error,
         )
 
-    def install_completion_guard(self, policy: CompletionPolicy) -> None:
+    def install_decision_gate(self, policy: DecisionGate) -> None:
         """委托 Brain 自管内部评估管线，安装确定性收尾 guardrail。
         通过结构化 isinstance 探测能力，而非 hasattr 字符串猜测：
         不支持时必须显式报错，避免调用方以为 guardrail 已生效、
         实际却被静默跳过。
         """
-        if not isinstance(self.brain, SupportsCompletionGuard):
+        if not isinstance(self.brain, SupportsDecisionGate):
             raise TypeError(
-                f"{type(self.brain).__name__} 未实现 SupportsCompletionGuard，"
+                f"{type(self.brain).__name__} 未实现 SupportsDecisionGate，"
                 "无法安装 completion guard"
             )
-        self.brain.install_completion_guard(policy)
+        self.brain.install_decision_gate(policy)

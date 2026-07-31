@@ -8,7 +8,7 @@ from lca.contracts.decision import Observation, Reflection
 from lca.contracts.ids import new_id
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols import MemorySystem, SharedMemoryStore
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 _DEFAULT_MAX_WORKING = 20
 _DEFAULT_MAX_EPISODIC = 50
@@ -30,7 +30,7 @@ class SimpleMemorySystem(MemorySystem):
             "procedural": [],
         }
 
-    def bind_shared_store(self, store: SharedMemoryStore) -> None:
+    def bind_shared_memory(self, store: SharedMemoryStore) -> None:
         """绑定团队共享记忆存储。共享层的数据读写委托给 store。"""
         self._shared_store = store
 
@@ -45,7 +45,7 @@ class SimpleMemorySystem(MemorySystem):
         else:
             self._private_layers[layer].append(record)
 
-    async def perceive(self, state: TypedState) -> TypedState:
+    async def perceive(self, state: AgentState) -> AgentState:
         records: list[MemoryRecord] = []
         for layer_name in self._private_layers:
             records.extend(self._get_layer_records(layer_name))
@@ -53,7 +53,7 @@ class SimpleMemorySystem(MemorySystem):
         return state
 
     async def update(
-        self, state: TypedState, observation: Observation, reflection: Reflection
+        self, state: AgentState, observation: Observation, reflection: Reflection
     ) -> None:
         if observation.payload is not None and observation.success:
             # 追加到 working memory 而非覆盖，确保多步委派历史对 agent 可见

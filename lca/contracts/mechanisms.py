@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, runtime_checkable
 
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 
 @runtime_checkable
@@ -30,7 +30,7 @@ class EventBus(Protocol):
 class Hook(Protocol):
     """生命周期钩子：接收事件名 + 当前状态，执行横切副作用。"""
 
-    async def __call__(self, event_name: str, state: TypedState, **kwargs: Any) -> None: ...
+    async def __call__(self, event_name: str, state: AgentState, **kwargs: Any) -> None: ...
 
 
 @runtime_checkable
@@ -38,7 +38,7 @@ class HookRegistry(Protocol):
     """钩子注册表：按事件名注册和触发 Hook。"""
 
     def register(self, event_name: str, hook: Hook) -> None: ...
-    async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> None: ...
+    async def trigger(self, event_name: str, state: AgentState, **kwargs: Any) -> None: ...
 
 
 @runtime_checkable

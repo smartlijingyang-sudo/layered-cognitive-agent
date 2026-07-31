@@ -10,10 +10,10 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.protocols import (
-    AgentEntrypoint,
     AgentTransport,
+    AgentUnit,
     Body,
-    BrainStrategy,
+    Brain,
     Critic,
     DecisionParser,
     EventBus,
@@ -27,7 +27,7 @@ from lca.contracts.protocols import (
     Runtime,
     SafeExecutor,
     StateStore,
-    TeamEntrypoint,
+    TeamUnit,
     Tool,
     ToolRegistry,
 )
@@ -62,7 +62,7 @@ from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_loggi
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
 # L2
-from lca.layer2_runtime.default_loop_judge import DefaultLoopJudge
+from lca.layer2_runtime.default_loop_judge import DefaultStopRule
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStepOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
@@ -144,7 +144,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
             critic=SimpleCritic(),
             evaluation_pipeline=SimpleCandidateEvaluationPipeline(),
         )
-        self.assertIsInstance(brain, BrainStrategy)
+        self.assertIsInstance(brain, Brain)
 
     def test_simple_reasoner(self):
         reasoner = self._build_brain_deps()
@@ -225,7 +225,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
             SimpleMemorySystem(),
             SimpleHookRegistry(obs),
             InMemoryStateStore(),
-            judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
+            judge=DefaultStopRule(outcome_policy=DefaultStepOutcomePolicy()),
         )
         self.assertIsInstance(runtime, Runtime)
 
@@ -233,7 +233,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
 class TestL3ProtocolCompliance(unittest.TestCase):
     """L3 Agent 层。"""
 
-    def _build_base_agent(self):
+    def _build_agent(self):
         from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 
         llm = MockLLMAdapter()
@@ -263,36 +263,36 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             SimpleMemorySystem(),
             SimpleHookRegistry(obs),
             InMemoryStateStore(),
-            judge=DefaultLoopJudge(outcome_policy=DefaultStepOutcomePolicy()),
+            judge=DefaultStopRule(outcome_policy=DefaultStepOutcomePolicy()),
         )
         return BaseAgent(runtime, rp), rp, runtime
 
-    def test_base_agent_is_agent_runtime(self):
-        agent, _, _ = self._build_base_agent()
-        self.assertIsInstance(agent, AgentEntrypoint)
+    def test_agent_is_agent_runtime(self):
+        agent, _, _ = self._build_agent()
+        self.assertIsInstance(agent, AgentUnit)
 
     def test_supervisor_is_agent_runtime(self):
-        _, rp, runtime = self._build_base_agent()
+        _, rp, runtime = self._build_agent()
         sup = BaseAgent(runtime, rp, max_steps=20, max_wall_clock_seconds=300)
-        self.assertIsInstance(sup, AgentEntrypoint)
+        self.assertIsInstance(sup, AgentUnit)
 
     def test_team_orchestrator_is_team_runtime(self):
         from lca.contracts.role_team import TeamConfig
         from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 
-        agent, _rp, _runtime = self._build_base_agent()
+        agent, _rp, _runtime = self._build_agent()
         config = TeamConfig(process="sequential")
         orchestrator = TeamOrchestrator([agent], config)
-        self.assertIsInstance(orchestrator, TeamEntrypoint)
+        self.assertIsInstance(orchestrator, TeamUnit)
 
 
-class TestStrategyRegistryIntegration(unittest.TestCase):
-    """验证 StrategyRegistry 动态选择 Brain 策略。"""
+class TestBrainFactoryRegistryIntegration(unittest.TestCase):
+    """验证 BrainFactoryRegistry 动态选择 Brain 策略。"""
 
     def test_default_strategy_registered(self):
-        from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
+        from lca.layer2_runtime.strategy_registry import get_global_brain_factory_registry
 
-        reg = get_global_strategy_registry()
+        reg = get_global_brain_factory_registry()
         self.assertIn("default", reg.list_strategies())
 
     def test_agent_with_string_strategy(self):
@@ -311,11 +311,11 @@ class TestStrategyRegistryIntegration(unittest.TestCase):
 
     def test_agent_with_custom_strategy(self):
         from lca.contracts.decision import Reflection
-        from lca.contracts.state import TypedState
+        from lca.contracts.state import AgentState
         from lca.layer4_app.api import Agent
 
-        class StubBrain(BrainStrategy):
-            async def think(self, state: TypedState):
+        class StubBrain(Brain):
+            async def think(self, state: AgentState):
                 return SimpleDecisionParser().parse(
                     '{"action_type":"respond","response_text":"stub","confidence":1.0}',
                     state,

@@ -59,13 +59,13 @@ class TestSupervisorWallClockPropagation(unittest.TestCase):
     def test_supervisor_wall_clock_preserved(self) -> None:
         from unittest.mock import MagicMock
 
-        from lca.layer3_agent.simple_agent import SimpleAgent
+        from lca.layer3_agent.simple_agent import CognitiveAgent
         from lca.layer4_app.assembly import _promote_supervisor
 
         runtime = MagicMock()
         role_profile = MagicMock()
         role_profile.role = "lead"
-        supervisor = SimpleAgent(runtime, role_profile, max_steps=10, max_wall_clock_seconds=900)
+        supervisor = CognitiveAgent(runtime, role_profile, max_steps=10, max_wall_clock_seconds=900)
         promoted = _promote_supervisor(supervisor)
         self.assertEqual(promoted.max_wall_clock_seconds, 900)
         self.assertEqual(promoted.max_steps, 20)
@@ -100,6 +100,54 @@ class TestAdrIndexMatchesFilesystem(unittest.TestCase):
             extra_in_readme,
             f"README 索引指向不存在的 ADR: {sorted(extra_in_readme)}",
         )
+
+
+class TestProgressiveDisclosureVocabulary(unittest.TestCase):
+    """Primary production names follow progressive-disclosure vocabulary."""
+
+    def test_agent_state_uses_member_status_not_progress_text(self) -> None:
+        from lca.contracts.state import AgentState, Budget
+        from lca.layer1_cognitive.member_status import InMemoryMemberStatus
+
+        board = InMemoryMemberStatus(required_roles=frozenset({"a"}))
+        state = AgentState(trace_id="t", task="x", budget=Budget(), member_status=board)
+        self.assertTrue(hasattr(state, "member_status"))
+        self.assertFalse(hasattr(state, "team_progress"))
+        self.assertFalse(hasattr(state, "team_progress_text"))
+        self.assertIn("a", board.as_prompt_text())
+
+    def test_public_api_uses_run_and_assemble_agent(self) -> None:
+        api = (_PROJECT_ROOT / "lca" / "layer4_app" / "api.py").read_text(encoding="utf-8")
+        assembly = (_PROJECT_ROOT / "lca" / "layer4_app" / "assembly.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("assemble_agent", api)
+        self.assertNotIn("assemble_base_agent", api)
+        self.assertIn("async def run", api)
+        self.assertIn("def assemble_agent", assembly)
+        self.assertIn("await self._agent.run", api)
+
+    def test_must_consult_all_rewrites_early_respond(self) -> None:
+        import asyncio
+
+        from lca.contracts.decision import Decision
+        from lca.contracts.state import AgentState, Budget
+        from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
+        from lca.layer1_cognitive.member_status import InMemoryMemberStatus
+
+        board = InMemoryMemberStatus(required_roles=frozenset({"analyst"}))
+        state = AgentState(trace_id="t", task="ship", budget=Budget(), member_status=board)
+        decision = Decision(
+            decision_id="d1",
+            action_type="respond",
+            rationale="done",
+            confidence=1.0,
+            response_text="final",
+        )
+        out = asyncio.run(MustConsultAllMembers().enforce(state, decision))
+        self.assertEqual(out.action_type, "delegate")
+        assert out.delegate_to is not None
+        self.assertEqual(out.delegate_to.target_role, "analyst")
 
 
 if __name__ == "__main__":

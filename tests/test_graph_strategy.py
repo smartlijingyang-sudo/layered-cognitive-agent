@@ -15,7 +15,7 @@ from lca.contracts.graph import (
     GraphNode,
     GraphValidationError,
 )
-from lca.contracts.protocols import OrchestrationContext
+from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import Budget
@@ -188,7 +188,7 @@ class TestGraphStrategyLinearExecution(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="writer", target="exit"))
 
         strategy = GraphStrategy(execution_graph=graph)
-        context = OrchestrationContext(members=[agent_a, agent_w])
+        context = TeamContext(members=[agent_a, agent_w])
 
         result = await strategy.run(context, "write a report")
 
@@ -197,7 +197,7 @@ class TestGraphStrategyLinearExecution(unittest.IsolatedAsyncioTestCase):
 
     async def test_no_graph_raises_value_error(self) -> None:
         strategy = GraphStrategy()
-        context = OrchestrationContext(members=[])
+        context = TeamContext(members=[])
         with self.assertRaises(ValueError):
             await strategy.run(context, "task")
 
@@ -228,7 +228,7 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="reviewer", target="exit"))
 
         strategy = GraphStrategy(execution_graph=graph)
-        context = OrchestrationContext(members=[agent_a, agent_b])
+        context = TeamContext(members=[agent_a, agent_b])
 
         result = await strategy.run(context, "task")
 
@@ -259,7 +259,7 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="skip_me", target="exit"))
 
         strategy = GraphStrategy(execution_graph=graph)
-        context = OrchestrationContext(members=[agent_a, agent_s])
+        context = TeamContext(members=[agent_a, agent_s])
 
         result = await strategy.run(context, "task")
 
@@ -287,7 +287,7 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="c", target="exit"))
 
         strategy = GraphStrategy(execution_graph=graph)
-        context = OrchestrationContext(members=[agent_b, agent_c])
+        context = TeamContext(members=[agent_b, agent_c])
 
         result = await strategy.run(context, "task")
 
@@ -324,7 +324,7 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="c", target="exit"))
 
         strategy = GraphStrategy(execution_graph=graph)
-        context = OrchestrationContext(members=[agent_b, agent_c])
+        context = TeamContext(members=[agent_b, agent_c])
 
         start = asyncio.get_event_loop().time()
         await strategy.run(context, "task")

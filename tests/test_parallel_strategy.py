@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import OrchestrationContext
+from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
@@ -53,7 +53,7 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("trace-b", "result-b", delay=0.05)
 
         strategy = ParallelStrategy()
-        context = OrchestrationContext(members=[agent_a, agent_b])
+        context = TeamContext(members=[agent_a, agent_b])
 
         result = await strategy.run(context, "test objective")
 
@@ -68,14 +68,14 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_c = _make_agent("trace-c", "third")
 
         strategy = ParallelStrategy()
-        context = OrchestrationContext(members=[agent_a, agent_b, agent_c])
+        context = TeamContext(members=[agent_a, agent_b, agent_c])
 
         result = await strategy.run(context, "task")
         self.assertEqual(result.output, "third")
 
     async def test_parallel_empty_members_returns_failed(self) -> None:
         strategy = ParallelStrategy()
-        context = OrchestrationContext(members=[])
+        context = TeamContext(members=[])
 
         result = await strategy.run(context, "task")
         self.assertEqual(result.status, "failed")
@@ -84,7 +84,7 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
     async def test_parallel_single_member(self) -> None:
         agent = _make_agent("trace-only", "solo-result")
         strategy = ParallelStrategy()
-        context = OrchestrationContext(members=[agent])
+        context = TeamContext(members=[agent])
 
         result = await strategy.run(context, "solo task")
         self.assertEqual(result.output, "solo-result")
@@ -100,7 +100,7 @@ class TestParallelStrategyConcurrency(unittest.IsolatedAsyncioTestCase):
         agent_c = _make_agent("trace-c", "c", delay=delay)
 
         strategy = ParallelStrategy()
-        context = OrchestrationContext(members=[agent_a, agent_b, agent_c])
+        context = TeamContext(members=[agent_a, agent_b, agent_c])
 
         start = asyncio.get_event_loop().time()
         await strategy.run(context, "task")
@@ -143,7 +143,7 @@ class TestParallelStrategyTraceIsolation(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_tracked_agent("trace-beta")
 
         strategy = ParallelStrategy()
-        context = OrchestrationContext(members=[agent_a, agent_b])
+        context = TeamContext(members=[agent_a, agent_b])
         await strategy.run(context, "task")
 
         self.assertEqual(set(traces_seen), {"trace-alpha", "trace-beta"})

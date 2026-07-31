@@ -16,13 +16,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.contracts.decision import Observation, Reflection
 from lca.contracts.enums import ReflectionVerdict
 from lca.contracts.memory import MemoryRecord
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 
 
-def _make_state(trace_id: str = "trace-1") -> TypedState:
-    return TypedState(trace_id=trace_id, task="test", budget=Budget())
+def _make_state(trace_id: str = "trace-1") -> AgentState:
+    return AgentState(trace_id=trace_id, task="test", budget=Budget())
 
 
 def _make_observation(success: bool = True, payload: str = "ok") -> Observation:
@@ -103,8 +103,8 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore(["semantic"])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a.bind_shared_store(store)
-        mem_b.bind_shared_store(store)
+        mem_a.bind_shared_memory(store)
+        mem_b.bind_shared_memory(store)
 
         record = _make_semantic_record("shared-knowledge")
         mem_a.write_shared_record("semantic", record)
@@ -117,8 +117,8 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore(["procedural"])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a.bind_shared_store(store)
-        mem_b.bind_shared_store(store)
+        mem_a.bind_shared_memory(store)
+        mem_b.bind_shared_memory(store)
 
         record = MemoryRecord(
             record_id="proc-1",
@@ -136,8 +136,8 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore(["semantic", "procedural"])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a.bind_shared_store(store)
-        mem_b.bind_shared_store(store)
+        mem_a.bind_shared_memory(store)
+        mem_b.bind_shared_memory(store)
 
         mem_a.write_shared_record("semantic", _make_semantic_record("fact-1"))
         mem_a.write_shared_record(
@@ -163,8 +163,8 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore(["semantic"])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a.bind_shared_store(store)
-        mem_b.bind_shared_store(store)
+        mem_a.bind_shared_memory(store)
+        mem_b.bind_shared_memory(store)
 
         # 通过 update 触发 episodic 写入
         await mem_a.update(_make_state("trace-a"), _make_observation(), _make_reflection())
@@ -182,8 +182,8 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore(["semantic"])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a.bind_shared_store(store)
-        mem_b.bind_shared_store(store)
+        mem_a.bind_shared_memory(store)
+        mem_b.bind_shared_memory(store)
 
         await mem_a.update(
             _make_state("trace-a"),
@@ -202,7 +202,7 @@ class TestWriteSharedRecordGuard(unittest.TestCase):
     def test_write_to_unshared_layer_raises(self) -> None:
         mem = SimpleMemorySystem()
         store = TeamSharedMemoryStore(["semantic"])
-        mem.bind_shared_store(store)
+        mem.bind_shared_memory(store)
 
         with self.assertRaises(KeyError):
             mem.write_shared_record("episodic", _make_semantic_record("x"))

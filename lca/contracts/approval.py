@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from lca.contracts.decision import StructuredDecision
+from lca.contracts.decision import Decision
 
 
 def _now() -> datetime:
@@ -15,13 +15,13 @@ def _now() -> datetime:
 
 @dataclass
 class ApprovalRequest:
-    """人工审批请求：携带待审批的 StructuredDecision 及上下文。"""
+    """人工审批请求：携带待审批的 Decision 及上下文。"""
 
     request_id: str
     trace_id: str
     step: int
     risk_reason: str
-    pending_decision: StructuredDecision
+    pending_decision: Decision
     created_at: datetime = field(default_factory=_now)
     extra: dict[str, Any] = field(default_factory=dict)
 

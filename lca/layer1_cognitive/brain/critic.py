@@ -14,7 +14,7 @@ from lca.contracts.semantic_keys import (
     FAILURE_KIND_TRANSIENT,
     FAILURE_KIND_VALIDATION,
 )
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 _FAILURE_KIND_HINT: dict[str, str] = {
     FAILURE_KIND_VALIDATION: "参数不合法，请重复同一动作，须修正参数后重新调用",
@@ -26,7 +26,7 @@ _FAILURE_KIND_HINT: dict[str, str] = {
 class SimpleCritic(Critic):
     """基于执行结果生成反思。"""
 
-    async def critique(self, state: TypedState, observation: Observation) -> Reflection:
+    async def critique(self, state: AgentState, observation: Observation) -> Reflection:
         if observation.success:
             return Reflection(
                 reflection_id=new_id("refl"),

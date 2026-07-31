@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 
 class NodeType(str, Enum):
@@ -34,7 +34,7 @@ class EdgeType(str, Enum):
     PARALLEL = "parallel"
 
 
-ConditionFn = Callable[[TypedState], bool]
+ConditionFn = Callable[[AgentState], bool]
 
 
 class GraphValidationError(Exception):

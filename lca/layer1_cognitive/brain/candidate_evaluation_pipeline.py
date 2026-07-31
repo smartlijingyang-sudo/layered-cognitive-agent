@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import structlog
 
-from lca.contracts.decision import StructuredDecision
-from lca.contracts.protocols import CandidateEvaluationPipeline, CompletionPolicy
-from lca.contracts.state import TypedState
+from lca.contracts.decision import Decision
+from lca.contracts.protocols import CandidateEvaluationPipeline, DecisionGate
+from lca.contracts.state import AgentState
 
 _log = structlog.get_logger("lca.candidate_evaluation_pipeline")
 
@@ -27,14 +27,14 @@ class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
     - evaluate: predict → score → conflict check → arbitrate 全内联
     """
 
-    async def decompose(self, state: TypedState) -> list[str]:
+    async def decompose(self, state: AgentState) -> list[str]:
         return [state.task]
 
     async def evaluate(
         self,
-        state: TypedState,
-        candidates: list[StructuredDecision],
-    ) -> StructuredDecision:
+        state: AgentState,
+        candidates: list[Decision],
+    ) -> Decision:
         conflicts = self._check_conflicts(candidates)
         if conflicts:
             _log.warning("conflicts_detected", conflicts=conflicts)
@@ -42,7 +42,7 @@ class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
         return candidates[best_idx]
 
     @staticmethod
-    def _check_conflicts(candidates: list[StructuredDecision]) -> list[str]:
+    def _check_conflicts(candidates: list[Decision]) -> list[str]:
         """Content-aware conflict detection among candidate decisions.
 
         Detects disagreements by comparing response text/rationale and action types.
@@ -63,7 +63,7 @@ class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
 
 
 class GuardedCandidateEvaluationPipeline(CandidateEvaluationPipeline):
-    """评估管线的装饰器：在 evaluate 结果上叠加 CompletionPolicy guardrail。
+    """评估管线的装饰器：在 evaluate 结果上叠加 DecisionGate guardrail。
 
     开闭原则应用——不修改内层管线，只在外部包裹策略校验。
     """
@@ -71,18 +71,18 @@ class GuardedCandidateEvaluationPipeline(CandidateEvaluationPipeline):
     def __init__(
         self,
         inner: CandidateEvaluationPipeline,
-        policy: CompletionPolicy,
+        policy: DecisionGate,
     ) -> None:
         self._inner = inner
         self._policy = policy
 
-    async def decompose(self, state: TypedState) -> list[str]:
+    async def decompose(self, state: AgentState) -> list[str]:
         return await self._inner.decompose(state)
 
     async def evaluate(
         self,
-        state: TypedState,
-        candidates: list[StructuredDecision],
-    ) -> StructuredDecision:
+        state: AgentState,
+        candidates: list[Decision],
+    ) -> Decision:
         decision = await self._inner.evaluate(state, candidates)
         return await self._policy.enforce(state, decision)

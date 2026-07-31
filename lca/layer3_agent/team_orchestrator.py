@@ -1,66 +1,48 @@
-"""TeamOrchestrator —— 管理团队的组织形态与通信信道。
-
-L3 层职责：
-    作为团队级组合根，TeamOrchestrator 负责：
-    1. 通过 OrchestrationStrategyRegistry 解析编排策略（注册表模式，无 if/elif）
-    2. 注入共享记忆（SharedStoreBindable 单路径，ADR-0016）
-    3. 绑定 Supervisor 的全部能力（transport / roster / hooks / guard）
-       —— supervisor 是组合期角色，不是独立类型
-    所有策略分发委托给 OrchestrationStrategy 实现，L3 不含业务逻辑。
-"""
+"""TeamOrchestrator — team shape, channel, and process strategy."""
 
 from __future__ import annotations
 
 from typing import cast
 
-from lca.contracts.enums import CompletionPolicyName
+from lca.contracts.enums import DecisionGateName
+from lca.contracts.member_status import MemberStatus
 from lca.contracts.message import AgentMessage, agent_message_as_text
 from lca.contracts.protocols import (
     AgentTransport,
-    OrchestrationContext,
-    OrchestrationStrategy,
     SharedMemoryStore,
-    TeamEntrypoint,
+    TeamContext,
+    TeamProcessStrategy,
+    TeamUnit,
 )
-from lca.contracts.protocols.capabilities import (
-    ExposesComponents,
-    SharedStoreBindable,
-)
-from lca.contracts.protocols.cognition import CompletionPolicy
+from lca.contracts.protocols.capabilities import HasBrainBodyMemory, HasSharedMemory
+from lca.contracts.protocols.cognition import DecisionGate
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
-from lca.contracts.team_progress import DelegationLedgerProtocol
 from lca.layer0_infra.component_registry import get_global_registry
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
-from lca.layer3_agent.simple_agent import SimpleAgent
-from lca.layer3_agent.supervisor_role import SupervisionCapabilities, apply_supervision
+from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.supervisor_role import SupervisorSetup, apply_supervisor_setup
 
 
-class TeamOrchestrator(TeamEntrypoint):
-    """
-    支持多种组织形态（hierarchical / sequential / parallel / graph / debate），
-    通过 OrchestrationStrategyRegistry 解析策略，不再 if/elif 硬编码。
-
-    共享记忆通过 SharedStoreBindable 单路径注入（ADR-0016）：
-    MemorySystem 层级共享，Agent 通过 perceive/update/query 统一访问。
-    """
+class TeamOrchestrator(TeamUnit):
+    """Resolve process strategy, inject shared memory, bind supervisor setup."""
 
     def __init__(
         self,
-        members: list[SimpleAgent],
+        members: list[CognitiveAgent],
         config: TeamConfig,
-        supervisor: SimpleAgent | None = None,
+        supervisor: CognitiveAgent | None = None,
         transport: AgentTransport | None = None,
-        roster_desc: str = "",
-        strategy: OrchestrationStrategy | None = None,
+        teammates_text: str = "",
+        strategy: TeamProcessStrategy | None = None,
         team_id: str = "",
     ) -> None:
         self.members = members
         self.config = config
         self.supervisor = supervisor
         self.transport = transport
-        self.roster_desc = roster_desc
+        self.teammates_text = teammates_text
         self.team_id = team_id or f"team-{config.process}"
 
         if strategy is not None:
@@ -72,73 +54,65 @@ class TeamOrchestrator(TeamEntrypoint):
         self._shared_store: SharedMemoryStore | None = None
         if config.shared_memory_layers:
             self._shared_store = TeamSharedMemoryStore(config.shared_memory_layers)
-            self._inject_shared_store()
+            self._inject_shared_memory()
 
-        # ── 组合期：创建 ledger + 绑定 supervisor 全部能力 ──
-        team_progress: DelegationLedgerProtocol | None = None
+        member_status: MemberStatus | None = None
         if supervisor is not None:
-            team_progress = self._create_ledger(members)
-            policy = self._resolve_completion_policy(config)
-            caps = SupervisionCapabilities(
-                transport=transport,
-                roster_desc=roster_desc,
-                ledger=team_progress,
-                completion_policy=policy,
+            member_status = self._create_member_status(members)
+            policy = self._resolve_decision_gate(config)
+            setup = SupervisorSetup(
+                channel=transport,
+                teammates_text=teammates_text,
+                member_status=member_status,
+                decision_gate=policy,
             )
-            apply_supervision(supervisor, caps)
+            apply_supervisor_setup(supervisor, setup)
 
-        self._context = OrchestrationContext(
+        self._context = TeamContext(
             members=members,
             config=config,
             supervisor=supervisor,
             transport=transport,
-            roster_desc=roster_desc,
-            team_progress=team_progress,
+            teammates_text=teammates_text,
+            member_status=member_status,
             team_id=self.team_id,
             shared_memory=self._shared_store,
         )
 
-    # ── 组合期绑定 ──────────────────────────────────────────
-
     @staticmethod
-    def _create_ledger(members: list[SimpleAgent]) -> DelegationLedgerProtocol:
-        """从全局注册表解析 DelegationLedger 并实例化。"""
-        mandatory_roles = frozenset(m.role_profile.role for m in members)
+    def _create_member_status(members: list[CognitiveAgent]) -> MemberStatus:
+        required_roles = frozenset(m.role_profile.role for m in members)
         reg = get_global_registry()
-        ledger_cls = reg.require("delegation_ledger", "default")
-        return cast("DelegationLedgerProtocol", ledger_cls(mandatory_roles=mandatory_roles))
+        # registry key kept for one cycle; value is InMemoryMemberStatus factory
+        cls = reg.require("member_status", "default")
+        try:
+            return cast("MemberStatus", cls(required_roles=required_roles))
+        except Exception:
+            cls = reg.require("delegation_ledger", "default")
+            return cast("MemberStatus", cls(required_roles=required_roles))
 
     @staticmethod
-    def _resolve_completion_policy(config: TeamConfig) -> CompletionPolicy | None:
-        """从全局注册表解析 completion policy 工厂并实例化。"""
-        policy_name = config.completion_policy if config else CompletionPolicyName.ROSTER_COVERAGE
-        if policy_name == CompletionPolicyName.NONE:
+    def _resolve_decision_gate(config: TeamConfig) -> DecisionGate | None:
+        policy_name = config.decision_gate if config else DecisionGateName.MUST_CONSULT_ALL
+        if policy_name == DecisionGateName.NONE:
             return None
         reg = get_global_registry()
-        policy_factory = reg.require("completion_policy", policy_name)
-        return cast("CompletionPolicy", policy_factory())
+        try:
+            factory = reg.require("decision_gate", policy_name)
+        except Exception:
+            factory = reg.require("completion_policy", policy_name)
+        return cast("DecisionGate", factory())
 
-    # ── 共享记忆 ────────────────────────────────────────────
-
-    def _inject_shared_store(self) -> None:
-        """将共享 store 通过 SharedStoreBindable 协议分发给每个成员。"""
+    def _inject_shared_memory(self) -> None:
         if self._shared_store is None:
             return
         for member in self.members:
-            if isinstance(member.runtime, ExposesComponents):
+            if isinstance(member.runtime, HasBrainBodyMemory):
                 memory = member.runtime.memory
-                if isinstance(memory, SharedStoreBindable):
-                    memory.bind_shared_store(self._shared_store)
+                if isinstance(memory, HasSharedMemory):
+                    memory.bind_shared_memory(self._shared_store)
 
-    # ── 执行入口 ────────────────────────────────────────────
-
-    async def run(
-        self,
-        objective: str | object,
-        ctx: object | None = None,
-    ) -> Result:
-        """按 TeamConfig.process 类型选择组织形态执行：dispatch 语义由 strategy 承担。"""
-        del ctx  # InvocationContext 预留
+    async def run(self, objective: str | object) -> Result:
         text = (
             agent_message_as_text(objective)
             if isinstance(objective, AgentMessage)

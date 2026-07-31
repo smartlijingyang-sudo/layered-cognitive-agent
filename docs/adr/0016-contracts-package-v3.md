@@ -5,7 +5,7 @@ Accepted
 
 ## 背景
 `lca/contracts/protocols.py` 已膨胀为 30+ Protocol 的枢纽文件，跨层类型与机制类混放，
-读者无法从路径判断"这是哪一层契约"。`docs/contracts-agent-refactor.md` 提出了一套
+读者无法从路径判断"这是哪一层契约"。原 `docs/contracts-agent-refactor.md`（已清理）提出了一套
 完整的拆包与多 agent 补齐方案，但部分建议与本仓库既有 ADR 冲突：
 
 | 重构文档建议 | 冲突点 | 本 ADR 决策 |

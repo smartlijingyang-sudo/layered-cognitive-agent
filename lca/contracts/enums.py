@@ -31,10 +31,10 @@ class TeamProcess(str, Enum):
     HANDOFF = "handoff"
 
 
-class CompletionPolicyName(str, Enum):
+class DecisionGateName(str, Enum):
     """内置收尾策略名称。"""
 
-    ROSTER_COVERAGE = "roster_coverage"
+    MUST_CONSULT_ALL = "must_consult_all"
     NONE = "none"
 
 

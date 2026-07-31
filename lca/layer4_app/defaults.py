@@ -8,7 +8,7 @@ registration only — it does not construct runnable object graphs (see
 
 from __future__ import annotations
 
-from lca.contracts.enums import CompletionPolicyName, TeamProcess
+from lca.contracts.enums import DecisionGateName, TeamProcess
 from lca.layer0_infra.component_registry import (
     defaults_registered,
     get_global_registry,
@@ -17,15 +17,13 @@ from lca.layer0_infra.component_registry import (
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.observability.jsonl_file_observability import JSONLFileObservability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
-from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
-    RosterCoveragePolicy,
-)
+from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
 from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
 from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
 from lca.layer1_cognitive.event_bus import SimpleEventBus
+from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from lca.layer1_cognitive.team_progress import DelegationLedger
-from lca.layer2_runtime.strategy_registry import get_global_strategy_registry
+from lca.layer2_runtime.strategy_registry import get_global_brain_factory_registry
 from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer3_agent.orchestration_strategies import (
     DebateStrategy,
@@ -49,9 +47,11 @@ def register_defaults() -> None:
     global_reg.register("state_store", "memory", InMemoryStateStore)
     global_reg.register("memory", "simple", SimpleMemorySystem)
     global_reg.register("event_bus", "simple", SimpleEventBus)
-    global_reg.register("delegation_ledger", "default", DelegationLedger)
+    global_reg.register("member_status", "default", InMemoryMemberStatus)
+    # Transitional registry key — remove after one release cycle.
+    global_reg.register("delegation_ledger", "default", InMemoryMemberStatus)
 
-    strategy_reg = get_global_strategy_registry()
+    strategy_reg = get_global_brain_factory_registry()
     strategy_reg.register("default", SimpleBrainFactory())
 
     orch_reg = get_global_orchestration_registry()
@@ -64,8 +64,10 @@ def register_defaults() -> None:
     orch_reg.register(TeamProcess.DEBATE, DebateStrategy)
     orch_reg.register(TeamProcess.HANDOFF, HandoffStrategy)
 
+    global_reg.register("decision_gate", DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers)
+    # Transitional registry key
     global_reg.register(
-        "completion_policy", CompletionPolicyName.ROSTER_COVERAGE, RosterCoveragePolicy
+        "completion_policy", DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers
     )
     mark_defaults_registered()
 

@@ -1,4 +1,4 @@
-"""DefaultLoopJudge —— 组合 StepOutcomePolicy + Budget 的默认终止裁判。
+"""DefaultStopRule —— 组合 StepOutcomePolicy + Budget 的默认终止裁判。
 
 L2 层职责：
     将原先散落在 CognitiveRuntime._loop 中的三种终止判定
@@ -7,35 +7,44 @@ L2 层职责：
     判定流程：
     1. 调用 StepOutcomePolicy.resolve() 获取业务判定
     2. 检查 budget 是否超限（资源约束）
-    3. 综合输出 TerminationSignal
+    3. 综合输出 StopDecision
 """
 
 from __future__ import annotations
 
-from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.decision import Decision, Observation, Reflection
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.loop_judge import LoopJudge, TerminationReason, TerminationSignal
+from lca.contracts.loop_judge import StopDecision, StopReason, StopRule
 from lca.contracts.protocols import StepOutcomePolicy
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 
-class DefaultLoopJudge(LoopJudge):
+class DefaultStopRule(StopRule):
     """默认循环终止裁判。
 
     组合 StepOutcomePolicy（业务判定）与 Budget 检查（资源约束），
-    输出统一的 TerminationSignal。
+    输出统一的 StopDecision。
     """
 
     def __init__(self, outcome_policy: StepOutcomePolicy) -> None:
         self._outcome_policy = outcome_policy
 
+    def decide(
+        self,
+        state: AgentState,
+        decision: Decision | None,
+        act_result: Observation | None,
+        reflection: Reflection | None,
+    ) -> StopDecision:
+        return self.judge(state, decision, act_result, reflection)
+
     def judge(
         self,
-        state: TypedState,
-        decision: StructuredDecision | None,
+        state: AgentState,
+        decision: Decision | None,
         observation: Observation | None,
         reflection: Reflection | None,
-    ) -> TerminationSignal:
+    ) -> StopDecision:
         outcome = self._outcome_policy.resolve(state, decision, observation, reflection)
         if outcome.final_output is not None:
             state.final_output = outcome.final_output
@@ -44,26 +53,26 @@ class DefaultLoopJudge(LoopJudge):
             return self._on_budget_exceeded(observation, state)
 
         if outcome.should_stop:
-            return TerminationSignal(
+            return StopDecision(
                 should_stop=True,
-                reason=TerminationReason.TASK_COMPLETED,
+                reason=StopReason.TASK_COMPLETED,
                 final_output=state.final_output if isinstance(state.final_output, str) else None,
                 status=_coerce_status(outcome.status) or TaskStatus.COMPLETED,
             )
 
-        return TerminationSignal()
+        return StopDecision()
 
     def _on_budget_exceeded(
         self,
         observation: Observation | None,
-        state: TypedState,
-    ) -> TerminationSignal:
+        state: AgentState,
+    ) -> StopDecision:
         budget_outcome = self._outcome_policy.resolve_budget_exceeded(observation, state)
         if budget_outcome.final_output is not None:
             state.final_output = budget_outcome.final_output
-        return TerminationSignal(
+        return StopDecision(
             should_stop=True,
-            reason=TerminationReason.BUDGET_EXCEEDED,
+            reason=StopReason.BUDGET_EXCEEDED,
             final_output=state.final_output if isinstance(state.final_output, str) else None,
             status=_coerce_status(budget_outcome.status) or TaskStatus.FAILED,
         )
@@ -90,4 +99,7 @@ def _coerce_status(value: str | TaskStatus | None) -> TaskStatus | None:
     return _STATUS_MAP.get(str(value), TaskStatus.COMPLETED)
 
 
-__all__ = ["DefaultLoopJudge"]
+# Transitional alias
+DefaultLoopJudge = DefaultStopRule
+
+__all__ = ["DefaultLoopJudge", "DefaultStopRule"]

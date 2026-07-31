@@ -1,30 +1,22 @@
-"""团队成员统一调用路径。
-
-L3 层职责：
-    提供 invoke_member 和 invoke_members_sequential 两个原子函数，
-    屏蔽 Transport 远程调用与直接 execute 的差异。
-    所有编排策略通过这两个函数调用成员，不直接依赖 BaseAgent 或 Transport。
-"""
+"""Uniform member call path for team process strategies."""
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from typing import cast
 
-from lca.contracts.decision import Observation
+from lca.contracts.decision import ActResult
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import OrchestrationContext
+from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 
 _DEFAULT_TIMEOUT_S = 300.0
 
 
-def observation_to_result(observation: Observation, task_id: str) -> Result:
-    """将 Observation 转换为 Result —— transport 路径的纯函数转换器。
-
-    提取为独立函数以便单元测试覆盖状态映射边界条件。
-    """
+def observation_to_result(observation: ActResult, task_id: str) -> Result:
+    """Convert ActResult from a channel path into Result."""
     status = TaskStatus.COMPLETED if observation.success else TaskStatus.FAILED
     output: str | None
     if isinstance(observation.payload, str):
@@ -44,8 +36,20 @@ def observation_to_result(observation: Observation, task_id: str) -> Result:
     )
 
 
+async def _call_local(member: object, objective: str) -> Result:
+    """Prefer awaitable run/execute; skip non-awaitable mocks."""
+    for name in ("run", "execute"):
+        fn = getattr(member, name, None)
+        if not callable(fn):
+            continue
+        out = fn(objective)
+        if isinstance(out, Awaitable):
+            return cast("Result", await out)
+    return Result.failed("member has no run method")
+
+
 async def invoke_member(
-    context: OrchestrationContext,
+    context: TeamContext,
     member: object,
     objective: str,
     *,
@@ -61,14 +65,11 @@ async def invoke_member(
         else:
             observation = await transport.receive_result(task_id)
         return observation_to_result(observation, task_id)
-    execute = getattr(member, "execute", None)
-    if execute is None:
-        return Result.failed("member has no execute method")
-    return cast("Result", await execute(objective))
+    return await _call_local(member, objective)
 
 
 async def invoke_members_sequential(
-    context: OrchestrationContext,
+    context: TeamContext,
     objective: str,
     *,
     pass_output_as_next_task: bool = True,
@@ -91,3 +92,7 @@ async def invoke_members_sequential(
         return Result.failed("No members in team")
     last_result.total_steps = total_steps
     return last_result
+
+
+# Friendly alias
+run_member = invoke_member

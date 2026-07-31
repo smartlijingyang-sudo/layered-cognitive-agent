@@ -9,7 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
@@ -25,9 +25,9 @@ class TestBudget(unittest.TestCase):
         self.assertFalse(budget.exceeded())
 
 
-class TestTypedState(unittest.TestCase):
+class TestAgentState(unittest.TestCase):
     def test_snapshot(self):
-        state = TypedState(trace_id="test_trace", task="test task", budget=Budget())
+        state = AgentState(trace_id="test_trace", task="test task", budget=Budget())
         snap = state.snapshot(reason="periodic")
         self.assertEqual(snap.step, 0)
         self.assertEqual(len(state.checkpoints), 1)
@@ -65,7 +65,7 @@ class TestMockLLMAdapter(unittest.TestCase):
 class TestDecisionParser(unittest.TestCase):
     def test_parse_tool_call(self):
         parser = SimpleDecisionParser()
-        state = TypedState(trace_id="t", task="test", budget=Budget())
+        state = AgentState(trace_id="t", task="test", budget=Budget())
         raw = '{"action_type": "use_tool", "tool_name": "calculator", "arguments": {"expression": "1+1"}, "rationale": "calc", "confidence": 0.9}'
         decision = parser.parse(raw, state)
         self.assertEqual(decision.action_type, "use_tool")
@@ -74,7 +74,7 @@ class TestDecisionParser(unittest.TestCase):
 
     def test_parse_fallback(self):
         parser = SimpleDecisionParser()
-        state = TypedState(trace_id="t", task="test", budget=Budget())
+        state = AgentState(trace_id="t", task="test", budget=Budget())
         decision = parser.parse("not json", state)
         self.assertEqual(decision.action_type, "respond")
         self.assertEqual(decision.confidence, 0.1)

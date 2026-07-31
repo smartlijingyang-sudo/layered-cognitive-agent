@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.contracts.enums import TeamProcess
 from lca.contracts.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import LLMAdapter, OrchestrationContext
+from lca.contracts.protocols import LLMAdapter, TeamContext
 from lca.contracts.role_team import TeamConfig
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
 from lca.layer4_app.api import Agent
@@ -44,9 +44,9 @@ class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):
     async def test_parallel_outputs_visible(self):
         llm = _LLM()
         members = [
-            Agent(role="市场分析师", goal="", backstory="", tools=[], llm=llm)._base_agent,
-            Agent(role="定价专员", goal="", backstory="", tools=[], llm=llm)._base_agent,
-            Agent(role="风控专员", goal="", backstory="", tools=[], llm=llm)._base_agent,
+            Agent(role="市场分析师", goal="", backstory="", tools=[], llm=llm)._agent,
+            Agent(role="定价专员", goal="", backstory="", tools=[], llm=llm)._agent,
+            Agent(role="风控专员", goal="", backstory="", tools=[], llm=llm)._agent,
         ]
         g = ExecutionGraph()
         g.add_node(GraphNode(id="entry", type=NodeType.ENTRY))
@@ -60,11 +60,11 @@ class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):
         g.add_edge(GraphEdge(source="pricing", target="exit"))
         g.add_edge(GraphEdge(source="risk", target="exit"))
         transport, roster = build_team_transport(members)
-        ctx = OrchestrationContext(
+        ctx = TeamContext(
             members=members,
             config=TeamConfig(process=TeamProcess.GRAPH),
             transport=transport,
-            roster_desc=roster,
+            teammates_text=roster,
         )
         result = await GraphStrategy(execution_graph=g).run(ctx, "launch")
         self.assertEqual(result.status, TaskStatus.COMPLETED)

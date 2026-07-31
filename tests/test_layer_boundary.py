@@ -1,8 +1,8 @@
 """分层通信铁律 —— AST 静态扫描，禁止 L3 裸 getattr 穿透 Runtime。
 
 L3 (agent) 通过 Runtime Protocol 的显式方法与 L1/L2 交互。
-需要访问 body / brain / memory / hooks 时，须先 ``isinstance(runtime, ExposesComponents)``
-或 ``HookRegistryHolder``，禁止 ``getattr(x.runtime, ...)`` 穿透。
+需要访问 body / brain / memory / hooks 时，须先 ``isinstance(runtime, HasBrainBodyMemory)``
+或 ``HasHooks``，禁止 ``getattr(x.runtime, ...)`` 穿透。
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ class _LayerBoundaryVisitor(ast.NodeVisitor):
                 self.violations.append(
                     f"{self.filename}:{node.lineno} — "
                     f"getattr({owner}.runtime, {second_arg.value!r}) 越层访问，"
-                    f"请用 ExposesComponents / HookRegistryHolder + isinstance"
+                    f"请用 HasBrainBodyMemory / HasHooks + isinstance"
                 )
         self.generic_visit(node)
 

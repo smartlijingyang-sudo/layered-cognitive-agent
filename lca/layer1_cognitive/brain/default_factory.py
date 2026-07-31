@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.protocols import BrainStrategy, LLMAdapter
+from lca.contracts.protocols import Brain, LLMAdapter
 from lca.contracts.role_team import RoleProfile
 from lca.layer1_cognitive.body.action_catalog import format_allowed_actions_desc
 from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
@@ -34,7 +34,7 @@ class SimpleBrainFactory:
         *,
         action_registry: ActionRegistryProtocol | None = None,
         **_ignored: Any,
-    ) -> BrainStrategy:
+    ) -> Brain:
         prompt_manager = SimplePromptManager()
         prompt_manager.register_template("react_prompt", load_builtin_prompt("react_prompt"))
         prompt_manager.register_template(

@@ -12,18 +12,18 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy, Synthesizer
+from lca.contracts.protocols import Synthesizer, TeamContext, TeamProcessStrategy
 from lca.contracts.result import Result
 from lca.layer3_agent.member_invoke import invoke_member
 
 
-class ParallelStrategy(OrchestrationStrategy):
+class ParallelStrategy(TeamProcessStrategy):
     """并行编排：所有成员同时执行同一任务，可选 Synthesizer 汇总结果。"""
 
     def __init__(self, synthesizer: Synthesizer | None = None) -> None:
         self._synthesizer = synthesizer
 
-    async def run(self, context: OrchestrationContext, objective: str) -> Result:
+    async def run(self, context: TeamContext, objective: str) -> Result:
         if not context.members:
             return Result.failed("No members in team")
         results = await asyncio.gather(

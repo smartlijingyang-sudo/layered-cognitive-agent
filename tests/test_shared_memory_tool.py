@@ -8,23 +8,23 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.decision import Observation, Reflection, StructuredDecision
+from lca.contracts.decision import Decision, Observation, Reflection
 from lca.contracts.memory import MemoryRecord
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.contracts.types import TeamAssignment, Turn
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 
 
 class TestSharedMemorySinglePath(unittest.IsolatedAsyncioTestCase):
-    """共享记忆通过 MemorySystem 单路径访问（SharedStoreBindable）。"""
+    """共享记忆通过 MemorySystem 单路径访问（HasSharedMemory）。"""
 
     async def test_shared_write_visible_across_agents(self) -> None:
         store = TeamSharedMemoryStore(["semantic"])
         agent_a = SimpleMemorySystem()
         agent_b = SimpleMemorySystem()
-        agent_a.bind_shared_store(store)
-        agent_b.bind_shared_store(store)
+        agent_a.bind_shared_memory(store)
+        agent_b.bind_shared_memory(store)
 
         agent_a.write_shared_record(
             "semantic",
@@ -49,14 +49,14 @@ class TestSharedMemorySinglePath(unittest.IsolatedAsyncioTestCase):
     async def test_query_shared_layer_returns_empty_initially(self) -> None:
         store = TeamSharedMemoryStore(["semantic"])
         mem = SimpleMemorySystem()
-        mem.bind_shared_store(store)
+        mem.bind_shared_memory(store)
         self.assertEqual(mem.query("semantic"), [])
 
 
 class TestTurnAndTeamAssignment(unittest.TestCase):
     def test_turn_on_typed_state_history(self) -> None:
-        state = TypedState(trace_id="t1", task="demo", budget=Budget())
-        decision = StructuredDecision(
+        state = AgentState(trace_id="t1", task="demo", budget=Budget())
+        decision = Decision(
             decision_id="d1",
             action_type="respond",
             rationale="r",

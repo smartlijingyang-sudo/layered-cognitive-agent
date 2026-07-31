@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 from lca.contracts.decision import Observation
 from lca.contracts.result import ToolExecutionError, ToolInputError
 from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
@@ -158,7 +158,7 @@ class TestSafeExecutorNormalPath:
 class TestCriticFailureKind:
     def setup_method(self) -> None:
         self.critic = SimpleCritic()
-        self.state = TypedState(trace_id="test", task="test", budget=Budget(), step=3)
+        self.state = AgentState(trace_id="test", task="test", budget=Budget(), step=3)
 
     async def test_validation_failure_produces_precise_lesson(self) -> None:
         obs = Observation(

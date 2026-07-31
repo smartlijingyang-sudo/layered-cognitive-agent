@@ -10,13 +10,13 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.decision import (
+    Decision,
     DelegationSpec,
     Observation,
-    StructuredDecision,
     ToolCall,
 )
 from lca.contracts.result import ToolExecutionError
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import (
     TransportNotFoundError,
@@ -33,16 +33,16 @@ def _make_registry(transport: InternalTransport) -> TransportRegistry:
     return registry
 
 
-def _make_state() -> TypedState:
-    return TypedState(trace_id="test-trace", task="test", budget=Budget())
+def _make_state() -> AgentState:
+    return AgentState(trace_id="test-trace", task="test", budget=Budget())
 
 
 def _make_decision(
     action_type: str = "delegate",
     delegate_to: DelegationSpec | None = None,
     tool_calls: list[ToolCall] | None = None,
-) -> StructuredDecision:
-    return StructuredDecision(
+) -> Decision:
+    return Decision(
         decision_id="dec-1",
         action_type=action_type,  # type: ignore[arg-type]  # 测试便利：str 与 ActionType(str Enum) 值相等
         rationale="test",

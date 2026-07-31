@@ -9,13 +9,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.skill_router import KeywordSkillRouter, StaticSkillRouter
 
 
-def _make_state(task: str) -> TypedState:
-    return TypedState(trace_id="test", task=task, budget=Budget())
+def _make_state(task: str) -> AgentState:
+    return AgentState(trace_id="test", task=task, budget=Budget())
 
 
 class TestKeywordSkillRouter(unittest.IsolatedAsyncioTestCase):

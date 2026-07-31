@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.decision import Decision, Observation
 from lca.contracts.protocols import (
     AgentTransport,
     Body,
@@ -12,7 +12,7 @@ from lca.contracts.protocols import (
     TransportRegistryProtocol,
 )
 from lca.contracts.result import UnregisteredActionError
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
@@ -21,9 +21,9 @@ from lca.layer1_cognitive.body.action_registry import ActionRegistry
 class SimpleBody(Body):
     """Default ``Body`` implementation — dispatches actions via ``ActionRegistry``.
 
-    Resolves the ``action_type`` from a ``StructuredDecision`` through the
+    Resolves the ``action_type`` from a ``Decision`` through the
     action registry and delegates execution to the registered
-    ``ActionOperation``.  Supports flexible construction: callers may inject
+    ``Action``.  Supports flexible construction: callers may inject
     a pre-built ``ActionRegistry``, or provide ``ToolRegistry`` +
     ``SafeExecutor`` and let the body build the registry automatically.
     """
@@ -57,10 +57,10 @@ class SimpleBody(Body):
         self.tool_registry = tool_registry
         self.safe_executor = safe_executor
 
-    def bind_transport(self, transport: AgentTransport) -> None:
+    def bind_channel(self, transport: AgentTransport) -> None:
         self.transport_registry.register(transport)
 
-    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
+    async def act(self, decision: Decision, state: AgentState) -> Observation:
         handler = self.action_registry.get(decision.action_type)
         if handler is None:
             raise UnregisteredActionError(decision.action_type)

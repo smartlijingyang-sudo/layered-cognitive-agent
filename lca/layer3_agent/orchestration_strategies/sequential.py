@@ -8,15 +8,15 @@ L3 层职责：
 
 from __future__ import annotations
 
-from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy
+from lca.contracts.protocols import TeamContext, TeamProcessStrategy
 from lca.contracts.result import Result
 from lca.layer3_agent.member_invoke import invoke_members_sequential
 
 
-class SequentialStrategy(OrchestrationStrategy):
+class SequentialStrategy(TeamProcessStrategy):
     """顺序链式编排：成员依次执行，输出传递给下一个成员。"""
 
-    async def run(self, context: OrchestrationContext, objective: str) -> Result:
+    async def run(self, context: TeamContext, objective: str) -> Result:
         return await invoke_members_sequential(
             context, objective, pass_output_as_next_task=True, stop_on_first_completed=False
         )

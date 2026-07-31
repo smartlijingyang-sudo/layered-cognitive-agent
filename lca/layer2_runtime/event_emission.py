@@ -19,7 +19,7 @@ from typing import Any
 
 from lca.contracts.enums import HookEvent
 from lca.contracts.protocols import EventBus
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 HOOK_NAMES = [
     "on_start",
@@ -38,11 +38,11 @@ HOOK_NAMES = [
 
 # ── 事件派生：hook 事件名 → (对外事件名, payload) 提取函数 ──
 
-EventDerivation = Callable[[TypedState, dict[str, Any]], tuple[str, dict[str, Any]] | None]
+EventDerivation = Callable[[AgentState, dict[str, Any]], tuple[str, dict[str, Any]] | None]
 
 
 def _derive_action_degraded(
-    state: TypedState, kwargs: dict[str, Any]
+    state: AgentState, kwargs: dict[str, Any]
 ) -> tuple[str, dict[str, Any]] | None:
     observation = kwargs.get("observation")
     if (
@@ -62,7 +62,7 @@ def _derive_action_degraded(
 
 
 def _derive_step_completed(
-    state: TypedState, kwargs: dict[str, Any]
+    state: AgentState, kwargs: dict[str, Any]
 ) -> tuple[str, dict[str, Any]] | None:
     return ("step_completed", {"step": state.step, "status": state.status})
 
@@ -74,7 +74,7 @@ _DERIVATIONS: dict[str, EventDerivation] = {
 
 
 def make_event_emitting_hook(event_bus: EventBus) -> Callable[..., Awaitable[None]]:
-    async def _hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
+    async def _hook(event_name: str, state: AgentState, **kwargs: Any) -> None:
         derive = _DERIVATIONS.get(event_name)
         if derive is None:
             return

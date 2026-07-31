@@ -1,4 +1,4 @@
-"""StrategyRegistry —— 策略注册表，支持运行时动态切换 Brain 策略。
+"""BrainFactoryRegistry —— 策略注册表，支持运行时动态切换 Brain 策略。
 
 L2 层职责：
     注册表模式（Registry Pattern）的实现。
@@ -11,13 +11,13 @@ from __future__ import annotations
 from lca.contracts.protocols.cognition import BrainFactory
 from lca.layer0_infra.component_registry import NamedRegistry
 
-_global_strategy_registry: StrategyRegistry | None = None
+_global_strategy_registry: BrainFactoryRegistry | None = None
 
 
-class StrategyRegistry(NamedRegistry[BrainFactory]):
-    """按名称注册和查找 BrainStrategy 工厂。
+class BrainFactoryRegistry(NamedRegistry[BrainFactory]):
+    """按名称注册和查找 Brain 工厂。
 
-    工厂签名: (llm, role_profile, tools_desc) -> BrainStrategy
+    工厂签名: (llm, role_profile, tools_desc) -> Brain
     """
 
     _REGISTRY_KIND = "Brain 策略"
@@ -26,8 +26,13 @@ class StrategyRegistry(NamedRegistry[BrainFactory]):
         return self.list()
 
 
-def get_global_strategy_registry() -> StrategyRegistry:
+def get_global_brain_factory_registry() -> BrainFactoryRegistry:
     global _global_strategy_registry
     if _global_strategy_registry is None:
-        _global_strategy_registry = StrategyRegistry()
+        _global_strategy_registry = BrainFactoryRegistry()
     return _global_strategy_registry
+
+
+# Transitional alias — remove after one release cycle.
+get_global_strategy_registry = get_global_brain_factory_registry
+StrategyRegistry = BrainFactoryRegistry

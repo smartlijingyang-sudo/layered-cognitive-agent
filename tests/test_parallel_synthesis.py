@@ -9,7 +9,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import OrchestrationContext, Synthesizer
+from lca.contracts.protocols import Synthesizer, TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
@@ -34,7 +34,7 @@ def _make_result(
 
 
 class _FakeMember:
-    """模拟 AgentEntrypoint，execute 返回预设 Result。"""
+    """模拟 AgentUnit，execute 返回预设 Result。"""
 
     def __init__(self, result: Result) -> None:
         self._result = result
@@ -157,7 +157,7 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t2", "Result B")),
             _FakeMember(_make_result("t3", "Result C")),
         ]
-        context = OrchestrationContext(members=members)
+        context = TeamContext(members=members)
         strategy = ParallelStrategy(synthesizer=ConcatSynthesizer())
 
         result = await strategy.run(context, "test task")
@@ -174,7 +174,7 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t1", "Result A")),
             _FakeMember(_make_result("t2", "Result B")),
         ]
-        context = OrchestrationContext(members=members)
+        context = TeamContext(members=members)
         strategy = ParallelStrategy()
 
         result = await strategy.run(context, "test task")
@@ -183,7 +183,7 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
 
     async def test_parallel_empty_members(self) -> None:
         """空成员列表应返回 failed。"""
-        context = OrchestrationContext(members=[])
+        context = TeamContext(members=[])
         strategy = ParallelStrategy(synthesizer=ConcatSynthesizer())
 
         result = await strategy.run(context, "test task")
@@ -215,7 +215,7 @@ class TestSynthesizerProtocol(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t1", "First")),
             _FakeMember(_make_result("t2", "Second")),
         ]
-        context = OrchestrationContext(members=members)
+        context = TeamContext(members=members)
         # 测试用内部类满足 Synthesizer Protocol 但 mypy 无法推断结构子类型
         strategy = ParallelStrategy(synthesizer=first_synth)  # type: ignore[arg-type]
 

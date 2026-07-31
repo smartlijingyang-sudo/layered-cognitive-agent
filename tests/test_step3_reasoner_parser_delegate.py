@@ -10,18 +10,18 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.prompt_manager import SimplePromptManager
 from lca.layer1_cognitive.brain.reasoner import (
     HIERARCHICAL_DELEGATE_TEMPLATE,
     SimpleReasoner,
-    build_team_roster,
+    build_teammates_text,
 )
 
 
-def _make_state(task: str = "test task") -> TypedState:
-    return TypedState(trace_id="test-trace", task=task, budget=Budget())
+def _make_state(task: str = "test task") -> AgentState:
+    return AgentState(trace_id="test-trace", task=task, budget=Budget())
 
 
 def _empty_manifest() -> ToolPermissionManifest:
@@ -35,14 +35,14 @@ def _make_profile(role: str = "supervisor", goal: str = "coordinate") -> RolePro
 
 
 class TestBuildTeamRoster(unittest.TestCase):
-    """build_team_roster 工具函数。"""
+    """build_teammates_text 工具函数。"""
 
     def test_empty_list(self) -> None:
-        self.assertEqual(build_team_roster([]), "(无可用队友)")
+        self.assertEqual(build_teammates_text([]), "(无可用队友)")
 
     def test_single_profile(self) -> None:
         profiles = [_make_profile("researcher", "research topics")]
-        result = build_team_roster(profiles)
+        result = build_teammates_text(profiles)
         self.assertIn("researcher", result)
         self.assertIn("research topics", result)
 
@@ -51,7 +51,7 @@ class TestBuildTeamRoster(unittest.TestCase):
             _make_profile("researcher", "research"),
             _make_profile("writer", "write reports"),
         ]
-        result = build_team_roster(profiles)
+        result = build_teammates_text(profiles)
         self.assertIn("researcher", result)
         self.assertIn("writer", result)
         self.assertEqual(result.count("\n") + 1, 2)
@@ -174,7 +174,7 @@ class TestDecisionParserDelegate(unittest.TestCase):
 
 
 class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
-    """SimpleReasoner：team_roster 存在时使用 hierarchical_prompt 模板。"""
+    """SimpleReasoner：teammates_text 存在时使用 hierarchical_prompt 模板。"""
 
     async def test_without_roster_uses_react_prompt(self) -> None:
         captured_prompt: list[str] = []
@@ -189,7 +189,7 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
             "react_prompt", "ROLE: {role}\nTASK: {task}\nTOOLS: {tools}\nCONTEXT:\n{context}"
         )
 
-        reasoner = SimpleReasoner(FakeLLM(), pm, _make_profile(), "search()", team_roster=None)
+        reasoner = SimpleReasoner(FakeLLM(), pm, _make_profile(), "search()", teammates_text=None)
         await reasoner.generate_candidates(_make_state())
 
         self.assertEqual(len(captured_prompt), 1)
@@ -209,12 +209,12 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
         pm.register_template("hierarchical_prompt", HIERARCHICAL_DELEGATE_TEMPLATE)
 
         roster = "- role: researcher | goal: research topics\n- role: writer | goal: write reports"
-        reasoner = SimpleReasoner(FakeLLM(), pm, _make_profile(), "search()", team_roster=roster)
+        reasoner = SimpleReasoner(FakeLLM(), pm, _make_profile(), "search()", teammates_text=roster)
         await reasoner.generate_candidates(_make_state())
 
         self.assertEqual(len(captured_prompt), 1)
         prompt = captured_prompt[0]
-        self.assertIn("TEAM_ROSTER", prompt)
+        self.assertIn("TEAMMATES", prompt)
         self.assertIn("researcher", prompt)
         self.assertIn("writer", prompt)
         self.assertIn("delegate", prompt)

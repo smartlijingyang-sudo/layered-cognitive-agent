@@ -1,4 +1,4 @@
-"""DecisionParser —— 将自由文本/工具调用稳健地解析为强类型 StructuredDecision。
+"""DecisionParser —— 将自由文本/工具调用稳健地解析为强类型 Decision。
 
 L2 防腐层：所有 LLM 原始输出必须先经过此层归一化，
 才能进入系统内部。核心域模型只看到已校验/已标记的决策。
@@ -10,12 +10,12 @@ import json
 import re
 
 from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import DelegationSpec, StructuredDecision, ToolCall
+from lca.contracts.decision import Decision, DelegationSpec, ToolCall
 from lca.contracts.enums import ActionType
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import DecisionParser
 from lca.contracts.semantic_keys import ORIGINAL_ACTION_TYPE
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 
 class SimpleDecisionParser(DecisionParser):
@@ -29,12 +29,12 @@ class SimpleDecisionParser(DecisionParser):
     def __init__(self, action_registry: ActionRegistryProtocol | None = None) -> None:
         self._action_registry = action_registry
 
-    def parse(self, raw_output: str, state: TypedState) -> StructuredDecision:
+    def parse(self, raw_output: str, state: AgentState) -> Decision:
         json_str = self._extract_json(raw_output)
         try:
             data = json.loads(json_str)
         except (json.JSONDecodeError, ValueError):
-            return StructuredDecision(
+            return Decision(
                 decision_id=new_id("dec"),
                 action_type=ActionType.RESPOND,
                 response_text=raw_output,
@@ -85,7 +85,7 @@ class SimpleDecisionParser(DecisionParser):
                 context_refs=context_refs,
             )
 
-        return StructuredDecision(
+        return Decision(
             decision_id=new_id("dec"),
             action_type=action_type,
             tool_calls=tool_calls,

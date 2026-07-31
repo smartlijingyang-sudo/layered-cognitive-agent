@@ -1,15 +1,15 @@
-"""ActionRegistry —— ActionOperation 的默认注册表实现（ADR-0015/0016）。
+"""ActionRegistry —— Action 的默认注册表实现（ADR-0015/0016）。
 
 从 contracts 迁出：contracts 只保留 Protocol，具体路由表属于 L1 embodiment。
 """
 
 from __future__ import annotations
 
-from lca.contracts.action import ActionOperation, ActionRegistryProtocol
+from lca.contracts.action import Action, ActionRegistryProtocol
 from lca.layer0_infra.component_registry import NamedRegistry
 
 
-class ActionRegistry(NamedRegistry[ActionOperation], ActionRegistryProtocol):
+class ActionRegistry(NamedRegistry[Action], ActionRegistryProtocol):
     """Action 能力注册表 —— 开闭原则的标准落地。
 
     无状态纯路由，不承载业务逻辑、不承载降级逻辑。
@@ -22,12 +22,12 @@ class ActionRegistry(NamedRegistry[ActionOperation], ActionRegistryProtocol):
         NamedRegistry.__init__(self)
         self._aliases: dict[str, str] = {}
 
-    def register(self, action_type: str, handler: ActionOperation) -> None:
-        """注册一个 ActionOperation 到指定 action_type。"""
+    def register(self, action_type: str, handler: Action) -> None:
+        """注册一个 Action 到指定 action_type。"""
         self._entries[action_type] = handler
         self._aliases[action_type] = action_type
 
-    def get(self, action_type: str) -> ActionOperation | None:
+    def get(self, action_type: str) -> Action | None:
         return self._entries.get(action_type)
 
     def register_alias(self, alias: str, canonical: str) -> None:

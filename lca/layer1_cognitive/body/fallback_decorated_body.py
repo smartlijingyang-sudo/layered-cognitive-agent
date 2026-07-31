@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.decision import Decision, Observation
 from lca.contracts.protocols import AgentTransport, Body, FallbackPolicy
 from lca.contracts.result import UnregisteredActionError
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 
 class FallbackDecoratedBody(Body):
@@ -30,7 +30,7 @@ class FallbackDecoratedBody(Body):
         self._fallback_handler = fallback_handler
         self._action_registry = action_registry
 
-    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation:
+    async def act(self, decision: Decision, state: AgentState) -> Observation:
         try:
             return await self._inner.act(decision, state)
         except UnregisteredActionError:
@@ -39,5 +39,5 @@ class FallbackDecoratedBody(Body):
                 registry = getattr(self._inner, "action_registry", None)
             return await self._fallback_handler.handle(decision, state, registry)
 
-    def bind_transport(self, transport: AgentTransport) -> None:
-        self._inner.bind_transport(transport)
+    def bind_channel(self, transport: AgentTransport) -> None:
+        self._inner.bind_channel(transport)

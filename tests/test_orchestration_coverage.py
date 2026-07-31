@@ -25,7 +25,7 @@ def _get_process_enum_values() -> set[str]:
 
 
 class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
-    """TeamConfig.process 声明值集合 恒等于 OrchestrationStrategyRegistry 的 key 集合。"""
+    """TeamConfig.process 声明值集合 恒等于 TeamProcessBrainFactoryRegistry 的 key 集合。"""
 
     def test_literal_values_match_registered_strategies(self) -> None:
         literal_values = _get_process_enum_values()
@@ -54,17 +54,17 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_graph_strategy_requires_execution_graph(self) -> None:
         """GraphStrategy 已落地实现，无 ExecutionGraph 时抛 ValueError。"""
-        from lca.contracts.protocols import OrchestrationContext
+        from lca.contracts.protocols import TeamContext
         from lca.layer3_agent.orchestration_strategies import GraphStrategy
 
         strategy = GraphStrategy()
-        context = OrchestrationContext()
+        context = TeamContext()
         with self.assertRaises(ValueError):
             await strategy.run(context, "test")
 
     async def test_debate_strategy_is_functional(self) -> None:
         """DebateStrategy 已落地实现，run() 不再抛 NotImplementedError。"""
-        from lca.contracts.protocols import OrchestrationContext
+        from lca.contracts.protocols import TeamContext
         from lca.contracts.result import Result
         from lca.contracts.state import Budget
         from lca.layer3_agent.orchestration_strategies import DebateStrategy
@@ -83,7 +83,7 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
             )
 
         agent.execute = AsyncMock(side_effect=_execute)
-        context = OrchestrationContext(members=[agent])
+        context = TeamContext(members=[agent])
         result = await strategy.run(context, "test")
         self.assertEqual(result.status, "completed")
 

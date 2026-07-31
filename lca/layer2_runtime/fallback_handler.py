@@ -9,12 +9,12 @@ L2 层职责：
 from __future__ import annotations
 
 from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.decision import Decision, Observation
 from lca.contracts.enums import ActionType
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import FallbackPolicy
 from lca.contracts.semantic_keys import FALLBACK_DEGRADED_FROM
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 FALLBACK_DEGRADATION_KEY = FALLBACK_DEGRADED_FROM
 
@@ -30,8 +30,8 @@ class FallbackActionPolicy(FallbackPolicy):
 
     async def handle(
         self,
-        decision: StructuredDecision,
-        state: TypedState,
+        decision: Decision,
+        state: AgentState,
         action_registry: ActionRegistryProtocol | None = None,
     ) -> Observation:
         original = decision.action_type

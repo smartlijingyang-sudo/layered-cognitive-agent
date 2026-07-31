@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.decision import Observation
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols.capabilities import RosterAware, TransportBindable
+from lca.contracts.protocols.capabilities import AcceptsTeammates, HasChannel
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from lca.contracts.state import Budget
@@ -20,6 +20,9 @@ from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer3_agent.simple_agent import BaseAgent
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 from lca.layer4_app.assembly import build_team_transport
+from lca.layer4_app.defaults import ensure_defaults
+
+ensure_defaults()
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -38,47 +41,47 @@ def _make_role(role: str, goal: str = "") -> RoleProfile:
 def _make_member(role: str, return_output: str = "done") -> BaseAgent:
     runtime = MagicMock()
     member = BaseAgent(runtime, _make_role(role))
-    member.execute = AsyncMock(  # type: ignore[method-assign]  # 测试桩：替换实例方法
-        return_value=Result(
-            trace_id=f"trace-{role}",
-            status=TaskStatus.COMPLETED,
-            output=return_output,
-            final_state_ref="",
-            total_steps=1,
-            budget_used=Budget(),
-        ),
+    result = Result(
+        trace_id=f"trace-{role}",
+        status=TaskStatus.COMPLETED,
+        output=return_output,
+        final_state_ref="",
+        total_steps=1,
+        budget_used=Budget(),
     )
+    member.run = AsyncMock(return_value=result)  # type: ignore[method-assign]
+    member.execute = AsyncMock(return_value=result)  # type: ignore[method-assign]
     return member
 
 
-class _BindableBody(TransportBindable):
-    """测试用 Body：实现 TransportBindable 协议。"""
+class _BindableBody(HasChannel):
+    """测试用 Body：实现 HasChannel 协议。"""
 
     def __init__(self, registry: TransportRegistry) -> None:
         self._registry = registry
 
-    def bind_transport(self, transport: object) -> None:
+    def bind_channel(self, transport: object) -> None:
         # 测试桩：TransportRegistry.register 期望 AgentTransport，此处故意泛化
         self._registry.register(transport)  # type: ignore[arg-type]  # 测试桩放宽类型
 
 
-class _RosterAwareBrain(RosterAware):
-    """测试用 Brain：实现 RosterAware 协议。"""
+class _AcceptsTeammatesBrain(AcceptsTeammates):
+    """测试用 Brain：实现 AcceptsTeammates 协议。"""
 
     def __init__(self) -> None:
-        self.team_roster: str | None = None
+        self.teammates_text: str | None = None
 
-    def set_team_roster(self, roster_desc: str) -> None:
-        self.team_roster = roster_desc
+    def set_teammates(self, teammates_text: str) -> None:
+        self.teammates_text = teammates_text
 
 
 def _make_supervisor_with_runtime() -> tuple[
-    BaseAgent, MagicMock, TransportRegistry, _RosterAwareBrain
+    BaseAgent, MagicMock, TransportRegistry, _AcceptsTeammatesBrain
 ]:
     """返回 (supervisor, mock_runtime, transport_registry, brain)。"""
     registry = TransportRegistry()
     mock_body = _BindableBody(registry)
-    mock_brain = _RosterAwareBrain()
+    mock_brain = _AcceptsTeammatesBrain()
 
     mock_runtime = MagicMock()
     mock_runtime.body = mock_body
@@ -100,24 +103,24 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         config = TeamConfig(process="hierarchical")
 
         sup, _, registry, _ = _make_supervisor_with_runtime()
-        sup.execute = AsyncMock(  # type: ignore[method-assign]  # 测试桩：替换实例方法
-            return_value=Result(
-                trace_id="t",
-                status=TaskStatus.COMPLETED,
-                output="ok",
-                final_state_ref="",
-                total_steps=1,
-                budget_used=Budget(),
-            ),
+        _ok = Result(
+            trace_id="t",
+            status=TaskStatus.COMPLETED,
+            output="ok",
+            final_state_ref="",
+            total_steps=1,
+            budget_used=Budget(),
         )
+        sup.run = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
+        sup.execute = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
 
-        transport, roster_desc = build_team_transport(members)
+        transport, teammates_text = build_team_transport(members)
         orchestrator = TeamOrchestrator(
             members,
             config,
             supervisor=sup,
             transport=transport,
-            roster_desc=roster_desc,
+            teammates_text=teammates_text,
         )
         await orchestrator.run("build feature")
 
@@ -128,28 +131,28 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         config = TeamConfig(process="hierarchical")
 
         sup, _, _, mock_brain = _make_supervisor_with_runtime()
-        sup.execute = AsyncMock(  # type: ignore[method-assign]  # 测试桩：替换实例方法
-            return_value=Result(
-                trace_id="t",
-                status=TaskStatus.COMPLETED,
-                output="ok",
-                final_state_ref="",
-                total_steps=1,
-                budget_used=Budget(),
-            ),
+        _ok = Result(
+            trace_id="t",
+            status=TaskStatus.COMPLETED,
+            output="ok",
+            final_state_ref="",
+            total_steps=1,
+            budget_used=Budget(),
         )
+        sup.run = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
+        sup.execute = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
 
-        transport, roster_desc = build_team_transport(members)
+        transport, teammates_text = build_team_transport(members)
         orchestrator = TeamOrchestrator(
             members,
             config,
             supervisor=sup,
             transport=transport,
-            roster_desc=roster_desc,
+            teammates_text=teammates_text,
         )
         await orchestrator.run("build feature")
 
-        self.assertIn("dev", mock_brain.team_roster)
+        self.assertIn("dev", mock_brain.teammates_text)
 
     async def test_orchestrator_without_transport_skips_bind(self) -> None:
         """不传 transport 时不报错（向后兼容）。"""
@@ -157,16 +160,16 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         config = TeamConfig(process="hierarchical")
 
         sup, _, registry, _ = _make_supervisor_with_runtime()
-        sup.execute = AsyncMock(  # type: ignore[method-assign]  # 测试桩：替换实例方法
-            return_value=Result(
-                trace_id="t",
-                status=TaskStatus.COMPLETED,
-                output="ok",
-                final_state_ref="",
-                total_steps=1,
-                budget_used=Budget(),
-            ),
+        _ok = Result(
+            trace_id="t",
+            status=TaskStatus.COMPLETED,
+            output="ok",
+            final_state_ref="",
+            total_steps=1,
+            budget_used=Budget(),
         )
+        sup.run = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
+        sup.execute = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
 
         orchestrator = TeamOrchestrator(members, config, supervisor=sup)
         await orchestrator.run("task")

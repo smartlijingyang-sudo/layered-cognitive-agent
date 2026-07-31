@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.decision import StructuredDecision, ToolCall
+from lca.contracts.decision import Decision, ToolCall
 from lca.contracts.role_team import ToolPermissionManifest
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer1_cognitive.body.action_handlers import RespondOperation, UseToolOperation
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
@@ -19,8 +19,8 @@ from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer2_runtime.fallback_handler import FALLBACK_DEGRADATION_KEY, FallbackActionPolicy
 
 
-def _make_state() -> TypedState:
-    return TypedState(trace_id="test", task="test", budget=Budget())
+def _make_state() -> AgentState:
+    return AgentState(trace_id="test", task="test", budget=Budget())
 
 
 def _make_registry_with_respond() -> ActionRegistry:
@@ -37,7 +37,7 @@ class TestFallbackWithResponseText:
         ["research_plan", "generate", "diagnostic_step", "structured_analysis"],
     )
     async def test_degrades_to_respond(self, unknown_action: str) -> None:
-        decision = StructuredDecision(
+        decision = Decision(
             decision_id="dec_test",
             action_type=unknown_action,
             rationale="LLM 发明的 action",
@@ -55,7 +55,7 @@ class TestFallbackWithResponseText:
         assert observation.extra[FALLBACK_DEGRADATION_KEY] == unknown_action
 
     async def test_original_action_type_preserved(self) -> None:
-        decision = StructuredDecision(
+        decision = Decision(
             decision_id="dec_test",
             action_type="research_plan",
             rationale="test",
@@ -87,7 +87,7 @@ class TestFallbackWithToolCalls:
         registry = ActionRegistry()
         registry.register("use_tool", UseToolOperation(tool_reg, safe_exec))
 
-        decision = StructuredDecision(
+        decision = Decision(
             decision_id="dec_test",
             action_type="compute",
             rationale="LLM 发明的 action",
@@ -110,7 +110,7 @@ class TestFallbackNoDegradationPath:
     """策略 3：既无 response_text 也无 tool_calls → 不可恢复失败。"""
 
     async def test_returns_failure(self) -> None:
-        decision = StructuredDecision(
+        decision = Decision(
             decision_id="dec_test",
             action_type="unknown_action",
             rationale="test",

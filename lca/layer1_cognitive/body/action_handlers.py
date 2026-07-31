@@ -1,4 +1,4 @@
-"""内置 ActionOperation 实现 —— 从 SimpleBody 提取的独立策略类。
+"""内置 Action 实现 —— 从 SimpleBody 提取的独立策略类。
 
 每种 action_type 对应一个独立 Operation，彼此零依赖、零共享可变状态。
 新增行动能力 = ActionCatalog 加一条 spec + 本模块一个 Operation + 注册。
@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.action import ActionOperation
-from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.action import Action
+from lca.contracts.decision import Decision, Observation
 from lca.contracts.delegation_context import delegator_scope
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
@@ -22,16 +22,16 @@ from lca.contracts.protocols import (
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
 from lca.contracts.semantic_keys import OBS_HANDOFF, OBS_TASK_ID
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 _POLL_INTERVAL_S = 0.05
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
 
 
-class RespondOperation(ActionOperation):
+class RespondOperation(Action):
     """处理 respond 动作：直接返回文本响应。"""
 
-    async def execute(self, decision: StructuredDecision, state: TypedState) -> Observation:
+    async def execute(self, decision: Decision, state: AgentState) -> Observation:
         return Observation(
             observation_id=new_id("obs"),
             success=True,
@@ -39,14 +39,14 @@ class RespondOperation(ActionOperation):
         )
 
 
-class UseToolOperation(ActionOperation):
+class UseToolOperation(Action):
     """处理 use_tool 动作：查找工具 → 权限校验 → 执行。"""
 
     def __init__(self, tool_registry: ToolRegistry, safe_executor: SafeExecutor) -> None:
         self._tool_registry = tool_registry
         self._safe_executor = safe_executor
 
-    async def execute(self, decision: StructuredDecision, state: TypedState) -> Observation:
+    async def execute(self, decision: Decision, state: AgentState) -> Observation:
         if not decision.tool_calls:
             raise ToolExecutionError("use_tool 需要至少一个 tool_call")
         tc = decision.tool_calls[0]
@@ -56,13 +56,13 @@ class UseToolOperation(ActionOperation):
         return await self._safe_executor.execute(tool, tc.arguments, RetryPolicy(), CacheConfig())
 
 
-class DelegateOperation(ActionOperation):
+class DelegateOperation(Action):
     """处理 delegate 动作：阻塞式委派，等待目标 Agent 返回结果。"""
 
     def __init__(self, transport_registry: TransportRegistryProtocol) -> None:
         self._transport_registry = transport_registry
 
-    async def execute(self, decision: StructuredDecision, state: TypedState) -> Observation:
+    async def execute(self, decision: Decision, state: AgentState) -> Observation:
         transport, task_id = await self._send_to_transport(decision, state)
 
         timeout_s = (
@@ -111,7 +111,7 @@ class DelegateOperation(ActionOperation):
         return await transport.receive_result(task_id)
 
     async def _send_to_transport(
-        self, decision: StructuredDecision, state: TypedState
+        self, decision: Decision, state: AgentState
     ) -> tuple[AgentTransport, str]:
         spec = decision.delegate_to
         if spec is None:
@@ -125,13 +125,13 @@ class DelegateOperation(ActionOperation):
         return transport, task_id
 
 
-class HandoffOperation(ActionOperation):
+class HandoffOperation(Action):
     """处理 handoff 动作：非阻塞控制权移交，发完即返回。"""
 
     def __init__(self, transport_registry: TransportRegistryProtocol) -> None:
         self._transport_registry = transport_registry
 
-    async def execute(self, decision: StructuredDecision, state: TypedState) -> Observation:
+    async def execute(self, decision: Decision, state: AgentState) -> Observation:
         spec = decision.delegate_to
         if spec is None:
             raise ToolExecutionError("handoff 动作缺少 delegate_to 规格")

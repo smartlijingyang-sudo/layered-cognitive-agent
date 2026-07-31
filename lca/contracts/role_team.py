@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.contracts.enums import CompletionPolicyName, TeamProcess
+from lca.contracts.enums import DecisionGateName, TeamProcess
 
 
 @dataclass
@@ -57,4 +57,4 @@ class TeamConfig:
     shared_memory_layers: list[str] = field(default_factory=list)
     max_rounds: int | None = None
     graph_definition_ref: str | None = None
-    completion_policy: CompletionPolicyName = CompletionPolicyName.ROSTER_COVERAGE
+    decision_gate: DecisionGateName = DecisionGateName.MUST_CONSULT_ALL

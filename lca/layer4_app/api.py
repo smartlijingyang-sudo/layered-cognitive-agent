@@ -21,17 +21,17 @@ from __future__ import annotations
 from lca.contracts.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
 from lca.contracts.enums import TeamProcess
 from lca.contracts.protocols import (
-    BrainStrategy,
+    Brain,
     LLMAdapter,
     MemorySystem,
     Observability,
-    OrchestrationStrategy,
     StateStore,
-    TeamEntrypoint,
+    TeamProcessStrategy,
+    TeamUnit,
     Tool,
 )
 from lca.contracts.result import Result
-from lca.layer4_app.assembly import assemble_base_agent, assemble_team
+from lca.layer4_app.assembly import assemble_agent, assemble_team
 from lca.layer4_app.defaults import ensure_defaults
 
 
@@ -65,7 +65,7 @@ class Agent:
     state_store:
         ``"memory"`` (default) or a ``StateStore`` instance.
     brain_strategy:
-        ``"default"`` or a registered strategy name / ``BrainStrategy`` instance.
+        ``"default"`` or a registered strategy name / ``Brain`` instance.
     """
 
     def __init__(
@@ -80,10 +80,10 @@ class Agent:
         memory: str | MemorySystem = "simple",
         observability: str | Observability = "console",
         state_store: str | StateStore = "memory",
-        brain_strategy: str | BrainStrategy = "default",
+        brain_strategy: str | Brain = "default",
     ) -> None:
         ensure_defaults()
-        self._base_agent = assemble_base_agent(
+        self._agent = assemble_agent(
             role=role,
             goal=goal,
             backstory=backstory,
@@ -99,7 +99,7 @@ class Agent:
 
     async def run(self, task: str) -> Result:
         """Execute *task* and return the result."""
-        return await self._base_agent.execute(task)
+        return await self._agent.run(task)
 
 
 class MultiAgentTeam:
@@ -120,7 +120,7 @@ class MultiAgentTeam:
     graph_definition_ref:
         Reference to a graph definition (for ``GRAPH`` process).
     strategy:
-        Optional custom ``OrchestrationStrategy`` override.
+        Optional custom ``TeamProcessStrategy`` override.
     """
 
     def __init__(
@@ -131,12 +131,12 @@ class MultiAgentTeam:
         max_rounds: int | None = None,
         shared_memory_layers: list[str] | None = None,
         graph_definition_ref: str | None = None,
-        strategy: OrchestrationStrategy | None = None,
+        strategy: TeamProcessStrategy | None = None,
     ) -> None:
         ensure_defaults()
-        base_members = [m._base_agent for m in members]
-        base_supervisor = supervisor._base_agent if supervisor else None
-        self._orchestrator: TeamEntrypoint = assemble_team(
+        base_members = [m._agent for m in members]
+        base_supervisor = supervisor._agent if supervisor else None
+        self._orchestrator: TeamUnit = assemble_team(
             members=base_members,
             process=process,
             supervisor=base_supervisor,

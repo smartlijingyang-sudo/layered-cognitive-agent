@@ -8,7 +8,7 @@ from typing import Any, Protocol, runtime_checkable
 from lca.contracts.decision import AgentCard, Observation
 from lca.contracts.observability import TraceSpan
 from lca.contracts.role_team import CacheConfig, RetryPolicy
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 
 @runtime_checkable
@@ -60,10 +60,10 @@ class SafeExecutor(Protocol):
 
 @runtime_checkable
 class StateStore(Protocol):
-    """状态持久化：save / load TypedState。"""
+    """状态持久化：save / load AgentState。"""
 
-    async def save(self, state: TypedState) -> str: ...
-    async def load(self, state_ref: str) -> TypedState: ...
+    async def save(self, state: AgentState) -> str: ...
+    async def load(self, state_ref: str) -> AgentState: ...
 
 
 @runtime_checkable

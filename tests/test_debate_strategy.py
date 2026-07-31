@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.decision import StructuredDecision
+from lca.contracts.decision import Decision
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import OrchestrationContext
+from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.contracts.state import Budget
@@ -57,7 +57,7 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         """单成员时，第 1 轮即达成共识退出。"""
         agent = _make_agent("t1", ["only proposal"])
         strategy = DebateStrategy()
-        context = OrchestrationContext(members=[agent])
+        context = TeamContext(members=[agent])
 
         result = await strategy.run(context, "task")
 
@@ -71,7 +71,7 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("t-b", ["same proposal"])
 
         strategy = DebateStrategy()
-        context = OrchestrationContext(
+        context = TeamContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=5),
         )
@@ -88,7 +88,7 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("t-b", ["B1", "B2", "consensus"])
 
         strategy = DebateStrategy()
-        context = OrchestrationContext(
+        context = TeamContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=5),
         )
@@ -109,7 +109,7 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("t-b", ["B1", "B2"])
 
         strategy = DebateStrategy()
-        context = OrchestrationContext(
+        context = TeamContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=2),
         )
@@ -126,7 +126,7 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("t-b", ["B1", "B2", "B3"])
 
         strategy = DebateStrategy()
-        context = OrchestrationContext(members=[agent_a, agent_b])
+        context = TeamContext(members=[agent_a, agent_b])
 
         await strategy.run(context, "task")
 
@@ -150,7 +150,7 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_tracking_agent("t-b", "proposal-b")
 
         strategy = DebateStrategy()
-        context = OrchestrationContext(
+        context = TeamContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=3),
         )
@@ -173,7 +173,7 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
 
         pipeline = MagicMock()
         pipeline.evaluate = AsyncMock(
-            return_value=StructuredDecision(
+            return_value=Decision(
                 decision_id="debate_1",
                 action_type="respond",
                 rationale="strong",
@@ -183,7 +183,7 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
         )
 
         strategy = DebateStrategy(evaluation_pipeline=pipeline)
-        context = OrchestrationContext(
+        context = TeamContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=1),
         )
@@ -198,7 +198,7 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("t-b", ["second"])
 
         strategy = DebateStrategy()
-        context = OrchestrationContext(
+        context = TeamContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=1),
         )
@@ -213,7 +213,7 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
 
     async def test_empty_members_returns_failed(self) -> None:
         strategy = DebateStrategy()
-        context = OrchestrationContext(members=[])
+        context = TeamContext(members=[])
 
         result = await strategy.run(context, "task")
 
@@ -224,7 +224,7 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
         """无 pipeline 时退化：跑满轮数返回首个结果。"""
         agent = _make_agent("t1", ["solo"])
         strategy = DebateStrategy()
-        context = OrchestrationContext(
+        context = TeamContext(
             members=[agent],
             config=TeamConfig(process="debate", max_rounds=1),
         )
@@ -240,7 +240,7 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("t-b", [""], status=TaskStatus.FAILED)
 
         strategy = DebateStrategy()
-        context = OrchestrationContext(
+        context = TeamContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=1),
         )

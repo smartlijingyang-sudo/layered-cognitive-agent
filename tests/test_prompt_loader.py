@@ -23,7 +23,8 @@ class TestLoadBuiltinPrompt(unittest.TestCase):
         """hierarchical_prompt.md loads and contains expected placeholders."""
         content = load_builtin_prompt("hierarchical_prompt")
         self.assertIn("{role}", content)
-        self.assertIn("{team_roster}", content)
+        self.assertIn("{teammates}", content)
+        self.assertIn("{member_status_text}", content)
         self.assertIn("{allowed_actions}", content)
         self.assertIn("target_role", content)
 

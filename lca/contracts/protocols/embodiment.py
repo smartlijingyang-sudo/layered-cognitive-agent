@@ -5,17 +5,17 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import Observation, StructuredDecision
+from lca.contracts.decision import Decision, Observation
 from lca.contracts.protocols.infra import AgentTransport
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 
 @runtime_checkable
 class Body(Protocol):
-    """行动执行体：将 StructuredDecision 转化为 Observation。"""
+    """行动执行体：将 Decision 转化为 Observation。"""
 
-    async def act(self, decision: StructuredDecision, state: TypedState) -> Observation: ...
-    def bind_transport(self, transport: AgentTransport) -> None: ...
+    async def act(self, decision: Decision, state: AgentState) -> Observation: ...
+    def bind_channel(self, transport: AgentTransport) -> None: ...
 
 
 @runtime_checkable
@@ -27,7 +27,7 @@ class FallbackPolicy(Protocol):
 
     async def handle(
         self,
-        decision: StructuredDecision,
-        state: TypedState,
+        decision: Decision,
+        state: AgentState,
         action_registry: ActionRegistryProtocol | None = None,
     ) -> Observation: ...

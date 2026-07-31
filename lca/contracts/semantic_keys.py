@@ -1,7 +1,7 @@
 """框架语义键 —— Observation.extra / Decision.extra 中的约定字段名。
 
-TypedState 一等字段（final_output / last_error / active_template /
-team_progress_text）不再走字符串键。仅 **扩展袋** 使用本模块常量，
+AgentState 一等字段（final_output / last_error / active_template /
+MEMBER_STATUS_PROMPT_REMOVED）不再走字符串键。仅 **扩展袋** 使用本模块常量，
 禁止在业务代码中书写裸字符串字面量。
 """
 
@@ -13,7 +13,7 @@ FALLBACK_DEGRADED_FROM = "degraded_from_action_type"
 OBS_TASK_ID = "task_id"
 OBS_HANDOFF = "handoff"
 
-# StructuredDecision.extra
+# Decision.extra
 ORIGINAL_ACTION_TYPE = "original_action_type"
 
 # failure_kind 取值

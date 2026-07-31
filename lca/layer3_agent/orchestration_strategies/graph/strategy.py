@@ -20,9 +20,9 @@ from typing import Any
 
 from lca.contracts.graph import EdgeType, ExecutionGraph, NodeType
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import OrchestrationContext, OrchestrationStrategy, StateStore
+from lca.contracts.protocols import StateStore, TeamContext, TeamProcessStrategy
 from lca.contracts.result import Result
-from lca.contracts.state import Budget, TypedState
+from lca.contracts.state import AgentState, Budget
 from lca.layer3_agent.member_invoke import invoke_member
 from lca.layer3_agent.orchestration_strategies.graph.topology import (
     cascade_skip,
@@ -49,11 +49,11 @@ class GraphExecutionState:
     queue: deque[str] = field(default_factory=deque)
 
 
-class GraphStrategy(OrchestrationStrategy):
+class GraphStrategy(TeamProcessStrategy):
     """DAG 工作流引擎：拓扑排序 + fan-in/fan-out + 条件分支 + 并行分支。
 
     构造时可选传入 ExecutionGraph 和 StateStore。
-    若未传入 graph，则从 OrchestrationContext 解析（当前要求构造时传入）。
+    若未传入 graph，则从 TeamContext 解析（当前要求构造时传入）。
     """
 
     def __init__(
@@ -64,13 +64,13 @@ class GraphStrategy(OrchestrationStrategy):
         self._graph = execution_graph
         self._state_store = state_store
 
-    async def run(self, context: OrchestrationContext, objective: str) -> Result:
+    async def run(self, context: TeamContext, objective: str) -> Result:
         graph = self._resolve_graph(context)
         graph.validate()
         if graph.allow_cycle:
             raise ValueError("GraphStrategy 仅支持严格 DAG（allow_cycle=False）。")
         member_map = {m.role_profile.role: m for m in context.members}
-        state = TypedState(trace_id=_GRAPH_TRACE_ID, task=objective, budget=Budget())
+        state = AgentState(trace_id=_GRAPH_TRACE_ID, task=objective, budget=Budget())
         in_degree, out_edge_indices = compute_in_degree_and_out_edges(graph)
 
         es = GraphExecutionState(
@@ -97,10 +97,10 @@ class GraphStrategy(OrchestrationStrategy):
         self,
         nid: str,
         graph: ExecutionGraph,
-        state: TypedState,
+        state: AgentState,
         out_edge_indices: dict[str, list[int]],
         es: GraphExecutionState,
-        context: OrchestrationContext,
+        context: TeamContext,
         member_map: dict[str, Any],
         objective: str,
     ) -> None:
@@ -131,10 +131,10 @@ class GraphStrategy(OrchestrationStrategy):
         self,
         targets: list[str],
         graph: ExecutionGraph,
-        context: OrchestrationContext,
+        context: TeamContext,
         member_map: dict[str, Any],
         objective: str,
-        state: TypedState,
+        state: AgentState,
         es: GraphExecutionState,
     ) -> None:
         """并行执行多个分支（asyncio.gather），每个分支可递归触发子并行。"""
@@ -184,10 +184,10 @@ class GraphStrategy(OrchestrationStrategy):
         self,
         node: Any,
         graph: ExecutionGraph,
-        context: OrchestrationContext,
+        context: TeamContext,
         member_map: dict[str, Any],
         objective: str,
-        state: TypedState,
+        state: AgentState,
         es: GraphExecutionState,
     ) -> None:
         if node.type == NodeType.AGENT:
@@ -212,7 +212,7 @@ class GraphStrategy(OrchestrationStrategy):
                 output="\n".join(parts),
             )
 
-    def _resolve_graph(self, context: OrchestrationContext) -> ExecutionGraph:
+    def _resolve_graph(self, context: TeamContext) -> ExecutionGraph:
         if self._graph is not None:
             return self._graph
         raise ValueError("GraphStrategy 需要 ExecutionGraph：构造时传入 execution_graph")

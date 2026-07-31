@@ -1,7 +1,8 @@
-"""CompletionPolicy 实现包。"""
+"""Compat — prefer ``lca.layer1_cognitive.brain.decision_gates``."""
 
-from lca.layer1_cognitive.brain.completion_policies.roster_coverage import (
+from lca.layer1_cognitive.brain.decision_gates import (
+    MustConsultAllMembers,
     RosterCoveragePolicy,
 )
 
-__all__ = ["RosterCoveragePolicy"]
+__all__ = ["MustConsultAllMembers", "RosterCoveragePolicy"]

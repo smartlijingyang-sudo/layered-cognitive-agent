@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.protocols import SkillRouter
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 
 class KeywordSkillRouter(SkillRouter):
@@ -28,7 +28,7 @@ class KeywordSkillRouter(SkillRouter):
         self._rules = rules
         self._default = default_template
 
-    async def route(self, state: TypedState) -> str:
+    async def route(self, state: AgentState) -> str:
         task_lower = state.task.lower()
         for template_name, keywords in self._rules.items():
             if any(kw.lower() in task_lower for kw in keywords):
@@ -42,5 +42,5 @@ class StaticSkillRouter(SkillRouter):
     def __init__(self, template_name: str) -> None:
         self._template = template_name
 
-    async def route(self, state: TypedState) -> str:
+    async def route(self, state: AgentState) -> str:
         return self._template

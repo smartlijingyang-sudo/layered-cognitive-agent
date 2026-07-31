@@ -10,7 +10,7 @@ from typing import Protocol, runtime_checkable
 
 from lca.contracts.decision import Observation, Reflection
 from lca.contracts.memory import MemoryRecord
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 
 
 @runtime_checkable
@@ -23,10 +23,10 @@ class MemorySystem(Protocol):
     - query：显式检索指定层的记录（共享记忆统一入口）
     """
 
-    async def perceive(self, state: TypedState) -> TypedState: ...
+    async def perceive(self, state: AgentState) -> AgentState: ...
 
     async def update(
-        self, state: TypedState, observation: Observation, reflection: Reflection
+        self, state: AgentState, observation: Observation, reflection: Reflection
     ) -> None: ...
 
     def query(self, layer: str) -> list[MemoryRecord]: ...

@@ -11,7 +11,7 @@ import structlog
 from lca.contracts.ids import new_id
 from lca.contracts.observability import TraceSpan
 from lca.contracts.protocols import HookRegistry, Observability
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 from lca.layer0_infra.observability.redaction import safe_repr
 from lca.layer0_infra.observability.span_attributes import extract_span_attributes
 
@@ -32,7 +32,7 @@ class SimpleHookRegistry(HookRegistry):
     def register(self, event_name: str, hook: Callable) -> None:
         self._hooks.setdefault(event_name, []).append(hook)
 
-    async def trigger(self, event_name: str, state: TypedState, **kwargs: Any) -> Any:
+    async def trigger(self, event_name: str, state: AgentState, **kwargs: Any) -> Any:
         span = TraceSpan(
             span_id=new_id("span"),
             trace_id=state.trace_id,
@@ -47,10 +47,10 @@ class SimpleHookRegistry(HookRegistry):
         return None
 
 
-async def default_logging_hook(event_name: str, state: TypedState, **kwargs: Any) -> None:
+async def default_logging_hook(event_name: str, state: AgentState, **kwargs: Any) -> None:
     extra = {k: v for k, v in kwargs.items() if k != "state"}
     role_info = f"role={state.agent_role}" if state.agent_role else ""
-    delegator_info = f"delegated_by={state.delegated_by}" if state.delegated_by else ""
+    delegator_info = f"from_role={state.delegated_by}" if state.delegated_by else ""
     context_parts = [p for p in [role_info, delegator_info] if p]
     context_str = " ".join(context_parts)
     safe_extra = {k: safe_repr(v) for k, v in extra.items()} if extra else None

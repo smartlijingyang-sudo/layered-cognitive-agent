@@ -1,4 +1,4 @@
-"""decision contracts - no lifecycle twins."""
+"""Decision / ActResult / Reflection contracts."""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ from lca.contracts.enums import ContentType, DelegationProtocol, ReflectionVerdi
 from lca.contracts.lifecycle import AgentCard
 
 __all__ = [
+    "ActResult",
     "AgentCard",
+    "Decision",
     "DelegationSpec",
     "Observation",
     "Reflection",
@@ -25,7 +27,7 @@ def _now() -> datetime:
 
 @dataclass
 class ToolCall:
-    """单次工具调用请求：工具名 + 参数 + 幂等键。"""
+    """Single tool invocation: name + arguments + optional idempotency key."""
 
     call_id: str
     tool_name: str
@@ -36,7 +38,7 @@ class ToolCall:
 
 @dataclass
 class DelegationSpec:
-    """委派规格：目标角色/Agent + 传输协议 + 截止时间。"""
+    """Ask a teammate: target role/agent + protocol + optional deadline."""
 
     subtask: str
     target_role: str | None = None
@@ -48,8 +50,8 @@ class DelegationSpec:
 
 
 @dataclass
-class StructuredDecision:
-    """Agent 单步决策输出：行动类型 + 理由 + 工具调用 / 委派规格。"""
+class Decision:
+    """One step's chosen action: type + rationale + tool calls / delegation."""
 
     decision_id: str
     action_type: str
@@ -64,8 +66,8 @@ class StructuredDecision:
 
 
 @dataclass
-class Observation:
-    """工具执行 / 委派结果：成功标志 + 载荷 + 降级信息。"""
+class ActResult:
+    """Outcome of acting on a Decision (tool / delegate / respond)."""
 
     observation_id: str
     success: bool
@@ -78,13 +80,26 @@ class Observation:
     degraded_from: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def ok(self) -> bool:
+        return self.success
+
+    @property
+    def data(self) -> Any:
+        return self.payload
+
 
 @dataclass
 class Reflection:
-    """Critic 自省输出：判定 + 教训 + 可选纠正决策。"""
+    """Critic output: verdict + lesson + optional correction Decision."""
 
     reflection_id: str
     verdict: ReflectionVerdict
     lesson: str | None = None
-    correction: StructuredDecision | None = None
+    correction: Decision | None = None
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+# Transitional aliases — remove after one release cycle.
+StructuredDecision = Decision
+Observation = ActResult
