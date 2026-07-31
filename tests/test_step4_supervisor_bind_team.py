@@ -17,7 +17,7 @@ from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManif
 from lca.contracts.state import Budget
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
-from lca.layer3_agent.simple_agent import BaseAgent
+from lca.layer3_agent.simple_agent import CognitiveAgent
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 from lca.layer4_app.assembly import build_team_transport
 from lca.layer4_app.defaults import ensure_defaults
@@ -38,9 +38,9 @@ def _make_role(role: str, goal: str = "") -> RoleProfile:
     )
 
 
-def _make_member(role: str, return_output: str = "done") -> BaseAgent:
+def _make_member(role: str, return_output: str = "done") -> CognitiveAgent:
     runtime = MagicMock()
-    member = BaseAgent(runtime, _make_role(role))
+    member = CognitiveAgent(runtime, _make_role(role))
     result = Result(
         trace_id=f"trace-{role}",
         status=TaskStatus.COMPLETED,
@@ -50,7 +50,6 @@ def _make_member(role: str, return_output: str = "done") -> BaseAgent:
         budget_used=Budget(),
     )
     member.run = AsyncMock(return_value=result)  # type: ignore[method-assign]
-    member.execute = AsyncMock(return_value=result)  # type: ignore[method-assign]
     return member
 
 
@@ -76,7 +75,7 @@ class _AcceptsTeammatesBrain(AcceptsTeammates):
 
 
 def _make_supervisor_with_runtime() -> tuple[
-    BaseAgent, MagicMock, TransportRegistry, _AcceptsTeammatesBrain
+    CognitiveAgent, MagicMock, TransportRegistry, _AcceptsTeammatesBrain
 ]:
     """返回 (supervisor, mock_runtime, transport_registry, brain)。"""
     registry = TransportRegistry()
@@ -88,7 +87,7 @@ def _make_supervisor_with_runtime() -> tuple[
     mock_runtime.brain = mock_brain
     mock_runtime.memory = MagicMock()
 
-    sup = BaseAgent(mock_runtime, _make_role("supervisor"))
+    sup = CognitiveAgent(mock_runtime, _make_role("supervisor"))
     return sup, mock_runtime, registry, mock_brain
 
 
@@ -112,7 +111,6 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
             budget_used=Budget(),
         )
         sup.run = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
-        sup.execute = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
 
         transport, teammates_text = build_team_transport(members)
         orchestrator = TeamOrchestrator(
@@ -140,7 +138,6 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
             budget_used=Budget(),
         )
         sup.run = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
-        sup.execute = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
 
         transport, teammates_text = build_team_transport(members)
         orchestrator = TeamOrchestrator(
@@ -169,7 +166,6 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
             budget_used=Budget(),
         )
         sup.run = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
-        sup.execute = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
 
         orchestrator = TeamOrchestrator(members, config, supervisor=sup)
         await orchestrator.run("task")
@@ -184,7 +180,7 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
 
 class TestDelegateRemoved(unittest.TestCase):
     def test_delegate_method_no_longer_exists(self) -> None:
-        self.assertFalse(hasattr(BaseAgent, "delegate"))
+        self.assertFalse(hasattr(CognitiveAgent, "delegate"))
 
 
 # ---------------------------------------------------------------------------

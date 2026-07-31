@@ -4,12 +4,10 @@ from lca.contracts.action import Action, ActionRegistryProtocol
 from lca.contracts.approval import ApprovalDecision, ApprovalRequest
 from lca.contracts.budget import create_budget
 from lca.contracts.decision import (
-    ActResult,
     Decision,
     DelegationSpec,
     Observation,
     Reflection,
-    StructuredDecision,
     ToolCall,
 )
 from lca.contracts.graph import (
@@ -20,12 +18,9 @@ from lca.contracts.graph import (
 )
 from lca.contracts.lifecycle import AgentCard, TaskStatus, TeamMessage
 from lca.contracts.loop_judge import (
-    LoopJudge,
     StopDecision,
     StopReason,
     StopRule,
-    TerminationReason,
-    TerminationSignal,
 )
 from lca.contracts.mechanisms import (
     EventBus,
@@ -51,17 +46,11 @@ from lca.contracts.role_team import (
     ToolPermissionManifest,
 )
 from lca.contracts.run_context import RunContext
-from lca.contracts.state import AgentState, Budget, StateSnapshot, TypedState
-from lca.contracts.team_progress import DelegationLedgerProtocol
+from lca.contracts.state import AgentState, Budget, StateSnapshot
 from lca.contracts.types import StepOutcome, Turn
 
-# Transitional Action alias used by some imports
-ActionOperation = Action
-
 __all__ = [
-    "ActResult",
     "Action",
-    "ActionOperation",
     "ActionRegistryProtocol",
     "AgentCard",
     "AgentState",
@@ -73,7 +62,6 @@ __all__ = [
     "CacheConfig",
     "Decision",
     "DecisionGate",
-    "DelegationLedgerProtocol",
     "DelegationSpec",
     "Event",
     "EventBus",
@@ -83,7 +71,6 @@ __all__ = [
     "GraphValidationError",
     "Hook",
     "HookRegistry",
-    "LoopJudge",
     "MemberStatus",
     "MemoryRecord",
     "NamedRegistryProtocol",
@@ -99,18 +86,14 @@ __all__ = [
     "StopDecision",
     "StopReason",
     "StopRule",
-    "StructuredDecision",
     "TaskStatus",
     "TeamConfig",
     "TeamMessage",
-    "TerminationReason",
-    "TerminationSignal",
     "ToolCall",
     "ToolExecutionError",
     "ToolPermissionManifest",
     "TraceSpan",
     "TransportRegistryProtocol",
     "Turn",
-    "TypedState",
     "create_budget",
 ]

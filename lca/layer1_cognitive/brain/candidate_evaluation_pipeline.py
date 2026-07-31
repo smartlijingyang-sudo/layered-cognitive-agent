@@ -15,6 +15,7 @@ import structlog
 
 from lca.contracts.decision import Decision
 from lca.contracts.protocols import CandidateEvaluationPipeline, DecisionGate
+from lca.contracts.semantic_keys import EVAL_CONFLICTS
 from lca.contracts.state import AgentState
 
 _log = structlog.get_logger("lca.candidate_evaluation_pipeline")
@@ -36,10 +37,11 @@ class SimpleCandidateEvaluationPipeline(CandidateEvaluationPipeline):
         candidates: list[Decision],
     ) -> Decision:
         conflicts = self._check_conflicts(candidates)
+        best = max(candidates, key=lambda d: d.confidence)
         if conflicts:
             _log.warning("conflicts_detected", conflicts=conflicts)
-        best_idx = max(range(len(candidates)), key=lambda i: 1.0)
-        return candidates[best_idx]
+            best.extra[EVAL_CONFLICTS] = conflicts
+        return best
 
     @staticmethod
     def _check_conflicts(candidates: list[Decision]) -> list[str]:

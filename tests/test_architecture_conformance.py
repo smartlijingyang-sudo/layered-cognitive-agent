@@ -93,14 +93,12 @@ def _collect_protocol_classes() -> set[type]:
     import lca.contracts.member_status as member_status_mod
     import lca.contracts.protocols as protocols_mod
     import lca.contracts.stop as stop_mod
-    import lca.contracts.team_progress as team_progress_mod
 
     result: set[type] = set()
     for mod in (
         protocols_mod,
         action_mod,
         mechanisms_mod,
-        team_progress_mod,
         member_status_mod,
         loop_judge_mod,
         stop_mod,

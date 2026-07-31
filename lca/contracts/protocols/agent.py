@@ -35,8 +35,3 @@ class TeamUnit(Protocol):
     """Team entry: run an objective end-to-end."""
 
     async def run(self, objective: str | AgentMessage) -> Result: ...
-
-
-# Transitional aliases — remove after one release cycle.
-AgentEntrypoint = AgentUnit
-TeamEntrypoint = TeamUnit

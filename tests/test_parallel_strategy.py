@@ -33,7 +33,7 @@ def _make_result(trace_id: str, output: str) -> Result:
 
 
 def _make_agent(trace_id: str, output: str, delay: float = 0.0):
-    """构建 BaseAgent 桩件，execute 返回指定 Result。"""
+    """构建 CognitiveAgent 桩件，run 返回指定 Result。"""
     agent = MagicMock()
 
     async def _execute(task: str) -> Result:
@@ -41,7 +41,7 @@ def _make_agent(trace_id: str, output: str, delay: float = 0.0):
             await asyncio.sleep(delay)
         return _make_result(trace_id, output)
 
-    agent.execute = AsyncMock(side_effect=_execute)
+    agent.run = AsyncMock(side_effect=_execute)
     return agent
 
 
@@ -57,8 +57,8 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
         result = await strategy.run(context, "test objective")
 
-        agent_a.execute.assert_awaited_once_with("test objective")
-        agent_b.execute.assert_awaited_once_with("test objective")
+        agent_a.run.assert_awaited_once_with("test objective")
+        agent_b.run.assert_awaited_once_with("test objective")
         self.assertEqual(result.trace_id, "trace-b")
         self.assertEqual(result.output, "result-b")
 
@@ -136,7 +136,7 @@ class TestParallelStrategyTraceIsolation(unittest.IsolatedAsyncioTestCase):
                 traces_seen.append(trace_id)
                 return _make_result(trace_id, f"output-{trace_id}")
 
-            agent.execute = AsyncMock(side_effect=_execute)
+            agent.run = AsyncMock(side_effect=_execute)
             return agent
 
         agent_a = _make_tracked_agent("trace-alpha")

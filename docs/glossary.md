@@ -41,7 +41,7 @@
 | **CognitiveLoop** / **CognitiveRuntime** | perceive → think → act → reflect → stop 认知闭环 |
 | **AgentState** | 循环状态容器（原 TypedState） |
 | **Decision** | 一步行动决策（原 StructuredDecision） |
-| **ActResult** | 行动结果（原 Observation 类型名；字段仍可 success/payload） |
+| **Observation** | 行动结果（原 ActResult 类型名；字段仍可 success/payload） |
 | **Reflection** | 自省判定 |
 | **StopRule** / **StopDecision** / **StopReason** | 是否结束循环（合并原 LoopJudge / TerminationSignal / StepOutcome 对外双轨） |
 | **DefaultStopRule** | 默认终止裁判；内部可组合 StepOutcomePolicy |
@@ -111,7 +111,7 @@
 |---|---|
 | StructuredDecision | Decision |
 | TypedState | AgentState |
-| Observation（类型） | ActResult |
+| ActResult | Observation |
 | DelegationLedger / team_progress | MemberStatus / member_status |
 | roster / roster_desc | teammates_text |
 | AgentEntrypoint / TeamEntrypoint | AgentUnit / TeamUnit |

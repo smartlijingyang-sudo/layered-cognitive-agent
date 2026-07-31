@@ -1,4 +1,4 @@
-"""TeamProcessBrainFactoryRegistry —— 按 process 名称注册和解析编排策略。
+"""TeamProcessStrategyRegistry —— 按 process 名称注册和解析编排策略。
 
 L3 层职责：
     注册表模式（Registry Pattern）的实现。
@@ -16,10 +16,10 @@ from lca.layer0_infra.component_registry import NamedRegistry
 
 OrchestrationFactory = Callable[[], TeamProcessStrategy]
 
-_global_orchestration_registry: TeamProcessBrainFactoryRegistry | None = None
+_global_orchestration_registry: TeamProcessStrategyRegistry | None = None
 
 
-class TeamProcessBrainFactoryRegistry(NamedRegistry[OrchestrationFactory]):
+class TeamProcessStrategyRegistry(NamedRegistry[OrchestrationFactory]):
     """按名称注册和查找 TeamProcessStrategy 工厂。
 
     工厂签名: ``() -> TeamProcessStrategy``
@@ -45,9 +45,9 @@ class TeamProcessBrainFactoryRegistry(NamedRegistry[OrchestrationFactory]):
         return name in self
 
 
-def get_global_orchestration_registry() -> TeamProcessBrainFactoryRegistry:
+def get_global_orchestration_registry() -> TeamProcessStrategyRegistry:
     """返回全局单例编排策略注册表。"""
     global _global_orchestration_registry
     if _global_orchestration_registry is None:
-        _global_orchestration_registry = TeamProcessBrainFactoryRegistry()
+        _global_orchestration_registry = TeamProcessStrategyRegistry()
     return _global_orchestration_registry

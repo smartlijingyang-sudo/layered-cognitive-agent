@@ -15,6 +15,7 @@ OBS_HANDOFF = "handoff"
 
 # Decision.extra
 ORIGINAL_ACTION_TYPE = "original_action_type"
+EVAL_CONFLICTS = "eval_conflicts"
 
 # failure_kind 取值
 FAILURE_KIND_VALIDATION = "validation"

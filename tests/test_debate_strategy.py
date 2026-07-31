@@ -9,9 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.decision import Decision
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import TeamContext
+from lca.contracts.protocols import Synthesizer, TeamContext
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.contracts.state import Budget
@@ -46,7 +45,7 @@ def _make_agent(
         call_count += 1
         return _make_result(trace_id, output, status=status)
 
-    agent.execute = AsyncMock(side_effect=_execute)
+    agent.run = AsyncMock(side_effect=_execute)
     return agent
 
 
@@ -63,7 +62,7 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.output, "only proposal")
-        self.assertEqual(agent.execute.call_count, 1)
+        self.assertEqual(agent.run.call_count, 1)
 
     async def test_early_exit_when_consensus(self) -> None:
         """所有成员输出相同时 → 提前退出，不跑满 max_rounds。"""
@@ -79,8 +78,8 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         result = await strategy.run(context, "task")
 
         self.assertEqual(result.status, "completed")
-        self.assertEqual(agent_a.execute.call_count, 1)
-        self.assertEqual(agent_b.execute.call_count, 1)
+        self.assertEqual(agent_a.run.call_count, 1)
+        self.assertEqual(agent_b.run.call_count, 1)
 
     async def test_convergence_after_rounds(self) -> None:
         """前 N-1 轮有分歧，第 N 轮收敛。"""
@@ -96,8 +95,8 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         result = await strategy.run(context, "task")
 
         self.assertEqual(result.status, "completed")
-        self.assertEqual(agent_a.execute.call_count, 3)
-        self.assertEqual(agent_b.execute.call_count, 3)
+        self.assertEqual(agent_a.run.call_count, 3)
+        self.assertEqual(agent_b.run.call_count, 3)
 
 
 class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
@@ -117,8 +116,8 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         result = await strategy.run(context, "task")
 
         self.assertEqual(result.status, "completed")
-        self.assertEqual(agent_a.execute.call_count, 2)
-        self.assertEqual(agent_b.execute.call_count, 2)
+        self.assertEqual(agent_a.run.call_count, 2)
+        self.assertEqual(agent_b.run.call_count, 2)
 
     async def test_default_max_rounds_is_three(self) -> None:
         """未指定 max_rounds 时默认 3 轮。"""
@@ -130,7 +129,7 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
 
         await strategy.run(context, "task")
 
-        self.assertEqual(agent_a.execute.call_count, 3)
+        self.assertEqual(agent_a.run.call_count, 3)
 
     async def test_objective_augmented_with_proposals(self) -> None:
         """每轮 objective 应包含前一轮各 Agent 的提案。"""
@@ -143,7 +142,7 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
                 seen_objectives.append(task)
                 return _make_result(trace_id, output)
 
-            agent.execute = AsyncMock(side_effect=_execute)
+            agent.run = AsyncMock(side_effect=_execute)
             return agent
 
         agent_a = _make_tracking_agent("t-a", "proposal-a")
@@ -166,23 +165,15 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
 class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
     """验证仲裁正确性。"""
 
-    async def test_arbitration_via_pipeline(self) -> None:
-        """pipeline.evaluate 返回的 winner 应被正确映射回 Result。"""
+    async def test_arbitration_via_synthesizer(self) -> None:
+        """Synthesizer.synthesize 的结果应作为最终输出。"""
         agent_a = _make_agent("t-a", ["weak"])
         agent_b = _make_agent("t-b", ["strong"])
 
-        pipeline = MagicMock()
-        pipeline.evaluate = AsyncMock(
-            return_value=Decision(
-                decision_id="debate_1",
-                action_type="respond",
-                rationale="strong",
-                confidence=0.9,
-                response_text="strong",
-            )
-        )
+        synth = MagicMock()
+        synth.synthesize = AsyncMock(return_value=_make_result("t-synth", "synthesized"))
 
-        strategy = DebateStrategy(evaluation_pipeline=pipeline)
+        strategy = DebateStrategy(synthesizer=synth)
         context = TeamContext(
             members=[agent_a, agent_b],
             config=TeamConfig(process="debate", max_rounds=1),
@@ -190,10 +181,11 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
 
         result = await strategy.run(context, "task")
 
-        self.assertEqual(result.output, "strong")
+        self.assertEqual(result.output, "synthesized")
+        self.assertIsInstance(synth, Synthesizer)
 
-    async def test_no_pipeline_returns_first_on_max_rounds(self) -> None:
-        """无 pipeline 时，跑满轮数后返回首个结果。"""
+    async def test_no_synthesizer_returns_first_on_max_rounds(self) -> None:
+        """无 Synthesizer 时，跑满轮数后返回首个结果。"""
         agent_a = _make_agent("t-a", ["first"])
         agent_b = _make_agent("t-b", ["second"])
 
@@ -220,8 +212,8 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "failed")
         self.assertIn("No members", result.error or "")
 
-    async def test_no_pipeline_still_works(self) -> None:
-        """无 pipeline 时退化：跑满轮数返回首个结果。"""
+    async def test_no_synthesizer_still_works(self) -> None:
+        """无 Synthesizer 时退化：跑满轮数返回首个结果。"""
         agent = _make_agent("t1", ["solo"])
         strategy = DebateStrategy()
         context = TeamContext(

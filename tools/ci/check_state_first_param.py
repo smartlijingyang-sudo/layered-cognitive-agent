@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""CI 15.1：含 TypedState 标注的协议方法，首个非 self 参数应命名为 state。
+"""CI 15.1：含 AgentState 标注的协议方法，首个非 self 参数应命名为 state。
 
 扫描范围：lca/contracts/protocols/**、lca/contracts/mechanisms.py、lca/contracts/action.py
-渐进收紧：当前仅对「第一个参数类型为 TypedState」做强制；
-若 TypedState 出现在非首参位置，输出 WARN 不失败（历史签名兼容）。
+渐进收紧：当前仅对「第一个参数类型为 AgentState」做强制；
+若 AgentState 出现在非首参位置，输出 WARN 不失败（历史签名兼容）。
 """
 
 from __future__ import annotations
@@ -52,19 +52,19 @@ def _check_file(path: Path) -> tuple[list[str], list[str]]:
             continue
         non_self = args[1:]
         typed_state_positions = [
-            i for i, a in enumerate(non_self) if _ann_name(a.annotation) == "TypedState"
+            i for i, a in enumerate(non_self) if _ann_name(a.annotation) == "AgentState"
         ]
         if not typed_state_positions:
             continue
         first = non_self[0]
-        if _ann_name(first.annotation) == "TypedState" and first.arg != "state":
+        if _ann_name(first.annotation) == "AgentState" and first.arg != "state":
             errors.append(
-                f"{rel}:{node.lineno} {node.name}() — 首个非 self 参数类型为 TypedState "
+                f"{rel}:{node.lineno} {node.name}() — 首个非 self 参数类型为 AgentState "
                 f"但命名为 {first.arg!r}，应为 'state'"
             )
         elif typed_state_positions[0] != 0:
             warnings.append(
-                f"{rel}:{node.lineno} {node.name}() — TypedState 不在首参 "
+                f"{rel}:{node.lineno} {node.name}() — AgentState 不在首参 "
                 f"(位置 {typed_state_positions[0] + 1})，建议逐步调整为 state 首参"
             )
     return errors, warnings
@@ -91,7 +91,7 @@ def main() -> int:
     for w in warnings:
         print(f"WARN: {w}")
     if errors:
-        print("FAIL: TypedState 首参命名违规（ADR-0016 / CI 15.1）:")
+        print("FAIL: AgentState 首参命名违规（ADR-0016 / CI 15.1）:")
         for e in errors:
             print(f"  - {e}")
         return 1

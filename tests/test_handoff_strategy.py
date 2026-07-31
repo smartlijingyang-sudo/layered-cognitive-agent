@@ -41,7 +41,7 @@ def _make_agent(role: str, output: str, status: TaskStatus = TaskStatus.COMPLETE
     async def _execute(task: str) -> Result:
         return _make_result(f"trace-{role}", output, status=status)
 
-    agent.execute = AsyncMock(side_effect=_execute)
+    agent.run = AsyncMock(side_effect=_execute)
     return agent
 
 
@@ -60,8 +60,8 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.output, "routed")
-        agent_a.execute.assert_awaited_once()
-        agent_b.execute.assert_not_awaited()
+        agent_a.run.assert_awaited_once()
+        agent_b.run.assert_not_awaited()
 
     async def test_fallback_to_next_agent_on_failure(self) -> None:
         """第一个 Agent 失败时，继续尝试下一个。"""

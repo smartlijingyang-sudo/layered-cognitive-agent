@@ -83,13 +83,8 @@ class TeamOrchestrator(TeamUnit):
     def _create_member_status(members: list[CognitiveAgent]) -> MemberStatus:
         required_roles = frozenset(m.role_profile.role for m in members)
         reg = get_global_registry()
-        # registry key kept for one cycle; value is InMemoryMemberStatus factory
         cls = reg.require("member_status", "default")
-        try:
-            return cast("MemberStatus", cls(required_roles=required_roles))
-        except Exception:
-            cls = reg.require("delegation_ledger", "default")
-            return cast("MemberStatus", cls(required_roles=required_roles))
+        return cast("MemberStatus", cls(required_roles=required_roles))
 
     @staticmethod
     def _resolve_decision_gate(config: TeamConfig) -> DecisionGate | None:
@@ -97,10 +92,7 @@ class TeamOrchestrator(TeamUnit):
         if policy_name == DecisionGateName.NONE:
             return None
         reg = get_global_registry()
-        try:
-            factory = reg.require("decision_gate", policy_name)
-        except Exception:
-            factory = reg.require("completion_policy", policy_name)
+        factory = reg.require("decision_gate", policy_name)
         return cast("DecisionGate", factory())
 
     def _inject_shared_memory(self) -> None:

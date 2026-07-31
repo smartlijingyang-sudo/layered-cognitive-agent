@@ -4,10 +4,10 @@
 |---|---|---|
 | [0001](0001-five-layer-separation.md) | 五层单向依赖分层 | contracts → L0 → L1 → L2 → L3 → L4，import-linter 自动守卫 |
 | [0002](0002-cognitive-loop.md) | 认知闭环 | perceive→think→act→observe→reflect→update，Loop <25 行 |
-| [0003](0003-map-five-module-brain.md) | MAP 五模块 Brain | TaskDecomposer/StatePredictor/StateEvaluator/ConflictMonitor/TaskCoordinator |
+| [0003](0003-map-five-module-brain.md) | MAP 五模块 Brain | TaskDecomposer/StatePredictor/StateEvaluator/ConflictMonitor/TaskCoordinator（已被 [0022](0022-map-pipeline-consolidation.md) 取代） |
 | [0004](0004-protocol-first-pluggability.md) | Protocol-First 可插拔 | 22+ Protocol，第三方实现接口即可接入 |
 | [0005](0005-composition-root-l4.md) | L4 组合根 | defaults.py 唯一引用所有具体类的组装点 |
-| [0006](0006-multi-agent-orchestration.md) | 多智能体编排 | hierarchical/sequential/graph/debate 可切换 |
+| [0006](0006-multi-agent-orchestration.md) | 多智能体编排 | hierarchical/sequential/graph/debate 可切换（已被 [0019](0019-refactor-cleanup.md)/[0021](0021-naming-convention-arbitration.md) 取代） |
 | [0007](0007-interop-mcp-a2a.md) | 原生互操作协议 | L0 内置 MCP/A2A 适配，协议本身可插拔 |
 | [0008](0008-framework-positioning.md) | 框架定位 | 认知可解释性 + 生产级工程能力，同时优先 |
 | [0009](0009-code-quality-toolchain.md) | 代码质量工具链 | ruff + mypy + pytest + import-linter + pre-commit + CI |
@@ -23,6 +23,7 @@
 | [0019](0019-refactor-cleanup.md) | 架构审查清理 | 删 GroupChat/Supervisor 壳类；Registry resolve 语义统一；hooks 文件改名 |
 | [0020](0020-map-pipeline-default-and-action-enums.md) | MAP 默认评估管线深化 | 默认 MAP 管线 + 领域枚举（原 ADR-0017，重编号） |
 | [0021](0021-naming-convention-arbitration.md) | Simple/Default/领域名三分规则 | L1 Simple* / L2 Default* / L3 领域名或 Simple*；BaseAgent→SimpleAgent |
+| [0022](0022-map-pipeline-consolidation.md) | MAP 管线收敛 | 五模块 → 单一 CandidateEvaluationPipeline；Supersedes ADR-0003 |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

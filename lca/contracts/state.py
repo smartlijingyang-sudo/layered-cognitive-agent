@@ -75,9 +75,15 @@ class AgentState:
     last_error: str | None = None
     active_template: str | None = None
 
-    # Transitional field aliases for one cycle.
     @property
     def delegated_by(self) -> str:
+        import warnings
+
+        warnings.warn(
+            "'delegated_by' is deprecated, use 'from_role'",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.from_role
 
     @delegated_by.setter
@@ -94,7 +100,3 @@ class AgentState:
         )
         self.checkpoints.append(snap)
         return snap
-
-
-# Transitional alias — remove after one release cycle.
-TypedState = AgentState

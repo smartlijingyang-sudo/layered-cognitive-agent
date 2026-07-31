@@ -8,16 +8,15 @@ L3 层职责：
 """
 
 from lca.layer3_agent.orchestration_registry import (
-    TeamProcessBrainFactoryRegistry,
+    TeamProcessStrategyRegistry,
     get_global_orchestration_registry,
 )
-from lca.layer3_agent.simple_agent import BaseAgent, CognitiveAgent
+from lca.layer3_agent.simple_agent import CognitiveAgent
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 
 __all__ = [
-    "BaseAgent",
     "CognitiveAgent",
     "TeamOrchestrator",
-    "TeamProcessBrainFactoryRegistry",
+    "TeamProcessStrategyRegistry",
     "get_global_orchestration_registry",
 ]

@@ -25,7 +25,7 @@ def _get_process_enum_values() -> set[str]:
 
 
 class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
-    """TeamConfig.process 声明值集合 恒等于 TeamProcessBrainFactoryRegistry 的 key 集合。"""
+    """TeamConfig.process 声明值集合 恒等于 TeamProcessStrategyRegistry 的 key 集合。"""
 
     def test_literal_values_match_registered_strategies(self) -> None:
         literal_values = _get_process_enum_values()
@@ -82,7 +82,7 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
                 budget_used=Budget(),
             )
 
-        agent.execute = AsyncMock(side_effect=_execute)
+        agent.run = AsyncMock(side_effect=_execute)
         context = TeamContext(members=[agent])
         result = await strategy.run(context, "test")
         self.assertEqual(result.status, "completed")

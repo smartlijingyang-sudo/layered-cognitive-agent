@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from lca.contracts.decision import Observation, Reflection
-from lca.contracts.state import TypedState
+from lca.contracts.state import AgentState
 from lca.layer0_infra.component_registry import get_global_registry
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
@@ -37,13 +37,13 @@ class LoggingMemorySystem:
         self.perceive_count = 0
         self.update_count = 0
 
-    async def perceive_and_retrieve(self, state: TypedState) -> TypedState:
+    async def perceive_and_retrieve(self, state: AgentState) -> AgentState:
         self.perceive_count += 1
         print(f"  [LoggingMemory] perceive_and_retrieve #{self.perceive_count}")
         return await self._inner.perceive_and_retrieve(state)
 
     async def update_multi_level(
-        self, state: TypedState, observation: Observation, reflection: Reflection
+        self, state: AgentState, observation: Observation, reflection: Reflection
     ) -> None:
         self.update_count += 1
         print(

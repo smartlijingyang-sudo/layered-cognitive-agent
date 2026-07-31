@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.decision import ActResult, Decision, Reflection
+from lca.contracts.decision import Decision, Observation, Reflection
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.state import AgentState
 
@@ -46,15 +46,15 @@ class StopRule(Protocol):
         self,
         state: AgentState,
         decision: Decision | None,
-        act_result: ActResult | None,
+        act_result: Observation | None,
         reflection: Reflection | None,
     ) -> StopDecision: ...
 
-    # Transitional name used by CognitiveLoop until fully migrated.
+    # Deprecated — use decide() instead.
     def judge(
         self,
         state: AgentState,
         decision: Decision | None,
-        observation: ActResult | None,
+        observation: Observation | None,
         reflection: Reflection | None,
     ) -> StopDecision: ...

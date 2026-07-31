@@ -221,7 +221,7 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
 
         # 构建两个带真实 Runtime 的 Agent
         from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-        from lca.layer3_agent.simple_agent import BaseAgent
+        from lca.layer3_agent.simple_agent import CognitiveAgent
 
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
@@ -242,8 +242,8 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
 
-        agent_a = BaseAgent(runtime_a, role_a)
-        agent_b = BaseAgent(runtime_b, role_b)
+        agent_a = CognitiveAgent(runtime_a, role_a)
+        agent_b = CognitiveAgent(runtime_b, role_b)
 
         config = TeamConfig(
             process="sequential",
@@ -268,7 +268,7 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
     async def test_orchestrator_no_shared_memory_when_config_empty(self) -> None:
         from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
         from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-        from lca.layer3_agent.simple_agent import BaseAgent
+        from lca.layer3_agent.simple_agent import CognitiveAgent
 
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
@@ -289,8 +289,8 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
 
-        agent_a = BaseAgent(runtime_a, role_a)
-        agent_b = BaseAgent(runtime_b, role_b)
+        agent_a = CognitiveAgent(runtime_a, role_a)
+        agent_b = CognitiveAgent(runtime_b, role_b)
 
         config = TeamConfig(process="sequential", shared_memory_layers=[])
 

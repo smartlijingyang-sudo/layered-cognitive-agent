@@ -36,21 +36,12 @@ class DefaultStopRule(StopRule):
         act_result: Observation | None,
         reflection: Reflection | None,
     ) -> StopDecision:
-        return self.judge(state, decision, act_result, reflection)
-
-    def judge(
-        self,
-        state: AgentState,
-        decision: Decision | None,
-        observation: Observation | None,
-        reflection: Reflection | None,
-    ) -> StopDecision:
-        outcome = self._outcome_policy.resolve(state, decision, observation, reflection)
+        outcome = self._outcome_policy.resolve(state, decision, act_result, reflection)
         if outcome.final_output is not None:
             state.final_output = outcome.final_output
 
         if state.budget.exceeded():
-            return self._on_budget_exceeded(observation, state)
+            return self._on_budget_exceeded(act_result, state)
 
         if outcome.should_stop:
             return StopDecision(
@@ -61,6 +52,22 @@ class DefaultStopRule(StopRule):
             )
 
         return StopDecision()
+
+    def judge(
+        self,
+        state: AgentState,
+        decision: Decision | None,
+        observation: Observation | None,
+        reflection: Reflection | None,
+    ) -> StopDecision:
+        import warnings
+
+        warnings.warn(
+            "'judge()' is deprecated, use 'decide()'",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.decide(state, decision, observation, reflection)
 
     def _on_budget_exceeded(
         self,
@@ -99,7 +106,4 @@ def _coerce_status(value: str | TaskStatus | None) -> TaskStatus | None:
     return _STATUS_MAP.get(str(value), TaskStatus.COMPLETED)
 
 
-# Transitional alias
-DefaultLoopJudge = DefaultStopRule
-
-__all__ = ["DefaultLoopJudge", "DefaultStopRule"]
+__all__ = ["DefaultStopRule"]

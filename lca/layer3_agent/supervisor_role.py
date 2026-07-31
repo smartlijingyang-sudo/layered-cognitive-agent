@@ -44,8 +44,3 @@ def apply_supervisor_setup(agent: CognitiveAgent, setup: SupervisorSetup) -> Non
 
     if setup.decision_gate is not None and isinstance(rt, SupportsDecisionGate):
         rt.install_decision_gate(setup.decision_gate)
-
-
-# Transitional aliases
-SupervisionCapabilities = SupervisorSetup
-apply_supervision = apply_supervisor_setup

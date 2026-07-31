@@ -31,8 +31,3 @@ def get_global_brain_factory_registry() -> BrainFactoryRegistry:
     if _global_strategy_registry is None:
         _global_strategy_registry = BrainFactoryRegistry()
     return _global_strategy_registry
-
-
-# Transitional alias — remove after one release cycle.
-get_global_strategy_registry = get_global_brain_factory_registry
-StrategyRegistry = BrainFactoryRegistry

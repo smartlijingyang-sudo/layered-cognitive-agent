@@ -69,32 +69,17 @@ def build_default_transport_registry() -> TransportRegistry:
 
 
 async def _call_member_for_channel(member: CognitiveAgent, subtask: str) -> Observation:
-    """Invoke a member for InternalTransport; prefer awaitable run/execute."""
-    from collections.abc import Awaitable
-
+    """Invoke a member for InternalTransport."""
     from lca.contracts.delegation_context import get_current_delegator
     from lca.contracts.run_context import RunContext
 
     from_role = get_current_delegator()
-    for name in ("run", "execute"):
-        fn = getattr(member, name, None)
-        if not callable(fn):
-            continue
-        cand = (
-            fn(subtask, RunContext(from_role=from_role))
-            if name == "run"
-            else fn(subtask, from_role=from_role)
-        )
-        if isinstance(cand, Awaitable):
-            result = await cand
-            return Observation(
-                observation_id=f"obs_{result.trace_id}",
-                success=result.status == TaskStatus.COMPLETED,
-                payload=result.output,
-                error=result.error,
-            )
+    result = await member.run(subtask, RunContext(from_role=from_role))
     return Observation(
-        observation_id="obs_failed", success=False, payload=None, error="no awaitable run"
+        observation_id=f"obs_{result.trace_id}",
+        success=result.status == TaskStatus.COMPLETED,
+        payload=result.output,
+        error=result.error,
     )
 
 

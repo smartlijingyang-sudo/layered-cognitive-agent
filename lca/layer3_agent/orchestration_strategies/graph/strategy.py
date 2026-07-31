@@ -20,7 +20,7 @@ from typing import Any
 
 from lca.contracts.graph import EdgeType, ExecutionGraph, NodeType
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import StateStore, TeamContext, TeamProcessStrategy
+from lca.contracts.protocols import StateStore, Synthesizer, TeamContext, TeamProcessStrategy
 from lca.contracts.result import Result
 from lca.contracts.state import AgentState, Budget
 from lca.layer3_agent.member_invoke import invoke_member
@@ -60,9 +60,11 @@ class GraphStrategy(TeamProcessStrategy):
         self,
         execution_graph: ExecutionGraph | None = None,
         state_store: StateStore | None = None,
+        synthesizer: Synthesizer | None = None,
     ) -> None:
         self._graph = execution_graph
         self._state_store = state_store
+        self._synthesizer = synthesizer
 
     async def run(self, context: TeamContext, objective: str) -> Result:
         graph = self._resolve_graph(context)
@@ -71,7 +73,7 @@ class GraphStrategy(TeamProcessStrategy):
             raise ValueError("GraphStrategy 仅支持严格 DAG（allow_cycle=False）。")
         member_map = {m.role_profile.role: m for m in context.members}
         state = AgentState(trace_id=_GRAPH_TRACE_ID, task=objective, budget=Budget())
-        in_degree, out_edge_indices = compute_in_degree_and_out_edges(graph)
+        in_degree, _ = compute_in_degree_and_out_edges(graph)
 
         es = GraphExecutionState(
             remaining=dict(in_degree),
@@ -87,39 +89,47 @@ class GraphStrategy(TeamProcessStrategy):
                 es.aggregator_ids.add(nid)
             await self._execute_node(node, graph, context, member_map, objective, state, es)
             es.executed.add(nid)
-            await self._process_outgoing(
-                nid, graph, state, out_edge_indices, es, context, member_map, objective
-            )
+            await self._process_outgoing(nid, graph, state, es, context, member_map, objective)
 
-        return self._finalize(graph, es.results, es.aggregator_ids)
+        return await self._finalize(graph, es.results, es.aggregator_ids)
+
+    @staticmethod
+    def _classify_outgoing(
+        nid: str, graph: ExecutionGraph, state: AgentState, es: GraphExecutionState
+    ) -> tuple[list[str], list[str]]:
+        """Classify outgoing edges into (fixed, parallel).
+
+        Conditional edges are evaluated: matching targets go to fixed,
+        non-matching trigger cascade_skip.
+        """
+        fixed: list[str] = []
+        parallel: list[str] = []
+        for edge in graph.outgoing(nid):
+            if edge.type == EdgeType.CONDITIONAL:
+                if edge.condition is not None and edge.condition(state):
+                    fixed.append(edge.target)
+                else:
+                    cascade_skip(
+                        graph, edge.target, es.remaining, es.skipped, es.executed, es.queue
+                    )
+            elif edge.type == EdgeType.PARALLEL:
+                parallel.append(edge.target)
+            else:
+                fixed.append(edge.target)
+        return fixed, parallel
 
     async def _process_outgoing(
         self,
         nid: str,
         graph: ExecutionGraph,
         state: AgentState,
-        out_edge_indices: dict[str, list[int]],
         es: GraphExecutionState,
         context: TeamContext,
         member_map: dict[str, Any],
         objective: str,
     ) -> None:
         """处理节点出边：分类为 fixed / parallel / conditional，驱动后续执行。"""
-        fixed_targets: list[str] = []
-        parallel_targets: list[str] = []
-        for edge_idx in out_edge_indices[nid]:
-            edge = graph.edges[edge_idx]
-            if edge.type == EdgeType.CONDITIONAL:
-                if edge.condition is not None and edge.condition(state):
-                    fixed_targets.append(edge.target)
-                else:
-                    cascade_skip(
-                        graph, edge.target, es.remaining, es.skipped, es.executed, es.queue
-                    )
-            elif edge.type == EdgeType.PARALLEL:
-                parallel_targets.append(edge.target)
-            else:
-                fixed_targets.append(edge.target)
+        fixed_targets, parallel_targets = self._classify_outgoing(nid, graph, state, es)
         if parallel_targets:
             await self._execute_parallel_branches(
                 parallel_targets, graph, context, member_map, objective, state, es
@@ -148,20 +158,7 @@ class GraphStrategy(TeamProcessStrategy):
             await self._execute_node(node, graph, context, member_map, objective, state, es)
             es.executed.add(target_nid)
 
-            sub_fixed: list[str] = []
-            sub_parallel: list[str] = []
-            for edge in graph.outgoing(target_nid):
-                if edge.type == EdgeType.PARALLEL:
-                    sub_parallel.append(edge.target)
-                elif edge.type == EdgeType.CONDITIONAL:
-                    if edge.condition is not None and edge.condition(state):
-                        sub_fixed.append(edge.target)
-                    else:
-                        cascade_skip(
-                            graph, edge.target, es.remaining, es.skipped, es.executed, es.queue
-                        )
-                else:
-                    sub_fixed.append(edge.target)
+            sub_fixed, sub_parallel = self._classify_outgoing(target_nid, graph, state, es)
             if sub_parallel:
                 await self._execute_parallel_branches(
                     sub_parallel, graph, context, member_map, objective, state, es
@@ -217,9 +214,8 @@ class GraphStrategy(TeamProcessStrategy):
             return self._graph
         raise ValueError("GraphStrategy 需要 ExecutionGraph：构造时传入 execution_graph")
 
-    @staticmethod
-    def _finalize(
-        graph: ExecutionGraph, results: dict[str, Result], aggregator_ids: set[str]
+    async def _finalize(
+        self, graph: ExecutionGraph, results: dict[str, Result], aggregator_ids: set[str]
     ) -> Result:
         if not results:
             return Result.failed("Graph execution produced no results")
@@ -257,6 +253,11 @@ class GraphStrategy(TeamProcessStrategy):
                     r = results[nid]
                     r.total_steps = total_steps
                     return r
+        if self._synthesizer is not None:
+            candidates = [results[nid] for nid in chosen if results[nid].output]
+            synthesized = await self._synthesizer.synthesize("", candidates)
+            synthesized.total_steps = total_steps
+            return synthesized
         return Result(
             trace_id=_GRAPH_TRACE_ID,
             status=TaskStatus.COMPLETED,

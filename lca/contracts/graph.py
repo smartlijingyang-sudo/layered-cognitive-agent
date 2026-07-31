@@ -22,7 +22,6 @@ class NodeType(str, Enum):
     ENTRY = "entry"
     EXIT = "exit"
     AGENT = "agent"
-    ROUTER = "router"
     AGGREGATOR = "aggregator"
 
 

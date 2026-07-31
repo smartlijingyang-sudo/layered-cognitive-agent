@@ -52,7 +52,7 @@ def _make_agent(role: str, output: str) -> MagicMock:
     async def _execute(task: str) -> Result:
         return _make_result(f"trace-{role}", output)
 
-    agent.execute = AsyncMock(side_effect=_execute)
+    agent.run = AsyncMock(side_effect=_execute)
     return agent
 
 
@@ -172,7 +172,7 @@ class TestGraphStrategyLinearExecution(unittest.IsolatedAsyncioTestCase):
                 execution_order.append(role)
                 return _make_result(f"trace-{role}", output)
 
-            agent.execute = AsyncMock(side_effect=_execute)
+            agent.run = AsyncMock(side_effect=_execute)
             return agent
 
         agent_a = _make_tracked_agent("analyst", "analysis result")
@@ -232,8 +232,8 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
 
         result = await strategy.run(context, "task")
 
-        agent_a.execute.assert_awaited_once()
-        agent_b.execute.assert_awaited_once()
+        agent_a.run.assert_awaited_once()
+        agent_b.run.assert_awaited_once()
         self.assertEqual(result.output, "review")
 
     async def test_conditional_skips_non_matching(self) -> None:
@@ -263,8 +263,8 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
 
         result = await strategy.run(context, "task")
 
-        agent_a.execute.assert_awaited_once()
-        agent_s.execute.assert_not_awaited()
+        agent_a.run.assert_awaited_once()
+        agent_s.run.assert_not_awaited()
         self.assertEqual(result.output, "analysis")
 
 
@@ -291,8 +291,8 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
 
         result = await strategy.run(context, "task")
 
-        agent_b.execute.assert_awaited_once()
-        agent_c.execute.assert_awaited_once()
+        agent_b.run.assert_awaited_once()
+        agent_c.run.assert_awaited_once()
         self.assertIsNotNone(result)
 
     async def test_parallel_fan_out_is_concurrent(self) -> None:
@@ -307,7 +307,7 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
                 await asyncio.sleep(delay)
                 return _make_result(f"trace-{role}", f"result-{role}")
 
-            agent.execute = AsyncMock(side_effect=_execute)
+            agent.run = AsyncMock(side_effect=_execute)
             return agent
 
         agent_b = _make_slow_agent("b", 0.1)

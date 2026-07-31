@@ -23,7 +23,3 @@ async def track_member_status_hook(event_name: str, state: AgentState, **kwargs:
                 RoleStatus.DONE if getattr(observation, "success", False) else RoleStatus.FAILED
             )
             state.member_status = board.mark(role, new_status)
-
-
-# Transitional alias — remove after one release cycle.
-ledger_tracking_hook = track_member_status_hook

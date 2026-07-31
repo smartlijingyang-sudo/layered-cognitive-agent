@@ -3,10 +3,10 @@
 | 种类 | 注册表 | 键 | 找不到时 | 生命周期 | 注册点 |
 |------|--------|----|----------|----------|--------|
 | **发现型** | `ComponentRegistry` | `(category, name)` | `get`→None / `require`→raise | 全局单例 | `defaults.ensure_defaults()` |
-| **发现型** | `StrategyRegistry` | brain 策略名 | `resolve`→raise | 全局 | 同上 |
-| **发现型** | `OrchestrationStrategyRegistry` | process 名 | `resolve`→raise | 全局 | 同上 |
+| **发现型** | `BrainFactoryRegistry` | brain 策略名 | `resolve`→raise | 全局 | 同上 |
+| **发现型** | `TeamProcessStrategyRegistry` | process 名 | `resolve`→raise | 全局 | 同上 |
 | **运行时** | `ActionRegistry` | action_type | `resolve`→None | 每 Agent 一份，assembly 注入 | `action_catalog.build_default_action_registry` |
-| **运行时** | `ToolRegistry` | tool name | `get`→None | 与 Action 共享同一实例 | `assemble_base_agent` |
+| **运行时** | `ToolRegistry` | tool name | `get`→None | 与 Action 共享同一实例 | `assemble_agent` |
 | **运行时** | `TransportRegistry` | protocol_name | `resolve`→raise | 每 Agent / 团队 | `build_default_transport_registry` |
 | **横切** | `HookRegistry` | event_name→多 hook | n/a | 每 Runtime | `assembly.build_hooks` |
 
@@ -18,5 +18,5 @@
 
 ## 入口
 
-- 完整对象图：`lca.layer4_app.assembly.assemble_base_agent`
+- 完整对象图：`lca.layer4_app.assembly.assemble_agent`
 - 默认发现注册：`lca.layer4_app.defaults.ensure_defaults`

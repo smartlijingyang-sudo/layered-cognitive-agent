@@ -1,4 +1,4 @@
-"""Decision / ActResult / Reflection contracts."""
+"""Decision / Observation / Reflection contracts."""
 
 from __future__ import annotations
 
@@ -10,13 +10,11 @@ from lca.contracts.enums import ContentType, DelegationProtocol, ReflectionVerdi
 from lca.contracts.lifecycle import AgentCard
 
 __all__ = [
-    "ActResult",
     "AgentCard",
     "Decision",
     "DelegationSpec",
     "Observation",
     "Reflection",
-    "StructuredDecision",
     "ToolCall",
 ]
 
@@ -66,7 +64,7 @@ class Decision:
 
 
 @dataclass
-class ActResult:
+class Observation:
     """Outcome of acting on a Decision (tool / delegate / respond)."""
 
     observation_id: str
@@ -98,8 +96,3 @@ class Reflection:
     lesson: str | None = None
     correction: Decision | None = None
     extra: dict[str, Any] = field(default_factory=dict)
-
-
-# Transitional aliases — remove after one release cycle.
-StructuredDecision = Decision
-Observation = ActResult

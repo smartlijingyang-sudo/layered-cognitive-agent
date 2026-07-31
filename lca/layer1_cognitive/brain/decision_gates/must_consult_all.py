@@ -41,7 +41,3 @@ class MustConsultAllMembers(DecisionGate):
             )
 
         return decision
-
-
-# Transitional alias
-RosterCoveragePolicy = MustConsultAllMembers

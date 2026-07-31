@@ -156,7 +156,7 @@ class CognitiveRuntime(Runtime):
             # ── Phase 6: Checkpoint ──
             await self._checkpoint(state)
             # ── Phase 7: Judge ──
-            signal = self.judge.judge(state, decision, observation, reflection)
+            signal = self.judge.decide(state, decision, observation, reflection)
             if signal.should_stop:
                 if signal.reason == StopReason.BUDGET_EXCEEDED:
                     await self.hooks.trigger("on_error", state, error=BudgetExceededError())

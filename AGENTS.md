@@ -16,6 +16,7 @@ layer4_app 是组合根，可以依赖所有下层，但下层不能反向 impor
 3. uv run lint-imports        # 检查五层架构契约，最容易被跳过但最重要
 4. uv run mypy lca
 5. uv run pytest
+6. uv run vulture lca --min-confidence 80  # 死代码检测（≥80% 置信度，防过渡别名等技术债堆积）
 
 ## 代码风格
 - 公共函数/类必须有类型标注

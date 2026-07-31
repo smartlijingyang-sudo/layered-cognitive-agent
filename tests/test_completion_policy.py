@@ -9,9 +9,9 @@ from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
     MustConsultAllMembers,
 )
-from lca.layer1_cognitive.team_progress import InMemoryMemberStatus
-from lca.layer1_cognitive.team_progress.progress_hooks import (
-    ledger_tracking_hook,
+from lca.layer1_cognitive.member_status import (
+    InMemoryMemberStatus,
+    track_member_status_hook,
 )
 
 # ── helpers ──
@@ -162,7 +162,7 @@ class TestLedgerTrackingHook:
 
         obs = Observation(observation_id="o1", success=True, payload="ok")
 
-        await ledger_tracking_hook("post_act", state, decision=decision, observation=obs)
+        await track_member_status_hook("post_act", state, decision=decision, observation=obs)
 
         assert state.member_status is not None
         assert state.member_status.status["analyst"] == "done"
@@ -180,7 +180,7 @@ class TestLedgerTrackingHook:
 
         obs = Observation(observation_id="o1", success=False, payload=None, error="boom")
 
-        await ledger_tracking_hook("post_act", state, decision=decision, observation=obs)
+        await track_member_status_hook("post_act", state, decision=decision, observation=obs)
 
         assert state.member_status is not None
         assert state.member_status.status["analyst"] == "failed"
@@ -189,7 +189,7 @@ class TestLedgerTrackingHook:
     async def test_noop_when_no_ledger(self) -> None:
         state = _state()  # no team_progress
         decision = _decision("delegate")
-        await ledger_tracking_hook("post_act", state, decision=decision)
+        await track_member_status_hook("post_act", state, decision=decision)
         # Should not raise
 
     @pytest.mark.asyncio
@@ -197,7 +197,7 @@ class TestLedgerTrackingHook:
         ledger = _ledger({"analyst"})
         state = _state(member_status=ledger)
         decision = _decision("respond")
-        await ledger_tracking_hook("post_act", state, decision=decision)
+        await track_member_status_hook("post_act", state, decision=decision)
         assert state.member_status.status["analyst"] == "pending"
 
 

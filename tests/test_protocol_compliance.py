@@ -67,7 +67,7 @@ from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultSt
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
 # L3
-from lca.layer3_agent.simple_agent import BaseAgent
+from lca.layer3_agent.simple_agent import CognitiveAgent
 
 
 class TestL0ProtocolCompliance(unittest.TestCase):
@@ -265,7 +265,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             InMemoryStateStore(),
             judge=DefaultStopRule(outcome_policy=DefaultStepOutcomePolicy()),
         )
-        return BaseAgent(runtime, rp), rp, runtime
+        return CognitiveAgent(runtime, rp), rp, runtime
 
     def test_agent_is_agent_runtime(self):
         agent, _, _ = self._build_agent()
@@ -273,7 +273,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
 
     def test_supervisor_is_agent_runtime(self):
         _, rp, runtime = self._build_agent()
-        sup = BaseAgent(runtime, rp, max_steps=20, max_wall_clock_seconds=300)
+        sup = CognitiveAgent(runtime, rp, max_steps=20, max_wall_clock_seconds=300)
         self.assertIsInstance(sup, AgentUnit)
 
     def test_team_orchestrator_is_team_runtime(self):

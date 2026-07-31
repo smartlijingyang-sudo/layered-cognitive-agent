@@ -37,7 +37,3 @@ class InMemoryMemberStatus:
         if waiting:
             return f"尚未咨询的角色: {', '.join(waiting)}"
         return "所有必需角色均已咨询完毕"
-
-
-# Transitional alias — remove after one release cycle.
-DelegationLedger = InMemoryMemberStatus

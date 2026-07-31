@@ -48,8 +48,6 @@ def register_defaults() -> None:
     global_reg.register("memory", "simple", SimpleMemorySystem)
     global_reg.register("event_bus", "simple", SimpleEventBus)
     global_reg.register("member_status", "default", InMemoryMemberStatus)
-    # Transitional registry key — remove after one release cycle.
-    global_reg.register("delegation_ledger", "default", InMemoryMemberStatus)
 
     strategy_reg = get_global_brain_factory_registry()
     strategy_reg.register("default", SimpleBrainFactory())
@@ -65,10 +63,6 @@ def register_defaults() -> None:
     orch_reg.register(TeamProcess.HANDOFF, HandoffStrategy)
 
     global_reg.register("decision_gate", DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers)
-    # Transitional registry key
-    global_reg.register(
-        "completion_policy", DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers
-    )
     mark_defaults_registered()
 
 

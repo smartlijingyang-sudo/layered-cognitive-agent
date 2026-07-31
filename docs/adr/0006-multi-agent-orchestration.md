@@ -1,7 +1,7 @@
 # ADR-0006: 多智能体团队编排模式
 
 ## 状态
-Accepted
+Superseded by [ADR-0019](0019-refactor-cleanup.md), [ADR-0021](0021-naming-convention-arbitration.md)
 
 ## 背景
 单个 Agent 能力有限，复杂任务需要多个 Agent 协作。问题是：团队编排应该是固定的还是可切换的？

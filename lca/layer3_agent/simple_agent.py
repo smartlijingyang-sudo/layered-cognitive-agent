@@ -53,31 +53,6 @@ class CognitiveAgent(AgentUnit):
             trace_id=trace_id or "",
         )
 
-    async def execute(
-        self,
-        task: str | AgentMessage,
-        ctx: RunContext | None = None,
-        member_status: object | None = None,
-        **context: str,
-    ) -> Result:
-        """Transitional alias for ``run`` — remove after one release cycle."""
-        if ctx is None and (member_status is not None or context):
-            ctx = RunContext(
-                member_status=member_status,  # type: ignore[arg-type]
-                from_role=context.get("from_role") or context.get("delegated_by", ""),
-                trace_id=context.get("trace_id"),
-            )
-        elif ctx is not None and member_status is not None and ctx.member_status is None:
-            ctx = RunContext(
-                trace_id=ctx.trace_id,
-                from_role=ctx.from_role,
-                member_status=member_status,  # type: ignore[arg-type]
-                context_refs=ctx.context_refs,
-                deadline=ctx.deadline,
-                extra=ctx.extra,
-            )
-        return await self.run(task, ctx)
-
     async def resume(
         self,
         snapshot: StateSnapshot,
@@ -100,8 +75,3 @@ class CognitiveAgent(AgentUnit):
 
     def install_decision_gate(self, policy: DecisionGate) -> None:
         self.runtime.install_decision_gate(policy)
-
-
-# Transitional aliases — remove after one release cycle.
-SimpleAgent = CognitiveAgent
-BaseAgent = CognitiveAgent
