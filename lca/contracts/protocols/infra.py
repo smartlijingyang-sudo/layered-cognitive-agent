@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from lca.contracts.decision import AgentCard, Observation
 from lca.contracts.observability import TraceSpan
@@ -24,9 +24,16 @@ class LLMAdapter(Protocol):
 
 @runtime_checkable
 class Tool(Protocol):
-    """工具能力接口：名称 + 幂等标志 + 执行 + 可选校验。"""
+    """工具能力接口：名称 + 描述 + 参数 schema + 幂等标志 + 执行 + 可选校验。
+
+    ``description`` 和 ``parameters`` 遵循 OpenAI function-calling 规范，
+    由 LLM 适配器转换为原生 tool spec 传递给模型，无需在 prompt 中
+    手工描述参数格式。
+    """
 
     name: str
+    description: str
+    parameters: ClassVar[dict[str, Any]]
     is_idempotent: bool
     default_timeout_s: int
 

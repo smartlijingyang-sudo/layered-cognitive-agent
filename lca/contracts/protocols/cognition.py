@@ -6,7 +6,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Decision, Observation, Reflection
-from lca.contracts.protocols.infra import LLMAdapter
+from lca.contracts.protocols.infra import LLMAdapter, Tool
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import AgentState
 
@@ -105,5 +105,6 @@ class BrainFactory(Protocol):
         tools_desc: str,
         *,
         action_registry: ActionRegistryProtocol | None = None,
+        tools: list[Tool] | None = None,
         **_: Any,
     ) -> Brain: ...

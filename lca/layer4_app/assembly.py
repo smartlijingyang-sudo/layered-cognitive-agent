@@ -197,7 +197,7 @@ def assemble_agent(
             )
         tools_desc = ", ".join(t.name for t in tools) or "(no tools available)"
         factory = strategy_reg.resolve(brain_strategy)
-        brain = factory(llm, role_profile, tools_desc, action_registry=action_registry)
+        brain = factory(llm, role_profile, tools_desc, action_registry=action_registry, tools=tools)
     else:
         brain = brain_strategy
 

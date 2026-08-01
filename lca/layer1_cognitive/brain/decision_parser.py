@@ -63,7 +63,7 @@ class SimpleDecisionParser(DecisionParser):
             tool_name = data.get("tool_name") or data.get("tool")
             arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
             if not isinstance(arguments, dict):
-                arguments = {"expression": str(arguments)}
+                arguments = {}
             if tool_name:
                 tool_calls.append(
                     ToolCall(

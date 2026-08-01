@@ -19,6 +19,17 @@ class CalculatorTool(Tool):
     """实现 Tool 的示例工具。"""
 
     name = "calculator"
+    description = "安全求值四则运算表达式（支持 + - * / // % ** 和一元 +/-）"
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "expression": {
+                "type": "string",
+                "description": "纯算术表达式，如 '26 * 1.5 + 3'",
+            }
+        },
+        "required": ["expression"],
+    }
     is_idempotent = True
     default_timeout_s = DEFAULT_TOOL_TIMEOUT_S
 

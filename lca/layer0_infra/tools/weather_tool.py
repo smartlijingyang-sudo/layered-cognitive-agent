@@ -21,6 +21,22 @@ class WeatherTool(Tool):
     """
 
     name = "get_weather"
+    description = "查询指定城市的天气（温度、天气状况）"
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "city": {
+                "type": "string",
+                "description": "城市名（中英文均可，如 '北京'、'tokyo'）",
+            },
+            "unit": {
+                "type": "string",
+                "enum": ["celsius", "fahrenheit"],
+                "description": "温度单位，默认 celsius",
+            },
+        },
+        "required": ["city"],
+    }
     is_idempotent = True
     default_timeout_s = DEFAULT_TOOL_TIMEOUT_S
 

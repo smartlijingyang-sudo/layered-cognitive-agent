@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.protocols import Brain, LLMAdapter
+from lca.contracts.protocols import Brain, LLMAdapter, Tool
 from lca.contracts.role_team import RoleProfile
 from lca.layer1_cognitive.body.action_catalog import format_allowed_actions_desc
 from lca.layer1_cognitive.brain.critic import SimpleCritic
@@ -29,6 +29,7 @@ class SimpleBrainFactory:
         tools_desc: str,
         *,
         action_registry: ActionRegistryProtocol | None = None,
+        tools: list[Tool] | None = None,
         **_ignored: Any,
     ) -> Brain:
         allowed_actions_desc = ""
@@ -41,6 +42,7 @@ class SimpleBrainFactory:
             llm,
             role_profile,
             tools_desc,
+            tools=tools,
             templates={
                 "react_prompt": load_builtin_prompt("react_prompt"),
                 "hierarchical_prompt": load_builtin_prompt("hierarchical_prompt"),

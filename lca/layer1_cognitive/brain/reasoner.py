@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols import LLMAdapter, Reasoner
+from collections.abc import Sequence
+
+from lca.contracts.protocols import LLMAdapter, Reasoner, Tool
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import AgentState
 
@@ -28,12 +30,15 @@ class SimpleReasoner(Reasoner):
         llm: LLMAdapter,
         role_profile: RoleProfile,
         tools_desc: str,
+        *,
+        tools: Sequence[Tool] | None = None,
         templates: dict[str, str] | None = None,
         allowed_actions_desc: str = "",
     ) -> None:
         self.llm = llm
         self.role_profile = role_profile
         self.tools_desc = tools_desc
+        self.tools: list[Tool] = list(tools) if tools else []
         self._templates: dict[str, str] = dict(templates or {})
         self.allowed_actions_desc = allowed_actions_desc
 
@@ -70,7 +75,7 @@ class SimpleReasoner(Reasoner):
         prompt = self._templates[template_name].format(**base_vars)
         candidates = []
         for _ in range(max(1, n)):
-            candidates.append(await self.llm.complete(prompt))
+            candidates.append(await self.llm.complete(prompt, tools=self.tools))
         return candidates
 
     def _resolve_template(self, state: AgentState) -> str:

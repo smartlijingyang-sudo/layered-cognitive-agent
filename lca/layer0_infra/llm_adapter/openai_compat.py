@@ -15,14 +15,27 @@
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import AsyncIterator
 from typing import Any
 
-from lca.contracts.protocols import LLMAdapter
+from lca.contracts.protocols import LLMAdapter, Tool
 
 _DEFAULT_TEMPERATURE = 0.7
 _DEFAULT_MAX_TOKENS = 2048
+
+
+def to_openai_tool_spec(tool: Tool) -> dict[str, Any]:
+    """将 Tool 协议实例转换为 OpenAI function-calling tool spec。"""
+    return {
+        "type": "function",
+        "function": {
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.parameters,
+        },
+    }
 
 
 class OpenAICompatAdapter(LLMAdapter):
@@ -47,14 +60,32 @@ class OpenAICompatAdapter(LLMAdapter):
         )
 
     async def complete(self, prompt: str, **kwargs: Any) -> str:
-        response = await self._client.chat.completions.create(
-            model=kwargs.pop("model", self._model),
-            messages=[{"role": "user", "content": prompt}],
-            temperature=kwargs.pop("temperature", _DEFAULT_TEMPERATURE),
-            max_tokens=kwargs.pop("max_tokens", _DEFAULT_MAX_TOKENS),
+        tools = kwargs.pop("tools", None)
+        api_kwargs: dict[str, Any] = {
+            "model": kwargs.pop("model", self._model),
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": kwargs.pop("temperature", _DEFAULT_TEMPERATURE),
+            "max_tokens": kwargs.pop("max_tokens", _DEFAULT_MAX_TOKENS),
             **kwargs,
-        )
-        return response.choices[0].message.content or ""
+        }
+        if tools:
+            api_kwargs["tools"] = [to_openai_tool_spec(t) for t in tools]
+
+        response = await self._client.chat.completions.create(**api_kwargs)
+        msg = response.choices[0].message
+
+        if msg.tool_calls:
+            tc = msg.tool_calls[0]
+            return json.dumps(
+                {
+                    "action_type": "use_tool",
+                    "tool_name": tc.function.name,
+                    "arguments": json.loads(tc.function.arguments),
+                    "rationale": msg.content or "",
+                },
+                ensure_ascii=False,
+            )
+        return msg.content or ""
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
         raise NotImplementedError("流式输出暂未实现")
