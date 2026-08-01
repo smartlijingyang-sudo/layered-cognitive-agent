@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from lca.contracts.enums import SpanStatus
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
+from lca.contracts.ids import utc_now
 
 
 @dataclass
@@ -35,4 +32,4 @@ class Event:
     event_name: str
     trace_id: str
     payload: Any
-    emitted_at: datetime = field(default_factory=_now)
+    emitted_at: datetime = field(default_factory=utc_now)

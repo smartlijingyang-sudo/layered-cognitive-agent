@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import uuid
-
 from lca.contracts.decision import Decision, DelegationSpec
 from lca.contracts.enums import ActionType
+from lca.contracts.ids import new_id
 from lca.contracts.protocols import DecisionGate
 from lca.contracts.state import AgentState
 
@@ -30,7 +29,7 @@ class MustConsultAllMembers(DecisionGate):
             waiting = board.waiting_roles()
             next_role = waiting[0]
             return Decision(
-                decision_id=f"dec_{uuid.uuid4().hex[:12]}",
+                decision_id=new_id("dec"),
                 action_type=ActionType.DELEGATE,
                 delegate_to=DelegationSpec(
                     target_role=next_role,

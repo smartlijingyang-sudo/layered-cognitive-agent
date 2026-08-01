@@ -3,18 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from lca.contracts.enums import SnapshotReason
-from lca.contracts.ids import new_id
+from lca.contracts.ids import new_id, utc_now
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.types import Turn
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 @dataclass
@@ -28,7 +24,7 @@ class Budget:
     used_tokens: int = 0
     used_cost_usd: float = 0.0
     used_steps: int = 0
-    started_at: datetime = field(default_factory=_now)
+    started_at: datetime = field(default_factory=utc_now)
     extra: dict[str, Any] = field(default_factory=dict)
 
     def exceeded(self) -> bool:
@@ -36,7 +32,7 @@ class Budget:
         if self.max_steps is not None and self.used_steps > self.max_steps:
             return True
         if self.max_wall_clock_seconds is not None:
-            elapsed = (_now() - self.started_at).total_seconds()
+            elapsed = (utc_now() - self.started_at).total_seconds()
             if elapsed > self.max_wall_clock_seconds:
                 return True
         return False
@@ -50,7 +46,7 @@ class StateSnapshot:
     step: int
     state_ref: str
     reason: SnapshotReason = SnapshotReason.PERIODIC
-    created_at: datetime = field(default_factory=_now)
+    created_at: datetime = field(default_factory=utc_now)
 
 
 @dataclass
@@ -70,6 +66,7 @@ class AgentState:
     agent_role: str = ""
     from_role: str = ""
     member_status: MemberStatus | None = None
+    teammates_text: str = ""
     history: list[Turn] = field(default_factory=list)
     final_output: Any | None = None
     last_error: str | None = None

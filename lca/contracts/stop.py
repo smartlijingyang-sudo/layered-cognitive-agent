@@ -29,14 +29,6 @@ class StopDecision:
     final_output: str | None = None
     status: TaskStatus | None = None
 
-    @property
-    def stop(self) -> bool:
-        return self.should_stop
-
-    @property
-    def output(self) -> str | None:
-        return self.final_output
-
 
 @runtime_checkable
 class StopRule(Protocol):
@@ -47,14 +39,5 @@ class StopRule(Protocol):
         state: AgentState,
         decision: Decision | None,
         act_result: Observation | None,
-        reflection: Reflection | None,
-    ) -> StopDecision: ...
-
-    # Deprecated — use decide() instead.
-    def judge(
-        self,
-        state: AgentState,
-        decision: Decision | None,
-        observation: Observation | None,
         reflection: Reflection | None,
     ) -> StopDecision: ...

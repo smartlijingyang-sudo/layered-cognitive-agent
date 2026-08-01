@@ -40,17 +40,12 @@ class CognitiveAgent(AgentUnit):
         ctx: RunContext | None = None,
     ) -> Result:
         text = _task_as_text(task)
-        member_status = ctx.member_status if ctx is not None else None
-        from_role = ctx.from_role if ctx is not None else ""
-        trace_id = ctx.trace_id if ctx is not None else None
         return await self.runtime.run(
             text,
+            ctx,
             max_steps=self.max_steps,
             max_wall_clock_seconds=self.max_wall_clock_seconds,
-            member_status=member_status,
             agent_role=self.role_profile.role,
-            from_role=from_role,
-            trace_id=trace_id or "",
         )
 
     async def resume(

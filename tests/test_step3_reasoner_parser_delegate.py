@@ -20,7 +20,9 @@ from lca.layer1_cognitive.brain.reasoner import (
 
 
 def _make_state(task: str = "test task", teammates_text: str = "") -> AgentState:
-    return AgentState(trace_id="test-trace", task=task, budget=Budget(), teammates_text=teammates_text)
+    return AgentState(
+        trace_id="test-trace", task=task, budget=Budget(), teammates_text=teammates_text
+    )
 
 
 def _empty_manifest() -> ToolPermissionManifest:
@@ -187,7 +189,6 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
             FakeLLM(),
             _make_profile(),
             "search()",
-            teammates_text=None,
             templates={
                 "react_prompt": "ROLE: {role}\nTASK: {task}\nTOOLS: {tools}\nCONTEXT:\n{context}"
             },
@@ -211,13 +212,12 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
             FakeLLM(),
             _make_profile(),
             "search()",
-            teammates_text=roster,
             templates={
                 "react_prompt": "SHOULD NOT BE USED",
                 "hierarchical_prompt": load_builtin_prompt("hierarchical_prompt"),
             },
         )
-        await reasoner.generate_candidates(_make_state())
+        await reasoner.generate_candidates(_make_state(teammates_text=roster))
 
         self.assertEqual(len(captured_prompt), 1)
         prompt = captured_prompt[0]

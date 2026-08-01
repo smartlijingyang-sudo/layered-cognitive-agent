@@ -12,6 +12,7 @@ A2A 协议核心流程：
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -90,8 +91,6 @@ class A2ATransport(AgentTransport):
 
     async def wait_result(self, task_id: str, timeout_s: float | None = None) -> Observation:
         """HTTP 轮询等待任务完成。"""
-        import asyncio
-
         elapsed = 0.0
         while True:
             status = await self.poll_status(task_id)
@@ -105,17 +104,17 @@ class A2ATransport(AgentTransport):
     async def poll_status(self, task_id: str) -> str:
         endpoint_info = self._task_endpoints.get(task_id, "")
         if endpoint_info.startswith("error:"):
-            return "failed"
+            return TaskStatus.FAILED
 
         client = await self._get_client()
         try:
             response = await client.get(f"{endpoint_info}/tasks/{task_id}")
             response.raise_for_status()
             data = response.json()
-            status = data.get("status", {}).get("state", "working")
+            status = data.get("status", {}).get("state", TaskStatus.WORKING)
             return str(status)
         except httpx.HTTPError:
-            return "working"
+            return TaskStatus.WORKING
 
     async def receive_result(self, task_id: str) -> Observation:
         endpoint_info = self._task_endpoints.get(task_id, "")

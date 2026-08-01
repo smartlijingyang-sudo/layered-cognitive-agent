@@ -19,6 +19,7 @@ class RunContext:
     trace_id: str | None = None
     from_role: str = ""
     member_status: MemberStatus | None = None
+    teammates_text: str = ""
     context_refs: list[str] = field(default_factory=list)
     deadline: datetime | None = None
     extra: dict[str, Any] = field(default_factory=dict)

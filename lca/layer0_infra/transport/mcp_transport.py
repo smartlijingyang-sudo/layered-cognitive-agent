@@ -122,7 +122,7 @@ class MCPTransport(AgentTransport):
         return task_id
 
     async def poll_status(self, task_id: str) -> str:
-        return self._task_statuses.get(task_id, "completed")
+        return self._task_statuses.get(task_id, TaskStatus.COMPLETED)
 
     async def receive_result(self, task_id: str) -> Observation:
         return self._task_results.get(

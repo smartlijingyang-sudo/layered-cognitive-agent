@@ -47,14 +47,7 @@ class JSONLFileObservability(Observability):
 
     def _serialize_span(self, span: TraceSpan) -> dict[str, Any]:
         """将 TraceSpan 转为可 JSON 序列化的 dict。"""
-        if hasattr(span, "__dataclass_fields__"):
-            record = asdict(span)
-        elif hasattr(span, "to_dict"):
-            record = span.to_dict()
-        elif isinstance(span, dict):
-            record = dict(span)
-        else:
-            record = {"span_data": str(span)}
+        record = asdict(span)
 
         # 确保 datetime 字段可序列化
         for key, value in record.items():

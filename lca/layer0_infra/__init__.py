@@ -4,7 +4,7 @@
 
 | 协议 | 子包 | 内置实现 |
 |------|------|----------|
-| LLMAdapter | llm_adapter/ | OpenAICompatLLM, AnthropicLLM, MockLLM |
+| LLMAdapter | llm_adapter/ | OpenAICompatAdapter, MockLLMAdapter |
 | Tool | tools/ | CalculatorTool, WeatherTool |
 | StateStore | state_store/ | InMemoryStateStore |
 | AgentTransport | transport/ | InternalTransport, A2ATransport, MCPTransport |

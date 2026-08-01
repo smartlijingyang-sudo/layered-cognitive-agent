@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.enums import ContentType, DelegationProtocol, ReflectionVerdict
+from lca.contracts.ids import utc_now
 from lca.contracts.lifecycle import AgentCard
 
 if TYPE_CHECKING:
@@ -20,10 +21,6 @@ __all__ = [
     "Reflection",
     "ToolCall",
 ]
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 @dataclass
@@ -62,7 +59,7 @@ class Decision:
     delegate_to: DelegationSpec | None = None
     response_text: str | None = None
     schema_version: str = "1.0"
-    created_at: datetime = field(default_factory=_now)
+    created_at: datetime = field(default_factory=utc_now)
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -80,14 +77,6 @@ class Observation:
     latency_ms: int = 0
     degraded_from: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def ok(self) -> bool:
-        return self.success
-
-    @property
-    def data(self) -> Any:
-        return self.payload
 
     @classmethod
     def from_result(cls, result: Result) -> Observation:

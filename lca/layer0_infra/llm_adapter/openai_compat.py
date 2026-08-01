@@ -40,7 +40,7 @@ class OpenAICompatAdapter(LLMAdapter):
     ) -> None:
         from openai import AsyncOpenAI
 
-        self._model = model or os.getenv("LLM_MODEL", "gpt-4.1")
+        self._model: str = model if model is not None else os.getenv("LLM_MODEL", "gpt-4.1")
         self._client = AsyncOpenAI(
             api_key=api_key or os.getenv("LLM_API_KEY", ""),
             base_url=base_url or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),

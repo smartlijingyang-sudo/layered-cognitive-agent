@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 from lca.contracts.enums import DecisionGateName
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.message import AgentMessage, agent_message_as_text
@@ -15,7 +13,6 @@ from lca.contracts.protocols import (
     TeamUnit,
 )
 from lca.contracts.protocols.capabilities import (
-    AcceptsTeammates,
     HasBrainBodyMemory,
     HasChannel,
     HasSharedMemory,
@@ -64,7 +61,7 @@ class TeamOrchestrator(TeamUnit):
         if supervisor is not None:
             member_status = self._create_member_status(members)
             policy = self._resolve_decision_gate(config)
-            self._bind_supervisor(supervisor, transport, teammates_text, policy)
+            self._bind_supervisor(supervisor, transport, policy)
 
         self._context = TeamContext(
             members=members,
@@ -73,8 +70,6 @@ class TeamOrchestrator(TeamUnit):
             transport=transport,
             teammates_text=teammates_text,
             member_status=member_status,
-            team_id=self.team_id,
-            shared_memory=self._shared_store,
         )
 
     @staticmethod
@@ -82,7 +77,12 @@ class TeamOrchestrator(TeamUnit):
         required_roles = frozenset(m.role_profile.role for m in members)
         reg = get_global_registry()
         cls = reg.require("member_status", "default")
-        return cast("MemberStatus", cls(required_roles=required_roles))
+        result = cls(required_roles=required_roles)
+        if not isinstance(result, MemberStatus):
+            raise TypeError(
+                f"member_status factory produced {type(result).__name__}, expected MemberStatus"
+            )
+        return result
 
     @staticmethod
     def _resolve_decision_gate(config: TeamConfig) -> DecisionGate | None:
@@ -91,7 +91,12 @@ class TeamOrchestrator(TeamUnit):
             return None
         reg = get_global_registry()
         factory = reg.require("decision_gate", policy_name)
-        return cast("DecisionGate", factory())
+        result = factory()
+        if not isinstance(result, DecisionGate):
+            raise TypeError(
+                f"decision_gate factory produced {type(result).__name__}, expected DecisionGate"
+            )
+        return result
 
     def _inject_shared_memory(self) -> None:
         if self._shared_store is None:
@@ -106,23 +111,19 @@ class TeamOrchestrator(TeamUnit):
     def _bind_supervisor(
         supervisor: CognitiveAgent,
         transport: AgentTransport | None,
-        teammates_text: str,
         policy: DecisionGate | None,
     ) -> None:
         """Bind supervisor capabilities at composition time.
 
-        Reaches into the supervisor's runtime to wire channel, teammates
-        text, and decision gate — the three bindings that make an agent
-        act as a hierarchical supervisor. Member-status tracking is
-        handled directly by DelegateOperation, not via a hook.
+        Wires channel and decision gate — the bindings that make an
+        agent act as a hierarchical supervisor. Teammates text flows
+        through RunContext → AgentState at run time, not here.
         """
         rt = supervisor.runtime
         if not isinstance(rt, HasBrainBodyMemory):
             return
         if transport is not None and isinstance(rt.body, HasChannel):
             rt.body.bind_channel(transport)
-        if teammates_text and isinstance(rt.brain, AcceptsTeammates):
-            rt.brain.set_teammates(teammates_text)
         if policy is not None and isinstance(rt, SupportsDecisionGate):
             rt.install_decision_gate(policy)
 

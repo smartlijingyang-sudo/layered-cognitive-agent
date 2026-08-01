@@ -23,6 +23,7 @@ class NodeType(str, Enum):
     EXIT = "exit"
     AGENT = "agent"
     AGGREGATOR = "aggregator"
+    ROUTER = "router"
 
 
 class EdgeType(str, Enum):

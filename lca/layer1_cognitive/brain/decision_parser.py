@@ -17,6 +17,9 @@ from lca.contracts.protocols import DecisionParser
 from lca.contracts.semantic_keys import ORIGINAL_ACTION_TYPE
 from lca.contracts.state import AgentState
 
+_PARSE_FAILURE_CONFIDENCE = 0.1
+_DEFAULT_CONFIDENCE = 0.5
+
 
 class SimpleDecisionParser(DecisionParser):
     """稳健 JSON 解析器：别名归一化 + Registry 校验 + 失败兜底。
@@ -39,7 +42,7 @@ class SimpleDecisionParser(DecisionParser):
                 action_type=ActionType.RESPOND,
                 response_text=raw_output,
                 rationale="解析失败兜底",
-                confidence=0.1,
+                confidence=_PARSE_FAILURE_CONFIDENCE,
             )
 
         raw_action = str(data.get("action_type", "respond")).lower().strip()
@@ -92,7 +95,7 @@ class SimpleDecisionParser(DecisionParser):
             delegate_to=delegate_to,
             response_text=data.get("response_text") or data.get("response") or data.get("text"),
             rationale=data.get("rationale", ""),
-            confidence=float(data.get("confidence", 0.5)),
+            confidence=float(data.get("confidence", _DEFAULT_CONFIDENCE)),
             extra=extra,
         )
 

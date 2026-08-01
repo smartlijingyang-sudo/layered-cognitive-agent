@@ -13,5 +13,8 @@ class HierarchicalStrategy(TeamProcessStrategy):
     async def run(self, context: TeamContext, objective: str) -> Result:
         if context.supervisor is None:
             raise ValueError("Hierarchical 模式需要 Supervisor")
-        ctx = RunContext(member_status=context.member_status)
+        ctx = RunContext(
+            member_status=context.member_status,
+            teammates_text=context.teammates_text,
+        )
         return await context.supervisor.run(objective, ctx)

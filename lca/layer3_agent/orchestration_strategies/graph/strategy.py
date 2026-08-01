@@ -16,17 +16,23 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any
 
-from lca.contracts.graph import EdgeType, ExecutionGraph, NodeType
+from lca.contracts.budget import create_budget
+from lca.contracts.graph import EdgeType, ExecutionGraph, GraphNode, NodeType
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import StateStore, Synthesizer, TeamContext, TeamProcessStrategy
+from lca.contracts.protocols import (
+    AgentUnit,
+    StateStore,
+    Synthesizer,
+    TeamContext,
+    TeamProcessStrategy,
+)
 from lca.contracts.result import Result
 from lca.contracts.state import AgentState, Budget
 from lca.layer3_agent.member_invoke import invoke_member
 from lca.layer3_agent.orchestration_strategies.graph.topology import (
     cascade_skip,
-    compute_in_degree_and_out_edges,
+    compute_in_degree,
     enqueue_ready_targets,
 )
 
@@ -72,8 +78,8 @@ class GraphStrategy(TeamProcessStrategy):
         if graph.allow_cycle:
             raise ValueError("GraphStrategy 仅支持严格 DAG（allow_cycle=False）。")
         member_map = {m.role_profile.role: m for m in context.members}
-        state = AgentState(trace_id=_GRAPH_TRACE_ID, task=objective, budget=Budget())
-        in_degree, _ = compute_in_degree_and_out_edges(graph)
+        state = AgentState(trace_id=_GRAPH_TRACE_ID, task=objective, budget=create_budget())
+        in_degree = compute_in_degree(graph)
 
         es = GraphExecutionState(
             remaining=dict(in_degree),
@@ -125,7 +131,7 @@ class GraphStrategy(TeamProcessStrategy):
         state: AgentState,
         es: GraphExecutionState,
         context: TeamContext,
-        member_map: dict[str, Any],
+        member_map: dict[str, AgentUnit],
         objective: str,
     ) -> None:
         """处理节点出边：分类为 fixed / parallel / conditional，驱动后续执行。"""
@@ -142,7 +148,7 @@ class GraphStrategy(TeamProcessStrategy):
         targets: list[str],
         graph: ExecutionGraph,
         context: TeamContext,
-        member_map: dict[str, Any],
+        member_map: dict[str, AgentUnit],
         objective: str,
         state: AgentState,
         es: GraphExecutionState,
@@ -179,10 +185,10 @@ class GraphStrategy(TeamProcessStrategy):
 
     async def _execute_node(
         self,
-        node: Any,
+        node: GraphNode,
         graph: ExecutionGraph,
         context: TeamContext,
-        member_map: dict[str, Any],
+        member_map: dict[str, AgentUnit],
         objective: str,
         state: AgentState,
         es: GraphExecutionState,

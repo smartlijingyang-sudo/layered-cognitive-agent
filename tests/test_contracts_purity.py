@@ -51,9 +51,8 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
     "Result": frozenset({"failed", "from_observation", "from_state"}),
     "Budget": frozenset({"exceeded"}),
     "AgentState": frozenset({"snapshot", "delegated_by"}),
-    "Observation": frozenset({"ok", "data", "from_result"}),
-    "StopDecision": frozenset({"stop", "output", "should_stop"}),
-    "Turn": frozenset({"act_result"}),
+    "Observation": frozenset({"from_result"}),
+    "StopDecision": frozenset({"should_stop"}),
 }
 
 # 已存在的非 dataclass / 非 Protocol / 非异常 / 非枚举类——

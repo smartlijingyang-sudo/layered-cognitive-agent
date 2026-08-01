@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.decision import Observation
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols.capabilities import AcceptsTeammates, HasChannel
+from lca.contracts.protocols.capabilities import HasChannel
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from lca.contracts.state import Budget
@@ -64,23 +64,13 @@ class _BindableBody(HasChannel):
         self._registry.register(transport)  # type: ignore[arg-type]  # 测试桩放宽类型
 
 
-class _AcceptsTeammatesBrain(AcceptsTeammates):
-    """测试用 Brain：实现 AcceptsTeammates 协议。"""
-
-    def __init__(self) -> None:
-        self.teammates_text: str | None = None
-
-    def set_teammates(self, teammates_text: str) -> None:
-        self.teammates_text = teammates_text
-
-
 def _make_supervisor_with_runtime() -> tuple[
-    CognitiveAgent, MagicMock, TransportRegistry, _AcceptsTeammatesBrain
+    CognitiveAgent, MagicMock, TransportRegistry, MagicMock
 ]:
     """返回 (supervisor, mock_runtime, transport_registry, brain)。"""
     registry = TransportRegistry()
     mock_body = _BindableBody(registry)
-    mock_brain = _AcceptsTeammatesBrain()
+    mock_brain = MagicMock()
 
     mock_runtime = MagicMock()
     mock_runtime.body = mock_body
@@ -124,11 +114,12 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(registry.resolve("internal"), InternalTransport)
 
-    async def test_orchestrator_sets_roster_on_brain(self) -> None:
+    async def test_orchestrator_carries_roster_in_context(self) -> None:
+        """teammates_text 通过 TeamContext 流转，不再绑定到 Brain 实例。"""
         members = [_make_member("dev")]
         config = TeamConfig(process="hierarchical")
 
-        sup, _, _, mock_brain = _make_supervisor_with_runtime()
+        sup, _, _, _ = _make_supervisor_with_runtime()
         _ok = Result(
             trace_id="t",
             status=TaskStatus.COMPLETED,
@@ -149,7 +140,7 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         )
         await orchestrator.run("build feature")
 
-        self.assertIn("dev", mock_brain.teammates_text)
+        self.assertIn("dev", orchestrator._context.teammates_text)
 
     async def test_orchestrator_without_transport_skips_bind(self) -> None:
         """不传 transport 时不报错（向后兼容）。"""

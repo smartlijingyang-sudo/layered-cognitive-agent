@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from lca.contracts.decision import Decision
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
+from lca.contracts.ids import utc_now
 
 
 @dataclass
@@ -22,7 +19,7 @@ class ApprovalRequest:
     step: int
     risk_reason: str
     pending_decision: Decision
-    created_at: datetime = field(default_factory=_now)
+    created_at: datetime = field(default_factory=utc_now)
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -34,4 +31,4 @@ class ApprovalDecision:
     approved: bool
     approver: str | None = None
     comment: str | None = None
-    decided_at: datetime = field(default_factory=_now)
+    decided_at: datetime = field(default_factory=utc_now)

@@ -9,7 +9,7 @@ L2 层职责：
 
 from __future__ import annotations
 
-import logging
+import structlog
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.enums import SnapshotReason
@@ -31,7 +31,7 @@ from lca.contracts.state import AgentState, StateSnapshot
 from lca.contracts.stop import StopReason, StopRule
 from lca.contracts.types import Turn
 
-_logger = logging.getLogger(__name__)
+_log = structlog.get_logger("lca.runtime_loop")
 
 
 class CognitiveRuntime(Runtime):
@@ -141,11 +141,7 @@ class CognitiveRuntime(Runtime):
                 # 信任边界处的兜底捕获（L2 是 Agent 最外层循环）：
                 # 任何未预料的异常都不能向上传播导致进程崩溃，
                 # 而是标记 FAILED、持久化快照、通知 hook 后安全退出。
-                _logger.exception(
-                    "CognitiveRuntime._loop: unexpected error at step %d",
-                    step,
-                    exc_info=err,
-                )
+                _log.exception("unexpected_loop_error", step=step, error=str(err))
                 await self.hooks.trigger("on_error", state, error=err)
                 state.status = TaskStatus.FAILED
                 await self._checkpoint(state, reason=SnapshotReason.ON_ERROR)
