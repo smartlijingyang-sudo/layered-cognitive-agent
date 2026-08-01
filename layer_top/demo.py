@@ -1,8 +1,8 @@
-"""layer-top + layer-engine 调用形式演示
+"""layer-top 调用形式演示
 =================================
 
 纯调用者视角，两个场景展示 Agent / MultiAgent 的使用形态。
-engine 内部的 brain/body/memory 和 strategy 是更下一层概念，用 ... 占位。
+brain / body / memory 和 strategy 是下一层概念，用 ... 占位。
 """
 
 # ruff: noqa: F841  -- demo 中变量为占位，仅展示调用形态
@@ -12,21 +12,13 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta
 
-from layer_engine import CognitiveEngine
 from layer_top import Agent, MultiAgent, Task
 from lca.contracts.role_team import RoleProfile
 
 
 async def scenario_one_single_agent() -> None:
     """场景一：单 Agent —— 竞品调研。"""
-    # ── 构造认知引擎（brain/body/memory 是更下一层概念）──
-    engine = CognitiveEngine(
-        brain=...,  # Brain 实现（下一层）
-        body=...,  # Body 实现（下一层）
-        memory=...,  # Memory 实现（下一层）
-    )
-
-    # ── 构造 Agent ──
+    # ── 构造 Agent（brain/body/memory 是下一层概念）──
     analyst = Agent(
         identity=RoleProfile(
             role="竞品分析师",
@@ -34,7 +26,9 @@ async def scenario_one_single_agent() -> None:
             backstory="资深 SaaS 市场研究员",
             tool_permission_manifest=...,  # 下一层提供
         ),
-        engine=engine,
+        brain=...,  # Brain 实现（下一层）
+        body=...,  # Body 实现（下一层）
+        memory=...,  # Memory 实现（下一层）
     )
 
     # ── 构造 Task ──
@@ -67,7 +61,9 @@ async def scenario_two_nested_team() -> None:
             backstory="十年 TMT 行业研究",
             tool_permission_manifest=...,
         ),
-        engine=CognitiveEngine(brain=..., body=..., memory=...),
+        brain=...,
+        body=...,
+        memory=...,
     )
     finance = Agent(
         identity=RoleProfile(
@@ -76,7 +72,9 @@ async def scenario_two_nested_team() -> None:
             backstory="CPA + CFA 双证",
             tool_permission_manifest=...,
         ),
-        engine=CognitiveEngine(brain=..., body=..., memory=...),
+        brain=...,
+        body=...,
+        memory=...,
     )
     reviewer = Agent(
         identity=RoleProfile(
@@ -85,7 +83,9 @@ async def scenario_two_nested_team() -> None:
             backstory="投委会资深委员",
             tool_permission_manifest=...,
         ),
-        engine=CognitiveEngine(brain=..., body=..., memory=...),
+        brain=...,
+        body=...,
+        memory=...,
     )
 
     # ── 构造内层 MultiAgent（本身是 Worker）──
