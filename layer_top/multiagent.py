@@ -9,8 +9,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from layer_top.contracts import Task, Worker
-from lca.contracts.result import Result
+from layer_top.contracts import Result, Task, Worker
 
 
 @runtime_checkable

@@ -1,8 +1,8 @@
 """layer-top 调用形式演示
 =================================
 
-纯调用者视角，不含实现。两个场景展示 Worker + Task 的使用形态。
-第二层实现后，替换构造方式即可运行。
+纯调用者视角，两个场景展示 Agent / MultiAgent 的使用形态。
+engine 和 strategy 是下一层概念，用 ... 占位。
 """
 
 # ruff: noqa: F841  -- demo 中变量为占位，仅展示调用形态
@@ -12,13 +12,22 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta
 
-from layer_top.contracts import Task
+from layer_top import Agent, MultiAgent, Task
+from lca.contracts.role_team import RoleProfile
 
 
 async def scenario_one_single_agent() -> None:
     """场景一：单 Agent —— 竞品调研。"""
-    # ── 构造 Worker（第二层提供 AgentWorker）──
-    worker = ...  # AgentWorker(role="竞品分析师", llm=...)
+    # ── 构造 Agent（engine 是下一层概念）──
+    analyst = Agent(
+        identity=RoleProfile(
+            role="竞品分析师",
+            goal="产出竞品定价对比",
+            backstory="资深 SaaS 市场研究员",
+            tool_permission_manifest=...,  # 下一层提供
+        ),
+        engine=...,  # CognitiveEngine 实现（下一层）
+    )
 
     # ── 构造 Task ──
     task = Task(
@@ -30,25 +39,58 @@ async def scenario_one_single_agent() -> None:
     )
 
     # ── 执行 ──
-    result = await worker.execute(task)  # type: ignore[attr-defined]  占位
-    print(result.output)
+    result = await analyst.execute(task)
+    if result.success:
+        print(result.output)
+    else:
+        print(f"失败: {result.error}")
 
 
 async def scenario_two_nested_team() -> None:
-    """场景二：嵌套 Team —— 投研流水线。
+    """场景二：嵌套 MultiAgent —— 投研流水线。
 
-    内层 Team（分析组）自身是 Worker，可作为外层 Team 的成员。
+    内层 MultiAgent（分析组）自身是 Worker，可作为外层 MultiAgent 的成员。
     """
-    # ── 构造内层 Worker（第二层提供 AgentWorker / TeamWorker）──
-    industry = ...  # AgentWorker(role="行业分析师")
-    finance = ...  # AgentWorker(role="财务分析师")
-    reviewer = ...  # AgentWorker(role="终审官")
+    # ── 构造内层 Agent ──
+    industry = Agent(
+        identity=RoleProfile(
+            role="行业分析师",
+            goal="产出行业判断",
+            backstory="十年 TMT 行业研究",
+            tool_permission_manifest=...,
+        ),
+        engine=...,
+    )
+    finance = Agent(
+        identity=RoleProfile(
+            role="财务分析师",
+            goal="产出财务风险评估",
+            backstory="CPA + CFA 双证",
+            tool_permission_manifest=...,
+        ),
+        engine=...,
+    )
+    reviewer = Agent(
+        identity=RoleProfile(
+            role="终审官",
+            goal="出具终审意见",
+            backstory="投委会资深委员",
+            tool_permission_manifest=...,
+        ),
+        engine=...,
+    )
 
-    # ── 构造内层 Team（本身是 Worker）──
-    analysis_team = ...  # TeamWorker(members=[industry, finance])
+    # ── 构造内层 MultiAgent（本身是 Worker）──
+    analysis_team = MultiAgent(
+        members=[industry, finance],
+        strategy=...,  # OrchestrationStrategy 实现（下一层）
+    )
 
-    # ── 嵌套：内层 Team 作为外层 Team 的成员 ──
-    committee = ...  # TeamWorker(members=[analysis_team, reviewer])
+    # ── 嵌套：内层 MultiAgent 作为外层 MultiAgent 的成员 ──
+    committee = MultiAgent(
+        members=[analysis_team, reviewer],
+        strategy=...,
+    )
 
     # ── 构造 Task ──
     task = Task(
@@ -59,9 +101,12 @@ async def scenario_two_nested_team() -> None:
         deadline=datetime.now() + timedelta(days=3),
     )
 
-    # ── 执行 ── 对外层 Team 来说，analysis_team 和 reviewer 都是 Worker
-    result = await committee.execute(task)  # type: ignore[attr-defined]  占位
-    print(result.output)
+    # ── 执行 ── 对外层来说，analysis_team 和 reviewer 都是 Worker
+    result = await committee.execute(task)
+    if result.success:
+        print(result.output)
+    else:
+        print(f"失败: {result.error}")
 
 
 async def main() -> None:

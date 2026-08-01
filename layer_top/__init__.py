@@ -9,7 +9,7 @@ Task 作为对象形式参数取代裸字符串，支持递归嵌套组合。
 from __future__ import annotations
 
 from layer_top.agent import Agent, CognitiveEngine
-from layer_top.contracts import Task, Worker
+from layer_top.contracts import Result, Task, Worker
 from layer_top.multiagent import MultiAgent, OrchestrationStrategy
 
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     "CognitiveEngine",
     "MultiAgent",
     "OrchestrationStrategy",
+    "Result",
     "Task",
     "Worker",
 ]

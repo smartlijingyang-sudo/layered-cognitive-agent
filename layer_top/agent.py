@@ -8,18 +8,15 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from layer_top.contracts import Task, Worker
-from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.result import Result
+from layer_top.contracts import Result, Task, Worker
 from lca.contracts.role_team import RoleProfile
-from lca.contracts.state import Budget
 
 
 @runtime_checkable
 class CognitiveEngine(Protocol):
     """认知引擎 — 接收 Task + 身份，运行 think→act→observe 循环，返回产出。
 
-    Agent 只负责 Task→Result 映射，认知循环的内部结构
+    Agent 只负责 output→Result 映射，认知循环的内部结构
     （推理、工具执行、状态跟踪）是引擎的下一层职责。
     """
 
@@ -35,11 +32,4 @@ class Agent(Worker):
 
     async def execute(self, task: Task) -> Result:
         output = await self._engine.run(task, self._identity)
-        return Result(
-            trace_id="",
-            status=TaskStatus.COMPLETED,
-            final_state_ref="",
-            total_steps=0,
-            budget_used=Budget(),
-            output=output,
-        )
+        return Result.completed(output)
