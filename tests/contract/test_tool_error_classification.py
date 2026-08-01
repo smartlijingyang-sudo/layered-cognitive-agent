@@ -126,6 +126,17 @@ class TestSafeExecutorInputErrorNoRetry:
         assert obs.success is False
         assert obs.extra.get("failure_kind") == "validation"
 
+    async def test_unsupported_ast_node_does_not_retry(self) -> None:
+        """列表字面量通过 validate（非空字符串），但 _eval_node 遇到 List 节点 → failure_kind=validation。"""
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            obs = await self.executor.execute(
+                self.tool, {"expression": "['128.0 * 1.35']"}, self.retry_policy, self.cache_config
+            )
+            mock_sleep.assert_not_called()
+
+        assert obs.success is False
+        assert obs.extra.get("failure_kind") == "validation"
+
 
 # ---------------------------------------------------------------------------
 # 5. SafeExecutor: 正常执行仍然成功

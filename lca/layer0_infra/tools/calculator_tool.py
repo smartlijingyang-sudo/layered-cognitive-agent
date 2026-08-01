@@ -94,7 +94,7 @@ class CalculatorTool(Tool):
             return float(self._OPS[type(node.op)](self._eval_node(node.operand)))
         node_type = type(node).__name__
         supported = "+, -, *, /, //, %, ** 和一元 +/-"
-        raise ValueError(
+        raise ToolInputError(
             f"不支持的运算 '{node_type}'。calculator 仅支持: {supported}。"
             f"问题片段: {ast.dump(node)}"
         )
