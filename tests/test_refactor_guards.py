@@ -61,12 +61,13 @@ class TestSupervisorWallClockPropagation(unittest.TestCase):
 
         from lca.layer3_agent.simple_agent import CognitiveAgent
         from lca.layer4_app.assembly import _promote_supervisor
+        from lca.layer4_app.policies import SupervisorBudgetPolicy
 
         runtime = MagicMock()
         role_profile = MagicMock()
         role_profile.role = "lead"
         supervisor = CognitiveAgent(runtime, role_profile, max_steps=10, max_wall_clock_seconds=900)
-        promoted = _promote_supervisor(supervisor)
+        promoted = _promote_supervisor(supervisor, SupervisorBudgetPolicy())
         self.assertEqual(promoted.max_wall_clock_seconds, 900)
         self.assertEqual(promoted.max_steps, 20)
 

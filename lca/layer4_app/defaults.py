@@ -59,7 +59,7 @@ def register_defaults(registries: Registries) -> None:
     reg.register(
         ComponentKind.DECISION_GATE, DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers
     )
-    reg.register(ComponentKind.BUDGET_POLICY, "supervisor", SupervisorBudgetPolicy())
+    reg.register(ComponentKind.BUDGET_POLICY, "supervisor", SupervisorBudgetPolicy)
 
 
 def build_default_registries() -> Registries:

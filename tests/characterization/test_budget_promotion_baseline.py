@@ -1,8 +1,8 @@
-"""Characteristic baseline for _promote_supervisor budget promotion.
+"""Baseline for _promote_supervisor budget promotion via BudgetPolicy.
 
-Pins down the CURRENT behavior of assembly._promote_supervisor before
-Phase B refactors it into a BudgetPolicy strategy. These tests will be
-updated to assert BudgetPolicyViolation (strict mode) after the refactor.
+Pins down the promotion behavior: SupervisorBudgetPolicy.resolve
+computes effective budget limits, _promote_supervisor applies them
+to construct a new CognitiveAgent with corrected values.
 """
 
 from __future__ import annotations
@@ -17,6 +17,9 @@ from lca.contracts.budget import (
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer3_agent.simple_agent import CognitiveAgent
 from lca.layer4_app.assembly import _promote_supervisor
+from lca.layer4_app.policies import SupervisorBudgetPolicy
+
+_policy = SupervisorBudgetPolicy()
 
 
 def _make_agent(
@@ -44,17 +47,17 @@ class TestPromoteSupervisorStepsBumped:
 
     def test_steps_below_floor_bumped(self) -> None:
         agent = _make_agent(max_steps=5)
-        promoted = _promote_supervisor(agent)
+        promoted = _promote_supervisor(agent, _policy)
         assert promoted.max_steps == SUPERVISOR_MIN_MAX_STEPS
 
     def test_steps_at_floor_unchanged(self) -> None:
         agent = _make_agent(max_steps=SUPERVISOR_MIN_MAX_STEPS)
-        promoted = _promote_supervisor(agent)
+        promoted = _promote_supervisor(agent, _policy)
         assert promoted.max_steps == SUPERVISOR_MIN_MAX_STEPS
 
     def test_steps_above_floor_unchanged(self) -> None:
         agent = _make_agent(max_steps=50)
-        promoted = _promote_supervisor(agent)
+        promoted = _promote_supervisor(agent, _policy)
         assert promoted.max_steps == 50
 
 
@@ -63,17 +66,17 @@ class TestPromoteSupervisorWallClockBumped:
 
     def test_wc_below_floor_bumped(self) -> None:
         agent = _make_agent(max_wall_clock_seconds=10)
-        promoted = _promote_supervisor(agent)
+        promoted = _promote_supervisor(agent, _policy)
         assert promoted.max_wall_clock_seconds == DEFAULT_MAX_WALL_CLOCK_SECONDS
 
     def test_wc_above_floor_unchanged(self) -> None:
         agent = _make_agent(max_wall_clock_seconds=600)
-        promoted = _promote_supervisor(agent)
+        promoted = _promote_supervisor(agent, _policy)
         assert promoted.max_wall_clock_seconds == 600
 
     def test_wc_none_set_to_default(self) -> None:
         agent = _make_agent(max_wall_clock_seconds=None)
-        promoted = _promote_supervisor(agent)
+        promoted = _promote_supervisor(agent, _policy)
         assert promoted.max_wall_clock_seconds == DEFAULT_MAX_WALL_CLOCK_SECONDS
 
 
@@ -82,13 +85,13 @@ class TestPromoteSupervisorPreservesIdentity:
 
     def test_role_profile_preserved(self) -> None:
         agent = _make_agent(role="lead")
-        promoted = _promote_supervisor(agent)
+        promoted = _promote_supervisor(agent, _policy)
         assert promoted.role_profile.role == "lead"
         assert promoted.role_profile.goal == "test"
 
     def test_runtime_preserved(self) -> None:
         agent = _make_agent()
-        promoted = _promote_supervisor(agent)
+        promoted = _promote_supervisor(agent, _policy)
         assert promoted.runtime is agent.runtime
 
 
@@ -97,13 +100,13 @@ class TestPromoteSupervisorReturnsNewInstance:
 
     def test_original_unchanged(self) -> None:
         agent = _make_agent(max_steps=5, max_wall_clock_seconds=10)
-        _promote_supervisor(agent)
+        _promote_supervisor(agent, _policy)
         assert agent.max_steps == 5
         assert agent.max_wall_clock_seconds == 10
 
     def test_returns_new_instance(self) -> None:
         agent = _make_agent()
-        promoted = _promote_supervisor(agent)
+        promoted = _promote_supervisor(agent, _policy)
         assert promoted is not agent
 
 

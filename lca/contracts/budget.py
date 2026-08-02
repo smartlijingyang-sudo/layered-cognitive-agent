@@ -8,6 +8,8 @@ L0 配置层：系统中所有 Budget 构造必须经过此工厂，
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from lca.contracts.state import Budget
 
 DEFAULT_MAX_STEPS: int = 10
@@ -26,19 +28,12 @@ DEFAULT_MAX_WALL_CLOCK_SECONDS: int = 300
 SUPERVISOR_MIN_MAX_STEPS: int = 20
 
 
-class BudgetPolicyViolation(ValueError):  # noqa: N818 - violation carries structured details
-    """携带违规详情，便于上层按字段做差异化处理，而不是解析异常消息字符串。"""
+@dataclass(frozen=True)
+class BudgetLimits:
+    """策略解析后的有效预算值——BudgetPolicy.resolve 的返回类型。"""
 
-    def __init__(self, agent_role: str, field: str, minimum: int, actual: int) -> None:
-        self.agent_role = agent_role
-        self.field = field
-        self.minimum = minimum
-        self.actual = actual
-        super().__init__(
-            f"{field} 需要 >= {minimum}，当前 {actual}"
-            f"（agent={agent_role}）。"
-            f"请在构造 supervisor 时显式设置。"
-        )
+    max_steps: int
+    max_wall_clock_seconds: int
 
 
 def create_budget(

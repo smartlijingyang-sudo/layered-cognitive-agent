@@ -10,13 +10,10 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-import structlog
-
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.budget import (
     DEFAULT_MAX_STEPS,
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
-    SUPERVISOR_MIN_MAX_STEPS,
 )
 from lca.contracts.decision import Observation
 from lca.contracts.enums import ComponentKind, HookEvent, MemoryLayer, RoleMode, TeamProcess
@@ -26,6 +23,7 @@ from lca.contracts.protocols import (
     Body,
     Brain,
     BrainFactory,
+    BudgetPolicy,
     EventBus,
     LLMAdapter,
     MemorySystem,
@@ -57,7 +55,6 @@ from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer3_agent.orchestration_registry import OrchestrationFactory
 from lca.layer3_agent.simple_agent import CognitiveAgent
 from lca.layer4_app.defaults import build_default_registries
-from lca.layer4_app.policies import SupervisorBudgetPolicy
 
 T = TypeVar("T")
 
@@ -147,30 +144,14 @@ def build_hooks(observability: Observability, event_bus: EventBus) -> SimpleHook
     return hooks
 
 
-_log = structlog.get_logger("lca.assembly")
-
-
-def _promote_supervisor(supervisor: CognitiveAgent) -> CognitiveAgent:
-    """Apply supervisor budget floors — sole composition decision for team leads.
-
-    Validates via the registered BudgetPolicy, then constructs a new agent
-    with corrected values if needed (transition mode). In strict mode,
-    validation raises BudgetPolicyViolation and this function is not reached.
-    """
-    policy = SupervisorBudgetPolicy()
-    policy.validate(supervisor)
-
-    wc = supervisor.max_wall_clock_seconds
-    effective_wc = (
-        max(wc, DEFAULT_MAX_WALL_CLOCK_SECONDS)
-        if wc is not None
-        else DEFAULT_MAX_WALL_CLOCK_SECONDS
-    )
+def _promote_supervisor(supervisor: CognitiveAgent, policy: BudgetPolicy) -> CognitiveAgent:
+    """Apply supervisor budget floors via the registered BudgetPolicy."""
+    limits = policy.resolve(supervisor)
     return CognitiveAgent(
         supervisor.runtime,
         supervisor.role_profile,
-        max_steps=max(supervisor.max_steps, SUPERVISOR_MIN_MAX_STEPS),
-        max_wall_clock_seconds=effective_wc,
+        max_steps=limits.max_steps,
+        max_wall_clock_seconds=limits.max_wall_clock_seconds,
     )
 
 
@@ -311,7 +292,15 @@ class Assembly:
             shared_memory_layers=list(shared_memory_layers or []),
             graph_definition_ref=graph_definition_ref,
         )
-        base_supervisor = _promote_supervisor(supervisor) if supervisor is not None else None
+        base_supervisor: CognitiveAgent | None = None
+        if supervisor is not None:
+            policy = _resolve_component(
+                self._registries.components,
+                ComponentKind.BUDGET_POLICY,
+                "supervisor",
+                BudgetPolicy,  # type: ignore[type-abstract]
+            )
+            base_supervisor = _promote_supervisor(supervisor, policy)
         transport, teammates_text = build_team_transport(members)
         teammate_profiles = [m.role_profile for m in members]
         role_mode = RoleMode.SUPERVISOR if base_supervisor is not None else RoleMode.SOLO

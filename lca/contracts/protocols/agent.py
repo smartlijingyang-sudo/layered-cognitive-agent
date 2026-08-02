@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+from lca.contracts.budget import BudgetLimits
 from lca.contracts.message import AgentMessage
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile
@@ -46,15 +47,13 @@ class BudgetAware(Protocol):
 
 @runtime_checkable
 class BudgetPolicy(Protocol):
-    """Composition-time budget validation strategy.
+    """组合时预算解析策略——单一真相源。
 
-    validate raises BudgetPolicyViolation when the agent's budget
-    fields are below required minimums. The caller (assembly) is
-    responsible for constructing the agent with correct values before
-    calling validate, or for catching the violation and correcting.
+    resolve 返回该 agent 在其角色下应得的有效预算值。
+    调用方 apply 返回值，不重算阈值。
     """
 
-    def validate(self, agent: BudgetAware) -> None: ...
+    def resolve(self, agent: BudgetAware) -> BudgetLimits: ...
 
 
 @runtime_checkable
