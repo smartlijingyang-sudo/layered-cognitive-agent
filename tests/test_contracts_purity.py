@@ -50,7 +50,7 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
     ),
     "Result": frozenset({"failed", "from_observation", "from_state"}),
     "Budget": frozenset({"exceeded"}),
-    "AgentState": frozenset({"snapshot", "delegated_by", "teammates_text"}),
+    "AgentState": frozenset({"snapshot"}),
     "Observation": frozenset({"from_result"}),
     "StopDecision": frozenset({"should_stop"}),
 }

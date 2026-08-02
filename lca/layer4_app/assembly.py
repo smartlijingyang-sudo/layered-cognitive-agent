@@ -46,7 +46,6 @@ from lca.layer1_cognitive.body.fallback_policy import FallbackActionPolicy
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer1_cognitive.brain.reasoner import build_teammates_text
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer2_runtime.default_loop_judge import DefaultStopRule
 from lca.layer2_runtime.event_emission import make_event_emitting_hook
@@ -93,8 +92,8 @@ async def _call_member_for_channel(member: CognitiveAgent, subtask: str) -> Obse
 
 def build_team_transport(
     members: list[CognitiveAgent],
-) -> tuple[AgentTransport, str]:
-    """Build in-process channel and teammates_text for a team."""
+) -> AgentTransport:
+    """Build in-process channel for a team."""
     transport = InternalTransport()
     for member in members:
 
@@ -102,7 +101,7 @@ def build_team_transport(
             return await _call_member_for_channel(_m, subtask)
 
         transport.register_agent(member.role_profile.role, _handler)
-    return transport, build_teammates_text([m.role_profile for m in members])
+    return transport
 
 
 def build_body_from_shared(
@@ -301,7 +300,7 @@ class Assembly:
                 BudgetPolicy,  # type: ignore[type-abstract]
             )
             base_supervisor = _promote_supervisor(supervisor, policy)
-        transport, teammates_text = build_team_transport(members)
+        transport = build_team_transport(members)
         teammate_profiles = [m.role_profile for m in members]
         role_mode = RoleMode.SUPERVISOR if base_supervisor is not None else RoleMode.SOLO
 
@@ -313,6 +312,5 @@ class Assembly:
             transport=transport,
             teammates=teammate_profiles,
             role_mode=role_mode,
-            teammates_text=teammates_text,
             strategy=strategy,
         )

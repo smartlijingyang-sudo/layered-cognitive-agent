@@ -20,10 +20,8 @@ class ConsoleObservability(Observability):
 
         # 构建角色链信息
         role = span.attributes.get("agent_role", "")
-        delegated_by = span.attributes.get("delegated_by", "")
-        role_prefix = (
-            f"[{delegated_by} → {role}] " if delegated_by else f"[{role}] " if role else ""
-        )
+        from_role = span.attributes.get("from_role", "")
+        role_prefix = f"[{from_role} → {role}] " if from_role else f"[{role}] " if role else ""
 
         # 构建关键属性摘要
         key_attrs = {}

@@ -18,6 +18,5 @@ class HierarchicalStrategy(TeamProcessStrategy):
             member_status=context.member_status,
             teammates=list(context.teammates),
             role_mode=RoleMode.SUPERVISOR,
-            teammates_text=context.teammates_text,
         )
         return await context.supervisor.run(objective, ctx)

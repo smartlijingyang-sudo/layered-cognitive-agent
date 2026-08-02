@@ -30,7 +30,6 @@ class TeamContext:
     transport: AgentTransport | None = None
     teammates: list[RoleProfile] = field(default_factory=list)
     role_mode: RoleMode = RoleMode.SOLO
-    teammates_text: str = ""
     member_status: MemberStatus | None = None
     team_id: str = ""
     shared_memory: SharedMemoryStore | None = None

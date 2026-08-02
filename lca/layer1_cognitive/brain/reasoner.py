@@ -68,7 +68,6 @@ class SimpleReasoner(Reasoner):
             )
             base_vars["teammates"] = teammates_text
             base_vars["member_status_text"] = status_text
-            base_vars["teammates_text"] = teammates_text
         subtasks = state.working_memory.get("subtasks")
         if subtasks:
             base_vars["context"] = (

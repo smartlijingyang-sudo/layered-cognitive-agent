@@ -50,7 +50,7 @@ class SimpleHookRegistry(HookRegistry):
 async def default_logging_hook(event_name: str, state: AgentState, **kwargs: Any) -> None:
     extra = {k: v for k, v in kwargs.items() if k != "state"}
     role_info = f"role={state.agent_role}" if state.agent_role else ""
-    delegator_info = f"from_role={state.delegated_by}" if state.delegated_by else ""
+    delegator_info = f"from_role={state.from_role}" if state.from_role else ""
     context_parts = [p for p in [role_info, delegator_info] if p]
     context_str = " ".join(context_parts)
     safe_extra = {k: safe_repr(v) for k, v in extra.items()} if extra else None

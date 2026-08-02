@@ -8,9 +8,11 @@ from lca.contracts.ids import new_id
 from lca.contracts.protocols import DecisionGate
 from lca.contracts.state import AgentState
 
+_CONSULT_SUBTASK_TEMPLATE = "请从 {role} 的视角，针对以下任务提供你的专业意见：{task}"
+
 
 def _infer_subtask(task: str, role: str) -> str:
-    return f"请从 {role} 的视角，针对以下任务提供你的专业意见：{task}"
+    return _CONSULT_SUBTASK_TEMPLATE.format(role=role, task=task)
 
 
 class MustConsultAllMembers(DecisionGate):

@@ -6,7 +6,6 @@ from typing import Protocol, runtime_checkable
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS
 from lca.contracts.decision import Decision, Observation, Reflection
-from lca.contracts.protocols.cognition import DecisionGate
 from lca.contracts.result import Result
 from lca.contracts.run_context import RunContext
 from lca.contracts.state import AgentState, StateSnapshot
@@ -32,12 +31,6 @@ class Runtime(Protocol):
         input: object | None = None,
         max_steps: int = DEFAULT_MAX_STEPS,
     ) -> Result: ...
-    def install_decision_gate(self, policy: DecisionGate) -> None:
-        """为本轮认知循环安装一个确定性收尾 guardrail。
-        若底层 Brain 不支持该能力，实现方必须显式报错，
-        不得静默降级为无操作。
-        """
-        ...
 
 
 @runtime_checkable

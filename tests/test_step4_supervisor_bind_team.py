@@ -102,21 +102,20 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         )
         sup.run = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
 
-        transport, teammates_text = build_team_transport(members)
+        transport = build_team_transport(members)
         orchestrator = TeamOrchestrator(
             members,
             config,
             registries=_REGISTRIES,
             supervisor=sup,
             transport=transport,
-            teammates_text=teammates_text,
         )
         await orchestrator.run("build feature")
 
         self.assertIsInstance(registry.resolve("internal"), InternalTransport)
 
     async def test_orchestrator_carries_roster_in_context(self) -> None:
-        """teammates_text 通过 TeamContext 流转，不再绑定到 Brain 实例。"""
+        """teammates 结构化字段通过 TeamContext 流转。"""
         members = [_make_member("dev")]
         config = TeamConfig(process="hierarchical")
 
@@ -131,18 +130,18 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         )
         sup.run = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
 
-        transport, teammates_text = build_team_transport(members)
+        transport = build_team_transport(members)
         orchestrator = TeamOrchestrator(
             members,
             config,
             registries=_REGISTRIES,
             supervisor=sup,
             transport=transport,
-            teammates_text=teammates_text,
+            teammates=[m.role_profile for m in members],
         )
         await orchestrator.run("build feature")
 
-        self.assertIn("dev", orchestrator._context.teammates_text)
+        self.assertTrue(any(p.role == "dev" for p in orchestrator._context.teammates))
 
     async def test_orchestrator_without_transport_skips_bind(self) -> None:
         """不传 transport 时不报错（向后兼容）。"""
@@ -184,15 +183,17 @@ class TestDelegateRemoved(unittest.TestCase):
 class TestBuildTeamTransport(unittest.IsolatedAsyncioTestCase):
     async def test_registers_each_member_by_role(self) -> None:
         members = [_make_member("researcher"), _make_member("writer")]
-        transport, _roster = build_team_transport(members)
+        transport = build_team_transport(members)
 
         self.assertIsInstance(transport, InternalTransport)
         self.assertIn("researcher", transport._directory)
         self.assertIn("writer", transport._directory)
 
     async def test_roster_contains_all_roles(self) -> None:
+        from lca.layer1_cognitive.brain.reasoner import build_teammates_text
+
         members = [_make_member("dev"), _make_member("qa")]
-        _, roster = build_team_transport(members)
+        roster = build_teammates_text([m.role_profile for m in members])
 
         self.assertIn("dev", roster)
         self.assertIn("qa", roster)
@@ -201,7 +202,7 @@ class TestBuildTeamTransport(unittest.IsolatedAsyncioTestCase):
 
     async def test_handler_returns_observation(self) -> None:
         members = [_make_member("worker", "result-output")]
-        transport, _ = build_team_transport(members)
+        transport = build_team_transport(members)
 
         handler = transport._directory["worker"]
         obs = await handler("do something")
@@ -210,10 +211,9 @@ class TestBuildTeamTransport(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(obs.payload, "result-output")
 
     async def test_empty_members(self) -> None:
-        transport, roster = build_team_transport([])
+        transport = build_team_transport([])
         self.assertIsInstance(transport, InternalTransport)
         self.assertEqual(len(transport._directory), 0)
-        self.assertIn("无可用队友", roster)
 
 
 # ---------------------------------------------------------------------------

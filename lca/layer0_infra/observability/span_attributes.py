@@ -20,8 +20,8 @@ def extract_span_attributes(event_name: str, kwargs: dict[str, Any]) -> dict[str
     if state is not None:
         if hasattr(state, "agent_role") and state.agent_role:
             attrs["agent_role"] = state.agent_role
-        if hasattr(state, "delegated_by") and state.delegated_by:
-            attrs["delegated_by"] = state.delegated_by
+        if hasattr(state, "from_role") and state.from_role:
+            attrs["from_role"] = state.from_role
         if hasattr(state, "task") and state.task:
             attrs["task_preview"] = truncate(sanitize(str(state.task)))
 

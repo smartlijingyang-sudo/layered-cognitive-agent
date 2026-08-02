@@ -5,7 +5,7 @@ from __future__ import annotations
 from lca.contracts.budget import DEFAULT_MAX_STEPS
 from lca.contracts.mechanisms import Hook
 from lca.contracts.message import AgentMessage, agent_message_as_text, agent_message_text
-from lca.contracts.protocols import AgentUnit, DecisionGate, Runtime
+from lca.contracts.protocols import AgentUnit, Runtime
 from lca.contracts.protocols.capabilities import HasHooks
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile
@@ -67,6 +67,3 @@ class CognitiveAgent(AgentUnit):
         runtime = self.runtime
         if isinstance(runtime, HasHooks):
             runtime.hooks.register(hook_name, hook_fn)
-
-    def install_decision_gate(self, policy: DecisionGate) -> None:
-        self.runtime.install_decision_gate(policy)

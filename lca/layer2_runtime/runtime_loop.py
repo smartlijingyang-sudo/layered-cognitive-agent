@@ -19,11 +19,9 @@ from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.protocols import (
     Body,
     Brain,
-    DecisionGate,
     MemorySystem,
     Runtime,
     StateStore,
-    SupportsDecisionGate,
 )
 from lca.contracts.result import ApprovalPendingError, BudgetExceededError, Result
 from lca.contracts.run_context import RunContext
@@ -168,16 +166,3 @@ class CognitiveRuntime(Runtime):
         ref = await self.state_store.save(state)
         snap.state_ref = ref
         return snap
-
-    def install_decision_gate(self, policy: DecisionGate) -> None:
-        """委托 Brain 自管内部评估管线，安装确定性收尾 guardrail。
-        通过结构化 isinstance 探测能力，而非 hasattr 字符串猜测：
-        不支持时必须显式报错，避免调用方以为 guardrail 已生效、
-        实际却被静默跳过。
-        """
-        if not isinstance(self.brain, SupportsDecisionGate):
-            raise TypeError(
-                f"{type(self.brain).__name__} 未实现 SupportsDecisionGate，"
-                "无法安装 completion guard"
-            )
-        self.brain.install_decision_gate(policy)

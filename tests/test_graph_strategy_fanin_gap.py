@@ -59,12 +59,11 @@ class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):
         g.add_edge(GraphEdge(source="market", target="risk", type=EdgeType.PARALLEL))
         g.add_edge(GraphEdge(source="pricing", target="exit"))
         g.add_edge(GraphEdge(source="risk", target="exit"))
-        transport, roster = build_team_transport(members)
+        transport = build_team_transport(members)
         ctx = TeamContext(
             members=members,
             config=TeamConfig(process=TeamProcess.GRAPH),
             transport=transport,
-            teammates_text=roster,
         )
         result = await GraphStrategy(execution_graph=g).run(ctx, "launch")
         self.assertEqual(result.status, TaskStatus.COMPLETED)

@@ -1,7 +1,6 @@
-"""Characteristic baseline for teammates_text rendering and routing.
+"""Characteristic baseline for teammates rendering and routing.
 
-Updated for Phase C: uses role_mode + teammates structured fields instead
-of the deprecated teammates_text field. The rendering is now lazy (in
+Uses role_mode + teammates structured fields. Rendering is lazy (in
 Reasoner), not at assembly time.
 """
 
@@ -101,48 +100,6 @@ class TestAgentStateStructuredFields:
         assert state.teammates == []
 
 
-class TestAgentStateTeammatesTextCompatProperty:
-    """The deprecated teammates_text @property renders from structured data."""
-
-    def test_empty_teammates_returns_empty_string(self) -> None:
-        import warnings
-
-        state = AgentState(trace_id="t1", task="test", budget=Budget())
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            assert state.teammates_text == ""
-
-    def test_non_empty_teammates_renders_text(self) -> None:
-        import warnings
-
-        profiles = [
-            _make_profile("coder", "write code"),
-            _make_profile("reviewer", "review code"),
-        ]
-        state = AgentState(
-            trace_id="t1",
-            task="test",
-            budget=Budget(),
-            role_mode=RoleMode.SUPERVISOR,
-            teammates=profiles,
-        )
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            assert state.teammates_text == (
-                "- role: coder | goal: write code\n- role: reviewer | goal: review code"
-            )
-
-    def test_property_emits_deprecation_warning(self) -> None:
-        import warnings
-
-        state = AgentState(trace_id="t1", task="test", budget=Budget())
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            _ = state.teammates_text
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-
-
 class TestReasonerTemplateRouting:
     """Verify _resolve_template uses role_mode to pick template.
 
@@ -217,7 +174,7 @@ class TestReasonerPromptVariableInjection:
             llm=llm,
             role_profile=_make_profile("supervisor", "manage"),
             tools_desc="(no tools)",
-            templates={"hierarchical_prompt": "{teammates} {teammates_text} {member_status_text}"},
+            templates={"hierarchical_prompt": "{teammates} {member_status_text}"},
         )
         state = AgentState(
             trace_id="t1",

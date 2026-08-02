@@ -23,7 +23,6 @@ class RunContext:
     member_status: MemberStatus | None = None
     teammates: list[RoleProfile] = field(default_factory=list)
     role_mode: RoleMode = RoleMode.SOLO
-    teammates_text: str = ""
     context_refs: list[str] = field(default_factory=list)
     deadline: datetime | None = None
     extra: dict[str, Any] = field(default_factory=dict)

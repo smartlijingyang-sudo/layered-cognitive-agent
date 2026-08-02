@@ -38,7 +38,6 @@ class TeamOrchestrator(TeamUnit):
         transport: AgentTransport | None = None,
         teammates: list[RoleProfile] | None = None,
         role_mode: RoleMode = RoleMode.SOLO,
-        teammates_text: str = "",
         strategy: TeamProcessStrategy | None = None,
         team_id: str = "",
     ) -> None:
@@ -48,7 +47,6 @@ class TeamOrchestrator(TeamUnit):
         self.transport = transport
         self.teammates = teammates or []
         self.role_mode = role_mode
-        self.teammates_text = teammates_text
         self.team_id = team_id or f"team-{config.process}"
 
         if strategy is not None:
@@ -74,7 +72,6 @@ class TeamOrchestrator(TeamUnit):
             transport=transport,
             teammates=self.teammates,
             role_mode=self.role_mode,
-            teammates_text=teammates_text,
             member_status=member_status,
         )
 
@@ -130,8 +127,8 @@ class TeamOrchestrator(TeamUnit):
             return
         if transport is not None and isinstance(rt.body, HasChannel):
             rt.body.bind_channel(transport)
-        if policy is not None and isinstance(rt, SupportsDecisionGate):
-            rt.install_decision_gate(policy)
+        if policy is not None and isinstance(rt.brain, SupportsDecisionGate):
+            rt.brain.install_decision_gate(policy)
 
     async def run(self, objective: str | object) -> Result:
         text = (
