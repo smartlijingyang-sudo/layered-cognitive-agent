@@ -20,12 +20,19 @@ from lca.contracts.role_team import RoleProfile
 class Decision:
     """认知决策 — Brain 的产出。
 
-    action 是 Brain 的动作意图，Body 解释执行。
-    final_answer 非空时循环结束。
+    answer 非空表示认知完成，as_result 返回 Result。
+    action 非空表示继续行动，Body 解释执行。
+    二者互斥。
     """
 
     action: str = ""
-    final_answer: str | None = None
+    answer: str | None = None
+
+    def as_result(self) -> Result | None:
+        """若为结论，返回 Result；否则 None 表示继续行动。"""
+        if self.answer is not None:
+            return Result.completed(self.answer)
+        return None
 
 
 @dataclass
@@ -76,14 +83,14 @@ class Memory(Protocol):
     """对话状态 — 感知与记忆更新。
 
     perceive：从记忆中提取相关上下文，丰富 state。
-    update：将新的决策和观察存入记忆。
+    update：将决策和观察存入记忆，同时更新 state。
     RAG / 长期检索是 Tool（Brain 决定何时检索），不是 Memory 的职责。
     """
 
     async def perceive(self, state: CognitiveState) -> CognitiveState: ...
 
     async def update(
-        self, decision: Decision, observation: Observation
+        self, state: CognitiveState, decision: Decision, observation: Observation
     ) -> None: ...
 
 
@@ -112,8 +119,7 @@ class Agent(Worker):
 
         while True:
             decision = await self._brain.think(state)
-            if decision.final_answer is not None:
-                return Result.completed(decision.final_answer)
+            if (result := decision.as_result()) is not None:
+                return result
             observation = await self._body.act(decision)
-            await self._memory.update(decision, observation)
-            state.history.append(observation.output)
+            await self._memory.update(state, decision, observation)
