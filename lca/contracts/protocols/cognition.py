@@ -59,13 +59,44 @@ class CandidateEvaluationPipeline(Protocol):
 
 @runtime_checkable
 class DecisionGate(Protocol):
-    """确定性收尾策略：校验候选决策是否可被采纳。"""
+    """确定性收尾策略：校验候选决策是否可被采纳。
+
+    如果某个 DecisionGate 能在 LLM 生成候选之前就确定性地判定下一步（不依赖候选
+    内容），应额外实现 ``SupportsShortcut`` 提供快速路径——这是可选能力，不是本
+    Protocol 的必选契约，理由见 ``SupportsShortcut`` 的文档。
+    """
 
     async def enforce(
         self,
         state: AgentState,
         decision: Decision,
     ) -> Decision: ...
+
+
+@runtime_checkable
+class SupportsShortcut(Protocol):
+    """可选能力：允许 DecisionGate 在认知管线之前提供确定性快速路径。
+
+    与 ``SupportsDecisionGate`` 用途相似、语义相反：
+
+    - ``SupportsDecisionGate`` 缺失 = 配置的 guardrail 没有生效，是正确性问题，
+      调用方 isinstance 探测失败必须报错。
+    - ``SupportsShortcut`` 缺失只是"这个 gate 没有快速路径可提供"，正确性完全由
+      必选的 ``enforce()`` 兜底；探测失败时静默走完整认知管线即可，不是错误。
+
+    ``try_shortcut`` 不直接加进 ``DecisionGate``：``@runtime_checkable`` 的 isinstance
+    检查要求 Protocol 声明的全部成员都存在，直接加会让所有结构化实现
+    ``DecisionGate``（不字面继承）的第三方 gate 在 ``_resolve_decision_gate()`` 的
+    ``isinstance(result, DecisionGate)`` 检查处直接 ``TypeError``，除非同步补上
+    ``try_shortcut``。把一个纯性能优化变成了破坏性的必选契约，与"新增可选能力用
+    ``Has*``/``Supports*`` 标记 Protocol + isinstance 探测"的既有约定
+    （``HasChannel``、``HasSharedMemory``）不一致。
+
+    ``try_shortcut`` 返回 ``None`` 的语义不是"校验失败"，是"我这层定不了，交给
+    LLM"——与 ``validate() -> None`` 不同。
+    """
+
+    async def try_shortcut(self, state: AgentState) -> Decision | None: ...
 
 
 @runtime_checkable

@@ -3,21 +3,26 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from lca.contracts.decision import Decision, DelegationSpec, Observation
 from lca.contracts.enums import RoleStatus
 from lca.contracts.ids import elapsed_seconds, remaining_seconds, utc_now
+from lca.contracts.protocols import SupportsShortcut
 from lca.contracts.role_status_rules import is_success_status, is_terminal_status
 from lca.contracts.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_VALIDATION,
 )
 from lca.contracts.state import AgentState, Budget
+from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
     MustConsultAllMembers,
 )
+from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
+from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.member_status import (
     InMemoryMemberStatus,
     compute_required_action,
@@ -296,6 +301,70 @@ class TestMustConsultAllMembers:
         assert result.delegate_to is not None
         assert "analyst" in result.delegate_to.subtask
         assert "launch product" in result.delegate_to.subtask
+
+
+# ── MustConsultAllMembers.try_shortcut ──
+
+
+class TestMustConsultAllMembersTryShortcut:
+    @pytest.mark.asyncio
+    async def test_short_circuits_when_exactly_one_waiting(self) -> None:
+        ledger = _ledger({"analyst"})
+        state = _state(member_status=ledger)
+        result = await MustConsultAllMembers().try_shortcut(state)
+
+        assert result is not None
+        assert result.action_type == "delegate"
+        assert result.delegate_to is not None
+        assert result.delegate_to.target_role == "analyst"
+        assert "[框架短路]" in result.rationale
+
+    @pytest.mark.asyncio
+    async def test_defers_when_multiple_waiting(self) -> None:
+        state = _state(member_status=_ledger({"analyst", "reviewer"}))
+        assert await MustConsultAllMembers().try_shortcut(state) is None
+
+    @pytest.mark.asyncio
+    async def test_defers_when_all_settled(self) -> None:
+        """may_respond 仍需要 LLM 生成 response_text，try_shortcut 不代劳。"""
+        state = _state(member_status=_ledger({"a"}, {"a": "done"}))
+        assert await MustConsultAllMembers().try_shortcut(state) is None
+
+    @pytest.mark.asyncio
+    async def test_defers_when_no_ledger(self) -> None:
+        state = _state()  # member_status=None
+        assert await MustConsultAllMembers().try_shortcut(state) is None
+
+
+def test_gate_without_shortcut_is_not_supports_shortcut() -> None:
+    """结构化实现 DecisionGate 但没有 try_shortcut 的 gate 不会被误判为支持快速路径。"""
+
+    class _EnforceOnlyGate:
+        async def enforce(self, state: AgentState, decision: Decision) -> Decision:
+            return decision
+
+    assert not isinstance(_EnforceOnlyGate(), SupportsShortcut)
+
+
+class TestModularBrainTryShortcutShortCircuit:
+    @pytest.mark.asyncio
+    async def test_think_skips_reasoner_when_try_shortcut_fires(self) -> None:
+        reasoner = MagicMock()
+        reasoner.generate_candidates = AsyncMock(
+            side_effect=AssertionError("must not be called"),
+        )
+        brain = ModularBrain(
+            reasoner=reasoner,
+            decision_parser=SimpleDecisionParser(),
+            critic=SimpleCritic(),
+        )
+        brain.install_decision_gate(MustConsultAllMembers())
+
+        state = _state(member_status=_ledger({"analyst"}))
+        decision = await brain.think(state)
+
+        assert decision.action_type == "delegate"
+        reasoner.generate_candidates.assert_not_called()
 
 
 # ── update_member_status + retry ──

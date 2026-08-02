@@ -43,6 +43,7 @@ from lca.contracts.protocols.cognition import (
     Reasoner,
     SkillRouter,
     SupportsDecisionGate,
+    SupportsShortcut,
 )
 
 # ── L1 Body / 行动执行协议 ───────────────────────────────
@@ -112,6 +113,7 @@ __all__ = [
     "StopOutcome",
     "StopOutcomePolicy",
     "SupportsDecisionGate",
+    "SupportsShortcut",
     "Synthesizer",
     "TeamContext",
     "TeamProcessStrategy",

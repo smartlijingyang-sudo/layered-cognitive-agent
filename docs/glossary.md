@@ -26,7 +26,8 @@
 | **AgentChannel** / **AgentTransport** | 成员间任务通道；内置 Internal / A2A / MCP Transport |
 | **SharedMemory** / **SharedMemoryStore** / **TeamSharedMemory** | 团队共享记忆 |
 | **SharedMemoryTool** | 将共享记忆包装为普通 Tool |
-| **DecisionGate** | 决策出门硬规则 |
+| **DecisionGate** | 决策出/入门硬规则（`enforce` 必选出门校验，`SupportsShortcut` 可选入门快速路径） |
+| **SupportsShortcut** | 可选能力：DecisionGate 在 LLM 之前提供确定性快速路径（`try_shortcut`） |
 | **MustConsultAllMembers** | 未咨询完所有必需角色时禁止 respond（原 RosterCoverage） |
 | **RunContext** | 一次 `run` 的类型化上下文（from_role / member_status / trace_id） |
 | **TeamConfig** / **RoleProfile** | 团队配置 / 角色画像 |

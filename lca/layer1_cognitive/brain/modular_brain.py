@@ -11,6 +11,7 @@ from lca.contracts.protocols import (
     DecisionParser,
     Reasoner,
     SkillRouter,
+    SupportsShortcut,
 )
 from lca.contracts.state import AgentState
 from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
@@ -53,14 +54,18 @@ class ModularBrain(Brain):
         self._decision_gate: DecisionGate | None = None
 
     async def think(self, state: AgentState) -> Decision:
+        if self._decision_gate is not None and isinstance(self._decision_gate, SupportsShortcut):
+            pre = await self._decision_gate.try_shortcut(state)
+            if pre is not None:
+                return pre
+
         if self.skill_router is not None:
             state.active_template = await self.skill_router.route(state)
 
         subtasks = await self.evaluation_pipeline.decompose(state)
         if subtasks:
             state.working_memory["subtasks"] = list(subtasks)
-        n = max(1, len(subtasks)) if len(subtasks) > 1 else 1
-        raw_candidates = await self.reasoner.generate_candidates(state, n=n)
+        raw_candidates = await self.reasoner.generate_candidates(state)
         candidates = [self.decision_parser.parse(rc, state) for rc in raw_candidates]
         decision = await self.evaluation_pipeline.evaluate(state, candidates)
 
