@@ -110,7 +110,7 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
         from lca.contracts.state import AgentState, Budget
         from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
-        board = InMemoryMemberStatus(required_roles=frozenset({"a"}))
+        board = InMemoryMemberStatus(role_order=("a",))
         state = AgentState(trace_id="t", task="x", budget=Budget(), member_status=board)
         self.assertTrue(hasattr(state, "member_status"))
         self.assertFalse(hasattr(state, "team_progress"))
@@ -136,7 +136,7 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
         from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
         from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
-        board = InMemoryMemberStatus(required_roles=frozenset({"analyst"}))
+        board = InMemoryMemberStatus(role_order=("analyst",))
         state = AgentState(trace_id="t", task="ship", budget=Budget(), member_status=board)
         decision = Decision(
             decision_id="d1",

@@ -75,6 +75,7 @@ class CognitiveRuntime(Runtime):
             member_status=(ctx.member_status if ctx else None),
             role_mode=(ctx.role_mode if ctx else RoleMode.SOLO),
             teammates=list(ctx.teammates) if ctx else [],
+            delegate_max_attempts=(ctx.delegate_max_attempts if ctx else 3),
         )
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)

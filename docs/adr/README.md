@@ -26,6 +26,7 @@
 | [0022](0022-map-pipeline-consolidation.md) | MAP 管线收敛 | 五模块 → 单一 CandidateEvaluationPipeline；Supersedes ADR-0003 |
 | [0023](0023-architecture-deepening.md) | 架构深化 | 溶解浅模块 + 消除冗余概念 + 完成 rename + 迁层 |
 | [0024](0024-registries-value-object.md) | Registries 值对象取代全局单例 | 三个 get_global_* 删除；TeamOrchestrator/Assembly 显式传递 Registries |
+| [0025](0025-role-settlement-retry-and-deadline-clock-domain.md) | 角色结算状态、委派重试与 deadline 时钟域 | settled/done 分类单一函数 + wall-clock 时间工具 + gate 双向仲裁 + role_order 确定性 + 重试留 tracking.py + 删除 poll 死代码 |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

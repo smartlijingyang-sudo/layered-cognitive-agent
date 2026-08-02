@@ -25,4 +25,5 @@ class RunContext:
     role_mode: RoleMode = RoleMode.SOLO
     context_refs: list[str] = field(default_factory=list)
     deadline: datetime | None = None
+    delegate_max_attempts: int = 3
     extra: dict[str, Any] = field(default_factory=dict)

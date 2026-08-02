@@ -58,3 +58,4 @@ class TeamConfig:
     max_rounds: int | None = None
     graph_definition_ref: str | None = None
     decision_gate: DecisionGateName = DecisionGateName.MUST_CONSULT_ALL
+    delegate_max_attempts: int = 3

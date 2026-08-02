@@ -21,3 +21,19 @@ def utc_now() -> datetime:
 def new_id(prefix: str) -> str:
     """生成 ``{prefix}_{hex12}`` 格式的唯一 id。"""
     return f"{prefix}_{uuid.uuid4().hex[:_ID_SUFFIX_LEN]}"
+
+
+def remaining_seconds(deadline: datetime, *, now: datetime | None = None) -> float:
+    """deadline 距今剩余的 wall-clock 秒数(可能为负,代表已过期)。
+
+    deadline 与 now 必须是同一 epoch 的 timezone-aware datetime(wall-clock/UTC)。
+    禁止把 ``asyncio.get_running_loop().time()`` 之类的 monotonic float 传入 ——
+    这正是问题 B 的根因。本函数的类型签名(要求 ``datetime``)已经在类型检查层面
+    拒绝 monotonic float 混入:不存在"不小心传错"的写法。
+    """
+    return (deadline - (now or utc_now())).total_seconds()
+
+
+def elapsed_seconds(started_at: datetime, *, now: datetime | None = None) -> float:
+    """自 started_at 起经过的 wall-clock 秒数。"""
+    return ((now or utc_now()) - started_at).total_seconds()

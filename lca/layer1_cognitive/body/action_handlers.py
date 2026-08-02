@@ -6,13 +6,10 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from lca.contracts.action import Action
 from lca.contracts.decision import Decision, Observation
 from lca.contracts.delegation_context import delegator_scope
-from lca.contracts.ids import new_id
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.ids import new_id, remaining_seconds
 from lca.contracts.protocols import (
     AgentTransport,
     SafeExecutor,
@@ -21,11 +18,15 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy
-from lca.contracts.semantic_keys import OBS_HANDOFF, OBS_TASK_ID
+from lca.contracts.semantic_keys import (
+    FAILURE_KIND,
+    FAILURE_KIND_TRANSIENT,
+    OBS_HANDOFF,
+    OBS_TASK_ID,
+)
 from lca.contracts.state import AgentState
 from lca.layer1_cognitive.member_status.tracking import update_member_status
 
-_POLL_INTERVAL_S = 0.05
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
 
 
@@ -66,11 +67,21 @@ class DelegateOperation(Action):
     async def execute(self, decision: Decision, state: AgentState) -> Observation:
         transport, task_id = await self._send_to_transport(decision, state)
 
-        timeout_s = (
-            (spec.deadline.timestamp() - asyncio.get_running_loop().time())
-            if (spec := decision.delegate_to) and spec.deadline
-            else _DEFAULT_DELEGATE_TIMEOUT_S
-        )
+        spec = decision.delegate_to
+        if spec and spec.deadline:
+            timeout_s = remaining_seconds(spec.deadline)
+            if timeout_s <= 0:
+                observation = Observation(
+                    observation_id=new_id("obs"),
+                    success=False,
+                    payload=None,
+                    error=f"delegate 超时(deadline 已过期): task_id={task_id}",
+                    extra={OBS_TASK_ID: task_id, FAILURE_KIND: FAILURE_KIND_TRANSIENT},
+                )
+                update_member_status(state, decision, observation)
+                return observation
+        else:
+            timeout_s = _DEFAULT_DELEGATE_TIMEOUT_S
 
         observation = await self._wait_for_result(transport, task_id, timeout_s)
         update_member_status(state, decision, observation)
@@ -83,34 +94,16 @@ class DelegateOperation(Action):
         task_id: str,
         timeout_s: float,
     ) -> Observation:
-        wait = getattr(transport, "wait_result", None)
-        if wait is not None:
-            try:
-                result: Observation = await wait(task_id, timeout_s)
-                return result
-            except TimeoutError:
-                return Observation(
-                    observation_id=new_id("obs"),
-                    success=False,
-                    payload=None,
-                    error=f"delegate 超时: task_id={task_id}",
-                    extra={OBS_TASK_ID: task_id},
-                )
-
-        # 回退：跨进程 / 旧 transport 轮询
-        elapsed = 0.0
-        while (await transport.poll_status(task_id)) != TaskStatus.WORKING:
-            if elapsed >= timeout_s:
-                return Observation(
-                    observation_id=new_id("obs"),
-                    success=False,
-                    payload=None,
-                    error=f"delegate 超时: task_id={task_id}",
-                    extra={OBS_TASK_ID: task_id},
-                )
-            await asyncio.sleep(_POLL_INTERVAL_S)
-            elapsed += _POLL_INTERVAL_S
-        return await transport.receive_result(task_id)
+        try:
+            return await transport.wait_result(task_id, timeout_s)
+        except TimeoutError:
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=f"delegate 超时: task_id={task_id}",
+                extra={OBS_TASK_ID: task_id, FAILURE_KIND: FAILURE_KIND_TRANSIENT},
+            )
 
     async def _send_to_transport(
         self, decision: Decision, state: AgentState

@@ -79,9 +79,9 @@ class TeamOrchestrator(TeamUnit):
     def _create_member_status(
         members: list[CognitiveAgent], registries: Registries
     ) -> MemberStatus:
-        required_roles = frozenset(m.role_profile.role for m in members)
+        role_order = tuple(m.role_profile.role for m in members)
         cls = registries.components.require(ComponentKind.MEMBER_STATUS, "default")
-        result = cls(required_roles=required_roles)
+        result = cls(role_order=role_order)
         if not isinstance(result, MemberStatus):
             raise TypeError(
                 f"member_status factory produced {type(result).__name__}, expected MemberStatus"

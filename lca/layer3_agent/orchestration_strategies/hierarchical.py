@@ -18,5 +18,6 @@ class HierarchicalStrategy(TeamProcessStrategy):
             member_status=context.member_status,
             teammates=list(context.teammates),
             role_mode=RoleMode.SUPERVISOR,
+            delegate_max_attempts=(context.config.delegate_max_attempts if context.config else 3),
         )
         return await context.supervisor.run(objective, ctx)

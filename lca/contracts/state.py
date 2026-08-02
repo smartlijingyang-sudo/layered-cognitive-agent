@@ -70,6 +70,8 @@ class AgentState:
     role_mode: RoleMode = RoleMode.SOLO
     teammates: list[RoleProfile] = field(default_factory=list)
     history: list[Turn] = field(default_factory=list)
+    delegate_max_attempts: int = 3
+    delegate_attempts: dict[str, int] = field(default_factory=dict)
     final_output: Any | None = None
     last_error: str | None = None
     active_template: str | None = None

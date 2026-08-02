@@ -9,16 +9,22 @@ from lca.contracts.decision import AgentCard, Observation
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
+from lca.contracts.semantic_keys import (
+    FAILURE_KIND,
+    FAILURE_KIND_EXECUTION,
+    FAILURE_KIND_VALIDATION,
+)
 
 AgentHandler = Callable[[str], Awaitable[Observation]]
 
 
-def _fail_observation(error: str) -> Observation:
+def _fail_observation(error: str, *, failure_kind: str = FAILURE_KIND_EXECUTION) -> Observation:
     return Observation(
         observation_id=new_id("obs"),
         success=False,
         payload=None,
         error=error,
+        extra={FAILURE_KIND: failure_kind},
     )
 
 
@@ -64,7 +70,11 @@ class InternalTransport(AgentTransport):
         if handler is None:
             loop = asyncio.get_running_loop()
             fut: asyncio.Future[Observation] = loop.create_future()
-            fut.set_result(_fail_observation("agent not found in directory"))
+            fut.set_result(
+                _fail_observation(
+                    "agent not found in directory", failure_kind=FAILURE_KIND_VALIDATION
+                )
+            )
             self._tasks[task_id] = fut
             return task_id
 

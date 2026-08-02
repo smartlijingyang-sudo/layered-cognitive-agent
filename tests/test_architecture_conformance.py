@@ -68,6 +68,9 @@ EXEMPT: dict[str, str] = {
     "lca.layer2_runtime.default_loop_judge.DefaultStopRule": (
         "StopRule 实现，Protocol 在 contracts.stop (ADR-0015)"
     ),
+    "lca.layer1_cognitive.member_status.policy.RequiredAction": (
+        "纯数据声明（gate 裁决结果），非可插拔组件；见 ADR-0025"
+    ),
 }
 
 _SCAN_PACKAGES = [
