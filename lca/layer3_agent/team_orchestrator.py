@@ -18,11 +18,10 @@ from lca.contracts.protocols.capabilities import (
     HasSharedMemory,
 )
 from lca.contracts.protocols.cognition import DecisionGate, SupportsDecisionGate
+from lca.contracts.registries import Registries
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
-from lca.layer0_infra.component_registry import get_global_registry
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
-from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer3_agent.simple_agent import CognitiveAgent
 
 
@@ -33,6 +32,8 @@ class TeamOrchestrator(TeamUnit):
         self,
         members: list[CognitiveAgent],
         config: TeamConfig,
+        *,
+        registries: Registries,
         supervisor: CognitiveAgent | None = None,
         transport: AgentTransport | None = None,
         teammates_text: str = "",
@@ -49,8 +50,7 @@ class TeamOrchestrator(TeamUnit):
         if strategy is not None:
             self._strategy = strategy
         else:
-            registry = get_global_orchestration_registry()
-            self._strategy = registry.resolve(config.process)
+            self._strategy = registries.orchestration.resolve(config.process)
 
         self._shared_store: SharedMemoryStore | None = None
         if config.shared_memory_layers:
@@ -59,8 +59,8 @@ class TeamOrchestrator(TeamUnit):
 
         member_status: MemberStatus | None = None
         if supervisor is not None:
-            member_status = self._create_member_status(members)
-            policy = self._resolve_decision_gate(config)
+            member_status = self._create_member_status(members, registries)
+            policy = self._resolve_decision_gate(config, registries)
             self._bind_supervisor(supervisor, transport, policy)
 
         self._context = TeamContext(
@@ -73,10 +73,11 @@ class TeamOrchestrator(TeamUnit):
         )
 
     @staticmethod
-    def _create_member_status(members: list[CognitiveAgent]) -> MemberStatus:
+    def _create_member_status(
+        members: list[CognitiveAgent], registries: Registries
+    ) -> MemberStatus:
         required_roles = frozenset(m.role_profile.role for m in members)
-        reg = get_global_registry()
-        cls = reg.require("member_status", "default")
+        cls = registries.components.require("member_status", "default")
         result = cls(required_roles=required_roles)
         if not isinstance(result, MemberStatus):
             raise TypeError(
@@ -85,12 +86,11 @@ class TeamOrchestrator(TeamUnit):
         return result
 
     @staticmethod
-    def _resolve_decision_gate(config: TeamConfig) -> DecisionGate | None:
+    def _resolve_decision_gate(config: TeamConfig, registries: Registries) -> DecisionGate | None:
         policy_name = config.decision_gate if config else DecisionGateName.MUST_CONSULT_ALL
         if policy_name == DecisionGateName.NONE:
             return None
-        reg = get_global_registry()
-        factory = reg.require("decision_gate", policy_name)
+        factory = registries.components.require("decision_gate", policy_name)
         result = factory()
         if not isinstance(result, DecisionGate):
             raise TypeError(

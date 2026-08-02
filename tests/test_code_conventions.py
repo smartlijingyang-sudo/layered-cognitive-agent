@@ -46,7 +46,9 @@ _SCAN_PACKAGES = [
 _MAX_FILE_LINES = 250
 
 # 已登记豁免（引用 ADR 或说明原因）
-_LINE_COUNT_EXEMPT: dict[str, str] = {}
+_LINE_COUNT_EXEMPT: dict[str, str] = {
+    "lca/layer4_app/assembly.py": "ADR-0024: Assembly 类 + 六个模块级自由函数同文件（test_refactor_guards 直接 import _promote_supervisor，progressive-disclosure 检查 def assemble_agent 子串）",
+}
 
 
 def _collect_all_concrete_classes() -> dict[str, type]:

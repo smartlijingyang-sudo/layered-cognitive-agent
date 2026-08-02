@@ -8,6 +8,7 @@ from __future__ import annotations
 
 # ── 跨层机制（re-exported from mechanisms for convenience）──
 from lca.contracts.mechanisms import (
+    ComponentRegistryProtocol,
     EventBus,
     Hook,
     HookRegistry,
@@ -78,6 +79,7 @@ __all__ = [
     "Brain",
     "BrainFactory",
     "CandidateEvaluationPipeline",
+    "ComponentRegistryProtocol",
     "Critic",
     "DecisionGate",
     "DecisionParser",

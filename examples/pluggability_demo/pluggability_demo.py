@@ -22,11 +22,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from lca.contracts.decision import Observation, Reflection
 from lca.contracts.state import AgentState
-from lca.layer0_infra.component_registry import get_global_registry
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer4_app.api import Agent
+from lca.layer4_app.assembly import Assembly
 
 
 class LoggingMemorySystem:
@@ -68,8 +68,8 @@ async def main() -> None:
     calculator = CalculatorTool()
 
     # --- 方式 1: 通过注册表名字注入自定义 MemorySystem ---
-    reg = get_global_registry()
-    reg.register("memory", "logging", LoggingMemorySystem)
+    assembly = Assembly()
+    assembly.register_component("memory", "logging", LoggingMemorySystem)
 
     print("=" * 70)
     print("Pluggability Demo: 自定义 MemorySystem (通过注册表名字)")
@@ -83,6 +83,7 @@ async def main() -> None:
         tools=[calculator],
         llm=llm,
         memory="logging",
+        assembly=assembly,
     )
 
     print("开始执行：agent.run('123 乘以 456 等于多少？')")
@@ -111,6 +112,7 @@ async def main() -> None:
         tools=[calculator],
         llm=llm,
         observability=my_obs,
+        assembly=assembly,
     )
 
     print("开始执行：agent.run('789 加 100 等于多少？')")
@@ -125,8 +127,8 @@ async def main() -> None:
 
     # --- 验证注册表列表 ---
     print()
-    print("已注册的 memory 实现:", reg.list("memory"))
-    print("已注册的 observability 实现:", reg.list("observability"))
+    print("已注册的 memory 实现:", assembly.registries.components.list("memory"))
+    print("已注册的 observability 实现:", assembly.registries.components.list("observability"))
 
 
 if __name__ == "__main__":

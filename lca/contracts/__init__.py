@@ -18,6 +18,7 @@ from lca.contracts.graph import (
 )
 from lca.contracts.lifecycle import AgentCard, TaskStatus, TeamMessage
 from lca.contracts.mechanisms import (
+    ComponentRegistryProtocol,
     EventBus,
     Hook,
     HookRegistry,
@@ -27,6 +28,7 @@ from lca.contracts.member_status import MemberStatus
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.observability import Event, TraceSpan
 from lca.contracts.protocols import DecisionGate, SharedMemoryStore, TransportRegistryProtocol
+from lca.contracts.registries import Registries
 from lca.contracts.result import (
     ApprovalPendingError,
     BudgetExceededError,
@@ -60,6 +62,7 @@ __all__ = [
     "Budget",
     "BudgetExceededError",
     "CacheConfig",
+    "ComponentRegistryProtocol",
     "Decision",
     "DecisionGate",
     "DelegationSpec",
@@ -76,6 +79,7 @@ __all__ = [
     "NamedRegistryProtocol",
     "Observation",
     "Reflection",
+    "Registries",
     "Result",
     "RetryPolicy",
     "RoleProfile",

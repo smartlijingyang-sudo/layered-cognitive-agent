@@ -20,9 +20,9 @@ from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer3_agent.simple_agent import CognitiveAgent
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 from lca.layer4_app.assembly import build_team_transport
-from lca.layer4_app.defaults import ensure_defaults
+from lca.layer4_app.defaults import build_default_registries
 
-ensure_defaults()
+_REGISTRIES = build_default_registries()
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -106,6 +106,7 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         orchestrator = TeamOrchestrator(
             members,
             config,
+            registries=_REGISTRIES,
             supervisor=sup,
             transport=transport,
             teammates_text=teammates_text,
@@ -134,6 +135,7 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         orchestrator = TeamOrchestrator(
             members,
             config,
+            registries=_REGISTRIES,
             supervisor=sup,
             transport=transport,
             teammates_text=teammates_text,
@@ -158,7 +160,7 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         )
         sup.run = AsyncMock(return_value=_ok)  # type: ignore[method-assign]
 
-        orchestrator = TeamOrchestrator(members, config, supervisor=sup)
+        orchestrator = TeamOrchestrator(members, config, registries=_REGISTRIES, supervisor=sup)
         await orchestrator.run("task")
 
         self.assertEqual(registry.list_protocols(), [])
@@ -222,7 +224,7 @@ class TestBuildTeamTransport(unittest.IsolatedAsyncioTestCase):
 class TestTeamOrchestratorBasic(unittest.IsolatedAsyncioTestCase):
     async def test_hierarchical_requires_supervisor(self) -> None:
         config = TeamConfig(process="hierarchical")
-        orchestrator = TeamOrchestrator([], config, supervisor=None)
+        orchestrator = TeamOrchestrator([], config, registries=_REGISTRIES, supervisor=None)
         with self.assertRaises(ValueError):
             await orchestrator.run("task")
 

@@ -251,8 +251,11 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
         )
 
         from lca.layer3_agent.team_orchestrator import TeamOrchestrator
+        from lca.layer4_app.defaults import build_default_registries
 
-        orchestrator = TeamOrchestrator(members=[agent_a, agent_b], config=config)
+        orchestrator = TeamOrchestrator(
+            members=[agent_a, agent_b], config=config, registries=build_default_registries()
+        )
 
         # 验证共享 store 已注入：两个成员的 semantic 层指向同一 store
         self.assertIsNotNone(orchestrator._shared_store)
@@ -295,8 +298,11 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
         config = TeamConfig(process="sequential", shared_memory_layers=[])
 
         from lca.layer3_agent.team_orchestrator import TeamOrchestrator
+        from lca.layer4_app.defaults import build_default_registries
 
-        orchestrator = TeamOrchestrator(members=[agent_a, agent_b], config=config)
+        orchestrator = TeamOrchestrator(
+            members=[agent_a, agent_b], config=config, registries=build_default_registries()
+        )
         self.assertIsNone(orchestrator._shared_store)
 
         # 两个成员的 semantic 层互不可见

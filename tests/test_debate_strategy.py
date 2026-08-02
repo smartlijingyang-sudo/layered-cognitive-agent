@@ -14,11 +14,10 @@ from lca.contracts.protocols import Synthesizer, TeamContext
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.contracts.state import Budget
-from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
-from lca.layer4_app.defaults import ensure_defaults
+from lca.layer4_app.defaults import build_default_registries
 
-ensure_defaults()
+_REGISTRIES = build_default_registries()
 
 
 def _make_result(trace_id: str, output: str, status: TaskStatus = TaskStatus.COMPLETED) -> Result:
@@ -245,12 +244,12 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
 class TestDebateStrategyRegistration(unittest.TestCase):
     """DebateStrategy 注册与解析。"""
 
-    def test_debate_registered_in_global_registry(self) -> None:
-        registry = get_global_orchestration_registry()
+    def test_debate_registered_by_default(self) -> None:
+        registry = _REGISTRIES.orchestration
         self.assertTrue(registry.has("debate"))
 
     def test_debate_resolves_to_debate_strategy(self) -> None:
-        registry = get_global_orchestration_registry()
+        registry = _REGISTRIES.orchestration
         strategy = registry.resolve("debate")
         self.assertIsInstance(strategy, ChoreographyStrategy)
 

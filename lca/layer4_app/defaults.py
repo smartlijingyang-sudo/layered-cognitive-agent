@@ -1,19 +1,17 @@
 """Built-in default registrations for the LCA framework.
 
-Idempotent — ``ensure_defaults()`` is safe to call multiple times; it only
-registers on the first invocation.  This module performs discovery-style
-registration only — it does not construct runnable object graphs (see
-``assembly.py``).
+ADR-0024：不再有隐藏的模块级幂等标记。register_defaults() 对调用方传入的
+Registries 实例做注册；对同一个 Registries 重复调用是安全的（覆盖写入相同的
+工厂，无副作用），生命周期完全交给调用方（通常是 Assembly）决定。
+
+本模块仍然只做发现型注册，不构造可运行对象图（见 assembly.py，ADR-0018）。
 """
 
 from __future__ import annotations
 
 from lca.contracts.enums import DecisionGateName, TeamProcess
-from lca.layer0_infra.component_registry import (
-    defaults_registered,
-    get_global_registry,
-    mark_defaults_registered,
-)
+from lca.contracts.registries import Registries
+from lca.layer0_infra.component_registry import ComponentRegistry, NamedRegistry
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.observability.jsonl_file_observability import JSONLFileObservability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
@@ -23,8 +21,7 @@ from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
 from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from lca.layer2_runtime.strategy_registry import get_global_brain_factory_registry
-from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
+from lca.layer3_agent.orchestration_registry import TeamProcessStrategyRegistry
 from lca.layer3_agent.orchestration_strategies import (
     ChoreographyStrategy,
     GraphStrategy,
@@ -32,42 +29,46 @@ from lca.layer3_agent.orchestration_strategies import (
 )
 
 
-def register_defaults() -> None:
-    """Register all built-in default implementations into the global registry.
+def register_defaults(registries: Registries) -> None:
+    """把框架内置的默认实现注册进给定的 *registries*。
 
-    Idempotent — calling multiple times simply overwrites with the same
-    factories, which is harmless.
+    幂等：对同一个 Registries 实例重复调用只是覆盖写入相同的工厂，无害。
     """
-    global_reg = get_global_registry()
-    global_reg.register("observability", "console", ConsoleObservability)
-    global_reg.register("observability", "jsonl_file", JSONLFileObservability)
-    global_reg.register("state_store", "memory", InMemoryStateStore)
-    global_reg.register("memory", "simple", SimpleMemorySystem)
-    global_reg.register("event_bus", "simple", SimpleEventBus)
-    global_reg.register("member_status", "default", InMemoryMemberStatus)
+    reg = registries.components
+    reg.register("observability", "console", ConsoleObservability)
+    reg.register("observability", "jsonl_file", JSONLFileObservability)
+    reg.register("state_store", "memory", InMemoryStateStore)
+    reg.register("memory", "simple", SimpleMemorySystem)
+    reg.register("event_bus", "simple", SimpleEventBus)
+    reg.register("member_status", "default", InMemoryMemberStatus)
 
-    strategy_reg = get_global_brain_factory_registry()
-    strategy_reg.register("default", SimpleBrainFactory())
+    registries.brain_factories.register("default", SimpleBrainFactory())
 
-    orch_reg = get_global_orchestration_registry()
-    orch_reg.register(TeamProcess.HIERARCHICAL, HierarchicalStrategy)
-    orch_reg.register(TeamProcess.SEQUENTIAL, lambda: ChoreographyStrategy("sequential"))
-    orch_reg.register(
+    orch = registries.orchestration
+    orch.register(TeamProcess.HIERARCHICAL, HierarchicalStrategy)
+    orch.register(TeamProcess.SEQUENTIAL, lambda: ChoreographyStrategy("sequential"))
+    orch.register(
         TeamProcess.PARALLEL,
         lambda: ChoreographyStrategy("parallel", synthesizer=ConcatSynthesizer()),
     )
-    orch_reg.register(TeamProcess.GRAPH, GraphStrategy)
-    orch_reg.register(TeamProcess.DEBATE, lambda: ChoreographyStrategy("debate"))
-    orch_reg.register(TeamProcess.HANDOFF, lambda: ChoreographyStrategy("handoff"))
+    orch.register(TeamProcess.GRAPH, GraphStrategy)
+    orch.register(TeamProcess.DEBATE, lambda: ChoreographyStrategy("debate"))
+    orch.register(TeamProcess.HANDOFF, lambda: ChoreographyStrategy("handoff"))
 
-    global_reg.register("decision_gate", DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers)
-    mark_defaults_registered()
+    reg.register("decision_gate", DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers)
 
 
-def ensure_defaults() -> None:
-    """Idempotent guard — registers defaults only on the first call.
+def build_default_registries() -> Registries:
+    """构造一份全新的、已注册全部内置默认实现的 Registries。
 
-    Invoked explicitly by ``Agent`` / ``MultiAgentTeam`` constructors.
+    这是"给我一份开箱即用的默认组合"的唯一入口 —— Assembly() 在未显式传入
+    registries 时用它；测试或需要绕开 Assembly 直接构造 TeamOrchestrator
+    的场景也可以直接调用它。
     """
-    if not defaults_registered():
-        register_defaults()
+    registries = Registries(
+        components=ComponentRegistry(),
+        brain_factories=NamedRegistry(),
+        orchestration=TeamProcessStrategyRegistry(),
+    )
+    register_defaults(registries)
+    return registries

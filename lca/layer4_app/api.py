@@ -1,9 +1,9 @@
 """Developer-facing API surface.
 
 Import ``Agent`` and ``MultiAgentTeam`` from here (or from the package
-root ``lca``).  These are thin wrappers around the composition root
-(``assembly``) that handle default registration and provide a clean,
-minimal constructor signature.
+root ``lca``). By default they share one lazily-constructed default
+``Assembly()``; pass ``assembly=`` to isolate composition state (custom
+registered implementations, test isolation).
 
 Example::
 
@@ -31,8 +31,16 @@ from lca.contracts.protocols import (
     Tool,
 )
 from lca.contracts.result import Result
-from lca.layer4_app.assembly import assemble_agent, assemble_team
-from lca.layer4_app.defaults import ensure_defaults
+from lca.layer4_app.assembly import Assembly
+
+_default_assembly: Assembly | None = None
+
+
+def _get_default_assembly() -> Assembly:
+    global _default_assembly
+    if _default_assembly is None:
+        _default_assembly = Assembly()
+    return _default_assembly
 
 
 class Agent:
@@ -66,6 +74,10 @@ class Agent:
         ``"memory"`` (default) or a ``StateStore`` instance.
     brain_strategy:
         ``"default"`` or a registered strategy name / ``Brain`` instance.
+    assembly:
+        Optional. Pass your own ``Assembly`` to isolate composition state
+        (e.g. custom registered implementations, or test isolation); when
+        omitted, the process-default lazily-constructed Assembly is used.
     """
 
     def __init__(
@@ -81,9 +93,10 @@ class Agent:
         observability: str | Observability = "console",
         state_store: str | StateStore = "memory",
         brain_strategy: str | Brain = "default",
+        assembly: Assembly | None = None,
     ) -> None:
-        ensure_defaults()
-        self._agent = assemble_agent(
+        target = assembly or _get_default_assembly()
+        self._agent = target.assemble_agent(
             role=role,
             goal=goal,
             backstory=backstory,
@@ -121,6 +134,9 @@ class MultiAgentTeam:
         Reference to a graph definition (for ``GRAPH`` process).
     strategy:
         Optional custom ``TeamProcessStrategy`` override.
+    assembly:
+        Optional. Pass your own ``Assembly`` to isolate composition state;
+        when omitted, the process-default lazily-constructed Assembly is used.
     """
 
     def __init__(
@@ -132,11 +148,12 @@ class MultiAgentTeam:
         shared_memory_layers: list[str] | None = None,
         graph_definition_ref: str | None = None,
         strategy: TeamProcessStrategy | None = None,
+        assembly: Assembly | None = None,
     ) -> None:
-        ensure_defaults()
+        target = assembly or _get_default_assembly()
         base_members = [m._agent for m in members]
         base_supervisor = supervisor._agent if supervisor else None
-        self._orchestrator: TeamUnit = assemble_team(
+        self._orchestrator: TeamUnit = target.assemble_team(
             members=base_members,
             process=process,
             supervisor=base_supervisor,

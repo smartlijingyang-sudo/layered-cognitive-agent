@@ -14,11 +14,10 @@ from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
-from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
-from lca.layer4_app.defaults import ensure_defaults
+from lca.layer4_app.defaults import build_default_registries
 
-ensure_defaults()
+_REGISTRIES = build_default_registries()
 
 
 def _make_result(trace_id: str, output: str) -> Result:
@@ -111,14 +110,14 @@ class TestParallelStrategyConcurrency(unittest.IsolatedAsyncioTestCase):
 
 
 class TestParallelStrategyRegistration(unittest.TestCase):
-    """ParallelStrategy 已注册到全局 registry，且与 TeamConfig.process Literal 对齐。"""
+    """ParallelStrategy 默认已注册，且与 TeamConfig.process Literal 对齐。"""
 
-    def test_parallel_registered_in_global_registry(self) -> None:
-        registry = get_global_orchestration_registry()
+    def test_parallel_registered_by_default(self) -> None:
+        registry = _REGISTRIES.orchestration
         self.assertTrue(registry.has("parallel"))
 
     def test_parallel_resolves_correctly(self) -> None:
-        registry = get_global_orchestration_registry()
+        registry = _REGISTRIES.orchestration
         strategy = registry.resolve("parallel")
         self.assertIsInstance(strategy, ChoreographyStrategy)
 

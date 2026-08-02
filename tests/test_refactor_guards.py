@@ -25,7 +25,7 @@ class TestDefaultsNoObjectConstruction(unittest.TestCase):
         for node in ast.walk(tree):
             if not isinstance(node, ast.FunctionDef):
                 continue
-            if node.name not in {"register_defaults", "ensure_defaults"}:
+            if node.name not in {"register_defaults"}:
                 for sub in ast.walk(node):
                     if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name):
                         name = sub.func.id

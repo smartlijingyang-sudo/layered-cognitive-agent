@@ -20,9 +20,6 @@ from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import Budget
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
-from lca.layer4_app.defaults import ensure_defaults
-
-ensure_defaults()
 
 
 def _make_role_profile(role: str) -> RoleProfile:
@@ -336,16 +333,16 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
 class TestGraphStrategyRegistration(unittest.TestCase):
     """GraphStrategy 注册与解析。"""
 
-    def test_graph_registered_in_global_registry(self) -> None:
-        from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
+    def test_graph_registered_by_default(self) -> None:
+        from lca.layer4_app.defaults import build_default_registries
 
-        registry = get_global_orchestration_registry()
+        registry = build_default_registries().orchestration
         self.assertTrue(registry.has("graph"))
 
     def test_graph_resolves_correctly(self) -> None:
-        from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
+        from lca.layer4_app.defaults import build_default_registries
 
-        registry = get_global_orchestration_registry()
+        registry = build_default_registries().orchestration
         strategy = registry.resolve("graph")
         self.assertIsInstance(strategy, GraphStrategy)
 

@@ -259,10 +259,11 @@ class TestL3ProtocolCompliance(unittest.TestCase):
     def test_team_orchestrator_is_team_runtime(self):
         from lca.contracts.role_team import TeamConfig
         from lca.layer3_agent.team_orchestrator import TeamOrchestrator
+        from lca.layer4_app.defaults import build_default_registries
 
         agent, _rp, _runtime = self._build_agent()
         config = TeamConfig(process="sequential")
-        orchestrator = TeamOrchestrator([agent], config)
+        orchestrator = TeamOrchestrator([agent], config, registries=build_default_registries())
         self.assertIsInstance(orchestrator, TeamUnit)
 
 
@@ -270,10 +271,10 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
     """验证 Brain 工厂注册表动态选择 Brain 策略。"""
 
     def test_default_strategy_registered(self):
-        from lca.layer2_runtime.strategy_registry import get_global_brain_factory_registry
+        from lca.layer4_app.defaults import build_default_registries
 
-        reg = get_global_brain_factory_registry()
-        self.assertIn("default", reg)
+        registries = build_default_registries()
+        self.assertIn("default", registries.brain_factories)
 
     def test_agent_with_string_strategy(self):
         from lca.layer4_app.api import Agent

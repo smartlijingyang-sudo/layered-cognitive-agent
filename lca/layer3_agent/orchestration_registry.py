@@ -5,6 +5,9 @@ L3 层职责：
     将编排策略名称（如 "hierarchical"、"sequential"）映射到
     TeamProcessStrategy 实例，消除 TeamOrchestrator 中的 if/elif 分发。
     工厂签名 ``() -> TeamProcessStrategy``，resolve 时自动调用工厂。
+
+ADR-0024：不再提供全局单例；实例归 Registries.orchestration 持有，
+由调用方（通常是 Assembly）显式构造和传递。
 """
 
 from __future__ import annotations
@@ -15,8 +18,6 @@ from lca.contracts.protocols import TeamProcessStrategy
 from lca.layer0_infra.component_registry import NamedRegistry
 
 OrchestrationFactory = Callable[[], TeamProcessStrategy]
-
-_global_orchestration_registry: TeamProcessStrategyRegistry | None = None
 
 
 class TeamProcessStrategyRegistry(NamedRegistry[OrchestrationFactory]):
@@ -43,11 +44,3 @@ class TeamProcessStrategyRegistry(NamedRegistry[OrchestrationFactory]):
 
     def has(self, name: str) -> bool:
         return name in self
-
-
-def get_global_orchestration_registry() -> TeamProcessStrategyRegistry:
-    """返回全局单例编排策略注册表。"""
-    global _global_orchestration_registry
-    if _global_orchestration_registry is None:
-        _global_orchestration_registry = TeamProcessStrategyRegistry()
-    return _global_orchestration_registry

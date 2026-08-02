@@ -7,10 +7,7 @@ L3 层职责：
     所有策略通过注册表解析，L3 不含 if/elif 业务分发。
 """
 
-from lca.layer3_agent.orchestration_registry import (
-    TeamProcessStrategyRegistry,
-    get_global_orchestration_registry,
-)
+from lca.layer3_agent.orchestration_registry import TeamProcessStrategyRegistry
 from lca.layer3_agent.simple_agent import CognitiveAgent
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 
@@ -18,5 +15,4 @@ __all__ = [
     "CognitiveAgent",
     "TeamOrchestrator",
     "TeamProcessStrategyRegistry",
-    "get_global_orchestration_registry",
 ]

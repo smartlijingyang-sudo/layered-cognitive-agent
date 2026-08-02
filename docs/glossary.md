@@ -68,6 +68,8 @@
 | **LLMAdapter** / **Anthropic** / **OpenAI** / **Mock** / **Adapter** | 多厂商 LLM 适配 |
 | **Transport** / **TransportRegistry** / **InternalTransport** / **A2ATransport** / **MCPTransport** | 传输实现与注册 |
 | **ComponentRegistry** / **NamedRegistry** | DI / 按名注册表 |
+| **Registries** | 三个发现型注册表的值对象包（components / brain_factories / orchestration），Assembly 私有持有，替代进程级全局单例（ADR-0024） |
+| **Assembly** | 组合根的显式对象化版本，持有一份 Registries；`assemble_agent` / `assemble_team` 是其方法（原模块级自由函数） |
 | **PromptManager** / **SkillRouter** | Prompt 模板与技能路由 |
 | **FallbackPolicy** / **FallbackActionPolicy** | 未知 action 降级 |
 | **DelegationSpec** / **AgentCard** / **TaskStatus** | 委派规格 / 能力名片 / 任务状态机 |

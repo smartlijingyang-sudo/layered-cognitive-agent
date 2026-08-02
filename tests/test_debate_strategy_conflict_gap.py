@@ -11,9 +11,6 @@ from lca.contracts.enums import TeamProcess
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import LLMAdapter
 from lca.layer4_app.api import Agent, MultiAgentTeam
-from lca.layer4_app.defaults import ensure_defaults
-
-ensure_defaults()
 
 
 def _decision(**kwargs):

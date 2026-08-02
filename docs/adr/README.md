@@ -25,6 +25,7 @@
 | [0021](0021-naming-convention-arbitration.md) | Simple/Default/领域名三分规则 | L1 Simple* / L2 Default* / L3 领域名或 Simple*；BaseAgent→SimpleAgent |
 | [0022](0022-map-pipeline-consolidation.md) | MAP 管线收敛 | 五模块 → 单一 CandidateEvaluationPipeline；Supersedes ADR-0003 |
 | [0023](0023-architecture-deepening.md) | 架构深化 | 溶解浅模块 + 消除冗余概念 + 完成 rename + 迁层 |
+| [0024](0024-registries-value-object.md) | Registries 值对象取代全局单例 | 三个 get_global_* 删除；TeamOrchestrator/Assembly 显式传递 Registries |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

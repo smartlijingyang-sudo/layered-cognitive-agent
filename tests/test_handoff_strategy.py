@@ -15,11 +15,10 @@ from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
 from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
-from lca.layer4_app.defaults import ensure_defaults
+from lca.layer4_app.defaults import build_default_registries
 
-ensure_defaults()
+_REGISTRIES = build_default_registries()
 
 
 def _make_result(trace_id: str, output: str, status: TaskStatus = TaskStatus.COMPLETED) -> Result:
@@ -242,11 +241,11 @@ class TestHandoffRegistration(unittest.TestCase):
     """HandoffStrategy 注册与解析。"""
 
     def test_handoff_registered(self) -> None:
-        registry = get_global_orchestration_registry()
+        registry = _REGISTRIES.orchestration
         self.assertTrue(registry.has("handoff"))
 
     def test_handoff_resolves(self) -> None:
-        registry = get_global_orchestration_registry()
+        registry = _REGISTRIES.orchestration
         strategy = registry.resolve("handoff")
         self.assertIsInstance(strategy, ChoreographyStrategy)
 

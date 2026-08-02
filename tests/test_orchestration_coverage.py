@@ -13,10 +13,9 @@ from unittest.mock import AsyncMock, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.enums import TeamProcess
-from lca.layer3_agent.orchestration_registry import get_global_orchestration_registry
-from lca.layer4_app.defaults import ensure_defaults
+from lca.layer4_app.defaults import build_default_registries
 
-ensure_defaults()
+_REGISTRIES = build_default_registries()
 
 
 def _get_process_enum_values() -> set[str]:
@@ -29,7 +28,7 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
 
     def test_literal_values_match_registered_strategies(self) -> None:
         literal_values = _get_process_enum_values()
-        registered = set(get_global_orchestration_registry().list_strategies())
+        registered = set(_REGISTRIES.orchestration.list_strategies())
 
         missing = literal_values - registered
         extra = registered - literal_values
@@ -47,7 +46,7 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_resolve_unknown_strategy_raises_value_error(self) -> None:
-        registry = get_global_orchestration_registry()
+        registry = _REGISTRIES.orchestration
         with self.assertRaises(ValueError) as ctx:
             registry.resolve("nonexistent_strategy")
         self.assertIn("nonexistent_strategy", str(ctx.exception))
