@@ -19,7 +19,7 @@ Example::
 from __future__ import annotations
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
-from lca.contracts.enums import TeamProcess
+from lca.contracts.enums import MemoryLayer, TeamProcess
 from lca.contracts.protocols import (
     Brain,
     LLMAdapter,
@@ -145,7 +145,7 @@ class MultiAgentTeam:
         process: TeamProcess = TeamProcess.HIERARCHICAL,
         supervisor: Agent | None = None,
         max_rounds: int | None = None,
-        shared_memory_layers: list[str] | None = None,
+        shared_memory_layers: list[MemoryLayer] | None = None,
         graph_definition_ref: str | None = None,
         strategy: TeamProcessStrategy | None = None,
         assembly: Assembly | None = None,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lca.contracts.enums import RoleMode
 from lca.contracts.protocols import TeamContext, TeamProcessStrategy
 from lca.contracts.result import Result
 from lca.contracts.run_context import RunContext
@@ -15,6 +16,8 @@ class HierarchicalStrategy(TeamProcessStrategy):
             raise ValueError("Hierarchical 模式需要 Supervisor")
         ctx = RunContext(
             member_status=context.member_status,
+            teammates=list(context.teammates),
+            role_mode=RoleMode.SUPERVISOR,
             teammates_text=context.teammates_text,
         )
         return await context.supervisor.run(objective, ctx)

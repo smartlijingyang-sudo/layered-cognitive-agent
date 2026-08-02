@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from lca.contracts.enums import RoleMode
 from lca.contracts.protocols import LLMAdapter, Reasoner, Tool
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.state import AgentState
@@ -47,7 +48,7 @@ class SimpleReasoner(Reasoner):
 
     async def generate_candidates(self, state: AgentState, n: int = 1) -> list[str]:
         context_lines = (
-            "\n".join(f"- [{r.memory_type}] {r.content}" for r in state.retrieved_context)
+            "\n".join(f"- [{r.memory_type.value}] {r.content}" for r in state.retrieved_context)
             or "(无历史上下文)"
         )
         base_vars = {
@@ -60,13 +61,14 @@ class SimpleReasoner(Reasoner):
             "allowed_actions": self.allowed_actions_desc,
         }
         template_name = self._resolve_template(state)
-        if state.teammates_text:
+        if state.role_mode != RoleMode.SOLO:
+            teammates_text = build_teammates_text(state.teammates)
             status_text = (
                 state.member_status.as_prompt_text() if state.member_status is not None else ""
             )
-            base_vars["teammates"] = state.teammates_text
+            base_vars["teammates"] = teammates_text
             base_vars["member_status_text"] = status_text
-            base_vars["teammates_text"] = state.teammates_text
+            base_vars["teammates_text"] = teammates_text
         subtasks = state.working_memory.get("subtasks")
         if subtasks:
             base_vars["context"] = (
@@ -81,6 +83,6 @@ class SimpleReasoner(Reasoner):
     def _resolve_template(self, state: AgentState) -> str:
         if state.active_template:
             return state.active_template
-        if state.teammates_text:
+        if state.role_mode != RoleMode.SOLO:
             return _HIERARCHICAL_TEMPLATE
         return _DEFAULT_TEMPLATE

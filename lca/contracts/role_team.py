@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.contracts.enums import DecisionGateName, TeamProcess
+from lca.contracts.enums import DecisionGateName, MemoryLayer, TeamProcess
 
 
 @dataclass
@@ -54,7 +54,7 @@ class TeamConfig:
     """团队编排配置：过程模式 + 共享记忆层 + 收尾策略。"""
 
     process: TeamProcess
-    shared_memory_layers: list[str] = field(default_factory=list)
+    shared_memory_layers: list[MemoryLayer] = field(default_factory=list)
     max_rounds: int | None = None
     graph_definition_ref: str | None = None
     decision_gate: DecisionGateName = DecisionGateName.MUST_CONSULT_ALL

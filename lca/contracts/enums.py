@@ -119,3 +119,41 @@ class RoleStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     DONE = "done"
     FAILED = "failed"
+
+
+class MemoryLayer(str, Enum):
+    """多级记忆层级（CoALA 分类）。"""
+
+    WORKING = "working"
+    SEMANTIC = "semantic"
+    EPISODIC = "episodic"
+    PROCEDURAL = "procedural"
+
+
+SHAREABLE_LAYERS: frozenset[MemoryLayer] = frozenset({MemoryLayer.SEMANTIC, MemoryLayer.PROCEDURAL})
+"""只有 semantic / procedural 两层可跨 Agent 共享（CoALA 语义边界）。"""
+
+
+class ComponentKind(str, Enum):
+    """组件注册表分类键 —— 值域有限，适用契约 1（值域即类型）。
+
+    对应 ComponentRegistryProtocol.register(category, name, impl) 中的
+    category 参数。name 参数视情况使用已有枚举（如 DecisionGateName）
+    或保留字符串（如角色名，来自配置）。
+    """
+
+    OBSERVABILITY = "observability"
+    STATE_STORE = "state_store"
+    MEMORY = "memory"
+    EVENT_BUS = "event_bus"
+    MEMBER_STATUS = "member_status"
+    DECISION_GATE = "decision_gate"
+    BUDGET_POLICY = "budget_policy"
+
+
+class RoleMode(str, Enum):
+    """Agent 在团队中的角色模式 —— 决定 prompt 模板和队友信息渲染。"""
+
+    SOLO = "solo"
+    SUPERVISOR = "supervisor"
+    MEMBER = "member"

@@ -14,7 +14,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.decision import Observation, Reflection
-from lca.contracts.enums import ReflectionVerdict
+from lca.contracts.enums import MemoryLayer, ReflectionVerdict
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
@@ -41,7 +41,7 @@ def _make_semantic_record(content: str, trace_id: str = "trace-1") -> MemoryReco
     return MemoryRecord(
         record_id=f"mem-{content}",
         content=content,
-        memory_type="semantic",
+        memory_type=MemoryLayer.SEMANTIC,
         importance=0.8,
         source_trace_id=trace_id,
     )
@@ -51,18 +51,17 @@ class TestTeamSharedMemoryStoreValidation(unittest.TestCase):
     """TeamSharedMemoryStore 构造参数校验。"""
 
     def test_valid_layers_accepted(self) -> None:
-        store = TeamSharedMemoryStore(["semantic", "procedural"])
-        self.assertEqual(set(store.shared_layers), {"semantic", "procedural"})
+        store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC, MemoryLayer.PROCEDURAL])
+        self.assertEqual(set(store.shared_layers), {MemoryLayer.SEMANTIC, MemoryLayer.PROCEDURAL})
 
     def test_single_layer_accepted(self) -> None:
-        store = TeamSharedMemoryStore(["semantic"])
-        self.assertTrue(store.is_shared("semantic"))
-        self.assertFalse(store.is_shared("procedural"))
+        store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
+        self.assertTrue(store.is_shared(MemoryLayer.SEMANTIC))
+        self.assertFalse(store.is_shared(MemoryLayer.PROCEDURAL))
 
     def test_invalid_layer_rejected(self) -> None:
         with self.assertRaises(ValueError) as ctx:
-            # 故意传入非法层名以触发校验异常
-            TeamSharedMemoryStore(["episodic"])  # type: ignore[list-item]
+            TeamSharedMemoryStore([MemoryLayer.EPISODIC])
         self.assertIn("semantic/procedural", str(ctx.exception))
 
     def test_empty_layers_accepted(self) -> None:
@@ -70,9 +69,9 @@ class TestTeamSharedMemoryStoreValidation(unittest.TestCase):
         self.assertEqual(store.shared_layers, [])
 
     def test_add_to_unshared_layer_raises(self) -> None:
-        store = TeamSharedMemoryStore(["semantic"])
+        store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         with self.assertRaises(KeyError):
-            store.add_record("procedural", _make_semantic_record("x"))
+            store.add_record(MemoryLayer.PROCEDURAL, _make_semantic_record("x"))
 
 
 class TestSharedMemoryIsolation(unittest.IsolatedAsyncioTestCase):
@@ -84,7 +83,7 @@ class TestSharedMemoryIsolation(unittest.IsolatedAsyncioTestCase):
 
         # 直接向私有层写入（模拟不共享场景）
         record = _make_semantic_record("agent-a-private-knowledge")
-        mem_a._private_layers["semantic"].append(record)
+        mem_a._private_layers[MemoryLayer.SEMANTIC].append(record)
 
         state_a = await mem_a.perceive(_make_state("trace-a"))
         state_b = await mem_b.perceive(_make_state("trace-b"))
@@ -100,21 +99,21 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
     """声明共享后，共享层的记录在成员间互相可见。"""
 
     async def test_shared_semantic_visible_across_members(self) -> None:
-        store = TeamSharedMemoryStore(["semantic"])
+        store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
         mem_a.bind_shared_memory(store)
         mem_b.bind_shared_memory(store)
 
         record = _make_semantic_record("shared-knowledge")
-        mem_a.write_shared_record("semantic", record)
+        mem_a.write_shared_record(MemoryLayer.SEMANTIC, record)
 
         state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]
         self.assertIn("shared-knowledge", b_contents)
 
     async def test_shared_procedural_visible_across_members(self) -> None:
-        store = TeamSharedMemoryStore(["procedural"])
+        store = TeamSharedMemoryStore([MemoryLayer.PROCEDURAL])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
         mem_a.bind_shared_memory(store)
@@ -123,29 +122,29 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         record = MemoryRecord(
             record_id="proc-1",
             content="shared-skill: use_tool",
-            memory_type="procedural",
+            memory_type=MemoryLayer.PROCEDURAL,
             importance=0.7,
         )
-        mem_a.write_shared_record("procedural", record)
+        mem_a.write_shared_record(MemoryLayer.PROCEDURAL, record)
 
         state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]
         self.assertIn("shared-skill: use_tool", b_contents)
 
     async def test_both_semantic_and_procedural_shared(self) -> None:
-        store = TeamSharedMemoryStore(["semantic", "procedural"])
+        store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC, MemoryLayer.PROCEDURAL])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
         mem_a.bind_shared_memory(store)
         mem_b.bind_shared_memory(store)
 
-        mem_a.write_shared_record("semantic", _make_semantic_record("fact-1"))
+        mem_a.write_shared_record(MemoryLayer.SEMANTIC, _make_semantic_record("fact-1"))
         mem_a.write_shared_record(
-            "procedural",
+            MemoryLayer.PROCEDURAL,
             MemoryRecord(
                 record_id="proc-1",
                 content="skill-1",
-                memory_type="procedural",
+                memory_type=MemoryLayer.PROCEDURAL,
                 importance=0.7,
             ),
         )
@@ -160,7 +159,7 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
     """即使在共享模式下，episodic/working 层也保持私有（CoALA 语义边界）。"""
 
     async def test_episodic_remains_private_with_shared_semantic(self) -> None:
-        store = TeamSharedMemoryStore(["semantic"])
+        store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
         mem_a.bind_shared_memory(store)
@@ -172,14 +171,14 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
         state_a = await mem_a.perceive(_make_state("trace-a"))
         state_b = await mem_b.perceive(_make_state("trace-b"))
 
-        a_episodic = [r for r in state_a.retrieved_context if r.memory_type == "episodic"]
-        b_episodic = [r for r in state_b.retrieved_context if r.memory_type == "episodic"]
+        a_episodic = [r for r in state_a.retrieved_context if r.memory_type == MemoryLayer.EPISODIC]
+        b_episodic = [r for r in state_b.retrieved_context if r.memory_type == MemoryLayer.EPISODIC]
 
         self.assertEqual(len(a_episodic), 1)
         self.assertEqual(len(b_episodic), 0)
 
     async def test_working_remains_private_with_shared_semantic(self) -> None:
-        store = TeamSharedMemoryStore(["semantic"])
+        store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
         mem_a.bind_shared_memory(store)
@@ -192,7 +191,7 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
         )
 
         state_b = await mem_b.perceive(_make_state("trace-b"))
-        b_working = [r for r in state_b.retrieved_context if r.memory_type == "working"]
+        b_working = [r for r in state_b.retrieved_context if r.memory_type == MemoryLayer.WORKING]
         self.assertEqual(len(b_working), 0)
 
 
@@ -201,16 +200,16 @@ class TestWriteSharedRecordGuard(unittest.TestCase):
 
     def test_write_to_unshared_layer_raises(self) -> None:
         mem = SimpleMemorySystem()
-        store = TeamSharedMemoryStore(["semantic"])
+        store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem.bind_shared_memory(store)
 
         with self.assertRaises(KeyError):
-            mem.write_shared_record("episodic", _make_semantic_record("x"))
+            mem.write_shared_record(MemoryLayer.EPISODIC, _make_semantic_record("x"))
 
     def test_write_without_store_raises(self) -> None:
         mem = SimpleMemorySystem()
         with self.assertRaises(KeyError):
-            mem.write_shared_record("semantic", _make_semantic_record("x"))
+            mem.write_shared_record(MemoryLayer.SEMANTIC, _make_semantic_record("x"))
 
 
 class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
@@ -247,7 +246,7 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
 
         config = TeamConfig(
             process="sequential",
-            shared_memory_layers=["semantic"],
+            shared_memory_layers=[MemoryLayer.SEMANTIC],
         )
 
         from lca.layer3_agent.team_orchestrator import TeamOrchestrator
@@ -261,7 +260,9 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
         self.assertIsNotNone(orchestrator._shared_store)
 
         # 通过 agent_a 的 memory 写入 semantic 记录
-        mem_a.write_shared_record("semantic", _make_semantic_record("orchestrator-shared-fact"))
+        mem_a.write_shared_record(
+            MemoryLayer.SEMANTIC, _make_semantic_record("orchestrator-shared-fact")
+        )
 
         # agent_b 应该能看到这条记录
         state_b = await mem_b.perceive(_make_state())
@@ -306,7 +307,7 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
         self.assertIsNone(orchestrator._shared_store)
 
         # 两个成员的 semantic 层互不可见
-        mem_a._private_layers["semantic"].append(_make_semantic_record("private-to-a"))
+        mem_a._private_layers[MemoryLayer.SEMANTIC].append(_make_semantic_record("private-to-a"))
 
         state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]

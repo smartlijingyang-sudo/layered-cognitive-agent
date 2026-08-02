@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.enums import DecisionGateName
+from lca.contracts.enums import ComponentKind, DecisionGateName, RoleMode
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.message import AgentMessage, agent_message_as_text
 from lca.contracts.protocols import (
@@ -20,7 +20,7 @@ from lca.contracts.protocols.capabilities import (
 from lca.contracts.protocols.cognition import DecisionGate, SupportsDecisionGate
 from lca.contracts.registries import Registries
 from lca.contracts.result import Result
-from lca.contracts.role_team import TeamConfig
+from lca.contracts.role_team import RoleProfile, TeamConfig
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.layer3_agent.simple_agent import CognitiveAgent
 
@@ -36,6 +36,8 @@ class TeamOrchestrator(TeamUnit):
         registries: Registries,
         supervisor: CognitiveAgent | None = None,
         transport: AgentTransport | None = None,
+        teammates: list[RoleProfile] | None = None,
+        role_mode: RoleMode = RoleMode.SOLO,
         teammates_text: str = "",
         strategy: TeamProcessStrategy | None = None,
         team_id: str = "",
@@ -44,6 +46,8 @@ class TeamOrchestrator(TeamUnit):
         self.config = config
         self.supervisor = supervisor
         self.transport = transport
+        self.teammates = teammates or []
+        self.role_mode = role_mode
         self.teammates_text = teammates_text
         self.team_id = team_id or f"team-{config.process}"
 
@@ -68,6 +72,8 @@ class TeamOrchestrator(TeamUnit):
             config=config,
             supervisor=supervisor,
             transport=transport,
+            teammates=self.teammates,
+            role_mode=self.role_mode,
             teammates_text=teammates_text,
             member_status=member_status,
         )
@@ -77,7 +83,7 @@ class TeamOrchestrator(TeamUnit):
         members: list[CognitiveAgent], registries: Registries
     ) -> MemberStatus:
         required_roles = frozenset(m.role_profile.role for m in members)
-        cls = registries.components.require("member_status", "default")
+        cls = registries.components.require(ComponentKind.MEMBER_STATUS, "default")
         result = cls(required_roles=required_roles)
         if not isinstance(result, MemberStatus):
             raise TypeError(
@@ -90,7 +96,7 @@ class TeamOrchestrator(TeamUnit):
         policy_name = config.decision_gate if config else DecisionGateName.MUST_CONSULT_ALL
         if policy_name == DecisionGateName.NONE:
             return None
-        factory = registries.components.require("decision_gate", policy_name)
+        factory = registries.components.require(ComponentKind.DECISION_GATE, policy_name)
         result = factory()
         if not isinstance(result, DecisionGate):
             raise TypeError(

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import TypeVar
 
+import structlog
+
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.budget import (
     DEFAULT_MAX_STEPS,
@@ -17,7 +19,7 @@ from lca.contracts.budget import (
     SUPERVISOR_MIN_MAX_STEPS,
 )
 from lca.contracts.decision import Observation
-from lca.contracts.enums import HookEvent, TeamProcess
+from lca.contracts.enums import ComponentKind, HookEvent, MemoryLayer, RoleMode, TeamProcess
 from lca.contracts.mechanisms import ComponentRegistryProtocol
 from lca.contracts.protocols import (
     AgentTransport,
@@ -55,6 +57,7 @@ from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer3_agent.orchestration_registry import OrchestrationFactory
 from lca.layer3_agent.simple_agent import CognitiveAgent
 from lca.layer4_app.defaults import build_default_registries
+from lca.layer4_app.policies import SupervisorBudgetPolicy
 
 T = TypeVar("T")
 
@@ -144,8 +147,19 @@ def build_hooks(observability: Observability, event_bus: EventBus) -> SimpleHook
     return hooks
 
 
+_log = structlog.get_logger("lca.assembly")
+
+
 def _promote_supervisor(supervisor: CognitiveAgent) -> CognitiveAgent:
-    """Apply supervisor budget floors — sole composition decision for team leads."""
+    """Apply supervisor budget floors — sole composition decision for team leads.
+
+    Validates via the registered BudgetPolicy, then constructs a new agent
+    with corrected values if needed (transition mode). In strict mode,
+    validation raises BudgetPolicyViolation and this function is not reached.
+    """
+    policy = SupervisorBudgetPolicy()
+    policy.validate(supervisor)
+
     wc = supervisor.max_wall_clock_seconds
     effective_wc = (
         max(wc, DEFAULT_MAX_WALL_CLOCK_SECONDS)
@@ -225,9 +239,9 @@ class Assembly:
         )
 
         # runtime_checkable Protocols support isinstance at runtime; mypy limitation #9208
-        obs = _resolve_component(reg, "observability", observability, Observability)  # type: ignore[type-abstract]
-        mem = _resolve_component(reg, "memory", memory, MemorySystem)  # type: ignore[type-abstract]
-        ss = _resolve_component(reg, "state_store", state_store, StateStore)  # type: ignore[type-abstract]
+        obs = _resolve_component(reg, ComponentKind.OBSERVABILITY, observability, Observability)  # type: ignore[type-abstract]
+        mem = _resolve_component(reg, ComponentKind.MEMORY, memory, MemorySystem)  # type: ignore[type-abstract]
+        ss = _resolve_component(reg, ComponentKind.STATE_STORE, state_store, StateStore)  # type: ignore[type-abstract]
 
         tool_registry = SimpleToolRegistry()
         for t in tools:
@@ -259,7 +273,7 @@ class Assembly:
             transport_registry,
             action_registry,
         )
-        event_bus = _resolve_component(reg, "event_bus", "simple", EventBus)  # type: ignore[type-abstract]
+        event_bus = _resolve_component(reg, ComponentKind.EVENT_BUS, "simple", EventBus)  # type: ignore[type-abstract]
         hooks = build_hooks(obs, event_bus)
         runtime = CognitiveRuntime(
             brain,
@@ -283,7 +297,7 @@ class Assembly:
         process: TeamProcess | None = None,
         supervisor: CognitiveAgent | None = None,
         max_rounds: int | None = None,
-        shared_memory_layers: list[str] | None = None,
+        shared_memory_layers: list[MemoryLayer] | None = None,
         graph_definition_ref: str | None = None,
         strategy: TeamProcessStrategy | None = None,
     ) -> TeamUnit:
@@ -299,6 +313,8 @@ class Assembly:
         )
         base_supervisor = _promote_supervisor(supervisor) if supervisor is not None else None
         transport, teammates_text = build_team_transport(members)
+        teammate_profiles = [m.role_profile for m in members]
+        role_mode = RoleMode.SUPERVISOR if base_supervisor is not None else RoleMode.SOLO
 
         return TeamOrchestrator(
             members,
@@ -306,6 +322,8 @@ class Assembly:
             registries=self._registries,
             supervisor=base_supervisor,
             transport=transport,
+            teammates=teammate_profiles,
+            role_mode=role_mode,
             teammates_text=teammates_text,
             strategy=strategy,
         )

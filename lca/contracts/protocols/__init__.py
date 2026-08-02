@@ -16,7 +16,12 @@ from lca.contracts.mechanisms import (
 )
 
 # ── L3 Agent / Team 入口 ──────────────────────────────────
-from lca.contracts.protocols.agent import AgentUnit, TeamUnit
+from lca.contracts.protocols.agent import (
+    AgentUnit,
+    BudgetAware,
+    BudgetPolicy,
+    TeamUnit,
+)
 
 # ── 可选能力协议（ADR-0017）──────────────────────────────
 from lca.contracts.protocols.capabilities import (
@@ -78,6 +83,8 @@ __all__ = [
     "Body",
     "Brain",
     "BrainFactory",
+    "BudgetAware",
+    "BudgetPolicy",
     "CandidateEvaluationPipeline",
     "ComponentRegistryProtocol",
     "Critic",

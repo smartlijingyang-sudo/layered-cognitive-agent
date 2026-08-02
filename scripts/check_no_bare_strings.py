@@ -42,6 +42,9 @@ _DOMAIN_STRINGS = {
     '"ok"': "SpanStatus.OK",
     '"error"': "SpanStatus.ERROR",
     '"must_consult_all"': "DecisionGateName.MUST_CONSULT_ALL",
+    '"semantic"': "MemoryLayer.SEMANTIC",
+    '"episodic"': "MemoryLayer.EPISODIC",
+    '"procedural"': "MemoryLayer.PROCEDURAL",
 }
 
 # ── 文件级白名单 ──

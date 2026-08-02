@@ -52,6 +52,20 @@ repos:
         pass_filenames: false
         types: [python]
 
+      - id: check-adr-sync
+        name: ADR-0017 与代码同步校验
+        entry: python scripts/check_adr_sync.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-assembly-purity
+        name: 装配期纯度校验（契约 2：只读不算）
+        entry: python scripts/check_assembly_purity.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
       - id: vulture
         name: 死代码检测 vulture（≥80% 置信度）
         entry: uv run vulture lca --min-confidence 80

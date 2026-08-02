@@ -26,6 +26,21 @@ DEFAULT_MAX_WALL_CLOCK_SECONDS: int = 300
 SUPERVISOR_MIN_MAX_STEPS: int = 20
 
 
+class BudgetPolicyViolation(ValueError):  # noqa: N818 - violation carries structured details
+    """携带违规详情，便于上层按字段做差异化处理，而不是解析异常消息字符串。"""
+
+    def __init__(self, agent_role: str, field: str, minimum: int, actual: int) -> None:
+        self.agent_role = agent_role
+        self.field = field
+        self.minimum = minimum
+        self.actual = actual
+        super().__init__(
+            f"{field} 需要 >= {minimum}，当前 {actual}"
+            f"（agent={agent_role}）。"
+            f"请在构造 supervisor 时显式设置。"
+        )
+
+
 def create_budget(
     max_steps: int = DEFAULT_MAX_STEPS,
     max_wall_clock_seconds: int | None = DEFAULT_MAX_WALL_CLOCK_SECONDS,

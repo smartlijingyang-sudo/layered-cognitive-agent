@@ -43,13 +43,15 @@ class ActionType(str, Enum):
 | `SpanStatus` | ok, error | `span.status = "error"` |
 | `SnapshotReason` | periodic, pre_approval, manual, on_error | `reason="periodic"` |
 | `ReflectionVerdict` | on_track, needs_correction... | `verdict == "on_track"` |
-| `SharedMemoryOp` | read, write, list | `op == "read"` |
-| `CompletionPolicyName` | roster_coverage, none | `policy_name = "roster_coverage"` |
+| `DecisionGateName` | must_consult_all, none | `policy_name = "must_consult_all"` |
 | `DelegationProtocol` | internal, a2a, mcp | `protocol: "internal"` |
 | `ContentType` | text, image, audio, structured | `content_type = "text"` |
 | `MessageKind` | text, data, file | `kind: "text"` |
 | `MessageRole` | user, agent | `role: "user"` |
 | `RoleStatus` | pending, in_progress, done, failed | `status == "done"` |
+| `MemoryLayer` | working, semantic, episodic, procedural | `memory_type = "semantic"` |
+| `ComponentKind` | observability, state_store, memory, ... | `category = "observability"` |
+| `RoleMode` | solo, supervisor, member | `role_mode = "supervisor"` |
 | `NodeType` | entry, exit, agent, router, aggregator | `type="entry"` |
 | `EdgeType` | fixed, conditional, parallel | `type="conditional"` |
 

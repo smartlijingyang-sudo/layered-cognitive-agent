@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.decision import Observation, Reflection
+from lca.contracts.enums import MemoryLayer
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.state import AgentState
 
@@ -29,4 +30,4 @@ class MemorySystem(Protocol):
         self, state: AgentState, observation: Observation, reflection: Reflection
     ) -> None: ...
 
-    def query(self, layer: str) -> list[MemoryRecord]: ...
+    def query(self, layer: MemoryLayer) -> list[MemoryRecord]: ...

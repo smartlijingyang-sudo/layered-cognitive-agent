@@ -6,12 +6,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from lca.contracts.enums import MemoryLayer, RoleMode
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols.agent import AgentUnit
 from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.result import Result
-from lca.contracts.role_team import TeamConfig
+from lca.contracts.role_team import RoleProfile, TeamConfig
 
 
 @dataclass
@@ -27,6 +28,8 @@ class TeamContext:
     config: TeamConfig | None = None
     supervisor: AgentUnit | None = None
     transport: AgentTransport | None = None
+    teammates: list[RoleProfile] = field(default_factory=list)
+    role_mode: RoleMode = RoleMode.SOLO
     teammates_text: str = ""
     member_status: MemberStatus | None = None
     team_id: str = ""
@@ -47,9 +50,9 @@ class SharedMemoryStore(Protocol):
     episodic/working 保持私有）。由 TeamOrchestrator 构造并注入。
     """
 
-    def is_shared(self, layer: str) -> bool: ...
-    def add_record(self, layer: str, record: MemoryRecord) -> None: ...
-    def get_records(self, layer: str) -> list[MemoryRecord]: ...
+    def is_shared(self, layer: MemoryLayer) -> bool: ...
+    def add_record(self, layer: MemoryLayer, record: MemoryRecord) -> None: ...
+    def get_records(self, layer: MemoryLayer) -> list[MemoryRecord]: ...
 
 
 @runtime_checkable

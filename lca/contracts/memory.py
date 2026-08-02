@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
+
+from lca.contracts.enums import MemoryLayer
 
 
 @dataclass
@@ -12,7 +14,7 @@ class MemoryRecord:
 
     record_id: str
     content: str
-    memory_type: Literal["working", "semantic", "episodic", "procedural"]
+    memory_type: MemoryLayer
     importance: float
     recency_score: float | None = None
     embedding: list[float] | None = None

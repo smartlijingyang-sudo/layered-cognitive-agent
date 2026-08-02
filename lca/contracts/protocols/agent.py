@@ -31,6 +31,33 @@ class AgentUnit(Protocol):
 
 
 @runtime_checkable
+class BudgetAware(Protocol):
+    """Agent that exposes budget fields for policy validation.
+
+    CognitiveAgent satisfies this protocol; the Protocol decouples
+    budget validation from the concrete agent class so that
+    BudgetPolicy implementations can live in contracts.
+    """
+
+    max_steps: int
+    max_wall_clock_seconds: int | None
+    role_profile: RoleProfile
+
+
+@runtime_checkable
+class BudgetPolicy(Protocol):
+    """Composition-time budget validation strategy.
+
+    validate raises BudgetPolicyViolation when the agent's budget
+    fields are below required minimums. The caller (assembly) is
+    responsible for constructing the agent with correct values before
+    calling validate, or for catching the violation and correcting.
+    """
+
+    def validate(self, agent: BudgetAware) -> None: ...
+
+
+@runtime_checkable
 class TeamUnit(Protocol):
     """Team entry: run an objective end-to-end."""
 

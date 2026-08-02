@@ -11,7 +11,7 @@ Agent 生态正在快速标准化。MCP（Model Context Protocol）和 A2A（Age
 
 - **MCP**：工具协议适配——框架内的 `ToolProtocol` 可直接对接 MCP Server/Client
 - **A2A**：Agent 间通信适配——`AgentTransport` Protocol 支持 A2A 协议的 `send_task` / `poll_status` / `receive_result`
-- **DelegationSpec.protocol**：`Literal["internal", "a2a", "mcp"]`，委派时可选择通信协议
+- **DelegationProtocol**：`lca.contracts.enums.DelegationProtocol(str, Enum)` 枚举（值域：`internal`, `a2a`, `mcp`），委派时可选择通信协议
 
 协议层本身可插拔——`AgentTransport` 是 Protocol，第三方可以实现自己的协议适配而不改框架代码。
 

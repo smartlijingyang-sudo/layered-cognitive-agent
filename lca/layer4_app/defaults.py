@@ -9,7 +9,7 @@ Registries 实例做注册；对同一个 Registries 重复调用是安全的（
 
 from __future__ import annotations
 
-from lca.contracts.enums import DecisionGateName, TeamProcess
+from lca.contracts.enums import ComponentKind, DecisionGateName, TeamProcess
 from lca.contracts.registries import Registries
 from lca.layer0_infra.component_registry import ComponentRegistry, NamedRegistry
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
@@ -27,6 +27,7 @@ from lca.layer3_agent.orchestration_strategies import (
     GraphStrategy,
     HierarchicalStrategy,
 )
+from lca.layer4_app.policies import SupervisorBudgetPolicy
 
 
 def register_defaults(registries: Registries) -> None:
@@ -35,12 +36,12 @@ def register_defaults(registries: Registries) -> None:
     幂等：对同一个 Registries 实例重复调用只是覆盖写入相同的工厂，无害。
     """
     reg = registries.components
-    reg.register("observability", "console", ConsoleObservability)
-    reg.register("observability", "jsonl_file", JSONLFileObservability)
-    reg.register("state_store", "memory", InMemoryStateStore)
-    reg.register("memory", "simple", SimpleMemorySystem)
-    reg.register("event_bus", "simple", SimpleEventBus)
-    reg.register("member_status", "default", InMemoryMemberStatus)
+    reg.register(ComponentKind.OBSERVABILITY, "console", ConsoleObservability)
+    reg.register(ComponentKind.OBSERVABILITY, "jsonl_file", JSONLFileObservability)
+    reg.register(ComponentKind.STATE_STORE, "memory", InMemoryStateStore)
+    reg.register(ComponentKind.MEMORY, "simple", SimpleMemorySystem)
+    reg.register(ComponentKind.EVENT_BUS, "simple", SimpleEventBus)
+    reg.register(ComponentKind.MEMBER_STATUS, "default", InMemoryMemberStatus)
 
     registries.brain_factories.register("default", SimpleBrainFactory())
 
@@ -55,7 +56,10 @@ def register_defaults(registries: Registries) -> None:
     orch.register(TeamProcess.DEBATE, lambda: ChoreographyStrategy("debate"))
     orch.register(TeamProcess.HANDOFF, lambda: ChoreographyStrategy("handoff"))
 
-    reg.register("decision_gate", DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers)
+    reg.register(
+        ComponentKind.DECISION_GATE, DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers
+    )
+    reg.register(ComponentKind.BUDGET_POLICY, "supervisor", SupervisorBudgetPolicy())
 
 
 def build_default_registries() -> Registries:

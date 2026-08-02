@@ -9,6 +9,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.decision import Decision, Observation, Reflection
+from lca.contracts.enums import MemoryLayer
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.state import AgentState, Budget
 from lca.contracts.types import TeamAssignment, Turn
@@ -20,37 +21,37 @@ class TestSharedMemorySinglePath(unittest.IsolatedAsyncioTestCase):
     """共享记忆通过 MemorySystem 单路径访问（HasSharedMemory）。"""
 
     async def test_shared_write_visible_across_agents(self) -> None:
-        store = TeamSharedMemoryStore(["semantic"])
+        store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         agent_a = SimpleMemorySystem()
         agent_b = SimpleMemorySystem()
         agent_a.bind_shared_memory(store)
         agent_b.bind_shared_memory(store)
 
         agent_a.write_shared_record(
-            "semantic",
+            MemoryLayer.SEMANTIC,
             MemoryRecord(
                 record_id="m1",
                 content="research notes about X",
-                memory_type="semantic",
+                memory_type=MemoryLayer.SEMANTIC,
                 importance=0.8,
                 source_trace_id="team-1",
             ),
         )
 
-        results = agent_b.query("semantic")
+        results = agent_b.query(MemoryLayer.SEMANTIC)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].content, "research notes about X")
 
     async def test_query_private_layer(self) -> None:
         mem = SimpleMemorySystem()
-        results = mem.query("working")
+        results = mem.query(MemoryLayer.WORKING)
         self.assertEqual(results, [])
 
     async def test_query_shared_layer_returns_empty_initially(self) -> None:
-        store = TeamSharedMemoryStore(["semantic"])
+        store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem = SimpleMemorySystem()
         mem.bind_shared_memory(store)
-        self.assertEqual(mem.query("semantic"), [])
+        self.assertEqual(mem.query(MemoryLayer.SEMANTIC), [])
 
 
 class TestTurnAndTeamAssignment(unittest.TestCase):

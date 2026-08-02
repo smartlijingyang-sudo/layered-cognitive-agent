@@ -9,6 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from lca.contracts.enums import RoleMode
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
@@ -19,9 +20,17 @@ from lca.layer1_cognitive.brain.reasoner import (
 )
 
 
-def _make_state(task: str = "test task", teammates_text: str = "") -> AgentState:
+def _make_state(
+    task: str = "test task",
+    teammates: list[RoleProfile] | None = None,
+    role_mode: RoleMode = RoleMode.SOLO,
+) -> AgentState:
     return AgentState(
-        trace_id="test-trace", task=task, budget=Budget(), teammates_text=teammates_text
+        trace_id="test-trace",
+        task=task,
+        budget=Budget(),
+        role_mode=role_mode,
+        teammates=teammates or [],
     )
 
 
@@ -207,7 +216,20 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 captured_prompt.append(prompt)
                 return '{"action_type": "delegate", "target_role": "researcher", "subtask": "分析", "rationale": "test", "confidence": 0.8}'
 
-        roster = "- role: researcher | goal: research topics\n- role: writer | goal: write reports"
+        teammates = [
+            RoleProfile(
+                role="researcher",
+                goal="research topics",
+                backstory="",
+                tool_permission_manifest=_empty_manifest(),
+            ),
+            RoleProfile(
+                role="writer",
+                goal="write reports",
+                backstory="",
+                tool_permission_manifest=_empty_manifest(),
+            ),
+        ]
         reasoner = SimpleReasoner(
             FakeLLM(),
             _make_profile(),
@@ -217,7 +239,9 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 "hierarchical_prompt": load_builtin_prompt("hierarchical_prompt"),
             },
         )
-        await reasoner.generate_candidates(_make_state(teammates_text=roster))
+        await reasoner.generate_candidates(
+            _make_state(teammates=teammates, role_mode=RoleMode.SUPERVISOR)
+        )
 
         self.assertEqual(len(captured_prompt), 1)
         prompt = captured_prompt[0]

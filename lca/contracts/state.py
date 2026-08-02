@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from lca.contracts.enums import SnapshotReason
+from lca.contracts.enums import RoleMode, SnapshotReason
 from lca.contracts.ids import new_id, utc_now
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.member_status import MemberStatus
+from lca.contracts.role_team import RoleProfile
 from lca.contracts.types import Turn
 
 
@@ -66,11 +68,31 @@ class AgentState:
     agent_role: str = ""
     from_role: str = ""
     member_status: MemberStatus | None = None
-    teammates_text: str = ""
+    role_mode: RoleMode = RoleMode.SOLO
+    teammates: list[RoleProfile] = field(default_factory=list)
     history: list[Turn] = field(default_factory=list)
     final_output: Any | None = None
     last_error: str | None = None
     active_template: str | None = None
+
+    @property
+    def teammates_text(self) -> str:
+        """Deprecated: use role_mode + teammates structured fields instead.
+
+        Renders teammates on demand from the structured list. Returns
+        empty string when there are no teammates (matching the old
+        default of '').
+        """
+        warnings.warn(
+            "teammates_text is deprecated; use role_mode + teammates"
+            " structured fields. This property will be removed in a"
+            " future major version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if not self.teammates:
+            return ""
+        return "\n".join(f"- role: {p.role} | goal: {p.goal}" for p in self.teammates)
 
     @property
     def delegated_by(self) -> str:
