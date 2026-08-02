@@ -21,8 +21,7 @@ layer4_app 是组合根，可以依赖所有下层，但下层不能反向 impor
 ## 代码风格
 - 公共函数/类必须有类型标注
 - lca/contracts 下的模型使用 stdlib dataclass（见 ADR-0012），保持字段名和方法签名不变
-- 禁止硬编码，禁止字符串裸，必须使用枚举等形式
-- 禁止临时打补丁 必须按业界规范主流重构优化
+- 禁止硬编码 API Key / Token，一律用环境变量，通过 pydantic-settings 注入配置
 
 ## 代码设计约束（AI Coding 必须遵守）
 
@@ -40,6 +39,20 @@ layer4_app 是组合根，可以依赖所有下层，但下层不能反向 impor
 - 禁止裸数字/字符串字面量出现在业务逻辑中，必须用命名常量（`MAX_RETRIES = 3`）或枚举
 - 配置项走 pydantic-settings / 环境变量，不要 `if env == "prod"` 硬编码
 - 禁止 if/else 链做类型/状态判断——用枚举、标签字段、注册表或策略模式替代：
+  ```python
+  # BAD
+  if provider == "openai":
+      ...
+  elif provider == "anthropic":
+      ...
+
+  # GOOD — 注册表 + 策略
+  _registry: dict[str, type[LLMAdapter]] = {}
+
+
+  def get_adapter(provider: str) -> LLMAdapter:
+      return _registry[provider]()
+  ```
 
 ### 设计模式优先
 - 多种实现 → 策略模式（`Protocol` + 注册表）
@@ -62,6 +75,76 @@ layer4_app 是组合根，可以依赖所有下层，但下层不能反向 impor
 - 日志用 structlog 结构化输出，不用 `print`
 - 异步代码中不在热路径做同步阻塞调用，需要时显式标注并说明原因
 
+## 真实 LLM 端到端测试
+
+默认 `pytest` 不跑需要 API Key 的集成测试。如需验证真实 LLM 链路：
+
+```bash
+# 1. 配置环境变量（或放 .env 文件在项目根目录或上级目录）
+export LLM_API_KEY="sk-..."
+export LLM_BASE_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"  # 可选
+export LLM_MODEL="qwen-plus"  # 可选，默认 gpt-4.1
+
+# 2. 安装可选依赖
+uv sync --all-groups
+
+# 3. 跑真实 LLM 测试
+uv run pytest -m real_llm -v
+```
+
+真实 LLM 测试的断言策略：验证结构化事件（`status == "completed"`、`total_steps >= N`），
+不验证具体文案（真实模型措辞不可预测）。
+
+## 如何新增团队场景
+
+在 `tests/fixtures/team_scenarios/` 下新增 YAML 文件，结构参考 `ecommerce_launch.yaml`：
+
+```yaml
+roles:
+  - key: my_role
+    role: 角色名
+    goal: 角色目标
+    backstory: 角色背景
+    tools: [calculator]  # 可选，目前支持 calculator
+
+teams:
+  my_team:
+    process: hierarchical  # hierarchical / sequential / parallel / handoff
+    supervisor: supervisor_role  # hierarchical 模式必须
+    members: [role1, role2]
+
+cases:
+  my_case:
+    team: my_team
+    objective: "测试任务描述"
+    assertions:
+      status: completed
+      min_steps: 4
+```
+
+然后在测试里用 `tests/support/scenario_loader.py` 加载：
+
+```python
+from tests.support.scenario_loader import build_team, load_scenario
+
+spec = load_scenario("tests/fixtures/team_scenarios/my_scenario.yaml")
+team = build_team(spec, "my_team", llm)
+result = await team.run("任务描述")
+```
+
+## Prompt 模板迭代
+
+Prompt 模板存放在 `lca/layer1_cognitive/brain/prompts/*.md`，不触碰 Python 代码即可迭代。
+用 `load_builtin_prompt("react_prompt")` 加载，占位符用 `{role}` / `{goal}` / `{task}` 等。
+
+## 可观测性
+
+默认 `ConsoleObservability` 打印到 stdout。切换为 JSONL 文件落盘：
+
+```python
+agent = Agent(..., observability="jsonl_file")
+# 输出到 traces/lca_trace.jsonl，每行一个 JSON，可用 jq 过滤
+```
 
 ## 禁止事项
 - 不要在 --no-verify 情况下绕过 pre-commit 提交
