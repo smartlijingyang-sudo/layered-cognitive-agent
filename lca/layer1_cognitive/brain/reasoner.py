@@ -4,7 +4,7 @@
 ``SupervisorReasoner`` serves SUPERVISOR-family planes:
 - consultation → hierarchical_prompt + board
 - routing → routing_prompt + soft assignment log
-Installed at composition time by ``SupervisorBinder``.
+Built at composition time by SupervisorFactory (closed object graph).
 
 Shared prompt/LLM mechanics live as module helpers so both reasoners
 stay thin and own their templates without a side catalog type.
@@ -162,16 +162,17 @@ class SupervisorReasoner(Reasoner):
 
     async def generate_candidates(self, state: AgentState, n: int = 1) -> list[str]:
         context = _context_lines(state)
-        if state.consultation is not None:
+        from lca.contracts.session import as_consultation, as_routing
+
+        if as_consultation(state.session) is not None:
             variables = self._consultation_vars(state, context)
             template_name = state.active_template or _HIERARCHICAL_TEMPLATE
-        elif state.routing is not None:
+        elif as_routing(state.session) is not None:
             variables = self._routing_vars(state, context)
             template_name = state.active_template or _ROUTING_TEMPLATE
         else:
             raise ValueError(
-                "SupervisorReasoner requires AgentState.consultation or .routing; "
-                "bind via TeamOrchestrator / HierarchicalStrategy"
+                "SupervisorReasoner requires AgentState.session (ConsultationState or RoutingState)"
             )
         variables = _with_subtasks(variables, state)
         return await _complete_candidates(
@@ -179,9 +180,9 @@ class SupervisorReasoner(Reasoner):
         )
 
     def _consultation_vars(self, state: AgentState, context_lines: str) -> dict[str, str]:
-        consultation = state.consultation
-        if consultation is None:
-            raise ValueError("consultation session required")
+        from lca.contracts.session import require_consultation
+
+        consultation = require_consultation(state.session)
         variables = _role_prompt_vars(
             self.role_profile,
             self.tools_desc,
@@ -194,9 +195,9 @@ class SupervisorReasoner(Reasoner):
         return variables
 
     def _routing_vars(self, state: AgentState, context_lines: str) -> dict[str, str]:
-        routing = state.routing
-        if routing is None:
-            raise ValueError("routing session required")
+        from lca.contracts.session import require_routing
+
+        routing = require_routing(state.session)
         assigned = ", ".join(routing.assigned_roles) if routing.assigned_roles else _EMPTY_ASSIGNED
         variables = _role_prompt_vars(
             self.role_profile,

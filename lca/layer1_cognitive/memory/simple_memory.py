@@ -22,18 +22,14 @@ class SimpleMemorySystem(MemorySystem):
     读写直接走共享 store，实现跨 Agent 记忆共享；未声明共享的层保持私有。
     """
 
-    def __init__(self) -> None:
-        self._shared_store: SharedMemoryStore | None = None
+    def __init__(self, shared_store: SharedMemoryStore | None = None) -> None:
+        self._shared_store: SharedMemoryStore | None = shared_store
         self._private_layers: dict[MemoryLayer, list[MemoryRecord]] = {
             MemoryLayer.WORKING: [],
             MemoryLayer.SEMANTIC: [],
             MemoryLayer.EPISODIC: [],
             MemoryLayer.PROCEDURAL: [],
         }
-
-    def bind_shared_memory(self, store: SharedMemoryStore) -> None:
-        """绑定团队共享记忆存储。共享层的数据读写委托给 store。"""
-        self._shared_store = store
 
     def _get_layer_records(self, layer: MemoryLayer) -> list[MemoryRecord]:
         if self._shared_store is not None and self._shared_store.is_shared(layer):

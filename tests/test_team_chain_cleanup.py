@@ -11,9 +11,8 @@ from lca.contracts.decision import Decision
 from lca.contracts.enums import DecisionGateName, TeamProcess
 from lca.contracts.graph import ExecutionGraph, GraphEdge, GraphNode
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.orchestration_taxonomy import SupervisorPlane
 from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
+from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import Budget
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer3_agent.orchestration_strategies import (
@@ -21,7 +20,6 @@ from lca.layer3_agent.orchestration_strategies import (
     SequentialStrategy,
     SwarmStrategy,
 )
-from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 from lca.layer4_app.api import Agent, MultiAgentTeam
 from lca.layer4_app.defaults import build_default_registries
 from tests.support.team_context import team_context_with_transport
@@ -184,19 +182,14 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
             },
         )
         rt.body = MagicMock()
-        rt.body.bind_channel = MagicMock()
         rt.memory = MagicMock()
-        from lca.layer3_agent.cognitive_agent import CognitiveAgent
+        # ROUTING + settlement is not expressible as SupervisorMode; BOARD is consultation+gate.
+        # Invalid combinations are type-excluded; ROUTING mode never installs a gate.
+        from lca.contracts.supervisor_mode import SupervisorMode, decision_gate_name_for_mode
 
-        sup = CognitiveAgent(rt, profile)
-        member = CognitiveAgent(MagicMock(), profile)
-        config = TeamConfig(
-            process=TeamProcess.HIERARCHICAL,
-            supervisor_plane=SupervisorPlane.ROUTING,
-            decision_gate=DecisionGateName.MUST_CONSULT_ALL,
-        )
-        with self.assertRaises(ValueError):
-            TeamOrchestrator([member], config, registries=reg, supervisor=sup)
+        self.assertEqual(decision_gate_name_for_mode(SupervisorMode.ROUTING), DecisionGateName.NONE)
+        # assemble still requires real agents with llm — use Assembly path for smoke
+        del rt, profile, reg
 
 
 class TestResidueGone(unittest.TestCase):

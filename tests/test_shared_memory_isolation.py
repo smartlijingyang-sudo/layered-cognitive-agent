@@ -102,8 +102,8 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a.bind_shared_memory(store)
-        mem_b.bind_shared_memory(store)
+        mem_a = SimpleMemorySystem(shared_store=store)  # was bind
+        mem_b = SimpleMemorySystem(shared_store=store)  # was bind
 
         record = _make_semantic_record("shared-knowledge")
         mem_a.write_shared_record(MemoryLayer.SEMANTIC, record)
@@ -116,8 +116,8 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.PROCEDURAL])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a.bind_shared_memory(store)
-        mem_b.bind_shared_memory(store)
+        mem_a = SimpleMemorySystem(shared_store=store)  # was bind
+        mem_b = SimpleMemorySystem(shared_store=store)  # was bind
 
         record = MemoryRecord(
             record_id="proc-1",
@@ -135,8 +135,8 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC, MemoryLayer.PROCEDURAL])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a.bind_shared_memory(store)
-        mem_b.bind_shared_memory(store)
+        mem_a = SimpleMemorySystem(shared_store=store)  # was bind
+        mem_b = SimpleMemorySystem(shared_store=store)  # was bind
 
         mem_a.write_shared_record(MemoryLayer.SEMANTIC, _make_semantic_record("fact-1"))
         mem_a.write_shared_record(
@@ -162,8 +162,8 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a.bind_shared_memory(store)
-        mem_b.bind_shared_memory(store)
+        mem_a = SimpleMemorySystem(shared_store=store)  # was bind
+        mem_b = SimpleMemorySystem(shared_store=store)  # was bind
 
         # 通过 update 触发 episodic 写入
         await mem_a.update(_make_state("trace-a"), _make_observation(), _make_reflection())
@@ -181,8 +181,8 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a.bind_shared_memory(store)
-        mem_b.bind_shared_memory(store)
+        mem_a = SimpleMemorySystem(shared_store=store)  # was bind
+        mem_b = SimpleMemorySystem(shared_store=store)  # was bind
 
         await mem_a.update(
             _make_state("trace-a"),
@@ -201,7 +201,7 @@ class TestWriteSharedRecordGuard(unittest.TestCase):
     def test_write_to_unshared_layer_raises(self) -> None:
         mem = SimpleMemorySystem()
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
-        mem.bind_shared_memory(store)
+        mem = SimpleMemorySystem(shared_store=store)  # was bind
 
         with self.assertRaises(KeyError):
             mem.write_shared_record(MemoryLayer.EPISODIC, _make_semantic_record("x"))
@@ -213,102 +213,50 @@ class TestWriteSharedRecordGuard(unittest.TestCase):
 
 
 class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
-    """TeamOrchestrator 构造时按需建 TeamSharedMemoryStore 并注入成员。"""
+    """Assembly.assemble_team rebuilds members with shared store (closed graph)."""
 
     async def test_orchestrator_injects_shared_memory(self) -> None:
-        from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
+        from lca.contracts.enums import TeamProcess
+        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.layer4_app.assembly import Assembly
 
-        # 构建两个带真实 Runtime 的 Agent
-        from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-        from lca.layer3_agent.cognitive_agent import CognitiveAgent
-
-        mem_a = SimpleMemorySystem()
-        mem_b = SimpleMemorySystem()
-
-        runtime_a = _make_minimal_runtime(mem_a)
-        runtime_b = _make_minimal_runtime(mem_b)
-
-        role_a = RoleProfile(
-            role="agent_a",
-            goal="test",
-            backstory="",
-            tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
-        )
-        role_b = RoleProfile(
-            role="agent_b",
-            goal="test",
-            backstory="",
-            tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
-        )
-
-        agent_a = CognitiveAgent(runtime_a, role_a)
-        agent_b = CognitiveAgent(runtime_b, role_b)
-
-        config = TeamConfig(
-            process="sequential",
+        asm = Assembly()
+        llm = MockLLMAdapter()
+        agent_a = asm.assemble_agent(role="agent_a", goal="test", backstory="", tools=[], llm=llm)
+        agent_b = asm.assemble_agent(role="agent_b", goal="test", backstory="", tools=[], llm=llm)
+        team = asm.assemble_team(
+            members=[agent_a, agent_b],
+            process=TeamProcess.SEQUENTIAL,
             shared_memory_layers=[MemoryLayer.SEMANTIC],
         )
-
-        from lca.layer3_agent.team_orchestrator import TeamOrchestrator
-        from lca.layer4_app.defaults import build_default_registries
-
-        orchestrator = TeamOrchestrator(
-            members=[agent_a, agent_b], config=config, registries=build_default_registries()
-        )
-
-        # 验证共享 store 已注入：两个成员的 semantic 层指向同一 store
-        self.assertIsNotNone(orchestrator._shared_store)
-
-        # 通过 agent_a 的 memory 写入 semantic 记录
+        self.assertIsNotNone(team._context.shared_memory)
+        mem_a = team.members[0].runtime.memory  # type: ignore[attr-defined]
+        mem_b = team.members[1].runtime.memory  # type: ignore[attr-defined]
         mem_a.write_shared_record(
             MemoryLayer.SEMANTIC, _make_semantic_record("orchestrator-shared-fact")
         )
-
-        # agent_b 应该能看到这条记录
         state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]
         self.assertIn("orchestrator-shared-fact", b_contents)
 
     async def test_orchestrator_no_shared_memory_when_config_empty(self) -> None:
-        from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
-        from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-        from lca.layer3_agent.cognitive_agent import CognitiveAgent
+        from lca.contracts.enums import TeamProcess
+        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.layer4_app.assembly import Assembly
 
-        mem_a = SimpleMemorySystem()
-        mem_b = SimpleMemorySystem()
-
-        runtime_a = _make_minimal_runtime(mem_a)
-        runtime_b = _make_minimal_runtime(mem_b)
-
-        role_a = RoleProfile(
-            role="agent_a",
-            goal="test",
-            backstory="",
-            tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+        asm = Assembly()
+        llm = MockLLMAdapter()
+        agent_a = asm.assemble_agent(role="agent_a", goal="test", backstory="", tools=[], llm=llm)
+        agent_b = asm.assemble_agent(role="agent_b", goal="test", backstory="", tools=[], llm=llm)
+        team = asm.assemble_team(
+            members=[agent_a, agent_b],
+            process=TeamProcess.SEQUENTIAL,
+            shared_memory_layers=[],
         )
-        role_b = RoleProfile(
-            role="agent_b",
-            goal="test",
-            backstory="",
-            tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
-        )
-
-        agent_a = CognitiveAgent(runtime_a, role_a)
-        agent_b = CognitiveAgent(runtime_b, role_b)
-
-        config = TeamConfig(process="sequential", shared_memory_layers=[])
-
-        from lca.layer3_agent.team_orchestrator import TeamOrchestrator
-        from lca.layer4_app.defaults import build_default_registries
-
-        orchestrator = TeamOrchestrator(
-            members=[agent_a, agent_b], config=config, registries=build_default_registries()
-        )
-        self.assertIsNone(orchestrator._shared_store)
-
-        # 两个成员的 semantic 层互不可见
+        self.assertIsNone(team._context.shared_memory)
+        mem_a = team.members[0].runtime.memory  # type: ignore[attr-defined]
+        mem_b = team.members[1].runtime.memory  # type: ignore[attr-defined]
         mem_a._private_layers[MemoryLayer.SEMANTIC].append(_make_semantic_record("private-to-a"))
-
         state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]
         self.assertNotIn("private-to-a", b_contents)

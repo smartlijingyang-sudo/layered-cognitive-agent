@@ -1,11 +1,13 @@
-"""HandoffStrategy + handoff action_type 测试 —— 控制权移交、短路退出、budget 正确关闭。"""
-
 from __future__ import annotations
+
+"""HandoffStrategy + handoff action_type 测试 —— 控制权移交、短路退出、budget 正确关闭。"""
 
 import os
 import sys
 import unittest
 from unittest.mock import AsyncMock, MagicMock
+
+from lca.contracts.enums import ActionScope
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -46,8 +48,6 @@ def _make_agent(role: str, output: str, status: TaskStatus = TaskStatus.COMPLETE
 
 
 class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
-    """HandoffStrategy 基本功能。"""
-
     async def test_first_agent_completes_short_circuits(self) -> None:
         """第一个 Agent 完成即返回，后续 Agent 不执行。"""
         agent_a = _make_agent("triage", "routed")
@@ -126,7 +126,9 @@ class TestHandoffActionType(unittest.TestCase):
         )
         transport_reg = TransportRegistry()
         transport_reg.register(InternalTransport())
-        registry = build_default_action_registry(tool_reg, safe_exec, transport_reg)
+        registry = build_default_action_registry(
+            tool_reg, safe_exec, transport_reg, scope=ActionScope.SUPERVISOR
+        )
         self.assertIn("handoff", registry.allowed_action_types())
 
 
@@ -148,7 +150,12 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
         mock_transport.send_task = AsyncMock(side_effect=_send_task)
         transport_registry.resolve = MagicMock(return_value=mock_transport)
 
-        body = SimpleBody(tool_registry, safe_executor, transport_registry=transport_registry)
+        body = SimpleBody(
+            tool_registry,
+            safe_executor,
+            transport_registry=transport_registry,
+            action_scope=ActionScope.SUPERVISOR,
+        )
 
         decision = Decision(
             decision_id="d1",
@@ -169,7 +176,7 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
         """handoff 缺少 delegate_to 应报错。"""
         tool_registry = MagicMock()
         safe_executor = MagicMock()
-        body = SimpleBody(tool_registry, safe_executor)
+        body = SimpleBody(tool_registry, safe_executor, action_scope=ActionScope.SUPERVISOR)
 
         decision = Decision(
             decision_id="d1",

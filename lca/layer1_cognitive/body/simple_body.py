@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Decision, Observation
+from lca.contracts.enums import ActionScope
 from lca.contracts.protocols import (
     AgentTransport,
     Body,
@@ -35,6 +36,8 @@ class SimpleBody(Body):
         transport_registry: TransportRegistryProtocol | None = None,
         transport: AgentTransport | None = None,
         action_registry: ActionRegistryProtocol | None = None,
+        *,
+        action_scope: ActionScope = ActionScope.SOLO,
     ) -> None:
         if transport_registry is not None:
             self.transport_registry = transport_registry
@@ -49,16 +52,16 @@ class SimpleBody(Body):
             self.action_registry = action_registry
         elif tool_registry is not None and safe_executor is not None:
             self.action_registry = build_default_action_registry(
-                tool_registry, safe_executor, self.transport_registry
+                tool_registry,
+                safe_executor,
+                self.transport_registry,
+                scope=action_scope,
             )
         else:
             self.action_registry = ActionRegistry()
 
         self.tool_registry = tool_registry
         self.safe_executor = safe_executor
-
-    def bind_channel(self, transport: AgentTransport) -> None:
-        self.transport_registry.register(transport)
 
     async def act(self, decision: Decision, state: AgentState) -> Observation:
         handler = self.action_registry.get(decision.action_type)

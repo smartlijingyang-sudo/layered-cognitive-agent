@@ -95,17 +95,15 @@ uv run pytest -m real_llm -v
 真实 LLM 测试的断言策略：验证结构化事件（`status == "completed"`、`total_steps >= N`），
 不验证具体文案（真实模型措辞不可预测）。
 
-## 编排族与业界插槽（ADR-0027 / ADR-0028）
+## 编排族与业界插槽（ADR-0027 / ADR-0028 / ADR-0029）
 
-- **Family**：`SUPERVISOR` / `CHOREOGRAPHY` / `PEER` / `GRAPH` — `orchestration_taxonomy.py`
-- **process** = 族内拓扑；**decision_gate** = 结算强度（默认 `none`）
-- **supervisor_plane**：`consultation`（结算 board）/ `routing`（自由 PM，`RoutingState`）
-- 全员咨询：`hierarchical` + `must_consult_all` + plane consultation（支持 multi-delegate 并行）
-- 自由 PM：`hierarchical` + `supervisor_plane=routing` + gate none
-- PEER：`handoff`（首成即返）/ `swarm`（轮询累积）— `HandoffStrategy` / `SwarmStrategy`
-- GRAPH：`process=graph` + `execution_graph=`（`ExecutionGraph`）
+- **Family**（分类学，非用户旋钮）：`SUPERVISOR` / `CHOREOGRAPHY` / `PEER` / `GRAPH`
+- **Recipe**（推荐）：`MultiAgentTeam.pipeline|fanout|manager|consult|board|relay|swarm|graph|debate`
+- **SupervisorMode 闭集**：`routing` | `consultation` | `board`（全员结算）；非法 gate×plane 不可表达
+- **封闭对象图**：无 `bind_*` / `install_*`；supervisor 由 `Assembly.recompose_as_supervisor` **新建**
+- **session 单槽**：`RunContext.session` / `AgentState.session` = ConsultationState | RoutingState
+- PEER：`handoff` / `swarm`；GRAPH：`execution_graph=`
 - 委派：仅 `Decision.delegations`；成员调用统一 `send_and_wait`
-- 控制面隔离：Consultation / Routing 各有白名单；禁止互塞
 
 ## 如何新增团队场景
 
@@ -121,9 +119,8 @@ roles:
 
 teams:
   my_team:
-    process: hierarchical  # hierarchical / sequential / parallel / handoff
-    decision_gate: must_consult_all  # 可选；默认 none（自由经理）
-    supervisor: supervisor_role  # hierarchical 模式必须
+    recipe: board  # 或 process + supervisor_mode；board = 全员咨询结算
+    supervisor: supervisor_role  # hierarchical / board / manager / consult 必须
     members: [role1, role2]
 
 cases:

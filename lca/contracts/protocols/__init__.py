@@ -23,14 +23,8 @@ from lca.contracts.protocols.agent import (
     TeamUnit,
 )
 
-# ── 可选能力协议（ADR-0017）──────────────────────────────
-from lca.contracts.protocols.capabilities import (
-    HasBrainBodyMemory,
-    HasChannel,
-    HasHooks,
-    HasReplaceableReasoner,
-    HasSharedMemory,
-)
+# ── 可选能力（ADR-0029：无 bind/install 组装面）────────────
+from lca.contracts.protocols.capabilities import HasHooks
 
 # ── L1 认知 / Brain 协议 ─────────────────────────────────
 from lca.contracts.protocols.cognition import (
@@ -42,7 +36,6 @@ from lca.contracts.protocols.cognition import (
     DecisionParser,
     Reasoner,
     SkillRouter,
-    SupportsDecisionGate,
     SupportsShortcut,
 )
 
@@ -93,11 +86,7 @@ __all__ = [
     "DecisionParser",
     "EventBus",
     "FallbackPolicy",
-    "HasBrainBodyMemory",
-    "HasChannel",
     "HasHooks",
-    "HasReplaceableReasoner",
-    "HasSharedMemory",
     "Hook",
     "HookRegistry",
     "LLMAdapter",
@@ -112,7 +101,6 @@ __all__ = [
     "StateStore",
     "StopOutcome",
     "StopOutcomePolicy",
-    "SupportsDecisionGate",
     "SupportsShortcut",
     "Synthesizer",
     "TeamContext",

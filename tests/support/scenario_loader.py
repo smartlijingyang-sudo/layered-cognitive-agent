@@ -2,7 +2,6 @@
 
 仅用于测试（不进 lca 包），把 tests/fixtures/team_scenarios/*.yaml
 翻译成对 lca.layer4_app.api.Agent / MultiAgentTeam 的构造参数。
-真正的组装（DI）仍然只发生在 L4 组合根内部，loader 不重新发明装配机制。
 """
 
 from __future__ import annotations
@@ -13,25 +12,31 @@ from typing import Any
 
 import yaml
 
-from lca.contracts.enums import DecisionGateName
-from lca.contracts.orchestration_taxonomy import SupervisorPlane
+from lca.contracts.enums import TeamProcess
 from lca.contracts.protocols import LLMAdapter, Tool
+from lca.contracts.supervisor_mode import Recipe, SupervisorMode
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer4_app.api import Agent, MultiAgentTeam
 
-# ── 工具注册表：YAML 里用字符串名引用工具 ──
 _TOOL_REGISTRY: dict[str, type[Tool]] = {
     "calculator": CalculatorTool,
 }
 
-# ── 默认 fixture 路径 ──
 _DEFAULT_FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "team_scenarios"
+
+# Legacy YAML keys → SupervisorMode (migration map for fixtures)
+_GATE_PLANE_TO_MODE: dict[tuple[str | None, str | None], SupervisorMode] = {
+    ("must_consult_all", None): SupervisorMode.BOARD,
+    ("must_consult_all", "consultation"): SupervisorMode.BOARD,
+    ("none", "routing"): SupervisorMode.ROUTING,
+    ("none", "consultation"): SupervisorMode.CONSULTATION,
+    (None, "routing"): SupervisorMode.ROUTING,
+    (None, "consultation"): SupervisorMode.CONSULTATION,
+}
 
 
 @dataclass
 class RoleSpec:
-    """YAML 里单个角色定义。"""
-
     key: str
     role: str
     goal: str
@@ -41,19 +46,18 @@ class RoleSpec:
 
 @dataclass
 class TeamSpec:
-    """YAML 里单个团队定义。"""
-
-    process: str  # hierarchical / sequential / parallel / handoff
+    process: str
     members: list[str] = field(default_factory=list)
     supervisor: str | None = None
-    decision_gate: str | None = None  # none / must_consult_all (ADR-0027)
-    supervisor_plane: str | None = None  # consultation (routing reserved)
+    recipe: str | None = None
+    supervisor_mode: str | None = None
+    # legacy (mapped then ignored at build)
+    decision_gate: str | None = None
+    supervisor_plane: str | None = None
 
 
 @dataclass
 class CaseSpec:
-    """YAML 里单个测试用例定义。"""
-
     team: str
     objective: str
     assertions: dict[str, Any] = field(default_factory=dict)
@@ -61,48 +65,29 @@ class CaseSpec:
 
 @dataclass
 class ScenarioSpec:
-    """完整场景规格：角色 + 团队 + 用例。"""
-
     roles: dict[str, RoleSpec]
     teams: dict[str, TeamSpec]
     cases: dict[str, CaseSpec]
 
 
 def load_scenario(path: str | Path) -> ScenarioSpec:
-    """从 YAML 文件加载 ScenarioSpec。
-
-    Args:
-        path: YAML 文件路径。
-
-    Returns:
-        解析后的 ScenarioSpec。
-
-    Raises:
-        FileNotFoundError: 文件不存在。
-        ValueError: YAML schema 校验失败。
-    """
     path = Path(path)
     if not path.is_file():
-        msg = f"Scenario file not found: {path}"
-        raise FileNotFoundError(msg)
+        raise FileNotFoundError(f"Scenario file not found: {path}")
 
     with open(path, encoding="utf-8") as f:
         raw = yaml.safe_load(f)
 
     if not isinstance(raw, dict):
-        msg = f"Scenario YAML must be a mapping, got {type(raw).__name__}"
-        raise ValueError(msg)
+        raise ValueError(f"Scenario YAML must be a mapping, got {type(raw).__name__}")
 
     return _parse_scenario(raw)
 
 
 def _parse_scenario(raw: dict[str, Any]) -> ScenarioSpec:
-    """解析原始 YAML dict 为 ScenarioSpec。"""
-    # Roles
     raw_roles = raw.get("roles", [])
     if not isinstance(raw_roles, list):
-        msg = f"'roles' must be a list, got {type(raw_roles).__name__}"
-        raise ValueError(msg)
+        raise ValueError(f"'roles' must be a list, got {type(raw_roles).__name__}")
     roles: dict[str, RoleSpec] = {}
     for entry in raw_roles:
         rs = RoleSpec(
@@ -114,26 +99,24 @@ def _parse_scenario(raw: dict[str, Any]) -> ScenarioSpec:
         )
         roles[rs.key] = rs
 
-    # Teams
     raw_teams = raw.get("teams", {})
     if not isinstance(raw_teams, dict):
-        msg = f"'teams' must be a mapping, got {type(raw_teams).__name__}"
-        raise ValueError(msg)
+        raise ValueError(f"'teams' must be a mapping, got {type(raw_teams).__name__}")
     teams: dict[str, TeamSpec] = {}
     for team_key, team_raw in raw_teams.items():
         teams[team_key] = TeamSpec(
-            process=team_raw["process"],
+            process=team_raw.get("process", "hierarchical"),
             members=team_raw.get("members", []),
             supervisor=team_raw.get("supervisor"),
+            recipe=team_raw.get("recipe"),
+            supervisor_mode=team_raw.get("supervisor_mode"),
             decision_gate=team_raw.get("decision_gate"),
             supervisor_plane=team_raw.get("supervisor_plane"),
         )
 
-    # Cases
     raw_cases = raw.get("cases", {})
     if not isinstance(raw_cases, dict):
-        msg = f"'cases' must be a mapping, got {type(raw_cases).__name__}"
-        raise ValueError(msg)
+        raise ValueError(f"'cases' must be a mapping, got {type(raw_cases).__name__}")
     cases: dict[str, CaseSpec] = {}
     for case_key, case_raw in raw_cases.items():
         cases[case_key] = CaseSpec(
@@ -146,13 +129,11 @@ def _parse_scenario(raw: dict[str, Any]) -> ScenarioSpec:
 
 
 def _instantiate_tools(tool_names: list[str]) -> list[Tool]:
-    """根据工具名列表实例化工具对象。"""
     tools: list[Tool] = []
     for name in tool_names:
         tool_cls = _TOOL_REGISTRY.get(name)
         if tool_cls is None:
-            msg = f"Unknown tool {name!r}. Available: {list(_TOOL_REGISTRY.keys())}"
-            raise ValueError(msg)
+            raise ValueError(f"Unknown tool {name!r}. Available: {list(_TOOL_REGISTRY.keys())}")
         tools.append(tool_cls())
     return tools
 
@@ -163,7 +144,6 @@ def build_agent(
     *,
     max_steps: int = 10,
 ) -> Agent:
-    """从 RoleSpec 构造 Agent 实例。"""
     tools = _instantiate_tools(role_spec.tools)
     return Agent(
         role=role_spec.role,
@@ -175,6 +155,21 @@ def build_agent(
     )
 
 
+def _resolve_mode(team_spec: TeamSpec) -> SupervisorMode | None:
+    if team_spec.supervisor_mode is not None:
+        return SupervisorMode(team_spec.supervisor_mode)
+    if team_spec.recipe is not None:
+        return None  # recipe expands mode
+    key = (team_spec.decision_gate, team_spec.supervisor_plane)
+    if key in _GATE_PLANE_TO_MODE:
+        return _GATE_PLANE_TO_MODE[key]
+    if team_spec.decision_gate == "must_consult_all":
+        return SupervisorMode.BOARD
+    if team_spec.supervisor_plane == "routing":
+        return SupervisorMode.ROUTING
+    return None
+
+
 def build_team(
     spec: ScenarioSpec,
     team_key: str,
@@ -182,33 +177,30 @@ def build_team(
     *,
     supervisor_max_steps: int = 20,
 ) -> MultiAgentTeam:
-    """从 ScenarioSpec 构造 MultiAgentTeam 实例。
-
-    Args:
-        spec: 完整场景规格。
-        team_key: 团队 key（对应 YAML 里 teams 下的 key）。
-        llm: 所有 agent 共用的 LLM adapter。
-        supervisor_max_steps: hierarchical 模式下 supervisor 的最大步数。
-
-    Returns:
-        装配好的 MultiAgentTeam。
-    """
     team_spec = spec.teams[team_key]
     members = [build_agent(spec.roles[k], llm) for k in team_spec.members]
+    mode = _resolve_mode(team_spec)
 
-    gate = (
-        DecisionGateName(team_spec.decision_gate) if team_spec.decision_gate is not None else None
-    )
-    plane = (
-        SupervisorPlane(team_spec.supervisor_plane)
-        if team_spec.supervisor_plane is not None
-        else None
-    )
+    if team_spec.recipe is not None:
+        recipe = Recipe(team_spec.recipe)
+        supervisor = None
+        if team_spec.supervisor is not None:
+            supervisor = build_agent(
+                spec.roles[team_spec.supervisor],
+                llm,
+                max_steps=supervisor_max_steps,
+            )
+        return MultiAgentTeam(
+            members=members,
+            recipe=recipe,
+            supervisor=supervisor,
+            supervisor_mode=mode,
+        )
 
-    if team_spec.process == "hierarchical":
+    process = TeamProcess(team_spec.process)
+    if process is TeamProcess.HIERARCHICAL:
         if team_spec.supervisor is None:
-            msg = "hierarchical team requires a 'supervisor' key"
-            raise ValueError(msg)
+            raise ValueError("hierarchical team requires a 'supervisor' key")
         supervisor = build_agent(
             spec.roles[team_spec.supervisor],
             llm,
@@ -216,20 +208,13 @@ def build_team(
         )
         return MultiAgentTeam(
             members=members,
-            process="hierarchical",
+            process=process,
             supervisor=supervisor,
-            decision_gate=gate,
-            supervisor_plane=plane,
+            supervisor_mode=mode or SupervisorMode.CONSULTATION,
         )
 
-    return MultiAgentTeam(
-        members=members,
-        process=team_spec.process,
-        decision_gate=gate,
-        supervisor_plane=plane,
-    )
+    return MultiAgentTeam(members=members, process=process)
 
 
 def list_scenarios() -> list[Path]:
-    """列出默认 fixtures 目录下所有 .yaml 场景文件。"""
     return sorted(_DEFAULT_FIXTURES_DIR.glob("*.yaml"))

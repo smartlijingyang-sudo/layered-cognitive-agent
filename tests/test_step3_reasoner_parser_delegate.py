@@ -39,7 +39,7 @@ def _make_state(
         trace_id="test-trace",
         task=task,
         budget=Budget(),
-        consultation=consultation,
+        session=consultation,
     )
 
 

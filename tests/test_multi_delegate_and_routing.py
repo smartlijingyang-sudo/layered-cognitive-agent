@@ -7,16 +7,13 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 from lca.contracts.decision import Decision, DelegationSpec, Observation
-from lca.contracts.enums import DecisionGateName, RoleStatus, TeamProcess
+from lca.contracts.enums import ActionScope, DecisionGateName, RoleStatus, TeamProcess
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.orchestration_taxonomy import (
-    ROUTING_SETTLEMENT_GATE_ERROR,
-    SupervisorPlane,
-)
 from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
 from lca.contracts.routing import RoutingState, assert_routing_field_whitelist
+from lca.contracts.session import as_consultation
 from lca.contracts.state import AgentState, Budget
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
@@ -25,14 +22,10 @@ from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsultAllMembers
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
-from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.orchestration_strategies import (
     HierarchicalStrategy,
     SwarmStrategy,
 )
-from lca.layer3_agent.team_orchestrator import TeamOrchestrator
-from lca.layer4_app.assembly import Assembly
-from lca.layer4_app.defaults import build_default_registries
 from tests.support.team_context import team_context_with_transport
 
 
@@ -84,7 +77,10 @@ class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):
         transport.register_agent("ra", _ha)
         transport.register_agent("rb", _hb)
         body = SimpleBody(
-            SimpleToolRegistry(), _noop_executor(), transport_registry=_make_registry(transport)
+            SimpleToolRegistry(),
+            _noop_executor(),
+            transport_registry=_make_registry(transport),
+            action_scope=ActionScope.SUPERVISOR,
         )
         decision = Decision(
             decision_id="d1",
@@ -103,14 +99,14 @@ class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):
             trace_id="t",
             task="t",
             budget=Budget(),
-            consultation=ConsultationState(member_status=board, teammates=[]),
+            session=ConsultationState(member_status=board, teammates=[]),
         )
         obs = await body.act(decision, state)
         self.assertTrue(obs.success)
         assert isinstance(obs.payload, dict)
         self.assertIn("ra", obs.payload)
-        self.assertEqual(state.consultation.member_status.status["ra"], RoleStatus.DONE)
-        self.assertEqual(state.consultation.member_status.status["rb"], RoleStatus.DONE)
+        self.assertEqual(as_consultation(state.session).member_status.status["ra"], RoleStatus.DONE)
+        self.assertEqual(as_consultation(state.session).member_status.status["rb"], RoleStatus.DONE)
 
 
 class TestMustConsultMultiShortcut(unittest.IsolatedAsyncioTestCase):
@@ -122,7 +118,7 @@ class TestMustConsultMultiShortcut(unittest.IsolatedAsyncioTestCase):
             trace_id="t",
             task="evaluate",
             budget=Budget(),
-            consultation=ConsultationState(member_status=board, teammates=[]),
+            session=ConsultationState(member_status=board, teammates=[]),
         )
         gate = MustConsultAllMembers()
         d = await gate.try_shortcut(state)
@@ -135,56 +131,19 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
     def test_routing_whitelist(self) -> None:
         assert_routing_field_whitelist()
 
-    async def test_routing_rejects_settlement_gate(self) -> None:
-        reg = build_default_registries()
-        profile = RoleProfile(
-            role="lead",
-            goal="g",
-            backstory="b",
-            tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
-        )
-        rt = MagicMock()
-        rt.brain = MagicMock()
-        rt.brain.reasoner = MagicMock()
-        from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
+    async def test_routing_mode_never_maps_to_settlement_gate(self) -> None:
+        from lca.contracts.supervisor_mode import SupervisorMode, decision_gate_name_for_mode
 
-        rt.brain.reasoner = SimpleReasoner(
-            MagicMock(),
-            profile,
-            "t",
-            templates={
-                "react_prompt": "r",
-                "hierarchical_prompt": "h {teammates} {member_status_text}",
-                "routing_prompt": "rt {teammates} {assigned_roles_text} {notes}",
-            },
+        self.assertEqual(decision_gate_name_for_mode(SupervisorMode.ROUTING), DecisionGateName.NONE)
+        # Illegal plane×gate product is not representable via SupervisorMode.
+        self.assertNotEqual(
+            decision_gate_name_for_mode(SupervisorMode.ROUTING),
+            DecisionGateName.MUST_CONSULT_ALL,
         )
-        rt.body = MagicMock()
-        rt.body.bind_channel = MagicMock()
-        rt.memory = MagicMock()
-        sup = CognitiveAgent(rt, profile)
-        member = CognitiveAgent(MagicMock(), profile)
-        config = TeamConfig(
-            process=TeamProcess.HIERARCHICAL,
-            supervisor_plane=SupervisorPlane.ROUTING,
-            decision_gate=DecisionGateName.MUST_CONSULT_ALL,
-        )
-        with self.assertRaises(ValueError) as orchestrator_err:
-            TeamOrchestrator([member], config, registries=reg, supervisor=sup)
-        self.assertEqual(str(orchestrator_err.exception), ROUTING_SETTLEMENT_GATE_ERROR)
-
-        assembly = Assembly(registries=reg)
-        with self.assertRaises(ValueError) as assembly_err:
-            assembly.assemble_team(
-                members=[member],
-                process=TeamProcess.HIERARCHICAL,
-                supervisor=sup,
-                supervisor_plane=SupervisorPlane.ROUTING,
-                decision_gate=DecisionGateName.MUST_CONSULT_ALL,
-            )
-        self.assertEqual(str(assembly_err.exception), ROUTING_SETTLEMENT_GATE_ERROR)
-        self.assertEqual(str(orchestrator_err.exception), str(assembly_err.exception))
 
     async def test_hierarchical_routing_injects_routing_state(self) -> None:
+        from lca.contracts.supervisor_mode import SupervisorMode
+
         strategy = HierarchicalStrategy()
         sup = MagicMock()
         captured: list = []
@@ -213,14 +172,13 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
             teammates=[profile],
             config=TeamConfig(
                 process=TeamProcess.HIERARCHICAL,
-                supervisor_plane=SupervisorPlane.ROUTING,
+                supervisor_mode=SupervisorMode.ROUTING,
             ),
         )
         result = await strategy.run(ctx, "obj")
         self.assertEqual(result.output, "ok")
         self.assertIsNotNone(captured[0])
-        self.assertIsInstance(captured[0].routing, RoutingState)
-        self.assertIsNone(captured[0].consultation)
+        self.assertIsInstance(captured[0].session, RoutingState)
 
 
 class TestPeerSwarm(unittest.IsolatedAsyncioTestCase):

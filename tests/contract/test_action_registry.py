@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from lca.contracts.enums import ActionScope
 from lca.contracts.role_team import ToolPermissionManifest
 from lca.layer0_infra.component_registry import RegistryKeyError
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
@@ -25,7 +26,9 @@ def _build_registry() -> ActionRegistry:
     safe_exec = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]), ConsoleObservability())
     transport_reg = TransportRegistry()
     transport_reg.register(InternalTransport())
-    return build_default_action_registry(tool_reg, safe_exec, transport_reg)
+    return build_default_action_registry(
+        tool_reg, safe_exec, transport_reg, scope=ActionScope.SUPERVISOR
+    )
 
 
 class TestActionRegistryCompleteness:

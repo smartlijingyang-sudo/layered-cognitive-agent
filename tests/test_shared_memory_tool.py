@@ -24,8 +24,8 @@ class TestSharedMemorySinglePath(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         agent_a = SimpleMemorySystem()
         agent_b = SimpleMemorySystem()
-        agent_a.bind_shared_memory(store)
-        agent_b.bind_shared_memory(store)
+        agent_a = SimpleMemorySystem(shared_store=store)  # was bind
+        agent_b = SimpleMemorySystem(shared_store=store)  # was bind
 
         agent_a.write_shared_record(
             MemoryLayer.SEMANTIC,
@@ -49,8 +49,7 @@ class TestSharedMemorySinglePath(unittest.IsolatedAsyncioTestCase):
 
     async def test_query_shared_layer_returns_empty_initially(self) -> None:
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
-        mem = SimpleMemorySystem()
-        mem.bind_shared_memory(store)
+        mem = SimpleMemorySystem(shared_store=store)
         self.assertEqual(mem.query(MemoryLayer.SEMANTIC), [])
 
 

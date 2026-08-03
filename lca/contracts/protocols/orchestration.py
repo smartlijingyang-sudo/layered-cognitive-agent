@@ -13,16 +13,15 @@ from lca.contracts.protocols.agent import AgentUnit
 from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig
+from lca.contracts.supervisor_mode import SupervisorMode
 
 
 @dataclass
 class TeamContext:
-    """编排策略的运行时上下文，由 TeamOrchestrator 构造并传给策略实例。
+    """编排策略的运行时上下文（已封闭对象图，策略只 run）。
 
-    supervisor 是 AgentUnit —— 组合期由 TeamOrchestrator
-    binds channel / decision gate / SupervisorReasoner; strategies only call run.
-    member_status is the MemberStatus board passed through to the supervisor
-    as ConsultationState by HierarchicalStrategy.
+    ``member_status`` is a board *template* for consultation modes: each
+    HierarchicalStrategy.run creates a fresh ConsultationState from it.
     """
 
     members: Sequence[AgentUnit] = field(default_factory=list)
@@ -33,6 +32,11 @@ class TeamContext:
     member_status: MemberStatus | None = None
     team_id: str = ""
     shared_memory: SharedMemoryStore | None = None
+
+
+def team_supervisor_mode(context: TeamContext) -> SupervisorMode | None:
+    """Read supervisor_mode from context.config (contracts stay behavior-light)."""
+    return context.config.supervisor_mode if context.config is not None else None
 
 
 @runtime_checkable
@@ -46,7 +50,7 @@ class TeamProcessStrategy(Protocol):
 class SharedMemoryStore(Protocol):
     """跨 Agent 共享记忆存储接口。
     按 layer 分流读写（CoALA：semantic/procedural 可共享，
-    episodic/working 保持私有）。由 TeamOrchestrator 构造并注入。
+    episodic/working 保持私有）。
     """
 
     def is_shared(self, layer: MemoryLayer) -> bool: ...

@@ -43,6 +43,7 @@ class ModularBrain(Brain):
         critic: Critic,
         evaluation_pipeline: CandidateEvaluationPipeline | None = None,
         skill_router: SkillRouter | None = None,
+        decision_gate: DecisionGate | None = None,
     ) -> None:
         self.reasoner = reasoner
         self.decision_parser = decision_parser
@@ -51,7 +52,7 @@ class ModularBrain(Brain):
             evaluation_pipeline or SimpleCandidateEvaluationPipeline()
         )
         self.skill_router = skill_router
-        self._decision_gate: DecisionGate | None = None
+        self._decision_gate: DecisionGate | None = decision_gate
 
     async def think(self, state: AgentState) -> Decision:
         if self._decision_gate is not None and isinstance(self._decision_gate, SupportsShortcut):
@@ -75,7 +76,3 @@ class ModularBrain(Brain):
 
     async def reflect(self, state: AgentState, observation: Observation) -> Reflection:
         return await self.critic.critique(state, observation)
-
-    def install_decision_gate(self, policy: DecisionGate) -> None:
-        """安装确定性收尾 guardrail，在评估结果上叠加策略校验。"""
-        self._decision_gate = policy

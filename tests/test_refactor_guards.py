@@ -116,9 +116,9 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
             trace_id="t",
             task="x",
             budget=Budget(),
-            consultation=ConsultationState(member_status=board),
+            session=ConsultationState(member_status=board),
         )
-        self.assertTrue(hasattr(state, "consultation"))
+        self.assertTrue(hasattr(state, "session"))
         self.assertFalse(hasattr(state, "member_status"))
         self.assertFalse(hasattr(state, "team_progress"))
         self.assertFalse(hasattr(state, "team_progress_text"))
@@ -149,7 +149,7 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
             trace_id="t",
             task="ship",
             budget=Budget(),
-            consultation=ConsultationState(member_status=board),
+            session=ConsultationState(member_status=board),
         )
         decision = Decision(
             decision_id="d1",

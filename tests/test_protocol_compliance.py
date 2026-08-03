@@ -252,13 +252,11 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(sup, AgentUnit)
 
     def test_team_orchestrator_is_team_runtime(self):
-        from lca.contracts.role_team import TeamConfig
-        from lca.layer3_agent.team_orchestrator import TeamOrchestrator
-        from lca.layer4_app.defaults import build_default_registries
+        from lca.contracts.enums import TeamProcess
+        from lca.layer4_app.assembly import Assembly
 
         agent, _rp, _runtime = self._build_agent()
-        config = TeamConfig(process="sequential")
-        orchestrator = TeamOrchestrator([agent], config, registries=build_default_registries())
+        orchestrator = Assembly().assemble_team(members=[agent], process=TeamProcess.SEQUENTIAL)
         self.assertIsInstance(orchestrator, TeamUnit)
 
 

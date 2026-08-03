@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """真实 LLM 端到端 Demo 测试 —— 单 Agent + 四种团队策略全链路验证。
 
 合并原 lca_single_agent_demo.py / examples/ 下的演示脚本为一个统一的
@@ -22,8 +24,6 @@ pytest 测试套件，用真实 LLM 跑完 L4→L3→L2→L1→L0 全链路，�
       - 工具调用结果正确性（CalculatorTool 数值验证）
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os
@@ -32,6 +32,7 @@ from pathlib import Path
 
 import pytest
 
+from lca.contracts.supervisor_mode import SupervisorMode
 from lca.layer0_infra.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer4_app.api import Agent, MultiAgentTeam
@@ -53,7 +54,6 @@ logger = logging.getLogger(__name__)
 
 
 def _setup_logging() -> None:
-    """配置 structlog + 文件 handler，让终端和日志文件都有详细输出。"""
     _TRACE_DIR.mkdir(parents=True, exist_ok=True)
 
     # 根 logger 配置
@@ -303,7 +303,7 @@ class TestHierarchicalTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             members=[market_analyst, pricing_specialist, copywriter],
             process="hierarchical",
             supervisor=supervisor,
-            decision_gate="must_consult_all",
+            supervisor_mode=SupervisorMode.BOARD,
         )
 
         result = await team.run("新品：无线降噪耳机，目标市场：东南亚，请给出是否上市的完整评估")

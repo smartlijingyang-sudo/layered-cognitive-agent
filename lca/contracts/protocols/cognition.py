@@ -100,17 +100,6 @@ class SupportsShortcut(Protocol):
 
 
 @runtime_checkable
-class SupportsDecisionGate(Protocol):
-    """可选能力：允许在 Brain 决策链外挂一层确定性收尾校验。
-    不是所有 Brain 都需要支持此能力；调用方通过
-    ``isinstance(brain, SupportsDecisionGate)`` 做结构化探测，
-    探测失败时应当报错，而不是静默跳过（区别于旧版 hasattr 的隐式降级）。
-    """
-
-    def install_decision_gate(self, policy: DecisionGate) -> None: ...
-
-
-@runtime_checkable
 class SkillRouter(Protocol):
     """运行时动态选择 Prompt 模板 / 工具子集。"""
 

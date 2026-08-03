@@ -2,26 +2,23 @@
 
 Import ``Agent`` and ``MultiAgentTeam`` from here (or from the package
 root ``lca``). By default they share one lazily-constructed default
-``Assembly()``; pass ``assembly=`` to isolate composition state (custom
-registered implementations, test isolation).
+``Assembly()``; pass ``assembly=`` to isolate composition state.
 
 Example::
 
     from lca import Agent, MultiAgentTeam
-    from lca.contracts.enums import TeamProcess
 
     researcher = Agent(role="Researcher", goal="Find info", backstory="...",
                        tools=[search_tool], llm=my_llm)
-    team = MultiAgentTeam(members=[researcher, writer], process=TeamProcess.SEQUENTIAL)
+    team = MultiAgentTeam.pipeline(members=[researcher, writer])
     result = await team.run("Write a blog post about AI")
 """
 
 from __future__ import annotations
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
-from lca.contracts.enums import DecisionGateName, MemoryLayer, TeamProcess
+from lca.contracts.enums import MemoryLayer, TeamProcess
 from lca.contracts.graph import ExecutionGraph
-from lca.contracts.orchestration_taxonomy import SupervisorPlane
 from lca.contracts.protocols import (
     Brain,
     LLMAdapter,
@@ -33,6 +30,7 @@ from lca.contracts.protocols import (
     Tool,
 )
 from lca.contracts.result import Result
+from lca.contracts.supervisor_mode import Recipe, SupervisorMode, expand_recipe
 from lca.layer4_app.assembly import Assembly
 
 _default_assembly: Assembly | None = None
@@ -46,41 +44,7 @@ def _get_default_assembly() -> Assembly:
 
 
 class Agent:
-    """A single cognitive agent with role, goal, tools, and an LLM.
-
-    Construct with a role description, a list of tools, and an LLM adapter.
-    Call ``await agent.run(task)`` to execute a task through the cognitive
-    runtime loop.
-
-    Parameters
-    ----------
-    role:
-        Short role label (e.g. ``"Researcher"``).
-    goal:
-        What this agent is trying to achieve.
-    backstory:
-        Narrative context that shapes the agent's behaviour.
-    tools:
-        Tools available to this agent.
-    llm:
-        The LLM adapter used for reasoning.
-    max_steps:
-        Maximum reasoning steps per ``run()`` call.
-    max_wall_clock_seconds:
-        Hard wall-clock timeout; ``None`` for no limit.
-    memory:
-        ``"simple"`` (default) or a ``MemorySystem`` instance.
-    observability:
-        ``"console"`` (default), ``"jsonl_file"``, or an ``Observability`` instance.
-    state_store:
-        ``"memory"`` (default) or a ``StateStore`` instance.
-    brain:
-        ``"default"`` or a registered brain factory name / ``Brain`` instance.
-    assembly:
-        Optional. Pass your own ``Assembly`` to isolate composition state
-        (e.g. custom registered implementations, or test isolation); when
-        omitted, the process-default lazily-constructed Assembly is used.
-    """
+    """A single cognitive agent with role, goal, tools, and an LLM."""
 
     def __init__(
         self,
@@ -113,72 +77,135 @@ class Agent:
         )
 
     async def run(self, task: str) -> Result:
-        """Execute *task* and return the result."""
         return await self._agent.run(task)
 
 
 class MultiAgentTeam:
     """A team of agents coordinated by a shared orchestration process.
 
-    Parameters
-    ----------
-    members:
-        The agents participating in this team.
-    process:
-        Topology within an orchestration family (see ADR-0027).
-    supervisor:
-        Optional supervisor agent (required for ``HIERARCHICAL`` process).
-    max_rounds:
-        Maximum coordination rounds; ``None`` for unlimited.
-    shared_memory_layers:
-        Memory layers shared across team members.
-    execution_graph:
-        Required when ``process=GRAPH`` (unless a custom *strategy* is passed).
-    strategy:
-        Optional custom ``TeamProcessStrategy`` override.
-    decision_gate:
-        SUPERVISOR settlement strength. Default ``none`` (free supervisor).
-        Use ``must_consult_all`` for full consultation compliance.
-    supervisor_plane:
-        SUPERVISOR control-plane kind: ``consultation`` (settlement board)
-        or ``routing`` (free PM). Illegal with non-none gate under routing.
-    delegate_max_attempts:
-        Per-role delegate retries on the consultation board.
-    assembly:
-        Optional. Pass your own ``Assembly`` to isolate composition state;
-        when omitted, the process-default lazily-constructed Assembly is used.
+    Prefer Recipe classmethods (``pipeline``, ``board``, ``manager``, …).
+    Advanced: construct with ``process`` + optional ``supervisor_mode``.
     """
 
     def __init__(
         self,
         members: list[Agent],
-        process: TeamProcess = TeamProcess.HIERARCHICAL,
+        *,
+        process: TeamProcess | None = None,
+        recipe: Recipe | None = None,
         supervisor: Agent | None = None,
         max_rounds: int | None = None,
         shared_memory_layers: list[MemoryLayer] | None = None,
         execution_graph: ExecutionGraph | None = None,
         strategy: TeamProcessStrategy | None = None,
-        decision_gate: DecisionGateName | None = None,
-        supervisor_plane: SupervisorPlane | None = None,
+        supervisor_mode: SupervisorMode | None = None,
         delegate_max_attempts: int | None = None,
         assembly: Assembly | None = None,
     ) -> None:
         target = assembly or _get_default_assembly()
         base_members = [m._agent for m in members]
         base_supervisor = supervisor._agent if supervisor else None
+
+        process_val = process
+        mode = supervisor_mode
+        if recipe is not None:
+            process_val, recipe_mode = expand_recipe(recipe)
+            if mode is None:
+                mode = recipe_mode
+        if process_val is None:
+            process_val = TeamProcess.HIERARCHICAL
+
         self._orchestrator: TeamUnit = target.assemble_team(
             members=base_members,
-            process=process,
+            process=process_val,
             supervisor=base_supervisor,
             max_rounds=max_rounds,
             shared_memory_layers=shared_memory_layers,
             execution_graph=execution_graph,
             strategy=strategy,
-            decision_gate=decision_gate,
-            supervisor_plane=supervisor_plane,
+            supervisor_mode=mode,
             delegate_max_attempts=delegate_max_attempts,
         )
 
     async def run(self, objective: str) -> Result:
-        """Run the team on *objective* and return the aggregated result."""
         return await self._orchestrator.run(objective)
+
+    @classmethod
+    def pipeline(
+        cls,
+        members: list[Agent],
+        **kwargs: object,
+    ) -> MultiAgentTeam:
+        return cls(members, recipe=Recipe.PIPELINE, **kwargs)  # type: ignore[arg-type]
+
+    @classmethod
+    def fanout(cls, members: list[Agent], **kwargs: object) -> MultiAgentTeam:
+        return cls(members, recipe=Recipe.FANOUT, **kwargs)  # type: ignore[arg-type]
+
+    @classmethod
+    def manager(
+        cls,
+        supervisor: Agent,
+        members: list[Agent],
+        **kwargs: object,
+    ) -> MultiAgentTeam:
+        return cls(
+            members,
+            recipe=Recipe.MANAGER,
+            supervisor=supervisor,
+            **kwargs,  # type: ignore[arg-type]
+        )
+
+    @classmethod
+    def consult(
+        cls,
+        supervisor: Agent,
+        members: list[Agent],
+        **kwargs: object,
+    ) -> MultiAgentTeam:
+        return cls(
+            members,
+            recipe=Recipe.CONSULT,
+            supervisor=supervisor,
+            **kwargs,  # type: ignore[arg-type]
+        )
+
+    @classmethod
+    def board(
+        cls,
+        supervisor: Agent,
+        members: list[Agent],
+        **kwargs: object,
+    ) -> MultiAgentTeam:
+        return cls(
+            members,
+            recipe=Recipe.BOARD,
+            supervisor=supervisor,
+            **kwargs,  # type: ignore[arg-type]
+        )
+
+    @classmethod
+    def relay(cls, members: list[Agent], **kwargs: object) -> MultiAgentTeam:
+        return cls(members, recipe=Recipe.RELAY, **kwargs)  # type: ignore[arg-type]
+
+    @classmethod
+    def swarm(cls, members: list[Agent], **kwargs: object) -> MultiAgentTeam:
+        return cls(members, recipe=Recipe.SWARM, **kwargs)  # type: ignore[arg-type]
+
+    @classmethod
+    def debate(cls, members: list[Agent], **kwargs: object) -> MultiAgentTeam:
+        return cls(members, recipe=Recipe.DEBATE, **kwargs)  # type: ignore[arg-type]
+
+    @classmethod
+    def graph(
+        cls,
+        members: list[Agent],
+        execution_graph: ExecutionGraph,
+        **kwargs: object,
+    ) -> MultiAgentTeam:
+        return cls(
+            members,
+            recipe=Recipe.GRAPH,
+            execution_graph=execution_graph,
+            **kwargs,  # type: ignore[arg-type]
+        )

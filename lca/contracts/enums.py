@@ -33,10 +33,18 @@ class TeamProcess(str, Enum):
 
 
 class DecisionGateName(str, Enum):
-    """内置收尾策略名称。"""
+    """内置收尾策略名称（registry 键；用户面用 SupervisorMode，勿并排配置）。"""
 
     MUST_CONSULT_ALL = "must_consult_all"
     NONE = "none"
+
+
+class ActionScope(str, Enum):
+    """Which built-in actions a Body may execute (construction-time closed set)."""
+
+    SOLO = "solo"
+    MEMBER = "member"
+    SUPERVISOR = "supervisor"
 
 
 class HookEvent(str, Enum):

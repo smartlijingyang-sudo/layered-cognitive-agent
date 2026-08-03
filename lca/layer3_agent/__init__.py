@@ -5,23 +5,15 @@ L3 层职责：
     并通过 TeamOrchestrator + TeamProcessStrategy 实现多 Agent 编排。
     支持 TeamProcess 族内拓扑：hierarchical / sequential / parallel /
     handoff / swarm / debate / graph（见 ADR-0027 编排族）。
-    所有策略通过注册表解析，L3 不含 if/elif 业务分发。
+    组合期封闭对象图在 L4；L3 只持有句柄并 run（ADR-0029）。
 """
 
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.orchestration_registry import TeamProcessStrategyRegistry
-from lca.layer3_agent.supervisor_bind import (
-    SupervisorBinder,
-    SupervisorBindError,
-    default_supervisor_cognition_factory,
-)
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 
 __all__ = [
     "CognitiveAgent",
-    "SupervisorBindError",
-    "SupervisorBinder",
     "TeamOrchestrator",
     "TeamProcessStrategyRegistry",
-    "default_supervisor_cognition_factory",
 ]

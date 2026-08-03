@@ -17,6 +17,7 @@ from lca.contracts.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_VALIDATION,
 )
+from lca.contracts.session import as_consultation
 from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
@@ -35,10 +36,10 @@ from lca.layer1_cognitive.member_status.tracking import _next_role_status
 
 
 def _state(task: str = "test task", **kw) -> AgentState:
-    if "member_status" in kw and "consultation" not in kw:
+    if "member_status" in kw and "session" not in kw:
         board = kw.pop("member_status")
         if board is not None:
-            kw["consultation"] = ConsultationState(member_status=board)
+            kw["session"] = ConsultationState(member_status=board)
     return AgentState(trace_id="t", task=task, budget=Budget(), **kw)
 
 
@@ -369,7 +370,14 @@ class TestModularBrainTryShortcutShortCircuit:
             decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
         )
-        brain.install_decision_gate(MustConsultAllMembers())
+        brain = ModularBrain(
+            reasoner=brain.reasoner,
+            decision_parser=brain.decision_parser,
+            critic=brain.critic,
+            evaluation_pipeline=brain.evaluation_pipeline,
+            skill_router=brain.skill_router,
+            decision_gate=MustConsultAllMembers(),
+        )
 
         state = _state(member_status=_ledger({"analyst"}))
         decision = await brain.think(state)
@@ -395,8 +403,8 @@ class TestUpdateMemberStatus:
 
         update_member_status(state, decision, obs)
 
-        assert state.consultation is not None
-        assert state.consultation.member_status.status["analyst"] == "done"
+        assert as_consultation(state.session) is not None
+        assert as_consultation(state.session).member_status.status["analyst"] == "done"
 
     @pytest.mark.asyncio
     async def test_marks_pending_on_first_execution_failure(self) -> None:
@@ -412,17 +420,17 @@ class TestUpdateMemberStatus:
 
         update_member_status(state, decision, obs)
 
-        assert state.consultation is not None
-        assert state.consultation.member_status.status["analyst"] == "pending"
-        assert state.consultation.delegate_attempts["analyst"] == 1
+        assert as_consultation(state.session) is not None
+        assert as_consultation(state.session).member_status.status["analyst"] == "pending"
+        assert as_consultation(state.session).delegate_attempts["analyst"] == 1
 
     @pytest.mark.asyncio
     async def test_marks_failed_after_max_attempts(self) -> None:
         """Exceeding max_attempts → FAILED (terminal)."""
         ledger = _ledger({"analyst"})
         state = _state(member_status=ledger)
-        assert state.consultation is not None
-        state.consultation.delegate_max_attempts = 2
+        assert as_consultation(state.session) is not None
+        as_consultation(state.session).delegate_max_attempts = 2
 
         decision = _decision(
             "delegate",
@@ -431,12 +439,12 @@ class TestUpdateMemberStatus:
         obs = _obs(success=False, error="boom")
 
         update_member_status(state, decision, obs)  # attempt 1 → pending
-        assert state.consultation.member_status.status["analyst"] == "pending"
+        assert as_consultation(state.session).member_status.status["analyst"] == "pending"
 
         update_member_status(state, decision, obs)  # attempt 2 → failed
-        assert state.consultation.member_status.status["analyst"] == "failed"
-        assert state.consultation.delegate_attempts["analyst"] == 2
-        assert state.consultation.member_status.all_settled() is True
+        assert as_consultation(state.session).member_status.status["analyst"] == "failed"
+        assert as_consultation(state.session).delegate_attempts["analyst"] == 2
+        assert as_consultation(state.session).member_status.all_settled() is True
 
     @pytest.mark.asyncio
     async def test_validation_failure_immediately_failed(self) -> None:
@@ -452,9 +460,9 @@ class TestUpdateMemberStatus:
 
         update_member_status(state, decision, obs)
 
-        assert state.consultation.member_status.status["analyst"] == "failed"
-        assert state.consultation.member_status.all_settled() is True
-        assert state.consultation.delegate_attempts["analyst"] == 1
+        assert as_consultation(state.session).member_status.status["analyst"] == "failed"
+        assert as_consultation(state.session).member_status.all_settled() is True
+        assert as_consultation(state.session).delegate_attempts["analyst"] == 1
 
     @pytest.mark.asyncio
     async def test_noop_when_no_ledger(self) -> None:
@@ -470,7 +478,7 @@ class TestUpdateMemberStatus:
         decision = _decision("respond")
         obs = _obs(success=True)
         update_member_status(state, decision, obs)
-        assert state.consultation.member_status.status["analyst"] == "pending"
+        assert as_consultation(state.session).member_status.status["analyst"] == "pending"
 
 
 # ── _next_role_status pure function ──

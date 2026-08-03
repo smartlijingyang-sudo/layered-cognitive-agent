@@ -6,7 +6,6 @@ from typing import Protocol, runtime_checkable
 
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Decision, Observation
-from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.state import AgentState
 
 
@@ -15,7 +14,6 @@ class Body(Protocol):
     """行动执行体：将 Decision 转化为 Observation。"""
 
     async def act(self, decision: Decision, state: AgentState) -> Observation: ...
-    def bind_channel(self, transport: AgentTransport) -> None: ...
 
 
 @runtime_checkable

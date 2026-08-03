@@ -40,9 +40,12 @@ def test_family_of(process: TeamProcess, family: OrchestrationFamily) -> None:
 
 
 def test_team_config_defaults_align_industry_free_supervisor() -> None:
+    from lca.contracts.supervisor_mode import SupervisorMode
+
     cfg = TeamConfig(process=TeamProcess.HIERARCHICAL)
-    assert cfg.decision_gate is DecisionGateName.NONE
-    assert cfg.supervisor_plane is SupervisorPlane.CONSULTATION
+    assert cfg.supervisor_mode is None  # set by assemble_team for hierarchical
+    cfg2 = TeamConfig(process=TeamProcess.HIERARCHICAL, supervisor_mode=SupervisorMode.CONSULTATION)
+    assert cfg2.supervisor_mode is SupervisorMode.CONSULTATION
 
 
 def test_reserved_slots_do_not_collide_with_live_processes() -> None:

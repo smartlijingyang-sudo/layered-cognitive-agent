@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Decision, Observation
-from lca.contracts.protocols import AgentTransport, Body, FallbackPolicy
+from lca.contracts.protocols import Body, FallbackPolicy
 from lca.contracts.result import UnregisteredActionError
 from lca.contracts.state import AgentState
 
@@ -38,6 +38,3 @@ class FallbackDecoratedBody(Body):
             if registry is None:
                 registry = getattr(self._inner, "action_registry", None)
             return await self._fallback_handler.handle(decision, state, registry)
-
-    def bind_channel(self, transport: AgentTransport) -> None:
-        self._inner.bind_channel(transport)

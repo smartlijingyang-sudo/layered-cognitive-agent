@@ -36,7 +36,9 @@ def update_member_status_for_spec(
     state: AgentState, spec: DelegationSpec, observation: Observation
 ) -> None:
     """Update the consultation board for one delegation target."""
-    consultation = state.consultation
+    from lca.contracts.session import as_consultation
+
+    consultation = as_consultation(state.session)
     if consultation is None:
         return
     board = consultation.member_status
@@ -71,7 +73,9 @@ def update_member_status(state: AgentState, decision: Decision, observation: Obs
 
 def record_routing_assignment(state: AgentState, spec: DelegationSpec) -> None:
     """Soft-log assigned role on free routing plane (advisory only)."""
-    routing = state.routing
+    from lca.contracts.session import as_routing
+
+    routing = as_routing(state.session)
     if routing is None or not spec.target_role:
         return
     if spec.target_role not in routing.assigned_roles:

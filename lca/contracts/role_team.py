@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.contracts.enums import DecisionGateName, MemoryLayer, TeamProcess
-from lca.contracts.orchestration_taxonomy import SupervisorPlane
+from lca.contracts.enums import MemoryLayer, TeamProcess
+from lca.contracts.supervisor_mode import SupervisorMode
 
 
 @dataclass
@@ -52,17 +52,14 @@ class RoleProfile:
 
 @dataclass
 class TeamConfig:
-    """团队编排配置：process（族内拓扑）+ gate（结算强度）+ 共享记忆等。
+    """团队编排规范配置（Blueprint 展开结果，非用户双源）。
 
-    正交维度见 ADR-0027：
-    - ``process`` → ``TeamProcessStrategy`` / ``OrchestrationFamily``
-    - ``decision_gate`` → SUPERVISOR 结算不变量（默认 none = 业界自由经理）
-    - ``supervisor_plane`` → consultation vs routing（均已实现）
+    - ``process`` → TeamProcessStrategy / OrchestrationFamily
+    - ``supervisor_mode`` → SUPERVISOR 闭集（仅 hierarchical 非 None）
     """
 
     process: TeamProcess
     shared_memory_layers: list[MemoryLayer] = field(default_factory=list)
     max_rounds: int | None = None
-    decision_gate: DecisionGateName = DecisionGateName.NONE
+    supervisor_mode: SupervisorMode | None = None
     delegate_max_attempts: int = 3
-    supervisor_plane: SupervisorPlane = SupervisorPlane.CONSULTATION

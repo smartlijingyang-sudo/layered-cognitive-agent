@@ -60,10 +60,7 @@ roles:
 
 teams:
   hierarchical:
-    process: hierarchical
-    # Consultation compliance (ADR-0027): opt-in settlement; free supervisor is gate none
-    decision_gate: must_consult_all
-    supervisor_plane: consultation
+    recipe: board
     supervisor: project_lead
     members:
       - market_analyst

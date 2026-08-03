@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from lca.contracts.action import Action
-from lca.contracts.enums import ActionType
+from lca.contracts.enums import ActionScope, ActionType
 from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.layer1_cognitive.body.action_handlers import (
     DelegateOperation,
@@ -93,14 +93,31 @@ def _operation_for(
     return None
 
 
+_SCOPE_ACTIONS: dict[ActionScope, frozenset[str]] = {
+    ActionScope.SOLO: frozenset({ActionType.RESPOND, ActionType.USE_TOOL}),
+    ActionScope.MEMBER: frozenset({ActionType.RESPOND, ActionType.USE_TOOL}),
+    ActionScope.SUPERVISOR: frozenset(
+        {
+            ActionType.RESPOND,
+            ActionType.USE_TOOL,
+            ActionType.DELEGATE,
+            ActionType.HANDOFF,
+        }
+    ),
+}
+
+
 def build_default_action_registry(
     tool_registry: ToolRegistry,
     safe_executor: SafeExecutor,
     transport_registry: TransportRegistryProtocol,
+    *,
+    scope: ActionScope = ActionScope.SOLO,
 ) -> ActionRegistry:
+    allowed = _SCOPE_ACTIONS[scope]
     registry = ActionRegistry()
     for spec in BUILTIN_ACTION_SPECS:
-        if not spec.executable:
+        if not spec.executable or spec.name not in allowed:
             continue
         op = _operation_for(spec.name, tool_registry, safe_executor, transport_registry)
         if op is None:

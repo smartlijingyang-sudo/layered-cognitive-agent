@@ -6,11 +6,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from lca.contracts.consultation import ConsultationState
 from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id, utc_now
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.routing import RoutingState
+from lca.contracts.session import ControlSession
 from lca.contracts.types import Turn
 
 
@@ -54,9 +53,8 @@ class StateSnapshot:
 class AgentState:
     """Full state for one agent cognitive loop.
 
-    Generic loop fields only. SUPERVISOR control planes live under optional
-    ``consultation`` (settlement) or ``routing`` (free PM) — mutually
-    exclusive per run by convention.
+    Generic loop fields only. SUPERVISOR control plane lives under optional
+    ``session`` (ConsultationState | RoutingState) — single slot (ADR-0029).
     """
 
     trace_id: str
@@ -71,8 +69,7 @@ class AgentState:
     extra: dict[str, Any] = field(default_factory=dict)
     agent_role: str = ""
     from_role: str = ""
-    consultation: ConsultationState | None = None
-    routing: RoutingState | None = None
+    session: ControlSession | None = None
     history: list[Turn] = field(default_factory=list)
     final_output: Any | None = None
     last_error: str | None = None

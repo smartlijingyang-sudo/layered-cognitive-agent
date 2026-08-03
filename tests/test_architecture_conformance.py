@@ -71,12 +71,6 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.member_status.required_action.RequiredAction": (
         "纯数据声明（gate 裁决结果），非可插拔组件；见 ADR-0025"
     ),
-    "lca.layer3_agent.supervisor_bind.SupervisorBinder": (
-        "组装期绑定助手（channel/gate/cognition），非运行时可插拔组件；见 ADR-0026"
-    ),
-    "lca.layer3_agent.supervisor_bind.SupervisorBindError": (
-        "异常类型，非可插拔组件 (ADR-0010/ADR-0026)"
-    ),
 }
 
 _SCAN_PACKAGES = [

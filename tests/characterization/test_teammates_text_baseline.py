@@ -9,6 +9,7 @@ from __future__ import annotations
 from lca.contracts.consultation import ConsultationState
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.run_context import RunContext
+from lca.contracts.session import as_consultation
 from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.brain.reasoner import build_teammates_text
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
@@ -70,14 +71,14 @@ class TestRunContextConsultation:
 
     def test_run_context_carries_consultation(self) -> None:
         profiles = [_make_profile("coder", "write code")]
-        ctx = RunContext(consultation=_consultation(profiles))
-        assert ctx.consultation is not None
-        assert len(ctx.consultation.teammates) == 1
-        assert ctx.consultation.teammates[0].role == "coder"
+        ctx = RunContext(session=_consultation(profiles))
+        assert ctx.session is not None
+        assert len(ctx.session.teammates) == 1
+        assert ctx.session.teammates[0].role == "coder"
 
     def test_run_context_default_has_no_consultation(self) -> None:
         ctx = RunContext()
-        assert ctx.consultation is None
+        assert ctx.session is None
         assert not hasattr(ctx, "role_mode")
         assert not hasattr(ctx, "teammates")
 
@@ -91,15 +92,15 @@ class TestAgentStateConsultation:
             trace_id="t1",
             task="test",
             budget=Budget(),
-            consultation=_consultation(profiles),
+            session=_consultation(profiles),
         )
-        assert state.consultation is not None
-        assert len(state.consultation.teammates) == 1
-        assert state.consultation.teammates[0].role == "coder"
+        assert as_consultation(state.session) is not None
+        assert len(as_consultation(state.session).teammates) == 1
+        assert as_consultation(state.session).teammates[0].role == "coder"
 
     def test_agent_state_default_no_consultation(self) -> None:
         state = AgentState(trace_id="t1", task="test", budget=Budget())
-        assert state.consultation is None
+        assert as_consultation(state.session) is None
         assert not hasattr(state, "role_mode")
         assert not hasattr(state, "teammates")
 
@@ -146,7 +147,7 @@ class TestSupervisorReasonerPrompt:
             trace_id="t1",
             task="test",
             budget=Budget(),
-            consultation=_consultation([_make_profile("coder", "write code")]),
+            session=_consultation([_make_profile("coder", "write code")]),
         )
         await reasoner.generate_candidates(state, n=1)
         prompt = llm.complete.call_args[0][0]
@@ -167,7 +168,7 @@ class TestSupervisorReasonerPrompt:
             templates={"hierarchical_prompt": "{teammates}"},
         )
         state = AgentState(trace_id="t1", task="test", budget=Budget())
-        with pytest.raises(ValueError, match="consultation"):
+        with pytest.raises(ValueError, match="session"):
             await reasoner.generate_candidates(state, n=1)
 
     async def test_active_template_override(self) -> None:
@@ -190,7 +191,7 @@ class TestSupervisorReasonerPrompt:
             trace_id="t1",
             task="test",
             budget=Budget(),
-            consultation=_consultation([_make_profile("coder")]),
+            session=_consultation([_make_profile("coder")]),
             active_template="custom",
         )
         await reasoner.generate_candidates(state, n=1)

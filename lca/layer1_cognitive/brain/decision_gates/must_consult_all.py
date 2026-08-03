@@ -56,7 +56,10 @@ class MustConsultAllMembers(DecisionGate):
     """
 
     async def try_shortcut(self, state: AgentState) -> Decision | None:
-        board = state.consultation.member_status if state.consultation else None
+        from lca.contracts.session import as_consultation
+
+        consultation = as_consultation(state.session)
+        board = consultation.member_status if consultation else None
         if board is None:
             return None
         waiting = board.waiting_roles()
@@ -79,7 +82,10 @@ class MustConsultAllMembers(DecisionGate):
         state: AgentState,
         decision: Decision,
     ) -> Decision:
-        board = state.consultation.member_status if state.consultation else None
+        from lca.contracts.session import as_consultation
+
+        consultation = as_consultation(state.session)
+        board = consultation.member_status if consultation else None
         if board is None:
             return decision
 

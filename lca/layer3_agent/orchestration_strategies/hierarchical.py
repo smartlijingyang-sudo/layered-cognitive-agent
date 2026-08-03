@@ -1,19 +1,17 @@
-"""Hierarchical team process: SUPERVISOR family entry (ADR-0027).
+"""Hierarchical team process: SUPERVISOR family entry (ADR-0027 / ADR-0029).
 
-Industry slot: Crew hierarchical / LangGraph supervisor node.
-Planes:
-- CONSULTATION → ``ConsultationState`` + optional settlement gate
-- ROUTING → ``RoutingState`` free PM (no settlement board)
+Strategy only creates a fresh ControlSession and runs the closed supervisor.
 """
 
 from __future__ import annotations
 
 from lca.contracts.consultation import ConsultationState
-from lca.contracts.orchestration_taxonomy import SupervisorPlane
 from lca.contracts.protocols import TeamContext, TeamProcessStrategy
+from lca.contracts.protocols.orchestration import team_supervisor_mode
 from lca.contracts.result import Result
 from lca.contracts.routing import RoutingState
 from lca.contracts.run_context import RunContext
+from lca.contracts.supervisor_mode import mode_uses_consultation_session
 
 _DEFAULT_DELEGATE_MAX_ATTEMPTS = 3
 
@@ -25,29 +23,27 @@ class HierarchicalStrategy(TeamProcessStrategy):
         if context.supervisor is None:
             raise ValueError("Hierarchical 模式需要 Supervisor")
 
-        plane = (
-            context.config.supervisor_plane
-            if context.config is not None
-            else SupervisorPlane.CONSULTATION
-        )
-        if plane is SupervisorPlane.ROUTING:
-            ctx = RunContext(
-                routing=RoutingState(teammates=list(context.teammates)),
-            )
-            return await context.supervisor.run(objective, ctx)
+        mode = team_supervisor_mode(context)
+        if mode is None:
+            raise ValueError("Hierarchical 模式需要 TeamConfig.supervisor_mode")
 
-        if context.member_status is None:
-            raise ValueError("Consultation plane 需要 MemberStatus board")
         max_attempts = (
             context.config.delegate_max_attempts
             if context.config is not None
             else _DEFAULT_DELEGATE_MAX_ATTEMPTS
         )
-        ctx = RunContext(
-            consultation=ConsultationState(
-                member_status=context.member_status,
+
+        if mode_uses_consultation_session(mode):
+            if context.member_status is None:
+                raise ValueError("Consultation/Board mode 需要 MemberStatus board template")
+            # Fresh board each team.run — clone via factory role_order if available.
+            board = context.member_status
+            session: ConsultationState | RoutingState = ConsultationState(
+                member_status=board,
                 teammates=list(context.teammates),
                 delegate_max_attempts=max_attempts,
-            ),
-        )
-        return await context.supervisor.run(objective, ctx)
+            )
+        else:
+            session = RoutingState(teammates=list(context.teammates))
+
+        return await context.supervisor.run(objective, RunContext(session=session))
