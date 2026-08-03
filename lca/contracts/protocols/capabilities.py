@@ -1,10 +1,10 @@
 """可选能力协议（ADR-0017）。
 
-把组件的可选绑定能力（channel / shared_memory）
+把组件的可选绑定能力（channel / shared_memory / replaceable reasoner）
 收敛成具名、runtime_checkable 的 Protocol，
 使能力契约可被 mypy 校验、可被 grep 发现。
 
-由组装层（TeamOrchestrator / Supervisor）通过 isinstance 检查直接调用，
+由组装层（TeamOrchestrator / SupervisorBinder）通过 isinstance 检查直接调用，
 不再经过 Runtime.configure() 间接分发。
 """
 
@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.mechanisms import HookRegistry
+from lca.contracts.protocols.cognition import Reasoner
 from lca.contracts.protocols.infra import AgentTransport
 
 
@@ -37,6 +38,13 @@ class HasBrainBodyMemory(Protocol):
     body: object
     brain: object
     memory: object
+
+
+@runtime_checkable
+class HasReplaceableReasoner(Protocol):
+    """Brain 若允许组装期替换 Reasoner（supervisor 认知绑定），实现此协议。"""
+
+    reasoner: Reasoner
 
 
 @runtime_checkable

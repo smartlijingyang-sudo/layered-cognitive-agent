@@ -6,11 +6,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from lca.contracts.enums import RoleMode, SnapshotReason
+from lca.contracts.consultation import ConsultationState
+from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id, utc_now
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.member_status import MemberStatus
-from lca.contracts.role_team import RoleProfile
 from lca.contracts.types import Turn
 
 
@@ -52,7 +51,11 @@ class StateSnapshot:
 
 @dataclass
 class AgentState:
-    """Full state for one agent cognitive loop."""
+    """Full state for one agent cognitive loop.
+
+    Generic loop fields only. Hierarchical supervisor control plane
+    lives under optional ``consultation`` (see ``ConsultationState``).
+    """
 
     trace_id: str
     task: str
@@ -66,12 +69,8 @@ class AgentState:
     extra: dict[str, Any] = field(default_factory=dict)
     agent_role: str = ""
     from_role: str = ""
-    member_status: MemberStatus | None = None
-    role_mode: RoleMode = RoleMode.SOLO
-    teammates: list[RoleProfile] = field(default_factory=list)
+    consultation: ConsultationState | None = None
     history: list[Turn] = field(default_factory=list)
-    delegate_max_attempts: int = 3
-    delegate_attempts: dict[str, int] = field(default_factory=dict)
     final_output: Any | None = None
     last_error: str | None = None
     active_template: str | None = None

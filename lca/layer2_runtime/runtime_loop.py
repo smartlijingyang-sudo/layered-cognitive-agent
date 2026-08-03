@@ -12,7 +12,7 @@ from __future__ import annotations
 import structlog
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS, create_budget
-from lca.contracts.enums import RoleMode, SnapshotReason
+from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.mechanisms import HookRegistry
@@ -72,10 +72,7 @@ class CognitiveRuntime(Runtime):
             ),
             agent_role=agent_role,
             from_role=(ctx.from_role if ctx else ""),
-            member_status=(ctx.member_status if ctx else None),
-            role_mode=(ctx.role_mode if ctx else RoleMode.SOLO),
-            teammates=list(ctx.teammates) if ctx else [],
-            delegate_max_attempts=(ctx.delegate_max_attempts if ctx else 3),
+            consultation=(ctx.consultation if ctx else None),
         )
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)

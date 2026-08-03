@@ -106,13 +106,20 @@ class TestAdrIndexMatchesFilesystem(unittest.TestCase):
 class TestProgressiveDisclosureVocabulary(unittest.TestCase):
     """Primary production names follow progressive-disclosure vocabulary."""
 
-    def test_agent_state_uses_member_status_not_progress_text(self) -> None:
+    def test_agent_state_uses_consultation_not_progress_text(self) -> None:
+        from lca.contracts.consultation import ConsultationState
         from lca.contracts.state import AgentState, Budget
         from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
         board = InMemoryMemberStatus(role_order=("a",))
-        state = AgentState(trace_id="t", task="x", budget=Budget(), member_status=board)
-        self.assertTrue(hasattr(state, "member_status"))
+        state = AgentState(
+            trace_id="t",
+            task="x",
+            budget=Budget(),
+            consultation=ConsultationState(member_status=board),
+        )
+        self.assertTrue(hasattr(state, "consultation"))
+        self.assertFalse(hasattr(state, "member_status"))
         self.assertFalse(hasattr(state, "team_progress"))
         self.assertFalse(hasattr(state, "team_progress_text"))
         self.assertIn("a", board.as_prompt_text())
@@ -131,13 +138,19 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
     def test_must_consult_all_rewrites_early_respond(self) -> None:
         import asyncio
 
+        from lca.contracts.consultation import ConsultationState
         from lca.contracts.decision import Decision
         from lca.contracts.state import AgentState, Budget
         from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
         from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
         board = InMemoryMemberStatus(role_order=("analyst",))
-        state = AgentState(trace_id="t", task="ship", budget=Budget(), member_status=board)
+        state = AgentState(
+            trace_id="t",
+            task="ship",
+            budget=Budget(),
+            consultation=ConsultationState(member_status=board),
+        )
         decision = Decision(
             decision_id="d1",
             action_type="respond",

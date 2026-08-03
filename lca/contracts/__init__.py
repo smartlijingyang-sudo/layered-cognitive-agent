@@ -3,6 +3,12 @@
 from lca.contracts.action import Action, ActionRegistryProtocol
 from lca.contracts.approval import ApprovalDecision, ApprovalRequest
 from lca.contracts.budget import create_budget
+from lca.contracts.consultation import (
+    CONSULTATION_FIELD_WHITELIST,
+    ConsultationState,
+    HierarchicalConsultation,
+    assert_consultation_field_whitelist,
+)
 from lca.contracts.decision import (
     Decision,
     DelegationSpec,
@@ -52,6 +58,7 @@ from lca.contracts.stop import (
 from lca.contracts.types import StopOutcome, Turn
 
 __all__ = [
+    "CONSULTATION_FIELD_WHITELIST",
     "Action",
     "ActionRegistryProtocol",
     "AgentCard",
@@ -63,6 +70,7 @@ __all__ = [
     "BudgetExceededError",
     "CacheConfig",
     "ComponentRegistryProtocol",
+    "ConsultationState",
     "Decision",
     "DecisionGate",
     "DelegationSpec",
@@ -72,6 +80,7 @@ __all__ = [
     "GraphEdge",
     "GraphNode",
     "GraphValidationError",
+    "HierarchicalConsultation",
     "Hook",
     "HookRegistry",
     "MemberStatus",
@@ -99,5 +108,6 @@ __all__ = [
     "TraceSpan",
     "TransportRegistryProtocol",
     "Turn",
+    "assert_consultation_field_whitelist",
     "create_budget",
 ]

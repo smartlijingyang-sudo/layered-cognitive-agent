@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.enums import ComponentKind, DecisionGateName, RoleMode
+from lca.contracts.enums import ComponentKind, DecisionGateName
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.message import AgentMessage, agent_message_as_text
 from lca.contracts.protocols import (
@@ -14,15 +14,15 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.protocols.capabilities import (
     HasBrainBodyMemory,
-    HasChannel,
     HasSharedMemory,
 )
-from lca.contracts.protocols.cognition import DecisionGate, SupportsDecisionGate
+from lca.contracts.protocols.cognition import DecisionGate
 from lca.contracts.registries import Registries
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.supervisor_bind import SupervisorBinder
 
 
 class TeamOrchestrator(TeamUnit):
@@ -37,17 +37,17 @@ class TeamOrchestrator(TeamUnit):
         supervisor: CognitiveAgent | None = None,
         transport: AgentTransport | None = None,
         teammates: list[RoleProfile] | None = None,
-        role_mode: RoleMode = RoleMode.SOLO,
         strategy: TeamProcessStrategy | None = None,
         team_id: str = "",
+        supervisor_binder: SupervisorBinder | None = None,
     ) -> None:
         self.members = members
         self.config = config
         self.supervisor = supervisor
         self.transport = transport
         self.teammates = teammates or []
-        self.role_mode = role_mode
         self.team_id = team_id or f"team-{config.process}"
+        self._supervisor_binder = supervisor_binder or SupervisorBinder()
 
         if strategy is not None:
             self._strategy = strategy
@@ -63,7 +63,11 @@ class TeamOrchestrator(TeamUnit):
         if supervisor is not None:
             member_status = self._create_member_status(members, registries)
             policy = self._resolve_decision_gate(config, registries)
-            self._bind_supervisor(supervisor, transport, policy)
+            self._supervisor_binder.bind(
+                supervisor,
+                transport=transport,
+                policy=policy,
+            )
 
         self._context = TeamContext(
             members=members,
@@ -71,7 +75,6 @@ class TeamOrchestrator(TeamUnit):
             supervisor=supervisor,
             transport=transport,
             teammates=self.teammates,
-            role_mode=self.role_mode,
             member_status=member_status,
         )
 
@@ -109,26 +112,6 @@ class TeamOrchestrator(TeamUnit):
                 memory = member.runtime.memory
                 if isinstance(memory, HasSharedMemory):
                     memory.bind_shared_memory(self._shared_store)
-
-    @staticmethod
-    def _bind_supervisor(
-        supervisor: CognitiveAgent,
-        transport: AgentTransport | None,
-        policy: DecisionGate | None,
-    ) -> None:
-        """Bind supervisor capabilities at composition time.
-
-        Wires channel and decision gate — the bindings that make an
-        agent act as a hierarchical supervisor. Teammates text flows
-        through RunContext → AgentState at run time, not here.
-        """
-        rt = supervisor.runtime
-        if not isinstance(rt, HasBrainBodyMemory):
-            return
-        if transport is not None and isinstance(rt.body, HasChannel):
-            rt.body.bind_channel(transport)
-        if policy is not None and isinstance(rt.brain, SupportsDecisionGate):
-            rt.brain.install_decision_gate(policy)
 
     async def run(self, objective: str | object) -> Result:
         text = (

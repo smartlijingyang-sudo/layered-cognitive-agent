@@ -67,10 +67,23 @@ class _BindableBody(HasChannel):
 def _make_supervisor_with_runtime() -> tuple[
     CognitiveAgent, MagicMock, TransportRegistry, MagicMock
 ]:
-    """返回 (supervisor, mock_runtime, transport_registry, brain)。"""
+    """返回 (supervisor, mock_runtime, transport_registry, brain)。
+
+    brain.reasoner 默认是 SimpleReasoner，以便 SupervisorBinder 显式提升
+    （ADR-0026：未知 reasoner 不再静默跳过）。
+    """
+    from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
+
     registry = TransportRegistry()
     mock_body = _BindableBody(registry)
     mock_brain = MagicMock()
+    mock_brain.reasoner = SimpleReasoner(
+        MagicMock(),
+        _make_role("supervisor"),
+        "tools",
+        templates={"react_prompt": "r", "hierarchical_prompt": "h {teammates}"},
+    )
+    mock_brain.install_decision_gate = MagicMock()
 
     mock_runtime = MagicMock()
     mock_runtime.body = mock_body
@@ -163,6 +176,34 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
         await orchestrator.run("task")
 
         self.assertEqual(registry.list_protocols(), [])
+
+    def test_bind_promotes_simple_reasoner_to_supervisor(self) -> None:
+        """组装期把 SimpleReasoner 提升为 SupervisorReasoner（身份不靠 RoleMode）。"""
+        from lca.layer1_cognitive.brain.reasoner import SimpleReasoner, SupervisorReasoner
+
+        members = [_make_member("dev")]
+        config = TeamConfig(process="hierarchical")
+        sup, _, _, mock_brain = _make_supervisor_with_runtime()
+        simple = SimpleReasoner(
+            MagicMock(),
+            _make_role("supervisor"),
+            "tools",
+            templates={"react_prompt": "r", "hierarchical_prompt": "h {teammates}"},
+        )
+        mock_brain.reasoner = simple
+        mock_brain.install_decision_gate = MagicMock()
+
+        TeamOrchestrator(
+            members,
+            config,
+            registries=_REGISTRIES,
+            supervisor=sup,
+            transport=build_team_transport(members),
+        )
+
+        self.assertIsInstance(mock_brain.reasoner, SupervisorReasoner)
+        self.assertIsNot(mock_brain.reasoner, simple)
+        mock_brain.install_decision_gate.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

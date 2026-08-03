@@ -27,6 +27,7 @@
 | [0023](0023-architecture-deepening.md) | 架构深化 | 溶解浅模块 + 消除冗余概念 + 完成 rename + 迁层 |
 | [0024](0024-registries-value-object.md) | Registries 值对象取代全局单例 | 三个 get_global_* 删除；TeamOrchestrator/Assembly 显式传递 Registries |
 | [0025](0025-role-settlement-retry-and-deadline-clock-domain.md) | 角色结算状态、委派重试与 deadline 时钟域 | settled/done 分类单一函数 + wall-clock 时间工具 + gate 双向仲裁 + role_order 确定性 + 重试留 tracking.py + 删除 poll 死代码 |
+| [0026](0026-supervisor-first-class-consultation.md) | Supervisor 一等公民 | ConsultationState 控制面 + SupervisorReasoner 组装期绑定；删除 RoleMode 与扁平 team 字段 |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

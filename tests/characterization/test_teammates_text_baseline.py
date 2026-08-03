@@ -1,16 +1,17 @@
-"""Characteristic baseline for teammates rendering and routing.
+"""Characteristic baseline for teammates rendering and supervisor cognition.
 
-Uses role_mode + teammates structured fields. Rendering is lazy (in
-Reasoner), not at assembly time.
+Teammates live on ConsultationState (supervisor control plane).
+SimpleReasoner is team-agnostic; SupervisorReasoner owns hierarchical prompt.
 """
 
 from __future__ import annotations
 
-from lca.contracts.enums import RoleMode
+from lca.contracts.consultation import ConsultationState
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.run_context import RunContext
 from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.brain.reasoner import build_teammates_text
+from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
 
 def _make_profile(role: str, goal: str = "test") -> RoleProfile:
@@ -19,6 +20,16 @@ def _make_profile(role: str, goal: str = "test") -> RoleProfile:
         goal=goal,
         backstory="",
         tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+    )
+
+
+def _consultation(
+    teammates: list[RoleProfile] | None = None,
+) -> ConsultationState:
+    roles = tuple(p.role for p in (teammates or [])) or ("member",)
+    return ConsultationState(
+        member_status=InMemoryMemberStatus(role_order=roles),
+        teammates=list(teammates or []),
     )
 
 
@@ -54,139 +65,49 @@ class TestBuildTeammatesTextRendering:
             assert line == f"- role: {p.role} | goal: {p.goal}"
 
 
-class TestRunContextStructuredFields:
-    """Verify RunContext carries role_mode and teammates."""
+class TestRunContextConsultation:
+    """RunContext carries optional consultation, not flat team fields."""
 
-    def test_run_context_carries_role_mode(self) -> None:
-        ctx = RunContext(role_mode=RoleMode.SUPERVISOR)
-        assert ctx.role_mode == RoleMode.SUPERVISOR
-
-    def test_run_context_carries_teammates(self) -> None:
+    def test_run_context_carries_consultation(self) -> None:
         profiles = [_make_profile("coder", "write code")]
-        ctx = RunContext(teammates=profiles, role_mode=RoleMode.SUPERVISOR)
-        assert len(ctx.teammates) == 1
-        assert ctx.teammates[0].role == "coder"
+        ctx = RunContext(consultation=_consultation(profiles))
+        assert ctx.consultation is not None
+        assert len(ctx.consultation.teammates) == 1
+        assert ctx.consultation.teammates[0].role == "coder"
 
-    def test_run_context_default_solo(self) -> None:
+    def test_run_context_default_has_no_consultation(self) -> None:
         ctx = RunContext()
-        assert ctx.role_mode == RoleMode.SOLO
-        assert ctx.teammates == []
+        assert ctx.consultation is None
+        assert not hasattr(ctx, "role_mode")
+        assert not hasattr(ctx, "teammates")
 
 
-class TestAgentStateStructuredFields:
-    """Verify AgentState uses role_mode + teammates, not teammates_text."""
+class TestAgentStateConsultation:
+    """AgentState uses consultation namespace for supervisor control plane."""
 
-    def test_agent_state_role_mode_field(self) -> None:
-        state = AgentState(
-            trace_id="t1", task="test", budget=Budget(), role_mode=RoleMode.SUPERVISOR
-        )
-        assert state.role_mode == RoleMode.SUPERVISOR
-
-    def test_agent_state_teammates_field(self) -> None:
+    def test_agent_state_consultation_field(self) -> None:
         profiles = [_make_profile("coder", "write code")]
         state = AgentState(
             trace_id="t1",
             task="test",
             budget=Budget(),
-            role_mode=RoleMode.SUPERVISOR,
-            teammates=profiles,
+            consultation=_consultation(profiles),
         )
-        assert len(state.teammates) == 1
-        assert state.teammates[0].role == "coder"
+        assert state.consultation is not None
+        assert len(state.consultation.teammates) == 1
+        assert state.consultation.teammates[0].role == "coder"
 
-    def test_agent_state_default_solo(self) -> None:
+    def test_agent_state_default_no_consultation(self) -> None:
         state = AgentState(trace_id="t1", task="test", budget=Budget())
-        assert state.role_mode == RoleMode.SOLO
-        assert state.teammates == []
+        assert state.consultation is None
+        assert not hasattr(state, "role_mode")
+        assert not hasattr(state, "teammates")
 
 
-class TestReasonerTemplateRouting:
-    """Verify _resolve_template uses role_mode to pick template.
+class TestSimpleReasonerTeamAgnostic:
+    """SimpleReasoner never branches on team identity."""
 
-    Phase C behavior:
-    - role_mode != SOLO → "hierarchical_prompt"
-    - role_mode == SOLO → "react_prompt"
-    - state.active_template takes precedence over both
-    """
-
-    def _make_reasoner(self) -> ...:
-        from unittest.mock import MagicMock
-
-        from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
-
-        return SimpleReasoner(
-            llm=MagicMock(),
-            role_profile=_make_profile("supervisor", "manage"),
-            tools_desc="(no tools)",
-            templates={"react_prompt": "react", "hierarchical_prompt": "hier"},
-        )
-
-    def test_solo_routes_to_react(self) -> None:
-        reasoner = self._make_reasoner()
-        state = AgentState(trace_id="t1", task="test", budget=Budget(), role_mode=RoleMode.SOLO)
-        assert reasoner._resolve_template(state) == "react_prompt"
-
-    def test_supervisor_routes_to_hierarchical(self) -> None:
-        reasoner = self._make_reasoner()
-        state = AgentState(
-            trace_id="t1",
-            task="test",
-            budget=Budget(),
-            role_mode=RoleMode.SUPERVISOR,
-            teammates=[_make_profile("coder", "write code")],
-        )
-        assert reasoner._resolve_template(state) == "hierarchical_prompt"
-
-    def test_member_routes_to_hierarchical(self) -> None:
-        reasoner = self._make_reasoner()
-        state = AgentState(
-            trace_id="t1",
-            task="test",
-            budget=Budget(),
-            role_mode=RoleMode.MEMBER,
-        )
-        assert reasoner._resolve_template(state) == "hierarchical_prompt"
-
-    def test_active_template_overrides(self) -> None:
-        reasoner = self._make_reasoner()
-        state = AgentState(
-            trace_id="t1",
-            task="test",
-            budget=Budget(),
-            role_mode=RoleMode.SUPERVISOR,
-            teammates=[_make_profile("coder", "write code")],
-            active_template="custom",
-        )
-        assert reasoner._resolve_template(state) == "custom"
-
-
-class TestReasonerPromptVariableInjection:
-    """Verify teammates are rendered into prompt variables when not solo."""
-
-    async def test_teammates_var_present_when_supervisor(self) -> None:
-        from unittest.mock import AsyncMock, MagicMock
-
-        from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
-
-        llm = MagicMock()
-        llm.complete = AsyncMock(return_value="ok")
-        reasoner = SimpleReasoner(
-            llm=llm,
-            role_profile=_make_profile("supervisor", "manage"),
-            tools_desc="(no tools)",
-            templates={"hierarchical_prompt": "{teammates} {member_status_text}"},
-        )
-        state = AgentState(
-            trace_id="t1",
-            task="test",
-            budget=Budget(),
-            role_mode=RoleMode.SUPERVISOR,
-            teammates=[_make_profile("coder", "write code")],
-        )
-        await reasoner.generate_candidates(state, n=1)
-        assert llm.complete.called
-
-    async def test_teammates_var_absent_when_solo(self) -> None:
+    async def test_solo_prompt_only(self) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
         from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
@@ -199,6 +120,78 @@ class TestReasonerPromptVariableInjection:
             tools_desc="(no tools)",
             templates={"react_prompt": "just {task}"},
         )
-        state = AgentState(trace_id="t1", task="test", budget=Budget(), role_mode=RoleMode.SOLO)
+        state = AgentState(trace_id="t1", task="test", budget=Budget())
         await reasoner.generate_candidates(state, n=1)
         assert llm.complete.called
+        assert "just test" in llm.complete.call_args[0][0]
+
+
+class TestSupervisorReasonerPrompt:
+    """SupervisorReasoner always uses hierarchical template + consultation."""
+
+    async def test_teammates_injected_from_consultation(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+
+        from lca.layer1_cognitive.brain.reasoner import SupervisorReasoner
+
+        llm = MagicMock()
+        llm.complete = AsyncMock(return_value="ok")
+        reasoner = SupervisorReasoner(
+            llm=llm,
+            role_profile=_make_profile("supervisor", "manage"),
+            tools_desc="(no tools)",
+            templates={"hierarchical_prompt": "{teammates} | {member_status_text}"},
+        )
+        state = AgentState(
+            trace_id="t1",
+            task="test",
+            budget=Budget(),
+            consultation=_consultation([_make_profile("coder", "write code")]),
+        )
+        await reasoner.generate_candidates(state, n=1)
+        prompt = llm.complete.call_args[0][0]
+        assert "coder" in prompt
+        assert "write code" in prompt
+
+    async def test_requires_consultation(self) -> None:
+        from unittest.mock import MagicMock
+
+        import pytest
+
+        from lca.layer1_cognitive.brain.reasoner import SupervisorReasoner
+
+        reasoner = SupervisorReasoner(
+            llm=MagicMock(),
+            role_profile=_make_profile("supervisor", "manage"),
+            tools_desc="(no tools)",
+            templates={"hierarchical_prompt": "{teammates}"},
+        )
+        state = AgentState(trace_id="t1", task="test", budget=Budget())
+        with pytest.raises(ValueError, match="consultation"):
+            await reasoner.generate_candidates(state, n=1)
+
+    async def test_active_template_override(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+
+        from lca.layer1_cognitive.brain.reasoner import SupervisorReasoner
+
+        llm = MagicMock()
+        llm.complete = AsyncMock(return_value="ok")
+        reasoner = SupervisorReasoner(
+            llm=llm,
+            role_profile=_make_profile("supervisor", "manage"),
+            tools_desc="(no tools)",
+            templates={
+                "hierarchical_prompt": "HIER",
+                "custom": "CUSTOM {task}",
+            },
+        )
+        state = AgentState(
+            trace_id="t1",
+            task="test",
+            budget=Budget(),
+            consultation=_consultation([_make_profile("coder")]),
+            active_template="custom",
+        )
+        await reasoner.generate_candidates(state, n=1)
+        assert llm.complete.call_args[0][0] == "CUSTOM test"

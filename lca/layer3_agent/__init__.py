@@ -9,10 +9,18 @@ L3 层职责：
 
 from lca.layer3_agent.orchestration_registry import TeamProcessStrategyRegistry
 from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.supervisor_bind import (
+    SupervisorBinder,
+    SupervisorBindError,
+    default_supervisor_cognition_factory,
+)
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 
 __all__ = [
     "CognitiveAgent",
+    "SupervisorBindError",
+    "SupervisorBinder",
     "TeamOrchestrator",
     "TeamProcessStrategyRegistry",
+    "default_supervisor_cognition_factory",
 ]

@@ -51,7 +51,6 @@ class ActionType(str, Enum):
 | `RoleStatus` | pending, in_progress, done, failed | `status == "done"` |
 | `MemoryLayer` | working, semantic, episodic, procedural | `memory_type = "semantic"` |
 | `ComponentKind` | observability, state_store, memory, ... | `category = "observability"` |
-| `RoleMode` | solo, supervisor, member | `role_mode = "supervisor"` |
 | `NodeType` | entry, exit, agent, router, aggregator | `type="entry"` |
 | `EdgeType` | fixed, conditional, parallel | `type="conditional"` |
 

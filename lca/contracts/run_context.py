@@ -6,24 +6,22 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from lca.contracts.enums import RoleMode
-from lca.contracts.member_status import MemberStatus
-from lca.contracts.role_team import RoleProfile
+from lca.contracts.consultation import ConsultationState
 
 
 @dataclass
 class RunContext:
-    """Metadata for a single ``run`` invocation.
+    """Per-invocation call metadata.
 
-    Replaces free-form ``**context: str`` and the old InvocationContext name.
+    Generic for every agent (solo / member / supervisor). Team
+    *control-plane* state is not flattened here — when the caller is a
+    hierarchical supervisor, pass a single ``consultation`` session
+    object. Member tracing still uses ``from_role`` only.
     """
 
     trace_id: str | None = None
     from_role: str = ""
-    member_status: MemberStatus | None = None
-    teammates: list[RoleProfile] = field(default_factory=list)
-    role_mode: RoleMode = RoleMode.SOLO
     context_refs: list[str] = field(default_factory=list)
     deadline: datetime | None = None
-    delegate_max_attempts: int = 3
+    consultation: ConsultationState | None = None
     extra: dict[str, Any] = field(default_factory=dict)

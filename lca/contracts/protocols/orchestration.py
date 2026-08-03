@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.enums import MemoryLayer, RoleMode
+from lca.contracts.enums import MemoryLayer
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols.agent import AgentUnit
@@ -20,8 +20,9 @@ class TeamContext:
     """编排策略的运行时上下文，由 TeamOrchestrator 构造并传给策略实例。
 
     supervisor 是 AgentUnit —— 组合期由 TeamOrchestrator
-    binds hooks / decision gate; strategies only call run.
-    member_status is the MemberStatus board passed through to the supervisor.
+    binds channel / decision gate / SupervisorReasoner; strategies only call run.
+    member_status is the MemberStatus board passed through to the supervisor
+    as ConsultationState by HierarchicalStrategy.
     """
 
     members: Sequence[AgentUnit] = field(default_factory=list)
@@ -29,7 +30,6 @@ class TeamContext:
     supervisor: AgentUnit | None = None
     transport: AgentTransport | None = None
     teammates: list[RoleProfile] = field(default_factory=list)
-    role_mode: RoleMode = RoleMode.SOLO
     member_status: MemberStatus | None = None
     team_id: str = ""
     shared_memory: SharedMemoryStore | None = None

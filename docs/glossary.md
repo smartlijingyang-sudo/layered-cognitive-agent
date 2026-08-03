@@ -20,7 +20,9 @@
 | **TeamContext** | 策略运行时上下文（原 OrchestrationContext） |
 | **TeamUnit** | 团队入口协议（原 TeamEntrypoint） |
 | **AgentUnit** | 单体入口协议（原 AgentEntrypoint） |
-| **teammates_text** | 写进提示词的「队友是谁」（单一事实源；原 roster_desc） |
+| **teammates_text** | 写进提示词的「队友是谁」（由 `build_teammates_text` 从 ConsultationState.teammates 渲染） |
+| **ConsultationState** / **HierarchicalConsultation** | hierarchical 结算控制面（board / teammates / retry）；字段白名单锁定；solo/member 为 None |
+| **SupervisorBinder** | 组装期绑定 channel + gate + supervisor cognition；失败显式抛 `SupervisorBindError` |
 | **MemberStatus** | 必问成员是否已咨询完毕（原 DelegationLedger / team_progress） |
 | **InMemoryMemberStatus** | MemberStatus 默认不可变实现 |
 | **AgentChannel** / **AgentTransport** | 成员间任务通道；内置 Internal / A2A / MCP Transport |
@@ -29,7 +31,8 @@
 | **DecisionGate** | 决策出/入门硬规则（`enforce` 必选出门校验，`SupportsShortcut` 可选入门快速路径） |
 | **SupportsShortcut** | 可选能力：DecisionGate 在 LLM 之前提供确定性快速路径（`try_shortcut`） |
 | **MustConsultAllMembers** | 未咨询完所有必需角色时禁止 respond（原 RosterCoverage） |
-| **RunContext** | 一次 `run` 的类型化上下文（from_role / member_status / trace_id） |
+| **RunContext** | 一次 `run` 的调用元数据（trace_id / from_role / deadline；可选 consultation） |
+| **SupervisorReasoner** | hierarchical supervisor 专用 Reasoner（hierarchical_prompt + consultation）；组装期绑定 |
 | **TeamConfig** / **RoleProfile** | 团队配置 / 角色画像 |
 | **TeamMessage** / **TeamAssignment** | 跨 Agent 消息 / 分工单元 |
 
@@ -85,7 +88,8 @@
 | **HandoffStrategy** | 交接 TeamProcess 策略 |
 | **SimpleBody** | Body 默认实现 |
 | **SimpleMemorySystem** | MemorySystem 默认实现 |
-| **SimpleReasoner** | Reasoner 默认实现 |
+| **SimpleReasoner** | Reasoner 默认实现（team-agnostic，solo/member） |
+| **SupervisorReasoner** | hierarchical supervisor 专用 Reasoner |
 | **SimpleCritic** | Critic 默认实现 |
 | **SimpleDecisionParser** | DecisionParser 默认实现 |
 | **SimplePromptManager** | PromptManager 默认实现 |

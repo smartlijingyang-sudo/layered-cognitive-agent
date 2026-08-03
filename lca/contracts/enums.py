@@ -149,11 +149,3 @@ class ComponentKind(str, Enum):
     MEMBER_STATUS = "member_status"
     DECISION_GATE = "decision_gate"
     BUDGET_POLICY = "budget_policy"
-
-
-class RoleMode(str, Enum):
-    """Agent 在团队中的角色模式 —— 决定 prompt 模板和队友信息渲染。"""
-
-    SOLO = "solo"
-    SUPERVISOR = "supervisor"
-    MEMBER = "member"

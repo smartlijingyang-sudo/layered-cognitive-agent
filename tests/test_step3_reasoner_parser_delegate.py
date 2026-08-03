@@ -9,28 +9,37 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.enums import RoleMode
+from lca.contracts.consultation import ConsultationState
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import AgentState, Budget
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import (
     SimpleReasoner,
+    SupervisorReasoner,
     build_teammates_text,
 )
+from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
 
 def _make_state(
     task: str = "test task",
     teammates: list[RoleProfile] | None = None,
-    role_mode: RoleMode = RoleMode.SOLO,
+    *,
+    as_supervisor: bool = False,
 ) -> AgentState:
+    consultation = None
+    if as_supervisor:
+        roles = tuple(p.role for p in (teammates or [])) or ("member",)
+        consultation = ConsultationState(
+            member_status=InMemoryMemberStatus(role_order=roles),
+            teammates=list(teammates or []),
+        )
     return AgentState(
         trace_id="test-trace",
         task=task,
         budget=Budget(),
-        role_mode=role_mode,
-        teammates=teammates or [],
+        consultation=consultation,
     )
 
 
@@ -184,9 +193,9 @@ class TestDecisionParserDelegate(unittest.TestCase):
 
 
 class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
-    """SimpleReasoner：teammates_text 存在时使用 hierarchical_prompt 模板。"""
+    """SimpleReasoner is team-agnostic; SupervisorReasoner owns hierarchical prompt."""
 
-    async def test_without_roster_uses_react_prompt(self) -> None:
+    async def test_simple_reasoner_uses_react_prompt(self) -> None:
         captured_prompt: list[str] = []
 
         class FakeLLM:
@@ -208,7 +217,7 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("TEAM_ROSTER", captured_prompt[0])
         self.assertIn("ROLE: supervisor", captured_prompt[0])
 
-    async def test_with_roster_uses_hierarchical_prompt(self) -> None:
+    async def test_supervisor_reasoner_uses_hierarchical_prompt(self) -> None:
         captured_prompt: list[str] = []
 
         class FakeLLM:
@@ -230,7 +239,7 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 tool_permission_manifest=_empty_manifest(),
             ),
         ]
-        reasoner = SimpleReasoner(
+        reasoner = SupervisorReasoner(
             FakeLLM(),
             _make_profile(),
             "search()",
@@ -239,9 +248,7 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 "hierarchical_prompt": load_builtin_prompt("hierarchical_prompt"),
             },
         )
-        await reasoner.generate_candidates(
-            _make_state(teammates=teammates, role_mode=RoleMode.SUPERVISOR)
-        )
+        await reasoner.generate_candidates(_make_state(teammates=teammates, as_supervisor=True))
 
         self.assertEqual(len(captured_prompt), 1)
         prompt = captured_prompt[0]

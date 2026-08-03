@@ -16,7 +16,7 @@ from lca.contracts.budget import (
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
 )
 from lca.contracts.decision import Observation
-from lca.contracts.enums import ComponentKind, HookEvent, MemoryLayer, RoleMode, TeamProcess
+from lca.contracts.enums import ComponentKind, HookEvent, MemoryLayer, TeamProcess
 from lca.contracts.mechanisms import ComponentRegistryProtocol
 from lca.contracts.protocols import (
     AgentTransport,
@@ -302,7 +302,6 @@ class Assembly:
             base_supervisor = _promote_supervisor(supervisor, policy)
         transport = build_team_transport(members)
         teammate_profiles = [m.role_profile for m in members]
-        role_mode = RoleMode.SUPERVISOR if base_supervisor is not None else RoleMode.SOLO
 
         return TeamOrchestrator(
             members,
@@ -311,6 +310,5 @@ class Assembly:
             supervisor=base_supervisor,
             transport=transport,
             teammates=teammate_profiles,
-            role_mode=role_mode,
             strategy=strategy,
         )

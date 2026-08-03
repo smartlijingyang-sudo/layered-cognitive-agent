@@ -5,10 +5,9 @@ not an optional observation. It lives here as a direct function called
 by DelegateOperation, not as a POST_ACT hook.
 
 Retry logic lives here (not on the Board Protocol) to keep the Board
-as a pure state container. Attempt counts are tracked on
-``AgentState.delegate_attempts``, and the max-attempts limit is read
-from ``AgentState.delegate_max_attempts`` (wired through the existing
-TeamConfig → RunContext → AgentState pipe).
+as a pure state container. Attempt counts and max-attempts live on
+``AgentState.consultation`` (``ConsultationState``), the supervisor
+control plane injected by ``HierarchicalStrategy``.
 """
 
 from __future__ import annotations
@@ -41,26 +40,27 @@ def _next_role_status(
 
 
 def update_member_status(state: AgentState, decision: Decision, observation: Observation) -> None:
-    """Update the member status board after a delegate action completes."""
-    board = state.member_status
-    if board is None or decision.delegate_to is None:
+    """Update the consultation board after a delegate action completes."""
+    consultation = state.consultation
+    if consultation is None or decision.delegate_to is None:
         return
+    board = consultation.member_status
     role = decision.delegate_to.target_role
     if role is None or role not in board.required_roles:
         return
 
     if observation.success:
-        state.member_status = board.mark(role, RoleStatus.DONE)
+        consultation.member_status = board.mark(role, RoleStatus.DONE)
         return
 
     failure_kind = observation.extra.get(FAILURE_KIND, FAILURE_KIND_EXECUTION)
-    attempts_after = state.delegate_attempts.get(role, 0) + 1
-    state.delegate_attempts[role] = attempts_after
+    attempts_after = consultation.delegate_attempts.get(role, 0) + 1
+    consultation.delegate_attempts[role] = attempts_after
 
     new_status = _next_role_status(
         success=False,
         failure_kind=failure_kind,
         attempts_after=attempts_after,
-        max_attempts=state.delegate_max_attempts,
+        max_attempts=consultation.delegate_max_attempts,
     )
-    state.member_status = board.mark(role, new_status)
+    consultation.member_status = board.mark(role, new_status)

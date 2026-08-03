@@ -28,6 +28,7 @@ from lca.contracts.protocols.capabilities import (
     HasBrainBodyMemory,
     HasChannel,
     HasHooks,
+    HasReplaceableReasoner,
     HasSharedMemory,
 )
 
@@ -96,6 +97,7 @@ __all__ = [
     "HasBrainBodyMemory",
     "HasChannel",
     "HasHooks",
+    "HasReplaceableReasoner",
     "HasSharedMemory",
     "Hook",
     "HookRegistry",
