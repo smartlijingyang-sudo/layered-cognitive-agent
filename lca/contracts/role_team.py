@@ -57,13 +57,12 @@ class TeamConfig:
     正交维度见 ADR-0027：
     - ``process`` → ``TeamProcessStrategy`` / ``OrchestrationFamily``
     - ``decision_gate`` → SUPERVISOR 结算不变量（默认 none = 业界自由经理）
-    - ``supervisor_plane`` → consultation（已实现）vs routing（预留）
+    - ``supervisor_plane`` → consultation vs routing（均已实现）
     """
 
     process: TeamProcess
     shared_memory_layers: list[MemoryLayer] = field(default_factory=list)
     max_rounds: int | None = None
-    graph_definition_ref: str | None = None
     decision_gate: DecisionGateName = DecisionGateName.NONE
     delegate_max_attempts: int = 3
     supervisor_plane: SupervisorPlane = SupervisorPlane.CONSULTATION

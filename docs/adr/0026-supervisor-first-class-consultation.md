@@ -113,7 +113,7 @@ CONSULTATION_FIELD_WHITELIST = {
 }
 ```
 
-- 别名：`HierarchicalConsultation = ConsultationState`（新代码优先用此名强调范围）
+- 类型名：`ConsultationState`（无过渡别名）
 - CI：`assert_consultation_field_whitelist()` + `tests/test_supervisor_bind.py`
 - **禁止**把 debate / handoff / group-chat / graph cursor 塞进该类型；
   那些属于对应 `TeamProcessStrategy` 的 strategy-local state 或独立 Session 类型
@@ -142,7 +142,7 @@ SupervisorBinder.bind(supervisor, transport=..., policy=...)
 
 | 体制 | 状态放哪 | 不要放哪 |
 |---|---|---|
-| hierarchical 结算 | `ConsultationState` / `HierarchicalConsultation` | — |
+| hierarchical 结算 | `ConsultationState` | — |
 | sequential/parallel/handoff | strategy + `invoke_member`（agent 无 consultation） | ConsultationState |
 | debate / group chat / graph | 专用 Session 或 strategy-local | ConsultationState / SimpleReasoner |
 

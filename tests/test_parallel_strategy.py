@@ -14,8 +14,11 @@ from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
-from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
+from lca.layer3_agent.orchestration_strategies import (
+    ParallelStrategy,
+)
 from lca.layer4_app.defaults import build_default_registries
+from tests.support.team_context import team_context_with_transport
 
 _REGISTRIES = build_default_registries()
 
@@ -34,6 +37,8 @@ def _make_result(trace_id: str, output: str) -> Result:
 def _make_agent(trace_id: str, output: str, delay: float = 0.0):
     """构建 CognitiveAgent 桩件，run 返回指定 Result。"""
     agent = MagicMock()
+    agent.role_profile = MagicMock()
+    agent.role_profile.role = trace_id
 
     async def _execute(task: str) -> Result:
         if delay > 0:
@@ -51,8 +56,8 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("trace-a", "result-a", delay=0.05)
         agent_b = _make_agent("trace-b", "result-b", delay=0.05)
 
-        strategy = ChoreographyStrategy("parallel")
-        context = TeamContext(members=[agent_a, agent_b])
+        strategy = ParallelStrategy()
+        context = team_context_with_transport([agent_a, agent_b])
 
         result = await strategy.run(context, "test objective")
 
@@ -66,14 +71,14 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("trace-b", "second")
         agent_c = _make_agent("trace-c", "third")
 
-        strategy = ChoreographyStrategy("parallel")
-        context = TeamContext(members=[agent_a, agent_b, agent_c])
+        strategy = ParallelStrategy()
+        context = team_context_with_transport([agent_a, agent_b, agent_c])
 
         result = await strategy.run(context, "task")
         self.assertEqual(result.output, "third")
 
     async def test_parallel_empty_members_returns_failed(self) -> None:
-        strategy = ChoreographyStrategy("parallel")
+        strategy = ParallelStrategy()
         context = TeamContext(members=[])
 
         result = await strategy.run(context, "task")
@@ -82,8 +87,8 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
     async def test_parallel_single_member(self) -> None:
         agent = _make_agent("trace-only", "solo-result")
-        strategy = ChoreographyStrategy("parallel")
-        context = TeamContext(members=[agent])
+        strategy = ParallelStrategy()
+        context = team_context_with_transport([agent])
 
         result = await strategy.run(context, "solo task")
         self.assertEqual(result.output, "solo-result")
@@ -98,8 +103,8 @@ class TestParallelStrategyConcurrency(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("trace-b", "b", delay=delay)
         agent_c = _make_agent("trace-c", "c", delay=delay)
 
-        strategy = ChoreographyStrategy("parallel")
-        context = TeamContext(members=[agent_a, agent_b, agent_c])
+        strategy = ParallelStrategy()
+        context = team_context_with_transport([agent_a, agent_b, agent_c])
 
         start = asyncio.get_event_loop().time()
         await strategy.run(context, "task")
@@ -119,7 +124,7 @@ class TestParallelStrategyRegistration(unittest.TestCase):
     def test_parallel_resolves_correctly(self) -> None:
         registry = _REGISTRIES.orchestration
         strategy = registry.resolve("parallel")
-        self.assertIsInstance(strategy, ChoreographyStrategy)
+        self.assertIsInstance(strategy, ParallelStrategy)
 
 
 class TestParallelStrategyTraceIsolation(unittest.IsolatedAsyncioTestCase):
@@ -141,8 +146,8 @@ class TestParallelStrategyTraceIsolation(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_tracked_agent("trace-alpha")
         agent_b = _make_tracked_agent("trace-beta")
 
-        strategy = ChoreographyStrategy("parallel")
-        context = TeamContext(members=[agent_a, agent_b])
+        strategy = ParallelStrategy()
+        context = team_context_with_transport([agent_a, agent_b])
         await strategy.run(context, "task")
 
         self.assertEqual(set(traces_seen), {"trace-alpha", "trace-beta"})

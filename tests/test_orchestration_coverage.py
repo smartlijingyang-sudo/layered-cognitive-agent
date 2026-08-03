@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.enums import TeamProcess
 from lca.layer4_app.defaults import build_default_registries
+from tests.support.team_context import team_context_with_transport
 
 _REGISTRIES = build_default_registries()
 
@@ -63,13 +64,16 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_debate_strategy_is_functional(self) -> None:
         """DebateStrategy 已落地实现，run() 不再抛 NotImplementedError。"""
-        from lca.contracts.protocols import TeamContext
         from lca.contracts.result import Result
         from lca.contracts.state import Budget
-        from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
+        from lca.layer3_agent.orchestration_strategies import (
+            DebateStrategy,
+        )
 
-        strategy = ChoreographyStrategy("debate")
+        strategy = DebateStrategy()
         agent = MagicMock()
+        agent.role_profile = MagicMock()
+        agent.role_profile.role = "debater"
 
         async def _execute(task: str) -> Result:
             return Result(
@@ -82,7 +86,7 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
             )
 
         agent.run = AsyncMock(side_effect=_execute)
-        context = TeamContext(members=[agent])
+        context = team_context_with_transport([agent])
         result = await strategy.run(context, "test")
         self.assertEqual(result.status, "completed")
 

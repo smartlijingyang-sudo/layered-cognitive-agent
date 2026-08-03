@@ -33,13 +33,14 @@ def extract_span_attributes(event_name: str, kwargs: dict[str, Any]) -> dict[str
             attrs["response_preview"] = truncate(sanitize(str(decision.response_text)))
         if hasattr(decision, "tool_name") and decision.tool_name:
             attrs["tool_name"] = decision.tool_name
-        delegate_to = getattr(decision, "delegate_to", None)
-        if delegate_to is not None:
-            target = getattr(delegate_to, "target_role", None) or getattr(
-                delegate_to, "target_agent_id", None
-            )
+        delegations = getattr(decision, "delegations", None) or []
+        if delegations:
+            first = delegations[0]
+            target = getattr(first, "target_role", None) or getattr(first, "target_agent_id", None)
             if target:
-                attrs["delegate_to"] = target
+                attrs["delegate_target"] = target
+            if len(delegations) > 1:
+                attrs["delegate_count"] = len(delegations)
 
     error = kwargs.get("error")
     if error is not None:

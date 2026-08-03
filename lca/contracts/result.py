@@ -49,7 +49,12 @@ class Result:
     @classmethod
     def from_observation(cls, observation: Observation, task_id: str) -> Result:
         """Bridge an Observation from the channel path into a Result."""
-        status = TaskStatus.COMPLETED if observation.success else TaskStatus.FAILED
+        extra = observation.extra or {}
+        source_status = extra.get("source_status")
+        if isinstance(source_status, TaskStatus):
+            status = source_status
+        else:
+            status = TaskStatus.COMPLETED if observation.success else TaskStatus.FAILED
         payload = observation.payload
         if isinstance(payload, str):
             output: str | None = payload
@@ -57,12 +62,14 @@ class Result:
             output = str(payload)
         else:
             output = None
+        total_steps = int(extra.get("source_total_steps") or 1)
+        trace_id = str(extra.get("source_trace_id") or new_id("trace"))
         return cls(
-            trace_id=new_id("trace"),
+            trace_id=trace_id,
             status=status,
-            final_state_ref=f"transport://{task_id}",
-            total_steps=1,
-            budget_used=Budget(used_steps=1),
+            final_state_ref=f"transport://{task_id or observation.observation_id}",
+            total_steps=total_steps,
+            budget_used=Budget(used_steps=total_steps),
             output=output,
             error=observation.error,
         )

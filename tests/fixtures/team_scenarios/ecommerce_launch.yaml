@@ -95,7 +95,7 @@ cases:
     team: hierarchical
     objective: "新品：无线降噪耳机，目标市场：东南亚，请给出是否上市的完整评估"
     assertions:
-      min_steps: 4
+      min_steps: 2
       status: completed
 
   sequential_pipeline:

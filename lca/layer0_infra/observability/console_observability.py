@@ -25,7 +25,7 @@ class ConsoleObservability(Observability):
 
         # 构建关键属性摘要
         key_attrs = {}
-        for k in ("action_type", "delegate_to", "tool_name", "task_preview"):
+        for k in ("action_type", "delegate_target", "delegate_count", "tool_name", "task_preview"):
             v = span.attributes.get(k)
             if v is not None:
                 key_attrs[k] = v

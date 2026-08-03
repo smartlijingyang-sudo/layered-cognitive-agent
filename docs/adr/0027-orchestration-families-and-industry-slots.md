@@ -47,7 +47,7 @@ fan-out、纯 swarm”时会再次污染 `ConsultationState` 或 `SimpleReasoner
 | Family | 控制面 / Session | 禁止 |
 |---|---|---|
 | SUPERVISOR · consultation | `ConsultationState`（白名单锁定） | 塞 debate/graph/swarm 字段 |
-| SUPERVISOR · routing（预留） | 未来 `RoutingState`（独立类型） | 扩 `ConsultationState` 白名单冒充 |
+| SUPERVISOR · routing | `RoutingState`（独立类型，已实现） | 扩 `ConsultationState` 白名单冒充 |
 | CHOREOGRAPHY | strategy-local / 无 agent session | 往 `AgentState.consultation` 写 |
 | PEER | 未来 `PeerSession` 或 handoff 链状态 | 与 consultation 混用 |
 | GRAPH | graph cursor / `ExecutionGraph` 运行态 | 塞进 Consultation |
@@ -65,8 +65,8 @@ fan-out、纯 swarm”时会再次污染 `ConsultationState` 或 `SimpleReasoner
 | **Process / Family** | `TeamConfig.process` → Strategy 注册表 | Crew Process / LangGraph 模板 |
 | **Settlement / Gate** | `TeamConfig.decision_gate` | 强不变量 vs 自由路由 |
 | **Transport** | `DelegationProtocol` + TransportRegistry | internal / A2A / MCP |
-| **Supervisor plane**（预留枚举） | `SupervisorPlane` | consultation vs free routing |
-| **Invoke shape**（预留） | 单 DELEGATE vs multi fan-out | 并行 subagents |
+| **Supervisor plane** | `SupervisorPlane` | consultation vs free routing |
+| **Invoke shape** | `Decision.delegations`（0/1/N）+ `send_and_wait` | 并行 subagents |
 
 默认对齐业界自由 supervisor：
 
@@ -101,7 +101,7 @@ fan-out、纯 swarm”时会再次污染 `ConsultationState` 或 `SimpleReasoner
 | 值 | 状态 |
 |---|---|
 | `consultation` | **已实现**（当前 hierarchical 默认 plane） |
-| `routing` | **预留**；启用前必须落地 RoutingState + binder 规则 |
+| `routing` | **已实现**（`RoutingState` + plane=ROUTING + gate none） |
 
 实现某预留名时：升为 `TeamProcess` 成员、注册 strategy、补映射与测试，
 并更新本 ADR 后果表。
@@ -113,11 +113,11 @@ fan-out、纯 swarm”时会再次污染 `ConsultationState` 或 `SimpleReasoner
 | Crew sequential | CHOREOGRAPHY | `process=sequential` | 已实现 |
 | Crew hierarchical（自由经理） | SUPERVISOR | `hierarchical` + `decision_gate=none` | 已实现（gate 默认 none） |
 | Crew hierarchical（强制全员） | SUPERVISOR | `hierarchical` + `must_consult_all` | 已实现 |
-| LangGraph supervisor node | SUPERVISOR | 同上；并行待 multi-delegate | 串行 DELEGATE |
+| LangGraph supervisor node | SUPERVISOR | 同上；multi-delegate via `delegations` | 已实现 |
 | LangGraph subagents-as-tools | SUPERVISOR | DELEGATE / Transport | 已实现（阻塞） |
 | parallel scatter-gather | CHOREOGRAPHY | `process=parallel` | 已实现 |
-| Swarm peer handoff | PEER | `process=handoff`；未来 `swarm` | handoff 弱实现 |
-| 任意 DAG | GRAPH | `process=graph` | 部分实现 |
+| Swarm peer handoff | PEER | `process=handoff` / `process=swarm` | 已实现 |
+| 任意 DAG | GRAPH | `process=graph` + `execution_graph=` | 已实现 |
 | nested supervisors | SUPERVISOR | 未来嵌套 TeamUnit / subgraph | 未实现（插槽：routing + graph） |
 
 ## 放弃的方案
@@ -135,7 +135,7 @@ fan-out、纯 swarm”时会再次污染 `ConsultationState` 或 `SimpleReasoner
   - 框架上 gate / process / plane / transport 正交，默认贴近自由 supervisor
 - **负面 / 迁移**：
   - `decision_gate` 默认从 `must_consult_all` 改为 `none`：依赖隐式全员结算的调用方须显式打开
-  - `handoff` 的 Family 标为 PEER 但实现仍走 ChoreographyStrategy：文档承认 gap，后续可迁出
+  - `handoff` / `swarm` 已迁至独立 PEER strategy 类（见 ADR-0028 cleanup）
 - **与既有 ADR**：
   - 延续 ADR-0006 的 process 可插拔
   - 强化 ADR-0026 的 session 隔离

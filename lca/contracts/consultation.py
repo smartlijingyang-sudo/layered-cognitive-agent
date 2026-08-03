@@ -1,10 +1,10 @@
 """SUPERVISOR-family consultation control-plane session (ADR-0026 / ADR-0027).
 
-``ConsultationState`` (alias ``HierarchicalConsultation``) is **only** for
-``SupervisorPlane.CONSULTATION``: required-role settlement, teammate roster
-for the supervisor prompt, and delegate retry counters.
+``ConsultationState`` is **only** for ``SupervisorPlane.CONSULTATION``:
+required-role settlement, teammate roster for the supervisor prompt, and
+delegate retry counters.
 
-Free industry-style routing belongs in a future ``RoutingState``
+Free industry-style routing belongs in ``RoutingState``
 (``SupervisorPlane.ROUTING``), not here.
 
 It is intentionally **not** a generic multi-agent session bag.
@@ -56,10 +56,6 @@ class ConsultationState:
     teammates: list[RoleProfile] = field(default_factory=list)
     delegate_max_attempts: int = 3
     delegate_attempts: dict[str, int] = field(default_factory=dict)
-
-
-# Prefer this name in new code when you need to stress hierarchical-only scope.
-HierarchicalConsultation = ConsultationState
 
 
 def assert_consultation_field_whitelist() -> None:

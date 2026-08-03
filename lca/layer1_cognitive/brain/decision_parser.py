@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+from typing import Any
 
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Decision, DelegationSpec, ToolCall
@@ -24,15 +25,15 @@ _DEFAULT_CONFIDENCE = 0.5
 class SimpleDecisionParser(DecisionParser):
     """稳健 JSON 解析器：别名归一化 + Registry 校验 + 失败兜底。
 
-    当提供 ActionRegistry 时，解析器会校验 action_type 是否已注册；
-    未注册的 action_type 不会被强行改写，而是在 extra 中标记原始值，
-    交由韧性层（FallbackActionPolicy）决定降级策略。
+    When provided an ActionRegistry, validates action_type registration;
+    unregistered types are marked in extra for FallbackActionPolicy.
     """
 
     def __init__(self, action_registry: ActionRegistryProtocol | None = None) -> None:
         self._action_registry = action_registry
 
     def parse(self, raw_output: str, state: AgentState) -> Decision:
+        del state
         json_str = self._extract_json(raw_output)
         try:
             data = json.loads(json_str)
@@ -75,49 +76,63 @@ class SimpleDecisionParser(DecisionParser):
             else:
                 action_type = ActionType.RESPOND
 
-        delegate_to: DelegationSpec | None = None
-        delegate_targets: list[DelegationSpec] = []
+        delegations: list[DelegationSpec] = []
         if action_type in (ActionType.DELEGATE, ActionType.HANDOFF):
-            multi = data.get("delegate_targets") or data.get("delegates")
-            if isinstance(multi, list) and multi:
-                for item in multi:
-                    if not isinstance(item, dict):
-                        continue
-                    refs = item.get("context_refs") or item.get("context") or []
-                    if not isinstance(refs, list):
-                        refs = [str(refs)]
-                    delegate_targets.append(
-                        DelegationSpec(
-                            subtask=str(item.get("subtask", "")),
-                            target_role=item.get("target_role"),
-                            context_refs=refs,
-                        )
-                    )
-                if delegate_targets:
-                    delegate_to = delegate_targets[0]
-            else:
-                subtask = data.get("subtask", "")
-                target_role = data.get("target_role")
-                context_refs = data.get("context_refs") or data.get("context") or []
-                if not isinstance(context_refs, list):
-                    context_refs = [str(context_refs)]
-                delegate_to = DelegationSpec(
-                    subtask=subtask,
-                    target_role=target_role,
-                    context_refs=context_refs,
-                )
+            delegations = self._parse_delegations(data)
 
         return Decision(
             decision_id=new_id("dec"),
             action_type=action_type,
             tool_calls=tool_calls,
-            delegate_to=delegate_to,
-            delegate_targets=delegate_targets,
+            delegations=delegations,
             response_text=data.get("response_text") or data.get("response") or data.get("text"),
             rationale=data.get("rationale", ""),
             confidence=float(data.get("confidence", _DEFAULT_CONFIDENCE)),
             extra=extra,
         )
+
+    @staticmethod
+    def _parse_delegations(data: dict[str, Any]) -> list[DelegationSpec]:
+        """Normalize LLM JSON into Decision.delegations only.
+
+        Accepted JSON shapes:
+        - ``delegations`` list of objects (preferred multi-target form)
+        - flat single: target_role + subtask (+ optional context_refs)
+        """
+        multi = data.get("delegations")
+        if isinstance(multi, list) and multi:
+            out: list[DelegationSpec] = []
+            for item in multi:
+                if not isinstance(item, dict):
+                    continue
+                refs = item.get("context_refs") or item.get("context") or []
+                if not isinstance(refs, list):
+                    refs = [str(refs)]
+                out.append(
+                    DelegationSpec(
+                        subtask=str(item.get("subtask", "")),
+                        target_role=item.get("target_role"),
+                        context_refs=refs,
+                    )
+                )
+            return out
+
+        subtask = data.get("subtask", "")
+        target_role = data.get("target_role")
+        context_refs = data.get("context_refs") or data.get("context") or []
+        if not isinstance(context_refs, list):
+            context_refs = [str(context_refs)]
+        # Single-target flat form always yields one entry when any target signal exists
+        # or subtask is present (existing parser behavior for handoff/delegate).
+        if target_role is not None or subtask or context_refs:
+            return [
+                DelegationSpec(
+                    subtask=str(subtask),
+                    target_role=target_role,
+                    context_refs=context_refs,
+                )
+            ]
+        return []
 
     @staticmethod
     def _extract_json(text: str) -> str:

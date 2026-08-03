@@ -6,7 +6,6 @@ from lca.contracts.budget import create_budget
 from lca.contracts.consultation import (
     CONSULTATION_FIELD_WHITELIST,
     ConsultationState,
-    HierarchicalConsultation,
     assert_consultation_field_whitelist,
 )
 from lca.contracts.decision import (
@@ -15,7 +14,6 @@ from lca.contracts.decision import (
     Observation,
     Reflection,
     ToolCall,
-    iter_delegation_specs,
 )
 from lca.contracts.graph import (
     ExecutionGraph,
@@ -99,7 +97,6 @@ __all__ = [
     "GraphEdge",
     "GraphNode",
     "GraphValidationError",
-    "HierarchicalConsultation",
     "Hook",
     "HookRegistry",
     "MemberStatus",
@@ -135,5 +132,4 @@ __all__ = [
     "assert_routing_field_whitelist",
     "create_budget",
     "family_of",
-    "iter_delegation_specs",
 ]

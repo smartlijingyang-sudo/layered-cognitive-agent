@@ -51,10 +51,8 @@ class DelegationSpec:
 class Decision:
     """One step's chosen action: type + rationale + tool calls / delegation.
 
-    Delegation:
-    - ``delegate_to``: single target (backward compatible).
-    - ``delegate_targets``: multi fan-out (parallel DELEGATE). When non-empty,
-      it is the source of truth; ``delegate_to`` should mirror the first entry.
+    ``delegations`` is the sole representation of DELEGATE/HANDOFF targets:
+    empty = none, one entry = single target, multiple = fan-out.
     """
 
     decision_id: str
@@ -62,21 +60,11 @@ class Decision:
     rationale: str
     confidence: float
     tool_calls: list[ToolCall] = field(default_factory=list)
-    delegate_to: DelegationSpec | None = None
-    delegate_targets: list[DelegationSpec] = field(default_factory=list)
+    delegations: list[DelegationSpec] = field(default_factory=list)
     response_text: str | None = None
     schema_version: str = "1.0"
     created_at: datetime = field(default_factory=utc_now)
     extra: dict[str, Any] = field(default_factory=dict)
-
-
-def iter_delegation_specs(decision: Decision) -> list[DelegationSpec]:
-    """Normalize single + multi delegation into an ordered list."""
-    if decision.delegate_targets:
-        return list(decision.delegate_targets)
-    if decision.delegate_to is not None:
-        return [decision.delegate_to]
-    return []
 
 
 @dataclass
@@ -104,6 +92,11 @@ class Observation:
             success=result.status == TaskStatus.COMPLETED,
             payload=result.output,
             error=result.error,
+            extra={
+                "source_trace_id": result.trace_id,
+                "source_total_steps": result.total_steps,
+                "source_status": result.status,
+            },
         )
 
 

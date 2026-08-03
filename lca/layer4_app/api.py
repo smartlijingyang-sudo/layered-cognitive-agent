@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
 from lca.contracts.enums import DecisionGateName, MemoryLayer, TeamProcess
+from lca.contracts.graph import ExecutionGraph
 from lca.contracts.orchestration_taxonomy import SupervisorPlane
 from lca.contracts.protocols import (
     Brain,
@@ -131,16 +132,16 @@ class MultiAgentTeam:
         Maximum coordination rounds; ``None`` for unlimited.
     shared_memory_layers:
         Memory layers shared across team members.
-    graph_definition_ref:
-        Reference to a graph definition (for ``GRAPH`` process).
+    execution_graph:
+        Required when ``process=GRAPH`` (unless a custom *strategy* is passed).
     strategy:
         Optional custom ``TeamProcessStrategy`` override.
     decision_gate:
         SUPERVISOR settlement strength. Default ``none`` (free supervisor).
         Use ``must_consult_all`` for full consultation compliance.
     supervisor_plane:
-        SUPERVISOR control-plane kind. Only ``consultation`` is implemented;
-        ``routing`` is reserved (ADR-0027).
+        SUPERVISOR control-plane kind: ``consultation`` (settlement board)
+        or ``routing`` (free PM). Illegal with non-none gate under routing.
     delegate_max_attempts:
         Per-role delegate retries on the consultation board.
     assembly:
@@ -155,7 +156,7 @@ class MultiAgentTeam:
         supervisor: Agent | None = None,
         max_rounds: int | None = None,
         shared_memory_layers: list[MemoryLayer] | None = None,
-        graph_definition_ref: str | None = None,
+        execution_graph: ExecutionGraph | None = None,
         strategy: TeamProcessStrategy | None = None,
         decision_gate: DecisionGateName | None = None,
         supervisor_plane: SupervisorPlane | None = None,
@@ -171,7 +172,7 @@ class MultiAgentTeam:
             supervisor=base_supervisor,
             max_rounds=max_rounds,
             shared_memory_layers=shared_memory_layers,
-            graph_definition_ref=graph_definition_ref,
+            execution_graph=execution_graph,
             strategy=strategy,
             decision_gate=decision_gate,
             supervisor_plane=supervisor_plane,

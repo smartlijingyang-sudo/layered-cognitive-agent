@@ -15,8 +15,9 @@ from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer3_agent.orchestration_strategies import PeerStrategy
+from lca.layer3_agent.orchestration_strategies import HandoffStrategy
 from lca.layer4_app.defaults import build_default_registries
+from tests.support.team_context import team_context_with_transport
 
 _REGISTRIES = build_default_registries()
 
@@ -52,8 +53,8 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("triage", "routed")
         agent_b = _make_agent("expert", "should not run")
 
-        strategy = PeerStrategy("handoff")
-        context = TeamContext(members=[agent_a, agent_b])
+        strategy = HandoffStrategy()
+        context = team_context_with_transport([agent_a, agent_b])
 
         result = await strategy.run(context, "customer question")
 
@@ -67,8 +68,8 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("triage", "", status=TaskStatus.FAILED)
         agent_b = _make_agent("expert", "handled by expert")
 
-        strategy = PeerStrategy("handoff")
-        context = TeamContext(members=[agent_a, agent_b])
+        strategy = HandoffStrategy()
+        context = team_context_with_transport([agent_a, agent_b])
 
         result = await strategy.run(context, "complex question")
 
@@ -80,15 +81,15 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("a", "", status=TaskStatus.FAILED)
         agent_b = _make_agent("b", "", status=TaskStatus.FAILED)
 
-        strategy = PeerStrategy("handoff")
-        context = TeamContext(members=[agent_a, agent_b])
+        strategy = HandoffStrategy()
+        context = team_context_with_transport([agent_a, agent_b])
 
         result = await strategy.run(context, "task")
 
         self.assertEqual(result.status, "failed")
 
     async def test_empty_members_returns_failed(self) -> None:
-        strategy = PeerStrategy("handoff")
+        strategy = HandoffStrategy()
         context = TeamContext(members=[])
 
         result = await strategy.run(context, "task")
@@ -98,8 +99,8 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
     async def test_single_member(self) -> None:
         agent = _make_agent("solo", "solo result")
-        strategy = PeerStrategy("handoff")
-        context = TeamContext(members=[agent])
+        strategy = HandoffStrategy()
+        context = team_context_with_transport([agent])
 
         result = await strategy.run(context, "task")
 
@@ -154,7 +155,7 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
             action_type="handoff",
             rationale="route to expert",
             confidence=0.9,
-            delegate_to=DelegationSpec(subtask="help me", target_role="expert"),
+            delegations=[DelegationSpec(subtask="help me", target_role="expert")],
         )
         state = MagicMock()
 
@@ -210,7 +211,7 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
             action_type="handoff",
             rationale="handoff to expert",
             confidence=0.9,
-            delegate_to=DelegationSpec(subtask="help", target_role="expert"),
+            delegations=[DelegationSpec(subtask="help", target_role="expert")],
         )
         brain.think = AsyncMock(return_value=decision)
         brain.reflect = AsyncMock(
@@ -247,7 +248,7 @@ class TestHandoffRegistration(unittest.TestCase):
     def test_handoff_resolves(self) -> None:
         registry = _REGISTRIES.orchestration
         strategy = registry.resolve("handoff")
-        self.assertIsInstance(strategy, PeerStrategy)
+        self.assertIsInstance(strategy, HandoffStrategy)
 
 
 if __name__ == "__main__":

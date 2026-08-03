@@ -13,7 +13,10 @@ from lca.contracts.protocols import Synthesizer, TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
-from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
+from lca.layer3_agent.orchestration_strategies import (
+    ParallelStrategy,
+)
+from tests.support.team_context import team_context_with_transport
 
 
 def _make_result(
@@ -157,8 +160,8 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t2", "Result B")),
             _FakeMember(_make_result("t3", "Result C")),
         ]
-        context = TeamContext(members=members)
-        strategy = ChoreographyStrategy("parallel", synthesizer=ConcatSynthesizer())
+        context = team_context_with_transport(members)
+        strategy = ParallelStrategy(synthesizer=ConcatSynthesizer())
 
         result = await strategy.run(context, "test task")
 
@@ -174,8 +177,8 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t1", "Result A")),
             _FakeMember(_make_result("t2", "Result B")),
         ]
-        context = TeamContext(members=members)
-        strategy = ChoreographyStrategy("parallel")
+        context = team_context_with_transport(members)
+        strategy = ParallelStrategy()
 
         result = await strategy.run(context, "test task")
 
@@ -184,7 +187,7 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
     async def test_parallel_empty_members(self) -> None:
         """空成员列表应返回 failed。"""
         context = TeamContext(members=[])
-        strategy = ChoreographyStrategy("parallel", synthesizer=ConcatSynthesizer())
+        strategy = ParallelStrategy(synthesizer=ConcatSynthesizer())
 
         result = await strategy.run(context, "test task")
 
@@ -215,9 +218,9 @@ class TestSynthesizerProtocol(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t1", "First")),
             _FakeMember(_make_result("t2", "Second")),
         ]
-        context = TeamContext(members=members)
+        context = team_context_with_transport(members)
         # 测试用内部类满足 Synthesizer Protocol 但 mypy 无法推断结构子类型
-        strategy = ChoreographyStrategy("parallel", synthesizer=first_synth)  # type: ignore[arg-type]
+        strategy = ParallelStrategy(synthesizer=first_synth)  # type: ignore[arg-type]
 
         result = await strategy.run(context, "test")
 

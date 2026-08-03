@@ -17,7 +17,7 @@ from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManif
 from lca.contracts.state import Budget
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
-from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 from lca.layer4_app.assembly import build_team_transport
 from lca.layer4_app.defaults import build_default_registries

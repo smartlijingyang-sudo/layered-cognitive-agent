@@ -20,6 +20,7 @@ from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import Budget
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
+from tests.support.team_context import team_context_with_transport
 
 
 def _make_role_profile(role: str) -> RoleProfile:
@@ -185,7 +186,7 @@ class TestGraphStrategyLinearExecution(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="writer", target="exit"))
 
         strategy = GraphStrategy(execution_graph=graph)
-        context = TeamContext(members=[agent_a, agent_w])
+        context = team_context_with_transport([agent_a, agent_w])
 
         result = await strategy.run(context, "write a report")
 
@@ -225,7 +226,7 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="reviewer", target="exit"))
 
         strategy = GraphStrategy(execution_graph=graph)
-        context = TeamContext(members=[agent_a, agent_b])
+        context = team_context_with_transport([agent_a, agent_b])
 
         result = await strategy.run(context, "task")
 
@@ -256,7 +257,7 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="skip_me", target="exit"))
 
         strategy = GraphStrategy(execution_graph=graph)
-        context = TeamContext(members=[agent_a, agent_s])
+        context = team_context_with_transport([agent_a, agent_s])
 
         result = await strategy.run(context, "task")
 
@@ -284,7 +285,7 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="c", target="exit"))
 
         strategy = GraphStrategy(execution_graph=graph)
-        context = TeamContext(members=[agent_b, agent_c])
+        context = team_context_with_transport([agent_b, agent_c])
 
         result = await strategy.run(context, "task")
 
@@ -321,7 +322,7 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="c", target="exit"))
 
         strategy = GraphStrategy(execution_graph=graph)
-        context = TeamContext(members=[agent_b, agent_c])
+        context = team_context_with_transport([agent_b, agent_c])
 
         start = asyncio.get_event_loop().time()
         await strategy.run(context, "task")

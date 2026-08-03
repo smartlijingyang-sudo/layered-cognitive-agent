@@ -17,7 +17,7 @@ from lca.contracts.protocols.capabilities import (
 )
 from lca.contracts.protocols.cognition import DecisionGate, SupportsDecisionGate
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner, SupervisorReasoner
-from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.cognitive_agent import CognitiveAgent
 
 SupervisorCognitionFactory = Callable[[Reasoner], Reasoner]
 

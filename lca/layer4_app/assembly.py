@@ -23,6 +23,7 @@ from lca.contracts.enums import (
     MemoryLayer,
     TeamProcess,
 )
+from lca.contracts.graph import ExecutionGraph
 from lca.contracts.mechanisms import ComponentRegistryProtocol
 from lca.contracts.orchestration_taxonomy import SupervisorPlane
 from lca.contracts.protocols import (
@@ -58,8 +59,9 @@ from lca.layer2_runtime.default_loop_judge import DefaultStopRule
 from lca.layer2_runtime.event_emission import make_event_emitting_hook
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.orchestration_registry import OrchestrationFactory
-from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.orchestration_strategies.graph import GraphStrategy
 from lca.layer4_app.defaults import build_default_registries
 
 T = TypeVar("T")
@@ -285,7 +287,7 @@ class Assembly:
         supervisor: CognitiveAgent | None = None,
         max_rounds: int | None = None,
         shared_memory_layers: list[MemoryLayer] | None = None,
-        graph_definition_ref: str | None = None,
+        execution_graph: ExecutionGraph | None = None,
         strategy: TeamProcessStrategy | None = None,
         decision_gate: DecisionGateName | None = None,
         supervisor_plane: SupervisorPlane | None = None,
@@ -296,22 +298,38 @@ class Assembly:
         Settlement / plane knobs (ADR-0027) are orthogonal to *process*:
         free supervisor = default gate none; consultation compliance =
         ``decision_gate=must_consult_all``.
+
+        ``process=GRAPH`` requires ``execution_graph`` (or an explicit *strategy*).
         """
         from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 
         process_val = process if process is not None else TeamProcess.HIERARCHICAL
+        gate = decision_gate if decision_gate is not None else DecisionGateName.NONE
+        plane = supervisor_plane if supervisor_plane is not None else SupervisorPlane.CONSULTATION
+        if plane is SupervisorPlane.ROUTING and gate is not DecisionGateName.NONE:
+            raise ValueError(
+                "SupervisorPlane.ROUTING does not support settlement gates; "
+                "use decision_gate=none or supervisor_plane=CONSULTATION"
+            )
+
         config = TeamConfig(
             process=process_val,
             max_rounds=max_rounds,
             shared_memory_layers=list(shared_memory_layers or []),
-            graph_definition_ref=graph_definition_ref,
-            decision_gate=decision_gate if decision_gate is not None else DecisionGateName.NONE,
-            supervisor_plane=supervisor_plane
-            if supervisor_plane is not None
-            else SupervisorPlane.CONSULTATION,
+            decision_gate=gate,
+            supervisor_plane=plane,
         )
         if delegate_max_attempts is not None:
             config.delegate_max_attempts = delegate_max_attempts
+
+        resolved_strategy = strategy
+        if resolved_strategy is None and process_val is TeamProcess.GRAPH:
+            if execution_graph is None:
+                raise ValueError(
+                    "process=GRAPH requires execution_graph= (or pass strategy=GraphStrategy(...))"
+                )
+            resolved_strategy = GraphStrategy(execution_graph=execution_graph)
+
         base_supervisor: CognitiveAgent | None = None
         if supervisor is not None:
             policy = _resolve_component(
@@ -331,5 +349,5 @@ class Assembly:
             supervisor=base_supervisor,
             transport=transport,
             teammates=teammate_profiles,
-            strategy=strategy,
+            strategy=resolved_strategy,
         )

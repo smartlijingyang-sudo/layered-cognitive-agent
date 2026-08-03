@@ -15,7 +15,7 @@ from lca.contracts.budget import (
     SUPERVISOR_MIN_MAX_STEPS,
 )
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer4_app.assembly import _promote_supervisor
 from lca.layer4_app.policies import SupervisorBudgetPolicy
 

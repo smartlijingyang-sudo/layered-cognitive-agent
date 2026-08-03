@@ -39,7 +39,7 @@ def _make_state() -> AgentState:
 
 def _make_decision(
     action_type: str = "delegate",
-    delegate_to: DelegationSpec | None = None,
+    delegations: list[DelegationSpec] | None = None,
     tool_calls: list[ToolCall] | None = None,
 ) -> Decision:
     return Decision(
@@ -48,7 +48,7 @@ def _make_decision(
         rationale="test",
         confidence=1.0,
         tool_calls=tool_calls or [],
-        delegate_to=delegate_to,
+        delegations=list(delegations or []),
     )
 
 
@@ -76,7 +76,7 @@ class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
         )
 
         spec = DelegationSpec(subtask="分析数据", target_agent_id="researcher")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         obs = await body.act(decision, _make_state())
 
@@ -92,7 +92,7 @@ class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
         )
 
         spec = DelegationSpec(subtask="分析", target_role="analyst")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         obs = await body.act(decision, _make_state())
         self.assertTrue(obs.success)
@@ -107,7 +107,7 @@ class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
         )
 
         spec = DelegationSpec(subtask="执行", target_agent_card="worker-key")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         obs = await body.act(decision, _make_state())
         self.assertTrue(obs.success)
@@ -124,7 +124,7 @@ class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
 
         refs = ["ctx://doc/1", "ctx://doc/2"]
         spec = DelegationSpec(subtask="处理", target_agent_id="worker", context_refs=refs)
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         obs = await body.act(decision, _make_state())
         self.assertTrue(obs.success)
@@ -141,7 +141,7 @@ class TestDelegatePolling(unittest.IsolatedAsyncioTestCase):
         )
 
         spec = DelegationSpec(subtask="慢任务", target_agent_id="slow")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         obs = await body.act(decision, _make_state())
         self.assertTrue(obs.success)
@@ -155,7 +155,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
         body = SimpleBody(SimpleToolRegistry(), _noop_executor())  # 空 registry
 
         spec = DelegationSpec(subtask="任务", target_agent_id="someone")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         with self.assertRaises(TransportNotFoundError) as ctx:
             await body.act(decision, _make_state())
@@ -167,7 +167,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(), _noop_executor(), transport_registry=_make_registry(transport)
         )
 
-        decision = _make_decision(action_type="delegate", delegate_to=None)
+        decision = _make_decision(action_type="delegate", delegations=[])
 
         with self.assertRaises(ToolExecutionError) as ctx:
             await body.act(decision, _make_state())
@@ -180,7 +180,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
         )
 
         spec = DelegationSpec(subtask="任务", target_agent_id="ghost")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         obs = await body.act(decision, _make_state())
         self.assertFalse(obs.success)
@@ -194,7 +194,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
         )
 
         spec = DelegationSpec(subtask="触发异常", target_agent_id="broken")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         obs = await body.act(decision, _make_state())
         self.assertFalse(obs.success)
@@ -231,7 +231,7 @@ class TestProtocolRouting(unittest.IsolatedAsyncioTestCase):
         body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport_registry=registry)
 
         spec = DelegationSpec(subtask="跨进程任务", target_agent_id="remote", protocol="a2a")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         with self.assertRaises(NotImplementedError) as ctx:
             await body.act(decision, _make_state())
@@ -245,7 +245,7 @@ class TestProtocolRouting(unittest.IsolatedAsyncioTestCase):
         body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport_registry=registry)
 
         spec = DelegationSpec(subtask="内部任务", target_agent_id="worker", protocol="internal")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         obs = await body.act(decision, _make_state())
         self.assertTrue(obs.success)
@@ -256,7 +256,7 @@ class TestProtocolRouting(unittest.IsolatedAsyncioTestCase):
         body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport_registry=registry)
 
         spec = DelegationSpec(subtask="任务", target_agent_id="x", protocol="internal")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         with self.assertRaises(TransportNotFoundError):
             await body.act(decision, _make_state())
@@ -271,7 +271,7 @@ class TestBackwardCompatTransport(unittest.IsolatedAsyncioTestCase):
         body = SimpleBody(SimpleToolRegistry(), _noop_executor(), transport=transport)
 
         spec = DelegationSpec(subtask="测试", target_agent_id="worker")
-        decision = _make_decision(delegate_to=spec)
+        decision = _make_decision(delegations=[spec])
 
         obs = await body.act(decision, _make_state())
         self.assertTrue(obs.success)

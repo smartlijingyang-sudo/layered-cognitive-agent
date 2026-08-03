@@ -180,8 +180,8 @@ class TestMustConsultAllMembers:
         result = await policy.enforce(state, decision)
 
         assert result.action_type == "delegate"
-        assert result.delegate_to is not None
-        assert result.delegate_to.target_role in {"analyst", "reviewer"}
+        assert result.delegations
+        assert result.delegations[0].target_role in {"analyst", "reviewer"}
         assert "[框架强制]" in result.rationale
         assert result.confidence == 1.0
 
@@ -216,12 +216,12 @@ class TestMustConsultAllMembers:
 
         decision = _decision(
             "delegate",
-            delegate_to=DelegationSpec(target_role="a", subtask="do stuff"),
+            delegations=[DelegationSpec(target_role="a", subtask="do stuff")],
         )
         result = await policy.enforce(state, decision)
 
         assert result.action_type == "delegate"
-        assert result.delegate_to.target_role == "a"
+        assert result.delegations[0].target_role == "a"
 
     @pytest.mark.asyncio
     async def test_delegate_to_settled_role_redirected(self) -> None:
@@ -232,12 +232,12 @@ class TestMustConsultAllMembers:
 
         decision = _decision(
             "delegate",
-            delegate_to=DelegationSpec(target_role="a", subtask="re-do"),
+            delegations=[DelegationSpec(target_role="a", subtask="re-do")],
         )
         result = await policy.enforce(state, decision)
 
         assert result.action_type == "delegate"
-        assert result.delegate_to.target_role == "b"
+        assert result.delegations[0].target_role == "b"
 
     @pytest.mark.asyncio
     async def test_delegate_to_failed_role_redirected(self) -> None:
@@ -248,12 +248,12 @@ class TestMustConsultAllMembers:
 
         decision = _decision(
             "delegate",
-            delegate_to=DelegationSpec(target_role="b", subtask="retry"),
+            delegations=[DelegationSpec(target_role="b", subtask="retry")],
         )
         result = await policy.enforce(state, decision)
 
         assert result.action_type == "delegate"
-        assert result.delegate_to.target_role == "c"
+        assert result.delegations[0].target_role == "c"
 
     @pytest.mark.asyncio
     async def test_delegate_when_all_settled_rewritten_to_respond(self) -> None:
@@ -264,7 +264,7 @@ class TestMustConsultAllMembers:
 
         decision = _decision(
             "delegate",
-            delegate_to=DelegationSpec(target_role="a", subtask="redo"),
+            delegations=[DelegationSpec(target_role="a", subtask="redo")],
         )
         result = await policy.enforce(state, decision)
 
@@ -289,7 +289,7 @@ class TestMustConsultAllMembers:
 
         decision = _decision(
             "handoff",
-            delegate_to=DelegationSpec(target_role="a", subtask="handoff"),
+            delegations=[DelegationSpec(target_role="a", subtask="handoff")],
         )
         result = await policy.enforce(state, decision)
 
@@ -303,9 +303,9 @@ class TestMustConsultAllMembers:
 
         result = await policy.enforce(state, _decision("respond"))
 
-        assert result.delegate_to is not None
-        assert "analyst" in result.delegate_to.subtask
-        assert "launch product" in result.delegate_to.subtask
+        assert result.delegations
+        assert "analyst" in result.delegations[0].subtask
+        assert "launch product" in result.delegations[0].subtask
 
 
 # ── MustConsultAllMembers.try_shortcut ──
@@ -320,20 +320,19 @@ class TestMustConsultAllMembersTryShortcut:
 
         assert result is not None
         assert result.action_type == "delegate"
-        assert result.delegate_to is not None
-        assert result.delegate_to.target_role == "analyst"
+        assert result.delegations
+        assert result.delegations[0].target_role == "analyst"
         assert "[框架短路]" in result.rationale
 
     @pytest.mark.asyncio
     async def test_fans_out_when_multiple_waiting(self) -> None:
         """ADR-0028: multi-waiting shortcut fans out all waiting roles in parallel."""
-        from lca.contracts.decision import iter_delegation_specs
 
         state = _state(member_status=_ledger({"analyst", "reviewer"}))
         result = await MustConsultAllMembers().try_shortcut(state)
         assert result is not None
         assert result.action_type == "delegate"
-        roles = {s.target_role for s in iter_delegation_specs(result)}
+        roles = {s.target_role for s in list(result.delegations)}
         assert roles == {"analyst", "reviewer"}
 
     @pytest.mark.asyncio
@@ -390,7 +389,7 @@ class TestUpdateMemberStatus:
 
         decision = _decision(
             "delegate",
-            delegate_to=DelegationSpec(target_role="analyst", subtask="analyze"),
+            delegations=[DelegationSpec(target_role="analyst", subtask="analyze")],
         )
         obs = _obs(success=True)
 
@@ -407,7 +406,7 @@ class TestUpdateMemberStatus:
 
         decision = _decision(
             "delegate",
-            delegate_to=DelegationSpec(target_role="analyst", subtask="analyze"),
+            delegations=[DelegationSpec(target_role="analyst", subtask="analyze")],
         )
         obs = _obs(success=False, error="boom")
 
@@ -427,7 +426,7 @@ class TestUpdateMemberStatus:
 
         decision = _decision(
             "delegate",
-            delegate_to=DelegationSpec(target_role="analyst", subtask="analyze"),
+            delegations=[DelegationSpec(target_role="analyst", subtask="analyze")],
         )
         obs = _obs(success=False, error="boom")
 
@@ -447,7 +446,7 @@ class TestUpdateMemberStatus:
 
         decision = _decision(
             "delegate",
-            delegate_to=DelegationSpec(target_role="analyst", subtask="analyze"),
+            delegations=[DelegationSpec(target_role="analyst", subtask="analyze")],
         )
         obs = _obs(success=False, error="not found", failure_kind=FAILURE_KIND_VALIDATION)
 

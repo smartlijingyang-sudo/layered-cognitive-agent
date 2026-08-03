@@ -7,8 +7,8 @@ L3 层职责：
     所有策略通过注册表解析，L3 不含 if/elif 业务分发。
 """
 
+from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.orchestration_registry import TeamProcessStrategyRegistry
-from lca.layer3_agent.simple_agent import CognitiveAgent
 from lca.layer3_agent.supervisor_bind import (
     SupervisorBinder,
     SupervisorBindError,

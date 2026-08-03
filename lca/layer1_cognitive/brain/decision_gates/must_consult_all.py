@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.decision import Decision, DelegationSpec, iter_delegation_specs
+from lca.contracts.decision import Decision, DelegationSpec
 from lca.contracts.enums import ActionType
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import DecisionGate
@@ -21,8 +21,7 @@ def _delegate_decision(task: str, role: str, *, rationale: str) -> Decision:
     return Decision(
         decision_id=new_id("dec"),
         action_type=ActionType.DELEGATE,
-        delegate_to=spec,
-        delegate_targets=[spec],
+        delegations=[spec],
         rationale=rationale,
         confidence=1.0,
     )
@@ -33,8 +32,7 @@ def _multi_delegate_decision(task: str, roles: list[str], *, rationale: str) -> 
     return Decision(
         decision_id=new_id("dec"),
         action_type=ActionType.DELEGATE,
-        delegate_to=specs[0] if specs else None,
-        delegate_targets=specs,
+        delegations=specs,
         rationale=rationale,
         confidence=1.0,
     )
@@ -96,7 +94,7 @@ class MustConsultAllMembers(DecisionGate):
             return decision
 
         waiting_set = set(board.waiting_roles())
-        specs = iter_delegation_specs(decision)
+        specs = list(decision.delegations)
         target_roles = {s.target_role for s in specs if s.target_role}
         already_correct = (
             decision.action_type == ActionType.DELEGATE
@@ -106,7 +104,6 @@ class MustConsultAllMembers(DecisionGate):
         if already_correct:
             return decision
 
-        # Prefer fan-out all waiting when LLM missed the mark entirely.
         if len(waiting_set) > 1:
             return _multi_delegate_decision(
                 state.task,

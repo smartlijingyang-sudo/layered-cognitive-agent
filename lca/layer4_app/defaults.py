@@ -23,10 +23,13 @@ from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer3_agent.orchestration_registry import TeamProcessStrategyRegistry
 from lca.layer3_agent.orchestration_strategies import (
-    ChoreographyStrategy,
+    DebateStrategy,
     GraphStrategy,
+    HandoffStrategy,
     HierarchicalStrategy,
-    PeerStrategy,
+    ParallelStrategy,
+    SequentialStrategy,
+    SwarmStrategy,
 )
 from lca.layer4_app.policies import SupervisorBudgetPolicy
 
@@ -46,20 +49,18 @@ def register_defaults(registries: Registries) -> None:
 
     registries.brain_factories.register("default", SimpleBrainFactory())
 
-    # Process → strategy (topology). Family map: orchestration_taxonomy (ADR-0027).
+    # Process → typed strategy class (no string topology tables). GRAPH is
+    # wired only when Assembly receives execution_graph (not a bare default).
     orch = registries.orchestration
-    orch.register(TeamProcess.HIERARCHICAL, HierarchicalStrategy)  # SUPERVISOR
-    orch.register(TeamProcess.SEQUENTIAL, lambda: ChoreographyStrategy("sequential"))
-    orch.register(
-        TeamProcess.PARALLEL,
-        lambda: ChoreographyStrategy("parallel", synthesizer=ConcatSynthesizer()),
-    )
+    orch.register(TeamProcess.HIERARCHICAL, HierarchicalStrategy)
+    orch.register(TeamProcess.SEQUENTIAL, SequentialStrategy)
+    orch.register(TeamProcess.PARALLEL, lambda: ParallelStrategy(synthesizer=ConcatSynthesizer()))
+    orch.register(TeamProcess.DEBATE, DebateStrategy)
+    orch.register(TeamProcess.HANDOFF, HandoffStrategy)
+    orch.register(TeamProcess.SWARM, SwarmStrategy)
+    # Bare GraphStrategy resolves; Assembly requires execution_graph for process=GRAPH.
     orch.register(TeamProcess.GRAPH, GraphStrategy)
-    orch.register(TeamProcess.DEBATE, lambda: ChoreographyStrategy("debate"))
-    orch.register(TeamProcess.HANDOFF, lambda: PeerStrategy("handoff"))
-    orch.register(TeamProcess.SWARM, lambda: PeerStrategy("swarm"))
 
-    # Settlement gates are opt-in; default TeamConfig.decision_gate is NONE.
     reg.register(
         ComponentKind.DECISION_GATE, DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers
     )

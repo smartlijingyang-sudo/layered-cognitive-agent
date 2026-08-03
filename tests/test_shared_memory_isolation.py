@@ -220,7 +220,7 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
 
         # 构建两个带真实 Runtime 的 Agent
         from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-        from lca.layer3_agent.simple_agent import CognitiveAgent
+        from lca.layer3_agent.cognitive_agent import CognitiveAgent
 
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
@@ -272,7 +272,7 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
     async def test_orchestrator_no_shared_memory_when_config_empty(self) -> None:
         from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
         from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-        from lca.layer3_agent.simple_agent import CognitiveAgent
+        from lca.layer3_agent.cognitive_agent import CognitiveAgent
 
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()

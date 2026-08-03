@@ -6,7 +6,7 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.contracts.decision import Decision, DelegationSpec, Observation, iter_delegation_specs
+from lca.contracts.decision import Decision, DelegationSpec, Observation
 from lca.contracts.enums import DecisionGateName, RoleStatus, TeamProcess
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.orchestration_taxonomy import SupervisorPlane
@@ -22,10 +22,14 @@ from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsultAllMembers
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
-from lca.layer3_agent.orchestration_strategies import HierarchicalStrategy, PeerStrategy
-from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.cognitive_agent import CognitiveAgent
+from lca.layer3_agent.orchestration_strategies import (
+    HierarchicalStrategy,
+    SwarmStrategy,
+)
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 from lca.layer4_app.defaults import build_default_registries
+from tests.support.team_context import team_context_with_transport
 
 
 def _noop_executor() -> MagicMock:
@@ -45,17 +49,17 @@ class TestMultiDelegateParse(unittest.TestCase):
           "action_type": "delegate",
           "rationale": "fan-out",
           "confidence": 0.9,
-          "delegate_targets": [
+          "delegations": [
             {"target_role": "a", "subtask": "ta"},
             {"target_role": "b", "subtask": "tb"}
           ]
         }
         """
         d = SimpleDecisionParser().parse(raw, AgentState(trace_id="t", task="x", budget=Budget()))
-        specs = iter_delegation_specs(d)
+        specs = list(d.delegations)
         self.assertEqual(len(specs), 2)
         self.assertEqual(specs[0].target_role, "a")
-        self.assertEqual(d.delegate_to.target_role if d.delegate_to else None, "a")
+        self.assertEqual(d.delegations[0].target_role, "a")
 
 
 class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):
@@ -83,7 +87,7 @@ class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):
             action_type="delegate",
             rationale="multi",
             confidence=1.0,
-            delegate_targets=[
+            delegations=[
                 DelegationSpec(subtask="1", target_role="ra"),
                 DelegationSpec(subtask="2", target_role="rb"),
             ],
@@ -119,7 +123,7 @@ class TestMustConsultMultiShortcut(unittest.IsolatedAsyncioTestCase):
         gate = MustConsultAllMembers()
         d = await gate.try_shortcut(state)
         assert d is not None
-        specs = iter_delegation_specs(d)
+        specs = list(d.delegations)
         self.assertEqual({s.target_role for s in specs}, {"a", "b", "c"})
 
 
@@ -230,8 +234,8 @@ class TestPeerSwarm(unittest.IsolatedAsyncioTestCase):
                 output="done",
             )
         )
-        strategy = PeerStrategy("swarm", max_rounds=1)
-        result = await strategy.run(TeamContext(members=[a, b]), "task")
+        strategy = SwarmStrategy(max_rounds=1)
+        result = await strategy.run(team_context_with_transport([a, b]), "task")
         self.assertEqual(result.output, "done")
         a.run.assert_awaited_once()
         b.run.assert_awaited_once()

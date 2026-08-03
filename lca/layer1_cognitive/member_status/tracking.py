@@ -1,18 +1,11 @@
-"""Member-status tracking — direct state update, not a hook.
+"""Member-status tracking — direct state update after DELEGATE settles.
 
-The status update after a delegate action is core state management,
-not an optional observation. It lives here as a direct function called
-by DelegateOperation, not as a POST_ACT hook.
-
-Retry logic lives here (not on the Board Protocol) to keep the Board
-as a pure state container. Attempt counts and max-attempts live on
-``AgentState.consultation`` (``ConsultationState``), the supervisor
-control plane injected by ``HierarchicalStrategy``.
+Retry classification is pure; board mutation lives on ConsultationState.
 """
 
 from __future__ import annotations
 
-from lca.contracts.decision import Decision, DelegationSpec, Observation, iter_delegation_specs
+from lca.contracts.decision import Decision, DelegationSpec, Observation
 from lca.contracts.enums import RoleStatus
 from lca.contracts.semantic_keys import (
     FAILURE_KIND,
@@ -29,7 +22,7 @@ def _next_role_status(
     attempts_after: int,
     max_attempts: int,
 ) -> RoleStatus:
-    """纯函数:不接触 AgentState/Board,只做分类决策,可穷举测试。"""
+    """Pure classifier: no AgentState/Board access."""
     if success:
         return RoleStatus.DONE
     if failure_kind == FAILURE_KIND_VALIDATION:
@@ -69,12 +62,9 @@ def update_member_status_for_spec(
 
 
 def update_member_status(state: AgentState, decision: Decision, observation: Observation) -> None:
-    """Update the consultation board after a (single) delegate action completes."""
-    specs = iter_delegation_specs(decision)
+    """Update the consultation board after a single-target DELEGATE completes."""
+    specs = list(decision.delegations)
     if len(specs) != 1:
-        # Multi-path updates each spec explicitly in DelegateOperation.
-        if len(specs) == 0 and decision.delegate_to is not None:
-            update_member_status_for_spec(state, decision.delegate_to, observation)
         return
     update_member_status_for_spec(state, specs[0], observation)
 

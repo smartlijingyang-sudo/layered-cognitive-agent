@@ -102,7 +102,9 @@ uv run pytest -m real_llm -v
 - **supervisor_plane**：`consultation`（结算 board）/ `routing`（自由 PM，`RoutingState`）
 - 全员咨询：`hierarchical` + `must_consult_all` + plane consultation（支持 multi-delegate 并行）
 - 自由 PM：`hierarchical` + `supervisor_plane=routing` + gate none
-- PEER：`handoff`（首成即返）/ `swarm`（轮询累积）— `PeerStrategy`
+- PEER：`handoff`（首成即返）/ `swarm`（轮询累积）— `HandoffStrategy` / `SwarmStrategy`
+- GRAPH：`process=graph` + `execution_graph=`（`ExecutionGraph`）
+- 委派：仅 `Decision.delegations`；成员调用统一 `send_and_wait`
 - 控制面隔离：Consultation / Routing 各有白名单；禁止互塞
 
 ## 如何新增团队场景

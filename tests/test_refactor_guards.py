@@ -59,7 +59,7 @@ class TestSupervisorWallClockPropagation(unittest.TestCase):
     def test_supervisor_wall_clock_preserved(self) -> None:
         from unittest.mock import MagicMock
 
-        from lca.layer3_agent.simple_agent import CognitiveAgent
+        from lca.layer3_agent.cognitive_agent import CognitiveAgent
         from lca.layer4_app.assembly import _promote_supervisor
         from lca.layer4_app.policies import SupervisorBudgetPolicy
 
@@ -160,8 +160,8 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
         )
         out = asyncio.run(MustConsultAllMembers().enforce(state, decision))
         self.assertEqual(out.action_type, "delegate")
-        assert out.delegate_to is not None
-        self.assertEqual(out.delegate_to.target_role, "analyst")
+        assert out.delegations
+        self.assertEqual(out.delegations[0].target_role, "analyst")
 
 
 if __name__ == "__main__":

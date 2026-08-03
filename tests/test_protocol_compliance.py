@@ -58,7 +58,7 @@ from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultSt
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
 # L3
-from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from tests.support.unimplemented_transport import UnimplementedTransport
 
 

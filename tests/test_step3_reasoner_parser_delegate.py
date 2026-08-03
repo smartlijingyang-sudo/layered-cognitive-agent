@@ -94,9 +94,9 @@ class TestDecisionParserDelegate(unittest.TestCase):
         )
         decision = self.parser.parse(raw, _make_state())
         self.assertEqual(decision.action_type, "delegate")
-        self.assertIsNotNone(decision.delegate_to)
-        self.assertEqual(decision.delegate_to.target_role, "researcher")
-        self.assertEqual(decision.delegate_to.subtask, "分析竞品数据")
+        self.assertTrue(decision.delegations)
+        self.assertEqual(decision.delegations[0].target_role, "researcher")
+        self.assertEqual(decision.delegations[0].subtask, "分析竞品数据")
         self.assertEqual(decision.rationale, "researcher 更擅长数据分析")
         self.assertAlmostEqual(decision.confidence, 0.9)
 
@@ -112,7 +112,7 @@ class TestDecisionParserDelegate(unittest.TestCase):
             }
         )
         decision = self.parser.parse(raw, _make_state())
-        self.assertEqual(decision.delegate_to.context_refs, ["ctx://doc/1", "ctx://doc/2"])
+        self.assertEqual(decision.delegations[0].context_refs, ["ctx://doc/1", "ctx://doc/2"])
 
     def test_delegate_without_target_role(self) -> None:
         raw = json.dumps(
@@ -125,8 +125,8 @@ class TestDecisionParserDelegate(unittest.TestCase):
         )
         decision = self.parser.parse(raw, _make_state())
         self.assertEqual(decision.action_type, "delegate")
-        self.assertIsNone(decision.delegate_to.target_role)
-        self.assertEqual(decision.delegate_to.subtask, "做点什么")
+        self.assertIsNone(decision.delegations[0].target_role)
+        self.assertEqual(decision.delegations[0].subtask, "做点什么")
 
     def test_delegate_with_markdown_code_block(self) -> None:
         raw = (
@@ -144,8 +144,8 @@ class TestDecisionParserDelegate(unittest.TestCase):
         )
         decision = self.parser.parse(raw, _make_state())
         self.assertEqual(decision.action_type, "delegate")
-        self.assertIsNotNone(decision.delegate_to)
-        self.assertEqual(decision.delegate_to.target_role, "coder")
+        self.assertTrue(decision.delegations)
+        self.assertEqual(decision.delegations[0].target_role, "coder")
 
     def test_use_tool_still_works(self) -> None:
         raw = json.dumps(
@@ -159,7 +159,7 @@ class TestDecisionParserDelegate(unittest.TestCase):
         )
         decision = self.parser.parse(raw, _make_state())
         self.assertEqual(decision.action_type, "use_tool")
-        self.assertIsNone(decision.delegate_to)
+        self.assertEqual(decision.delegations, [])
         self.assertEqual(len(decision.tool_calls), 1)
         self.assertEqual(decision.tool_calls[0].tool_name, "search")
 
@@ -174,7 +174,7 @@ class TestDecisionParserDelegate(unittest.TestCase):
         )
         decision = self.parser.parse(raw, _make_state())
         self.assertEqual(decision.action_type, "respond")
-        self.assertIsNone(decision.delegate_to)
+        self.assertEqual(decision.delegations, [])
         self.assertEqual(decision.response_text, "这是回复")
 
     def test_delegate_context_refs_non_list_coerced(self) -> None:
@@ -189,7 +189,7 @@ class TestDecisionParserDelegate(unittest.TestCase):
             }
         )
         decision = self.parser.parse(raw, _make_state())
-        self.assertEqual(decision.delegate_to.context_refs, ["single-ref"])
+        self.assertEqual(decision.delegations[0].context_refs, ["single-ref"])
 
 
 class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):

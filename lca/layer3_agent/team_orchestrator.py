@@ -22,7 +22,7 @@ from lca.contracts.registries import Registries
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
-from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.supervisor_bind import SupervisorBinder
 
 

@@ -8,14 +8,14 @@ import pytest
 
 from lca.contracts.consultation import (
     CONSULTATION_FIELD_WHITELIST,
-    HierarchicalConsultation,
+    ConsultationState,
     assert_consultation_field_whitelist,
 )
 from lca.contracts.protocols.capabilities import HasChannel
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner, SupervisorReasoner
-from lca.layer3_agent.simple_agent import CognitiveAgent
+from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.supervisor_bind import (
     SupervisorBinder,
     SupervisorBindError,
@@ -173,12 +173,11 @@ class TestConsultationDiscipline:
         assert "member_status" in CONSULTATION_FIELD_WHITELIST
         assert "extra" not in CONSULTATION_FIELD_WHITELIST
 
-    def test_hierarchical_consultation_alias(self) -> None:
-        from lca.contracts.consultation import ConsultationState
+    def test_consultation_state_constructible(self) -> None:
         from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
         board = InMemoryMemberStatus(role_order=("a",))
-        session = HierarchicalConsultation(member_status=board)
+        session = ConsultationState(member_status=board)
         assert isinstance(session, ConsultationState)
 
 
@@ -204,7 +203,6 @@ class TestSimpleReasonerTeamAgnosticSource:
             "hierarchical_prompt",
             "member_status_text",
             "ConsultationState",
-            "HierarchicalConsultation",
         }
         hit = (names | attrs) & banned
         assert not hit, f"SimpleReasoner code must not use {sorted(hit)} (ADR-0026)"

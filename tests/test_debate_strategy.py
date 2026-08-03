@@ -14,8 +14,9 @@ from lca.contracts.protocols import Synthesizer, TeamContext
 from lca.contracts.result import Result
 from lca.contracts.role_team import TeamConfig
 from lca.contracts.state import Budget
-from lca.layer3_agent.orchestration_strategies import ChoreographyStrategy
+from lca.layer3_agent.orchestration_strategies import DebateStrategy
 from lca.layer4_app.defaults import build_default_registries
+from tests.support.team_context import team_context_with_transport
 
 _REGISTRIES = build_default_registries()
 
@@ -36,6 +37,8 @@ def _make_agent(
 ) -> MagicMock:
     """构建 Agent 桩件，按调用顺序返回不同 output。"""
     agent = MagicMock()
+    agent.role_profile = MagicMock()
+    agent.role_profile.role = trace_id
     call_count = 0
 
     async def _execute(task: str) -> Result:
@@ -54,8 +57,8 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
     async def test_single_member_converges_immediately(self) -> None:
         """单成员时，第 1 轮即达成共识退出。"""
         agent = _make_agent("t1", ["only proposal"])
-        strategy = ChoreographyStrategy("debate")
-        context = TeamContext(members=[agent])
+        strategy = DebateStrategy()
+        context = team_context_with_transport([agent])
 
         result = await strategy.run(context, "task")
 
@@ -68,10 +71,9 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["same proposal"])
         agent_b = _make_agent("t-b", ["same proposal"])
 
-        strategy = ChoreographyStrategy("debate")
-        context = TeamContext(
-            members=[agent_a, agent_b],
-            config=TeamConfig(process="debate", max_rounds=5),
+        strategy = DebateStrategy()
+        context = team_context_with_transport(
+            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=5)
         )
 
         result = await strategy.run(context, "task")
@@ -85,10 +87,9 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["A1", "A2", "consensus"])
         agent_b = _make_agent("t-b", ["B1", "B2", "consensus"])
 
-        strategy = ChoreographyStrategy("debate")
-        context = TeamContext(
-            members=[agent_a, agent_b],
-            config=TeamConfig(process="debate", max_rounds=5),
+        strategy = DebateStrategy()
+        context = team_context_with_transport(
+            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=5)
         )
 
         result = await strategy.run(context, "task")
@@ -106,10 +107,9 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["A1", "A2"])
         agent_b = _make_agent("t-b", ["B1", "B2"])
 
-        strategy = ChoreographyStrategy("debate")
-        context = TeamContext(
-            members=[agent_a, agent_b],
-            config=TeamConfig(process="debate", max_rounds=2),
+        strategy = DebateStrategy()
+        context = team_context_with_transport(
+            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=2)
         )
 
         result = await strategy.run(context, "task")
@@ -123,8 +123,8 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["A1", "A2", "A3"])
         agent_b = _make_agent("t-b", ["B1", "B2", "B3"])
 
-        strategy = ChoreographyStrategy("debate")
-        context = TeamContext(members=[agent_a, agent_b])
+        strategy = DebateStrategy()
+        context = team_context_with_transport([agent_a, agent_b])
 
         await strategy.run(context, "task")
 
@@ -147,10 +147,9 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_tracking_agent("t-a", "proposal-a")
         agent_b = _make_tracking_agent("t-b", "proposal-b")
 
-        strategy = ChoreographyStrategy("debate")
-        context = TeamContext(
-            members=[agent_a, agent_b],
-            config=TeamConfig(process="debate", max_rounds=3),
+        strategy = DebateStrategy()
+        context = team_context_with_transport(
+            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=3)
         )
 
         await strategy.run(context, "original task")
@@ -172,10 +171,9 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
         synth = MagicMock()
         synth.synthesize = AsyncMock(return_value=_make_result("t-synth", "synthesized"))
 
-        strategy = ChoreographyStrategy("debate", synthesizer=synth)
-        context = TeamContext(
-            members=[agent_a, agent_b],
-            config=TeamConfig(process="debate", max_rounds=1),
+        strategy = DebateStrategy(synthesizer=synth)
+        context = team_context_with_transport(
+            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=1)
         )
 
         result = await strategy.run(context, "task")
@@ -188,10 +186,9 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["first"])
         agent_b = _make_agent("t-b", ["second"])
 
-        strategy = ChoreographyStrategy("debate")
-        context = TeamContext(
-            members=[agent_a, agent_b],
-            config=TeamConfig(process="debate", max_rounds=1),
+        strategy = DebateStrategy()
+        context = team_context_with_transport(
+            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=1)
         )
 
         result = await strategy.run(context, "task")
@@ -203,7 +200,7 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
     """边界情况。"""
 
     async def test_empty_members_returns_failed(self) -> None:
-        strategy = ChoreographyStrategy("debate")
+        strategy = DebateStrategy()
         context = TeamContext(members=[])
 
         result = await strategy.run(context, "task")
@@ -214,10 +211,9 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
     async def test_no_synthesizer_still_works(self) -> None:
         """无 Synthesizer 时退化：跑满轮数返回首个结果。"""
         agent = _make_agent("t1", ["solo"])
-        strategy = ChoreographyStrategy("debate")
-        context = TeamContext(
-            members=[agent],
-            config=TeamConfig(process="debate", max_rounds=1),
+        strategy = DebateStrategy()
+        context = team_context_with_transport(
+            [agent], config=TeamConfig(process="debate", max_rounds=1)
         )
 
         result = await strategy.run(context, "task")
@@ -230,10 +226,9 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["good"], status=TaskStatus.COMPLETED)
         agent_b = _make_agent("t-b", [""], status=TaskStatus.FAILED)
 
-        strategy = ChoreographyStrategy("debate")
-        context = TeamContext(
-            members=[agent_a, agent_b],
-            config=TeamConfig(process="debate", max_rounds=1),
+        strategy = DebateStrategy()
+        context = team_context_with_transport(
+            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=1)
         )
 
         result = await strategy.run(context, "task")
@@ -251,7 +246,7 @@ class TestDebateStrategyRegistration(unittest.TestCase):
     def test_debate_resolves_to_debate_strategy(self) -> None:
         registry = _REGISTRIES.orchestration
         strategy = registry.resolve("debate")
-        self.assertIsInstance(strategy, ChoreographyStrategy)
+        self.assertIsInstance(strategy, DebateStrategy)
 
 
 if __name__ == "__main__":

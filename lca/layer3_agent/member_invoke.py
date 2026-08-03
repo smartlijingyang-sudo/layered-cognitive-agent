@@ -1,16 +1,18 @@
-"""Uniform member call path for team process strategies."""
+"""Uniform member call path for team process strategies.
+
+All strategy-level member calls go through TeamContext.transport via
+``send_and_wait``. Assembly always installs InternalTransport for teams;
+strategies do not call ``member.run`` directly.
+"""
 
 from __future__ import annotations
 
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentUnit, TeamContext
 from lca.contracts.result import Result
+from lca.layer0_infra.transport.invocation import send_and_wait
 
 _DEFAULT_TIMEOUT_S = 300.0
-
-
-async def _call_local(member: AgentUnit, objective: str) -> Result:
-    return await member.run(objective)
 
 
 async def invoke_member(
@@ -20,18 +22,23 @@ async def invoke_member(
     *,
     timeout_s: float = _DEFAULT_TIMEOUT_S,
 ) -> Result:
+    """Invoke one team member through the shared transport port."""
     transport = context.transport
-    if transport is not None:
-        role = member.role_profile.role
-        if role:
-            task_id = await transport.send_task(role, objective, [])
-            wait = getattr(transport, "wait_result", None)
-            if wait is not None:
-                observation = await wait(task_id, timeout_s)
-            else:
-                observation = await transport.receive_result(task_id)
-            return Result.from_observation(observation, task_id)
-    return await _call_local(member, objective)
+    if transport is None:
+        raise ValueError(
+            "TeamContext.transport is required for member invocation; "
+            "assemble teams via Assembly.assemble_team / MultiAgentTeam"
+        )
+    role = member.role_profile.role
+    if not role:
+        raise ValueError("member role_profile.role is required for transport invoke")
+    observation = await send_and_wait(
+        transport,
+        role,
+        objective,
+        timeout_s=timeout_s,
+    )
+    return Result.from_observation(observation, task_id=observation.extra.get("task_id", ""))
 
 
 async def invoke_members_sequential(
