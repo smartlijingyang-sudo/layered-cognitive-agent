@@ -26,13 +26,12 @@ _BANNED_CLASS_PATTERN = re.compile(
 
 # 显式豁免清单（参照 docs/glossary.md "命名约定" 章节）
 _NAME_EXEMPT: dict[str, str] = {
-    "PromptManager": "glossary 显式豁免: Prompt 模板注册与渲染缺少更精确的领域词",
-    # 过渡期 alias（ADR-0016）——下一主版本删除后同步清理
-    "RespondOperation": "过渡期 alias → RespondOperation",
-    "UseToolOperation": "过渡期 alias → UseToolOperation",
-    "DelegateOperation": "过渡期 alias → DelegateOperation",
-    "HandoffOperation": "过渡期 alias → HandoffOperation",
-    "FallbackActionPolicy": "过渡期 alias → FallbackActionPolicy",
+    # Action 策略类：Operation 后缀表达策略模式插槽，非禁用词 Manager/Helper
+    "RespondOperation": "Action 策略实现（contracts.action.Action）",
+    "UseToolOperation": "Action 策略实现（contracts.action.Action）",
+    "DelegateOperation": "Action 策略实现（contracts.action.Action）",
+    "HandoffOperation": "Action 策略实现（contracts.action.Action）",
+    "FallbackActionPolicy": "FallbackPolicy 默认实现（ADR-0023 迁至 L1 body）",
 }
 
 _SCAN_PACKAGES = [

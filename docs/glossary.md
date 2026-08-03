@@ -27,6 +27,7 @@
 | **teammates_text** | 写进提示词的「队友是谁」（由 `build_teammates_text` 从 ConsultationState.teammates 渲染） |
 | **ConsultationState** | SUPERVISOR·consultation 控制面（board / teammates / retry）；字段白名单锁定；solo/member 为 None |
 | **SupervisorPlane** | SUPERVISOR 控制面种类：consultation（结算 board）/ routing（自由 PM） |
+| **assert_supervisor_plane_gate_compatible** | ROUTING+非 none 结算 gate 的单一不变量（contracts/orchestration_taxonomy） |
 | **DecisionGate**（配置） | 结算强度：默认 `none`（自由经理）；`must_consult_all` 为咨询合规 opt-in |
 | **SupervisorBinder** | 组装期绑定 channel + gate + supervisor cognition；失败显式抛 `SupervisorBindError` |
 | **MemberStatus** | 必问成员是否已咨询完毕的 board |
@@ -53,7 +54,7 @@
 | **Observation** | 行动结果 |
 | **Reflection** | 自省判定 |
 | **StopRule** / **StopDecision** / **StopReason** | 是否结束循环 |
-| **DefaultStopRule** | 默认终止裁判；内部可组合 StopOutcomePolicy |
+| **DefaultStopRule** | 默认终止裁判（``default_stop_rule.py``）；内部可组合 StopOutcomePolicy |
 | **StopOutcome** / **StopOutcomePolicy** / **DefaultStopOutcomePolicy** | 单步结果判定（DefaultStopRule 内部使用） |
 | **Brain** / **Body** / **Memory** | 想 / 做 / 记 |
 | **ModularBrain** / **MAP** | 默认 Brain；CandidateEvaluationPipeline 做 decompose → evaluate |
@@ -80,7 +81,9 @@
 | **ComponentRegistry** / **NamedRegistry** | DI / 按名注册表 |
 | **Registries** | 三个发现型注册表的值对象包（components / brain_factories / orchestration），Assembly 私有持有，替代进程级全局单例（ADR-0024） |
 | **Assembly** | 组合根的显式对象化版本，持有一份 Registries；`assemble_agent` / `assemble_team` 是其方法 |
-| **PromptManager** / **SkillRouter** | Prompt 模板与技能路由 |
+| **team_wiring** / **build_team_transport** | L4 团队 channel 接线（与 agent 组装决策分离）；`assembly` 再导出 |
+| **SkillRouter** | 运行时动态选择 Prompt 模板 / 工具子集 |
+| **load_builtin_prompt** | 从 ``brain/prompts/*.md`` 加载内置模板 |
 | **FallbackPolicy** / **FallbackActionPolicy** | 未知 action 降级 |
 | **DelegationSpec** / **AgentCard** / **TaskStatus** | 委派规格 / 能力名片 / 任务状态机 |
 | **ApprovalPendingError** / **BudgetExceededError** / **ToolExecutionError** | 运行时异常 |
@@ -98,7 +101,6 @@
 | **SupervisorReasoner** | hierarchical supervisor 专用 Reasoner |
 | **SimpleCritic** | Critic 默认实现 |
 | **SimpleDecisionParser** | DecisionParser 默认实现 |
-| **SimplePromptManager** | PromptManager 默认实现 |
 | **SimpleEventBus** | EventBus 默认实现 |
 | **SimpleHookRegistry** | HookRegistry 默认实现 |
 | **SimpleSafeExecutor** | SafeExecutor / ToolRunner 默认实现 |
@@ -131,7 +133,12 @@
 | execute（Agent 入口） | run |
 | CompletionPolicy / RosterCoverage | DecisionGate / MustConsultAllMembers |
 | LoopJudge / TerminationSignal（对外） | StopRule / StopDecision |
+| judge（CognitiveRuntime 参数/字段） | stop_rule |
+| default_loop_judge.py | default_stop_rule.py |
+| brain_strategy（Agent/Assembly 参数） | brain |
 | BrainStrategy | Brain |
+| PromptManager / SimplePromptManager | Reasoner 内建模板字典（ADR-0023 完成溶解） |
+| member_status/policy.py | member_status/required_action.py |
 
 ## 禁止复活
 

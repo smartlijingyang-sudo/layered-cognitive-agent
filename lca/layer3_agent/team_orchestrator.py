@@ -5,7 +5,10 @@ from __future__ import annotations
 from lca.contracts.enums import ComponentKind, DecisionGateName
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.message import AgentMessage, agent_message_as_text
-from lca.contracts.orchestration_taxonomy import SupervisorPlane
+from lca.contracts.orchestration_taxonomy import (
+    SupervisorPlane,
+    assert_supervisor_plane_gate_compatible,
+)
 from lca.contracts.protocols import (
     AgentTransport,
     SharedMemoryStore,
@@ -62,12 +65,8 @@ class TeamOrchestrator(TeamUnit):
 
         member_status: MemberStatus | None = None
         if supervisor is not None:
+            assert_supervisor_plane_gate_compatible(config.supervisor_plane, config.decision_gate)
             if config.supervisor_plane is SupervisorPlane.ROUTING:
-                if config.decision_gate is not DecisionGateName.NONE:
-                    raise ValueError(
-                        "SupervisorPlane.ROUTING does not support settlement gates; "
-                        "use decision_gate=none or supervisor_plane=CONSULTATION"
-                    )
                 # Free PM: channel + supervisor cognition, no board / gate.
                 self._supervisor_binder.bind(
                     supervisor,

@@ -1,5 +1,5 @@
 """CognitiveRuntime —— 核心认知循环（ADR-0002）。
-Loop 只做编排：perceive → think → act → reflect → record → checkpoint → judge。
+Loop 只做编排：perceive → think → act → reflect → record → checkpoint → stop。
 终止判定完全委托给 StopRule，业务逻辑零泄漏。
 L2 层职责：
     将 Brain（认知）、Body（执行）、Memory（记忆）三大能力
@@ -46,14 +46,14 @@ class CognitiveRuntime(Runtime):
         memory: MemorySystem,
         hooks: HookRegistry,
         state_store: StateStore,
-        judge: StopRule,
+        stop_rule: StopRule,
     ) -> None:
         self.brain = brain
         self.body = body
         self.memory = memory
         self.hooks = hooks
         self.state_store = state_store
-        self.judge = judge
+        self.stop_rule = stop_rule
 
     async def run(
         self,
@@ -99,7 +99,7 @@ class CognitiveRuntime(Runtime):
             4. reflect  — 反思结果、判定质量
             5. record   — 追加 Turn 到历史、更新多层记忆
             6. checkpoint — 持久化状态快照
-            7. judge    — 委托 StopRule 决定是否终止
+            7. stop     — 委托 StopRule 决定是否终止
         """
         decision = observation = reflection = None
         for step in range(state.step, max_steps):
@@ -147,13 +147,13 @@ class CognitiveRuntime(Runtime):
                 break
             # ── Phase 6: Checkpoint ──
             await self._checkpoint(state)
-            # ── Phase 7: Judge ──
-            signal = self.judge.decide(state, decision, observation, reflection)
-            if signal.should_stop:
-                if signal.reason == StopReason.BUDGET_EXCEEDED:
+            # ── Phase 7: Stop ──
+            stop = self.stop_rule.decide(state, decision, observation, reflection)
+            if stop.should_stop:
+                if stop.reason == StopReason.BUDGET_EXCEEDED:
                     await self.hooks.trigger("on_error", state, error=BudgetExceededError())
-                if signal.status is not None:
-                    state.status = signal.status
+                if stop.status is not None:
+                    state.status = stop.status
                 break
         await self.hooks.trigger("on_complete", state)
         return Result.from_state(state)

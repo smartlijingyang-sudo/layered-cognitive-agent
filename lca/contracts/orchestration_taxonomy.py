@@ -1,6 +1,7 @@
 """Orchestration families, process→family map, and industry pattern slots.
 
-See ADR-0027. Pure taxonomy (no behavior).
+See ADR-0027. Pure taxonomy (no I/O). Plane↔gate compatibility lives here so
+every composition path shares one invariant message.
 """
 
 from __future__ import annotations
@@ -8,7 +9,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Final
 
-from lca.contracts.enums import TeamProcess
+from lca.contracts.enums import DecisionGateName, TeamProcess
 
 
 class OrchestrationFamily(str, Enum):
@@ -28,6 +29,25 @@ class SupervisorPlane(str, Enum):
 
     ROUTING = "routing"
     """``RoutingState`` freeform PM — no full-roster settlement."""
+
+
+ROUTING_SETTLEMENT_GATE_ERROR: Final[str] = (
+    "SupervisorPlane.ROUTING does not support settlement gates; "
+    "use decision_gate=none or supervisor_plane=CONSULTATION"
+)
+
+
+def assert_supervisor_plane_gate_compatible(
+    plane: SupervisorPlane,
+    gate: DecisionGateName,
+) -> None:
+    """Raise if *plane* and *gate* form an illegal SUPERVISOR combination.
+
+    ROUTING is free-PM: settlement gates (must_consult_all, …) require the
+    consultation board and are only legal under CONSULTATION.
+    """
+    if plane is SupervisorPlane.ROUTING and gate is not DecisionGateName.NONE:
+        raise ValueError(ROUTING_SETTLEMENT_GATE_ERROR)
 
 
 PROCESS_FAMILY: Final[dict[TeamProcess, OrchestrationFamily]] = {

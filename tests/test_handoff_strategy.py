@@ -190,7 +190,7 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_stops_on_handoff(self) -> None:
         """handoff action 应触发 StopRule 返回 should_stop=True。"""
-        from lca.layer2_runtime.default_loop_judge import DefaultStopRule
+        from lca.layer2_runtime.default_stop_rule import DefaultStopRule
         from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
             DefaultStopOutcomePolicy,
         )
@@ -230,7 +230,7 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
             memory,
             hooks,
             state_store,
-            judge=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         result = await runtime.run("test task", max_steps=10)
 

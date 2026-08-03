@@ -65,10 +65,10 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.brain.decision_gates.must_consult_all.MustConsultAllMembers": (
         "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0016)"
     ),
-    "lca.layer2_runtime.default_loop_judge.DefaultStopRule": (
+    "lca.layer2_runtime.default_stop_rule.DefaultStopRule": (
         "StopRule 实现，Protocol 在 contracts.stop (ADR-0015)"
     ),
-    "lca.layer1_cognitive.member_status.policy.RequiredAction": (
+    "lca.layer1_cognitive.member_status.required_action.RequiredAction": (
         "纯数据声明（gate 裁决结果），非可插拔组件；见 ADR-0025"
     ),
     "lca.layer3_agent.supervisor_bind.SupervisorBinder": (
@@ -146,9 +146,10 @@ class TestArchitectureConformance(unittest.TestCase):
         protocol_bases = _collect_protocol_classes()
         self.assertGreaterEqual(
             len(protocol_bases),
-            32,
-            "Protocol 数量低于基线 32 —— 是否有协议被意外删除？"
-            " 如果确实需要减少协议数量，请同步更新此断言并附 ADR。",
+            31,
+            "Protocol 数量低于基线 31 —— 是否有协议被意外删除？"
+            " 如果确实需要减少协议数量，请同步更新此断言并附 ADR。"
+            "（PromptManager 已按 ADR-0023 溶解进 Reasoner，基线 32→31）",
         )
 
     def test_every_l0_to_l3_class_declares_a_protocol(self) -> None:

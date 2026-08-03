@@ -3,7 +3,8 @@
 L3 层职责：
     将 L2 的 CognitiveRuntime 封装为 CognitiveAgent（单 Agent 执行单元），
     并通过 TeamOrchestrator + TeamProcessStrategy 实现多 Agent 编排。
-    支持六种编排模式：hierarchical / sequential / parallel / handoff / debate / graph。
+    支持 TeamProcess 族内拓扑：hierarchical / sequential / parallel /
+    handoff / swarm / debate / graph（见 ADR-0027 编排族）。
     所有策略通过注册表解析，L3 不含 if/elif 业务分发。
 """
 

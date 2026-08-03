@@ -9,7 +9,10 @@ from unittest.mock import AsyncMock, MagicMock
 from lca.contracts.decision import Decision, DelegationSpec, Observation
 from lca.contracts.enums import DecisionGateName, RoleStatus, TeamProcess
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.orchestration_taxonomy import SupervisorPlane
+from lca.contracts.orchestration_taxonomy import (
+    ROUTING_SETTLEMENT_GATE_ERROR,
+    SupervisorPlane,
+)
 from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
@@ -28,6 +31,7 @@ from lca.layer3_agent.orchestration_strategies import (
     SwarmStrategy,
 )
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
+from lca.layer4_app.assembly import Assembly
 from lca.layer4_app.defaults import build_default_registries
 from tests.support.team_context import team_context_with_transport
 
@@ -164,8 +168,21 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
             supervisor_plane=SupervisorPlane.ROUTING,
             decision_gate=DecisionGateName.MUST_CONSULT_ALL,
         )
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as orchestrator_err:
             TeamOrchestrator([member], config, registries=reg, supervisor=sup)
+        self.assertEqual(str(orchestrator_err.exception), ROUTING_SETTLEMENT_GATE_ERROR)
+
+        assembly = Assembly(registries=reg)
+        with self.assertRaises(ValueError) as assembly_err:
+            assembly.assemble_team(
+                members=[member],
+                process=TeamProcess.HIERARCHICAL,
+                supervisor=sup,
+                supervisor_plane=SupervisorPlane.ROUTING,
+                decision_gate=DecisionGateName.MUST_CONSULT_ALL,
+            )
+        self.assertEqual(str(assembly_err.exception), ROUTING_SETTLEMENT_GATE_ERROR)
+        self.assertEqual(str(orchestrator_err.exception), str(assembly_err.exception))
 
     async def test_hierarchical_routing_injects_routing_state(self) -> None:
         strategy = HierarchicalStrategy()

@@ -39,6 +39,18 @@ from lca.layer1_cognitive.member_status.tracking import (
 )
 
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
+_ERR_DEADLINE_EXPIRED = "delegate 超时(deadline 已过期)"
+_ERR_TIMEOUT = "delegate 超时"
+
+
+def _timeout_observation(error: str) -> Observation:
+    return Observation(
+        observation_id=new_id("obs"),
+        success=False,
+        payload=None,
+        error=error,
+        extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
+    )
 
 
 class RespondOperation(Action):
@@ -84,74 +96,14 @@ class DelegateOperation(Action):
         return await self._execute_many(specs, state)
 
     async def _execute_one(self, spec: DelegationSpec, state: AgentState) -> Observation:
-        transport, agent_card = self._resolve_target(spec, state)
-        timeout_s = self._timeout_for(spec)
-        if timeout_s <= 0:
-            observation = Observation(
-                observation_id=new_id("obs"),
-                success=False,
-                payload=None,
-                error="delegate 超时(deadline 已过期)",
-                extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
-            )
-            update_member_status_for_spec(state, spec, observation)
-            record_routing_assignment(state, spec)
-            return observation
-
-        try:
-            with delegator_scope(state.agent_role):
-                observation = await send_and_wait(
-                    transport,
-                    agent_card,
-                    spec.subtask,
-                    spec.context_refs,
-                    timeout_s=timeout_s,
-                )
-        except TimeoutError:
-            observation = Observation(
-                observation_id=new_id("obs"),
-                success=False,
-                payload=None,
-                error="delegate 超时",
-                extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
-            )
+        observation = await self._invoke(spec, state)
         update_member_status_for_spec(state, spec, observation)
         record_routing_assignment(state, spec)
         return observation
 
     async def _execute_many(self, specs: list[DelegationSpec], state: AgentState) -> Observation:
         """Fan-out: send all, wait all, settle board per role."""
-
-        async def _one(spec: DelegationSpec) -> Observation:
-            transport, agent_card = self._resolve_target(spec, state)
-            timeout_s = self._timeout_for(spec)
-            if timeout_s <= 0:
-                return Observation(
-                    observation_id=new_id("obs"),
-                    success=False,
-                    payload=None,
-                    error="delegate 超时(deadline 已过期)",
-                    extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
-                )
-            try:
-                with delegator_scope(state.agent_role):
-                    return await send_and_wait(
-                        transport,
-                        agent_card,
-                        spec.subtask,
-                        spec.context_refs,
-                        timeout_s=timeout_s,
-                    )
-            except TimeoutError:
-                return Observation(
-                    observation_id=new_id("obs"),
-                    success=False,
-                    payload=None,
-                    error="delegate 超时",
-                    extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
-                )
-
-        observations = await asyncio.gather(*[_one(spec) for spec in specs])
+        observations = await asyncio.gather(*[self._invoke(spec, state) for spec in specs])
         member_payload: dict[str, object] = {}
         task_ids: list[str] = []
         for spec, obs in zip(specs, observations, strict=True):
@@ -169,6 +121,23 @@ class DelegateOperation(Action):
             error=None if all_ok else "one or more delegates failed",
             extra={OBS_TASK_IDS: task_ids, OBS_MEMBER_RESULTS: member_payload},
         )
+
+    async def _invoke(self, spec: DelegationSpec, state: AgentState) -> Observation:
+        transport, agent_card = self._resolve_target(spec, state)
+        timeout_s = self._timeout_for(spec)
+        if timeout_s <= 0:
+            return _timeout_observation(_ERR_DEADLINE_EXPIRED)
+        try:
+            with delegator_scope(state.agent_role):
+                return await send_and_wait(
+                    transport,
+                    agent_card,
+                    spec.subtask,
+                    spec.context_refs,
+                    timeout_s=timeout_s,
+                )
+        except TimeoutError:
+            return _timeout_observation(_ERR_TIMEOUT)
 
     @staticmethod
     def _timeout_for(spec: DelegationSpec) -> float:

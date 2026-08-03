@@ -7,7 +7,7 @@ from lca.contracts.enums import ActionType
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import DecisionGate
 from lca.contracts.state import AgentState
-from lca.layer1_cognitive.member_status.policy import compute_required_action
+from lca.layer1_cognitive.member_status.required_action import compute_required_action
 
 _CONSULT_SUBTASK_TEMPLATE = "请从 {role} 的视角，针对以下任务提供你的专业意见：{task}"
 

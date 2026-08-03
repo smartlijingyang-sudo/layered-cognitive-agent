@@ -36,9 +36,11 @@ from lca.contracts.orchestration_taxonomy import (
     INDUSTRY_PATTERN_SLOTS,
     PROCESS_FAMILY,
     RESERVED_PROCESS_SLOTS,
+    ROUTING_SETTLEMENT_GATE_ERROR,
     OrchestrationFamily,
     SupervisorPlane,
     assert_process_family_complete,
+    assert_supervisor_plane_gate_compatible,
     family_of,
 )
 from lca.contracts.protocols import DecisionGate, SharedMemoryStore, TransportRegistryProtocol
@@ -76,6 +78,7 @@ __all__ = [
     "PROCESS_FAMILY",
     "RESERVED_PROCESS_SLOTS",
     "ROUTING_FIELD_WHITELIST",
+    "ROUTING_SETTLEMENT_GATE_ERROR",
     "Action",
     "ActionRegistryProtocol",
     "AgentCard",
@@ -130,6 +133,7 @@ __all__ = [
     "assert_consultation_field_whitelist",
     "assert_process_family_complete",
     "assert_routing_field_whitelist",
+    "assert_supervisor_plane_gate_compatible",
     "create_budget",
     "family_of",
 ]

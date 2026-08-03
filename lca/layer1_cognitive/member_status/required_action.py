@@ -1,7 +1,8 @@
-"""MustConsultAllMembers 的裁决逻辑——单一纯函数决定状态机下一步。
+"""Consultation board → next allowed action (pure).
 
-不放进 contracts/:producer(本文件)和 consumer(must_consult_all.py)
-都在 layer1_cognitive 内部,层内私有协作类型不需要上升到 contracts。
+Single pure function deciding the consultation state machine step.
+Producer (this module) and consumer (must_consult_all gate) both live in
+layer1_cognitive — layer-private collaboration types stay out of contracts.
 """
 
 from __future__ import annotations

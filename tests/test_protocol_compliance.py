@@ -22,7 +22,6 @@ from lca.contracts.protocols import (
     LLMAdapter,
     MemorySystem,
     Observability,
-    PromptManager,
     Reasoner,
     Runtime,
     SafeExecutor,
@@ -46,14 +45,13 @@ from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.prompt_manager import SimplePromptManager
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
 from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
 # L2
-from lca.layer2_runtime.default_loop_judge import DefaultStopRule
+from lca.layer2_runtime.default_stop_rule import DefaultStopRule
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
@@ -123,7 +121,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
         reasoner = SimpleReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         return reasoner
 
-    def test_modular_brain_is_brain_strategy(self):
+    def test_modular_brain_is_brain(self):
         reasoner = self._build_brain_deps()
         brain = ModularBrain(
             reasoner=reasoner,
@@ -167,9 +165,6 @@ class TestL1ProtocolCompliance(unittest.TestCase):
     def test_simple_event_bus(self):
         self.assertIsInstance(SimpleEventBus(), EventBus)
 
-    def test_simple_prompt_manager(self):
-        self.assertIsInstance(SimplePromptManager(), PromptManager)
-
     def test_simple_hook_registry(self):
         obs = ConsoleObservability()
         self.assertIsInstance(SimpleHookRegistry(obs), HookRegistry)
@@ -208,7 +203,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
             SimpleMemorySystem(),
             SimpleHookRegistry(obs),
             InMemoryStateStore(),
-            judge=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         self.assertIsInstance(runtime, Runtime)
 
@@ -243,7 +238,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             SimpleMemorySystem(),
             SimpleHookRegistry(obs),
             InMemoryStateStore(),
-            judge=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         return CognitiveAgent(runtime, rp), rp, runtime
 
@@ -268,15 +263,15 @@ class TestL3ProtocolCompliance(unittest.TestCase):
 
 
 class TestBrainFactoryRegistryIntegration(unittest.TestCase):
-    """验证 Brain 工厂注册表动态选择 Brain 策略。"""
+    """验证 Brain 工厂注册表动态选择 Brain 实现。"""
 
-    def test_default_strategy_registered(self):
+    def test_default_brain_registered(self):
         from lca.layer4_app.defaults import build_default_registries
 
         registries = build_default_registries()
         self.assertIn("default", registries.brain_factories)
 
-    def test_agent_with_string_strategy(self):
+    def test_agent_with_string_brain(self):
         from lca.layer4_app.api import Agent
 
         agent = Agent(
@@ -285,12 +280,12 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
             backstory="测试",
             tools=[CalculatorTool()],
             llm=MockLLMAdapter(),
-            brain_strategy="default",
+            brain="default",
         )
         result = asyncio.run(agent.run("1 + 2"))
         self.assertEqual(result.status, "completed")
 
-    def test_agent_with_custom_strategy(self):
+    def test_agent_with_custom_brain(self):
         from lca.contracts.decision import Reflection
         from lca.contracts.state import AgentState
         from lca.layer4_app.api import Agent
@@ -311,13 +306,13 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
             backstory="测试",
             tools=[],
             llm=MockLLMAdapter(),
-            brain_strategy=StubBrain(),
+            brain=StubBrain(),
         )
         result = asyncio.run(agent.run("anything"))
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.output, "stub")
 
-    def test_agent_with_unknown_strategy_raises(self):
+    def test_agent_with_unknown_brain_raises(self):
         from lca.layer4_app.api import Agent
 
         with self.assertRaises(ValueError) as ctx:
@@ -327,7 +322,7 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
                 backstory="测试",
                 tools=[],
                 llm=MockLLMAdapter(),
-                brain_strategy="nonexistent",
+                brain="nonexistent",
             )
         self.assertIn("nonexistent", str(ctx.exception))
 

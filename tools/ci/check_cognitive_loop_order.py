@@ -7,7 +7,7 @@
   → act
   → reflect
   → update_multi_level | update
-  → outcome_policy.resolve  (judge)
+  → stop_rule.decide  (StopRule; may also call outcome resolve internally)
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ EXPECTED_STEPS: list[tuple[str, frozenset[str]]] = [
     ("act", frozenset({"act"})),
     ("reflect", frozenset({"reflect"})),
     ("update", frozenset({"update_multi_level", "update"})),
-    ("judge", frozenset({"resolve"})),
+    ("stop", frozenset({"decide", "resolve"})),
 ]
 
 

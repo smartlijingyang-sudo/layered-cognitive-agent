@@ -111,14 +111,6 @@ class SupportsDecisionGate(Protocol):
 
 
 @runtime_checkable
-class PromptManager(Protocol):
-    """Prompt 模板管理：渲染 + 注册。"""
-
-    def render(self, template_name: str, variables: dict[str, Any]) -> str: ...
-    def register_template(self, name: str, template: str) -> None: ...
-
-
-@runtime_checkable
 class SkillRouter(Protocol):
     """运行时动态选择 Prompt 模板 / 工具子集。"""
 

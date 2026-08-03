@@ -2,8 +2,10 @@
 
 Sole module that assembles the full Agent / Team object graphs via the
 ``Assembly`` class. Entry points: ``Assembly.assemble_agent`` (single agent),
-``Assembly.assemble_team`` (team). Lower-level builders:
-``build_body_from_shared``, ``build_hooks``.
+``Assembly.assemble_team`` (team).
+
+Team transport channel builders live in ``team_wiring`` and are re-exported
+here for a stable composition-root import path.
 """
 
 from __future__ import annotations
@@ -15,7 +17,6 @@ from lca.contracts.budget import (
     DEFAULT_MAX_STEPS,
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
 )
-from lca.contracts.decision import Observation
 from lca.contracts.enums import (
     ComponentKind,
     DecisionGateName,
@@ -25,9 +26,11 @@ from lca.contracts.enums import (
 )
 from lca.contracts.graph import ExecutionGraph
 from lca.contracts.mechanisms import ComponentRegistryProtocol
-from lca.contracts.orchestration_taxonomy import SupervisorPlane
+from lca.contracts.orchestration_taxonomy import (
+    SupervisorPlane,
+    assert_supervisor_plane_gate_compatible,
+)
 from lca.contracts.protocols import (
-    AgentTransport,
     Body,
     Brain,
     BrainFactory,
@@ -44,10 +47,6 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.registries import Registries
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
-from lca.layer0_infra.transport.a2a_transport import A2ATransport
-from lca.layer0_infra.transport.agent_transport import InternalTransport
-from lca.layer0_infra.transport.mcp_transport import MCPTransport
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
 from lca.layer1_cognitive.body.fallback_policy import FallbackActionPolicy
@@ -55,7 +54,7 @@ from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
-from lca.layer2_runtime.default_loop_judge import DefaultStopRule
+from lca.layer2_runtime.default_stop_rule import DefaultStopRule
 from lca.layer2_runtime.event_emission import make_event_emitting_hook
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
@@ -63,6 +62,19 @@ from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.orchestration_registry import OrchestrationFactory
 from lca.layer3_agent.orchestration_strategies.graph import GraphStrategy
 from lca.layer4_app.defaults import build_default_registries
+from lca.layer4_app.team_wiring import (
+    build_default_transport_registry,
+    build_team_transport,
+)
+
+# Stable re-exports for tests and progressive-disclosure imports.
+__all__ = [
+    "Assembly",
+    "build_body_from_shared",
+    "build_default_transport_registry",
+    "build_hooks",
+    "build_team_transport",
+]
 
 T = TypeVar("T")
 
@@ -80,37 +92,6 @@ def _resolve_component(
             f"{category} expected {expected_type.__name__}, got {type(result).__name__}"
         )
     return result
-
-
-def build_default_transport_registry() -> TransportRegistry:
-    registry = TransportRegistry()
-    for t in (InternalTransport(), A2ATransport(), MCPTransport()):
-        registry.register(t)
-    return registry
-
-
-async def _call_member_for_channel(member: CognitiveAgent, subtask: str) -> Observation:
-    """Invoke a member for InternalTransport."""
-    from lca.contracts.delegation_context import get_current_delegator
-    from lca.contracts.run_context import RunContext
-
-    from_role = get_current_delegator()
-    result = await member.run(subtask, RunContext(from_role=from_role))
-    return Observation.from_result(result)
-
-
-def build_team_transport(
-    members: list[CognitiveAgent],
-) -> AgentTransport:
-    """Build in-process channel for a team."""
-    transport = InternalTransport()
-    for member in members:
-
-        async def _handler(subtask: str, _m: CognitiveAgent = member) -> Observation:
-            return await _call_member_for_channel(_m, subtask)
-
-        transport.register_agent(member.role_profile.role, _handler)
-    return transport
 
 
 def build_body_from_shared(
@@ -207,7 +188,7 @@ class Assembly:
         memory: str | MemorySystem = "simple",
         observability: str | Observability = "console",
         state_store: str | StateStore = "memory",
-        brain_strategy: str | Brain = "default",
+        brain: str | Brain = "default",
     ) -> CognitiveAgent:
         """Assemble a complete CognitiveAgent with a single shared pipeline.
 
@@ -241,20 +222,18 @@ class Assembly:
             tool_registry, safe_executor, transport_registry
         )
 
-        brain: Brain
-        if isinstance(brain_strategy, str):
-            strategy_reg = self._registries.brain_factories
-            if brain_strategy not in strategy_reg:
-                raise ValueError(
-                    f"Unknown brain_strategy: {brain_strategy!r}. Available: {strategy_reg.list()}"
-                )
+        resolved_brain: Brain
+        if isinstance(brain, str):
+            factory_reg = self._registries.brain_factories
+            if brain not in factory_reg:
+                raise ValueError(f"Unknown brain: {brain!r}. Available: {factory_reg.list()}")
             tools_desc = ", ".join(t.name for t in tools) or "(no tools available)"
-            factory = strategy_reg.resolve(brain_strategy)
-            brain = factory(
+            factory = factory_reg.resolve(brain)
+            resolved_brain = factory(
                 llm, role_profile, tools_desc, action_registry=action_registry, tools=tools
             )
         else:
-            brain = brain_strategy
+            resolved_brain = brain
 
         body = build_body_from_shared(
             tool_registry,
@@ -265,12 +244,12 @@ class Assembly:
         event_bus = _resolve_component(reg, ComponentKind.EVENT_BUS, "simple", EventBus)  # type: ignore[type-abstract]
         hooks = build_hooks(obs, event_bus)
         runtime = CognitiveRuntime(
-            brain,
+            resolved_brain,
             body,
             mem,
             hooks,
             ss,
-            judge=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         return CognitiveAgent(
             runtime,
@@ -306,11 +285,7 @@ class Assembly:
         process_val = process if process is not None else TeamProcess.HIERARCHICAL
         gate = decision_gate if decision_gate is not None else DecisionGateName.NONE
         plane = supervisor_plane if supervisor_plane is not None else SupervisorPlane.CONSULTATION
-        if plane is SupervisorPlane.ROUTING and gate is not DecisionGateName.NONE:
-            raise ValueError(
-                "SupervisorPlane.ROUTING does not support settlement gates; "
-                "use decision_gate=none or supervisor_plane=CONSULTATION"
-            )
+        assert_supervisor_plane_gate_compatible(plane, gate)
 
         config = TeamConfig(
             process=process_val,

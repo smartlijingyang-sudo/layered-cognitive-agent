@@ -7,9 +7,11 @@ import pytest
 from lca.contracts.enums import DecisionGateName, TeamProcess
 from lca.contracts.orchestration_taxonomy import (
     RESERVED_PROCESS_SLOTS,
+    ROUTING_SETTLEMENT_GATE_ERROR,
     OrchestrationFamily,
     SupervisorPlane,
     assert_process_family_complete,
+    assert_supervisor_plane_gate_compatible,
     family_of,
 )
 from lca.contracts.role_team import TeamConfig
@@ -46,3 +48,20 @@ def test_team_config_defaults_align_industry_free_supervisor() -> None:
 def test_reserved_slots_do_not_collide_with_live_processes() -> None:
     live = {p.value for p in TeamProcess}
     assert RESERVED_PROCESS_SLOTS.isdisjoint(live)
+
+
+def test_routing_plane_rejects_settlement_gate_with_single_message() -> None:
+    with pytest.raises(ValueError, match=ROUTING_SETTLEMENT_GATE_ERROR):
+        assert_supervisor_plane_gate_compatible(
+            SupervisorPlane.ROUTING, DecisionGateName.MUST_CONSULT_ALL
+        )
+
+
+def test_routing_plane_allows_none_gate() -> None:
+    assert_supervisor_plane_gate_compatible(SupervisorPlane.ROUTING, DecisionGateName.NONE)
+
+
+def test_consultation_plane_allows_settlement_gate() -> None:
+    assert_supervisor_plane_gate_compatible(
+        SupervisorPlane.CONSULTATION, DecisionGateName.MUST_CONSULT_ALL
+    )

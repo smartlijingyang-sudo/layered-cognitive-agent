@@ -74,8 +74,8 @@ class Agent:
         ``"console"`` (default), ``"jsonl_file"``, or an ``Observability`` instance.
     state_store:
         ``"memory"`` (default) or a ``StateStore`` instance.
-    brain_strategy:
-        ``"default"`` or a registered strategy name / ``Brain`` instance.
+    brain:
+        ``"default"`` or a registered brain factory name / ``Brain`` instance.
     assembly:
         Optional. Pass your own ``Assembly`` to isolate composition state
         (e.g. custom registered implementations, or test isolation); when
@@ -94,7 +94,7 @@ class Agent:
         memory: str | MemorySystem = "simple",
         observability: str | Observability = "console",
         state_store: str | StateStore = "memory",
-        brain_strategy: str | Brain = "default",
+        brain: str | Brain = "default",
         assembly: Assembly | None = None,
     ) -> None:
         target = assembly or _get_default_assembly()
@@ -109,7 +109,7 @@ class Agent:
             memory=memory,
             observability=observability,
             state_store=state_store,
-            brain_strategy=brain_strategy,
+            brain=brain,
         )
 
     async def run(self, task: str) -> Result:

@@ -27,7 +27,7 @@ from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
 from lca.layer1_cognitive.brain.skill_router import StaticSkillRouter
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
-from lca.layer2_runtime.default_loop_judge import DefaultStopRule
+from lca.layer2_runtime.default_stop_rule import DefaultStopRule
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer4_app.api import Agent, MultiAgentTeam
@@ -125,7 +125,7 @@ class TestCheckpointResume:
             memory=_Mem(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
             hooks=SimpleHookRegistry(ConsoleObservability()),
             state_store=store,
-            judge=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         result = await rt.run("checkpoint me", max_steps=3)
         assert result.status == TaskStatus.COMPLETED
