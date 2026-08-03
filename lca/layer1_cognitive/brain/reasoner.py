@@ -1,9 +1,10 @@
 """Reasoner — call LLM to generate candidate thoughts.
 
 ``SimpleReasoner`` is team-agnostic (solo / member default brain).
-``SupervisorReasoner`` is the hierarchical-supervisor cognitive path:
-always hierarchical prompt + consultation board. Installed at
-composition time by ``TeamOrchestrator._bind_supervisor``.
+``SupervisorReasoner`` serves SUPERVISOR-family planes:
+- consultation → hierarchical_prompt + board
+- routing → routing_prompt + soft assignment log
+Installed at composition time by ``SupervisorBinder``.
 """
 
 from __future__ import annotations
@@ -16,7 +17,9 @@ from lca.contracts.state import AgentState
 
 _DEFAULT_TEMPLATE = "react_prompt"
 _HIERARCHICAL_TEMPLATE = "hierarchical_prompt"
+_ROUTING_TEMPLATE = "routing_prompt"
 _EMPTY_TEAMMATES = "(无可用队友)"
+_EMPTY_ASSIGNED = "(尚未委派)"
 
 
 def build_teammates_text(profiles: list[RoleProfile]) -> str:
@@ -81,14 +84,7 @@ class SimpleReasoner(Reasoner):
 
 
 class SupervisorReasoner(Reasoner):
-    """Hierarchical supervisor reasoner — bounded LLM discretion over consultation.
-
-    Always uses ``hierarchical_prompt``. Requires ``state.consultation``
-    (installed via ``RunContext`` by ``HierarchicalStrategy``). Which
-    waiting role to consult next and how to phrase the subtask is LLM
-    discretion when multiple roles remain; the decision gate enforces
-    the settlement invariant after the fact.
-    """
+    """SUPERVISOR-family reasoner for consultation and free routing planes."""
 
     def __init__(
         self,
@@ -123,29 +119,21 @@ class SupervisorReasoner(Reasoner):
         self._templates[name] = template
 
     async def generate_candidates(self, state: AgentState, n: int = 1) -> list[str]:
-        consultation = state.consultation
-        if consultation is None:
-            raise ValueError(
-                "SupervisorReasoner requires AgentState.consultation; "
-                "bind hierarchical supervisor via TeamOrchestrator / HierarchicalStrategy"
-            )
         context_lines = (
             "\n".join(f"- [{r.memory_type.value}] {r.content}" for r in state.retrieved_context)
             or "(无历史上下文)"
         )
-        status_text = consultation.member_status.as_prompt_text()
-        base_vars = {
-            "role": self.role_profile.role,
-            "goal": self.role_profile.goal,
-            "backstory": self.role_profile.backstory,
-            "tools": self.tools_desc,
-            "task": state.task,
-            "context": context_lines,
-            "allowed_actions": self.allowed_actions_desc,
-            "teammates": build_teammates_text(consultation.teammates),
-            "member_status_text": status_text,
-        }
-        template_name = state.active_template or _HIERARCHICAL_TEMPLATE
+        if state.consultation is not None:
+            base_vars = self._consultation_vars(state, context_lines)
+            template_name = state.active_template or _HIERARCHICAL_TEMPLATE
+        elif state.routing is not None:
+            base_vars = self._routing_vars(state, context_lines)
+            template_name = state.active_template or _ROUTING_TEMPLATE
+        else:
+            raise ValueError(
+                "SupervisorReasoner requires AgentState.consultation or .routing; "
+                "bind via TeamOrchestrator / HierarchicalStrategy"
+            )
         subtasks = state.working_memory.get("subtasks")
         if subtasks:
             base_vars["context"] = (
@@ -156,3 +144,37 @@ class SupervisorReasoner(Reasoner):
         for _ in range(max(1, n)):
             candidates.append(await self.llm.complete(prompt, tools=self.tools))
         return candidates
+
+    def _consultation_vars(self, state: AgentState, context_lines: str) -> dict[str, str]:
+        consultation = state.consultation
+        if consultation is None:
+            raise ValueError("consultation session required")
+        return {
+            "role": self.role_profile.role,
+            "goal": self.role_profile.goal,
+            "backstory": self.role_profile.backstory,
+            "tools": self.tools_desc,
+            "task": state.task,
+            "context": context_lines,
+            "allowed_actions": self.allowed_actions_desc,
+            "teammates": build_teammates_text(consultation.teammates),
+            "member_status_text": consultation.member_status.as_prompt_text(),
+        }
+
+    def _routing_vars(self, state: AgentState, context_lines: str) -> dict[str, str]:
+        routing = state.routing
+        if routing is None:
+            raise ValueError("routing session required")
+        assigned = ", ".join(routing.assigned_roles) if routing.assigned_roles else _EMPTY_ASSIGNED
+        return {
+            "role": self.role_profile.role,
+            "goal": self.role_profile.goal,
+            "backstory": self.role_profile.backstory,
+            "tools": self.tools_desc,
+            "task": state.task,
+            "context": context_lines,
+            "allowed_actions": self.allowed_actions_desc,
+            "teammates": build_teammates_text(routing.teammates),
+            "assigned_roles_text": assigned,
+            "notes": routing.notes or "(无)",
+        }

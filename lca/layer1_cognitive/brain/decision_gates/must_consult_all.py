@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.decision import Decision, DelegationSpec
+from lca.contracts.decision import Decision, DelegationSpec, iter_delegation_specs
 from lca.contracts.enums import ActionType
 from lca.contracts.ids import new_id
 from lca.contracts.protocols import DecisionGate
@@ -17,10 +17,24 @@ def _infer_subtask(task: str, role: str) -> str:
 
 
 def _delegate_decision(task: str, role: str, *, rationale: str) -> Decision:
+    spec = DelegationSpec(target_role=role, subtask=_infer_subtask(task, role))
     return Decision(
         decision_id=new_id("dec"),
         action_type=ActionType.DELEGATE,
-        delegate_to=DelegationSpec(target_role=role, subtask=_infer_subtask(task, role)),
+        delegate_to=spec,
+        delegate_targets=[spec],
+        rationale=rationale,
+        confidence=1.0,
+    )
+
+
+def _multi_delegate_decision(task: str, roles: list[str], *, rationale: str) -> Decision:
+    specs = [DelegationSpec(target_role=role, subtask=_infer_subtask(task, role)) for role in roles]
+    return Decision(
+        decision_id=new_id("dec"),
+        action_type=ActionType.DELEGATE,
+        delegate_to=specs[0] if specs else None,
+        delegate_targets=specs,
         rationale=rationale,
         confidence=1.0,
     )
@@ -38,24 +52,9 @@ def _respond_override(rationale: str) -> Decision:
 class MustConsultAllMembers(DecisionGate):
     """Rewrite decisions that violate the "all required roles must settle" invariant.
 
-    Implements ``DecisionGate.enforce`` (required) and structurally satisfies
-    ``SupportsShortcut.try_shortcut`` (optional — not declared as a base class,
-    same convention as ``SimpleBody`` satisfying ``HasChannel``).
-
-    ``try_shortcut`` only short-circuits when exactly one required role is still
-    waiting: the one case where ``compute_required_action()``'s outcome cannot
-    change no matter what the LLM says, so asking it is pure waste. Two or
-    more waiting roles is left to the cognitive pipeline — which role to
-    consult next, and how to phrase the ask, is genuine LLM discretion that
-    ``enforce`` below already knows how to validate after the fact.
-
-    ``enforce`` is unchanged in behavior from before try_shortcut existed: it
-    remains the single correctness backstop regardless of whether try_shortcut
-    ran, fired, or exists at all on some other DecisionGate.
-
-    Scope: only RESPOND and DELEGATE are intercepted. HANDOFF / USE_TOOL
-    pass through unchanged. Extending gate jurisdiction is an explicit
-    product decision, declared out-of-scope in ADR-0025.
+    With multi-delegate support: when multiple roles are waiting, a DELEGATE
+    whose targets are a non-empty subset of waiting is accepted; shortcut may
+    fan-out to **all** waiting roles in one step.
     """
 
     async def try_shortcut(self, state: AgentState) -> Decision | None:
@@ -63,12 +62,18 @@ class MustConsultAllMembers(DecisionGate):
         if board is None:
             return None
         waiting = board.waiting_roles()
-        if len(waiting) != 1:
+        if not waiting:
             return None
-        return _delegate_decision(
+        if len(waiting) == 1:
+            return _delegate_decision(
+                state.task,
+                waiting[0],
+                rationale="[框架短路] 唯一待咨询角色已确定，跳过本轮 LLM 调用",
+            )
+        return _multi_delegate_decision(
             state.task,
-            waiting[0],
-            rationale="[框架短路] 唯一待咨询角色已确定，跳过本轮 LLM 调用",
+            waiting,
+            rationale="[框架短路] 并行咨询全部待结算角色，跳过本轮 LLM 调用",
         )
 
     async def enforce(
@@ -90,20 +95,27 @@ class MustConsultAllMembers(DecisionGate):
                 return _respond_override("[框架强制] 所有必需角色已结算,无需进一步委派")
             return decision
 
-        # required.kind == "must_delegate"; try_shortcut already short-circuits
-        # len(waiting) == 1, so reaching here means >= 2 waiting roles.
         waiting_set = set(board.waiting_roles())
+        specs = iter_delegation_specs(decision)
+        target_roles = {s.target_role for s in specs if s.target_role}
         already_correct = (
             decision.action_type == ActionType.DELEGATE
-            and decision.delegate_to is not None
-            and decision.delegate_to.target_role in waiting_set
+            and bool(target_roles)
+            and target_roles.issubset(waiting_set)
         )
         if already_correct:
             return decision
 
+        # Prefer fan-out all waiting when LLM missed the mark entirely.
+        if len(waiting_set) > 1:
+            return _multi_delegate_decision(
+                state.task,
+                board.waiting_roles(),
+                rationale="[框架强制] 尚有必需角色未完成结算,并行委派全部等待角色",
+            )
         target = required.target_role
         if target is None:
-            return decision  # defensive: compute_required_action invariant
+            return decision
         return _delegate_decision(
             state.task,
             target,

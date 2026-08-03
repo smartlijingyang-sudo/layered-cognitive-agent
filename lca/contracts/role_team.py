@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from lca.contracts.enums import DecisionGateName, MemoryLayer, TeamProcess
+from lca.contracts.orchestration_taxonomy import SupervisorPlane
 
 
 @dataclass
@@ -51,11 +52,18 @@ class RoleProfile:
 
 @dataclass
 class TeamConfig:
-    """团队编排配置：过程模式 + 共享记忆层 + 收尾策略。"""
+    """团队编排配置：process（族内拓扑）+ gate（结算强度）+ 共享记忆等。
+
+    正交维度见 ADR-0027：
+    - ``process`` → ``TeamProcessStrategy`` / ``OrchestrationFamily``
+    - ``decision_gate`` → SUPERVISOR 结算不变量（默认 none = 业界自由经理）
+    - ``supervisor_plane`` → consultation（已实现）vs routing（预留）
+    """
 
     process: TeamProcess
     shared_memory_layers: list[MemoryLayer] = field(default_factory=list)
     max_rounds: int | None = None
     graph_definition_ref: str | None = None
-    decision_gate: DecisionGateName = DecisionGateName.MUST_CONSULT_ALL
+    decision_gate: DecisionGateName = DecisionGateName.NONE
     delegate_max_attempts: int = 3
+    supervisor_plane: SupervisorPlane = SupervisorPlane.CONSULTATION

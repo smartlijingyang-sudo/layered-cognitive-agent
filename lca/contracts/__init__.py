@@ -15,6 +15,7 @@ from lca.contracts.decision import (
     Observation,
     Reflection,
     ToolCall,
+    iter_delegation_specs,
 )
 from lca.contracts.graph import (
     ExecutionGraph,
@@ -33,6 +34,15 @@ from lca.contracts.mechanisms import (
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.observability import Event, TraceSpan
+from lca.contracts.orchestration_taxonomy import (
+    INDUSTRY_PATTERN_SLOTS,
+    PROCESS_FAMILY,
+    RESERVED_PROCESS_SLOTS,
+    OrchestrationFamily,
+    SupervisorPlane,
+    assert_process_family_complete,
+    family_of,
+)
 from lca.contracts.protocols import DecisionGate, SharedMemoryStore, TransportRegistryProtocol
 from lca.contracts.registries import Registries
 from lca.contracts.result import (
@@ -48,6 +58,11 @@ from lca.contracts.role_team import (
     TeamConfig,
     ToolPermissionManifest,
 )
+from lca.contracts.routing import (
+    ROUTING_FIELD_WHITELIST,
+    RoutingState,
+    assert_routing_field_whitelist,
+)
 from lca.contracts.run_context import RunContext
 from lca.contracts.state import AgentState, Budget, StateSnapshot
 from lca.contracts.stop import (
@@ -59,6 +74,10 @@ from lca.contracts.types import StopOutcome, Turn
 
 __all__ = [
     "CONSULTATION_FIELD_WHITELIST",
+    "INDUSTRY_PATTERN_SLOTS",
+    "PROCESS_FAMILY",
+    "RESERVED_PROCESS_SLOTS",
+    "ROUTING_FIELD_WHITELIST",
     "Action",
     "ActionRegistryProtocol",
     "AgentCard",
@@ -87,11 +106,13 @@ __all__ = [
     "MemoryRecord",
     "NamedRegistryProtocol",
     "Observation",
+    "OrchestrationFamily",
     "Reflection",
     "Registries",
     "Result",
     "RetryPolicy",
     "RoleProfile",
+    "RoutingState",
     "RunContext",
     "SharedMemoryStore",
     "StateSnapshot",
@@ -99,6 +120,7 @@ __all__ = [
     "StopOutcome",
     "StopReason",
     "StopRule",
+    "SupervisorPlane",
     "TaskStatus",
     "TeamConfig",
     "TeamMessage",
@@ -109,5 +131,9 @@ __all__ = [
     "TransportRegistryProtocol",
     "Turn",
     "assert_consultation_field_whitelist",
+    "assert_process_family_complete",
+    "assert_routing_field_whitelist",
     "create_budget",
+    "family_of",
+    "iter_delegation_specs",
 ]

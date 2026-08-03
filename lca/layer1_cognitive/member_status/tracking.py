@@ -12,7 +12,7 @@ control plane injected by ``HierarchicalStrategy``.
 
 from __future__ import annotations
 
-from lca.contracts.decision import Decision, Observation
+from lca.contracts.decision import Decision, DelegationSpec, Observation, iter_delegation_specs
 from lca.contracts.enums import RoleStatus
 from lca.contracts.semantic_keys import (
     FAILURE_KIND,
@@ -39,13 +39,15 @@ def _next_role_status(
     return RoleStatus.PENDING
 
 
-def update_member_status(state: AgentState, decision: Decision, observation: Observation) -> None:
-    """Update the consultation board after a delegate action completes."""
+def update_member_status_for_spec(
+    state: AgentState, spec: DelegationSpec, observation: Observation
+) -> None:
+    """Update the consultation board for one delegation target."""
     consultation = state.consultation
-    if consultation is None or decision.delegate_to is None:
+    if consultation is None:
         return
     board = consultation.member_status
-    role = decision.delegate_to.target_role
+    role = spec.target_role
     if role is None or role not in board.required_roles:
         return
 
@@ -64,3 +66,23 @@ def update_member_status(state: AgentState, decision: Decision, observation: Obs
         max_attempts=consultation.delegate_max_attempts,
     )
     consultation.member_status = board.mark(role, new_status)
+
+
+def update_member_status(state: AgentState, decision: Decision, observation: Observation) -> None:
+    """Update the consultation board after a (single) delegate action completes."""
+    specs = iter_delegation_specs(decision)
+    if len(specs) != 1:
+        # Multi-path updates each spec explicitly in DelegateOperation.
+        if len(specs) == 0 and decision.delegate_to is not None:
+            update_member_status_for_spec(state, decision.delegate_to, observation)
+        return
+    update_member_status_for_spec(state, specs[0], observation)
+
+
+def record_routing_assignment(state: AgentState, spec: DelegationSpec) -> None:
+    """Soft-log assigned role on free routing plane (advisory only)."""
+    routing = state.routing
+    if routing is None or not spec.target_role:
+        return
+    if spec.target_role not in routing.assigned_roles:
+        routing.assigned_roles.append(spec.target_role)

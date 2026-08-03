@@ -95,6 +95,16 @@ uv run pytest -m real_llm -v
 真实 LLM 测试的断言策略：验证结构化事件（`status == "completed"`、`total_steps >= N`），
 不验证具体文案（真实模型措辞不可预测）。
 
+## 编排族与业界插槽（ADR-0027 / ADR-0028）
+
+- **Family**：`SUPERVISOR` / `CHOREOGRAPHY` / `PEER` / `GRAPH` — `orchestration_taxonomy.py`
+- **process** = 族内拓扑；**decision_gate** = 结算强度（默认 `none`）
+- **supervisor_plane**：`consultation`（结算 board）/ `routing`（自由 PM，`RoutingState`）
+- 全员咨询：`hierarchical` + `must_consult_all` + plane consultation（支持 multi-delegate 并行）
+- 自由 PM：`hierarchical` + `supervisor_plane=routing` + gate none
+- PEER：`handoff`（首成即返）/ `swarm`（轮询累积）— `PeerStrategy`
+- 控制面隔离：Consultation / Routing 各有白名单；禁止互塞
+
 ## 如何新增团队场景
 
 在 `tests/fixtures/team_scenarios/` 下新增 YAML 文件，结构参考 `ecommerce_launch.yaml`：
@@ -110,6 +120,7 @@ roles:
 teams:
   my_team:
     process: hierarchical  # hierarchical / sequential / parallel / handoff
+    decision_gate: must_consult_all  # 可选；默认 none（自由经理）
     supervisor: supervisor_role  # hierarchical 模式必须
     members: [role1, role2]
 

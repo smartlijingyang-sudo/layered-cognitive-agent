@@ -21,5 +21,7 @@ CONTEXT:
 5. 你的目标是高效收集所有关键视角后产出综合回复，既不遗漏队友也不重复委派。
 
 请以 JSON 输出下一步 Decision，必须包含字段：action_type, rationale, confidence。
-当 action_type 为 "delegate" 时，还必须包含 target_role 和 subtask。
+当 action_type 为 "delegate" 时：
+- 单目标：target_role, subtask
+- 多目标并行：delegate_targets 数组（每项含 target_role 与 subtask）
 当 action_type 为 "respond" 时，必须包含 response_text。

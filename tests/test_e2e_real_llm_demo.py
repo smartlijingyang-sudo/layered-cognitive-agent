@@ -303,6 +303,7 @@ class TestHierarchicalTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             members=[market_analyst, pricing_specialist, copywriter],
             process="hierarchical",
             supervisor=supervisor,
+            decision_gate="must_consult_all",
         )
 
         result = await team.run("新品：无线降噪耳机，目标市场：东南亚，请给出是否上市的完整评估")

@@ -1,9 +1,9 @@
-"""ChoreographyStrategy — sequential / parallel / handoff / debate in one class.
+"""ChoreographyStrategy — sequential / parallel / debate.
 
-Replaces 4 separate strategy classes with a single dispatch-table-driven
-strategy. All four topologies are external choreography — they call members
-directly via ``invoke_member`` without going through a supervisor's
-cognitive loop.
+CHOREOGRAPHY family (ADR-0027): external topology advances members via
+``invoke_member``, not a supervisor cognitive loop.
+
+PEER topologies (handoff / swarm) live in ``peer.PeerStrategy``.
 """
 
 from __future__ import annotations
@@ -24,7 +24,6 @@ class ChoreographyStrategy(TeamProcessStrategy):
     Topologies:
     - ``sequential``: chain A → B → C, output passes to next member
     - ``parallel``: all members run concurrently, optional synthesizer aggregates
-    - ``handoff``: sequential, first completed wins (no output chaining)
     - ``debate``: multi-round parallel, exits on consensus
     """
 
@@ -50,14 +49,6 @@ class ChoreographyStrategy(TeamProcessStrategy):
     ) -> Result:
         return await invoke_members_sequential(
             context, objective, pass_output_as_next_task=True, stop_on_first_completed=False
-        )
-
-    @staticmethod
-    async def _run_handoff(
-        _self: ChoreographyStrategy, context: TeamContext, objective: str
-    ) -> Result:
-        return await invoke_members_sequential(
-            context, objective, pass_output_as_next_task=False, stop_on_first_completed=True
         )
 
     @staticmethod
@@ -138,6 +129,5 @@ async def _arbitrate(self: ChoreographyStrategy, objective: str, results: list[R
 _DISPATCH: dict[str, Callable[..., Awaitable[Result]]] = {
     "sequential": ChoreographyStrategy._run_sequential,
     "parallel": ChoreographyStrategy._run_parallel,
-    "handoff": ChoreographyStrategy._run_handoff,
     "debate": ChoreographyStrategy._run_debate,
 }

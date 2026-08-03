@@ -6,7 +6,11 @@
 |---|---|
 | **Agent** | L4 门面：角色 + 工具 + LLM，`await agent.run(task)` |
 | **MultiAgentTeam** | L4 团队门面：`members` + `TeamProcess`，`await team.run(objective)` |
-| **TeamProcess** | 协作方式：hierarchical / sequential / parallel / graph / debate / handoff |
+| **TeamProcess** | 族内拓扑：hierarchical / sequential / parallel / graph / debate / handoff / swarm |
+| **OrchestrationFamily** | 控制权归属族：supervisor / choreography / peer / graph（ADR-0027） |
+| **multi-delegate** | 一步并行委派多个角色（`delegate_targets` + `DelegateOperation` gather） |
+| **RoutingState** | SUPERVISOR 自由 PM 控制面（无全员结算）；与 ConsultationState 隔离 |
+| **PeerStrategy** | PEER 族：handoff（首成即返）/ swarm（轮询累积） |
 | **Result** | 运行最终结果：status / output / budget / error |
 | **run** | 全链路唯一生命周期动词（Agent / Team / CognitiveLoop） |
 
@@ -21,14 +25,16 @@
 | **TeamUnit** | 团队入口协议（原 TeamEntrypoint） |
 | **AgentUnit** | 单体入口协议（原 AgentEntrypoint） |
 | **teammates_text** | 写进提示词的「队友是谁」（由 `build_teammates_text` 从 ConsultationState.teammates 渲染） |
-| **ConsultationState** / **HierarchicalConsultation** | hierarchical 结算控制面（board / teammates / retry）；字段白名单锁定；solo/member 为 None |
+| **ConsultationState** / **HierarchicalConsultation** | SUPERVISOR·consultation 控制面（board / teammates / retry）；字段白名单锁定；solo/member 为 None |
+| **SupervisorPlane** | SUPERVISOR 控制面种类：consultation（已实现）/ routing（预留） |
+| **DecisionGate**（配置） | 结算强度：默认 `none`（自由经理）；`must_consult_all` 为咨询合规 opt-in |
 | **SupervisorBinder** | 组装期绑定 channel + gate + supervisor cognition；失败显式抛 `SupervisorBindError` |
 | **MemberStatus** | 必问成员是否已咨询完毕（原 DelegationLedger / team_progress） |
 | **InMemoryMemberStatus** | MemberStatus 默认不可变实现 |
 | **AgentChannel** / **AgentTransport** | 成员间任务通道；内置 Internal / A2A / MCP Transport |
 | **SharedMemory** / **SharedMemoryStore** / **TeamSharedMemory** | 团队共享记忆 |
 | **SharedMemoryTool** | 将共享记忆包装为普通 Tool |
-| **DecisionGate** | 决策出/入门硬规则（`enforce` 必选出门校验，`SupportsShortcut` 可选入门快速路径） |
+| **DecisionGate**（组件） | 决策出/入门硬规则（`enforce` 必选出门校验，`SupportsShortcut` 可选入门快速路径） |
 | **SupportsShortcut** | 可选能力：DecisionGate 在 LLM 之前提供确定性快速路径（`try_shortcut`） |
 | **MustConsultAllMembers** | 未咨询完所有必需角色时禁止 respond（原 RosterCoverage） |
 | **RunContext** | 一次 `run` 的调用元数据（trace_id / from_role / deadline；可选 consultation） |

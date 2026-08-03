@@ -26,6 +26,7 @@ from lca.layer3_agent.orchestration_strategies import (
     ChoreographyStrategy,
     GraphStrategy,
     HierarchicalStrategy,
+    PeerStrategy,
 )
 from lca.layer4_app.policies import SupervisorBudgetPolicy
 
@@ -45,8 +46,9 @@ def register_defaults(registries: Registries) -> None:
 
     registries.brain_factories.register("default", SimpleBrainFactory())
 
+    # Process → strategy (topology). Family map: orchestration_taxonomy (ADR-0027).
     orch = registries.orchestration
-    orch.register(TeamProcess.HIERARCHICAL, HierarchicalStrategy)
+    orch.register(TeamProcess.HIERARCHICAL, HierarchicalStrategy)  # SUPERVISOR
     orch.register(TeamProcess.SEQUENTIAL, lambda: ChoreographyStrategy("sequential"))
     orch.register(
         TeamProcess.PARALLEL,
@@ -54,8 +56,10 @@ def register_defaults(registries: Registries) -> None:
     )
     orch.register(TeamProcess.GRAPH, GraphStrategy)
     orch.register(TeamProcess.DEBATE, lambda: ChoreographyStrategy("debate"))
-    orch.register(TeamProcess.HANDOFF, lambda: ChoreographyStrategy("handoff"))
+    orch.register(TeamProcess.HANDOFF, lambda: PeerStrategy("handoff"))
+    orch.register(TeamProcess.SWARM, lambda: PeerStrategy("swarm"))
 
+    # Settlement gates are opt-in; default TeamConfig.decision_gate is NONE.
     reg.register(
         ComponentKind.DECISION_GATE, DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers
     )

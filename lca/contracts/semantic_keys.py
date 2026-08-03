@@ -11,6 +11,8 @@ from __future__ import annotations
 FAILURE_KIND = "failure_kind"
 FALLBACK_DEGRADED_FROM = "degraded_from_action_type"
 OBS_TASK_ID = "task_id"
+OBS_TASK_IDS = "task_ids"
+OBS_MEMBER_RESULTS = "member_results"
 OBS_HANDOFF = "handoff"
 
 # Decision.extra

@@ -19,7 +19,8 @@ Example::
 from __future__ import annotations
 
 from lca.contracts.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
-from lca.contracts.enums import MemoryLayer, TeamProcess
+from lca.contracts.enums import DecisionGateName, MemoryLayer, TeamProcess
+from lca.contracts.orchestration_taxonomy import SupervisorPlane
 from lca.contracts.protocols import (
     Brain,
     LLMAdapter,
@@ -123,7 +124,7 @@ class MultiAgentTeam:
     members:
         The agents participating in this team.
     process:
-        Orchestration pattern (hierarchical, sequential, parallel, etc.).
+        Topology within an orchestration family (see ADR-0027).
     supervisor:
         Optional supervisor agent (required for ``HIERARCHICAL`` process).
     max_rounds:
@@ -134,6 +135,14 @@ class MultiAgentTeam:
         Reference to a graph definition (for ``GRAPH`` process).
     strategy:
         Optional custom ``TeamProcessStrategy`` override.
+    decision_gate:
+        SUPERVISOR settlement strength. Default ``none`` (free supervisor).
+        Use ``must_consult_all`` for full consultation compliance.
+    supervisor_plane:
+        SUPERVISOR control-plane kind. Only ``consultation`` is implemented;
+        ``routing`` is reserved (ADR-0027).
+    delegate_max_attempts:
+        Per-role delegate retries on the consultation board.
     assembly:
         Optional. Pass your own ``Assembly`` to isolate composition state;
         when omitted, the process-default lazily-constructed Assembly is used.
@@ -148,6 +157,9 @@ class MultiAgentTeam:
         shared_memory_layers: list[MemoryLayer] | None = None,
         graph_definition_ref: str | None = None,
         strategy: TeamProcessStrategy | None = None,
+        decision_gate: DecisionGateName | None = None,
+        supervisor_plane: SupervisorPlane | None = None,
+        delegate_max_attempts: int | None = None,
         assembly: Assembly | None = None,
     ) -> None:
         target = assembly or _get_default_assembly()
@@ -161,6 +173,9 @@ class MultiAgentTeam:
             shared_memory_layers=shared_memory_layers,
             graph_definition_ref=graph_definition_ref,
             strategy=strategy,
+            decision_gate=decision_gate,
+            supervisor_plane=supervisor_plane,
+            delegate_max_attempts=delegate_max_attempts,
         )
 
     async def run(self, objective: str) -> Result:

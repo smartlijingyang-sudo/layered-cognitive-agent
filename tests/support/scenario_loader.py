@@ -13,6 +13,8 @@ from typing import Any
 
 import yaml
 
+from lca.contracts.enums import DecisionGateName
+from lca.contracts.orchestration_taxonomy import SupervisorPlane
 from lca.contracts.protocols import LLMAdapter, Tool
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer4_app.api import Agent, MultiAgentTeam
@@ -44,6 +46,8 @@ class TeamSpec:
     process: str  # hierarchical / sequential / parallel / handoff
     members: list[str] = field(default_factory=list)
     supervisor: str | None = None
+    decision_gate: str | None = None  # none / must_consult_all (ADR-0027)
+    supervisor_plane: str | None = None  # consultation (routing reserved)
 
 
 @dataclass
@@ -121,6 +125,8 @@ def _parse_scenario(raw: dict[str, Any]) -> ScenarioSpec:
             process=team_raw["process"],
             members=team_raw.get("members", []),
             supervisor=team_raw.get("supervisor"),
+            decision_gate=team_raw.get("decision_gate"),
+            supervisor_plane=team_raw.get("supervisor_plane"),
         )
 
     # Cases
@@ -190,6 +196,15 @@ def build_team(
     team_spec = spec.teams[team_key]
     members = [build_agent(spec.roles[k], llm) for k in team_spec.members]
 
+    gate = (
+        DecisionGateName(team_spec.decision_gate) if team_spec.decision_gate is not None else None
+    )
+    plane = (
+        SupervisorPlane(team_spec.supervisor_plane)
+        if team_spec.supervisor_plane is not None
+        else None
+    )
+
     if team_spec.process == "hierarchical":
         if team_spec.supervisor is None:
             msg = "hierarchical team requires a 'supervisor' key"
@@ -203,9 +218,16 @@ def build_team(
             members=members,
             process="hierarchical",
             supervisor=supervisor,
+            decision_gate=gate,
+            supervisor_plane=plane,
         )
 
-    return MultiAgentTeam(members=members, process=team_spec.process)
+    return MultiAgentTeam(
+        members=members,
+        process=team_spec.process,
+        decision_gate=gate,
+        supervisor_plane=plane,
+    )
 
 
 def list_scenarios() -> list[Path]:

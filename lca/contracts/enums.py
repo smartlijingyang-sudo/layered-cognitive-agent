@@ -29,6 +29,7 @@ class TeamProcess(str, Enum):
     GRAPH = "graph"
     DEBATE = "debate"
     HANDOFF = "handoff"
+    SWARM = "swarm"
 
 
 class DecisionGateName(str, Enum):

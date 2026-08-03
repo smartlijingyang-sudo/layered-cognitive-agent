@@ -46,6 +46,7 @@ class SimpleBrainFactory:
             templates={
                 "react_prompt": load_builtin_prompt("react_prompt"),
                 "hierarchical_prompt": load_builtin_prompt("hierarchical_prompt"),
+                "routing_prompt": load_builtin_prompt("routing_prompt"),
             },
             allowed_actions_desc=allowed_actions_desc,
         )

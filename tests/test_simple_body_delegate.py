@@ -171,7 +171,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(ToolExecutionError) as ctx:
             await body.act(decision, _make_state())
-        self.assertIn("delegate_to", str(ctx.exception))
+        self.assertIn("delegate", str(ctx.exception))
 
     async def test_agent_not_found_returns_failed_observation(self) -> None:
         transport = InternalTransport()

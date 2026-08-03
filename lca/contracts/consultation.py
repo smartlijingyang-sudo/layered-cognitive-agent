@@ -1,8 +1,11 @@
-"""Hierarchical supervisor control-plane session.
+"""SUPERVISOR-family consultation control-plane session (ADR-0026 / ADR-0027).
 
-``ConsultationState`` (alias ``HierarchicalConsultation``) is **only** for the
-hierarchical team process: required-role settlement, teammate roster for the
-supervisor prompt, and delegate retry counters.
+``ConsultationState`` (alias ``HierarchicalConsultation``) is **only** for
+``SupervisorPlane.CONSULTATION``: required-role settlement, teammate roster
+for the supervisor prompt, and delegate retry counters.
+
+Free industry-style routing belongs in a future ``RoutingState``
+(``SupervisorPlane.ROUTING``), not here.
 
 It is intentionally **not** a generic multi-agent session bag.
 

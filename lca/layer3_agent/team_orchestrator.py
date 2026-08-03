@@ -5,6 +5,7 @@ from __future__ import annotations
 from lca.contracts.enums import ComponentKind, DecisionGateName
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.message import AgentMessage, agent_message_as_text
+from lca.contracts.orchestration_taxonomy import SupervisorPlane
 from lca.contracts.protocols import (
     AgentTransport,
     SharedMemoryStore,
@@ -61,13 +62,26 @@ class TeamOrchestrator(TeamUnit):
 
         member_status: MemberStatus | None = None
         if supervisor is not None:
-            member_status = self._create_member_status(members, registries)
-            policy = self._resolve_decision_gate(config, registries)
-            self._supervisor_binder.bind(
-                supervisor,
-                transport=transport,
-                policy=policy,
-            )
+            if config.supervisor_plane is SupervisorPlane.ROUTING:
+                if config.decision_gate is not DecisionGateName.NONE:
+                    raise ValueError(
+                        "SupervisorPlane.ROUTING does not support settlement gates; "
+                        "use decision_gate=none or supervisor_plane=CONSULTATION"
+                    )
+                # Free PM: channel + supervisor cognition, no board / gate.
+                self._supervisor_binder.bind(
+                    supervisor,
+                    transport=transport,
+                    policy=None,
+                )
+            else:
+                member_status = self._create_member_status(members, registries)
+                policy = self._resolve_decision_gate(config, registries)
+                self._supervisor_binder.bind(
+                    supervisor,
+                    transport=transport,
+                    policy=policy,
+                )
 
         self._context = TeamContext(
             members=members,
@@ -93,7 +107,8 @@ class TeamOrchestrator(TeamUnit):
 
     @staticmethod
     def _resolve_decision_gate(config: TeamConfig, registries: Registries) -> DecisionGate | None:
-        policy_name = config.decision_gate if config else DecisionGateName.MUST_CONSULT_ALL
+        # Default NONE = industry free supervisor (ADR-0027); settlement is opt-in.
+        policy_name = config.decision_gate if config else DecisionGateName.NONE
         if policy_name == DecisionGateName.NONE:
             return None
         factory = registries.components.require(ComponentKind.DECISION_GATE, policy_name)

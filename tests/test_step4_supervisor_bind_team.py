@@ -203,6 +203,36 @@ class TestTeamOrchestratorBindsSupervisor(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(mock_brain.reasoner, SupervisorReasoner)
         self.assertIsNot(mock_brain.reasoner, simple)
+        # ADR-0027: default decision_gate is NONE — settlement is opt-in
+        mock_brain.install_decision_gate.assert_not_called()
+
+    def test_bind_installs_gate_when_must_consult_all(self) -> None:
+        from lca.contracts.enums import DecisionGateName
+        from lca.layer1_cognitive.brain.reasoner import SimpleReasoner, SupervisorReasoner
+
+        members = [_make_member("dev")]
+        config = TeamConfig(
+            process="hierarchical",
+            decision_gate=DecisionGateName.MUST_CONSULT_ALL,
+        )
+        sup, _, _, mock_brain = _make_supervisor_with_runtime()
+        mock_brain.reasoner = SimpleReasoner(
+            MagicMock(),
+            _make_role("supervisor"),
+            "tools",
+            templates={"react_prompt": "r", "hierarchical_prompt": "h {teammates}"},
+        )
+        mock_brain.install_decision_gate = MagicMock()
+
+        TeamOrchestrator(
+            members,
+            config,
+            registries=_REGISTRIES,
+            supervisor=sup,
+            transport=build_team_transport(members),
+        )
+
+        self.assertIsInstance(mock_brain.reasoner, SupervisorReasoner)
         mock_brain.install_decision_gate.assert_called_once()
 
 

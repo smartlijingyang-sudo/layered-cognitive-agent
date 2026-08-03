@@ -16,8 +16,15 @@ from lca.contracts.budget import (
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
 )
 from lca.contracts.decision import Observation
-from lca.contracts.enums import ComponentKind, HookEvent, MemoryLayer, TeamProcess
+from lca.contracts.enums import (
+    ComponentKind,
+    DecisionGateName,
+    HookEvent,
+    MemoryLayer,
+    TeamProcess,
+)
 from lca.contracts.mechanisms import ComponentRegistryProtocol
+from lca.contracts.orchestration_taxonomy import SupervisorPlane
 from lca.contracts.protocols import (
     AgentTransport,
     Body,
@@ -280,8 +287,16 @@ class Assembly:
         shared_memory_layers: list[MemoryLayer] | None = None,
         graph_definition_ref: str | None = None,
         strategy: TeamProcessStrategy | None = None,
+        decision_gate: DecisionGateName | None = None,
+        supervisor_plane: SupervisorPlane | None = None,
+        delegate_max_attempts: int | None = None,
     ) -> TeamUnit:
-        """Assemble a team object graph from *members* with the given *process*."""
+        """Assemble a team object graph from *members* with the given *process*.
+
+        Settlement / plane knobs (ADR-0027) are orthogonal to *process*:
+        free supervisor = default gate none; consultation compliance =
+        ``decision_gate=must_consult_all``.
+        """
         from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 
         process_val = process if process is not None else TeamProcess.HIERARCHICAL
@@ -290,7 +305,13 @@ class Assembly:
             max_rounds=max_rounds,
             shared_memory_layers=list(shared_memory_layers or []),
             graph_definition_ref=graph_definition_ref,
+            decision_gate=decision_gate if decision_gate is not None else DecisionGateName.NONE,
+            supervisor_plane=supervisor_plane
+            if supervisor_plane is not None
+            else SupervisorPlane.CONSULTATION,
         )
+        if delegate_max_attempts is not None:
+            config.delegate_max_attempts = delegate_max_attempts
         base_supervisor: CognitiveAgent | None = None
         if supervisor is not None:
             policy = _resolve_component(

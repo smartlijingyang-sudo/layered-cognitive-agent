@@ -325,9 +325,16 @@ class TestMustConsultAllMembersTryShortcut:
         assert "[框架短路]" in result.rationale
 
     @pytest.mark.asyncio
-    async def test_defers_when_multiple_waiting(self) -> None:
+    async def test_fans_out_when_multiple_waiting(self) -> None:
+        """ADR-0028: multi-waiting shortcut fans out all waiting roles in parallel."""
+        from lca.contracts.decision import iter_delegation_specs
+
         state = _state(member_status=_ledger({"analyst", "reviewer"}))
-        assert await MustConsultAllMembers().try_shortcut(state) is None
+        result = await MustConsultAllMembers().try_shortcut(state)
+        assert result is not None
+        assert result.action_type == "delegate"
+        roles = {s.target_role for s in iter_delegation_specs(result)}
+        assert roles == {"analyst", "reviewer"}
 
     @pytest.mark.asyncio
     async def test_defers_when_all_settled(self) -> None:

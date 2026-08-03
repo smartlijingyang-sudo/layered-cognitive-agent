@@ -10,6 +10,7 @@ from lca.contracts.consultation import ConsultationState
 from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id, utc_now
 from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.routing import RoutingState
 from lca.contracts.types import Turn
 
 
@@ -53,8 +54,9 @@ class StateSnapshot:
 class AgentState:
     """Full state for one agent cognitive loop.
 
-    Generic loop fields only. Hierarchical supervisor control plane
-    lives under optional ``consultation`` (see ``ConsultationState``).
+    Generic loop fields only. SUPERVISOR control planes live under optional
+    ``consultation`` (settlement) or ``routing`` (free PM) — mutually
+    exclusive per run by convention.
     """
 
     trace_id: str
@@ -70,6 +72,7 @@ class AgentState:
     agent_role: str = ""
     from_role: str = ""
     consultation: ConsultationState | None = None
+    routing: RoutingState | None = None
     history: list[Turn] = field(default_factory=list)
     final_output: Any | None = None
     last_error: str | None = None

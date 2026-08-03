@@ -76,23 +76,43 @@ class SimpleDecisionParser(DecisionParser):
                 action_type = ActionType.RESPOND
 
         delegate_to: DelegationSpec | None = None
+        delegate_targets: list[DelegationSpec] = []
         if action_type in (ActionType.DELEGATE, ActionType.HANDOFF):
-            subtask = data.get("subtask", "")
-            target_role = data.get("target_role")
-            context_refs = data.get("context_refs") or data.get("context") or []
-            if not isinstance(context_refs, list):
-                context_refs = [str(context_refs)]
-            delegate_to = DelegationSpec(
-                subtask=subtask,
-                target_role=target_role,
-                context_refs=context_refs,
-            )
+            multi = data.get("delegate_targets") or data.get("delegates")
+            if isinstance(multi, list) and multi:
+                for item in multi:
+                    if not isinstance(item, dict):
+                        continue
+                    refs = item.get("context_refs") or item.get("context") or []
+                    if not isinstance(refs, list):
+                        refs = [str(refs)]
+                    delegate_targets.append(
+                        DelegationSpec(
+                            subtask=str(item.get("subtask", "")),
+                            target_role=item.get("target_role"),
+                            context_refs=refs,
+                        )
+                    )
+                if delegate_targets:
+                    delegate_to = delegate_targets[0]
+            else:
+                subtask = data.get("subtask", "")
+                target_role = data.get("target_role")
+                context_refs = data.get("context_refs") or data.get("context") or []
+                if not isinstance(context_refs, list):
+                    context_refs = [str(context_refs)]
+                delegate_to = DelegationSpec(
+                    subtask=subtask,
+                    target_role=target_role,
+                    context_refs=context_refs,
+                )
 
         return Decision(
             decision_id=new_id("dec"),
             action_type=action_type,
             tool_calls=tool_calls,
             delegate_to=delegate_to,
+            delegate_targets=delegate_targets,
             response_text=data.get("response_text") or data.get("response") or data.get("text"),
             rationale=data.get("rationale", ""),
             confidence=float(data.get("confidence", _DEFAULT_CONFIDENCE)),
