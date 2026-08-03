@@ -6,13 +6,14 @@ import pytest
 
 from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Decision, Observation, Reflection
-from lca.contracts.enums import ActionType, ReflectionVerdict, TeamProcess
+from lca.contracts.enums import ActionType, ReflectionVerdict
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import AgentCard, TaskStatus
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.result import UnregisteredActionError
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import AgentState, Budget
+from lca.contracts.team_coordination import Debate
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer1_cognitive.body.action_handlers import RespondOperation
@@ -30,7 +31,7 @@ from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
-from lca.layer4_app.api import Agent, MultiAgentTeam
+from lca.layer4_app.api import Agent, Team
 
 
 def _state() -> AgentState:
@@ -213,7 +214,7 @@ class TestDebateMultiRound:
         llm = DebateLLM()
         a = Agent(role="保守派定价", goal="", backstory="", tools=[], llm=llm, max_steps=2)
         b = Agent(role="激进派定价", goal="", backstory="", tools=[], llm=llm, max_steps=2)
-        team = MultiAgentTeam(members=[a, b], process=TeamProcess.DEBATE, max_rounds=3)
+        team = Team(members=[a, b], coordination=Debate(max_rounds=3))
         result = await team.run("请定价")
         assert result.status == TaskStatus.COMPLETED
         assert result.total_steps >= 2

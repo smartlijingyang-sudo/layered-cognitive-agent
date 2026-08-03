@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Pre-commit hook: 装配期只读不算（契约 2）—— assembly.py 不允许 if/else 字符串比较分支。
+"""Pre-commit hook: 装配期只读不算（契约 2）—— composer.py 不允许 if/else 字符串比较分支。
 
-检测 layer4_app/assembly.py 中是否出现字符串比较分支（如 `if x == "supervisor"`），
-这类分支违反"装配期只读不算"原则：assembly 只应取值 -> 传参 -> 组装，
+检测 layer4_app/composer.py 中是否出现字符串比较分支（如 `if x == "supervisor"`），
+这类分支违反"装配期只读不算"原则：composer 只应取值 -> 传参 -> 组装，
 业务判断逻辑应放在策略层或运行时。
 """
 
@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
-_ASSEMBLY = _ROOT / "lca" / "layer4_app" / "assembly.py"
+_ASSEMBLY = _ROOT / "lca" / "layer4_app" / "composer.py"
 
 
 def _check_file(filepath):
@@ -37,8 +37,8 @@ def _check_file(filepath):
         # detect == "string" or != "string" patterns (excluding format strings)
         if re.search(r'[!=]=\s*"[^"]*"', stripped) and not re.search(r'(format|f["\'])', stripped):
             rel = str(filepath.relative_to(_ROOT))
-            violations.append(f"  {rel}:{i}: assembly string comparison: {stripped}")
-            violations.append("    -> violates contract 2 (assembly is read-only compose)")
+            violations.append(f"  {rel}:{i}: composer string comparison: {stripped}")
+            violations.append("    -> violates contract 2 (composer is read-only compose)")
 
     return violations
 
@@ -50,14 +50,14 @@ def main():
     violations = _check_file(_ASSEMBLY)
 
     if violations:
-        print("FAILED: assembly.py has string comparison branches")
-        print("        (violates contract 2: assembly is read-only compose)")
+        print("FAILED: composer.py has string comparison branches")
+        print("        (violates contract 2: composer is read-only compose)")
         print()
         for v in violations:
             print(v)
         return 1
 
-    print("PASS: assembly.py purity check passed")
+    print("PASS: composer.py purity check passed")
     return 0
 
 

@@ -27,7 +27,7 @@ async def invoke_member(
     if transport is None:
         raise ValueError(
             "TeamContext.transport is required for member invocation; "
-            "assemble teams via Assembly.assemble_team / MultiAgentTeam"
+            "assemble teams via TeamComposer.compose_team / Team"
         )
     role = member.role_profile.role
     if not role:

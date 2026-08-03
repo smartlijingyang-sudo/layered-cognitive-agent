@@ -7,14 +7,13 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lca.contracts.enums import TeamProcess
 from lca.contracts.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import LLMAdapter, TeamContext
 from lca.contracts.role_team import TeamConfig
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
 from lca.layer4_app.api import Agent
-from lca.layer4_app.assembly import build_team_transport
+from lca.layer4_app.composer import build_team_transport
 
 
 class _LLM(LLMAdapter):
@@ -62,7 +61,7 @@ class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):
         transport = build_team_transport(members)
         ctx = TeamContext(
             members=members,
-            config=TeamConfig(process=TeamProcess.GRAPH),
+            config=TeamConfig(strategy_key="graph"),
             transport=transport,
         )
         result = await GraphStrategy(execution_graph=g).run(ctx, "launch")

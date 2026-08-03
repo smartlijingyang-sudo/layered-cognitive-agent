@@ -1,15 +1,8 @@
 from __future__ import annotations
 
-"""SimpleBody.delegate 分支单元测试 —— 验证 Body 通过 TransportRegistry 按协议路由委派任务。"""
-
+# SimpleBody.delegate 分支单元测试 —— 验证 Body 通过 TransportRegistry 按协议路由委派任务。
 import asyncio
-import os
-import sys
 import unittest
-
-from lca.contracts.enums import ActionScope
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.decision import (
     Decision,
@@ -17,6 +10,7 @@ from lca.contracts.decision import (
     Observation,
     ToolCall,
 )
+from lca.contracts.enums import ActionScope
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.state import AgentState, Budget
 from lca.layer0_infra.transport.agent_transport import InternalTransport
@@ -75,7 +69,7 @@ class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=_make_registry(transport),
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         spec = DelegationSpec(subtask="分析数据", target_agent_id="researcher")
@@ -94,7 +88,7 @@ class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=_make_registry(transport),
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         spec = DelegationSpec(subtask="分析", target_role="analyst")
@@ -112,7 +106,7 @@ class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=_make_registry(transport),
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         spec = DelegationSpec(subtask="执行", target_agent_card="worker-key")
@@ -131,7 +125,7 @@ class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=_make_registry(transport),
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         refs = ["ctx://doc/1", "ctx://doc/2"]
@@ -152,7 +146,7 @@ class TestDelegatePolling(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=_make_registry(transport),
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         spec = DelegationSpec(subtask="慢任务", target_agent_id="slow")
@@ -168,7 +162,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
 
     async def test_no_transport_raises_clear_error(self) -> None:
         body = SimpleBody(
-            SimpleToolRegistry(), _noop_executor(), action_scope=ActionScope.SUPERVISOR
+            SimpleToolRegistry(), _noop_executor(), action_scope=ActionScope.LEAD
         )  # empty transport registry
 
         spec = DelegationSpec(subtask="任务", target_agent_id="someone")
@@ -184,7 +178,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=_make_registry(transport),
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         decision = _make_decision(action_type="delegate", delegations=[])
@@ -199,7 +193,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=_make_registry(transport),
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         spec = DelegationSpec(subtask="任务", target_agent_id="ghost")
@@ -216,7 +210,7 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=_make_registry(transport),
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         spec = DelegationSpec(subtask="触发异常", target_agent_id="broken")
@@ -231,9 +225,7 @@ class TestDelegateDoesNotAffectOtherBranches(unittest.IsolatedAsyncioTestCase):
     """确保新增 delegate 分支不影响 respond / use_tool 原有行为。"""
 
     async def test_respond_still_works(self) -> None:
-        body = SimpleBody(
-            SimpleToolRegistry(), _noop_executor(), action_scope=ActionScope.SUPERVISOR
-        )
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor(), action_scope=ActionScope.LEAD)
         decision = _make_decision(action_type="respond")
         decision.response_text = "hello"
 
@@ -242,9 +234,7 @@ class TestDelegateDoesNotAffectOtherBranches(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(obs.payload, "hello")
 
     async def test_unknown_action_still_raises(self) -> None:
-        body = SimpleBody(
-            SimpleToolRegistry(), _noop_executor(), action_scope=ActionScope.SUPERVISOR
-        )
+        body = SimpleBody(SimpleToolRegistry(), _noop_executor(), action_scope=ActionScope.LEAD)
         decision = _make_decision(action_type="ask_human")  # type: ignore[arg-type]  # 故意传未注册类型触发异常
 
         with self.assertRaises(ToolExecutionError):
@@ -262,7 +252,7 @@ class TestProtocolRouting(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=registry,
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         spec = DelegationSpec(subtask="跨进程任务", target_agent_id="remote", protocol="a2a")
@@ -281,7 +271,7 @@ class TestProtocolRouting(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=registry,
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         spec = DelegationSpec(subtask="内部任务", target_agent_id="worker", protocol="internal")
@@ -297,7 +287,7 @@ class TestProtocolRouting(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=registry,
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         spec = DelegationSpec(subtask="任务", target_agent_id="x", protocol="internal")
@@ -317,7 +307,7 @@ class TestBackwardCompatTransport(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport=transport,
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
 
         spec = DelegationSpec(subtask="测试", target_agent_id="worker")

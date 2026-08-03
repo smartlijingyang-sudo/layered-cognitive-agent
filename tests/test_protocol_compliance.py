@@ -96,7 +96,7 @@ class TestL0ProtocolCompliance(unittest.TestCase):
 
     def test_default_registry_resolves_all_delegation_protocols(self):
         """DelegationSpec.protocol 的每个取值都能在默认 registry 中 resolve 到非空实现。"""
-        from lca.layer4_app.assembly import build_default_transport_registry
+        from lca.layer4_app.composer import build_default_transport_registry
 
         registry = build_default_transport_registry()
         for protocol in ("internal", "a2a", "mcp"):
@@ -252,11 +252,13 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(sup, AgentUnit)
 
     def test_team_orchestrator_is_team_runtime(self):
-        from lca.contracts.enums import TeamProcess
-        from lca.layer4_app.assembly import Assembly
+        from lca.contracts.team_coordination import (
+            Pipeline,
+        )
+        from lca.layer4_app.composer import TeamComposer
 
         agent, _rp, _runtime = self._build_agent()
-        orchestrator = Assembly().assemble_team(members=[agent], process=TeamProcess.SEQUENTIAL)
+        orchestrator = TeamComposer().compose_team(members=[agent], coordination=Pipeline())
         self.assertIsInstance(orchestrator, TeamUnit)
 
 

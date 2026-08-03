@@ -8,19 +8,20 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 from lca.contracts.decision import Decision
-from lca.contracts.enums import DecisionGateName, TeamProcess
+from lca.contracts.enums import DecisionGateName
 from lca.contracts.graph import ExecutionGraph, GraphEdge, GraphNode
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import Budget
+from lca.contracts.team_coordination import Graph
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer3_agent.orchestration_strategies import (
     HandoffStrategy,
     SequentialStrategy,
     SwarmStrategy,
 )
-from lca.layer4_app.api import Agent, MultiAgentTeam
+from lca.layer4_app.api import Agent, Team
 from lca.layer4_app.defaults import build_default_registries
 from tests.support.team_context import team_context_with_transport
 
@@ -76,9 +77,9 @@ class TestTypedProcessDispatch(unittest.TestCase):
 
     def test_registry_maps_to_typed_classes(self) -> None:
         reg = build_default_registries().orchestration
-        self.assertIsInstance(reg.resolve(TeamProcess.SEQUENTIAL), SequentialStrategy)
-        self.assertIsInstance(reg.resolve(TeamProcess.HANDOFF), HandoffStrategy)
-        self.assertIsInstance(reg.resolve(TeamProcess.SWARM), SwarmStrategy)
+        self.assertIsInstance(reg.resolve("pipeline"), SequentialStrategy)
+        self.assertIsInstance(reg.resolve("peer_relay"), HandoffStrategy)
+        self.assertIsInstance(reg.resolve("peer_swarm"), SwarmStrategy)
 
 
 class TestSingleInvokePort(unittest.IsolatedAsyncioTestCase):
@@ -133,8 +134,8 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
         )
         member = Agent(role="a", goal="g", backstory="b", tools=[], llm=llm)
         with self.assertRaises(ValueError) as ctx:
-            MultiAgentTeam(members=[member], process=TeamProcess.GRAPH)
-        self.assertIn("execution_graph", str(ctx.exception))
+            Team(members=[member])  # neither lead nor coordination
+        self.assertIn("exactly one", str(ctx.exception))
 
     async def test_graph_runs_via_public_api(self) -> None:
         class _LLM:
@@ -154,7 +155,7 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
         graph.add_node(GraphNode(id="exit", type="exit"))
         graph.add_edge(GraphEdge(source="entry", target="writer"))
         graph.add_edge(GraphEdge(source="writer", target="exit"))
-        team = MultiAgentTeam(members=[a], process=TeamProcess.GRAPH, execution_graph=graph)
+        team = Team(members=[a], coordination=Graph(execution_graph=graph))
         result = await team.run("write")
         self.assertEqual(result.status, TaskStatus.COMPLETED)
         self.assertEqual(result.output, "node-out")
@@ -183,11 +184,11 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
         )
         rt.body = MagicMock()
         rt.memory = MagicMock()
-        # ROUTING + settlement is not expressible as SupervisorMode; BOARD is consultation+gate.
+        # ROUTING + settlement is not expressible as LeadMandate; BOARD is consultation+gate.
         # Invalid combinations are type-excluded; ROUTING mode never installs a gate.
-        from lca.contracts.supervisor_mode import SupervisorMode, decision_gate_name_for_mode
+        from lca.contracts.team_coordination import LeadMandate, gate_name_for_mandate
 
-        self.assertEqual(decision_gate_name_for_mode(SupervisorMode.ROUTING), DecisionGateName.NONE)
+        self.assertEqual(gate_name_for_mandate(LeadMandate.ROUTING), DecisionGateName.NONE)
         # assemble still requires real agents with llm — use Assembly path for smoke
         del rt, profile, reg
 

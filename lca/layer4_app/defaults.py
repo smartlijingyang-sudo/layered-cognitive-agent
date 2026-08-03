@@ -1,16 +1,22 @@
 """Built-in default registrations for the LCA framework.
 
-ADR-0024：不再有隐藏的模块级幂等标记。register_defaults() 对调用方传入的
-Registries 实例做注册；对同一个 Registries 重复调用是安全的（覆盖写入相同的
-工厂，无副作用），生命周期完全交给调用方（通常是 Assembly）决定。
-
-本模块仍然只做发现型注册，不构造可运行对象图（见 assembly.py，ADR-0018）。
+register_defaults() registers factories on the given Registries.
+Object-graph construction lives in composer.py (ADR-0018 / ADR-0030).
 """
 
 from __future__ import annotations
 
-from lca.contracts.enums import ComponentKind, DecisionGateName, TeamProcess
+from lca.contracts.enums import ComponentKind, DecisionGateName
 from lca.contracts.registries import Registries
+from lca.contracts.team_coordination import (
+    STRATEGY_KEY_DEBATE,
+    STRATEGY_KEY_FAN_OUT,
+    STRATEGY_KEY_GRAPH,
+    STRATEGY_KEY_LEAD,
+    STRATEGY_KEY_PEER_RELAY,
+    STRATEGY_KEY_PEER_SWARM,
+    STRATEGY_KEY_PIPELINE,
+)
 from lca.layer0_infra.component_registry import ComponentRegistry, NamedRegistry
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.observability.jsonl_file_observability import JSONLFileObservability
@@ -21,24 +27,21 @@ from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
 from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from lca.layer3_agent.orchestration_registry import TeamProcessStrategyRegistry
+from lca.layer3_agent.orchestration_registry import TeamStrategyRegistry
 from lca.layer3_agent.orchestration_strategies import (
     DebateStrategy,
     GraphStrategy,
     HandoffStrategy,
-    HierarchicalStrategy,
+    LeadStrategy,
     ParallelStrategy,
     SequentialStrategy,
     SwarmStrategy,
 )
-from lca.layer4_app.policies import SupervisorBudgetPolicy
+from lca.layer4_app.policies import LeadBudgetPolicy
 
 
 def register_defaults(registries: Registries) -> None:
-    """把框架内置的默认实现注册进给定的 *registries*。
-
-    幂等：对同一个 Registries 实例重复调用只是覆盖写入相同的工厂，无害。
-    """
+    """Register built-in defaults into *registries* (idempotent overwrite)."""
     reg = registries.components
     reg.register(ComponentKind.OBSERVABILITY, "console", ConsoleObservability)
     reg.register(ComponentKind.OBSERVABILITY, "jsonl_file", JSONLFileObservability)
@@ -49,35 +52,27 @@ def register_defaults(registries: Registries) -> None:
 
     registries.brain_factories.register("default", SimpleBrainFactory())
 
-    # Process → typed strategy class (no string topology tables). GRAPH is
-    # wired only when Assembly receives execution_graph (not a bare default).
     orch = registries.orchestration
-    orch.register(TeamProcess.HIERARCHICAL, HierarchicalStrategy)
-    orch.register(TeamProcess.SEQUENTIAL, SequentialStrategy)
-    orch.register(TeamProcess.PARALLEL, lambda: ParallelStrategy(synthesizer=ConcatSynthesizer()))
-    orch.register(TeamProcess.DEBATE, DebateStrategy)
-    orch.register(TeamProcess.HANDOFF, HandoffStrategy)
-    orch.register(TeamProcess.SWARM, SwarmStrategy)
-    # Bare GraphStrategy resolves; Assembly requires execution_graph for process=GRAPH.
-    orch.register(TeamProcess.GRAPH, GraphStrategy)
+    orch.register(STRATEGY_KEY_LEAD, LeadStrategy)
+    orch.register(STRATEGY_KEY_PIPELINE, SequentialStrategy)
+    orch.register(STRATEGY_KEY_FAN_OUT, lambda: ParallelStrategy(synthesizer=ConcatSynthesizer()))
+    orch.register(STRATEGY_KEY_DEBATE, DebateStrategy)
+    orch.register(STRATEGY_KEY_PEER_RELAY, HandoffStrategy)
+    orch.register(STRATEGY_KEY_PEER_SWARM, SwarmStrategy)
+    orch.register(STRATEGY_KEY_GRAPH, GraphStrategy)
 
     reg.register(
         ComponentKind.DECISION_GATE, DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers
     )
-    reg.register(ComponentKind.BUDGET_POLICY, "supervisor", SupervisorBudgetPolicy)
+    reg.register(ComponentKind.BUDGET_POLICY, "lead", LeadBudgetPolicy)
 
 
 def build_default_registries() -> Registries:
-    """构造一份全新的、已注册全部内置默认实现的 Registries。
-
-    这是"给我一份开箱即用的默认组合"的唯一入口 —— Assembly() 在未显式传入
-    registries 时用它；测试或需要绕开 Assembly 直接构造 TeamOrchestrator
-    的场景也可以直接调用它。
-    """
+    """Fresh Registries with all built-in defaults registered."""
     registries = Registries(
         components=ComponentRegistry(),
         brain_factories=NamedRegistry(),
-        orchestration=TeamProcessStrategyRegistry(),
+        orchestration=TeamStrategyRegistry(),
     )
     register_defaults(registries)
     return registries

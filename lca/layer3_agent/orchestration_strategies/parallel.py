@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.protocols import Synthesizer, TeamContext, TeamProcessStrategy
+from lca.contracts.protocols import Synthesizer, TeamContext, TeamStrategy
 from lca.contracts.result import Result
 from lca.layer3_agent.member_invoke import invoke_member
 
 
-class ParallelStrategy(TeamProcessStrategy):
+class ParallelStrategy(TeamStrategy):
     """Run all members concurrently; optional Synthesizer aggregates results."""
 
     def __init__(self, synthesizer: Synthesizer | None = None) -> None:

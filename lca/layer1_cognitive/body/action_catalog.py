@@ -96,7 +96,7 @@ def _operation_for(
 _SCOPE_ACTIONS: dict[ActionScope, frozenset[str]] = {
     ActionScope.SOLO: frozenset({ActionType.RESPOND, ActionType.USE_TOOL}),
     ActionScope.MEMBER: frozenset({ActionType.RESPOND, ActionType.USE_TOOL}),
-    ActionScope.SUPERVISOR: frozenset(
+    ActionScope.LEAD: frozenset(
         {
             ActionType.RESPOND,
             ActionType.USE_TOOL,

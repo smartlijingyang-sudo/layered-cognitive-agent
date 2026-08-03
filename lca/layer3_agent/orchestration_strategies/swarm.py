@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import TeamContext, TeamProcessStrategy
+from lca.contracts.protocols import TeamContext, TeamStrategy
 from lca.contracts.result import Result
 from lca.layer3_agent.member_invoke import invoke_member
 
 _DEFAULT_SWARM_ROUNDS = 3
 
 
-class SwarmStrategy(TeamProcessStrategy):
+class SwarmStrategy(TeamStrategy):
     """Round-robin peers; accumulate peer updates until success or budget."""
 
     def __init__(self, max_rounds: int | None = None) -> None:

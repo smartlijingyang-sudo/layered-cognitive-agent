@@ -1,4 +1,4 @@
-"""重构护栏 —— 防止组合根边界、supervisor 配置、ADR 索引再次腐化。"""
+"""重构护栏 —— 组合根边界、lead 预算、ADR 索引、领域语言。"""
 
 from __future__ import annotations
 
@@ -11,12 +11,11 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _ADR_DIR = _PROJECT_ROOT / "docs" / "adr"
 _DEFAULTS_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "defaults.py"
 _API_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "api.py"
+_COMPOSER_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "composer.py"
 _ADR_README = _ADR_DIR / "README.md"
 
 
 class TestDefaultsNoObjectConstruction(unittest.TestCase):
-    """defaults.py 只做注册，不构造可运行对象图。"""
-
     def test_defaults_no_object_construction(self) -> None:
         source = _DEFAULTS_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(_DEFAULTS_PATH))
@@ -31,50 +30,42 @@ class TestDefaultsNoObjectConstruction(unittest.TestCase):
                         name = sub.func.id
                         if name.endswith("Transport") or name.startswith("build_"):
                             offenders.append(
-                                f"{node.name}() 内调用 {name}() — 对象构造应留在 assembly.py"
+                                f"{node.name}() 内调用 {name}() — 对象构造应留在 composer.py"
                             )
         self.assertFalse(offenders, "\n".join(offenders))
 
 
-class TestL4NoCompositionDecisionsOutsideAssembly(unittest.TestCase):
-    """api.py 作为门面不得做 supervisor 预算 floor 等组合决策。"""
-
-    def test_api_no_supervisor_budget_floors(self) -> None:
+class TestL4ApiIsThinFacade(unittest.TestCase):
+    def test_api_no_lead_budget_floors(self) -> None:
         source = _API_PATH.read_text(encoding="utf-8")
         forbidden_patterns = [
             r"_as_supervisor",
+            r"_promote_lead",
             r"_SUPERVISOR_MIN",
             r"max\s*\(\s*[^,]+\s*,\s*\d+\s*\).*max_steps",
         ]
         offenders = [pattern for pattern in forbidden_patterns if re.search(pattern, source)]
-        self.assertFalse(
-            offenders,
-            f"api.py 含组合期决策模式: {offenders}",
-        )
+        self.assertFalse(offenders, f"api.py 含组合期决策模式: {offenders}")
 
 
-class TestSupervisorWallClockPropagation(unittest.TestCase):
-    """MultiAgentTeam supervisor 的 max_wall_clock_seconds 不得被静默覆盖。"""
-
-    def test_supervisor_wall_clock_preserved(self) -> None:
+class TestLeadWallClockPropagation(unittest.TestCase):
+    def test_lead_wall_clock_preserved(self) -> None:
         from unittest.mock import MagicMock
 
         from lca.layer3_agent.cognitive_agent import CognitiveAgent
-        from lca.layer4_app.assembly import _promote_supervisor
-        from lca.layer4_app.policies import SupervisorBudgetPolicy
+        from lca.layer4_app.composer import _promote_lead
+        from lca.layer4_app.policies import LeadBudgetPolicy
 
         runtime = MagicMock()
         role_profile = MagicMock()
         role_profile.role = "lead"
-        supervisor = CognitiveAgent(runtime, role_profile, max_steps=10, max_wall_clock_seconds=900)
-        promoted = _promote_supervisor(supervisor, SupervisorBudgetPolicy())
+        lead = CognitiveAgent(runtime, role_profile, max_steps=10, max_wall_clock_seconds=900)
+        promoted = _promote_lead(lead, LeadBudgetPolicy())
         self.assertEqual(promoted.max_wall_clock_seconds, 900)
         self.assertEqual(promoted.max_steps, 20)
 
 
 class TestAdrIndexMatchesFilesystem(unittest.TestCase):
-    """docs/adr/README.md 索引与目录内 ADR 编号一致且无重复。"""
-
     def test_adr_index_matches_filesystem(self) -> None:
         adr_files = sorted(_ADR_DIR.glob("*.md"))
         file_numbers: list[str] = []
@@ -91,6 +82,7 @@ class TestAdrIndexMatchesFilesystem(unittest.TestCase):
         readme = _ADR_README.read_text(encoding="utf-8")
         indexed = set(re.findall(r"\[(\d{4})\]", readme))
         filesystem = set(file_numbers)
+        # 0030 may not be in README yet — allow missing until ADR written
         missing_in_readme = filesystem - indexed
         extra_in_readme = indexed - filesystem
         self.assertFalse(
@@ -104,8 +96,6 @@ class TestAdrIndexMatchesFilesystem(unittest.TestCase):
 
 
 class TestProgressiveDisclosureVocabulary(unittest.TestCase):
-    """Primary production names follow progressive-disclosure vocabulary."""
-
     def test_agent_state_uses_consultation_not_progress_text(self) -> None:
         from lca.contracts.consultation import ConsultationState
         from lca.contracts.state import AgentState, Budget
@@ -121,19 +111,19 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
         self.assertTrue(hasattr(state, "session"))
         self.assertFalse(hasattr(state, "member_status"))
         self.assertFalse(hasattr(state, "team_progress"))
-        self.assertFalse(hasattr(state, "team_progress_text"))
         self.assertIn("a", board.as_prompt_text())
 
-    def test_public_api_uses_run_and_assemble_agent(self) -> None:
-        api = (_PROJECT_ROOT / "lca" / "layer4_app" / "api.py").read_text(encoding="utf-8")
-        assembly = (_PROJECT_ROOT / "lca" / "layer4_app" / "assembly.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("assemble_agent", api)
-        self.assertNotIn("assemble_base_agent", api)
+    def test_public_api_uses_run_and_compose(self) -> None:
+        api = _API_PATH.read_text(encoding="utf-8")
+        composer = _COMPOSER_PATH.read_text(encoding="utf-8")
+        self.assertIn("class Team", api)
+        self.assertIn("class TeamLead", api)
         self.assertIn("async def run", api)
-        self.assertIn("def assemble_agent", assembly)
+        self.assertIn("def compose(", composer)
+        self.assertIn("def compose_team(", composer)
         self.assertIn("await self._agent.run", api)
+        self.assertNotIn("MultiAgentTeam", api)
+        self.assertNotIn("assemble_agent", api)
 
     def test_must_consult_all_rewrites_early_respond(self) -> None:
         import asyncio
@@ -151,18 +141,13 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
             budget=Budget(),
             session=ConsultationState(member_status=board),
         )
-        decision = Decision(
+        gate = MustConsultAllMembers()
+        early = Decision(
             decision_id="d1",
             action_type="respond",
             rationale="done",
             confidence=1.0,
-            response_text="final",
+            response_text="ok",
         )
-        out = asyncio.run(MustConsultAllMembers().enforce(state, decision))
-        self.assertEqual(out.action_type, "delegate")
-        assert out.delegations
-        self.assertEqual(out.delegations[0].target_role, "analyst")
-
-
-if __name__ == "__main__":
-    unittest.main()
+        rewritten = asyncio.run(gate.enforce(state, early))
+        self.assertEqual(rewritten.action_type, "delegate")

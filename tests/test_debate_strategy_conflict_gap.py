@@ -7,10 +7,10 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lca.contracts.enums import TeamProcess
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import LLMAdapter
-from lca.layer4_app.api import Agent, MultiAgentTeam
+from lca.contracts.team_coordination import Debate
+from lca.layer4_app.api import Agent, Team
 
 
 def _decision(**kwargs):
@@ -48,7 +48,7 @@ class TestDebateStrategyCapability(unittest.IsolatedAsyncioTestCase):
         self.b = Agent(role="激进派定价策略师", goal="", backstory="", tools=[], llm=self.llm)
 
     async def test_default_debate_multi_round(self):
-        team = MultiAgentTeam(members=[self.a, self.b], process=TeamProcess.DEBATE, max_rounds=3)
+        team = Team(members=[self.a, self.b], coordination=Debate(max_rounds=3))
         result = await team.run("请定价")
         self.assertEqual(result.status, TaskStatus.COMPLETED)
         self.assertGreaterEqual(result.total_steps, 2)

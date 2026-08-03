@@ -13,20 +13,20 @@ from lca.contracts.protocols.agent import AgentUnit
 from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig
-from lca.contracts.supervisor_mode import SupervisorMode
+from lca.contracts.team_coordination import LeadMandate
 
 
 @dataclass
 class TeamContext:
     """编排策略的运行时上下文（已封闭对象图，策略只 run）。
 
-    ``member_status`` is a board *template* for consultation modes: each
-    HierarchicalStrategy.run creates a fresh ConsultationState from it.
+    ``member_status`` is a board *template* for consultation mandates: each
+    LeadStrategy.run creates a fresh ConsultationState from it.
     """
 
     members: Sequence[AgentUnit] = field(default_factory=list)
     config: TeamConfig | None = None
-    supervisor: AgentUnit | None = None
+    lead: AgentUnit | None = None
     transport: AgentTransport | None = None
     teammates: list[RoleProfile] = field(default_factory=list)
     member_status: MemberStatus | None = None
@@ -34,14 +34,14 @@ class TeamContext:
     shared_memory: SharedMemoryStore | None = None
 
 
-def team_supervisor_mode(context: TeamContext) -> SupervisorMode | None:
-    """Read supervisor_mode from context.config (contracts stay behavior-light)."""
-    return context.config.supervisor_mode if context.config is not None else None
+def team_lead_mandate(context: TeamContext) -> LeadMandate | None:
+    """Read lead_mandate from context.config (contracts stay behavior-light)."""
+    return context.config.lead_mandate if context.config is not None else None
 
 
 @runtime_checkable
-class TeamProcessStrategy(Protocol):
-    """编排策略接口：每种 process 模式对应一个实现。"""
+class TeamStrategy(Protocol):
+    """编排策略接口：每种 coordination / lead 路径对应一个实现。"""
 
     async def run(self, context: TeamContext, objective: str) -> Result: ...
 

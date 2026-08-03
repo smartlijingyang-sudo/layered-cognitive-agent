@@ -32,17 +32,6 @@ from lca.contracts.mechanisms import (
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.observability import Event, TraceSpan
-from lca.contracts.orchestration_taxonomy import (
-    INDUSTRY_PATTERN_SLOTS,
-    PROCESS_FAMILY,
-    RESERVED_PROCESS_SLOTS,
-    ROUTING_SETTLEMENT_GATE_ERROR,
-    OrchestrationFamily,
-    SupervisorPlane,
-    assert_process_family_complete,
-    assert_supervisor_plane_gate_compatible,
-    family_of,
-)
 from lca.contracts.protocols import DecisionGate, SharedMemoryStore, TransportRegistryProtocol
 from lca.contracts.registries import Registries
 from lca.contracts.result import (
@@ -70,15 +59,20 @@ from lca.contracts.stop import (
     StopReason,
     StopRule,
 )
+from lca.contracts.team_coordination import (
+    Debate,
+    FanOut,
+    Graph,
+    LeadMandate,
+    PeerRelay,
+    PeerSwarm,
+    Pipeline,
+)
 from lca.contracts.types import StopOutcome, Turn
 
 __all__ = [
     "CONSULTATION_FIELD_WHITELIST",
-    "INDUSTRY_PATTERN_SLOTS",
-    "PROCESS_FAMILY",
-    "RESERVED_PROCESS_SLOTS",
     "ROUTING_FIELD_WHITELIST",
-    "ROUTING_SETTLEMENT_GATE_ERROR",
     "Action",
     "ActionRegistryProtocol",
     "AgentCard",
@@ -91,22 +85,28 @@ __all__ = [
     "CacheConfig",
     "ComponentRegistryProtocol",
     "ConsultationState",
+    "Debate",
     "Decision",
     "DecisionGate",
     "DelegationSpec",
     "Event",
     "EventBus",
     "ExecutionGraph",
+    "FanOut",
+    "Graph",
     "GraphEdge",
     "GraphNode",
     "GraphValidationError",
     "Hook",
     "HookRegistry",
+    "LeadMandate",
     "MemberStatus",
     "MemoryRecord",
     "NamedRegistryProtocol",
     "Observation",
-    "OrchestrationFamily",
+    "PeerRelay",
+    "PeerSwarm",
+    "Pipeline",
     "Reflection",
     "Registries",
     "Result",
@@ -120,7 +120,6 @@ __all__ = [
     "StopOutcome",
     "StopReason",
     "StopRule",
-    "SupervisorPlane",
     "TaskStatus",
     "TeamConfig",
     "TeamMessage",
@@ -131,9 +130,6 @@ __all__ = [
     "TransportRegistryProtocol",
     "Turn",
     "assert_consultation_field_whitelist",
-    "assert_process_family_complete",
     "assert_routing_field_whitelist",
-    "assert_supervisor_plane_gate_compatible",
     "create_budget",
-    "family_of",
 ]

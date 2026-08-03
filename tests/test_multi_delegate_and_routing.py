@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 from lca.contracts.decision import Decision, DelegationSpec, Observation
-from lca.contracts.enums import ActionScope, DecisionGateName, RoleStatus, TeamProcess
+from lca.contracts.enums import ActionScope, DecisionGateName, RoleStatus
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
@@ -23,7 +23,7 @@ from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsu
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 from lca.layer3_agent.orchestration_strategies import (
-    HierarchicalStrategy,
+    LeadStrategy,
     SwarmStrategy,
 )
 from tests.support.team_context import team_context_with_transport
@@ -80,7 +80,7 @@ class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):
             SimpleToolRegistry(),
             _noop_executor(),
             transport_registry=_make_registry(transport),
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
         )
         decision = Decision(
             decision_id="d1",
@@ -132,19 +132,19 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
         assert_routing_field_whitelist()
 
     async def test_routing_mode_never_maps_to_settlement_gate(self) -> None:
-        from lca.contracts.supervisor_mode import SupervisorMode, decision_gate_name_for_mode
+        from lca.contracts.team_coordination import LeadMandate, gate_name_for_mandate
 
-        self.assertEqual(decision_gate_name_for_mode(SupervisorMode.ROUTING), DecisionGateName.NONE)
-        # Illegal plane×gate product is not representable via SupervisorMode.
+        self.assertEqual(gate_name_for_mandate(LeadMandate.ROUTING), DecisionGateName.NONE)
+        # Illegal plane×gate product is not representable via LeadMandate.
         self.assertNotEqual(
-            decision_gate_name_for_mode(SupervisorMode.ROUTING),
+            gate_name_for_mandate(LeadMandate.ROUTING),
             DecisionGateName.MUST_CONSULT_ALL,
         )
 
     async def test_hierarchical_routing_injects_routing_state(self) -> None:
-        from lca.contracts.supervisor_mode import SupervisorMode
+        from lca.contracts.team_coordination import LeadMandate
 
-        strategy = HierarchicalStrategy()
+        strategy = LeadStrategy()
         sup = MagicMock()
         captured: list = []
 
@@ -168,11 +168,11 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
         )
         ctx = TeamContext(
             members=[],
-            supervisor=sup,
+            lead=sup,
             teammates=[profile],
             config=TeamConfig(
-                process=TeamProcess.HIERARCHICAL,
-                supervisor_mode=SupervisorMode.ROUTING,
+                strategy_key="lead",
+                lead_mandate=LeadMandate.ROUTING,
             ),
         )
         result = await strategy.run(ctx, "obj")

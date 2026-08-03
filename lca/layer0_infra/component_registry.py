@@ -5,8 +5,8 @@
 - ``require`` / ``NamedRegistry.resolve``：硬查询，找不到 raise RegistryKeyError
 
 ADR-0024：本模块不再持有进程级全局单例。ComponentRegistry / NamedRegistry
-的实例生命周期由调用方决定 —— 框架默认路径中，实例归 Assembly 私有持有
-（见 lca.contracts.registries.Registries、lca.layer4_app.assembly.Assembly）。
+的实例生命周期由调用方决定 —— 框架默认路径中，实例归 TeamComposer 私有持有
+（见 lca.contracts.registries.Registries、lca.layer4_app.composer.TeamComposer）。
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ class ComponentRegistry:
     name 是用户可见的实现名称，例如 "console"、"simple" 等。
     值可以是类（无参构造）或工厂函数（接受上下文参数）。
 
-    运行时绑定型注册表（Action / Tool / Transport）应由 Assembly 注入实例，
+    运行时绑定型注册表（Action / Tool / Transport）应由 TeamComposer 注入实例，
     不要用 ComponentRegistry 承载。
     """
 

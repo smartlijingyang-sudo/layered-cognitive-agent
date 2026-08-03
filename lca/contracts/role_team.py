@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.contracts.enums import MemoryLayer, TeamProcess
-from lca.contracts.supervisor_mode import SupervisorMode
+from lca.contracts.enums import MemoryLayer
+from lca.contracts.team_coordination import LeadMandate
 
 
 @dataclass
@@ -52,14 +52,14 @@ class RoleProfile:
 
 @dataclass
 class TeamConfig:
-    """团队编排规范配置（Blueprint 展开结果，非用户双源）。
+    """Closed team configuration after composition (not a dual user API).
 
-    - ``process`` → TeamProcessStrategy / OrchestrationFamily
-    - ``supervisor_mode`` → SUPERVISOR 闭集（仅 hierarchical 非 None）
+    - ``strategy_key`` → TeamStrategy registry id (pipeline / lead / …)
+    - ``lead_mandate`` → only when strategy_key is lead
     """
 
-    process: TeamProcess
+    strategy_key: str
     shared_memory_layers: list[MemoryLayer] = field(default_factory=list)
     max_rounds: int | None = None
-    supervisor_mode: SupervisorMode | None = None
+    lead_mandate: LeadMandate | None = None
     delegate_max_attempts: int = 3

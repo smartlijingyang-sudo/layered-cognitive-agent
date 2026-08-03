@@ -1,7 +1,7 @@
-"""Baseline for _promote_supervisor budget promotion via BudgetPolicy.
+"""Baseline for _promote_lead budget promotion via BudgetPolicy.
 
-Pins down the promotion behavior: SupervisorBudgetPolicy.resolve
-computes effective budget limits, _promote_supervisor applies them
+Pins down the promotion behavior: LeadBudgetPolicy.resolve
+computes effective budget limits, _promote_lead applies them
 to construct a new CognitiveAgent with corrected values.
 """
 
@@ -16,10 +16,10 @@ from lca.contracts.budget import (
 )
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
-from lca.layer4_app.assembly import _promote_supervisor
-from lca.layer4_app.policies import SupervisorBudgetPolicy
+from lca.layer4_app.composer import _promote_lead
+from lca.layer4_app.policies import LeadBudgetPolicy
 
-_policy = SupervisorBudgetPolicy()
+_policy = LeadBudgetPolicy()
 
 
 def _make_agent(
@@ -47,17 +47,17 @@ class TestPromoteSupervisorStepsBumped:
 
     def test_steps_below_floor_bumped(self) -> None:
         agent = _make_agent(max_steps=5)
-        promoted = _promote_supervisor(agent, _policy)
+        promoted = _promote_lead(agent, _policy)
         assert promoted.max_steps == SUPERVISOR_MIN_MAX_STEPS
 
     def test_steps_at_floor_unchanged(self) -> None:
         agent = _make_agent(max_steps=SUPERVISOR_MIN_MAX_STEPS)
-        promoted = _promote_supervisor(agent, _policy)
+        promoted = _promote_lead(agent, _policy)
         assert promoted.max_steps == SUPERVISOR_MIN_MAX_STEPS
 
     def test_steps_above_floor_unchanged(self) -> None:
         agent = _make_agent(max_steps=50)
-        promoted = _promote_supervisor(agent, _policy)
+        promoted = _promote_lead(agent, _policy)
         assert promoted.max_steps == 50
 
 
@@ -66,17 +66,17 @@ class TestPromoteSupervisorWallClockBumped:
 
     def test_wc_below_floor_bumped(self) -> None:
         agent = _make_agent(max_wall_clock_seconds=10)
-        promoted = _promote_supervisor(agent, _policy)
+        promoted = _promote_lead(agent, _policy)
         assert promoted.max_wall_clock_seconds == DEFAULT_MAX_WALL_CLOCK_SECONDS
 
     def test_wc_above_floor_unchanged(self) -> None:
         agent = _make_agent(max_wall_clock_seconds=600)
-        promoted = _promote_supervisor(agent, _policy)
+        promoted = _promote_lead(agent, _policy)
         assert promoted.max_wall_clock_seconds == 600
 
     def test_wc_none_set_to_default(self) -> None:
         agent = _make_agent(max_wall_clock_seconds=None)
-        promoted = _promote_supervisor(agent, _policy)
+        promoted = _promote_lead(agent, _policy)
         assert promoted.max_wall_clock_seconds == DEFAULT_MAX_WALL_CLOCK_SECONDS
 
 
@@ -85,28 +85,28 @@ class TestPromoteSupervisorPreservesIdentity:
 
     def test_role_profile_preserved(self) -> None:
         agent = _make_agent(role="lead")
-        promoted = _promote_supervisor(agent, _policy)
+        promoted = _promote_lead(agent, _policy)
         assert promoted.role_profile.role == "lead"
         assert promoted.role_profile.goal == "test"
 
     def test_runtime_preserved(self) -> None:
         agent = _make_agent()
-        promoted = _promote_supervisor(agent, _policy)
+        promoted = _promote_lead(agent, _policy)
         assert promoted.runtime is agent.runtime
 
 
 class TestPromoteSupervisorReturnsNewInstance:
-    """_promote_supervisor returns a new CognitiveAgent, not a mutant."""
+    """_promote_lead returns a new CognitiveAgent, not a mutant."""
 
     def test_original_unchanged(self) -> None:
         agent = _make_agent(max_steps=5, max_wall_clock_seconds=10)
-        _promote_supervisor(agent, _policy)
+        _promote_lead(agent, _policy)
         assert agent.max_steps == 5
         assert agent.max_wall_clock_seconds == 10
 
     def test_returns_new_instance(self) -> None:
         agent = _make_agent()
-        promoted = _promote_supervisor(agent, _policy)
+        promoted = _promote_lead(agent, _policy)
         assert promoted is not agent
 
 

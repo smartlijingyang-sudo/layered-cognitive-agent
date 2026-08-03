@@ -73,7 +73,7 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
 
         strategy = DebateStrategy()
         context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=5)
+            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=5)
         )
 
         result = await strategy.run(context, "task")
@@ -89,7 +89,7 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
 
         strategy = DebateStrategy()
         context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=5)
+            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=5)
         )
 
         result = await strategy.run(context, "task")
@@ -109,7 +109,7 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
 
         strategy = DebateStrategy()
         context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=2)
+            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=2)
         )
 
         result = await strategy.run(context, "task")
@@ -149,7 +149,7 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
 
         strategy = DebateStrategy()
         context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=3)
+            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=3)
         )
 
         await strategy.run(context, "original task")
@@ -173,7 +173,7 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
 
         strategy = DebateStrategy(synthesizer=synth)
         context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=1)
+            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=1)
         )
 
         result = await strategy.run(context, "task")
@@ -188,7 +188,7 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
 
         strategy = DebateStrategy()
         context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=1)
+            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=1)
         )
 
         result = await strategy.run(context, "task")
@@ -213,7 +213,7 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent = _make_agent("t1", ["solo"])
         strategy = DebateStrategy()
         context = team_context_with_transport(
-            [agent], config=TeamConfig(process="debate", max_rounds=1)
+            [agent], config=TeamConfig(strategy_key="debate", max_rounds=1)
         )
 
         result = await strategy.run(context, "task")
@@ -228,7 +228,7 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
 
         strategy = DebateStrategy()
         context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(process="debate", max_rounds=1)
+            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=1)
         )
 
         result = await strategy.run(context, "task")

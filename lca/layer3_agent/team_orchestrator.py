@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.message import AgentMessage, agent_message_as_text
-from lca.contracts.protocols import TeamContext, TeamProcessStrategy, TeamUnit
+from lca.contracts.protocols import TeamContext, TeamStrategy, TeamUnit
 from lca.contracts.result import Result
 
 
@@ -13,14 +13,13 @@ class TeamOrchestrator(TeamUnit):
     def __init__(
         self,
         context: TeamContext,
-        strategy: TeamProcessStrategy,
+        strategy: TeamStrategy,
     ) -> None:
         self._context = context
         self._strategy = strategy
-        # Public fields expected by some tests / typing as team shape.
         self.members = list(context.members)
         self.config = context.config
-        self.supervisor = context.supervisor
+        self.lead = context.lead
         self.transport = context.transport
         self.teammates = list(context.teammates)
         self.team_id = context.team_id

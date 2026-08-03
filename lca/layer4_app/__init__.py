@@ -1,8 +1,6 @@
-"""Layer 4 — Application / orchestration layer.
+"""Layer 4 — Application / composition root."""
 
-Re-exports the developer-facing ``Agent`` and ``MultiAgentTeam`` classes.
-"""
+from lca.layer4_app.api import Agent, Team, TeamLead
+from lca.layer4_app.composer import AgentComposer, TeamComposer
 
-from lca.layer4_app.api import Agent, MultiAgentTeam
-
-__all__ = ["Agent", "MultiAgentTeam"]
+__all__ = ["Agent", "AgentComposer", "Team", "TeamComposer", "TeamLead"]

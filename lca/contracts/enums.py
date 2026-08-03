@@ -20,20 +20,8 @@ class ActionType(str, Enum):
     ASK_HUMAN = "ask_human"
 
 
-class TeamProcess(str, Enum):
-    """团队编排模式。"""
-
-    HIERARCHICAL = "hierarchical"
-    SEQUENTIAL = "sequential"
-    PARALLEL = "parallel"
-    GRAPH = "graph"
-    DEBATE = "debate"
-    HANDOFF = "handoff"
-    SWARM = "swarm"
-
-
 class DecisionGateName(str, Enum):
-    """内置收尾策略名称（registry 键；用户面用 SupervisorMode，勿并排配置）。"""
+    """内置收尾策略名称（registry 键；由 LeadMandate 展开，非用户旋钮）。"""
 
     MUST_CONSULT_ALL = "must_consult_all"
     NONE = "none"
@@ -44,7 +32,7 @@ class ActionScope(str, Enum):
 
     SOLO = "solo"
     MEMBER = "member"
-    SUPERVISOR = "supervisor"
+    LEAD = "lead"
 
 
 class HookEvent(str, Enum):

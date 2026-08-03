@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.protocols import Synthesizer, TeamContext, TeamProcessStrategy
+from lca.contracts.protocols import Synthesizer, TeamContext, TeamStrategy
 from lca.contracts.result import Result
 from lca.layer3_agent.member_invoke import invoke_member
 
 _DEFAULT_MAX_ROUNDS = 3
 
 
-class DebateStrategy(TeamProcessStrategy):
+class DebateStrategy(TeamStrategy):
     """Multi-round parallel debate; exit early on identical outputs."""
 
     def __init__(

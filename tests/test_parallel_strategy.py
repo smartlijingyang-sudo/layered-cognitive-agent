@@ -119,11 +119,11 @@ class TestParallelStrategyRegistration(unittest.TestCase):
 
     def test_parallel_registered_by_default(self) -> None:
         registry = _REGISTRIES.orchestration
-        self.assertTrue(registry.has("parallel"))
+        self.assertTrue(registry.has("fan_out"))
 
     def test_parallel_resolves_correctly(self) -> None:
         registry = _REGISTRIES.orchestration
-        strategy = registry.resolve("parallel")
+        strategy = registry.resolve("fan_out")
         self.assertIsInstance(strategy, ParallelStrategy)
 
 

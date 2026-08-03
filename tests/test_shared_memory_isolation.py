@@ -216,17 +216,19 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
     """Assembly.assemble_team rebuilds members with shared store (closed graph)."""
 
     async def test_orchestrator_injects_shared_memory(self) -> None:
-        from lca.contracts.enums import TeamProcess
+        from lca.contracts.team_coordination import (
+            Pipeline,
+        )
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-        from lca.layer4_app.assembly import Assembly
+        from lca.layer4_app.composer import TeamComposer
 
-        asm = Assembly()
+        asm = TeamComposer()
         llm = MockLLMAdapter()
-        agent_a = asm.assemble_agent(role="agent_a", goal="test", backstory="", tools=[], llm=llm)
-        agent_b = asm.assemble_agent(role="agent_b", goal="test", backstory="", tools=[], llm=llm)
-        team = asm.assemble_team(
+        agent_a = asm.compose(role="agent_a", goal="test", backstory="", tools=[], llm=llm)
+        agent_b = asm.compose(role="agent_b", goal="test", backstory="", tools=[], llm=llm)
+        team = asm.compose_team(
             members=[agent_a, agent_b],
-            process=TeamProcess.SEQUENTIAL,
+            coordination=Pipeline(),
             shared_memory_layers=[MemoryLayer.SEMANTIC],
         )
         self.assertIsNotNone(team._context.shared_memory)
@@ -240,17 +242,19 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
         self.assertIn("orchestrator-shared-fact", b_contents)
 
     async def test_orchestrator_no_shared_memory_when_config_empty(self) -> None:
-        from lca.contracts.enums import TeamProcess
+        from lca.contracts.team_coordination import (
+            Pipeline,
+        )
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-        from lca.layer4_app.assembly import Assembly
+        from lca.layer4_app.composer import TeamComposer
 
-        asm = Assembly()
+        asm = TeamComposer()
         llm = MockLLMAdapter()
-        agent_a = asm.assemble_agent(role="agent_a", goal="test", backstory="", tools=[], llm=llm)
-        agent_b = asm.assemble_agent(role="agent_b", goal="test", backstory="", tools=[], llm=llm)
-        team = asm.assemble_team(
+        agent_a = asm.compose(role="agent_a", goal="test", backstory="", tools=[], llm=llm)
+        agent_b = asm.compose(role="agent_b", goal="test", backstory="", tools=[], llm=llm)
+        team = asm.compose_team(
             members=[agent_a, agent_b],
-            process=TeamProcess.SEQUENTIAL,
+            coordination=Pipeline(),
             shared_memory_layers=[],
         )
         self.assertIsNone(team._context.shared_memory)

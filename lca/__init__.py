@@ -1,10 +1,30 @@
 """LCA Framework — Layered Cognitive Agent.
 
-Public API re-exported here for convenience::
+Public API::
 
-    from lca import Agent, MultiAgentTeam
+    from lca import Agent, Team, TeamLead, LeadMandate, Pipeline, FanOut, ...
 """
 
-from lca.layer4_app.api import Agent, MultiAgentTeam
+from lca.contracts.team_coordination import (
+    Debate,
+    FanOut,
+    Graph,
+    LeadMandate,
+    PeerRelay,
+    PeerSwarm,
+    Pipeline,
+)
+from lca.layer4_app.api import Agent, Team, TeamLead
 
-__all__ = ["Agent", "MultiAgentTeam"]
+__all__ = [
+    "Agent",
+    "Debate",
+    "FanOut",
+    "Graph",
+    "LeadMandate",
+    "PeerRelay",
+    "PeerSwarm",
+    "Pipeline",
+    "Team",
+    "TeamLead",
+]

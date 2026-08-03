@@ -1,7 +1,7 @@
-"""YAML → Agent / MultiAgentTeam 装配胶水层。
+"""YAML → Agent / Team 装配胶水层。
 
 仅用于测试（不进 lca 包），把 tests/fixtures/team_scenarios/*.yaml
-翻译成对 lca.layer4_app.api.Agent / MultiAgentTeam 的构造参数。
+翻译成 lca Agent / Team 构造参数。
 """
 
 from __future__ import annotations
@@ -12,11 +12,18 @@ from typing import Any
 
 import yaml
 
-from lca.contracts.enums import TeamProcess
 from lca.contracts.protocols import LLMAdapter, Tool
-from lca.contracts.supervisor_mode import Recipe, SupervisorMode
+from lca.contracts.team_coordination import (
+    Debate,
+    FanOut,
+    Graph,
+    LeadMandate,
+    PeerRelay,
+    PeerSwarm,
+    Pipeline,
+)
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
-from lca.layer4_app.api import Agent, MultiAgentTeam
+from lca.layer4_app.api import Agent, Team, TeamLead
 
 _TOOL_REGISTRY: dict[str, type[Tool]] = {
     "calculator": CalculatorTool,
@@ -24,14 +31,13 @@ _TOOL_REGISTRY: dict[str, type[Tool]] = {
 
 _DEFAULT_FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "team_scenarios"
 
-# Legacy YAML keys → SupervisorMode (migration map for fixtures)
-_GATE_PLANE_TO_MODE: dict[tuple[str | None, str | None], SupervisorMode] = {
-    ("must_consult_all", None): SupervisorMode.BOARD,
-    ("must_consult_all", "consultation"): SupervisorMode.BOARD,
-    ("none", "routing"): SupervisorMode.ROUTING,
-    ("none", "consultation"): SupervisorMode.CONSULTATION,
-    (None, "routing"): SupervisorMode.ROUTING,
-    (None, "consultation"): SupervisorMode.CONSULTATION,
+_COORDINATION_BUILDERS: dict[str, type] = {
+    "pipeline": Pipeline,
+    "fan_out": FanOut,
+    "peer_relay": PeerRelay,
+    "peer_swarm": PeerSwarm,
+    "debate": Debate,
+    "graph": Graph,
 }
 
 
@@ -46,14 +52,11 @@ class RoleSpec:
 
 @dataclass
 class TeamSpec:
-    process: str
     members: list[str] = field(default_factory=list)
-    supervisor: str | None = None
-    recipe: str | None = None
-    supervisor_mode: str | None = None
-    # legacy (mapped then ignored at build)
-    decision_gate: str | None = None
-    supervisor_plane: str | None = None
+    lead_agent: str | None = None
+    lead_mandate: str | None = None
+    coordination: str | None = None
+    max_rounds: int | None = None
 
 
 @dataclass
@@ -104,14 +107,18 @@ def _parse_scenario(raw: dict[str, Any]) -> ScenarioSpec:
         raise ValueError(f"'teams' must be a mapping, got {type(raw_teams).__name__}")
     teams: dict[str, TeamSpec] = {}
     for team_key, team_raw in raw_teams.items():
+        lead_raw = team_raw.get("lead")
+        lead_agent = None
+        lead_mandate = None
+        if isinstance(lead_raw, dict):
+            lead_agent = lead_raw.get("agent")
+            lead_mandate = lead_raw.get("mandate")
         teams[team_key] = TeamSpec(
-            process=team_raw.get("process", "hierarchical"),
             members=team_raw.get("members", []),
-            supervisor=team_raw.get("supervisor"),
-            recipe=team_raw.get("recipe"),
-            supervisor_mode=team_raw.get("supervisor_mode"),
-            decision_gate=team_raw.get("decision_gate"),
-            supervisor_plane=team_raw.get("supervisor_plane"),
+            lead_agent=lead_agent,
+            lead_mandate=lead_mandate,
+            coordination=team_raw.get("coordination"),
+            max_rounds=team_raw.get("max_rounds"),
         )
 
     raw_cases = raw.get("cases", {})
@@ -155,65 +162,46 @@ def build_agent(
     )
 
 
-def _resolve_mode(team_spec: TeamSpec) -> SupervisorMode | None:
-    if team_spec.supervisor_mode is not None:
-        return SupervisorMode(team_spec.supervisor_mode)
-    if team_spec.recipe is not None:
-        return None  # recipe expands mode
-    key = (team_spec.decision_gate, team_spec.supervisor_plane)
-    if key in _GATE_PLANE_TO_MODE:
-        return _GATE_PLANE_TO_MODE[key]
-    if team_spec.decision_gate == "must_consult_all":
-        return SupervisorMode.BOARD
-    if team_spec.supervisor_plane == "routing":
-        return SupervisorMode.ROUTING
-    return None
-
-
 def build_team(
     spec: ScenarioSpec,
     team_key: str,
     llm: LLMAdapter,
     *,
-    supervisor_max_steps: int = 20,
-) -> MultiAgentTeam:
+    lead_max_steps: int = 20,
+) -> Team:
     team_spec = spec.teams[team_key]
     members = [build_agent(spec.roles[k], llm) for k in team_spec.members]
-    mode = _resolve_mode(team_spec)
 
-    if team_spec.recipe is not None:
-        recipe = Recipe(team_spec.recipe)
-        supervisor = None
-        if team_spec.supervisor is not None:
-            supervisor = build_agent(
-                spec.roles[team_spec.supervisor],
-                llm,
-                max_steps=supervisor_max_steps,
-            )
-        return MultiAgentTeam(
-            members=members,
-            recipe=recipe,
-            supervisor=supervisor,
-            supervisor_mode=mode,
-        )
+    has_lead = team_spec.lead_agent is not None
+    has_coord = team_spec.coordination is not None
+    if has_lead == has_coord:
+        raise ValueError(f"team {team_key!r} requires exactly one of lead= or coordination=")
 
-    process = TeamProcess(team_spec.process)
-    if process is TeamProcess.HIERARCHICAL:
-        if team_spec.supervisor is None:
-            raise ValueError("hierarchical team requires a 'supervisor' key")
-        supervisor = build_agent(
-            spec.roles[team_spec.supervisor],
+    if has_lead:
+        assert team_spec.lead_agent is not None
+        assert team_spec.lead_mandate is not None
+        lead_agent = build_agent(
+            spec.roles[team_spec.lead_agent],
             llm,
-            max_steps=supervisor_max_steps,
+            max_steps=lead_max_steps,
         )
-        return MultiAgentTeam(
-            members=members,
-            process=process,
-            supervisor=supervisor,
-            supervisor_mode=mode or SupervisorMode.CONSULTATION,
-        )
+        mandate = LeadMandate(team_spec.lead_mandate)
+        return Team(members=members, lead=TeamLead(lead_agent, mandate))
 
-    return MultiAgentTeam(members=members, process=process)
+    assert team_spec.coordination is not None
+    name = team_spec.coordination
+    if name not in _COORDINATION_BUILDERS:
+        raise ValueError(f"Unknown coordination {name!r}")
+    if name == "graph":
+        raise ValueError(
+            "graph coordination requires execution_graph in code tests, not YAML alone"
+        )
+    if name in ("peer_swarm", "debate"):
+        rounds = team_spec.max_rounds if team_spec.max_rounds is not None else 3
+        coord = _COORDINATION_BUILDERS[name](max_rounds=rounds)
+    else:
+        coord = _COORDINATION_BUILDERS[name]()
+    return Team(members=members, coordination=coord)
 
 
 def list_scenarios() -> list[Path]:

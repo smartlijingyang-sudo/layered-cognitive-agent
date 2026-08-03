@@ -60,29 +60,30 @@ roles:
 
 teams:
   hierarchical:
-    recipe: board
-    supervisor: project_lead
+    lead:
+      agent: project_lead
+      mandate: board
     members:
       - market_analyst
       - pricing_specialist
       - copywriter
 
   sequential:
-    process: sequential
+    coordination: pipeline
     members:
       - market_analyst
       - pricing_specialist
       - copywriter
 
   parallel:
-    process: parallel
+    coordination: fan_out
     members:
       - copywriter_a
       - copywriter_b
       - copywriter_c
 
   handoff:
-    process: handoff
+    coordination: peer_relay
     members:
       - refund_specialist
       - tech_support

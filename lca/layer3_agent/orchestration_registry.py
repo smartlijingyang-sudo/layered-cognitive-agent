@@ -1,41 +1,27 @@
-"""TeamProcessStrategyRegistry —— 按 process 名称注册和解析编排策略。
+"""TeamStrategyRegistry —— 按 strategy key 注册和解析编排策略。
 
-L3 层职责：
-    注册表模式（Registry Pattern）的实现。
-    将编排策略名称（如 "hierarchical"、"sequential"）映射到
-    TeamProcessStrategy 实例，消除 TeamOrchestrator 中的 if/elif 分发。
-    工厂签名 ``() -> TeamProcessStrategy``，resolve 时自动调用工厂。
+L3：将 ``pipeline`` / ``lead`` / ``fan_out`` 等键映射到 ``TeamStrategy`` 工厂，
+消除 if/elif 分发。``resolve`` 调用工厂后返回策略实例。
 
-ADR-0024：不再提供全局单例；实例归 Registries.orchestration 持有，
-由调用方（通常是 Assembly）显式构造和传递。
+ADR-0024：无全局单例；实例归 ``Registries.orchestration``，由 TeamComposer 持有。
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 
-from lca.contracts.protocols import TeamProcessStrategy
+from lca.contracts.protocols import TeamStrategy
 from lca.layer0_infra.component_registry import NamedRegistry
 
-OrchestrationFactory = Callable[[], TeamProcessStrategy]
+OrchestrationFactory = Callable[[], TeamStrategy]
 
 
-class TeamProcessStrategyRegistry(NamedRegistry[OrchestrationFactory]):
-    """按名称注册和查找 TeamProcessStrategy 工厂。
-
-    工厂签名: ``() -> TeamProcessStrategy``
-    策略实例在 ``run()`` 时通过 TeamContext 获取运行时数据。
-
-    ``resolve()`` 有意覆盖基类签名：基类返回工厂（``OrchestrationFactory``），
-    本类调用工厂后返回策略实例（``TeamProcessStrategy``），
-    这是注册表模式的常见变体——注册的是工厂，消费方拿到的是产品。
-    """
+class TeamStrategyRegistry(NamedRegistry[OrchestrationFactory]):
+    """按名称注册和查找 TeamStrategy 工厂。"""
 
     _REGISTRY_KIND = "编排策略"
 
-    def resolve(self, name: str) -> TeamProcessStrategy:  # type: ignore[override]
-        # 有意将返回类型从 OrchestrationFactory 变为 TeamProcessStrategy 实例：
-        # 注册表存工厂，resolve 调用工厂返回产品，消费方无需知道工厂细节。
+    def resolve(self, name: str) -> TeamStrategy:  # type: ignore[override]
         factory = super().resolve(name)
         return factory()
 

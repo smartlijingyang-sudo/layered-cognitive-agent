@@ -1,50 +1,39 @@
-"""编排策略覆盖测试 —— 确保 TeamProcess 枚举的每个值都有对应策略注册。
-
-只要有人给 TeamProcess 加新枚举值却忘了注册对应策略，这条测试当场失败。
-"""
+"""编排策略覆盖测试 —— strategy key 集合与注册表一致。"""
 
 from __future__ import annotations
 
-import os
-import sys
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from lca.contracts.enums import TeamProcess
+from lca.contracts.team_coordination import (
+    STRATEGY_KEY_DEBATE,
+    STRATEGY_KEY_FAN_OUT,
+    STRATEGY_KEY_GRAPH,
+    STRATEGY_KEY_LEAD,
+    STRATEGY_KEY_PEER_RELAY,
+    STRATEGY_KEY_PEER_SWARM,
+    STRATEGY_KEY_PIPELINE,
+)
 from lca.layer4_app.defaults import build_default_registries
 from tests.support.team_context import team_context_with_transport
 
 _REGISTRIES = build_default_registries()
 
-
-def _get_process_enum_values() -> set[str]:
-    """从 TeamProcess 枚举中提取所有合法值。"""
-    return {m.value for m in TeamProcess}
+_EXPECTED_KEYS = {
+    STRATEGY_KEY_LEAD,
+    STRATEGY_KEY_PIPELINE,
+    STRATEGY_KEY_FAN_OUT,
+    STRATEGY_KEY_DEBATE,
+    STRATEGY_KEY_PEER_RELAY,
+    STRATEGY_KEY_PEER_SWARM,
+    STRATEGY_KEY_GRAPH,
+}
 
 
 class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
-    """TeamConfig.process 声明值集合 恒等于 TeamProcessStrategyRegistry 的 key 集合。"""
-
-    def test_literal_values_match_registered_strategies(self) -> None:
-        literal_values = _get_process_enum_values()
+    def test_strategy_keys_match_registry(self) -> None:
         registered = set(_REGISTRIES.orchestration.list_strategies())
-
-        missing = literal_values - registered
-        extra = registered - literal_values
-
-        msg_parts: list[str] = []
-        if missing:
-            msg_parts.append(f"已声明但未注册策略: {missing}")
-        if extra:
-            msg_parts.append(f"已注册但未在 TeamConfig.process 中声明: {extra}")
-
-        self.assertEqual(
-            literal_values,
-            registered,
-            f"编排策略覆盖不完整: {'; '.join(msg_parts)}",
-        )
+        self.assertEqual(_EXPECTED_KEYS, registered)
 
     def test_resolve_unknown_strategy_raises_value_error(self) -> None:
         registry = _REGISTRIES.orchestration
@@ -53,7 +42,6 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("nonexistent_strategy", str(ctx.exception))
 
     async def test_graph_strategy_requires_execution_graph(self) -> None:
-        """GraphStrategy 已落地实现，无 ExecutionGraph 时抛 ValueError。"""
         from lca.contracts.protocols import TeamContext
         from lca.layer3_agent.orchestration_strategies import GraphStrategy
 
@@ -63,12 +51,9 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
             await strategy.run(context, "test")
 
     async def test_debate_strategy_is_functional(self) -> None:
-        """DebateStrategy 已落地实现，run() 不再抛 NotImplementedError。"""
         from lca.contracts.result import Result
         from lca.contracts.state import Budget
-        from lca.layer3_agent.orchestration_strategies import (
-            DebateStrategy,
-        )
+        from lca.layer3_agent.orchestration_strategies import DebateStrategy
 
         strategy = DebateStrategy()
         agent = MagicMock()

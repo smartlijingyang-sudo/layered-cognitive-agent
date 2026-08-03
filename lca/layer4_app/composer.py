@@ -1,7 +1,7 @@
 """Composition root — wires all layers into a working object graph.
 
-Sole module that assembles Agent / Team object graphs via ``Assembly``.
-Closed object graph (ADR-0029): no post-construction bind/install.
+``AgentComposer`` / ``TeamComposer`` assemble closed Agent / Team graphs.
+No post-construction bind/install (ADR-0029 / ADR-0030).
 """
 
 from __future__ import annotations
@@ -19,9 +19,7 @@ from lca.contracts.enums import (
     DecisionGateName,
     HookEvent,
     MemoryLayer,
-    TeamProcess,
 )
-from lca.contracts.graph import ExecutionGraph
 from lca.contracts.mechanisms import ComponentRegistryProtocol
 from lca.contracts.protocols import (
     Body,
@@ -35,7 +33,7 @@ from lca.contracts.protocols import (
     Observability,
     SharedMemoryStore,
     StateStore,
-    TeamProcessStrategy,
+    TeamStrategy,
     TeamUnit,
     Tool,
     TransportRegistryProtocol,
@@ -44,10 +42,15 @@ from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.protocols.orchestration import TeamContext
 from lca.contracts.registries import Registries
 from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
-from lca.contracts.supervisor_mode import (
-    SupervisorMode,
-    decision_gate_name_for_mode,
-    mode_uses_consultation_session,
+from lca.contracts.team_coordination import (
+    Coordination,
+    Graph,
+    LeadMandate,
+    gate_name_for_mandate,
+    mandate_uses_consultation_session,
+    max_rounds_from_coordination,
+    strategy_key_for_coordination,
+    strategy_key_for_lead,
 )
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
@@ -67,7 +70,9 @@ from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultSt
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.orchestration_registry import OrchestrationFactory
+from lca.layer3_agent.orchestration_strategies.debate import DebateStrategy
 from lca.layer3_agent.orchestration_strategies.graph import GraphStrategy
+from lca.layer3_agent.orchestration_strategies.swarm import SwarmStrategy
 from lca.layer3_agent.team_orchestrator import TeamOrchestrator
 from lca.layer4_app.defaults import build_default_registries
 from lca.layer4_app.team_wiring import (
@@ -76,7 +81,8 @@ from lca.layer4_app.team_wiring import (
 )
 
 __all__ = [
-    "Assembly",
+    "AgentComposer",
+    "TeamComposer",
     "build_body_from_shared",
     "build_default_transport_registry",
     "build_hooks",
@@ -133,11 +139,11 @@ def build_hooks(observability: Observability, event_bus: EventBus) -> SimpleHook
     return hooks
 
 
-def _promote_supervisor(supervisor: CognitiveAgent, policy: BudgetPolicy) -> CognitiveAgent:
-    limits = policy.resolve(supervisor)
+def _promote_lead(lead: CognitiveAgent, policy: BudgetPolicy) -> CognitiveAgent:
+    limits = policy.resolve(lead)
     return CognitiveAgent(
-        supervisor.runtime,
-        supervisor.role_profile,
+        lead.runtime,
+        lead.role_profile,
         max_steps=limits.max_steps,
         max_wall_clock_seconds=limits.max_wall_clock_seconds,
     )
@@ -146,7 +152,6 @@ def _promote_supervisor(supervisor: CognitiveAgent, policy: BudgetPolicy) -> Cog
 def _tools_from_agent(agent: CognitiveAgent) -> list[Tool]:
     runtime = agent.runtime
     body = getattr(runtime, "body", None)
-    # Unwrap fallback decorator
     inner = getattr(body, "_inner", body)
     registry = getattr(inner, "tool_registry", None)
     if registry is None:
@@ -163,15 +168,15 @@ def _llm_from_agent(agent: CognitiveAgent) -> LLMAdapter:
     if llm is None:
         raise TypeError(
             "cannot recompose agent without llm on brain.reasoner; "
-            "assemble via Assembly.assemble_agent / L4 Agent"
+            "assemble via AgentComposer.compose / L4 Agent"
         )
     if not isinstance(llm, LLMAdapter):
         raise TypeError(f"reasoner.llm must be LLMAdapter, got {type(llm).__name__}")
     return llm
 
 
-class Assembly:
-    """组合根（ADR-0024 / ADR-0029）。私有 Registries，封闭对象图。"""
+class AgentComposer:
+    """Compose a single closed CognitiveAgent."""
 
     def __init__(self, registries: Registries | None = None) -> None:
         self._registries = registries if registries is not None else build_default_registries()
@@ -186,12 +191,10 @@ class Assembly:
     def register_brain_factory(self, name: str, factory: BrainFactory) -> None:
         self._registries.brain_factories.register(name, factory)
 
-    def register_orchestration_strategy(
-        self, process: TeamProcess, factory: OrchestrationFactory
-    ) -> None:
-        self._registries.orchestration.register(process, factory)
+    def register_orchestration_strategy(self, key: str, factory: OrchestrationFactory) -> None:
+        self._registries.orchestration.register(key, factory)
 
-    def assemble_agent(
+    def compose(
         self,
         *,
         role: str,
@@ -208,7 +211,7 @@ class Assembly:
         action_scope: ActionScope = ActionScope.SOLO,
         team_channel: AgentTransport | None = None,
         decision_gate: DecisionGate | None = None,
-        supervisor_cognition: bool = False,
+        lead_cognition: bool = False,
         shared_store: SharedMemoryStore | None = None,
     ) -> CognitiveAgent:
         """Assemble a complete CognitiveAgent (closed graph)."""
@@ -259,10 +262,10 @@ class Assembly:
         else:
             resolved_brain = brain
 
-        if supervisor_cognition or decision_gate is not None:
-            resolved_brain = self._apply_supervisor_brain(
+        if lead_cognition or decision_gate is not None:
+            resolved_brain = self._apply_lead_brain(
                 resolved_brain,
-                supervisor_cognition=supervisor_cognition,
+                lead_cognition=lead_cognition,
                 decision_gate=decision_gate,
             )
 
@@ -290,22 +293,22 @@ class Assembly:
         )
 
     @staticmethod
-    def _apply_supervisor_brain(
+    def _apply_lead_brain(
         brain: Brain,
         *,
-        supervisor_cognition: bool,
+        lead_cognition: bool,
         decision_gate: DecisionGate | None,
     ) -> Brain:
-        """Return a new ModularBrain with supervisor reasoner/gate when applicable."""
+        """Return a new ModularBrain with lead reasoner/gate when applicable."""
         if not isinstance(brain, ModularBrain):
-            if decision_gate is not None or supervisor_cognition:
+            if decision_gate is not None or lead_cognition:
                 raise TypeError(
-                    f"supervisor composition requires ModularBrain (got {type(brain).__name__})"
+                    f"lead composition requires ModularBrain (got {type(brain).__name__})"
                 )
             return brain
 
         reasoner = brain.reasoner
-        if supervisor_cognition:
+        if lead_cognition:
             if isinstance(reasoner, SupervisorReasoner):
                 pass
             elif isinstance(reasoner, SimpleReasoner):
@@ -324,19 +327,19 @@ class Assembly:
             decision_gate=decision_gate,
         )
 
-    def recompose_as_supervisor(
+    def compose_as_lead(
         self,
         raw: CognitiveAgent,
         *,
         transport: AgentTransport,
-        mode: SupervisorMode,
+        mandate: LeadMandate,
     ) -> CognitiveAgent:
-        """Build a new closed supervisor agent from a raw agent (no patch)."""
+        """Build a new closed lead agent from a raw agent (no patch)."""
         tools = _tools_from_agent(raw)
         llm = _llm_from_agent(raw)
         profile = raw.role_profile
-        gate = self._resolve_decision_gate(decision_gate_name_for_mode(mode))
-        composed = self.assemble_agent(
+        gate = self._resolve_decision_gate(gate_name_for_mandate(mandate))
+        composed = self.compose(
             role=profile.role,
             goal=profile.goal,
             backstory=profile.backstory,
@@ -344,20 +347,20 @@ class Assembly:
             llm=llm,
             max_steps=raw.max_steps,
             max_wall_clock_seconds=raw.max_wall_clock_seconds,
-            action_scope=ActionScope.SUPERVISOR,
+            action_scope=ActionScope.LEAD,
             team_channel=transport,
             decision_gate=gate,
-            supervisor_cognition=True,
+            lead_cognition=True,
         )
         policy = _resolve_component(
             self._registries.components,
             ComponentKind.BUDGET_POLICY,
-            "supervisor",
+            "lead",
             BudgetPolicy,  # type: ignore[type-abstract]
         )
-        return _promote_supervisor(composed, policy)
+        return _promote_lead(composed, policy)
 
-    def recompose_member(
+    def compose_member(
         self,
         raw: CognitiveAgent,
         *,
@@ -369,7 +372,7 @@ class Assembly:
         tools = _tools_from_agent(raw)
         llm = _llm_from_agent(raw)
         profile = raw.role_profile
-        return self.assemble_agent(
+        return self.compose(
             role=profile.role,
             goal=profile.goal,
             backstory=profile.backstory,
@@ -392,30 +395,40 @@ class Assembly:
             )
         return result
 
-    def assemble_team(
+
+class TeamComposer(AgentComposer):
+    """Compose a closed team: members + (lead XOR coordination)."""
+
+    def compose_team(
         self,
         *,
         members: list[CognitiveAgent],
-        process: TeamProcess | None = None,
-        supervisor: CognitiveAgent | None = None,
-        max_rounds: int | None = None,
+        lead: tuple[CognitiveAgent, LeadMandate] | None = None,
+        coordination: Coordination | None = None,
         shared_memory_layers: list[MemoryLayer] | None = None,
-        execution_graph: ExecutionGraph | None = None,
-        strategy: TeamProcessStrategy | None = None,
-        supervisor_mode: SupervisorMode | None = None,
+        strategy: TeamStrategy | None = None,
         delegate_max_attempts: int | None = None,
     ) -> TeamUnit:
-        """Assemble a closed team graph. Hierarchical requires supervisor_mode."""
-        process_val = process if process is not None else TeamProcess.HIERARCHICAL
-        mode = supervisor_mode
-        if process_val is TeamProcess.HIERARCHICAL and mode is None:
-            mode = SupervisorMode.CONSULTATION
+        if (lead is None) == (coordination is None):
+            raise ValueError("Team requires exactly one of lead= or coordination=")
+
+        if lead is not None:
+            raw_lead, mandate = lead
+            strategy_key = strategy_key_for_lead()
+            max_rounds = None
+        else:
+            if coordination is None:  # pragma: no cover - guarded above
+                raise ValueError("Team requires exactly one of lead= or coordination=")
+            strategy_key = strategy_key_for_coordination(coordination)
+            max_rounds = max_rounds_from_coordination(coordination)
+            mandate = None
+            raw_lead = None
 
         config = TeamConfig(
-            process=process_val,
+            strategy_key=strategy_key,
             max_rounds=max_rounds,
             shared_memory_layers=list(shared_memory_layers or []),
-            supervisor_mode=mode if process_val is TeamProcess.HIERARCHICAL else None,
+            lead_mandate=mandate,
         )
         if delegate_max_attempts is not None:
             config.delegate_max_attempts = delegate_max_attempts
@@ -424,41 +437,45 @@ class Assembly:
         if config.shared_memory_layers:
             shared_store = TeamSharedMemoryStore(config.shared_memory_layers)
 
-        composed_members = [self.recompose_member(m, shared_store=shared_store) for m in members]
+        composed_members = [self.compose_member(m, shared_store=shared_store) for m in members]
 
         resolved_strategy = strategy
-        if resolved_strategy is None and process_val is TeamProcess.GRAPH:
-            if execution_graph is None:
-                raise ValueError(
-                    "process=GRAPH requires execution_graph= (or pass strategy=GraphStrategy(...))"
-                )
-            resolved_strategy = GraphStrategy(execution_graph=execution_graph)
+        if resolved_strategy is None and isinstance(coordination, Graph):
+            resolved_strategy = GraphStrategy(execution_graph=coordination.execution_graph)
+        if resolved_strategy is None and coordination is not None:
+            key = strategy_key_for_coordination(coordination)
+            if key == "peer_swarm":
+                rounds = max_rounds_from_coordination(coordination)
+                resolved_strategy = SwarmStrategy(max_rounds=rounds)
+            elif key == "debate":
+                rounds = max_rounds_from_coordination(coordination)
+                resolved_strategy = DebateStrategy(max_rounds=rounds)
+            else:
+                resolved_strategy = self._registries.orchestration.resolve(key)
+        if resolved_strategy is None and lead is not None:
+            resolved_strategy = self._registries.orchestration.resolve(strategy_key_for_lead())
         if resolved_strategy is None:
-            resolved_strategy = self._registries.orchestration.resolve(process_val)
+            raise ValueError(f"unable to resolve TeamStrategy for key={strategy_key!r}")
 
         transport = build_team_transport(composed_members)
         teammate_profiles = [m.role_profile for m in composed_members]
 
-        closed_supervisor: CognitiveAgent | None = None
+        closed_lead: CognitiveAgent | None = None
         member_status = None
-        if supervisor is not None:
-            if mode is None:
-                raise ValueError("supervisor provided but supervisor_mode is None")
-            closed_supervisor = self.recompose_as_supervisor(
-                supervisor, transport=transport, mode=mode
-            )
-            if mode_uses_consultation_session(mode):
+        if raw_lead is not None and mandate is not None:
+            closed_lead = self.compose_as_lead(raw_lead, transport=transport, mandate=mandate)
+            if mandate_uses_consultation_session(mandate):
                 role_order = tuple(m.role_profile.role for m in composed_members)
                 member_status = InMemoryMemberStatus(role_order=role_order)
 
         context = TeamContext(
             members=composed_members,
             config=config,
-            supervisor=closed_supervisor,
+            lead=closed_lead,
             transport=transport,
             teammates=teammate_profiles,
             member_status=member_status,
-            team_id=f"team-{process_val}",
+            team_id=f"team-{strategy_key}",
             shared_memory=shared_store,
         )
         return TeamOrchestrator(context, resolved_strategy)

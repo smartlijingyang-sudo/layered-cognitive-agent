@@ -95,15 +95,15 @@ uv run pytest -m real_llm -v
 真实 LLM 测试的断言策略：验证结构化事件（`status == "completed"`、`total_steps >= N`），
 不验证具体文案（真实模型措辞不可预测）。
 
-## 编排族与业界插槽（ADR-0027 / ADR-0028 / ADR-0029）
+## 团队协作（领域语言）
 
-- **Family**（分类学，非用户旋钮）：`SUPERVISOR` / `CHOREOGRAPHY` / `PEER` / `GRAPH`
-- **Recipe**（推荐）：`MultiAgentTeam.pipeline|fanout|manager|consult|board|relay|swarm|graph|debate`
-- **SupervisorMode 闭集**：`routing` | `consultation` | `board`（全员结算）；非法 gate×plane 不可表达
-- **封闭对象图**：无 `bind_*` / `install_*`；supervisor 由 `Assembly.recompose_as_supervisor` **新建**
-- **session 单槽**：`RunContext.session` / `AgentState.session` = ConsultationState | RoutingState
-- PEER：`handoff` / `swarm`；GRAPH：`execution_graph=`
-- 委派：仅 `Decision.delegations`；成员调用统一 `send_and_wait`
+- `Agent`：单角色；`Team`：members + **恰好一种**协作机制。
+- 有主导者：`Team(members=..., lead=TeamLead.board(pm))`
+  - `LeadMandate`：`routing` | `consult` | `board`（全员咨询后收口）
+- 无主导者：`Team(members=..., coordination=Pipeline()|FanOut()|PeerRelay()|PeerSwarm()|Debate()|Graph(...))`
+- 场景 YAML：`lead.mandate` 或 `coordination`，禁止并存。
+- 对象图由 `TeamComposer` 封闭组装；成员调用统一 `send_and_wait`；委派仅 `Decision.delegations`。
+
 
 ## 如何新增团队场景
 
@@ -119,9 +119,14 @@ roles:
 
 teams:
   my_team:
-    recipe: board  # 或 process + supervisor_mode；board = 全员咨询结算
-    supervisor: supervisor_role  # hierarchical / board / manager / consult 必须
+    lead:
+      agent: lead_role
+      mandate: board   # routing | consult | board
     members: [role1, role2]
+  # 或无主导者：
+  # my_pipeline:
+  #   coordination: pipeline  # pipeline | fan_out | peer_relay | peer_swarm | debate
+  #   members: [role1, role2]
 
 cases:
   my_case:

@@ -1,29 +1,6 @@
 from __future__ import annotations
 
-"""真实 LLM 端到端 Demo 测试 —— 单 Agent + 四种团队策略全链路验证。
-
-合并原 lca_single_agent_demo.py / examples/ 下的演示脚本为一个统一的
-pytest 测试套件，用真实 LLM 跑完 L4→L3→L2→L1→L0 全链路，同时输出
-结构化日志到终端和 JSONL 文件，方便排查。
-
-运行方式（一键）：
-    # 需要 LLM_API_KEY 环境变量
-    uv run pytest -m real_llm -v -s --no-cov
-
-    # 无 Key 时自动 skip，不会报错
-    uv run pytest  # 默认排除 real_llm marker
-
-日志输出：
-    - 终端：structlog 结构化日志 + ConsoleObservability TraceSpan
-    - 文件：traces/e2e_demo_trace.jsonl（每行一个 JSON span）
-
-断言策略：
-    真实模型措辞不可预测，断言结构化事件而非文本内容：
-      - result.status == "completed"
-      - result.total_steps >= N（证明多轮委派确实发生）
-      - 工具调用结果正确性（CalculatorTool 数值验证）
-"""
-
+# 真实 LLM 端到端 Demo 测试 —— 单 Agent + 四种团队策略全链路验证。
 import json
 import logging
 import os
@@ -32,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.supervisor_mode import SupervisorMode
+from lca.contracts.team_coordination import FanOut, PeerRelay, Pipeline
 from lca.layer0_infra.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
-from lca.layer4_app.api import Agent, MultiAgentTeam
+from lca.layer4_app.api import Agent, Team, TeamLead
 
 # 加载 .env（如果存在）
 load_dotenv_if_present()
@@ -170,9 +147,9 @@ class TestSequentialTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             observability="jsonl_file",
         )
 
-        team = MultiAgentTeam(
+        team = Team(
             members=[researcher, writer],
-            process="sequential",
+            coordination=Pipeline(),
         )
 
         result = await team.run("分析无线降噪耳机市场趋势并撰写简报")
@@ -228,9 +205,9 @@ class TestParallelTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             observability="jsonl_file",
         )
 
-        team = MultiAgentTeam(
+        team = Team(
             members=[writer_a, writer_b, writer_c],
-            process="parallel",
+            coordination=FanOut(),
         )
 
         result = await team.run("为无线降噪耳机新品写一句上市文案")
@@ -299,11 +276,9 @@ class TestHierarchicalTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             observability="jsonl_file",
         )
 
-        team = MultiAgentTeam(
+        team = Team(
             members=[market_analyst, pricing_specialist, copywriter],
-            process="hierarchical",
-            supervisor=supervisor,
-            supervisor_mode=SupervisorMode.BOARD,
+            lead=TeamLead.board(supervisor),
         )
 
         result = await team.run("新品：无线降噪耳机，目标市场：东南亚，请给出是否上市的完整评估")
@@ -352,9 +327,9 @@ class TestHandoffTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             observability="jsonl_file",
         )
 
-        team = MultiAgentTeam(
+        team = Team(
             members=[refund_specialist, tech_support],
-            process="handoff",
+            coordination=PeerRelay(),
         )
 
         result = await team.run("用户反馈耳机连接失败，怀疑是硬件故障还是需要退款，请分诊处理")

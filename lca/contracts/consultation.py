@@ -69,5 +69,5 @@ def assert_consultation_field_whitelist() -> None:
             f"missing={sorted(missing)} extra={sorted(extra)}. "
             "Update CONSULTATION_FIELD_WHITELIST and docs/adr/0026 only after "
             "confirming the field is hierarchical settlement state — not another "
-            "TeamProcess session concern."
+            "team lead session concern."
         )

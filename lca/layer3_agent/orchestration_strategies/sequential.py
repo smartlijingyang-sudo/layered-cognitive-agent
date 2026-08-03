@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols import TeamContext, TeamProcessStrategy
+from lca.contracts.protocols import TeamContext, TeamStrategy
 from lca.contracts.result import Result
 from lca.layer3_agent.member_invoke import invoke_members_sequential
 
 
-class SequentialStrategy(TeamProcessStrategy):
+class SequentialStrategy(TeamStrategy):
     """Chain members in order; each member's output becomes the next task."""
 
     async def run(self, context: TeamContext, objective: str) -> Result:

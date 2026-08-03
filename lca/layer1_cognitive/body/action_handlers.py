@@ -161,7 +161,7 @@ class DelegateOperation(Action):
 class HandoffOperation(Action):
     """处理 handoff 动作：非阻塞控制权移交，发完即返回（不等待结果）。
 
-    Distinct from TeamProcess.HANDOFF (peer first-completed topology).
+    Distinct from PeerRelay coordination (peer first-completed topology).
     """
 
     def __init__(self, transport_registry: TransportRegistryProtocol) -> None:

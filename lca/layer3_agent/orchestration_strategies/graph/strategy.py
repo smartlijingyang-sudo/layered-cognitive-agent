@@ -25,7 +25,7 @@ from lca.contracts.protocols import (
     StateStore,
     Synthesizer,
     TeamContext,
-    TeamProcessStrategy,
+    TeamStrategy,
 )
 from lca.contracts.result import Result
 from lca.contracts.state import AgentState, Budget
@@ -55,7 +55,7 @@ class GraphExecutionState:
     queue: deque[str] = field(default_factory=deque)
 
 
-class GraphStrategy(TeamProcessStrategy):
+class GraphStrategy(TeamStrategy):
     """DAG 工作流引擎：拓扑排序 + fan-in/fan-out + 条件分支 + 并行分支。
 
     构造时可选传入 ExecutionGraph 和 StateStore。

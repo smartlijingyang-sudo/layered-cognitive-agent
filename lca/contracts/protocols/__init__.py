@@ -62,7 +62,7 @@ from lca.contracts.protocols.orchestration import (
     SharedMemoryStore,
     Synthesizer,
     TeamContext,
-    TeamProcessStrategy,
+    TeamStrategy,
 )
 
 # ── L2 Runtime 协议 ──────────────────────────────────────
@@ -104,7 +104,7 @@ __all__ = [
     "SupportsShortcut",
     "Synthesizer",
     "TeamContext",
-    "TeamProcessStrategy",
+    "TeamStrategy",
     "TeamUnit",
     "Tool",
     "ToolRegistry",
