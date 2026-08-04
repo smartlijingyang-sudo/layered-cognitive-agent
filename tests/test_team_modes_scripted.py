@@ -413,9 +413,9 @@ async def test_llm_chat_span_emitted() -> None:
 
 @pytest.mark.asyncio
 async def test_routing_duplicate_delegation_is_idempotent() -> None:
-    """字面重复的 (角色, 子任务) 委派被账本幂等短路。
+    """字面重复的 (角色, 子任务) 委派被回报记录幂等短路。
 
-    Lead 第一次 fan-out 成功结算后，第二次发出完全相同的两条委派——应命中
+    Lead 第一次 fan-out 全部成功返回后，第二次发出完全相同的两条委派——应命中
     ``delegate.cache_hit`` 而不是再次走 transport 重跑成员。
     """
     col = InMemoryObservability()
@@ -423,7 +423,7 @@ async def test_routing_duplicate_delegation_is_idempotent() -> None:
         {
             "Lead": [
                 multi_delegate([("Alice", "analyze"), ("Bob", "review")]),
-                # 字面重复：同角色同子任务，应短路复用账本结果
+                # 字面重复：同角色同子任务，应短路复用已返回的结果
                 multi_delegate([("Alice", "analyze"), ("Bob", "review")]),
                 respond("lead final"),
             ],

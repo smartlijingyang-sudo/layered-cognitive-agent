@@ -44,7 +44,7 @@ from lca.layer1_cognitive.body.delegation_cache import (
     tag_delegation_extra,
 )
 from lca.layer1_cognitive.member_status.tracking import (
-    settle_delegation,
+    record_delegation_return,
 )
 
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
@@ -116,23 +116,23 @@ class DelegateOperation(Action):
         if cached is not None:
             return cached
         observation = await self._invoke(spec, state)
-        self._settle(spec, observation, state)
+        self._record_return(spec, observation, state)
         return tag_delegation_extra(observation, spec)
 
     async def _execute_many(self, specs: list[DelegationSpec], state: AgentState) -> Observation:
-        settled: dict[int, Observation] = {}
+        returns: dict[int, Observation] = {}
         pending: list[tuple[int, DelegationSpec]] = []
         for index, spec in enumerate(specs):
             cached = cached_delegation_observation(spec, state)
             if cached is not None:
-                settled[index] = cached
+                returns[index] = cached
             else:
                 pending.append((index, spec))
         fresh = await asyncio.gather(*[self._invoke(spec, state) for _, spec in pending])
         for (index, spec), observation in zip(pending, fresh, strict=True):
-            self._settle(spec, observation, state)
-            settled[index] = observation
-        observations = [settled[index] for index in range(len(specs))]
+            self._record_return(spec, observation, state)
+            returns[index] = observation
+        observations = [returns[index] for index in range(len(specs))]
 
         member_payload: dict[str, object] = {}
         member_subtasks: dict[str, object] = {}
@@ -157,8 +157,10 @@ class DelegateOperation(Action):
             },
         )
 
-    def _settle(self, spec: DelegationSpec, observation: Observation, state: AgentState) -> None:
-        settle_delegation(state, spec, observation)
+    def _record_return(
+        self, spec: DelegationSpec, observation: Observation, state: AgentState
+    ) -> None:
+        record_delegation_return(state, spec, observation)
 
     async def _invoke(self, spec: DelegationSpec, state: AgentState) -> Observation:
         transport, agent_card = self._resolve_target(spec, state)

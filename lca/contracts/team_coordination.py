@@ -27,10 +27,10 @@ class LeadMandate(str, Enum):
     """Authority and obligations of a TeamLead (closed set)."""
 
     ROUTING = "routing"
-    """Free assignment; no full-roster settlement duty."""
+    """Free assignment; no full-roster consult duty."""
 
     CONSULT = "consult"
-    """Roster-aware board; settlement not forced."""
+    """Roster-aware board; full response not enforced."""
 
     BOARD = "board"
     """Must consult all required members before final respond."""

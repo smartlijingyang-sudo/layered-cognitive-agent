@@ -18,7 +18,7 @@ from lca.contracts.semantic_keys import (
     FAILURE_KIND_VALIDATION,
 )
 from lca.contracts.state import AgentState, Budget
-from lca.contracts.team_awareness import Settlement, TeamAwareness
+from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
     MustConsultAllMembers,
@@ -28,7 +28,7 @@ from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.member_status import (
     InMemoryMemberStatus,
     compute_required_action,
-    settle_delegation,
+    record_delegation_return,
 )
 from lca.layer1_cognitive.member_status.tracking import _next_role_status
 
@@ -40,15 +40,15 @@ def _state(task: str = "test task", **kw) -> AgentState:
         board = kw.pop("member_status")
         if board is not None:
             kw["team_awareness"] = TeamAwareness(
-                settlement=Settlement(
+                consult_duty=ConsultDuty(
                     member_status=board, max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS
                 )
             )
     return AgentState(trace_id="t", task=task, budget=Budget(), **kw)
 
 
-def _settlement(state: AgentState) -> Settlement | None:
-    return state.team_awareness.settlement if state.team_awareness else None
+def _duty(state: AgentState) -> ConsultDuty | None:
+    return state.team_awareness.consult_duty if state.team_awareness else None
 
 
 def _decision(action_type: str = "respond", **kw) -> Decision:
@@ -61,7 +61,7 @@ def _decision(action_type: str = "respond", **kw) -> Decision:
     )
 
 
-def _ledger(roles: set[str], status: dict[str, str] | None = None) -> InMemoryMemberStatus:
+def _board(roles: set[str], status: dict[str, str] | None = None) -> InMemoryMemberStatus:
     return InMemoryMemberStatus(
         role_order=tuple(roles),
         status=status or dict.fromkeys(roles, "pending"),
@@ -86,61 +86,61 @@ def _obs(success: bool = True, error: str = "", *, failure_kind: str | None = No
 
 class TestInMemoryMemberStatus:
     def test_auto_init_pending(self) -> None:
-        ledger = _ledger({"a", "b"})
-        assert ledger.status["a"] == "pending"
-        assert ledger.status["b"] == "pending"
+        board = _board({"a", "b"})
+        assert board.status["a"] == "pending"
+        assert board.status["b"] == "pending"
 
     def test_all_done_false_when_pending(self) -> None:
-        ledger = _ledger({"a", "b"})
-        assert ledger.all_done() is False
+        board = _board({"a", "b"})
+        assert board.all_done() is False
 
     def test_all_done_true_when_all_done(self) -> None:
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "done"})
-        assert ledger.all_done() is True
+        board = _board({"a", "b"}, {"a": "done", "b": "done"})
+        assert board.all_done() is True
 
     def test_all_done_partial(self) -> None:
-        ledger = _ledger({"a", "b", "c"}, {"a": "done", "b": "done", "c": "pending"})
-        assert ledger.all_done() is False
+        board = _board({"a", "b", "c"}, {"a": "done", "b": "done", "c": "pending"})
+        assert board.all_done() is False
 
-    def test_all_settled_false_when_pending(self) -> None:
-        ledger = _ledger({"a", "b"})
-        assert ledger.all_settled() is False
+    def test_all_terminal_false_when_pending(self) -> None:
+        board = _board({"a", "b"})
+        assert board.all_terminal() is False
 
-    def test_all_settled_true_when_all_terminal(self) -> None:
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "failed"})
-        assert ledger.all_settled() is True
+    def test_all_terminal_true_when_all_terminal(self) -> None:
+        board = _board({"a", "b"}, {"a": "done", "b": "failed"})
+        assert board.all_terminal() is True
 
-    def test_all_settled_false_when_in_progress(self) -> None:
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "in_progress"})
-        assert ledger.all_settled() is False
+    def test_all_terminal_false_when_in_progress(self) -> None:
+        board = _board({"a", "b"}, {"a": "done", "b": "in_progress"})
+        assert board.all_terminal() is False
 
     def test_waiting_roles_excludes_terminal(self) -> None:
         """FAILED roles no longer appear in waiting_roles (Fix A)."""
-        ledger = _ledger(
+        board = _board(
             {"a", "b", "c"},
             {"a": "done", "b": "pending", "c": "failed"},
         )
-        waiting = ledger.waiting_roles()
+        waiting = board.waiting_roles()
         assert set(waiting) == {"b"}
 
     def test_waiting_roles_order_deterministic(self) -> None:
         """Same role_order → same iteration order (Fix D)."""
         order = ("x", "y", "z")
         for _ in range(10):
-            ledger = InMemoryMemberStatus(role_order=order)
-            assert ledger.waiting_roles() == ["x", "y", "z"]
+            board = InMemoryMemberStatus(role_order=order)
+            assert board.waiting_roles() == ["x", "y", "z"]
 
     def test_mark_returns_new_instance(self) -> None:
-        ledger = _ledger({"a", "b"})
-        new_ledger = ledger.mark("a", "done")
-        assert new_ledger is not ledger
-        assert new_ledger.status["a"] == "done"
-        assert ledger.status["a"] == "pending"  # original unchanged
+        board = _board({"a", "b"})
+        new_board = board.mark("a", "done")
+        assert new_board is not board
+        assert new_board.status["a"] == "done"
+        assert board.status["a"] == "pending"  # original unchanged
 
     def test_mark_chain(self) -> None:
-        ledger = _ledger({"a", "b"})
-        ledger = ledger.mark("a", "done").mark("b", "done")
-        assert ledger.all_done() is True
+        board = _board({"a", "b"})
+        board = board.mark("a", "done").mark("b", "done")
+        assert board.all_done() is True
 
     def test_duplicate_role_order_raises(self) -> None:
         with pytest.raises(ValueError, match="重复"):
@@ -152,19 +152,19 @@ class TestInMemoryMemberStatus:
 
 class TestMemberStatusPromptText:
     def test_waiting_roles_text(self) -> None:
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "pending"})
-        text = ledger.as_prompt_text()
+        board = _board({"a", "b"}, {"a": "done", "b": "pending"})
+        text = board.as_prompt_text()
         assert "b" in text
 
     def test_all_done_text(self) -> None:
-        ledger = _ledger({"a"}, {"a": "done"})
-        text = ledger.as_prompt_text()
+        board = _board({"a"}, {"a": "done"})
+        text = board.as_prompt_text()
         assert "完毕" in text
 
     def test_failed_roles_disclosed(self) -> None:
         """Fix 5: honest disclosure of permanently failed roles."""
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "failed"})
-        text = ledger.as_prompt_text()
+        board = _board({"a", "b"}, {"a": "done", "b": "failed"})
+        text = board.as_prompt_text()
         assert "b" in text
         assert "不可用" in text
 
@@ -180,9 +180,9 @@ class TestMemberStatusPromptText:
 
 class TestMustConsultAllMembers:
     @pytest.mark.asyncio
-    async def test_respond_blocked_when_not_settled(self) -> None:
-        ledger = _ledger({"analyst", "reviewer"})
-        state = _state(member_status=ledger)
+    async def test_respond_blocked_when_not_terminal(self) -> None:
+        board = _board({"analyst", "reviewer"})
+        state = _state(member_status=board)
         policy = MustConsultAllMembers()
 
         decision = _decision("respond")
@@ -195,10 +195,10 @@ class TestMustConsultAllMembers:
         assert result.confidence == 1.0
 
     @pytest.mark.asyncio
-    async def test_respond_allowed_when_settled_with_failures(self) -> None:
-        """Degradation by design: may respond when all settled even if some failed."""
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "failed"})
-        state = _state(member_status=ledger)
+    async def test_respond_allowed_when_terminal_with_failures(self) -> None:
+        """Degradation by design: may respond when all terminal even if some failed."""
+        board = _board({"a", "b"}, {"a": "done", "b": "failed"})
+        state = _state(member_status=board)
         policy = MustConsultAllMembers()
 
         decision = _decision("respond")
@@ -208,8 +208,8 @@ class TestMustConsultAllMembers:
 
     @pytest.mark.asyncio
     async def test_respond_allowed_when_all_done(self) -> None:
-        ledger = _ledger({"a"}, {"a": "done"})
-        state = _state(member_status=ledger)
+        board = _board({"a"}, {"a": "done"})
+        state = _state(member_status=board)
         policy = MustConsultAllMembers()
 
         decision = _decision("respond")
@@ -219,8 +219,8 @@ class TestMustConsultAllMembers:
 
     @pytest.mark.asyncio
     async def test_delegate_to_waiting_role_passes_through(self) -> None:
-        ledger = _ledger({"a", "b"})
-        state = _state(member_status=ledger)
+        board = _board({"a", "b"})
+        state = _state(member_status=board)
         policy = MustConsultAllMembers()
 
         decision = _decision(
@@ -233,10 +233,10 @@ class TestMustConsultAllMembers:
         assert result.delegations[0].target_role == "a"
 
     @pytest.mark.asyncio
-    async def test_delegate_to_settled_role_redirected(self) -> None:
-        """Fix C: gate intercepts DELEGATE to already-settled role."""
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "pending"})
-        state = _state(member_status=ledger)
+    async def test_delegate_to_terminal_role_redirected(self) -> None:
+        """Fix C: gate intercepts DELEGATE to already-terminal role."""
+        board = _board({"a", "b"}, {"a": "done", "b": "pending"})
+        state = _state(member_status=board)
         policy = MustConsultAllMembers()
 
         decision = _decision(
@@ -250,9 +250,9 @@ class TestMustConsultAllMembers:
 
     @pytest.mark.asyncio
     async def test_delegate_to_failed_role_redirected(self) -> None:
-        """FAILED role is settled; gate redirects to remaining waiting role."""
-        ledger = _ledger({"a", "b", "c"}, {"a": "done", "b": "failed", "c": "pending"})
-        state = _state(member_status=ledger)
+        """FAILED role is terminal; gate redirects to remaining waiting role."""
+        board = _board({"a", "b", "c"}, {"a": "done", "b": "failed", "c": "pending"})
+        state = _state(member_status=board)
         policy = MustConsultAllMembers()
 
         decision = _decision(
@@ -265,10 +265,10 @@ class TestMustConsultAllMembers:
         assert result.delegations[0].target_role == "c"
 
     @pytest.mark.asyncio
-    async def test_delegate_when_all_settled_rewritten_to_respond(self) -> None:
-        """All settled → gate rewrites DELEGATE to RESPOND."""
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "failed"})
-        state = _state(member_status=ledger)
+    async def test_delegate_when_all_terminal_rewritten_to_respond(self) -> None:
+        """All terminal → gate rewrites DELEGATE to RESPOND."""
+        board = _board({"a", "b"}, {"a": "done", "b": "failed"})
+        state = _state(member_status=board)
         policy = MustConsultAllMembers()
 
         decision = _decision(
@@ -280,7 +280,7 @@ class TestMustConsultAllMembers:
         assert result.action_type == "respond"
 
     @pytest.mark.asyncio
-    async def test_no_ledger_passes_through(self) -> None:
+    async def test_no_board_passes_through(self) -> None:
         state = _state()  # member_status=None
         policy = MustConsultAllMembers()
 
@@ -292,8 +292,8 @@ class TestMustConsultAllMembers:
     @pytest.mark.asyncio
     async def test_handoff_passes_through(self) -> None:
         """HANDOFF is out-of-scope; gate does not intercept."""
-        ledger = _ledger({"a", "b"})
-        state = _state(member_status=ledger)
+        board = _board({"a", "b"})
+        state = _state(member_status=board)
         policy = MustConsultAllMembers()
 
         decision = _decision(
@@ -306,8 +306,8 @@ class TestMustConsultAllMembers:
 
     @pytest.mark.asyncio
     async def test_subtask_includes_role_and_task(self) -> None:
-        ledger = _ledger({"analyst"})
-        state = _state(task="launch product", member_status=ledger)
+        board = _board({"analyst"})
+        state = _state(task="launch product", member_status=board)
         policy = MustConsultAllMembers()
 
         result = await policy.enforce(state, _decision("respond"))
@@ -323,8 +323,8 @@ class TestMustConsultAllMembers:
 class TestMustConsultAllMembersTryShortcut:
     @pytest.mark.asyncio
     async def test_short_circuits_when_exactly_one_waiting(self) -> None:
-        ledger = _ledger({"analyst"})
-        state = _state(member_status=ledger)
+        board = _board({"analyst"})
+        state = _state(member_status=board)
         result = await MustConsultAllMembers().try_shortcut(state)
 
         assert result is not None
@@ -337,7 +337,7 @@ class TestMustConsultAllMembersTryShortcut:
     async def test_fans_out_when_multiple_waiting(self) -> None:
         """Multi-waiting shortcut fans out all waiting roles in parallel."""
 
-        state = _state(member_status=_ledger({"analyst", "reviewer"}))
+        state = _state(member_status=_board({"analyst", "reviewer"}))
         result = await MustConsultAllMembers().try_shortcut(state)
         assert result is not None
         assert result.action_type == "delegate"
@@ -345,13 +345,13 @@ class TestMustConsultAllMembersTryShortcut:
         assert roles == {"analyst", "reviewer"}
 
     @pytest.mark.asyncio
-    async def test_defers_when_all_settled(self) -> None:
+    async def test_defers_when_all_terminal(self) -> None:
         """may_respond 仍需要 LLM 生成 response_text，try_shortcut 不代劳。"""
-        state = _state(member_status=_ledger({"a"}, {"a": "done"}))
+        state = _state(member_status=_board({"a"}, {"a": "done"}))
         assert await MustConsultAllMembers().try_shortcut(state) is None
 
     @pytest.mark.asyncio
-    async def test_defers_when_no_ledger(self) -> None:
+    async def test_defers_when_no_board(self) -> None:
         state = _state()  # member_status=None
         assert await MustConsultAllMembers().try_shortcut(state) is None
 
@@ -387,21 +387,21 @@ class TestModularBrainTryShortcutShortCircuit:
             decision_gate=MustConsultAllMembers(),
         )
 
-        state = _state(member_status=_ledger({"analyst"}))
+        state = _state(member_status=_board({"analyst"}))
         decision = await brain.think(state)
 
         assert decision.action_type == "delegate"
         reasoner.generate_thoughts.assert_not_called()
 
 
-# ── settle_delegation + retry ──
+# ── record_delegation_return + retry ──
 
 
-class TestSettleDelegation:
+class TestRecordDelegationReturn:
     @pytest.mark.asyncio
     async def test_marks_done_on_success(self) -> None:
-        ledger = _ledger({"analyst"})
-        state = _state(member_status=ledger)
+        board = _board({"analyst"})
+        state = _state(member_status=board)
 
         decision = _decision(
             "delegate",
@@ -409,16 +409,16 @@ class TestSettleDelegation:
         )
         obs = _obs(success=True)
 
-        settle_delegation(state, decision.delegations[0], obs)
+        record_delegation_return(state, decision.delegations[0], obs)
 
-        assert _settlement(state) is not None
-        assert _settlement(state).member_status.status["analyst"] == "done"
+        assert _duty(state) is not None
+        assert _duty(state).member_status.status["analyst"] == "done"
 
     @pytest.mark.asyncio
     async def test_marks_pending_on_first_execution_failure(self) -> None:
         """First execution failure stays PENDING (retry, not terminal)."""
-        ledger = _ledger({"analyst"})
-        state = _state(member_status=ledger)
+        board = _board({"analyst"})
+        state = _state(member_status=board)
 
         decision = _decision(
             "delegate",
@@ -426,19 +426,19 @@ class TestSettleDelegation:
         )
         obs = _obs(success=False, error="boom")
 
-        settle_delegation(state, decision.delegations[0], obs)
+        record_delegation_return(state, decision.delegations[0], obs)
 
-        assert _settlement(state) is not None
-        assert _settlement(state).member_status.status["analyst"] == "pending"
-        assert _settlement(state).attempts["analyst"] == 1
+        assert _duty(state) is not None
+        assert _duty(state).member_status.status["analyst"] == "pending"
+        assert _duty(state).attempts["analyst"] == 1
 
     @pytest.mark.asyncio
     async def test_marks_failed_after_max_attempts(self) -> None:
         """Exceeding max_attempts → FAILED (terminal)."""
-        ledger = _ledger({"analyst"})
-        state = _state(member_status=ledger)
-        assert _settlement(state) is not None
-        _settlement(state).max_attempts = 2
+        board = _board({"analyst"})
+        state = _state(member_status=board)
+        assert _duty(state) is not None
+        _duty(state).max_attempts = 2
 
         decision = _decision(
             "delegate",
@@ -446,19 +446,19 @@ class TestSettleDelegation:
         )
         obs = _obs(success=False, error="boom")
 
-        settle_delegation(state, decision.delegations[0], obs)  # attempt 1 → pending
-        assert _settlement(state).member_status.status["analyst"] == "pending"
+        record_delegation_return(state, decision.delegations[0], obs)  # attempt 1 → pending
+        assert _duty(state).member_status.status["analyst"] == "pending"
 
-        settle_delegation(state, decision.delegations[0], obs)  # attempt 2 → failed
-        assert _settlement(state).member_status.status["analyst"] == "failed"
-        assert _settlement(state).attempts["analyst"] == 2
-        assert _settlement(state).member_status.all_settled() is True
+        record_delegation_return(state, decision.delegations[0], obs)  # attempt 2 → failed
+        assert _duty(state).member_status.status["analyst"] == "failed"
+        assert _duty(state).attempts["analyst"] == 2
+        assert _duty(state).member_status.all_terminal() is True
 
     @pytest.mark.asyncio
     async def test_validation_failure_immediately_failed(self) -> None:
         """Validation-type failure → immediate FAILED (no retry)."""
-        ledger = _ledger({"analyst"})
-        state = _state(member_status=ledger)
+        board = _board({"analyst"})
+        state = _state(member_status=board)
 
         decision = _decision(
             "delegate",
@@ -466,25 +466,25 @@ class TestSettleDelegation:
         )
         obs = _obs(success=False, error="not found", failure_kind=FAILURE_KIND_VALIDATION)
 
-        settle_delegation(state, decision.delegations[0], obs)
+        record_delegation_return(state, decision.delegations[0], obs)
 
-        assert _settlement(state).member_status.status["analyst"] == "failed"
-        assert _settlement(state).member_status.all_settled() is True
-        assert _settlement(state).attempts["analyst"] == 1
+        assert _duty(state).member_status.status["analyst"] == "failed"
+        assert _duty(state).member_status.all_terminal() is True
+        assert _duty(state).attempts["analyst"] == 1
 
     @pytest.mark.asyncio
     async def test_noop_without_team_awareness(self) -> None:
         state = _state()  # no team awareness at all
         spec = DelegationSpec(target_role="analyst", subtask="analyze")
-        settle_delegation(state, spec, _obs(success=True))
+        record_delegation_return(state, spec, _obs(success=True))
 
     @pytest.mark.asyncio
     async def test_noop_for_non_required_role(self) -> None:
-        ledger = _ledger({"analyst"})
-        state = _state(member_status=ledger)
+        board = _board({"analyst"})
+        state = _state(member_status=board)
         spec = DelegationSpec(target_role="someone_else", subtask="chore")
-        settle_delegation(state, spec, _obs(success=True))
-        assert _settlement(state).member_status.status["analyst"] == "pending"
+        record_delegation_return(state, spec, _obs(success=True))
+        assert _duty(state).member_status.status["analyst"] == "pending"
 
 
 # ── _next_role_status pure function ──
@@ -559,28 +559,26 @@ class TestRoleStatusRules:
 
 class TestComputeRequiredAction:
     def test_must_delegate_when_waiting(self) -> None:
-        ledger = InMemoryMemberStatus(
-            role_order=("a", "b"), status={"a": "pending", "b": "pending"}
-        )
-        action = compute_required_action(ledger)
+        board = InMemoryMemberStatus(role_order=("a", "b"), status={"a": "pending", "b": "pending"})
+        action = compute_required_action(board)
         assert action.kind == "must_delegate"
         assert action.target_role == "a"  # first in role_order
 
     def test_must_delegate_when_partial(self) -> None:
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "pending"})
-        action = compute_required_action(ledger)
+        board = _board({"a", "b"}, {"a": "done", "b": "pending"})
+        action = compute_required_action(board)
         assert action.kind == "must_delegate"
         assert action.target_role == "b"
 
     def test_may_respond_when_all_done(self) -> None:
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "done"})
-        action = compute_required_action(ledger)
+        board = _board({"a", "b"}, {"a": "done", "b": "done"})
+        action = compute_required_action(board)
         assert action.kind == "may_respond"
         assert action.target_role is None
 
-    def test_may_respond_when_all_settled_with_failures(self) -> None:
-        ledger = _ledger({"a", "b"}, {"a": "done", "b": "failed"})
-        action = compute_required_action(ledger)
+    def test_may_respond_when_all_terminal_with_failures(self) -> None:
+        board = _board({"a", "b"}, {"a": "done", "b": "failed"})
+        action = compute_required_action(board)
         assert action.kind == "may_respond"
         assert action.target_role is None
 

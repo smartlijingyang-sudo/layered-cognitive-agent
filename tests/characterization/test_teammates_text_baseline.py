@@ -1,6 +1,6 @@
 """Characteristic baseline for teammates rendering and lead awareness cognition.
 
-Teammates live on TeamAwareness; settlement is its optional component.
+Teammates live on TeamAwareness; consult_duty is its optional component.
 PromptReasoner is shape-agnostic: awareness renders itself into prompt vars.
 """
 
@@ -10,7 +10,7 @@ from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.run_context import RunContext
 from lca.contracts.state import AgentState, Budget
-from lca.contracts.team_awareness import Settlement, TeamAwareness
+from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
 from lca.layer1_cognitive.brain.reasoner import build_teammates_text
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
@@ -30,7 +30,7 @@ def _awareness(
     roles = tuple(p.role for p in (teammates or [])) or ("member",)
     return TeamAwareness(
         teammates=list(teammates or []),
-        settlement=Settlement(
+        consult_duty=ConsultDuty(
             member_status=InMemoryMemberStatus(role_order=roles),
             max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS,
         ),

@@ -1,11 +1,11 @@
-"""DelegationResult —— 委派结算的一等类型化表示。
+"""DelegationResult —— 委派回报的一等类型化表示。
 
 背景：成员返回曾以 ``TOOL_RESULT: {payload}`` 字符串糊进 working memory，
 丢失归属（谁 / 哪个子任务 / 哪一步 / 成败），导致监督者把已返回的委派结果
 误判为"历史记录"而重复委派。
 
 本模块提供：
-- ``DelegationResult``：一次委派的结算产物，团队 awareness 账本
+- ``DelegationResult``：一次委派返回的回报，团队 awareness 回报记录
   （``TeamAwareness.results``）的元素；
 - ``find_result``：幂等键 ``(target_role, subtask)`` 的纯查询函数。
 
@@ -21,10 +21,10 @@ from datetime import datetime
 
 @dataclass(frozen=True)
 class DelegationResult:
-    """一次委派的结算产物 —— 监督控制面的一等事实。
+    """一次委派返回的回报 —— 监督控制面的一等事实。
 
     - ``TeamAwareness.results`` 是 lead prompt 与幂等委派的权威事实源
-    - 失败结算同样入账（供 prompt 暴露"谁没答成"），但 ``find_result``
+    - 失败回报同样记录在案（供 prompt 暴露"谁没答成"），但 ``find_result``
       只命中成功结果 —— 失败可以被重新委派
     """
 

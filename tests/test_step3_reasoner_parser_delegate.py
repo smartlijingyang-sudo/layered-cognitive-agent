@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import AgentState, Budget
-from lca.contracts.team_awareness import Settlement, TeamAwareness
+from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import (
@@ -33,7 +33,7 @@ def _make_state(
         roles = tuple(p.role for p in (teammates or [])) or ("member",)
         awareness = TeamAwareness(
             teammates=list(teammates or []),
-            settlement=Settlement(
+            consult_duty=ConsultDuty(
                 member_status=InMemoryMemberStatus(role_order=roles),
                 max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS,
             ),

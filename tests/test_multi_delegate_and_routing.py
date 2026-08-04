@@ -13,7 +13,7 @@ from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import AgentState, Budget
-from lca.contracts.team_awareness import Settlement, TeamAwareness
+from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.simple_body import SimpleBody
@@ -97,7 +97,7 @@ class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):
             task="t",
             budget=Budget(),
             team_awareness=TeamAwareness(
-                settlement=Settlement(
+                consult_duty=ConsultDuty(
                     member_status=board, max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS
                 )
             ),
@@ -107,12 +107,12 @@ class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):
         assert isinstance(obs.payload, dict)
         self.assertIn("ra", obs.payload)
         assert state.team_awareness is not None
-        assert state.team_awareness.settlement is not None
+        assert state.team_awareness.consult_duty is not None
         self.assertEqual(
-            state.team_awareness.settlement.member_status.status["ra"], RoleStatus.DONE
+            state.team_awareness.consult_duty.member_status.status["ra"], RoleStatus.DONE
         )
         self.assertEqual(
-            state.team_awareness.settlement.member_status.status["rb"], RoleStatus.DONE
+            state.team_awareness.consult_duty.member_status.status["rb"], RoleStatus.DONE
         )
 
 
@@ -124,7 +124,7 @@ class TestMustConsultMultiShortcut(unittest.IsolatedAsyncioTestCase):
             task="evaluate",
             budget=Budget(),
             team_awareness=TeamAwareness(
-                settlement=Settlement(
+                consult_duty=ConsultDuty(
                     member_status=board, max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS
                 )
             ),
@@ -137,7 +137,7 @@ class TestMustConsultMultiShortcut(unittest.IsolatedAsyncioTestCase):
 
 
 class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
-    async def test_routing_mode_never_maps_to_settlement_gate(self) -> None:
+    async def test_routing_mode_never_maps_to_duty_gate(self) -> None:
         from lca.contracts.team_coordination import LeadMandate, gate_name_for_mandate
 
         self.assertEqual(gate_name_for_mandate(LeadMandate.ROUTING), DecisionGateName.NONE)
@@ -147,7 +147,7 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
             DecisionGateName.MUST_CONSULT_ALL,
         )
 
-    async def test_routing_lead_injects_awareness_without_settlement(self) -> None:
+    async def test_routing_lead_injects_awareness_without_consult_duty(self) -> None:
         sup = MagicMock()
         captured: list = []
 
@@ -180,7 +180,7 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(captured[0])
         awareness = captured[0].team_awareness
         self.assertIsInstance(awareness, TeamAwareness)
-        self.assertIsNone(awareness.settlement)
+        self.assertIsNone(awareness.consult_duty)
         self.assertEqual([p.role for p in awareness.teammates], ["m"])
 
 

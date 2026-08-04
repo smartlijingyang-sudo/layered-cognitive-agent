@@ -48,7 +48,7 @@ def _respond_override(rationale: str) -> Decision:
 
 
 class MustConsultAllMembers(DecisionGate):
-    """Rewrite decisions that violate the "all required roles must settle" invariant.
+    """Rewrite decisions that violate the "all required roles must respond" invariant.
 
     With multi-delegate support: when multiple roles are waiting, a DELEGATE
     whose targets are a non-empty subset of waiting is accepted; shortcut may
@@ -56,9 +56,9 @@ class MustConsultAllMembers(DecisionGate):
     """
 
     async def try_shortcut(self, state: AgentState) -> Decision | None:
-        from lca.layer1_cognitive.member_status.tracking import settlement_board
+        from lca.layer1_cognitive.member_status.tracking import duty_board
 
-        board = settlement_board(state)
+        board = duty_board(state)
         if board is None:
             return None
         waiting = board.waiting_roles()
@@ -73,7 +73,7 @@ class MustConsultAllMembers(DecisionGate):
         return _multi_delegate_decision(
             state.task,
             waiting,
-            rationale="[框架短路] 并行咨询全部待结算角色，跳过本轮 LLM 调用",
+            rationale="[框架短路] 并行咨询全部待咨询角色，跳过本轮 LLM 调用",
         )
 
     async def enforce(
@@ -81,9 +81,9 @@ class MustConsultAllMembers(DecisionGate):
         state: AgentState,
         decision: Decision,
     ) -> Decision:
-        from lca.layer1_cognitive.member_status.tracking import settlement_board
+        from lca.layer1_cognitive.member_status.tracking import duty_board
 
-        board = settlement_board(state)
+        board = duty_board(state)
         if board is None:
             return decision
 
@@ -94,7 +94,7 @@ class MustConsultAllMembers(DecisionGate):
 
         if required.kind == "may_respond":
             if decision.action_type == ActionType.DELEGATE:
-                return _respond_override("[框架强制] 所有必需角色已结算,无需进一步委派")
+                return _respond_override("[框架强制] 所有必需角色均已应答,无需进一步委派")
             return decision
 
         waiting_set = set(board.waiting_roles())
@@ -112,7 +112,7 @@ class MustConsultAllMembers(DecisionGate):
             return _multi_delegate_decision(
                 state.task,
                 board.waiting_roles(),
-                rationale="[框架强制] 尚有必需角色未完成结算,并行委派全部等待角色",
+                rationale="[框架强制] 尚有必需角色未回复,并行委派全部等待角色",
             )
         target = required.target_role
         if target is None:
@@ -120,5 +120,5 @@ class MustConsultAllMembers(DecisionGate):
         return _delegate_decision(
             state.task,
             target,
-            rationale="[框架强制] 尚有必需角色未完成结算,禁止提前收尾或委派已终态角色",
+            rationale="[框架强制] 尚有必需角色未回复,禁止提前收尾或委派已终态角色",
         )

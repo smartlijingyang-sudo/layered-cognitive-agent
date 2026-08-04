@@ -34,7 +34,7 @@ class SpanName(str, Enum):
     TRANSPORT_REQUEST = "transport.request"
     TRANSPORT_RESPONSE = "transport.response"
     # Emitted when a repeated delegation is short-circuited by the
-    # idempotency ledger  — no transport round-trip happens.
+    # idempotency record — no transport round-trip happens.
     DELEGATE_CACHE_HIT = "delegate.cache_hit"
     TEAM_STRATEGY = "team.strategy"
     TEAM_MEMBER_INVOKE = "team.member_invoke"

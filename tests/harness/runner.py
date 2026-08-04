@@ -51,7 +51,7 @@ def _default_scripts_for_roles(roles: list[str], lead_role: str | None) -> dict[
     for r in members:
         scripts[r] = [respond(f"output from {r}")]
     if lead_role:
-        # Board/consult gates may short-circuit; after settlement, respond.
+        # Board/consult gates may short-circuit; after all members respond, respond.
         # Routing: explicit multi-delegate then respond.
         if members:
             scripts[lead_role] = [

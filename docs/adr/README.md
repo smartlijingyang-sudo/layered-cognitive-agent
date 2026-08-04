@@ -16,6 +16,7 @@
 | [0033](0033-declarative-agent-spec.md) | 声明式 AgentSpec 与协议化门面 | Accepted |
 | [0034](0034-closed-team-strategy.md) | 封闭 TeamStrategy 与 TeamSpec 单一事实来源 | Accepted |
 | [0035](0035-team-awareness-unified-session.md) | TeamAwareness —— 统一 lead 团队认知，废除会话分裂 | Accepted |
+| [0036](0036-retire-financial-metaphor.md) | 废除金融隐喻——团队认知词汇统一为「回报记录 / 咨询义务」 | Accepted |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

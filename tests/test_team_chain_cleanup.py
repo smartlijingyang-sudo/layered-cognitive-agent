@@ -189,7 +189,7 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
         )
         rt.body = MagicMock()
         rt.memory = MagicMock()
-        # ROUTING + settlement is not expressible as LeadMandate; BOARD is consultation+gate.
+        # ROUTING + consult_duty is not expressible as LeadMandate; BOARD is consultation+gate.
         # Invalid combinations are type-excluded; ROUTING mode never installs a gate.
         from lca.contracts.team_coordination import LeadMandate, gate_name_for_mandate
 

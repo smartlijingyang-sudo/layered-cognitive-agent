@@ -22,7 +22,7 @@ from lca.layer1_cognitive.body.delegation_cache import (
 )
 
 
-def _ledger_result(role: str = "Alice", subtask: str = "analyze") -> DelegationResult:
+def _delegation_result(role: str = "Alice", subtask: str = "analyze") -> DelegationResult:
     return DelegationResult(
         result_id="dres_1",
         target_role=role,
@@ -42,7 +42,7 @@ def _state(awareness: TeamAwareness | None) -> AgentState:
 
 class TestCachedDelegationObservation(unittest.TestCase):
     def test_hit_returns_cached_payload_without_transport(self) -> None:
-        awareness = TeamAwareness(results=[_ledger_result()])
+        awareness = TeamAwareness(results=[_delegation_result()])
         spec = DelegationSpec(subtask="analyze", target_role="Alice")
         obs = cached_delegation_observation(spec, _state(awareness))
         assert obs is not None
@@ -54,7 +54,7 @@ class TestCachedDelegationObservation(unittest.TestCase):
         self.assertEqual(obs.extra[OBS_MEMBER_SUBTASKS], {"Alice": "analyze"})
 
     def test_miss_on_new_subtask(self) -> None:
-        awareness = TeamAwareness(results=[_ledger_result()])
+        awareness = TeamAwareness(results=[_delegation_result()])
         spec = DelegationSpec(subtask="re-analyze with new angle", target_role="Alice")
         self.assertIsNone(cached_delegation_observation(spec, _state(awareness)))
 
@@ -63,7 +63,7 @@ class TestCachedDelegationObservation(unittest.TestCase):
         self.assertIsNone(cached_delegation_observation(spec, _state(None)))
 
     def test_miss_without_target_role(self) -> None:
-        awareness = TeamAwareness(results=[_ledger_result()])
+        awareness = TeamAwareness(results=[_delegation_result()])
         spec = DelegationSpec(subtask="analyze", target_agent_id="agent_x")
         self.assertIsNone(cached_delegation_observation(spec, _state(awareness)))
 

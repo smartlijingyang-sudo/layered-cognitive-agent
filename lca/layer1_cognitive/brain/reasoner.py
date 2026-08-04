@@ -28,7 +28,7 @@ _EMPTY_CONTEXT = "(无历史上下文)"
 _EMPTY_REPORTS = "(尚无成员回报)"
 _EMPTY_NOTES = "(无)"
 _KIND_EXCLUDE_NONE: frozenset[MemoryRecordKind] = frozenset()
-_LEDGER_EXCLUDED_KINDS: frozenset[MemoryRecordKind] = frozenset(
+_REPORT_EXCLUDED_KINDS: frozenset[MemoryRecordKind] = frozenset(
     {MemoryRecordKind.DELEGATION_RESULT}
 )
 
@@ -59,7 +59,7 @@ def _context_lines(
 
 
 def build_member_reports_text(results: Sequence[DelegationResult]) -> str:
-    """Render the delegation ledger as the lead's authoritative fact view."""
+    """Render returned member reports as the lead's authoritative fact view."""
     if not results:
         return _EMPTY_REPORTS
     lines: list[str] = []
@@ -75,26 +75,26 @@ def build_member_reports_text(results: Sequence[DelegationResult]) -> str:
 
 
 def default_template_for(awareness: TeamAwareness) -> str:
-    """Awareness 默认模板：有结算义务走层级提示词，否则自由 routing。"""
-    if awareness.settlement is not None:
+    """Awareness 默认模板：有咨询义务走层级提示词，否则自由 routing。"""
+    if awareness.consult_duty is not None:
         return _HIERARCHICAL_TEMPLATE
     return _ROUTING_TEMPLATE
 
 
 def context_exclusions_for(awareness: TeamAwareness) -> frozenset[MemoryRecordKind]:
-    """自由 routing 下账本（MEMBER_REPORTS）是委派事实的权威视图，
-    从 CONTEXT 中剔除重复的委派记录；settlement 路径由状态板表达。"""
-    if awareness.settlement is None:
-        return _LEDGER_EXCLUDED_KINDS
+    """自由 routing 下回报记录（MEMBER_REPORTS）是委派事实的权威视图，
+    从 CONTEXT 中剔除重复的委派记录；义务路径由状态板表达。"""
+    if awareness.consult_duty is None:
+        return _REPORT_EXCLUDED_KINDS
     return _KIND_EXCLUDE_NONE
 
 
 def build_awareness_variables(awareness: TeamAwareness) -> dict[str, str]:
     """Awareness 自行渲染提示词变量——Reasoner 不窥探其内部形态。"""
     variables = {"teammates": build_teammates_text(awareness.teammates)}
-    settlement = awareness.settlement
-    if settlement is not None:
-        variables["member_status_text"] = settlement.member_status.as_prompt_text()
+    duty = awareness.consult_duty
+    if duty is not None:
+        variables["member_status_text"] = duty.member_status.as_prompt_text()
         return variables
     assigned = ", ".join(awareness.assigned_roles) if awareness.assigned_roles else _EMPTY_ASSIGNED
     variables["assigned_roles_text"] = assigned

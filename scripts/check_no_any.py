@@ -47,7 +47,6 @@ _LINE_ALLOW_PATTERNS = [
     re.compile(r"members:\s*list\[Any\]"),  # 已标注注释说明
     re.compile(r"supervisor:\s*Any"),  # 跨层引用（有注释）
     re.compile(r"shared_memory:\s*Any"),  # 跨层引用（有注释）
-    re.compile(r"ledger_factory.*Any"),  # 工厂返回类型
     re.compile(r"^\s*#"),  # 注释行
     re.compile(r"# .*(Any|protocol|跨层|动态|注册表)"),  # 带解释的 Any
     re.compile(r"from typing import.*\bAny\b.*# noqa"),
@@ -59,7 +58,6 @@ _LINE_ALLOW_PATTERNS = [
     re.compile(r"kind:\s*Any\s*="),  # extra.get 动态提取
     re.compile(r"final_output:\s*Any"),  # 框架运行槽位
     re.compile(r"retrieved_context:\s*list\[Any\]"),  # 检索结果多态
-    re.compile(r"_team_progress:\s*Any"),  # 可选能力槽位
     re.compile(r"hook_fn:\s*Any"),  # hook 注册（动态类型）
     re.compile(r"last_observation:\s*Any"),  # 异常附带数据
     re.compile(r"approval_request:\s*Any"),  # 审批请求数据

@@ -287,7 +287,7 @@ class TestHierarchicalTeamRealLLM(unittest.IsolatedAsyncioTestCase):
         logger.info("Output preview: %s", (result.output or "")[:300])
 
         self.assertEqual(result.status, "completed", msg=f"result={result}")
-        # Multi-delegate fan-out can settle the full roster in one supervisor step,
+        # Multi-delegate fan-out can collect the full roster's returns in one lead step,
         # then RESPOND — two steps is a valid completed consultation chain.
         self.assertGreaterEqual(result.total_steps, 2)
 

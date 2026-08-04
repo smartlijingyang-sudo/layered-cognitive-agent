@@ -41,7 +41,7 @@ class TestFindResult(unittest.TestCase):
     def test_failed_result_misses(self) -> None:
         self.assertIsNone(find_result([_result(success=False)], target_role="Alice", subtask="s1"))
 
-    def test_empty_ledger_misses(self) -> None:
+    def test_empty_results_miss(self) -> None:
         self.assertIsNone(find_result([], target_role="Alice", subtask="s1"))
 
     def test_first_success_wins(self) -> None:
@@ -52,11 +52,11 @@ class TestFindResult(unittest.TestCase):
         self.assertEqual(hit.output, "second")
 
 
-class TestAwarenessLedgerSurface(unittest.TestCase):
+class TestAwarenessResultsSurface(unittest.TestCase):
     def test_results_field_exists_on_awareness(self) -> None:
         self.assertIn("results", set(TeamAwareness.__dataclass_fields__))
 
-    def test_fresh_awareness_has_empty_ledger(self) -> None:
+    def test_fresh_awareness_has_empty_results(self) -> None:
         self.assertEqual(TeamAwareness().results, [])
 
     def test_result_is_immutable(self) -> None:

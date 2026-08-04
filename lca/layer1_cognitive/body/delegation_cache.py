@@ -1,6 +1,6 @@
-"""幂等委派 —— 路由账本的缓存命中短路与归属标签。
+"""幂等委派 —— 回报记录的缓存命中短路与归属标签。
 
-纯函数集：``DelegateOperation`` 只负责调度编排；账本匹配、缓存 span 发射与
+纯函数集：``DelegateOperation`` 只负责调度编排；回报记录匹配、缓存 span 发射与
 Observation 归属标签集中在此，可独立测试。
 """
 
@@ -29,9 +29,9 @@ from lca.layer0_infra.observability.redaction import sanitize, truncate
 
 
 def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Observation | None:
-    """幂等短路：账本中已有成功结算的 ``(target_role, subtask)`` 直接复用。
+    """幂等短路：回报记录中已有成功返回的 ``(target_role, subtask)`` 直接复用。
 
-    账本只在自由 routing（无 settlement）下累积——settlement 路径由状态板
+    回报记录只在自由 routing（无 consult_duty）下累积——义务路径由状态板
     管辖，不走此路径。命中时发射 ``delegate.cache_hit`` span，不产生
     transport 往返。语义刻意保守：仅拦字面重复，改写措辞的新问题不受影响。
     """

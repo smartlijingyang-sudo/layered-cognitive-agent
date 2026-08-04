@@ -41,7 +41,7 @@ class InMemoryMemberStatus:
     def all_done(self) -> bool:
         return all(is_success_status(self.status[r]) for r in self.role_order)
 
-    def all_settled(self) -> bool:
+    def all_terminal(self) -> bool:
         return all(is_terminal_status(self.status[r]) for r in self.role_order)
 
     def waiting_roles(self) -> list[str]:

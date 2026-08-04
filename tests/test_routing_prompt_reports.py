@@ -1,4 +1,4 @@
-"""自由 routing 的 lead prompt 从 awareness 账本渲染 MEMBER_REPORTS。"""
+"""自由 routing 的 lead prompt 从 awareness 回报记录渲染 MEMBER_REPORTS。"""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _profile(role: str) -> RoleProfile:
     )
 
 
-def _ledger(role: str, subtask: str, output: str) -> DelegationResult:
+def _result(role: str, subtask: str, output: str) -> DelegationResult:
     return DelegationResult(
         result_id=f"dres_{role}",
         target_role=role,
@@ -59,11 +59,11 @@ class _CaptureLLM:
 
 
 class TestMemberReportsText(unittest.TestCase):
-    def test_empty_ledger(self) -> None:
+    def test_empty_results(self) -> None:
         self.assertEqual(build_member_reports_text([]), "(尚无成员回报)")
 
     def test_success_entry_carries_attribution(self) -> None:
-        text = build_member_reports_text([_ledger("Alice", "tech risk", "兼容性是核心风险")])
+        text = build_member_reports_text([_result("Alice", "tech risk", "兼容性是核心风险")])
         self.assertIn("Alice", text)
         self.assertIn("tech risk", text)
         self.assertIn("兼容性是核心风险", text)
@@ -86,7 +86,7 @@ class TestMemberReportsText(unittest.TestCase):
         self.assertIn("可重新委派", text)
 
 
-class TestRoutingPromptLedger(unittest.IsolatedAsyncioTestCase):
+class TestRoutingPromptMemberReports(unittest.IsolatedAsyncioTestCase):
     async def test_prompt_contains_member_reports_and_excludes_duplicate_context(self) -> None:
         llm = _CaptureLLM()
         reasoner = PromptReasoner(
@@ -99,10 +99,10 @@ class TestRoutingPromptLedger(unittest.IsolatedAsyncioTestCase):
         awareness = TeamAwareness(
             teammates=[_profile("Alice"), _profile("Bob")],
             assigned_roles=["Alice"],
-            results=[_ledger("Alice", "tech risk", "兼容性是核心风险")],
+            results=[_result("Alice", "tech risk", "兼容性是核心风险")],
         )
         state = AgentState(trace_id="t", task="probe", budget=Budget(), team_awareness=awareness)
-        # working memory 里另有一条委派记录 —— 账本视图下不得重复出现在 CONTEXT
+        # working memory 里另有一条委派记录 —— 回报记录视图下不得重复出现在 CONTEXT
         state.retrieved_context = [
             MemoryRecord(
                 record_id="mem_1",
@@ -120,7 +120,7 @@ class TestRoutingPromptLedger(unittest.IsolatedAsyncioTestCase):
         self.assertIn("MEMBER_REPORTS", prompt)
         self.assertIn("Alice | step 0 | 子任务: tech risk", prompt)
         self.assertIn("兼容性是核心风险", prompt)
-        # CONTEXT 段不再重复渲染委派记录（账本是唯一事实视图）
+        # CONTEXT 段不再重复渲染委派记录（回报记录是唯一事实视图）
         self.assertNotIn("Alice 已返回(step=0)", prompt)
 
 

@@ -129,7 +129,7 @@ class TestAdrIndexMatchesFilesystem(unittest.TestCase):
 class TestProgressiveDisclosureVocabulary(unittest.TestCase):
     def test_agent_state_uses_team_awareness_not_progress_text(self) -> None:
         from lca.contracts.state import AgentState, Budget
-        from lca.contracts.team_awareness import Settlement, TeamAwareness
+        from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
         from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
         board = InMemoryMemberStatus(role_order=("a",))
@@ -138,7 +138,7 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
             task="x",
             budget=Budget(),
             team_awareness=TeamAwareness(
-                settlement=Settlement(member_status=board, max_attempts=3)
+                consult_duty=ConsultDuty(member_status=board, max_attempts=3)
             ),
         )
         self.assertTrue(hasattr(state, "team_awareness"))
@@ -163,7 +163,7 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
 
         from lca.contracts.decision import Decision
         from lca.contracts.state import AgentState, Budget
-        from lca.contracts.team_awareness import Settlement, TeamAwareness
+        from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
         from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
         from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
@@ -173,7 +173,7 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
             task="ship",
             budget=Budget(),
             team_awareness=TeamAwareness(
-                settlement=Settlement(member_status=board, max_attempts=3)
+                consult_duty=ConsultDuty(member_status=board, max_attempts=3)
             ),
         )
         gate = MustConsultAllMembers()

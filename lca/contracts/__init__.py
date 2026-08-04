@@ -54,7 +54,7 @@ from lca.contracts.stop import (
     StopReason,
     StopRule,
 )
-from lca.contracts.team_awareness import Settlement, TeamAwareness
+from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.team_coordination import (
     Debate,
     FanOut,
@@ -78,6 +78,7 @@ __all__ = [
     "BudgetExceededError",
     "CacheConfig",
     "ComponentRegistryProtocol",
+    "ConsultDuty",
     "Debate",
     "Decision",
     "DecisionGate",
@@ -108,7 +109,6 @@ __all__ = [
     "RetryPolicy",
     "RoleProfile",
     "RunContext",
-    "Settlement",
     "SharedMemoryStore",
     "StateSnapshot",
     "StopDecision",

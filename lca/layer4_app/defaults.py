@@ -61,8 +61,8 @@ EVENT_BUS_SIMPLE = "simple"
 """EventBus 内置注册名（组合根内部使用，非用户旋钮）。"""
 
 
-_SETTLING_MANDATES: frozenset[LeadMandate] = frozenset({LeadMandate.CONSULT, LeadMandate.BOARD})
-"""携带结算义务的授权（ADR-0035）：组合期决定 awareness 是否挂 Settlement。"""
+_DUTY_MANDATES: frozenset[LeadMandate] = frozenset({LeadMandate.CONSULT, LeadMandate.BOARD})
+"""携带咨询义务的授权（ADR-0035 / ADR-0036）：组合期决定 awareness 是否挂 ConsultDuty。"""
 
 
 def _lead_strategy(assembly: TeamAssembly) -> LeadStrategy:
@@ -74,7 +74,7 @@ def _lead_strategy(assembly: TeamAssembly) -> LeadStrategy:
     role_order = tuple(member.role_profile.role for member in members)
     board = (
         InMemoryMemberStatus(role_order=role_order)
-        if governance.mandate in _SETTLING_MANDATES
+        if governance.mandate in _DUTY_MANDATES
         else None
     )
     return LeadStrategy(
