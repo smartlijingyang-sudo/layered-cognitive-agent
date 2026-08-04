@@ -1,7 +1,7 @@
 """Built-in default registrations for the LCA framework.
 
 register_defaults() registers factories on the given Registries.
-Object-graph construction lives in composer.py (ADR-0018 / ADR-0030).
+Object-graph construction lives in composer.py (ADR-0030).
 """
 
 from __future__ import annotations

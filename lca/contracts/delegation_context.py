@@ -1,4 +1,4 @@
-"""跨异步边界传递"当前委派者角色"的显式上下文原语（ADR-0017）。
+"""跨异步边界传递"当前委派者角色"的显式上下文原语。
 背景：AgentTransport.send_task(agent_card, subtask, context_refs) 的签名要与
 Google A2A 的 AgentCard 模型保持一致，不能塞入 LCA 内部专用的委派身份字段；
 同时 send_task 内部用 asyncio.create_task 异步调度、poll/receive 分离，

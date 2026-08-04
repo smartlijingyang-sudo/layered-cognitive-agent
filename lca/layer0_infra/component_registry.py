@@ -1,10 +1,10 @@
 """注册表基础设施 —— ComponentRegistry + NamedRegistry 泛型基类。
 
-语义约定（PR-5 / ADR-0019）：
+语义约定：
 - ``get``：软查询，找不到返回 None
 - ``require`` / ``NamedRegistry.resolve``：硬查询，找不到 raise RegistryKeyError
 
-ADR-0024：本模块不再持有进程级全局单例。ComponentRegistry / NamedRegistry
+本模块不再持有进程级全局单例。ComponentRegistry / NamedRegistry
 的实例生命周期由调用方决定 —— 框架默认路径中，实例归 TeamComposer 私有持有
 （见 lca.contracts.registries.Registries、lca.layer4_app.composer.TeamComposer）。
 """

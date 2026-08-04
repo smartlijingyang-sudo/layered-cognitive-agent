@@ -1,4 +1,4 @@
-"""SUPERVISOR-family consultation control-plane session (ADR-0026 / ADR-0027).
+"""SUPERVISOR-family consultation control-plane session.
 
 ``ConsultationState`` is **only** for ``SupervisorPlane.CONSULTATION``:
 required-role settlement, teammate roster for the supervisor prompt, and
@@ -16,8 +16,8 @@ Forbidden here (use strategy-local state or a dedicated session type instead):
 - graph execution cursors
 - free-form ``extra`` team fields
 
-Field whitelist is frozen for architecture tests (ADR-0026).
-Adding a field requires updating ``CONSULTATION_FIELD_WHITELIST`` and ADR-0026.
+Field whitelist is frozen for architecture tests.
+Adding a field requires updating ``CONSULTATION_FIELD_WHITELIST``.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from lca.contracts.member_status import MemberStatus
 from lca.contracts.role_team import RoleProfile
 
 # Locked surface of hierarchical consultation. CI fails if the dataclass
-# grows fields without an explicit whitelist update (ADR-0026).
+# grows fields without an explicit whitelist update.
 CONSULTATION_FIELD_WHITELIST: Final[frozenset[str]] = frozenset(
     {
         "member_status",
@@ -65,9 +65,9 @@ def assert_consultation_field_whitelist() -> None:
         missing = CONSULTATION_FIELD_WHITELIST - actual
         extra = actual - CONSULTATION_FIELD_WHITELIST
         raise AssertionError(
-            "ConsultationState field surface drifted from ADR-0026 whitelist. "
+            "ConsultationState field surface drifted from the whitelist. "
             f"missing={sorted(missing)} extra={sorted(extra)}. "
-            "Update CONSULTATION_FIELD_WHITELIST and docs/adr/0026 only after "
-            "confirming the field is hierarchical settlement state — not another "
-            "team lead session concern."
+            "Update CONSULTATION_FIELD_WHITELIST only after confirming the field "
+            "is hierarchical settlement state — not another team lead session "
+            "concern."
         )

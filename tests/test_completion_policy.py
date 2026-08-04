@@ -327,7 +327,7 @@ class TestMustConsultAllMembersTryShortcut:
 
     @pytest.mark.asyncio
     async def test_fans_out_when_multiple_waiting(self) -> None:
-        """ADR-0028: multi-waiting shortcut fans out all waiting roles in parallel."""
+        """Multi-waiting shortcut fans out all waiting roles in parallel."""
 
         state = _state(member_status=_ledger({"analyst", "reviewer"}))
         result = await MustConsultAllMembers().try_shortcut(state)

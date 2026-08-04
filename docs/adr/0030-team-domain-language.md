@@ -18,5 +18,5 @@ Recipe / TeamProcess / SupervisorMode / Family / Plane 叠层导致认知与维�
 - 负面：breaking change，无 shim。
 
 ## 相关
-- Supersedes 用户面叙事：ADR-0027 三维旋钮、ADR-0029 Recipe/Mode 公共模型。
+- Supersedes 用户面叙事：此前的三维旋钮（Family / Plane / Mode）与 Recipe/Mode 公共模型。
 - Keeps：封闭对象图、send_and_wait、delegations、单 session 槽。

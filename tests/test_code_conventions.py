@@ -31,7 +31,7 @@ _NAME_EXEMPT: dict[str, str] = {
     "UseToolOperation": "Action 策略实现（contracts.action.Action）",
     "DelegateOperation": "Action 策略实现（contracts.action.Action）",
     "HandoffOperation": "Action 策略实现（contracts.action.Action）",
-    "FallbackActionPolicy": "FallbackPolicy 默认实现（ADR-0023 迁至 L1 body）",
+    "FallbackActionPolicy": "FallbackPolicy 默认实现（迁至 L1 body）",
 }
 
 _SCAN_PACKAGES = [
@@ -46,7 +46,7 @@ _MAX_FILE_LINES = 250
 
 # 已登记豁免（引用 ADR 或说明原因）
 _LINE_COUNT_EXEMPT: dict[str, str] = {
-    "lca/layer4_app/composer.py": "ADR-0024: TeamComposer 类 + 模块级自由函数同文件（_promote_lead(agent, policy) 由 test_refactor_guards 直接 import，progressive-disclosure 检查 def compose 子串）",
+    "lca/layer4_app/composer.py": "TeamComposer 类 + 模块级自由函数同文件（_promote_lead(agent, policy) 由 test_refactor_guards 直接 import，progressive-disclosure 检查 def compose 子串）",
 }
 
 

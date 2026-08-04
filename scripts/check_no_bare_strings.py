@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pre-commit hook: 禁止领域语义的裸字符串字面量（ADR-0017）。
+"""Pre-commit hook: 禁止领域语义的裸字符串字面量。
 
 检测应该使用枚举却使用了裸字符串的比较场景：
   - action_type == "respond"      → 应用 ActionType.RESPOND
@@ -113,13 +113,13 @@ def main():
             all_violations.extend(_check_file(f))
 
     if all_violations:
-        print("❌ 发现领域语义裸字符串比较（ADR-0017）：")
+        print("❌ 发现领域语义裸字符串比较：")
         print()
         for v in all_violations:
             print(v)
         print()
         print("请使用对应的枚举常量替代裸字符串。")
-        print("详见 lca/contracts/enums.py 和 ADR-0017。")
+        print("详见 lca/contracts/enums.py。")
         return 1
 
     print("✅ 裸字符串检查通过")

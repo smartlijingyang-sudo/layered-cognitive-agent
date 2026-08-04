@@ -1,6 +1,6 @@
 """Optional capability protocols used outside composition mutation.
 
-Closed object graph (ADR-0029): channel / gate / shared memory / reasoner
+Closed object graph : channel / gate / shared memory / reasoner
 are construction-time dependencies — not post-hoc bind/install slots.
 
 ``HasHooks`` remains for lifecycle registration on an already-built runtime.

@@ -15,7 +15,7 @@ class RunContext:
 
     Generic for every agent (solo / member / supervisor). Team *control-plane*
     sessions use the single optional ``session`` slot — never flatten
-    board/retry/routing into ``extra`` (ADR-0026 / ADR-0029).
+    board/retry/routing into ``extra`` .
     """
 
     trace_id: str | None = None

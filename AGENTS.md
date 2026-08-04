@@ -20,7 +20,7 @@ layer4_app 是组合根，可以依赖所有下层，但下层不能反向 impor
 
 ## 代码风格
 - 公共函数/类必须有类型标注
-- lca/contracts 下的模型使用 stdlib dataclass（见 ADR-0012），保持字段名和方法签名不变
+- lca/contracts 下的模型使用 stdlib dataclass，保持字段名和方法签名不变
 - 禁止硬编码 API Key / Token，一律用环境变量，通过 pydantic-settings 注入配置
 
 ## 代码设计约束（AI Coding 必须遵守）

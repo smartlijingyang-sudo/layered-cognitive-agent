@@ -413,7 +413,7 @@ async def test_llm_chat_span_emitted() -> None:
 
 @pytest.mark.asyncio
 async def test_routing_duplicate_delegation_is_idempotent() -> None:
-    """ADR-0032: 字面重复的 (角色, 子任务) 委派被账本幂等短路。
+    """字面重复的 (角色, 子任务) 委派被账本幂等短路。
 
     Lead 第一次 fan-out 成功结算后，第二次发出完全相同的两条委派——应命中
     ``delegate.cache_hit`` 而不是再次走 transport 重跑成员。

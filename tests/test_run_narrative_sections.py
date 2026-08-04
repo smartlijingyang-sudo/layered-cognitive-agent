@@ -1,4 +1,4 @@
-"""叙事分节无状态化 —— 并发交错下 span 行不再挂错角色节（ADR-0032）。"""
+"""叙事分节无状态化 —— 并发交错下 span 行不再挂错角色节。"""
 
 from __future__ import annotations
 

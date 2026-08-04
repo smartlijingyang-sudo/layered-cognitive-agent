@@ -1,4 +1,4 @@
-"""SharedMemory + Turn history 契约测试（ADR-0016 单路径统一后）。"""
+"""SharedMemory + Turn history 契约测试。"""
 
 from __future__ import annotations
 

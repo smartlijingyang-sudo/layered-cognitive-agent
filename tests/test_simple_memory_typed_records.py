@@ -1,4 +1,4 @@
-"""记忆类型化写入 —— 观察按 kind 落盘，委派结果带归属（ADR-0032）。"""
+"""记忆类型化写入 —— 观察按 kind 落盘，委派结果带归属。"""
 
 from __future__ import annotations
 

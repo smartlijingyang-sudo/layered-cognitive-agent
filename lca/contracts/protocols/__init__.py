@@ -1,5 +1,5 @@
 """契约协议包 —— 全量 re-export，保持 ``from lca.contracts.protocols import X`` 兼容。
-子模块按层拆分（ADR-0016）：
+子模块按层拆分：
 infra / cognition / embodiment / memory / runtime / agent / orchestration
 跨层机制见 ``lca.contracts.mechanisms``，跨层纯类型见 ``lca.contracts.types``。
 """
@@ -23,7 +23,7 @@ from lca.contracts.protocols.agent import (
     TeamUnit,
 )
 
-# ── 可选能力（ADR-0029：无 bind/install 组装面）────────────
+# ── 可选能力（无 bind/install 组装面）────────────
 from lca.contracts.protocols.capabilities import HasHooks
 
 # ── L1 认知 / Brain 协议 ─────────────────────────────────

@@ -3,7 +3,7 @@
 L3：将 ``pipeline`` / ``lead`` / ``fan_out`` 等键映射到 ``TeamStrategy`` 工厂，
 消除 if/elif 分发。``resolve`` 调用工厂后返回策略实例。
 
-ADR-0024：无全局单例；实例归 ``Registries.orchestration``，由 TeamComposer 持有。
+无全局单例；实例归 ``Registries.orchestration``，由 TeamComposer 持有。
 """
 
 from __future__ import annotations

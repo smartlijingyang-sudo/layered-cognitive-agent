@@ -20,7 +20,7 @@ from pathlib import Path
 # 键: 类的全限定名 (qualname)
 # 值: 豁免理由（必须引用 ADR 编号）
 #
-# 豁免标准（详见 ADR-0010）：
+# 豁免标准：
 #   1. DI 注册表 / 路由基础设施——它们是协议接线机制本身，不是被接线的组件
 #   2. 内部数据结构——不跨越模块边界、不需要运行时多态
 #   3. 异常类型——错误信号，不是可插拔组件
@@ -29,11 +29,11 @@ EXEMPT: dict[str, str] = {
         "纯数据声明（action_type 元数据），非可插拔行为实现；见 ActionCatalog PR-4"
     ),
     "lca.layer0_infra.component_registry.ComponentRegistry": (
-        "DI 注册表本身，非可插拔组件 (ADR-0005/ADR-0010)"
+        "DI 注册表本身，非可插拔组件 (ADR-0005)"
     ),
-    "lca.layer0_infra.component_registry.RegistryKeyError": ("异常类型，非可插拔组件 (ADR-0010)"),
+    "lca.layer0_infra.component_registry.RegistryKeyError": ("异常类型，非可插拔组件 "),
     "lca.layer0_infra.transport.transport_registry.TransportNotFoundError": (
-        "异常类型，非可插拔组件 (ADR-0010)"
+        "异常类型，非可插拔组件 "
     ),
     "lca.layer1_cognitive.body.action_registry.ActionRegistry": (
         "ActionRegistryProtocol 实现，Protocol 在 contracts.action (ADR-0015/0016)"
@@ -57,30 +57,26 @@ EXEMPT: dict[str, str] = {
         "BFS 执行状态 dataclass，纯内部数据结构，非可插拔组件"
     ),
     "lca.layer1_cognitive.body.fallback_policy.FallbackActionPolicy": (
-        "FallbackPolicy 实现，Protocol 在 contracts.protocols.embodiment (ADR-0016)"
+        "FallbackPolicy 实现，Protocol 在 contracts.protocols.embodiment "
     ),
     "lca.layer1_cognitive.brain.default_factory.SimpleBrainFactory": (
-        "BrainFactory Protocol 可调用实现 (ADR-0021)"
+        "BrainFactory Protocol 可调用实现 "
     ),
     "lca.layer1_cognitive.brain.decision_gates.must_consult_all.MustConsultAllMembers": (
-        "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0016)"
+        "DecisionGate 实现，Protocol 在 contracts.protocols.cognition "
     ),
     "lca.layer2_runtime.default_stop_rule.DefaultStopRule": (
         "StopRule 实现，Protocol 在 contracts.stop (ADR-0015)"
     ),
     "lca.layer1_cognitive.member_status.required_action.RequiredAction": (
-        "纯数据声明（gate 裁决结果），非可插拔组件；见 ADR-0025"
+        "纯数据声明（gate 裁决结果），非可插拔组件"
     ),
-    "lca.layer0_infra.observability.runtime.SpanContext": (
-        "correlation 值对象，非可插拔组件 (ADR-0031)"
-    ),
-    "lca.layer0_infra.observability.runtime._Span": (
-        "Telemetry span 引擎内部类型，非公共组件 (ADR-0031)"
-    ),
+    "lca.layer0_infra.observability.runtime.SpanContext": ("correlation 值对象，非可插拔组件 "),
+    "lca.layer0_infra.observability.runtime._Span": ("Telemetry span 引擎内部类型，非公共组件 "),
     "lca.layer0_infra.observability.runtime.ContextTelemetry": (
-        "Telemetry Protocol 实现，见 contracts.protocols.Telemetry (ADR-0031)"
+        "Telemetry Protocol 实现，见 contracts.protocols.Telemetry "
     ),
-    "lca.layer0_infra.observability.runtime.NullTelemetry": ("Telemetry no-op 默认实现 (ADR-0031)"),
+    "lca.layer0_infra.observability.runtime.NullTelemetry": ("Telemetry no-op 默认实现 "),
 }
 
 _SCAN_PACKAGES = [
@@ -153,7 +149,7 @@ class TestArchitectureConformance(unittest.TestCase):
             31,
             "Protocol 数量低于基线 31 —— 是否有协议被意外删除？"
             " 如果确实需要减少协议数量，请同步更新此断言并附 ADR。"
-            "（PromptManager 已按 ADR-0023 溶解进 Reasoner，基线 32→31）",
+            "（PromptManager 已溶解进 Reasoner，基线 32→31）",
         )
 
     def test_every_l0_to_l3_class_declares_a_protocol(self) -> None:

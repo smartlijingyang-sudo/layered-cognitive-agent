@@ -39,22 +39,15 @@ repos:
         types: [python]
 
       - id: check-no-any
-        name: 禁止裸 Any 类型标注（ADR-0017）
+        name: 禁止裸 Any 类型标注
         entry: python scripts/check_no_any.py
         language: system
         pass_filenames: false
         types: [python]
 
       - id: check-no-bare-strings
-        name: 禁止领域语义裸字符串（ADR-0017）
+        name: 禁止领域语义裸字符串
         entry: python scripts/check_no_bare_strings.py
-        language: system
-        pass_filenames: false
-        types: [python]
-
-      - id: check-adr-sync
-        name: ADR-0017 与代码同步校验
-        entry: python scripts/check_adr_sync.py
         language: system
         pass_filenames: false
         types: [python]

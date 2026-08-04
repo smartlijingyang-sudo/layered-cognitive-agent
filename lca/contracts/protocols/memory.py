@@ -18,7 +18,7 @@ from lca.contracts.state import AgentState
 class MemorySystem(Protocol):
     """记忆系统：检索感知 + 多级写入 + 显式查询。
 
-    两阶段语义（ADR-0016）：
+    两阶段语义：
     - perceive：think 之前，刷新 retrieved_context
     - update：reflect 之后，写入 observation + reflection
     - query：显式检索指定层的记录（共享记忆统一入口）

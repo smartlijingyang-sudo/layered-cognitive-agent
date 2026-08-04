@@ -7,7 +7,7 @@
 | **Agent** | L4 门面：角色 + 工具 + LLM，`await agent.run(task)` |
 | **MultiAgentTeam** | L4 团队门面：`members` + `TeamProcess`，`await team.run(objective)` |
 | **TeamProcess** | 族内拓扑：hierarchical / sequential / parallel / graph / debate / handoff / swarm |
-| **OrchestrationFamily** | 控制权归属族：supervisor / choreography / peer / graph（ADR-0027） |
+| **OrchestrationFamily** | 控制权归属族：supervisor / choreography / peer / graph |
 | **multi-delegate** | 一步并行委派多个角色（`Decision.delegations` 多条 + `DelegateOperation` gather） |
 | **RoutingState** | SUPERVISOR 自由 PM 控制面（无全员结算）；与 ConsultationState 隔离 |
 | **HandoffStrategy** / **SwarmStrategy** | PEER 族：handoff（首成即返）/ swarm（轮询累积） |
@@ -79,7 +79,7 @@
 | **LLMAdapter** / **Anthropic** / **OpenAI** / **Mock** / **Adapter** | 多厂商 LLM 适配 |
 | **Transport** / **TransportRegistry** / **InternalTransport** / **A2ATransport** / **MCPTransport** | 传输实现与注册 |
 | **ComponentRegistry** / **NamedRegistry** | DI / 按名注册表 |
-| **Registries** | 三个发现型注册表的值对象包（components / brain_factories / orchestration），Assembly 私有持有，替代进程级全局单例（ADR-0024） |
+| **Registries** | 三个发现型注册表的值对象包（components / brain_factories / orchestration），Assembly 私有持有，替代进程级全局单例 |
 | **Assembly** | 组合根的显式对象化版本，持有一份 Registries；`assemble_agent` / `assemble_team` 是其方法 |
 | **team_wiring** / **build_team_transport** | L4 团队 channel 接线（与 agent 组装决策分离）；`assembly` 再导出 |
 | **SkillRouter** | 运行时动态选择 Prompt 模板 / 工具子集 |
@@ -137,7 +137,7 @@
 | default_loop_judge.py | default_stop_rule.py |
 | brain_strategy（Agent/Assembly 参数） | brain |
 | BrainStrategy | Brain |
-| PromptManager / SimplePromptManager | Reasoner 内建模板字典（ADR-0023 完成溶解） |
+| PromptManager / SimplePromptManager | Reasoner 内建模板字典（已溶解） |
 | member_status/policy.py | member_status/required_action.py |
 
 ## 禁止复活

@@ -1,7 +1,7 @@
 """实时 span 行叙事 —— 分节键与单行渲染（无状态、属性驱动）。
 
 场景卡（run.plan 横幅）在 ``plan_narrative.py``；共享折行/取属性工具在
-``narrative_utils.py``。分节完全由 span 自身属性推导（ADR-0032），
+``narrative_utils.py``。分节完全由 span 自身属性推导，
 并发成员交错完成时不会把行挂到错误的角色节下。
 """
 
@@ -37,7 +37,7 @@ def _dur_ms(span: TraceSpan) -> int:
 
 
 def section_key_for_span(span: TraceSpan) -> str:
-    """Group live lines by actor — derived purely from span attributes (ADR-0032).
+    """Group live lines by actor — derived purely from span attributes.
 
     Stateless: never falls back to "previous section", so concurrent members
     interleave without misattribution. Every span now carries ``agent_role``

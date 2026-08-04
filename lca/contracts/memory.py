@@ -12,7 +12,7 @@ from lca.contracts.enums import MemoryLayer, MemoryRecordKind
 class MemoryRecord:
     """多级记忆记录：支持 working / semantic / episodic / procedural 四种类型。
 
-    ``kind`` 标注语义分类（ADR-0032），``metadata`` 承载归属信息
+    ``kind`` 标注语义分类，``metadata`` 承载归属信息
     （如委派结果的 role / subtask / step）。默认 GENERIC 保持向后兼容。
     """
 

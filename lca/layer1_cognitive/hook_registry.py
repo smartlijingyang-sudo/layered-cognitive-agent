@@ -42,7 +42,7 @@ class SimpleHookRegistry(HookRegistry):
 
     async def trigger(self, event_name: str, state: AgentState, **kwargs: Any) -> Any:
         # Ambient actor identity so nested llm.chat / tool / transport spans are
-        # self-describing (ADR-0032); the loop itself stays observability-free.
+        # self-describing; the loop itself stays observability-free.
         set_actor(state.agent_role, state.step)
         attrs = extract_span_attributes(event_name, kwargs)
         attrs[ATTR_STEP] = state.step

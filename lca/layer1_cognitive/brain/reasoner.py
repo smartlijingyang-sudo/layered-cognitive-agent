@@ -118,7 +118,7 @@ class SimpleReasoner(Reasoner):
     """Default Reasoner: render prompt template and call the LLM.
 
     Team-agnostic solo/member default. Hierarchical control-plane reads
-    belong exclusively to ``SupervisorReasoner`` (ADR-0026).
+    belong exclusively to ``SupervisorReasoner`` .
     Owns prompt templates directly (dict + str.format).
     """
 

@@ -54,7 +54,7 @@ class AgentState:
     """Full state for one agent cognitive loop.
 
     Generic loop fields only. SUPERVISOR control plane lives under optional
-    ``session`` (ConsultationState | RoutingState) — single slot (ADR-0029).
+    ``session`` (ConsultationState | RoutingState) — single slot.
     """
 
     trace_id: str

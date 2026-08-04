@@ -88,7 +88,7 @@ def record_routing_assignment(state: AgentState, spec: DelegationSpec) -> None:
 def record_routing_result(
     state: AgentState, spec: DelegationSpec, observation: Observation
 ) -> None:
-    """Append a settled delegation to the routing ledger (ADR-0032).
+    """Append a settled delegation to the routing ledger.
 
     The ledger is the authoritative fact source for the supervisor prompt
     (MEMBER_REPORTS) and idempotent delegation. Failed settlements are

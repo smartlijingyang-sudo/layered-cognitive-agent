@@ -1,4 +1,4 @@
-"""Routing 监督者 prompt 从账本渲染 MEMBER_REPORTS（ADR-0032）。"""
+"""Routing 监督者 prompt 从账本渲染 MEMBER_REPORTS。"""
 
 from __future__ import annotations
 

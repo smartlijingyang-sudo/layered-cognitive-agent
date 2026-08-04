@@ -1,4 +1,4 @@
-"""DelegationResult —— 委派结算的一等类型化表示（ADR-0032）。
+"""DelegationResult —— 委派结算的一等类型化表示。
 
 背景：成员返回曾以 ``TOOL_RESULT: {payload}`` 字符串糊进 working memory，
 丢失归属（谁 / 哪个子任务 / 哪一步 / 成败），导致监督者把已返回的委派结果
@@ -9,7 +9,7 @@
   （``RoutingState.results``）的元素；
 - ``find_result``：幂等键 ``(target_role, subtask)`` 的纯查询函数。
 
-contracts 放纯函数的先例：``lca/contracts/role_status_rules.py``（ADR-0025）。
+contracts 放纯函数的先例：``lca/contracts/role_status_rules.py``。
 """
 
 from __future__ import annotations

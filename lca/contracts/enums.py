@@ -1,4 +1,4 @@
-"""领域枚举集中定义 —— 消除裸字符串字面量（ADR-0017）。
+"""领域枚举集中定义 —— 消除裸字符串字面量。
 
 所有 str Enum 值与原始字符串一致，保证序列化 / 反序列化兼容。
 比较时 ``ActionType.RESPOND == "respond"`` 为 True（str Enum 特性）。
@@ -132,7 +132,7 @@ SHAREABLE_LAYERS: frozenset[MemoryLayer] = frozenset({MemoryLayer.SEMANTIC, Memo
 
 
 class MemoryRecordKind(str, Enum):
-    """记忆记录语义分类（ADR-0032）——观察写入记忆时的类型化标记。
+    """记忆记录语义分类——观察写入记忆时的类型化标记。
 
     此前成员委派返回 / 工具结果 / 自身回复都被压扁成 ``TOOL_RESULT:`` 字符串，
     丢失归属。此枚举让写入侧声明语义、渲染侧按类分派，委派结果以

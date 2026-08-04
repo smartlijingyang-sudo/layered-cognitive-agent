@@ -60,7 +60,7 @@ class SimpleMemorySystem(MemorySystem):
     async def update(
         self, state: AgentState, observation: Observation, reflection: Reflection
     ) -> None:
-        # 追加到 working memory 而非覆盖，确保多步委派历史对 agent 可见（ADR-0032 类型化）
+        # 追加到 working memory 而非覆盖，确保多步委派历史对 agent 可见
         for record in self._working_records_for(state, observation):
             self._private_layers[MemoryLayer.WORKING].append(record)
         # 防止 working memory 无限增长
@@ -83,7 +83,7 @@ class SimpleMemorySystem(MemorySystem):
     def _working_records_for(
         self, state: AgentState, observation: Observation
     ) -> list[MemoryRecord]:
-        """Type the observation into working-memory records (ADR-0032).
+        """Type the observation into working-memory records.
 
         Delegation results become one attributed record per member instead of a
         ``TOOL_RESULT:`` blob, so the supervisor can see *who answered what*.

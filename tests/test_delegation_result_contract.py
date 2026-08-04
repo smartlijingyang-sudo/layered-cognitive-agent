@@ -1,4 +1,4 @@
-"""DelegationResult 契约与幂等查询语义（ADR-0032）。"""
+"""DelegationResult 契约与幂等查询语义。"""
 
 from __future__ import annotations
 

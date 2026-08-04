@@ -1,10 +1,10 @@
-"""SUPERVISOR-family free routing control plane (ADR-0027 / ADR-0028).
+"""SUPERVISOR-family free routing control plane.
 
 ``RoutingState`` is for dynamic PM-style supervisors: no full-roster
 settlement invariant. Do **not** grow ``ConsultationState`` for this.
 
 Field whitelist is locked for architecture tests — same discipline as
-ADR-0026 consultation.
+the consultation control plane.
 """
 
 from __future__ import annotations
@@ -33,10 +33,10 @@ class RoutingState:
     - ``teammates``: fixed roster for prompt
     - ``assigned_roles``: soft log of who was already delegated to (advisory)
     - ``notes``: short freeform planner notes (optional)
-    - ``results``: settled delegation ledger (ADR-0032) — authoritative fact
+    - ``results``: settled delegation ledger  — authoritative fact
       source for the supervisor prompt (MEMBER_REPORTS) and idempotent
       delegation. It is a factual record, **not** a settlement gate:
-      routing keeps no MustConsultAllMembers invariant (ADR-0028).
+      routing keeps no MustConsultAllMembers invariant.
     """
 
     teammates: list[RoleProfile] = field(default_factory=list)

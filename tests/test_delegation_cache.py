@@ -1,4 +1,4 @@
-"""委派幂等短路与归属标签 —— delegation_cache 纯函数（ADR-0032）。"""
+"""委派幂等短路与归属标签 —— delegation_cache 纯函数。"""
 
 from __future__ import annotations
 

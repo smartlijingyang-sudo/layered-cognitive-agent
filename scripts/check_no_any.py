@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pre-commit hook: 禁止裸 Any 类型标注（ADR-0017）。
+"""Pre-commit hook: 禁止裸 Any 类型标注。
 
 扫描 lca/ 下所有 .py 文件，检测 `from typing import Any` 的使用。
 以下场景允许 Any（白名单模式）：
@@ -127,13 +127,13 @@ def main():
             all_violations.extend(_check_file(f))
 
     if all_violations:
-        print("❌ 发现裸 Any 类型标注（ADR-0017）：")
+        print("❌ 发现裸 Any 类型标注：")
         print()
         for v in all_violations:
             print(v)
         print()
         print("允许模式: dict[str, Any] / **kwargs: Any / payload: Any 等")
-        print("详见脚本顶部注释和 ADR-0017。")
+        print("详见脚本顶部注释。")
         return 1
 
     print("✅ Any 检查通过")

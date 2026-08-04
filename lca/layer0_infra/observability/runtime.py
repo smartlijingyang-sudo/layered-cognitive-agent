@@ -42,7 +42,7 @@ _trace_id: ContextVar[str | None] = ContextVar("lca_trace_id", default=None)
 _parent_span_id: ContextVar[str | None] = ContextVar("lca_parent_span_id", default=None)
 _telemetry: ContextVar[Telemetry | None] = ContextVar("lca_telemetry", default=None)
 
-# ── ambient actor (OTel baggage-style, ADR-0032) ─────────────
+# ── ambient actor (OTel baggage-style) ─────────────
 # Set at the hook-trigger boundary of the cognitive loop; spans that carry no
 # explicit agent_role/step attribute pick these up so every span is
 # self-describing (required for stateless narrative sectioning). ContextVars
@@ -107,7 +107,7 @@ class _Span:
         return self._record
 
     def _autofill_actor(self) -> None:
-        """Stamp ambient actor identity onto spans that lack it (ADR-0032).
+        """Stamp ambient actor identity onto spans that lack it.
 
         Explicit attributes win; only missing ``agent_role``/``step`` are filled
         so llm.chat / tool.execute / transport spans become self-describing.

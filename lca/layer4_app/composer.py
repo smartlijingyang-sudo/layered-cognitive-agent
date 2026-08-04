@@ -1,7 +1,7 @@
 """Composition root — wires all layers into a working object graph.
 
 ``AgentComposer`` / ``TeamComposer`` assemble closed Agent / Team graphs.
-No post-construction bind/install (ADR-0029 / ADR-0030).
+No post-construction bind/install (ADR-0030).
 """
 
 from __future__ import annotations
