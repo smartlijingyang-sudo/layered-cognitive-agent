@@ -11,6 +11,7 @@ from typing import Any
 
 import structlog
 
+from lca.contracts.enums import HookEvent
 from lca.contracts.protocols import HookRegistry, Observability
 from lca.contracts.state import AgentState
 from lca.contracts.telemetry import ATTR_STEP, HOOK_TO_PHASE_SPAN, SpanName
@@ -24,7 +25,7 @@ _log = structlog.get_logger("lca.hook_registry")
 def _span_name_for_hook(event_name: str) -> str:
     if event_name in HOOK_TO_PHASE_SPAN:
         return HOOK_TO_PHASE_SPAN[event_name]
-    if event_name == "on_error":
+    if event_name == HookEvent.ON_ERROR:
         return SpanName.ERROR.value
     return f"hook.{event_name}"
 

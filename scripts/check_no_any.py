@@ -41,6 +41,9 @@ _LINE_ALLOW_PATTERNS = [
     re.compile(r"replacement:\s*Any"),  # 装饰器模式
     re.compile(r"wrapper:\s*Any"),  # 装饰器模式
     re.compile(r"impl:\s*Any"),  # 泛型注册表
+    re.compile(r"NamedRegistry\[Any\]"),  # 泛型注册表容器
+    re.compile(r"\*\*attributes:\s*Any"),  # span 遥测可变属性
+    re.compile(r"\*\*_ignored:\s*Any"),  # 工厂签名吞多余参数
     re.compile(r"members:\s*list\[Any\]"),  # 已标注注释说明
     re.compile(r"supervisor:\s*Any"),  # 跨层引用（有注释）
     re.compile(r"shared_memory:\s*Any"),  # 跨层引用（有注释）
