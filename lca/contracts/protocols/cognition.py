@@ -26,6 +26,18 @@ class DecisionParser(Protocol):
 
 
 @runtime_checkable
+class DegradationPolicy(Protocol):
+    """越界决策降级策略：把词表外的 action_type 改写为词表内的等价行动。
+
+    防腐层的最后一道归一化——LLM "发明" action_type 是常态而非异常。
+    实现方在 ``Decision`` 上完成改写并通过 ``degraded_from`` 记录降级轨迹；
+    无法降级时必须原样返回，由 Body 以 ``UnregisteredActionError`` 拒绝。
+    """
+
+    def degrade(self, decision: Decision, action_registry: ActionRegistryProtocol) -> Decision: ...
+
+
+@runtime_checkable
 class Critic(Protocol):
     """自省评估器：根据 Observation 产出 Reflection。"""
 

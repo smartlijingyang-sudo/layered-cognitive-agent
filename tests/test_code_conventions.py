@@ -32,7 +32,6 @@ _NAME_EXEMPT: dict[str, str] = {
     "UseToolOperation": "Action 策略实现（contracts.action.Action）",
     "DelegateOperation": "Action 策略实现（contracts.action.Action）",
     "HandoffOperation": "Action 策略实现（contracts.action.Action）",
-    "FallbackActionPolicy": "FallbackPolicy 默认实现（迁至 L1 body）",
 }
 
 _SCAN_PACKAGES = [

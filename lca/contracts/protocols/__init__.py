@@ -34,13 +34,14 @@ from lca.contracts.protocols.cognition import (
     Critic,
     DecisionGate,
     DecisionParser,
+    DegradationPolicy,
     Reasoner,
     SkillRouter,
     SupportsShortcut,
 )
 
 # ── L1 Body / 行动执行协议 ───────────────────────────────
-from lca.contracts.protocols.embodiment import Body, FallbackPolicy
+from lca.contracts.protocols.embodiment import Body
 
 # ── L0 基础设施协议 ──────────────────────────────────────
 from lca.contracts.protocols.infra import (
@@ -85,8 +86,8 @@ __all__ = [
     "Critic",
     "DecisionGate",
     "DecisionParser",
+    "DegradationPolicy",
     "EventBus",
-    "FallbackPolicy",
     "HasHooks",
     "Hook",
     "HookRegistry",

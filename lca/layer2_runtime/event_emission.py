@@ -45,11 +45,15 @@ def _derive_action_degraded(
         and getattr(observation, "success", False)
         and getattr(observation, "degraded_from", None)
     ):
+        # 降级目标取改写后的 decision.action_type（respond / use_tool 均可能）；
+        # decision 缺省时退回历史默认 respond。
+        decision = kwargs.get("decision")
+        degraded_to = getattr(decision, "action_type", None) or ActionType.RESPOND.value
         return (
             EVENT_ACTION_DEGRADED,
             {
                 _KEY_ORIGINAL_ACTION_TYPE: observation.degraded_from,
-                _KEY_DEGRADED_TO: ActionType.RESPOND.value,
+                _KEY_DEGRADED_TO: degraded_to,
                 _KEY_STEP: state.step,
             },
         )

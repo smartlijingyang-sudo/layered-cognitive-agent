@@ -53,6 +53,11 @@ class Decision:
 
     ``delegations`` is the sole representation of DELEGATE/HANDOFF targets:
     empty = none, one entry = single target, multiple = fan-out.
+
+    ``degraded_from`` records the original ``action_type`` when the decision
+    was rewritten by the anti-corruption layer (see ``DegradationPolicy``);
+    ``None`` means the decision is native. Provenance flows Decision →
+    Observation so hooks and stop policies can see the degradation.
     """
 
     decision_id: str
@@ -62,6 +67,7 @@ class Decision:
     tool_calls: list[ToolCall] = field(default_factory=list)
     delegations: list[DelegationSpec] = field(default_factory=list)
     response_text: str | None = None
+    degraded_from: str | None = None
     schema_version: str = "1.0"
     created_at: datetime = field(default_factory=utc_now)
     extra: dict[str, Any] = field(default_factory=dict)

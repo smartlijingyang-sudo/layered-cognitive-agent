@@ -18,8 +18,6 @@ from lca.layer0_infra.observability.console_observability import ConsoleObservab
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer1_cognitive.body.action_handlers import RespondOperation
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
-from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
-from lca.layer1_cognitive.body.fallback_policy import FallbackActionPolicy
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
@@ -63,22 +61,20 @@ class TestDegradationFirstClass:
             await body.act(decision, _state())
         assert ei.value.action_type == "invented"
 
-    async def test_fallback_sets_degraded_from_and_policy_stops(self) -> None:
+    async def test_parser_degradation_sets_degraded_from_and_policy_stops(self) -> None:
         registry = ActionRegistry()
         registry.register(ActionType.RESPOND, RespondOperation())
-        body = FallbackDecoratedBody(
-            inner=SimpleBody(action_registry=registry),
-            fallback_handler=FallbackActionPolicy(),
+        parser = SimpleDecisionParser(action_registry=registry)
+        raw = (
+            '{"action_type": "research_plan", "response_text": "valid answer body",'
+            ' "rationale": "llm invented", "confidence": 0.7}'
         )
-        decision = Decision(
-            decision_id="d",
-            action_type="research_plan",
-            rationale="llm invented",
-            confidence=0.7,
-            response_text="valid answer body",
-        )
+        decision = parser.parse(raw, _state())
+        assert decision.action_type == ActionType.RESPOND
+        assert decision.degraded_from == "research_plan"
+
         state = _state()
-        obs = await body.act(decision, state)
+        obs = await SimpleBody(action_registry=registry).act(decision, state)
         assert obs.success is True
         assert obs.degraded_from == "research_plan"
         reflection = Reflection(reflection_id="r", verdict=ReflectionVerdict.ON_TRACK)

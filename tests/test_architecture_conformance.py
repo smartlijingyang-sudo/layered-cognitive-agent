@@ -56,9 +56,6 @@ EXEMPT: dict[str, str] = {
     "lca.layer3_agent.orchestration_strategies.graph.strategy.GraphExecutionState": (
         "BFS 执行状态 dataclass，纯内部数据结构，非可插拔组件"
     ),
-    "lca.layer1_cognitive.body.fallback_policy.FallbackActionPolicy": (
-        "FallbackPolicy 实现，Protocol 在 contracts.protocols.embodiment "
-    ),
     "lca.layer1_cognitive.brain.default_factory.SimpleBrainFactory": (
         "BrainFactory Protocol 可调用实现 "
     ),
@@ -227,13 +224,12 @@ class TestCognitiveLoopSkeleton(unittest.TestCase):
     def test_runtime_loop_import_whitelist(self) -> None:
         """runtime_loop.py 只允许 import contracts 协议类型，禁止 import 具体策略实现。
 
-        防止降级逻辑、事件总线实现等具体概念重新泄漏进 Loop。
+        防止事件总线实现等具体概念重新泄漏进 Loop。
         """
         source = self._LOOP_FILE.read_text(encoding="utf-8")
         tree = ast.parse(source)
 
         forbidden_modules = {
-            "lca.layer1_cognitive.body.fallback_policy",
             "lca.layer1_cognitive.event_bus",
             "lca.contracts.action",
         }

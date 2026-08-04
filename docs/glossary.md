@@ -98,7 +98,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **team_wiring** / **build_team_transport** | L4 团队 channel 接线（与 agent 组装决策分离） |
 | **SkillRouter** / **KeywordSkillRouter** / **StaticSkillRouter** | 运行时动态选择 Prompt 模板 / 工具子集（关键词 / 静态映射） |
 | **load_builtin_prompt** | 从 ``brain/prompts/*.md`` 加载内置模板 |
-| **FallbackPolicy** / **FallbackActionPolicy** | 未知 action 降级 |
+| **DegradationPolicy** / **GracefulDegradation** | 越界 action 优雅降级（防腐层归一化：解析期改写为词表内等价行动，经 Decision.degraded_from 溯源） |
 | **DelegationSpec** / **AgentCard** / **TaskStatus** | 委派规格 / 能力名片 / 任务状态机 |
 | **ApprovalPendingError** / **BudgetExceededError** / **ToolExecutionError** | 运行时异常 |
 | **MemoryRecord** / **MemoryLayer** | 记忆契约（分层参考 CoALA：working / semantic / episodic / procedural） |
@@ -119,7 +119,6 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **SimpleSafeExecutor** | SafeExecutor 默认实现 |
 | **SimpleToolRegistry** | ToolRegistry 默认实现 |
 | **CandidateEvaluationPipeline** | 候选评估管线协议（SimpleCandidateEvaluationPipeline 为默认实现） |
-| **FallbackDecoratedBody** | 带降级策略的 Body 装饰器 |
 | **InMemoryStateStore** | StateStore 内存实现 |
 | **CalculatorTool** / **WeatherTool** | 内置示例 Tool |
 
@@ -154,6 +153,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | BrainStrategy | Brain |
 | PromptManager / SimplePromptManager | Reasoner 内建模板字典（已溶解） |
 | member_status/policy.py | member_status/required_action.py |
+| FallbackPolicy / FallbackActionPolicy / FallbackDecoratedBody | DegradationPolicy / GracefulDegradation（降级前移至防腐层解析期，Body 不再承载异常驱动的降级装饰） |
 
 ## 禁止复活
 

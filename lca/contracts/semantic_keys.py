@@ -9,7 +9,7 @@ from __future__ import annotations
 
 # Observation.extra
 FAILURE_KIND = "failure_kind"
-FALLBACK_DEGRADED_FROM = "degraded_from_action_type"
+OBS_DEGRADED_FROM = "degraded_from_action_type"
 OBS_TASK_ID = "task_id"
 OBS_TASK_IDS = "task_ids"
 OBS_MEMBER_RESULTS = "member_results"
@@ -25,7 +25,6 @@ META_STEP = "step"
 META_TASK_ID = "task_id"
 
 # Decision.extra
-ORIGINAL_ACTION_TYPE = "original_action_type"
 EVAL_CONFLICTS = "eval_conflicts"
 
 # failure_kind 取值

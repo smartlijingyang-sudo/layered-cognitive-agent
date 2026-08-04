@@ -55,8 +55,6 @@ from lca.contracts.team_coordination import (
 from lca.layer0_infra.llm_adapter.telemetry_llm import TelemetryLLMAdapter
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
-from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
-from lca.layer1_cognitive.body.fallback_policy import FallbackActionPolicy
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
@@ -113,23 +111,18 @@ def build_body_from_shared(
     safe_executor: SimpleSafeExecutor,
     transport_registry: TransportRegistryProtocol,
     action_registry: ActionRegistryProtocol,
-    *,
-    enable_fallback: bool = True,
 ) -> Body:
-    """Build Body from already-shared pipeline components."""
-    simple_body = SimpleBody(
+    """Build Body from already-shared pipeline components.
+
+    越界 action_type 的降级在防腐层（DecisionParser + DegradationPolicy）
+    完成，Body 只做词表内分发，无需装饰器。
+    """
+    return SimpleBody(
         tool_registry=tool_registry,
         safe_executor=safe_executor,
         transport_registry=transport_registry,
         action_registry=action_registry,
     )
-    if enable_fallback:
-        return FallbackDecoratedBody(
-            inner=simple_body,
-            fallback_handler=FallbackActionPolicy(),
-            action_registry=action_registry,
-        )
-    return simple_body
 
 
 def build_hooks(observability: Observability, event_bus: EventBus) -> SimpleHookRegistry:

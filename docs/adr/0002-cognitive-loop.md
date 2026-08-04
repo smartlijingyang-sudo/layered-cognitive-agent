@@ -43,12 +43,23 @@ Loop 本体保持稳定不变（<25 行），所有策略切换、Prompt 模板�
 | 关注点 | 接入方式 | 组件位置 |
 |---|---|---|
 | 终止判定 / 输出提取 | `StepOutcomePolicy` 协议 | `lca/contracts/protocols.py` |
-| 降级（未知 action → respond/use_tool） | `FallbackDecoratedBody`（Body 装饰器） | `lca/layer1_cognitive/body/` |
+| 降级（未知 action → respond/use_tool） | `DegradationPolicy` 协议（防腐层解析期归一化，默认 `GracefulDegradation`） | `lca/layer1_cognitive/brain/degradation.py` |
 | 事件发布（step_completed / action_degraded） | Hook（`make_event_emitting_hook`） | `lca/layer2_runtime/hooks.py` |
 | Checkpoint 写入 | `_checkpoint` 私有方法 | `lca/layer2_runtime/runtime_loop.py` |
 
 ### CI 门禁
 
 - `_loop` 方法 AST 语句数 ≤ 30（`test_architecture_conformance.py::TestCognitiveLoopSkeleton`）
-- `runtime_loop.py` 禁止 import `fallback_handler`、`event_bus` 实现、`contracts.action`（import 白名单测试）
-- `HOOK_NAMES` 作为 Loop 唯一对外开放的挂载点，新特性只能以注册 Hook 或实现 `StepOutcomePolicy` / Body 装饰器的方式接入
+- `runtime_loop.py` 禁止 import `event_bus` 实现、`contracts.action`（import 白名单测试）
+- `HOOK_NAMES` 作为 Loop 唯一对外开放的挂载点，新特性只能以注册 Hook 或实现 `StepOutcomePolicy` / `DegradationPolicy` 的方式接入
+
+### 降级前移至防腐层（2026-08-04）
+
+原方案用 `FallbackDecoratedBody`（Body 装饰器）在执行期捕获 `UnregisteredActionError`
+再委托 `FallbackActionPolicy` 重新分发——同一个"LLM 输出越界 action_type"条件在
+parser / body / 装饰器 / 策略四处出现，且以异常驱动常态流程。
+
+现改为：越界决策在防腐层解析期由 `DegradationPolicy`（默认 `GracefulDegradation`）
+改写为词表内等价行动，`Decision.degraded_from` 记录溯源并由 Body 传播到 Observation。
+`UnregisteredActionError` 退化为纯防御断言（到达 Body 仍越界 = 契约违例）。
+`FallbackPolicy` / `FallbackActionPolicy` / `FallbackDecoratedBody` 已删除。

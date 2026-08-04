@@ -1,7 +1,9 @@
 """DecisionParser —— 将自由文本/工具调用稳健地解析为强类型 Decision。
 
-L2 防腐层：所有 LLM 原始输出必须先经过此层归一化，
-才能进入系统内部。核心域模型只看到已校验/已标记的决策。
+防腐层：所有 LLM 原始输出必须先经过此层归一化，才能进入系统内部。
+归一化管线：JSON 提取 → 别名归一化 → 词表校验 → 越界降级（GracefulDegradation）。
+下游永远只看到词表内的 action_type——越界决策在解析期就被改写，
+而不是留到执行期以异常形式暴露。
 """
 
 from __future__ import annotations
@@ -14,23 +16,30 @@ from lca.contracts.action import ActionRegistryProtocol
 from lca.contracts.decision import Decision, DelegationSpec, ToolCall
 from lca.contracts.enums import ActionType
 from lca.contracts.ids import new_id
-from lca.contracts.protocols import DecisionParser
-from lca.contracts.semantic_keys import ORIGINAL_ACTION_TYPE
+from lca.contracts.protocols import DecisionParser, DegradationPolicy
 from lca.contracts.state import AgentState
+from lca.layer1_cognitive.brain.degradation import GracefulDegradation
 
 _PARSE_FAILURE_CONFIDENCE = 0.1
 _DEFAULT_CONFIDENCE = 0.5
 
 
 class SimpleDecisionParser(DecisionParser):
-    """稳健 JSON 解析器：别名归一化 + Registry 校验 + 失败兜底。
+    """稳健 JSON 解析器：别名归一化 + 词表校验 + 越界降级 + 解析兜底。
 
-    When provided an ActionRegistry, validates action_type registration;
-    unregistered types are marked in extra for FallbackActionPolicy.
+    注入 ActionRegistry 后，解析结果保证词表内：未注册的 action_type
+    交由 DegradationPolicy 改写（默认 GracefulDegradation）；无法降级时
+    原样保留，由 Body 以 UnregisteredActionError 拒绝。
+    未注入 ActionRegistry 时跳过校验与降级。
     """
 
-    def __init__(self, action_registry: ActionRegistryProtocol | None = None) -> None:
+    def __init__(
+        self,
+        action_registry: ActionRegistryProtocol | None = None,
+        degradation: DegradationPolicy | None = None,
+    ) -> None:
         self._action_registry = action_registry
+        self._degradation = degradation if degradation is not None else GracefulDegradation()
 
     def parse(self, raw_output: str, state: AgentState) -> Decision:
         del state
@@ -53,34 +62,29 @@ class SimpleDecisionParser(DecisionParser):
             else raw_action
         )
 
-        extra: dict[str, str] = {}
-        if self._action_registry is not None and not self._action_registry.is_registered(
-            action_type
-        ):
-            extra[ORIGINAL_ACTION_TYPE] = action_type
-
+        # 工具意图与 action_type 解耦提取：LLM 可能把工具调用挂在越界的
+        # action_type 上，内容先收齐，交给降级策略决定是否改写。
+        tool_name = data.get("tool_name") or data.get("tool")
+        arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
+        if not isinstance(arguments, dict):
+            arguments = {}
         tool_calls: list[ToolCall] = []
-        if action_type == ActionType.USE_TOOL:
-            tool_name = data.get("tool_name") or data.get("tool")
-            arguments = data.get("arguments") or data.get("args") or data.get("parameters") or {}
-            if not isinstance(arguments, dict):
-                arguments = {}
-            if tool_name:
-                tool_calls.append(
-                    ToolCall(
-                        call_id=new_id("call"),
-                        tool_name=tool_name,
-                        arguments=arguments,
-                    )
+        if tool_name:
+            tool_calls.append(
+                ToolCall(
+                    call_id=new_id("call"),
+                    tool_name=tool_name,
+                    arguments=arguments,
                 )
-            else:
-                action_type = ActionType.RESPOND
+            )
+        elif action_type == ActionType.USE_TOOL:
+            action_type = ActionType.RESPOND
 
         delegations: list[DelegationSpec] = []
         if action_type in (ActionType.DELEGATE, ActionType.HANDOFF):
             delegations = self._parse_delegations(data)
 
-        return Decision(
+        decision = Decision(
             decision_id=new_id("dec"),
             action_type=action_type,
             tool_calls=tool_calls,
@@ -88,8 +92,15 @@ class SimpleDecisionParser(DecisionParser):
             response_text=data.get("response_text") or data.get("response") or data.get("text"),
             rationale=data.get("rationale", ""),
             confidence=float(data.get("confidence", _DEFAULT_CONFIDENCE)),
-            extra=extra,
         )
+        return self._degrade_if_unregistered(decision)
+
+    def _degrade_if_unregistered(self, decision: Decision) -> Decision:
+        """词表归一化最后一道：越界 action_type 就地降级为词表内等价行动。"""
+        registry = self._action_registry
+        if registry is None or registry.is_registered(decision.action_type):
+            return decision
+        return self._degradation.degrade(decision, registry)
 
     @staticmethod
     def _parse_delegations(data: dict[str, Any]) -> list[DelegationSpec]:

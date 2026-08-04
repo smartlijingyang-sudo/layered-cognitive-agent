@@ -139,6 +139,9 @@ class UnregisteredActionError(ToolExecutionError):
 
     This is a deterministic error — retrying will not help because the
     action catalog simply does not contain the requested type.
+
+    LLM 输出的越界 action_type 应已在防腐层被 ``DegradationPolicy`` 改写；
+    到达 Body 仍越界属于契约违例，本异常是纯防御断言。
     """
 
     retryable = False
