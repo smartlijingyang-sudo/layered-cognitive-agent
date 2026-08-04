@@ -19,6 +19,9 @@ STRATEGY_KEY_PEER_SWARM = "peer_swarm"
 STRATEGY_KEY_DEBATE = "debate"
 STRATEGY_KEY_GRAPH = "graph"
 
+DEFAULT_COORDINATION_MAX_ROUNDS = 3
+"""轮次型协调机制（PeerSwarm / Debate）的默认轮数上限。"""
+
 
 class LeadMandate(str, Enum):
     """Authority and obligations of a TeamLead (closed set)."""
@@ -52,14 +55,14 @@ class PeerRelay:
 class PeerSwarm:
     """Round-robin peers with context accumulation."""
 
-    max_rounds: int = 3
+    max_rounds: int = DEFAULT_COORDINATION_MAX_ROUNDS
 
 
 @dataclass(frozen=True)
 class Debate:
     """Multi-round peer debate."""
 
-    max_rounds: int = 3
+    max_rounds: int = DEFAULT_COORDINATION_MAX_ROUNDS
 
 
 @dataclass(frozen=True)
@@ -72,20 +75,27 @@ class Graph:
 Coordination = Pipeline | FanOut | PeerRelay | PeerSwarm | Debate | Graph
 
 
+_COORDINATION_STRATEGY_KEYS: dict[type, str] = {
+    Pipeline: STRATEGY_KEY_PIPELINE,
+    FanOut: STRATEGY_KEY_FAN_OUT,
+    PeerRelay: STRATEGY_KEY_PEER_RELAY,
+    PeerSwarm: STRATEGY_KEY_PEER_SWARM,
+    Debate: STRATEGY_KEY_DEBATE,
+    Graph: STRATEGY_KEY_GRAPH,
+}
+"""Coordination 类型 → 策略注册键的声明式映射（数据驱动分发，无 if 链）。"""
+
+_MANDATE_DECISION_GATES: dict[LeadMandate, DecisionGateName] = {
+    LeadMandate.BOARD: DecisionGateName.MUST_CONSULT_ALL,
+}
+"""LeadMandate → DecisionGate 注册名的展开表；未列出者为 NONE。"""
+
+
 def strategy_key_for_coordination(coordination: Coordination) -> str:
-    if isinstance(coordination, Pipeline):
-        return STRATEGY_KEY_PIPELINE
-    if isinstance(coordination, FanOut):
-        return STRATEGY_KEY_FAN_OUT
-    if isinstance(coordination, PeerRelay):
-        return STRATEGY_KEY_PEER_RELAY
-    if isinstance(coordination, PeerSwarm):
-        return STRATEGY_KEY_PEER_SWARM
-    if isinstance(coordination, Debate):
-        return STRATEGY_KEY_DEBATE
-    if isinstance(coordination, Graph):
-        return STRATEGY_KEY_GRAPH
-    raise TypeError(f"unknown coordination type: {type(coordination)!r}")
+    key = _COORDINATION_STRATEGY_KEYS.get(type(coordination))
+    if key is None:
+        raise TypeError(f"unknown coordination type: {type(coordination)!r}")
+    return key
 
 
 def strategy_key_for_lead() -> str:
@@ -93,9 +103,7 @@ def strategy_key_for_lead() -> str:
 
 
 def gate_name_for_mandate(mandate: LeadMandate) -> DecisionGateName:
-    if mandate is LeadMandate.BOARD:
-        return DecisionGateName.MUST_CONSULT_ALL
-    return DecisionGateName.NONE
+    return _MANDATE_DECISION_GATES.get(mandate, DecisionGateName.NONE)
 
 
 def mandate_uses_consultation_session(mandate: LeadMandate) -> bool:

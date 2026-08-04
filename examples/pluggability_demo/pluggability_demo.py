@@ -21,6 +21,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from lca.contracts.decision import Observation, Reflection
+from lca.contracts.enums import MemoryLayer
+from lca.contracts.memory import MemoryRecord
 from lca.contracts.state import AgentState
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
@@ -37,19 +39,20 @@ class LoggingMemorySystem:
         self.perceive_count = 0
         self.update_count = 0
 
-    async def perceive_and_retrieve(self, state: AgentState) -> AgentState:
+    async def perceive(self, state: AgentState) -> AgentState:
         self.perceive_count += 1
-        print(f"  [LoggingMemory] perceive_and_retrieve #{self.perceive_count}")
-        return await self._inner.perceive_and_retrieve(state)
+        print(f"  [LoggingMemory] perceive #{self.perceive_count}")
+        return await self._inner.perceive(state)
 
-    async def update_multi_level(
+    async def update(
         self, state: AgentState, observation: Observation, reflection: Reflection
     ) -> None:
         self.update_count += 1
-        print(
-            f"  [LoggingMemory] update_multi_level #{self.update_count} success={observation.success}"
-        )
-        await self._inner.update_multi_level(state, observation, reflection)
+        print(f"  [LoggingMemory] update #{self.update_count} success={observation.success}")
+        await self._inner.update(state, observation, reflection)
+
+    def query(self, layer: MemoryLayer) -> list[MemoryRecord]:
+        return self._inner.query(layer)
 
 
 class MinimalObservability:
@@ -83,7 +86,7 @@ async def main() -> None:
         tools=[calculator],
         llm=llm,
         memory="logging",
-        assembly=assembly,
+        composer=assembly,
     )
 
     print("开始执行：agent.run('123 乘以 456 等于多少？')")
@@ -112,7 +115,7 @@ async def main() -> None:
         tools=[calculator],
         llm=llm,
         observability=my_obs,
-        assembly=assembly,
+        composer=assembly,
     )
 
     print("开始执行：agent.run('789 加 100 等于多少？')")

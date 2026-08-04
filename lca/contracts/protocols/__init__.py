@@ -13,6 +13,7 @@ from lca.contracts.mechanisms import (
     Hook,
     HookRegistry,
     NamedRegistryProtocol,
+    OrchestrationRegistryProtocol,
 )
 
 # ── L3 Agent / Team 入口 ──────────────────────────────────
@@ -95,6 +96,7 @@ __all__ = [
     "MemorySystem",
     "NamedRegistryProtocol",
     "Observability",
+    "OrchestrationRegistryProtocol",
     "Reasoner",
     "Runtime",
     "SafeExecutor",

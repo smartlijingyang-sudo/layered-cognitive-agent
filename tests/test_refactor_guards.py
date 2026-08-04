@@ -48,6 +48,37 @@ class TestL4ApiIsThinFacade(unittest.TestCase):
         self.assertFalse(offenders, f"api.py 含组合期决策模式: {offenders}")
 
 
+class TestNoProcessLevelComposerSingleton(unittest.TestCase):
+    """ADR-0033：门面不得持有进程级 composer 单例（全局可变状态）。"""
+
+    def test_no_global_composer_in_facade_or_composer(self) -> None:
+        offenders: list[str] = []
+        for path in (_API_PATH, _COMPOSER_PATH):
+            source = path.read_text(encoding="utf-8")
+            if re.search(r"^\s*global\s+", source, re.MULTILINE):
+                offenders.append(f"{path.name} 含 global 语句")
+            if "_get_default_composer" in source:
+                offenders.append(f"{path.name} 引用 _get_default_composer")
+        self.assertFalse(offenders, "\n".join(offenders))
+
+
+class TestComposerNoClosedGraphExcavation(unittest.TestCase):
+    """ADR-0033：composer 只从声明式 spec 组装，禁止从成品图反向挖零件。"""
+
+    def test_no_excavation_patterns(self) -> None:
+        source = _COMPOSER_PATH.read_text(encoding="utf-8")
+        forbidden_patterns = [
+            r"_tools_from_agent",
+            r"_llm_from_agent",
+            r"_obs_from_agent",
+            r"\._entries",
+            r"\.reasoner\.llm",
+            r"getattr\(\s*runtime",
+        ]
+        offenders = [pattern for pattern in forbidden_patterns if re.search(pattern, source)]
+        self.assertFalse(offenders, f"composer.py 含封闭图挖掘反模式: {offenders}")
+
+
 class TestLeadWallClockPropagation(unittest.TestCase):
     def test_lead_wall_clock_preserved(self) -> None:
         from unittest.mock import MagicMock

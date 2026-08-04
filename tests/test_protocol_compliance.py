@@ -256,9 +256,13 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             Pipeline,
         )
         from lca.layer4_app.composer import TeamComposer
+        from tests.support.agent_specs import make_spec
 
         agent, _rp, _runtime = self._build_agent()
-        orchestrator = TeamComposer().compose_team(members=[agent], coordination=Pipeline())
+        orchestrator = TeamComposer().compose_team(
+            members=[make_spec(agent.role_profile.role, MockLLMAdapter())],
+            coordination=Pipeline(),
+        )
         self.assertIsInstance(orchestrator, TeamUnit)
 
 

@@ -1,7 +1,7 @@
 """Team channel wiring — transport registry and in-process member handlers.
 
-Separated from ``assembly.py`` so agent-graph decisions and team transport
-wiring can be read independently. Public re-exports stay on ``assembly`` for
+Separated from ``composer.py`` so agent-graph decisions and team transport
+wiring can be read independently. Public re-exports stay on ``composer`` for
 call sites that import the composition-root builders.
 """
 

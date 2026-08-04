@@ -332,20 +332,30 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
 
 
 class TestGraphStrategyRegistration(unittest.TestCase):
-    """GraphStrategy 注册与解析。"""
+    """GraphStrategy 注册与解析（工厂接收 Coordination，ADR-0033）。"""
 
     def test_graph_registered_by_default(self) -> None:
+        from lca.contracts.team_coordination import STRATEGY_KEY_GRAPH
         from lca.layer4_app.defaults import build_default_registries
 
         registry = build_default_registries().orchestration
-        self.assertTrue(registry.has("graph"))
+        self.assertTrue(registry.has(STRATEGY_KEY_GRAPH))
 
     def test_graph_resolves_correctly(self) -> None:
+        from lca.contracts.team_coordination import STRATEGY_KEY_GRAPH, Graph
         from lca.layer4_app.defaults import build_default_registries
 
         registry = build_default_registries().orchestration
-        strategy = registry.resolve("graph")
+        strategy = registry.resolve(STRATEGY_KEY_GRAPH, Graph(execution_graph=ExecutionGraph()))
         self.assertIsInstance(strategy, GraphStrategy)
+
+    def test_graph_requires_graph_coordination(self) -> None:
+        from lca.contracts.team_coordination import STRATEGY_KEY_GRAPH
+        from lca.layer4_app.defaults import build_default_registries
+
+        registry = build_default_registries().orchestration
+        with self.assertRaises(TypeError):
+            registry.resolve(STRATEGY_KEY_GRAPH)
 
 
 if __name__ == "__main__":

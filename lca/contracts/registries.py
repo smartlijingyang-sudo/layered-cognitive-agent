@@ -12,7 +12,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.contracts.mechanisms import ComponentRegistryProtocol, NamedRegistryProtocol
+from lca.contracts.mechanisms import (
+    ComponentRegistryProtocol,
+    NamedRegistryProtocol,
+    OrchestrationRegistryProtocol,
+)
 
 
 @dataclass(frozen=True)
@@ -21,4 +25,4 @@ class Registries:
 
     components: ComponentRegistryProtocol
     brain_factories: NamedRegistryProtocol
-    orchestration: NamedRegistryProtocol
+    orchestration: OrchestrationRegistryProtocol

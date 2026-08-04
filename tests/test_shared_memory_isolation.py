@@ -221,13 +221,12 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
         )
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
         from lca.layer4_app.composer import TeamComposer
+        from tests.support.agent_specs import make_spec
 
         asm = TeamComposer()
         llm = MockLLMAdapter()
-        agent_a = asm.compose(role="agent_a", goal="test", backstory="", tools=[], llm=llm)
-        agent_b = asm.compose(role="agent_b", goal="test", backstory="", tools=[], llm=llm)
         team = asm.compose_team(
-            members=[agent_a, agent_b],
+            members=[make_spec("agent_a", llm), make_spec("agent_b", llm)],
             coordination=Pipeline(),
             shared_memory_layers=[MemoryLayer.SEMANTIC],
         )
@@ -247,13 +246,12 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
         )
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
         from lca.layer4_app.composer import TeamComposer
+        from tests.support.agent_specs import make_spec
 
         asm = TeamComposer()
         llm = MockLLMAdapter()
-        agent_a = asm.compose(role="agent_a", goal="test", backstory="", tools=[], llm=llm)
-        agent_b = asm.compose(role="agent_b", goal="test", backstory="", tools=[], llm=llm)
         team = asm.compose_team(
-            members=[agent_a, agent_b],
+            members=[make_spec("agent_a", llm), make_spec("agent_b", llm)],
             coordination=Pipeline(),
             shared_memory_layers=[],
         )

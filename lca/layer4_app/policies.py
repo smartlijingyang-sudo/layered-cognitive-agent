@@ -12,6 +12,9 @@ from lca.contracts.budget import (
 )
 from lca.contracts.protocols import BudgetAware, BudgetPolicy
 
+LEAD_BUDGET_POLICY_KEY = "lead"
+"""lead 预算策略在 ComponentRegistry(BUDGET_POLICY) 下的注册名。"""
+
 
 class LeadBudgetPolicy(BudgetPolicy):
     """Lead budget floors — ensures team lead has adequate headroom."""

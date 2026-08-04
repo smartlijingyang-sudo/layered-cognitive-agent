@@ -13,9 +13,11 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 
 | 术语 | 定义 |
 |---|---|
-| **Agent** | L4 门面：角色 + 工具 + LLM，`await agent.run(task)` |
-| **Team** | L4 团队门面：`members` + 恰好一种协作机制（`lead` XOR `coordination`），`await team.run(objective)` |
-| **TeamLead** | 有主导者团队的入口：`TeamLead.routing/consult/board(agent)`，携带 LeadMandate |
+| **Agent** | L4 门面：显式实现 AgentUnit；持有 AgentSpec + 由它组装的封闭图，`await agent.run(task)` |
+| **Team** | L4 团队门面：显式实现 TeamUnit；`members` + 恰好一种协作机制（`lead` XOR `coordination`），`await team.run(objective)` |
+| **TeamLead** | 有主导者团队的入口：`TeamLead.routing/consult/board(agent)`，LeadSpec 的门面持有者 |
+| **AgentSpec** | Agent 声明式构造规格（frozen 值对象）：RoleProfile + LLM/工具 + 预算 + 组件选择；组合根的唯一声明式输入（ADR-0033） |
+| **LeadSpec** | lead 入口规格：AgentSpec + LeadMandate；全层统一表示，取代 tuple 传参（ADR-0033） |
 | **LeadMandate** | 主导者授权：routing（自由 PM）/ consult（按需咨询）/ board（全员咨询后收口） |
 | **Coordination** | 无主导者协作机制的联合类型（类型别名）：Pipeline / FanOut / PeerRelay / PeerSwarm / Debate / Graph |
 | **Pipeline** | 协调机制（常用）：成员按序接力，前者产出进入后者上下文（策略键 `pipeline` → SequentialStrategy） |
@@ -24,7 +26,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **PeerSwarm** | 协调机制（进阶）：轮询累积直至轮数上限（策略键 `peer_swarm` → SwarmStrategy） |
 | **Debate** | 协调机制（进阶）：多轮辩论收敛（策略键 `debate` → DebateStrategy） |
 | **Graph** | 协调机制（进阶）：按 ExecutionGraph 拓扑执行（策略键 `graph` → GraphStrategy） |
-| **AgentComposer** / **TeamComposer** | 组合根：封闭组装 Agent / Team 对象图，无构造后 bind/install（ADR-0030） |
+| **AgentComposer** / **TeamComposer** | 组合根：从 AgentSpec / LeadSpec 封闭组装 Agent / Team 对象图，无构造后 bind/install（ADR-0030 / ADR-0033）；无进程级单例，门面未注入时各自构造默认实例 |
 | **multi-delegate** | 一步并行委派多个角色（`Decision.delegations` 多条 + DelegateOperation gather） |
 | **RoutingState** | lead·routing 授权下的主导者会话状态（无全员结算不变量）；与 ConsultationState 严格隔离，不得反向生长 |
 | **Result** | 运行最终结果：status / output / budget / error |
@@ -36,9 +38,9 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 |---|---|
 | **Registries** | 三个发现型注册表的值对象包（components / brain_factories / orchestration），由 TeamComposer 私有持有，替代进程级全局单例 |
 | **CognitiveAgent** | L3 可调度单元：CognitiveRuntime + RoleProfile |
-| **TeamOrchestrator** | 组团队、注入共享记忆、绑定 lead、按策略键解析 TeamStrategy |
+| **TeamOrchestrator** | 已封闭团队的运行句柄：持有 TeamContext + TeamStrategy，只 run 不组装 |
 | **TeamStrategy** | 团队协作策略协议；每种 coordination / lead 路径一个实现类 |
-| **TeamStrategyRegistry** | TeamStrategy 的 NamedRegistry（策略键 → 工厂） |
+| **TeamStrategyRegistry** | TeamStrategy 的 NamedRegistry（策略键 → 工厂）；工厂签名 `(Coordination | None) -> TeamStrategy`，参数化策略在 resolve 期提取构造参数（ADR-0033） |
 | **TeamContext** | 策略运行时上下文（含 transport / member_status / shared_memory） |
 | **TeamUnit** | 团队入口协议 |
 | **AgentUnit** | 单体入口协议 |

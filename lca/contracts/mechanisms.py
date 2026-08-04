@@ -59,6 +59,25 @@ class NamedRegistryProtocol(Protocol):
 
 
 @runtime_checkable
+class OrchestrationRegistryProtocol(Protocol):
+    """编排策略注册表接口：策略键 + Coordination → TeamStrategy 实例。
+
+    与 NamedRegistryProtocol（无参工厂）不同，编排工厂在 resolve 时接收
+    用户声明的 Coordination 对象，从中取得 max_rounds / execution_graph 等
+    构造参数——参数化策略（Swarm / Debate / Graph）因此同样走注册表分发，
+    组合根无需按策略键做 if/elif 特判（ADR-0033）。
+    """
+
+    def register(self, name: str, impl: Any) -> None: ...
+
+    def resolve(self, name: str, coordination: Any = None) -> Any: ...
+
+    def list(self) -> list[str]: ...
+
+    def __contains__(self, name: str) -> bool: ...
+
+
+@runtime_checkable
 class ComponentRegistryProtocol(Protocol):
     """按 (category, name) 注册和解析组件实现的通用接口。
 
