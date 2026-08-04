@@ -14,6 +14,7 @@
 | [0015](0015-contracts-no-behavior-classes.md) | contracts/ 仅保留类型与接口，参考实现必须放在实现层 | Accepted |
 | [0030](0030-team-domain-language.md) | Team 领域语言（Lead / Coordination） | Accepted |
 | [0033](0033-declarative-agent-spec.md) | 声明式 AgentSpec 与协议化门面 | Accepted |
+| [0034](0034-closed-team-strategy.md) | 封闭 TeamStrategy 与 TeamSpec 单一事实来源 | Accepted |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件
