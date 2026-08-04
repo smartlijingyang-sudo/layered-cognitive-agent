@@ -14,8 +14,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from lca.contracts.delegation import DelegationResult
+from lca.contracts.enums import MemoryRecordKind
+from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols import LLMAdapter, Reasoner, Tool
 from lca.contracts.role_team import RoleProfile
+from lca.contracts.semantic_keys import META_ROLE, META_STEP
 from lca.contracts.state import AgentState
 
 _DEFAULT_TEMPLATE = "react_prompt"
@@ -24,6 +28,8 @@ _ROUTING_TEMPLATE = "routing_prompt"
 _EMPTY_TEAMMATES = "(无可用队友)"
 _EMPTY_ASSIGNED = "(尚未委派)"
 _EMPTY_CONTEXT = "(无历史上下文)"
+_EMPTY_REPORTS = "(尚无成员回报)"
+_KIND_EXCLUDE_NONE: frozenset[MemoryRecordKind] = frozenset()
 
 
 def build_teammates_text(profiles: list[RoleProfile]) -> str:
@@ -32,11 +38,39 @@ def build_teammates_text(profiles: list[RoleProfile]) -> str:
     return "\n".join(f"- role: {p.role} | goal: {p.goal}" for p in profiles)
 
 
-def _context_lines(state: AgentState) -> str:
-    return (
-        "\n".join(f"- [{r.memory_type.value}] {r.content}" for r in state.retrieved_context)
-        or _EMPTY_CONTEXT
-    )
+def _format_record_line(record: MemoryRecord) -> str:
+    layer = record.memory_type.value
+    if record.kind == MemoryRecordKind.DELEGATION_RESULT:
+        role = record.metadata.get(META_ROLE, "?")
+        step = record.metadata.get(META_STEP, "?")
+        return f"- [{layer}] {role} 已返回(step={step}): {record.content}"
+    if record.kind == MemoryRecordKind.RESPONSE:
+        step = record.metadata.get(META_STEP, "?")
+        return f"- [{layer}] 我此前的回复(step={step}): {record.content}"
+    return f"- [{layer}] {record.content}"
+
+
+def _context_lines(
+    state: AgentState, *, exclude_kinds: frozenset[MemoryRecordKind] = _KIND_EXCLUDE_NONE
+) -> str:
+    lines = [_format_record_line(r) for r in state.retrieved_context if r.kind not in exclude_kinds]
+    return "\n".join(lines) or _EMPTY_CONTEXT
+
+
+def build_member_reports_text(results: Sequence[DelegationResult]) -> str:
+    """Render the routing ledger as the supervisor's authoritative fact view."""
+    if not results:
+        return _EMPTY_REPORTS
+    lines: list[str] = []
+    for item in results:
+        if item.success:
+            outcome = f"已返回: {item.output or ''}"
+        else:
+            outcome = f"失败({item.error or '未知原因'})，可重新委派"
+        lines.append(
+            f"- {item.target_role} | step {item.step} | 子任务: {item.subtask} | {outcome}"
+        )
+    return "\n".join(lines)
 
 
 def _role_prompt_vars(
@@ -161,13 +195,18 @@ class SupervisorReasoner(Reasoner):
         self._templates[name] = template
 
     async def generate_candidates(self, state: AgentState, n: int = 1) -> list[str]:
-        context = _context_lines(state)
         from lca.contracts.session import as_consultation, as_routing
 
         if as_consultation(state.session) is not None:
+            context = _context_lines(state)
             variables = self._consultation_vars(state, context)
             template_name = state.active_template or _HIERARCHICAL_TEMPLATE
         elif as_routing(state.session) is not None:
+            # The ledger (MEMBER_REPORTS) is the authoritative delegation view;
+            # drop the duplicate working-memory records from CONTEXT.
+            context = _context_lines(
+                state, exclude_kinds=frozenset({MemoryRecordKind.DELEGATION_RESULT})
+            )
             variables = self._routing_vars(state, context)
             template_name = state.active_template or _ROUTING_TEMPLATE
         else:
@@ -209,4 +248,5 @@ class SupervisorReasoner(Reasoner):
         variables["teammates"] = build_teammates_text(routing.teammates)
         variables["assigned_roles_text"] = assigned
         variables["notes"] = routing.notes or "(无)"
+        variables["member_reports_text"] = build_member_reports_text(routing.results)
         return variables

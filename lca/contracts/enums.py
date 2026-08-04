@@ -131,6 +131,20 @@ SHAREABLE_LAYERS: frozenset[MemoryLayer] = frozenset({MemoryLayer.SEMANTIC, Memo
 """只有 semantic / procedural 两层可跨 Agent 共享（CoALA 语义边界）。"""
 
 
+class MemoryRecordKind(str, Enum):
+    """记忆记录语义分类（ADR-0032）——观察写入记忆时的类型化标记。
+
+    此前成员委派返回 / 工具结果 / 自身回复都被压扁成 ``TOOL_RESULT:`` 字符串，
+    丢失归属。此枚举让写入侧声明语义、渲染侧按类分派，委派结果以
+    ``DelegationResult`` 一等事实进入监督者 prompt。
+    """
+
+    GENERIC = "generic"
+    TOOL_RESULT = "tool_result"
+    DELEGATION_RESULT = "delegation_result"
+    RESPONSE = "response"
+
+
 class ComponentKind(str, Enum):
     """组件注册表分类键 —— 值域有限，适用契约 1（值域即类型）。
 

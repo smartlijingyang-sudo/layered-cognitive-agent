@@ -1,0 +1,141 @@
+# 全模式脚本化场景目录 —— 每个 case 对应一种 Team 模式（+ solo）
+# 由 tests/test_team_modes_scripted 与 harness 加载；断言以 trace 拓扑为主。
+
+roles:
+  - key: alice
+    role: Alice
+    goal: 完成分配任务
+    backstory: member A
+  - key: bob
+    role: Bob
+    goal: 完成分配任务
+    backstory: member B
+  - key: carol
+    role: Carol
+    goal: 完成分配任务
+    backstory: member C
+  - key: lead
+    role: Lead
+    goal: 统筹团队
+    backstory: team lead
+  - key: solo
+    role: Solo
+    goal: 独立完成任务
+    backstory: solo agent
+
+teams:
+  lead_routing:
+    lead:
+      agent: lead
+      mandate: routing
+    members: [alice, bob]
+
+  lead_consult:
+    lead:
+      agent: lead
+      mandate: consult
+    members: [alice, bob]
+
+  lead_board:
+    lead:
+      agent: lead
+      mandate: board
+    members: [alice, bob]
+
+  coord_pipeline:
+    coordination: pipeline
+    members: [alice, bob, carol]
+
+  coord_fan_out:
+    coordination: fan_out
+    members: [alice, bob, carol]
+
+  coord_peer_relay:
+    coordination: peer_relay
+    members: [alice, bob]
+
+  coord_peer_swarm:
+    coordination: peer_swarm
+    max_rounds: 2
+    members: [alice, bob]
+
+  coord_debate:
+    coordination: debate
+    max_rounds: 2
+    members: [alice, bob]
+
+  # graph: execution_graph 由代码注入，YAML 仅声明成员与 coordination 标记
+  coord_graph:
+    coordination: graph
+    members: [alice, bob]
+
+cases:
+  routing_happy:
+    team: lead_routing
+    objective: "routing probe — assign and finish"
+    assertions:
+      status: completed
+      mode: routing
+
+  consult_happy:
+    team: lead_consult
+    objective: "consult probe — roster-aware"
+    assertions:
+      status: completed
+      mode: consult
+
+  board_happy:
+    team: lead_board
+    objective: "board probe — full consult then close"
+    assertions:
+      status: completed
+      mode: board
+
+  pipeline_happy:
+    team: coord_pipeline
+    objective: "pipeline probe — A then B then C"
+    assertions:
+      status: completed
+      mode: pipeline
+
+  fan_out_happy:
+    team: coord_fan_out
+    objective: "fan_out probe — parallel then synthesize"
+    assertions:
+      status: completed
+      mode: fan_out
+
+  peer_relay_happy:
+    team: coord_peer_relay
+    objective: "peer_relay probe — first success wins"
+    assertions:
+      status: completed
+      mode: peer_relay
+
+  peer_swarm_happy:
+    team: coord_peer_swarm
+    objective: "peer_swarm probe — round robin improve"
+    assertions:
+      status: completed
+      mode: peer_swarm
+
+  debate_happy:
+    team: coord_debate
+    objective: "debate probe — multi-round proposals"
+    assertions:
+      status: completed
+      mode: debate
+
+  graph_happy:
+    team: coord_graph
+    objective: "graph probe — DAG Alice then Bob"
+    assertions:
+      status: completed
+      mode: graph
+
+  solo_happy:
+    team: lead_routing  # placeholder; solo built without team in runner
+    objective: "solo probe"
+    assertions:
+      status: completed
+      mode: solo

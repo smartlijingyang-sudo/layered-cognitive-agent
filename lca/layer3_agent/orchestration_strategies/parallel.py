@@ -6,6 +6,8 @@ import asyncio
 
 from lca.contracts.protocols import Synthesizer, TeamContext, TeamStrategy
 from lca.contracts.result import Result
+from lca.contracts.telemetry import ATTR_CANDIDATE_COUNT, ATTR_SYNTHESIS_METHOD, SpanName
+from lca.layer0_infra.observability import span
 from lca.layer3_agent.member_invoke import invoke_member
 
 
@@ -23,7 +25,14 @@ class ParallelStrategy(TeamStrategy):
         )
         total_steps = sum(r.total_steps for r in results)
         if self._synthesizer is not None:
-            synthesized = await self._synthesizer.synthesize(objective, list(results))
+            with span(
+                SpanName.TEAM_SYNTHESIS,
+                **{
+                    ATTR_CANDIDATE_COUNT: len(results),
+                    ATTR_SYNTHESIS_METHOD: type(self._synthesizer).__name__,
+                },
+            ):
+                synthesized = await self._synthesizer.synthesize(objective, list(results))
             synthesized.total_steps = total_steps
             return synthesized
         primary = results[-1]

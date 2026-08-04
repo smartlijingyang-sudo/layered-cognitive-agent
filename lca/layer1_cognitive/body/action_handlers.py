@@ -4,6 +4,7 @@
 新增行动能力 = ActionCatalog 加一条 spec + 本模块一个 Operation + 注册。
 
 DELEGATE/HANDOFF 成员调用统一走 ``send_and_wait``（与 strategy 同端口）。
+可观测性由 transport 边界统一发射，本模块不耦合 Observability。
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import asyncio
 from lca.contracts.action import Action
 from lca.contracts.decision import Decision, DelegationSpec, Observation
 from lca.contracts.delegation_context import delegator_scope
+from lca.contracts.enums import MemoryRecordKind
 from lca.contracts.ids import new_id, remaining_seconds
 from lca.contracts.lifecycle import AgentCard
 from lca.contracts.protocols import (
@@ -28,13 +30,22 @@ from lca.contracts.semantic_keys import (
     FAILURE_KIND_TRANSIENT,
     OBS_HANDOFF,
     OBS_MEMBER_RESULTS,
+    OBS_MEMBER_SUBTASKS,
+    OBS_RESULT_KIND,
     OBS_TASK_ID,
     OBS_TASK_IDS,
 )
 from lca.contracts.state import AgentState
+from lca.contracts.telemetry import ATTR_CALLEE_ROLE, ATTR_OK, ATTR_PROTOCOL, SpanName
+from lca.layer0_infra.observability import span
 from lca.layer0_infra.transport.invocation import send_and_wait
+from lca.layer1_cognitive.body.delegation_cache import (
+    cached_delegation_observation,
+    tag_delegation_extra,
+)
 from lca.layer1_cognitive.member_status.tracking import (
     record_routing_assignment,
+    record_routing_result,
     update_member_status_for_spec,
 )
 
@@ -61,6 +72,7 @@ class RespondOperation(Action):
             observation_id=new_id("obs"),
             success=True,
             payload=decision.response_text,
+            extra={OBS_RESULT_KIND: MemoryRecordKind.RESPONSE},
         )
 
 
@@ -78,7 +90,13 @@ class UseToolOperation(Action):
         tool = self._tool_registry.get(tc.tool_name)
         if tool is None:
             raise ToolExecutionError(f"未注册工具: {tc.tool_name}")
-        return await self._safe_executor.execute(tool, tc.arguments, RetryPolicy(), CacheConfig())
+        observation = await self._safe_executor.execute(
+            tool, tc.arguments, RetryPolicy(), CacheConfig()
+        )
+        extra = dict(observation.extra or {})
+        extra.setdefault(OBS_RESULT_KIND, MemoryRecordKind.TOOL_RESULT)
+        observation.extra = extra
+        return observation
 
 
 class DelegateOperation(Action):
@@ -96,21 +114,35 @@ class DelegateOperation(Action):
         return await self._execute_many(specs, state)
 
     async def _execute_one(self, spec: DelegationSpec, state: AgentState) -> Observation:
+        cached = cached_delegation_observation(spec, state)
+        if cached is not None:
+            return cached
         observation = await self._invoke(spec, state)
-        update_member_status_for_spec(state, spec, observation)
-        record_routing_assignment(state, spec)
-        return observation
+        self._settle(spec, observation, state)
+        return tag_delegation_extra(observation, spec)
 
     async def _execute_many(self, specs: list[DelegationSpec], state: AgentState) -> Observation:
-        """Fan-out: send all, wait all, settle board per role."""
-        observations = await asyncio.gather(*[self._invoke(spec, state) for spec in specs])
+        settled: dict[int, Observation] = {}
+        pending: list[tuple[int, DelegationSpec]] = []
+        for index, spec in enumerate(specs):
+            cached = cached_delegation_observation(spec, state)
+            if cached is not None:
+                settled[index] = cached
+            else:
+                pending.append((index, spec))
+        fresh = await asyncio.gather(*[self._invoke(spec, state) for _, spec in pending])
+        for (index, spec), observation in zip(pending, fresh, strict=True):
+            self._settle(spec, observation, state)
+            settled[index] = observation
+        observations = [settled[index] for index in range(len(specs))]
+
         member_payload: dict[str, object] = {}
+        member_subtasks: dict[str, object] = {}
         task_ids: list[str] = []
         for spec, obs in zip(specs, observations, strict=True):
-            update_member_status_for_spec(state, spec, obs)
-            record_routing_assignment(state, spec)
             key = spec.target_role or spec.target_agent_id or obs.observation_id
             member_payload[str(key)] = obs.payload if obs.success else obs.error
+            member_subtasks[str(key)] = spec.subtask
             task_ids.append(str(obs.extra.get(OBS_TASK_ID, obs.observation_id)))
 
         all_ok = all(o.success for o in observations)
@@ -119,8 +151,18 @@ class DelegateOperation(Action):
             success=all_ok,
             payload=member_payload,
             error=None if all_ok else "one or more delegates failed",
-            extra={OBS_TASK_IDS: task_ids, OBS_MEMBER_RESULTS: member_payload},
+            extra={
+                OBS_TASK_IDS: task_ids,
+                OBS_MEMBER_RESULTS: member_payload,
+                OBS_MEMBER_SUBTASKS: member_subtasks,
+                OBS_RESULT_KIND: MemoryRecordKind.DELEGATION_RESULT,
+            },
         )
+
+    def _settle(self, spec: DelegationSpec, observation: Observation, state: AgentState) -> None:
+        update_member_status_for_spec(state, spec, observation)
+        record_routing_assignment(state, spec)
+        record_routing_result(state, spec, observation)
 
     async def _invoke(self, spec: DelegationSpec, state: AgentState) -> Observation:
         transport, agent_card = self._resolve_target(spec, state)
@@ -159,10 +201,7 @@ class DelegateOperation(Action):
 
 
 class HandoffOperation(Action):
-    """处理 handoff 动作：非阻塞控制权移交，发完即返回（不等待结果）。
-
-    Distinct from PeerRelay coordination (peer first-completed topology).
-    """
+    """处理 handoff 动作：非阻塞控制权移交，发完即返回（不等待结果）。"""
 
     def __init__(self, transport_registry: TransportRegistryProtocol) -> None:
         self._transport_registry = transport_registry
@@ -176,8 +215,21 @@ class HandoffOperation(Action):
         agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
         if agent_card is None:
             raise ToolExecutionError("handoff 动作缺少目标（agent_card / agent_id / role 均为空）")
-        with delegator_scope(state.agent_role):
+        callee = (
+            agent_card
+            if isinstance(agent_card, str)
+            else getattr(agent_card, "role", str(agent_card))
+        )
+        protocol = getattr(transport, "protocol_name", "unknown")
+        with (
+            delegator_scope(state.agent_role),
+            span(
+                SpanName.TRANSPORT_REQUEST,
+                **{ATTR_CALLEE_ROLE: callee, ATTR_PROTOCOL: protocol},
+            ) as handle,
+        ):
             task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
+            handle.attributes[ATTR_OK] = True
         return Observation(
             observation_id=new_id("obs"),
             success=True,

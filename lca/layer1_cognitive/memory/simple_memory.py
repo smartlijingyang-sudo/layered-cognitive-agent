@@ -5,10 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.decision import Observation, Reflection
-from lca.contracts.enums import MemoryLayer
+from lca.contracts.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.ids import new_id
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols import MemorySystem, SharedMemoryStore
+from lca.contracts.semantic_keys import (
+    META_ROLE,
+    META_STEP,
+    META_SUBTASK,
+    OBS_MEMBER_RESULTS,
+    OBS_MEMBER_SUBTASKS,
+    OBS_RESULT_KIND,
+)
 from lca.contracts.state import AgentState
 
 _DEFAULT_MAX_WORKING = 20
@@ -52,22 +60,14 @@ class SimpleMemorySystem(MemorySystem):
     async def update(
         self, state: AgentState, observation: Observation, reflection: Reflection
     ) -> None:
-        if observation.payload is not None and observation.success:
-            # 追加到 working memory 而非覆盖，确保多步委派历史对 agent 可见
-            self._private_layers[MemoryLayer.WORKING].append(
-                MemoryRecord(
-                    record_id=new_id("mem"),
-                    content=f"TOOL_RESULT: {observation.payload}",
-                    memory_type=MemoryLayer.WORKING,
-                    importance=0.9,
-                    source_trace_id=state.trace_id,
-                )
-            )
-            # 防止 working memory 无限增长
-            if len(self._private_layers[MemoryLayer.WORKING]) > _DEFAULT_MAX_WORKING:
-                self._private_layers[MemoryLayer.WORKING] = self._private_layers[
-                    MemoryLayer.WORKING
-                ][-_DEFAULT_MAX_WORKING:]
+        # 追加到 working memory 而非覆盖，确保多步委派历史对 agent 可见（ADR-0032 类型化）
+        for record in self._working_records_for(state, observation):
+            self._private_layers[MemoryLayer.WORKING].append(record)
+        # 防止 working memory 无限增长
+        if len(self._private_layers[MemoryLayer.WORKING]) > _DEFAULT_MAX_WORKING:
+            self._private_layers[MemoryLayer.WORKING] = self._private_layers[MemoryLayer.WORKING][
+                -_DEFAULT_MAX_WORKING:
+            ]
         self._append_record(
             MemoryLayer.EPISODIC,
             MemoryRecord(
@@ -79,6 +79,65 @@ class SimpleMemorySystem(MemorySystem):
             ),
         )
         await self.compress()
+
+    def _working_records_for(
+        self, state: AgentState, observation: Observation
+    ) -> list[MemoryRecord]:
+        """Type the observation into working-memory records (ADR-0032).
+
+        Delegation results become one attributed record per member instead of a
+        ``TOOL_RESULT:`` blob, so the supervisor can see *who answered what*.
+        Tool results keep the ``TOOL_RESULT:`` prefix (mock-LLM parses it).
+        """
+        if observation.payload is None or not observation.success:
+            return []
+        kind = observation.extra.get(OBS_RESULT_KIND, MemoryRecordKind.GENERIC)
+        if kind == MemoryRecordKind.DELEGATION_RESULT:
+            return self._delegation_records(state, observation)
+        if kind == MemoryRecordKind.RESPONSE:
+            content = f"MY_RESPONSE: {observation.payload}"
+        elif kind == MemoryRecordKind.TOOL_RESULT:
+            content = f"TOOL_RESULT: {observation.payload}"
+        else:
+            content = f"TOOL_RESULT: {observation.payload}"
+        return [
+            MemoryRecord(
+                record_id=new_id("mem"),
+                content=content,
+                memory_type=MemoryLayer.WORKING,
+                importance=0.9,
+                source_trace_id=state.trace_id,
+                kind=kind,
+                metadata={META_STEP: state.step},
+            )
+        ]
+
+    def _delegation_records(
+        self, state: AgentState, observation: Observation
+    ) -> list[MemoryRecord]:
+        results = observation.extra.get(OBS_MEMBER_RESULTS)
+        if not isinstance(results, dict) or not results:
+            return []
+        subtasks = observation.extra.get(OBS_MEMBER_SUBTASKS)
+        subtasks = subtasks if isinstance(subtasks, dict) else {}
+        records: list[MemoryRecord] = []
+        for role, output in results.items():
+            records.append(
+                MemoryRecord(
+                    record_id=new_id("mem"),
+                    content=str(output) if output is not None else "",
+                    memory_type=MemoryLayer.WORKING,
+                    importance=0.9,
+                    source_trace_id=state.trace_id,
+                    kind=MemoryRecordKind.DELEGATION_RESULT,
+                    metadata={
+                        META_ROLE: str(role),
+                        META_SUBTASK: str(subtasks.get(role, "")),
+                        META_STEP: state.step,
+                    },
+                )
+            )
+        return records
 
     async def compress(self) -> None:
         episodic = self._get_layer_records(MemoryLayer.EPISODIC)

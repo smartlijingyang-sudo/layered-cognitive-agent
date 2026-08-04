@@ -15,6 +15,7 @@ from lca.contracts.decision import (
     Reflection,
     ToolCall,
 )
+from lca.contracts.delegation import DelegationResult, find_result
 from lca.contracts.graph import (
     ExecutionGraph,
     GraphEdge,
@@ -88,6 +89,7 @@ __all__ = [
     "Debate",
     "Decision",
     "DecisionGate",
+    "DelegationResult",
     "DelegationSpec",
     "Event",
     "EventBus",
@@ -132,4 +134,5 @@ __all__ = [
     "assert_consultation_field_whitelist",
     "assert_routing_field_whitelist",
     "create_budget",
+    "find_result",
 ]

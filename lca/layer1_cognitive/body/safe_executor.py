@@ -1,4 +1,4 @@
-"""SafeExecutor —— 权限校验 -> 前置校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。"""
+"""SafeExecutor — permission → validate → cache → retry → execute."""
 
 from __future__ import annotations
 
@@ -10,8 +10,7 @@ import structlog
 
 from lca.contracts.decision import Observation
 from lca.contracts.enums import SpanStatus
-from lca.contracts.ids import new_id, utc_now
-from lca.contracts.observability import TraceSpan
+from lca.contracts.ids import new_id
 from lca.contracts.protocols import Observability, SafeExecutor, Tool
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
@@ -21,20 +20,18 @@ from lca.contracts.semantic_keys import (
     FAILURE_KIND_TRANSIENT,
     FAILURE_KIND_VALIDATION,
 )
+from lca.contracts.telemetry import ATTR_OK, ATTR_TOOL_NAME, SpanName
+from lca.layer0_infra.observability import span
 
 _log = structlog.get_logger("lca.safe_executor")
 
 
 class SimpleSafeExecutor(SafeExecutor):
-    """权限校验 -> 前置校验 -> 缓存命中 -> 重试装饰 -> 沙箱执行。
-
-    重试语义由两个信号驱动，SafeExecutor 不猜测错误类型：
-    - ``tool.validate(args)``：前置校验，失败直接返回，不进入重试循环
-    - ``exception.retryable``：执行中异常，``False`` 则 fail-fast
-    """
+    """Permission → validate → cache → retry → sandbox execute."""
 
     def __init__(self, permission_manifest: ToolPermissionManifest, observability: Observability):
         self.permission_manifest = permission_manifest
+        # Composition injects sink for the agent graph; ambient Telemetry is bound at run entry.
         self.observability = observability
         self._cache: dict[str, Observation] = {}
 
@@ -68,13 +65,29 @@ class SimpleSafeExecutor(SafeExecutor):
         last_error: str = ""
         delay = retry_policy.backoff_base_s
         for attempt in range(retry_policy.max_retries + 1):
-            span = TraceSpan(
-                span_id=new_id("span"),
-                trace_id="",
-                name=f"tool.{tool.name}",
-                started_at=utc_now(),
-                attributes={"args": args, "attempt": attempt},
-            )
+            obs = await self._execute_once(tool, args, attempt)
+            if obs.success:
+                if cache_config.enabled:
+                    self._cache[cache_key] = obs
+                return obs
+            if obs.extra.get(FAILURE_KIND) == FAILURE_KIND_VALIDATION:
+                return obs
+            last_obs = obs
+            last_error = obs.error or ""
+            if attempt < retry_policy.max_retries:
+                await asyncio.sleep(delay)
+                delay *= retry_policy.backoff_multiplier
+
+        detail = f"，最后错误: {last_error}" if last_error else ""
+        raise ToolExecutionError(
+            f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败{detail}", last_obs
+        )
+
+    async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:
+        with span(
+            SpanName.TOOL_EXECUTE,
+            **{ATTR_TOOL_NAME: tool.name, "args": args, "attempt": attempt},
+        ) as handle:
             try:
                 obs = await tool.execute(args)
             except ToolExecutionError as err:
@@ -85,14 +98,11 @@ class SimpleSafeExecutor(SafeExecutor):
                     error=str(err),
                     extra={FAILURE_KIND: FAILURE_KIND_EXECUTION},
                 )
-                if not getattr(err, "retryable", True):
-                    span.ended_at = utc_now()
-                    span.status = SpanStatus.ERROR
-                    span.attributes["error"] = obs.error
-                    span.attributes[FAILURE_KIND] = FAILURE_KIND_EXECUTION
-                    span.attributes["retryable"] = False
-                    self.observability.emit_span(span)
-                    return obs
+                handle.attributes["error"] = obs.error
+                handle.attributes[FAILURE_KIND] = FAILURE_KIND_EXECUTION
+                handle.attributes["retryable"] = getattr(err, "retryable", True)
+                handle.status = SpanStatus.ERROR
+                return obs
             except Exception as err:
                 _log.warning(
                     "tool_execution_error",
@@ -108,36 +118,17 @@ class SimpleSafeExecutor(SafeExecutor):
                     error=str(err),
                     extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
                 )
-
-            span.ended_at = utc_now()
-            span.status = SpanStatus.OK if obs.success else SpanStatus.ERROR
+            handle.attributes[ATTR_OK] = obs.success
             if not obs.success:
-                span.attributes["error"] = obs.error
-                span.attributes[FAILURE_KIND] = obs.extra.get(FAILURE_KIND, FAILURE_KIND_EXECUTION)
-            self.observability.emit_span(span)
-
-            if obs.success:
-                if cache_config.enabled:
-                    self._cache[cache_key] = obs
-                return obs
-
-            if obs.extra.get(FAILURE_KIND) == FAILURE_KIND_VALIDATION:
-                return obs
-
-            last_obs = obs
-            last_error = obs.error or ""
-            if attempt < retry_policy.max_retries:
-                await asyncio.sleep(delay)
-                delay *= retry_policy.backoff_multiplier
-
-        detail = f"，最后错误: {last_error}" if last_error else ""
-        raise ToolExecutionError(
-            f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败{detail}", last_obs
-        )
+                handle.attributes["error"] = obs.error
+                handle.attributes[FAILURE_KIND] = obs.extra.get(
+                    FAILURE_KIND, FAILURE_KIND_EXECUTION
+                )
+                handle.status = SpanStatus.ERROR
+            return obs
 
     @staticmethod
     def _validate_args(tool: Tool, args: dict[str, Any]) -> str | None:
-        """调用工具的可选 validate 钩子，未实现则跳过。"""
         validator: Any = getattr(tool, "validate", None)
         if validator is None:
             return None

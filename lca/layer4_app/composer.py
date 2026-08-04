@@ -52,6 +52,8 @@ from lca.contracts.team_coordination import (
     strategy_key_for_coordination,
     strategy_key_for_lead,
 )
+from lca.layer0_infra.llm_adapter.telemetry_llm import TelemetryLLMAdapter
+from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.fallback_decorated_body import FallbackDecoratedBody
 from lca.layer1_cognitive.body.fallback_policy import FallbackActionPolicy
@@ -170,8 +172,24 @@ def _llm_from_agent(agent: CognitiveAgent) -> LLMAdapter:
             "cannot recompose agent without llm on brain.reasoner; "
             "assemble via AgentComposer.compose / L4 Agent"
         )
-    if not isinstance(llm, LLMAdapter):
-        raise TypeError(f"reasoner.llm must be LLMAdapter, got {type(llm).__name__}")
+    if isinstance(llm, TelemetryLLMAdapter):
+        llm = llm._inner  # unwrap so we can re-wrap with shared obs
+    # Structural check: tests may pass lightweight fakes that satisfy complete().
+    if not callable(getattr(llm, "complete", None)):
+        raise TypeError(f"reasoner.llm must provide complete(), got {type(llm).__name__}")
+    return llm
+
+
+def _obs_from_agent(agent: CognitiveAgent) -> Observability | None:
+    runtime = agent.runtime
+    hooks = getattr(runtime, "hooks", None)
+    obs = getattr(hooks, "observability", None)
+    return obs if isinstance(obs, Observability) else None
+
+
+def _unwrap_llm(llm: LLMAdapter) -> LLMAdapter:
+    if isinstance(llm, TelemetryLLMAdapter):
+        return llm._inner
     return llm
 
 
@@ -249,6 +267,8 @@ class AgentComposer:
             scope=action_scope,
         )
 
+        instrumented_llm: LLMAdapter = TelemetryLLMAdapter(_unwrap_llm(llm))
+
         resolved_brain: Brain
         if isinstance(brain, str):
             factory_reg = self._registries.brain_factories
@@ -257,7 +277,11 @@ class AgentComposer:
             tools_desc = ", ".join(t.name for t in tools) or "(no tools available)"
             factory = factory_reg.resolve(brain)
             resolved_brain = factory(
-                llm, role_profile, tools_desc, action_registry=action_registry, tools=tools
+                instrumented_llm,
+                role_profile,
+                tools_desc,
+                action_registry=action_registry,
+                tools=tools,
             )
         else:
             resolved_brain = brain
@@ -333,12 +357,14 @@ class AgentComposer:
         *,
         transport: AgentTransport,
         mandate: LeadMandate,
+        observability: Observability | None = None,
     ) -> CognitiveAgent:
         """Build a new closed lead agent from a raw agent (no patch)."""
         tools = _tools_from_agent(raw)
         llm = _llm_from_agent(raw)
         profile = raw.role_profile
         gate = self._resolve_decision_gate(gate_name_for_mandate(mandate))
+        obs_arg: str | Observability = observability if observability is not None else "console"
         composed = self.compose(
             role=profile.role,
             goal=profile.goal,
@@ -351,6 +377,7 @@ class AgentComposer:
             team_channel=transport,
             decision_gate=gate,
             lead_cognition=True,
+            observability=obs_arg,
         )
         policy = _resolve_component(
             self._registries.components,
@@ -365,13 +392,15 @@ class AgentComposer:
         raw: CognitiveAgent,
         *,
         shared_store: SharedMemoryStore | None = None,
+        observability: Observability | None = None,
     ) -> CognitiveAgent:
-        """Rebuild member with optional shared memory (closed graph)."""
-        if shared_store is None:
+        """Rebuild member with optional shared memory / shared observability."""
+        if shared_store is None and observability is None:
             return raw
         tools = _tools_from_agent(raw)
         llm = _llm_from_agent(raw)
         profile = raw.role_profile
+        obs_arg: str | Observability = observability if observability is not None else "console"
         return self.compose(
             role=profile.role,
             goal=profile.goal,
@@ -382,6 +411,7 @@ class AgentComposer:
             max_wall_clock_seconds=raw.max_wall_clock_seconds,
             action_scope=ActionScope.MEMBER,
             shared_store=shared_store,
+            observability=obs_arg,
         )
 
     def _resolve_decision_gate(self, name: DecisionGateName) -> DecisionGate | None:
@@ -408,6 +438,7 @@ class TeamComposer(AgentComposer):
         shared_memory_layers: list[MemoryLayer] | None = None,
         strategy: TeamStrategy | None = None,
         delegate_max_attempts: int | None = None,
+        observability: Observability | None = None,
     ) -> TeamUnit:
         if (lead is None) == (coordination is None):
             raise ValueError("Team requires exactly one of lead= or coordination=")
@@ -437,7 +468,19 @@ class TeamComposer(AgentComposer):
         if config.shared_memory_layers:
             shared_store = TeamSharedMemoryStore(config.shared_memory_layers)
 
-        composed_members = [self.compose_member(m, shared_store=shared_store) for m in members]
+        # One shared Observability for orchestrator + all members (span tree continuity).
+        shared_obs = observability
+        if shared_obs is None and members:
+            shared_obs = _obs_from_agent(members[0])
+        if shared_obs is None and raw_lead is not None:
+            shared_obs = _obs_from_agent(raw_lead)
+        if shared_obs is None:
+            shared_obs = ConsoleObservability()
+
+        composed_members = [
+            self.compose_member(m, shared_store=shared_store, observability=shared_obs)
+            for m in members
+        ]
 
         resolved_strategy = strategy
         if resolved_strategy is None and isinstance(coordination, Graph):
@@ -463,7 +506,12 @@ class TeamComposer(AgentComposer):
         closed_lead: CognitiveAgent | None = None
         member_status = None
         if raw_lead is not None and mandate is not None:
-            closed_lead = self.compose_as_lead(raw_lead, transport=transport, mandate=mandate)
+            closed_lead = self.compose_as_lead(
+                raw_lead,
+                transport=transport,
+                mandate=mandate,
+                observability=shared_obs,
+            )
             if mandate_uses_consultation_session(mandate):
                 role_order = tuple(m.role_profile.role for m in composed_members)
                 member_status = InMemoryMemberStatus(role_order=role_order)
@@ -477,5 +525,6 @@ class TeamComposer(AgentComposer):
             member_status=member_status,
             team_id=f"team-{strategy_key}",
             shared_memory=shared_store,
+            observability=shared_obs,
         )
         return TeamOrchestrator(context, resolved_strategy)

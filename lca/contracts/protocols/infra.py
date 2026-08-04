@@ -107,6 +107,21 @@ class TransportRegistryProtocol(Protocol):
 
 @runtime_checkable
 class Observability(Protocol):
-    """可观测性后端：接收 TraceSpan 并输出。"""
+    """后端 sink：接收已完成的 TraceSpan。
+
+    由组合根注入；业务层不直接调用，统一经 :class:`Telemetry`。
+    """
 
     def emit_span(self, span: TraceSpan) -> None: ...
+
+
+@runtime_checkable
+class Telemetry(Protocol):
+    """应用 facade：在边界打 span，不耦合 sink 实现。
+
+    L0 提供 ambient 绑定（``bind``）与 ``span``；长期唯一发射面。
+    """
+
+    def span(self, name: str, **attributes: Any) -> Any:
+        """Context manager yielding TraceSpan (mutable ``attributes``)."""
+        ...

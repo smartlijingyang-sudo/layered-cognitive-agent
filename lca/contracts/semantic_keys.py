@@ -13,7 +13,16 @@ FALLBACK_DEGRADED_FROM = "degraded_from_action_type"
 OBS_TASK_ID = "task_id"
 OBS_TASK_IDS = "task_ids"
 OBS_MEMBER_RESULTS = "member_results"
+OBS_MEMBER_SUBTASKS = "member_subtasks"
+OBS_RESULT_KIND = "result_kind"
+OBS_CACHE_HIT = "cache_hit"
 OBS_HANDOFF = "handoff"
+
+# MemoryRecord.metadata（委派结果归属，ADR-0032）
+META_ROLE = "role"
+META_SUBTASK = "subtask"
+META_STEP = "step"
+META_TASK_ID = "task_id"
 
 # Decision.extra
 ORIGINAL_ACTION_TYPE = "original_action_type"

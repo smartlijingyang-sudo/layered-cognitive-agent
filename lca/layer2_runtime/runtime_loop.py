@@ -28,6 +28,7 @@ from lca.contracts.run_context import RunContext
 from lca.contracts.state import AgentState, StateSnapshot
 from lca.contracts.stop import StopReason, StopRule
 from lca.contracts.types import Turn
+from lca.layer0_infra.observability import get_span_context
 
 _log = structlog.get_logger("lca.runtime_loop")
 
@@ -64,8 +65,13 @@ class CognitiveRuntime(Runtime):
         max_wall_clock_seconds: int | None = None,
         agent_role: str = "",
     ) -> Result:
+        # Prefer explicit RunContext.trace_id, then active span context (team chain), else new.
+        span_ctx = get_span_context()
+        trace_id = (
+            (ctx.trace_id if ctx and ctx.trace_id else None) or span_ctx.trace_id or new_id("trace")
+        )
         state = AgentState(
-            trace_id=(ctx.trace_id if ctx and ctx.trace_id else new_id("trace")),
+            trace_id=trace_id,
             task=task,
             budget=create_budget(
                 max_steps=max_steps, max_wall_clock_seconds=max_wall_clock_seconds

@@ -1,16 +1,7 @@
 """通用 OpenAI 兼容 LLM 适配器。
 
-支持所有 OpenAI chat/completions 兼容 API：
-  - OpenAI (api.openai.com)
-  - DashScope / 通义千问 (dashscope.aliyuncs.com/compatible-mode)
-  - Ollama, vLLM, LiteLLM 等
-
-只需配置环境变量即可切换，代码无需改动：
-  LLM_API_KEY   API Key
-  LLM_BASE_URL  基地址（默认 https://api.openai.com/v1）
-  LLM_MODEL     模型名（默认 gpt-4.1）
-
-依赖: pip install "openai>=1.40"
+支持所有 OpenAI chat/completions 兼容 API。
+可观测性由 TelemetryLLMAdapter（组合根包装）负责，本适配器只做 API 调用。
 """
 
 from __future__ import annotations

@@ -154,12 +154,25 @@ Prompt 模板存放在 `lca/layer1_cognitive/brain/prompts/*.md`，不触碰 Pyt
 
 ## 可观测性
 
-默认 `ConsoleObservability` 打印到 stdout。切换为 JSONL 文件落盘：
+默认 `ConsoleObservability`（`observability="console"`）在 **框架 `run()` 内**打印：
+- `run.plan` 场景卡（strategy / mandate / members / 计划步骤 / 任务预览）
+- 关键步骤标记（LLM / 决策 / 调用成员 / Agent 完成…）
+- 全量 span 行
+
+无需 tests 或 CLI 补丁；任意 `Team.run` / `Agent.run` 即有。
 
 ```python
+# 默认就是 console
+team = Team(members=[...], lead=TeamLead.routing(lead), observability="console")
+await team.run("任务")
+
+# 落盘
 agent = Agent(..., observability="jsonl_file")
 # 输出到 traces/lca_trace.jsonl，每行一个 JSON，可用 jq 过滤
 ```
+
+本地探针 CLI（选 mode + 默认任务文案 + 结束 digest）：
+`uv run python scripts/run_team_mode.py`
 
 ## 禁止事项
 - 不要在 --no-verify 情况下绕过 pre-commit 提交

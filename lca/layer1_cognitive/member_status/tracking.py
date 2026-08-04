@@ -6,11 +6,14 @@ Retry classification is pure; board mutation lives on ConsultationState.
 from __future__ import annotations
 
 from lca.contracts.decision import Decision, DelegationSpec, Observation
+from lca.contracts.delegation import DelegationResult
 from lca.contracts.enums import RoleStatus
+from lca.contracts.ids import new_id, utc_now
 from lca.contracts.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_VALIDATION,
+    OBS_TASK_ID,
 )
 from lca.contracts.state import AgentState
 
@@ -80,3 +83,35 @@ def record_routing_assignment(state: AgentState, spec: DelegationSpec) -> None:
         return
     if spec.target_role not in routing.assigned_roles:
         routing.assigned_roles.append(spec.target_role)
+
+
+def record_routing_result(
+    state: AgentState, spec: DelegationSpec, observation: Observation
+) -> None:
+    """Append a settled delegation to the routing ledger (ADR-0032).
+
+    The ledger is the authoritative fact source for the supervisor prompt
+    (MEMBER_REPORTS) and idempotent delegation. Failed settlements are
+    recorded too so the prompt can surface "who has not answered yet";
+    ``find_result`` only matches successful ones.
+    """
+    from lca.contracts.session import as_routing
+
+    routing = as_routing(state.session)
+    if routing is None or not spec.target_role:
+        return
+    task_id = observation.extra.get(OBS_TASK_ID)
+    output = observation.payload if observation.success else None
+    routing.results.append(
+        DelegationResult(
+            result_id=new_id("dres"),
+            target_role=spec.target_role,
+            subtask=spec.subtask,
+            output=str(output) if output is not None else None,
+            success=observation.success,
+            error=observation.error,
+            task_id=str(task_id) if task_id is not None else None,
+            step=state.step,
+            returned_at=utc_now(),
+        )
+    )

@@ -32,6 +32,8 @@
 | [0028](0028-multi-delegate-routing-and-peer.md) | Multi-delegate、Routing plane、Peer/Swarm | Accepted |
 | [0029](0029-closed-object-graph-and-supervisor-mode.md) | 封闭对象图 + SupervisorMode 闭集 + 组合权在 L4 | Accepted |
 | [0030](0030-team-domain-language.md) | Team 领域语言（Lead / Coordination） | Accepted |
+| [0031](0031-full-chain-telemetry-and-dual-track-tests.md) | 全链路 Telemetry + 双轨 Team 模式测试 | Accepted |
+| [0032](0032-delegation-result-ledger-idempotent-delegation.md) | DelegationResult 一等公民 — 路由账本、幂等委派与自描述 span | Accepted |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

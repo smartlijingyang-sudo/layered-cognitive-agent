@@ -1,15 +1,18 @@
-"""Uniform member call path for team process strategies.
-
-All strategy-level member calls go through TeamContext.transport via
-``send_and_wait``. Assembly always installs InternalTransport for teams;
-strategies do not call ``member.run`` directly.
-"""
+"""Uniform member call path for team process strategies."""
 
 from __future__ import annotations
 
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentUnit, TeamContext
 from lca.contracts.result import Result
+from lca.contracts.telemetry import (
+    ATTR_CALLEE_ROLE,
+    ATTR_CALLER_ROLE,
+    ATTR_OK,
+    ATTR_STATUS,
+    SpanName,
+)
+from lca.layer0_infra.observability import span
 from lca.layer0_infra.transport.invocation import send_and_wait
 
 _DEFAULT_TIMEOUT_S = 300.0
@@ -21,6 +24,7 @@ async def invoke_member(
     objective: str,
     *,
     timeout_s: float = _DEFAULT_TIMEOUT_S,
+    caller_role: str = "",
 ) -> Result:
     """Invoke one team member through the shared transport port."""
     transport = context.transport
@@ -32,13 +36,19 @@ async def invoke_member(
     role = member.role_profile.role
     if not role:
         raise ValueError("member role_profile.role is required for transport invoke")
-    observation = await send_and_wait(
-        transport,
-        role,
-        objective,
-        timeout_s=timeout_s,
-    )
-    return Result.from_observation(observation, task_id=observation.extra.get("task_id", ""))
+
+    with span(
+        SpanName.TEAM_MEMBER_INVOKE,
+        **{
+            ATTR_CALLEE_ROLE: role,
+            ATTR_CALLER_ROLE: caller_role or "strategy",
+        },
+    ) as handle:
+        observation = await send_and_wait(transport, role, objective, timeout_s=timeout_s)
+        result = Result.from_observation(observation, task_id=observation.extra.get("task_id", ""))
+        handle.attributes[ATTR_STATUS] = result.status
+        handle.attributes[ATTR_OK] = result.status == TaskStatus.COMPLETED
+        return result
 
 
 async def invoke_members_sequential(

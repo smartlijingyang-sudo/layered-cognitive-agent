@@ -109,6 +109,7 @@ class Team:
         coordination: Coordination | None = None,
         shared_memory_layers: list[MemoryLayer] | None = None,
         delegate_max_attempts: int | None = None,
+        observability: str | Observability | None = None,
         composer: TeamComposer | None = None,
     ) -> None:
         if (lead is None) == (coordination is None):
@@ -118,12 +119,31 @@ class Team:
         base_members = [m._agent for m in members]
         lead_arg = (lead._cognitive, lead.mandate) if lead is not None else None
 
+        shared_obs: Observability | None
+        if isinstance(observability, str):
+            from lca.layer4_app.defaults import build_default_registries
+
+            reg = build_default_registries().components
+            from lca.contracts.enums import ComponentKind
+
+            factory = reg.require(ComponentKind.OBSERVABILITY, observability)
+            created = factory()
+            if not isinstance(created, Observability):
+                raise TypeError(
+                    f"observability factory produced {type(created).__name__}, "
+                    "expected Observability"
+                )
+            shared_obs = created
+        else:
+            shared_obs = observability
+
         self._orchestrator = target.compose_team(
             members=base_members,
             lead=lead_arg,
             coordination=coordination,
             shared_memory_layers=shared_memory_layers,
             delegate_max_attempts=delegate_max_attempts,
+            observability=shared_obs,
         )
 
     async def run(self, objective: str) -> Result:

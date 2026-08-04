@@ -10,7 +10,7 @@ from lca.contracts.enums import MemoryLayer
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols.agent import AgentUnit
-from lca.contracts.protocols.infra import AgentTransport
+from lca.contracts.protocols.infra import AgentTransport, Observability
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, TeamConfig
 from lca.contracts.team_coordination import LeadMandate
@@ -22,6 +22,8 @@ class TeamContext:
 
     ``member_status`` is a board *template* for consultation mandates: each
     LeadStrategy.run creates a fresh ConsultationState from it.
+    ``observability`` is shared across orchestrator and all members so the
+    span tree stays on one backend.
     """
 
     members: Sequence[AgentUnit] = field(default_factory=list)
@@ -32,6 +34,7 @@ class TeamContext:
     member_status: MemberStatus | None = None
     team_id: str = ""
     shared_memory: SharedMemoryStore | None = None
+    observability: Observability | None = None
 
 
 def team_lead_mandate(context: TeamContext) -> LeadMandate | None:

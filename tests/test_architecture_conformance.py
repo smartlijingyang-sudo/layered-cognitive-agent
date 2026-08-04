@@ -71,6 +71,16 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.member_status.required_action.RequiredAction": (
         "纯数据声明（gate 裁决结果），非可插拔组件；见 ADR-0025"
     ),
+    "lca.layer0_infra.observability.runtime.SpanContext": (
+        "correlation 值对象，非可插拔组件 (ADR-0031)"
+    ),
+    "lca.layer0_infra.observability.runtime._Span": (
+        "Telemetry span 引擎内部类型，非公共组件 (ADR-0031)"
+    ),
+    "lca.layer0_infra.observability.runtime.ContextTelemetry": (
+        "Telemetry Protocol 实现，见 contracts.protocols.Telemetry (ADR-0031)"
+    ),
+    "lca.layer0_infra.observability.runtime.NullTelemetry": ("Telemetry no-op 默认实现 (ADR-0031)"),
 }
 
 _SCAN_PACKAGES = [
