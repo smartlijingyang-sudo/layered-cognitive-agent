@@ -62,9 +62,12 @@ from lca.contracts.protocols.memory import MemorySystem
 
 # ── L3 团队编排协议 ──────────────────────────────────────
 from lca.contracts.protocols.orchestration import (
+    MemberInvoker,
     SharedMemoryStore,
     Synthesizer,
+    TeamAssembly,
     TeamContext,
+    TeamStage,
     TeamStrategy,
 )
 
@@ -93,6 +96,7 @@ __all__ = [
     "Hook",
     "HookRegistry",
     "LLMAdapter",
+    "MemberInvoker",
     "MemorySystem",
     "NamedRegistryProtocol",
     "Observability",
@@ -107,7 +111,9 @@ __all__ = [
     "StopOutcomePolicy",
     "SupportsShortcut",
     "Synthesizer",
+    "TeamAssembly",
     "TeamContext",
+    "TeamStage",
     "TeamStrategy",
     "TeamUnit",
     "Telemetry",

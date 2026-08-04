@@ -1,6 +1,11 @@
 """LCA core contracts — typed models and protocols."""
 
 from lca.contracts.action import Action, ActionRegistryProtocol
+from lca.contracts.agent_spec import (
+    Governance,
+    TeamSpec,
+    strategy_key_for_governance,
+)
 from lca.contracts.approval import ApprovalDecision, ApprovalRequest
 from lca.contracts.budget import create_budget
 from lca.contracts.consultation import (
@@ -95,6 +100,7 @@ __all__ = [
     "EventBus",
     "ExecutionGraph",
     "FanOut",
+    "Governance",
     "Graph",
     "GraphEdge",
     "GraphNode",
@@ -125,6 +131,7 @@ __all__ = [
     "TaskStatus",
     "TeamConfig",
     "TeamMessage",
+    "TeamSpec",
     "ToolCall",
     "ToolExecutionError",
     "ToolPermissionManifest",
@@ -135,4 +142,5 @@ __all__ = [
     "assert_routing_field_whitelist",
     "create_budget",
     "find_result",
+    "strategy_key_for_governance",
 ]

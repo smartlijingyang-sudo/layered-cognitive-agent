@@ -5,7 +5,7 @@ Public API::
     from lca import Agent, Team, TeamLead, LeadMandate, Pipeline, FanOut, ...
 """
 
-from lca.contracts.agent_spec import AgentSpec, LeadSpec
+from lca.contracts.agent_spec import AgentSpec, Governance, LeadSpec, TeamSpec
 from lca.contracts.team_coordination import (
     Debate,
     FanOut,
@@ -22,6 +22,7 @@ __all__ = [
     "AgentSpec",
     "Debate",
     "FanOut",
+    "Governance",
     "Graph",
     "LeadMandate",
     "LeadSpec",
@@ -30,4 +31,5 @@ __all__ = [
     "Pipeline",
     "Team",
     "TeamLead",
+    "TeamSpec",
 ]

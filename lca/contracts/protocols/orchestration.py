@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS, Governance
 from lca.contracts.enums import MemoryLayer
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.memory import MemoryRecord
@@ -47,6 +48,38 @@ class TeamStrategy(Protocol):
     """编排策略接口：每种 coordination / lead 路径对应一个实现。"""
 
     async def run(self, context: TeamContext, objective: str) -> Result: ...
+
+
+@runtime_checkable
+class MemberInvoker(Protocol):
+    """策略调用成员的唯一通道 —— 组合期绑定 transport 的布线协议（ADR-0034）。
+
+    策略只认「成员 + 任务」，不认 transport；通道在组合期闭合注入。
+    """
+
+    async def invoke(self, member: AgentUnit, task: str, *, caller_role: str = "") -> Result: ...
+
+
+@dataclass(frozen=True)
+class TeamStage:
+    """协调型策略的行动舞台：成员 + 调用通道（布线类型，非领域概念）。"""
+
+    members: tuple[AgentUnit, ...]
+    invoker: MemberInvoker
+
+
+@dataclass(frozen=True)
+class TeamAssembly:
+    """策略工厂 resolve 期的只读装配视图（仅存在于组合期；布线类型）。
+
+    ``lead`` 仅当 governance 为 LeadSpec 时非 None；工厂从中取所需闭合
+    策略，运行期不出现本对象。
+    """
+
+    governance: Governance
+    stage: TeamStage
+    lead: AgentUnit | None = None
+    delegate_max_attempts: int = DEFAULT_DELEGATE_MAX_ATTEMPTS
 
 
 @runtime_checkable
