@@ -104,9 +104,3 @@ def gate_name_for_mandate(mandate: LeadMandate) -> DecisionGateName:
 
 def mandate_uses_consultation_session(mandate: LeadMandate) -> bool:
     return mandate is not LeadMandate.ROUTING
-
-
-def max_rounds_from_coordination(coordination: Coordination) -> int | None:
-    if isinstance(coordination, (PeerSwarm, Debate)):
-        return coordination.max_rounds
-    return None

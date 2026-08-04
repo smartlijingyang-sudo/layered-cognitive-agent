@@ -157,6 +157,5 @@ class ComponentKind(str, Enum):
     STATE_STORE = "state_store"
     MEMORY = "memory"
     EVENT_BUS = "event_bus"
-    MEMBER_STATUS = "member_status"
     DECISION_GATE = "decision_gate"
     BUDGET_POLICY = "budget_policy"

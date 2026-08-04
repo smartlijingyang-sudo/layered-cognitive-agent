@@ -59,9 +59,6 @@ from lca.layer4_app.policies import LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy
 EVENT_BUS_SIMPLE = "simple"
 """EventBus 内置注册名（组合根内部使用，非用户旋钮）。"""
 
-MEMBER_STATUS_DEFAULT = "default"
-"""MemberStatus 内置注册名（组合根内部使用，非用户旋钮）。"""
-
 
 def _lead_strategy(assembly: TeamAssembly) -> LeadStrategy:
     governance = assembly.governance
@@ -122,7 +119,6 @@ def register_defaults(registries: Registries) -> None:
     reg.register(ComponentKind.STATE_STORE, STATE_STORE_CHOICE_MEMORY, InMemoryStateStore)
     reg.register(ComponentKind.MEMORY, MEMORY_CHOICE_SIMPLE, SimpleMemorySystem)
     reg.register(ComponentKind.EVENT_BUS, EVENT_BUS_SIMPLE, SimpleEventBus)
-    reg.register(ComponentKind.MEMBER_STATUS, MEMBER_STATUS_DEFAULT, InMemoryMemberStatus)
 
     registries.brain_factories.register(BRAIN_CHOICE_DEFAULT, SimpleBrainFactory())
 
