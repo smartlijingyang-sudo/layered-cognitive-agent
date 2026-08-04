@@ -11,14 +11,15 @@ from unittest.mock import AsyncMock, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import TeamContext
+from lca.contracts.protocols import TeamAssembly
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
+from lca.contracts.team_coordination import FanOut
 from lca.layer3_agent.orchestration_strategies import (
     ParallelStrategy,
 )
 from lca.layer4_app.defaults import build_default_registries
-from tests.support.team_context import team_context_with_transport
+from tests.support.team_stage import stage_with_invoker
 
 _REGISTRIES = build_default_registries()
 
@@ -56,10 +57,9 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("trace-a", "result-a", delay=0.05)
         agent_b = _make_agent("trace-b", "result-b", delay=0.05)
 
-        strategy = ParallelStrategy()
-        context = team_context_with_transport([agent_a, agent_b])
+        strategy = ParallelStrategy(stage_with_invoker([agent_a, agent_b]))
 
-        result = await strategy.run(context, "test objective")
+        result = await strategy.run("test objective")
 
         agent_a.run.assert_awaited_once_with("test objective")
         agent_b.run.assert_awaited_once_with("test objective")
@@ -71,26 +71,23 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("trace-b", "second")
         agent_c = _make_agent("trace-c", "third")
 
-        strategy = ParallelStrategy()
-        context = team_context_with_transport([agent_a, agent_b, agent_c])
+        strategy = ParallelStrategy(stage_with_invoker([agent_a, agent_b, agent_c]))
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
         self.assertEqual(result.output, "third")
 
     async def test_parallel_empty_members_returns_failed(self) -> None:
-        strategy = ParallelStrategy()
-        context = TeamContext(members=[])
+        strategy = ParallelStrategy(stage_with_invoker([]))
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
         self.assertEqual(result.status, "failed")
         self.assertIn("No members", result.error or "")
 
     async def test_parallel_single_member(self) -> None:
         agent = _make_agent("trace-only", "solo-result")
-        strategy = ParallelStrategy()
-        context = team_context_with_transport([agent])
+        strategy = ParallelStrategy(stage_with_invoker([agent]))
 
-        result = await strategy.run(context, "solo task")
+        result = await strategy.run("solo task")
         self.assertEqual(result.output, "solo-result")
 
 
@@ -103,11 +100,10 @@ class TestParallelStrategyConcurrency(unittest.IsolatedAsyncioTestCase):
         agent_b = _make_agent("trace-b", "b", delay=delay)
         agent_c = _make_agent("trace-c", "c", delay=delay)
 
-        strategy = ParallelStrategy()
-        context = team_context_with_transport([agent_a, agent_b, agent_c])
+        strategy = ParallelStrategy(stage_with_invoker([agent_a, agent_b, agent_c]))
 
         start = asyncio.get_event_loop().time()
-        await strategy.run(context, "task")
+        await strategy.run("task")
         elapsed = asyncio.get_event_loop().time() - start
 
         # 并行执行：总耗时应接近单个 delay，而非 3 * delay
@@ -115,7 +111,7 @@ class TestParallelStrategyConcurrency(unittest.IsolatedAsyncioTestCase):
 
 
 class TestParallelStrategyRegistration(unittest.TestCase):
-    """ParallelStrategy 默认已注册，且与 TeamConfig.process Literal 对齐。"""
+    """ParallelStrategy 默认已注册，且与 FanOut 治理对齐。"""
 
     def test_parallel_registered_by_default(self) -> None:
         registry = _REGISTRIES.orchestration
@@ -123,7 +119,8 @@ class TestParallelStrategyRegistration(unittest.TestCase):
 
     def test_parallel_resolves_correctly(self) -> None:
         registry = _REGISTRIES.orchestration
-        strategy = registry.resolve("fan_out")
+        assembly = TeamAssembly(governance=FanOut(), stage=stage_with_invoker([]))
+        strategy = registry.resolve("fan_out", assembly)
         self.assertIsInstance(strategy, ParallelStrategy)
 
 
@@ -146,9 +143,8 @@ class TestParallelStrategyTraceIsolation(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_tracked_agent("trace-alpha")
         agent_b = _make_tracked_agent("trace-beta")
 
-        strategy = ParallelStrategy()
-        context = team_context_with_transport([agent_a, agent_b])
-        await strategy.run(context, "task")
+        strategy = ParallelStrategy(stage_with_invoker([agent_a, agent_b]))
+        await strategy.run("task")
 
         self.assertEqual(set(traces_seen), {"trace-alpha", "trace-beta"})
 

@@ -9,6 +9,9 @@ L3 层职责：
 
     执行核心：BFS 队列驱动拓扑排序，入度归零即入队。
     仅接受严格 DAG（allow_cycle=False）。
+
+构造期闭合（ADR-0034）：execution_graph 必填，舞台（成员 + 调用通道）
+构造期注入，运行期不解包任何上下文。
 """
 
 from __future__ import annotations
@@ -24,12 +27,11 @@ from lca.contracts.protocols import (
     AgentUnit,
     StateStore,
     Synthesizer,
-    TeamContext,
+    TeamStage,
     TeamStrategy,
 )
 from lca.contracts.result import Result
 from lca.contracts.state import AgentState, Budget
-from lca.layer3_agent.member_invoke import invoke_member
 from lca.layer3_agent.orchestration_strategies.graph.topology import (
     cascade_skip,
     compute_in_degree,
@@ -56,28 +58,26 @@ class GraphExecutionState:
 
 
 class GraphStrategy(TeamStrategy):
-    """DAG 工作流引擎：拓扑排序 + fan-in/fan-out + 条件分支 + 并行分支。
-
-    构造时可选传入 ExecutionGraph 和 StateStore。
-    若未传入 graph，则从 TeamContext 解析（当前要求构造时传入）。
-    """
+    """DAG 工作流引擎：拓扑排序 + fan-in/fan-out + 条件分支 + 并行分支。"""
 
     def __init__(
         self,
-        execution_graph: ExecutionGraph | None = None,
+        stage: TeamStage,
+        execution_graph: ExecutionGraph,
         state_store: StateStore | None = None,
         synthesizer: Synthesizer | None = None,
     ) -> None:
+        self._stage = stage
         self._graph = execution_graph
         self._state_store = state_store
         self._synthesizer = synthesizer
 
-    async def run(self, context: TeamContext, objective: str) -> Result:
-        graph = self._resolve_graph(context)
+    async def run(self, objective: str) -> Result:
+        graph = self._graph
         graph.validate()
         if graph.allow_cycle:
             raise ValueError("GraphStrategy 仅支持严格 DAG（allow_cycle=False）。")
-        member_map = {m.role_profile.role: m for m in context.members}
+        member_map = {m.role_profile.role: m for m in self._stage.members}
         state = AgentState(trace_id=_GRAPH_TRACE_ID, task=objective, budget=create_budget())
         in_degree = compute_in_degree(graph)
 
@@ -93,9 +93,9 @@ class GraphStrategy(TeamStrategy):
             node = graph.nodes[nid]
             if node.type == NodeType.AGGREGATOR:
                 es.aggregator_ids.add(nid)
-            await self._execute_node(node, graph, context, member_map, objective, state, es)
+            await self._execute_node(node, graph, member_map, objective, state, es)
             es.executed.add(nid)
-            await self._process_outgoing(nid, graph, state, es, context, member_map, objective)
+            await self._process_outgoing(nid, graph, state, es, member_map, objective)
 
         return await self._finalize(graph, es.results, es.aggregator_ids)
 
@@ -130,7 +130,6 @@ class GraphStrategy(TeamStrategy):
         graph: ExecutionGraph,
         state: AgentState,
         es: GraphExecutionState,
-        context: TeamContext,
         member_map: dict[str, AgentUnit],
         objective: str,
     ) -> None:
@@ -138,7 +137,7 @@ class GraphStrategy(TeamStrategy):
         fixed_targets, parallel_targets = self._classify_outgoing(nid, graph, state, es)
         if parallel_targets:
             await self._execute_parallel_branches(
-                parallel_targets, graph, context, member_map, objective, state, es
+                parallel_targets, graph, member_map, objective, state, es
             )
         else:
             enqueue_ready_targets(fixed_targets, es.remaining, es.executed, es.queue)
@@ -147,7 +146,6 @@ class GraphStrategy(TeamStrategy):
         self,
         targets: list[str],
         graph: ExecutionGraph,
-        context: TeamContext,
         member_map: dict[str, AgentUnit],
         objective: str,
         state: AgentState,
@@ -161,13 +159,13 @@ class GraphStrategy(TeamStrategy):
             node = graph.nodes[target_nid]
             if node.type == NodeType.AGGREGATOR:
                 es.aggregator_ids.add(target_nid)
-            await self._execute_node(node, graph, context, member_map, objective, state, es)
+            await self._execute_node(node, graph, member_map, objective, state, es)
             es.executed.add(target_nid)
 
             sub_fixed, sub_parallel = self._classify_outgoing(target_nid, graph, state, es)
             if sub_parallel:
                 await self._execute_parallel_branches(
-                    sub_parallel, graph, context, member_map, objective, state, es
+                    sub_parallel, graph, member_map, objective, state, es
                 )
             else:
                 for sub_target in sub_fixed:
@@ -187,7 +185,6 @@ class GraphStrategy(TeamStrategy):
         self,
         node: GraphNode,
         graph: ExecutionGraph,
-        context: TeamContext,
         member_map: dict[str, AgentUnit],
         objective: str,
         state: AgentState,
@@ -197,7 +194,7 @@ class GraphStrategy(TeamStrategy):
             role = node.config.get("role", "")
             member = member_map.get(role)
             if member:
-                es.results[node.id] = await invoke_member(context, member, objective)
+                es.results[node.id] = await self._stage.invoker.invoke(member, objective)
                 if self._state_store:
                     await self._state_store.save(state)
         elif node.type == NodeType.AGGREGATOR:
@@ -214,11 +211,6 @@ class GraphStrategy(TeamStrategy):
                 budget_used=Budget(used_steps=total_steps or 1),
                 output="\n".join(parts),
             )
-
-    def _resolve_graph(self, context: TeamContext) -> ExecutionGraph:
-        if self._graph is not None:
-            return self._graph
-        raise ValueError("GraphStrategy 需要 ExecutionGraph：构造时传入 execution_graph")
 
     async def _finalize(
         self, graph: ExecutionGraph, results: dict[str, Result], aggregator_ids: set[str]

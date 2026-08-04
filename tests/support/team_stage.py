@@ -1,4 +1,4 @@
-"""Test helpers: TeamContext with InternalTransport for mock members."""
+"""Test helpers: closed TeamStage over InternalTransport for mock members."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ from collections.abc import Sequence
 from unittest.mock import MagicMock
 
 from lca.contracts.decision import Observation
-from lca.contracts.protocols import TeamContext
-from lca.contracts.role_team import TeamConfig
+from lca.contracts.protocols import TeamStage
 from lca.layer0_infra.transport.agent_transport import InternalTransport
+from lca.layer3_agent.member_invoke import TransportMemberInvoker
 
 
 def _ensure_string_role(member: object, fallback: str) -> str:
@@ -23,19 +23,15 @@ def _ensure_string_role(member: object, fallback: str) -> str:
     return fallback
 
 
-def team_context_with_transport(
-    members: Sequence[MagicMock | object],
-    *,
-    config: TeamConfig | None = None,
-) -> TeamContext:
+def stage_with_invoker(members: Sequence[MagicMock | object]) -> TeamStage:
     """Register each member's run() on InternalTransport keyed by role."""
     transport = InternalTransport()
     for index, member in enumerate(members):
         role = _ensure_string_role(member, fallback=f"member-{index}")
 
         async def _handler(subtask: str, _m: object = member) -> Observation:
-            result = await _m.run(subtask)  # type: ignore[attr-defined]
+            result = await _m.run(subtask)  # type: ignore[union-attr]
             return Observation.from_result(result)
 
         transport.register_agent(role, _handler)
-    return TeamContext(members=list(members), transport=transport, config=config)
+    return TeamStage(members=tuple(members), invoker=TransportMemberInvoker(transport))

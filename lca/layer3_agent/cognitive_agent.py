@@ -21,8 +21,7 @@ from lca.contracts.telemetry import (
 )
 from lca.layer0_infra.observability import NullObservability, bind, get_span_context, span
 from lca.layer0_infra.observability.plan_narrative import plan_steps_joined
-
-_OBJECTIVE_PREVIEW_MAX = 240
+from lca.layer0_infra.observability.team_trace import objective_preview
 
 
 def _task_as_text(task: str | AgentMessage) -> str:
@@ -72,7 +71,7 @@ class CognitiveAgent(AgentUnit):
                     **{
                         ATTR_AGENT_ROLE: role,
                         ATTR_STRATEGY_KEY: "solo",
-                        ATTR_OBJECTIVE_PREVIEW: text[:_OBJECTIVE_PREVIEW_MAX],
+                        ATTR_OBJECTIVE_PREVIEW: objective_preview(text),
                         ATTR_PLAN_STEPS: plan_steps_joined("solo"),
                     },
                 ):

@@ -11,10 +11,11 @@ from lca.contracts.decision import Decision
 from lca.contracts.enums import DecisionGateName
 from lca.contracts.graph import ExecutionGraph, GraphEdge, GraphNode
 from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.protocols import TeamAssembly
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import Budget
-from lca.contracts.team_coordination import Graph
+from lca.contracts.team_coordination import Graph, PeerRelay, PeerSwarm, Pipeline
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer3_agent.orchestration_strategies import (
     HandoffStrategy,
@@ -23,7 +24,7 @@ from lca.layer3_agent.orchestration_strategies import (
 )
 from lca.layer4_app.api import Agent, Team
 from lca.layer4_app.defaults import build_default_registries
-from tests.support.team_context import team_context_with_transport
+from tests.support.team_stage import stage_with_invoker
 
 _ROOT = Path(__file__).resolve().parents[1]
 
@@ -77,9 +78,13 @@ class TestTypedProcessDispatch(unittest.TestCase):
 
     def test_registry_maps_to_typed_classes(self) -> None:
         reg = build_default_registries().orchestration
-        self.assertIsInstance(reg.resolve("pipeline"), SequentialStrategy)
-        self.assertIsInstance(reg.resolve("peer_relay"), HandoffStrategy)
-        self.assertIsInstance(reg.resolve("peer_swarm"), SwarmStrategy)
+
+        def _assembly(governance) -> TeamAssembly:
+            return TeamAssembly(governance=governance, stage=stage_with_invoker([]))
+
+        self.assertIsInstance(reg.resolve("pipeline", _assembly(Pipeline())), SequentialStrategy)
+        self.assertIsInstance(reg.resolve("peer_relay", _assembly(PeerRelay())), HandoffStrategy)
+        self.assertIsInstance(reg.resolve("peer_swarm", _assembly(PeerSwarm())), SwarmStrategy)
 
 
 class TestSingleInvokePort(unittest.IsolatedAsyncioTestCase):
@@ -106,22 +111,22 @@ class TestSingleInvokePort(unittest.IsolatedAsyncioTestCase):
             return m
 
         a, b = _agent("a", "from-a"), _agent("b", "from-b")
-        ctx = team_context_with_transport([a, b])
-        self.assertIsNotNone(ctx.transport)
+        stage = stage_with_invoker([a, b])
+        self.assertIsNotNone(stage.invoker)
 
-        seq = await SequentialStrategy().run(ctx, "start")
+        seq = await SequentialStrategy(stage).run("start")
         self.assertEqual(seq.output, "from-b")
         self.assertEqual(calls, ["a", "b"])
 
         calls.clear()
-        hand = await HandoffStrategy().run(team_context_with_transport([a, b]), "start")
+        hand = await HandoffStrategy(stage_with_invoker([a, b])).run("start")
         self.assertEqual(hand.output, "from-a")
         self.assertEqual(calls, ["a"])
 
     def test_member_invoke_source_requires_transport(self) -> None:
-        src = inspect.getsource(
-            __import__("lca.layer3_agent.member_invoke", fromlist=["invoke_member"]).invoke_member
-        )
+        from lca.layer3_agent.member_invoke import TransportMemberInvoker
+
+        src = inspect.getsource(TransportMemberInvoker.invoke)
         self.assertIn("send_and_wait", src)
         self.assertNotIn("member.run", src)
 

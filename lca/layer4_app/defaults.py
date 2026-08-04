@@ -3,9 +3,10 @@
 register_defaults() registers factories on the given Registries.
 Object-graph construction lives in composer.py (ADR-0030).
 
-编排策略工厂统一签名为 ``(Coordination | None) -> TeamStrategy``：
-参数化策略（Swarm / Debate / Graph）在 resolve 期从 Coordination 提取
-构造参数，组合根因此不需要按策略键做 if/elif 特判（ADR-0033）。
+编排策略工厂统一签名为 ``(TeamAssembly) -> TeamStrategy``（ADR-0034）：
+工厂在 resolve 期从组合期闭合的装配视图中取所需（stage / lead /
+governance 参数），把所有治理方式——含 lead——闭合为封闭策略。
+组合根因此既不需要按策略键做 if/elif 特判，也不编排 lead 专属布线。
 """
 
 from __future__ import annotations
@@ -16,8 +17,10 @@ from lca.contracts.agent_spec import (
     OBSERVABILITY_CHOICE_CONSOLE,
     OBSERVABILITY_CHOICE_JSONL_FILE,
     STATE_STORE_CHOICE_MEMORY,
+    LeadSpec,
 )
 from lca.contracts.enums import ComponentKind, DecisionGateName
+from lca.contracts.protocols import TeamAssembly
 from lca.contracts.registries import Registries
 from lca.contracts.team_coordination import (
     STRATEGY_KEY_DEBATE,
@@ -27,9 +30,9 @@ from lca.contracts.team_coordination import (
     STRATEGY_KEY_PEER_RELAY,
     STRATEGY_KEY_PEER_SWARM,
     STRATEGY_KEY_PIPELINE,
-    Coordination,
+    Debate,
     Graph,
-    max_rounds_from_coordination,
+    PeerSwarm,
 )
 from lca.layer0_infra.component_registry import ComponentRegistry, NamedRegistry
 from lca.layer0_infra.observability.console_observability import ConsoleObservability
@@ -60,36 +63,53 @@ MEMBER_STATUS_DEFAULT = "default"
 """MemberStatus 内置注册名（组合根内部使用，非用户旋钮）。"""
 
 
-def _lead_strategy(_coordination: Coordination | None) -> LeadStrategy:
-    return LeadStrategy()
+def _lead_strategy(assembly: TeamAssembly) -> LeadStrategy:
+    governance = assembly.governance
+    if not isinstance(governance, LeadSpec) or assembly.lead is None:
+        raise TypeError(f"strategy {STRATEGY_KEY_LEAD!r} requires LeadSpec governance")
+    members = assembly.stage.members
+    roster = tuple(member.role_profile for member in members)
+    role_order = tuple(member.role_profile.role for member in members)
+    return LeadStrategy(
+        lead=assembly.lead,
+        mandate=governance.mandate,
+        roster=roster,
+        board=InMemoryMemberStatus(role_order=role_order),
+        delegate_max_attempts=assembly.delegate_max_attempts,
+    )
 
 
-def _pipeline_strategy(_coordination: Coordination | None) -> SequentialStrategy:
-    return SequentialStrategy()
+def _pipeline_strategy(assembly: TeamAssembly) -> SequentialStrategy:
+    return SequentialStrategy(assembly.stage)
 
 
-def _fan_out_strategy(_coordination: Coordination | None) -> ParallelStrategy:
-    return ParallelStrategy(synthesizer=ConcatSynthesizer())
+def _fan_out_strategy(assembly: TeamAssembly) -> ParallelStrategy:
+    return ParallelStrategy(assembly.stage, synthesizer=ConcatSynthesizer())
 
 
-def _peer_relay_strategy(_coordination: Coordination | None) -> HandoffStrategy:
-    return HandoffStrategy()
+def _peer_relay_strategy(assembly: TeamAssembly) -> HandoffStrategy:
+    return HandoffStrategy(assembly.stage)
 
 
-def _peer_swarm_strategy(coordination: Coordination | None) -> SwarmStrategy:
-    rounds = max_rounds_from_coordination(coordination) if coordination is not None else None
-    return SwarmStrategy(max_rounds=rounds)
+def _peer_swarm_strategy(assembly: TeamAssembly) -> SwarmStrategy:
+    governance = assembly.governance
+    if not isinstance(governance, PeerSwarm):
+        raise TypeError(f"strategy {STRATEGY_KEY_PEER_SWARM!r} requires PeerSwarm governance")
+    return SwarmStrategy(assembly.stage, max_rounds=governance.max_rounds)
 
 
-def _debate_strategy(coordination: Coordination | None) -> DebateStrategy:
-    rounds = max_rounds_from_coordination(coordination) if coordination is not None else None
-    return DebateStrategy(max_rounds=rounds)
+def _debate_strategy(assembly: TeamAssembly) -> DebateStrategy:
+    governance = assembly.governance
+    if not isinstance(governance, Debate):
+        raise TypeError(f"strategy {STRATEGY_KEY_DEBATE!r} requires Debate governance")
+    return DebateStrategy(assembly.stage, max_rounds=governance.max_rounds)
 
 
-def _graph_strategy(coordination: Coordination | None) -> GraphStrategy:
-    if not isinstance(coordination, Graph):
-        raise TypeError(f"strategy {STRATEGY_KEY_GRAPH!r} requires Graph coordination")
-    return GraphStrategy(execution_graph=coordination.execution_graph)
+def _graph_strategy(assembly: TeamAssembly) -> GraphStrategy:
+    governance = assembly.governance
+    if not isinstance(governance, Graph):
+        raise TypeError(f"strategy {STRATEGY_KEY_GRAPH!r} requires Graph governance")
+    return GraphStrategy(assembly.stage, execution_graph=governance.execution_graph)
 
 
 def register_defaults(registries: Registries) -> None:

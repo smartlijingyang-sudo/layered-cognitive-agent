@@ -4,13 +4,10 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.protocols import Synthesizer, TeamContext, TeamStrategy
+from lca.contracts.protocols import Synthesizer, TeamStage, TeamStrategy
 from lca.contracts.result import Result
 from lca.contracts.telemetry import ATTR_MAX_ROUNDS, ATTR_ROUND, SpanName
 from lca.layer0_infra.observability import span
-from lca.layer3_agent.member_invoke import invoke_member
-
-_DEFAULT_MAX_ROUNDS = 3
 
 
 class DebateStrategy(TeamStrategy):
@@ -18,31 +15,29 @@ class DebateStrategy(TeamStrategy):
 
     def __init__(
         self,
+        stage: TeamStage,
+        max_rounds: int,
         synthesizer: Synthesizer | None = None,
-        max_rounds: int | None = None,
     ) -> None:
-        self._synthesizer = synthesizer
+        self._stage = stage
         self._max_rounds = max_rounds
+        self._synthesizer = synthesizer
 
-    async def run(self, context: TeamContext, objective: str) -> Result:
-        if not context.members:
+    async def run(self, objective: str) -> Result:
+        members = self._stage.members
+        if not members:
             return Result.failed("No members in team")
-        max_rounds = self._max_rounds or (
-            context.config.max_rounds
-            if context.config and context.config.max_rounds
-            else _DEFAULT_MAX_ROUNDS
-        )
         current_objective = objective
         all_round_results: list[list[Result]] = []
         total_steps = 0
 
-        for round_idx in range(max_rounds):
+        for round_idx in range(self._max_rounds):
             with span(
                 SpanName.TEAM_ROUND,
-                **{ATTR_ROUND: round_idx, ATTR_MAX_ROUNDS: max_rounds},
+                **{ATTR_ROUND: round_idx, ATTR_MAX_ROUNDS: self._max_rounds},
             ):
                 round_results = await asyncio.gather(
-                    *[invoke_member(context, m, current_objective) for m in context.members]
+                    *[self._stage.invoker.invoke(member, current_objective) for member in members]
                 )
             total_steps += sum(r.total_steps for r in round_results)
             all_round_results.append(list(round_results))

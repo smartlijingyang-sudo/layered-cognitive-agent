@@ -66,7 +66,6 @@ from lca.contracts.protocols.orchestration import (
     SharedMemoryStore,
     Synthesizer,
     TeamAssembly,
-    TeamContext,
     TeamStage,
     TeamStrategy,
 )
@@ -112,7 +111,6 @@ __all__ = [
     "SupportsShortcut",
     "Synthesizer",
     "TeamAssembly",
-    "TeamContext",
     "TeamStage",
     "TeamStrategy",
     "TeamUnit",

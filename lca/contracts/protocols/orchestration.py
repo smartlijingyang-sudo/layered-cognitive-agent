@@ -1,60 +1,39 @@
-"""L3 团队编排协议 —— 策略 / 上下文 / 共享记忆 / 聚合。"""
+"""L3 团队编排契约 —— 封闭策略与布线类型（ADR-0034）。
+
+本质模型：团队在组合期被编译成封闭的 ``TeamStrategy``，运行期没有
+上下文包——策略自己就是团队。``TeamStage`` / ``TeamAssembly`` /
+``MemberInvoker`` 是组合期布线类型，不属于运行期领域概念。
+"""
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS, Governance
 from lca.contracts.enums import MemoryLayer
-from lca.contracts.member_status import MemberStatus
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols.agent import AgentUnit
-from lca.contracts.protocols.infra import AgentTransport, Observability
 from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile, TeamConfig
-from lca.contracts.team_coordination import LeadMandate
-
-
-@dataclass
-class TeamContext:
-    """编排策略的运行时上下文（已封闭对象图，策略只 run）。
-
-    ``member_status`` is a board *template* for consultation mandates: each
-    LeadStrategy.run creates a fresh ConsultationState from it.
-    ``observability`` is shared across orchestrator and all members so the
-    span tree stays on one backend.
-    """
-
-    members: Sequence[AgentUnit] = field(default_factory=list)
-    config: TeamConfig | None = None
-    lead: AgentUnit | None = None
-    transport: AgentTransport | None = None
-    teammates: list[RoleProfile] = field(default_factory=list)
-    member_status: MemberStatus | None = None
-    team_id: str = ""
-    shared_memory: SharedMemoryStore | None = None
-    observability: Observability | None = None
-
-
-def team_lead_mandate(context: TeamContext) -> LeadMandate | None:
-    """Read lead_mandate from context.config (contracts stay behavior-light)."""
-    return context.config.lead_mandate if context.config is not None else None
 
 
 @runtime_checkable
 class TeamStrategy(Protocol):
-    """编排策略接口：每种 coordination / lead 路径对应一个实现。"""
+    """编排策略接口：构造期闭合，运行期只 ``run(objective)``（ADR-0034）。
 
-    async def run(self, context: TeamContext, objective: str) -> Result: ...
+    每种 Governance（LeadSpec | Coordination）经注册表工厂闭合为一个实现；
+    策略所需的一切（成员 / 调用通道 / lead / 轮次参数）在构造期注入。
+    """
+
+    async def run(self, objective: str) -> Result: ...
 
 
 @runtime_checkable
 class MemberInvoker(Protocol):
     """策略调用成员的唯一通道 —— 组合期绑定 transport 的布线协议（ADR-0034）。
 
-    策略只认「成员 + 任务」，不认 transport；通道在组合期闭合注入。
+    策略只认「成员 + 任务」，不认 transport；通道在组合期闭合注入，
+    角色合法性由组合期 fail-fast 保证。
     """
 
     async def invoke(self, member: AgentUnit, task: str, *, caller_role: str = "") -> Result: ...

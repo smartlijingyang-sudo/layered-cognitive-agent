@@ -5,9 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.contracts.enums import MemoryLayer
-from lca.contracts.team_coordination import LeadMandate
-
 
 @dataclass
 class RetryPolicy:
@@ -48,18 +45,3 @@ class RoleProfile:
     tone: str | None = None
     values: list[str] = field(default_factory=list)
     extra: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class TeamConfig:
-    """Closed team configuration after composition (not a dual user API).
-
-    - ``strategy_key`` → TeamStrategy registry id (pipeline / lead / …)
-    - ``lead_mandate`` → only when strategy_key is lead
-    """
-
-    strategy_key: str
-    shared_memory_layers: list[MemoryLayer] = field(default_factory=list)
-    max_rounds: int | None = None
-    lead_mandate: LeadMandate | None = None
-    delegate_max_attempts: int = 3

@@ -98,10 +98,6 @@ def strategy_key_for_coordination(coordination: Coordination) -> str:
     return key
 
 
-def strategy_key_for_lead() -> str:
-    return STRATEGY_KEY_LEAD
-
-
 def gate_name_for_mandate(mandate: LeadMandate) -> DecisionGateName:
     return _MANDATE_DECISION_GATES.get(mandate, DecisionGateName.NONE)
 

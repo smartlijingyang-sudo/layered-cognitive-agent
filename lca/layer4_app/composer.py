@@ -1,8 +1,10 @@
 """Composition root — wires all layers into working object graphs.
 
-``AgentComposer`` / ``TeamComposer`` 从声明式 ``AgentSpec`` / ``LeadSpec``
+``AgentComposer`` / ``TeamComposer`` 从声明式 ``AgentSpec`` / ``TeamSpec``
 组装封闭的 Agent / Team 对象图：spec 是唯一声明式输入，composer 是唯一
 组装点，构造后无 bind/install（ADR-0005 / ADR-0029 / ADR-0030 / ADR-0033）。
+团队侧按本质模型组装（ADR-0034）：TeamSpec 是团队形态的唯一事实来源，
+composer 把它编译成封闭 TeamStrategy，运行期句柄不编排。
 """
 
 from __future__ import annotations
@@ -12,7 +14,15 @@ from dataclasses import replace
 from typing import TypeVar
 
 from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.agent_spec import OBSERVABILITY_CHOICE_CONSOLE, AgentSpec, LeadSpec
+from lca.contracts.agent_spec import (
+    DEFAULT_DELEGATE_MAX_ATTEMPTS,
+    OBSERVABILITY_CHOICE_CONSOLE,
+    AgentSpec,
+    Governance,
+    LeadSpec,
+    TeamSpec,
+    strategy_key_for_governance,
+)
 from lca.contracts.enums import (
     ActionScope,
     ComponentKind,
@@ -22,6 +32,7 @@ from lca.contracts.enums import (
 )
 from lca.contracts.mechanisms import ComponentRegistryProtocol
 from lca.contracts.protocols import (
+    AgentUnit,
     Brain,
     BrainFactory,
     BudgetPolicy,
@@ -32,23 +43,20 @@ from lca.contracts.protocols import (
     Observability,
     SharedMemoryStore,
     StateStore,
-    TeamStrategy,
+    TeamAssembly,
+    TeamStage,
     TeamUnit,
 )
 from lca.contracts.protocols.infra import AgentTransport
-from lca.contracts.protocols.orchestration import TeamContext
 from lca.contracts.registries import Registries
-from lca.contracts.role_team import RoleProfile, TeamConfig
+from lca.contracts.role_team import RoleProfile
 from lca.contracts.team_coordination import (
     Coordination,
     LeadMandate,
     gate_name_for_mandate,
-    mandate_uses_consultation_session,
-    max_rounds_from_coordination,
-    strategy_key_for_coordination,
-    strategy_key_for_lead,
 )
 from lca.layer0_infra.llm_adapter.telemetry_llm import TelemetryLLMAdapter
+from lca.layer0_infra.observability.team_trace import TeamTraceProfile, team_id_for
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
@@ -56,7 +64,6 @@ from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.reasoner import SimpleReasoner, SupervisorReasoner
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
-from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
@@ -64,8 +71,9 @@ from lca.layer2_runtime.event_emission import make_event_emitting_hook
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
+from lca.layer3_agent.member_invoke import TransportMemberInvoker
 from lca.layer3_agent.orchestration_registry import OrchestrationFactory
-from lca.layer3_agent.team_orchestrator import TeamOrchestrator
+from lca.layer3_agent.team_handle import TeamHandle
 from lca.layer4_app.defaults import EVENT_BUS_SIMPLE, build_default_registries
 from lca.layer4_app.policies import LEAD_BUDGET_POLICY_KEY
 from lca.layer4_app.team_wiring import (
@@ -345,7 +353,13 @@ class AgentComposer:
 
 
 class TeamComposer(AgentComposer):
-    """Compose a closed team from declarative specs: members + (lead XOR coordination)."""
+    """Compose a closed team from a declarative TeamSpec (ADR-0034).
+
+    管线五步，每步一个命名职责：共享观测 → 共享记忆 → 封闭成员 →
+    舞台（角色校验 + transport + 调用通道）→ 装配视图（含 lead 时闭合 lead）
+    → 注册表解析封闭策略 → 运行句柄。团队形态只从 TeamSpec.governance
+    单向派生，composer 不做运行期决策。
+    """
 
     def compose_team(
         self,
@@ -354,97 +368,121 @@ class TeamComposer(AgentComposer):
         lead: LeadSpec | None = None,
         coordination: Coordination | None = None,
         shared_memory_layers: Sequence[MemoryLayer] | None = None,
-        strategy: TeamStrategy | None = None,
         delegate_max_attempts: int | None = None,
         observability: str | Observability | None = None,
     ) -> TeamUnit:
-        if (lead is None) == (coordination is None):
-            raise ValueError("Team requires exactly one of lead= or coordination=")
-
-        if lead is not None:
-            strategy_key = strategy_key_for_lead()
-            max_rounds = None
-            mandate: LeadMandate | None = lead.mandate
-        else:
-            if coordination is None:  # pragma: no cover - guarded above
-                raise ValueError("Team requires exactly one of lead= or coordination=")
-            strategy_key = strategy_key_for_coordination(coordination)
-            max_rounds = max_rounds_from_coordination(coordination)
-            mandate = None
-
-        config = TeamConfig(
-            strategy_key=strategy_key,
-            max_rounds=max_rounds,
-            shared_memory_layers=list(shared_memory_layers or []),
-            lead_mandate=mandate,
+        """Assemble a closed team from kwargs; folds governance at the boundary."""
+        governance = _governance_from(lead, coordination)
+        spec = TeamSpec(
+            members=tuple(members),
+            governance=governance,
+            shared_memory_layers=tuple(shared_memory_layers or ()),
+            delegate_max_attempts=(
+                delegate_max_attempts
+                if delegate_max_attempts is not None
+                else DEFAULT_DELEGATE_MAX_ATTEMPTS
+            ),
+            observability=observability,
         )
-        if delegate_max_attempts is not None:
-            config.delegate_max_attempts = delegate_max_attempts
+        return self.compose_team_spec(spec)
 
-        shared_store: SharedMemoryStore | None = None
-        if config.shared_memory_layers:
-            shared_store = TeamSharedMemoryStore(config.shared_memory_layers)
-
-        # One shared Observability for orchestrator + all members (span tree continuity).
-        shared_obs = self._resolve_shared_observability(observability, members, lead)
-        composed_members = [
-            self.compose_member(m, shared_store=shared_store, observability=shared_obs)
-            for m in members
-        ]
-
-        resolved_strategy: TeamStrategy = (
-            strategy
-            if strategy is not None
-            else self._registries.orchestration.resolve(strategy_key, coordination)
+    def compose_team_spec(self, spec: TeamSpec) -> TeamUnit:
+        """Assemble the closed team object graph from *spec* (sole composition path)."""
+        shared_obs = self._resolve_team_observability(spec)
+        shared_store: SharedMemoryStore | None = (
+            TeamSharedMemoryStore(list(spec.shared_memory_layers))
+            if spec.shared_memory_layers
+            else None
         )
+        closed_members = tuple(
+            self.compose_member(member_spec, shared_store=shared_store, observability=shared_obs)
+            for member_spec in spec.members
+        )
+        stage, transport = self._build_stage(closed_members)
+        assembly = self._assemble(spec, stage, transport, shared_obs)
+        strategy_key = strategy_key_for_governance(spec.governance)
+        strategy = self._registries.orchestration.resolve(strategy_key, assembly)
+        profile = self._trace_profile(strategy_key, spec.governance, closed_members, assembly.lead)
+        return TeamHandle(strategy, profile, shared_obs, closed_members, assembly.lead)
 
-        transport = build_team_transport(composed_members)
+    def _build_stage(self, members: tuple[CognitiveAgent, ...]) -> tuple[TeamStage, AgentTransport]:
+        """Validate roles (fail-fast) and close the member invocation channel."""
+        roles = [member.role_profile.role for member in members]
+        if any(not role for role in roles):
+            raise ValueError("member role_profile.role is required for transport invoke")
+        if len(set(roles)) != len(roles):
+            raise ValueError(f"duplicate member roles in team: {sorted(roles)}")
+        transport = build_team_transport(list(members))
+        return TeamStage(members=members, invoker=TransportMemberInvoker(transport)), transport
+
+    def _assemble(
+        self,
+        spec: TeamSpec,
+        stage: TeamStage,
+        transport: AgentTransport,
+        shared_obs: Observability,
+    ) -> TeamAssembly:
+        """Close the lead agent when governance is a LeadSpec; build the factory view."""
+        governance = spec.governance
         closed_lead: CognitiveAgent | None = None
-        member_status = None
-        if lead is not None:
+        if isinstance(governance, LeadSpec):
             closed_lead = self.compose_as_lead(
-                lead.agent,
+                governance.agent,
                 transport=transport,
-                mandate=lead.mandate,
+                mandate=governance.mandate,
                 observability=shared_obs,
             )
-            if mandate_uses_consultation_session(lead.mandate):
-                role_order = tuple(m.role_profile.role for m in composed_members)
-                member_status = InMemoryMemberStatus(role_order=role_order)
-
-        context = TeamContext(
-            members=composed_members,
-            config=config,
+        return TeamAssembly(
+            governance=governance,
+            stage=stage,
             lead=closed_lead,
-            transport=transport,
-            teammates=[m.role_profile for m in composed_members],
-            member_status=member_status,
-            team_id=f"team-{strategy_key}",
-            shared_memory=shared_store,
-            observability=shared_obs,
+            delegate_max_attempts=spec.delegate_max_attempts,
         )
-        return TeamOrchestrator(context, resolved_strategy)
 
-    def _resolve_shared_observability(
-        self,
-        explicit: str | Observability | None,
-        members: Sequence[AgentSpec],
-        lead: LeadSpec | None,
-    ) -> Observability:
-        """Single shared Observability instance for the whole team.
+    @staticmethod
+    def _trace_profile(
+        strategy_key: str,
+        governance: Governance,
+        members: tuple[CognitiveAgent, ...],
+        lead: AgentUnit | None,
+    ) -> TeamTraceProfile:
+        """Static span profile — all data known at composition time (no reflection)."""
+        mandate = governance.mandate.value if isinstance(governance, LeadSpec) else None
+        return TeamTraceProfile(
+            team_id=team_id_for(strategy_key),
+            strategy_key=strategy_key,
+            mandate=mandate,
+            lead_role=lead.role_profile.role if lead is not None else "",
+            member_roles=tuple(member.role_profile.role for member in members),
+        )
 
-        Priority: explicit arg > member specs in order > lead spec > console default.
+    def _resolve_team_observability(self, spec: TeamSpec) -> Observability:
+        """Single shared Observability instance for the whole team (span tree continuity).
+
+        Priority: explicit TeamSpec arg > member specs in order > lead spec > console default.
         First instance wins as-is; first registry name is resolved once and shared.
         """
         candidates: list[str | Observability] = []
-        if explicit is not None:
-            candidates.append(explicit)
-        candidates.extend(member.observability for member in members)
-        if lead is not None:
-            candidates.append(lead.agent.observability)
+        if spec.observability is not None:
+            candidates.append(spec.observability)
+        candidates.extend(member.observability for member in spec.members)
+        governance = spec.governance
+        if isinstance(governance, LeadSpec):
+            candidates.append(governance.agent.observability)
         for choice in candidates:
             if isinstance(choice, Observability):
                 return choice
             if isinstance(choice, str):
                 return self._resolve_observability(choice)
         return self._resolve_observability(OBSERVABILITY_CHOICE_CONSOLE)
+
+
+def _governance_from(lead: LeadSpec | None, coordination: Coordination | None) -> Governance:
+    """Fold the public XOR knobs into the single governance slot."""
+    if lead is not None:
+        if coordination is not None:
+            raise ValueError("Team requires exactly one of lead= or coordination=")
+        return lead
+    if coordination is not None:
+        return coordination
+    raise ValueError("Team requires exactly one of lead= or coordination=")

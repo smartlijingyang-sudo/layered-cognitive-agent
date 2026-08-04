@@ -38,6 +38,13 @@ from lca.layer0_infra.observability.runtime import (
     span,
 )
 from lca.layer0_infra.observability.span_attributes import extract_span_attributes
+from lca.layer0_infra.observability.team_trace import (
+    TeamTraceProfile,
+    objective_preview,
+    plan_card_attrs,
+    team_id_for,
+    team_run_attrs,
+)
 
 __all__ = [
     "ConsoleObservability",
@@ -45,6 +52,7 @@ __all__ = [
     "MultiplexObservability",
     "NullObservability",
     "SpanContext",
+    "TeamTraceProfile",
     "bind",
     "current",
     "extract_span_attributes",
@@ -55,6 +63,8 @@ __all__ = [
     "get_span_context",
     "is_milestone_span",
     "logical_depth",
+    "objective_preview",
+    "plan_card_attrs",
     "plan_steps_joined",
     "safe_repr",
     "sanitize",
@@ -62,5 +72,7 @@ __all__ = [
     "set_actor",
     "span",
     "strategy_plan_steps",
+    "team_id_for",
+    "team_run_attrs",
     "truncate",
 ]

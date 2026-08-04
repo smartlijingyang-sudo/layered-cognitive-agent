@@ -50,7 +50,6 @@ from lca.contracts.role_team import (
     CacheConfig,
     RetryPolicy,
     RoleProfile,
-    TeamConfig,
     ToolPermissionManifest,
 )
 from lca.contracts.routing import (
@@ -129,7 +128,6 @@ __all__ = [
     "StopReason",
     "StopRule",
     "TaskStatus",
-    "TeamConfig",
     "TeamMessage",
     "TeamSpec",
     "ToolCall",

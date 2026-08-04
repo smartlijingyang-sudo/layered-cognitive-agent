@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 import unittest
+from unittest.mock import MagicMock
 
 from lca.contracts.enums import DecisionGateName
-from lca.contracts.role_team import TeamConfig
+from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.team_coordination import (
     STRATEGY_KEY_FAN_OUT,
     STRATEGY_KEY_LEAD,
@@ -43,12 +45,44 @@ class TestDomainLanguagePublicSurface(unittest.TestCase):
             with self.assertRaises(ModuleNotFoundError):
                 importlib.import_module(mod)
 
-    def test_team_config_shape(self) -> None:
-        cfg = TeamConfig(strategy_key=STRATEGY_KEY_LEAD, lead_mandate=LeadMandate.BOARD)
-        self.assertEqual(cfg.strategy_key, STRATEGY_KEY_LEAD)
-        self.assertIs(cfg.lead_mandate, LeadMandate.BOARD)
-        self.assertFalse(hasattr(cfg, "process"))
-        self.assertFalse(hasattr(cfg, "supervisor_mode"))
+    def test_team_spec_shape(self) -> None:
+        """TeamSpec 是团队形态唯一事实来源：字段面冻结，无旧模型残留字段。"""
+        from lca.contracts.agent_spec import TeamSpec
+
+        names = {f.name for f in dataclasses.fields(TeamSpec)}
+        self.assertEqual(
+            names,
+            {
+                "members",
+                "governance",
+                "shared_memory_layers",
+                "delegate_max_attempts",
+                "observability",
+            },
+        )
+        for legacy in ("strategy_key", "lead_mandate", "max_rounds", "process", "supervisor_mode"):
+            self.assertNotIn(legacy, names)
+
+    def test_governance_strategy_key_derivation(self) -> None:
+        """strategy key 由 governance 单向派生（lead 与 coordination 同一入口）。"""
+        from lca.contracts.agent_spec import (
+            AgentSpec,
+            LeadSpec,
+            strategy_key_for_governance,
+        )
+
+        self.assertEqual(strategy_key_for_governance(Pipeline()), STRATEGY_KEY_PIPELINE)
+        agent_spec = AgentSpec(
+            profile=RoleProfile(
+                role="lead",
+                goal="g",
+                backstory="b",
+                tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+            ),
+            llm=MagicMock(),
+        )
+        lead = LeadSpec(agent=agent_spec, mandate=LeadMandate.BOARD)
+        self.assertEqual(strategy_key_for_governance(lead), STRATEGY_KEY_LEAD)
 
     def test_mandate_gate_mapping(self) -> None:
         self.assertEqual(

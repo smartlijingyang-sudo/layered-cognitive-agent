@@ -7,13 +7,12 @@ from unittest.mock import AsyncMock, MagicMock
 from lca.contracts.decision import Decision, DelegationSpec
 from lca.contracts.enums import ActionScope
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer3_agent.orchestration_strategies import HandoffStrategy
 from lca.layer4_app.defaults import build_default_registries
-from tests.support.team_context import team_context_with_transport
+from tests.support.team_stage import stage_with_invoker
 
 _REGISTRIES = build_default_registries()
 
@@ -47,10 +46,9 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("triage", "routed")
         agent_b = _make_agent("expert", "should not run")
 
-        strategy = HandoffStrategy()
-        context = team_context_with_transport([agent_a, agent_b])
+        strategy = HandoffStrategy(stage_with_invoker([agent_a, agent_b]))
 
-        result = await strategy.run(context, "customer question")
+        result = await strategy.run("customer question")
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.output, "routed")
@@ -62,10 +60,9 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("triage", "", status=TaskStatus.FAILED)
         agent_b = _make_agent("expert", "handled by expert")
 
-        strategy = HandoffStrategy()
-        context = team_context_with_transport([agent_a, agent_b])
+        strategy = HandoffStrategy(stage_with_invoker([agent_a, agent_b]))
 
-        result = await strategy.run(context, "complex question")
+        result = await strategy.run("complex question")
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.output, "handled by expert")
@@ -75,28 +72,25 @@ class TestHandoffStrategyBasic(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("a", "", status=TaskStatus.FAILED)
         agent_b = _make_agent("b", "", status=TaskStatus.FAILED)
 
-        strategy = HandoffStrategy()
-        context = team_context_with_transport([agent_a, agent_b])
+        strategy = HandoffStrategy(stage_with_invoker([agent_a, agent_b]))
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.status, "failed")
 
     async def test_empty_members_returns_failed(self) -> None:
-        strategy = HandoffStrategy()
-        context = TeamContext(members=[])
+        strategy = HandoffStrategy(stage_with_invoker([]))
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.status, "failed")
         self.assertIn("No members", result.error or "")
 
     async def test_single_member(self) -> None:
         agent = _make_agent("solo", "solo result")
-        strategy = HandoffStrategy()
-        context = team_context_with_transport([agent])
+        strategy = HandoffStrategy(stage_with_invoker([agent]))
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.output, "solo result")
 
@@ -247,8 +241,12 @@ class TestHandoffRegistration(unittest.TestCase):
         self.assertTrue(registry.has("peer_relay"))
 
     def test_handoff_resolves(self) -> None:
+        from lca.contracts.protocols import TeamAssembly
+        from lca.contracts.team_coordination import PeerRelay
+
         registry = _REGISTRIES.orchestration
-        strategy = registry.resolve("peer_relay")
+        assembly = TeamAssembly(governance=PeerRelay(), stage=stage_with_invoker([]))
+        strategy = registry.resolve("peer_relay", assembly)
         self.assertIsInstance(strategy, HandoffStrategy)
 
 

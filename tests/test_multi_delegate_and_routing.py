@@ -9,9 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 from lca.contracts.decision import Decision, DelegationSpec, Observation
 from lca.contracts.enums import ActionScope, DecisionGateName, RoleStatus
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import TeamContext
 from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile, TeamConfig, ToolPermissionManifest
+from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.routing import RoutingState, assert_routing_field_whitelist
 from lca.contracts.session import as_consultation
 from lca.contracts.state import AgentState, Budget
@@ -26,7 +25,7 @@ from lca.layer3_agent.orchestration_strategies import (
     LeadStrategy,
     SwarmStrategy,
 )
-from tests.support.team_context import team_context_with_transport
+from tests.support.team_stage import stage_with_invoker
 
 
 def _noop_executor() -> MagicMock:
@@ -144,7 +143,6 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
     async def test_hierarchical_routing_injects_routing_state(self) -> None:
         from lca.contracts.team_coordination import LeadMandate
 
-        strategy = LeadStrategy()
         sup = MagicMock()
         captured: list = []
 
@@ -166,16 +164,14 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
             backstory="b",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        ctx = TeamContext(
-            members=[],
+        strategy = LeadStrategy(
             lead=sup,
-            teammates=[profile],
-            config=TeamConfig(
-                strategy_key="lead",
-                lead_mandate=LeadMandate.ROUTING,
-            ),
+            mandate=LeadMandate.ROUTING,
+            roster=(profile,),
+            board=None,
+            delegate_max_attempts=3,
         )
-        result = await strategy.run(ctx, "obj")
+        result = await strategy.run("obj")
         self.assertEqual(result.output, "ok")
         self.assertIsNotNone(captured[0])
         self.assertIsInstance(captured[0].session, RoutingState)
@@ -209,8 +205,8 @@ class TestPeerSwarm(unittest.IsolatedAsyncioTestCase):
                 output="done",
             )
         )
-        strategy = SwarmStrategy(max_rounds=1)
-        result = await strategy.run(team_context_with_transport([a, b]), "task")
+        strategy = SwarmStrategy(stage_with_invoker([a, b]), max_rounds=1)
+        result = await strategy.run("task")
         self.assertEqual(result.output, "done")
         a.run.assert_awaited_once()
         b.run.assert_awaited_once()

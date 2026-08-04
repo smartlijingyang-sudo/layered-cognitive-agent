@@ -1,48 +1,52 @@
-"""LeadStrategy — team path with TeamLead (ADR-0030).
+"""LeadStrategy — 有主导者团队路径（ADR-0030 / ADR-0034）。
 
-Strategy only creates a fresh control session and runs the closed lead agent.
+构造期闭合：持有封闭 lead agent + mandate + 名册 + board 模板。
+策略只在每次 run 时新建控制会话（ConsultationState / RoutingState），
+不从任何运行期上下文解包——lead 与 coordination 同为 Governance。
 """
 
 from __future__ import annotations
 
 from lca.contracts.consultation import ConsultationState
-from lca.contracts.protocols import TeamContext, TeamStrategy
-from lca.contracts.protocols.orchestration import team_lead_mandate
+from lca.contracts.member_status import MemberStatus
+from lca.contracts.protocols import AgentUnit, TeamStrategy
 from lca.contracts.result import Result
+from lca.contracts.role_team import RoleProfile
 from lca.contracts.routing import RoutingState
 from lca.contracts.run_context import RunContext
-from lca.contracts.team_coordination import mandate_uses_consultation_session
-
-_DEFAULT_DELEGATE_MAX_ATTEMPTS = 3
+from lca.contracts.team_coordination import LeadMandate, mandate_uses_consultation_session
 
 
 class LeadStrategy(TeamStrategy):
-    """Lead path: inject session, run lead agent."""
+    """Lead path: fresh session per run, then execute the closed lead agent."""
 
-    async def run(self, context: TeamContext, objective: str) -> Result:
-        if context.lead is None:
-            raise ValueError("Lead 路径需要 TeamLead")
+    def __init__(
+        self,
+        lead: AgentUnit,
+        mandate: LeadMandate,
+        roster: tuple[RoleProfile, ...],
+        board: MemberStatus | None,
+        delegate_max_attempts: int,
+    ) -> None:
+        if mandate_uses_consultation_session(mandate) and board is None:
+            raise ValueError("Consult/Board mandate 需要 MemberStatus board template")
+        self._lead = lead
+        self._mandate = mandate
+        self._roster = roster
+        self._board = board
+        self._delegate_max_attempts = delegate_max_attempts
 
-        mandate = team_lead_mandate(context)
-        if mandate is None:
-            raise ValueError("Lead 路径需要 TeamConfig.lead_mandate")
-
-        max_attempts = (
-            context.config.delegate_max_attempts
-            if context.config is not None
-            else _DEFAULT_DELEGATE_MAX_ATTEMPTS
-        )
-
-        if mandate_uses_consultation_session(mandate):
-            if context.member_status is None:
+    async def run(self, objective: str) -> Result:
+        session: ConsultationState | RoutingState
+        if mandate_uses_consultation_session(self._mandate):
+            board = self._board
+            if board is None:  # 构造期不变量已保证；防御性守卫
                 raise ValueError("Consult/Board mandate 需要 MemberStatus board template")
-            board = context.member_status
-            session: ConsultationState | RoutingState = ConsultationState(
+            session = ConsultationState(
                 member_status=board,
-                teammates=list(context.teammates),
-                delegate_max_attempts=max_attempts,
+                teammates=list(self._roster),
+                delegate_max_attempts=self._delegate_max_attempts,
             )
         else:
-            session = RoutingState(teammates=list(context.teammates))
-
-        return await context.lead.run(objective, RunContext(session=session))
+            session = RoutingState(teammates=list(self._roster))
+        return await self._lead.run(objective, RunContext(session=session))

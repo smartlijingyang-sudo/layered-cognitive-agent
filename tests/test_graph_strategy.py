@@ -15,12 +15,12 @@ from lca.contracts.graph import (
     GraphNode,
     GraphValidationError,
 )
-from lca.contracts.protocols import TeamContext
+from lca.contracts.protocols import TeamAssembly
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import Budget
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
-from tests.support.team_context import team_context_with_transport
+from tests.support.team_stage import stage_with_invoker
 
 
 def _make_role_profile(role: str) -> RoleProfile:
@@ -185,19 +185,16 @@ class TestGraphStrategyLinearExecution(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="analyst", target="writer"))
         graph.add_edge(GraphEdge(source="writer", target="exit"))
 
-        strategy = GraphStrategy(execution_graph=graph)
-        context = team_context_with_transport([agent_a, agent_w])
+        strategy = GraphStrategy(stage_with_invoker([agent_a, agent_w]), execution_graph=graph)
 
-        result = await strategy.run(context, "write a report")
+        result = await strategy.run("write a report")
 
         self.assertEqual(execution_order, ["analyst", "writer"])
         self.assertEqual(result.output, "final draft")
 
-    async def test_no_graph_raises_value_error(self) -> None:
-        strategy = GraphStrategy()
-        context = TeamContext(members=[])
-        with self.assertRaises(ValueError):
-            await strategy.run(context, "task")
+    async def test_graph_required_at_construction(self) -> None:
+        with self.assertRaises(TypeError):
+            GraphStrategy(stage_with_invoker([]))  # type: ignore[call-arg]
 
 
 class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
@@ -225,10 +222,9 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="analyst", target="exit"))
         graph.add_edge(GraphEdge(source="reviewer", target="exit"))
 
-        strategy = GraphStrategy(execution_graph=graph)
-        context = team_context_with_transport([agent_a, agent_b])
+        strategy = GraphStrategy(stage_with_invoker([agent_a, agent_b]), execution_graph=graph)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         agent_a.run.assert_awaited_once()
         agent_b.run.assert_awaited_once()
@@ -256,10 +252,9 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="analyst", target="exit"))
         graph.add_edge(GraphEdge(source="skip_me", target="exit"))
 
-        strategy = GraphStrategy(execution_graph=graph)
-        context = team_context_with_transport([agent_a, agent_s])
+        strategy = GraphStrategy(stage_with_invoker([agent_a, agent_s]), execution_graph=graph)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         agent_a.run.assert_awaited_once()
         agent_s.run.assert_not_awaited()
@@ -284,10 +279,9 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="b", target="exit"))
         graph.add_edge(GraphEdge(source="c", target="exit"))
 
-        strategy = GraphStrategy(execution_graph=graph)
-        context = team_context_with_transport([agent_b, agent_c])
+        strategy = GraphStrategy(stage_with_invoker([agent_b, agent_c]), execution_graph=graph)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         agent_b.run.assert_awaited_once()
         agent_c.run.assert_awaited_once()
@@ -321,18 +315,17 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="b", target="exit"))
         graph.add_edge(GraphEdge(source="c", target="exit"))
 
-        strategy = GraphStrategy(execution_graph=graph)
-        context = team_context_with_transport([agent_b, agent_c])
+        strategy = GraphStrategy(stage_with_invoker([agent_b, agent_c]), execution_graph=graph)
 
         start = asyncio.get_event_loop().time()
-        await strategy.run(context, "task")
+        await strategy.run("task")
         elapsed = asyncio.get_event_loop().time() - start
 
         self.assertLess(elapsed, 0.25, "parallel 边应并发执行，但耗时过长")
 
 
 class TestGraphStrategyRegistration(unittest.TestCase):
-    """GraphStrategy 注册与解析（工厂接收 Coordination，ADR-0033）。"""
+    """GraphStrategy 注册与解析（工厂接收 TeamAssembly，ADR-0034）。"""
 
     def test_graph_registered_by_default(self) -> None:
         from lca.contracts.team_coordination import STRATEGY_KEY_GRAPH
@@ -346,16 +339,20 @@ class TestGraphStrategyRegistration(unittest.TestCase):
         from lca.layer4_app.defaults import build_default_registries
 
         registry = build_default_registries().orchestration
-        strategy = registry.resolve(STRATEGY_KEY_GRAPH, Graph(execution_graph=ExecutionGraph()))
+        assembly = TeamAssembly(
+            governance=Graph(execution_graph=ExecutionGraph()), stage=stage_with_invoker([])
+        )
+        strategy = registry.resolve(STRATEGY_KEY_GRAPH, assembly)
         self.assertIsInstance(strategy, GraphStrategy)
 
     def test_graph_requires_graph_coordination(self) -> None:
-        from lca.contracts.team_coordination import STRATEGY_KEY_GRAPH
+        from lca.contracts.team_coordination import STRATEGY_KEY_GRAPH, Pipeline
         from lca.layer4_app.defaults import build_default_registries
 
         registry = build_default_registries().orchestration
+        assembly = TeamAssembly(governance=Pipeline(), stage=stage_with_invoker([]))
         with self.assertRaises(TypeError):
-            registry.resolve(STRATEGY_KEY_GRAPH)
+            registry.resolve(STRATEGY_KEY_GRAPH, assembly)
 
 
 if __name__ == "__main__":

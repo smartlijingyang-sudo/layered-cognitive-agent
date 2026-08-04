@@ -71,14 +71,14 @@ class TestSpecFaithfulRecomposition(unittest.IsolatedAsyncioTestCase):
         brain = _StubBrain()
         agent = _agent(memory=memory, brain=brain)
         team = Team(members=[agent], coordination=Pipeline())
-        member = team._orchestrator.members[0]  # type: ignore[attr-defined]
+        member = team._handle.members[0]  # type: ignore[attr-defined]
         self.assertIs(member.runtime.memory, memory)  # type: ignore[attr-defined]
         self.assertIs(member.runtime.brain, brain)  # type: ignore[attr-defined]
 
     async def test_member_keeps_budget(self) -> None:
         agent = _agent(max_steps=7)
         team = Team(members=[agent], coordination=Pipeline())
-        member = team._orchestrator.members[0]  # type: ignore[attr-defined]
+        member = team._handle.members[0]  # type: ignore[attr-defined]
         self.assertEqual(member.max_steps, 7)
 
 
@@ -94,7 +94,7 @@ class TestExplicitComposerInjection(unittest.IsolatedAsyncioTestCase):
             coordination=Pipeline(),
             composer=composer,
         )
-        member = team._orchestrator.members[0]  # type: ignore[attr-defined]
+        member = team._handle.members[0]  # type: ignore[attr-defined]
         self.assertIsInstance(member.runtime.memory, SimpleMemorySystem)  # type: ignore[attr-defined]
 
     async def test_unknown_component_without_composer_raises(self) -> None:

@@ -26,7 +26,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **PeerSwarm** | 协调机制（进阶）：轮询累积直至轮数上限（策略键 `peer_swarm` → SwarmStrategy） |
 | **Debate** | 协调机制（进阶）：多轮辩论收敛（策略键 `debate` → DebateStrategy） |
 | **Graph** | 协调机制（进阶）：按 ExecutionGraph 拓扑执行（策略键 `graph` → GraphStrategy） |
-| **AgentComposer** / **TeamComposer** | 组合根：从 AgentSpec / LeadSpec 封闭组装 Agent / Team 对象图，无构造后 bind/install（ADR-0030 / ADR-0033）；无进程级单例，门面未注入时各自构造默认实例 |
+| **AgentComposer** / **TeamComposer** | 组合根：从 AgentSpec / TeamSpec 封闭组装 Agent / Team 对象图，无构造后 bind/install（ADR-0030 / ADR-0033 / ADR-0034）；无进程级单例，门面未注入时各自构造默认实例 |
 | **multi-delegate** | 一步并行委派多个角色（`Decision.delegations` 多条 + DelegateOperation gather） |
 | **RoutingState** | lead·routing 授权下的主导者会话状态（无全员结算不变量）；与 ConsultationState 严格隔离，不得反向生长 |
 | **Result** | 运行最终结果：status / output / budget / error |
@@ -38,10 +38,15 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 |---|---|
 | **Registries** | 三个发现型注册表的值对象包（components / brain_factories / orchestration），由 TeamComposer 私有持有，替代进程级全局单例 |
 | **CognitiveAgent** | L3 可调度单元：CognitiveRuntime + RoleProfile |
-| **TeamOrchestrator** | 已封闭团队的运行句柄：持有 TeamContext + TeamStrategy，只 run 不组装 |
-| **TeamStrategy** | 团队协作策略协议；每种 coordination / lead 路径一个实现类 |
-| **TeamStrategyRegistry** | TeamStrategy 的 NamedRegistry（策略键 → 工厂）；工厂签名 `(Coordination | None) -> TeamStrategy`，参数化策略在 resolve 期提取构造参数（ADR-0033） |
-| **TeamContext** | 策略运行时上下文（含 transport / member_status / shared_memory） |
+| **TeamHandle** | 封闭团队的运行句柄：持有闭合 TeamStrategy + TeamTraceProfile，run 只做 trace 边缘 + 委派，不做编排（ADR-0034） |
+| **TeamSpec** | 团队声明式构造规格：成员 + Governance，团队组合根的唯一事实来源（ADR-0034） |
+| **Governance** | 团队治理方式 = LeadSpec \| Coordination：谁来决定下一步；XOR 由类型槽位表达，lead 与 coordination 同为治理方式（ADR-0034） |
+| **TeamStrategy** | 团队协作策略协议：构造期闭合，运行期只 `run(objective)`；每种 Governance 经注册表工厂闭合为一个实现（ADR-0034） |
+| **TeamStrategyRegistry** | TeamStrategy 的 NamedRegistry（策略键 → 工厂）；工厂签名 `(TeamAssembly) -> TeamStrategy`，所有治理方式（含 lead）走同一条注册表路径（ADR-0034） |
+| **TeamAssembly** | 策略工厂 resolve 期的只读装配视图（governance / stage / lead）；仅存在于组合期的布线类型（ADR-0034） |
+| **TeamStage** | 协调型策略的行动舞台：成员 + MemberInvoker；布线类型，非运行期领域概念（ADR-0034） |
+| **MemberInvoker** / **TransportMemberInvoker** | 策略调用成员的唯一通道协议 / 绑定 transport 的默认实现（组合期闭合，运行期零防御校验）（ADR-0034） |
+| **TeamTraceProfile** | 团队级静态 span 档案（team_id / strategy_key / mandate / 角色名）；组合期派生，遥测与行为分离（ADR-0034） |
 | **TeamUnit** | 团队入口协议 |
 | **AgentUnit** | 单体入口协议 |
 | **ConsultationState** | lead·consult/board 授权的会话状态（board / teammates / retry）；字段白名单锁定；solo/member 为 None；routing 语义不得长在这里 |
@@ -57,7 +62,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **RunContext** | 一次 `run` 的调用元数据（trace_id / from_role / deadline；可选 consultation） |
 | **SupervisorReasoner** | lead 专用 Reasoner（lead 提示词 + consultation）；组装期由 TeamComposer 绑定 |
 | **LeadBudgetPolicy** | lead 预算提升策略（compose_as_lead 时经 ComponentRegistry 解析） |
-| **TeamConfig** / **RoleProfile** | 团队配置 / 角色画像 |
+| **RoleProfile** | 角色画像 |
 | **TeamMessage** / **TeamAssignment** | 跨 Agent 消息 / 分工单元 |
 
 ## L-Loop
@@ -129,6 +134,9 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | 旧名 | 新名 |
 |---|---|
 | MultiAgentTeam | Team |
+| TeamOrchestrator | TeamHandle（编排决策全部闭合进 TeamStrategy，句柄只是 trace 边缘；ADR-0034） |
+| TeamContext | 已删除；策略构造期闭合，运行期无上下文包（ADR-0034） |
+| TeamConfig | 已删除；strategy_key 仅作注册表键/遥测标签，max_rounds/mandate 为策略构造参数，共享记忆层归组合期布线（ADR-0034） |
 | TeamProcess | LeadMandate + Coordination（一元的 lead XOR coordination，ADR-0030） |
 | OrchestrationFamily / SupervisorMode / Recipe | 已删除，无替代概念（ADR-0030） |
 | Assembly / assemble_agent | AgentComposer / TeamComposer |
@@ -162,6 +170,9 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 除上述废弃名外，以下设计模式同样禁止重新引入：
 
 - 三维旋钮（Family / Plane / Mode）与 Recipe / TeamProcess 公共面（ADR-0030）
+- 运行期团队上下文包 / 配置袋（TeamContext / TeamConfig）：团队形态只由 TeamSpec.governance 表达，策略构造期闭合（ADR-0034）
+- 编排器概念（TeamOrchestrator）：编排决策在组合期烘焙进策略，运行期句柄不编排（ADR-0034）
+- strategy_key 字符串在运行期流转：仅组合期派生一次，作注册表分发键与遥测标签（ADR-0034）
 - 双重公开 stop 类型（对外只保留 `StopRule` / `StopDecision` 单通道）
 - Agent 入口签名带 `**context: str`（用 `RunContext` 类型化上下文替代）
 - progress-text 字段 + 注入 hook 三件套（用 `MemberStatus` 替代）

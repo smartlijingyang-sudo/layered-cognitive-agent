@@ -10,13 +10,12 @@ from unittest.mock import AsyncMock, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import Synthesizer, TeamContext
+from lca.contracts.protocols import Synthesizer
 from lca.contracts.result import Result
-from lca.contracts.role_team import TeamConfig
 from lca.contracts.state import Budget
 from lca.layer3_agent.orchestration_strategies import DebateStrategy
 from lca.layer4_app.defaults import build_default_registries
-from tests.support.team_context import team_context_with_transport
+from tests.support.team_stage import stage_with_invoker
 
 _REGISTRIES = build_default_registries()
 
@@ -57,10 +56,9 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
     async def test_single_member_converges_immediately(self) -> None:
         """单成员时，第 1 轮即达成共识退出。"""
         agent = _make_agent("t1", ["only proposal"])
-        strategy = DebateStrategy()
-        context = team_context_with_transport([agent])
+        strategy = DebateStrategy(stage_with_invoker([agent]), max_rounds=3)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.output, "only proposal")
@@ -71,12 +69,9 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["same proposal"])
         agent_b = _make_agent("t-b", ["same proposal"])
 
-        strategy = DebateStrategy()
-        context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=5)
-        )
+        strategy = DebateStrategy(stage_with_invoker([agent_a, agent_b]), max_rounds=5)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(agent_a.run.call_count, 1)
@@ -87,12 +82,9 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["A1", "A2", "consensus"])
         agent_b = _make_agent("t-b", ["B1", "B2", "consensus"])
 
-        strategy = DebateStrategy()
-        context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=5)
-        )
+        strategy = DebateStrategy(stage_with_invoker([agent_a, agent_b]), max_rounds=5)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(agent_a.run.call_count, 3)
@@ -107,12 +99,9 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["A1", "A2"])
         agent_b = _make_agent("t-b", ["B1", "B2"])
 
-        strategy = DebateStrategy()
-        context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=2)
-        )
+        strategy = DebateStrategy(stage_with_invoker([agent_a, agent_b]), max_rounds=2)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(agent_a.run.call_count, 2)
@@ -123,10 +112,9 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["A1", "A2", "A3"])
         agent_b = _make_agent("t-b", ["B1", "B2", "B3"])
 
-        strategy = DebateStrategy()
-        context = team_context_with_transport([agent_a, agent_b])
+        strategy = DebateStrategy(stage_with_invoker([agent_a, agent_b]), max_rounds=3)
 
-        await strategy.run(context, "task")
+        await strategy.run("task")
 
         self.assertEqual(agent_a.run.call_count, 3)
 
@@ -147,12 +135,9 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_tracking_agent("t-a", "proposal-a")
         agent_b = _make_tracking_agent("t-b", "proposal-b")
 
-        strategy = DebateStrategy()
-        context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=3)
-        )
+        strategy = DebateStrategy(stage_with_invoker([agent_a, agent_b]), max_rounds=3)
 
-        await strategy.run(context, "original task")
+        await strategy.run("original task")
 
         self.assertEqual(seen_objectives[0], "original task")
         self.assertIn("Previous proposals", seen_objectives[2])
@@ -171,12 +156,11 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
         synth = MagicMock()
         synth.synthesize = AsyncMock(return_value=_make_result("t-synth", "synthesized"))
 
-        strategy = DebateStrategy(synthesizer=synth)
-        context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=1)
+        strategy = DebateStrategy(
+            stage_with_invoker([agent_a, agent_b]), max_rounds=1, synthesizer=synth
         )
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.output, "synthesized")
         self.assertIsInstance(synth, Synthesizer)
@@ -186,12 +170,9 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["first"])
         agent_b = _make_agent("t-b", ["second"])
 
-        strategy = DebateStrategy()
-        context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=1)
-        )
+        strategy = DebateStrategy(stage_with_invoker([agent_a, agent_b]), max_rounds=1)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.output, "first")
 
@@ -200,10 +181,9 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
     """边界情况。"""
 
     async def test_empty_members_returns_failed(self) -> None:
-        strategy = DebateStrategy()
-        context = TeamContext(members=[])
+        strategy = DebateStrategy(stage_with_invoker([]), max_rounds=1)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.status, "failed")
         self.assertIn("No members", result.error or "")
@@ -211,12 +191,9 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
     async def test_no_synthesizer_still_works(self) -> None:
         """无 Synthesizer 时退化：跑满轮数返回首个结果。"""
         agent = _make_agent("t1", ["solo"])
-        strategy = DebateStrategy()
-        context = team_context_with_transport(
-            [agent], config=TeamConfig(strategy_key="debate", max_rounds=1)
-        )
+        strategy = DebateStrategy(stage_with_invoker([agent]), max_rounds=1)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.output, "solo")
@@ -226,12 +203,9 @@ class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent_a = _make_agent("t-a", ["good"], status=TaskStatus.COMPLETED)
         agent_b = _make_agent("t-b", [""], status=TaskStatus.FAILED)
 
-        strategy = DebateStrategy()
-        context = team_context_with_transport(
-            [agent_a, agent_b], config=TeamConfig(strategy_key="debate", max_rounds=1)
-        )
+        strategy = DebateStrategy(stage_with_invoker([agent_a, agent_b]), max_rounds=1)
 
-        result = await strategy.run(context, "task")
+        result = await strategy.run("task")
 
         self.assertEqual(result.status, "completed")
 
@@ -244,8 +218,12 @@ class TestDebateStrategyRegistration(unittest.TestCase):
         self.assertTrue(registry.has("debate"))
 
     def test_debate_resolves_to_debate_strategy(self) -> None:
+        from lca.contracts.protocols import TeamAssembly
+        from lca.contracts.team_coordination import Debate
+
         registry = _REGISTRIES.orchestration
-        strategy = registry.resolve("debate")
+        assembly = TeamAssembly(governance=Debate(), stage=stage_with_invoker([]))
+        strategy = registry.resolve("debate", assembly)
         self.assertIsInstance(strategy, DebateStrategy)
 
 

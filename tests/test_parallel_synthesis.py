@@ -9,14 +9,14 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import Synthesizer, TeamContext
+from lca.contracts.protocols import Synthesizer
 from lca.contracts.result import Result
 from lca.contracts.state import Budget
 from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
 from lca.layer3_agent.orchestration_strategies import (
     ParallelStrategy,
 )
-from tests.support.team_context import team_context_with_transport
+from tests.support.team_stage import stage_with_invoker
 
 
 def _make_result(
@@ -160,10 +160,9 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t2", "Result B")),
             _FakeMember(_make_result("t3", "Result C")),
         ]
-        context = team_context_with_transport(members)
-        strategy = ParallelStrategy(synthesizer=ConcatSynthesizer())
+        strategy = ParallelStrategy(stage_with_invoker(members), synthesizer=ConcatSynthesizer())
 
-        result = await strategy.run(context, "test task")
+        result = await strategy.run("test task")
 
         self.assertEqual(result.status, "completed")
         assert result.output is not None
@@ -177,19 +176,17 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t1", "Result A")),
             _FakeMember(_make_result("t2", "Result B")),
         ]
-        context = team_context_with_transport(members)
-        strategy = ParallelStrategy()
+        strategy = ParallelStrategy(stage_with_invoker(members))
 
-        result = await strategy.run(context, "test task")
+        result = await strategy.run("test task")
 
         self.assertEqual(result.output, "Result B")
 
     async def test_parallel_empty_members(self) -> None:
         """空成员列表应返回 failed。"""
-        context = TeamContext(members=[])
-        strategy = ParallelStrategy(synthesizer=ConcatSynthesizer())
+        strategy = ParallelStrategy(stage_with_invoker([]), synthesizer=ConcatSynthesizer())
 
-        result = await strategy.run(context, "test task")
+        result = await strategy.run("test task")
 
         self.assertEqual(result.status, "failed")
 
@@ -218,11 +215,13 @@ class TestSynthesizerProtocol(unittest.IsolatedAsyncioTestCase):
             _FakeMember(_make_result("t1", "First")),
             _FakeMember(_make_result("t2", "Second")),
         ]
-        context = team_context_with_transport(members)
         # 测试用内部类满足 Synthesizer Protocol 但 mypy 无法推断结构子类型
-        strategy = ParallelStrategy(synthesizer=first_synth)  # type: ignore[arg-type]
+        strategy = ParallelStrategy(
+            stage_with_invoker(members),
+            synthesizer=first_synth,  # type: ignore[arg-type]
+        )
 
-        result = await strategy.run(context, "test")
+        result = await strategy.run("test")
 
         self.assertEqual(result.output, "First")
 

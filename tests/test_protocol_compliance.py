@@ -251,7 +251,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         sup = CognitiveAgent(runtime, rp, max_steps=20, max_wall_clock_seconds=300)
         self.assertIsInstance(sup, AgentUnit)
 
-    def test_team_orchestrator_is_team_runtime(self):
+    def test_team_handle_is_team_runtime(self):
         from lca.contracts.team_coordination import (
             Pipeline,
         )
@@ -259,11 +259,11 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         from tests.support.agent_specs import make_spec
 
         agent, _rp, _runtime = self._build_agent()
-        orchestrator = TeamComposer().compose_team(
+        handle = TeamComposer().compose_team(
             members=[make_spec(agent.role_profile.role, MockLLMAdapter())],
             coordination=Pipeline(),
         )
-        self.assertIsInstance(orchestrator, TeamUnit)
+        self.assertIsInstance(handle, TeamUnit)
 
 
 class TestBrainFactoryRegistryIntegration(unittest.TestCase):

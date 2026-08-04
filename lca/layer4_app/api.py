@@ -22,11 +22,14 @@ from typing import Any
 
 from lca.contracts.agent_spec import (
     BRAIN_CHOICE_DEFAULT,
+    DEFAULT_DELEGATE_MAX_ATTEMPTS,
     MEMORY_CHOICE_SIMPLE,
     OBSERVABILITY_CHOICE_CONSOLE,
     STATE_STORE_CHOICE_MEMORY,
     AgentSpec,
+    Governance,
     LeadSpec,
+    TeamSpec,
 )
 from lca.contracts.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
 from lca.contracts.enums import MemoryLayer
@@ -159,20 +162,36 @@ class Team(TeamUnit):
         observability: str | Observability | None = None,
         composer: TeamComposer | None = None,
     ) -> None:
-        if (lead is None) == (coordination is None):
+        governance: Governance
+        if lead is not None:
+            if coordination is not None:
+                raise ValueError("Team requires exactly one of lead= or coordination=")
+            governance = lead.spec
+        elif coordination is not None:
+            governance = coordination
+        else:
             raise ValueError("Team requires exactly one of lead= or coordination=")
-        target = composer if composer is not None else TeamComposer()
-        self._orchestrator = target.compose_team(
-            members=[member.spec for member in members],
-            lead=lead.spec if lead is not None else None,
-            coordination=coordination,
-            shared_memory_layers=shared_memory_layers,
-            delegate_max_attempts=delegate_max_attempts,
+        self._spec = TeamSpec(
+            members=tuple(member.spec for member in members),
+            governance=governance,
+            shared_memory_layers=tuple(shared_memory_layers or ()),
+            delegate_max_attempts=(
+                delegate_max_attempts
+                if delegate_max_attempts is not None
+                else DEFAULT_DELEGATE_MAX_ATTEMPTS
+            ),
             observability=observability,
         )
+        target = composer if composer is not None else TeamComposer()
+        self._handle = target.compose_team_spec(self._spec)
+
+    @property
+    def spec(self) -> TeamSpec:
+        """声明式构造规格 —— 团队重组的唯一事实来源。"""
+        return self._spec
 
     async def run(self, objective: str | AgentMessage) -> Result:
-        return await self._orchestrator.run(objective)
+        return await self._handle.run(objective)
 
     @classmethod
     def pipeline(cls, members: Sequence[Agent], **kwargs: Any) -> Team:

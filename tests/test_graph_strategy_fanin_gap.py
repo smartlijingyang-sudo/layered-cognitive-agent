@@ -9,8 +9,8 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.contracts.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import LLMAdapter, TeamContext
-from lca.contracts.role_team import TeamConfig
+from lca.contracts.protocols import LLMAdapter, TeamStage
+from lca.layer3_agent.member_invoke import TransportMemberInvoker
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
 from lca.layer4_app.api import Agent
 from lca.layer4_app.composer import build_team_transport
@@ -59,12 +59,8 @@ class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):
         g.add_edge(GraphEdge(source="pricing", target="exit"))
         g.add_edge(GraphEdge(source="risk", target="exit"))
         transport = build_team_transport(members)
-        ctx = TeamContext(
-            members=members,
-            config=TeamConfig(strategy_key="graph"),
-            transport=transport,
-        )
-        result = await GraphStrategy(execution_graph=g).run(ctx, "launch")
+        stage = TeamStage(members=tuple(members), invoker=TransportMemberInvoker(transport))
+        result = await GraphStrategy(stage, execution_graph=g).run("launch")
         self.assertEqual(result.status, TaskStatus.COMPLETED)
         out = result.output or ""
         self.assertIn("PRICE_RECOMMENDATION", out)

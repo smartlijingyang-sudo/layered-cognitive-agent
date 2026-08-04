@@ -17,7 +17,7 @@ Business layers never touch Observability or SpanScope; they only call bind/span
 
 Composition rule
 ----------------
-TeamOrchestrator.run / CognitiveAgent.run **always** ``bind`` at the edge.
+TeamHandle.run / CognitiveAgent.run **always** ``bind`` at the edge.
 Nested components (hooks, tools, transport, LLM wrapper) only call ``span``.
 """
 

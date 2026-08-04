@@ -111,7 +111,7 @@ class TestPromoteSupervisorReturnsNewInstance:
 
 
 class TestNoPersistencePath:
-    """Verify that MemoryRecord and TeamConfig are never persisted to disk.
+    """Verify that MemoryRecord and TeamSpec are never persisted to disk.
 
     This confirms there is no serialization/deserialization path that
     would require a data migration when memory_type/shared_memory_layers

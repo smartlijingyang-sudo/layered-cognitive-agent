@@ -212,8 +212,8 @@ class TestWriteSharedRecordGuard(unittest.TestCase):
             mem.write_shared_record(MemoryLayer.SEMANTIC, _make_semantic_record("x"))
 
 
-class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
-    """Assembly.assemble_team rebuilds members with shared store (closed graph)."""
+class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
+    """compose_team rebuilds members with shared store (closed graph, ADR-0034)."""
 
     async def test_orchestrator_injects_shared_memory(self) -> None:
         from lca.contracts.team_coordination import (
@@ -230,9 +230,9 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
             coordination=Pipeline(),
             shared_memory_layers=[MemoryLayer.SEMANTIC],
         )
-        self.assertIsNotNone(team._context.shared_memory)
         mem_a = team.members[0].runtime.memory  # type: ignore[attr-defined]
         mem_b = team.members[1].runtime.memory  # type: ignore[attr-defined]
+        self.assertIsNotNone(mem_a._shared_store)
         mem_a.write_shared_record(
             MemoryLayer.SEMANTIC, _make_semantic_record("orchestrator-shared-fact")
         )
@@ -255,9 +255,9 @@ class TestTeamOrchestratorSharedMemoryInjection(unittest.IsolatedAsyncioTestCase
             coordination=Pipeline(),
             shared_memory_layers=[],
         )
-        self.assertIsNone(team._context.shared_memory)
         mem_a = team.members[0].runtime.memory  # type: ignore[attr-defined]
         mem_b = team.members[1].runtime.memory  # type: ignore[attr-defined]
+        self.assertIsNone(mem_a._shared_store)
         mem_a._private_layers[MemoryLayer.SEMANTIC].append(_make_semantic_record("private-to-a"))
         state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]

@@ -74,6 +74,9 @@ EXEMPT: dict[str, str] = {
         "Telemetry Protocol 实现，见 contracts.protocols.Telemetry "
     ),
     "lca.layer0_infra.observability.runtime.NullTelemetry": ("Telemetry no-op 默认实现 "),
+    "lca.layer0_infra.observability.team_trace.TeamTraceProfile": (
+        "团队 span 静态档案值对象，纯数据结构，非可插拔组件 (ADR-0034)"
+    ),
 }
 
 _SCAN_PACKAGES = [
