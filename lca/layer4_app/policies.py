@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from lca.contracts.budget import (
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
-    SUPERVISOR_MIN_MAX_STEPS,
+    LEAD_MIN_MAX_STEPS,
     BudgetLimits,
 )
 from lca.contracts.protocols import BudgetAware, BudgetPolicy
@@ -21,7 +21,7 @@ class LeadBudgetPolicy(BudgetPolicy):
 
     def resolve(self, agent: BudgetAware) -> BudgetLimits:
         return BudgetLimits(
-            max_steps=max(agent.max_steps, SUPERVISOR_MIN_MAX_STEPS),
+            max_steps=max(agent.max_steps, LEAD_MIN_MAX_STEPS),
             max_wall_clock_seconds=max(
                 agent.max_wall_clock_seconds or 0, DEFAULT_MAX_WALL_CLOCK_SECONDS
             ),

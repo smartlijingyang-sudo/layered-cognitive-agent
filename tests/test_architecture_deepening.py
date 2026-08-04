@@ -23,7 +23,7 @@ from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
-from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
+from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 from lca.layer1_cognitive.brain.skill_router import StaticSkillRouter
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
@@ -153,7 +153,7 @@ class TestSkillRouterTemplate:
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
         brain = ModularBrain(
-            reasoner=SimpleReasoner(
+            reasoner=PromptReasoner(
                 CapturingLLM(),
                 rp,
                 tools_desc="none",

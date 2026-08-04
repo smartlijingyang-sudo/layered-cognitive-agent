@@ -62,7 +62,6 @@ from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.reasoner import SimpleReasoner, SupervisorReasoner
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
@@ -147,7 +146,6 @@ class AgentComposer:
         action_scope: ActionScope = ActionScope.SOLO,
         team_channel: AgentTransport | None = None,
         decision_gate: DecisionGate | None = None,
-        lead_cognition: bool = False,
         shared_store: SharedMemoryStore | None = None,
     ) -> CognitiveAgent:
         """Assemble a complete CognitiveAgent from *spec* (closed graph)."""
@@ -176,12 +174,8 @@ class AgentComposer:
         )
 
         brain = self._resolve_brain(spec, profile, action_registry)
-        if lead_cognition or decision_gate is not None:
-            brain = self._apply_lead_brain(
-                brain,
-                lead_cognition=lead_cognition,
-                decision_gate=decision_gate,
-            )
+        if decision_gate is not None:
+            brain = self._apply_lead_brain(brain, decision_gate=decision_gate)
 
         body = SimpleBody(
             tool_registry=tool_registry,
@@ -218,7 +212,7 @@ class AgentComposer:
         mandate: LeadMandate,
         observability: Observability | None = None,
     ) -> CognitiveAgent:
-        """Build a closed lead agent from *spec* (supervisor cognition + gate)."""
+        """Build a closed lead agent from *spec* (awareness-aware reasoner + gate)."""
         lead_spec = (
             replace(spec, observability=observability) if observability is not None else spec
         )
@@ -228,7 +222,6 @@ class AgentComposer:
             action_scope=ActionScope.LEAD,
             team_channel=transport,
             decision_gate=gate,
-            lead_cognition=True,
         )
         policy = _resolve_component(
             self._registries.components,
@@ -306,33 +299,17 @@ class AgentComposer:
         return hooks
 
     @staticmethod
-    def _apply_lead_brain(
-        brain: Brain,
-        *,
-        lead_cognition: bool,
-        decision_gate: DecisionGate | None,
-    ) -> Brain:
-        """Return a new ModularBrain with lead reasoner/gate when applicable."""
-        if not isinstance(brain, ModularBrain):
-            if decision_gate is not None or lead_cognition:
-                raise TypeError(
-                    f"lead composition requires ModularBrain (got {type(brain).__name__})"
-                )
-            return brain
+    def _apply_lead_brain(brain: Brain, *, decision_gate: DecisionGate) -> Brain:
+        """Return a new ModularBrain carrying the lead decision gate.
 
-        reasoner = brain.reasoner
-        if lead_cognition:
-            if isinstance(reasoner, SupervisorReasoner):
-                pass
-            elif isinstance(reasoner, SimpleReasoner):
-                reasoner = SupervisorReasoner.from_simple(reasoner)
-            else:
-                raise TypeError(
-                    f"cannot promote reasoner type {type(reasoner).__name__} to SupervisorReasoner"
-                )
+        ADR-0035：Reasoner 不再按 mandate 升级——唯一的 PromptReasoner
+        通过 ``AgentState.team_awareness`` 统一覆盖 solo / member / lead。
+        """
+        if not isinstance(brain, ModularBrain):
+            raise TypeError(f"lead composition requires ModularBrain (got {type(brain).__name__})")
 
         return ModularBrain(
-            reasoner=reasoner,
+            reasoner=brain.reasoner,
             decision_parser=brain.decision_parser,
             critic=brain.critic,
             evaluation_pipeline=brain.evaluation_pipeline,

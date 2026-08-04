@@ -1,4 +1,4 @@
-"""Routing 监督者 prompt 从账本渲染 MEMBER_REPORTS。"""
+"""自由 routing 的 lead prompt 从 awareness 账本渲染 MEMBER_REPORTS。"""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ from lca.contracts.delegation import DelegationResult
 from lca.contracts.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.routing import RoutingState
 from lca.contracts.semantic_keys import META_ROLE, META_STEP
 from lca.contracts.state import AgentState, Budget
+from lca.contracts.team_awareness import TeamAwareness
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import (
-    SupervisorReasoner,
+    PromptReasoner,
     build_member_reports_text,
 )
 
@@ -89,19 +89,19 @@ class TestMemberReportsText(unittest.TestCase):
 class TestRoutingPromptLedger(unittest.IsolatedAsyncioTestCase):
     async def test_prompt_contains_member_reports_and_excludes_duplicate_context(self) -> None:
         llm = _CaptureLLM()
-        reasoner = SupervisorReasoner(
+        reasoner = PromptReasoner(
             llm,  # type: ignore[arg-type]
             _profile("Lead"),
             tools_desc="(no tools available)",
             templates={"routing_prompt": load_builtin_prompt("routing_prompt")},
             allowed_actions_desc="1. delegate 2. respond",
         )
-        routing = RoutingState(
+        awareness = TeamAwareness(
             teammates=[_profile("Alice"), _profile("Bob")],
             assigned_roles=["Alice"],
             results=[_ledger("Alice", "tech risk", "兼容性是核心风险")],
         )
-        state = AgentState(trace_id="t", task="probe", budget=Budget(), session=routing)
+        state = AgentState(trace_id="t", task="probe", budget=Budget(), team_awareness=awareness)
         # working memory 里另有一条委派记录 —— 账本视图下不得重复出现在 CONTEXT
         state.retrieved_context = [
             MemoryRecord(
@@ -114,7 +114,7 @@ class TestRoutingPromptLedger(unittest.IsolatedAsyncioTestCase):
             )
         ]
 
-        await reasoner.generate_candidates(state)
+        await reasoner.generate_thoughts(state)
 
         prompt = llm.prompts[0]
         self.assertIn("MEMBER_REPORTS", prompt)

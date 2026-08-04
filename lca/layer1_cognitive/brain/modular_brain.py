@@ -66,7 +66,7 @@ class ModularBrain(Brain):
         subtasks = await self.evaluation_pipeline.decompose(state)
         if subtasks:
             state.working_memory["subtasks"] = list(subtasks)
-        raw_candidates = await self.reasoner.generate_candidates(state)
+        raw_candidates = await self.reasoner.generate_thoughts(state)
         candidates = [self.decision_parser.parse(rc, state) for rc in raw_candidates]
         decision = await self.evaluation_pipeline.evaluate(state, candidates)
 

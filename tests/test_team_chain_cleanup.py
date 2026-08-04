@@ -174,10 +174,10 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
         rt = MagicMock()
-        from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
+        from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
         rt.brain = MagicMock()
-        rt.brain.reasoner = SimpleReasoner(
+        rt.brain.reasoner = PromptReasoner(
             MagicMock(),
             profile,
             "t",

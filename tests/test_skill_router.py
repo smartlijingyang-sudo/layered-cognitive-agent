@@ -59,7 +59,7 @@ class TestSkillRouterIntegration(unittest.IsolatedAsyncioTestCase):
         router = StaticSkillRouter("custom_prompt")
 
         reasoner = MagicMock()
-        reasoner.generate_candidates = AsyncMock(return_value=["think"])
+        reasoner.generate_thoughts = AsyncMock(return_value=["think"])
         decision_parser = MagicMock()
         mock_decision = MagicMock()
         mock_decision.rationale = "test"
@@ -87,7 +87,7 @@ class TestSkillRouterIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_think_without_router_no_template(self) -> None:
         """无 SkillRouter 时，working_memory 不设 active_template。"""
         reasoner = MagicMock()
-        reasoner.generate_candidates = AsyncMock(return_value=["think"])
+        reasoner.generate_thoughts = AsyncMock(return_value=["think"])
         decision_parser = MagicMock()
         mock_decision = MagicMock()
         mock_decision.rationale = "test"
@@ -116,7 +116,7 @@ class TestSkillRouterIntegration(unittest.IsolatedAsyncioTestCase):
         router = StaticSkillRouter("t")
 
         reasoner = MagicMock()
-        reasoner.generate_candidates = AsyncMock(return_value=["x"])
+        reasoner.generate_thoughts = AsyncMock(return_value=["x"])
         decision_parser = MagicMock()
         mock_decision = MagicMock()
         mock_decision.rationale = "x"

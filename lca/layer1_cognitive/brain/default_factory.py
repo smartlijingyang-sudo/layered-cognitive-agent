@@ -12,7 +12,7 @@ from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
-from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
+from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
 
 class SimpleBrainFactory:
@@ -38,7 +38,7 @@ class SimpleBrainFactory:
                 action_registry.allowed_action_types()
             )
 
-        reasoner = SimpleReasoner(
+        reasoner = PromptReasoner(
             llm,
             role_profile,
             tools_desc,

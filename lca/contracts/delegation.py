@@ -5,8 +5,8 @@
 误判为"历史记录"而重复委派。
 
 本模块提供：
-- ``DelegationResult``：一次委派的结算产物，路由控制面账本
-  （``RoutingState.results``）的元素；
+- ``DelegationResult``：一次委派的结算产物，团队 awareness 账本
+  （``TeamAwareness.results``）的元素；
 - ``find_result``：幂等键 ``(target_role, subtask)`` 的纯查询函数。
 
 contracts 放纯函数的先例：``lca/contracts/role_status_rules.py``。
@@ -23,7 +23,7 @@ from datetime import datetime
 class DelegationResult:
     """一次委派的结算产物 —— 监督控制面的一等事实。
 
-    - ``RoutingState.results`` 是监督者 prompt 与幂等委派的权威事实源
+    - ``TeamAwareness.results`` 是 lead prompt 与幂等委派的权威事实源
     - 失败结算同样入账（供 prompt 暴露"谁没答成"），但 ``find_result``
       只命中成功结果 —— 失败可以被重新委派
     """

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lca.contracts.consultation import ConsultationState
+from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.contracts.decision import Decision, DelegationSpec, Observation
 from lca.contracts.enums import RoleStatus
 from lca.contracts.ids import elapsed_seconds, remaining_seconds, utc_now
@@ -17,8 +17,8 @@ from lca.contracts.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_VALIDATION,
 )
-from lca.contracts.session import as_consultation
 from lca.contracts.state import AgentState, Budget
+from lca.contracts.team_awareness import Settlement, TeamAwareness
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
     MustConsultAllMembers,
@@ -28,7 +28,7 @@ from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.member_status import (
     InMemoryMemberStatus,
     compute_required_action,
-    update_member_status,
+    settle_delegation,
 )
 from lca.layer1_cognitive.member_status.tracking import _next_role_status
 
@@ -36,11 +36,19 @@ from lca.layer1_cognitive.member_status.tracking import _next_role_status
 
 
 def _state(task: str = "test task", **kw) -> AgentState:
-    if "member_status" in kw and "session" not in kw:
+    if "member_status" in kw and "team_awareness" not in kw:
         board = kw.pop("member_status")
         if board is not None:
-            kw["session"] = ConsultationState(member_status=board)
+            kw["team_awareness"] = TeamAwareness(
+                settlement=Settlement(
+                    member_status=board, max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS
+                )
+            )
     return AgentState(trace_id="t", task=task, budget=Budget(), **kw)
+
+
+def _settlement(state: AgentState) -> Settlement | None:
+    return state.team_awareness.settlement if state.team_awareness else None
 
 
 def _decision(action_type: str = "respond", **kw) -> Decision:
@@ -362,7 +370,7 @@ class TestModularBrainTryShortcutShortCircuit:
     @pytest.mark.asyncio
     async def test_think_skips_reasoner_when_try_shortcut_fires(self) -> None:
         reasoner = MagicMock()
-        reasoner.generate_candidates = AsyncMock(
+        reasoner.generate_thoughts = AsyncMock(
             side_effect=AssertionError("must not be called"),
         )
         brain = ModularBrain(
@@ -383,13 +391,13 @@ class TestModularBrainTryShortcutShortCircuit:
         decision = await brain.think(state)
 
         assert decision.action_type == "delegate"
-        reasoner.generate_candidates.assert_not_called()
+        reasoner.generate_thoughts.assert_not_called()
 
 
-# ── update_member_status + retry ──
+# ── settle_delegation + retry ──
 
 
-class TestUpdateMemberStatus:
+class TestSettleDelegation:
     @pytest.mark.asyncio
     async def test_marks_done_on_success(self) -> None:
         ledger = _ledger({"analyst"})
@@ -401,10 +409,10 @@ class TestUpdateMemberStatus:
         )
         obs = _obs(success=True)
 
-        update_member_status(state, decision, obs)
+        settle_delegation(state, decision.delegations[0], obs)
 
-        assert as_consultation(state.session) is not None
-        assert as_consultation(state.session).member_status.status["analyst"] == "done"
+        assert _settlement(state) is not None
+        assert _settlement(state).member_status.status["analyst"] == "done"
 
     @pytest.mark.asyncio
     async def test_marks_pending_on_first_execution_failure(self) -> None:
@@ -418,19 +426,19 @@ class TestUpdateMemberStatus:
         )
         obs = _obs(success=False, error="boom")
 
-        update_member_status(state, decision, obs)
+        settle_delegation(state, decision.delegations[0], obs)
 
-        assert as_consultation(state.session) is not None
-        assert as_consultation(state.session).member_status.status["analyst"] == "pending"
-        assert as_consultation(state.session).delegate_attempts["analyst"] == 1
+        assert _settlement(state) is not None
+        assert _settlement(state).member_status.status["analyst"] == "pending"
+        assert _settlement(state).attempts["analyst"] == 1
 
     @pytest.mark.asyncio
     async def test_marks_failed_after_max_attempts(self) -> None:
         """Exceeding max_attempts → FAILED (terminal)."""
         ledger = _ledger({"analyst"})
         state = _state(member_status=ledger)
-        assert as_consultation(state.session) is not None
-        as_consultation(state.session).delegate_max_attempts = 2
+        assert _settlement(state) is not None
+        _settlement(state).max_attempts = 2
 
         decision = _decision(
             "delegate",
@@ -438,13 +446,13 @@ class TestUpdateMemberStatus:
         )
         obs = _obs(success=False, error="boom")
 
-        update_member_status(state, decision, obs)  # attempt 1 → pending
-        assert as_consultation(state.session).member_status.status["analyst"] == "pending"
+        settle_delegation(state, decision.delegations[0], obs)  # attempt 1 → pending
+        assert _settlement(state).member_status.status["analyst"] == "pending"
 
-        update_member_status(state, decision, obs)  # attempt 2 → failed
-        assert as_consultation(state.session).member_status.status["analyst"] == "failed"
-        assert as_consultation(state.session).delegate_attempts["analyst"] == 2
-        assert as_consultation(state.session).member_status.all_settled() is True
+        settle_delegation(state, decision.delegations[0], obs)  # attempt 2 → failed
+        assert _settlement(state).member_status.status["analyst"] == "failed"
+        assert _settlement(state).attempts["analyst"] == 2
+        assert _settlement(state).member_status.all_settled() is True
 
     @pytest.mark.asyncio
     async def test_validation_failure_immediately_failed(self) -> None:
@@ -458,27 +466,25 @@ class TestUpdateMemberStatus:
         )
         obs = _obs(success=False, error="not found", failure_kind=FAILURE_KIND_VALIDATION)
 
-        update_member_status(state, decision, obs)
+        settle_delegation(state, decision.delegations[0], obs)
 
-        assert as_consultation(state.session).member_status.status["analyst"] == "failed"
-        assert as_consultation(state.session).member_status.all_settled() is True
-        assert as_consultation(state.session).delegate_attempts["analyst"] == 1
-
-    @pytest.mark.asyncio
-    async def test_noop_when_no_ledger(self) -> None:
-        state = _state()  # no member_status
-        decision = _decision("delegate")
-        obs = _obs(success=True)
-        update_member_status(state, decision, obs)
+        assert _settlement(state).member_status.status["analyst"] == "failed"
+        assert _settlement(state).member_status.all_settled() is True
+        assert _settlement(state).attempts["analyst"] == 1
 
     @pytest.mark.asyncio
-    async def test_noop_for_respond(self) -> None:
+    async def test_noop_without_team_awareness(self) -> None:
+        state = _state()  # no team awareness at all
+        spec = DelegationSpec(target_role="analyst", subtask="analyze")
+        settle_delegation(state, spec, _obs(success=True))
+
+    @pytest.mark.asyncio
+    async def test_noop_for_non_required_role(self) -> None:
         ledger = _ledger({"analyst"})
         state = _state(member_status=ledger)
-        decision = _decision("respond")
-        obs = _obs(success=True)
-        update_member_status(state, decision, obs)
-        assert as_consultation(state.session).member_status.status["analyst"] == "pending"
+        spec = DelegationSpec(target_role="someone_else", subtask="chore")
+        settle_delegation(state, spec, _obs(success=True))
+        assert _settlement(state).member_status.status["analyst"] == "pending"
 
 
 # ── _next_role_status pure function ──

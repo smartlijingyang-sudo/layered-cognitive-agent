@@ -13,9 +13,9 @@ from lca.contracts.state import AgentState
 
 @runtime_checkable
 class Reasoner(Protocol):
-    """候选方案生成器：基于当前状态产出 n 个候选 prompt。"""
+    """思考生成器：基于当前状态产出 n 条候选思考文本（ADR-0035）。"""
 
-    async def generate_candidates(self, state: AgentState, n: int = 1) -> list[str]: ...
+    async def generate_thoughts(self, state: AgentState, n: int = 1) -> list[str]: ...
 
 
 @runtime_checkable

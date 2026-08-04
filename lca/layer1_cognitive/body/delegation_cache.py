@@ -31,16 +31,14 @@ from lca.layer0_infra.observability.redaction import sanitize, truncate
 def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Observation | None:
     """幂等短路：账本中已有成功结算的 ``(target_role, subtask)`` 直接复用。
 
-    只有 routing 平面持有 ``results`` 账本（consultation 由结算 gate 管辖，
-    不走此路径）。命中时发射 ``delegate.cache_hit`` span，不产生 transport 往返。
-    语义刻意保守：仅拦字面重复，改写措辞的新问题不受影响。
+    账本只在自由 routing（无 settlement）下累积——settlement 路径由状态板
+    管辖，不走此路径。命中时发射 ``delegate.cache_hit`` span，不产生
+    transport 往返。语义刻意保守：仅拦字面重复，改写措辞的新问题不受影响。
     """
-    from lca.contracts.session import as_routing
-
-    routing = as_routing(state.session)
-    if routing is None or not spec.target_role:
+    awareness = state.team_awareness
+    if awareness is None or not spec.target_role:
         return None
-    hit = find_result(routing.results, target_role=spec.target_role, subtask=spec.subtask)
+    hit = find_result(awareness.results, target_role=spec.target_role, subtask=spec.subtask)
     if hit is None:
         return None
     with span(

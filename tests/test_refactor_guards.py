@@ -127,9 +127,9 @@ class TestAdrIndexMatchesFilesystem(unittest.TestCase):
 
 
 class TestProgressiveDisclosureVocabulary(unittest.TestCase):
-    def test_agent_state_uses_consultation_not_progress_text(self) -> None:
-        from lca.contracts.consultation import ConsultationState
+    def test_agent_state_uses_team_awareness_not_progress_text(self) -> None:
         from lca.contracts.state import AgentState, Budget
+        from lca.contracts.team_awareness import Settlement, TeamAwareness
         from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
         board = InMemoryMemberStatus(role_order=("a",))
@@ -137,9 +137,11 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
             trace_id="t",
             task="x",
             budget=Budget(),
-            session=ConsultationState(member_status=board),
+            team_awareness=TeamAwareness(
+                settlement=Settlement(member_status=board, max_attempts=3)
+            ),
         )
-        self.assertTrue(hasattr(state, "session"))
+        self.assertTrue(hasattr(state, "team_awareness"))
         self.assertFalse(hasattr(state, "member_status"))
         self.assertFalse(hasattr(state, "team_progress"))
         self.assertIn("a", board.as_prompt_text())
@@ -159,9 +161,9 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
     def test_must_consult_all_rewrites_early_respond(self) -> None:
         import asyncio
 
-        from lca.contracts.consultation import ConsultationState
         from lca.contracts.decision import Decision
         from lca.contracts.state import AgentState, Budget
+        from lca.contracts.team_awareness import Settlement, TeamAwareness
         from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
         from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
@@ -170,7 +172,9 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
             trace_id="t",
             task="ship",
             budget=Budget(),
-            session=ConsultationState(member_status=board),
+            team_awareness=TeamAwareness(
+                settlement=Settlement(member_status=board, max_attempts=3)
+            ),
         )
         gate = MustConsultAllMembers()
         early = Decision(

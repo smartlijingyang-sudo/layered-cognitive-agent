@@ -24,8 +24,8 @@ DEFAULT_A2A_TIMEOUT_S: float = 30.0
 DEFAULT_MAX_WALL_CLOCK_SECONDS: int = 300
 """Default wall-clock timeout for agent / team runs (seconds)."""
 
-# Minimum step budget when an agent is promoted to team supervisor.
-SUPERVISOR_MIN_MAX_STEPS: int = 20
+# Minimum step budget when an agent is composed as team lead.
+LEAD_MIN_MAX_STEPS: int = 20
 
 
 @dataclass(frozen=True)

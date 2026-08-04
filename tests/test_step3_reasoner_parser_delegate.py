@@ -9,14 +9,14 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.consultation import ConsultationState
+from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import AgentState, Budget
+from lca.contracts.team_awareness import Settlement, TeamAwareness
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import (
-    SimpleReasoner,
-    SupervisorReasoner,
+    PromptReasoner,
     build_teammates_text,
 )
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
@@ -26,20 +26,23 @@ def _make_state(
     task: str = "test task",
     teammates: list[RoleProfile] | None = None,
     *,
-    as_supervisor: bool = False,
+    as_lead: bool = False,
 ) -> AgentState:
-    consultation = None
-    if as_supervisor:
+    awareness = None
+    if as_lead:
         roles = tuple(p.role for p in (teammates or [])) or ("member",)
-        consultation = ConsultationState(
-            member_status=InMemoryMemberStatus(role_order=roles),
+        awareness = TeamAwareness(
             teammates=list(teammates or []),
+            settlement=Settlement(
+                member_status=InMemoryMemberStatus(role_order=roles),
+                max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS,
+            ),
         )
     return AgentState(
         trace_id="test-trace",
         task=task,
         budget=Budget(),
-        session=consultation,
+        team_awareness=awareness,
     )
 
 
@@ -193,9 +196,9 @@ class TestDecisionParserDelegate(unittest.TestCase):
 
 
 class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
-    """SimpleReasoner is team-agnostic; SupervisorReasoner owns hierarchical prompt."""
+    """PromptReasoner 单一实现：无 awareness 走 react，有 awareness 走层级提示词。"""
 
-    async def test_simple_reasoner_uses_react_prompt(self) -> None:
+    async def test_solo_reasoner_uses_react_prompt(self) -> None:
         captured_prompt: list[str] = []
 
         class FakeLLM:
@@ -203,7 +206,7 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 captured_prompt.append(prompt)
                 return '{"action_type": "respond", "response_text": "ok", "rationale": "", "confidence": 1.0}'
 
-        reasoner = SimpleReasoner(
+        reasoner = PromptReasoner(
             FakeLLM(),
             _make_profile(),
             "search()",
@@ -211,13 +214,13 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 "react_prompt": "ROLE: {role}\nTASK: {task}\nTOOLS: {tools}\nCONTEXT:\n{context}"
             },
         )
-        await reasoner.generate_candidates(_make_state())
+        await reasoner.generate_thoughts(_make_state())
 
         self.assertEqual(len(captured_prompt), 1)
         self.assertNotIn("TEAM_ROSTER", captured_prompt[0])
         self.assertIn("ROLE: supervisor", captured_prompt[0])
 
-    async def test_supervisor_reasoner_uses_hierarchical_prompt(self) -> None:
+    async def test_lead_reasoner_uses_hierarchical_prompt(self) -> None:
         captured_prompt: list[str] = []
 
         class FakeLLM:
@@ -239,7 +242,7 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 tool_permission_manifest=_empty_manifest(),
             ),
         ]
-        reasoner = SupervisorReasoner(
+        reasoner = PromptReasoner(
             FakeLLM(),
             _make_profile(),
             "search()",
@@ -248,7 +251,7 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 "hierarchical_prompt": load_builtin_prompt("hierarchical_prompt"),
             },
         )
-        await reasoner.generate_candidates(_make_state(teammates=teammates, as_supervisor=True))
+        await reasoner.generate_thoughts(_make_state(teammates=teammates, as_lead=True))
 
         self.assertEqual(len(captured_prompt), 1)
         prompt = captured_prompt[0]

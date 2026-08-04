@@ -1,4 +1,4 @@
-"""Lead composition / closed-graph composition (ADR-0030 / ADR-0033)."""
+"""Lead composition / closed-graph composition (ADR-0030 / ADR-0033 / ADR-0035)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from lca.contracts.team_coordination import LeadMandate, gate_name_for_mandate
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.reasoner import SimpleReasoner, SupervisorReasoner
+from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 from lca.layer4_app.composer import TeamComposer
 from lca.layer4_app.team_wiring import build_team_transport
 from tests.support.agent_specs import make_spec
@@ -30,7 +30,8 @@ class TestLeadMandateMapping(unittest.TestCase):
 
 
 class TestComposeAsLead(unittest.IsolatedAsyncioTestCase):
-    async def test_new_instance_with_lead_reasoner_and_gate(self) -> None:
+    async def test_new_instance_with_gate(self) -> None:
+        """ADR-0035：lead 不做 reasoner 升级——gate 是唯一按 mandate 展开的组合差异。"""
         asm = TeamComposer()
         member_spec = make_spec("worker", MockLLMAdapter())
         member = asm.compose(member_spec)
@@ -42,7 +43,7 @@ class TestComposeAsLead(unittest.IsolatedAsyncioTestCase):
         )
         brain = lead.runtime.brain  # type: ignore[attr-defined]
         self.assertIsInstance(brain, ModularBrain)
-        self.assertIsInstance(brain.reasoner, SupervisorReasoner)
+        self.assertIsInstance(brain.reasoner, PromptReasoner)
         self.assertIsInstance(brain._decision_gate, MustConsultAllMembers)
         body = getattr(lead.runtime, "body", None)
         inner = getattr(body, "_inner", body)
@@ -60,7 +61,7 @@ class TestComposeAsLead(unittest.IsolatedAsyncioTestCase):
             mandate=LeadMandate.ROUTING,
         )
         brain = lead.runtime.brain  # type: ignore[attr-defined]
-        self.assertIsInstance(brain.reasoner, SupervisorReasoner)
+        self.assertIsInstance(brain.reasoner, PromptReasoner)
         self.assertIsNone(brain._decision_gate)
 
     async def test_no_bind_or_install_apis(self) -> None:
@@ -68,7 +69,7 @@ class TestComposeAsLead(unittest.IsolatedAsyncioTestCase):
         inner = getattr(body, "_inner", body)
         self.assertFalse(hasattr(inner, "bind_channel"))
         brain = ModularBrain(
-            reasoner=MagicMock(spec=SimpleReasoner),
+            reasoner=MagicMock(spec=PromptReasoner),
             decision_parser=MagicMock(),
             critic=MagicMock(),
         )
@@ -84,7 +85,7 @@ class TestComposeTeamClosedGraph(unittest.IsolatedAsyncioTestCase):
             lead=LeadSpec(make_spec("lead", llm), LeadMandate.BOARD),
         )
         self.assertIsNotNone(team.lead)
-        self.assertIsInstance(team.lead.runtime.brain.reasoner, SupervisorReasoner)  # type: ignore[attr-defined]
+        self.assertIsInstance(team.lead.runtime.brain.reasoner, PromptReasoner)  # type: ignore[attr-defined]
 
     async def test_compose_rejects_missing_spec_shape(self) -> None:
         """compose 只接受 AgentSpec —— 成品 agent 不再是组合输入。"""

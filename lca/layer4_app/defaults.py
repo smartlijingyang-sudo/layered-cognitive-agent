@@ -32,6 +32,7 @@ from lca.contracts.team_coordination import (
     STRATEGY_KEY_PIPELINE,
     Debate,
     Graph,
+    LeadMandate,
     PeerSwarm,
 )
 from lca.layer0_infra.component_registry import ComponentRegistry, NamedRegistry
@@ -60,6 +61,10 @@ EVENT_BUS_SIMPLE = "simple"
 """EventBus 内置注册名（组合根内部使用，非用户旋钮）。"""
 
 
+_SETTLING_MANDATES: frozenset[LeadMandate] = frozenset({LeadMandate.CONSULT, LeadMandate.BOARD})
+"""携带结算义务的授权（ADR-0035）：组合期决定 awareness 是否挂 Settlement。"""
+
+
 def _lead_strategy(assembly: TeamAssembly) -> LeadStrategy:
     governance = assembly.governance
     if not isinstance(governance, LeadSpec) or assembly.lead is None:
@@ -67,11 +72,15 @@ def _lead_strategy(assembly: TeamAssembly) -> LeadStrategy:
     members = assembly.stage.members
     roster = tuple(member.role_profile for member in members)
     role_order = tuple(member.role_profile.role for member in members)
+    board = (
+        InMemoryMemberStatus(role_order=role_order)
+        if governance.mandate in _SETTLING_MANDATES
+        else None
+    )
     return LeadStrategy(
         lead=assembly.lead,
-        mandate=governance.mandate,
         roster=roster,
-        board=InMemoryMemberStatus(role_order=role_order),
+        board=board,
         delegate_max_attempts=assembly.delegate_max_attempts,
     )
 

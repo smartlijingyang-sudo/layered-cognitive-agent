@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 from lca.contracts.budget import (
     DEFAULT_MAX_STEPS,
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
-    SUPERVISOR_MIN_MAX_STEPS,
+    LEAD_MIN_MAX_STEPS,
 )
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
@@ -43,17 +43,17 @@ def _make_agent(
 
 
 class TestPromoteSupervisorStepsBumped:
-    """max_steps below floor is silently bumped to SUPERVISOR_MIN_MAX_STEPS."""
+    """max_steps below floor is silently bumped to LEAD_MIN_MAX_STEPS."""
 
     def test_steps_below_floor_bumped(self) -> None:
         agent = _make_agent(max_steps=5)
         promoted = _promote_lead(agent, _policy)
-        assert promoted.max_steps == SUPERVISOR_MIN_MAX_STEPS
+        assert promoted.max_steps == LEAD_MIN_MAX_STEPS
 
     def test_steps_at_floor_unchanged(self) -> None:
-        agent = _make_agent(max_steps=SUPERVISOR_MIN_MAX_STEPS)
+        agent = _make_agent(max_steps=LEAD_MIN_MAX_STEPS)
         promoted = _promote_lead(agent, _policy)
-        assert promoted.max_steps == SUPERVISOR_MIN_MAX_STEPS
+        assert promoted.max_steps == LEAD_MIN_MAX_STEPS
 
     def test_steps_above_floor_unchanged(self) -> None:
         agent = _make_agent(max_steps=50)

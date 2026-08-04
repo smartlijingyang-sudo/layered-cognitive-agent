@@ -100,7 +100,3 @@ def strategy_key_for_coordination(coordination: Coordination) -> str:
 
 def gate_name_for_mandate(mandate: LeadMandate) -> DecisionGateName:
     return _MANDATE_DECISION_GATES.get(mandate, DecisionGateName.NONE)
-
-
-def mandate_uses_consultation_session(mandate: LeadMandate) -> bool:
-    return mandate is not LeadMandate.ROUTING

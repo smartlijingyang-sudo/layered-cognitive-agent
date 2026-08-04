@@ -8,7 +8,7 @@ Team 组合期从 spec 重建成员对象图，组合无损且可重复，组合
 TeamSpec 是 Team 构造的唯一声明式输入（ADR-0034）：成员 specs + 治理方式
 （``Governance = LeadSpec | Coordination``）。团队形态只由这一个槽位表达——
 有主导者与无主导者互斥，非法组合在类型层面不可表示，组合根不再做 XOR
-对账。其余一切（策略键、gate、session）从 governance 单向派生。
+对账。其余一切（策略键、gate、team_awareness）从 governance 单向派生。
 
 组件选择字段支持「注册名字符串 | 实例」双模：字符串经 ComponentRegistry
 解析（可插拔），实例直接采用（显式注入）。常量 *_CHOICE_* 是框架内置
@@ -78,8 +78,8 @@ class AgentSpec:
 class LeadSpec:
     """有主导者团队的 lead 入口规格：AgentSpec + LeadMandate。
 
-    LeadMandate 是 lead 的唯一用户旋钮；DecisionGate / SupervisorReasoner
-    等组合细节由组合根按 mandate 展开（ADR-0030），不出现在本规格中。
+    LeadMandate 是 lead 的唯一用户旋钮；DecisionGate / 结算义务（Settlement）
+    等组合细节由组合根按 mandate 展开（ADR-0030 / ADR-0035），不出现在本规格中。
     """
 
     agent: AgentSpec

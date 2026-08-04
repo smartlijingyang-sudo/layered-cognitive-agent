@@ -78,7 +78,7 @@ class CognitiveRuntime(Runtime):
             ),
             agent_role=agent_role,
             from_role=(ctx.from_role if ctx else ""),
-            session=(ctx.session if ctx else None),
+            team_awareness=(ctx.team_awareness if ctx else None),
         )
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)

@@ -6,14 +6,14 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
+from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.contracts.decision import Decision, DelegationSpec, Observation
 from lca.contracts.enums import ActionScope, DecisionGateName, RoleStatus
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.routing import RoutingState, assert_routing_field_whitelist
-from lca.contracts.session import as_consultation
 from lca.contracts.state import AgentState, Budget
+from lca.contracts.team_awareness import Settlement, TeamAwareness
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.simple_body import SimpleBody
@@ -92,32 +92,42 @@ class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):
             ],
         )
         board = InMemoryMemberStatus(role_order=("ra", "rb"))
-        from lca.contracts.consultation import ConsultationState
-
         state = AgentState(
             trace_id="t",
             task="t",
             budget=Budget(),
-            session=ConsultationState(member_status=board, teammates=[]),
+            team_awareness=TeamAwareness(
+                settlement=Settlement(
+                    member_status=board, max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS
+                )
+            ),
         )
         obs = await body.act(decision, state)
         self.assertTrue(obs.success)
         assert isinstance(obs.payload, dict)
         self.assertIn("ra", obs.payload)
-        self.assertEqual(as_consultation(state.session).member_status.status["ra"], RoleStatus.DONE)
-        self.assertEqual(as_consultation(state.session).member_status.status["rb"], RoleStatus.DONE)
+        assert state.team_awareness is not None
+        assert state.team_awareness.settlement is not None
+        self.assertEqual(
+            state.team_awareness.settlement.member_status.status["ra"], RoleStatus.DONE
+        )
+        self.assertEqual(
+            state.team_awareness.settlement.member_status.status["rb"], RoleStatus.DONE
+        )
 
 
 class TestMustConsultMultiShortcut(unittest.IsolatedAsyncioTestCase):
     async def test_shortcut_fans_out_all_waiting(self) -> None:
         board = InMemoryMemberStatus(role_order=("a", "b", "c"))
-        from lca.contracts.consultation import ConsultationState
-
         state = AgentState(
             trace_id="t",
             task="evaluate",
             budget=Budget(),
-            session=ConsultationState(member_status=board, teammates=[]),
+            team_awareness=TeamAwareness(
+                settlement=Settlement(
+                    member_status=board, max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS
+                )
+            ),
         )
         gate = MustConsultAllMembers()
         d = await gate.try_shortcut(state)
@@ -127,9 +137,6 @@ class TestMustConsultMultiShortcut(unittest.IsolatedAsyncioTestCase):
 
 
 class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
-    def test_routing_whitelist(self) -> None:
-        assert_routing_field_whitelist()
-
     async def test_routing_mode_never_maps_to_settlement_gate(self) -> None:
         from lca.contracts.team_coordination import LeadMandate, gate_name_for_mandate
 
@@ -140,9 +147,7 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
             DecisionGateName.MUST_CONSULT_ALL,
         )
 
-    async def test_hierarchical_routing_injects_routing_state(self) -> None:
-        from lca.contracts.team_coordination import LeadMandate
-
+    async def test_routing_lead_injects_awareness_without_settlement(self) -> None:
         sup = MagicMock()
         captured: list = []
 
@@ -166,15 +171,17 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
         )
         strategy = LeadStrategy(
             lead=sup,
-            mandate=LeadMandate.ROUTING,
             roster=(profile,),
             board=None,
-            delegate_max_attempts=3,
+            delegate_max_attempts=DEFAULT_DELEGATE_MAX_ATTEMPTS,
         )
         result = await strategy.run("obj")
         self.assertEqual(result.output, "ok")
         self.assertIsNotNone(captured[0])
-        self.assertIsInstance(captured[0].session, RoutingState)
+        awareness = captured[0].team_awareness
+        self.assertIsInstance(awareness, TeamAwareness)
+        self.assertIsNone(awareness.settlement)
+        self.assertEqual([p.role for p in awareness.teammates], ["m"])
 
 
 class TestPeerSwarm(unittest.IsolatedAsyncioTestCase):

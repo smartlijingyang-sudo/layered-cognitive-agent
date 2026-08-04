@@ -45,7 +45,7 @@ from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.reasoner import SimpleReasoner
+from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 from lca.layer1_cognitive.event_bus import SimpleEventBus
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
@@ -118,7 +118,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
             backstory="t",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = SimpleReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
+        reasoner = PromptReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         return reasoner
 
     def test_modular_brain_is_brain(self):
@@ -186,7 +186,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
             backstory="t",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = SimpleReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
+        reasoner = PromptReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         brain = ModularBrain(
             reasoner=reasoner,
             decision_parser=SimpleDecisionParser(),
@@ -221,7 +221,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             backstory="t",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = SimpleReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
+        reasoner = PromptReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         brain = ModularBrain(
             reasoner=reasoner,
             decision_parser=SimpleDecisionParser(),

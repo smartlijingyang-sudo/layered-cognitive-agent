@@ -44,9 +44,7 @@ from lca.layer1_cognitive.body.delegation_cache import (
     tag_delegation_extra,
 )
 from lca.layer1_cognitive.member_status.tracking import (
-    record_routing_assignment,
-    record_routing_result,
-    update_member_status_for_spec,
+    settle_delegation,
 )
 
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
@@ -160,9 +158,7 @@ class DelegateOperation(Action):
         )
 
     def _settle(self, spec: DelegationSpec, observation: Observation, state: AgentState) -> None:
-        update_member_status_for_spec(state, spec, observation)
-        record_routing_assignment(state, spec)
-        record_routing_result(state, spec, observation)
+        settle_delegation(state, spec, observation)
 
     async def _invoke(self, spec: DelegationSpec, state: AgentState) -> Observation:
         transport, agent_card = self._resolve_target(spec, state)

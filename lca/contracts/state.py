@@ -9,7 +9,7 @@ from typing import Any
 from lca.contracts.enums import SnapshotReason
 from lca.contracts.ids import new_id, utc_now
 from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.session import ControlSession
+from lca.contracts.team_awareness import TeamAwareness
 from lca.contracts.types import Turn
 
 
@@ -53,8 +53,8 @@ class StateSnapshot:
 class AgentState:
     """Full state for one agent cognitive loop.
 
-    Generic loop fields only. Lead control plane lives under optional
-    ``session`` (ConsultationState | RoutingState) — single slot.
+    Generic loop fields only. The lead's live team cognition lives under the
+    optional ``team_awareness`` slot — single slot, single type (ADR-0035).
     """
 
     trace_id: str
@@ -69,7 +69,7 @@ class AgentState:
     extra: dict[str, Any] = field(default_factory=dict)
     agent_role: str = ""
     from_role: str = ""
-    session: ControlSession | None = None
+    team_awareness: TeamAwareness | None = None
     history: list[Turn] = field(default_factory=list)
     final_output: Any | None = None
     last_error: str | None = None

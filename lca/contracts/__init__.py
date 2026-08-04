@@ -8,11 +8,6 @@ from lca.contracts.agent_spec import (
 )
 from lca.contracts.approval import ApprovalDecision, ApprovalRequest
 from lca.contracts.budget import create_budget
-from lca.contracts.consultation import (
-    CONSULTATION_FIELD_WHITELIST,
-    ConsultationState,
-    assert_consultation_field_whitelist,
-)
 from lca.contracts.decision import (
     Decision,
     DelegationSpec,
@@ -52,11 +47,6 @@ from lca.contracts.role_team import (
     RoleProfile,
     ToolPermissionManifest,
 )
-from lca.contracts.routing import (
-    ROUTING_FIELD_WHITELIST,
-    RoutingState,
-    assert_routing_field_whitelist,
-)
 from lca.contracts.run_context import RunContext
 from lca.contracts.state import AgentState, Budget, StateSnapshot
 from lca.contracts.stop import (
@@ -64,6 +54,7 @@ from lca.contracts.stop import (
     StopReason,
     StopRule,
 )
+from lca.contracts.team_awareness import Settlement, TeamAwareness
 from lca.contracts.team_coordination import (
     Debate,
     FanOut,
@@ -76,8 +67,6 @@ from lca.contracts.team_coordination import (
 from lca.contracts.types import StopOutcome, Turn
 
 __all__ = [
-    "CONSULTATION_FIELD_WHITELIST",
-    "ROUTING_FIELD_WHITELIST",
     "Action",
     "ActionRegistryProtocol",
     "AgentCard",
@@ -89,7 +78,6 @@ __all__ = [
     "BudgetExceededError",
     "CacheConfig",
     "ComponentRegistryProtocol",
-    "ConsultationState",
     "Debate",
     "Decision",
     "DecisionGate",
@@ -119,8 +107,8 @@ __all__ = [
     "Result",
     "RetryPolicy",
     "RoleProfile",
-    "RoutingState",
     "RunContext",
+    "Settlement",
     "SharedMemoryStore",
     "StateSnapshot",
     "StopDecision",
@@ -128,6 +116,7 @@ __all__ = [
     "StopReason",
     "StopRule",
     "TaskStatus",
+    "TeamAwareness",
     "TeamMessage",
     "TeamSpec",
     "ToolCall",
@@ -136,8 +125,6 @@ __all__ = [
     "TraceSpan",
     "TransportRegistryProtocol",
     "Turn",
-    "assert_consultation_field_whitelist",
-    "assert_routing_field_whitelist",
     "create_budget",
     "find_result",
     "strategy_key_for_governance",

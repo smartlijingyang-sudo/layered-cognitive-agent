@@ -5,11 +5,12 @@ from lca.layer1_cognitive.member_status.required_action import (
     RequiredAction,
     compute_required_action,
 )
-from lca.layer1_cognitive.member_status.tracking import update_member_status
+from lca.layer1_cognitive.member_status.tracking import settle_delegation, settlement_board
 
 __all__ = [
     "InMemoryMemberStatus",
     "RequiredAction",
     "compute_required_action",
-    "update_member_status",
+    "settle_delegation",
+    "settlement_board",
 ]

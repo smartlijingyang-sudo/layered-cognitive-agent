@@ -28,7 +28,6 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **Graph** | 协调机制（进阶）：按 ExecutionGraph 拓扑执行（策略键 `graph` → GraphStrategy） |
 | **AgentComposer** / **TeamComposer** | 组合根：从 AgentSpec / TeamSpec 封闭组装 Agent / Team 对象图，无构造后 bind/install（ADR-0030 / ADR-0033 / ADR-0034）；无进程级单例，门面未注入时各自构造默认实例 |
 | **multi-delegate** | 一步并行委派多个角色（`Decision.delegations` 多条 + DelegateOperation gather） |
-| **RoutingState** | lead·routing 授权下的主导者会话状态（无全员结算不变量）；与 ConsultationState 严格隔离，不得反向生长 |
 | **Result** | 运行最终结果：status / output / budget / error |
 | **run** | 全链路唯一生命周期动词（Agent / Team / CognitiveRuntime） |
 
@@ -49,8 +48,9 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **TeamTraceProfile** | 团队级静态 span 档案（team_id / strategy_key / mandate / 角色名）；组合期派生，遥测与行为分离（ADR-0034） |
 | **TeamUnit** | 团队入口协议 |
 | **AgentUnit** | 单体入口协议 |
-| **ConsultationState** | lead·consult/board 授权的会话状态（board / teammates / retry）；字段白名单锁定；solo/member 为 None；routing 语义不得长在这里 |
-| **teammates_text** | 写进提示词的「队友是谁」（由 `build_teammates_text` 从 ConsultationState.teammates 渲染） |
+| **TeamAwareness** | lead 一次 run 的团队实时认知：teammates + 委派账本（results）+ 可选 Settlement；仅 lead run 持有，solo/member 为 None；不按 mandate 分裂类型（ADR-0035） |
+| **Settlement** | 结算义务（consult / board 授权专属）：必问成员状态板 + 重试计数；TeamAwareness 的可选组件，None 即自由 routing（ADR-0035） |
+| **teammates_text** | 写进提示词的「队友是谁」（由 `build_teammates_text` 从 TeamAwareness.teammates 渲染） |
 | **DecisionGate**（配置） | 结算强度：由 LeadMandate 展开——routing → `none`（自由经理），board → `must_consult_all`（咨询合规） |
 | **DecisionGate**（组件） | 决策出/入门硬规则（`enforce` 必选出门校验，`SupportsShortcut` 可选入门快速路径） |
 | **SupportsShortcut** | 可选能力：DecisionGate 在 LLM 之前提供确定性快速路径（`try_shortcut`） |
@@ -59,8 +59,8 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **InMemoryMemberStatus** | MemberStatus 默认不可变实现 |
 | **AgentTransport** / **send_and_wait** | 成员间任务通道与统一调用端口；内置 Internal / A2A / MCP |
 | **SharedMemoryStore** / **TeamSharedMemoryStore** | 共享记忆存储协议 / 团队按 MemoryLayer 分层的默认实现 |
-| **RunContext** | 一次 `run` 的调用元数据（trace_id / from_role / deadline；可选 consultation） |
-| **SupervisorReasoner** | lead 专用 Reasoner（lead 提示词 + consultation）；组装期由 TeamComposer 绑定 |
+| **RunContext** | 一次 `run` 的调用元数据（trace_id / from_role / deadline；可选 team_awareness） |
+| **PromptReasoner** | Reasoner 唯一实现（ADR-0035）：渲染模板并调 LLM；携带 TeamAwareness 时并入 awareness 变量与默认模板，统一覆盖 solo / member / lead，不按 mandate 分裂类型 |
 | **LeadBudgetPolicy** | lead 预算提升策略（compose_as_lead 时经 ComponentRegistry 解析） |
 | **RoleProfile** | 角色画像 |
 | **TeamMessage** / **TeamAssignment** | 跨 Agent 消息 / 分工单元 |
@@ -118,7 +118,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **SwarmStrategy** | PeerSwarm 协调的 TeamStrategy（策略键 `peer_swarm`） |
 | **SimpleBody** | Body 默认实现 |
 | **SimpleMemorySystem** | MemorySystem 默认实现 |
-| **SimpleReasoner** | Reasoner 默认实现（team-agnostic，solo/member） |
+| **PromptReasoner** | Reasoner 默认实现（team-shape agnostic，solo/member/lead 统一） |
 | **SimpleCritic** | Critic 默认实现 |
 | **SimpleDecisionParser** | DecisionParser 默认实现 |
 | **SimpleEventBus** | EventBus 默认实现 |
@@ -142,8 +142,13 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | Assembly / assemble_agent | AgentComposer / TeamComposer |
 | TeamProcessStrategy | TeamStrategy |
 | HierarchicalStrategy | LeadStrategy |
-| SupervisorPlane | 已删除；会话语义分裂为 RoutingState（routing）与 ConsultationState（consult/board） |
+| SupervisorPlane | 已删除；会话分裂（RoutingState / ConsultationState）亦已统一为 TeamAwareness（ADR-0035） |
 | SupervisorBinder | 已删除；绑定逻辑并入 TeamComposer.compose_as_lead |
+| ConsultationState / RoutingState / ControlSession | TeamAwareness（结算义务收敛为可选 Settlement 组件，不再按 mandate 分裂会话类型；ADR-0035） |
+| SimpleReasoner / SupervisorReasoner | PromptReasoner（单一 Reasoner；lead 提示词差异由 TeamAwareness 自渲染表达，组合期不再"升级" reasoner；ADR-0035） |
+| generate_candidates | generate_thoughts（Reasoner 协议方法；候选竞争语义早已不存在，化石名废除；ADR-0035） |
+| mandate_uses_consultation_session / as_consultation / as_routing | 已删除；组合期决定 Settlement 是否挂载，运行期无类型窄化（ADR-0035） |
+| AgentState.session / RunContext.session | AgentState.team_awareness / RunContext.team_awareness（ADR-0035） |
 | OpenAICompatLLM | OpenAICompatAdapter |
 | SharedMemoryTool / SkillRecord / KGTriple | 已删除（共享记忆经 SharedMemoryStore；记忆契约收敛为 MemoryRecord） |
 | StructuredDecision | Decision |
@@ -176,3 +181,6 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 - 双重公开 stop 类型（对外只保留 `StopRule` / `StopDecision` 单通道）
 - Agent 入口签名带 `**context: str`（用 `RunContext` 类型化上下文替代）
 - progress-text 字段 + 注入 hook 三件套（用 `MemberStatus` 替代）
+- lead 会话分裂（ConsultationState / RoutingState 联合 + `as_*` 窄化 + mandate→会话类型映射函数）：团队认知是单一 `TeamAwareness`，结算义务是其可选 `Settlement` 组件（ADR-0035）
+- 按 mandate 升级/替换 Reasoner（`from_simple` 之类的 promotion）：Reasoner 单一实现，团队差异经 `AgentState.team_awareness` 数据注入（ADR-0035）
+- 字段白名单断言看守会话 dataclass：概念统一后无裂缝可守，纯净门禁（ADR-0015）兜底（ADR-0035）

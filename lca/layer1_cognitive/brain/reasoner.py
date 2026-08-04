@@ -1,13 +1,9 @@
-"""Reasoner — call LLM to generate candidate thoughts.
+"""PromptReasoner — call LLM to generate candidate thoughts.
 
-``SimpleReasoner`` is team-agnostic (solo / member default brain).
-``SupervisorReasoner`` serves lead mandates:
-- consult / board → hierarchical_prompt + board
-- routing → routing_prompt + soft assignment log
-Built at composition time by TeamComposer (closed object graph).
-
-Shared prompt/LLM mechanics live as module helpers so both reasoners
-stay thin and own their templates without a side catalog type.
+solo / member / lead 共用同一个 Reasoner（ADR-0035）：状态携带
+``TeamAwareness`` 时并入 awareness 变量并采用 awareness 默认模板，
+否则走角色 react 模板。不按会话类型分支——awareness 通过纯函数
+自行渲染提示词变量，Reasoner 只负责模板与 LLM 机制。
 """
 
 from __future__ import annotations
@@ -21,6 +17,7 @@ from lca.contracts.protocols import LLMAdapter, Reasoner, Tool
 from lca.contracts.role_team import RoleProfile
 from lca.contracts.semantic_keys import META_ROLE, META_STEP
 from lca.contracts.state import AgentState
+from lca.contracts.team_awareness import TeamAwareness
 
 _DEFAULT_TEMPLATE = "react_prompt"
 _HIERARCHICAL_TEMPLATE = "hierarchical_prompt"
@@ -29,7 +26,11 @@ _EMPTY_TEAMMATES = "(无可用队友)"
 _EMPTY_ASSIGNED = "(尚未委派)"
 _EMPTY_CONTEXT = "(无历史上下文)"
 _EMPTY_REPORTS = "(尚无成员回报)"
+_EMPTY_NOTES = "(无)"
 _KIND_EXCLUDE_NONE: frozenset[MemoryRecordKind] = frozenset()
+_LEDGER_EXCLUDED_KINDS: frozenset[MemoryRecordKind] = frozenset(
+    {MemoryRecordKind.DELEGATION_RESULT}
+)
 
 
 def build_teammates_text(profiles: list[RoleProfile]) -> str:
@@ -58,7 +59,7 @@ def _context_lines(
 
 
 def build_member_reports_text(results: Sequence[DelegationResult]) -> str:
-    """Render the routing ledger as the supervisor's authoritative fact view."""
+    """Render the delegation ledger as the lead's authoritative fact view."""
     if not results:
         return _EMPTY_REPORTS
     lines: list[str] = []
@@ -71,6 +72,35 @@ def build_member_reports_text(results: Sequence[DelegationResult]) -> str:
             f"- {item.target_role} | step {item.step} | 子任务: {item.subtask} | {outcome}"
         )
     return "\n".join(lines)
+
+
+def default_template_for(awareness: TeamAwareness) -> str:
+    """Awareness 默认模板：有结算义务走层级提示词，否则自由 routing。"""
+    if awareness.settlement is not None:
+        return _HIERARCHICAL_TEMPLATE
+    return _ROUTING_TEMPLATE
+
+
+def context_exclusions_for(awareness: TeamAwareness) -> frozenset[MemoryRecordKind]:
+    """自由 routing 下账本（MEMBER_REPORTS）是委派事实的权威视图，
+    从 CONTEXT 中剔除重复的委派记录；settlement 路径由状态板表达。"""
+    if awareness.settlement is None:
+        return _LEDGER_EXCLUDED_KINDS
+    return _KIND_EXCLUDE_NONE
+
+
+def build_awareness_variables(awareness: TeamAwareness) -> dict[str, str]:
+    """Awareness 自行渲染提示词变量——Reasoner 不窥探其内部形态。"""
+    variables = {"teammates": build_teammates_text(awareness.teammates)}
+    settlement = awareness.settlement
+    if settlement is not None:
+        variables["member_status_text"] = settlement.member_status.as_prompt_text()
+        return variables
+    assigned = ", ".join(awareness.assigned_roles) if awareness.assigned_roles else _EMPTY_ASSIGNED
+    variables["assigned_roles_text"] = assigned
+    variables["notes"] = awareness.notes or _EMPTY_NOTES
+    variables["member_reports_text"] = build_member_reports_text(awareness.results)
+    return variables
 
 
 def _role_prompt_vars(
@@ -114,12 +144,13 @@ async def _complete_candidates(
     return [await llm.complete(prompt, tools=tools) for _ in range(max(1, n))]
 
 
-class SimpleReasoner(Reasoner):
+class PromptReasoner(Reasoner):
     """Default Reasoner: render prompt template and call the LLM.
 
-    Team-agnostic solo/member default. Hierarchical control-plane reads
-    belong exclusively to ``SupervisorReasoner`` .
-    Owns prompt templates directly (dict + str.format).
+    Team-shape agnostic by construction: the lead's team cognition arrives
+    as ``AgentState.team_awareness`` and renders itself via
+    ``build_awareness_variables`` / ``default_template_for`` — the reasoner
+    never branches on mandate or session shape.
     """
 
     def __init__(
@@ -142,111 +173,23 @@ class SimpleReasoner(Reasoner):
     def register_template(self, name: str, template: str) -> None:
         self._templates[name] = template
 
-    async def generate_candidates(self, state: AgentState, n: int = 1) -> list[str]:
-        variables = _with_subtasks(
-            _role_prompt_vars(
-                self.role_profile,
-                self.tools_desc,
-                self.allowed_actions_desc,
-                state,
-                _context_lines(state),
-            ),
+    async def generate_thoughts(self, state: AgentState, n: int = 1) -> list[str]:
+        awareness = state.team_awareness
+        exclusions = (
+            context_exclusions_for(awareness) if awareness is not None else _KIND_EXCLUDE_NONE
+        )
+        variables = _role_prompt_vars(
+            self.role_profile,
+            self.tools_desc,
+            self.allowed_actions_desc,
             state,
+            _context_lines(state, exclude_kinds=exclusions),
         )
         template_name = state.active_template or _DEFAULT_TEMPLATE
-        return await _complete_candidates(
-            self.llm, self.tools, self._templates, template_name, variables, n
-        )
-
-
-class SupervisorReasoner(Reasoner):
-    """Lead reasoner for consultation (consult/board) and free routing mandates."""
-
-    def __init__(
-        self,
-        llm: LLMAdapter,
-        role_profile: RoleProfile,
-        tools_desc: str,
-        *,
-        tools: Sequence[Tool] | None = None,
-        templates: dict[str, str] | None = None,
-        allowed_actions_desc: str = "",
-    ) -> None:
-        self.llm = llm
-        self.role_profile = role_profile
-        self.tools_desc = tools_desc
-        self.tools: list[Tool] = list(tools) if tools else []
-        self._templates: dict[str, str] = dict(templates or {})
-        self.allowed_actions_desc = allowed_actions_desc
-
-    @classmethod
-    def from_simple(cls, base: SimpleReasoner) -> SupervisorReasoner:
-        """Promote a solo reasoner at supervisor composition time."""
-        return cls(
-            base.llm,
-            base.role_profile,
-            base.tools_desc,
-            tools=base.tools,
-            templates=dict(base._templates),
-            allowed_actions_desc=base.allowed_actions_desc,
-        )
-
-    def register_template(self, name: str, template: str) -> None:
-        self._templates[name] = template
-
-    async def generate_candidates(self, state: AgentState, n: int = 1) -> list[str]:
-        from lca.contracts.session import as_consultation, as_routing
-
-        if as_consultation(state.session) is not None:
-            context = _context_lines(state)
-            variables = self._consultation_vars(state, context)
-            template_name = state.active_template or _HIERARCHICAL_TEMPLATE
-        elif as_routing(state.session) is not None:
-            # The ledger (MEMBER_REPORTS) is the authoritative delegation view;
-            # drop the duplicate working-memory records from CONTEXT.
-            context = _context_lines(
-                state, exclude_kinds=frozenset({MemoryRecordKind.DELEGATION_RESULT})
-            )
-            variables = self._routing_vars(state, context)
-            template_name = state.active_template or _ROUTING_TEMPLATE
-        else:
-            raise ValueError(
-                "SupervisorReasoner requires AgentState.session (ConsultationState or RoutingState)"
-            )
+        if awareness is not None:
+            variables.update(build_awareness_variables(awareness))
+            template_name = state.active_template or default_template_for(awareness)
         variables = _with_subtasks(variables, state)
         return await _complete_candidates(
             self.llm, self.tools, self._templates, template_name, variables, n
         )
-
-    def _consultation_vars(self, state: AgentState, context_lines: str) -> dict[str, str]:
-        from lca.contracts.session import require_consultation
-
-        consultation = require_consultation(state.session)
-        variables = _role_prompt_vars(
-            self.role_profile,
-            self.tools_desc,
-            self.allowed_actions_desc,
-            state,
-            context_lines,
-        )
-        variables["teammates"] = build_teammates_text(consultation.teammates)
-        variables["member_status_text"] = consultation.member_status.as_prompt_text()
-        return variables
-
-    def _routing_vars(self, state: AgentState, context_lines: str) -> dict[str, str]:
-        from lca.contracts.session import require_routing
-
-        routing = require_routing(state.session)
-        assigned = ", ".join(routing.assigned_roles) if routing.assigned_roles else _EMPTY_ASSIGNED
-        variables = _role_prompt_vars(
-            self.role_profile,
-            self.tools_desc,
-            self.allowed_actions_desc,
-            state,
-            context_lines,
-        )
-        variables["teammates"] = build_teammates_text(routing.teammates)
-        variables["assigned_roles_text"] = assigned
-        variables["notes"] = routing.notes or "(无)"
-        variables["member_reports_text"] = build_member_reports_text(routing.results)
-        return variables

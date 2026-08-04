@@ -6,7 +6,7 @@ import unittest
 from datetime import datetime, timezone
 
 from lca.contracts.delegation import DelegationResult, find_result
-from lca.contracts.routing import RoutingState, assert_routing_field_whitelist
+from lca.contracts.team_awareness import TeamAwareness
 
 
 def _result(
@@ -52,13 +52,12 @@ class TestFindResult(unittest.TestCase):
         self.assertEqual(hit.output, "second")
 
 
-class TestRoutingLedgerSurface(unittest.TestCase):
-    def test_results_field_is_whitelisted(self) -> None:
-        assert_routing_field_whitelist()
-        self.assertIn("results", set(RoutingState.__dataclass_fields__))
+class TestAwarenessLedgerSurface(unittest.TestCase):
+    def test_results_field_exists_on_awareness(self) -> None:
+        self.assertIn("results", set(TeamAwareness.__dataclass_fields__))
 
-    def test_fresh_session_has_empty_ledger(self) -> None:
-        self.assertEqual(RoutingState().results, [])
+    def test_fresh_awareness_has_empty_ledger(self) -> None:
+        self.assertEqual(TeamAwareness().results, [])
 
     def test_result_is_immutable(self) -> None:
         from dataclasses import FrozenInstanceError

@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from lca.contracts.decision import DelegationSpec, Observation
 from lca.contracts.delegation import DelegationResult
 from lca.contracts.enums import MemoryRecordKind
-from lca.contracts.routing import RoutingState
 from lca.contracts.semantic_keys import (
     OBS_CACHE_HIT,
     OBS_MEMBER_RESULTS,
@@ -16,6 +15,7 @@ from lca.contracts.semantic_keys import (
     OBS_RESULT_KIND,
 )
 from lca.contracts.state import AgentState, Budget
+from lca.contracts.team_awareness import TeamAwareness
 from lca.layer1_cognitive.body.delegation_cache import (
     cached_delegation_observation,
     tag_delegation_extra,
@@ -36,15 +36,15 @@ def _ledger_result(role: str = "Alice", subtask: str = "analyze") -> DelegationR
     )
 
 
-def _state(session: RoutingState | None) -> AgentState:
-    return AgentState(trace_id="t", task="probe", budget=Budget(), session=session)
+def _state(awareness: TeamAwareness | None) -> AgentState:
+    return AgentState(trace_id="t", task="probe", budget=Budget(), team_awareness=awareness)
 
 
 class TestCachedDelegationObservation(unittest.TestCase):
     def test_hit_returns_cached_payload_without_transport(self) -> None:
-        routing = RoutingState(results=[_ledger_result()])
+        awareness = TeamAwareness(results=[_ledger_result()])
         spec = DelegationSpec(subtask="analyze", target_role="Alice")
-        obs = cached_delegation_observation(spec, _state(routing))
+        obs = cached_delegation_observation(spec, _state(awareness))
         assert obs is not None
         self.assertTrue(obs.success)
         self.assertEqual(obs.payload, "cached answer")
@@ -54,18 +54,18 @@ class TestCachedDelegationObservation(unittest.TestCase):
         self.assertEqual(obs.extra[OBS_MEMBER_SUBTASKS], {"Alice": "analyze"})
 
     def test_miss_on_new_subtask(self) -> None:
-        routing = RoutingState(results=[_ledger_result()])
+        awareness = TeamAwareness(results=[_ledger_result()])
         spec = DelegationSpec(subtask="re-analyze with new angle", target_role="Alice")
-        self.assertIsNone(cached_delegation_observation(spec, _state(routing)))
+        self.assertIsNone(cached_delegation_observation(spec, _state(awareness)))
 
-    def test_miss_without_routing_session(self) -> None:
+    def test_miss_without_team_awareness(self) -> None:
         spec = DelegationSpec(subtask="analyze", target_role="Alice")
         self.assertIsNone(cached_delegation_observation(spec, _state(None)))
 
     def test_miss_without_target_role(self) -> None:
-        routing = RoutingState(results=[_ledger_result()])
+        awareness = TeamAwareness(results=[_ledger_result()])
         spec = DelegationSpec(subtask="analyze", target_agent_id="agent_x")
-        self.assertIsNone(cached_delegation_observation(spec, _state(routing)))
+        self.assertIsNone(cached_delegation_observation(spec, _state(awareness)))
 
 
 class TestTagDelegationExtra(unittest.TestCase):
