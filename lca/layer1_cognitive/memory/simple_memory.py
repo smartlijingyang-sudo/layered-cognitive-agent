@@ -86,7 +86,7 @@ class SimpleMemorySystem(MemorySystem):
         """Type the observation into working-memory records.
 
         Delegation results become one attributed record per member instead of a
-        ``TOOL_RESULT:`` blob, so the supervisor can see *who answered what*.
+        ``TOOL_RESULT:`` blob, so the lead can see *who answered what*.
         Tool results keep the ``TOOL_RESULT:`` prefix (mock-LLM parses it).
         """
         if observation.payload is None or not observation.success:

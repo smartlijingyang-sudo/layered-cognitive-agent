@@ -12,7 +12,7 @@ MEMBER_REPORTS（你已发起委派的返回，确定性事实，不是历史记
 CONTEXT:
 {context}
 
-你是团队 Supervisor（自由路由模式）。你可以选择以下行动之一：
+你是团队主导者（lead，自由路由模式）。你可以选择以下行动之一：
 {allowed_actions}
 
 ## 工作规则

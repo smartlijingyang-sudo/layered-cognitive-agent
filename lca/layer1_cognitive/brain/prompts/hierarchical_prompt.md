@@ -10,7 +10,7 @@ USER_TASK: {task}
 CONTEXT:
 {context}
 
-你是团队 Supervisor。你可以选择以下行动之一：
+你是团队主导者（lead）。你可以选择以下行动之一：
 {allowed_actions}
 
 ## 工作规则
