@@ -11,6 +11,7 @@ import inspect
 import os
 import pkgutil
 import re
+import types
 import unittest
 from pathlib import Path
 
@@ -81,6 +82,57 @@ def _read_glossary_terms() -> set[str]:
             match = re.search(r"\*\*([^*]+)\*\*", line)
             if match:
                 terms.add(match.group(1).strip())
+    return terms
+
+
+# 反向校验的扫描范围：术语表覆盖 contracts 与 L0-L4 全部层的类名
+_REVERSE_SCAN_PACKAGES = (
+    "lca.contracts",
+    "lca.layer0_infra",
+    "lca.layer1_cognitive",
+    "lca.layer2_runtime",
+    "lca.layer3_agent",
+    "lca.layer4_app",
+)
+_CAMEL_CASE_TERM = re.compile(r"^[A-Z][A-Za-z0-9]*$")
+_DEPRECATED_SECTION_MARKERS = ("已废弃主名", "禁止复活")
+
+
+def _collect_class_names(scan_packages: tuple[str, ...]) -> set[str]:
+    """收集指定包内定义的类名，以及模块级 union 类型别名（如 Coordination）。"""
+    names: set[str] = set()
+    for pkg_name in scan_packages:
+        pkg = importlib.import_module(pkg_name)
+        for _importer, modname, _ispkg in pkgutil.walk_packages(
+            pkg.__path__,
+            prefix=pkg.__name__ + ".",
+        ):
+            try:
+                mod = importlib.import_module(modname)
+            except ImportError:
+                continue
+            for cls_name, cls in inspect.getmembers(mod, inspect.isclass):
+                if cls.__module__.startswith(pkg_name):
+                    names.add(cls_name)
+            for name, value in vars(mod).items():
+                if type(value) is types.UnionType and _CAMEL_CASE_TERM.match(name):
+                    names.add(name)
+    return names
+
+
+def _read_active_glossary_terms() -> set[str]:
+    """提取现役区（「已废弃主名」章节之前）表格行中的全部 **bold** 术语。"""
+    if not _GLOSSARY_PATH.exists():
+        return set()
+    terms: set[str] = set()
+    for line in _GLOSSARY_PATH.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## ") and any(
+            marker in stripped for marker in _DEPRECATED_SECTION_MARKERS
+        ):
+            break
+        if stripped.startswith("|") and "**" in stripped:
+            terms.update(m.strip() for m in re.findall(r"\*\*([^*]+)\*\*", stripped))
     return terms
 
 
@@ -199,6 +251,32 @@ class TestGlossaryTermCoverage(unittest.TestCase):
                 + "\n".join(uncovered[:5])
                 + "\n请在 docs/glossary.md 中补充对应词条。"
             )
+
+
+class TestGlossaryReverseCoverage(unittest.TestCase):
+    """glossary.md 现役区的 CamelCase 术语必须对应 lca 包内真实类名。
+
+    与 TestGlossaryTermCoverage 互为反向：后者保证「代码类 → 术语表」，
+    本测试保证「术语表 → 代码类」。缺失反向校验时，ADR-0030 删除的
+    MultiAgentTeam / TeamProcess / OrchestrationFamily 等废弃名曾长期
+    滞留在现役区误导读者。术语被改名/删除后必须移入「已废弃主名」表。
+    """
+
+    def test_active_glossary_terms_exist_in_code(self) -> None:
+        terms = _read_active_glossary_terms()
+        if not terms:
+            self.skipTest("docs/glossary.md 不存在或为空")
+
+        class_names = _collect_class_names(_REVERSE_SCAN_PACKAGES)
+        missing = sorted(
+            term for term in terms if _CAMEL_CASE_TERM.match(term) and term not in class_names
+        )
+        self.assertFalse(
+            missing,
+            "以下现役术语在 lca 包中不存在对应类名"
+            "（已改名/删除的术语请移入「已废弃主名」表，"
+            "概念性词语请勿加粗为术语词条）:\n" + "\n".join(f"  - {term}" for term in missing),
+        )
 
 
 if __name__ == "__main__":

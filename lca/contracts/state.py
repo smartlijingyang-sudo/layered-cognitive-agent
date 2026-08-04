@@ -53,7 +53,7 @@ class StateSnapshot:
 class AgentState:
     """Full state for one agent cognitive loop.
 
-    Generic loop fields only. SUPERVISOR control plane lives under optional
+    Generic loop fields only. Lead control plane lives under optional
     ``session`` (ConsultationState | RoutingState) — single slot.
     """
 

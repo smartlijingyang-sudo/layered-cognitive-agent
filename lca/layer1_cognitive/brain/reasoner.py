@@ -1,10 +1,10 @@
 """Reasoner — call LLM to generate candidate thoughts.
 
 ``SimpleReasoner`` is team-agnostic (solo / member default brain).
-``SupervisorReasoner`` serves SUPERVISOR-family planes:
-- consultation → hierarchical_prompt + board
+``SupervisorReasoner`` serves lead mandates:
+- consult / board → hierarchical_prompt + board
 - routing → routing_prompt + soft assignment log
-Built at composition time by SupervisorFactory (closed object graph).
+Built at composition time by TeamComposer (closed object graph).
 
 Shared prompt/LLM mechanics live as module helpers so both reasoners
 stay thin and own their templates without a side catalog type.
@@ -160,7 +160,7 @@ class SimpleReasoner(Reasoner):
 
 
 class SupervisorReasoner(Reasoner):
-    """SUPERVISOR-family reasoner for consultation and free routing planes."""
+    """Lead reasoner for consultation (consult/board) and free routing mandates."""
 
     def __init__(
         self,

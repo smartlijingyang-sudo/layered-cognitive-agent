@@ -1,6 +1,6 @@
-"""SUPERVISOR-family free routing control plane.
+"""Lead·routing mandate session state (free PM style).
 
-``RoutingState`` is for dynamic PM-style supervisors: no full-roster
+``RoutingState`` is for dynamic PM-style leads: no full-roster
 settlement invariant. Do **not** grow ``ConsultationState`` for this.
 
 Field whitelist is locked for architecture tests — same discipline as
@@ -29,7 +29,7 @@ ROUTING_FIELD_WHITELIST: Final[frozenset[str]] = frozenset(
 class RoutingState:
     """Freeform supervisor session for one team run.
 
-    Present when ``SupervisorPlane.ROUTING``; solo/member keep None.
+    Present when the lead runs with ``LeadMandate.ROUTING``; solo/member keep None.
     - ``teammates``: fixed roster for prompt
     - ``assigned_roles``: soft log of who was already delegated to (advisory)
     - ``notes``: short freeform planner notes (optional)

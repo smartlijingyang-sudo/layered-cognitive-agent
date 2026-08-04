@@ -1,11 +1,12 @@
-"""SUPERVISOR-family consultation control-plane session.
+"""Lead consultation/board mandate control-plane session.
 
-``ConsultationState`` is **only** for ``SupervisorPlane.CONSULTATION``:
-required-role settlement, teammate roster for the supervisor prompt, and
+``ConsultationState`` is **only** for ``LeadMandate.CONSULT`` /
+``LeadMandate.BOARD``:
+required-role settlement, teammate roster for the lead prompt, and
 delegate retry counters.
 
 Free industry-style routing belongs in ``RoutingState``
-(``SupervisorPlane.ROUTING``), not here.
+(``LeadMandate.ROUTING``), not here.
 
 It is intentionally **not** a generic multi-agent session bag.
 
