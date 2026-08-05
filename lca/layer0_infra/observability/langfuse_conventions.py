@@ -33,6 +33,16 @@ OBSERVATION_TYPE_AGENT = "agent"
 OBSERVATION_TYPE_GENERATION = "generation"
 OBSERVATION_TYPE_TOOL = "tool"
 
+# ── OpenTelemetry GenAI 语义约定键名（业界标准，非 LCA 词表）──
+# generation 投影（journal OtelProjector）与 LLM 适配器共享，禁止散落字面量。
+GEN_AI_OPERATION = "gen_ai.operation.name"
+GEN_AI_OPERATION_CHAT = "chat"
+GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
+GEN_AI_INPUT = "gen_ai.input"
+GEN_AI_OUTPUT = "gen_ai.output"
+GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
+GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
+
 # ── trace 级标签（业务维度过滤）────────────────────────
 FRAMEWORK_TAG = "lca"
 

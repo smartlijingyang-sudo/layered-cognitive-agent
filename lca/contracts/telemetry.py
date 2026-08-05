@@ -32,6 +32,8 @@ class SpanName(str, Enum):
     TEAM_MEMBER_INVOKE = "team.member_invoke"
     TEAM_ROUND = "team.round"
     TEAM_SYNTHESIS = "team.synthesis"
+    # 委派往返（一等公民：包住成员全程，ADR-0037）
+    DELEGATION = "delegation"
     # ── 认知域 ──
     LOOP_PHASE_PERCEIVE = "loop.phase.perceive"
     LOOP_PHASE_THINK = "loop.phase.think"
@@ -63,6 +65,7 @@ class EventName(str, Enum):
     STEP_COMPLETED = "step.completed"
     # ── 运行域 ──
     RUN_COMPLETED = "run.completed"
+    RUN_INSIGHT = "run.insight"
 
 
 # ── 属性键（封闭词表，禁止裸字符串）────────────────────
@@ -90,6 +93,21 @@ ATTR_OK = "ok"
 ATTR_STATUS = "status"
 ATTR_PROTOCOL = "protocol"
 ATTR_LATENCY_MS = "latency_ms"
+ATTR_MECHANISM = "mechanism"
+ATTR_PARALLEL_GROUP = "parallel_group"
+ATTR_TASK_ID = "task_id"
+ATTR_STEPS = "steps"
+ATTR_ERROR = "error"
+ATTR_ATTEMPT = "attempt"
+ATTR_CONFIDENCE = "confidence"
+ATTR_REASON = "reason"
+ATTR_RATIONALE_PREVIEW = "rationale_preview"
+ATTR_ORIGINAL_ACTION_TYPE = "original_action_type"
+ATTR_DEGRADED_TO = "degraded_to"
+# 洞察事件（RunInsight）
+ATTR_KIND = "kind"
+ATTR_SUMMARY = "summary"
+ATTR_DETAIL = "detail"
 ATTR_OBJECTIVE_PREVIEW = "objective_preview"
 ATTR_OBJECTIVE = "objective"
 ATTR_RESULT_OUTPUT = "result_output"

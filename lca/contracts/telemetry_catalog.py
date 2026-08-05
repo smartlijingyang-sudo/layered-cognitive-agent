@@ -97,6 +97,12 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
         required=(ATTR_CALLEE_ROLE,),
         desc="成员调用（含传输）",
     ),
+    SpanName.DELEGATION.value: _span(
+        VocabDomain.TEAM,
+        "lca.layer0_infra.observability.journal.otel_projector",
+        required=(ATTR_CALLEE_ROLE,),
+        desc="委派往返（journal 投影；包住成员全程，ADR-0037）",
+    ),
     SpanName.TEAM_ROUND.value: _span(
         VocabDomain.TEAM,
         "lca.layer3_agent.orchestration_strategies",
@@ -206,5 +212,9 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
         "lca.layer3_agent",
         required=(ATTR_STATUS,),
         desc="运行收尾 digest（solo 与 team 两个 run 边缘）",
+    ),
+    EventName.RUN_INSIGHT.value: _event(
+        "lca.layer0_infra.observability.journal.otel_projector",
+        desc="计算洞察的 OTel 事件投影（journal RunInsight，ADR-0037）",
     ),
 }

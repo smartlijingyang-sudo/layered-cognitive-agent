@@ -60,6 +60,7 @@ from lca.layer0_infra.observability.facade import (
 from lca.layer0_infra.observability.hub import ObservabilityHub
 from lca.layer0_infra.observability.journal import (
     ExecutionJournal,
+    OtelProjector,
     UnregisteredJournalEventError,
 )
 from lca.layer0_infra.observability.langfuse_conventions import (
@@ -124,6 +125,7 @@ __all__ = [
     "LlmCallCompleted",
     "ObservabilityHub",
     "ObservabilitySettings",
+    "OtelProjector",
     "RunInsight",
     "RunScope",
     "SpanContext",

@@ -9,8 +9,10 @@ from lca.layer0_infra.observability.journal.engine import (
     ExecutionJournal,
     UnregisteredJournalEventError,
 )
+from lca.layer0_infra.observability.journal.otel_projector import OtelProjector
 
 __all__ = [
     "ExecutionJournal",
+    "OtelProjector",
     "UnregisteredJournalEventError",
 ]
