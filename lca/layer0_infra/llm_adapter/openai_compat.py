@@ -11,6 +11,7 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
+from lca.contracts.llm import LLMResponse, TokenUsage
 from lca.contracts.protocols import LLMAdapter, Tool
 
 _DEFAULT_TEMPERATURE = 0.7
@@ -50,7 +51,7 @@ class OpenAICompatAdapter(LLMAdapter):
             base_url=base_url or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
         )
 
-    async def complete(self, prompt: str, **kwargs: Any) -> str:
+    async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         tools = kwargs.pop("tools", None)
         api_kwargs: dict[str, Any] = {
             "model": kwargs.pop("model", self._model),
@@ -64,10 +65,12 @@ class OpenAICompatAdapter(LLMAdapter):
 
         response = await self._client.chat.completions.create(**api_kwargs)
         msg = response.choices[0].message
+        usage = self._extract_usage(response)
+        model = getattr(response, "model", "") or self._model
 
         if msg.tool_calls:
             tc = msg.tool_calls[0]
-            return json.dumps(
+            text = json.dumps(
                 {
                     "action_type": "use_tool",
                     "tool_name": tc.function.name,
@@ -76,7 +79,18 @@ class OpenAICompatAdapter(LLMAdapter):
                 },
                 ensure_ascii=False,
             )
-        return msg.content or ""
+            return LLMResponse(text=text, model=model, usage=usage)
+        return LLMResponse(text=msg.content or "", model=model, usage=usage)
+
+    @staticmethod
+    def _extract_usage(response: Any) -> TokenUsage | None:
+        raw = getattr(response, "usage", None)
+        if raw is None:
+            return None
+        return TokenUsage(
+            prompt_tokens=getattr(raw, "prompt_tokens", None),
+            completion_tokens=getattr(raw, "completion_tokens", None),
+        )
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
         raise NotImplementedError("流式输出暂未实现")

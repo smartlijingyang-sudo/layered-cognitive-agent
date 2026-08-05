@@ -9,6 +9,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.contracts.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter, TeamStage
 from lca.layer3_agent.member_invoke import TransportMemberInvoker
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
@@ -33,10 +34,12 @@ class _LLM(LLMAdapter):
             r = "RISK_REVIEW"
         else:
             r = "OK"
-        return json.dumps({"action_type": "respond", "response_text": r, "confidence": 0.8})
+        return LLMResponse(
+            text=json.dumps({"action_type": "respond", "response_text": r, "confidence": 0.8})
+        )
 
     async def stream(self, prompt: str, **kwargs):
-        yield await self.complete(prompt)
+        yield (await self.complete(prompt)).text
 
 
 class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):

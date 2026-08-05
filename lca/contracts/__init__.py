@@ -23,6 +23,7 @@ from lca.contracts.graph import (
     GraphValidationError,
 )
 from lca.contracts.lifecycle import AgentCard, TaskStatus, TeamMessage
+from lca.contracts.llm import LLMResponse, TokenUsage
 from lca.contracts.mechanisms import (
     ComponentRegistryProtocol,
     EventBus,
@@ -32,7 +33,6 @@ from lca.contracts.mechanisms import (
 )
 from lca.contracts.member_status import MemberStatus
 from lca.contracts.memory import MemoryRecord
-from lca.contracts.observability import Event, TraceSpan
 from lca.contracts.protocols import DecisionGate, SharedMemoryStore, TransportRegistryProtocol
 from lca.contracts.registries import Registries
 from lca.contracts.result import (
@@ -84,7 +84,6 @@ __all__ = [
     "DecisionGate",
     "DelegationResult",
     "DelegationSpec",
-    "Event",
     "EventBus",
     "ExecutionGraph",
     "FanOut",
@@ -95,6 +94,7 @@ __all__ = [
     "GraphValidationError",
     "Hook",
     "HookRegistry",
+    "LLMResponse",
     "LeadMandate",
     "MemberStatus",
     "MemoryRecord",
@@ -119,10 +119,10 @@ __all__ = [
     "TeamAwareness",
     "TeamMessage",
     "TeamSpec",
+    "TokenUsage",
     "ToolCall",
     "ToolExecutionError",
     "ToolPermissionManifest",
-    "TraceSpan",
     "TransportRegistryProtocol",
     "Turn",
     "create_budget",

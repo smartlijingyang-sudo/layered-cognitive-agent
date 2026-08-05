@@ -11,6 +11,7 @@ from lca.contracts.decision import Decision
 from lca.contracts.enums import DecisionGateName
 from lca.contracts.graph import ExecutionGraph, GraphEdge, GraphNode
 from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.llm import LLMResponse
 from lca.contracts.protocols import TeamAssembly
 from lca.contracts.result import Result
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
@@ -147,8 +148,8 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
             name = "mock"
 
             async def complete(self, prompt: str, **kwargs: object) -> str:
-                return (
-                    '{"action_type":"respond","response_text":"node-out",'
+                return LLMResponse(
+                    text='{"action_type":"respond","response_text":"node-out",'
                     '"rationale":"r","confidence":1.0}'
                 )
 

@@ -48,10 +48,8 @@ from lca.contracts.protocols.embodiment import Body
 from lca.contracts.protocols.infra import (
     AgentTransport,
     LLMAdapter,
-    Observability,
     SafeExecutor,
     StateStore,
-    Telemetry,
     Tool,
     ToolRegistry,
     TransportRegistryProtocol,
@@ -59,6 +57,9 @@ from lca.contracts.protocols.infra import (
 
 # ── L1 Memory 协议 ───────────────────────────────────────
 from lca.contracts.protocols.memory import MemorySystem
+
+# ── 可观测性协议（业务层唯一发射门面）──────────────────
+from lca.contracts.protocols.observability import ObservabilityBackend, Telemetry
 
 # ── L3 团队编排协议 ──────────────────────────────────────
 from lca.contracts.protocols.orchestration import (
@@ -98,7 +99,7 @@ __all__ = [
     "MemberInvoker",
     "MemorySystem",
     "NamedRegistryProtocol",
-    "Observability",
+    "ObservabilityBackend",
     "OrchestrationRegistryProtocol",
     "Reasoner",
     "Runtime",

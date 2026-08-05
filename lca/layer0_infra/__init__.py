@@ -8,6 +8,6 @@
 | Tool | tools/ | CalculatorTool, WeatherTool |
 | StateStore | state_store/ | InMemoryStateStore |
 | AgentTransport | transport/ | InternalTransport, A2ATransport, MCPTransport |
-| Observability | observability/ | ConsoleObservability, JsonlFileObservability |
+| Telemetry (facade) | observability/ | ObservabilityHub + console/jsonl/memory/langfuse 导出器 |
 | NamedRegistryProtocol | component_registry.py | NamedRegistry, ComponentRegistry |
 """

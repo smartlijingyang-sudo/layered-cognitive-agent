@@ -13,11 +13,14 @@ from lca.contracts.result import Result
 from lca.contracts.telemetry import (
     ATTR_CALLEE_ROLE,
     ATTR_CALLER_ROLE,
+    ATTR_DELEGATE_TARGET,
     ATTR_OK,
     ATTR_STATUS,
+    ATTR_SUBTASK_PREVIEW,
+    EventName,
     SpanName,
 )
-from lca.layer0_infra.observability import span
+from lca.layer0_infra.observability import event, span
 from lca.layer0_infra.transport.invocation import send_and_wait
 
 _DEFAULT_TIMEOUT_S = 300.0
@@ -33,6 +36,14 @@ class TransportMemberInvoker(MemberInvoker):
     async def invoke(self, member: AgentUnit, task: str, *, caller_role: str = "") -> Result:
         """通过共享 transport 端口调用一个成员。"""
         role = member.role_profile.role
+        event(
+            EventName.DELEGATE_REQUESTED,
+            **{
+                ATTR_DELEGATE_TARGET: role,
+                ATTR_CALLER_ROLE: caller_role or "strategy",
+                ATTR_SUBTASK_PREVIEW: task,
+            },
+        )
         with span(
             SpanName.TEAM_MEMBER_INVOKE,
             **{

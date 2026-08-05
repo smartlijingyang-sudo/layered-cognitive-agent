@@ -11,7 +11,6 @@ import pytest
 from lca.contracts.enums import ActionScope
 from lca.contracts.role_team import ToolPermissionManifest
 from lca.layer0_infra.component_registry import RegistryKeyError
-from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
@@ -23,7 +22,7 @@ from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 
 def _build_registry() -> ActionRegistry:
     tool_reg = SimpleToolRegistry()
-    safe_exec = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]), ConsoleObservability())
+    safe_exec = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
     transport_reg = TransportRegistry()
     transport_reg.register(InternalTransport())
     return build_default_action_registry(tool_reg, safe_exec, transport_reg, scope=ActionScope.LEAD)

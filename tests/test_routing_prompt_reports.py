@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from lca.contracts.delegation import DelegationResult
 from lca.contracts.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.llm import LLMResponse
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.semantic_keys import META_ROLE, META_STEP
@@ -50,12 +51,12 @@ class _CaptureLLM:
 
     async def complete(self, prompt: str, **kwargs: object) -> str:
         self.prompts.append(prompt)
-        return (
-            '{"action_type": "respond", "response_text": "ok", "rationale": "r", "confidence": 0.9}'
+        return LLMResponse(
+            text='{"action_type": "respond", "response_text": "ok", "rationale": "r", "confidence": 0.9}'
         )
 
     async def stream(self, prompt: str, **kwargs: object):
-        yield await self.complete(prompt, **kwargs)
+        yield (await self.complete(prompt, **kwargs)).text
 
 
 class TestMemberReportsText(unittest.TestCase):

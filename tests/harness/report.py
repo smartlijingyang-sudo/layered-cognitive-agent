@@ -11,10 +11,10 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from lca.contracts.observability import TraceSpan
 from lca.contracts.result import Result
 from lca.contracts.telemetry import SpanName
-from lca.layer0_infra.observability.run_narrative import is_milestone_span
+from lca.layer0_infra.observability import SpanView
+from lca.layer0_infra.observability.narrative import is_milestone_span
 from tests.harness.collector import TraceBundle
 
 
@@ -22,10 +22,8 @@ def _status_str(value: Any) -> str:
     return str(getattr(value, "value", value))
 
 
-def _dur_ms(span: TraceSpan) -> int:
-    if span.ended_at is None:
-        return 0
-    return int((span.ended_at - span.started_at).total_seconds() * 1000)
+def _dur_ms(span: SpanView) -> int:
+    return span.duration_ms
 
 
 def format_case_digest(
@@ -203,7 +201,7 @@ def format_trace_tree(
     if milestones_only:
         # Tree order (parent before children); non-milestones are skipped but
         # still connect descendants for indentation.
-        def walk_milestones(span: TraceSpan, depth: int) -> list[str]:
+        def walk_milestones(span: SpanView, depth: int) -> list[str]:
             out: list[str] = []
             show = is_milestone_span(span)
             child_depth = depth + 1 if show else depth
@@ -240,7 +238,7 @@ def format_trace_tree(
     return "\n".join(lines)
 
 
-def _render_subtree(bundle: TraceBundle, span: TraceSpan, depth: int, seen: set[str]) -> list[str]:
+def _render_subtree(bundle: TraceBundle, span: SpanView, depth: int, seen: set[str]) -> list[str]:
     if span.span_id in seen:
         return []
     seen.add(span.span_id)
@@ -250,9 +248,9 @@ def _render_subtree(bundle: TraceBundle, span: TraceSpan, depth: int, seen: set[
     return out
 
 
-def _format_span(span: TraceSpan, depth: int, *, orphan: bool = False) -> str:
+def _format_span(span: SpanView, depth: int, *, orphan: bool = False) -> str:
     """Tree line aligned with ConsoleObservability naming."""
-    from lca.layer0_infra.observability.run_narrative import format_span_line
+    from lca.layer0_infra.observability.narrative import format_span_line
 
     line = format_span_line(span, depth=depth)
     if orphan:

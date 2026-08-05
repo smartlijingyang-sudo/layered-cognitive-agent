@@ -7,6 +7,8 @@ import os
 import sys
 import unittest
 
+from lca.contracts.llm import LLMResponse
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
@@ -204,7 +206,9 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
         class FakeLLM:
             async def complete(self, prompt: str, **kwargs):
                 captured_prompt.append(prompt)
-                return '{"action_type": "respond", "response_text": "ok", "rationale": "", "confidence": 1.0}'
+                return LLMResponse(
+                    text='{"action_type": "respond", "response_text": "ok", "rationale": "", "confidence": 1.0}'
+                )
 
         reasoner = PromptReasoner(
             FakeLLM(),
@@ -226,7 +230,9 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
         class FakeLLM:
             async def complete(self, prompt: str, **kwargs):
                 captured_prompt.append(prompt)
-                return '{"action_type": "delegate", "target_role": "researcher", "subtask": "分析", "rationale": "test", "confidence": 0.8}'
+                return LLMResponse(
+                    text='{"action_type": "delegate", "target_role": "researcher", "subtask": "分析", "rationale": "test", "confidence": 0.8}'
+                )
 
         teammates = [
             RoleProfile(

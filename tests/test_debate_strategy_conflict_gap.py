@@ -8,6 +8,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.team_coordination import Debate
 from lca.layer4_app.api import Agent, Team
@@ -30,15 +31,19 @@ class DebatePricingLLM(LLMAdapter):
         converging = "Previous proposals" in prompt
         if not converging:
             price = 39.9 if "保守" in role else 59.9
-            return _decision(
-                action_type="respond", response_text=f"PROPOSAL: ${price}", confidence=0.7
+            return LLMResponse(
+                text=_decision(
+                    action_type="respond", response_text=f"PROPOSAL: ${price}", confidence=0.7
+                )
             )
-        return _decision(
-            action_type="respond", response_text="PROPOSAL: $49.9 折衷", confidence=0.9
+        return LLMResponse(
+            text=_decision(
+                action_type="respond", response_text="PROPOSAL: $49.9 折衷", confidence=0.9
+            )
         )
 
     async def stream(self, prompt: str, **kwargs):
-        yield await self.complete(prompt)
+        yield (await self.complete(prompt)).text
 
 
 class TestDebateStrategyCapability(unittest.IsolatedAsyncioTestCase):

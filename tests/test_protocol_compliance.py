@@ -21,7 +21,6 @@ from lca.contracts.protocols import (
     HookRegistry,
     LLMAdapter,
     MemorySystem,
-    Observability,
     Reasoner,
     Runtime,
     SafeExecutor,
@@ -32,7 +31,7 @@ from lca.contracts.protocols import (
 )
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
-from lca.layer0_infra.observability.console_observability import ConsoleObservability
+from lca.layer0_infra.observability import create_observability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer0_infra.tools.weather_tool import WeatherTool
@@ -75,8 +74,11 @@ class TestL0ProtocolCompliance(unittest.TestCase):
     def test_weather_is_tool(self):
         self.assertIsInstance(WeatherTool(), Tool)
 
-    def test_console_observability(self):
-        self.assertIsInstance(ConsoleObservability(), Observability)
+    def test_create_observability_is_backend(self):
+        from lca.contracts.protocols import ObservabilityBackend
+        from lca.layer0_infra.observability import create_observability
+
+        self.assertIsInstance(create_observability("console"), ObservabilityBackend)
 
     def test_in_memory_state_store(self):
         self.assertIsInstance(InMemoryStateStore(), StateStore)
@@ -142,10 +144,9 @@ class TestL1ProtocolCompliance(unittest.TestCase):
 
     def test_simple_body(self):
         tool_reg = SimpleToolRegistry()
-        obs = ConsoleObservability()
         from lca.contracts.role_team import ToolPermissionManifest
 
-        executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]), obs)
+        executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
         body = SimpleBody(tool_reg, executor)
         self.assertIsInstance(body, Body)
 
@@ -153,10 +154,9 @@ class TestL1ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(SimpleToolRegistry(), ToolRegistry)
 
     def test_simple_safe_executor(self):
-        obs = ConsoleObservability()
         from lca.contracts.role_team import ToolPermissionManifest
 
-        executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]), obs)
+        executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
         self.assertIsInstance(executor, SafeExecutor)
 
     def test_simple_memory_system(self):
@@ -166,8 +166,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(SimpleEventBus(), EventBus)
 
     def test_simple_hook_registry(self):
-        obs = ConsoleObservability()
-        self.assertIsInstance(SimpleHookRegistry(obs), HookRegistry)
+        self.assertIsInstance(SimpleHookRegistry(), HookRegistry)
 
     def test_default_logging_hook_is_hook(self):
         self.assertIsInstance(default_logging_hook, Hook)
@@ -192,16 +191,15 @@ class TestL2ProtocolCompliance(unittest.TestCase):
             decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
         )
-        obs = ConsoleObservability()
         body = SimpleBody(
             SimpleToolRegistry(),
-            SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]), obs),
+            SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[])),
         )
         runtime = CognitiveRuntime(
             brain,
             body,
             SimpleMemorySystem(),
-            SimpleHookRegistry(obs),
+            SimpleHookRegistry(),
             InMemoryStateStore(),
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
@@ -227,20 +225,19 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
         )
-        obs = ConsoleObservability()
         body = SimpleBody(
             SimpleToolRegistry(),
-            SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]), obs),
+            SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[])),
         )
         runtime = CognitiveRuntime(
             brain,
             body,
             SimpleMemorySystem(),
-            SimpleHookRegistry(obs),
+            SimpleHookRegistry(),
             InMemoryStateStore(),
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
-        return CognitiveAgent(runtime, rp), rp, runtime
+        return CognitiveAgent(runtime, rp, create_observability("console")), rp, runtime
 
     def test_agent_is_agent_runtime(self):
         agent, _, _ = self._build_agent()
@@ -248,7 +245,9 @@ class TestL3ProtocolCompliance(unittest.TestCase):
 
     def test_supervisor_is_agent_runtime(self):
         _, rp, runtime = self._build_agent()
-        sup = CognitiveAgent(runtime, rp, max_steps=20, max_wall_clock_seconds=300)
+        sup = CognitiveAgent(
+            runtime, rp, create_observability("console"), max_steps=20, max_wall_clock_seconds=300
+        )
         self.assertIsInstance(sup, AgentUnit)
 
     def test_team_handle_is_team_runtime(self):

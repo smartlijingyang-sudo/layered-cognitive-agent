@@ -9,9 +9,8 @@ from typing import Any
 import structlog
 
 from lca.contracts.decision import Observation
-from lca.contracts.enums import SpanStatus
 from lca.contracts.ids import new_id
-from lca.contracts.protocols import Observability, SafeExecutor, Tool
+from lca.contracts.protocols import SafeExecutor, Tool
 from lca.contracts.result import ToolExecutionError
 from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.semantic_keys import (
@@ -20,8 +19,8 @@ from lca.contracts.semantic_keys import (
     FAILURE_KIND_TRANSIENT,
     FAILURE_KIND_VALIDATION,
 )
-from lca.contracts.telemetry import ATTR_OK, ATTR_TOOL_NAME, SpanName
-from lca.layer0_infra.observability import span
+from lca.contracts.telemetry import ATTR_OK, ATTR_TOOL_NAME, EventName, SpanName
+from lca.layer0_infra.observability import event, span
 
 _log = structlog.get_logger("lca.safe_executor")
 
@@ -29,10 +28,8 @@ _log = structlog.get_logger("lca.safe_executor")
 class SimpleSafeExecutor(SafeExecutor):
     """Permission → validate → cache → retry → sandbox execute."""
 
-    def __init__(self, permission_manifest: ToolPermissionManifest, observability: Observability):
+    def __init__(self, permission_manifest: ToolPermissionManifest):
         self.permission_manifest = permission_manifest
-        # Composition injects sink for the agent graph; ambient Telemetry is bound at run entry.
-        self.observability = observability
         self._cache: dict[str, Observation] = {}
 
     async def execute(
@@ -43,12 +40,17 @@ class SimpleSafeExecutor(SafeExecutor):
         cache_config: CacheConfig,
     ) -> Observation:
         if tool.name not in self.permission_manifest.allowed_tools:
+            event(EventName.TOOL_DENIED, **{ATTR_TOOL_NAME: tool.name, "reason": "permission"})
             raise ToolExecutionError(
                 f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权"
             )
 
         validation_error = self._validate_args(tool, args)
         if validation_error is not None:
+            event(
+                EventName.TOOL_DENIED,
+                **{ATTR_TOOL_NAME: tool.name, "reason": "validation"},
+            )
             return Observation(
                 observation_id=new_id("obs"),
                 success=False,
@@ -101,7 +103,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 handle.attributes["error"] = obs.error
                 handle.attributes[FAILURE_KIND] = FAILURE_KIND_EXECUTION
                 handle.attributes["retryable"] = getattr(err, "retryable", True)
-                handle.status = SpanStatus.ERROR
+                handle.mark_error(obs.error or "")
                 return obs
             except Exception as err:
                 _log.warning(
@@ -124,7 +126,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 handle.attributes[FAILURE_KIND] = obs.extra.get(
                     FAILURE_KIND, FAILURE_KIND_EXECUTION
                 )
-                handle.status = SpanStatus.ERROR
+                handle.mark_error(obs.error or "")
             return obs
 
     @staticmethod

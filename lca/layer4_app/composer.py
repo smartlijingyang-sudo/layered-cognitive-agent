@@ -40,7 +40,7 @@ from lca.contracts.protocols import (
     EventBus,
     LLMAdapter,
     MemorySystem,
-    Observability,
+    ObservabilityBackend,
     SharedMemoryStore,
     StateStore,
     TeamAssembly,
@@ -55,8 +55,13 @@ from lca.contracts.team_coordination import (
     LeadMandate,
     gate_name_for_mandate,
 )
-from lca.layer0_infra.llm_adapter.telemetry_llm import TelemetryLLMAdapter
-from lca.layer0_infra.observability.team_trace import TeamTraceProfile, team_id_for
+from lca.layer0_infra.observability import (
+    ObservabilityHub,
+    TeamTraceProfile,
+    create_observability,
+    team_id_for,
+)
+from lca.layer0_infra.observability.adapters import TelemetryLLMAdapter, TelemetryMemoryAdapter
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
@@ -79,6 +84,7 @@ from lca.layer4_app.team_wiring import (
     build_default_transport_registry,
     build_team_transport,
 )
+from lca.layer4_app.telemetry_bridge import install_telemetry_bridge
 
 __all__ = [
     "AgentComposer",
@@ -115,6 +121,7 @@ def _promote_lead(lead: CognitiveAgent, policy: BudgetPolicy) -> CognitiveAgent:
     return CognitiveAgent(
         lead.runtime,
         lead.role_profile,
+        lead.observability,
         max_steps=limits.max_steps,
         max_wall_clock_seconds=limits.max_wall_clock_seconds,
     )
@@ -150,7 +157,7 @@ class AgentComposer:
     ) -> CognitiveAgent:
         """Assemble a complete CognitiveAgent from *spec* (closed graph)."""
         profile = spec.profile
-        obs = self._resolve_observability(spec.observability)
+        hub = create_observability(spec.observability)
         mem = self._resolve_memory(spec.memory, shared_store)
         state_store = _resolve_component(
             self._registries.components,
@@ -162,7 +169,7 @@ class AgentComposer:
         tool_registry = SimpleToolRegistry()
         for tool in spec.tools:
             tool_registry.register(tool)
-        safe_executor = SimpleSafeExecutor(profile.tool_permission_manifest, obs)
+        safe_executor = SimpleSafeExecutor(profile.tool_permission_manifest)
         transport_registry = build_default_transport_registry()
         if team_channel is not None:
             transport_registry.register(team_channel)
@@ -193,13 +200,14 @@ class AgentComposer:
             brain,
             body,
             mem,
-            self._build_hooks(obs, event_bus),
+            self._build_hooks(event_bus),
             state_store,
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         return CognitiveAgent(
             runtime,
             profile,
+            hub,
             max_steps=spec.max_steps,
             max_wall_clock_seconds=spec.max_wall_clock_seconds,
         )
@@ -210,7 +218,7 @@ class AgentComposer:
         *,
         transport: AgentTransport,
         mandate: LeadMandate,
-        observability: Observability | None = None,
+        observability: ObservabilityHub | None = None,
     ) -> CognitiveAgent:
         """Build a closed lead agent from *spec* (awareness-aware reasoner + gate)."""
         lead_spec = (
@@ -236,7 +244,7 @@ class AgentComposer:
         spec: AgentSpec,
         *,
         shared_store: SharedMemoryStore | None = None,
-        observability: Observability | None = None,
+        observability: ObservabilityHub | None = None,
     ) -> CognitiveAgent:
         """Build a team member from *spec* (shared memory / shared observability)."""
         member_spec = (
@@ -244,27 +252,21 @@ class AgentComposer:
         )
         return self.compose(member_spec, action_scope=ActionScope.MEMBER, shared_store=shared_store)
 
-    def _resolve_observability(self, choice: str | Observability) -> Observability:
-        return _resolve_component(
-            self._registries.components,
-            ComponentKind.OBSERVABILITY,
-            choice,
-            Observability,  # type: ignore[type-abstract]
-        )
-
     def _resolve_memory(
         self,
         choice: str | MemorySystem,
         shared_store: SharedMemoryStore | None,
     ) -> MemorySystem:
         if shared_store is not None:
-            return SimpleMemorySystem(shared_store=shared_store)
-        return _resolve_component(
-            self._registries.components,
-            ComponentKind.MEMORY,
-            choice,
-            MemorySystem,  # type: ignore[type-abstract]
-        )
+            mem: MemorySystem = SimpleMemorySystem(shared_store=shared_store)
+        else:
+            mem = _resolve_component(
+                self._registries.components,
+                ComponentKind.MEMORY,
+                choice,
+                MemorySystem,  # type: ignore[type-abstract]
+            )
+        return TelemetryMemoryAdapter(mem)
 
     def _resolve_brain(
         self,
@@ -290,8 +292,9 @@ class AgentComposer:
         return resolved
 
     @staticmethod
-    def _build_hooks(observability: Observability, event_bus: EventBus) -> SimpleHookRegistry:
-        hooks = SimpleHookRegistry(observability)
+    def _build_hooks(event_bus: EventBus) -> SimpleHookRegistry:
+        hooks = SimpleHookRegistry()
+        install_telemetry_bridge(event_bus)
         event_hook = make_event_emitting_hook(event_bus)
         for event_name in HookEvent:
             hooks.register(event_name, default_logging_hook)
@@ -346,7 +349,7 @@ class TeamComposer(AgentComposer):
         coordination: Coordination | None = None,
         shared_memory_layers: Sequence[MemoryLayer] | None = None,
         delegate_max_attempts: int | None = None,
-        observability: str | Observability | None = None,
+        observability: str | ObservabilityHub | None = None,
     ) -> TeamUnit:
         """Assemble a closed team from kwargs; folds governance at the boundary."""
         governance = _governance_from(lead, coordination)
@@ -397,7 +400,7 @@ class TeamComposer(AgentComposer):
         spec: TeamSpec,
         stage: TeamStage,
         transport: AgentTransport,
-        shared_obs: Observability,
+        shared_obs: ObservabilityHub,
     ) -> TeamAssembly:
         """Close the lead agent when governance is a LeadSpec; build the factory view."""
         governance = spec.governance
@@ -433,13 +436,13 @@ class TeamComposer(AgentComposer):
             member_roles=tuple(member.role_profile.role for member in members),
         )
 
-    def _resolve_team_observability(self, spec: TeamSpec) -> Observability:
-        """Single shared Observability instance for the whole team (span tree continuity).
+    def _resolve_team_observability(self, spec: TeamSpec) -> ObservabilityHub:
+        """Single shared hub for the whole team (span tree continuity).
 
         Priority: explicit TeamSpec arg > member specs in order > lead spec > console default.
-        First instance wins as-is; first registry name is resolved once and shared.
+        First hub instance wins as-is; first choice string is resolved once and shared.
         """
-        candidates: list[str | Observability] = []
+        candidates: list[str | ObservabilityBackend] = []
         if spec.observability is not None:
             candidates.append(spec.observability)
         candidates.extend(member.observability for member in spec.members)
@@ -447,11 +450,11 @@ class TeamComposer(AgentComposer):
         if isinstance(governance, LeadSpec):
             candidates.append(governance.agent.observability)
         for choice in candidates:
-            if isinstance(choice, Observability):
+            if isinstance(choice, ObservabilityHub):
                 return choice
             if isinstance(choice, str):
-                return self._resolve_observability(choice)
-        return self._resolve_observability(OBSERVABILITY_CHOICE_CONSOLE)
+                return create_observability(choice)
+        return create_observability(OBSERVABILITY_CHOICE_CONSOLE)
 
 
 def _governance_from(lead: LeadSpec | None, coordination: Coordination | None) -> Governance:

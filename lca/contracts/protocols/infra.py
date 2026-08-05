@@ -1,4 +1,7 @@
-"""L0 基础设施协议 —— LLM / Tool / StateStore / Transport / Observability。"""
+"""L0 基础设施协议 —— LLM / Tool / StateStore / Transport。
+
+可观测性协议见 ``lca.contracts.protocols.observability``。
+"""
 
 from __future__ import annotations
 
@@ -6,16 +9,20 @@ from collections.abc import AsyncIterator
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from lca.contracts.decision import AgentCard, Observation
-from lca.contracts.observability import TraceSpan
+from lca.contracts.llm import LLMResponse
 from lca.contracts.role_team import CacheConfig, RetryPolicy
 from lca.contracts.state import AgentState
 
 
 @runtime_checkable
 class LLMAdapter(Protocol):
-    """LLM 适配器接口：屏蔽 provider 差异。"""
+    """LLM 适配器接口：屏蔽 provider 差异。
 
-    async def complete(self, prompt: str, **kwargs: Any) -> str: ...
+    ``complete`` 返回结构化 :class:`LLMResponse`（文本 + 模型 + token 用量），
+    用量是可观测性成本链路的单一事实源。
+    """
+
+    async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse: ...
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
         """流式输出，逐 chunk 返回文本。子类按需覆写。"""
         ...
@@ -103,25 +110,3 @@ class TransportRegistryProtocol(Protocol):
     def resolve(self, protocol_name: str) -> AgentTransport: ...
 
     def list_protocols(self) -> list[str]: ...
-
-
-@runtime_checkable
-class Observability(Protocol):
-    """后端 sink：接收已完成的 TraceSpan。
-
-    由组合根注入；业务层不直接调用，统一经 :class:`Telemetry`。
-    """
-
-    def emit_span(self, span: TraceSpan) -> None: ...
-
-
-@runtime_checkable
-class Telemetry(Protocol):
-    """应用 facade：在边界打 span，不耦合 sink 实现。
-
-    L0 提供 ambient 绑定（``bind``）与 ``span``；长期唯一发射面。
-    """
-
-    def span(self, name: str, **attributes: Any) -> Any:
-        """Context manager yielding TraceSpan (mutable ``attributes``)."""
-        ...

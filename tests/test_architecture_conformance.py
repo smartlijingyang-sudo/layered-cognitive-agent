@@ -68,15 +68,29 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.member_status.required_action.RequiredAction": (
         "纯数据声明（gate 裁决结果），非可插拔组件"
     ),
-    "lca.layer0_infra.observability.runtime.SpanContext": ("correlation 值对象，非可插拔组件 "),
-    "lca.layer0_infra.observability.runtime._Span": ("Telemetry span 引擎内部类型，非公共组件 "),
-    "lca.layer0_infra.observability.runtime.ContextTelemetry": (
-        "Telemetry Protocol 实现，见 contracts.protocols.Telemetry "
+    # ── 可观测性子系统（OTel 骨干重建后）──
+    "lca.layer0_infra.observability.facade.SpanContext": ("correlation 值对象，非可插拔组件"),
+    "lca.layer0_infra.observability.hub.SpanHandle": ("span 句柄内部类型，非公共组件"),
+    "lca.layer0_infra.observability.hub.NullSpanHandle": ("span 句柄 no-op 内部类型"),
+    "lca.layer0_infra.observability.hub._IsolatedExporter": ("导出器故障隔离包装，子系统内部"),
+    "lca.layer0_infra.observability.policy.AttributePolicy": ("属性脱敏/截断策略，子系统内部"),
+    "lca.layer0_infra.observability.policy.Verbosity": ("信息量档位配置枚举，非组件"),
+    "lca.layer0_infra.observability.settings.ObservabilitySettings": (
+        "pydantic-settings 配置模型，非组件"
     ),
-    "lca.layer0_infra.observability.runtime.NullTelemetry": ("Telemetry no-op 默认实现 "),
-    "lca.layer0_infra.observability.team_trace.TeamTraceProfile": (
+    "lca.layer0_infra.observability.team_profile.TeamTraceProfile": (
         "团队 span 静态档案值对象，纯数据结构，非可插拔组件 (ADR-0034)"
     ),
+    "lca.layer0_infra.observability.view.SpanView": ("ReadableSpan 投影值对象，非组件"),
+    "lca.layer0_infra.observability.exporters.console._RunDigest": ("console digest 内部累加器"),
+    "lca.layer0_infra.observability.exporters.console.ConsoleNarratorExporter": (
+        "实现 OTel SpanExporter 标准接口，非 LCA 协议组件"
+    ),
+    "lca.layer0_infra.observability.exporters.jsonl.JsonlExporter": (
+        "实现 OTel SpanExporter 标准接口，非 LCA 协议组件"
+    ),
+    "lca.layer0_infra.observability.exporters.langfuse.ExporterUnavailableError": ("异常类型"),
+    "lca.layer0_infra.observability.registry.UnknownExporterError": ("异常类型"),
 }
 
 _SCAN_PACKAGES = [

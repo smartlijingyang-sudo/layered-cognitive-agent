@@ -152,24 +152,34 @@ result = await team.run("任务描述")
 Prompt 模板存放在 `lca/layer1_cognitive/brain/prompts/*.md`，不触碰 Python 代码即可迭代。
 用 `load_builtin_prompt("react_prompt")` 加载，占位符用 `{role}` / `{goal}` / `{task}` 等。
 
-## 可观测性
+## 可观测性（OTel 骨干 · 单入口 · Langfuse-Ready）
 
-默认 `ConsoleObservability`（`observability="console"`）在 **框架 `run()` 内**打印：
-- `run.plan` 场景卡（strategy / mandate / members / 计划步骤 / 任务预览）
-- 关键步骤标记（LLM / 决策 / 调用成员 / Agent 完成…）
-- 全量 span 行
+三层分治：**认知语义**（contracts 词表 + L0 facade，我们拥有）→ **OpenTelemetry 骨干**（业界标准，业务层不可见）→ **后端**（console/jsonl/memory/langfuse，配置化装配）。
 
-无需 tests 或 CLI 补丁；任意 `Team.run` / `Agent.run` 即有。
+**对外唯一入口**：`Agent/Team(observability="console")`（或 `"console+langfuse"` 多后端、`create_observability(...)` 显式构造）。默认 console 在框架 `run()` 内打印场景卡（run.plan）、按角色分节的全量 span 行、运行末 digest（错误数/最慢 top-3/耗时）。
 
+**内部埋点**（业务层只 import 包根，三种形态）：
 ```python
-# 默认就是 console
-team = Team(members=[...], lead=TeamLead.routing(lead), observability="console")
-await team.run("任务")
+from lca.layer0_infra.observability import span, event, traced, annotate
 
-# 落盘
-agent = Agent(..., observability="jsonl_file")
-# 输出到 traces/lca_trace.jsonl，每行一个 JSON，可用 jq 过滤
+@traced(SpanName.TOOL_EXECUTE, capture=...)   # ① 装饰器：函数级零样板
+with span(SpanName.LLM_CHAT, **attrs) as h:   # ② 上下文管理器：中途写属性
+    ...
+event(EventName.DECISION_MADE, **attrs)        # ③ 业务事件
 ```
+认知四相 / LLM / 记忆读写由 hook 边界与适配器**零埋点**自动发射。span/event 名必须取 `SpanName`/`EventName` 枚举，新词条须在 `contracts/telemetry_catalog.py` 登记唯一发射点（守卫强制）。
+
+**属性策略**：脱敏（密钥正则）与 verbosity 截断在写入期集中强制（`AttributePolicy`），发射点不需要自觉。档位 `LCA_OBS_VERBOSITY=minimal|standard|verbose`，后端组合 `LCA_OBS_BACKENDS`，采样 `LCA_OBS_SAMPLING_RATE`（pydantic-settings，读 `.env`）。
+
+**Langfuse**（可选组 `observability-langfuse`）：
+```bash
+uv sync --group observability-langfuse
+# .env: LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST
+```
+```python
+team = Team(members=[...], lead=TeamLead.board(lead), observability="console+langfuse")
+```
+映射：run 根 → trace（session=team_id）· `llm.chat` → generation（gen_ai 语义约定，token/成本自动核算）· 业务事件 → event。
 
 本地探针 CLI（选 mode + 默认任务文案 + 结束 digest）：
 `uv run python scripts/run_team_mode.py`

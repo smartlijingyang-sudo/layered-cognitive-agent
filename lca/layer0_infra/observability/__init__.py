@@ -1,78 +1,75 @@
-"""L0 Observability package.
+"""LCA 可观测性子系统 —— 唯一公共面（白名单守卫）。
 
-Public application API (only these for business layers)
--------------------------------------------------------
-- ``bind(observability)``  — install ambient Telemetry at run entry
-- ``span(name, **attrs)``  — emit a correlated span (contracts: SpanName)
-- backends: Console / JSONL / Multiplex / Null
+架构三层：
+    ① 认知语义层（contracts 词表 + 本包 facade）—— 我们拥有
+    ② 遥测骨干（OpenTelemetry）—— 业界标准，被 facade 封装，业务层不可见
+    ③ 后端（console/jsonl/memory/langfuse）—— 注册表装配，配置化
 
-Internal
---------
-Correlation + Telemetry runtime live in ``runtime.py``.
+外部使用（唯一入口）::
+
+    from lca.layer0_infra.observability import create_observability, bind, span, event
+
+    hub = create_observability("console+langfuse")   # 或 Agent(observability=...)
+    with bind(hub):
+        with span(SpanName.RUN_AGENT):
+            ...
+
+包外禁止 import 任何子模块（守卫测试强制）；本 ``__init__`` 是唯一表面。
 """
 
-from lca.layer0_infra.observability.console_observability import ConsoleObservability
-from lca.layer0_infra.observability.jsonl_file_observability import JSONLFileObservability
-from lca.layer0_infra.observability.multiplex import MultiplexObservability
-from lca.layer0_infra.observability.null_observability import NullObservability
-from lca.layer0_infra.observability.plan_narrative import (
-    format_run_plan_card,
-    plan_steps_joined,
-    strategy_plan_steps,
-)
-from lca.layer0_infra.observability.redaction import safe_repr, sanitize, truncate
-from lca.layer0_infra.observability.run_narrative import (
-    format_section_header,
-    format_span_line,
-    format_step_banner,
-    is_milestone_span,
-    logical_depth,
-    section_key_for_span,
-)
-from lca.layer0_infra.observability.runtime import (
+from lca.layer0_infra.observability.exporters.langfuse import ExporterUnavailableError
+from lca.layer0_infra.observability.facade import (
     SpanContext,
+    annotate,
     bind,
-    current,
+    event,
     get_span_context,
+    score,
     set_actor,
+    set_session,
     span,
+    traced,
 )
-from lca.layer0_infra.observability.span_attributes import extract_span_attributes
-from lca.layer0_infra.observability.team_trace import (
+from lca.layer0_infra.observability.hub import ObservabilityHub
+from lca.layer0_infra.observability.narrative import plan_steps_joined
+from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
+from lca.layer0_infra.observability.registry import (
+    UnknownExporterError,
+    create_observability,
+)
+from lca.layer0_infra.observability.settings import ObservabilitySettings
+from lca.layer0_infra.observability.team_profile import (
     TeamTraceProfile,
     objective_preview,
     plan_card_attrs,
     team_id_for,
     team_run_attrs,
 )
+from lca.layer0_infra.observability.view import SpanView
 
 __all__ = [
-    "ConsoleObservability",
-    "JSONLFileObservability",
-    "MultiplexObservability",
-    "NullObservability",
+    "AttributePolicy",
+    "ExporterUnavailableError",
+    "ObservabilityHub",
+    "ObservabilitySettings",
     "SpanContext",
+    "SpanView",
     "TeamTraceProfile",
+    "UnknownExporterError",
+    "Verbosity",
+    "annotate",
     "bind",
-    "current",
-    "extract_span_attributes",
-    "format_run_plan_card",
-    "format_section_header",
-    "format_span_line",
-    "format_step_banner",
+    "create_observability",
+    "event",
     "get_span_context",
-    "is_milestone_span",
-    "logical_depth",
     "objective_preview",
     "plan_card_attrs",
     "plan_steps_joined",
-    "safe_repr",
-    "sanitize",
-    "section_key_for_span",
+    "score",
     "set_actor",
+    "set_session",
     "span",
-    "strategy_plan_steps",
     "team_id_for",
     "team_run_attrs",
-    "truncate",
+    "traced",
 ]

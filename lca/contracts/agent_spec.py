@@ -32,17 +32,21 @@ from lca.contracts.team_coordination import (
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.cognition import Brain
-    from lca.contracts.protocols.infra import LLMAdapter, Observability, StateStore, Tool
+    from lca.contracts.protocols.infra import LLMAdapter, StateStore, Tool
     from lca.contracts.protocols.memory import MemorySystem
+    from lca.contracts.protocols.observability import ObservabilityBackend
 
 MEMORY_CHOICE_SIMPLE = "simple"
 """MemorySystem 内置注册名：SimpleMemorySystem。"""
 
 OBSERVABILITY_CHOICE_CONSOLE = "console"
-"""Observability 内置注册名：ConsoleObservability。"""
+"""可观测后端内置选择名：console 叙述导出器。"""
 
-OBSERVABILITY_CHOICE_JSONL_FILE = "jsonl_file"
-"""Observability 内置注册名：JSONLFileObservability。"""
+OBSERVABILITY_CHOICE_JSONL = "jsonl"
+"""可观测后端内置选择名：JSONL 落盘导出器。"""
+
+OBSERVABILITY_CHOICE_LANGFUSE = "langfuse"
+"""可观测后端内置选择名：Langfuse 桥（需 observability-langfuse 可选依赖组）。"""
 
 STATE_STORE_CHOICE_MEMORY = "memory"
 """StateStore 内置注册名：InMemoryStateStore。"""
@@ -69,7 +73,7 @@ class AgentSpec:
     max_steps: int = DEFAULT_MAX_STEPS
     max_wall_clock_seconds: int | None = DEFAULT_MAX_WALL_CLOCK_SECONDS
     memory: str | MemorySystem = MEMORY_CHOICE_SIMPLE
-    observability: str | Observability = OBSERVABILITY_CHOICE_CONSOLE
+    observability: str | ObservabilityBackend = OBSERVABILITY_CHOICE_CONSOLE
     state_store: str | StateStore = STATE_STORE_CHOICE_MEMORY
     brain: str | Brain = BRAIN_CHOICE_DEFAULT
 
@@ -115,7 +119,7 @@ class TeamSpec:
     governance: Governance
     shared_memory_layers: tuple[MemoryLayer, ...] = ()
     delegate_max_attempts: int = DEFAULT_DELEGATE_MAX_ATTEMPTS
-    observability: str | Observability | None = None
+    observability: str | ObservabilityBackend | None = None
 
 
 def strategy_key_for_governance(governance: Governance) -> str:

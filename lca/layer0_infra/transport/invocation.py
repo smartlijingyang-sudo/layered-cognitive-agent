@@ -12,6 +12,30 @@ from lca.layer0_infra.observability import span
 _DEFAULT_TIMEOUT_S = 300.0
 
 
+def _describe_target(agent_card: AgentCard | str) -> str:
+    return (
+        agent_card if isinstance(agent_card, str) else getattr(agent_card, "role", str(agent_card))
+    )
+
+
+async def send_task_traced(
+    transport: AgentTransport,
+    agent_card: AgentCard | str,
+    subtask: str,
+    context_refs: list[str],
+) -> str:
+    """发送子任务（阻塞与非阻塞路径共用的唯一 transport.request 发射点）。"""
+    callee = _describe_target(agent_card)
+    protocol = getattr(transport, "protocol_name", "unknown")
+    with span(
+        SpanName.TRANSPORT_REQUEST,
+        **{ATTR_CALLEE_ROLE: callee, ATTR_PROTOCOL: protocol},
+    ) as handle:
+        task_id = await transport.send_task(agent_card, subtask, context_refs)
+        handle.attributes[ATTR_OK] = True
+    return task_id
+
+
 async def send_and_wait(
     transport: AgentTransport,
     agent_card: AgentCard | str,
@@ -22,16 +46,10 @@ async def send_and_wait(
 ) -> Observation:
     """Send a subtask via *transport* and wait for the Observation result."""
     refs = list(context_refs or [])
-    callee = (
-        agent_card if isinstance(agent_card, str) else getattr(agent_card, "role", str(agent_card))
-    )
+    callee = _describe_target(agent_card)
     protocol = getattr(transport, "protocol_name", "unknown")
 
-    with span(
-        SpanName.TRANSPORT_REQUEST,
-        **{ATTR_CALLEE_ROLE: callee, ATTR_PROTOCOL: protocol},
-    ):
-        task_id = await transport.send_task(agent_card, subtask, refs)
+    task_id = await send_task_traced(transport, agent_card, subtask, refs)
 
     with span(
         SpanName.TRANSPORT_RESPONSE,

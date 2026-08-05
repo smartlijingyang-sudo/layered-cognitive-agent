@@ -40,7 +40,7 @@ from lca.contracts.protocols import (
     Brain,
     LLMAdapter,
     MemorySystem,
-    Observability,
+    ObservabilityBackend,
     StateStore,
     TeamUnit,
     Tool,
@@ -77,7 +77,7 @@ class Agent(AgentUnit):
         max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = DEFAULT_MAX_WALL_CLOCK_SECONDS,
         memory: str | MemorySystem = MEMORY_CHOICE_SIMPLE,
-        observability: str | Observability = OBSERVABILITY_CHOICE_CONSOLE,
+        observability: str | ObservabilityBackend = OBSERVABILITY_CHOICE_CONSOLE,
         state_store: str | StateStore = STATE_STORE_CHOICE_MEMORY,
         brain: str | Brain = BRAIN_CHOICE_DEFAULT,
         composer: AgentComposer | None = None,
@@ -159,7 +159,7 @@ class Team(TeamUnit):
         coordination: Coordination | None = None,
         shared_memory_layers: Sequence[MemoryLayer] | None = None,
         delegate_max_attempts: int | None = None,
-        observability: str | Observability | None = None,
+        observability: str | ObservabilityBackend | None = None,
         composer: TeamComposer | None = None,
     ) -> None:
         governance: Governance

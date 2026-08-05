@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-from lca.contracts.observability import TraceSpan
 from lca.contracts.telemetry import (
     ATTR_AGENT_ROLE,
     ATTR_LEAD_ROLE,
@@ -17,7 +16,8 @@ from lca.contracts.telemetry import (
     ATTR_STRATEGY_KEY,
     ATTR_TEAM_ID,
 )
-from lca.layer0_infra.observability.narrative_utils import attr_text, wrap_words
+from lca.layer0_infra.observability.narrative.narrative_utils import attr_text, wrap_words
+from lca.layer0_infra.observability.view import SpanView
 
 # Generic plan templates by strategy_key (coordination / lead family).
 _STRATEGY_PLAN: dict[str, tuple[str, ...]] = {
@@ -88,7 +88,7 @@ def plan_steps_joined(strategy_key: str, mandate: str | None = None) -> str:
     return " | ".join(strategy_plan_steps(strategy_key, mandate))
 
 
-def format_run_plan_card(span: TraceSpan) -> str:
+def format_run_plan_card(span: SpanView) -> str:
     """Banner for SpanName.RUN_PLAN — who / strategy / objective / steps."""
     attrs = span.attributes or {}
     strategy = attr_text(attrs, ATTR_STRATEGY_KEY) or _NO_STRATEGY

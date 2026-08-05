@@ -121,14 +121,14 @@ async def _run_one(
     objective: str | None,
     max_rounds: int,
 ) -> int:
-    """Run via framework Team/Agent path; ConsoleObservability prints scenario+steps."""
+    """Run via framework Team/Agent path; console 叙述导出器打印场景卡+步骤."""
     llm: LLMAdapter = (
         scripted_llm_for_mode(mode) if track == _TRACK_SCRIPTED else _resolve_real_llm()
     )
 
     # CLI-only convenience: mode-specific default task (framework prints whatever is passed).
     obj = objective if objective is not None else default_objective(mode)
-    # LiveCollector = InMemory + framework ConsoleObservability (not a second narrative).
+    # LiveCollector = InMemory + console 叙述导出器（同一份叙事，不双写）。
     col = LiveCollector(live=live)
 
     try:
@@ -177,7 +177,7 @@ def _build_parser() -> argparse.ArgumentParser:
   uv run python scripts/run_team_mode.py board
   uv run python scripts/run_team_mode.py --list
 
-场景卡 / 步骤进度来自框架 ConsoleObservability（Team/Agent.run 内），
+场景卡 / 步骤进度来自框架 console 叙述导出器（Team/Agent.run 内），
 不是测试脚本私货。本 CLI 只负责：选 mode、默认任务文案、结束 TRACE digest。
 
 可选:

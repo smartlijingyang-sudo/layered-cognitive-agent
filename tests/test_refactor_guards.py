@@ -83,6 +83,7 @@ class TestLeadWallClockPropagation(unittest.TestCase):
     def test_lead_wall_clock_preserved(self) -> None:
         from unittest.mock import MagicMock
 
+        from lca.layer0_infra.observability import create_observability
         from lca.layer3_agent.cognitive_agent import CognitiveAgent
         from lca.layer4_app.composer import _promote_lead
         from lca.layer4_app.policies import LeadBudgetPolicy
@@ -90,7 +91,13 @@ class TestLeadWallClockPropagation(unittest.TestCase):
         runtime = MagicMock()
         role_profile = MagicMock()
         role_profile.role = "lead"
-        lead = CognitiveAgent(runtime, role_profile, max_steps=10, max_wall_clock_seconds=900)
+        lead = CognitiveAgent(
+            runtime,
+            role_profile,
+            create_observability("memory"),
+            max_steps=10,
+            max_wall_clock_seconds=900,
+        )
         promoted = _promote_lead(lead, LeadBudgetPolicy())
         self.assertEqual(promoted.max_wall_clock_seconds, 900)
         self.assertEqual(promoted.max_steps, 20)

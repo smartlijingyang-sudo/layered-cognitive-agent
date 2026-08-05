@@ -11,6 +11,7 @@ import re
 from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any
 
+from lca.contracts.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
 
 _ROLE_RE = re.compile(r"^ROLE:\s*(.+)$", re.MULTILINE)
@@ -88,26 +89,30 @@ class ScriptedLLMAdapter(LLMAdapter):
         self._scripts[role] = list(responses)
         self._cursors[role] = 0
 
-    async def complete(self, prompt: str, **kwargs: Any) -> str:
+    async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         role = self._extract_role(prompt) or "*"
         self.calls.append((role, prompt[:200]))
         queue = self._next(role)
         if queue is not None:
-            return queue
+            return self._respond(queue)
         if role != "*" and "*" in self._scripts:
             queue = self._next("*")
             if queue is not None:
-                return queue
+                return self._respond(queue)
         if self._default_respond:
-            return respond(f"{self._default_text} ({role})")
+            return self._respond(respond(f"{self._default_text} ({role})"))
         raise LookupError(
             f"ScriptedLLM has no remaining response for role={role!r}. "
             f"Calls so far: {len(self.calls)}. Define a script or enable default_respond."
         )
 
+    @staticmethod
+    def _respond(text: str) -> LLMResponse:
+        return LLMResponse(text=text, model="scripted-llm")
+
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
-        text = await self.complete(prompt, **kwargs)
-        yield text
+        response = await self.complete(prompt, **kwargs)
+        yield response.text
 
     def _next(self, role: str) -> str | None:
         seq = self._scripts.get(role)

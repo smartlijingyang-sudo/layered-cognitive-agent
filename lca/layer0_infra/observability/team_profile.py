@@ -1,9 +1,8 @@
-"""团队 trace 档案 —— 团队级静态 span 属性与装配（ADR-0034）。
+"""团队 trace 档案 —— 团队级静态 span 属性装配（ADR-0034）。
 
 遥测与行为分离：组合根从组合期已知的角色画像装配一份不可变
 ``TeamTraceProfile``；运行边缘（``TeamHandle.run``）只消费它发出
-``run.team`` / ``run.plan`` 场景卡，不再临时拼 attrs、不做 getattr 反射。
-属性键值与旧模型逐字节一致，console / jsonl 输出保持兼容。
+``run.team`` / ``run.plan`` 场景卡，不临时拼 attrs、不做 getattr 反射。
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ from lca.contracts.telemetry import (
     ATTR_STRATEGY_KEY,
     ATTR_TEAM_ID,
 )
-from lca.layer0_infra.observability.plan_narrative import plan_steps_joined
+from lca.layer0_infra.observability.narrative import plan_steps_joined
 
 _OBJECTIVE_PREVIEW_MAX = 240
 """目标文本在 span 属性中的展示长度上限（solo / team 场景卡共用）。"""

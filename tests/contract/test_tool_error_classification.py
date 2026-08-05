@@ -13,7 +13,6 @@ from lca.contracts.decision import Observation
 from lca.contracts.result import ToolExecutionError, ToolInputError
 from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.state import AgentState, Budget
-from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.brain.critic import SimpleCritic
@@ -75,7 +74,6 @@ class TestSafeExecutorValidationNoRetry:
     def setup_method(self) -> None:
         self.executor = SimpleSafeExecutor(
             ToolPermissionManifest(allowed_tools=["calculator"]),
-            ConsoleObservability(),
         )
         self.tool = CalculatorTool()
         self.retry_policy = RetryPolicy(max_retries=3, backoff_base_s=0.01)
@@ -109,7 +107,6 @@ class TestSafeExecutorInputErrorNoRetry:
     def setup_method(self) -> None:
         self.executor = SimpleSafeExecutor(
             ToolPermissionManifest(allowed_tools=["calculator"]),
-            ConsoleObservability(),
         )
         self.tool = CalculatorTool()
         self.retry_policy = RetryPolicy(max_retries=3, backoff_base_s=0.01)
@@ -147,7 +144,6 @@ class TestSafeExecutorNormalPath:
     def setup_method(self) -> None:
         self.executor = SimpleSafeExecutor(
             ToolPermissionManifest(allowed_tools=["calculator"]),
-            ConsoleObservability(),
         )
         self.tool = CalculatorTool()
         self.retry_policy = RetryPolicy(max_retries=3, backoff_base_s=0.01)

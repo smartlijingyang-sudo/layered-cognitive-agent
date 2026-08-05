@@ -16,9 +16,14 @@ class RunContext:
     Generic for every agent (solo / member / lead). The lead's live team
     cognition uses the single optional ``team_awareness`` slot — never
     flatten board/retry/routing into ``extra`` .
+
+    ``session_id`` groups related runs into one conversation/session
+    (stable across resume); observability backends use it for session
+    views (e.g. Langfuse session grouping).
     """
 
     trace_id: str | None = None
+    session_id: str | None = None
     from_role: str = ""
     context_refs: list[str] = field(default_factory=list)
     deadline: datetime | None = None

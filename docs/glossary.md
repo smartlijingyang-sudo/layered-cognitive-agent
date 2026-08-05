@@ -82,8 +82,15 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **ModularBrain** | 默认 Brain（reasoner / critic / decision_parser 可替换）；CandidateEvaluationPipeline 做 decompose → evaluate |
 | **Turn** | 单步记录：decision + act result + reflection |
 | **Budget** | token / cost / steps / wall_clock 预算 |
-| **Hook** / **HookRegistry** / **EventBus** / **Event** | 生命周期钩子与事件 |
-| **Observability** / **TraceSpan** / **ConsoleObservability** / **JSONLFileObservability** | 可观测性（console 打印 / JSONL 落盘） |
+| **Hook** / **HookRegistry** / **EventBus** | 生命周期钩子与事件总线（业务事实经遥测桥进入 trace 管道） |
+| **Telemetry** | 业务层唯一发射门面契约：span / event / score，不耦合任何后端 |
+| **ObservabilityHub** | 可观测性唯一门面对象：OTel 骨干 + 处理器策略 + 导出器 fan-out + 生命周期；满足 **ObservabilityBackend** 结构契约 |
+| **SpanName** / **EventName** | 封闭遥测词表（span 名 / 业务事件名），配 **VocabDef** 目录登记唯一发射点 |
+| **SpanView** / **SpanContext** | OTel span 的本地投影视图 / 当前关联上下文（trace/span id） |
+| **AttributePolicy** / **Verbosity** | 属性策略（脱敏/截断，写入期强制）与信息量档位（minimal/standard/verbose） |
+| **ConsoleNarratorExporter** / **JsonlExporter** | console 叙述 / JSONL 落盘导出器（OTel SpanExporter 实现） |
+| **LangfuseBridge** / **ExporterUnavailableError** | Langfuse 后端桥接（OTel 原生 SDK 挂接）/ 导出器不可用异常 |
+| **LLMResponse** / **TokenUsage** | LLM 结构化返回（文本 + 模型 + token 用量），成本链路单一事实源 |
 | **StateStore** / **StateSnapshot** | 状态持久化与快照 |
 
 ## L-Plugin / L0
@@ -133,6 +140,11 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 
 | 旧名 | 新名 |
 |---|---|
+| Observability / TraceSpan | ObservabilityBackend / Telemetry（门面契约）+ OTel span / SpanView（自研 span 模型被 OpenTelemetry 骨干取代） |
+| ConsoleObservability | ConsoleNarratorExporter（OTel SpanExporter 实现） |
+| JSONLFileObservability | JsonlExporter（OTel SpanExporter 实现） |
+| Event（契约 dataclass） | OTel span event（业务事件经 `event(EventName.X)` 发射） |
+| MultiplexObservability / NullObservability | ObservabilityHub fan-out / 未 bind 时 ambient no-op |
 | MultiAgentTeam | Team |
 | TeamOrchestrator | TeamHandle（编排决策全部闭合进 TeamStrategy，句柄只是 trace 边缘；ADR-0034） |
 | TeamContext | 已删除；策略构造期闭合，运行期无上下文包（ADR-0034） |

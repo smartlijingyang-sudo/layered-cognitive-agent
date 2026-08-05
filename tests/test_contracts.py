@@ -50,16 +50,16 @@ class TestMockLLMAdapter(unittest.TestCase):
     def test_arithmetic_detection(self):
         llm = MockLLMAdapter()
         result = asyncio.run(llm.complete("ROLE: test\nUSER_TASK: 123 乘以 456 等于多少？\n"))
-        self.assertIn("use_tool", result)
-        self.assertIn("calculator", result)
+        self.assertIn("use_tool", result.text)
+        self.assertIn("calculator", result.text)
 
     def test_tool_result_response(self):
         llm = MockLLMAdapter()
         result = asyncio.run(
             llm.complete("USER_TASK: 123 乘以 456\nCONTEXT:\nTOOL_RESULT: 56088\n")
         )
-        self.assertIn("respond", result)
-        self.assertIn("56088", result)
+        self.assertIn("respond", result.text)
+        self.assertIn("56088", result.text)
 
 
 class TestDecisionParser(unittest.TestCase):

@@ -15,7 +15,6 @@ from lca.contracts.result import UnregisteredActionError
 from lca.contracts.role_team import ToolPermissionManifest
 from lca.contracts.semantic_keys import OBS_DEGRADED_FROM
 from lca.contracts.state import AgentState, Budget
-from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.body.action_handlers import RespondOperation, UseToolOperation
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
@@ -39,9 +38,7 @@ def _respond_registry() -> ActionRegistry:
 def _tool_registry_with_calculator() -> ActionRegistry:
     tool_registry = SimpleToolRegistry()
     tool_registry.register(CalculatorTool())
-    safe_executor = SimpleSafeExecutor(
-        ToolPermissionManifest(allowed_tools=["calculator"]), ConsoleObservability()
-    )
+    safe_executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=["calculator"]))
     registry = ActionRegistry()
     registry.register(ActionType.USE_TOOL, UseToolOperation(tool_registry, safe_executor))
     return registry

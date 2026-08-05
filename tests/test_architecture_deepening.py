@@ -9,12 +9,12 @@ from lca.contracts.decision import Decision, Observation, Reflection
 from lca.contracts.enums import ActionType, ReflectionVerdict
 from lca.contracts.ids import new_id
 from lca.contracts.lifecycle import AgentCard, TaskStatus
+from lca.contracts.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.result import UnregisteredActionError
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.state import AgentState, Budget
 from lca.contracts.team_coordination import Debate
-from lca.layer0_infra.observability.console_observability import ConsoleObservability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer1_cognitive.body.action_handlers import RespondOperation
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
@@ -120,7 +120,7 @@ class TestCheckpointResume:
             brain=_Brain(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
             body=_Body(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
             memory=_Mem(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
-            hooks=SimpleHookRegistry(ConsoleObservability()),
+            hooks=SimpleHookRegistry(),
             state_store=store,
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
@@ -136,15 +136,15 @@ class TestSkillRouterTemplate:
         class CapturingLLM(LLMAdapter):
             name = "cap"
 
-            async def complete(self, prompt: str, **kwargs: object) -> str:
+            async def complete(self, prompt: str, **kwargs: object) -> LLMResponse:
                 recorded.append(prompt)
-                return (
-                    '{"action_type":"respond","response_text":"ok",'
+                return LLMResponse(
+                    text='{"action_type":"respond","response_text":"ok",'
                     '"rationale":"r","confidence":0.9}'
                 )
 
             async def stream(self, prompt: str, **kwargs: object):  # type: ignore[no-untyped-def]  # kwargs 类型由 Protocol 约束
-                yield await self.complete(prompt)
+                yield (await self.complete(prompt)).text
 
         rp = RoleProfile(
             role="研究员",
@@ -180,7 +180,7 @@ class TestDebateMultiRound:
         class DebateLLM(LLMAdapter):
             name = "debate"
 
-            async def complete(self, prompt: str, **kwargs: object) -> str:
+            async def complete(self, prompt: str, **kwargs: object) -> LLMResponse:
                 import json
                 import re
 
@@ -189,23 +189,27 @@ class TestDebateMultiRound:
                 converging = "Previous proposals" in prompt
                 if not converging:
                     price = 39.9 if "保守" in role else 59.9
-                    return json.dumps(
+                    return LLMResponse(
+                        text=json.dumps(
+                            {
+                                "action_type": "respond",
+                                "response_text": f"PROPOSAL: ${price}",
+                                "confidence": 0.7,
+                            }
+                        )
+                    )
+                return LLMResponse(
+                    text=json.dumps(
                         {
                             "action_type": "respond",
-                            "response_text": f"PROPOSAL: ${price}",
-                            "confidence": 0.7,
+                            "response_text": "PROPOSAL: $49.9 折衷",
+                            "confidence": 0.9,
                         }
                     )
-                return json.dumps(
-                    {
-                        "action_type": "respond",
-                        "response_text": "PROPOSAL: $49.9 折衷",
-                        "confidence": 0.9,
-                    }
                 )
 
             async def stream(self, prompt: str, **kwargs: object):  # type: ignore[no-untyped-def]  # kwargs 类型由 Protocol 约束
-                yield await self.complete(prompt)
+                yield (await self.complete(prompt)).text
 
         llm = DebateLLM()
         a = Agent(role="保守派定价", goal="", backstory="", tools=[], llm=llm, max_steps=2)

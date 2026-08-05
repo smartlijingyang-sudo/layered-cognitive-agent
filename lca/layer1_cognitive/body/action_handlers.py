@@ -10,6 +10,7 @@ DELEGATE/HANDOFF 成员调用统一走 ``send_and_wait``（与 strategy 同端�
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from lca.contracts.action import Action
 from lca.contracts.decision import Decision, DelegationSpec, Observation
@@ -36,9 +37,14 @@ from lca.contracts.semantic_keys import (
     OBS_TASK_IDS,
 )
 from lca.contracts.state import AgentState
-from lca.contracts.telemetry import ATTR_CALLEE_ROLE, ATTR_OK, ATTR_PROTOCOL, SpanName
-from lca.layer0_infra.observability import span
-from lca.layer0_infra.transport.invocation import send_and_wait
+from lca.contracts.telemetry import (
+    ATTR_ACTION_TYPE,
+    ATTR_DELEGATE_COUNT,
+    ATTR_DELEGATE_TARGET,
+    EventName,
+)
+from lca.layer0_infra.observability import event
+from lca.layer0_infra.transport.invocation import send_and_wait, send_task_traced
 from lca.layer1_cognitive.body.delegation_cache import (
     cached_delegation_observation,
     tag_delegation_extra,
@@ -107,6 +113,15 @@ class DelegateOperation(Action):
         specs = list(decision.delegations)
         if not specs:
             raise ToolExecutionError(f"{decision.action_type} 动作缺少 delegations 规格")
+        first = specs[0]
+        attrs: dict[str, Any] = {
+            ATTR_ACTION_TYPE: decision.action_type,
+            ATTR_DELEGATE_TARGET: first.target_role or first.target_agent_id or "",
+            "rationale_preview": decision.rationale,
+        }
+        if len(specs) > 1:
+            attrs[ATTR_DELEGATE_COUNT] = len(specs)
+        event(EventName.DECISION_MADE, **attrs)
         if len(specs) == 1:
             return await self._execute_one(specs[0], state)
         return await self._execute_many(specs, state)
@@ -213,21 +228,8 @@ class HandoffOperation(Action):
         agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
         if agent_card is None:
             raise ToolExecutionError("handoff 动作缺少目标（agent_card / agent_id / role 均为空）")
-        callee = (
-            agent_card
-            if isinstance(agent_card, str)
-            else getattr(agent_card, "role", str(agent_card))
-        )
-        protocol = getattr(transport, "protocol_name", "unknown")
-        with (
-            delegator_scope(state.agent_role),
-            span(
-                SpanName.TRANSPORT_REQUEST,
-                **{ATTR_CALLEE_ROLE: callee, ATTR_PROTOCOL: protocol},
-            ) as handle,
-        ):
-            task_id = await transport.send_task(agent_card, spec.subtask, spec.context_refs)
-            handle.attributes[ATTR_OK] = True
+        with delegator_scope(state.agent_role):
+            task_id = await send_task_traced(transport, agent_card, spec.subtask, spec.context_refs)
         return Observation(
             observation_id=new_id("obs"),
             success=True,

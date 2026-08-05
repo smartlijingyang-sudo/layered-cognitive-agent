@@ -15,6 +15,7 @@ from lca.contracts.budget import (
     LEAD_MIN_MAX_STEPS,
 )
 from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
+from lca.layer0_infra.observability import create_observability
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer4_app.composer import _promote_lead
 from lca.layer4_app.policies import LeadBudgetPolicy
@@ -37,6 +38,7 @@ def _make_agent(
     return CognitiveAgent(
         runtime,
         rp,
+        create_observability("memory"),
         max_steps=max_steps,
         max_wall_clock_seconds=max_wall_clock_seconds,
     )

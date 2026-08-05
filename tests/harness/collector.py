@@ -1,33 +1,39 @@
-"""In-memory Observability collector for tests (not part of lca package)."""
+"""In-memory observability collectors for tests (not part of lca package).
+
+新基建：collector 本身就是 ``ObservabilityHub``（内置 OTel InMemoryExporter），
+直接作为 observability 注入；``TraceBundle`` 查询 API 不变（SpanView 投影）。
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.observability import TraceSpan
-from lca.contracts.protocols import Observability
-from lca.layer0_infra.observability.console_observability import ConsoleObservability
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+from lca.layer0_infra.observability import ObservabilityHub, SpanView
+from lca.layer0_infra.observability.exporters.console import ConsoleNarratorExporter
+from lca.layer0_infra.observability.view import view_of
 
 
 @dataclass
 class TraceBundle:
     """Collected spans for one or more runs."""
 
-    spans: list[TraceSpan] = field(default_factory=list)
+    spans: list[SpanView] = field(default_factory=list)
 
-    def by_name(self, name: str) -> list[TraceSpan]:
+    def by_name(self, name: str) -> list[SpanView]:
         return [s for s in self.spans if s.name == name]
 
     def names(self) -> list[str]:
         return [s.name for s in self.spans]
 
-    def root_spans(self) -> list[TraceSpan]:
+    def root_spans(self) -> list[SpanView]:
         return [s for s in self.spans if s.parent_span_id is None]
 
-    def children(self, span: TraceSpan) -> list[TraceSpan]:
+    def children(self, span: SpanView) -> list[SpanView]:
         return [s for s in self.spans if s.parent_span_id == span.span_id]
 
-    def walk(self, span: TraceSpan) -> list[TraceSpan]:
+    def walk(self, span: SpanView) -> list[SpanView]:
         out = [span]
         for child in self.children(span):
             out.extend(self.walk(child))
@@ -44,36 +50,34 @@ class TraceBundle:
         return {s.trace_id for s in self.spans if s.trace_id}
 
 
-class InMemoryObservability(Observability):
-    """Collect every TraceSpan in memory for topology assertions."""
+class InMemoryObservability(ObservabilityHub):
+    """Collect every span in memory for topology assertions (injectable hub)."""
 
     name = "in_memory"
 
     def __init__(self) -> None:
-        self.spans: list[TraceSpan] = []
-
-    def emit_span(self, span: TraceSpan) -> None:
-        self.spans.append(span)
+        self._memory_exporter = InMemorySpanExporter()
+        super().__init__([self._memory_exporter])
 
     def bundle(self) -> TraceBundle:
-        return TraceBundle(spans=list(self.spans))
+        self.flush()
+        views = [view_of(s) for s in self._memory_exporter.get_finished_spans()]
+        return TraceBundle(spans=views)
 
     def clear(self) -> None:
-        self.spans.clear()
+        self._memory_exporter.clear()
 
 
 class LiveCollector(InMemoryObservability):
-    """Memory + framework ConsoleObservability (same narrative as real apps)."""
+    """Memory + console narrator (same narrative as real apps)."""
 
     name = "live_collector"
 
     def __init__(self, *, live: bool = True, detail: object = None) -> None:
         # detail kept for CLI API compat; console always full-span human view
         del detail
-        super().__init__()
-        self._console = ConsoleObservability() if live else None
-
-    def emit_span(self, span: TraceSpan) -> None:
-        if self._console is not None:
-            self._console.emit_span(span)
-        super().emit_span(span)
+        self._memory_exporter = InMemorySpanExporter()
+        exporters: list = [self._memory_exporter]
+        if live:
+            exporters.append(ConsoleNarratorExporter())
+        ObservabilityHub.__init__(self, exporters)

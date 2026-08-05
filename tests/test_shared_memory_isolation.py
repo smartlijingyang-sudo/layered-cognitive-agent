@@ -230,8 +230,8 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
             coordination=Pipeline(),
             shared_memory_layers=[MemoryLayer.SEMANTIC],
         )
-        mem_a = team.members[0].runtime.memory  # type: ignore[attr-defined]
-        mem_b = team.members[1].runtime.memory  # type: ignore[attr-defined]
+        mem_a = team.members[0].runtime.memory.inner  # type: ignore[attr-defined]
+        mem_b = team.members[1].runtime.memory.inner  # type: ignore[attr-defined]
         self.assertIsNotNone(mem_a._shared_store)
         mem_a.write_shared_record(
             MemoryLayer.SEMANTIC, _make_semantic_record("orchestrator-shared-fact")
@@ -255,8 +255,8 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
             coordination=Pipeline(),
             shared_memory_layers=[],
         )
-        mem_a = team.members[0].runtime.memory  # type: ignore[attr-defined]
-        mem_b = team.members[1].runtime.memory  # type: ignore[attr-defined]
+        mem_a = team.members[0].runtime.memory.inner  # type: ignore[attr-defined]
+        mem_b = team.members[1].runtime.memory.inner  # type: ignore[attr-defined]
         self.assertIsNone(mem_a._shared_store)
         mem_a._private_layers[MemoryLayer.SEMANTIC].append(_make_semantic_record("private-to-a"))
         state_b = await mem_b.perceive(_make_state())

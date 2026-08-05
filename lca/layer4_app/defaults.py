@@ -14,8 +14,6 @@ from __future__ import annotations
 from lca.contracts.agent_spec import (
     BRAIN_CHOICE_DEFAULT,
     MEMORY_CHOICE_SIMPLE,
-    OBSERVABILITY_CHOICE_CONSOLE,
-    OBSERVABILITY_CHOICE_JSONL_FILE,
     STATE_STORE_CHOICE_MEMORY,
     LeadSpec,
 )
@@ -36,8 +34,6 @@ from lca.contracts.team_coordination import (
     PeerSwarm,
 )
 from lca.layer0_infra.component_registry import ComponentRegistry, NamedRegistry
-from lca.layer0_infra.observability.console_observability import ConsoleObservability
-from lca.layer0_infra.observability.jsonl_file_observability import JSONLFileObservability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
 from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
@@ -119,12 +115,12 @@ def _graph_strategy(assembly: TeamAssembly) -> GraphStrategy:
 
 
 def register_defaults(registries: Registries) -> None:
-    """Register built-in defaults into *registries* (idempotent overwrite)."""
+    """Register built-in defaults into *registries* (idempotent overwrite).
+
+    可观测后端不在此注册：由 L0 ``observability.registry`` 统一管理
+    （create_observability 唯一构造入口）。
+    """
     reg = registries.components
-    reg.register(ComponentKind.OBSERVABILITY, OBSERVABILITY_CHOICE_CONSOLE, ConsoleObservability)
-    reg.register(
-        ComponentKind.OBSERVABILITY, OBSERVABILITY_CHOICE_JSONL_FILE, JSONLFileObservability
-    )
     reg.register(ComponentKind.STATE_STORE, STATE_STORE_CHOICE_MEMORY, InMemoryStateStore)
     reg.register(ComponentKind.MEMORY, MEMORY_CHOICE_SIMPLE, SimpleMemorySystem)
     reg.register(ComponentKind.EVENT_BUS, EVENT_BUS_SIMPLE, SimpleEventBus)

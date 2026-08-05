@@ -18,6 +18,8 @@ from lca.contracts.role_team import RoleProfile
 from lca.contracts.semantic_keys import META_ROLE, META_STEP
 from lca.contracts.state import AgentState
 from lca.contracts.team_awareness import TeamAwareness
+from lca.contracts.telemetry import ATTR_PROMPT_TEMPLATE
+from lca.layer0_infra.observability import annotate
 
 _DEFAULT_TEMPLATE = "react_prompt"
 _HIERARCHICAL_TEMPLATE = "hierarchical_prompt"
@@ -141,7 +143,9 @@ async def _complete_candidates(
     n: int,
 ) -> list[str]:
     prompt = templates[template_name].format(**variables)
-    return [await llm.complete(prompt, tools=tools) for _ in range(max(1, n))]
+    annotate(**{ATTR_PROMPT_TEMPLATE: template_name})
+    responses = [await llm.complete(prompt, tools=tools) for _ in range(max(1, n))]
+    return [r.text for r in responses]
 
 
 class PromptReasoner(Reasoner):

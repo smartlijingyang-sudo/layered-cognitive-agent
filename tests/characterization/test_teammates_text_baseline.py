@@ -114,10 +114,11 @@ class TestPromptReasonerSolo:
     async def test_solo_prompt_only(self) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
+        from lca.contracts.llm import LLMResponse
         from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
         llm = MagicMock()
-        llm.complete = AsyncMock(return_value="ok")
+        llm.complete = AsyncMock(return_value=LLMResponse(text="ok"))
         reasoner = PromptReasoner(
             llm=llm,
             role_profile=_make_profile("solo", "work"),
@@ -136,10 +137,11 @@ class TestPromptReasonerAwareness:
     async def test_teammates_injected_from_awareness(self) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
+        from lca.contracts.llm import LLMResponse
         from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
         llm = MagicMock()
-        llm.complete = AsyncMock(return_value="ok")
+        llm.complete = AsyncMock(return_value=LLMResponse(text="ok"))
         reasoner = PromptReasoner(
             llm=llm,
             role_profile=_make_profile("lead", "manage"),
@@ -160,10 +162,11 @@ class TestPromptReasonerAwareness:
     async def test_active_template_override(self) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
+        from lca.contracts.llm import LLMResponse
         from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
         llm = MagicMock()
-        llm.complete = AsyncMock(return_value="ok")
+        llm.complete = AsyncMock(return_value=LLMResponse(text="ok"))
         reasoner = PromptReasoner(
             llm=llm,
             role_profile=_make_profile("lead", "manage"),

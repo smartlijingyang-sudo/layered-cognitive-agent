@@ -25,7 +25,6 @@ from lca.contracts.telemetry import (
     SpanName,
 )
 from lca.layer0_infra.observability import span
-from lca.layer0_infra.observability.redaction import sanitize, truncate
 
 
 def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Observation | None:
@@ -46,7 +45,7 @@ def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Ob
         **{
             ATTR_CALLEE_ROLE: hit.target_role,
             ATTR_STEP: state.step,
-            ATTR_SUBTASK_PREVIEW: truncate(sanitize(spec.subtask)),
+            ATTR_SUBTASK_PREVIEW: spec.subtask,
         },
     ):
         pass

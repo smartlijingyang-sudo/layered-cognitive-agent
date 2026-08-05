@@ -4,25 +4,22 @@ from __future__ import annotations
 
 import io
 import unittest
-from datetime import datetime, timedelta, timezone
 
-from lca.contracts.observability import TraceSpan
 from lca.contracts.telemetry import ATTR_AGENT_ROLE, ATTR_MODEL, ATTR_STEP, SpanName
-from lca.layer0_infra.observability.console_observability import ConsoleObservability
-from lca.layer0_infra.observability.run_narrative import section_key_for_span
+from lca.layer0_infra.observability import SpanView
+from lca.layer0_infra.observability.exporters.console import ConsoleNarratorExporter
+from lca.layer0_infra.observability.narrative import section_key_for_span
 
-_T0 = datetime(2026, 8, 3, 12, 0, 0, tzinfo=timezone.utc)
 
-
-def _span(name: str, *, span_id: str, parent: str | None = None, **attrs: object) -> TraceSpan:
-    return TraceSpan(
+def _span(name: str, *, span_id: str, parent: str | None = None, **attrs: object) -> SpanView:
+    return SpanView(
+        name=name,
         span_id=span_id,
         trace_id="trace_n",
-        name=name,
-        started_at=_T0,
-        ended_at=_T0 + timedelta(milliseconds=10),
         parent_span_id=parent,
         attributes=dict(attrs),
+        status="ok",
+        duration_ms=10,
     )
 
 
@@ -53,11 +50,11 @@ class TestSectionKeyDerivation(unittest.TestCase):
 class TestConcurrentInterleaving(unittest.TestCase):
     """Alice/Bob 的 span 按完成顺序交错到达，行必须落在各自角色的节里。"""
 
-    def _render(self, spans: list[TraceSpan]) -> str:
+    def _render(self, spans: list[SpanView]) -> str:
         buf = io.StringIO()
-        console = ConsoleObservability(stream=buf)
+        console = ConsoleNarratorExporter(stream=buf)
         for span in spans:
-            console.emit_span(span)
+            console.emit_view(span)
         return buf.getvalue()
 
     def test_interleaved_llm_spans_land_in_correct_sections(self) -> None:
@@ -89,7 +86,7 @@ class TestConcurrentInterleaving(unittest.TestCase):
         sections: dict[str, list[str]] = {}
         current = ""
         for line in out.splitlines():
-            if line.startswith("── "):
+            if line.startswith("── ") and "digest" not in line:
                 current = line.strip("─ ")
                 sections[current] = []
             elif current:

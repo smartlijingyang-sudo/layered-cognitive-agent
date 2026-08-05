@@ -101,7 +101,6 @@ class TestHandoffActionType(unittest.TestCase):
     def test_handoff_in_action_registry(self) -> None:
         """handoff 应在 ActionRegistry 的已注册集合中。"""
         from lca.contracts.role_team import ToolPermissionManifest
-        from lca.layer0_infra.observability.console_observability import ConsoleObservability
         from lca.layer0_infra.transport.agent_transport import InternalTransport
         from lca.layer0_infra.transport.transport_registry import TransportRegistry
         from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
@@ -109,9 +108,7 @@ class TestHandoffActionType(unittest.TestCase):
         from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 
         tool_reg = SimpleToolRegistry()
-        safe_exec = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=[]), ConsoleObservability()
-        )
+        safe_exec = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
         transport_reg = TransportRegistry()
         transport_reg.register(InternalTransport())
         registry = build_default_action_registry(

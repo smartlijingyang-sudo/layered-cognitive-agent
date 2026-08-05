@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-from lca.contracts.observability import TraceSpan
 from lca.contracts.telemetry import (
     ATTR_ACTION_TYPE,
     ATTR_AGENT_ROLE,
@@ -25,18 +24,13 @@ from lca.contracts.telemetry import (
     ATTR_TOOL_NAME,
     SpanName,
 )
-from lca.layer0_infra.observability.narrative_utils import attr_text, wrap_words
+from lca.layer0_infra.observability.narrative.narrative_utils import attr_text, wrap_words
+from lca.layer0_infra.observability.view import SpanView
 
 _NAME_WIDTH = 22
 
 
-def _dur_ms(span: TraceSpan) -> int:
-    if span.ended_at is None:
-        return 0
-    return int((span.ended_at - span.started_at).total_seconds() * 1000)
-
-
-def section_key_for_span(span: TraceSpan) -> str:
+def section_key_for_span(span: SpanView) -> str:
     """Group live lines by actor — derived purely from span attributes.
 
     Stateless: never falls back to "previous section", so concurrent members
@@ -68,7 +62,7 @@ def format_section_header(key: str) -> str:
     return f"\n── {key} ──"
 
 
-def _short_name(span: TraceSpan) -> str:
+def _short_name(span: SpanView) -> str:
     name = span.name
     attrs = span.attributes or {}
     if name.startswith("loop.phase."):
@@ -100,7 +94,7 @@ def _short_name(span: TraceSpan) -> str:
     return name
 
 
-def format_span_line(span: TraceSpan, *, depth: int = 0) -> str:
+def format_span_line(span: SpanView, *, depth: int = 0) -> str:
     """Aligned span line; llm.chat expands prompt/response block below."""
     attrs = span.attributes or {}
     pad = "  " * max(depth, 0)
@@ -145,14 +139,13 @@ def format_span_line(span: TraceSpan, *, depth: int = 0) -> str:
         if rc is not None:
             bits.append(f"out={rc}c")
 
-    dur = _dur_ms(span)
+    dur = span.duration_ms
     if dur > 0 or span.name in (SpanName.LLM_CHAT.value, SpanName.TOOL_EXECUTE.value):
         bits.append(f"{dur}ms")
 
-    st = attr_text(attrs, ATTR_STATUS) or attr_text(attrs, "status")
-    span_st = getattr(span.status, "value", span.status)
-    if span_st not in ("ok", "OK", None, ""):
-        bits.append(str(span_st))
+    if span.status not in ("ok", ""):
+        bits.append(span.status)
+    st = attr_text(attrs, ATTR_STATUS)
     if st:
         bits.append(f"status={st}")
     if attrs.get("ok") is False:
@@ -207,7 +200,7 @@ def _wrap_keep_newlines(text: str, *, width: int) -> list[str]:
     return out if out else [""]
 
 
-def logical_depth(span: TraceSpan) -> int:
+def logical_depth(span: SpanView) -> int:
     """Indent under a role section: phases/hooks flat, llm nested one level."""
     name = span.name
     if name in (
@@ -222,7 +215,7 @@ def logical_depth(span: TraceSpan) -> int:
     return 0
 
 
-def is_milestone_span(span: TraceSpan) -> bool:
+def is_milestone_span(span: SpanView) -> bool:
     """Used by test digests when filtering trees."""
     name = span.name
     if name == SpanName.RUN_PLAN.value:
@@ -244,10 +237,3 @@ def is_milestone_span(span: TraceSpan) -> bool:
     return (
         name.startswith("loop.phase.") and (span.attributes or {}).get(ATTR_ACTION_TYPE) is not None
     )
-
-
-# Back-compat alias (no longer dual-printed by console)
-def format_step_banner(span: TraceSpan) -> str | None:
-    if not is_milestone_span(span) or span.name == SpanName.RUN_PLAN.value:
-        return None
-    return format_span_line(span, depth=0)
