@@ -55,6 +55,9 @@ from lca.contracts.protocols.infra import (
     TransportRegistryProtocol,
 )
 
+# ── 执行日志投影协议（ADR-0037 Journal-as-Truth）────────
+from lca.contracts.protocols.journal import JournalProjector
+
 # ── L1 Memory 协议 ───────────────────────────────────────
 from lca.contracts.protocols.memory import MemorySystem
 
@@ -95,6 +98,7 @@ __all__ = [
     "HasHooks",
     "Hook",
     "HookRegistry",
+    "JournalProjector",
     "LLMAdapter",
     "MemberInvoker",
     "MemorySystem",

@@ -23,8 +23,10 @@ from typing import Any, TypeVar
 
 from opentelemetry import trace as otel_trace
 
+from lca.contracts.journal import JournalEvent
 from lca.contracts.telemetry import ATTR_SESSION_ID
-from lca.layer0_infra.observability.hub import NullSpanHandle, ObservabilityHub, SpanHandle
+from lca.layer0_infra.observability.handles import NullSpanHandle, SpanHandle
+from lca.layer0_infra.observability.hub import ObservabilityHub
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
@@ -121,6 +123,19 @@ def event(name: object, **attributes: Any) -> None:
         return
     label = name.value if hasattr(name, "value") else str(name)
     hub.emit_event(label, attributes)
+
+
+def record(event: JournalEvent) -> None:
+    """记录 journal 事件（叙事平面，ADR-0037）。
+
+    与 span/event 并列的第四种发射形态：事件必须是 ``JournalEvent``
+    子类实例（词表守卫强制）；关联骨架（trace/run/parent/delegation id）
+    由引擎从 ambient ``RunScope`` 盖章，发射点不需要提供。未 bind 时 no-op。
+    """
+    hub = _hub_var.get()
+    if hub is None:
+        return
+    hub.journal.record(event)
 
 
 def annotate(**attributes: Any) -> None:

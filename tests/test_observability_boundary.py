@@ -9,6 +9,7 @@ import ast
 import unittest
 from pathlib import Path
 
+from lca.contracts.journal_catalog import JOURNAL_CATALOG, JOURNAL_EVENT_CLASSES
 from lca.contracts.telemetry import EventName, SpanName
 from lca.contracts.telemetry_catalog import TELEMETRY_CATALOG
 
@@ -209,6 +210,58 @@ class TestVerbosityLevels(unittest.TestCase):
 
     def test_verbose_keeps_full_text(self) -> None:
         self.assertGreaterEqual(self._preview_len("verbose"), 5000)
+
+
+class TestJournalVocabularyGuard(unittest.TestCase):
+    """journal 词表守卫：record(...) 必须构造已登记事件；一事件一发射点。"""
+
+    def _collect_record_emissions(self) -> dict[str, set[str]]:
+        """事件类名 → 发射模块集合（仅统计裸 ``record(...)`` 调用）。
+
+        属性调用（``hub.journal.record(...)`` / ``self._journal.record(...)``）
+        是引擎内部接线，不算业务发射点；发射点一律从包根 import 裸调用。
+        """
+        emissions: dict[str, set[str]] = {}
+        for mod, path in _iter_lca_modules():
+            if mod.startswith("lca.contracts"):
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                if not isinstance(func, ast.Name) or func.id != "record" or not node.args:
+                    continue
+                first = node.args[0]
+                if isinstance(first, ast.Call) and isinstance(first.func, ast.Name):
+                    emissions.setdefault(first.func.id, set()).add(mod)
+                else:
+                    self.fail(
+                        f"{mod}: record(...) 首参必须是已登记事件类的构造调用（ADR-0037 词表守卫）"
+                    )
+        return emissions
+
+    def test_recorded_events_exist_in_vocabulary(self) -> None:
+        for cls_name in self._collect_record_emissions():
+            self.assertIn(cls_name, JOURNAL_EVENT_CLASSES, f"发射了未登记 journal 事件 {cls_name}")
+
+    def test_single_emission_site_per_journal_event(self) -> None:
+        for cls_name, mods in self._collect_record_emissions().items():
+            entry = JOURNAL_CATALOG.get(cls_name)
+            self.assertIsNotNone(entry, f"journal 事件 {cls_name} 未在 JOURNAL_CATALOG 登记")
+            offenders = [m for m in mods if not m.startswith(entry.emitter)]
+            self.assertEqual(
+                offenders,
+                [],
+                f"{cls_name} 的唯一发射模块应为 {entry.emitter}，越界发射：{sorted(offenders)}",
+            )
+
+    def test_catalog_covers_every_event_class(self) -> None:
+        self.assertEqual(
+            set(JOURNAL_CATALOG),
+            set(JOURNAL_EVENT_CLASSES),
+            "JOURNAL_CATALOG 与 JOURNAL_EVENT_CLASSES 必须一一对应",
+        )
 
 
 if __name__ == "__main__":

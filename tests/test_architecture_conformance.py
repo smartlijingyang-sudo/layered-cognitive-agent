@@ -70,9 +70,9 @@ EXEMPT: dict[str, str] = {
     ),
     # ── 可观测性子系统（OTel 骨干重建后）──
     "lca.layer0_infra.observability.facade.SpanContext": ("correlation 值对象，非可插拔组件"),
-    "lca.layer0_infra.observability.hub.SpanHandle": ("span 句柄内部类型，非公共组件"),
-    "lca.layer0_infra.observability.hub.NullSpanHandle": ("span 句柄 no-op 内部类型"),
-    "lca.layer0_infra.observability.hub._IsolatedExporter": ("导出器故障隔离包装，子系统内部"),
+    "lca.layer0_infra.observability.handles.SpanHandle": ("span 句柄内部类型，非公共组件"),
+    "lca.layer0_infra.observability.handles.NullSpanHandle": ("span 句柄 no-op 内部类型"),
+    "lca.layer0_infra.observability.handles._IsolatedExporter": ("导出器故障隔离包装，子系统内部"),
     "lca.layer0_infra.observability.policy.AttributePolicy": ("属性脱敏/截断策略，子系统内部"),
     "lca.layer0_infra.observability.policy.Verbosity": ("信息量档位配置枚举，非组件"),
     "lca.layer0_infra.observability.settings.ObservabilitySettings": (
@@ -91,6 +91,11 @@ EXEMPT: dict[str, str] = {
     ),
     "lca.layer0_infra.observability.exporters.langfuse.ExporterUnavailableError": ("异常类型"),
     "lca.layer0_infra.observability.registry.UnknownExporterError": ("异常类型"),
+    # ── 执行日志（ADR-0037 Journal-as-Truth）──
+    "lca.layer0_infra.observability.journal.engine.ExecutionJournal": (
+        "journal 引擎，子系统内部写入端；投影器侧协议为 JournalProjector"
+    ),
+    "lca.layer0_infra.observability.journal.engine.UnregisteredJournalEventError": ("异常类型"),
 }
 
 _SCAN_PACKAGES = [
