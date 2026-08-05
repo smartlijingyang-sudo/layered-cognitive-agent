@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from lca.layer0_infra.observability import ObservabilityHub, SpanView
-from lca.layer0_infra.observability.exporters.console import ConsoleNarratorExporter
+from lca.layer0_infra.observability.journal.console_projector import ConsoleJournalProjector
 from lca.layer0_infra.observability.view import view_of
 
 
@@ -69,15 +69,13 @@ class InMemoryObservability(ObservabilityHub):
 
 
 class LiveCollector(InMemoryObservability):
-    """Memory + console narrator (same narrative as real apps)."""
+    """Memory + journal console projector (same narrative as real apps)."""
 
     name = "live_collector"
 
     def __init__(self, *, live: bool = True, detail: object = None) -> None:
-        # detail kept for CLI API compat; console always full-span human view
+        # detail kept for CLI API compat; console = journal-driven human view
         del detail
         self._memory_exporter = InMemorySpanExporter()
-        exporters: list = [self._memory_exporter]
-        if live:
-            exporters.append(ConsoleNarratorExporter())
-        ObservabilityHub.__init__(self, exporters)
+        projectors = [ConsoleJournalProjector()] if live else []
+        ObservabilityHub.__init__(self, [self._memory_exporter], journal_projectors=projectors)

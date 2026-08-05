@@ -153,12 +153,13 @@ def agent_run_finished_attrs(event: AgentRunFinished) -> dict[str, Any]:
 
 
 def delegation_issued_attrs(event: DelegationIssued) -> dict[str, Any]:
+    mechanism = getattr(event.mechanism, "value", event.mechanism)
     return drop_empty(
         {
             ATTR_CALLER_ROLE: event.caller_role,
             ATTR_CALLEE_ROLE: event.callee_role,
             ATTR_SUBTASK_PREVIEW: event.subtask_preview,
-            ATTR_MECHANISM: event.mechanism.value,
+            ATTR_MECHANISM: mechanism,
             ATTR_PARALLEL_GROUP: event.parallel_group,
         }
     )

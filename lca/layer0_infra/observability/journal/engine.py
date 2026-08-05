@@ -16,6 +16,7 @@ import dataclasses
 import time
 from collections.abc import Sequence
 from enum import Enum
+from typing import Any
 
 import structlog
 
@@ -109,13 +110,16 @@ class ExecutionJournal:
     def _apply_policy(self, event: JournalEvent) -> JournalEvent:
         """字符串字段写入期策略强制（脱敏/预览裁剪/截断）；非字符串原样。
 
-        枚举（含 ``str`` 混入的词表枚举）不视为字符串——原样保留，
-        投影期再归一为 ``.value``。
+        枚举（含 ``str`` 混入的词表枚举）归一为纯值——投影/渲染侧
+        永不见到 ``ActionType.XXX`` 之类的 repr 泄漏。
         """
-        updates: dict[str, str] = {}
+        updates: dict[str, Any] = {}
         for item in dataclasses.fields(event):
             value = getattr(event, item.name)
-            if isinstance(value, Enum) or not isinstance(value, str):
+            if isinstance(value, Enum):
+                updates[item.name] = value.value
+                continue
+            if not isinstance(value, str):
                 continue
             prepared = self._policy.prepare({item.name: value})
             updates[item.name] = prepared.get(item.name, "")

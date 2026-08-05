@@ -211,7 +211,8 @@ class OtelProjector(JournalProjector):
     # ── 委派（一等公民，显式定父、不 attach）────────────
     def _on_delegation_issued(self, stamped: StampedEvent) -> None:
         event = cast("DelegationIssued", stamped.event)
-        if event.mechanism is DelegationMechanism.HANDOFF:
+        mechanism = getattr(event.mechanism, "value", event.mechanism)
+        if mechanism == DelegationMechanism.HANDOFF.value:
             # 非阻塞移交无回执：投影为 run span 事件，不开容器（无泄漏）
             self._project_run_event(
                 stamped, EventName.DELEGATE_REQUESTED.value, mapping.delegation_issued_attrs(event)

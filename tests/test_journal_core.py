@@ -116,7 +116,8 @@ def test_secret_in_journal_field_redacted_at_record() -> None:
     assert "[REDACTED]" in event.prompt_preview
 
 
-def test_non_string_fields_pass_through_policy() -> None:
+def test_enum_fields_normalized_at_record() -> None:
+    """枚举字段（str 混入词表枚举）写入期归一为纯值，杜绝 repr 泄漏。"""
     journal = ExecutionJournal()
     stamped = journal.record(
         DelegationIssued(
@@ -127,7 +128,8 @@ def test_non_string_fields_pass_through_policy() -> None:
     )
     event = stamped.event
     assert isinstance(event, DelegationIssued)
-    assert event.mechanism is DelegationMechanism.DELEGATE
+    assert event.mechanism == DelegationMechanism.DELEGATE.value
+    assert not isinstance(event.mechanism, DelegationMechanism)
 
 
 def test_minimal_verbosity_drops_previews_in_journal() -> None:

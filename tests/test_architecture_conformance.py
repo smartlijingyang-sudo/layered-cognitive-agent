@@ -96,6 +96,9 @@ EXEMPT: dict[str, str] = {
         "journal 引擎，子系统内部写入端；投影器侧协议为 JournalProjector"
     ),
     "lca.layer0_infra.observability.journal.engine.UnregisteredJournalEventError": ("异常类型"),
+    "lca.layer0_infra.observability.journal.console_projector._TraceState": (
+        "console 投影内部累加器（同 _RunDigest 先例）"
+    ),
 }
 
 _SCAN_PACKAGES = [
