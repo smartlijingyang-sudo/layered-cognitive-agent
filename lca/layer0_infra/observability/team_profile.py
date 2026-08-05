@@ -13,6 +13,7 @@ from lca.contracts.telemetry import (
     ATTR_LEAD_ROLE,
     ATTR_MANDATE,
     ATTR_MEMBERS,
+    ATTR_OBJECTIVE,
     ATTR_OBJECTIVE_PREVIEW,
     ATTR_PLAN_STEPS,
     ATTR_STRATEGY_KEY,
@@ -49,14 +50,18 @@ def objective_preview(text: str) -> str:
     return text[:_OBJECTIVE_PREVIEW_MAX]
 
 
-def team_run_attrs(profile: TeamTraceProfile) -> dict[str, object]:
-    """``run.team`` 根 span 属性。"""
+def team_run_attrs(
+    profile: TeamTraceProfile, objective_text: str | None = None
+) -> dict[str, object]:
+    """``run.team`` 根 span 属性（含目标全文 → Langfuse 根 observation input）。"""
     attrs: dict[str, object] = {
         ATTR_TEAM_ID: profile.team_id,
         ATTR_STRATEGY_KEY: profile.strategy_key,
     }
     if profile.mandate is not None:
         attrs[ATTR_MANDATE] = profile.mandate
+    if objective_text is not None:
+        attrs[ATTR_OBJECTIVE] = objective_text
     return attrs
 
 

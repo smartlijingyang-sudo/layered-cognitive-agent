@@ -1,0 +1,57 @@
+# 企业 SaaS 大客户续约危机 —— 跨职能挽留作战小组
+# 真实业务场景：战略大客户续约窗口临近，产品性能、功能交付、商务价格三重不满叠加，
+# 竞品低价挖角。board 制团队：各专家先独立给出专业判断，客户成功负责人收口出
+# 可执行的挽留方案（Go/No-Go + 技术承诺 + 交付排期 + 商务方案）。
+
+roles:
+  - key: cs_director
+    role: 客户成功总监
+    goal: 统筹挽留作战，产出能让客户续约的完整行动计划
+    backstory: 八年企业客户成功经验，主导过多个千万级大客户续约谈判，擅长跨部门资源协调与风险权衡
+    tools: []
+
+  - key: solution_architect
+    role: 解决方案架构师
+    goal: 诊断性能问题根因，给出有明确时间点的技术改造承诺
+    backstory: 分布式系统性能调优专家，主导过多个 SaaS 平台的 SLA 治理项目
+    tools: []
+
+  - key: commercial_manager
+    role: 商务经理
+    goal: 在毛利红线内设计续约让步与激励方案
+    backstory: 擅长阶梯定价、多年期锁定与服务抵扣等合同设计；公司毛利红线 55%，单笔让步上限 25%
+    tools:
+      - calculator
+
+  - key: product_manager
+    role: 产品经理
+    goal: 评估客户诉求功能的可行性与可承诺交付时点
+    backstory: 负责移动端产品线，擅长在客户定制需求与产品路线图冲突时给出可信的排期承诺
+    tools: []
+
+teams:
+  rescue_board:
+    lead:
+      agent: cs_director
+      mandate: board
+    members:
+      - solution_architect
+      - commercial_manager
+      - product_manager
+
+cases:
+  renewal_rescue:
+    team: rescue_board
+    objective: |
+      【大客户续约危机 · 需要在 48 小时内给出决策与行动方案】
+      客户：蓝海物流集团（战略大客户，年合同额 240 万元，45 天后到期）。
+      客户 CIO 已正式发函表达三点不满，同时竞品「云枢科技」同类产品价格低 30% 正在接触客户：
+      1. 性能问题：报表导出接口 P99 时延近三个月从 2 秒恶化到 9 秒，上月两次 SLA 违约；
+      2. 功能欠账：移动端审批功能两个季度前已提出但至今未交付，客户运营团队仍靠邮件流转审批；
+      3. 商务压力：客户要求续约价格至少下调 20%，否则将启动竞品替换评估。
+      请各专家从自身专业角度给出判断与方案，最后由客户成功总监收口，产出完整挽留计划：
+      必须包含 Go/No-Go 建议、技术改造承诺（含时间点）、功能交付排期、商务方案三部分。
+    assertions:
+      status: completed
+      # board 制：lead 可一步 fan-out 全员咨询、一步收口 RESPOND，2 步即合法完成
+      min_steps: 2

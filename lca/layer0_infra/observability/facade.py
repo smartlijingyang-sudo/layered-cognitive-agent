@@ -81,12 +81,7 @@ def get_span_context() -> SpanContext:
 # ── 发射 API ─────────────────────────────────────────────
 
 
-def span(name: object, **attributes: Any) -> SpanHandle | NullSpanHandle:
-    """打开子 span（context manager）。
-
-    ``name`` 必须取 ``SpanName`` 成员（守卫测试强制）；
-    会话 id 自动注入根级属性。
-    """
+def _open(name: object, attributes: dict[str, Any], *, attach: bool) -> SpanHandle | NullSpanHandle:
     hub = _hub_var.get()
     if hub is None:
         return NullSpanHandle()
@@ -95,7 +90,28 @@ def span(name: object, **attributes: Any) -> SpanHandle | NullSpanHandle:
     session = _session_var.get()
     if session is not None and ATTR_SESSION_ID not in attrs:
         attrs[ATTR_SESSION_ID] = session
-    return hub.open_span(label, attrs, actor_role=_actor_role.get(), actor_step=_actor_step.get())
+    return hub.open_span(
+        label, attrs, actor_role=_actor_role.get(), actor_step=_actor_step.get(), attach=attach
+    )
+
+
+def span(name: object, **attributes: Any) -> SpanHandle | NullSpanHandle:
+    """打开子 span（context manager）。
+
+    ``name`` 必须取 ``SpanName`` 成员（守卫测试强制）；
+    会话 id 自动注入根级属性。
+    """
+    return _open(name, attributes, attach=True)
+
+
+def detached_span(name: object, **attributes: Any) -> SpanHandle | NullSpanHandle:
+    """打开 detached span（context manager）：只计时/落属性，不占 ambient 上下文。
+
+    块内发射的 span/事件仍挂外层父节点——专用于生命周期脚手架 span
+    （如 hook 边界相位 span），避免业务事件被挂到脚手架节点下、
+    后端过滤脚手架后留下孤儿子节点。
+    """
+    return _open(name, attributes, attach=False)
 
 
 def event(name: object, **attributes: Any) -> None:

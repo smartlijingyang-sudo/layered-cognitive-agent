@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from lca.contracts.protocols import ObservabilityBackend
+from lca.layer0_infra.observability.langfuse_conventions import langfuse_span_visible
+from lca.layer0_infra.observability.policy import Verbosity
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 
 if TYPE_CHECKING:
@@ -29,6 +31,11 @@ _INSTALL_HINT = "uv sync --group observability-langfuse"
 
 class ExporterUnavailableError(Exception):
     """导出器不可用（依赖缺失或凭据未配置）。"""
+
+
+def _span_visible(span: Any) -> bool:
+    """Langfuse SDK 导出回调：框架内部噪音 span 不进 Langfuse 视图。"""
+    return langfuse_span_visible(getattr(span, "name", ""))
 
 
 class LangfuseBridge(ObservabilityBackend):
@@ -48,6 +55,7 @@ class LangfuseBridge(ObservabilityBackend):
         self._public_key = settings.langfuse_public_key
         self._secret_key = settings.langfuse_secret_key
         self._host = settings.langfuse_host
+        self._verbose = settings.verbosity is Verbosity.VERBOSE
         self._client: Any = None
 
     def attach(self, hub: ObservabilityHub) -> None:
@@ -59,8 +67,10 @@ class LangfuseBridge(ObservabilityBackend):
             secret_key=self._secret_key,
             host=self._host,
             tracer_provider=hub.provider,
-            # LCA span 全部导出（SDK 默认过滤器只收 gen_ai/SDK span）
-            should_export_span=lambda _span: True,
+            # LCA span 全部导出（SDK 默认过滤器只收 gen_ai/SDK span）；
+            # 噪音过滤在此叠加：verbose 档全量放行，其余档位隐藏
+            # 零 I/O 的框架内部 span（词表见 langfuse_conventions）。
+            should_export_span=(lambda _span: True) if self._verbose else _span_visible,
         )
         hub.register_scorer(self._score_current)
 

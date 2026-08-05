@@ -34,6 +34,24 @@ from lca.contracts.telemetry import (
     SpanName,
 )
 from lca.layer0_infra.observability.facade import span
+from lca.layer0_infra.observability.langfuse_conventions import (
+    LANGFUSE_OBSERVATION_INPUT as _LANGFUSE_OBSERVATION_INPUT,
+)
+from lca.layer0_infra.observability.langfuse_conventions import (
+    LANGFUSE_OBSERVATION_MODEL_NAME as _LANGFUSE_OBSERVATION_MODEL,
+)
+from lca.layer0_infra.observability.langfuse_conventions import (
+    LANGFUSE_OBSERVATION_OUTPUT as _LANGFUSE_OBSERVATION_OUTPUT,
+)
+from lca.layer0_infra.observability.langfuse_conventions import (
+    LANGFUSE_OBSERVATION_TYPE as _LANGFUSE_OBSERVATION_TYPE,
+)
+from lca.layer0_infra.observability.langfuse_conventions import (
+    LANGFUSE_OBSERVATION_USAGE_DETAILS as _LANGFUSE_OBSERVATION_USAGE,
+)
+from lca.layer0_infra.observability.langfuse_conventions import (
+    OBSERVATION_TYPE_GENERATION as _OBSERVATION_TYPE_GENERATION,
+)
 
 # OpenTelemetry GenAI 语义约定（业界标准键名，非 LCA 词表）
 _GEN_AI_OPERATION = "gen_ai.operation.name"
@@ -43,14 +61,6 @@ _GEN_AI_INPUT = "gen_ai.input"
 _GEN_AI_OUTPUT = "gen_ai.output"
 _GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
 _GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
-
-# Langfuse OTel 观测约定（v4 服务端按此映射 generation 字段）
-_LANGFUSE_OBSERVATION_TYPE = "langfuse.observation.type"
-_LANGFUSE_OBSERVATION_MODEL = "langfuse.observation.model.name"
-_LANGFUSE_OBSERVATION_INPUT = "langfuse.observation.input"
-_LANGFUSE_OBSERVATION_OUTPUT = "langfuse.observation.output"
-_LANGFUSE_OBSERVATION_USAGE = "langfuse.observation.usage_details"
-_OBSERVATION_TYPE_GENERATION = "generation"
 
 _PERF_COUNTER_SCALE = 1000
 """perf_counter 秒 → 毫秒换算。"""

@@ -11,6 +11,7 @@ from lca.contracts.message import AgentMessage, agent_message_as_text
 from lca.contracts.protocols import AgentUnit, TeamStrategy, TeamUnit
 from lca.contracts.result import Result
 from lca.contracts.telemetry import (
+    ATTR_RESULT_OUTPUT,
     ATTR_STATUS,
     ATTR_STRATEGY_KEY,
     EventName,
@@ -54,7 +55,7 @@ class TeamHandle(TeamUnit):
         set_session(self._profile.team_id)
         with (
             bind(self._observability),
-            span(SpanName.RUN_TEAM, **team_run_attrs(self._profile)) as root,
+            span(SpanName.RUN_TEAM, **team_run_attrs(self._profile, text)) as root,
         ):
             # 场景卡（console 与一切后端的首个子节点）
             with span(SpanName.RUN_PLAN, **plan_card_attrs(self._profile, text)):
@@ -62,6 +63,7 @@ class TeamHandle(TeamUnit):
             with span(SpanName.TEAM_STRATEGY, **{ATTR_STRATEGY_KEY: self._profile.strategy_key}):
                 result = await self._strategy.run(text)
             root.attributes[ATTR_STATUS] = result.status
+            root.attributes[ATTR_RESULT_OUTPUT] = result.output or ""
             event(
                 EventName.RUN_COMPLETED,
                 **{ATTR_STATUS: result.status, "steps": result.total_steps},

@@ -38,6 +38,11 @@ class ObservabilitySettings(BaseSettings):
     jsonl_path: str = _DEFAULT_JSONL_PATH
     redact_enabled: bool = True
 
+    environment: str = Field(
+        default="development",
+        validation_alias=AliasChoices("LCA_OBS_ENVIRONMENT", "LANGFUSE_ENVIRONMENT"),
+    )
+
     langfuse_public_key: str = Field(
         default="",
         validation_alias=AliasChoices("LCA_OBS_LANGFUSE_PUBLIC_KEY", "LANGFUSE_PUBLIC_KEY"),
@@ -48,7 +53,9 @@ class ObservabilitySettings(BaseSettings):
     )
     langfuse_host: str = Field(
         default=_DEFAULT_LANGFUSE_HOST,
-        validation_alias=AliasChoices("LCA_OBS_LANGFUSE_HOST", "LANGFUSE_HOST"),
+        validation_alias=AliasChoices(
+            "LCA_OBS_LANGFUSE_HOST", "LANGFUSE_HOST", "LANGFUSE_BASE_URL"
+        ),
     )
 
     def backend_names(self) -> list[str]:

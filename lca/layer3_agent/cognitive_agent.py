@@ -13,14 +13,19 @@ from lca.contracts.run_context import RunContext
 from lca.contracts.state import StateSnapshot
 from lca.contracts.telemetry import (
     ATTR_AGENT_ROLE,
+    ATTR_OBJECTIVE,
     ATTR_OBJECTIVE_PREVIEW,
     ATTR_PLAN_STEPS,
+    ATTR_RESULT_OUTPUT,
     ATTR_STATUS,
     ATTR_STRATEGY_KEY,
     EventName,
     SpanName,
 )
 from lca.layer0_infra.observability import (
+    LANGFUSE_OBSERVATION_METADATA_AGENT_ROLE,
+    LANGFUSE_OBSERVATION_TYPE,
+    OBSERVATION_TYPE_AGENT,
     ObservabilityHub,
     bind,
     event,
@@ -76,7 +81,17 @@ class CognitiveAgent(AgentUnit):
         # Always bind at the agent edge (re-entrant if Team already bound).
         with (
             bind(self._observability),
-            span(SpanName.RUN_AGENT, **{ATTR_AGENT_ROLE: role}) as handle,
+            span(
+                SpanName.RUN_AGENT,
+                **{
+                    ATTR_AGENT_ROLE: role,
+                    ATTR_OBJECTIVE: text,
+                    LANGFUSE_OBSERVATION_TYPE: OBSERVATION_TYPE_AGENT,
+                    # span 名取自稳定词表（架构约束）；角色经 metadata 前缀
+                    # 升为 Langfuse 顶层可过滤字段，保证子 agent 可区分。
+                    LANGFUSE_OBSERVATION_METADATA_AGENT_ROLE: role,
+                },
+            ) as handle,
         ):
             if top_level:
                 with span(
@@ -97,6 +112,7 @@ class CognitiveAgent(AgentUnit):
                 agent_role=role,
             )
             handle.attributes[ATTR_STATUS] = result.status
+            handle.attributes[ATTR_RESULT_OUTPUT] = result.output or ""
             if top_level:
                 event(
                     EventName.RUN_COMPLETED,

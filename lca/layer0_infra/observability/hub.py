@@ -25,10 +25,20 @@ from opentelemetry.trace import StatusCode
 from lca.contracts.protocols import ObservabilityBackend
 from lca.contracts.telemetry import (
     ATTR_AGENT_ROLE,
+    ATTR_OBJECTIVE,
     ATTR_OBJECTIVE_PREVIEW,
+    ATTR_RESULT_OUTPUT,
     ATTR_SESSION_ID,
     ATTR_STEP,
+    ATTR_STRATEGY_KEY,
     SpanName,
+)
+from lca.layer0_infra.observability.langfuse_conventions import (
+    FRAMEWORK_TAG,
+    LANGFUSE_ENVIRONMENT,
+    LANGFUSE_OBSERVATION_INPUT,
+    LANGFUSE_OBSERVATION_OUTPUT,
+    LANGFUSE_TRACE_TAGS,
 )
 from lca.layer0_infra.observability.policy import AttributePolicy
 
@@ -46,8 +56,6 @@ _ERROR_MESSAGE_MAX = 500
 _ROOT_SPAN_NAMES = frozenset({SpanName.RUN_TEAM.value, SpanName.RUN_AGENT.value})
 
 # Langfuse 后端约定属性键（自托管 v3/v4 实证；仅 L0 感知，业务层不可见）
-_LANGFUSE_TRACE_NAME = "langfuse.trace.name"
-_LANGFUSE_TRACE_INPUT = "langfuse.trace.input"
 _LANGFUSE_SESSION_ID = "session.id"
 
 
@@ -87,17 +95,28 @@ class SpanHandle:
 
     进入时把 span attach 到 OTel 上下文——嵌套 span/事件以此为父
     （等价于 start_as_current_span 语义）；退出时 detach。
+    ``attach=False``（detached）时只计时/落属性、不占用 ambient 上下文：
+    块内发射的 span/事件仍挂外层父节点（生命周期脚手架 span 用）。
     用法由包根 ``span()`` 提供，业务层不直接构造。
     """
 
-    def __init__(self, hub: ObservabilityHub, otel_span: Any, attributes: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        hub: ObservabilityHub,
+        otel_span: Any,
+        attributes: dict[str, Any],
+        *,
+        attach: bool = True,
+    ) -> None:
         self._hub = hub
         self._otel = otel_span
         self.attributes: dict[str, Any] = attributes
+        self._attach = attach
         self._ctx_token: Token[Context] | None = None
 
     def __enter__(self) -> SpanHandle:
-        self._ctx_token = otel_context.attach(otel_trace.set_span_in_context(self._otel))
+        if self._attach:
+            self._ctx_token = otel_context.attach(otel_trace.set_span_in_context(self._otel))
         return self
 
     def mark_error(self, message: str = "") -> None:
@@ -119,6 +138,11 @@ class SpanHandle:
             self._otel.record_exception(exc)
             self._otel.set_status(StatusCode.ERROR)
         prepared = self._hub.policy.prepare(self.attributes)
+        if self._otel.name in _ROOT_SPAN_NAMES:
+            # v4：trace 级 I/O 取自根 observation 的 input/output（trace.input 已弃用）
+            result_output = prepared.get(ATTR_RESULT_OUTPUT)
+            if result_output:
+                prepared[LANGFUSE_OBSERVATION_OUTPUT] = result_output
         for key, value in prepared.items():
             self._otel.set_attribute(key, value)
         self._otel.end()
@@ -152,14 +176,19 @@ class ObservabilityHub(ObservabilityBackend):
         policy: AttributePolicy | None = None,
         sampling_rate: float = 1.0,
         service_name: str = _DEFAULT_SERVICE_NAME,
+        environment: str | None = None,
     ) -> None:
         sampler = (
             ParentBased(ALWAYS_ON)
             if sampling_rate >= 1.0
             else ParentBased(TraceIdRatioBased(sampling_rate))
         )
+        resource_attrs: dict[str, str] = {_SERVICE_NAME_KEY: service_name}
+        if environment:
+            # 资源级 environment → Langfuse 环境维度（隔离测试/生产 trace）
+            resource_attrs[LANGFUSE_ENVIRONMENT] = environment
         self._provider = TracerProvider(
-            resource=Resource.create({_SERVICE_NAME_KEY: service_name}),
+            resource=Resource.create(resource_attrs),
             sampler=sampler,
         )
         self._processors: list[SimpleSpanProcessor] = []
@@ -193,8 +222,13 @@ class ObservabilityHub(ObservabilityBackend):
         *,
         actor_role: str = "",
         actor_step: int | None = None,
+        attach: bool = True,
     ) -> SpanHandle:
-        """打开一个 span；actor 身份自动盖章（显式属性优先）。"""
+        """打开一个 span；actor 身份自动盖章（显式属性优先）。
+
+        ``attach=False``：span 不成为 ambient 当前 span（detached），
+        块内发射的内容仍挂外层父节点——用于生命周期脚手架 span。
+        """
         attrs = dict(attributes)
         if actor_role and ATTR_AGENT_ROLE not in attrs:
             attrs[ATTR_AGENT_ROLE] = actor_role
@@ -203,17 +237,22 @@ class ObservabilityHub(ObservabilityBackend):
         if name in _ROOT_SPAN_NAMES:
             attrs.update(self._backend_root_attrs(attrs))
         otel_span = self._tracer.start_span(name, attributes=self._policy.prepare(dict(attrs)))
-        return SpanHandle(self, otel_span, attrs)
+        return SpanHandle(self, otel_span, attrs, attach=attach)
 
     def _backend_root_attrs(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        """根 span 的后端约定属性（Langfuse trace/session 映射）。"""
+        """根 span 的后端约定属性（Langfuse session / 根 I/O / tags 映射）。"""
         out: dict[str, Any] = {}
         session = attrs.get(ATTR_SESSION_ID)
         if session:
             out[_LANGFUSE_SESSION_ID] = session
-        objective = attrs.get(ATTR_OBJECTIVE_PREVIEW)
+        objective = attrs.get(ATTR_OBJECTIVE) or attrs.get(ATTR_OBJECTIVE_PREVIEW)
         if objective:
-            out[_LANGFUSE_TRACE_INPUT] = objective
+            out[LANGFUSE_OBSERVATION_INPUT] = objective
+        tags: list[str] = [FRAMEWORK_TAG]
+        strategy = attrs.get(ATTR_STRATEGY_KEY)
+        if strategy:
+            tags.append(str(strategy))
+        out[LANGFUSE_TRACE_TAGS] = tags
         return out
 
     def emit_event(self, name: str, attributes: dict[str, Any]) -> None:

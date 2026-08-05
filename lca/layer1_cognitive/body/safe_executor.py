@@ -20,9 +20,23 @@ from lca.contracts.semantic_keys import (
     FAILURE_KIND_VALIDATION,
 )
 from lca.contracts.telemetry import ATTR_OK, ATTR_TOOL_NAME, EventName, SpanName
-from lca.layer0_infra.observability import event, span
+from lca.layer0_infra.observability import (
+    LANGFUSE_OBSERVATION_INPUT,
+    LANGFUSE_OBSERVATION_OUTPUT,
+    LANGFUSE_OBSERVATION_TYPE,
+    OBSERVATION_TYPE_TOOL,
+    event,
+    span,
+)
 
 _log = structlog.get_logger("lca.safe_executor")
+
+
+def _langfuse_tool_output(obs: Observation) -> str:
+    """工具结果 → Langfuse observation output（成功取 payload，失败取错误）。"""
+    if obs.success:
+        return json.dumps(obs.payload, ensure_ascii=False, default=str)
+    return obs.error or ""
 
 
 class SimpleSafeExecutor(SafeExecutor):
@@ -88,7 +102,13 @@ class SimpleSafeExecutor(SafeExecutor):
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:
         with span(
             SpanName.TOOL_EXECUTE,
-            **{ATTR_TOOL_NAME: tool.name, "args": args, "attempt": attempt},
+            **{
+                ATTR_TOOL_NAME: tool.name,
+                "args": args,
+                "attempt": attempt,
+                LANGFUSE_OBSERVATION_TYPE: OBSERVATION_TYPE_TOOL,
+                LANGFUSE_OBSERVATION_INPUT: json.dumps(args, ensure_ascii=False, default=str),
+            },
         ) as handle:
             try:
                 obs = await tool.execute(args)
@@ -104,6 +124,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 handle.attributes[FAILURE_KIND] = FAILURE_KIND_EXECUTION
                 handle.attributes["retryable"] = getattr(err, "retryable", True)
                 handle.mark_error(obs.error or "")
+                handle.attributes[LANGFUSE_OBSERVATION_OUTPUT] = _langfuse_tool_output(obs)
                 return obs
             except Exception as err:
                 _log.warning(
@@ -127,6 +148,7 @@ class SimpleSafeExecutor(SafeExecutor):
                     FAILURE_KIND, FAILURE_KIND_EXECUTION
                 )
                 handle.mark_error(obs.error or "")
+            handle.attributes[LANGFUSE_OBSERVATION_OUTPUT] = _langfuse_tool_output(obs)
             return obs
 
     @staticmethod

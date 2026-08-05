@@ -180,6 +180,7 @@ uv sync --group observability-langfuse
 team = Team(members=[...], lead=TeamLead.board(lead), observability="console+langfuse")
 ```
 映射：run 根 → trace（session=team_id）· `llm.chat` → generation（gen_ai 语义约定，token/成本自动核算）· 业务事件 → event。
+Langfuse 视图只留有信息量的观测：零 I/O 的框架内部 span（`loop.phase.*` / `hook.*` / `memory.*` / `transport.response`）在导出边界被过滤（词表在 `langfuse_conventions.py`），console/jsonl 后端全量保留；`LCA_OBS_VERBOSITY=verbose` 停用过滤。hook 边界 span 以 `detached_span` 发射（只计时不占上下文），钩子内业务事件直接挂 run 根，过滤后不留孤儿。
 
 本地探针 CLI（选 mode + 默认任务文案 + 结束 digest）：
 `uv run python scripts/run_team_mode.py`

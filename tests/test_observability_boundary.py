@@ -15,7 +15,7 @@ from lca.contracts.telemetry_catalog import TELEMETRY_CATALOG
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _LCA_DIR = _REPO_ROOT / "lca"
 _OBS_PKG = "lca.layer0_infra.observability"
-_EMIT_CALLS = frozenset({"span", "event", "traced"})
+_EMIT_CALLS = frozenset({"span", "detached_span", "event", "traced"})
 
 
 def _iter_lca_modules() -> list[tuple[str, Path]]:

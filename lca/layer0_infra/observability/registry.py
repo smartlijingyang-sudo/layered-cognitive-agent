@@ -79,6 +79,7 @@ def create_observability(
         exporters,
         policy=AttributePolicy(cfg.verbosity, redact=cfg.redact_enabled),
         sampling_rate=cfg.sampling_rate,
+        environment=cfg.environment,
     )
     for bridge in bridges:
         hub.attach_bridge(bridge)

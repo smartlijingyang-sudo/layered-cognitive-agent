@@ -22,6 +22,7 @@ from lca.layer0_infra.observability.facade import (
     SpanContext,
     annotate,
     bind,
+    detached_span,
     event,
     get_span_context,
     score,
@@ -31,6 +32,21 @@ from lca.layer0_infra.observability.facade import (
     traced,
 )
 from lca.layer0_infra.observability.hub import ObservabilityHub
+from lca.layer0_infra.observability.langfuse_conventions import (
+    FRAMEWORK_TAG,
+    LANGFUSE_ENVIRONMENT,
+    LANGFUSE_OBSERVATION_INPUT,
+    LANGFUSE_OBSERVATION_METADATA_AGENT_ROLE,
+    LANGFUSE_OBSERVATION_MODEL_NAME,
+    LANGFUSE_OBSERVATION_OUTPUT,
+    LANGFUSE_OBSERVATION_TYPE,
+    LANGFUSE_OBSERVATION_USAGE_DETAILS,
+    LANGFUSE_TRACE_TAGS,
+    OBSERVATION_TYPE_AGENT,
+    OBSERVATION_TYPE_GENERATION,
+    OBSERVATION_TYPE_TOOL,
+    langfuse_span_visible,
+)
 from lca.layer0_infra.observability.narrative import plan_steps_joined
 from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
 from lca.layer0_infra.observability.registry import (
@@ -48,6 +64,18 @@ from lca.layer0_infra.observability.team_profile import (
 from lca.layer0_infra.observability.view import SpanView
 
 __all__ = [
+    "FRAMEWORK_TAG",
+    "LANGFUSE_ENVIRONMENT",
+    "LANGFUSE_OBSERVATION_INPUT",
+    "LANGFUSE_OBSERVATION_METADATA_AGENT_ROLE",
+    "LANGFUSE_OBSERVATION_MODEL_NAME",
+    "LANGFUSE_OBSERVATION_OUTPUT",
+    "LANGFUSE_OBSERVATION_TYPE",
+    "LANGFUSE_OBSERVATION_USAGE_DETAILS",
+    "LANGFUSE_TRACE_TAGS",
+    "OBSERVATION_TYPE_AGENT",
+    "OBSERVATION_TYPE_GENERATION",
+    "OBSERVATION_TYPE_TOOL",
     "AttributePolicy",
     "ExporterUnavailableError",
     "ObservabilityHub",
@@ -60,8 +88,10 @@ __all__ = [
     "annotate",
     "bind",
     "create_observability",
+    "detached_span",
     "event",
     "get_span_context",
+    "langfuse_span_visible",
     "objective_preview",
     "plan_card_attrs",
     "plan_steps_joined",

@@ -15,7 +15,7 @@ from lca.contracts.enums import HookEvent
 from lca.contracts.protocols import HookRegistry
 from lca.contracts.state import AgentState
 from lca.contracts.telemetry import ATTR_STEP, HOOK_TO_PHASE_SPAN, SpanName
-from lca.layer0_infra.observability import set_actor, span
+from lca.layer0_infra.observability import detached_span, set_actor
 
 _log = structlog.get_logger("lca.hook_registry")
 
@@ -90,7 +90,10 @@ class SimpleHookRegistry(HookRegistry):
         set_actor(state.agent_role, state.step)
         attrs = _extract_span_attributes(event_name, kwargs)
         attrs[ATTR_STEP] = state.step
-        with span(_span_name_for_hook(event_name), **attrs):
+        # detached：脚手架 span 只计时/落属性，不占用 ambient 上下文——
+        # 钩子内发出的业务事件（如 step.completed）直接挂到 run 根，
+        # Langfuse 过滤相位 span 后不会留下孤儿子节点。
+        with detached_span(_span_name_for_hook(event_name), **attrs):
             for hook in self._hooks.get(event_name, []):
                 await hook(event_name, state, **kwargs)
         return None

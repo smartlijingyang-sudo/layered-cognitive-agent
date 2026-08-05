@@ -12,7 +12,7 @@ from typing import Any
 
 import yaml
 
-from lca.contracts.protocols import LLMAdapter, Tool
+from lca.contracts.protocols import LLMAdapter, ObservabilityBackend, Tool
 from lca.contracts.team_coordination import (
     Debate,
     FanOut,
@@ -150,8 +150,12 @@ def build_agent(
     llm: LLMAdapter,
     *,
     max_steps: int = 10,
+    observability: str | ObservabilityBackend | None = None,
 ) -> Agent:
     tools = _instantiate_tools(role_spec.tools)
+    extra: dict[str, str | ObservabilityBackend] = {}
+    if observability is not None:
+        extra["observability"] = observability
     return Agent(
         role=role_spec.role,
         goal=role_spec.goal,
@@ -159,6 +163,7 @@ def build_agent(
         tools=tools,
         llm=llm,
         max_steps=max_steps,
+        **extra,
     )
 
 
@@ -168,9 +173,12 @@ def build_team(
     llm: LLMAdapter,
     *,
     lead_max_steps: int = 20,
+    observability: str | ObservabilityBackend | None = None,
 ) -> Team:
     team_spec = spec.teams[team_key]
-    members = [build_agent(spec.roles[k], llm) for k in team_spec.members]
+    members = [
+        build_agent(spec.roles[k], llm, observability=observability) for k in team_spec.members
+    ]
 
     has_lead = team_spec.lead_agent is not None
     has_coord = team_spec.coordination is not None
@@ -184,9 +192,12 @@ def build_team(
             spec.roles[team_spec.lead_agent],
             llm,
             max_steps=lead_max_steps,
+            observability=observability,
         )
         mandate = LeadMandate(team_spec.lead_mandate)
-        return Team(members=members, lead=TeamLead(lead_agent, mandate))
+        return Team(
+            members=members, lead=TeamLead(lead_agent, mandate), observability=observability
+        )
 
     assert team_spec.coordination is not None
     name = team_spec.coordination
@@ -201,7 +212,7 @@ def build_team(
         coord = _COORDINATION_BUILDERS[name](max_rounds=rounds)
     else:
         coord = _COORDINATION_BUILDERS[name]()
-    return Team(members=members, coordination=coord)
+    return Team(members=members, coordination=coord, observability=observability)
 
 
 def list_scenarios() -> list[Path]:
