@@ -57,13 +57,14 @@ LANGFUSE_HIDDEN_SPAN_NAMES: frozenset[str] = frozenset(
     {
         SpanName.MEMORY_READ.value,
         SpanName.MEMORY_WRITE.value,
+        SpanName.TRANSPORT_REQUEST.value,
         SpanName.TRANSPORT_RESPONSE.value,
     }
 )
 """按名隐藏：零 I/O 的资源边界 span。
 
-注：``transport.request`` 保留——它承载成员 ``run.agent`` 的父子链
-且带 callee_role/protocol/ok 等有信息量的属性。
+注：ADR-0037 后成员父子链由 ``delegation`` span 承载，
+transport.request/response 退回纯机制细节（verbose 档可见）。
 """
 
 

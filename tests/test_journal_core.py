@@ -186,10 +186,13 @@ def test_hub_lifecycle_flushes_and_closes_journal() -> None:
 
 def test_facade_record_routes_through_hub() -> None:
     hub = ObservabilityHub([])
-    with bind(hub), run_scope(RunScope(run_id="r-1")):
-        record(TeamRunStarted(team_id="via-facade"))
-    assert len(hub.journal.events) == 1
-    assert hub.journal.events[0].scope.run_id == "r-1"
+    try:
+        with bind(hub), run_scope(RunScope(run_id="r-1")):
+            record(TeamRunStarted(team_id="via-facade"))
+        assert len(hub.journal.events) == 1
+        assert hub.journal.events[0].scope.run_id == "r-1"
+    finally:
+        hub.close()  # 容器必闭：投影 attach 不泄漏到后续测试
 
 
 def test_facade_record_noop_without_hub() -> None:

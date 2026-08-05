@@ -83,15 +83,15 @@ def assert_parent_chain_walkable(
 
 
 def assert_pipeline_sequential(bundle: TraceBundle, result: Result) -> None:
-    invokes = bundle.by_name(SpanName.TEAM_MEMBER_INVOKE.value)
-    if len(invokes) < 1:
-        _fail("pipeline expects ≥1 team.member_invoke", bundle, result)
+    delegations = bundle.by_name(SpanName.DELEGATION.value)
+    if len(delegations) < 1:
+        _fail("pipeline expects ≥1 delegation", bundle, result)
 
 
 def assert_fan_out_all_members(bundle: TraceBundle, result: Result) -> None:
-    invokes = bundle.by_name(SpanName.TEAM_MEMBER_INVOKE.value)
-    if len(invokes) < 2:
-        _fail(f"fan_out expects ≥2 member_invoke, got {len(invokes)}", bundle, result)
+    delegations = bundle.by_name(SpanName.DELEGATION.value)
+    if len(delegations) < 2:
+        _fail(f"fan_out expects ≥2 delegations, got {len(delegations)}", bundle, result)
     if not bundle.by_name(SpanName.TEAM_SYNTHESIS.value):
         _fail("fan_out expects team.synthesis span", bundle, result)
 
@@ -110,34 +110,32 @@ def assert_board_consults_members(bundle: TraceBundle, result: Result) -> None:
 
 
 def assert_lead_transport_chain(bundle: TraceBundle, result: Result) -> None:
+    # ADR-0037 拓扑：run.team → run.agent(lead) → delegation → run.agent(member)。
+    # transport.request 仍在（机制平面），但不再是成员的结构性父链承载者。
     assert_must_include_spans(
         bundle,
-        [SpanName.RUN_TEAM.value, SpanName.TRANSPORT_REQUEST.value, SpanName.RUN_AGENT.value],
+        [
+            SpanName.RUN_TEAM.value,
+            SpanName.DELEGATION.value,
+            SpanName.TRANSPORT_REQUEST.value,
+            SpanName.RUN_AGENT.value,
+        ],
         result=result,
     )
     assert_parent_chain_walkable(
-        bundle, SpanName.RUN_TEAM.value, SpanName.TRANSPORT_REQUEST.value, result=result
+        bundle, SpanName.RUN_TEAM.value, SpanName.DELEGATION.value, result=result
     )
-    if not bundle.has_path_to(SpanName.RUN_TEAM.value, SpanName.RUN_AGENT.value):
-        _fail("lead path: no run.agent under run.team", bundle, result)
+    # 成员 run.agent 挂在 delegation 之下（一等委派），不再是 0 秒 transport 化石
+    assert_parent_chain_walkable(
+        bundle, SpanName.DELEGATION.value, SpanName.RUN_AGENT.value, result=result
+    )
     assert_shared_trace_id(bundle, result)
-    if not (
-        bundle.has_path_to(SpanName.RUN_TEAM.value, SpanName.LLM_CHAT.value)
-        or bundle.has_path_to(SpanName.TRANSPORT_REQUEST.value, SpanName.RUN_AGENT.value)
-    ):
-        _fail(
-            "lead path: cannot walk run.team→llm.chat or transport.request→run.agent",
-            bundle,
-            result,
-        )
+    if not bundle.has_path_to(SpanName.RUN_TEAM.value, SpanName.LLM_CHAT.value):
+        _fail("lead path: cannot walk run.team→llm.chat", bundle, result)
 
 
-def assert_has_team_and_strategy(bundle: TraceBundle, result: Result) -> None:
-    assert_must_include_spans(
-        bundle,
-        [SpanName.RUN_TEAM.value, SpanName.TEAM_STRATEGY.value],
-        result=result,
-    )
+def assert_team_root(bundle: TraceBundle, result: Result) -> None:
+    assert_must_include_spans(bundle, [SpanName.RUN_TEAM.value], result=result)
 
 
 def assert_swarm_rounds(bundle: TraceBundle, result: Result) -> None:
@@ -150,7 +148,7 @@ INVARIANTS: dict[str, InvariantFn] = {
     "fan_out_all_members": assert_fan_out_all_members,
     "board_consults_members": assert_board_consults_members,
     "lead_transport_chain": assert_lead_transport_chain,
-    "has_team_and_strategy": assert_has_team_and_strategy,
+    "team_root": assert_team_root,
     "swarm_rounds": assert_swarm_rounds,
     "shared_trace": lambda b, r: assert_shared_trace_id(b, r),
 }

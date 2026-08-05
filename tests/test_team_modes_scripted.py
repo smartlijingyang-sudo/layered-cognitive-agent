@@ -46,22 +46,21 @@ MODE_EXPECT: dict[str, dict] = {
         "trace": {
             "must_include_spans": [
                 SpanName.RUN_TEAM.value,
-                SpanName.TEAM_STRATEGY.value,
-                SpanName.TEAM_MEMBER_INVOKE.value,
+                SpanName.DELEGATION.value,
                 SpanName.LOOP_PHASE_THINK.value,
                 SpanName.LLM_CHAT.value,
             ],
             "parent_root": SpanName.RUN_TEAM.value,
             "parent_leaf": SpanName.LLM_CHAT.value,
         },
-        "invariants": ["has_team_and_strategy", "pipeline_sequential"],
+        "invariants": ["team_root", "pipeline_sequential"],
     },
     "fan_out": {
         "result": {"status": "completed"},
         "trace": {
             "must_include_spans": [
                 SpanName.RUN_TEAM.value,
-                SpanName.TEAM_MEMBER_INVOKE.value,
+                SpanName.DELEGATION.value,
                 SpanName.TEAM_SYNTHESIS.value,
                 SpanName.LLM_CHAT.value,
             ],
@@ -75,13 +74,13 @@ MODE_EXPECT: dict[str, dict] = {
         "trace": {
             "must_include_spans": [
                 SpanName.RUN_TEAM.value,
-                SpanName.TEAM_MEMBER_INVOKE.value,
+                SpanName.DELEGATION.value,
                 SpanName.LLM_CHAT.value,
             ],
             "parent_root": SpanName.RUN_TEAM.value,
             "parent_leaf": SpanName.LLM_CHAT.value,
         },
-        "invariants": ["has_team_and_strategy"],
+        "invariants": ["team_root"],
     },
     "peer_swarm": {
         "result": {"status": "completed"},
@@ -114,53 +113,55 @@ MODE_EXPECT: dict[str, dict] = {
         "trace": {
             "must_include_spans": [
                 SpanName.RUN_TEAM.value,
-                SpanName.TEAM_MEMBER_INVOKE.value,
+                SpanName.DELEGATION.value,
                 SpanName.LLM_CHAT.value,
             ],
             "parent_root": SpanName.RUN_TEAM.value,
             "parent_leaf": SpanName.LLM_CHAT.value,
         },
-        "invariants": ["has_team_and_strategy"],
+        "invariants": ["team_root"],
     },
     "routing": {
         "result": {"status": "completed"},
         "trace": {
             "must_include_spans": [
                 SpanName.RUN_TEAM.value,
-                SpanName.TEAM_STRATEGY.value,
+                SpanName.DELEGATION.value,
                 SpanName.TRANSPORT_REQUEST.value,
                 SpanName.LLM_CHAT.value,
             ],
             "parent_root": SpanName.RUN_TEAM.value,
             "parent_leaf": SpanName.LLM_CHAT.value,
         },
-        "invariants": ["has_team_and_strategy", "board_consults_members", "lead_transport_chain"],
+        "invariants": ["team_root", "board_consults_members", "lead_transport_chain"],
     },
     "consult": {
         "result": {"status": "completed"},
         "trace": {
             "must_include_spans": [
                 SpanName.RUN_TEAM.value,
+                SpanName.DELEGATION.value,
                 SpanName.TRANSPORT_REQUEST.value,
                 SpanName.LLM_CHAT.value,
             ],
             "parent_root": SpanName.RUN_TEAM.value,
             "parent_leaf": SpanName.LLM_CHAT.value,
         },
-        "invariants": ["has_team_and_strategy", "board_consults_members", "lead_transport_chain"],
+        "invariants": ["team_root", "board_consults_members", "lead_transport_chain"],
     },
     "board": {
         "result": {"status": "completed"},
         "trace": {
             "must_include_spans": [
                 SpanName.RUN_TEAM.value,
+                SpanName.DELEGATION.value,
                 SpanName.TRANSPORT_REQUEST.value,
                 SpanName.LLM_CHAT.value,
             ],
             "parent_root": SpanName.RUN_TEAM.value,
             "parent_leaf": SpanName.LLM_CHAT.value,
         },
-        "invariants": ["has_team_and_strategy", "board_consults_members", "lead_transport_chain"],
+        "invariants": ["team_root", "board_consults_members", "lead_transport_chain"],
     },
     "solo": {
         "result": {"status": "completed"},
@@ -248,6 +249,7 @@ async def test_lead_board_parent_chain_to_member_llm() -> None:
         outcome.bundle,
         [
             SpanName.RUN_TEAM.value,
+            SpanName.DELEGATION.value,
             SpanName.TRANSPORT_REQUEST.value,
             SpanName.TRANSPORT_RESPONSE.value,
             SpanName.RUN_AGENT.value,
@@ -298,7 +300,7 @@ async def test_edge_single_member_pipeline() -> None:
     team = Team(members=[agent], coordination=Pipeline(), observability=col)
     result = await team.run("solo pipeline")
     assert result.status == "completed", format_case_digest(col.bundle(), result=result)
-    assert SpanName.TEAM_MEMBER_INVOKE.value in col.bundle().names()
+    assert SpanName.DELEGATION.value in col.bundle().names()
 
 
 @pytest.mark.asyncio
@@ -309,7 +311,7 @@ async def test_edge_fan_out_one_member() -> None:
     team = Team(members=[agent], coordination=FanOut(), observability=col)
     result = await team.run("fanout1")
     assert result.status == "completed", format_case_digest(col.bundle(), result=result)
-    assert SpanName.TEAM_MEMBER_INVOKE.value in col.bundle().names()
+    assert SpanName.DELEGATION.value in col.bundle().names()
 
 
 @pytest.mark.asyncio
@@ -323,7 +325,7 @@ async def test_edge_peer_relay_first_wins() -> None:
     team = Team(members=[a, b], coordination=PeerRelay(), observability=col)
     result = await team.run("relay")
     assert result.status == "completed", format_case_digest(col.bundle(), result=result)
-    invokes = col.bundle().by_name(SpanName.TEAM_MEMBER_INVOKE.value)
+    invokes = col.bundle().by_name(SpanName.DELEGATION.value)
     # first completed stops — typically 1 invoke
     assert len(invokes) >= 1, format_case_digest(col.bundle(), result=result)
 
@@ -435,7 +437,13 @@ async def test_routing_duplicate_delegation_is_idempotent() -> None:
     outcome = await run_mode("routing", llm, collector=col, objective="dedup probe")
     digest = format_case_digest(col.bundle(), title="routing-dedup", result=outcome.result)
 
-    cache_hits = col.bundle().by_name(SpanName.DELEGATE_CACHE_HIT.value)
+    # ADR-0037：cache hit 是所属 run span 上的事件（不再是 0 秒孤儿 span）
+    cache_hits = [
+        ev
+        for s in col.bundle().spans
+        for ev in s.events
+        if ev[0] == SpanName.DELEGATE_CACHE_HIT.value
+    ]
     assert len(cache_hits) == 2, digest
     # 只有第一轮真正走 transport（Alice/Bob 各一次）
     transports = col.bundle().by_name(SpanName.TRANSPORT_REQUEST.value)

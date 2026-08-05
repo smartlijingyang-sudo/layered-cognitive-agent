@@ -1,66 +1,30 @@
 """观测装饰器（Decorator 模式）—— 组合根装配，业务代码零埋点。
 
-- ``TelemetryLLMAdapter``：LLM 调用 → llm.chat span（含 gen_ai 语义约定，
-  Langfuse/任何 OTel GenAI 后端自动识别 generation 与 token 用量）；
+- ``TelemetryLLMAdapter``：LLM 调用 → journal ``LlmCallCompleted``
+  （OTel 投影为 generation，gen_ai 语义约定 + token/成本自动核算）；
 - ``TelemetryMemoryAdapter``：记忆读写 → memory.read / memory.write span
-  （知识检索可观测）。
+  （机制平面，verbose 档调试细节）。
 """
 
 from __future__ import annotations
 
-import json
 import time
 from collections.abc import AsyncIterator
 from typing import Any
 
 from lca.contracts.decision import Observation, Reflection
 from lca.contracts.enums import MemoryLayer
+from lca.contracts.journal import LlmCallCompleted
 from lca.contracts.llm import LLMResponse
 from lca.contracts.memory import MemoryRecord
 from lca.contracts.protocols import LLMAdapter, MemorySystem
 from lca.contracts.state import AgentState
 from lca.contracts.telemetry import (
-    ATTR_COMPLETION_TOKENS,
     ATTR_HIT,
-    ATTR_LATENCY_MS,
     ATTR_MEMORY_LAYER,
-    ATTR_MODEL,
-    ATTR_OK,
-    ATTR_PROMPT_CHARS,
-    ATTR_PROMPT_PREVIEW,
-    ATTR_PROMPT_TOKENS,
-    ATTR_RESPONSE_CHARS,
-    ATTR_RESPONSE_PREVIEW,
     SpanName,
 )
-from lca.layer0_infra.observability.facade import span
-from lca.layer0_infra.observability.langfuse_conventions import (
-    LANGFUSE_OBSERVATION_INPUT as _LANGFUSE_OBSERVATION_INPUT,
-)
-from lca.layer0_infra.observability.langfuse_conventions import (
-    LANGFUSE_OBSERVATION_MODEL_NAME as _LANGFUSE_OBSERVATION_MODEL,
-)
-from lca.layer0_infra.observability.langfuse_conventions import (
-    LANGFUSE_OBSERVATION_OUTPUT as _LANGFUSE_OBSERVATION_OUTPUT,
-)
-from lca.layer0_infra.observability.langfuse_conventions import (
-    LANGFUSE_OBSERVATION_TYPE as _LANGFUSE_OBSERVATION_TYPE,
-)
-from lca.layer0_infra.observability.langfuse_conventions import (
-    LANGFUSE_OBSERVATION_USAGE_DETAILS as _LANGFUSE_OBSERVATION_USAGE,
-)
-from lca.layer0_infra.observability.langfuse_conventions import (
-    OBSERVATION_TYPE_GENERATION as _OBSERVATION_TYPE_GENERATION,
-)
-
-# OpenTelemetry GenAI 语义约定（业界标准键名，非 LCA 词表）
-_GEN_AI_OPERATION = "gen_ai.operation.name"
-_GEN_AI_OPERATION_CHAT = "chat"
-_GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
-_GEN_AI_INPUT = "gen_ai.input"
-_GEN_AI_OUTPUT = "gen_ai.output"
-_GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
-_GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
+from lca.layer0_infra.observability.facade import record, span
 
 _PERF_COUNTER_SCALE = 1000
 """perf_counter 秒 → 毫秒换算。"""
@@ -76,8 +40,15 @@ def _model_label(inner: LLMAdapter) -> str:
     return type(inner).__name__
 
 
+def _usage_of(response: LLMResponse) -> tuple[int, int]:
+    usage = response.usage
+    if usage is None:
+        return 0, 0
+    return usage.prompt_tokens or 0, usage.completion_tokens or 0
+
+
 class TelemetryLLMAdapter(LLMAdapter):
-    """装饰器：LLM 边界打 llm.chat span，不持有后端（ambient Telemetry）。"""
+    """装饰器：LLM 边界记录 LlmCallCompleted，不持有后端（ambient journal）。"""
 
     name = "telemetry-llm"
 
@@ -93,90 +64,49 @@ class TelemetryLLMAdapter(LLMAdapter):
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         model = _model_label(self._inner)
         started = time.perf_counter()
-        with span(
-            SpanName.LLM_CHAT,
-            **{
-                ATTR_MODEL: model,
-                _GEN_AI_OPERATION: _GEN_AI_OPERATION_CHAT,
-                _GEN_AI_REQUEST_MODEL: model,
-                _GEN_AI_INPUT: prompt,
-                _LANGFUSE_OBSERVATION_TYPE: _OBSERVATION_TYPE_GENERATION,
-                _LANGFUSE_OBSERVATION_MODEL: model,
-                _LANGFUSE_OBSERVATION_INPUT: prompt,
-            },
-        ) as handle:
-            attrs = handle.attributes
-            attrs[ATTR_PROMPT_CHARS] = len(prompt)
-            attrs[ATTR_PROMPT_PREVIEW] = prompt
-            try:
-                response = await self._inner.complete(prompt, **kwargs)
-            except Exception:
-                attrs[ATTR_OK] = False
-                attrs[ATTR_LATENCY_MS] = int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
-                raise
-            attrs[ATTR_OK] = True
-            attrs[ATTR_LATENCY_MS] = int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
-            attrs[ATTR_RESPONSE_CHARS] = len(response.text)
-            attrs[ATTR_RESPONSE_PREVIEW] = response.text
-            attrs[_GEN_AI_OUTPUT] = response.text
-            attrs[_LANGFUSE_OBSERVATION_OUTPUT] = response.text
-            self._record_usage(attrs, response)
-            return response
-
-    @staticmethod
-    def _record_usage(attrs: dict[str, Any], response: LLMResponse) -> None:
-        usage = response.usage
-        if usage is None:
-            return
-        if usage.prompt_tokens is not None:
-            attrs[ATTR_PROMPT_TOKENS] = usage.prompt_tokens
-            attrs[_GEN_AI_USAGE_INPUT_TOKENS] = usage.prompt_tokens
-        if usage.completion_tokens is not None:
-            attrs[ATTR_COMPLETION_TOKENS] = usage.completion_tokens
-            attrs[_GEN_AI_USAGE_OUTPUT_TOKENS] = usage.completion_tokens
-        details: dict[str, int] = {}
-        if usage.prompt_tokens is not None:
-            details["input"] = usage.prompt_tokens
-        if usage.completion_tokens is not None:
-            details["output"] = usage.completion_tokens
-        if details:
-            attrs[_LANGFUSE_OBSERVATION_USAGE] = json.dumps(details)
+        try:
+            response = await self._inner.complete(prompt, **kwargs)
+        except Exception:
+            self._record(model, prompt, "", False, started, 0, 0)
+            raise
+        prompt_tokens, completion_tokens = _usage_of(response)
+        self._record(model, prompt, response.text, True, started, prompt_tokens, completion_tokens)
+        return response
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
         model = _model_label(self._inner)
         started = time.perf_counter()
         chunks: list[str] = []
-        with span(
-            SpanName.LLM_CHAT,
-            **{
-                ATTR_MODEL: model,
-                "stream": True,
-                _GEN_AI_OPERATION: _GEN_AI_OPERATION_CHAT,
-                _GEN_AI_REQUEST_MODEL: model,
-                _GEN_AI_INPUT: prompt,
-                _LANGFUSE_OBSERVATION_TYPE: _OBSERVATION_TYPE_GENERATION,
-                _LANGFUSE_OBSERVATION_MODEL: model,
-                _LANGFUSE_OBSERVATION_INPUT: prompt,
-            },
-        ) as handle:
-            attrs = handle.attributes
-            attrs[ATTR_PROMPT_CHARS] = len(prompt)
-            attrs[ATTR_PROMPT_PREVIEW] = prompt
-            try:
-                async for chunk in self._inner.stream(prompt, **kwargs):
-                    chunks.append(chunk)
-                    yield chunk
-            except Exception:
-                attrs[ATTR_OK] = False
-                attrs[ATTR_LATENCY_MS] = int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
-                raise
-            text = "".join(chunks)
-            attrs[ATTR_OK] = True
-            attrs[ATTR_LATENCY_MS] = int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
-            attrs[ATTR_RESPONSE_CHARS] = len(text)
-            attrs[ATTR_RESPONSE_PREVIEW] = text
-            attrs[_GEN_AI_OUTPUT] = text
-            attrs[_LANGFUSE_OBSERVATION_OUTPUT] = text
+        try:
+            async for chunk in self._inner.stream(prompt, **kwargs):
+                chunks.append(chunk)
+                yield chunk
+        except Exception:
+            self._record(model, prompt, "".join(chunks), False, started, 0, 0)
+            raise
+        self._record(model, prompt, "".join(chunks), True, started, 0, 0)
+
+    @staticmethod
+    def _record(
+        model: str,
+        prompt: str,
+        response_text: str,
+        ok: bool,
+        started: float,
+        prompt_tokens: int,
+        completion_tokens: int,
+    ) -> None:
+        record(
+            LlmCallCompleted(
+                model=model,
+                ok=ok,
+                latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
+                prompt_preview=prompt,
+                response_preview=response_text,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+        )
 
 
 _MEMORY_LAYER_PERCEIVE = "perceive"
@@ -184,7 +114,7 @@ _MEMORY_LAYER_UPDATE = "update"
 
 
 class TelemetryMemoryAdapter(MemorySystem):
-    """装饰器：记忆边界打 memory.read / memory.write span（知识检索可观测）。"""
+    """装饰器：记忆边界打 memory.read / memory.write span（机制平面）。"""
 
     def __init__(self, inner: MemorySystem) -> None:
         self._inner = inner

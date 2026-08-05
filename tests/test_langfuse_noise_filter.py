@@ -41,6 +41,7 @@ from lca.layer0_infra.observability.view import view_of
         "hook.on_complete",
         "memory.read",
         "memory.write",
+        "transport.request",  # ADR-0037：父子链改由 delegation 承载，退回机制平面
         "transport.response",
     ],
 )
@@ -55,9 +56,9 @@ def test_noise_spans_hidden(name: str) -> None:
         SpanName.RUN_AGENT.value,
         SpanName.RUN_PLAN.value,
         SpanName.TEAM_STRATEGY.value,
+        SpanName.DELEGATION.value,  # 一等委派（承载成员父子链）
         SpanName.LLM_CHAT.value,
         SpanName.TOOL_EXECUTE.value,
-        SpanName.TRANSPORT_REQUEST.value,  # 承载成员 run.agent 父子链
         SpanName.DELEGATE_CACHE_HIT.value,
         SpanName.ERROR.value,
         "step.completed",  # 业务事件保留

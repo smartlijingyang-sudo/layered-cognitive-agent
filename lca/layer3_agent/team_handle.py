@@ -1,31 +1,28 @@
-"""TeamHandle —— 封闭团队的运行句柄：策略即行为，句柄只是 trace 边缘（ADR-0034）。
+"""TeamHandle —— 封闭团队的运行句柄：策略即行为，句柄只是叙事边缘（ADR-0037）。
 
 团队的一切编排决策在组合期已闭合进 ``TeamStrategy``；句柄运行期不编排，
-只做三件事：bind 观测 hub → 发 ``run.team`` / ``run.plan`` 场景卡 → 委派策略，
-并打上状态。成员与 lead 以只读属性暴露，供组合无损性内省。
+只做三件事：bind 观测 hub → record 团队 run 容器（场景卡随事件投影）→
+委派策略。span 拓扑由 OtelProjector 从 journal 生成，句柄不接触 span。
+成员与 lead 以只读属性暴露，供组合无损性内省。
 """
 
 from __future__ import annotations
 
+from lca.contracts.ids import new_id
+from lca.contracts.journal import RunScope, TeamRunFinished, TeamRunStarted
+from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.message import AgentMessage, agent_message_as_text
 from lca.contracts.protocols import AgentUnit, TeamStrategy, TeamUnit
 from lca.contracts.result import Result
-from lca.contracts.telemetry import (
-    ATTR_RESULT_OUTPUT,
-    ATTR_STATUS,
-    ATTR_STRATEGY_KEY,
-    EventName,
-    SpanName,
-)
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     TeamTraceProfile,
     bind,
-    event,
-    plan_card_attrs,
+    objective_preview,
+    plan_steps_joined,
+    record,
+    run_scope,
     set_session,
-    span,
-    team_run_attrs,
 )
 
 
@@ -53,19 +50,37 @@ class TeamHandle(TeamUnit):
             else str(objective)
         )
         set_session(self._profile.team_id)
-        with (
-            bind(self._observability),
-            span(SpanName.RUN_TEAM, **team_run_attrs(self._profile, text)) as root,
-        ):
-            # 场景卡（console 与一切后端的首个子节点）
-            with span(SpanName.RUN_PLAN, **plan_card_attrs(self._profile, text)):
-                pass
-            with span(SpanName.TEAM_STRATEGY, **{ATTR_STRATEGY_KEY: self._profile.strategy_key}):
-                result = await self._strategy.run(text)
-            root.attributes[ATTR_STATUS] = result.status
-            root.attributes[ATTR_RESULT_OUTPUT] = result.output or ""
-            event(
-                EventName.RUN_COMPLETED,
-                **{ATTR_STATUS: result.status, "steps": result.total_steps},
+        scope = RunScope(trace_id=new_id("trace"), run_id=new_id("run"))
+        with bind(self._observability), run_scope(scope):
+            record(
+                TeamRunStarted(
+                    team_id=self._profile.team_id,
+                    strategy_key=self._profile.strategy_key,
+                    mandate=self._profile.mandate or "",
+                    lead_role=self._profile.lead_role,
+                    members=self._profile.member_roles,
+                    objective=text,
+                    objective_preview=objective_preview(text),
+                    plan_steps=plan_steps_joined(self._profile.strategy_key, self._profile.mandate),
+                )
+            )
+            result = await _run_with_closed_container(self._strategy, text)
+            record(
+                TeamRunFinished(
+                    status=result.status,
+                    output_preview=result.output or "",
+                    steps=result.total_steps,
+                )
             )
             return result
+
+
+async def _run_with_closed_container(strategy: TeamStrategy, text: str) -> Result:
+    """策略执行；异常路径补发失败收尾事件，保证 run 容器必闭（投影不泄漏）。"""
+    try:
+        return await strategy.run(text)
+    except Exception as err:
+        record(
+            TeamRunFinished(status=TaskStatus.FAILED.value, error=f"{type(err).__name__}: {err}")
+        )
+        raise

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from lca.contracts.journal import (
@@ -18,6 +19,7 @@ from lca.contracts.journal import (
     DelegationCacheHit,
     DelegationCompleted,
     DelegationIssued,
+    JournalEvent,
     RunInsight,
     StepCompleted,
     SynthesisCompleted,
@@ -65,6 +67,8 @@ from lca.contracts.telemetry import (
     ATTR_TASK_ID,
     ATTR_TEAM_ID,
     ATTR_TOOL_NAME,
+    EventName,
+    SpanName,
 )
 from lca.layer0_infra.observability.langfuse_conventions import (
     FRAMEWORK_TAG,
@@ -114,6 +118,7 @@ def team_run_finished_attrs(event: TeamRunFinished) -> dict[str, Any]:
         {
             ATTR_STATUS: event.status,
             ATTR_STEPS: event.steps,
+            ATTR_ERROR: event.error,
             ATTR_RESULT_OUTPUT: event.output_preview,
             LANGFUSE_OBSERVATION_OUTPUT: event.output_preview,
         }
@@ -177,6 +182,7 @@ def tool_invoked_attrs(event: ToolInvoked) -> dict[str, Any]:
             ATTR_OK: event.ok,
             ATTR_LATENCY_MS: event.latency_ms,
             ATTR_ATTEMPT: event.attempt,
+            ATTR_ERROR: event.error,
             ATTR_RESULT_OUTPUT: event.result_preview,
             LANGFUSE_OBSERVATION_TYPE: OBSERVATION_TYPE_TOOL,
             LANGFUSE_OBSERVATION_INPUT: event.arguments_preview,
@@ -243,3 +249,18 @@ def run_insight_attrs(event: RunInsight) -> dict[str, Any]:
     return drop_empty(
         {ATTR_KIND: event.kind, ATTR_SUMMARY: event.summary, ATTR_DETAIL: event.detail}
     )
+
+
+AttrMapper = Callable[[Any], dict[str, Any]]
+
+#: 瞬时事实投影表：事件类型 → (OTel event 名, 属性映射)。
+#: OtelProjector 据此统一落为所属 run span 的 event（非孤儿 0 秒 span）。
+EVENT_PROJECTIONS: dict[type[JournalEvent], tuple[str, AttrMapper]] = {
+    DecisionMade: (EventName.DECISION_MADE.value, decision_made_attrs),
+    StepCompleted: (EventName.STEP_COMPLETED.value, step_completed_attrs),
+    ActionDegraded: (EventName.ACTION_DEGRADED.value, action_degraded_attrs),
+    ToolDenied: (EventName.TOOL_DENIED.value, tool_denied_attrs),
+    DelegationCacheHit: (SpanName.DELEGATE_CACHE_HIT.value, delegation_cache_hit_attrs),
+    SynthesisCompleted: (SpanName.TEAM_SYNTHESIS.value, synthesis_completed_attrs),
+    RunInsight: (EventName.RUN_INSIGHT.value, run_insight_attrs),
+}

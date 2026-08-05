@@ -4,7 +4,7 @@
 1. 单树性：唯一 run.team 根，所有 span 可回溯到根；
 2. 资源 span 归属：llm.chat / tool.execute / memory.* 必在 run.agent 子树内；
    四相边界标记（pre/post）在每个 run.agent 子树内齐全；
-3. 委派连续性：成员 run.agent 祖先链必含 team.member_invoke；
+3. 委派连续性：成员 run.agent 祖先链必含 delegation（ADR-0037 一等委派）；
 4. 身份完备：相位/资源 span 必带 agent_role；
 5. 内容完备：llm.chat 必带 model 与 prompt 预览。
 """
@@ -87,7 +87,7 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
                 missing, set(), f"run.agent 子树缺少相位标记：{missing}（{agent_root.span_id}）"
             )
 
-    def test_member_runs_chain_through_member_invoke(self) -> None:
+    def test_member_runs_chain_through_delegation(self) -> None:
         member_runs = [
             s
             for s in self.bundle.by_name(SpanName.RUN_AGENT.value)
@@ -96,8 +96,8 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(len(member_runs), 2)
         for s in member_runs:
             self.assertTrue(
-                _has_ancestor_named(self.bundle, s, SpanName.TEAM_MEMBER_INVOKE.value),
-                f"成员 run.agent 缺少 team.member_invoke 祖先（委派断链）：{s.span_id}",
+                _has_ancestor_named(self.bundle, s, SpanName.DELEGATION.value),
+                f"成员 run.agent 缺少 delegation 祖先（委派断链）：{s.span_id}",
             )
 
     def test_phase_spans_carry_actor_identity(self) -> None:

@@ -115,6 +115,7 @@ class TeamRunFinished(JournalEvent):
     status: str = ""
     output_preview: str = ""
     steps: int = 0
+    error: str = ""
 
 
 @dataclass(frozen=True)
@@ -243,6 +244,7 @@ class ToolInvoked(JournalEvent):
     ok: bool = True
     latency_ms: int = 0
     attempt: int = 1
+    error: str = ""
 
 
 @dataclass(frozen=True)

@@ -34,3 +34,14 @@ class SimpleEventBus(EventBus):
 
     def subscribe(self, event_name: str, handler: Callable[[Any], Awaitable[None]]) -> None:
         self._subs.setdefault(event_name, []).append(handler)
+
+    async def drain(self) -> None:
+        """等待已发射事件的订阅者处理完毕。
+
+        run 收尾前调用，确保 fire-and-forget 派发的桥接事件（如
+        step.completed → journal）先于容器关闭落地。处理过程中新产生的
+        任务也会被纳入（收敛到空为止）。
+        """
+        while self._tasks:
+            pending = list(self._tasks)
+            await asyncio.gather(*pending, return_exceptions=True)

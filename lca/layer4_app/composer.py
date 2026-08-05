@@ -84,7 +84,7 @@ from lca.layer4_app.team_wiring import (
     build_default_transport_registry,
     build_team_transport,
 )
-from lca.layer4_app.telemetry_bridge import install_telemetry_bridge
+from lca.layer4_app.telemetry_bridge import install_telemetry_bridge, make_bus_drain_hook
 
 __all__ = [
     "AgentComposer",
@@ -299,6 +299,8 @@ class AgentComposer:
         for event_name in HookEvent:
             hooks.register(event_name, default_logging_hook)
             hooks.register(event_name, event_hook)
+        # run 收尾前排空总线：异步桥接事件（step.completed 等）先于容器关闭落 journal
+        hooks.register(HookEvent.ON_COMPLETE, make_bus_drain_hook(event_bus))
         return hooks
 
     @staticmethod

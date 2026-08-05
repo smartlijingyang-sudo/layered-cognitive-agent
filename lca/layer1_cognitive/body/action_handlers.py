@@ -4,19 +4,20 @@
 新增行动能力 = ActionCatalog 加一条 spec + 本模块一个 Operation + 注册。
 
 DELEGATE/HANDOFF 成员调用统一走 ``send_and_wait``（与 strategy 同端口）。
-可观测性由 transport 边界统一发射，本模块不耦合 Observability。
+委派叙事由 transport 边界统一发射；决策事实（DecisionMade）与 board
+收口综合（SynthesisCompleted）在本模块发射（ADR-0037 journal）。
 """
 
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 from lca.contracts.action import Action
 from lca.contracts.decision import Decision, DelegationSpec, Observation
 from lca.contracts.delegation_context import delegator_scope
 from lca.contracts.enums import MemoryRecordKind
 from lca.contracts.ids import new_id, remaining_seconds
+from lca.contracts.journal import DecisionMade, SynthesisCompleted
 from lca.contracts.lifecycle import AgentCard
 from lca.contracts.protocols import (
     AgentTransport,
@@ -37,25 +38,22 @@ from lca.contracts.semantic_keys import (
     OBS_TASK_IDS,
 )
 from lca.contracts.state import AgentState
-from lca.contracts.telemetry import (
-    ATTR_ACTION_TYPE,
-    ATTR_DELEGATE_COUNT,
-    ATTR_DELEGATE_TARGET,
-    EventName,
-)
-from lca.layer0_infra.observability import event
-from lca.layer0_infra.transport.invocation import send_and_wait, send_task_traced
+from lca.layer0_infra.observability import record
+from lca.layer0_infra.transport.invocation import handoff_task_traced, send_and_wait
 from lca.layer1_cognitive.body.delegation_cache import (
     cached_delegation_observation,
     tag_delegation_extra,
 )
+from lca.layer1_cognitive.member_status.required_action import compute_required_action
 from lca.layer1_cognitive.member_status.tracking import (
+    duty_board,
     record_delegation_return,
 )
 
 _DEFAULT_DELEGATE_TIMEOUT_S = 30.0
 _ERR_DEADLINE_EXPIRED = "delegate 超时(deadline 已过期)"
 _ERR_TIMEOUT = "delegate 超时"
+_SYNTHESIS_METHOD_ALL_CONSULTED = "all_consulted"
 
 
 def _timeout_observation(error: str) -> Observation:
@@ -69,14 +67,35 @@ def _timeout_observation(error: str) -> Observation:
 
 
 class RespondOperation(Action):
-    """处理 respond 动作：直接返回文本响应。"""
+    """处理 respond 动作：直接返回文本响应。
+
+    board/consult 收口可见化：lead 在全部必问成员应答后产出终版响应时，
+    record ``SynthesisCompleted``（与 ``MustConsultAllMembers`` 的
+    may_respond 判据同源，叙事与守门不变量绝不漂移）。
+    """
 
     async def execute(self, decision: Decision, state: AgentState) -> Observation:
+        self._record_synthesis_if_all_consulted(decision, state)
         return Observation(
             observation_id=new_id("obs"),
             success=True,
             payload=decision.response_text,
             extra={OBS_RESULT_KIND: MemoryRecordKind.RESPONSE},
+        )
+
+    @staticmethod
+    def _record_synthesis_if_all_consulted(decision: Decision, state: AgentState) -> None:
+        board = duty_board(state)
+        if board is None:
+            return
+        if compute_required_action(board).kind != "may_respond":
+            return
+        record(
+            SynthesisCompleted(
+                method=_SYNTHESIS_METHOD_ALL_CONSULTED,
+                candidate_count=len(board.required_roles),
+                output_preview=decision.response_text or "",
+            )
         )
 
 
@@ -114,14 +133,16 @@ class DelegateOperation(Action):
         if not specs:
             raise ToolExecutionError(f"{decision.action_type} 动作缺少 delegations 规格")
         first = specs[0]
-        attrs: dict[str, Any] = {
-            ATTR_ACTION_TYPE: decision.action_type,
-            ATTR_DELEGATE_TARGET: first.target_role or first.target_agent_id or "",
-            "rationale_preview": decision.rationale,
-        }
-        if len(specs) > 1:
-            attrs[ATTR_DELEGATE_COUNT] = len(specs)
-        event(EventName.DECISION_MADE, **attrs)
+        record(
+            DecisionMade(
+                step=state.step,
+                action_type=decision.action_type,
+                rationale_preview=decision.rationale,
+                delegate_target=first.target_role or first.target_agent_id or "",
+                delegate_count=len(specs) if len(specs) > 1 else 0,
+                confidence=decision.confidence,
+            )
+        )
         if len(specs) == 1:
             return await self._execute_one(specs[0], state)
         return await self._execute_many(specs, state)
@@ -229,7 +250,9 @@ class HandoffOperation(Action):
         if agent_card is None:
             raise ToolExecutionError("handoff 动作缺少目标（agent_card / agent_id / role 均为空）")
         with delegator_scope(state.agent_role):
-            task_id = await send_task_traced(transport, agent_card, spec.subtask, spec.context_refs)
+            task_id = await handoff_task_traced(
+                transport, agent_card, spec.subtask, spec.context_refs
+            )
         return Observation(
             observation_id=new_id("obs"),
             success=True,

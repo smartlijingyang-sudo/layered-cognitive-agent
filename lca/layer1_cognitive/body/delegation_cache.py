@@ -10,6 +10,7 @@ from lca.contracts.decision import DelegationSpec, Observation
 from lca.contracts.delegation import find_result
 from lca.contracts.enums import MemoryRecordKind
 from lca.contracts.ids import new_id
+from lca.contracts.journal import DelegationCacheHit
 from lca.contracts.semantic_keys import (
     OBS_CACHE_HIT,
     OBS_MEMBER_RESULTS,
@@ -18,20 +19,14 @@ from lca.contracts.semantic_keys import (
     OBS_TASK_ID,
 )
 from lca.contracts.state import AgentState
-from lca.contracts.telemetry import (
-    ATTR_CALLEE_ROLE,
-    ATTR_STEP,
-    ATTR_SUBTASK_PREVIEW,
-    SpanName,
-)
-from lca.layer0_infra.observability import span
+from lca.layer0_infra.observability import record
 
 
 def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Observation | None:
     """幂等短路：回报记录中已有成功返回的 ``(target_role, subtask)`` 直接复用。
 
     回报记录只在自由 routing（无 consult_duty）下累积——义务路径由状态板
-    管辖，不走此路径。命中时发射 ``delegate.cache_hit`` span，不产生
+    管辖，不走此路径。命中时 record ``DelegationCacheHit``，不产生
     transport 往返。语义刻意保守：仅拦字面重复，改写措辞的新问题不受影响。
     """
     awareness = state.team_awareness
@@ -40,15 +35,13 @@ def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Ob
     hit = find_result(awareness.results, target_role=spec.target_role, subtask=spec.subtask)
     if hit is None:
         return None
-    with span(
-        SpanName.DELEGATE_CACHE_HIT,
-        **{
-            ATTR_CALLEE_ROLE: hit.target_role,
-            ATTR_STEP: state.step,
-            ATTR_SUBTASK_PREVIEW: spec.subtask,
-        },
-    ):
-        pass
+    record(
+        DelegationCacheHit(
+            callee_role=hit.target_role,
+            subtask_preview=spec.subtask,
+            step=state.step,
+        )
+    )
     observation = Observation(
         observation_id=new_id("obs"),
         success=True,

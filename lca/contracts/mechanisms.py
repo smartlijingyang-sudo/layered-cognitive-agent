@@ -24,6 +24,10 @@ class EventBus(Protocol):
     def subscribe(
         self, event_name: str, handler: Callable[[dict[str, Any]], Awaitable[None]]
     ) -> None: ...
+    async def drain(self) -> None:
+        """等待已发射事件的订阅者全部处理完（run 收尾前调用，
+        保证异步派发的桥接事件先于容器关闭落入 journal）。"""
+        ...
 
 
 @runtime_checkable

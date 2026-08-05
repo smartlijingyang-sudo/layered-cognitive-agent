@@ -35,6 +35,7 @@ from lca.layer0_infra.observability.handles import (
     _IsolatedExporter,
 )
 from lca.layer0_infra.observability.journal.engine import ExecutionJournal
+from lca.layer0_infra.observability.journal.otel_projector import OtelProjector
 from lca.layer0_infra.observability.langfuse_conventions import (
     FRAMEWORK_TAG,
     LANGFUSE_ENVIRONMENT,
@@ -86,7 +87,11 @@ class ObservabilityHub(ObservabilityBackend):
             self._processors.append(processor)
         self._tracer = self._provider.get_tracer(_TRACER_NAME)
         self._policy = policy if policy is not None else AttributePolicy()
-        self._journal = ExecutionJournal(journal_projectors, policy=self._policy)
+        # journal 永远在线：OtelProjector 内置（span 平面由叙事驱动），
+        # 其余投影器（console/jsonl/序列图...）按后端配置装配。
+        self._journal = ExecutionJournal(
+            [OtelProjector(self._tracer), *journal_projectors], policy=self._policy
+        )
         self._scorer: Any = None
         self._bridges: list[Any] = []
 

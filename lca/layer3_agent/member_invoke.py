@@ -1,26 +1,17 @@
-"""成员调用通道 —— TransportMemberInvoker 与接力式共享逻辑（ADR-0034）。
+"""成员调用通道 —— TransportMemberInvoker 与接力式共享逻辑（ADR-0034/0037）。
 
 策略经组合期注入的 invoker 调用成员：策略侧不认 transport，角色合法性
-由组合期 fail-fast 保证，运行期零防御性校验。
+由组合期 fail-fast 保证，运行期零防御性校验。委派叙事（DelegationIssued/
+Completed）由 transport 唯一通道发射，本模块只标记 member_invoke 机制。
 """
 
 from __future__ import annotations
 
+from lca.contracts.delegation_context import member_invoke_scope
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentUnit, MemberInvoker, TeamStage
 from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.result import Result
-from lca.contracts.telemetry import (
-    ATTR_CALLEE_ROLE,
-    ATTR_CALLER_ROLE,
-    ATTR_DELEGATE_TARGET,
-    ATTR_OK,
-    ATTR_STATUS,
-    ATTR_SUBTASK_PREVIEW,
-    EventName,
-    SpanName,
-)
-from lca.layer0_infra.observability import event, span
 from lca.layer0_infra.transport.invocation import send_and_wait
 
 _DEFAULT_TIMEOUT_S = 300.0
@@ -35,31 +26,13 @@ class TransportMemberInvoker(MemberInvoker):
 
     async def invoke(self, member: AgentUnit, task: str, *, caller_role: str = "") -> Result:
         """通过共享 transport 端口调用一个成员。"""
+        del caller_role  # 调用者身份由 journal 关联骨架承载（scope.agent_role）
         role = member.role_profile.role
-        event(
-            EventName.DELEGATE_REQUESTED,
-            **{
-                ATTR_DELEGATE_TARGET: role,
-                ATTR_CALLER_ROLE: caller_role or "strategy",
-                ATTR_SUBTASK_PREVIEW: task,
-            },
-        )
-        with span(
-            SpanName.TEAM_MEMBER_INVOKE,
-            **{
-                ATTR_CALLEE_ROLE: role,
-                ATTR_CALLER_ROLE: caller_role or "strategy",
-            },
-        ) as handle:
+        with member_invoke_scope():
             observation = await send_and_wait(
                 self._transport, role, task, timeout_s=self._timeout_s
             )
-            result = Result.from_observation(
-                observation, task_id=observation.extra.get("task_id", "")
-            )
-            handle.attributes[ATTR_STATUS] = result.status
-            handle.attributes[ATTR_OK] = result.status == TaskStatus.COMPLETED
-            return result
+        return Result.from_observation(observation, task_id=observation.extra.get("task_id", ""))
 
 
 async def invoke_members_sequential(
