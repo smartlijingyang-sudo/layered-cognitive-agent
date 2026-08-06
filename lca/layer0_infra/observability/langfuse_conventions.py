@@ -32,6 +32,10 @@ LANGFUSE_ENVIRONMENT = "langfuse.environment"
 OBSERVATION_TYPE_AGENT = "agent"
 OBSERVATION_TYPE_GENERATION = "generation"
 OBSERVATION_TYPE_TOOL = "tool"
+OBSERVATION_TYPE_EVENT = "event"
+"""瞬时事实（决策/综合/洞察...）投影为 EVENT 观测（自托管 v3/v4 实证：
+OTel span event 不被导出，须以 ``langfuse.observation.type=event`` 的
+零时长 span 承载，方能在 Langfuse 视图可见）。"""
 
 # ── OpenTelemetry GenAI 语义约定键名（业界标准，非 LCA 词表）──
 # generation 投影（journal OtelProjector）与 LLM 适配器共享，禁止散落字面量。

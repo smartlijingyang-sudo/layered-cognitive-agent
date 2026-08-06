@@ -93,6 +93,9 @@ EXEMPT: dict[str, str] = {
         "console 投影内部累加器（同 _RunDigest 先例）"
     ),
     "lca.layer0_infra.observability.journal.journal_io.JournalFormatError": ("异常类型"),
+    "lca.layer0_infra.observability.journal.otel_span_index.SpanContainerIndex": (
+        "OtelProjector 内部容器索引机制件（同 _IsolatedExporter 先例）"
+    ),
 }
 
 _SCAN_PACKAGES = [

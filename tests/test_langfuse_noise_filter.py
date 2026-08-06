@@ -13,7 +13,7 @@ from typing import ClassVar
 import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lca.contracts.telemetry import SpanName
+from lca.contracts.telemetry import EventName, SpanName
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     bind,
@@ -60,7 +60,8 @@ def test_noise_spans_hidden(name: str) -> None:
         SpanName.TOOL_EXECUTE.value,
         SpanName.DELEGATE_CACHE_HIT.value,
         SpanName.ERROR.value,
-        "step.completed",  # 业务事件保留
+        EventName.DECISION_MADE.value,  # 瞬时事实 EVENT 观测
+        EventName.RUN_INSIGHT.value,
     ],
 )
 def test_value_spans_visible(name: str) -> None:

@@ -437,13 +437,8 @@ async def test_routing_duplicate_delegation_is_idempotent() -> None:
     outcome = await run_mode("routing", llm, collector=col, objective="dedup probe")
     digest = format_case_digest(col.bundle(), title="routing-dedup", result=outcome.result)
 
-    # ADR-0037：cache hit 是所属 run span 上的事件（不再是 0 秒孤儿 span）
-    cache_hits = [
-        ev
-        for s in col.bundle().spans
-        for ev in s.events
-        if ev[0] == SpanName.DELEGATE_CACHE_HIT.value
-    ]
+    # ADR-0037：cache hit 投影为 EVENT 观测（journal DelegationCacheHit）
+    cache_hits = col.bundle().by_name(SpanName.DELEGATE_CACHE_HIT.value)
     assert len(cache_hits) == 2, digest
     # 只有第一轮真正走 transport（Alice/Bob 各一次）
     transports = col.bundle().by_name(SpanName.TRANSPORT_REQUEST.value)

@@ -22,6 +22,7 @@ from lca.contracts.journal import (
     LlmCallCompleted,
     RunScope,
     StampedEvent,
+    StepCompleted,
     SynthesisCompleted,
     TeamRunFinished,
     TeamRunStarted,
@@ -249,8 +250,8 @@ def test_no_orphan_or_fossil_spans() -> None:
     for view in views:
         if view.parent_span_id is not None:
             assert view.parent_span_id in ids, f"孤儿 span: {view.name}"
-    # span 总数 = 1 team + 3 agent + 2 delegation + 5 llm + 1 tool = 12
-    assert len(views) == 12
+    # span 总数 = 1 team + 3 agent + 2 delegation + 5 llm + 1 tool + 1 synthesis = 13
+    assert len(views) == 13
     # 无 0 时长容器化石
     for view in views:
         if view.name in ("delegation", "run.agent", "run.team"):
@@ -260,7 +261,8 @@ def test_no_orphan_or_fossil_spans() -> None:
 # ── 瞬时事实：run span 上的 event，非孤儿 span ──────────
 
 
-def test_synthesis_projects_as_run_event() -> None:
+def test_synthesis_projects_as_event_observation() -> None:
+    """ADR-0037：瞬时事实投影为 EVENT 观测（挂在所属 run span 下）。"""
     projector, exporter = _make_projector()
     _board_run(projector)
     views = _all_views(exporter)
@@ -269,9 +271,22 @@ def test_synthesis_projects_as_run_event() -> None:
         for v in views
         if v.name == "run.agent" and v.attributes.get("agent_role") == "客户成功总监"
     )
-    synthesis_events = [ev for ev in lead.events if ev[0] == "team.synthesis"]
-    assert len(synthesis_events) == 1
-    assert synthesis_events[0][1]["candidate_count"] == 2
+    synthesis = [
+        v for v in views if v.name == "team.synthesis" and v.parent_span_id == lead.span_id
+    ]
+    assert len(synthesis) == 1
+    assert synthesis[0].attributes.get("candidate_count") == 2
+    assert synthesis[0].attributes.get("langfuse.observation.type") == "event"
+
+
+def test_step_completed_stays_journal_only() -> None:
+    """step.completed 是生命周期噪音：不进 OTel/Langfuse，只在 journal。"""
+    projector, exporter = _make_projector()
+    _board_run(projector)
+    scope = RunScope(trace_id="t", run_id="lead-run", parent_run_id="team-run", agent_role="Lead")
+    projector.on_event(_stamped(99, _BASE_TS + 2, scope, StepCompleted(step=0, status="working")))
+    views = _all_views(exporter)
+    assert all(v.name != "step.completed" for v in views)
 
 
 # ── Langfuse 约定属性 ───────────────────────────────────
