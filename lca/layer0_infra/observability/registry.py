@@ -15,10 +15,10 @@ from opentelemetry.sdk.trace.export import SpanExporter
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from lca.contracts.protocols import JournalProjector, ObservabilityBackend
-from lca.layer0_infra.observability.exporters.jsonl import JsonlExporter
 from lca.layer0_infra.observability.exporters.langfuse import LangfuseBridge
 from lca.layer0_infra.observability.hub import ObservabilityHub
 from lca.layer0_infra.observability.journal.console_projector import ConsoleJournalProjector
+from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
 from lca.layer0_infra.observability.policy import AttributePolicy
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 
@@ -32,13 +32,13 @@ EXPORTER_NAME_MEMORY = "memory"
 EXPORTER_NAME_LANGFUSE = "langfuse"
 
 EXPORTER_FACTORIES: dict[str, ExporterFactory] = {
-    EXPORTER_NAME_JSONL: lambda s: JsonlExporter(s.jsonl_path),
     EXPORTER_NAME_MEMORY: lambda _s: InMemorySpanExporter(),
     EXPORTER_NAME_LANGFUSE: lambda s: LangfuseBridge(s),
 }
 
 JOURNAL_PROJECTOR_FACTORIES: dict[str, ProjectorFactory] = {
     EXPORTER_NAME_CONSOLE: lambda s: ConsoleJournalProjector(s.verbosity),
+    EXPORTER_NAME_JSONL: lambda s: JsonlJournalProjector(s.jsonl_path),
 }
 
 

@@ -1,4 +1,4 @@
-"""Unit tests for JsonlExporter + hook span attribute extraction + redaction."""
+"""journal jsonl 落盘 + hook 属性提取 + 脱敏守卫（ADR-0037 journal.v1 schema）。"""
 
 from __future__ import annotations
 
@@ -7,72 +7,88 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.contracts.telemetry import SpanName
-from lca.layer0_infra.observability import ObservabilityHub, bind, span
-from lca.layer0_infra.observability.exporters.jsonl import JsonlExporter
+from lca.contracts.journal import (
+    AgentRunFinished,
+    AgentRunStarted,
+    RunScope,
+    TeamRunFinished,
+    TeamRunStarted,
+    run_scope,
+)
+from lca.layer0_infra.observability import ObservabilityHub, bind, create_observability, record
+from lca.layer0_infra.observability.journal.journal_io import (
+    JOURNAL_SCHEMA_VERSION,
+    read_journal,
+)
+from lca.layer0_infra.observability.settings import ObservabilitySettings
 
 
-def _jsonl_hub(tmpdir: str, filename: str = "trace.jsonl") -> tuple[ObservabilityHub, Path]:
+def _journal_hub(tmpdir: str, filename: str = "journal.jsonl") -> tuple[ObservabilityHub, Path]:
     output = Path(tmpdir) / filename
-    return ObservabilityHub([JsonlExporter(output)]), output
+    cfg = ObservabilitySettings(backends="jsonl", jsonl_path=str(output))
+    return create_observability("jsonl", settings=cfg), output
 
 
-def _span_records(output: Path) -> list[dict]:
-    lines = output.read_text(encoding="utf-8").strip().split("\n")
-    records = [json.loads(line) for line in lines if line.strip()]
-    return [r for r in records if r.get("record") == "span"]
+def _run_solo(hub: ObservabilityHub) -> None:
+    scope = RunScope(trace_id="t", run_id="r", agent_role="Solo")
+    with bind(hub), run_scope(scope):
+        record(AgentRunStarted(agent_role="Solo", objective="hi"))
+        record(AgentRunFinished(status="completed", steps=1, output_preview="done"))
 
 
-class TestJsonlExporter(unittest.TestCase):
-    """Tests for JsonlExporter through the real hub pipeline."""
+class TestJsonlJournalProjector(unittest.TestCase):
+    """journal 落盘：schema 版本化、一行一事件、replay 可重建。"""
 
-    def test_emit_span_creates_file(self) -> None:
-        """export creates the output file (incl. missing parents) if needed."""
+    def test_creates_file_including_missing_parents(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            target = Path(tmpdir) / "subdir" / "trace.jsonl"
-            hub = ObservabilityHub([JsonlExporter(target)])
-            with bind(hub), span(SpanName.RUN_AGENT):
-                pass
+            target = Path(tmpdir) / "subdir" / "journal.jsonl"
+            cfg = ObservabilitySettings(backends="jsonl", jsonl_path=str(target))
+            hub = create_observability("jsonl", settings=cfg)
+            _run_solo(hub)
+            hub.close()
             self.assertTrue(target.is_file())
 
-    def test_emit_span_writes_valid_json(self) -> None:
-        """Each span is written as a valid JSON line with record=span."""
+    def test_writes_schema_versioned_records(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            hub, output = _jsonl_hub(tmpdir)
-            with (
-                bind(hub),
-                span(
-                    SpanName.LOOP_PHASE_THINK,
-                    **{"action_type": "respond", "confidence": 0.95},
-                ),
-            ):
-                pass
-            records = _span_records(output)
-            self.assertEqual(len(records), 1)
-            record = records[0]
-            self.assertEqual(record["name"], SpanName.LOOP_PHASE_THINK.value)
-            self.assertEqual(record["attributes"]["action_type"], "respond")
+            hub, output = _journal_hub(tmpdir)
+            _run_solo(hub)
+            hub.close()
+            lines = [json.loads(x) for x in output.read_text(encoding="utf-8").splitlines() if x]
+            self.assertGreaterEqual(len(lines), 2)
+            for line in lines:
+                self.assertEqual(line["schema"], JOURNAL_SCHEMA_VERSION)
+                self.assertIn("scope", line)
+                self.assertIn("event_type", line)
+                self.assertIn("event", line)
+            types = {x["event_type"] for x in lines}
+            self.assertIn("AgentRunStarted", types)
+            self.assertIn("AgentRunFinished", types)
 
-    def test_multiple_spans_append(self) -> None:
-        """Multiple spans are appended, one per line."""
+    def test_scope_carries_correlation(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            hub, output = _jsonl_hub(tmpdir)
-            with bind(hub):
-                for i in range(3):
-                    with span(SpanName.TOOL_EXECUTE, **{"i": i}):
-                        pass
-            records = _span_records(output)
-            self.assertEqual(len(records), 3)
+            hub, output = _journal_hub(tmpdir)
+            _run_solo(hub)
+            hub.close()
+            first = json.loads(output.read_text(encoding="utf-8").splitlines()[0])
+            scope = first["scope"]
+            self.assertEqual(scope["trace_id"], "t")
+            self.assertEqual(scope["run_id"], "r")
+            self.assertEqual(scope["agent_role"], "Solo")
 
-    def test_record_schema_fields(self) -> None:
-        """Span records carry topology + timing fields."""
+    def test_replay_reconstructs_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            hub, output = _jsonl_hub(tmpdir)
-            with bind(hub), span(SpanName.RUN_AGENT):
-                pass
-            record = _span_records(output)[0]
-            for key in ("trace_id", "span_id", "parent_span_id", "status", "duration_ms"):
-                self.assertIn(key, record)
+            hub, output = _journal_hub(tmpdir)
+            scope = RunScope(trace_id="t", run_id="team-run")
+            with bind(hub), run_scope(scope):
+                record(TeamRunStarted(team_id="team-x", strategy_key="lead"))
+                record(TeamRunFinished(status="completed", steps=1))
+            hub.close()
+            events = read_journal(output)
+            self.assertEqual(len(events), 2)
+            self.assertIsInstance(events[0].event, TeamRunStarted)
+            self.assertEqual(events[0].event.team_id, "team-x")
+            self.assertEqual(events[0].scope.run_id, "team-run")
+            self.assertIsInstance(events[1].event, TeamRunFinished)
 
 
 class TestHookSpanAttributes(unittest.TestCase):

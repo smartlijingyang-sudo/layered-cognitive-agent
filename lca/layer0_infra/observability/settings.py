@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from lca.layer0_infra.observability.policy import Verbosity
 
 _DEFAULT_BACKENDS = "console"
-_DEFAULT_JSONL_PATH = "traces/lca_trace.jsonl"
+_DEFAULT_JSONL_PATH = "traces/lca_journal.jsonl"
 _DEFAULT_LANGFUSE_HOST = "http://localhost:3000"
 
 

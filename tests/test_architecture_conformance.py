@@ -99,6 +99,7 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.observability.journal.console_projector._TraceState": (
         "console 投影内部累加器（同 _RunDigest 先例）"
     ),
+    "lca.layer0_infra.observability.journal.journal_io.JournalFormatError": ("异常类型"),
 }
 
 _SCAN_PACKAGES = [
