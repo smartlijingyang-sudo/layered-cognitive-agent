@@ -35,6 +35,7 @@ from lca.layer0_infra.observability.handles import (
     _IsolatedExporter,
 )
 from lca.layer0_infra.observability.journal.engine import ExecutionJournal
+from lca.layer0_infra.observability.journal.insight_engine import InsightEngine
 from lca.layer0_infra.observability.journal.otel_projector import OtelProjector
 from lca.layer0_infra.observability.langfuse_conventions import (
     FRAMEWORK_TAG,
@@ -87,11 +88,15 @@ class ObservabilityHub(ObservabilityBackend):
             self._processors.append(processor)
         self._tracer = self._provider.get_tracer(_TRACER_NAME)
         self._policy = policy if policy is not None else AttributePolicy()
-        # journal 永远在线：OtelProjector 内置（span 平面由叙事驱动），
-        # 其余投影器（console/jsonl/序列图...）按后端配置装配。
+        # journal 永远在线（ADR-0037）。投影器顺序即语义：
+        # InsightEngine 先行（收尾时把 RunInsight 回注 journal，须在 OTel 关闭
+        # run span、console 渲染 Run Card 之前完成），随后 OtelProjector（span
+        # 平面由叙事驱动），最后按后端配置装配其余投影器（console/jsonl...）。
+        insight = InsightEngine()
         self._journal = ExecutionJournal(
-            [OtelProjector(self._tracer), *journal_projectors], policy=self._policy
+            [insight, OtelProjector(self._tracer), *journal_projectors], policy=self._policy
         )
+        insight.bind_journal(self._journal.record)
         self._scorer: Any = None
         self._bridges: list[Any] = []
 

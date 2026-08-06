@@ -35,6 +35,10 @@ def _tool_output_preview(obs: Observation) -> str:
     return obs.error or ""
 
 
+def _elapsed_ms(started: float) -> int:
+    return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
+
+
 class SimpleSafeExecutor(SafeExecutor):
     """Permission → validate → cache → retry → sandbox execute."""
 
@@ -68,18 +72,30 @@ class SimpleSafeExecutor(SafeExecutor):
 
         cache_key = f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
         if cache_config.enabled and cache_key in self._cache:
-            return self._cache[cache_key]
+            cached = self._cache[cache_key]
+            # 缓存命中也是一次「调用」——冗余检测必须看见它，否则被短路掩盖
+            self._record_invoked(tool, args, cached, latency_ms=0, attempt=0)
+            return cached
 
+        started = time.perf_counter()
         last_obs: Observation | None = None
         last_error: str = ""
+        attempts_used = 0
         delay = retry_policy.backoff_base_s
         for attempt in range(retry_policy.max_retries + 1):
+            attempts_used = attempt + 1
             obs = await self._execute_once(tool, args, attempt)
             if obs.success:
                 if cache_config.enabled:
                     self._cache[cache_key] = obs
+                self._record_invoked(
+                    tool, args, obs, latency_ms=_elapsed_ms(started), attempt=attempts_used
+                )
                 return obs
             if obs.extra.get(FAILURE_KIND) == FAILURE_KIND_VALIDATION:
+                self._record_invoked(
+                    tool, args, obs, latency_ms=_elapsed_ms(started), attempt=attempts_used
+                )
                 return obs
             last_obs = obs
             last_error = obs.error or ""
@@ -87,17 +103,36 @@ class SimpleSafeExecutor(SafeExecutor):
                 await asyncio.sleep(delay)
                 delay *= retry_policy.backoff_multiplier
 
+        if last_obs is not None:
+            self._record_invoked(
+                tool, args, last_obs, latency_ms=_elapsed_ms(started), attempt=attempts_used
+            )
         detail = f"，最后错误: {last_error}" if last_error else ""
         raise ToolExecutionError(
             f"工具 {tool.name} 重试 {retry_policy.max_retries} 次后仍失败{detail}", last_obs
         )
 
+    @staticmethod
+    def _record_invoked(
+        tool: Tool, args: dict[str, Any], obs: Observation, *, latency_ms: int, attempt: int
+    ) -> None:
+        record(
+            ToolInvoked(
+                tool_name=tool.name,
+                arguments_preview=json.dumps(args, ensure_ascii=False, default=str),
+                result_preview=_tool_output_preview(obs),
+                ok=obs.success,
+                latency_ms=latency_ms,
+                attempt=attempt,
+                error="" if obs.success else (obs.error or ""),
+            )
+        )
+
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:
-        started = time.perf_counter()
         try:
-            obs = await tool.execute(args)
+            return await tool.execute(args)
         except ToolExecutionError as err:
-            obs = Observation(
+            return Observation(
                 observation_id=new_id("obs"),
                 success=False,
                 payload=None,
@@ -112,26 +147,13 @@ class SimpleSafeExecutor(SafeExecutor):
                 error=str(err),
                 attempt=attempt,
             )
-            obs = Observation(
+            return Observation(
                 observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=str(err),
                 extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
             )
-        latency_ms = int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
-        record(
-            ToolInvoked(
-                tool_name=tool.name,
-                arguments_preview=json.dumps(args, ensure_ascii=False, default=str),
-                result_preview=_tool_output_preview(obs),
-                ok=obs.success,
-                latency_ms=latency_ms,
-                attempt=attempt,
-                error="" if obs.success else (obs.error or ""),
-            )
-        )
-        return obs
 
     @staticmethod
     def _validate_args(tool: Tool, args: dict[str, Any]) -> str | None:
