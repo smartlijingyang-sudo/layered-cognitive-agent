@@ -25,7 +25,6 @@ class Budget:
     used_cost_usd: float = 0.0
     used_steps: int = 0
     started_at: datetime = field(default_factory=utc_now)
-    extra: dict[str, Any] = field(default_factory=dict)
 
     def exceeded(self) -> bool:
         """True when step or wall-clock limits are exceeded."""

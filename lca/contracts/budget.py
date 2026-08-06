@@ -21,6 +21,9 @@ DEFAULT_TOOL_TIMEOUT_S: int = 5
 DEFAULT_A2A_TIMEOUT_S: float = 30.0
 """Default HTTP timeout (seconds) for A2A transport."""
 
+DEFAULT_DELEGATION_TIMEOUT_S: float = 300.0
+"""Default timeout (seconds) for send_and_wait / member invocation."""
+
 DEFAULT_MAX_WALL_CLOCK_SECONDS: int = 300
 """Default wall-clock timeout for agent / team runs (seconds)."""
 

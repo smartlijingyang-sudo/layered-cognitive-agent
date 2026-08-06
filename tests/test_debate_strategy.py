@@ -53,8 +53,8 @@ def _make_agent(
 class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
     """验证多轮辩论收敛行为。"""
 
-    async def test_single_member_converges_immediately(self) -> None:
-        """单成员时，第 1 轮即达成共识退出。"""
+    async def test_single_member_runs_full_rounds(self) -> None:
+        """单成员不构成辩论（需 >= 2），跑满 max_rounds 后返回最终结果。"""
         agent = _make_agent("t1", ["only proposal"])
         strategy = DebateStrategy(stage_with_invoker([agent]), max_rounds=3)
 
@@ -62,7 +62,7 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.output, "only proposal")
-        self.assertEqual(agent.run.call_count, 1)
+        self.assertEqual(agent.run.call_count, 3)
 
     async def test_early_exit_when_consensus(self) -> None:
         """所有成员输出相同时 → 提前退出，不跑满 max_rounds。"""

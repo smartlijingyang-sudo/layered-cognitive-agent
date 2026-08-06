@@ -34,6 +34,8 @@ class InternalTransport(AgentTransport):
     维护 ``_directory``（key → async handler），``send_task`` 通过
     ``asyncio.create_task`` 调度 handler。调用方优先用 ``wait_result``
     await Future；``poll_status`` / ``receive_result`` 保留以兼容统一协议。
+
+    生命周期：调用 ``aclose()`` 取消所有未完成任务并释放资源。
     """
 
     protocol_name: str = "internal"
@@ -72,7 +74,8 @@ class InternalTransport(AgentTransport):
             fut: asyncio.Future[Observation] = loop.create_future()
             fut.set_result(
                 _fail_observation(
-                    "agent not found in directory", failure_kind=FAILURE_KIND_VALIDATION
+                    "agent not found in directory",
+                    failure_kind=FAILURE_KIND_VALIDATION,
                 )
             )
             self._tasks[task_id] = fut
@@ -99,12 +102,14 @@ class InternalTransport(AgentTransport):
 
     async def receive_result(self, task_id: str) -> Observation:
         fut = self._tasks.get(task_id)
-        if fut is not None and fut.done():
-            try:
-                return fut.result()
-            except Exception as exc:
-                return _fail_observation(str(exc))
-        return _fail_observation("task not found")
+        if fut is None:
+            return _fail_observation("task not found")
+        if not fut.done():
+            return _fail_observation("task still in progress")
+        try:
+            return fut.result()
+        except Exception as exc:
+            return _fail_observation(str(exc))
 
     async def wait_result(self, task_id: str, timeout_s: float | None = None) -> Observation:
         fut = self._tasks.get(task_id)
@@ -112,4 +117,17 @@ class InternalTransport(AgentTransport):
             return _fail_observation("task not found")
         if timeout_s is None:
             return await fut
-        return await asyncio.wait_for(asyncio.shield(fut), timeout=timeout_s)
+        try:
+            return await asyncio.wait_for(fut, timeout=timeout_s)
+        except asyncio.TimeoutError:
+            # 取消孤儿任务，防止资源泄漏
+            fut.cancel()
+            self._tasks.pop(task_id, None)
+            raise
+
+    async def aclose(self) -> None:
+        """取消所有未完成任务，清空 _tasks，释放资源。"""
+        for _task_id, fut in list(self._tasks.items()):
+            if not fut.done():
+                fut.cancel()
+        self._tasks.clear()

@@ -28,7 +28,6 @@ _EMPTY_TEAMMATES = "(无可用队友)"
 _EMPTY_ASSIGNED = "(尚未委派)"
 _EMPTY_CONTEXT = "(无历史上下文)"
 _EMPTY_REPORTS = "(尚无成员回报)"
-_EMPTY_NOTES = "(无)"
 _KIND_EXCLUDE_NONE: frozenset[MemoryRecordKind] = frozenset()
 _REPORT_EXCLUDED_KINDS: frozenset[MemoryRecordKind] = frozenset(
     {MemoryRecordKind.DELEGATION_RESULT}
@@ -100,7 +99,6 @@ def build_awareness_variables(awareness: TeamAwareness) -> dict[str, str]:
         return variables
     assigned = ", ".join(awareness.assigned_roles) if awareness.assigned_roles else _EMPTY_ASSIGNED
     variables["assigned_roles_text"] = assigned
-    variables["notes"] = awareness.notes or _EMPTY_NOTES
     variables["member_reports_text"] = build_member_reports_text(awareness.results)
     return variables
 

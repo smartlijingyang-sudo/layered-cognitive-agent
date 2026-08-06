@@ -63,10 +63,10 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
         agent_a.run.assert_awaited_once_with("test objective")
         agent_b.run.assert_awaited_once_with("test objective")
-        self.assertEqual(result.trace_id, "trace-b")
-        self.assertEqual(result.output, "result-b")
+        self.assertEqual(result.output, "result-a\nresult-b")
 
     async def test_parallel_returns_last_result(self) -> None:
+        """无 synthesizer 时合并所有成功成员输出。"""
         agent_a = _make_agent("trace-a", "first")
         agent_b = _make_agent("trace-b", "second")
         agent_c = _make_agent("trace-c", "third")
@@ -74,7 +74,7 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
         strategy = ParallelStrategy(stage_with_invoker([agent_a, agent_b, agent_c]))
 
         result = await strategy.run("task")
-        self.assertEqual(result.output, "third")
+        self.assertEqual(result.output, "first\nsecond\nthird")
 
     async def test_parallel_empty_members_returns_failed(self) -> None:
         strategy = ParallelStrategy(stage_with_invoker([]))

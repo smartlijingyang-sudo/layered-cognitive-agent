@@ -90,16 +90,16 @@ class A2ATransport(AgentTransport):
         return task_id
 
     async def wait_result(self, task_id: str, timeout_s: float | None = None) -> Observation:
-        """HTTP 轮询等待任务完成。"""
-        elapsed = 0.0
+        """HTTP 轮询等待任务完成（单调时钟，精确控制超时）。"""
+        loop = asyncio.get_event_loop()
+        deadline = (loop.time() + timeout_s) if timeout_s is not None else None
         while True:
             status = await self.poll_status(task_id)
             if status != TaskStatus.WORKING:
                 return await self.receive_result(task_id)
-            if timeout_s is not None and elapsed >= timeout_s:
+            if deadline is not None and loop.time() >= deadline:
                 raise TimeoutError(f"a2a wait_result 超时: {task_id}")
             await asyncio.sleep(_DEFAULT_POLL_INTERVAL_S)
-            elapsed += _DEFAULT_POLL_INTERVAL_S
 
     async def poll_status(self, task_id: str) -> str:
         endpoint_info = self._task_endpoints.get(task_id, "")

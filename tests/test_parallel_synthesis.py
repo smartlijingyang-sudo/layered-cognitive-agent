@@ -170,8 +170,8 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Result B", result.output)
         self.assertIn("Result C", result.output)
 
-    async def test_parallel_without_synthesizer_returns_last(self) -> None:
-        """无 Synthesizer 时保持向后兼容：返回最后一个结果。"""
+    async def test_parallel_without_synthesizer_merges_outputs(self) -> None:
+        """无 Synthesizer 时合并所有成功成员输出。"""
         members = [
             _FakeMember(_make_result("t1", "Result A")),
             _FakeMember(_make_result("t2", "Result B")),
@@ -180,7 +180,7 @@ class TestParallelStrategyWithSynthesizer(unittest.IsolatedAsyncioTestCase):
 
         result = await strategy.run("test task")
 
-        self.assertEqual(result.output, "Result B")
+        self.assertEqual(result.output, "Result A\nResult B")
 
     async def test_parallel_empty_members(self) -> None:
         """空成员列表应返回 failed。"""

@@ -7,6 +7,7 @@ Completed）由 transport 唯一通道发射，本模块只标记 member_invoke 
 
 from __future__ import annotations
 
+from lca.contracts.budget import DEFAULT_DELEGATION_TIMEOUT_S
 from lca.contracts.delegation_context import member_invoke_scope
 from lca.contracts.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentUnit, MemberInvoker, TeamStage
@@ -14,13 +15,13 @@ from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.result import Result
 from lca.layer0_infra.transport.invocation import send_and_wait
 
-_DEFAULT_TIMEOUT_S = 300.0
-
 
 class TransportMemberInvoker(MemberInvoker):
     """组合期绑定的成员调用通道：成员角色 → transport ``send_and_wait``。"""
 
-    def __init__(self, transport: AgentTransport, timeout_s: float = _DEFAULT_TIMEOUT_S) -> None:
+    def __init__(
+        self, transport: AgentTransport, timeout_s: float = DEFAULT_DELEGATION_TIMEOUT_S
+    ) -> None:
         self._transport = transport
         self._timeout_s = timeout_s
 
@@ -42,7 +43,10 @@ async def invoke_members_sequential(
     pass_output_as_next_task: bool = True,
     stop_on_first_completed: bool = False,
 ) -> Result:
-    """接力式编排共享逻辑（Pipeline 链式输出 / PeerRelay 首个完成即赢）。"""
+    """接力式编排共享逻辑（Pipeline 链式输出 / PeerRelay 首个完成即赢）。
+
+    错误隔离：单成员失败时停止链式传递，返回已有最佳结果。
+    """
     members = stage.members
     if not members:
         return Result.failed("No members in team")
@@ -50,7 +54,14 @@ async def invoke_members_sequential(
     last_result: Result | None = None
     total_steps = 0
     for member in members:
-        last_result = await stage.invoker.invoke(member, current_task)
+        try:
+            last_result = await stage.invoker.invoke(member, current_task)
+        except Exception as exc:
+            # 成员调用异常：停止链式传递，返回已有最佳结果
+            if last_result is not None:
+                last_result.total_steps = total_steps
+                return last_result
+            return Result.failed(f"member {member.role_profile.role} failed: {exc}")
         total_steps += last_result.total_steps
         if stop_on_first_completed and last_result.status == TaskStatus.COMPLETED:
             last_result.total_steps = total_steps

@@ -5,7 +5,6 @@ AVAILABLE_TOOLS: {tools}
 TEAMMATES:
 {teammates}
 ALREADY_ASSIGNED: {assigned_roles_text}
-PLANNER_NOTES: {notes}
 USER_TASK: {task}
 MEMBER_REPORTS（你已发起委派的返回，确定性事实，不是历史记录）:
 {member_reports_text}

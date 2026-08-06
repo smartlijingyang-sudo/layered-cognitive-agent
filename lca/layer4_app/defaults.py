@@ -45,9 +45,9 @@ from lca.layer3_agent.orchestration_registry import TeamStrategyRegistry
 from lca.layer3_agent.orchestration_strategies import (
     DebateStrategy,
     GraphStrategy,
-    HandoffStrategy,
     LeadStrategy,
     ParallelStrategy,
+    RaceStrategy,
     SequentialStrategy,
     SwarmStrategy,
 )
@@ -89,8 +89,8 @@ def _fan_out_strategy(assembly: TeamAssembly) -> ParallelStrategy:
     return ParallelStrategy(assembly.stage, synthesizer=ConcatSynthesizer())
 
 
-def _peer_relay_strategy(assembly: TeamAssembly) -> HandoffStrategy:
-    return HandoffStrategy(assembly.stage)
+def _peer_relay_strategy(assembly: TeamAssembly) -> RaceStrategy:
+    return RaceStrategy(assembly.stage)
 
 
 def _peer_swarm_strategy(assembly: TeamAssembly) -> SwarmStrategy:

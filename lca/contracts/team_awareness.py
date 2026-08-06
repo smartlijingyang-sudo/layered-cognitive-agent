@@ -53,4 +53,3 @@ class TeamAwareness:
     results: list[DelegationResult] = field(default_factory=list)
     consult_duty: ConsultDuty | None = None
     assigned_roles: list[str] = field(default_factory=list)
-    notes: str = ""

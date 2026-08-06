@@ -10,6 +10,7 @@ asyncio.create_task 边界，成员 run 由此派生 parent_run_id / delegation_
 
 from __future__ import annotations
 
+from lca.contracts.budget import DEFAULT_DELEGATION_TIMEOUT_S
 from lca.contracts.decision import Observation
 from lca.contracts.delegation_context import (
     delegation_scope,
@@ -30,8 +31,6 @@ from lca.contracts.protocols import AgentTransport
 from lca.contracts.semantic_keys import OBS_TASK_ID
 from lca.contracts.telemetry import ATTR_CALLEE_ROLE, ATTR_OK, ATTR_PROTOCOL, SpanName
 from lca.layer0_infra.observability import record, span
-
-_DEFAULT_TIMEOUT_S = 300.0
 
 
 def _describe_target(agent_card: AgentCard | str) -> str:
@@ -87,13 +86,22 @@ async def send_and_wait(
     subtask: str,
     context_refs: list[str] | None = None,
     *,
-    timeout_s: float = _DEFAULT_TIMEOUT_S,
+    timeout_s: float = DEFAULT_DELEGATION_TIMEOUT_S,
 ) -> Observation:
     """Send a subtask via *transport* and wait for the Observation result.
 
     委派叙事一等公民：Issued（开）→ 传输往返 → Completed（闭），
     delegation_id 穿透到成员任务（成员 run 的关联骨架由此派生）。
     """
+    # 超时前置检查：避免派发任务后立即丢弃导致孤儿 Task
+    if timeout_s <= 0:
+        return Observation(
+            observation_id=new_id("obs"),
+            success=False,
+            payload=None,
+            error="delegate 超时(deadline 已过期)",
+        )
+
     refs = list(context_refs or [])
     callee = _describe_target(agent_card)
     protocol = getattr(transport, "protocol_name", "unknown")
@@ -128,20 +136,13 @@ async def send_and_wait(
             **{ATTR_CALLEE_ROLE: callee, ATTR_PROTOCOL: protocol, "task_id": task_id},
         ) as handle:
             wait = getattr(transport, "wait_result", None)
-            if wait is not None and timeout_s > 0:
+            if wait is not None:
                 waited = await wait(task_id, timeout_s)
                 if not isinstance(waited, Observation):
                     raise TypeError(
                         f"wait_result must return Observation, got {type(waited).__name__}"
                     )
                 observation = waited
-            elif timeout_s <= 0:
-                observation = Observation(
-                    observation_id=f"obs_{task_id}",
-                    success=False,
-                    payload=None,
-                    error=f"delegate 超时(deadline 已过期): task_id={task_id}",
-                )
             else:
                 observation = await transport.receive_result(task_id)
             handle.attributes[ATTR_OK] = observation.success
