@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.budget import BudgetLimits
-from lca.contracts.message import AgentMessage
-from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile
-from lca.contracts.run_context import RunContext
-from lca.contracts.state import StateSnapshot
+from lca.contracts.models.core.budget import BudgetLimits
+from lca.contracts.models.core.message import AgentMessage
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import StateSnapshot
+from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.models.team.run_context import RunContext
 
 
 @runtime_checkable

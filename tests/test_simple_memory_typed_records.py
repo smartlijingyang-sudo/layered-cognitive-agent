@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import unittest
 
-from lca.contracts.budget import create_budget
-from lca.contracts.decision import Observation, Reflection
-from lca.contracts.enums import MemoryLayer, MemoryRecordKind, ReflectionVerdict
-from lca.contracts.semantic_keys import (
+from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind, ReflectionVerdict
+from lca.contracts.atoms.semantic_keys import (
     META_ROLE,
     META_SUBTASK,
     OBS_MEMBER_RESULTS,
     OBS_MEMBER_SUBTASKS,
     OBS_RESULT_KIND,
 )
-from lca.contracts.state import AgentState
+from lca.contracts.models.core.budget import create_budget
+from lca.contracts.models.core.decision import Observation, Reflection
+from lca.contracts.models.core.state import AgentState
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
 

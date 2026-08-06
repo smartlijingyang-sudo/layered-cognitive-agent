@@ -9,7 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.state import AgentState, Budget
+from lca.contracts.models.core.state import AgentState, Budget
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser

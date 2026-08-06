@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.enums import MessageKind, MessageRole
+from lca.contracts.atoms.enums import MessageKind, MessageRole
 
 
 @dataclass

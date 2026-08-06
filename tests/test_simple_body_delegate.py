@@ -4,15 +4,15 @@ from __future__ import annotations
 import asyncio
 import unittest
 
-from lca.contracts.decision import (
+from lca.contracts.atoms.enums import ActionScope
+from lca.contracts.models.core.decision import (
     Decision,
     DelegationSpec,
     Observation,
     ToolCall,
 )
-from lca.contracts.enums import ActionScope
-from lca.contracts.result import ToolExecutionError
-from lca.contracts.state import AgentState, Budget
+from lca.contracts.models.core.result import ToolExecutionError
+from lca.contracts.models.core.state import AgentState, Budget
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import (
     TransportNotFoundError,

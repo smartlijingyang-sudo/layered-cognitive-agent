@@ -20,10 +20,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from lca.contracts.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
-from lca.contracts.enums import MemoryLayer
-from lca.contracts.role_team import RoleProfile
-from lca.contracts.team_coordination import (
+from lca.contracts.atoms.enums import MemoryLayer
+from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
+from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.models.team.team_coordination import (
     STRATEGY_KEY_LEAD,
     Coordination,
     LeadMandate,

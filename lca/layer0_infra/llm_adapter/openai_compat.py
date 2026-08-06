@@ -11,7 +11,7 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
-from lca.contracts.llm import LLMResponse, TokenUsage
+from lca.contracts.models.core.llm import LLMResponse, TokenUsage
 from lca.contracts.protocols import LLMAdapter, Tool
 
 _DEFAULT_TEMPERATURE = 0.7

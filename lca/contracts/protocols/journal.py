@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.journal import StampedEvent
+from lca.contracts.models.observability.journal import StampedEvent
 
 
 @runtime_checkable

@@ -10,7 +10,7 @@ import io
 
 import pytest
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
     DelegationCompleted,

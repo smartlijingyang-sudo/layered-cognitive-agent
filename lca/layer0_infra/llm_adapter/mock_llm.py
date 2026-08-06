@@ -8,7 +8,7 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from lca.contracts.llm import LLMResponse
+from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
 
 # Minimum token count (numbers + operators) to qualify as an arithmetic expression.

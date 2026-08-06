@@ -20,11 +20,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     RunScope,
     StampedEvent,
 )
-from lca.contracts.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
 
 JOURNAL_SCHEMA_VERSION = "journal.v1"
 

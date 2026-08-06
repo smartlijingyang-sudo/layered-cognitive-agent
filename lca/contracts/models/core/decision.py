@@ -6,12 +6,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.enums import ContentType, DelegationProtocol, ReflectionVerdict
-from lca.contracts.ids import utc_now
-from lca.contracts.lifecycle import AgentCard
+from lca.contracts.atoms.enums import ContentType, DelegationProtocol, ReflectionVerdict
+from lca.contracts.atoms.ids import utc_now
+from lca.contracts.models.core.lifecycle import AgentCard
 
 if TYPE_CHECKING:
-    from lca.contracts.result import Result
+    from lca.contracts.models.core.result import Result
 
 __all__ = [
     "AgentCard",
@@ -91,7 +91,7 @@ class Observation:
     @classmethod
     def from_result(cls, result: Result) -> Observation:
         """Bridge a Result back into an Observation for channel return path."""
-        from lca.contracts.lifecycle import TaskStatus
+        from lca.contracts.models.core.lifecycle import TaskStatus
 
         return cls(
             observation_id=f"obs_{result.trace_id}",
@@ -114,4 +114,14 @@ class Reflection:
     verdict: ReflectionVerdict
     lesson: str | None = None
     correction: Decision | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class Turn:
+    """One cognitive step: decision + act result + optional reflection."""
+
+    decision: Decision
+    observation: Observation
+    reflection: Reflection | None = None
     extra: dict[str, Any] = field(default_factory=dict)

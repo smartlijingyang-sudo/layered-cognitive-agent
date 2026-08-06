@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.enums import RoleStatus
-from lca.contracts.role_status_rules import is_success_status, is_terminal_status
+from lca.contracts.atoms.enums import RoleStatus
+from lca.contracts.models.team.role_status_rules import is_success_status, is_terminal_status
 
 
 @dataclass(frozen=True)

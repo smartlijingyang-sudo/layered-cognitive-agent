@@ -7,9 +7,9 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lca.contracts.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
-from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.llm import LLMResponse
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.team.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.protocols import LLMAdapter, TeamStage
 from lca.layer3_agent.member_invoke import TransportMemberInvoker
 from lca.layer3_agent.orchestration_strategies import GraphStrategy

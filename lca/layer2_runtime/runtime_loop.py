@@ -11,23 +11,24 @@ from __future__ import annotations
 
 import structlog
 
-from lca.contracts.budget import DEFAULT_MAX_STEPS, create_budget
-from lca.contracts.enums import SnapshotReason
-from lca.contracts.ids import new_id
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.atoms.enums import SnapshotReason
+from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms import HookRegistry
+from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, create_budget
+from lca.contracts.models.core.decision import Turn
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.result import ApprovalPendingError, BudgetExceededError, Result
+from lca.contracts.models.core.state import AgentState, StateSnapshot
+from lca.contracts.models.core.stop import StopReason
+from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import (
     Body,
     Brain,
     MemorySystem,
     Runtime,
     StateStore,
+    StopRule,
 )
-from lca.contracts.result import ApprovalPendingError, BudgetExceededError, Result
-from lca.contracts.run_context import RunContext
-from lca.contracts.state import AgentState, StateSnapshot
-from lca.contracts.stop import StopReason, StopRule
-from lca.contracts.types import Turn
 from lca.layer0_infra.observability import get_span_context
 
 _log = structlog.get_logger("lca.runtime_loop")

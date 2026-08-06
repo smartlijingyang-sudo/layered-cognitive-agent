@@ -17,9 +17,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lca.contracts.delegation import DelegationResult
-from lca.contracts.member_status import MemberStatus
-from lca.contracts.role_team import RoleProfile
+from lca.contracts.models.team.delegation import DelegationResult
+from lca.contracts.models.team.member_status import MemberStatus
+from lca.contracts.models.team.role_team import RoleProfile
 
 
 @dataclass
@@ -27,7 +27,7 @@ class ConsultDuty:
     """咨询义务（consult / board 授权专属）：必问成员状态板 + 委派重试计数。
 
     ``max_attempts`` 由组合期注入（唯一默认值见
-    ``lca.contracts.agent_spec.DEFAULT_DELEGATE_MAX_ATTEMPTS``），
+    ``lca.contracts.protocols.spec.DEFAULT_DELEGATE_MAX_ATTEMPTS``），
     契约层不私藏重试策略。
 
     Mutability（一次 run 内）:

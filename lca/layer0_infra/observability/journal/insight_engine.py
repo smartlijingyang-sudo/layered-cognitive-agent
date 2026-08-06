@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
     DecisionMade,

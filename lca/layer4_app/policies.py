@@ -5,7 +5,7 @@ Policies are registered under ComponentKind.BUDGET_POLICY (e.g. ``lead``).
 
 from __future__ import annotations
 
-from lca.contracts.budget import (
+from lca.contracts.models.core.budget import (
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
     LEAD_MIN_MAX_STEPS,
     BudgetLimits,

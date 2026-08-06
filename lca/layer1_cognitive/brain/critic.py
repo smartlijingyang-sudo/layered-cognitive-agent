@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.decision import Observation, Reflection
-from lca.contracts.enums import ReflectionVerdict
-from lca.contracts.ids import new_id
-from lca.contracts.protocols import Critic
-from lca.contracts.semantic_keys import (
+from lca.contracts.atoms.enums import ReflectionVerdict
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_TRANSIENT,
     FAILURE_KIND_VALIDATION,
 )
-from lca.contracts.state import AgentState
+from lca.contracts.models.core.decision import Observation, Reflection
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.protocols import Critic
 
 _FAILURE_KIND_HINT: dict[str, str] = {
     FAILURE_KIND_VALIDATION: "参数不合法，请重复同一动作，须修正参数后重新调用",

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.state import AgentState, Budget
+from lca.contracts.models.core.state import AgentState, Budget
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.skill_router import KeywordSkillRouter, StaticSkillRouter
 

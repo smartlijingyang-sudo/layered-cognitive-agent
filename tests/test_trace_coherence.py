@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import unittest
 
-from lca.contracts.telemetry import ATTR_AGENT_ROLE, ATTR_MODEL, ATTR_PROMPT_PREVIEW, SpanName
+from lca.contracts.atoms.telemetry import ATTR_AGENT_ROLE, ATTR_MODEL, ATTR_PROMPT_PREVIEW, SpanName
 from tests.harness.collector import TraceBundle
 from tests.harness.modes import scripted_llm_for_mode
 from tests.harness.runner import run_team_scripted
@@ -36,7 +36,7 @@ def _has_ancestor_named(bundle: TraceBundle, span, *names: str) -> bool:
 class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         from lca import Agent
-        from lca.contracts.team_coordination import Pipeline
+        from lca.contracts.models.team.team_coordination import Pipeline
 
         llm = scripted_llm_for_mode("pipeline")
         members = [

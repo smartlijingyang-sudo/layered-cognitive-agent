@@ -5,10 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
-from lca.contracts.protocols import LLMAdapter
-from lca.contracts.result import Result
-from lca.contracts.team_coordination import (
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.team.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
+from lca.contracts.models.team.team_coordination import (
     Debate,
     FanOut,
     Graph,
@@ -17,6 +16,7 @@ from lca.contracts.team_coordination import (
     PeerSwarm,
     Pipeline,
 )
+from lca.contracts.protocols import LLMAdapter
 from lca.layer4_app.api import Agent, Team, TeamLead
 from tests.harness.collector import InMemoryObservability, TraceBundle
 from tests.harness.scripted_llm import ScriptedLLMAdapter, multi_delegate, respond

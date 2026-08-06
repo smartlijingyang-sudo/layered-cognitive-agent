@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.team_coordination import (
+from lca.contracts.atoms.telemetry import SpanName
+from lca.contracts.models.team.team_coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
     STRATEGY_KEY_GRAPH,
@@ -22,7 +23,6 @@ from lca.contracts.team_coordination import (
     PeerSwarm,
     Pipeline,
 )
-from lca.contracts.telemetry import SpanName
 from lca.layer4_app.api import Agent, Team, TeamLead
 from lca.layer4_app.defaults import build_default_registries
 from tests.harness.collector import InMemoryObservability

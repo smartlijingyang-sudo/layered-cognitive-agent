@@ -10,11 +10,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS, Governance
-from lca.contracts.enums import MemoryLayer
-from lca.contracts.memory import MemoryRecord
+from lca.contracts.atoms.enums import MemoryLayer
+from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.result import Result
 from lca.contracts.protocols.agent import AgentUnit
-from lca.contracts.result import Result
+from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS, Governance
 
 
 @runtime_checkable

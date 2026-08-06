@@ -1,7 +1,7 @@
 """契约协议包 —— 全量 re-export，保持 ``from lca.contracts.protocols import X`` 兼容。
 子模块按层拆分：
 infra / cognition / embodiment / memory / runtime / agent / orchestration
-跨层机制见 ``lca.contracts.mechanisms``，跨层纯类型见 ``lca.contracts.types``。
+跨层机制见 ``lca.contracts.mechanisms``，跨层纯类型见 ``lca.contracts.models.core``。
 """
 
 from __future__ import annotations
@@ -15,6 +15,9 @@ from lca.contracts.mechanisms import (
     NamedRegistryProtocol,
     OrchestrationRegistryProtocol,
 )
+
+# ── 纯数据类型 ───────────────────────────────────────────
+from lca.contracts.models.core.stop import StopOutcome
 
 # ── L3 Agent / Team 入口 ──────────────────────────────────
 from lca.contracts.protocols.agent import (
@@ -75,10 +78,7 @@ from lca.contracts.protocols.orchestration import (
 )
 
 # ── L2 Runtime 协议 ──────────────────────────────────────
-from lca.contracts.protocols.runtime import Runtime, StopOutcomePolicy
-
-# ── 纯数据类型 ───────────────────────────────────────────
-from lca.contracts.types import StopOutcome
+from lca.contracts.protocols.runtime import Runtime, StopOutcomePolicy, StopRule
 
 __all__ = [
     "AgentTransport",
@@ -113,6 +113,7 @@ __all__ = [
     "StateStore",
     "StopOutcome",
     "StopOutcomePolicy",
+    "StopRule",
     "SupportsShortcut",
     "Synthesizer",
     "TeamAssembly",

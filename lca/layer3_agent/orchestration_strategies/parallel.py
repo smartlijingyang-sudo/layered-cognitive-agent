@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.budget import create_budget
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.atoms.telemetry import ATTR_CANDIDATE_COUNT, ATTR_SYNTHESIS_METHOD, SpanName
+from lca.contracts.models.core.budget import create_budget
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.result import Result
 from lca.contracts.protocols import Synthesizer, TeamStage, TeamStrategy
-from lca.contracts.result import Result
-from lca.contracts.telemetry import ATTR_CANDIDATE_COUNT, ATTR_SYNTHESIS_METHOD, SpanName
 from lca.layer0_infra.observability import span
 
 

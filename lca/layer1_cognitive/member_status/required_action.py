@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from lca.contracts.member_status import MemberStatus
+from lca.contracts.models.team.member_status import MemberStatus
 
 
 @dataclass(frozen=True)

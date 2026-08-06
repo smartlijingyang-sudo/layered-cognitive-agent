@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from lca.contracts.team_awareness import TeamAwareness
+from lca.contracts.models.team.team_awareness import TeamAwareness
 
 
 @dataclass

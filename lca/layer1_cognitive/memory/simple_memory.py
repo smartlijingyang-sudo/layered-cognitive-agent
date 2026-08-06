@@ -4,12 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.decision import Observation, Reflection
-from lca.contracts.enums import MemoryLayer, MemoryRecordKind
-from lca.contracts.ids import new_id
-from lca.contracts.memory import MemoryRecord
-from lca.contracts.protocols import MemorySystem, SharedMemoryStore
-from lca.contracts.semantic_keys import (
+from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.semantic_keys import (
     META_ROLE,
     META_STEP,
     META_SUBTASK,
@@ -17,7 +14,10 @@ from lca.contracts.semantic_keys import (
     OBS_MEMBER_SUBTASKS,
     OBS_RESULT_KIND,
 )
-from lca.contracts.state import AgentState
+from lca.contracts.models.core.decision import Observation, Reflection
+from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.protocols import MemorySystem, SharedMemoryStore
 
 _DEFAULT_MAX_WORKING = 20
 _DEFAULT_MAX_EPISODIC = 50

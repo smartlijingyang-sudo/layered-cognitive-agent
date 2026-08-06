@@ -10,7 +10,7 @@ import asyncio
 
 import pytest
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     DelegationIssued,
     DelegationMechanism,
     JournalEvent,
@@ -21,7 +21,7 @@ from lca.contracts.journal import (
     get_current_run_scope,
     run_scope,
 )
-from lca.contracts.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
 from lca.layer0_infra.observability import (
     ExecutionJournal,
     ObservabilityHub,

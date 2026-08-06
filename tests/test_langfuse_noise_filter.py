@@ -13,7 +13,7 @@ from typing import ClassVar
 import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lca.contracts.telemetry import EventName, SpanName
+from lca.contracts.atoms.telemetry import EventName, SpanName
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     bind,

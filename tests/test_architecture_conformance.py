@@ -36,22 +36,22 @@ EXEMPT: dict[str, str] = {
         "异常类型，非可插拔组件 "
     ),
     "lca.layer1_cognitive.body.action_registry.ActionRegistry": (
-        "ActionRegistryProtocol 实现，Protocol 在 contracts.action (ADR-0015/0016)"
+        "ActionRegistryProtocol 实现，Protocol 在 contracts.protocols.action (ADR-0015/0016)"
     ),
     "lca.layer1_cognitive.body.action_handlers.RespondOperation": (
-        "Action 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+        "Action 策略实现，Protocol 定义在 contracts.protocols.action"
     ),
     "lca.layer1_cognitive.body.action_handlers.UseToolOperation": (
-        "Action 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+        "Action 策略实现，Protocol 定义在 contracts.protocols.action"
     ),
     "lca.layer1_cognitive.body.action_handlers.DelegateOperation": (
-        "Action 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+        "Action 策略实现，Protocol 定义在 contracts.protocols.action"
     ),
     "lca.layer1_cognitive.body.action_handlers.HandoffOperation": (
-        "Action 策略实现，Protocol 定义在 contracts.action 而非 contracts.protocols"
+        "Action 策略实现，Protocol 定义在 contracts.protocols.action"
     ),
     "lca.layer1_cognitive.member_status.in_memory.InMemoryMemberStatus": (
-        "MemberStatus 实现，Protocol 定义在 contracts.member_status 而非 contracts.protocols (ADR-0015)"
+        "MemberStatus 实现，数据契约定义在 contracts.models.team.member_status (ADR-0015)"
     ),
     "lca.layer3_agent.orchestration_strategies.graph.strategy.GraphExecutionState": (
         "BFS 执行状态 dataclass，纯内部数据结构，非可插拔组件"
@@ -112,11 +112,11 @@ def _collect_protocol_classes() -> set[type]:
     利用 typing 模块对 Protocol 子类设置的 _is_protocol 标记，
     只匹配直接继承 Protocol 的接口定义，不会误匹配实现了 Protocol 的具体类。
     """
-    import lca.contracts.action as action_mod
     import lca.contracts.mechanisms as mechanisms_mod
-    import lca.contracts.member_status as member_status_mod
+    import lca.contracts.models.core.stop as stop_mod
+    import lca.contracts.models.team.member_status as member_status_mod
     import lca.contracts.protocols as protocols_mod
-    import lca.contracts.stop as stop_mod
+    import lca.contracts.protocols.action as action_mod
 
     result: set[type] = set()
     for mod in (
@@ -253,7 +253,7 @@ class TestCognitiveLoopSkeleton(unittest.TestCase):
 
         forbidden_modules = {
             "lca.layer1_cognitive.event_bus",
-            "lca.contracts.action",
+            "lca.contracts.protocols.action",
         }
         violations: list[str] = []
 

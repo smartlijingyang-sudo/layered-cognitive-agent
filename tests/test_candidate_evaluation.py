@@ -8,9 +8,9 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.decision import Decision
-from lca.contracts.semantic_keys import EVAL_CONFLICTS
-from lca.contracts.state import AgentState, Budget
+from lca.contracts.atoms.semantic_keys import EVAL_CONFLICTS
+from lca.contracts.models.core.decision import Decision
+from lca.contracts.models.core.state import AgentState, Budget
 from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
     SimpleCandidateEvaluationPipeline,
 )

@@ -12,11 +12,11 @@ L2 层职责：
 
 from __future__ import annotations
 
-from lca.contracts.decision import Decision, Observation, Reflection
-from lca.contracts.lifecycle import TaskStatus, coerce_status
-from lca.contracts.protocols import StopOutcomePolicy
-from lca.contracts.state import AgentState
-from lca.contracts.stop import StopDecision, StopReason, StopRule
+from lca.contracts.models.core.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.lifecycle import TaskStatus, coerce_status
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.stop import StopDecision, StopReason
+from lca.contracts.protocols import StopOutcomePolicy, StopRule
 
 
 class DefaultStopRule(StopRule):

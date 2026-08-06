@@ -5,17 +5,17 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timezone
 
-from lca.contracts.decision import DelegationSpec, Observation
-from lca.contracts.delegation import DelegationResult
-from lca.contracts.enums import MemoryRecordKind
-from lca.contracts.semantic_keys import (
+from lca.contracts.atoms.enums import MemoryRecordKind
+from lca.contracts.atoms.semantic_keys import (
     OBS_CACHE_HIT,
     OBS_MEMBER_RESULTS,
     OBS_MEMBER_SUBTASKS,
     OBS_RESULT_KIND,
 )
-from lca.contracts.state import AgentState, Budget
-from lca.contracts.team_awareness import TeamAwareness
+from lca.contracts.models.core.decision import DelegationSpec, Observation
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.delegation import DelegationResult
+from lca.contracts.models.team.team_awareness import TeamAwareness
 from lca.layer1_cognitive.body.delegation_cache import (
     cached_delegation_observation,
     tag_delegation_extra,

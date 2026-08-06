@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from lca.contracts.budget import create_budget
-from lca.contracts.graph import ExecutionGraph, NodeType
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.models.core.budget import create_budget
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.team.graph import ExecutionGraph, NodeType
 from lca.contracts.protocols import Synthesizer
-from lca.contracts.result import Result
 
 _AGGREGATOR_TRACE_PREFIX = "graph-agg"
 

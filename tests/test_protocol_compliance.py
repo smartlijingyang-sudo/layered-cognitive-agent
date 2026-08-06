@@ -111,7 +111,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
 
     def _build_brain_deps(self):
         """构建 ModularBrain 所需的依赖。"""
-        from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
+        from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 
         llm = MockLLMAdapter()
         rp = RoleProfile(
@@ -144,7 +144,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
 
     def test_simple_body(self):
         tool_reg = SimpleToolRegistry()
-        from lca.contracts.role_team import ToolPermissionManifest
+        from lca.contracts.models.team.role_team import ToolPermissionManifest
 
         executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
         body = SimpleBody(tool_reg, executor)
@@ -154,7 +154,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(SimpleToolRegistry(), ToolRegistry)
 
     def test_simple_safe_executor(self):
-        from lca.contracts.role_team import ToolPermissionManifest
+        from lca.contracts.models.team.role_team import ToolPermissionManifest
 
         executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
         self.assertIsInstance(executor, SafeExecutor)
@@ -176,7 +176,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
     """L2 运行时层。"""
 
     def test_cognitive_runtime_is_runtime(self):
-        from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
+        from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 
         llm = MockLLMAdapter()
         rp = RoleProfile(
@@ -210,7 +210,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
     """L3 Agent 层。"""
 
     def _build_agent(self):
-        from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
+        from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 
         llm = MockLLMAdapter()
         rp = RoleProfile(
@@ -251,7 +251,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(sup, AgentUnit)
 
     def test_team_handle_is_team_runtime(self):
-        from lca.contracts.team_coordination import (
+        from lca.contracts.models.team.team_coordination import (
             Pipeline,
         )
         from lca.layer4_app.composer import TeamComposer
@@ -289,8 +289,8 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
         self.assertEqual(result.status, "completed")
 
     def test_agent_with_custom_brain(self):
-        from lca.contracts.decision import Reflection
-        from lca.contracts.state import AgentState
+        from lca.contracts.models.core.decision import Reflection
+        from lca.contracts.models.core.state import AgentState
         from lca.layer4_app.api import Agent
 
         class StubBrain(Brain):

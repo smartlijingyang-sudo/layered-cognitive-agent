@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
-from lca.contracts.budget import DEFAULT_MAX_STEPS
-from lca.contracts.ids import new_id
-from lca.contracts.journal import AgentRunFinished, AgentRunStarted, RunScope
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms import Hook
-from lca.contracts.message import AgentMessage, agent_message_as_text, agent_message_text
+from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.message import (
+    AgentMessage,
+    agent_message_as_text,
+    agent_message_text,
+)
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import StateSnapshot
+from lca.contracts.models.observability.journal import AgentRunFinished, AgentRunStarted, RunScope
+from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import AgentUnit, Runtime
 from lca.contracts.protocols.capabilities import HasHooks
-from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile
-from lca.contracts.run_context import RunContext
-from lca.contracts.state import StateSnapshot
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     bind,

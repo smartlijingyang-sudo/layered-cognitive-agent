@@ -5,14 +5,14 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timezone
 
-from lca.contracts.delegation import DelegationResult
-from lca.contracts.enums import MemoryLayer, MemoryRecordKind
-from lca.contracts.llm import LLMResponse
-from lca.contracts.memory import MemoryRecord
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.semantic_keys import META_ROLE, META_STEP
-from lca.contracts.state import AgentState, Budget
-from lca.contracts.team_awareness import TeamAwareness
+from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.atoms.semantic_keys import META_ROLE, META_STEP
+from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.delegation import DelegationResult
+from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.team_awareness import TeamAwareness
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import (
     PromptReasoner,

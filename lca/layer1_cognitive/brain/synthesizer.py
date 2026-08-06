@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import Budget
 from lca.contracts.protocols import Synthesizer
-from lca.contracts.result import Result
-from lca.contracts.state import Budget
 
 
 class ConcatSynthesizer(Synthesizer):

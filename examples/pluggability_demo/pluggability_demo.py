@@ -4,7 +4,7 @@ LCA Framework Demo —— 可插拔性验证
 
 演示如何在不修改框架源码的情况下：
 1. 自定义 MemorySystem（装饰器模式，包一层日志）
-2. 自定义 Observability 实现
+2. 直接传入已装配的 ObservabilityHub 实例
 3. 通过注册表名字或自定义实例注入 Agent
 
 运行方式：
@@ -20,11 +20,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from lca.contracts.decision import Observation, Reflection
-from lca.contracts.enums import MemoryLayer
-from lca.contracts.memory import MemoryRecord
-from lca.contracts.state import AgentState
+from lca.contracts.atoms.enums import MemoryLayer
+from lca.contracts.models.core.decision import Observation, Reflection
+from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.state import AgentState
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from lca.layer0_infra.observability import create_observability
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer4_app.api import Agent
@@ -53,17 +54,6 @@ class LoggingMemorySystem:
 
     def query(self, layer: MemoryLayer) -> list[MemoryRecord]:
         return self._inner.query(layer)
-
-
-class MinimalObservability:
-    """极简可观测实现 —— 只输出工具调用。"""
-
-    def emit_span(self, span) -> None:
-        if span.name.startswith("tool."):
-            dur = None
-            if span.ended_at:
-                dur = int((span.ended_at - span.started_at).total_seconds() * 1000)
-            print(f"  [MinObs] {span.name} dur_ms={dur}")
 
 
 async def main() -> None:
@@ -99,14 +89,14 @@ async def main() -> None:
     print(f"  total_steps={result.total_steps}")
     print("=" * 70)
 
-    # --- 方式 2: 直接传入自定义 Observability 实例 ---
+    # --- 方式 2: 直接传入已装配的 ObservabilityHub 实例 ---
     print()
     print("=" * 70)
-    print("Pluggability Demo: 自定义 Observability (直接传实例)")
+    print("Pluggability Demo: ObservabilityHub (直接传实例)")
     print("=" * 70)
     print()
 
-    my_obs = MinimalObservability()
+    my_obs = create_observability("console")
 
     agent_with_custom_obs = Agent(
         role="通用问答助手",

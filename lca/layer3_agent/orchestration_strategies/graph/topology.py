@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections import deque
 
-from lca.contracts.graph import ExecutionGraph
+from lca.contracts.models.team.graph import ExecutionGraph
 
 
 def compute_in_degree(

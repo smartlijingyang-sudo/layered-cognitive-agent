@@ -20,13 +20,13 @@ from typing import Any
 
 import structlog
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     JournalEvent,
     RunScope,
     StampedEvent,
     get_current_run_scope,
 )
-from lca.contracts.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.observability.policy import AttributePolicy
 

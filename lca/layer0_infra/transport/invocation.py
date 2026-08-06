@@ -10,15 +10,13 @@ asyncio.create_task 边界，成员 run 由此派生 parent_run_id / delegation_
 
 from __future__ import annotations
 
-from lca.contracts.budget import DEFAULT_DELEGATION_TIMEOUT_S
-from lca.contracts.decision import Observation
-from lca.contracts.delegation_context import (
-    delegation_scope,
-    get_delegator_context,
-    in_member_invoke,
-)
-from lca.contracts.ids import new_id
-from lca.contracts.journal import (
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.semantic_keys import OBS_TASK_ID
+from lca.contracts.atoms.telemetry import ATTR_CALLEE_ROLE, ATTR_OK, ATTR_PROTOCOL, SpanName
+from lca.contracts.models.core.budget import DEFAULT_DELEGATION_TIMEOUT_S
+from lca.contracts.models.core.decision import Observation
+from lca.contracts.models.core.lifecycle import AgentCard, TaskStatus
+from lca.contracts.models.observability.journal import (
     DelegationCompleted,
     DelegationIssued,
     DelegationMechanism,
@@ -26,10 +24,12 @@ from lca.contracts.journal import (
     get_current_run_scope,
     run_scope,
 )
-from lca.contracts.lifecycle import AgentCard, TaskStatus
+from lca.contracts.models.team.delegation_context import (
+    delegation_scope,
+    get_delegator_context,
+    in_member_invoke,
+)
 from lca.contracts.protocols import AgentTransport
-from lca.contracts.semantic_keys import OBS_TASK_ID
-from lca.contracts.telemetry import ATTR_CALLEE_ROLE, ATTR_OK, ATTR_PROTOCOL, SpanName
 from lca.layer0_infra.observability import record, span
 
 

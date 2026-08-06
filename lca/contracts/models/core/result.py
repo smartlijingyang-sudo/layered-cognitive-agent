@@ -5,13 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.ids import new_id
-from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.state import Budget
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.state import Budget
 
 if TYPE_CHECKING:
-    from lca.contracts.decision import Observation
-    from lca.contracts.state import AgentState
+    from lca.contracts.models.core.decision import Observation
+    from lca.contracts.models.core.state import AgentState
 
 
 @dataclass

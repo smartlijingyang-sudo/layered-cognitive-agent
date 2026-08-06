@@ -7,19 +7,19 @@
 
 from __future__ import annotations
 
-from lca.contracts.decision import DelegationSpec, Observation
-from lca.contracts.delegation import DelegationResult
-from lca.contracts.enums import RoleStatus
-from lca.contracts.ids import new_id, utc_now
-from lca.contracts.member_status import MemberStatus
-from lca.contracts.semantic_keys import (
+from lca.contracts.atoms.enums import RoleStatus
+from lca.contracts.atoms.ids import new_id, utc_now
+from lca.contracts.atoms.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_VALIDATION,
     OBS_TASK_ID,
 )
-from lca.contracts.state import AgentState
-from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.core.decision import DelegationSpec, Observation
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.team.delegation import DelegationResult
+from lca.contracts.models.team.member_status import MemberStatus
+from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 
 
 def duty_board(state: AgentState) -> MemberStatus | None:

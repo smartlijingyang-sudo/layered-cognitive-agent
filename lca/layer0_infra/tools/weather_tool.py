@@ -6,9 +6,9 @@ import asyncio
 import time
 from typing import Any, ClassVar
 
-from lca.contracts.budget import DEFAULT_TOOL_TIMEOUT_S
-from lca.contracts.decision import Observation
-from lca.contracts.ids import new_id
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.budget import DEFAULT_TOOL_TIMEOUT_S
+from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols import Tool
 
 _SIMULATED_LATENCY_S = 0.05

@@ -8,11 +8,11 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.decision import Decision, Observation, Reflection
-from lca.contracts.enums import MemoryLayer
-from lca.contracts.memory import MemoryRecord
-from lca.contracts.state import AgentState, Budget
-from lca.contracts.types import TeamAssignment, Turn
+from lca.contracts.atoms.enums import MemoryLayer
+from lca.contracts.models.core.decision import Decision, Observation, Reflection, Turn
+from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.team_coordination import TeamAssignment
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 

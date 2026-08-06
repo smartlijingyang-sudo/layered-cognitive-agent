@@ -14,7 +14,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     ActionDegraded,
     AgentRunFinished,
     AgentRunStarted,

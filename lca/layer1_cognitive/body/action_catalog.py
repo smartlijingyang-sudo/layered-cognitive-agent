@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from lca.contracts.action import Action
-from lca.contracts.enums import ActionScope, ActionType
+from lca.contracts.atoms.enums import ActionScope, ActionType
 from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistryProtocol
+from lca.contracts.protocols.action import Action
 from lca.layer1_cognitive.body.action_handlers import (
     DelegateOperation,
     HandoffOperation,

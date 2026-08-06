@@ -6,11 +6,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from lca.contracts.enums import SnapshotReason
-from lca.contracts.ids import new_id, utc_now
-from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.team_awareness import TeamAwareness
-from lca.contracts.types import Turn
+from lca.contracts.atoms.enums import SnapshotReason
+from lca.contracts.atoms.ids import new_id, utc_now
+from lca.contracts.models.core.decision import Turn
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.team.team_awareness import TeamAwareness
 
 
 @dataclass

@@ -23,8 +23,8 @@ from typing import Any, TypeVar
 
 from opentelemetry import trace as otel_trace
 
-from lca.contracts.journal import JournalEvent
-from lca.contracts.telemetry import ATTR_SESSION_ID
+from lca.contracts.atoms.telemetry import ATTR_SESSION_ID
+from lca.contracts.models.observability.journal import JournalEvent
 from lca.layer0_infra.observability.handles import NullSpanHandle, SpanHandle
 from lca.layer0_infra.observability.hub import ObservabilityHub
 

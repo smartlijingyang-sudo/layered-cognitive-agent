@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.team_coordination import FanOut, PeerRelay, Pipeline
+from lca.contracts.models.team.team_coordination import FanOut, PeerRelay, Pipeline
 from lca.layer0_infra.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer4_app.api import Agent, Team, TeamLead

@@ -7,12 +7,12 @@
 
 from __future__ import annotations
 
-from lca.contracts.member_status import MemberStatus
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.team.member_status import MemberStatus
+from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.models.team.run_context import RunContext
+from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols import AgentUnit, TeamStrategy
-from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile
-from lca.contracts.run_context import RunContext
-from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
 
 
 class LeadStrategy(TeamStrategy):

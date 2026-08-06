@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import Decision, Observation
-from lca.contracts.enums import ActionScope
+from lca.contracts.atoms.enums import ActionScope
+from lca.contracts.atoms.semantic_keys import OBS_DEGRADED_FROM
+from lca.contracts.models.core.decision import Decision, Observation
+from lca.contracts.models.core.result import UnregisteredActionError
+from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import (
     AgentTransport,
     Body,
@@ -12,9 +14,7 @@ from lca.contracts.protocols import (
     ToolRegistry,
     TransportRegistryProtocol,
 )
-from lca.contracts.result import UnregisteredActionError
-from lca.contracts.semantic_keys import OBS_DEGRADED_FROM
-from lca.contracts.state import AgentState
+from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.action_registry import ActionRegistry

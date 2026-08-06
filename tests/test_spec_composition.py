@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import unittest
 
-from lca.contracts.agent_spec import AgentSpec, LeadSpec
-from lca.contracts.decision import Reflection
-from lca.contracts.enums import ComponentKind
+from lca.contracts.atoms.enums import ComponentKind
+from lca.contracts.models.core.decision import Reflection
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.team.team_coordination import LeadMandate, Pipeline
 from lca.contracts.protocols import AgentUnit, Brain, TeamUnit
-from lca.contracts.state import AgentState
-from lca.contracts.team_coordination import LeadMandate, Pipeline
+from lca.contracts.protocols.spec import AgentSpec, LeadSpec
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem

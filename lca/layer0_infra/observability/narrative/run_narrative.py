@@ -6,7 +6,7 @@ ADR-0037 后人类视图由 journal console 投影承担；本模块只剩 span 
 
 from __future__ import annotations
 
-from lca.contracts.telemetry import (
+from lca.contracts.atoms.telemetry import (
     ATTR_ACTION_TYPE,
     ATTR_CALLEE_ROLE,
     ATTR_EVENT,

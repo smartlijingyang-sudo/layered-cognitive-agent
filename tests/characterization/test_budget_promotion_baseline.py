@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from lca.contracts.budget import (
+from lca.contracts.models.core.budget import (
     DEFAULT_MAX_STEPS,
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
     LEAD_MIN_MAX_STEPS,
 )
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer0_infra.observability import create_observability
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer4_app.composer import _promote_lead
@@ -121,7 +121,7 @@ class TestNoPersistencePath:
     """
 
     def test_memory_record_is_in_memory_only(self) -> None:
-        from lca.contracts.enums import MemoryLayer
+        from lca.contracts.atoms.enums import MemoryLayer
         from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
         from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
         from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore

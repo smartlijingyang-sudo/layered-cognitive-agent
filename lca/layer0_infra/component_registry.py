@@ -10,7 +10,7 @@ ComponentRegistry 是「category → NamedRegistry」的组合器：每个 categ
 
 本模块不再持有进程级全局单例。ComponentRegistry / NamedRegistry
 的实例生命周期由调用方决定 —— 框架默认路径中，实例归 TeamComposer 私有持有
-（见 lca.contracts.registries.Registries、lca.layer4_app.composer.TeamComposer）。
+（见 lca.contracts.mechanisms.registries.Registries、lca.layer4_app.composer.TeamComposer）。
 """
 
 from __future__ import annotations

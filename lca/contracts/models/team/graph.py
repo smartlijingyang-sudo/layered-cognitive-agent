@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from lca.contracts.state import AgentState
+from lca.contracts.models.core.state import AgentState
 
 
 class NodeType(str, Enum):

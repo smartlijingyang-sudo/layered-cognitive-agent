@@ -11,7 +11,7 @@ import re
 from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any
 
-from lca.contracts.llm import LLMResponse
+from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
 
 _ROLE_RE = re.compile(r"^ROLE:\s*(.+)$", re.MULTILINE)

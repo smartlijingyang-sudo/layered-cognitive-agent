@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.decision import Decision, Observation, ToolCall
-from lca.contracts.enums import ActionType
-from lca.contracts.result import UnregisteredActionError
-from lca.contracts.role_team import ToolPermissionManifest
-from lca.contracts.semantic_keys import OBS_DEGRADED_FROM
-from lca.contracts.state import AgentState, Budget
+from lca.contracts.atoms.enums import ActionType
+from lca.contracts.atoms.semantic_keys import OBS_DEGRADED_FROM
+from lca.contracts.models.core.decision import Decision, Observation, ToolCall
+from lca.contracts.models.core.result import UnregisteredActionError
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.role_team import ToolPermissionManifest
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.body.action_handlers import RespondOperation, UseToolOperation
 from lca.layer1_cognitive.body.action_registry import ActionRegistry

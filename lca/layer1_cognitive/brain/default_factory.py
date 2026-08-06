@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.action import ActionRegistryProtocol
+from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.protocols import Brain, LLMAdapter, Tool
-from lca.contracts.role_team import RoleProfile
+from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.layer1_cognitive.body.action_catalog import format_allowed_actions_desc
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser

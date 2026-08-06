@@ -12,18 +12,18 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
-from lca.contracts.decision import Observation, Reflection
-from lca.contracts.enums import MemoryLayer
-from lca.contracts.journal import LlmCallCompleted
-from lca.contracts.llm import LLMResponse
-from lca.contracts.memory import MemoryRecord
-from lca.contracts.protocols import LLMAdapter, MemorySystem
-from lca.contracts.state import AgentState
-from lca.contracts.telemetry import (
+from lca.contracts.atoms.enums import MemoryLayer
+from lca.contracts.atoms.telemetry import (
     ATTR_HIT,
     ATTR_MEMORY_LAYER,
     SpanName,
 )
+from lca.contracts.models.core.decision import Observation, Reflection
+from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.observability.journal import LlmCallCompleted
+from lca.contracts.protocols import LLMAdapter, MemorySystem
 from lca.layer0_infra.observability.facade import record, span
 
 _PERF_COUNTER_SCALE = 1000

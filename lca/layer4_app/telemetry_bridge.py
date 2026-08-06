@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from lca.contracts.journal import ActionDegraded, StepCompleted
+from lca.contracts.models.observability.journal import ActionDegraded, StepCompleted
 from lca.contracts.protocols import EventBus
 from lca.layer0_infra.observability import record
 from lca.layer2_runtime.event_emission import EVENT_ACTION_DEGRADED, EVENT_STEP_COMPLETED

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from lca.contracts.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import (
     Brain,
     CandidateEvaluationPipeline,
@@ -13,7 +14,6 @@ from lca.contracts.protocols import (
     SkillRouter,
     SupportsShortcut,
 )
-from lca.contracts.state import AgentState
 from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
     SimpleCandidateEvaluationPipeline,
 )

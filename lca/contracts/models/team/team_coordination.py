@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from lca.contracts.enums import DecisionGateName
+from lca.contracts.atoms.enums import DecisionGateName
 
 if TYPE_CHECKING:
-    from lca.contracts.graph import ExecutionGraph
+    from lca.contracts.models.team.graph import ExecutionGraph
 
 STRATEGY_KEY_LEAD = "lead"
 STRATEGY_KEY_PIPELINE = "pipeline"
@@ -100,3 +100,12 @@ def strategy_key_for_coordination(coordination: Coordination) -> str:
 
 def gate_name_for_mandate(mandate: LeadMandate) -> DecisionGateName:
     return _MANDATE_DECISION_GATES.get(mandate, DecisionGateName.NONE)
+
+
+@dataclass(frozen=True)
+class TeamAssignment:
+    """一次成员分配：成员 + 目标 + 前置依赖（协调策略构图用）。"""
+
+    member_id: str
+    objective: str
+    depends_on: list[str] = field(default_factory=list)

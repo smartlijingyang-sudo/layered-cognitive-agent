@@ -13,7 +13,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
     DelegationCompleted,

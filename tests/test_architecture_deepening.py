@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import Decision, Observation, Reflection
-from lca.contracts.enums import ActionType, ReflectionVerdict
-from lca.contracts.ids import new_id
-from lca.contracts.lifecycle import AgentCard, TaskStatus
-from lca.contracts.llm import LLMResponse
+from lca.contracts.atoms.enums import ActionType, ReflectionVerdict
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.lifecycle import AgentCard, TaskStatus
+from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.result import UnregisteredActionError
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.team_coordination import Debate
 from lca.contracts.protocols import LLMAdapter
-from lca.contracts.result import UnregisteredActionError
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.state import AgentState, Budget
-from lca.contracts.team_coordination import Debate
+from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer1_cognitive.body.action_handlers import RespondOperation
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
@@ -38,8 +38,8 @@ def _state() -> AgentState:
 
 class TestLifecycleTwins:
     def test_single_agent_card_definition(self) -> None:
-        import lca.contracts.decision as decision_mod
-        import lca.contracts.lifecycle as life_mod
+        import lca.contracts.models.core.decision as decision_mod
+        import lca.contracts.models.core.lifecycle as life_mod
 
         assert decision_mod.AgentCard is life_mod.AgentCard
         assert not hasattr(decision_mod, "TaskStatus")

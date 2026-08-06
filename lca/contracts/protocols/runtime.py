@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.budget import DEFAULT_MAX_STEPS
-from lca.contracts.decision import Decision, Observation, Reflection
-from lca.contracts.result import Result
-from lca.contracts.run_context import RunContext
-from lca.contracts.state import AgentState, StateSnapshot
-from lca.contracts.types import StopOutcome
+from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS
+from lca.contracts.models.core.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import AgentState, StateSnapshot
+from lca.contracts.models.core.stop import StopDecision, StopOutcome
+from lca.contracts.models.team.run_context import RunContext
 
 
 @runtime_checkable
@@ -51,3 +51,16 @@ class StopOutcomePolicy(Protocol):
         observation: Observation | None,
         state: AgentState,
     ) -> StopOutcome: ...
+
+
+@runtime_checkable
+class StopRule(Protocol):
+    """Decides after each step whether the cognitive loop continues."""
+
+    def decide(
+        self,
+        state: AgentState,
+        decision: Decision | None,
+        act_result: Observation | None,
+        reflection: Reflection | None,
+    ) -> StopDecision: ...

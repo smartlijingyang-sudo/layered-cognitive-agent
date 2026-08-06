@@ -11,24 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from lca.contracts.journal import (
-    ActionDegraded,
-    AgentRunFinished,
-    AgentRunStarted,
-    DecisionMade,
-    DelegationCacheHit,
-    DelegationCompleted,
-    DelegationIssued,
-    JournalEvent,
-    RunInsight,
-    StepCompleted,
-    SynthesisCompleted,
-    TeamRunFinished,
-    TeamRunStarted,
-    ToolDenied,
-    ToolInvoked,
-)
-from lca.contracts.telemetry import (
+from lca.contracts.atoms.telemetry import (
     ATTR_ACTION_TYPE,
     ATTR_AGENT_ROLE,
     ATTR_ATTEMPT,
@@ -69,6 +52,23 @@ from lca.contracts.telemetry import (
     ATTR_TOOL_NAME,
     EventName,
     SpanName,
+)
+from lca.contracts.models.observability.journal import (
+    ActionDegraded,
+    AgentRunFinished,
+    AgentRunStarted,
+    DecisionMade,
+    DelegationCacheHit,
+    DelegationCompleted,
+    DelegationIssued,
+    JournalEvent,
+    RunInsight,
+    StepCompleted,
+    SynthesisCompleted,
+    TeamRunFinished,
+    TeamRunStarted,
+    ToolDenied,
+    ToolInvoked,
 )
 from lca.layer0_infra.observability.langfuse_conventions import (
     FRAMEWORK_TAG,

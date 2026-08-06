@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.atoms.telemetry import ATTR_MAX_ROUNDS, ATTR_ROUND, SpanName
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.result import Result
 from lca.contracts.protocols import TeamStage, TeamStrategy
-from lca.contracts.result import Result
-from lca.contracts.telemetry import ATTR_MAX_ROUNDS, ATTR_ROUND, SpanName
 from lca.layer0_infra.observability import span
 
 

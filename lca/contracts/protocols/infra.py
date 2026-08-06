@@ -8,10 +8,10 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
-from lca.contracts.decision import AgentCard, Observation
-from lca.contracts.llm import LLMResponse
-from lca.contracts.role_team import CacheConfig, RetryPolicy
-from lca.contracts.state import AgentState
+from lca.contracts.models.core.decision import AgentCard, Observation
+from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
 
 
 @runtime_checkable

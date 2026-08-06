@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import SkillRouter
-from lca.contracts.state import AgentState
 
 
 class KeywordSkillRouter(SkillRouter):

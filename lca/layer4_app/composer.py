@@ -13,17 +13,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from typing import TypeVar
 
-from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.agent_spec import (
-    DEFAULT_DELEGATE_MAX_ATTEMPTS,
-    OBSERVABILITY_CHOICE_CONSOLE,
-    AgentSpec,
-    Governance,
-    LeadSpec,
-    TeamSpec,
-    strategy_key_for_governance,
-)
-from lca.contracts.enums import (
+from lca.contracts.atoms.enums import (
     ActionScope,
     ComponentKind,
     DecisionGateName,
@@ -31,6 +21,13 @@ from lca.contracts.enums import (
     MemoryLayer,
 )
 from lca.contracts.mechanisms import ComponentRegistryProtocol
+from lca.contracts.mechanisms.registries import Registries
+from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.models.team.team_coordination import (
+    Coordination,
+    LeadMandate,
+    gate_name_for_mandate,
+)
 from lca.contracts.protocols import (
     AgentUnit,
     Brain,
@@ -47,13 +44,16 @@ from lca.contracts.protocols import (
     TeamStage,
     TeamUnit,
 )
+from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.contracts.protocols.infra import AgentTransport
-from lca.contracts.registries import Registries
-from lca.contracts.role_team import RoleProfile
-from lca.contracts.team_coordination import (
-    Coordination,
-    LeadMandate,
-    gate_name_for_mandate,
+from lca.contracts.protocols.spec import (
+    DEFAULT_DELEGATE_MAX_ATTEMPTS,
+    OBSERVABILITY_CHOICE_CONSOLE,
+    AgentSpec,
+    Governance,
+    LeadSpec,
+    TeamSpec,
+    strategy_key_for_governance,
 )
 from lca.layer0_infra.observability import (
     ObservabilityHub,

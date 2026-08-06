@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import structlog
 
-from lca.contracts.decision import Decision
+from lca.contracts.atoms.semantic_keys import EVAL_CONFLICTS
+from lca.contracts.models.core.decision import Decision
+from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import CandidateEvaluationPipeline
-from lca.contracts.semantic_keys import EVAL_CONFLICTS
-from lca.contracts.state import AgentState
 
 _log = structlog.get_logger("lca.candidate_evaluation_pipeline")
 

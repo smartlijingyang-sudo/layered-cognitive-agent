@@ -7,8 +7,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from lca.contracts.enums import DelegationProtocol
-from lca.contracts.ids import utc_now
+from lca.contracts.atoms.enums import DelegationProtocol
+from lca.contracts.atoms.ids import utc_now
 
 
 class TaskStatus(str, Enum):

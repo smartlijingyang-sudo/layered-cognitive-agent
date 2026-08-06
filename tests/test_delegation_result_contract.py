@@ -5,8 +5,8 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timezone
 
-from lca.contracts.delegation import DelegationResult, find_result
-from lca.contracts.team_awareness import TeamAwareness
+from lca.contracts.models.team.delegation import DelegationResult, find_result
+from lca.contracts.models.team.team_awareness import TeamAwareness
 
 
 def _result(

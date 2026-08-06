@@ -5,8 +5,7 @@ Public API::
     from lca import Agent, Team, TeamLead, LeadMandate, Pipeline, FanOut, ...
 """
 
-from lca.contracts.agent_spec import AgentSpec, Governance, LeadSpec, TeamSpec
-from lca.contracts.team_coordination import (
+from lca.contracts.models.team.team_coordination import (
     Debate,
     FanOut,
     Graph,
@@ -15,6 +14,7 @@ from lca.contracts.team_coordination import (
     PeerSwarm,
     Pipeline,
 )
+from lca.contracts.protocols.spec import AgentSpec, Governance, LeadSpec, TeamSpec
 from lca.layer4_app.api import Agent, Team, TeamLead
 
 __all__ = [

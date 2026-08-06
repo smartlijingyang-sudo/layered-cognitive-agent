@@ -6,8 +6,8 @@ episodic 是个体的情景经历，working 是当前会话上下文，这两层
 
 from __future__ import annotations
 
-from lca.contracts.enums import SHAREABLE_LAYERS, MemoryLayer
-from lca.contracts.memory import MemoryRecord
+from lca.contracts.atoms.enums import SHAREABLE_LAYERS, MemoryLayer
+from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.protocols import SharedMemoryStore
 
 

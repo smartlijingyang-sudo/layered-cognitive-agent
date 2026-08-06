@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.action import Action, ActionRegistryProtocol
+from lca.contracts.protocols.action import Action, ActionRegistryProtocol
 from lca.layer0_infra.component_registry import NamedRegistry
 
 

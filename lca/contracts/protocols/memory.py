@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.decision import Observation, Reflection
-from lca.contracts.enums import MemoryLayer
-from lca.contracts.memory import MemoryRecord
-from lca.contracts.state import AgentState
+from lca.contracts.atoms.enums import MemoryLayer
+from lca.contracts.models.core.decision import Observation, Reflection
+from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.state import AgentState
 
 
 @runtime_checkable

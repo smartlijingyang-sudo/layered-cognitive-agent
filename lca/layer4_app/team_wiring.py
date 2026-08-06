@@ -7,7 +7,7 @@ call sites that import the composition-root builders.
 
 from __future__ import annotations
 
-from lca.contracts.decision import Observation
+from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols import AgentTransport
 from lca.layer0_infra.transport.a2a_transport import A2ATransport
 from lca.layer0_infra.transport.agent_transport import InternalTransport
@@ -26,8 +26,8 @@ def build_default_transport_registry() -> TransportRegistry:
 
 async def call_member_for_channel(member: CognitiveAgent, subtask: str) -> Observation:
     """Invoke a team member for InternalTransport (preserves delegator role)."""
-    from lca.contracts.delegation_context import get_current_delegator
-    from lca.contracts.run_context import RunContext
+    from lca.contracts.models.team.delegation_context import get_current_delegator
+    from lca.contracts.models.team.run_context import RunContext
 
     from_role = get_current_delegator()
     result = await member.run(subtask, RunContext(from_role=from_role))

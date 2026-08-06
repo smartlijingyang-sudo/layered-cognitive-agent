@@ -6,9 +6,9 @@ import dataclasses
 import unittest
 from unittest.mock import MagicMock
 
-from lca.contracts.enums import DecisionGateName
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.team_coordination import (
+from lca.contracts.atoms.enums import DecisionGateName
+from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.team_coordination import (
     STRATEGY_KEY_FAN_OUT,
     STRATEGY_KEY_LEAD,
     STRATEGY_KEY_PIPELINE,
@@ -47,7 +47,7 @@ class TestDomainLanguagePublicSurface(unittest.TestCase):
 
     def test_team_spec_shape(self) -> None:
         """TeamSpec 是团队形态唯一事实来源：字段面冻结，无旧模型残留字段。"""
-        from lca.contracts.agent_spec import TeamSpec
+        from lca.contracts.protocols.spec import TeamSpec
 
         names = {f.name for f in dataclasses.fields(TeamSpec)}
         self.assertEqual(
@@ -65,7 +65,7 @@ class TestDomainLanguagePublicSurface(unittest.TestCase):
 
     def test_governance_strategy_key_derivation(self) -> None:
         """strategy key 由 governance 单向派生（lead 与 coordination 同一入口）。"""
-        from lca.contracts.agent_spec import (
+        from lca.contracts.protocols.spec import (
             AgentSpec,
             LeadSpec,
             strategy_key_for_governance,
@@ -91,7 +91,7 @@ class TestDomainLanguagePublicSurface(unittest.TestCase):
         self.assertEqual(gate_name_for_mandate(LeadMandate.ROUTING), DecisionGateName.NONE)
 
     def test_pipeline_strategy_key(self) -> None:
-        from lca.contracts.team_coordination import strategy_key_for_coordination
+        from lca.contracts.models.team.team_coordination import strategy_key_for_coordination
 
         self.assertEqual(strategy_key_for_coordination(Pipeline()), STRATEGY_KEY_PIPELINE)
         self.assertEqual(STRATEGY_KEY_FAN_OUT, "fan_out")

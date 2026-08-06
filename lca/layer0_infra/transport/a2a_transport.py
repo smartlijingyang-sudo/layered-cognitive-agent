@@ -17,10 +17,10 @@ from typing import Any
 
 import httpx
 
-from lca.contracts.budget import DEFAULT_A2A_TIMEOUT_S
-from lca.contracts.decision import AgentCard, Observation
-from lca.contracts.ids import new_id
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.budget import DEFAULT_A2A_TIMEOUT_S
+from lca.contracts.models.core.decision import AgentCard, Observation
+from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
 
 _DEFAULT_POLL_INTERVAL_S = 0.1

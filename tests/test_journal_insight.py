@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
     LlmCallCompleted,

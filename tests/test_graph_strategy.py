@@ -9,16 +9,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.graph import (
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import Budget
+from lca.contracts.models.team.graph import (
     ExecutionGraph,
     GraphEdge,
     GraphNode,
     GraphValidationError,
 )
+from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import TeamAssembly
-from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.state import Budget
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
 from tests.support.team_stage import stage_with_invoker
 
@@ -328,14 +328,14 @@ class TestGraphStrategyRegistration(unittest.TestCase):
     """GraphStrategy 注册与解析（工厂接收 TeamAssembly，ADR-0034）。"""
 
     def test_graph_registered_by_default(self) -> None:
-        from lca.contracts.team_coordination import STRATEGY_KEY_GRAPH
+        from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH
         from lca.layer4_app.defaults import build_default_registries
 
         registry = build_default_registries().orchestration
         self.assertTrue(registry.has(STRATEGY_KEY_GRAPH))
 
     def test_graph_resolves_correctly(self) -> None:
-        from lca.contracts.team_coordination import STRATEGY_KEY_GRAPH, Graph
+        from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH, Graph
         from lca.layer4_app.defaults import build_default_registries
 
         registry = build_default_registries().orchestration
@@ -346,7 +346,7 @@ class TestGraphStrategyRegistration(unittest.TestCase):
         self.assertIsInstance(strategy, GraphStrategy)
 
     def test_graph_requires_graph_coordination(self) -> None:
-        from lca.contracts.team_coordination import STRATEGY_KEY_GRAPH, Pipeline
+        from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH, Pipeline
         from lca.layer4_app.defaults import build_default_registries
 
         registry = build_default_registries().orchestration

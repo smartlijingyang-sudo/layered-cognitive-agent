@@ -5,7 +5,11 @@ L0 配置层：确保 Agent 声明的 max_steps 与最终生效的 Budget.max_st
 
 from __future__ import annotations
 
-from lca.contracts.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS, create_budget
+from lca.contracts.models.core.budget import (
+    DEFAULT_MAX_STEPS,
+    DEFAULT_MAX_WALL_CLOCK_SECONDS,
+    create_budget,
+)
 
 
 class TestBudgetFactory:
@@ -52,7 +56,7 @@ class TestBudgetRuntimeIntegration:
 
     async def test_runtime_respects_max_steps(self) -> None:
         """CognitiveRuntime.run(max_steps=20) 的 Budget 应该生效 20 步。"""
-        from lca.contracts.budget import create_budget
+        from lca.contracts.models.core.budget import create_budget
 
         budget = create_budget(max_steps=20)
         assert budget.max_steps == 20

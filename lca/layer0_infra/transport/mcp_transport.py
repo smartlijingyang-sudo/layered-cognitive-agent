@@ -11,9 +11,9 @@ from __future__ import annotations
 import contextlib
 from typing import Any
 
-from lca.contracts.decision import AgentCard, Observation
-from lca.contracts.ids import new_id
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.decision import AgentCard, Observation
+from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
 
 _MCP_SDK_MISSING_MSG = "MCP Python SDK 未安装。请运行: pip install mcp 或 uv add mcp"

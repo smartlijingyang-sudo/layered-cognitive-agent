@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.result import Result
 from lca.contracts.protocols import TeamStage, TeamStrategy
-from lca.contracts.result import Result
 from lca.layer3_agent.member_invoke import invoke_members_sequential
 
 

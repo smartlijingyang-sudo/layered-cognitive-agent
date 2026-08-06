@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
-from lca.contracts.telemetry import (
+from lca.contracts.atoms.telemetry import (
     ATTR_AGENT_ROLE,
     ATTR_CALLEE_ROLE,
     ATTR_DELEGATE_TARGET,

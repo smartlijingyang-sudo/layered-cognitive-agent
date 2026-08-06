@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.contracts.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
 
 
 @dataclass

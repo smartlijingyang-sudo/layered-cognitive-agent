@@ -11,10 +11,10 @@ from typing import Any
 
 import structlog
 
-from lca.contracts.enums import HookEvent
+from lca.contracts.atoms.enums import HookEvent
+from lca.contracts.atoms.telemetry import ATTR_STEP, HOOK_TO_PHASE_SPAN, SpanName
+from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import HookRegistry
-from lca.contracts.state import AgentState
-from lca.contracts.telemetry import ATTR_STEP, HOOK_TO_PHASE_SPAN, SpanName
 from lca.layer0_infra.observability import detached_span, set_actor
 
 _log = structlog.get_logger("lca.hook_registry")

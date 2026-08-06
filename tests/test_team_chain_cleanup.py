@@ -7,16 +7,16 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.contracts.decision import Decision
-from lca.contracts.enums import DecisionGateName
-from lca.contracts.graph import ExecutionGraph, GraphEdge, GraphNode
-from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.llm import LLMResponse
+from lca.contracts.atoms.enums import DecisionGateName
+from lca.contracts.models.core.decision import Decision
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import Budget
+from lca.contracts.models.team.graph import ExecutionGraph, GraphEdge, GraphNode
+from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.team_coordination import Graph, PeerRelay, PeerSwarm, Pipeline
 from lca.contracts.protocols import TeamAssembly
-from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.state import Budget
-from lca.contracts.team_coordination import Graph, PeerRelay, PeerSwarm, Pipeline
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer3_agent.orchestration_strategies import (
     HandoffStrategy,
@@ -41,7 +41,7 @@ class TestDecisionSingleDelegationField(unittest.TestCase):
 
     def test_parser_0_1_n(self) -> None:
         parser = SimpleDecisionParser()
-        from lca.contracts.state import AgentState
+        from lca.contracts.models.core.state import AgentState
 
         state = AgentState(trace_id="t", task="x", budget=Budget())
         empty = parser.parse('{"action_type":"respond","rationale":"r","confidence":1}', state)
@@ -192,7 +192,7 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
         rt.memory = MagicMock()
         # ROUTING + consult_duty is not expressible as LeadMandate; BOARD is consultation+gate.
         # Invalid combinations are type-excluded; ROUTING mode never installs a gate.
-        from lca.contracts.team_coordination import LeadMandate, gate_name_for_mandate
+        from lca.contracts.models.team.team_coordination import LeadMandate, gate_name_for_mandate
 
         self.assertEqual(gate_name_for_mandate(LeadMandate.ROUTING), DecisionGateName.NONE)
         # assemble still requires real agents with llm — use Assembly path for smoke

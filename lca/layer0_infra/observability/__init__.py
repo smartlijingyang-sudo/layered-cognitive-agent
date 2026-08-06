@@ -17,7 +17,7 @@
 包外禁止 import 任何子模块（守卫测试强制）；本 ``__init__`` 是唯一表面。
 """
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     ActionDegraded,
     AgentRunFinished,
     AgentRunStarted,
@@ -40,7 +40,10 @@ from lca.contracts.journal import (
     get_current_run_scope,
     run_scope,
 )
-from lca.contracts.journal_catalog import JOURNAL_CATALOG, JOURNAL_EVENT_CLASSES
+from lca.contracts.models.observability.journal_catalog import (
+    JOURNAL_CATALOG,
+    JOURNAL_EVENT_CLASSES,
+)
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.observability.exporters.langfuse import ExporterUnavailableError
 from lca.layer0_infra.observability.facade import (

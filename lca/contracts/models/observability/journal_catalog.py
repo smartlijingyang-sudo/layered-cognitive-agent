@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     ActionDegraded,
     AgentRunFinished,
     AgentRunStarted,
@@ -25,7 +25,7 @@ from lca.contracts.journal import (
     ToolDenied,
     ToolInvoked,
 )
-from lca.contracts.telemetry_catalog import VocabDef, VocabDomain, VocabKind
+from lca.contracts.models.observability.telemetry_catalog import VocabDef, VocabDomain, VocabKind
 
 # ── 词表登记 ────────────────────────────────────────────
 

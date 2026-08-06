@@ -5,7 +5,7 @@ L2 层职责：
     将认知循环的关键事件（action_degraded、step_completed）
     发射到 EventBus，实现横切可观测性。
 
-    Hook 事件名的单一事实源是 ``HookEvent`` 枚举（``lca.contracts.enums``）。
+    Hook 事件名的单一事实源是 ``HookEvent`` 枚举（``lca.contracts.atoms.enums``）。
     新增对外事件只需：
     1. 写一个 _derive_xxx 函数
     2. 在 _DERIVATIONS 表中注册一行
@@ -17,9 +17,9 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from lca.contracts.enums import ActionType, HookEvent
+from lca.contracts.atoms.enums import ActionType, HookEvent
+from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import EventBus
-from lca.contracts.state import AgentState
 
 # ── 对外事件名（EventBus payload） ──
 EVENT_ACTION_DEGRADED = "action_degraded"

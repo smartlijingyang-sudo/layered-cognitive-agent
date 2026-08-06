@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.contracts.protocols.infra import LLMAdapter, Tool
-from lca.contracts.role_team import RoleProfile
-from lca.contracts.state import AgentState
 
 
 @runtime_checkable

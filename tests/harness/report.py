@@ -11,8 +11,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from lca.contracts.result import Result
-from lca.contracts.telemetry import SpanName
+from lca.contracts.atoms.telemetry import SpanName
+from lca.contracts.models.core.result import Result
 from lca.layer0_infra.observability import SpanView
 from lca.layer0_infra.observability.narrative import is_milestone_span
 from tests.harness.collector import TraceBundle

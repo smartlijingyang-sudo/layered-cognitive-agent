@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from lca.contracts.decision import Decision, DelegationSpec
-from lca.contracts.enums import ActionType
-from lca.contracts.ids import new_id
+from lca.contracts.atoms.enums import ActionType
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.decision import Decision, DelegationSpec
+from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
-from lca.contracts.state import AgentState
 from lca.layer1_cognitive.member_status.required_action import compute_required_action
 
 _CONSULT_SUBTASK_TEMPLATE = "请从 {role} 的视角，针对以下任务提供你的专业意见：{task}"

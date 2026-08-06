@@ -9,8 +9,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.decision import Observation
-from lca.contracts.lifecycle import AgentCard
+from lca.contracts.models.core.decision import Observation
+from lca.contracts.models.core.lifecycle import AgentCard
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 
 

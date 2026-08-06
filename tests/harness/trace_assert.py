@@ -8,8 +8,8 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from lca.contracts.result import Result
-from lca.contracts.telemetry import SpanName
+from lca.contracts.atoms.telemetry import SpanName
+from lca.contracts.models.core.result import Result
 from tests.harness.collector import TraceBundle
 from tests.harness.report import format_case_digest
 

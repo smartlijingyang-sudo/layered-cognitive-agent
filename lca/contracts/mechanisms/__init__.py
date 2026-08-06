@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, runtime_checkable
 
-from lca.contracts.state import AgentState
+from lca.contracts.models.core.state import AgentState
 
 
 @runtime_checkable

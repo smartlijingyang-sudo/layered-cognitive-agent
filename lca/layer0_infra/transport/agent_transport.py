@@ -5,15 +5,15 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 
-from lca.contracts.decision import AgentCard, Observation
-from lca.contracts.ids import new_id
-from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.protocols import AgentTransport
-from lca.contracts.semantic_keys import (
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_VALIDATION,
 )
+from lca.contracts.models.core.decision import AgentCard, Observation
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.protocols import AgentTransport
 
 AgentHandler = Callable[[str], Awaitable[Observation]]
 

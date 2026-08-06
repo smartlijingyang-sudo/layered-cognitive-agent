@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.enums import RoleStatus
+from lca.contracts.atoms.enums import RoleStatus
 
 
 @runtime_checkable

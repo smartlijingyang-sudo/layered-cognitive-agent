@@ -16,7 +16,7 @@ evaluator / guardrail``（驱动 Agent Graph 与类型过滤），本框架按�
 
 from __future__ import annotations
 
-from lca.contracts.telemetry import SpanName
+from lca.contracts.atoms.telemetry import SpanName
 
 # ── 属性键名（langfuse.* 命名空间）──────────────────────
 LANGFUSE_OBSERVATION_TYPE = "langfuse.observation.type"

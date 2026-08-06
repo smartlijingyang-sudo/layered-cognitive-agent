@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
     RunScope,

@@ -6,11 +6,11 @@ PromptReasoner is shape-agnostic: awareness renders itself into prompt vars.
 
 from __future__ import annotations
 
-from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.run_context import RunContext
-from lca.contracts.state import AgentState, Budget
-from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.run_context import RunContext
+from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.layer1_cognitive.brain.reasoner import build_teammates_text
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 
@@ -114,7 +114,7 @@ class TestPromptReasonerSolo:
     async def test_solo_prompt_only(self) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
-        from lca.contracts.llm import LLMResponse
+        from lca.contracts.models.core.llm import LLMResponse
         from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
         llm = MagicMock()
@@ -137,7 +137,7 @@ class TestPromptReasonerAwareness:
     async def test_teammates_injected_from_awareness(self) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
-        from lca.contracts.llm import LLMResponse
+        from lca.contracts.models.core.llm import LLMResponse
         from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
         llm = MagicMock()
@@ -162,7 +162,7 @@ class TestPromptReasonerAwareness:
     async def test_active_template_override(self) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
-        from lca.contracts.llm import LLMResponse
+        from lca.contracts.models.core.llm import LLMResponse
         from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
         llm = MagicMock()

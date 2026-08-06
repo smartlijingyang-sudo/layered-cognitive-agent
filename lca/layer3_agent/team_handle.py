@@ -8,12 +8,12 @@
 
 from __future__ import annotations
 
-from lca.contracts.ids import new_id
-from lca.contracts.journal import RunScope, TeamRunFinished, TeamRunStarted
-from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.message import AgentMessage, agent_message_as_text
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.message import AgentMessage, agent_message_as_text
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.observability.journal import RunScope, TeamRunFinished, TeamRunStarted
 from lca.contracts.protocols import AgentUnit, TeamStrategy, TeamUnit
-from lca.contracts.result import Result
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     TeamTraceProfile,

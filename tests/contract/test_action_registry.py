@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.enums import ActionScope
-from lca.contracts.role_team import ToolPermissionManifest
+from lca.contracts.atoms.enums import ActionScope
+from lca.contracts.models.team.role_team import ToolPermissionManifest
 from lca.layer0_infra.component_registry import RegistryKeyError
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry

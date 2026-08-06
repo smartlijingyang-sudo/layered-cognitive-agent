@@ -6,19 +6,19 @@ Observation 归属标签集中在此，可独立测试。
 
 from __future__ import annotations
 
-from lca.contracts.decision import DelegationSpec, Observation
-from lca.contracts.delegation import find_result
-from lca.contracts.enums import MemoryRecordKind
-from lca.contracts.ids import new_id
-from lca.contracts.journal import DelegationCacheHit
-from lca.contracts.semantic_keys import (
+from lca.contracts.atoms.enums import MemoryRecordKind
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.semantic_keys import (
     OBS_CACHE_HIT,
     OBS_MEMBER_RESULTS,
     OBS_MEMBER_SUBTASKS,
     OBS_RESULT_KIND,
     OBS_TASK_ID,
 )
-from lca.contracts.state import AgentState
+from lca.contracts.models.core.decision import DelegationSpec, Observation
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.observability.journal import DelegationCacheHit
+from lca.contracts.models.team.delegation import find_result
 from lca.layer0_infra.observability import record
 
 

@@ -12,11 +12,11 @@ L2 层职责：
 
 from __future__ import annotations
 
-from lca.contracts.decision import Decision, Observation, Reflection
-from lca.contracts.enums import ActionType, ReflectionVerdict
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.atoms.enums import ActionType, ReflectionVerdict
+from lca.contracts.models.core.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import StopOutcome, StopOutcomePolicy
-from lca.contracts.state import AgentState
 
 
 class DefaultStopOutcomePolicy(StopOutcomePolicy):

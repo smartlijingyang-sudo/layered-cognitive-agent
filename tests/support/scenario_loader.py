@@ -12,8 +12,7 @@ from typing import Any
 
 import yaml
 
-from lca.contracts.protocols import LLMAdapter, ObservabilityBackend, Tool
-from lca.contracts.team_coordination import (
+from lca.contracts.models.team.team_coordination import (
     Debate,
     FanOut,
     Graph,
@@ -22,6 +21,7 @@ from lca.contracts.team_coordination import (
     PeerSwarm,
     Pipeline,
 )
+from lca.contracts.protocols import LLMAdapter, ObservabilityBackend, Tool
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer4_app.api import Agent, Team, TeamLead
 

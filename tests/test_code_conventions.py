@@ -28,10 +28,10 @@ _BANNED_CLASS_PATTERN = re.compile(
 # 显式豁免清单（参照 docs/glossary.md "命名约定" 章节）
 _NAME_EXEMPT: dict[str, str] = {
     # Action 策略类：Operation 后缀表达策略模式插槽，非禁用词 Manager/Helper
-    "RespondOperation": "Action 策略实现（contracts.action.Action）",
-    "UseToolOperation": "Action 策略实现（contracts.action.Action）",
-    "DelegateOperation": "Action 策略实现（contracts.action.Action）",
-    "HandoffOperation": "Action 策略实现（contracts.action.Action）",
+    "RespondOperation": "Action 策略实现（contracts.protocols.action.Action）",
+    "UseToolOperation": "Action 策略实现（contracts.protocols.action.Action）",
+    "DelegateOperation": "Action 策略实现（contracts.protocols.action.Action）",
+    "HandoffOperation": "Action 策略实现（contracts.protocols.action.Action）",
 }
 
 _SCAN_PACKAGES = [

@@ -7,14 +7,14 @@ import os
 import sys
 import unittest
 
-from lca.contracts.llm import LLMResponse
+from lca.contracts.models.core.llm import LLMResponse
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.agent_spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.state import AgentState, Budget
-from lca.contracts.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
+from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import (

@@ -12,22 +12,9 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.action import Action
-from lca.contracts.decision import Decision, DelegationSpec, Observation
-from lca.contracts.delegation_context import delegator_scope
-from lca.contracts.enums import MemoryRecordKind
-from lca.contracts.ids import new_id, remaining_seconds
-from lca.contracts.journal import DecisionMade, SynthesisCompleted
-from lca.contracts.lifecycle import AgentCard
-from lca.contracts.protocols import (
-    AgentTransport,
-    SafeExecutor,
-    ToolRegistry,
-    TransportRegistryProtocol,
-)
-from lca.contracts.result import ToolExecutionError
-from lca.contracts.role_team import CacheConfig, RetryPolicy
-from lca.contracts.semantic_keys import (
+from lca.contracts.atoms.enums import MemoryRecordKind
+from lca.contracts.atoms.ids import new_id, remaining_seconds
+from lca.contracts.atoms.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_TRANSIENT,
     OBS_HANDOFF,
@@ -37,7 +24,20 @@ from lca.contracts.semantic_keys import (
     OBS_TASK_ID,
     OBS_TASK_IDS,
 )
-from lca.contracts.state import AgentState
+from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation
+from lca.contracts.models.core.lifecycle import AgentCard
+from lca.contracts.models.core.result import ToolExecutionError
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.observability.journal import DecisionMade, SynthesisCompleted
+from lca.contracts.models.team.delegation_context import delegator_scope
+from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
+from lca.contracts.protocols import (
+    AgentTransport,
+    SafeExecutor,
+    ToolRegistry,
+    TransportRegistryProtocol,
+)
+from lca.contracts.protocols.action import Action
 from lca.layer0_infra.observability import record
 from lca.layer0_infra.transport.invocation import handoff_task_traced, send_and_wait
 from lca.layer1_cognitive.body.delegation_cache import (

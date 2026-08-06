@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.decision import Decision, Observation
-from lca.contracts.state import AgentState
+from lca.contracts.models.core.decision import Decision, Observation
+from lca.contracts.models.core.state import AgentState
 
 
 @runtime_checkable

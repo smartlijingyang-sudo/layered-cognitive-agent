@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from lca.contracts.budget import (
+from lca.contracts.models.core.budget import (
     DEFAULT_MAX_WALL_CLOCK_SECONDS,
     LEAD_MIN_MAX_STEPS,
     BudgetLimits,
 )
+from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import BudgetAware, BudgetPolicy
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer4_app.policies import LeadBudgetPolicy
 
 

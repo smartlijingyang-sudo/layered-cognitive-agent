@@ -12,12 +12,12 @@ import json
 import re
 from typing import Any
 
-from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import Decision, DelegationSpec, ToolCall
-from lca.contracts.enums import ActionType
-from lca.contracts.ids import new_id
+from lca.contracts.atoms.enums import ActionType
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.decision import Decision, DelegationSpec, ToolCall
+from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionParser, DegradationPolicy
-from lca.contracts.state import AgentState
+from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.layer1_cognitive.brain.degradation import GracefulDegradation
 
 _PARSE_FAILURE_CONFIDENCE = 0.1

@@ -9,10 +9,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import Budget
 from lca.contracts.protocols import Synthesizer
-from lca.contracts.result import Result
-from lca.contracts.state import Budget
 from lca.layer3_agent.orchestration_strategies import DebateStrategy
 from lca.layer4_app.defaults import build_default_registries
 from tests.support.team_stage import stage_with_invoker
@@ -218,8 +218,8 @@ class TestDebateStrategyRegistration(unittest.TestCase):
         self.assertTrue(registry.has("debate"))
 
     def test_debate_resolves_to_debate_strategy(self) -> None:
+        from lca.contracts.models.team.team_coordination import Debate
         from lca.contracts.protocols import TeamAssembly
-        from lca.contracts.team_coordination import Debate
 
         registry = _REGISTRIES.orchestration
         assembly = TeamAssembly(governance=Debate(), stage=stage_with_invoker([]))

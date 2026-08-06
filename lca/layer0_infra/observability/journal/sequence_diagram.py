@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from lca.contracts.journal import (
+from lca.contracts.models.observability.journal import (
     AgentRunStarted,
     DelegationCompleted,
     DelegationIssued,

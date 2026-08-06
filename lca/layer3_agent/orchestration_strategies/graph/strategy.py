@@ -21,9 +21,11 @@ import asyncio
 from collections import deque
 from dataclasses import dataclass, field
 
-from lca.contracts.budget import create_budget
-from lca.contracts.graph import EdgeType, ExecutionGraph, GraphNode, NodeType
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.models.core.budget import create_budget
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.graph import EdgeType, ExecutionGraph, GraphNode, NodeType
 from lca.contracts.protocols import (
     AgentUnit,
     StateStore,
@@ -31,8 +33,6 @@ from lca.contracts.protocols import (
     TeamStage,
     TeamStrategy,
 )
-from lca.contracts.result import Result
-from lca.contracts.state import AgentState, Budget
 from lca.layer3_agent.orchestration_strategies.graph._finalize import (
     finalize_graph_result,
 )

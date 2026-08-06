@@ -24,7 +24,14 @@ from typing import TYPE_CHECKING, Any, cast
 import structlog
 from opentelemetry import trace as otel_trace
 
-from lca.contracts.journal import (
+from lca.contracts.atoms.telemetry import (
+    ATTR_AGENT_ROLE,
+    ATTR_RATIONALE_PREVIEW,
+    ATTR_SUMMARY,
+    EventName,
+    SpanName,
+)
+from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
     DelegationCompleted,
@@ -39,13 +46,6 @@ from lca.contracts.journal import (
     ToolInvoked,
 )
 from lca.contracts.protocols import JournalProjector
-from lca.contracts.telemetry import (
-    ATTR_AGENT_ROLE,
-    ATTR_RATIONALE_PREVIEW,
-    ATTR_SUMMARY,
-    EventName,
-    SpanName,
-)
 from lca.layer0_infra.observability.journal import otel_genai_mapping as genai
 from lca.layer0_infra.observability.journal import otel_mapping as mapping
 from lca.layer0_infra.observability.journal.otel_mapping import EVENT_PROJECTIONS

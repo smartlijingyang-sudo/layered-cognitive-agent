@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import TextIO
 
-from lca.contracts.journal import StampedEvent
+from lca.contracts.models.observability.journal import StampedEvent
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
 

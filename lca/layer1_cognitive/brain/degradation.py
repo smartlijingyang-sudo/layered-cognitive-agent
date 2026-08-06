@@ -13,10 +13,10 @@ from collections.abc import Callable
 from dataclasses import replace
 from typing import ClassVar
 
-from lca.contracts.action import ActionRegistryProtocol
-from lca.contracts.decision import Decision
-from lca.contracts.enums import ActionType
+from lca.contracts.atoms.enums import ActionType
+from lca.contracts.models.core.decision import Decision
 from lca.contracts.protocols import DegradationPolicy
+from lca.contracts.protocols.action import ActionRegistryProtocol
 
 
 def _carries_response(decision: Decision) -> bool:

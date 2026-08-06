@@ -13,10 +13,10 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lca.contracts.decision import Observation, Reflection
-from lca.contracts.enums import MemoryLayer, ReflectionVerdict
-from lca.contracts.memory import MemoryRecord
-from lca.contracts.state import AgentState, Budget
+from lca.contracts.atoms.enums import MemoryLayer, ReflectionVerdict
+from lca.contracts.models.core.decision import Observation, Reflection
+from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.state import AgentState, Budget
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 
@@ -216,7 +216,7 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
     """compose_team rebuilds members with shared store (closed graph, ADR-0034)."""
 
     async def test_orchestrator_injects_shared_memory(self) -> None:
-        from lca.contracts.team_coordination import (
+        from lca.contracts.models.team.team_coordination import (
             Pipeline,
         )
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
@@ -241,7 +241,7 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
         self.assertIn("orchestrator-shared-fact", b_contents)
 
     async def test_orchestrator_no_shared_memory_when_config_empty(self) -> None:
-        from lca.contracts.team_coordination import (
+        from lca.contracts.models.team.team_coordination import (
             Pipeline,
         )
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
@@ -268,8 +268,8 @@ def _make_minimal_runtime(memory: SimpleMemorySystem):
     """构建最小化 Runtime 桩件，仅支持 run()。"""
     from unittest.mock import AsyncMock, MagicMock
 
-    from lca.contracts.result import Result
-    from lca.contracts.state import Budget
+    from lca.contracts.models.core.result import Result
+    from lca.contracts.models.core.state import Budget
 
     runtime = MagicMock()
     runtime.body = MagicMock()

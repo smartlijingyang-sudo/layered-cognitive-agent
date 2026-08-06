@@ -11,16 +11,9 @@ governance 参数），把所有治理方式——含 lead——闭合为封闭�
 
 from __future__ import annotations
 
-from lca.contracts.agent_spec import (
-    BRAIN_CHOICE_DEFAULT,
-    MEMORY_CHOICE_SIMPLE,
-    STATE_STORE_CHOICE_MEMORY,
-    LeadSpec,
-)
-from lca.contracts.enums import ComponentKind, DecisionGateName
-from lca.contracts.protocols import TeamAssembly
-from lca.contracts.registries import Registries
-from lca.contracts.team_coordination import (
+from lca.contracts.atoms.enums import ComponentKind, DecisionGateName
+from lca.contracts.mechanisms.registries import Registries
+from lca.contracts.models.team.team_coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
     STRATEGY_KEY_GRAPH,
@@ -32,6 +25,13 @@ from lca.contracts.team_coordination import (
     Graph,
     LeadMandate,
     PeerSwarm,
+)
+from lca.contracts.protocols import TeamAssembly
+from lca.contracts.protocols.spec import (
+    BRAIN_CHOICE_DEFAULT,
+    MEMORY_CHOICE_SIMPLE,
+    STATE_STORE_CHOICE_MEMORY,
+    LeadSpec,
 )
 from lca.layer0_infra.component_registry import ComponentRegistry, NamedRegistry
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore

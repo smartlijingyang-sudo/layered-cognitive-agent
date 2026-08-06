@@ -7,12 +7,12 @@ import operator
 import time
 from typing import Any, ClassVar
 
-from lca.contracts.budget import DEFAULT_TOOL_TIMEOUT_S
-from lca.contracts.decision import Observation
-from lca.contracts.ids import new_id
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
+from lca.contracts.models.core.budget import DEFAULT_TOOL_TIMEOUT_S
+from lca.contracts.models.core.decision import Observation
+from lca.contracts.models.core.result import ToolInputError
 from lca.contracts.protocols import Tool
-from lca.contracts.result import ToolInputError
-from lca.contracts.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 
 
 class CalculatorTool(Tool):

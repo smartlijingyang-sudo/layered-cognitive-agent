@@ -10,15 +10,15 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from lca.contracts.delegation import DelegationResult
-from lca.contracts.enums import MemoryRecordKind
-from lca.contracts.memory import MemoryRecord
+from lca.contracts.atoms.enums import MemoryRecordKind
+from lca.contracts.atoms.semantic_keys import META_ROLE, META_STEP
+from lca.contracts.atoms.telemetry import ATTR_PROMPT_TEMPLATE
+from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.team.delegation import DelegationResult
+from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.models.team.team_awareness import TeamAwareness
 from lca.contracts.protocols import LLMAdapter, Reasoner, Tool
-from lca.contracts.role_team import RoleProfile
-from lca.contracts.semantic_keys import META_ROLE, META_STEP
-from lca.contracts.state import AgentState
-from lca.contracts.team_awareness import TeamAwareness
-from lca.contracts.telemetry import ATTR_PROMPT_TEMPLATE
 from lca.layer0_infra.observability import annotate
 
 _DEFAULT_TEMPLATE = "react_prompt"

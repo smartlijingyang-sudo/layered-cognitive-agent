@@ -20,21 +20,25 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from lca.contracts.agent_spec import (
-    BRAIN_CHOICE_DEFAULT,
-    DEFAULT_DELEGATE_MAX_ATTEMPTS,
-    MEMORY_CHOICE_SIMPLE,
-    OBSERVABILITY_CHOICE_CONSOLE,
-    STATE_STORE_CHOICE_MEMORY,
-    AgentSpec,
-    Governance,
-    LeadSpec,
-    TeamSpec,
+from lca.contracts.atoms.enums import MemoryLayer
+from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
+from lca.contracts.models.core.message import AgentMessage
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import StateSnapshot
+from lca.contracts.models.team.graph import ExecutionGraph
+from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
+from lca.contracts.models.team.run_context import RunContext
+from lca.contracts.models.team.team_coordination import (
+    DEFAULT_COORDINATION_MAX_ROUNDS,
+    Coordination,
+    Debate,
+    FanOut,
+    Graph,
+    LeadMandate,
+    PeerRelay,
+    PeerSwarm,
+    Pipeline,
 )
-from lca.contracts.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
-from lca.contracts.enums import MemoryLayer
-from lca.contracts.graph import ExecutionGraph
-from lca.contracts.message import AgentMessage
 from lca.contracts.protocols import (
     AgentUnit,
     Brain,
@@ -45,20 +49,16 @@ from lca.contracts.protocols import (
     TeamUnit,
     Tool,
 )
-from lca.contracts.result import Result
-from lca.contracts.role_team import RoleProfile, ToolPermissionManifest
-from lca.contracts.run_context import RunContext
-from lca.contracts.state import StateSnapshot
-from lca.contracts.team_coordination import (
-    DEFAULT_COORDINATION_MAX_ROUNDS,
-    Coordination,
-    Debate,
-    FanOut,
-    Graph,
-    LeadMandate,
-    PeerRelay,
-    PeerSwarm,
-    Pipeline,
+from lca.contracts.protocols.spec import (
+    BRAIN_CHOICE_DEFAULT,
+    DEFAULT_DELEGATE_MAX_ATTEMPTS,
+    MEMORY_CHOICE_SIMPLE,
+    OBSERVABILITY_CHOICE_CONSOLE,
+    STATE_STORE_CHOICE_MEMORY,
+    AgentSpec,
+    Governance,
+    LeadSpec,
+    TeamSpec,
 )
 from lca.layer4_app.composer import AgentComposer, TeamComposer
 

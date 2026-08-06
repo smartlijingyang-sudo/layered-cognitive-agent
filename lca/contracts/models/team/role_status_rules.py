@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.enums import RoleStatus
+from lca.contracts.atoms.enums import RoleStatus
 
 _TERMINAL_STATUSES: frozenset[RoleStatus] = frozenset({RoleStatus.DONE, RoleStatus.FAILED})
 

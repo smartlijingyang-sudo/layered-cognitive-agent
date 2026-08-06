@@ -7,12 +7,12 @@ Completed）由 transport 唯一通道发射，本模块只标记 member_invoke 
 
 from __future__ import annotations
 
-from lca.contracts.budget import DEFAULT_DELEGATION_TIMEOUT_S
-from lca.contracts.delegation_context import member_invoke_scope
-from lca.contracts.lifecycle import TaskStatus
+from lca.contracts.models.core.budget import DEFAULT_DELEGATION_TIMEOUT_S
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.team.delegation_context import member_invoke_scope
 from lca.contracts.protocols import AgentUnit, MemberInvoker, TeamStage
 from lca.contracts.protocols.infra import AgentTransport
-from lca.contracts.result import Result
 from lca.layer0_infra.transport.invocation import send_and_wait
 
 

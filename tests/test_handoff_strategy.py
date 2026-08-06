@@ -4,11 +4,11 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.contracts.decision import Decision, DelegationSpec
-from lca.contracts.enums import ActionScope
-from lca.contracts.lifecycle import TaskStatus
-from lca.contracts.result import Result
-from lca.contracts.state import Budget
+from lca.contracts.atoms.enums import ActionScope
+from lca.contracts.models.core.decision import Decision, DelegationSpec
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import Budget
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer3_agent.orchestration_strategies import HandoffStrategy
 from lca.layer4_app.defaults import build_default_registries
@@ -100,7 +100,7 @@ class TestHandoffActionType(unittest.TestCase):
 
     def test_handoff_in_action_registry(self) -> None:
         """handoff 应在 ActionRegistry 的已注册集合中。"""
-        from lca.contracts.role_team import ToolPermissionManifest
+        from lca.contracts.models.team.role_team import ToolPermissionManifest
         from lca.layer0_infra.transport.agent_transport import InternalTransport
         from lca.layer0_infra.transport.transport_registry import TransportRegistry
         from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
@@ -171,7 +171,7 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
         )
         state = MagicMock()
 
-        from lca.contracts.result import ToolExecutionError
+        from lca.contracts.models.core.result import ToolExecutionError
 
         with self.assertRaises(ToolExecutionError):
             await body.act(decision, state)
@@ -238,8 +238,8 @@ class TestHandoffRegistration(unittest.TestCase):
         self.assertTrue(registry.has("peer_relay"))
 
     def test_handoff_resolves(self) -> None:
+        from lca.contracts.models.team.team_coordination import PeerRelay
         from lca.contracts.protocols import TeamAssembly
-        from lca.contracts.team_coordination import PeerRelay
 
         registry = _REGISTRIES.orchestration
         assembly = TeamAssembly(governance=PeerRelay(), stage=stage_with_invoker([]))

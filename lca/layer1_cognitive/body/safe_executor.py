@@ -9,18 +9,18 @@ from typing import Any
 
 import structlog
 
-from lca.contracts.decision import Observation
-from lca.contracts.ids import new_id
-from lca.contracts.journal import ToolDenied, ToolInvoked
-from lca.contracts.protocols import SafeExecutor, Tool
-from lca.contracts.result import ToolExecutionError
-from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.contracts.semantic_keys import (
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.semantic_keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_TRANSIENT,
     FAILURE_KIND_VALIDATION,
 )
+from lca.contracts.models.core.decision import Observation
+from lca.contracts.models.core.result import ToolExecutionError
+from lca.contracts.models.observability.journal import ToolDenied, ToolInvoked
+from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
+from lca.contracts.protocols import SafeExecutor, Tool
 from lca.layer0_infra.observability import record
 
 _log = structlog.get_logger("lca.safe_executor")

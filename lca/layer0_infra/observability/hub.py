@@ -20,11 +20,11 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON, ParentBased, TraceIdRatioBased
 
-from lca.contracts.protocols import JournalProjector, ObservabilityBackend
-from lca.contracts.telemetry import (
+from lca.contracts.atoms.telemetry import (
     ATTR_AGENT_ROLE,
     ATTR_STEP,
 )
+from lca.contracts.protocols import JournalProjector, ObservabilityBackend
 from lca.layer0_infra.observability.handles import (
     SpanHandle,
     _IsolatedExporter,

@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-from lca.contracts.decision import Observation
-from lca.contracts.result import ToolExecutionError, ToolInputError
-from lca.contracts.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.contracts.state import AgentState, Budget
+from lca.contracts.models.core.decision import Observation
+from lca.contracts.models.core.result import ToolExecutionError, ToolInputError
+from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.brain.critic import SimpleCritic

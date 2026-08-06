@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.contracts.state import Budget
+from lca.contracts.models.core.state import Budget
 
 DEFAULT_MAX_STEPS: int = 10
 """Default maximum reasoning steps per agent run."""

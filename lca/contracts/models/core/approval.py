@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from lca.contracts.decision import Decision
-from lca.contracts.ids import utc_now
+from lca.contracts.atoms.ids import utc_now
+from lca.contracts.models.core.decision import Decision
 
 
 @dataclass
