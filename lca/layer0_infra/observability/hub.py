@@ -23,14 +23,9 @@ from opentelemetry.sdk.trace.sampling import ALWAYS_ON, ParentBased, TraceIdRati
 from lca.contracts.protocols import JournalProjector, ObservabilityBackend
 from lca.contracts.telemetry import (
     ATTR_AGENT_ROLE,
-    ATTR_OBJECTIVE,
-    ATTR_OBJECTIVE_PREVIEW,
-    ATTR_SESSION_ID,
     ATTR_STEP,
-    ATTR_STRATEGY_KEY,
 )
 from lca.layer0_infra.observability.handles import (
-    _ROOT_SPAN_NAMES,
     SpanHandle,
     _IsolatedExporter,
 )
@@ -38,10 +33,7 @@ from lca.layer0_infra.observability.journal.engine import ExecutionJournal
 from lca.layer0_infra.observability.journal.insight_engine import InsightEngine
 from lca.layer0_infra.observability.journal.otel_projector import OtelProjector
 from lca.layer0_infra.observability.langfuse_conventions import (
-    FRAMEWORK_TAG,
     LANGFUSE_ENVIRONMENT,
-    LANGFUSE_OBSERVATION_INPUT,
-    LANGFUSE_TRACE_TAGS,
 )
 from lca.layer0_infra.observability.policy import AttributePolicy
 
@@ -50,9 +42,6 @@ _log = structlog.get_logger("lca.observability")
 _TRACER_NAME = "lca"
 _SERVICE_NAME_KEY = "service.name"
 _DEFAULT_SERVICE_NAME = "lca"
-
-# Langfuse 后端约定属性键（自托管 v3/v4 实证；仅 L0 感知，业务层不可见）
-_LANGFUSE_SESSION_ID = "session.id"
 
 
 class ObservabilityHub(ObservabilityBackend):
@@ -138,26 +127,8 @@ class ObservabilityHub(ObservabilityBackend):
             attrs[ATTR_AGENT_ROLE] = actor_role
         if actor_step is not None and ATTR_STEP not in attrs:
             attrs[ATTR_STEP] = actor_step
-        if name in _ROOT_SPAN_NAMES:
-            attrs.update(self._backend_root_attrs(attrs))
         otel_span = self._tracer.start_span(name, attributes=self._policy.prepare(dict(attrs)))
         return SpanHandle(self, otel_span, attrs, attach=attach)
-
-    def _backend_root_attrs(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        """根 span 的后端约定属性（Langfuse session / 根 I/O / tags 映射）。"""
-        out: dict[str, Any] = {}
-        session = attrs.get(ATTR_SESSION_ID)
-        if session:
-            out[_LANGFUSE_SESSION_ID] = session
-        objective = attrs.get(ATTR_OBJECTIVE) or attrs.get(ATTR_OBJECTIVE_PREVIEW)
-        if objective:
-            out[LANGFUSE_OBSERVATION_INPUT] = objective
-        tags: list[str] = [FRAMEWORK_TAG]
-        strategy = attrs.get(ATTR_STRATEGY_KEY)
-        if strategy:
-            tags.append(str(strategy))
-        out[LANGFUSE_TRACE_TAGS] = tags
-        return out
 
     def emit_event(self, name: str, attributes: dict[str, Any]) -> None:
         """业务事件：优先挂当前 span；无活跃 span 时落零时长 span。"""

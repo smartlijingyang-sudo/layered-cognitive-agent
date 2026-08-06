@@ -88,9 +88,7 @@ from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.observability.team_profile import (
     TeamTraceProfile,
     objective_preview,
-    plan_card_attrs,
     team_id_for,
-    team_run_attrs,
 )
 from lca.layer0_infra.observability.view import SpanView
 
@@ -150,7 +148,6 @@ __all__ = [
     "get_span_context",
     "langfuse_span_visible",
     "objective_preview",
-    "plan_card_attrs",
     "plan_steps_joined",
     "record",
     "run_scope",
@@ -159,6 +156,5 @@ __all__ = [
     "set_session",
     "span",
     "team_id_for",
-    "team_run_attrs",
     "traced",
 ]

@@ -50,13 +50,13 @@ async def test_mode_real_llm_smoke(mode: str) -> None:
         max_rounds=1,
     )
     assert outcome.result.status in ("completed", "failed", "input_required")
-    # Topology: team modes must emit run.team; solo emits run.agent
+    # Topology: team modes must emit run.team + delegation（ADR-0037 一等委派）
     names = outcome.bundle.names()
     if mode == "solo":
         assert SpanName.RUN_AGENT.value in names
     else:
         assert_must_include_spans(
             outcome.bundle,
-            [SpanName.RUN_TEAM.value, SpanName.TEAM_STRATEGY.value],
+            [SpanName.RUN_TEAM.value, SpanName.DELEGATION.value],
         )
     assert outcome.result.total_steps >= 0

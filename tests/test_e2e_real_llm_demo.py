@@ -97,7 +97,7 @@ class TestSingleAgentRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="擅长借助工具进行精确计算，不臆测数值结果。",
             tools=[calculator],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         result = await agent.run("123 乘以 456 等于多少？")
@@ -135,7 +135,7 @@ class TestSequentialTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="十年一线调研经验，擅长交叉验证信息源",
             tools=[],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         writer = Agent(
@@ -144,7 +144,7 @@ class TestSequentialTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="资深技术写手，擅长将复杂数据转化为清晰叙述",
             tools=[],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         team = Team(
@@ -184,7 +184,7 @@ class TestParallelTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="擅长品牌调性",
             tools=[],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         writer_b = Agent(
@@ -193,7 +193,7 @@ class TestParallelTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="擅长用户痛点",
             tools=[],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         writer_c = Agent(
@@ -202,7 +202,7 @@ class TestParallelTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="擅长差异化卖点",
             tools=[],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         team = Team(
@@ -245,7 +245,7 @@ class TestHierarchicalTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="十年跨境电商选品经验",
             tools=[],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         pricing_specialist = Agent(
@@ -254,7 +254,7 @@ class TestHierarchicalTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="擅长成本加成定价",
             tools=[CalculatorTool()],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         copywriter = Agent(
@@ -263,7 +263,7 @@ class TestHierarchicalTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="资深电商文案",
             tools=[],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         supervisor = Agent(
@@ -273,7 +273,7 @@ class TestHierarchicalTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             tools=[],
             llm=self.llm,
             max_steps=20,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         team = Team(
@@ -315,7 +315,7 @@ class TestHandoffTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="熟悉退款流程",
             tools=[],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         tech_support = Agent(
@@ -324,7 +324,7 @@ class TestHandoffTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             backstory="硬件故障排查专家",
             tools=[],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         team = Team(
@@ -363,7 +363,7 @@ class TestObservabilityOutput(unittest.IsolatedAsyncioTestCase):
             backstory="测试用",
             tools=[],
             llm=self.llm,
-            observability="jsonl_file",
+            observability="jsonl",
         )
 
         result = await agent.run("你好")
@@ -372,7 +372,7 @@ class TestObservabilityOutput(unittest.IsolatedAsyncioTestCase):
         # 验证 trace 文件存在且有内容
         import anyio
 
-        trace_path = anyio.Path("traces/lca_trace.jsonl")
+        trace_path = anyio.Path("traces/lca_journal.jsonl")
         if await trace_path.exists():
             content = await trace_path.read_text(encoding="utf-8")
             lines = content.strip().split("\n")

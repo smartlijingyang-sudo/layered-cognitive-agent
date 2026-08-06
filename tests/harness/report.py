@@ -66,7 +66,7 @@ def format_case_digest(
         lines.append(f"transport_callees: {callees}")
     # Path probes for quick health read
     probes = [
-        (SpanName.RUN_TEAM.value, SpanName.TEAM_STRATEGY.value),
+        (SpanName.RUN_TEAM.value, SpanName.DELEGATION.value),
         (SpanName.RUN_TEAM.value, SpanName.TRANSPORT_REQUEST.value),
         (SpanName.RUN_TEAM.value, SpanName.LLM_CHAT.value),
         (SpanName.RUN_TEAM.value, SpanName.LOOP_PHASE_THINK.value),

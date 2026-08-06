@@ -54,8 +54,7 @@ def test_noise_spans_hidden(name: str) -> None:
     [
         SpanName.RUN_TEAM.value,
         SpanName.RUN_AGENT.value,
-        SpanName.RUN_PLAN.value,
-        SpanName.TEAM_STRATEGY.value,
+        SpanName.TEAM_ROUND.value,  # 策略轮次包络保留
         SpanName.DELEGATION.value,  # 一等委派（承载成员父子链）
         SpanName.LLM_CHAT.value,
         SpanName.TOOL_EXECUTE.value,

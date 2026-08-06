@@ -1,23 +1,10 @@
-"""Run-plan 场景卡叙事（run.plan span → 人类可读横幅）。
+"""计划步模板 —— 按 strategy_key / mandate 生成 run 计划描述（ADR-0037）。
 
-按 strategy_key / mandate 提供计划步骤模板，并把 RUN_PLAN span 渲染成
-``┌──┐`` 卡片。实时 span 行渲染在 ``run_narrative.py``。
+场景卡的渲染由 journal console 投影器承担（``console_render.render_scenario_card``）；
+本模块只提供计划步文案模板，供 ``TeamRunStarted.plan_steps`` 与团队组合期使用。
 """
 
 from __future__ import annotations
-
-from lca.contracts.telemetry import (
-    ATTR_AGENT_ROLE,
-    ATTR_LEAD_ROLE,
-    ATTR_MANDATE,
-    ATTR_MEMBERS,
-    ATTR_OBJECTIVE_PREVIEW,
-    ATTR_PLAN_STEPS,
-    ATTR_STRATEGY_KEY,
-    ATTR_TEAM_ID,
-)
-from lca.layer0_infra.observability.narrative.narrative_utils import attr_text, wrap_words
-from lca.layer0_infra.observability.view import SpanView
 
 # Generic plan templates by strategy_key (coordination / lead family).
 _STRATEGY_PLAN: dict[str, tuple[str, ...]] = {
@@ -69,10 +56,6 @@ _MANDATE_NOTE: dict[str, str] = {
     "board": "mandate=board：全员咨询后 Lead 收口",
 }
 
-_CARD_WIDTH = 58
-_TASK_WIDTH = 54
-_NO_STRATEGY = "—"
-
 
 def strategy_plan_steps(strategy_key: str, mandate: str | None = None) -> tuple[str, ...]:
     key = strategy_key or "solo"
@@ -86,67 +69,3 @@ def strategy_plan_steps(strategy_key: str, mandate: str | None = None) -> tuple[
 
 def plan_steps_joined(strategy_key: str, mandate: str | None = None) -> str:
     return " | ".join(strategy_plan_steps(strategy_key, mandate))
-
-
-def format_run_plan_card(span: SpanView) -> str:
-    """Banner for SpanName.RUN_PLAN — who / strategy / objective / steps."""
-    attrs = span.attributes or {}
-    strategy = attr_text(attrs, ATTR_STRATEGY_KEY) or _NO_STRATEGY
-    mandate = attr_text(attrs, ATTR_MANDATE)
-    members = attr_text(attrs, ATTR_MEMBERS)
-    lead = attr_text(attrs, ATTR_LEAD_ROLE)
-    team_id = attr_text(attrs, ATTR_TEAM_ID)
-    role = attr_text(attrs, ATTR_AGENT_ROLE)
-    objective = attr_text(attrs, ATTR_OBJECTIVE_PREVIEW)
-    plan_raw = attr_text(attrs, ATTR_PLAN_STEPS)
-    steps = (
-        [s.strip() for s in plan_raw.split("|") if s.strip()]
-        if plan_raw
-        else list(
-            strategy_plan_steps(strategy if strategy != _NO_STRATEGY else "solo", mandate or None)
-        )
-    )
-
-    title = _card_title(role, strategy, members)
-    lines = ["", "┌" + "─" * _CARD_WIDTH + "┐", f"│ {title}"]
-    meta = _card_meta(team_id, strategy, mandate, lead, members, role)
-    if meta:
-        lines.append("│ " + "  ".join(meta))
-    lines.append("│")
-    lines.append("│ plan")
-    for s in steps:
-        lines.append(f"│   {s}")
-    if objective:
-        lines.append("│")
-        lines.append("│ task")
-        for chunk in wrap_words(objective, _TASK_WIDTH):
-            lines.append(f"│   {chunk}")
-    lines.append("└" + "─" * _CARD_WIDTH + "┘")
-    return "\n".join(lines)
-
-
-def _card_title(role: str, strategy: str, members: str) -> str:
-    if role and not members:
-        return f"Agent  ·  {role}"
-    if strategy and strategy != _NO_STRATEGY:
-        return f"Team   ·  strategy={strategy}"
-    return "Run"
-
-
-def _card_meta(
-    team_id: str, strategy: str, mandate: str, lead: str, members: str, role: str
-) -> list[str]:
-    meta: list[str] = []
-    if team_id:
-        meta.append(f"team={team_id}")
-    if strategy and strategy != _NO_STRATEGY:
-        meta.append(f"strategy={strategy}")
-    if mandate:
-        meta.append(f"mandate={mandate}")
-    if lead:
-        meta.append(f"lead={lead}")
-    if members:
-        meta.append(f"members={members}")
-    if role and not members:
-        meta.append(f"role={role}")
-    return meta

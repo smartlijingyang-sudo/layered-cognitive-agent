@@ -17,11 +17,6 @@ from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.trace import StatusCode
 
-from lca.contracts.telemetry import ATTR_RESULT_OUTPUT, SpanName
-from lca.layer0_infra.observability.langfuse_conventions import (
-    LANGFUSE_OBSERVATION_OUTPUT,
-)
-
 if TYPE_CHECKING:
     from opentelemetry.context import Context, Token
 
@@ -31,8 +26,6 @@ _log = structlog.get_logger("lca.observability")
 
 _ERROR_MESSAGE_MAX = 500
 """错误消息属性截断上限（避免超长堆栈撑爆 trace）。"""
-
-_ROOT_SPAN_NAMES = frozenset({SpanName.RUN_TEAM.value, SpanName.RUN_AGENT.value})
 
 
 class _IsolatedExporter(SpanExporter):
@@ -114,11 +107,6 @@ class SpanHandle:
             self._otel.record_exception(exc)
             self._otel.set_status(StatusCode.ERROR)
         prepared = self._hub.policy.prepare(self.attributes)
-        if self._otel.name in _ROOT_SPAN_NAMES:
-            # v4：trace 级 I/O 取自根 observation 的 input/output（trace.input 已弃用）
-            result_output = prepared.get(ATTR_RESULT_OUTPUT)
-            if result_output:
-                prepared[LANGFUSE_OBSERVATION_OUTPUT] = result_output
         for key, value in prepared.items():
             self._otel.set_attribute(key, value)
         self._otel.end()

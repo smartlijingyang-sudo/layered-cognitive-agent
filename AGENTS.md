@@ -152,24 +152,33 @@ result = await team.run("任务描述")
 Prompt 模板存放在 `lca/layer1_cognitive/brain/prompts/*.md`，不触碰 Python 代码即可迭代。
 用 `load_builtin_prompt("react_prompt")` 加载，占位符用 `{role}` / `{goal}` / `{task}` 等。
 
-## 可观测性（OTel 骨干 · 单入口 · Langfuse-Ready）
+## 可观测性（Journal-as-Truth · OTel 骨干 · Langfuse-Ready，ADR-0037）
 
-三层分治：**认知语义**（contracts 词表 + L0 facade，我们拥有）→ **OpenTelemetry 骨干**（业界标准，业务层不可见）→ **后端**（console/jsonl/memory/langfuse，配置化装配）。
+**核心范式**：执行日志（journal）是唯一真相，span 树只是它的一个投影。协作运行时在语义边界 `record(JournalEvent)`，投影器把日志渲染成各后端视图——**不要直接发 span 表达协作叙事**（run/delegation/llm/tool 由 journal 投影；机制平面的相位/钩子/记忆/传输 span 是 verbose 档调试细节）。
 
-**对外唯一入口**：`Agent/Team(observability="console")`（或 `"console+langfuse"` 多后端、`create_observability(...)` 显式构造）。默认 console 在框架 `run()` 内打印场景卡（run.plan）、按角色分节的全量 span 行、运行末 digest（错误数/最慢 top-3/耗时）。
+三层分治：**叙事平面**（contracts journal 词表 + L0 journal 引擎，我们拥有）→ **OpenTelemetry 骨干**（业界标准交换格式，业务层不可见）→ **后端投影**（console/jsonl/memory/langfuse，配置化装配）。
 
-**内部埋点**（业务层只 import 包根，三种形态）：
+**对外唯一入口**：`Agent/Team(observability="console")`（或 `"console+langfuse"` 多后端、`create_observability(...)` 显式构造）。console 输出场景卡、按角色分节的叙事行（委派 ⇢/⇠、决策、LLM、工具、收口综合）、运行末 **Run Card**（状态/时长/成员贡献/token/洞察）；verbose 档附 LLM I/O 预览与 Mermaid 序列图。
+
+**journal 事件词表**（`contracts/journal.py` + `journal_catalog.py`）：容器事件（TeamRun/AgentRun 开闭）、协作事件（DelegationIssued/Completed 一等公民、SynthesisCompleted 收口）、资源事实（LlmCallCompleted/ToolInvoked）、认知事实（DecisionMade/StepCompleted）、洞察（RunInsight 由 InsightEngine 回注）。发射点 `record(...)` 只 import 包根；事件类与唯一发射模块由 `JOURNAL_CATALOG` 登记（AST 守卫强制）。关联骨架（trace/run/parent/delegation id）由引擎从 ambient `RunScope` 盖章，经 contextvar 跨 `asyncio.create_task` 穿透。
+
+**内部埋点**（机制平面，业务层只 import 包根）：
 ```python
-from lca.layer0_infra.observability import span, event, traced, annotate
+from lca.layer0_infra.observability import record, span, traced
 
-@traced(SpanName.TOOL_EXECUTE, capture=...)   # ① 装饰器：函数级零样板
-with span(SpanName.LLM_CHAT, **attrs) as h:   # ② 上下文管理器：中途写属性
+record(DelegationIssued(...))                    # ① 叙事平面：journal 事件
+with span(SpanName.MEMORY_READ, **attrs) as h:   # ② 机制平面：相位/记忆/传输
     ...
-event(EventName.DECISION_MADE, **attrs)        # ③ 业务事件
+@traced(SpanName.TOOL_EXECUTE, capture=...)      # ③ 装饰器（机制平面）
 ```
-认知四相 / LLM / 记忆读写由 hook 边界与适配器**零埋点**自动发射。span/event 名必须取 `SpanName`/`EventName` 枚举，新词条须在 `contracts/telemetry_catalog.py` 登记唯一发射点（守卫强制）。
+认知四相由 hook 边界 `detached_span` 发射（只计时不占上下文）；LLM/工具/委派在适配器与 transport 单一通道发射。run 边缘容器必须 try/except 保证 Finished 事件必发（容器必闭）。
 
-**属性策略**：脱敏（密钥正则）与 verbosity 截断在写入期集中强制（`AttributePolicy`），发射点不需要自觉。档位 `LCA_OBS_VERBOSITY=minimal|standard|verbose`，后端组合 `LCA_OBS_BACKENDS`，采样 `LCA_OBS_SAMPLING_RATE`（pydantic-settings，读 `.env`）。
+**Insight 层**：InsightEngine 在 run 收尾聚合 journal 触发规则——冗余工具调用、疑似循环、关键路径、成本汇总——`RunInsight` 回注日志，自动流入 Run Card / Langfuse / jsonl，不需要各视图各自实现分析。
+
+**落盘与 replay**（record-as-data）：`observability="jsonl"` 按 `journal.v1` schema 逐行落盘（默认 `traces/lca_journal.jsonl`）；离线重放不重跑、不连后端：
+`uv run python scripts/replay_journal.py traces/lca_journal.jsonl [--verbosity verbose]`
+
+**属性策略**：脱敏（密钥正则）、枚举归一、verbosity 截断在 journal 写入期集中强制（`AttributePolicy`），发射点不需要自觉。档位 `LCA_OBS_VERBOSITY=minimal|standard|verbose`，后端组合 `LCA_OBS_BACKENDS`，采样 `LCA_OBS_SAMPLING_RATE`（pydantic-settings，读 `.env`）。
 
 **Langfuse**（可选组 `observability-langfuse`）：
 ```bash
@@ -179,10 +188,10 @@ uv sync --group observability-langfuse
 ```python
 team = Team(members=[...], lead=TeamLead.board(lead), observability="console+langfuse")
 ```
-映射：run 根 → trace（session=team_id）· `llm.chat` → generation（gen_ai 语义约定，token/成本自动核算）· 业务事件 → event。
-Langfuse 视图只留有信息量的观测：零 I/O 的框架内部 span（`loop.phase.*` / `hook.*` / `memory.*` / `transport.response`）在导出边界被过滤（词表在 `langfuse_conventions.py`），console/jsonl 后端全量保留；`LCA_OBS_VERBOSITY=verbose` 停用过滤。hook 边界 span 以 `detached_span` 发射（只计时不占上下文），钩子内业务事件直接挂 run 根，过滤后不留孤儿。
+映射：run 根 → trace（session=team_id，tags=lca+strategy）· run.agent/delegation → agent/span 观测 · `llm.chat` → generation（gen_ai 语义约定，token/成本自动核算）· 瞬时事实 → run span event。
+Langfuse 标准视图只留叙事：机制平面 span（`loop.phase.*` / `hook.*` / `memory.*` / `transport.*`）在导出边界过滤（词表在 `langfuse_conventions.py`）；`LCA_OBS_VERBOSITY=verbose` 停用过滤全量导出。成员父子链由 delegation span 承载（显式关联定父，不依赖 ambient 继承，并行委派不串线）。
 
-本地探针 CLI（选 mode + 默认任务文案 + 结束 digest）：
+本地探针 CLI（选 mode + 默认任务文案 + 结束 Run Card）：
 `uv run python scripts/run_team_mode.py`
 
 ## 禁止事项

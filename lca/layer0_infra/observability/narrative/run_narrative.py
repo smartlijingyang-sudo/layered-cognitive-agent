@@ -1,15 +1,13 @@
-"""实时 span 行叙事 —— 分节键与单行渲染（无状态、属性驱动）。
+"""span 树诊断渲染 —— 测试失败摘要用的里程碑过滤与单行格式化。
 
-场景卡（run.plan 横幅）在 ``plan_narrative.py``；共享折行/取属性工具在
-``narrative_utils.py``。分节完全由 span 自身属性推导，
-并发成员交错完成时不会把行挂到错误的角色节下。
+ADR-0037 后人类视图由 journal console 投影承担；本模块只剩 span 平面的
+诊断工具（harness/report.py 在断言失败时渲染 span 树定位问题）。
 """
 
 from __future__ import annotations
 
 from lca.contracts.telemetry import (
     ATTR_ACTION_TYPE,
-    ATTR_AGENT_ROLE,
     ATTR_CALLEE_ROLE,
     ATTR_EVENT,
     ATTR_MODEL,
@@ -30,38 +28,6 @@ from lca.layer0_infra.observability.view import SpanView
 _NAME_WIDTH = 22
 
 
-def section_key_for_span(span: SpanView) -> str:
-    """Group live lines by actor — derived purely from span attributes.
-
-    Stateless: never falls back to "previous section", so concurrent members
-    interleave without misattribution. Every span now carries ``agent_role``
-    (ambient autofill at emission); explicit attributes always win.
-    """
-    attrs = span.attributes or {}
-    name = span.name
-    if name in (
-        SpanName.RUN_TEAM.value,
-        SpanName.TEAM_STRATEGY.value,
-        SpanName.TEAM_ROUND.value,
-        SpanName.TEAM_SYNTHESIS.value,
-    ):
-        return "team"
-    role = attr_text(attrs, ATTR_AGENT_ROLE)
-    if role:
-        step = attrs.get(ATTR_STEP)
-        if step is not None:
-            return f"{role} · step {step}"
-        return role
-    callee = attr_text(attrs, ATTR_CALLEE_ROLE)
-    if callee:
-        return callee
-    return "team"
-
-
-def format_section_header(key: str) -> str:
-    return f"\n── {key} ──"
-
-
 def _short_name(span: SpanView) -> str:
     name = span.name
     attrs = span.attributes or {}
@@ -79,18 +45,14 @@ def _short_name(span: SpanView) -> str:
         return "transport→"
     if name == SpanName.TRANSPORT_RESPONSE.value:
         return "transport←"
-    if name == SpanName.DELEGATE_CACHE_HIT.value:
-        return "delegate.cache"
-    if name == SpanName.TEAM_MEMBER_INVOKE.value:
-        return "member_invoke"
+    if name == SpanName.DELEGATION.value:
+        return "delegation"
     if name == SpanName.LLM_CHAT.value:
         return "llm.chat"
     if name == SpanName.RUN_AGENT.value:
         return "run.agent"
     if name == SpanName.RUN_TEAM.value:
         return "run.team"
-    if name == SpanName.TEAM_STRATEGY.value:
-        return "team.strategy"
     return name
 
 
@@ -107,14 +69,10 @@ def format_span_line(span: SpanView, *, depth: int = 0) -> str:
     if action:
         bits.append(f"→ {action}")
     callee = attr_text(attrs, ATTR_CALLEE_ROLE)
-    if (callee and "transport" in name) or (
-        callee and span.name == SpanName.TEAM_MEMBER_INVOKE.value
-    ):
-        bits.append(callee)
-    if callee and span.name == SpanName.DELEGATE_CACHE_HIT.value:
+    if callee and ("transport" in name or span.name in (SpanName.DELEGATION.value,)):
         bits.append(callee)
         subtask = attr_text(attrs, ATTR_SUBTASK_PREVIEW)
-        if subtask:
+        if subtask and span.name == SpanName.DELEGATION.value:
             bits.append(f"subtask={subtask}")
 
     tool = attr_text(attrs, ATTR_TOOL_NAME)
@@ -140,7 +98,11 @@ def format_span_line(span: SpanView, *, depth: int = 0) -> str:
             bits.append(f"out={rc}c")
 
     dur = span.duration_ms
-    if dur > 0 or span.name in (SpanName.LLM_CHAT.value, SpanName.TOOL_EXECUTE.value):
+    if dur > 0 or span.name in (
+        SpanName.LLM_CHAT.value,
+        SpanName.TOOL_EXECUTE.value,
+        SpanName.DELEGATION.value,
+    ):
         bits.append(f"{dur}ms")
 
     if span.status not in ("ok", ""):
@@ -152,10 +114,7 @@ def format_span_line(span: SpanView, *, depth: int = 0) -> str:
         bits.append("FAIL")
 
     sk = attr_text(attrs, ATTR_STRATEGY_KEY)
-    if sk and span.name in (
-        SpanName.RUN_TEAM.value,
-        SpanName.TEAM_STRATEGY.value,
-    ):
+    if sk and span.name == SpanName.RUN_TEAM.value:
         bits.append(f"strategy={sk}")
 
     rnd = attrs.get("round")
@@ -200,33 +159,14 @@ def _wrap_keep_newlines(text: str, *, width: int) -> list[str]:
     return out if out else [""]
 
 
-def logical_depth(span: SpanView) -> int:
-    """Indent under a role section: phases/hooks flat, llm nested one level."""
-    name = span.name
-    if name in (
-        SpanName.RUN_TEAM.value,
-        SpanName.TEAM_STRATEGY.value,
-        SpanName.RUN_AGENT.value,
-    ):
-        return 0
-    if name in (SpanName.LLM_CHAT.value, SpanName.TOOL_EXECUTE.value):
-        return 1
-    # phases, hooks, transport — same level under section header
-    return 0
-
-
 def is_milestone_span(span: SpanView) -> bool:
-    """Used by test digests when filtering trees."""
+    """诊断摘要的里程碑 span（ADR-0037 拓扑：delegation 承载委派链）。"""
     name = span.name
-    if name == SpanName.RUN_PLAN.value:
-        return True
     if name in (
         SpanName.RUN_TEAM.value,
         SpanName.RUN_AGENT.value,
-        SpanName.TEAM_STRATEGY.value,
-        SpanName.TEAM_MEMBER_INVOKE.value,
+        SpanName.DELEGATION.value,
         SpanName.TRANSPORT_REQUEST.value,
-        SpanName.DELEGATE_CACHE_HIT.value,
         SpanName.LLM_CHAT.value,
         SpanName.TOOL_EXECUTE.value,
         SpanName.TEAM_ROUND.value,

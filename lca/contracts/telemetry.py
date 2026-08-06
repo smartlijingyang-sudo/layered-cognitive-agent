@@ -26,10 +26,7 @@ class SpanName(str, Enum):
     # ── 运行域 ──
     RUN_AGENT = "run.agent"
     RUN_TEAM = "run.team"
-    RUN_PLAN = "run.plan"  # run 入口场景卡（嵌套于 run.team / run.agent）
     # ── 团队域 ──
-    TEAM_STRATEGY = "team.strategy"
-    TEAM_MEMBER_INVOKE = "team.member_invoke"
     TEAM_ROUND = "team.round"
     TEAM_SYNTHESIS = "team.synthesis"
     # 委派往返（一等公民：包住成员全程，ADR-0037）
@@ -64,7 +61,6 @@ class EventName(str, Enum):
     ACTION_DEGRADED = "action.degraded"
     STEP_COMPLETED = "step.completed"
     # ── 运行域 ──
-    RUN_COMPLETED = "run.completed"
     RUN_INSIGHT = "run.insight"
 
 

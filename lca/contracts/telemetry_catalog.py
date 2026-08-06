@@ -16,11 +16,8 @@ from lca.contracts.telemetry import (
     ATTR_DELEGATE_TARGET,
     ATTR_MEMORY_LAYER,
     ATTR_MODEL,
-    ATTR_OBJECTIVE_PREVIEW,
     ATTR_ROUND,
-    ATTR_STATUS,
     ATTR_STEP,
-    ATTR_STRATEGY_KEY,
     ATTR_TOOL_NAME,
     EventName,
     SpanName,
@@ -71,32 +68,18 @@ def _event(emitter: str, *, required: tuple[str, ...] = (), desc: str = "") -> V
 
 #: 词汇目录 —— 单一事实源（守卫测试输入 / 文档 / Langfuse 映射配置源）
 TELEMETRY_CATALOG: dict[str, VocabDef] = {
-    # ── 运行域：run 边缘（恰 2 处）──
+    # ── 运行域：run 容器（ADR-0037 起由 OtelProjector 从 journal 投影）──
     SpanName.RUN_AGENT.value: _span(
-        VocabDomain.RUN, "lca.layer3_agent.cognitive_agent", desc="单 agent 运行根"
+        VocabDomain.RUN,
+        "lca.layer0_infra.observability.journal.otel_projector",
+        desc="单 agent 运行根（journal AgentRunStarted/Finished 投影）",
     ),
     SpanName.RUN_TEAM.value: _span(
-        VocabDomain.RUN, "lca.layer3_agent.team_handle", desc="团队运行根"
-    ),
-    SpanName.RUN_PLAN.value: _span(
         VocabDomain.RUN,
-        "lca.layer3_agent",
-        required=(ATTR_AGENT_ROLE, ATTR_OBJECTIVE_PREVIEW),
-        desc="run 入口场景卡（solo 与 team 两个 run 边缘）",
+        "lca.layer0_infra.observability.journal.otel_projector",
+        desc="团队运行根（journal TeamRunStarted/Finished 投影）",
     ),
     # ── 团队域：编排层 ──
-    SpanName.TEAM_STRATEGY.value: _span(
-        VocabDomain.TEAM,
-        "lca.layer3_agent",
-        required=(ATTR_STRATEGY_KEY,),
-        desc="团队策略声明",
-    ),
-    SpanName.TEAM_MEMBER_INVOKE.value: _span(
-        VocabDomain.TEAM,
-        "lca.layer3_agent.member_invoke",
-        required=(ATTR_CALLEE_ROLE,),
-        desc="成员调用（含传输）",
-    ),
     SpanName.DELEGATION.value: _span(
         VocabDomain.TEAM,
         "lca.layer0_infra.observability.journal.otel_projector",
@@ -174,10 +157,9 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
         "lca.layer0_infra.transport.invocation",
         desc="传输响应",
     ),
-    SpanName.DELEGATE_CACHE_HIT.value: _span(
-        VocabDomain.RESOURCE,
-        "lca.layer1_cognitive.body.delegation_cache",
-        desc="委派幂等短路",
+    SpanName.DELEGATE_CACHE_HIT.value: _event(
+        "lca.layer0_infra.observability.journal.otel_projector",
+        desc="委派幂等短路（journal DelegationCacheHit 投影为 run span event，ADR-0037）",
     ),
     SpanName.ERROR.value: _span(
         VocabDomain.RESOURCE,
@@ -207,11 +189,6 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
         "lca.layer4_app.telemetry_bridge",
         required=(ATTR_STEP,),
         desc="步骤完成（EventBus 桥接）",
-    ),
-    EventName.RUN_COMPLETED.value: _event(
-        "lca.layer3_agent",
-        required=(ATTR_STATUS,),
-        desc="运行收尾 digest（solo 与 team 两个 run 边缘）",
     ),
     EventName.RUN_INSIGHT.value: _event(
         "lca.layer0_infra.observability.journal.otel_projector",

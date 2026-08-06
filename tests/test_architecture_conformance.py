@@ -82,13 +82,6 @@ EXEMPT: dict[str, str] = {
         "团队 span 静态档案值对象，纯数据结构，非可插拔组件 (ADR-0034)"
     ),
     "lca.layer0_infra.observability.view.SpanView": ("ReadableSpan 投影值对象，非组件"),
-    "lca.layer0_infra.observability.exporters.console._RunDigest": ("console digest 内部累加器"),
-    "lca.layer0_infra.observability.exporters.console.ConsoleNarratorExporter": (
-        "实现 OTel SpanExporter 标准接口，非 LCA 协议组件"
-    ),
-    "lca.layer0_infra.observability.exporters.jsonl.JsonlExporter": (
-        "实现 OTel SpanExporter 标准接口，非 LCA 协议组件"
-    ),
     "lca.layer0_infra.observability.exporters.langfuse.ExporterUnavailableError": ("异常类型"),
     "lca.layer0_infra.observability.registry.UnknownExporterError": ("异常类型"),
     # ── 执行日志（ADR-0037 Journal-as-Truth）──

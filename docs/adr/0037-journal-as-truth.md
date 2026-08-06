@@ -79,19 +79,28 @@ Accepted
 | `run_id` | 一个 agent run 容器的 id（团队根、lead、成员各一个） |
 | `parent_run_id` | 生成此 run 的 run（根为 None） |
 | `delegation_id` | 生成此 run 的委派（无则 None） |
+| `agent_role` | 当前 run 的角色（资源 span 身份盖章） |
 
-`RunScope` 是 layer0 的 contextvar 记录（`contextvars.ContextVar`），在 run
-边界设置：`CognitiveAgent.run` 生成 `run_id`，从调用方 scope 继承
-`parent_run_id`/`delegation_id`。委派方在发射 `DelegationIssued` 时生成
-`delegation_id`，经 `delegator_scope`（contracts 既有 contextvar，扩展携带
-run_id + delegation_id）穿透 `asyncio.create_task` 边界——`InternalTransport`
-的 handler 装配（`call_member_for_channel`）读出并写入成员的 `RunContext`。
-外部 transport（A2A/MCP）优雅降级为仅 from_role。
+`RunScope` 是 contracts 的 contextvar 记录，在 run 边界设置：
+`CognitiveAgent.run` 生成 `run_id`，从调用方 scope 继承 `parent_run_id`/
+`delegation_id`。委派方在发射 `DelegationIssued` 时生成 `delegation_id`，
+经 `delegation_scope`（扩展 `delegator_scope`）穿透 `asyncio.create_task`
+边界——成员任务在被调度时继承关联骨架。外部 transport（A2A/MCP）优雅
+降级为仅 from_role。
 
-OtelProjector 维护 `容器 id → 已开 OTel span` 映射，开子 span 时用显式
-parent context（`start_span(context=...)`）而非 ambient——**0 秒化石 span 与
-错挂父子链在构造上不可能再出现**。顺带修复 `top_level` 恒 True 的隐藏 bug
-（判据改为 `parent_run_id is None`）。
+**OtelProjector 定父（实现定稿）**：
+- run/delegation 容器与资源 span 以关联骨架显式查表定父
+  （`start_span(context=...)`），与事件到达顺序无关，并行委派不串线；
+- delegation 父节点为混合判据：事件时刻 ambient 若非投影器自有容器
+  （即策略层包络如 `team.round`）则就近挂载，否则退回 run 关联——
+  swarm/debate 的轮次包络因此保住子树；
+- run 容器额外 attach 进 ambient：机制平面 span（相位/记忆/传输，仍走旧
+  `span()` API）以 run.agent 为最近附着祖先正确归位；
+- 瞬时事实（决策/步/降级/短路/综合/洞察）投影为所属 run span 的 event，
+  不再产生孤儿 0 秒 span；EventBus 桥接事件经 `drain()` 在容器关闭前落地。
+
+**0 秒化石 span 与错挂父子链在构造上不可能再出现**。顺带修复 `top_level`
+恒 True 的隐藏 bug（判据改为继承 scope 是否存在）。
 
 ### 三、Journal 事件词表（contracts 层，纯 dataclass，遵守 ADR-0015）
 
