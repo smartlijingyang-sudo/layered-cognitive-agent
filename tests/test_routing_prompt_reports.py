@@ -5,9 +5,9 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timezone
 
-from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.atoms.enums import LLMStreamEventType, MemoryLayer, MemoryRecordKind
 from lca.contracts.atoms.semantic_keys import META_ROLE, META_STEP
-from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.delegation import DelegationResult
@@ -56,7 +56,9 @@ class _CaptureLLM:
         )
 
     async def stream(self, prompt: str, **kwargs: object):
-        yield (await self.complete(prompt, **kwargs)).text
+        response = await self.complete(prompt, **kwargs)
+        yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
 
 
 class TestMemberReportsText(unittest.TestCase):

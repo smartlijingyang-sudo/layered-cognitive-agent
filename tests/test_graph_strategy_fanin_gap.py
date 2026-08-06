@@ -7,8 +7,9 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.team.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.protocols import LLMAdapter, TeamStage
 from lca.layer3_agent.member_invoke import TransportMemberInvoker
@@ -39,7 +40,9 @@ class _LLM(LLMAdapter):
         )
 
     async def stream(self, prompt: str, **kwargs):
-        yield (await self.complete(prompt)).text
+        response = await self.complete(prompt, **kwargs)
+        yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
 
 
 class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):

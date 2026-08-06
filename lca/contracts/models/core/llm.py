@@ -6,7 +6,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
+
+from lca.contracts.atoms.enums import LLMStreamEventType
 
 
 @dataclass(frozen=True)
@@ -28,3 +31,19 @@ class LLMResponse:
     text: str
     model: str = ""
     usage: TokenUsage | None = None
+
+
+@dataclass(frozen=True)
+class LLMStreamEvent:
+    """单次 LLM 流式调用的结构化事件。
+
+    ``COMPLETED`` 事件的 ``response`` 与同次 ``complete()`` 返回值逐字段相等（不变式）。
+    """
+
+    type: LLMStreamEventType
+    text: str = ""
+    tool_call_id: str | None = None
+    tool_name: str | None = None
+    arguments_delta: str = ""
+    response: LLMResponse | None = None
+    extra: dict[str, Any] = field(default_factory=dict)

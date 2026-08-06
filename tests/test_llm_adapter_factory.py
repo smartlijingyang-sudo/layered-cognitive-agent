@@ -58,6 +58,21 @@ class TestResolveLLMAdapter(unittest.TestCase):
         # Must be mock, and must not have tried to import openai
         self.assertEqual(adapter.name, "mock-llm")
 
+    @unittest.skipUnless(_HAS_OPENAI, "openai SDK not installed")
+    def test_api_param_forwarded_to_openai_compat(self) -> None:
+        from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
+
+        with (
+            mock.patch.dict(os.environ, {"LLM_API_KEY": "sk-test-fake-key"}, clear=False),
+            mock.patch(
+                "lca.layer0_infra.llm_adapter.openai_compat.OpenAICompatAdapter"
+            ) as mock_cls,
+        ):
+            mock_cls.return_value.name = "openai-compat"
+            resolve_llm_adapter(api=LLMApiStyle.RESPONSES)
+        mock_cls.assert_called_once()
+        self.assertEqual(mock_cls.call_args.kwargs.get("api"), LLMApiStyle.RESPONSES)
+
 
 class TestLoadDotenvIfPresent(unittest.TestCase):
     """Tests for load_dotenv_if_present()."""

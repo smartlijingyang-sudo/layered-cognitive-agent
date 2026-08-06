@@ -19,7 +19,7 @@ from lca.contracts.models.core.decision import (
     Turn,
 )
 from lca.contracts.models.core.lifecycle import AgentCard, TaskStatus, TeamMessage
-from lca.contracts.models.core.llm import LLMResponse, TokenUsage
+from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.result import (
     ApprovalPendingError,
@@ -100,6 +100,7 @@ __all__ = [
     "Hook",
     "HookRegistry",
     "LLMResponse",
+    "LLMStreamEvent",
     "LeadMandate",
     "MemberStatus",
     "MemoryRecord",

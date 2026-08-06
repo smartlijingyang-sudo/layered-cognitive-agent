@@ -8,8 +8,9 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
+from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.decision import AgentCard, Observation
-from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
 
@@ -23,10 +24,10 @@ class LLMAdapter(Protocol):
     """
 
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse: ...
-    async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
-        """流式输出，逐 chunk 返回文本。子类按需覆写。"""
+    async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
+        """流式输出，逐事件返回结构化 ``LLMStreamEvent``。子类按需覆写。"""
         ...
-        yield ""  # pragma: no cover
+        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED)  # pragma: no cover
 
 
 @runtime_checkable

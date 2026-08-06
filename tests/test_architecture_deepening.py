@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.enums import ActionType, ReflectionVerdict
+from lca.contracts.atoms.enums import ActionType, LLMStreamEventType, ReflectionVerdict
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.lifecycle import AgentCard, TaskStatus
-from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.result import UnregisteredActionError
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
@@ -144,7 +144,9 @@ class TestSkillRouterTemplate:
                 )
 
             async def stream(self, prompt: str, **kwargs: object):  # type: ignore[no-untyped-def]  # kwargs 类型由 Protocol 约束
-                yield (await self.complete(prompt)).text
+                response = await self.complete(prompt, **kwargs)
+                yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+                yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
 
         rp = RoleProfile(
             role="研究员",
@@ -209,7 +211,9 @@ class TestDebateMultiRound:
                 )
 
             async def stream(self, prompt: str, **kwargs: object):  # type: ignore[no-untyped-def]  # kwargs 类型由 Protocol 约束
-                yield (await self.complete(prompt)).text
+                response = await self.complete(prompt, **kwargs)
+                yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+                yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
 
         llm = DebateLLM()
         a = Agent(role="保守派定价", goal="", backstory="", tools=[], llm=llm, max_steps=2)

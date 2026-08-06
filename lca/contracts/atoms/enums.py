@@ -145,6 +145,14 @@ class MemoryRecordKind(str, Enum):
     RESPONSE = "response"
 
 
+class LLMStreamEventType(str, Enum):
+    """LLM 流式事件类型 —— 值与 OpenAI Responses SSE ``type`` 字符串对齐。"""
+
+    OUTPUT_TEXT_DELTA = "response.output_text.delta"
+    FUNCTION_CALL_ARGUMENTS_DELTA = "response.function_call_arguments.delta"
+    COMPLETED = "response.completed"
+
+
 class ComponentKind(str, Enum):
     """组件注册表分类键 —— 值域有限，适用契约 1（值域即类型）。
 

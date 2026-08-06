@@ -68,6 +68,18 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.member_status.required_action.RequiredAction": (
         "纯数据声明（gate 裁决结果），非可插拔组件"
     ),
+    "lca.layer0_infra.llm_adapter.api_style.LLMApiStyle": (
+        "L0 wire-protocol 配置枚举，非跨层契约 (ADR-0038)"
+    ),
+    "lca.layer0_infra.llm_adapter.openai_compat._chat_completions._ChatCompletionsStrategy": (
+        "OpenAICompatAdapter 内部 Strategy，模块私有 (ADR-0038)"
+    ),
+    "lca.layer0_infra.llm_adapter.openai_compat._responses._ResponsesStrategy": (
+        "OpenAICompatAdapter 内部 Strategy，模块私有 (ADR-0038)"
+    ),
+    "lca.layer0_infra.llm_adapter.openai_compat._shared._RawToolCall": (
+        "L0 内部 tool_call 归一化 NamedTuple，非可插拔组件 (ADR-0038)"
+    ),
     # ── 可观测性子系统（OTel 骨干重建后）──
     "lca.layer0_infra.observability.facade.SpanContext": ("correlation 值对象，非可插拔组件"),
     "lca.layer0_infra.observability.handles.SpanHandle": ("span 句柄内部类型，非公共组件"),

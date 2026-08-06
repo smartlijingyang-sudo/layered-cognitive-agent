@@ -7,8 +7,9 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.team.team_coordination import Debate
 from lca.contracts.protocols import LLMAdapter
 from lca.layer4_app.api import Agent, Team
@@ -43,7 +44,9 @@ class DebatePricingLLM(LLMAdapter):
         )
 
     async def stream(self, prompt: str, **kwargs):
-        yield (await self.complete(prompt)).text
+        response = await self.complete(prompt, **kwargs)
+        yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
 
 
 class TestDebateStrategyCapability(unittest.IsolatedAsyncioTestCase):

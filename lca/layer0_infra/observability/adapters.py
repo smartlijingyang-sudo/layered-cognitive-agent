@@ -12,14 +12,16 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
-from lca.contracts.atoms.enums import MemoryLayer
+import structlog
+
+from lca.contracts.atoms.enums import LLMStreamEventType, MemoryLayer
 from lca.contracts.atoms.telemetry import (
     ATTR_HIT,
     ATTR_MEMORY_LAYER,
     SpanName,
 )
 from lca.contracts.models.core.decision import Observation, Reflection
-from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import LlmCallCompleted
@@ -28,6 +30,8 @@ from lca.layer0_infra.observability.facade import record, span
 
 _PERF_COUNTER_SCALE = 1000
 """perf_counter 秒 → 毫秒换算。"""
+
+_log = structlog.get_logger("lca.telemetry_llm")
 
 
 def _model_label(inner: LLMAdapter) -> str:
@@ -67,24 +71,65 @@ class TelemetryLLMAdapter(LLMAdapter):
         try:
             response = await self._inner.complete(prompt, **kwargs)
         except Exception:
-            self._record(model, prompt, "", False, started, 0, 0)
+            self._record(model, prompt, "", False, started, 0, 0, stream=False)
             raise
         prompt_tokens, completion_tokens = _usage_of(response)
-        self._record(model, prompt, response.text, True, started, prompt_tokens, completion_tokens)
+        self._record(
+            model,
+            prompt,
+            response.text,
+            True,
+            started,
+            prompt_tokens,
+            completion_tokens,
+            stream=False,
+        )
         return response
 
-    async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
+    async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
         model = _model_label(self._inner)
         started = time.perf_counter()
-        chunks: list[str] = []
+        accumulated_text = ""
+        final_response: LLMResponse | None = None
         try:
-            async for chunk in self._inner.stream(prompt, **kwargs):
-                chunks.append(chunk)
-                yield chunk
+            async for event in self._inner.stream(prompt, **kwargs):
+                if event.type == LLMStreamEventType.COMPLETED:
+                    final_response = event.response
+                elif event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
+                    accumulated_text += event.text
+                yield event
         except Exception:
-            self._record(model, prompt, "".join(chunks), False, started, 0, 0)
+            preview = final_response.text if final_response is not None else accumulated_text
+            self._record(model, prompt, preview, False, started, 0, 0, stream=True)
             raise
-        self._record(model, prompt, "".join(chunks), True, started, 0, 0)
+
+        if final_response is not None:
+            prompt_tokens, completion_tokens = _usage_of(final_response)
+            self._record(
+                model,
+                prompt,
+                final_response.text,
+                True,
+                started,
+                prompt_tokens,
+                completion_tokens,
+                stream=True,
+            )
+        else:
+            _log.warning(
+                "inner_adapter_stream_missing_completed",
+                adapter=type(self._inner).__name__,
+            )
+            self._record(
+                model,
+                prompt,
+                accumulated_text,
+                True,
+                started,
+                0,
+                0,
+                stream=True,
+            )
 
     @staticmethod
     def _record(
@@ -95,6 +140,8 @@ class TelemetryLLMAdapter(LLMAdapter):
         started: float,
         prompt_tokens: int,
         completion_tokens: int,
+        *,
+        stream: bool,
     ) -> None:
         record(
             LlmCallCompleted(
@@ -105,6 +152,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                 response_preview=response_text,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
+                stream=stream,
             )
         )
 

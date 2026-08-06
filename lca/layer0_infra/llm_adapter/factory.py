@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 
 from lca.contracts.protocols import LLMAdapter
+from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ def resolve_llm_adapter(
     api_key: str | None = None,
     base_url: str | None = None,
     model: str | None = None,
+    api: LLMApiStyle | None = None,
 ) -> LLMAdapter:
     """根据环境变量解析 LLM Adapter 实例。
 
@@ -77,6 +79,7 @@ def resolve_llm_adapter(
             model=model,
             api_key=resolved_key,
             base_url=base_url,
+            api=api,
         )
 
     from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter

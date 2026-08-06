@@ -80,6 +80,37 @@ class TestDecisionParser(unittest.TestCase):
         self.assertEqual(decision.confidence, 0.1)
 
 
+class TestLLMStreamEventContract(unittest.TestCase):
+    def test_stream_event_type_values_match_responses_sse(self) -> None:
+        from lca.contracts.atoms.enums import LLMStreamEventType
+
+        self.assertEqual(LLMStreamEventType.OUTPUT_TEXT_DELTA.value, "response.output_text.delta")
+        self.assertEqual(
+            LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA.value,
+            "response.function_call_arguments.delta",
+        )
+        self.assertEqual(LLMStreamEventType.COMPLETED.value, "response.completed")
+
+    def test_stream_event_frozen_defaults(self) -> None:
+        from dataclasses import FrozenInstanceError
+
+        from lca.contracts.atoms.enums import LLMStreamEventType
+        from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+
+        event = LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA)
+        self.assertEqual(event.text, "")
+        self.assertIsNone(event.tool_call_id)
+        self.assertEqual(event.extra, {})
+        with self.assertRaises(FrozenInstanceError):
+            event.text = "x"  # type: ignore[misc]
+
+        completed = LLMStreamEvent(
+            type=LLMStreamEventType.COMPLETED,
+            response=LLMResponse(text="ok"),
+        )
+        self.assertIsNotNone(completed.response)
+
+
 class TestEndToEnd(unittest.TestCase):
     def test_single_agent_qa(self):
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter

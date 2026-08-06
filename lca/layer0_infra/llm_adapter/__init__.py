@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
 from lca.layer0_infra.llm_adapter.factory import load_dotenv_if_present, resolve_llm_adapter
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 
 __all__ = [
+    "LLMApiStyle",
     "MockLLMAdapter",
     "OpenAICompatAdapter",
     "load_dotenv_if_present",

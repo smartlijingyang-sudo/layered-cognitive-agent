@@ -11,7 +11,8 @@ import re
 from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any
 
-from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.atoms.enums import LLMStreamEventType
+from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.protocols import LLMAdapter
 
 _ROLE_RE = re.compile(r"^ROLE:\s*(.+)$", re.MULTILINE)
@@ -110,9 +111,10 @@ class ScriptedLLMAdapter(LLMAdapter):
     def _respond(text: str) -> LLMResponse:
         return LLMResponse(text=text, model="scripted-llm")
 
-    async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
+    async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
         response = await self.complete(prompt, **kwargs)
-        yield response.text
+        yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
 
     def _next(self, role: str) -> str | None:
         seq = self._scripts.get(role)

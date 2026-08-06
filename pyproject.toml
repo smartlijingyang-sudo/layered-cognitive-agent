@@ -82,7 +82,7 @@ security = [
     "interrogate>=1.7",
 ]
 llm-openai = [
-    "openai>=1.40",
+    "openai>=2.0",
     "python-dotenv>=1.0",
 ]
 observability-langfuse = [
@@ -141,7 +141,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = "lca.layer0_infra.llm_adapter.openai_compat"
+module = "lca.layer0_infra.llm_adapter.openai_compat.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -164,6 +164,6 @@ paths = ["lca"]
 exclude = [
     "lca/contracts/protocols",
     "lca/layer0_infra/llm_adapter/anthropic_llm.py",
-    "lca/layer0_infra/llm_adapter/openai_compat.py",
+    "lca/layer0_infra/llm_adapter/openai_compat/",
 ]
 ignore_names = ["n", "predicted_state", "version", "agent_card", "context_refs", "subtask"]

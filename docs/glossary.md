@@ -110,6 +110,8 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **BrainFactory** / **SimpleBrainFactory** | Brain 工厂（注册表用 NamedRegistry） |
 | **Synthesizer** / **ConcatSynthesizer** | 并行结果聚合协议 / 默认拼接实现 |
 | **LLMAdapter** / **OpenAICompatAdapter** / **MockLLMAdapter** / **TelemetryLLMAdapter** | 多厂商 LLM 适配协议与实现（Telemetry 为装饰器） |
+| **LLMStreamEvent** / **LLMStreamEventType** | provider-neutral 流式事件契约；``COMPLETED.response`` 与同次 ``complete()`` 返回值一致 |
+| **LLMApiStyle** | OpenAICompatAdapter 内部 wire-protocol 选择（Responses 默认 / Chat Completions opt-in） |
 | **AgentTransport** / **TransportRegistry** / **InternalTransport** / **A2ATransport** / **MCPTransport** | 传输协议、注册与实现 |
 | **ComponentRegistry** / **NamedRegistry** | DI / 按名注册表（ComponentRegistry 是 category → NamedRegistry 的组合器） |
 | **RegistryKeyError** | 注册表硬查询失败异常（继承 ValueError） |
