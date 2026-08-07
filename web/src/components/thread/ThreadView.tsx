@@ -1,13 +1,16 @@
-import { EXAMPLE_PROMPTS } from "../../contracts/modes.generated";
+import {
+  AUTO_EXAMPLE_PROMPTS,
+  AUTO_MODE_KEY,
+  EXAMPLE_PROMPTS,
+} from "../../contracts/modes.generated";
 import type { Conversation } from "../../domain/conversation";
+import { AUTO_MODE_HELP } from "../../lib/modes";
 import { AssistantBubble } from "./AssistantBubble";
 import { UserBubble } from "./UserBubble";
 import type { StampedEvent } from "../../contracts";
 import type { TraceState, Verbosity } from "../../projectors";
 import { cn } from "../../lib/cn";
 import { focusRing, mutedText } from "../../lib/ui";
-
-const WELCOME_MODES = ["board", "pipeline", "solo"] as const;
 
 function WelcomePanel({
   title,
@@ -44,6 +47,10 @@ function WelcomePanel({
   );
 }
 
+function autoWelcomePrompts() {
+  return AUTO_EXAMPLE_PROMPTS.map((text) => ({ key: AUTO_MODE_KEY, text }));
+}
+
 export function ThreadView({
   conversation,
   liveEvents,
@@ -62,14 +69,21 @@ export function ThreadView({
   readonly onExampleSelect?: (prompt: string, exampleMode: string) => void;
 }) {
   if (!conversation) {
-    const prompts = (EXAMPLE_PROMPTS[mode as keyof typeof EXAMPLE_PROMPTS] ?? []).map((text) => ({
-      key: mode,
-      text,
-    }));
+    const prompts =
+      mode === AUTO_MODE_KEY
+        ? autoWelcomePrompts()
+        : (EXAMPLE_PROMPTS[mode as keyof typeof EXAMPLE_PROMPTS] ?? []).map((text) => ({
+            key: mode,
+            text,
+          }));
     return (
       <WelcomePanel
         title="LCA 团队协作对话"
-        subtitle="从左侧新建对话，或在下方直接发送第一条消息。"
+        subtitle={
+          mode === AUTO_MODE_KEY
+            ? `默认「智能组队」：${AUTO_MODE_HELP} 直接发送问题，或点示例快速体验。`
+            : "从左侧新建对话，或在下方直接发送第一条消息。"
+        }
         prompts={prompts}
         onExampleSelect={onExampleSelect}
       />
@@ -77,13 +91,11 @@ export function ThreadView({
   }
 
   if (conversation.turns.length === 0) {
-    const prompts = WELCOME_MODES.flatMap((key) =>
-      EXAMPLE_PROMPTS[key].map((text) => ({ key, text })),
-    );
+    const prompts = autoWelcomePrompts();
     return (
       <WelcomePanel
         title={conversation.title}
-        subtitle="试试示例任务："
+        subtitle="试试智能组队示例（也可在下方切换固定协作模式）："
         prompts={prompts}
         onExampleSelect={onExampleSelect}
       />

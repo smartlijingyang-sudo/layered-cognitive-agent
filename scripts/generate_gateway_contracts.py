@@ -13,6 +13,9 @@ if str(_ROOT) not in sys.path:
 from gateway.contracts import CreateRunRequest, CreateRunResponse  # noqa: E402
 from gateway.mode_catalog import (  # noqa: E402
     ALL_MODES,
+    AUTO_EXAMPLE_PROMPTS,
+    AUTO_MODE_HELP,
+    AUTO_MODE_KEY,
     EXAMPLE_PROMPTS,
     MODE_HAS_LEAD,
     MODE_HELP,
@@ -57,6 +60,11 @@ def generate_modes() -> str:
         "",
         f"export const ALL_MODES = {list(ALL_MODES)!r} as const;",
         "export type Mode = (typeof ALL_MODES)[number];",
+        "",
+        # 自动组队入口独立于 MODE_DEFINITIONS（ADR-0040 静态目录前提，ADR-0042）
+        f'export const AUTO_MODE_KEY = "{AUTO_MODE_KEY}";',
+        f'export const AUTO_MODE_HELP = "{AUTO_MODE_HELP}";',
+        f"export const AUTO_EXAMPLE_PROMPTS = {list(AUTO_EXAMPLE_PROMPTS)!r} as const;",
         "",
         _literal_record("MODE_HELP", MODE_HELP),
         "",

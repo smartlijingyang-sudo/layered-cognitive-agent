@@ -142,6 +142,20 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **InMemoryStateStore** | StateStore 内存实现 |
 | **CalculatorTool** / **WeatherTool** | 内置示例 Tool |
 
+## L-Casting（自动组队，ADR-0042）
+
+| 术语 | 定义 |
+|---|---|
+| **RoleLibrary** | 角色库抽象（Protocol）：index() 产精简目录供选角，get() 取完整角色卡；文件实现 FileRoleLibrary 在 gateway 扫描 AGENCY_ROLES_DIR（默认仓库 roles/） |
+| **RoleIndexEntry** | 精简索引条目：role_id / title / department / summary，只进组队提示词，控制 token 成本 |
+| **RoleCard** | 单个角色的完整声明式定义：字段对齐 AgentSpec.profile（title→role，summary→goal 基底，backstory→角色卡全文） |
+| **SelectedRole** | 一次选角中的单个角色：role_id + 可选 task_hint（该角色在本次任务中的分工） |
+| **CastingPlan** | 一次 casting 的产物：白名单校验过的选角 + 治理方式（既有九词表），编译成 TeamSpec 前的声明式中间形态 |
+| **TeamCaster** | 选角抽象（Protocol）：cast(objective, library, llm) → CastingPlan；自动组队中唯一异步、不确定的步骤 |
+| **LLMTeamCaster** | 默认 TeamCaster：一次结构化 LLM 调用 + 白名单校验 + 一次纠正重试，失败抛 CastingError |
+| **CastingError** | 自动组队判定失败：解析 / 白名单校验 / 纠正重试全部失败 |
+| **RoleNotFoundError** | role_id 不存在于角色库 |
+
 ## 已废弃主名（仅允许过渡别名，见 contracts 内注释）
 
 | 旧名 | 新名 |

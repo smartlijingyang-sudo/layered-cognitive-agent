@@ -17,9 +17,25 @@ export function reduceTrace(state: TraceState, stamped: StampedEvent): TraceStat
   const runs = cloneRuns(state.runs);
 
   switch (e.type) {
+    case "CastingStarted":
+      return { ...state, phase: "casting" };
+    case "CastingCompleted":
+      return {
+        ...state,
+        phase: "collaborating",
+        casting: {
+          governanceKind: e.governance_kind,
+          leadRole: e.lead_role,
+          selectedRoles: [...e.selected_roles],
+          rationale: e.rationale,
+        },
+      };
+    case "CastingFailed":
+      return { ...state, phase: "failed", castingError: e.error };
     case "TeamRunStarted":
       return {
         ...state,
+        phase: "collaborating",
         teamRun: {
           teamId: e.team_id,
           mandate: e.mandate,
@@ -32,7 +48,7 @@ export function reduceTrace(state: TraceState, stamped: StampedEvent): TraceStat
         }),
       };
     case "TeamRunFinished":
-      return { ...state, status: e.status };
+      return { ...state, status: e.status, phase: e.status === "completed" ? "completed" : "failed" };
     case "AgentRunStarted": {
       const next = new Map(runs);
       next.set(stamped.scope.run_id, {
@@ -87,7 +103,7 @@ export function reduceTrace(state: TraceState, stamped: StampedEvent): TraceStat
     case "RunInsight":
       return { ...state, insights: [...state.insights, e] };
     case "SynthesisCompleted":
-      return { ...state, synthesisText: e.output_text };
+      return { ...state, synthesisText: e.output_text, phase: "synthesizing" };
     default:
       return state;
   }

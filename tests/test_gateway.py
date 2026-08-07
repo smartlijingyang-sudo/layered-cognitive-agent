@@ -12,6 +12,7 @@ from starlette.testclient import TestClient
 from gateway.app import create_app
 from gateway.llm_resolver import ProductionLLMResolver
 from gateway.run_registry import RunRegistry
+from tests.harness.scripted_llm import ScriptedLLMAdapter, respond
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
 
@@ -32,6 +33,34 @@ def _collect_sse(client: TestClient, run_id: str, *, max_frames: int = 500) -> l
                 if len(frames) >= max_frames:
                     return frames
     return frames
+
+
+def _collect_sse_until_types(
+    client: TestClient,
+    run_id: str,
+    required: set[str],
+    *,
+    timeout_s: float = 15.0,
+) -> set[str]:
+    """订阅 SSE 直到出现所需事件类型（不必等 run 全程结束）。"""
+    seen: set[str] = set()
+    deadline = time.monotonic() + timeout_s
+    with client.stream("GET", f"/runs/{run_id}/events") as response:
+        buffer = ""
+        for chunk in response.iter_bytes():
+            if time.monotonic() > deadline:
+                break
+            buffer += chunk.decode("utf-8")
+            while "\n\n" in buffer:
+                block, buffer = buffer.split("\n\n", 1)
+                data_line = next((ln for ln in block.splitlines() if ln.startswith("data: ")), None)
+                if data_line is None:
+                    continue
+                payload = json.loads(data_line[6:])
+                seen.add(payload["event_type"])
+                if required.issubset(seen):
+                    return seen
+    return seen
 
 
 def _wait_until_done(client: TestClient, run_id: str, *, timeout_s: float = 30.0) -> dict:
@@ -90,6 +119,52 @@ class TestObservabilityGateway(unittest.TestCase):
         seqs = [e["seq"] for e in events]
         self.assertEqual(len(seqs), len(set(seqs)))
         self.assertEqual(sorted(seqs), list(range(min(seqs), min(seqs) + len(seqs))))
+
+    def test_create_run_auto_mode_streams_casting_events(self) -> None:
+        registry = RunRegistry()
+        plan = json.dumps(
+            {
+                "selected": [
+                    {"role_id": "product/product-manager"},
+                    {"role_id": "marketing/content-specialist"},
+                ],
+                "governance": {"kind": "fan_out"},
+                "rationale": "test",
+            },
+            ensure_ascii=False,
+        )
+        llm = ScriptedLLMAdapter(
+            {
+                "caster": [plan],
+                "产品经理": [respond("pm output")],
+                "内容专家": [respond("content output")],
+            },
+            default_respond=True,
+        )
+
+        class _Resolver:
+            def is_available(self) -> bool:
+                return True
+
+            def resolve(self, *, mode: str) -> ScriptedLLMAdapter:
+                del mode
+                return llm
+
+        client = TestClient(create_app(registry, llm_resolver=_Resolver()))
+        create = client.post(
+            "/runs",
+            json={"question": "auto probe", "mode": "auto"},
+        )
+        self.assertEqual(create.status_code, 201)
+        run_id = create.json()["run_id"]
+        types = _collect_sse_until_types(
+            client,
+            run_id,
+            {"CastingStarted", "CastingCompleted", "TeamRunStarted"},
+        )
+        self.assertIn("CastingStarted", types)
+        self.assertIn("CastingCompleted", types)
+        self.assertIn("TeamRunStarted", types)
 
     def test_last_event_id_replay(self) -> None:
         registry = RunRegistry()

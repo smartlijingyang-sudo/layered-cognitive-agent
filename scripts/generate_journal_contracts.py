@@ -17,6 +17,9 @@ from lca.contracts.models.observability.journal import (  # noqa: E402
     ActionDegraded,
     AgentRunFinished,
     AgentRunStarted,
+    CastingCompleted,
+    CastingFailed,
+    CastingStarted,
     DecisionMade,
     DelegationCacheHit,
     DelegationCompleted,
@@ -87,6 +90,9 @@ def _domain_map() -> str:
 
 def generate() -> str:
     event_classes = [
+        CastingStarted,
+        CastingCompleted,
+        CastingFailed,
         TeamRunStarted,
         TeamRunFinished,
         AgentRunStarted,

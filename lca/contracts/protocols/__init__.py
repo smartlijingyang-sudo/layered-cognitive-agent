@@ -30,6 +30,9 @@ from lca.contracts.protocols.agent import (
 # ── 可选能力（无 bind/install 组装面）────────────
 from lca.contracts.protocols.capabilities import HasHooks
 
+# ── 自动组队（角色库与选角契约，ADR-0042）────────
+from lca.contracts.protocols.casting import RoleLibrary, TeamCaster
+
 # ── L1 认知 / Brain 协议 ─────────────────────────────────
 from lca.contracts.protocols.cognition import (
     Brain,
@@ -106,6 +109,7 @@ __all__ = [
     "ObservabilityBackend",
     "OrchestrationRegistryProtocol",
     "Reasoner",
+    "RoleLibrary",
     "Runtime",
     "SafeExecutor",
     "SharedMemoryStore",
@@ -117,6 +121,7 @@ __all__ = [
     "SupportsShortcut",
     "Synthesizer",
     "TeamAssembly",
+    "TeamCaster",
     "TeamStage",
     "TeamStrategy",
     "TeamUnit",

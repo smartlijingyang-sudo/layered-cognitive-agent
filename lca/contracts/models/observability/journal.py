@@ -120,6 +120,30 @@ class TeamRunFinished(JournalEvent):
 
 
 @dataclass(frozen=True)
+class CastingStarted(JournalEvent):
+    """自动组队选角开始（auto 模式在 Team 编译前的一次 LLM 调用）。"""
+
+    objective_preview: str = ""
+
+
+@dataclass(frozen=True)
+class CastingCompleted(JournalEvent):
+    """自动组队选角完成 —— 白名单校验后的 CastingPlan 快照（可回放）。"""
+
+    governance_kind: str = ""
+    lead_role: str = ""
+    selected_roles: tuple[str, ...] = ()
+    rationale: str = field(default="", metadata={"journal_kind": "content"})
+
+
+@dataclass(frozen=True)
+class CastingFailed(JournalEvent):
+    """自动组队选角失败（解析/白名单/重试耗尽）。"""
+
+    error: str = ""
+
+
+@dataclass(frozen=True)
 class AgentRunStarted(JournalEvent):
     """agent run 容器开启（根 run 时兼 solo 场景卡）。"""
 

@@ -7,10 +7,11 @@ from typing import Any
 
 from gateway.collector import GatewayCollector
 from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
-from gateway.mode_catalog import DEFAULT_MODE
+from gateway.mode_catalog import AUTO_MODE_KEY, DEFAULT_MODE
 from gateway.run_registry import RunRegistry, RunSession, RunStatus
-from gateway.team_factory import build_runnable
+from gateway.team_factory import build_runnable, build_runnable_auto
 from lca.contracts.atoms.ids import new_id
+from lca.layer4_app.api import Agent, Team
 
 _default_llm_resolver: LLMResolver = ProductionLLMResolver()
 
@@ -42,7 +43,20 @@ async def execute_run(
     session.status = RunStatus.RUNNING
     try:
         llm = get_llm_resolver().resolve(mode=mode)
-        runnable = build_runnable(mode, llm, observability=session.hub)
+        runnable: Agent | Team
+        # 全仓库唯一按 mode 分支处：auto 需先 await 选角，无法并入同步
+        # build_runnable 查表路径（ADR-0042）。若未来出现第二个特殊入口，
+        # 应重构为 runner 注册表而非继续加分支。
+        if mode == AUTO_MODE_KEY:
+            runnable = await build_runnable_auto(
+                question,
+                llm,
+                observability=session.hub,
+                trace_id=session.trace_id,
+                run_id=session.run_id,
+            )
+        else:
+            runnable = build_runnable(mode, llm, observability=session.hub)
         await runnable.run(question)
         session.status = RunStatus.CANCELED if session.cancel_requested else RunStatus.COMPLETED
     except asyncio.CancelledError:

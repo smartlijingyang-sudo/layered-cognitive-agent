@@ -24,6 +24,21 @@ _PARSE_FAILURE_CONFIDENCE = 0.1
 _DEFAULT_CONFIDENCE = 0.5
 
 
+def extract_json_block(raw_output: str) -> str:
+    """从 LLM 原始输出提取 JSON 文本：优先 ```json 围栏，其次裸 {...} 块。
+
+    归一化管线的公共第一步；DecisionParser 与 L4 自动组队
+    （LLMTeamCaster）共用，禁止各自复制提取逻辑。
+    """
+    m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", raw_output, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    m = re.search(r"\{.*\}", raw_output, re.DOTALL)
+    if m:
+        return m.group(0)
+    return raw_output.strip()
+
+
 class SimpleDecisionParser(DecisionParser):
     """稳健 JSON 解析器：别名归一化 + 词表校验 + 越界降级 + 解析兜底。
 
@@ -147,10 +162,4 @@ class SimpleDecisionParser(DecisionParser):
 
     @staticmethod
     def _extract_json(text: str) -> str:
-        m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
-        if m:
-            return m.group(1).strip()
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        if m:
-            return m.group(0)
-        return text.strip()
+        return extract_json_block(text)

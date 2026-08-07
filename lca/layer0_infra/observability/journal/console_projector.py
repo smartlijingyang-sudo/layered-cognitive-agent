@@ -18,6 +18,9 @@ from lca.contracts.models.observability.journal import (
     ActionDegraded,
     AgentRunFinished,
     AgentRunStarted,
+    CastingCompleted,
+    CastingFailed,
+    CastingStarted,
     DecisionMade,
     DelegationCacheHit,
     DelegationCompleted,
@@ -219,6 +222,14 @@ class ConsoleJournalProjector(JournalProjector):
             return f"◈ synthesis ({event.method}, {event.candidate_count} candidates)"
         if isinstance(event, ActionDegraded):
             return f"⚠ degraded: {event.original_action_type} → {event.degraded_to}"
+        if isinstance(event, CastingStarted):
+            return f"◎ 自动选角 · {event.objective_preview}"
+        if isinstance(event, CastingCompleted):
+            roles = "、".join(event.selected_roles)
+            lead = f" · 主导 {event.lead_role}" if event.lead_role else ""
+            return f"✓ 组队完成 · {event.governance_kind}{lead} · {roles}"
+        if isinstance(event, CastingFailed):
+            return f"✗ 组队失败 · {event.error}"
         return ""
 
     # ── 聚合与工具 ─────────────────────────────────────

@@ -199,6 +199,22 @@ EXAMPLE_PROMPTS: Final[dict[str, tuple[str, ...]]] = {
 
 DEFAULT_MODE: Final[str] = "board"
 
+AUTO_MODE_KEY: Final[str] = "auto"
+"""自动组队入口（ADR-0042）：按问题从角色库选角并决定治理方式。
+
+刻意不进 MODE_DEFINITIONS——后者是「固定角色静态目录」的单一事实源
+（ADR-0040），auto 是动态机制，进入会破坏该前提。
+"""
+
+AUTO_MODE_HELP: Final[str] = "AI 根据问题自动挑选角色与协作方式（从角色库组队，无需手动选模式）"
+
+AUTO_EXAMPLE_PROMPTS: Final[tuple[str, ...]] = (
+    "给新功能写发布文案并评估技术风险",
+    "制定季度产品路线图的关键里程碑",
+    "从效率、协作、文化三个角度分析远程办公",
+    "是否应在本周发布灰度版本？",
+)
+
 _MEMBER_MAX_STEPS = 8
 _LEAD_MAX_STEPS = 20
 _SOLO_MAX_STEPS = 12

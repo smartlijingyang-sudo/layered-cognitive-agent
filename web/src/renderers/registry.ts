@@ -1,6 +1,9 @@
 import type { JournalEventType } from "../contracts";
 import { JOURNAL_EVENT_TYPES } from "../contracts";
 import {
+  CastingCompletedCard,
+  CastingFailedCard,
+  CastingStartedCard,
   ContainerCard,
   DecisionCard,
   DelegationCard,
@@ -15,6 +18,9 @@ import {
 
 /** 事件类型 → 渲染组件登记表（与 JOURNAL_EVENT_CLASSES 对称）。 */
 export const EVENT_RENDERERS: Record<JournalEventType, EventRenderer> = {
+  CastingStarted: CastingStartedCard,
+  CastingCompleted: CastingCompletedCard,
+  CastingFailed: CastingFailedCard,
   TeamRunStarted: ContainerCard,
   TeamRunFinished: ContainerCard,
   AgentRunStarted: ContainerCard,

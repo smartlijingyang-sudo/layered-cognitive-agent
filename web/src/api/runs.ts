@@ -47,9 +47,17 @@ export async function cancelRun(runId: string): Promise<RunStatus> {
   return data.status ?? "canceled";
 }
 
-export async function fetchRunStatus(runId: string): Promise<RunStatus | null> {
+export async function fetchRunSummary(
+  runId: string,
+): Promise<{ readonly status: RunStatus; readonly error?: string } | null> {
   const response = await fetch(`/runs/${runId}`);
   if (!response.ok) return null;
-  const data = (await response.json()) as { status?: RunStatus };
-  return data.status ?? null;
+  const data = (await response.json()) as { status?: RunStatus; error?: string };
+  if (!data.status) return null;
+  return { status: data.status, error: data.error };
+}
+
+export async function fetchRunStatus(runId: string): Promise<RunStatus | null> {
+  const summary = await fetchRunSummary(runId);
+  return summary?.status ?? null;
 }

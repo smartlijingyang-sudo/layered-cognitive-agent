@@ -3,6 +3,10 @@
 export const ALL_MODES = ['routing', 'consult', 'board', 'pipeline', 'fan_out', 'peer_relay', 'peer_swarm', 'debate', 'graph', 'solo'] as const;
 export type Mode = (typeof ALL_MODES)[number];
 
+export const AUTO_MODE_KEY = "auto";
+export const AUTO_MODE_HELP = "AI 根据问题自动挑选角色与协作方式（从角色库组队，无需手动选模式）";
+export const AUTO_EXAMPLE_PROMPTS = ['给新功能写发布文案并评估技术风险', '制定季度产品路线图的关键里程碑', '从效率、协作、文化三个角度分析远程办公', '是否应在本周发布灰度版本？'] as const;
+
 export const MODE_HELP = {
   routing: "有主导 · Lead 显式委派成员后收口",
   consult: "有主导 · Lead 咨询成员后自己决定",

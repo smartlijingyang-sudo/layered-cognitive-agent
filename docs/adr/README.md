@@ -21,6 +21,7 @@
 | [0038](0038-llm-stream-event-contract.md) | LLMAdapter 流式事件契约 | Accepted |
 | [0040](0040-gateway-mode-catalog-contracts.md) | 协作模式契约单一事实源 — gateway/mode_catalog → TS 生成 | Accepted |
 | [0041](0041-prompt-reasoner-stream-text-delta.md) | PromptReasoner 流式增量文本；answer-delta 归属前端投影 | Proposed |
+| [0042](0042-role-library-and-auto-casting.md) | 角色库与自动组队 — 一句话 → 自动选角 → 既有 Team 执行 | Accepted |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

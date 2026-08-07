@@ -32,5 +32,43 @@ describe("trace projector", () => {
     const state = buildTraceState([parseStampedRecord(started)]);
     expect(state.teamRun?.teamId).toBe("team-x");
     expect(state.teamRun?.members).toEqual(["Alice", "Bob"]);
+    expect(state.phase).toBe("collaborating");
+  });
+
+  it("reduces casting lifecycle", () => {
+    const scope = {
+      trace_id: "t",
+      run_id: "r",
+      parent_run_id: null,
+      delegation_id: null,
+      agent_role: "",
+    };
+    const events = [
+      parseStampedRecord({
+        schema: "journal.v1",
+        seq: 1,
+        ts: 1,
+        scope,
+        event_type: "CastingStarted",
+        event: { type: "CastingStarted", objective_preview: "写文案" },
+      }),
+      parseStampedRecord({
+        schema: "journal.v1",
+        seq: 2,
+        ts: 2,
+        scope,
+        event_type: "CastingCompleted",
+        event: {
+          type: "CastingCompleted",
+          governance_kind: "pipeline",
+          lead_role: "",
+          selected_roles: ["产品经理"],
+          rationale: "ok",
+        },
+      }),
+    ];
+    const state = buildTraceState(events);
+    expect(state.phase).toBe("collaborating");
+    expect(state.casting?.selectedRoles).toEqual(["产品经理"]);
   });
 });

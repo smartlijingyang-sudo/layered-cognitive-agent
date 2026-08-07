@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ModePicker } from "./ModePicker";
 import { SendHorizontal, Square } from "lucide-react";
+import { AUTO_MODE_KEY } from "../../contracts/modes.generated";
 import { btnPrimary, btnSecondary, inputField } from "../../lib/ui";
 import { cn } from "../../lib/cn";
 
@@ -45,7 +46,9 @@ export function Composer({
         placeholder={
           llmAvailable === false
             ? "LLM 未配置，请在服务端设置 LLM_API_KEY"
-            : "输入问题，Enter 发送，Shift+Enter 换行"
+            : mode === AUTO_MODE_KEY
+              ? "描述你的问题，系统将自动选角组队（Enter 发送，Shift+Enter 换行）"
+              : "输入问题，Enter 发送，Shift+Enter 换行"
         }
         value={question}
         onChange={(e) => setQuestion(e.target.value)}

@@ -29,7 +29,7 @@ function stamp<E extends StampedRecord["event"]>(
 describe("chat projector", () => {
   it("buffers StepTextDelta until user-facing DecisionMade commits answer-delta", () => {
     let state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", pendingSteps: new Map() },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", pendingSteps: new Map() },
       stamp(1, { type: "StepTextDelta", step: 0, text_delta: "hel", seq: 0 }),
     );
     expect(state.answer).toBe("");
@@ -52,7 +52,7 @@ describe("chat projector", () => {
 
   it("discards buffered deltas for non-user-facing decisions", () => {
     let state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", pendingSteps: new Map() },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", pendingSteps: new Map() },
       stamp(1, { type: "StepTextDelta", step: 1, text_delta: "delegate json", seq: 0 }),
     );
     state = reduceChat(
@@ -62,6 +62,36 @@ describe("chat projector", () => {
     expect(state.answer).toBe("");
     expect(state.answerDeltas).toEqual([]);
     expect(state.pendingSteps.size).toBe(0);
+  });
+
+  it("tracks casting phase through CastingCompleted", () => {
+    let state = reduceChat(
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "casting", pendingSteps: new Map() },
+      stamp(1, { type: "CastingStarted", objective_preview: "写文案" }),
+    );
+    expect(state.phase).toBe("casting");
+
+    state = reduceChat(
+      state,
+      stamp(2, {
+        type: "CastingCompleted",
+        governance_kind: "pipeline",
+        lead_role: "",
+        selected_roles: ["产品经理", "内容专家"],
+        rationale: "先需求后文案",
+      }),
+    );
+    expect(state.phase).toBe("collaborating");
+  });
+
+  it("marks failed on CastingFailed", () => {
+    const state = reduceChat(
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "casting", pendingSteps: new Map() },
+      stamp(1, { type: "CastingFailed", error: "自动组队失败" }),
+    );
+    expect(state.status).toBe("failed");
+    expect(state.phase).toBe("failed");
+    expect(state.errorMessage).toBe("自动组队失败");
   });
 
   it("exports user-facing terminal action set", () => {

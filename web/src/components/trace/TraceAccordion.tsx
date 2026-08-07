@@ -12,6 +12,11 @@ import { cn } from "../../lib/cn";
 import { focusRing, mutedText } from "../../lib/ui";
 
 function traceSummary(trace: TraceState): string {
+  if (trace.phase === "casting") return "◎ 正在智能选角…";
+  if (trace.casting) {
+    const roles = trace.casting.selectedRoles.join("、");
+    return `✓ 已组队 · ${trace.casting.governanceKind} · ${roles}`;
+  }
   const parts = [
     trace.teamRun ? `${trace.teamRun.teamId} · ${trace.teamRun.mandate}` : null,
     trace.status ? `状态 ${trace.status}` : null,

@@ -11,6 +11,9 @@ from lca.contracts.models.observability.journal import (
     ActionDegraded,
     AgentRunFinished,
     AgentRunStarted,
+    CastingCompleted,
+    CastingFailed,
+    CastingStarted,
     DecisionMade,
     DelegationCacheHit,
     DelegationCompleted,
@@ -33,6 +36,9 @@ from lca.contracts.models.observability.telemetry_catalog import VocabDef, Vocab
 JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
     cls.__name__: cls
     for cls in (
+        CastingStarted,
+        CastingCompleted,
+        CastingFailed,
         TeamRunStarted,
         TeamRunFinished,
         AgentRunStarted,
@@ -60,6 +66,24 @@ def _journal(
 
 
 JOURNAL_CATALOG: dict[str, VocabDef] = {
+    "CastingStarted": _journal(
+        VocabDomain.TEAM,
+        "gateway.team_factory",
+        required=("objective_preview",),
+        desc="自动组队选角开始",
+    ),
+    "CastingCompleted": _journal(
+        VocabDomain.TEAM,
+        "gateway.team_factory",
+        required=("governance_kind",),
+        desc="自动组队选角完成",
+    ),
+    "CastingFailed": _journal(
+        VocabDomain.TEAM,
+        "gateway.team_factory",
+        required=("error",),
+        desc="自动组队选角失败",
+    ),
     "TeamRunStarted": _journal(
         VocabDomain.RUN, "lca.layer3_agent.team_handle", desc="团队 run 开启（场景卡）"
     ),

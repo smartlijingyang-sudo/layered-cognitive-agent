@@ -36,6 +36,35 @@ function Card({
   );
 }
 
+export function CastingStartedCard({ event, domain }: EventRendererProps) {
+  if (event.type !== "CastingStarted") return null;
+  return (
+    <Card
+      domain={domain}
+      title="◎ 智能选角"
+      body={`正在分析问题并挑选角色…\n${event.objective_preview}`}
+    />
+  );
+}
+
+export function CastingCompletedCard({ event, domain }: EventRendererProps) {
+  if (event.type !== "CastingCompleted") return null;
+  const roles = event.selected_roles.join("、");
+  const lead = event.lead_role ? `\n主导：${event.lead_role}` : "";
+  return (
+    <Card
+      domain={domain}
+      title="✓ 组队完成"
+      body={`协作方式：${event.governance_kind}${lead}\n成员：${roles}${event.rationale ? `\n${event.rationale}` : ""}`}
+    />
+  );
+}
+
+export function CastingFailedCard({ event, domain }: EventRendererProps) {
+  if (event.type !== "CastingFailed") return null;
+  return <Card domain={domain} title="✗ 组队失败" body={event.error} />;
+}
+
 export function DelegationCard({ event, domain }: EventRendererProps) {
   if (event.type !== "DelegationIssued") return null;
   return (

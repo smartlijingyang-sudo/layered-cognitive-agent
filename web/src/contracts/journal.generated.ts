@@ -20,6 +20,24 @@ export interface StampedRecord<E = JournalEvent> {
   readonly domain?: VocabDomain;
 }
 
+export interface CastingStarted {
+  readonly type: "CastingStarted";
+  readonly objective_preview: string;
+}
+
+export interface CastingCompleted {
+  readonly type: "CastingCompleted";
+  readonly governance_kind: string;
+  readonly lead_role: string;
+  readonly selected_roles: readonly string[];
+  readonly rationale: string;
+}
+
+export interface CastingFailed {
+  readonly type: "CastingFailed";
+  readonly error: string;
+}
+
 export interface TeamRunStarted {
   readonly type: "TeamRunStarted";
   readonly team_id: string;
@@ -162,14 +180,17 @@ export interface RunInsight {
   readonly detail: string;
 }
 
-export type JournalEvent = TeamRunStarted | TeamRunFinished | AgentRunStarted | AgentRunFinished | DelegationIssued | DelegationCompleted | DelegationCacheHit | SynthesisCompleted | DecisionMade | StepCompleted | ActionDegraded | LlmCallCompleted | StepTextDelta | ToolInvoked | ToolDenied | RunInsight;
+export type JournalEvent = CastingStarted | CastingCompleted | CastingFailed | TeamRunStarted | TeamRunFinished | AgentRunStarted | AgentRunFinished | DelegationIssued | DelegationCompleted | DelegationCacheHit | SynthesisCompleted | DecisionMade | StepCompleted | ActionDegraded | LlmCallCompleted | StepTextDelta | ToolInvoked | ToolDenied | RunInsight;
 export type JournalEventType = JournalEvent["type"];
-export const JOURNAL_EVENT_TYPES = ['TeamRunStarted', 'TeamRunFinished', 'AgentRunStarted', 'AgentRunFinished', 'DelegationIssued', 'DelegationCompleted', 'DelegationCacheHit', 'SynthesisCompleted', 'DecisionMade', 'StepCompleted', 'ActionDegraded', 'LlmCallCompleted', 'StepTextDelta', 'ToolInvoked', 'ToolDenied', 'RunInsight'] as const;
+export const JOURNAL_EVENT_TYPES = ['CastingStarted', 'CastingCompleted', 'CastingFailed', 'TeamRunStarted', 'TeamRunFinished', 'AgentRunStarted', 'AgentRunFinished', 'DelegationIssued', 'DelegationCompleted', 'DelegationCacheHit', 'SynthesisCompleted', 'DecisionMade', 'StepCompleted', 'ActionDegraded', 'LlmCallCompleted', 'StepTextDelta', 'ToolInvoked', 'ToolDenied', 'RunInsight'] as const;
 
 export const EVENT_DOMAINS: Record<JournalEventType, VocabDomain> = {
   ActionDegraded: "event",
   AgentRunFinished: "run",
   AgentRunStarted: "run",
+  CastingCompleted: "team",
+  CastingFailed: "team",
+  CastingStarted: "team",
   DecisionMade: "event",
   DelegationCacheHit: "team",
   DelegationCompleted: "team",

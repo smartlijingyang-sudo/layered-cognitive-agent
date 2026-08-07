@@ -1,5 +1,5 @@
 import type { StampedEvent } from "../contracts/stamped";
-import { EMPTY_CHAT_STATE, type ChatState } from "./types";
+import { EMPTY_CHAT_STATE, type ChatState, type RunPhase } from "./types";
 
 /** 面向用户的终态动作 — 其 StepTextDelta 可提交到对话主线（answer-delta 投影层）。 */
 export const USER_FACING_TERMINAL_ACTIONS = new Set(["respond", "stop", "ask_human"]);
@@ -10,6 +10,13 @@ interface StepBuffer {
 
 interface ChatProjectorInternal extends ChatState {
   readonly pendingSteps: ReadonlyMap<string, StepBuffer>;
+}
+
+function phaseFromStatus(status: ChatState["status"], prev: RunPhase): RunPhase {
+  if (status === "failed") return "failed";
+  if (status === "completed") return "completed";
+  if (status === "running") return prev === "idle" ? "casting" : prev;
+  return "idle";
 }
 
 function stepBufferKey(runId: string, step: number): string {
@@ -95,39 +102,58 @@ export function reduceChat(state: ChatProjectorInternal, stamped: StampedEvent):
   const runId = stamped.scope.run_id;
 
   switch (e.type) {
+    case "CastingStarted":
+      return { ...state, status: "running", phase: "casting" };
+    case "CastingCompleted":
+      return { ...state, status: "running", phase: "collaborating" };
+    case "CastingFailed":
+      return {
+        ...state,
+        status: "failed",
+        phase: "failed",
+        errorMessage: e.error || "自动组队失败",
+      };
     case "TeamRunStarted":
       return {
         ...state,
         status: "running",
+        phase: "collaborating",
         teamId: e.team_id,
         question: e.objective_preview || state.question,
       };
     case "TeamRunFinished": {
       const committed = commitAllRunBuffers(state, runId);
+      const status = e.status === "completed" ? "completed" : "failed";
       return {
         ...committed,
-        status: e.status === "completed" ? "completed" : "failed",
+        status,
+        phase: status === "completed" ? "completed" : "failed",
         answer: e.output_text || committed.answer,
+        errorMessage: e.error || committed.errorMessage,
       };
     }
     case "AgentRunStarted":
       if (!state.question && e.objective_preview) {
-        return { ...state, question: e.objective_preview, status: "running" };
+        return { ...state, question: e.objective_preview, status: "running", phase: "collaborating" };
       }
-      return { ...state, status: "running" };
+      return { ...state, status: "running", phase: state.phase === "casting" ? "collaborating" : state.phase };
     case "AgentRunFinished": {
       const committed = commitAllRunBuffers(state, runId);
       if (e.output_text) {
+        const status = e.status === "completed" ? "completed" : "failed";
         return {
           ...committed,
           answer: e.output_text,
-          status: e.status === "completed" ? "completed" : "failed",
+          status,
+          phase: status === "completed" ? "completed" : "failed",
         };
       }
       if (!committed.answer) {
+        const status = e.status === "completed" ? "completed" : "failed";
         return {
           ...committed,
-          status: e.status === "completed" ? "completed" : "failed",
+          status,
+          phase: phaseFromStatus(status, committed.phase),
         };
       }
       return committed;
@@ -136,6 +162,7 @@ export function reduceChat(state: ChatProjectorInternal, stamped: StampedEvent):
       const committed = commitAllRunBuffers(state, runId);
       return {
         ...committed,
+        phase: "synthesizing",
         answer: e.output_text || committed.answer,
       };
     }
@@ -158,7 +185,7 @@ export class ChatProjector {
   private state: ChatProjectorInternal = EMPTY_INTERNAL;
 
   start(question: string): void {
-    this.state = { ...EMPTY_INTERNAL, question, status: "running" };
+    this.state = { ...EMPTY_INTERNAL, question, status: "running", phase: "casting" };
   }
 
   onEvent(stamped: StampedEvent): ChatState {

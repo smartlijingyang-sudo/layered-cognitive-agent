@@ -7,7 +7,7 @@ import { ConversationSidebar } from "../components/sidebar/ConversationSidebar";
 import { ThreadView } from "../components/thread/ThreadView";
 import { Composer } from "../components/composer/Composer";
 import { DeveloperTracePanel } from "../components/trace/DeveloperTracePanel";
-import { createRun, cancelRun, fetchHealth } from "../api/runs";
+import { createRun, cancelRun, fetchHealth, fetchRunSummary } from "../api/runs";
 import {
   activeConversation,
   activeTurn,
@@ -104,11 +104,33 @@ export default function App() {
 
         await transport.connect(runId, (event) => log.append(event));
         unsub();
+
+        const finalChat = chatProjector.snapshot();
+        let finalStatus = mapRunStatus(finalChat.status === "idle" ? "running" : finalChat.status);
+        let finalAnswer = finalChat.answer;
+        let finalError = finalChat.errorMessage;
+
+        if (finalStatus === "running" || finalStatus === "pending") {
+          const summary = await fetchRunSummary(runId);
+          if (summary?.status === "failed") {
+            finalStatus = "failed";
+            finalError = summary.error ?? finalError ?? "运行失败";
+          } else if (summary?.status === "completed") {
+            finalStatus = "completed";
+          } else if (summary?.status === "canceled") {
+            finalStatus = "canceled";
+          }
+        }
+
         await store.updateActiveTurn({
-          status: mapRunStatus(chatProjector.snapshot().status),
-          answer: chatProjector.snapshot().answer,
-          answerDeltas: chatProjector.snapshot().answerDeltas,
+          status: finalStatus,
+          answer: finalAnswer,
+          answerDeltas: finalChat.answerDeltas,
         });
+
+        if (finalStatus === "failed" && finalError && !store.error) {
+          store.setError(finalError);
+        }
       } catch (error) {
         store.setError(error instanceof Error ? error.message : String(error));
         await store.updateActiveTurn({ status: "failed" });
@@ -205,8 +227,10 @@ export default function App() {
             canStop={busy && Boolean(store.activeRunId ?? turn?.runId)}
             llmAvailable={llmAvailable}
           />
-          {!store.settings.developerMode && chat.answer ? (
-            <p className={cn("text-sm", mutedText)}>最近回答状态：{chat.status}</p>
+          {!store.settings.developerMode && chat.phase !== "idle" ? (
+            <p className={cn("text-sm", mutedText)}>
+              运行阶段：{chat.phase === "completed" ? "已完成" : chat.phase === "failed" ? "失败" : "进行中"}
+            </p>
           ) : null}
         </>
       }

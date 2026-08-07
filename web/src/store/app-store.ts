@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { StampedEvent } from "../contracts";
+import { AUTO_MODE_KEY } from "../contracts/modes.generated";
 import type { Conversation, Turn, TurnStatus } from "../domain/conversation";
 import {
   createConversation,
@@ -64,7 +65,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     theme: "dark",
     verbosity: "standard",
     developerMode: false,
-    mode: "board",
+    mode: AUTO_MODE_KEY,
   },
   hydrated: false,
   sidebarOpen: true,

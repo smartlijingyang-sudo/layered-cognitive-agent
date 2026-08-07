@@ -1,5 +1,10 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { ALL_MODES, MODE_HAS_LEAD, MODE_HELP, type Mode } from "../../contracts/modes.generated";
+import {
+  ALL_MODES,
+  AUTO_MODE_KEY,
+  MODE_HAS_LEAD,
+} from "../../contracts/modes.generated";
+import { modeHelp, modeLabel } from "../../lib/modes";
 import { X } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { elevatedSurface, focusRing, iconButton, inputField, mutedText } from "../../lib/ui";
@@ -21,10 +26,8 @@ export function ModePicker({
           className={cn(inputField, "max-w-md cursor-pointer text-left")}
           disabled={disabled}
         >
-          <span className="block font-semibold">{value}</span>
-          <span className={cn("block text-sm", mutedText)}>
-            {MODE_HELP[value as Mode] ?? "选择协作模式"}
-          </span>
+          <span className="block font-semibold">{modeLabel(value)}</span>
+          <span className={cn("block text-sm", mutedText)}>{modeHelp(value)}</span>
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -45,6 +48,25 @@ export function ModePicker({
             </Dialog.Close>
           </div>
           <div className="mt-3 grid gap-2">
+            <button
+              type="button"
+              className={cn(
+                "cursor-pointer rounded-[var(--radius-md)] border bg-surface p-3 text-left text-inherit",
+                value === AUTO_MODE_KEY
+                  ? "border-accent"
+                  : "border-border hover:border-accent/50",
+                focusRing,
+              )}
+              onClick={() => onChange(AUTO_MODE_KEY)}
+            >
+              <div className="flex items-center gap-2">
+                <strong>{modeLabel(AUTO_MODE_KEY)}</strong>
+                <span className="rounded-full border border-border px-1.5 py-0.5 text-xs text-accent">
+                  推荐
+                </span>
+              </div>
+              <p className={cn("m-0 mt-1 text-sm", mutedText)}>{modeHelp(AUTO_MODE_KEY)}</p>
+            </button>
             {ALL_MODES.map((mode) => {
               const selected = mode === value;
               return (
@@ -59,7 +81,7 @@ export function ModePicker({
                   onClick={() => onChange(mode)}
                 >
                   <div className="flex items-center gap-2">
-                    <strong>{mode}</strong>
+                    <strong>{modeLabel(mode)}</strong>
                     {MODE_HAS_LEAD[mode] ? (
                       <span className="rounded-full border border-border px-1.5 py-0.5 text-xs text-team">
                         有主导
@@ -71,7 +93,7 @@ export function ModePicker({
                       </span>
                     ) : null}
                   </div>
-                  <p className={cn("m-0 mt-1 text-sm", mutedText)}>{MODE_HELP[mode]}</p>
+                  <p className={cn("m-0 mt-1 text-sm", mutedText)}>{modeHelp(mode)}</p>
                 </button>
               );
             })}
