@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""从 gateway 模式目录 + HTTP 契约生成 web/src/contracts/catalog.generated.ts。"""
+"""从 gateway 模式目录 + HTTP 契约生成 web/src/contracts/*.generated.ts。"""
 
 from __future__ import annotations
 
@@ -18,9 +18,10 @@ from gateway.mode_catalog import (  # noqa: E402
     MODE_HELP,
 )
 from gateway.run_registry import RunStatus  # noqa: E402
-from scripts._ts_codegen import dataclass_interface  # noqa: E402
+from scripts._ts_codegen import dataclass_interface, ts_type  # noqa: E402
 
-_OUT = _ROOT / "web" / "src" / "contracts" / "catalog.generated.ts"
+_MODES_OUT = _ROOT / "web" / "src" / "contracts" / "modes.generated.ts"
+_RUNS_OUT = _ROOT / "web" / "src" / "contracts" / "runs.generated.ts"
 
 
 def _literal_record(name: str, mapping: dict[str, str | bool]) -> str:
@@ -36,29 +37,23 @@ def _literal_record(name: str, mapping: dict[str, str | bool]) -> str:
     return "\n".join(lines)
 
 
+def _escape_ts_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def _example_prompts_record() -> str:
     lines = ["export const EXAMPLE_PROMPTS = {"]
     for key in ALL_MODES:
         prompts = EXAMPLE_PROMPTS[key]
-        items = ", ".join(
-            f'"{prompt.replace(chr(92), chr(92) + chr(92)).replace(chr(34), chr(92) + chr(34))}"'
-            for prompt in prompts
-        )
+        items = ", ".join(f'"{_escape_ts_string(prompt)}"' for prompt in prompts)
         lines.append(f"  {key}: [{items}],")
     lines.append("} as const;")
     return "\n".join(lines)
 
 
-def _run_status_type() -> str:
-    members = [m.value for m in RunStatus]
-    members.append("canceled")
-    unique = dict.fromkeys(members)
-    return " | ".join(f'"{m}"' for m in unique)
-
-
-def generate() -> str:
+def generate_modes() -> str:
     parts = [
-        "/** AUTO-GENERATED — scripts/generate_ui_catalog.py */",
+        "/** AUTO-GENERATED — scripts/generate_gateway_contracts.py */",
         "",
         f"export const ALL_MODES = {list(ALL_MODES)!r} as const;",
         "export type Mode = (typeof ALL_MODES)[number];",
@@ -69,7 +64,15 @@ def generate() -> str:
         "",
         _example_prompts_record(),
         "",
-        f"export type RunStatus = {_run_status_type()};",
+    ]
+    return "\n".join(parts) + "\n"
+
+
+def generate_runs() -> str:
+    parts = [
+        "/** AUTO-GENERATED — scripts/generate_gateway_contracts.py */",
+        "",
+        f"export type RunStatus = {ts_type(RunStatus)};",
         "",
         dataclass_interface("CreateRunRequest", CreateRunRequest),
         "",
@@ -80,10 +83,13 @@ def generate() -> str:
 
 
 def main() -> None:
-    content = generate()
-    _OUT.parent.mkdir(parents=True, exist_ok=True)
-    _OUT.write_text(content, encoding="utf-8")
-    print(f"Wrote {_OUT}")
+    for path, content in (
+        (_MODES_OUT, generate_modes()),
+        (_RUNS_OUT, generate_runs()),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        print(f"Wrote {path}")
 
 
 if __name__ == "__main__":

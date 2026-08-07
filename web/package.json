@@ -10,8 +10,8 @@
     "test": "vitest run --config vitest.config.ts",
     "lint:layers": "depcruise src --config .dependency-cruiser.cjs",
     "generate:contracts": "cd .. && uv run python scripts/generate_journal_contracts.py",
-    "generate:catalog": "cd .. && uv run python scripts/generate_ui_catalog.py",
-    "generate": "npm run generate:contracts && npm run generate:catalog"
+    "generate:gateway": "cd .. && uv run python scripts/generate_gateway_contracts.py",
+    "generate": "npm run generate:contracts && npm run generate:gateway"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",

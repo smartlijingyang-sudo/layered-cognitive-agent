@@ -1,4 +1,5 @@
-import type { CreateRunRequest, CreateRunResponse, Mode, RunStatus } from "../contracts/catalog.generated";
+import type { CreateRunRequest, CreateRunResponse, RunStatus } from "../contracts/runs.generated";
+import type { Mode } from "../contracts/modes.generated";
 
 export type { CreateRunRequest, CreateRunResponse, Mode, RunStatus };
 

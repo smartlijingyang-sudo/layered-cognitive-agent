@@ -1,4 +1,4 @@
-import { EXAMPLE_PROMPTS } from "../../contracts/catalog.generated";
+import { EXAMPLE_PROMPTS } from "../../contracts/modes.generated";
 import type { Conversation } from "../../domain/conversation";
 import { AssistantBubble } from "./AssistantBubble";
 import { UserBubble } from "./UserBubble";

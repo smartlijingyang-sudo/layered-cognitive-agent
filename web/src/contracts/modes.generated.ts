@@ -1,4 +1,4 @@
-/** AUTO-GENERATED — scripts/generate_ui_catalog.py */
+/** AUTO-GENERATED — scripts/generate_gateway_contracts.py */
 
 export const ALL_MODES = ['routing', 'consult', 'board', 'pipeline', 'fan_out', 'peer_relay', 'peer_swarm', 'debate', 'graph', 'solo'] as const;
 export type Mode = (typeof ALL_MODES)[number];
@@ -41,17 +41,4 @@ export const EXAMPLE_PROMPTS = {
   graph: ["生成一份每日站会议程", "按固定流程完成需求评审摘要"],
   solo: ["用三句话解释这个技术选型的利弊", "帮我列一份决策 checklist"],
 } as const;
-
-export type RunStatus = "pending" | "running" | "completed" | "failed" | "canceled";
-
-export interface CreateRunRequest {
-  readonly question: string;
-  readonly mode: string;
-  readonly conversation_id: unknown;
-}
-
-export interface CreateRunResponse {
-  readonly run_id: string;
-  readonly trace_id: string;
-}
 

@@ -44,7 +44,7 @@
 | 3 | 视觉是表单，不是对话 | `App.tsx` 用原生 `<select>`/`<textarea>`，`app.css` 只有 6 个写死的十六进制变量，无设计令牌、无浅色主题、断点只有一条 `@media (min-width:960px)` | 「调试页」既是功能上的，也是像素上的 |
 | 4 | 回答渲染是纯文本 | `renderers/typewriter.tsx` 只是 `<p>{sentences}</p>` | 没有 Markdown、代码块、表格渲染，答案稍微复杂就是一坨没有格式的字符串 |
 | 5 | 打字机是假的，且代码自己承认 | `chat-projector.ts` 注释原文：「逐句打字机（真 token 流接入前顶一顶）」 | 这不是我发现的问题，是实现者已经标注的临时方案——但 `docs/adr/0038-llm-stream-event-contract.md` 明确写了「不把 `stream()` 接进 `reasoner.py`（零生产调用方，另立 ADR）」，也就是说**真正的逐 token 流式在后端层面还没有排期**，前端架构必须为此留缝，而不是假装很快能接上 |
-| 6 | 协作模式选择器数据已经过期 | `App.tsx`：`const MODES = ["board", "routing", "pipeline", "solo"]`；而 `tests/harness/modes.py` 的 `ALL_MODES` 实际有 10 种（`routing/consult/board/pipeline/fan_out/peer_relay/peer_swarm/debate/graph/solo`） | 后端已经支持的 `consult / fan_out / peer_relay / peer_swarm / debate / graph` 六种协作模式，用户在 UI 上根本选不到——这正是「手抄枚举」必然漂移的实例，不是假设 |
+| 6 | 协作模式选择器数据已经过期 | 前端曾手抄 4 项 `MODES`；而 `gateway/mode_catalog.py::ALL_MODES` 实际有 10 种（`routing/consult/board/pipeline/fan_out/peer_relay/peer_swarm/debate/graph/solo`） | 后端已经支持的 `consult / fan_out / peer_relay / peer_swarm / debate / graph` 六种协作模式，用户在 UI 上根本选不到——这正是「手抄枚举」必然漂移的实例，不是假设 |
 | 7 | 「运行轨迹」是调试信息的堆叠，不是产品体验 | `renderers/trace-panel.tsx` 直接顺序渲染 `EVENT_RENDERERS[type]`，是一份原始事件列表 | 后端其实已经算好了更高层的叙事（见下一条），前端却只展示最原始那一层 |
 | 8 | 后端已建成但前端从未使用的能力 | `docs/adr/0037-journal-as-truth.md` 提到的 `SequenceProjector`（Mermaid 时序图）与 `InsightEngine`（计算关键路径/冗余调用/循环，回注为 `RunInsight` 事件） | `RunInsight` 虽然在 `EVENT_RENDERERS` 里有 `InsightBadge`，但只是列表里的一张卡片，没有被当作「团队协作总结」的头条来用——这是白白放着的产品亮点 |
 | 9 | `web/` 完全没接入 CI | `.github/workflows/ci.yml` 只跑 `uv run ruff/mypy/pytest/...`，通篇没有 `cd web`；而 `web/package.json` 里其实已经有 `test`/`lint:layers`/`build` 脚本 | 前端目前是「本地能跑就行」，没有任何门禁保证不回退——這是 0 成本就能修的纪律缺口 |
@@ -130,7 +130,7 @@ interface Conversation {
 
 ### 3.4 协作模式选择器
 
-现状的 4 项漂移（见 1.2 #6）先修正为与 `tests/harness/modes.py::ALL_MODES` 对齐的 10 项，**且直接复用后端已经写好的 `MODE_HELP` 文案**，不重新造一遍："有主导 · 全员咨询后 Lead 收口"（board）、"无主导 · 多轮辩论"（debate）等——这些文案已经是准确、简短、面向用户的中文描述，前端只需要把它们从 Python 字典搬到生成的 TS 契约里（见 3.4 与 5.5），不要在两处各写一份、迟早再漂移一次。
+现状的 4 项漂移（见 1.2 #6）先修正为与 `gateway/mode_catalog.py::ALL_MODES` 对齐的 10 项，**且由 `scripts/generate_gateway_contracts.py` 从生产目录生成 `MODE_HELP` 等 TS 契约**（见 ADR-0040 / 5.5），不重新手抄一遍："有主导 · 全员咨询后 Lead 收口"（board）、"无主导 · 多轮辩论"（debate）等——这些文案已经在 `gateway/mode_catalog.py` 里写好，前端只需要消费生成产物，不要在两处各写一份、迟早再漂移一次。
 
 交互上从原生 `<select>` 升级为类似 ChatGPT 模型选择器的弹层列表：每一项一行标题 + `MODE_HELP` 一句话描述 + 是否「有主导」的小标签，而不是裸词条 `board`。
 
@@ -281,10 +281,12 @@ web/src/
 
 ### 5.5 契约生成扩展
 
-`scripts/generate_journal_contracts.py` 的模式是对的，只是覆盖面窄了。建议扩展它（或新增同风格脚本）同时生成：
+`scripts/generate_journal_contracts.py` 的模式是对的，只是覆盖面窄了。`scripts/generate_gateway_contracts.py`（ADR-0040）沿用同风格，同时生成：
 
-- 协作模式词表：把 `tests/harness/modes.py::ALL_MODES` + `MODE_HELP` 一并生成到 TS（解决 1.2 #6 的漂移），前端 `ModePicker` 直接消费生成产物，永远不会再手抄漏项。
-- `RunStatus`（`gateway/run_registry.py` 的枚举）与 `/runs` 请求体的 DTO 形状，避免 `api/runs.ts` 里再手写一份 `{question, mode, track}` 的 shape。
+- 协作模式词表：从 `gateway/mode_catalog.py::MODE_DEFINITIONS` 及其派生表（`ALL_MODES` / `MODE_HELP` / `MODE_HAS_LEAD` / `EXAMPLE_PROMPTS`）生成 `web/src/contracts/modes.generated.ts`（解决 1.2 #6 的漂移），前端 `ModePicker` 直接消费生成产物，永远不会再手抄漏项。
+- `RunStatus`（`gateway/run_registry.py` 的枚举）与 `/runs` 请求体的 DTO 形状（`gateway/contracts.py`），生成 `web/src/contracts/runs.generated.ts`，避免 `api/runs.ts` 里再手写一份 shape。
+
+`tests/harness/modes.py` 继续只服务 CLI 探针与 scripted 测试；CI 通过 `test_refactor_guards.py::TestModeCatalogKeyParity` 断言其与 `gateway.mode_catalog` 的 key 集合一致，但不作为前端契约生成源。
 
 ### 5.6 测试策略延续
 
@@ -380,5 +382,5 @@ gantt
 ## 附录：本次走查发现的可独立执行的低成本项（不依赖本文其余部分拍板）
 
 1. **`web/` 接入 CI**（5.7）——零架构风险，建议本周内单独提交。
-2. **`MODES` 从 4 项补全到 10 项并对齐 `MODE_HELP` 文案**（1.2 #6 / 3.4）——纯数据修正，不涉及视觉改版也能先做。
+2. **协作模式契约生成**（1.2 #6 / 3.4 / ADR-0040）——`generate_gateway_contracts.py` + `modes.generated.ts`，纯构建期数据修正，不涉及视觉改版也能先做。
 3. **`RunInsight` 从事件列表中摘出置顶**（3.6 第 2 点）——现有渲染组件已经存在（`InsightBadge`），只是调整了摆放位置，成本极低。

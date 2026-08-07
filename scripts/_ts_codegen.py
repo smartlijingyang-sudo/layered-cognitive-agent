@@ -18,6 +18,13 @@ def ts_type(field_type: object, *, event_base: type | None = None) -> str:
     if isinstance(field_type, type) and field_type in _PY_TO_TS:
         return _PY_TO_TS[field_type]
     origin = typing.get_origin(field_type)
+    if origin is typing.Union:
+        args = typing.get_args(field_type)
+        if type(None) in args:
+            non_none = [arg for arg in args if arg is not type(None)]
+            if len(non_none) == 1:
+                return f"{ts_type(non_none[0], event_base=event_base)} | null"
+        return " | ".join(ts_type(arg, event_base=event_base) for arg in args)
     if origin is tuple:
         return "readonly string[]"
     if (

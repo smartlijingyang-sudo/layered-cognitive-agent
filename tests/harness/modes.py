@@ -3,13 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Final
 
-from gateway import mode_catalog
 from tests.harness.scripted_llm import ScriptedLLMAdapter, multi_delegate, respond
-
-ALL_MODES = mode_catalog.ALL_MODES
-MODE_HELP = mode_catalog.MODE_HELP
-MODE_HAS_LEAD = mode_catalog.MODE_HAS_LEAD
 
 
 @dataclass(frozen=True)
@@ -24,7 +20,7 @@ class ModeScenario:
     default_objective: str
 
 
-# Short blurbs for interactive pickers (zh) — 与 gateway.mode_catalog 同步
+# Short blurbs for interactive pickers (zh) — key 集合须与 gateway.mode_catalog 一致（见 test_refactor_guards）
 
 _SCENARIOS: dict[str, ModeScenario] = {
     "routing": ModeScenario(
@@ -182,6 +178,9 @@ _SCENARIOS: dict[str, ModeScenario] = {
         ),
     ),
 }
+
+
+ALL_MODES: Final[tuple[str, ...]] = tuple(_SCENARIOS.keys())
 
 
 def get_scenario(mode: str) -> ModeScenario:

@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { ALL_MODES, MODE_HAS_LEAD, MODE_HELP, type Mode } from "../../contracts/catalog.generated";
+import { ALL_MODES, MODE_HAS_LEAD, MODE_HELP, type Mode } from "../../contracts/modes.generated";
 import { X } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { elevatedSurface, focusRing, iconButton, inputField, mutedText } from "../../lib/ui";
