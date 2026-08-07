@@ -15,6 +15,8 @@ import {
   useAppStore,
 } from "../store/app-store";
 import { createTurn } from "../domain/conversation";
+import { cn } from "../lib/cn";
+import { mutedText } from "../lib/ui";
 import "./app.css";
 
 export default function App() {
@@ -64,61 +66,72 @@ export default function App() {
     return store.newConversation();
   }, [store]);
 
-  const handleSubmit = async (question: string) => {
-    store.setError(null);
-    setBusy(true);
-    const conversationId = await ensureConversation();
-    log.clear();
-    store.clearLiveEvents();
-    chatProjector.start(question);
-    setChat(chatProjector.snapshot());
-    traceProjector.reset();
-    setTrace(traceProjector.snapshot());
-    transport.resetCursor();
+  const handleSubmit = useCallback(
+    async (question: string, modeOverride?: string) => {
+      store.setError(null);
+      setBusy(true);
+      const conversationId = await ensureConversation();
+      const mode = modeOverride ?? store.settings.mode;
+      log.clear();
+      store.clearLiveEvents();
+      chatProjector.start(question);
+      setChat(chatProjector.snapshot());
+      traceProjector.reset();
+      setTrace(traceProjector.snapshot());
+      transport.resetCursor();
 
-    const trackArg = store.settings.track === "auto" ? undefined : store.settings.track;
-    try {
-      const { run_id: runId, trace_id: traceId } = await createRun({
-        question,
-        mode: store.settings.mode,
-        track: trackArg,
-        conversation_id: conversationId,
-      });
-      const pendingTurn = createTurn(
-        runId,
-        traceId,
-        question,
-        store.settings.mode,
-        store.settings.track,
-      );
-      await store.appendTurn({ ...pendingTurn, status: "running" });
-      store.setActiveRun(runId);
-
-      const unsub = log.subscribe((stamped) => {
-        store.appendLiveEvent(stamped);
-        const nextChat = chatProjector.onEvent(stamped);
-        setChat(nextChat);
-        setTrace(traceProjector.onEvent(stamped));
-        void store.updateActiveTurn({
-          status: mapRunStatus(nextChat.status === "idle" ? "running" : nextChat.status),
-          answer: nextChat.answer,
+      try {
+        const { run_id: runId, trace_id: traceId } = await createRun({
+          question,
+          mode,
+          conversation_id: conversationId,
         });
-      });
+        const pendingTurn = createTurn(runId, traceId, question, mode);
+        await store.appendTurn({ ...pendingTurn, status: "running" });
+        store.setActiveRun(runId);
 
-      await transport.connect(runId, (event) => log.append(event));
-      unsub();
-      await store.updateActiveTurn({
-        status: mapRunStatus(chatProjector.snapshot().status),
-        answer: chatProjector.snapshot().answer,
-      });
-    } catch (error) {
-      store.setError(error instanceof Error ? error.message : String(error));
-      await store.updateActiveTurn({ status: "failed" });
-    } finally {
-      setBusy(false);
-      store.setActiveRun(null);
-    }
-  };
+        const unsub = log.subscribe((stamped) => {
+          store.appendLiveEvent(stamped);
+          const nextChat = chatProjector.onEvent(stamped);
+          setChat(nextChat);
+          setTrace(traceProjector.onEvent(stamped));
+          void store.updateActiveTurn({
+            status: mapRunStatus(nextChat.status === "idle" ? "running" : nextChat.status),
+            answer: nextChat.answer,
+          });
+        });
+
+        await transport.connect(runId, (event) => log.append(event));
+        unsub();
+        await store.updateActiveTurn({
+          status: mapRunStatus(chatProjector.snapshot().status),
+          answer: chatProjector.snapshot().answer,
+        });
+      } catch (error) {
+        store.setError(error instanceof Error ? error.message : String(error));
+        await store.updateActiveTurn({ status: "failed" });
+      } finally {
+        setBusy(false);
+        store.setActiveRun(null);
+      }
+    },
+    [
+      chatProjector,
+      ensureConversation,
+      log,
+      store,
+      traceProjector,
+      transport,
+    ],
+  );
+
+  const handleExampleSelect = useCallback(
+    (prompt: string, exampleMode: string) => {
+      store.setMode(exampleMode);
+      void handleSubmit(prompt, exampleMode);
+    },
+    [handleSubmit, store],
+  );
 
   const handleStop = async () => {
     const runId = store.activeRunId ?? turn?.runId;
@@ -153,7 +166,10 @@ export default function App() {
         <ConversationSidebar
           conversations={store.conversations}
           activeId={store.activeConversationId}
-          onSelect={(id) => void store.selectConversation(id)}
+          onSelect={(id) => {
+            void store.selectConversation(id);
+            store.setSidebarOpen(false);
+          }}
           onNew={() => void store.newConversation()}
           onDelete={(id) => void store.deleteConversation(id)}
         />
@@ -167,24 +183,34 @@ export default function App() {
             verbosity={store.settings.verbosity}
             developerMode={store.settings.developerMode}
             mode={store.settings.mode}
+            onExampleSelect={handleExampleSelect}
           />
-          {store.error ? <div className="error-banner">{store.error}</div> : null}
+          {store.error ? (
+            <div
+              className={cn(
+                "rounded-[var(--radius-md)] border border-danger/35 bg-danger/10 px-3 py-2.5 text-danger",
+              )}
+            >
+              {store.error}
+            </div>
+          ) : null}
           <Composer
             mode={store.settings.mode}
-            track={store.settings.track}
             onModeChange={store.setMode}
-            onTrackChange={store.setTrack}
             onSubmit={(question) => void handleSubmit(question)}
             onStop={() => void handleStop()}
             busy={busy}
             canStop={busy && Boolean(store.activeRunId ?? turn?.runId)}
+            llmAvailable={llmAvailable}
           />
           {!store.settings.developerMode && chat.answer ? (
-            <p className="muted run-footnote">最近回答状态：{chat.status}</p>
+            <p className={cn("text-sm", mutedText)}>最近回答状态：{chat.status}</p>
           ) : null}
         </>
       }
       tracePanel={tracePanel}
+      sidebarOpen={store.sidebarOpen}
+      onSidebarToggle={() => store.setSidebarOpen(!store.sidebarOpen)}
     />
   );
 }

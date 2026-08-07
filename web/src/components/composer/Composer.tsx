@@ -1,75 +1,67 @@
 import { useState } from "react";
 import { ModePicker } from "./ModePicker";
-import type { TrackChoice } from "../../api/runs";
 import { SendHorizontal, Square } from "lucide-react";
+import { btnPrimary, btnSecondary, inputField } from "../../lib/ui";
+import { cn } from "../../lib/cn";
 
 export function Composer({
   mode,
-  track,
   onModeChange,
-  onTrackChange,
   onSubmit,
   onStop,
   busy,
   canStop,
+  llmAvailable,
 }: {
   readonly mode: string;
-  readonly track: TrackChoice;
   readonly onModeChange: (mode: string) => void;
-  readonly onTrackChange: (track: TrackChoice) => void;
   readonly onSubmit: (question: string) => void;
   readonly onStop: () => void;
   readonly busy: boolean;
   readonly canStop: boolean;
+  readonly llmAvailable: boolean | null;
 }) {
   const [question, setQuestion] = useState("");
+  const disabled = busy || llmAvailable === false;
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      if (!busy && question.trim()) {
-      onSubmit(question.trim());
-      setQuestion("");
-    }
+      if (!disabled && question.trim()) {
+        onSubmit(question.trim());
+        setQuestion("");
+      }
     }
   };
 
   return (
-    <div className="composer">
-      <div className="composer-toolbar">
+    <div className="mt-auto flex flex-col gap-2.5 border-t border-border pt-4">
+      <div className="flex flex-wrap gap-3">
         <ModePicker value={mode} onChange={onModeChange} disabled={busy} />
-        <label className="track-select">
-          <span>轨道</span>
-          <select
-            value={track}
-            onChange={(e) => onTrackChange(e.target.value as TrackChoice)}
-            disabled={busy}
-          >
-            <option value="auto">自动</option>
-            <option value="real">真实 LLM</option>
-            <option value="scripted">离线 scripted</option>
-          </select>
-        </label>
       </div>
       <textarea
-        className="composer-input"
+        className={cn(inputField, "min-h-[5.5rem] resize-y")}
         rows={3}
-        placeholder="输入问题，Enter 发送，Shift+Enter 换行"
+        placeholder={
+          llmAvailable === false
+            ? "LLM 未配置，请在服务端设置 LLM_API_KEY"
+            : "输入问题，Enter 发送，Shift+Enter 换行"
+        }
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         onKeyDown={handleKeyDown}
-        disabled={busy}
+        disabled={disabled}
       />
-      <div className="composer-actions">
+      <div className="flex justify-end">
         {canStop ? (
-          <button type="button" className="btn-secondary" onClick={onStop}>
+          <button type="button" className={btnSecondary} onClick={onStop}>
             <Square size={14} /> 停止生成
           </button>
         ) : (
           <button
             type="button"
-            className="btn-primary"
-            disabled={busy || !question.trim()}
+            className={btnPrimary}
+            disabled={disabled || !question.trim()}
             onClick={() => {
               onSubmit(question.trim());
               setQuestion("");

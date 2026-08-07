@@ -1,10 +1,12 @@
 import type { Turn } from "../../domain/conversation";
+import { cn } from "../../lib/cn";
+import { elevatedSurface, mutedText } from "../../lib/ui";
 
 export function UserBubble({ turn }: { readonly turn: Turn }) {
   return (
-    <article className="bubble user-bubble">
-      <header className="bubble-meta">你 · {turn.mode}</header>
-      <p>{turn.question}</p>
+    <article className={cn(elevatedSurface, "border-l-[3px] border-l-cognitive px-4 py-3.5")}>
+      <header className={cn("mb-1.5 text-xs", mutedText)}>你 · {turn.mode}</header>
+      <p className="m-0">{turn.question}</p>
     </article>
   );
 }

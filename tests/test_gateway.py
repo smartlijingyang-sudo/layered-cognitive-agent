@@ -1,15 +1,18 @@
-"""Starlette 网关集成测试（scripted LLM，无 API Key）。"""
+"""Starlette 网关集成测试（scripted LLM 经依赖注入，无 API Key）。"""
 
 from __future__ import annotations
 
 import json
 import time
 import unittest
+from unittest.mock import patch
 
 from starlette.testclient import TestClient
 
 from gateway.app import create_app
+from gateway.llm_resolver import ProductionLLMResolver
 from gateway.run_registry import RunRegistry
+from tests.support.gateway_scripted import ScriptedLLMResolver
 
 
 def _collect_sse(client: TestClient, run_id: str, *, max_frames: int = 500) -> list[dict]:
@@ -44,20 +47,33 @@ def _wait_until_done(client: TestClient, run_id: str, *, timeout_s: float = 30.0
 
 class TestObservabilityGateway(unittest.TestCase):
     def test_health(self) -> None:
-        client = TestClient(create_app(RunRegistry()))
+        client = TestClient(create_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
         response = client.get("/health")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["status"], "ok")
         self.assertIn("llm_available", payload)
-        self.assertIn("default_track", payload)
+        self.assertTrue(payload["llm_available"])
+
+    def test_create_run_without_llm_returns_503(self) -> None:
+        registry = RunRegistry()
+        resolver = ProductionLLMResolver()
+        with patch("gateway.llm_resolver.llm_credentials", return_value=(None, None, None)):
+            client = TestClient(create_app(registry, llm_resolver=resolver))
+            response = client.post(
+                "/runs",
+                json={"question": "solo probe", "mode": "solo"},
+            )
+        self.assertEqual(response.status_code, 503)
+        payload = response.json()
+        self.assertEqual(payload["error"], "llm_unavailable")
 
     def test_create_run_and_stream_events(self) -> None:
         registry = RunRegistry()
-        client = TestClient(create_app(registry))
+        client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
         create = client.post(
             "/runs",
-            json={"question": "solo probe", "mode": "solo", "track": "scripted"},
+            json={"question": "solo probe", "mode": "solo"},
         )
         self.assertEqual(create.status_code, 201)
         run_id = create.json()["run_id"]
@@ -77,10 +93,10 @@ class TestObservabilityGateway(unittest.TestCase):
 
     def test_last_event_id_replay(self) -> None:
         registry = RunRegistry()
-        client = TestClient(create_app(registry))
+        client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
         create = client.post(
             "/runs",
-            json={"question": "quick", "mode": "solo", "track": "scripted"},
+            json={"question": "quick", "mode": "solo"},
         )
         run_id = create.json()["run_id"]
         _wait_until_done(client, run_id)

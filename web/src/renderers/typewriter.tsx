@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { splitSentences } from "../projectors/chat-projector";
 
+import { mutedText } from "../lib/ui";
+
 export function TypewriterAnswer({ text, active }: { readonly text: string; readonly active: boolean }) {
   const [visible, setVisible] = useState(0);
   const sentences = splitSentences(text);
@@ -17,12 +19,12 @@ export function TypewriterAnswer({ text, active }: { readonly text: string; read
     return () => window.clearInterval(timer);
   }, [text, active, sentences.length]);
 
-  if (!text) return <p className="muted">等待团队收口…</p>;
+  if (!text) return <p className={mutedText}>等待团队收口…</p>;
   if (!active) return <p>{text}</p>;
   return (
     <p>
       {sentences.slice(0, visible).join(" ")}
-      {visible < sentences.length ? <span className="cursor">▍</span> : null}
+      {visible < sentences.length ? <span className="text-run">▍</span> : null}
     </p>
   );
 }

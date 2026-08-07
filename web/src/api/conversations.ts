@@ -14,7 +14,6 @@ export interface ConversationDetail {
     readonly trace_id: string;
     readonly question: string;
     readonly mode: string;
-    readonly track: string;
     readonly status: string;
     readonly created_at: number;
   }[];

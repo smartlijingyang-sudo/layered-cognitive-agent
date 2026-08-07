@@ -29,17 +29,17 @@ export const MODE_HAS_LEAD = {
   solo: false,
 } as const;
 
-export const MODE_DEFAULT_OBJECTIVE = {
-  routing: "你是项目 Lead。任务：评估「移动端新功能上线」的风险。必须先分别委派：Alice 做技术风险（一句话），Bob 做业务风险（一句话）；等他们返回后，你再汇总成 3 条结论。禁止自己直接答完、禁止反问。",
-  consult: "你是决策 Lead。问题：我们是否应该本周发布灰度？请先向 Alice 和 Bob 各征求一句意见，再由你本人给出「发布/暂缓」结论和理由。禁止只反问用户。",
-  board: "董事会场景：是否把客服机器人切换到新模型？请 Alice 给「支持」理由一句，Bob 给「风险」一句；Lead 综合后给出最终决议（通过/否决）和一句总结。禁止反问。",
-  pipeline: "流水线任务：写一条「周末大促」短信文案。Alice 先写草稿（一句），Bob 改得更有转化力（一句），Carol 输出最终可发送版本（一句）。每人只做自己那一棒。",
-  fan_out: "并行调研：关于「远程办公」各给一个观点——Alice 从效率、Bob 从协作、Carol 从文化；最后合成三条要点。每人一句，禁止反问。",
-  peer_relay: "接力任务：把「用户登录慢」从现象拆到可能原因。Alice 先写现象与假设（一句），Bob 在其基础上给出最可能原因（一句）。简洁，禁止反问。",
-  peer_swarm: "两人对等讨论：产品 slogan 候选。Alice 提一个 slogan，Bob 提改进；各一轮后给出你们共同认可的最终 slogan（一句）。禁止反问。",
-  debate: "辩论题：是否应强制双因素认证。Alice 支持强制，Bob 反对强制；各陈述一句后给出一个折中建议（一句）。禁止反问。",
-  graph: "图执行任务：生成「每日站会」议程。Alice 列出 3 个议题关键词，Bob 整理成一句可宣读的议程。禁止反问。",
-  solo: "用一句话自我介绍，并说明你理解到的任务是「solo 模式探针」。直接回答，不要反问，不要超过两句。",
+export const EXAMPLE_PROMPTS = {
+  routing: ["评估新功能上线的技术风险与业务影响", "制定季度产品路线图的关键里程碑"],
+  consult: ["是否应在本周发布灰度版本？", "选择云厂商时应优先考虑哪些因素？"],
+  board: ["是否将客服机器人切换到新模型？", "是否批准下一轮融资的使用计划？"],
+  pipeline: ["起草并优化一条营销短信", "把用户反馈整理成可执行的行动清单"],
+  fan_out: ["从效率、协作、文化三个角度分析远程办公", "并行评估三种技术方案后给出推荐"],
+  peer_relay: ["从现象到根因，分析用户登录变慢的问题", "逐步细化一项 MVP 的功能范围"],
+  peer_swarm: ["共同拟定一个产品 slogan", "讨论并收敛一份发布检查清单"],
+  debate: ["辩论是否应强制双因素认证", "正反方讨论是否采用微服务架构"],
+  graph: ["生成一份每日站会议程", "按固定流程完成需求评审摘要"],
+  solo: ["用三句话解释这个技术选型的利弊", "帮我列一份决策 checklist"],
 } as const;
 
 export type RunStatus = "pending" | "running" | "completed" | "failed" | "canceled";
@@ -47,7 +47,7 @@ export type RunStatus = "pending" | "running" | "completed" | "failed" | "cancel
 export interface CreateRunRequest {
   readonly question: string;
   readonly mode: string;
-  readonly track: unknown;
+  readonly conversation_id: unknown;
 }
 
 export interface CreateRunResponse {

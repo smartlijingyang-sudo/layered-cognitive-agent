@@ -1,28 +1,19 @@
 import type { CreateRunRequest, CreateRunResponse, Mode, RunStatus } from "../contracts/catalog.generated";
 
 export type { CreateRunRequest, CreateRunResponse, Mode, RunStatus };
-export type TrackChoice = "auto" | "real" | "scripted";
 
 export interface LlmHealth {
   readonly llmAvailable: boolean;
-  readonly defaultTrack: TrackChoice;
 }
 
 export async function fetchHealth(): Promise<LlmHealth> {
   const response = await fetch("/health");
   if (!response.ok) {
-    return { llmAvailable: false, defaultTrack: "scripted" };
+    return { llmAvailable: false };
   }
-  const data = (await response.json()) as {
-    llm_available?: boolean;
-    default_track?: string;
-  };
-  const track = data.default_track;
-  const defaultTrack: TrackChoice =
-    track === "real" || track === "scripted" || track === "auto" ? track : "scripted";
+  const data = (await response.json()) as { llm_available?: boolean };
   return {
     llmAvailable: Boolean(data.llm_available),
-    defaultTrack,
   };
 }
 
@@ -35,8 +26,12 @@ export async function createRun(
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    const err = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(err.error ?? `HTTP ${response.status}`);
+    const err = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      detail?: string;
+    };
+    const message = err.detail ?? err.error ?? `HTTP ${response.status}`;
+    throw new Error(message);
   }
   return (await response.json()) as CreateRunResponse;
 }

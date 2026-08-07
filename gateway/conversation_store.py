@@ -20,7 +20,6 @@ class TurnRecord:
     trace_id: str
     question: str
     mode: str
-    track: str
     status: str
     created_at: float
 
@@ -109,7 +108,7 @@ class ConversationStore:
                 return None
             turns = conn.execute(
                 """
-                SELECT id, run_id, trace_id, question, mode, track, status, created_at
+                SELECT id, run_id, trace_id, question, mode, status, created_at
                 FROM turns WHERE conversation_id = ? ORDER BY created_at ASC
                 """,
                 (conversation_id,),
@@ -129,7 +128,6 @@ class ConversationStore:
         trace_id: str,
         question: str,
         mode: str,
-        track: str,
         status: str = "pending",
     ) -> dict[str, Any] | None:
         import time
@@ -152,7 +150,7 @@ class ConversationStore:
                     trace_id,
                     question,
                     mode,
-                    track,
+                    "",
                     status,
                     created_at,
                 ),
@@ -164,7 +162,6 @@ class ConversationStore:
                 "trace_id": trace_id,
                 "question": question,
                 "mode": mode,
-                "track": track,
                 "status": status,
                 "created_at": created_at,
             }
@@ -184,7 +181,6 @@ class ConversationStore:
                 "trace_id": data["trace_id"],
                 "question": data["question"],
                 "mode": data["mode"],
-                "track": data["track"],
                 "status": data["status"],
                 "created_at": data["created_at"],
             }
@@ -194,7 +190,6 @@ class ConversationStore:
             "trace_id": row["trace_id"],
             "question": row["question"],
             "mode": row["mode"],
-            "track": row["track"],
             "status": row["status"],
             "created_at": row["created_at"],
         }

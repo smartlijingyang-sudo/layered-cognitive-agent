@@ -11,7 +11,14 @@ from starlette.responses import JSONResponse, StreamingResponse
 from starlette.routing import Route
 
 from gateway.conversation_store import ConversationStore
-from gateway.run_executor import create_run_session, llm_status, schedule_run
+from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
+from gateway.mode_catalog import DEFAULT_MODE
+from gateway.run_executor import (
+    create_run_session,
+    llm_status,
+    schedule_run,
+    set_llm_resolver,
+)
 from gateway.run_registry import RunRegistry, RunStatus
 
 CORS_HEADERS = {
@@ -47,24 +54,30 @@ async def create_run(request: Request) -> JSONResponse:
         return JSONResponse(
             {"error": "question is required"}, status_code=400, headers=CORS_HEADERS
         )
-    mode = str(body.get("mode", "board")).strip() or "board"
-    track = body.get("track")
-    track_str = str(track).strip() if track is not None else None
+    mode = str(body.get("mode", DEFAULT_MODE)).strip() or DEFAULT_MODE
     conversation_id = body.get("conversation_id")
     conversation_id_str = str(conversation_id).strip() if conversation_id else None
 
+    if not llm_status()["llm_available"]:
+        return JSONResponse(
+            {
+                "error": "llm_unavailable",
+                "detail": "LLM_API_KEY 未配置，无法创建 run。",
+            },
+            status_code=503,
+            headers=CORS_HEADERS,
+        )
+
     session = create_run_session(_registry, question=question, mode=mode)
-    schedule_run(_registry, session, track=track_str)
+    schedule_run(_registry, session)
 
     if conversation_id_str:
-        track_label = track_str or "auto"
         _conversations.add_turn(
             conversation_id_str,
             run_id=session.run_id,
             trace_id=session.trace_id,
             question=question,
             mode=mode,
-            track=track_label,
             status=RunStatus.PENDING.value,
         )
 
@@ -121,8 +134,7 @@ async def stream_events(request: Request) -> StreamingResponse:
 
 
 async def health(_request: Request) -> JSONResponse:
-    status = llm_status()
-    return JSONResponse({"status": "ok", **status}, headers=CORS_HEADERS)
+    return JSONResponse({"status": "ok", **llm_status()}, headers=CORS_HEADERS)
 
 
 async def create_conversation(request: Request) -> JSONResponse:
@@ -162,8 +174,7 @@ async def add_conversation_turn(request: Request) -> JSONResponse:
         run_id=str(body.get("run_id", "")),
         trace_id=str(body.get("trace_id", "")),
         question=str(body.get("question", "")),
-        mode=str(body.get("mode", "board")),
-        track=str(body.get("track", "auto")),
+        mode=str(body.get("mode", DEFAULT_MODE)),
         status=str(body.get("status", RunStatus.PENDING.value)),
     )
     if turn is None:
@@ -176,13 +187,18 @@ async def add_conversation_turn(request: Request) -> JSONResponse:
 def create_app(
     registry: RunRegistry | None = None,
     conversation_store: ConversationStore | None = None,
+    llm_resolver: LLMResolver | None = None,
 ) -> Starlette:
-    """工厂：测试可注入独立 RunRegistry / ConversationStore。"""
+    """工厂：测试可注入独立 RunRegistry / ConversationStore / LLMResolver。"""
     global _registry, _conversations
     if registry is not None:
         _registry = registry
     if conversation_store is not None:
         _conversations = conversation_store
+    if llm_resolver is not None:
+        set_llm_resolver(llm_resolver)
+    else:
+        set_llm_resolver(ProductionLLMResolver())
     return Starlette(
         routes=[
             Route("/health", health, methods=["GET"]),

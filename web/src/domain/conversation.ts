@@ -1,7 +1,5 @@
 /** 对话领域模型 —— 与 gateway 解耦的纯类型。 */
 
-export type TrackChoice = "auto" | "real" | "scripted";
-
 export type TurnStatus = "pending" | "running" | "completed" | "failed" | "canceled";
 
 export interface Turn {
@@ -9,7 +7,6 @@ export interface Turn {
   readonly traceId: string;
   readonly question: string;
   readonly mode: string;
-  readonly track: TrackChoice;
   readonly status: TurnStatus;
   readonly answer: string;
   readonly createdAt: number;
@@ -42,14 +39,12 @@ export function createTurn(
   traceId: string,
   question: string,
   mode: string,
-  track: TrackChoice,
 ): Turn {
   return {
     runId,
     traceId,
     question,
     mode,
-    track,
     status: "pending",
     answer: "",
     createdAt: Date.now(),

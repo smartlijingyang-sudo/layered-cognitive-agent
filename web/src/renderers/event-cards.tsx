@@ -2,6 +2,8 @@ import type { ReactElement } from "react";
 import type { RunScope } from "../contracts";
 import type { JournalEvent } from "../contracts";
 import { domainColor } from "./domain-colors";
+import { cn } from "../lib/cn";
+import { mutedText } from "../lib/ui";
 
 export interface EventRendererProps<E extends JournalEvent = JournalEvent> {
   readonly event: E;
@@ -22,9 +24,14 @@ function Card({
 }) {
   const border = domainColor(domain as Parameters<typeof domainColor>[0]);
   return (
-    <div className="event-card" style={{ borderLeftColor: border }}>
-      <div className="event-card-title">{title}</div>
-      <div className="event-card-body">{body}</div>
+    <div
+      className={cn(
+        "rounded-[var(--radius-sm)] border-l-[3px] bg-[color-mix(in_srgb,var(--bg)_65%,transparent)] px-3 py-2",
+      )}
+      style={{ borderLeftColor: border }}
+    >
+      <div className="text-sm font-semibold">{title}</div>
+      <div className={cn("mt-0.5 text-sm whitespace-pre-wrap", mutedText)}>{body}</div>
     </div>
   );
 }

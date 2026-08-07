@@ -45,3 +45,30 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 960px;
+  --breakpoint-lg: 1280px;
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-run: var(--color-run);
+  --color-team: var(--color-team);
+  --color-cognitive: var(--color-cognitive);
+  --color-resource: var(--color-resource);
+  --color-event: var(--color-event);
+  --color-danger: var(--color-danger);
+}

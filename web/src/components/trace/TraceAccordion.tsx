@@ -8,6 +8,8 @@ import { renderSequenceDiagram } from "../../domain/sequence-diagram";
 import { InsightSummary } from "./InsightSummary";
 import { JournalRail } from "./JournalRail";
 import { TracePanel } from "../../renderers/trace-panel";
+import { cn } from "../../lib/cn";
+import { focusRing, mutedText } from "../../lib/ui";
 
 function traceSummary(trace: TraceState): string {
   const parts = [
@@ -52,27 +54,55 @@ export function TraceAccordion({
   if (events.length === 0) return null;
 
   return (
-    <div className={`trace-accordion ${open ? "open" : ""}`}>
-      <button type="button" className="trace-accordion-toggle" onClick={() => setOpen((v) => !v)}>
+    <div className="mt-3 border-t border-border pt-2">
+      <button
+        type="button"
+        className={cn(
+          "w-full cursor-pointer border-0 bg-transparent py-1 text-left text-sm",
+          mutedText,
+          focusRing,
+        )}
+        onClick={() => setOpen((v) => !v)}
+      >
         {open ? "收起轨迹" : traceSummary(trace)}
       </button>
       {open ? (
-        <div className="trace-accordion-body">
+        <div className="animate-fade-in grid gap-3">
           <InsightSummary insights={trace.insights} />
           <Tabs.Root defaultValue="timeline">
-            <Tabs.List className="trace-tabs">
-              <Tabs.Trigger value="timeline">事件流</Tabs.Trigger>
-              {diagram ? <Tabs.Trigger value="sequence">协作时序图</Tabs.Trigger> : null}
+            <Tabs.List className="mb-2 flex gap-2">
+              <Tabs.Trigger
+                value="timeline"
+                className={cn(
+                  "cursor-pointer rounded-full border border-border px-2.5 py-1 text-sm text-text-muted",
+                  "data-[state=active]:border-accent data-[state=active]:text-text",
+                  focusRing,
+                )}
+              >
+                事件流
+              </Tabs.Trigger>
+              {diagram ? (
+                <Tabs.Trigger
+                  value="sequence"
+                  className={cn(
+                    "cursor-pointer rounded-full border border-border px-2.5 py-1 text-sm text-text-muted",
+                    "data-[state=active]:border-accent data-[state=active]:text-text",
+                    focusRing,
+                  )}
+                >
+                  协作时序图
+                </Tabs.Trigger>
+              ) : null}
             </Tabs.List>
-            <Tabs.Content value="timeline" className="trace-tab-panel">
-              <div className="trace-with-rail">
+            <Tabs.Content value="timeline" className="outline-none">
+              <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-3">
                 <JournalRail events={visible} onSelect={() => undefined} />
                 <TracePanel events={events} trace={trace} verbosity={verbosity} />
               </div>
             </Tabs.Content>
             {diagram ? (
-              <Tabs.Content value="sequence" className="trace-tab-panel">
-                <div ref={diagramRef} className="mermaid-panel" />
+              <Tabs.Content value="sequence" className="outline-none">
+                <div ref={diagramRef} className="overflow-x-auto" />
               </Tabs.Content>
             ) : null}
           </Tabs.Root>

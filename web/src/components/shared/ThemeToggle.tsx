@@ -1,5 +1,6 @@
 import { Moon, Sun } from "lucide-react";
 import type { ThemeMode } from "../../store/app-store";
+import { iconButton } from "../../lib/ui";
 
 export function ThemeToggle({
   theme,
@@ -12,7 +13,7 @@ export function ThemeToggle({
   return (
     <button
       type="button"
-      className="icon-button"
+      className={iconButton}
       aria-label={`切换到${next === "dark" ? "深色" : "浅色"}主题`}
       onClick={() => onChange(next)}
     >

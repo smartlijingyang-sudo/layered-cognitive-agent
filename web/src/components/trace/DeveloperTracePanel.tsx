@@ -2,6 +2,8 @@ import type { StampedEvent } from "../../contracts";
 import type { TraceState, Verbosity } from "../../projectors";
 import { InsightSummary } from "./InsightSummary";
 import { TracePanel } from "../../renderers/trace-panel";
+import { btnSecondary, panelSurface } from "../../lib/ui";
+import { cn } from "../../lib/cn";
 
 export function DeveloperTracePanel({
   events,
@@ -24,10 +26,10 @@ export function DeveloperTracePanel({
   };
 
   return (
-    <aside className="developer-trace">
-      <header className="developer-trace-header">
-        <h2>开发者轨迹</h2>
-        <button type="button" className="btn-secondary" onClick={downloadJsonl}>
+    <aside className={cn(panelSurface, "flex flex-col gap-3 overflow-auto p-3.5")}>
+      <header className="flex items-center justify-between gap-2">
+        <h2 className="m-0 text-sm font-semibold">开发者轨迹</h2>
+        <button type="button" className={btnSecondary} onClick={downloadJsonl}>
           下载 journal
         </button>
       </header>

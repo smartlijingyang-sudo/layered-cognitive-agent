@@ -4,21 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from gateway import mode_catalog
 from tests.harness.scripted_llm import ScriptedLLMAdapter, multi_delegate, respond
 
-# Order shown in CLI menus and docs
-ALL_MODES: tuple[str, ...] = (
-    "routing",
-    "consult",
-    "board",
-    "pipeline",
-    "fan_out",
-    "peer_relay",
-    "peer_swarm",
-    "debate",
-    "graph",
-    "solo",
-)
+ALL_MODES = mode_catalog.ALL_MODES
+MODE_HELP = mode_catalog.MODE_HELP
+MODE_HAS_LEAD = mode_catalog.MODE_HAS_LEAD
 
 
 @dataclass(frozen=True)
@@ -33,32 +24,7 @@ class ModeScenario:
     default_objective: str
 
 
-# Short blurbs for interactive pickers (zh)
-MODE_HELP: dict[str, str] = {
-    "routing": "有主导 · Lead 显式委派成员后收口",
-    "consult": "有主导 · Lead 咨询成员后自己决定",
-    "board": "有主导 · 全员咨询后 Lead 收口",
-    "pipeline": "无主导 · 成员顺序接力",
-    "fan_out": "无主导 · 并行执行再合成",
-    "peer_relay": "无主导 · 点对点接力",
-    "peer_swarm": "无主导 · 对等多轮 swarm",
-    "debate": "无主导 · 多轮辩论",
-    "graph": "无主导 · 执行图 ENTRY→agents→EXIT",
-    "solo": "单 Agent（无 Team）",
-}
-
-MODE_HAS_LEAD: dict[str, bool] = {
-    "routing": True,
-    "consult": True,
-    "board": True,
-    "pipeline": False,
-    "fan_out": False,
-    "peer_relay": False,
-    "peer_swarm": False,
-    "debate": False,
-    "graph": False,
-    "solo": False,
-}
+# Short blurbs for interactive pickers (zh) — 与 gateway.mode_catalog 同步
 
 _SCENARIOS: dict[str, ModeScenario] = {
     "routing": ModeScenario(

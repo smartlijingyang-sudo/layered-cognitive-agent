@@ -1,9 +1,48 @@
-import { MODE_DEFAULT_OBJECTIVE } from "../../contracts/catalog.generated";
+import { EXAMPLE_PROMPTS } from "../../contracts/catalog.generated";
 import type { Conversation } from "../../domain/conversation";
 import { AssistantBubble } from "./AssistantBubble";
 import { UserBubble } from "./UserBubble";
 import type { StampedEvent } from "../../contracts";
 import type { TraceState, Verbosity } from "../../projectors";
+import { cn } from "../../lib/cn";
+import { focusRing, mutedText } from "../../lib/ui";
+
+const WELCOME_MODES = ["board", "pipeline", "solo"] as const;
+
+function WelcomePanel({
+  title,
+  subtitle,
+  prompts,
+  onExampleSelect,
+}: {
+  readonly title: string;
+  readonly subtitle: string;
+  readonly prompts: readonly { readonly key: string; readonly text: string }[];
+  readonly onExampleSelect?: (prompt: string, exampleMode: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <h2 className="m-0 text-xl font-semibold">{title}</h2>
+      <p className={cn("m-0", mutedText)}>{subtitle}</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {prompts.map(({ key, text }) => (
+          <button
+            key={`${key}-${text}`}
+            type="button"
+            className={cn(
+              "cursor-pointer rounded-[var(--radius-md)] border border-dashed border-border bg-surface p-3 text-left text-text-muted transition-colors hover:border-accent/50 hover:text-text",
+              focusRing,
+            )}
+            onClick={() => onExampleSelect?.(text, key)}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+      <p className={cn("m-0 text-sm", mutedText)}>历史仅保存在本机浏览器，不会跨设备同步。</p>
+    </div>
+  );
+}
 
 export function ThreadView({
   conversation,
@@ -12,6 +51,7 @@ export function ThreadView({
   verbosity,
   developerMode,
   mode,
+  onExampleSelect,
 }: {
   readonly conversation: Conversation | null;
   readonly liveEvents: readonly StampedEvent[];
@@ -19,47 +59,44 @@ export function ThreadView({
   readonly verbosity: Verbosity;
   readonly developerMode: boolean;
   readonly mode: string;
+  readonly onExampleSelect?: (prompt: string, exampleMode: string) => void;
 }) {
   if (!conversation) {
+    const prompts = (EXAMPLE_PROMPTS[mode as keyof typeof EXAMPLE_PROMPTS] ?? []).map((text) => ({
+      key: mode,
+      text,
+    }));
     return (
-      <div className="welcome">
-        <h2>LCA 团队协作对话</h2>
-        <p className="muted">从左侧新建对话，或在下方直接发送第一条消息。</p>
-        <div className="prompt-grid">
-          <button type="button" className="prompt-chip" data-mode={mode}>
-            {MODE_DEFAULT_OBJECTIVE[mode as keyof typeof MODE_DEFAULT_OBJECTIVE]?.slice(0, 80) ??
-              "开始一个新任务"}
-          </button>
-        </div>
-        <p className="storage-note">历史仅保存在本机浏览器，不会跨设备同步。</p>
-      </div>
+      <WelcomePanel
+        title="LCA 团队协作对话"
+        subtitle="从左侧新建对话，或在下方直接发送第一条消息。"
+        prompts={prompts}
+        onExampleSelect={onExampleSelect}
+      />
     );
   }
 
   if (conversation.turns.length === 0) {
+    const prompts = WELCOME_MODES.flatMap((key) =>
+      EXAMPLE_PROMPTS[key].map((text) => ({ key, text })),
+    );
     return (
-      <div className="welcome">
-        <h2>{conversation.title}</h2>
-        <p className="muted">试试示例任务：</p>
-        <div className="prompt-grid">
-          {(["board", "pipeline", "solo"] as const).map((key) => (
-            <button key={key} type="button" className="prompt-chip" data-mode={key}>
-              {MODE_DEFAULT_OBJECTIVE[key].slice(0, 96)}…
-            </button>
-          ))}
-        </div>
-        <p className="storage-note">历史仅保存在本机浏览器，不会跨设备同步。</p>
-      </div>
+      <WelcomePanel
+        title={conversation.title}
+        subtitle="试试示例任务："
+        prompts={prompts}
+        onExampleSelect={onExampleSelect}
+      />
     );
   }
 
   return (
-    <div className="thread">
+    <div className="flex flex-col gap-4">
       {conversation.turns.map((turn, index) => {
         const isLast = index === conversation.turns.length - 1;
         const events = isLast ? liveEvents : [];
         return (
-          <div key={turn.runId} className="turn-block">
+          <div key={turn.runId} className="flex flex-col gap-3">
             <UserBubble turn={turn} />
             <AssistantBubble
               turn={turn}

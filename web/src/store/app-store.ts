@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { StampedEvent } from "../contracts";
-import type { Conversation, TrackChoice, Turn, TurnStatus } from "../domain/conversation";
+import type { Conversation, Turn, TurnStatus } from "../domain/conversation";
 import {
   createConversation,
   conversationTitle,
@@ -21,7 +21,6 @@ interface AppSettings {
   readonly verbosity: Verbosity;
   readonly developerMode: boolean;
   readonly mode: string;
-  readonly track: TrackChoice;
 }
 
 interface AppState {
@@ -38,7 +37,6 @@ interface AppState {
   setVerbosity: (verbosity: Verbosity) => void;
   setDeveloperMode: (enabled: boolean) => void;
   setMode: (mode: string) => void;
-  setTrack: (track: TrackChoice) => void;
   setSidebarOpen: (open: boolean) => void;
   setError: (error: string | null) => void;
   newConversation: () => Promise<string>;
@@ -67,7 +65,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     verbosity: "standard",
     developerMode: false,
     mode: "board",
-    track: "auto",
   },
   hydrated: false,
   sidebarOpen: true,
@@ -92,7 +89,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setDeveloperMode: (developerMode) =>
     set((s) => ({ settings: { ...s.settings, developerMode } })),
   setMode: (mode) => set((s) => ({ settings: { ...s.settings, mode } })),
-  setTrack: (track) => set((s) => ({ settings: { ...s.settings, track } })),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setError: (error) => set({ error }),
 

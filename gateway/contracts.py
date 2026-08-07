@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class CreateRunRequest:
     question: str
     mode: str = "board"
-    track: str | None = None
+    conversation_id: str | None = None
 
 
 @dataclass(frozen=True)

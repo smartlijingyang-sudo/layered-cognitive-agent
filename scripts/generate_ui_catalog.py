@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""从 modes.py + gateway 契约生成 web/src/contracts/catalog.generated.ts。"""
+"""从 gateway 模式目录 + HTTP 契约生成 web/src/contracts/catalog.generated.ts。"""
 
 from __future__ import annotations
 
@@ -11,14 +11,14 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from gateway.contracts import CreateRunRequest, CreateRunResponse  # noqa: E402
-from gateway.run_registry import RunStatus  # noqa: E402
-from scripts._ts_codegen import dataclass_interface  # noqa: E402
-from tests.harness.modes import (  # noqa: E402
-    _SCENARIOS,
+from gateway.mode_catalog import (  # noqa: E402
     ALL_MODES,
+    EXAMPLE_PROMPTS,
     MODE_HAS_LEAD,
     MODE_HELP,
 )
+from gateway.run_registry import RunStatus  # noqa: E402
+from scripts._ts_codegen import dataclass_interface  # noqa: E402
 
 _OUT = _ROOT / "web" / "src" / "contracts" / "catalog.generated.ts"
 
@@ -36,10 +36,24 @@ def _literal_record(name: str, mapping: dict[str, str | bool]) -> str:
     return "\n".join(lines)
 
 
+def _example_prompts_record() -> str:
+    lines = ["export const EXAMPLE_PROMPTS = {"]
+    for key in ALL_MODES:
+        prompts = EXAMPLE_PROMPTS[key]
+        items = ", ".join(
+            f'"{prompt.replace(chr(92), chr(92) + chr(92)).replace(chr(34), chr(92) + chr(34))}"'
+            for prompt in prompts
+        )
+        lines.append(f"  {key}: [{items}],")
+    lines.append("} as const;")
+    return "\n".join(lines)
+
+
 def _run_status_type() -> str:
     members = [m.value for m in RunStatus]
     members.append("canceled")
-    return " | ".join(f'"{m}"' for m in members)
+    unique = dict.fromkeys(members)
+    return " | ".join(f'"{m}"' for m in unique)
 
 
 def generate() -> str:
@@ -53,10 +67,7 @@ def generate() -> str:
         "",
         _literal_record("MODE_HAS_LEAD", {k: MODE_HAS_LEAD[k] for k in ALL_MODES}),
         "",
-        _literal_record(
-            "MODE_DEFAULT_OBJECTIVE",
-            {k: _SCENARIOS[k].default_objective for k in ALL_MODES},
-        ),
+        _example_prompts_record(),
         "",
         f"export type RunStatus = {_run_status_type()};",
         "",
