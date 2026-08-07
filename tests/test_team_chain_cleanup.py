@@ -147,11 +147,19 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
         class _LLM:
             name = "mock"
 
-            async def complete(self, prompt: str, **kwargs: object) -> str:
+            async def complete(self, prompt: str, **kwargs: object) -> LLMResponse:
                 return LLMResponse(
                     text='{"action_type":"respond","response_text":"node-out",'
                     '"rationale":"r","confidence":1.0}'
                 )
+
+            async def stream(self, prompt: str, **kwargs: object):
+                from lca.contracts.atoms.enums import LLMStreamEventType
+                from lca.contracts.models.core.llm import LLMStreamEvent
+
+                response = await self.complete(prompt, **kwargs)
+                yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+                yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
 
         llm = _LLM()
         a = Agent(role="writer", goal="g", backstory="b", tools=[], llm=llm)  # type: ignore[arg-type]

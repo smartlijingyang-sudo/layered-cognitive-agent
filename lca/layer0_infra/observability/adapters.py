@@ -24,7 +24,7 @@ from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.observability.journal import LlmCallCompleted
+from lca.contracts.models.observability.journal import LlmCallCompleted, StepTextDelta
 from lca.contracts.protocols import LLMAdapter, MemorySystem
 from lca.layer0_infra.observability.facade import record, span
 
@@ -49,6 +49,15 @@ def _usage_of(response: LLMResponse) -> tuple[int, int]:
     if usage is None:
         return 0, 0
     return usage.prompt_tokens or 0, usage.completion_tokens or 0
+
+
+def _stream_observability_kwargs(kwargs: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """Extract journal ``step`` before forwarding kwargs to provider adapters."""
+    step = kwargs.get("step", 0)
+    if not isinstance(step, int):
+        step = 0
+    inner_kwargs = {k: v for k, v in kwargs.items() if k != "step"}
+    return step, inner_kwargs
 
 
 class TelemetryLLMAdapter(LLMAdapter):
@@ -91,31 +100,45 @@ class TelemetryLLMAdapter(LLMAdapter):
         started = time.perf_counter()
         accumulated_text = ""
         final_response: LLMResponse | None = None
+        step, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
+        delta_seq = 0
+        recorded = False
         try:
-            async for event in self._inner.stream(prompt, **kwargs):
+            async for event in self._inner.stream(prompt, **inner_kwargs):
                 if event.type == LLMStreamEventType.COMPLETED:
                     final_response = event.response
+                    if final_response is not None:
+                        prompt_tokens, completion_tokens = _usage_of(final_response)
+                        self._record(
+                            model,
+                            prompt,
+                            final_response.text,
+                            True,
+                            started,
+                            prompt_tokens,
+                            completion_tokens,
+                            stream=True,
+                        )
+                        recorded = True
                 elif event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
-                    accumulated_text += event.text
+                    delta_text = event.text or ""
+                    accumulated_text += delta_text
+                    record(
+                        StepTextDelta(
+                            step=step,
+                            text_delta=delta_text,
+                            seq=delta_seq,
+                        )
+                    )
+                    delta_seq += 1
                 yield event
         except Exception:
-            preview = final_response.text if final_response is not None else accumulated_text
-            self._record(model, prompt, preview, False, started, 0, 0, stream=True)
+            if not recorded:
+                preview = final_response.text if final_response is not None else accumulated_text
+                self._record(model, prompt, preview, False, started, 0, 0, stream=True)
             raise
 
-        if final_response is not None:
-            prompt_tokens, completion_tokens = _usage_of(final_response)
-            self._record(
-                model,
-                prompt,
-                final_response.text,
-                True,
-                started,
-                prompt_tokens,
-                completion_tokens,
-                stream=True,
-            )
-        else:
+        if not recorded:
             _log.warning(
                 "inner_adapter_stream_missing_completed",
                 adapter=type(self._inner).__name__,

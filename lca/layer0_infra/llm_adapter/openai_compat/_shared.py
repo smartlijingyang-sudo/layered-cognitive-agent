@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import json
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from lca.contracts.models.core.llm import LLMResponse, TokenUsage
 
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 2048
+
+# Observability-only kwargs forwarded by TelemetryLLMAdapter — must not reach provider APIs.
+_OBSERVABILITY_KWARG_KEYS = frozenset({"step"})
+
+
+def strip_observability_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in kwargs.items() if k not in _OBSERVABILITY_KWARG_KEYS}
 
 
 class _RawToolCall(NamedTuple):

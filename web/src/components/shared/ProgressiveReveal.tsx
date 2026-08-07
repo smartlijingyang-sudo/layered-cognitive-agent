@@ -1,34 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
-import { splitSentences } from "../../projectors/chat-projector";
+import { revealChunks } from "../../projectors/chat-projector";
 
 export function ProgressiveReveal({
   text,
+  deltas,
   active,
 }: {
   readonly text: string;
+  readonly deltas?: readonly string[];
   readonly active: boolean;
 }) {
-  const sentences = useMemo(() => splitSentences(text), [text]);
-  const [visibleCount, setVisibleCount] = useState(active ? 0 : sentences.length);
+  const chunks = useMemo(() => revealChunks(text, deltas ?? []), [text, deltas]);
+  const [visibleCount, setVisibleCount] = useState(active ? 0 : chunks.length);
 
   useEffect(() => {
     if (!active) {
-      setVisibleCount(sentences.length);
+      setVisibleCount(chunks.length);
       return;
     }
     setVisibleCount(0);
-    if (sentences.length === 0) return;
+    if (chunks.length === 0) return;
     let index = 0;
     const timer = window.setInterval(() => {
       index += 1;
       setVisibleCount(index);
-      if (index >= sentences.length) {
+      if (index >= chunks.length) {
         window.clearInterval(timer);
       }
     }, 420);
     return () => window.clearInterval(timer);
-  }, [active, sentences]);
+  }, [active, chunks]);
 
-  const visible = sentences.slice(0, visibleCount).join(" ");
+  const visible = chunks.slice(0, visibleCount).join("");
   return <span>{visible || text}</span>;
 }

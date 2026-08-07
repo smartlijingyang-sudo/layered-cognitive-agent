@@ -108,17 +108,30 @@ class TestAgentStateAwareness:
         assert not hasattr(state, "teammates")
 
 
+class _CapturingStreamLLM:
+    """Minimal LLM fake: records prompts via stream() (n=1 production path)."""
+
+    def __init__(self, text: str = "ok") -> None:
+        self.text = text
+        self.prompts: list[str] = []
+
+    async def stream(self, prompt: str, **kwargs: object):
+        from lca.contracts.atoms.enums import LLMStreamEventType
+        from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+
+        self.prompts.append(prompt)
+        response = LLMResponse(text=self.text)
+        yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
+
+
 class TestPromptReasonerSolo:
     """Without awareness the reasoner renders the plain role prompt."""
 
     async def test_solo_prompt_only(self) -> None:
-        from unittest.mock import AsyncMock, MagicMock
-
-        from lca.contracts.models.core.llm import LLMResponse
         from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
-        llm = MagicMock()
-        llm.complete = AsyncMock(return_value=LLMResponse(text="ok"))
+        llm = _CapturingStreamLLM()
         reasoner = PromptReasoner(
             llm=llm,
             role_profile=_make_profile("solo", "work"),
@@ -127,21 +140,17 @@ class TestPromptReasonerSolo:
         )
         state = AgentState(trace_id="t1", task="test", budget=Budget())
         await reasoner.generate_thoughts(state, n=1)
-        assert llm.complete.called
-        assert "just test" in llm.complete.call_args[0][0]
+        assert len(llm.prompts) == 1
+        assert "just test" in llm.prompts[0]
 
 
 class TestPromptReasonerAwareness:
     """With awareness the reasoner merges awareness vars and its default template."""
 
     async def test_teammates_injected_from_awareness(self) -> None:
-        from unittest.mock import AsyncMock, MagicMock
-
-        from lca.contracts.models.core.llm import LLMResponse
         from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
-        llm = MagicMock()
-        llm.complete = AsyncMock(return_value=LLMResponse(text="ok"))
+        llm = _CapturingStreamLLM()
         reasoner = PromptReasoner(
             llm=llm,
             role_profile=_make_profile("lead", "manage"),
@@ -155,18 +164,14 @@ class TestPromptReasonerAwareness:
             team_awareness=_awareness([_make_profile("coder", "write code")]),
         )
         await reasoner.generate_thoughts(state, n=1)
-        prompt = llm.complete.call_args[0][0]
+        prompt = llm.prompts[0]
         assert "coder" in prompt
         assert "write code" in prompt
 
     async def test_active_template_override(self) -> None:
-        from unittest.mock import AsyncMock, MagicMock
-
-        from lca.contracts.models.core.llm import LLMResponse
         from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
-        llm = MagicMock()
-        llm.complete = AsyncMock(return_value=LLMResponse(text="ok"))
+        llm = _CapturingStreamLLM()
         reasoner = PromptReasoner(
             llm=llm,
             role_profile=_make_profile("lead", "manage"),
@@ -184,4 +189,4 @@ class TestPromptReasonerAwareness:
             active_template="custom",
         )
         await reasoner.generate_thoughts(state, n=1)
-        assert llm.complete.call_args[0][0] == "CUSTOM test"
+        assert llm.prompts[0] == "CUSTOM test"

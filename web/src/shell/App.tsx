@@ -98,6 +98,7 @@ export default function App() {
           void store.updateActiveTurn({
             status: mapRunStatus(nextChat.status === "idle" ? "running" : nextChat.status),
             answer: nextChat.answer,
+            answerDeltas: nextChat.answerDeltas,
           });
         });
 
@@ -106,6 +107,7 @@ export default function App() {
         await store.updateActiveTurn({
           status: mapRunStatus(chatProjector.snapshot().status),
           answer: chatProjector.snapshot().answer,
+          answerDeltas: chatProjector.snapshot().answerDeltas,
         });
       } catch (error) {
         store.setError(error instanceof Error ? error.message : String(error));

@@ -9,7 +9,7 @@ from unittest import mock
 
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
-from lca.contracts.models.observability.journal import LlmCallCompleted
+from lca.contracts.models.observability.journal import LlmCallCompleted, StepTextDelta
 from lca.contracts.protocols import LLMAdapter
 from lca.layer0_infra.observability.adapters import TelemetryLLMAdapter
 
@@ -44,7 +44,7 @@ class _FakeInner(LLMAdapter):
 
 class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.recorded: list[LlmCallCompleted] = []
+        self.recorded: list[LlmCallCompleted | StepTextDelta] = []
         self.record_patcher = mock.patch(
             "lca.layer0_infra.observability.adapters.record",
             side_effect=lambda event: self.recorded.append(event),
@@ -75,12 +75,27 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.recorded[0].ok)
         self.assertFalse(self.recorded[0].stream)
 
+    async def test_stream_records_step_text_deltas_before_yield(self) -> None:
+        adapter = TelemetryLLMAdapter(_FakeInner())
+        events = [e async for e in adapter.stream("prompt", step=2)]
+        self.assertEqual(len(events), 3)
+        deltas = [e for e in self.recorded if isinstance(e, StepTextDelta)]
+        self.assertEqual(len(deltas), 2)
+        self.assertEqual(deltas[0].step, 2)
+        self.assertEqual(deltas[0].seq, 0)
+        self.assertEqual(deltas[0].text_delta, "hel")
+        self.assertEqual(deltas[1].seq, 1)
+        self.assertEqual(deltas[1].text_delta, "lo")
+        completed = [e for e in self.recorded if isinstance(e, LlmCallCompleted)]
+        self.assertEqual(len(completed), 1)
+
     async def test_stream_uses_completed_tokens(self) -> None:
         adapter = TelemetryLLMAdapter(_FakeInner())
         events = [e async for e in adapter.stream("prompt")]
         self.assertEqual(len(events), 3)
-        self.assertEqual(len(self.recorded), 1)
-        event = self.recorded[0]
+        completed = [e for e in self.recorded if isinstance(e, LlmCallCompleted)]
+        self.assertEqual(len(completed), 1)
+        event = completed[0]
         self.assertTrue(event.ok)
         self.assertEqual(event.prompt_tokens, 20)
         self.assertEqual(event.completion_tokens, 8)
@@ -94,8 +109,9 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
             adapter = TelemetryLLMAdapter(inner)
             events = [e async for e in adapter.stream("prompt")]
         self.assertEqual(len(events), 2)
-        self.assertEqual(len(self.recorded), 1)
-        event = self.recorded[0]
+        completed = [e for e in self.recorded if isinstance(e, LlmCallCompleted)]
+        self.assertEqual(len(completed), 1)
+        event = completed[0]
         self.assertTrue(event.ok)
         self.assertEqual(event.prompt_tokens, 0)
         self.assertEqual(event.completion_tokens, 0)

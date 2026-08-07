@@ -14,6 +14,7 @@ from lca.layer0_infra.llm_adapter.openai_compat._shared import (
     _RawToolCall,
     build_llm_response,
     pick_first_tool_call,
+    strip_observability_kwargs,
 )
 
 
@@ -109,6 +110,7 @@ class _ChatCompletionsStrategy:
 
     def _build_request_kwargs(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         tools = kwargs.pop("tools", None)
+        kwargs = strip_observability_kwargs(kwargs)
         api_kwargs: dict[str, Any] = {
             "model": kwargs.pop("model", self._model),
             "messages": [{"role": "user", "content": prompt}],

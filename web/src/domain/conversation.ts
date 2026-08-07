@@ -9,6 +9,7 @@ export interface Turn {
   readonly mode: string;
   readonly status: TurnStatus;
   readonly answer: string;
+  readonly answerDeltas?: readonly string[];
   readonly createdAt: number;
 }
 
@@ -47,6 +48,7 @@ export function createTurn(
     mode,
     status: "pending",
     answer: "",
+    answerDeltas: [],
     createdAt: Date.now(),
   };
 }

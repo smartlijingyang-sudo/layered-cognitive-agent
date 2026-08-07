@@ -7,7 +7,8 @@ import os
 import sys
 import unittest
 
-from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.atoms.enums import LLMStreamEventType
+from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -210,6 +211,14 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                     text='{"action_type": "respond", "response_text": "ok", "rationale": "", "confidence": 1.0}'
                 )
 
+            async def stream(self, prompt: str, **kwargs):
+                captured_prompt.append(prompt)
+                response = LLMResponse(
+                    text='{"action_type": "respond", "response_text": "ok", "rationale": "", "confidence": 1.0}'
+                )
+                yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+                yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
+
         reasoner = PromptReasoner(
             FakeLLM(),
             _make_profile(),
@@ -233,6 +242,14 @@ class TestReasonerTeamRoster(unittest.IsolatedAsyncioTestCase):
                 return LLMResponse(
                     text='{"action_type": "delegate", "target_role": "researcher", "subtask": "分析", "rationale": "test", "confidence": 0.8}'
                 )
+
+            async def stream(self, prompt: str, **kwargs):
+                captured_prompt.append(prompt)
+                response = LLMResponse(
+                    text='{"action_type": "delegate", "target_role": "researcher", "subtask": "分析", "rationale": "test", "confidence": 0.8}'
+                )
+                yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+                yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
 
         teammates = [
             RoleProfile(

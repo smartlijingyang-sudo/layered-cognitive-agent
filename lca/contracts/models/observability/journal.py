@@ -225,6 +225,15 @@ class ActionDegraded(JournalEvent):
 
 
 @dataclass(frozen=True)
+class StepTextDelta(JournalEvent):
+    """某认知步 LLM 生成的原始增量文本（中性，不预判终态归属）。"""
+
+    step: int = 0
+    text_delta: str = field(default="", metadata={"journal_kind": "content"})
+    seq: int = 0
+
+
+@dataclass(frozen=True)
 class LlmCallCompleted(JournalEvent):
     """LLM 调用完成（OTel 投影为 generation，gen_ai 语义约定）。"""
 

@@ -1,9 +1,99 @@
 import type { StampedEvent } from "../contracts/stamped";
 import { EMPTY_CHAT_STATE, type ChatState } from "./types";
 
-/** 对话主线：问题 + TeamRunFinished.output_text 打字机落地。 */
-export function reduceChat(state: ChatState, stamped: StampedEvent): ChatState {
+/** 面向用户的终态动作 — 其 StepTextDelta 可提交到对话主线（answer-delta 投影层）。 */
+export const USER_FACING_TERMINAL_ACTIONS = new Set(["respond", "stop", "ask_human"]);
+
+interface StepBuffer {
+  readonly deltas: Map<number, string>;
+}
+
+interface ChatProjectorInternal extends ChatState {
+  readonly pendingSteps: ReadonlyMap<string, StepBuffer>;
+}
+
+function stepBufferKey(runId: string, step: number): string {
+  return `${runId}:${step}`;
+}
+
+function orderedDeltaText(buffer: StepBuffer): readonly string[] {
+  return [...buffer.deltas.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([, text]) => text);
+}
+
+function appendBuffer(
+  pending: ReadonlyMap<string, StepBuffer>,
+  runId: string,
+  step: number,
+  seq: number,
+  textDelta: string,
+): ReadonlyMap<string, StepBuffer> {
+  const key = stepBufferKey(runId, step);
+  const prev = pending.get(key) ?? { deltas: new Map() };
+  const nextDeltas = new Map(prev.deltas);
+  nextDeltas.set(seq, textDelta);
+  const next = new Map(pending);
+  next.set(key, { deltas: nextDeltas });
+  return next;
+}
+
+function commitStepBuffer(
+  state: ChatProjectorInternal,
+  runId: string,
+  step: number,
+): ChatProjectorInternal {
+  const key = stepBufferKey(runId, step);
+  const buffer = state.pendingSteps.get(key);
+  if (!buffer) return state;
+  const deltaList = orderedDeltaText(buffer);
+  const text = deltaList.join("");
+  const nextPending = new Map(state.pendingSteps);
+  nextPending.delete(key);
+  return {
+    ...state,
+    pendingSteps: nextPending,
+    answerDeltas: [...state.answerDeltas, ...deltaList],
+    answer: state.answer ? `${state.answer}${text}` : text,
+  };
+}
+
+function discardStepBuffer(
+  state: ChatProjectorInternal,
+  runId: string,
+  step: number,
+): ChatProjectorInternal {
+  const key = stepBufferKey(runId, step);
+  if (!state.pendingSteps.has(key)) return state;
+  const nextPending = new Map(state.pendingSteps);
+  nextPending.delete(key);
+  return { ...state, pendingSteps: nextPending };
+}
+
+function commitAllRunBuffers(
+  state: ChatProjectorInternal,
+  runId: string,
+): ChatProjectorInternal {
+  let next = state;
+  for (const key of state.pendingSteps.keys()) {
+    if (key.startsWith(`${runId}:`)) {
+      const step = Number(key.slice(runId.length + 1));
+      next = commitStepBuffer(next, runId, step);
+    }
+  }
+  return next;
+}
+
+const EMPTY_INTERNAL: ChatProjectorInternal = {
+  ...EMPTY_CHAT_STATE,
+  pendingSteps: new Map(),
+};
+
+/** 对话主线：问题 + 已确认 answer-delta 流 + 终态 output_text。 */
+export function reduceChat(state: ChatProjectorInternal, stamped: StampedEvent): ChatProjectorInternal {
   const e = stamped.event;
+  const runId = stamped.scope.run_id;
+
   switch (e.type) {
     case "TeamRunStarted":
       return {
@@ -12,52 +102,85 @@ export function reduceChat(state: ChatState, stamped: StampedEvent): ChatState {
         teamId: e.team_id,
         question: e.objective_preview || state.question,
       };
-    case "TeamRunFinished":
+    case "TeamRunFinished": {
+      const committed = commitAllRunBuffers(state, runId);
       return {
-        ...state,
+        ...committed,
         status: e.status === "completed" ? "completed" : "failed",
-        answer: e.output_text || state.answer,
+        answer: e.output_text || committed.answer,
       };
+    }
     case "AgentRunStarted":
       if (!state.question && e.objective_preview) {
         return { ...state, question: e.objective_preview, status: "running" };
       }
       return { ...state, status: "running" };
-    case "AgentRunFinished":
-      if (!state.answer && e.output_text) {
+    case "AgentRunFinished": {
+      const committed = commitAllRunBuffers(state, runId);
+      if (e.output_text) {
         return {
-          ...state,
+          ...committed,
           answer: e.output_text,
           status: e.status === "completed" ? "completed" : "failed",
         };
       }
-      return state;
+      if (!committed.answer) {
+        return {
+          ...committed,
+          status: e.status === "completed" ? "completed" : "failed",
+        };
+      }
+      return committed;
+    }
+    case "SynthesisCompleted": {
+      const committed = commitAllRunBuffers(state, runId);
+      return {
+        ...committed,
+        answer: e.output_text || committed.answer,
+      };
+    }
+    case "StepTextDelta":
+      return {
+        ...state,
+        pendingSteps: appendBuffer(state.pendingSteps, runId, e.step, e.seq, e.text_delta),
+      };
+    case "DecisionMade":
+      if (USER_FACING_TERMINAL_ACTIONS.has(e.action_type)) {
+        return commitStepBuffer(state, runId, e.step);
+      }
+      return discardStepBuffer(state, runId, e.step);
     default:
       return state;
   }
 }
 
 export class ChatProjector {
-  private state: ChatState = EMPTY_CHAT_STATE;
+  private state: ChatProjectorInternal = EMPTY_INTERNAL;
 
   start(question: string): void {
-    this.state = { question, answer: "", status: "running" };
+    this.state = { ...EMPTY_INTERNAL, question, status: "running" };
   }
 
   onEvent(stamped: StampedEvent): ChatState {
     this.state = reduceChat(this.state, stamped);
-    return this.state;
+    return this.snapshot();
   }
 
   snapshot(): ChatState {
-    return this.state;
+    const { pendingSteps: _pending, ...publicState } = this.state;
+    return publicState;
   }
 }
 
-/** 逐句打字机（真 token 流接入前顶一顶）。 */
+/** 假流式 fallback：无真实 delta 时按句切分（ADR-0041 过渡态）。 */
 export function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[。！？.!?])\s*/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/** 优先消费真实 delta 序列，否则回退 splitSentences。 */
+export function revealChunks(text: string, deltas: readonly string[]): readonly string[] {
+  return deltas.length > 0 ? deltas : splitSentences(text);
 }

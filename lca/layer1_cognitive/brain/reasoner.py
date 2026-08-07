@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from lca.contracts.atoms.enums import MemoryRecordKind
+from lca.contracts.atoms.enums import LLMStreamEventType, MemoryRecordKind
 from lca.contracts.atoms.semantic_keys import META_ROLE, META_STEP
 from lca.contracts.atoms.telemetry import ATTR_PROMPT_TEMPLATE
 from lca.contracts.models.core.memory import MemoryRecord
@@ -132,6 +132,23 @@ def _with_subtasks(variables: dict[str, str], state: AgentState) -> dict[str, st
     return enriched
 
 
+async def _stream_single_text(
+    llm: LLMAdapter,
+    tools: list[Tool],
+    prompt: str,
+    *,
+    step: int,
+) -> str:
+    accumulated = ""
+    final_text = ""
+    async for event in llm.stream(prompt, tools=tools, step=step):
+        if event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
+            accumulated += event.text or ""
+        elif event.type == LLMStreamEventType.COMPLETED and event.response is not None:
+            final_text = event.response.text or accumulated
+    return final_text or accumulated
+
+
 async def _complete_candidates(
     llm: LLMAdapter,
     tools: list[Tool],
@@ -139,10 +156,15 @@ async def _complete_candidates(
     template_name: str,
     variables: dict[str, str],
     n: int,
+    *,
+    step: int,
 ) -> list[str]:
     prompt = templates[template_name].format(**variables)
     annotate(**{ATTR_PROMPT_TEMPLATE: template_name})
-    responses = [await llm.complete(prompt, tools=tools) for _ in range(max(1, n))]
+    count = max(1, n)
+    if count == 1:
+        return [await _stream_single_text(llm, tools, prompt, step=step)]
+    responses = [await llm.complete(prompt, tools=tools) for _ in range(count)]
     return [r.text for r in responses]
 
 
@@ -193,5 +215,5 @@ class PromptReasoner(Reasoner):
             template_name = state.active_template or default_template_for(awareness)
         variables = _with_subtasks(variables, state)
         return await _complete_candidates(
-            self.llm, self.tools, self._templates, template_name, variables, n
+            self.llm, self.tools, self._templates, template_name, variables, n, step=state.step
         )

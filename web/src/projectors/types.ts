@@ -4,6 +4,7 @@ import type {
   JournalEvent,
   LlmCallCompleted,
   RunInsight,
+  StepTextDelta,
   ToolInvoked,
 } from "../contracts";
 
@@ -30,6 +31,7 @@ export interface TraceState {
   readonly decisions: readonly DecisionMade[];
   readonly toolCalls: readonly ToolInvoked[];
   readonly llmCalls: readonly LlmCallCompleted[];
+  readonly stepTextDeltas: readonly StepTextDelta[];
   readonly insights: readonly RunInsight[];
   readonly synthesisText?: string;
   readonly status?: string;
@@ -41,12 +43,14 @@ export const EMPTY_TRACE_STATE: TraceState = {
   decisions: [],
   toolCalls: [],
   llmCalls: [],
+  stepTextDeltas: [],
   insights: [],
 };
 
 export interface ChatState {
   readonly question: string;
   readonly answer: string;
+  readonly answerDeltas: readonly string[];
   readonly status: "idle" | "running" | "completed" | "failed";
   readonly teamId?: string;
 }
@@ -54,6 +58,7 @@ export interface ChatState {
 export const EMPTY_CHAT_STATE: ChatState = {
   question: "",
   answer: "",
+  answerDeltas: [],
   status: "idle",
 };
 
@@ -67,5 +72,6 @@ export function shouldShowEvent(eventType: JournalEvent["type"], verbosity: Verb
       eventType === "RunInsight"
     );
   }
+  if (eventType === "StepTextDelta") return verbosity === "verbose";
   return eventType !== "StepCompleted" && eventType !== "ActionDegraded";
 }

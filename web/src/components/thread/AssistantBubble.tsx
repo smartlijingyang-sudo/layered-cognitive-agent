@@ -21,9 +21,10 @@ export function AssistantBubble({
   readonly developerMode: boolean;
 }) {
   const streaming = turn.status === "running" || turn.status === "pending";
+  const deltas = turn.answerDeltas ?? [];
   const body =
     turn.status === "running" && !developerMode ? (
-      <ProgressiveReveal text={turn.answer} active={streaming} />
+      <ProgressiveReveal text={turn.answer} deltas={deltas} active={streaming} />
     ) : (
       turn.answer
     );

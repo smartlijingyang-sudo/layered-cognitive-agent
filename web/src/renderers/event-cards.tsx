@@ -80,7 +80,18 @@ export function LlmCallCard({ event, domain }: EventRendererProps) {
     <Card
       domain={domain}
       title={`LLM · ${event.model}`}
-      body={`${event.latency_ms}ms${tokens}${event.ok ? "" : " · FAIL"}`}
+      body={`${event.latency_ms}ms${tokens}${event.ok ? "" : " · FAIL"}${event.stream ? " · stream" : ""}`}
+    />
+  );
+}
+
+export function StepTextDeltaCard({ event, domain }: EventRendererProps) {
+  if (event.type !== "StepTextDelta") return null;
+  return (
+    <Card
+      domain={domain}
+      title={`Δ step ${event.step} · seq ${event.seq}`}
+      body={event.text_delta || "(empty)"}
     />
   );
 }

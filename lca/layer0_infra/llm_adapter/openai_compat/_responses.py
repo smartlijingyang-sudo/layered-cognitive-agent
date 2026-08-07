@@ -13,6 +13,7 @@ from lca.layer0_infra.llm_adapter.openai_compat._shared import (
     DEFAULT_TEMPERATURE,
     _RawToolCall,
     build_llm_response,
+    strip_observability_kwargs,
 )
 
 _RESPONSE_OUTPUT_TEXT_DELTA = "response.output_text.delta"
@@ -67,6 +68,7 @@ class _ResponsesStrategy:
 
     def _build_request_kwargs(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         tools = kwargs.pop("tools", None)
+        kwargs = strip_observability_kwargs(kwargs)
         api_kwargs: dict[str, Any] = {
             "model": kwargs.pop("model", self._model),
             "input": prompt,

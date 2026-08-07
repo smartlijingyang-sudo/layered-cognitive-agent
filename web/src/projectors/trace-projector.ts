@@ -82,6 +82,8 @@ export function reduceTrace(state: TraceState, stamped: StampedEvent): TraceStat
       }
       return { ...state, runs: next, llmCalls: [...state.llmCalls, e] };
     }
+    case "StepTextDelta":
+      return { ...state, stepTextDeltas: [...state.stepTextDeltas, e] };
     case "RunInsight":
       return { ...state, insights: [...state.insights, e] };
     case "SynthesisCompleted":

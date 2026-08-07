@@ -19,6 +19,7 @@ from lca.contracts.models.observability.journal import (
     LlmCallCompleted,
     RunInsight,
     StepCompleted,
+    StepTextDelta,
     SynthesisCompleted,
     TeamRunFinished,
     TeamRunStarted,
@@ -44,6 +45,7 @@ JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
         StepCompleted,
         ActionDegraded,
         LlmCallCompleted,
+        StepTextDelta,
         ToolInvoked,
         ToolDenied,
         RunInsight,
@@ -119,6 +121,12 @@ JOURNAL_CATALOG: dict[str, VocabDef] = {
         "lca.layer0_infra.observability.adapters",
         required=("model",),
         desc="LLM 调用完成",
+    ),
+    "StepTextDelta": _journal(
+        VocabDomain.RESOURCE,
+        "lca.layer0_infra.observability.adapters",
+        required=("step", "seq"),
+        desc="认知步 LLM 增量文本（中性）",
     ),
     "ToolInvoked": _journal(
         VocabDomain.RESOURCE,

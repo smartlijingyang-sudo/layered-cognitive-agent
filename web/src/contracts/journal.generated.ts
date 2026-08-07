@@ -131,6 +131,13 @@ export interface LlmCallCompleted {
   readonly stream: boolean;
 }
 
+export interface StepTextDelta {
+  readonly type: "StepTextDelta";
+  readonly step: number;
+  readonly text_delta: string;
+  readonly seq: number;
+}
+
 export interface ToolInvoked {
   readonly type: "ToolInvoked";
   readonly tool_name: string;
@@ -155,9 +162,9 @@ export interface RunInsight {
   readonly detail: string;
 }
 
-export type JournalEvent = TeamRunStarted | TeamRunFinished | AgentRunStarted | AgentRunFinished | DelegationIssued | DelegationCompleted | DelegationCacheHit | SynthesisCompleted | DecisionMade | StepCompleted | ActionDegraded | LlmCallCompleted | ToolInvoked | ToolDenied | RunInsight;
+export type JournalEvent = TeamRunStarted | TeamRunFinished | AgentRunStarted | AgentRunFinished | DelegationIssued | DelegationCompleted | DelegationCacheHit | SynthesisCompleted | DecisionMade | StepCompleted | ActionDegraded | LlmCallCompleted | StepTextDelta | ToolInvoked | ToolDenied | RunInsight;
 export type JournalEventType = JournalEvent["type"];
-export const JOURNAL_EVENT_TYPES = ['TeamRunStarted', 'TeamRunFinished', 'AgentRunStarted', 'AgentRunFinished', 'DelegationIssued', 'DelegationCompleted', 'DelegationCacheHit', 'SynthesisCompleted', 'DecisionMade', 'StepCompleted', 'ActionDegraded', 'LlmCallCompleted', 'ToolInvoked', 'ToolDenied', 'RunInsight'] as const;
+export const JOURNAL_EVENT_TYPES = ['TeamRunStarted', 'TeamRunFinished', 'AgentRunStarted', 'AgentRunFinished', 'DelegationIssued', 'DelegationCompleted', 'DelegationCacheHit', 'SynthesisCompleted', 'DecisionMade', 'StepCompleted', 'ActionDegraded', 'LlmCallCompleted', 'StepTextDelta', 'ToolInvoked', 'ToolDenied', 'RunInsight'] as const;
 
 export const EVENT_DOMAINS: Record<JournalEventType, VocabDomain> = {
   ActionDegraded: "event",
@@ -170,6 +177,7 @@ export const EVENT_DOMAINS: Record<JournalEventType, VocabDomain> = {
   LlmCallCompleted: "resource",
   RunInsight: "event",
   StepCompleted: "event",
+  StepTextDelta: "resource",
   SynthesisCompleted: "team",
   TeamRunFinished: "run",
   TeamRunStarted: "run",

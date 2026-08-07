@@ -20,6 +20,7 @@
 | [0037](0037-journal-as-truth.md) | Journal-as-Truth —— 执行日志为唯一真相，span 树降级为投影 | Accepted |
 | [0038](0038-llm-stream-event-contract.md) | LLMAdapter 流式事件契约 | Accepted |
 | [0040](0040-gateway-mode-catalog-contracts.md) | 协作模式契约单一事实源 — gateway/mode_catalog → TS 生成 | Accepted |
+| [0041](0041-prompt-reasoner-stream-text-delta.md) | PromptReasoner 流式增量文本；answer-delta 归属前端投影 | Proposed |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件
