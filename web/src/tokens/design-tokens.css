@@ -1,0 +1,47 @@
+:root {
+  color-scheme: light dark;
+
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-run: #0d9488;
+  --color-team: #7c3aed;
+  --color-cognitive: #2563eb;
+  --color-resource: #d97706;
+  --color-event: #64748b;
+  --color-danger: #ef4444;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --motion-fast: 200ms;
+}
+
+[data-theme="dark"] {
+  --bg: #0b1220;
+  --surface: #111827;
+  --surface-elevated: #1e293b;
+  --border: #334155;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: var(--color-run);
+}
+
+[data-theme="light"] {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-elevated: #f1f5f9;
+  --border: #cbd5e1;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --accent: var(--color-run);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

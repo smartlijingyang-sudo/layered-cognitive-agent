@@ -153,7 +153,7 @@ def _board_run(projector: OtelProjector) -> None:
     emit(
         _BASE_TS + 45.8,
         team_scope,
-        TeamRunFinished(status="completed", steps=6, output_preview="续约挽留作战计划终版"),
+        TeamRunFinished(status="completed", steps=6, output_text="续约挽留作战计划终版"),
     )
 
 

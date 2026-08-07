@@ -33,7 +33,7 @@ def _run_solo(hub: ObservabilityHub) -> None:
     scope = RunScope(trace_id="t", run_id="r", agent_role="Solo")
     with bind(hub), run_scope(scope):
         record(AgentRunStarted(agent_role="Solo", objective="hi"))
-        record(AgentRunFinished(status="completed", steps=1, output_preview="done"))
+        record(AgentRunFinished(status="completed", steps=1, output_text="done"))
 
 
 class TestJsonlJournalProjector(unittest.TestCase):

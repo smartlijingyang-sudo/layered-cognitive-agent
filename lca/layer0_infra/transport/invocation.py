@@ -151,7 +151,7 @@ async def send_and_wait(
             delegation_id=delegation_id,
             ok=observation.success,
             status=(TaskStatus.COMPLETED.value if observation.success else TaskStatus.FAILED.value),
-            output_preview=_payload_preview(observation.payload),
+            output_text=_payload_preview(observation.payload),
             task_id=task_id,
         )
     )

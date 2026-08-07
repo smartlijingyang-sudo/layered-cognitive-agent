@@ -27,6 +27,7 @@ class RunStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELED = "canceled"
 
 
 @dataclass
@@ -41,6 +42,8 @@ class RunSession:
     mode: str
     status: RunStatus = RunStatus.PENDING
     error: str = ""
+    task: asyncio.Task[Any] | None = None
+    cancel_requested: bool = False
     frames: list[str] = field(default_factory=list)
     _subscribers: list[asyncio.Queue[str | None]] = field(default_factory=list)
     _closed: bool = False

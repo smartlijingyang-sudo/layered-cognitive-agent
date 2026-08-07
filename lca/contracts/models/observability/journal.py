@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 # ── 关联骨架 ─────────────────────────────────────────────
@@ -113,7 +113,8 @@ class TeamRunFinished(JournalEvent):
     """团队 run 容器关闭（触发 Run Card / 序列图 / InsightEngine）。"""
 
     status: str = ""
-    output_preview: str = ""
+    output_text: str = field(default="", metadata={"journal_kind": "content"})
+    output_truncated: bool = False
     steps: int = 0
     error: str = ""
 
@@ -134,7 +135,8 @@ class AgentRunFinished(JournalEvent):
     """agent run 容器关闭。"""
 
     status: str = ""
-    output_preview: str = ""
+    output_text: str = field(default="", metadata={"journal_kind": "content"})
+    output_truncated: bool = False
     steps: int = 0
     error: str = ""
 
@@ -161,7 +163,8 @@ class DelegationCompleted(JournalEvent):
     delegation_id: str = ""
     ok: bool = True
     status: str = ""
-    output_preview: str = ""
+    output_text: str = field(default="", metadata={"journal_kind": "content"})
+    output_truncated: bool = False
     task_id: str = ""
 
 
@@ -180,7 +183,8 @@ class SynthesisCompleted(JournalEvent):
 
     method: str = ""
     candidate_count: int = 0
-    output_preview: str = ""
+    output_text: str = field(default="", metadata={"journal_kind": "content"})
+    output_truncated: bool = False
 
 
 # ── 认知事实（决策 / 步 / 降级）─────────────────────────

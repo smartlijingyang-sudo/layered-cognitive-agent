@@ -31,7 +31,7 @@ export interface TraceState {
   readonly toolCalls: readonly ToolInvoked[];
   readonly llmCalls: readonly LlmCallCompleted[];
   readonly insights: readonly RunInsight[];
-  readonly synthesisPreview?: string;
+  readonly synthesisText?: string;
   readonly status?: string;
 }
 

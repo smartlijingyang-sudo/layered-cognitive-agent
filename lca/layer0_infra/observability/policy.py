@@ -33,6 +33,11 @@ _PREVIEW_LEN_VERBOSE = 100_000
 _GENERIC_STR_MAX = 2_000
 """非预览类字符串属性的统一截断上限（防超大属性撑爆 trace）。"""
 
+_CONTENT_STR_MAX = 50_000
+"""journal 内容字段（``journal_kind=content``）的安全上限，不受 verbosity 档位影响。"""
+
+_JOURNAL_KIND_CONTENT = "content"
+
 _SUFFIX = "..."
 
 
@@ -101,13 +106,23 @@ class AttributePolicy:
             return [safe_repr(v) for v in value]
         return safe_repr(value)
 
-    def _prepare_str(self, key: str, text: str) -> str | None:
+    def _prepare_str(self, key: str, text: str, *, journal_kind: str | None = None) -> str | None:
         text = text.replace("\r\n", "\n")
         if self._redact:
             text = sanitize(text)
+        if journal_kind == _JOURNAL_KIND_CONTENT:
+            return truncate(text, _CONTENT_STR_MAX)
         if key in _PREVIEW_KEYS:
             budget = self._preview_budget()
             if budget <= 0:
                 return None  # minimal 档不带预览
             return truncate(text, budget)
         return truncate(text, _GENERIC_STR_MAX)
+
+    def prepare_content(self, key: str, text: str) -> tuple[str | None, bool]:
+        """journal 内容字段：仅安全上限截断，不受 verbosity 影响。"""
+        text = text.replace("\r\n", "\n")
+        if self._redact:
+            text = sanitize(text)
+        truncated = len(text) > _CONTENT_STR_MAX
+        return truncate(text, _CONTENT_STR_MAX), truncated

@@ -67,7 +67,11 @@ async def execute_run(
         from tests.harness.runner import run_mode
 
         await run_mode(mode, llm, collector=session.hub, objective=question)
-        session.status = RunStatus.COMPLETED
+        session.status = RunStatus.CANCELED if session.cancel_requested else RunStatus.COMPLETED
+    except asyncio.CancelledError:
+        session.status = RunStatus.CANCELED
+        session.cancel_requested = True
+        raise
     except Exception as exc:
         session.status = RunStatus.FAILED
         session.error = f"{type(exc).__name__}: {exc}"
@@ -112,8 +116,8 @@ def schedule_run(
     *,
     track: str | None = None,
 ) -> asyncio.Task[Any]:
-    """fire-and-forget 后台执行。"""
-    return asyncio.create_task(
+    """fire-and-forget 后台执行；task 强引用存入 session 以支持取消与 GC 安全。"""
+    task = asyncio.create_task(
         execute_run(
             registry,
             run_id=session.run_id,
@@ -122,3 +126,5 @@ def schedule_run(
             track=track,
         )
     )
+    session.task = task
+    return task

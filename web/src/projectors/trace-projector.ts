@@ -85,7 +85,7 @@ export function reduceTrace(state: TraceState, stamped: StampedEvent): TraceStat
     case "RunInsight":
       return { ...state, insights: [...state.insights, e] };
     case "SynthesisCompleted":
-      return { ...state, synthesisPreview: e.output_preview };
+      return { ...state, synthesisText: e.output_text };
     default:
       return state;
   }

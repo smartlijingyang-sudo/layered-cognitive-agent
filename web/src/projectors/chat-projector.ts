@@ -1,7 +1,7 @@
 import type { StampedEvent } from "../contracts/stamped";
 import { EMPTY_CHAT_STATE, type ChatState } from "./types";
 
-/** 对话主线：问题 + TeamRunFinished.output_preview 打字机落地。 */
+/** 对话主线：问题 + TeamRunFinished.output_text 打字机落地。 */
 export function reduceChat(state: ChatState, stamped: StampedEvent): ChatState {
   const e = stamped.event;
   switch (e.type) {
@@ -16,7 +16,7 @@ export function reduceChat(state: ChatState, stamped: StampedEvent): ChatState {
       return {
         ...state,
         status: e.status === "completed" ? "completed" : "failed",
-        answer: e.output_preview || state.answer,
+        answer: e.output_text || state.answer,
       };
     case "AgentRunStarted":
       if (!state.question && e.objective_preview) {
@@ -24,10 +24,10 @@ export function reduceChat(state: ChatState, stamped: StampedEvent): ChatState {
       }
       return { ...state, status: "running" };
     case "AgentRunFinished":
-      if (!state.answer && e.output_preview) {
+      if (!state.answer && e.output_text) {
         return {
           ...state,
-          answer: e.output_preview,
+          answer: e.output_text,
           status: e.status === "completed" ? "completed" : "failed",
         };
       }

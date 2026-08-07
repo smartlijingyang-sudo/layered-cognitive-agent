@@ -121,8 +121,15 @@ class ExecutionJournal:
                 continue
             if not isinstance(value, str):
                 continue
-            prepared = self._policy.prepare({item.name: value})
-            updates[item.name] = prepared.get(item.name, "")
+            journal_kind = item.metadata.get("journal_kind")
+            if journal_kind == "content":
+                prepared, truncated = self._policy.prepare_content(item.name, value)
+                updates[item.name] = prepared if prepared is not None else ""
+                if truncated:
+                    updates["output_truncated"] = True
+            else:
+                prepared_map = self._policy.prepare({item.name: value})
+                updates[item.name] = prepared_map.get(item.name, "")
         return dataclasses.replace(event, **updates) if updates else event
 
     def flush(self) -> None:

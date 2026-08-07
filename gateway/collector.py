@@ -8,16 +8,20 @@ from lca.layer0_infra.observability import ObservabilityHub
 from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
 from lca.layer0_infra.observability.journal.sse_projector import EmitFn, SSEJournalProjector
 from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
+from lca.layer0_infra.observability.settings import ObservabilitySettings
 from tests.harness.collector import TraceBundle
 
 
 class GatewayCollector(ObservabilityHub):
     """SSE 广播 + jsonl 落盘；run_mode 收尾会调 bundle()，此处返回空 TraceBundle。"""
 
-    def __init__(self, emit: EmitFn, jsonl_path: Path) -> None:
+    def __init__(
+        self, emit: EmitFn, jsonl_path: Path, *, verbosity: Verbosity | None = None
+    ) -> None:
+        resolved = verbosity if verbosity is not None else ObservabilitySettings().verbosity
         super().__init__(
             [],
-            policy=AttributePolicy(Verbosity.STANDARD),
+            policy=AttributePolicy(resolved),
             journal_projectors=[
                 SSEJournalProjector(emit),
                 JsonlJournalProjector(jsonl_path),

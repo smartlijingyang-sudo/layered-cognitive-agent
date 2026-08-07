@@ -68,7 +68,7 @@ class TeamHandle(TeamUnit):
             record(
                 TeamRunFinished(
                     status=result.status,
-                    output_preview=result.output or "",
+                    output_text=result.output or "",
                     steps=result.total_steps,
                 )
             )

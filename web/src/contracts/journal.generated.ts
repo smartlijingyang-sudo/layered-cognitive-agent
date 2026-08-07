@@ -35,7 +35,8 @@ export interface TeamRunStarted {
 export interface TeamRunFinished {
   readonly type: "TeamRunFinished";
   readonly status: string;
-  readonly output_preview: string;
+  readonly output_text: string;
+  readonly output_truncated: boolean;
   readonly steps: number;
   readonly error: string;
 }
@@ -52,7 +53,8 @@ export interface AgentRunStarted {
 export interface AgentRunFinished {
   readonly type: "AgentRunFinished";
   readonly status: string;
-  readonly output_preview: string;
+  readonly output_text: string;
+  readonly output_truncated: boolean;
   readonly steps: number;
   readonly error: string;
 }
@@ -72,7 +74,8 @@ export interface DelegationCompleted {
   readonly delegation_id: string;
   readonly ok: boolean;
   readonly status: string;
-  readonly output_preview: string;
+  readonly output_text: string;
+  readonly output_truncated: boolean;
   readonly task_id: string;
 }
 
@@ -87,7 +90,8 @@ export interface SynthesisCompleted {
   readonly type: "SynthesisCompleted";
   readonly method: string;
   readonly candidate_count: number;
-  readonly output_preview: string;
+  readonly output_text: string;
+  readonly output_truncated: boolean;
 }
 
 export interface DecisionMade {

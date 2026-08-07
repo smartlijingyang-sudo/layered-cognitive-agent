@@ -3,6 +3,7 @@ import type { StampedEvent } from "../contracts/stamped";
 import type { TraceState, Verbosity } from "../projectors";
 import { shouldShowEvent } from "../projectors";
 import { EVENT_RENDERERS } from "./registry";
+import { InsightBadge } from "./event-cards";
 
 export function TracePanel({
   events,
@@ -28,6 +29,22 @@ export function TracePanel({
           </span>
         ) : null}
       </header>
+      <div className="trace-insights">
+        {trace.insights.map((insight, index) => (
+          <InsightBadge
+            key={`${insight.kind}-${index}`}
+            event={insight}
+            scope={{
+              trace_id: "",
+              run_id: "",
+              parent_run_id: null,
+              delegation_id: null,
+              agent_role: "",
+            }}
+            domain="event"
+          />
+        ))}
+      </div>
       <div className="trace-list">
         {visible.map((stamped) => {
           const Renderer = EVENT_RENDERERS[stamped.event.type];

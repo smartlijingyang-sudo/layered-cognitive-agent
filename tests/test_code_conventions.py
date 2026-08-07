@@ -39,6 +39,8 @@ _SCAN_PACKAGES = [
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",
+    "lca.layer4_app",
+    "gateway",
 ]
 
 # ── 文件行数上限 ─────────────────────────────────────────────────────────

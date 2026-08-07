@@ -94,7 +94,7 @@ class RespondOperation(Action):
             SynthesisCompleted(
                 method=_SYNTHESIS_METHOD_ALL_CONSULTED,
                 candidate_count=len(board.required_roles),
-                output_preview=decision.response_text or "",
+                output_text=decision.response_text or "",
             )
         )
 

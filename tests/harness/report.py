@@ -40,7 +40,7 @@ def format_case_digest(
     if result is not None:
         lines.append(
             f"result.status={result.status!r} total_steps={result.total_steps} "
-            f"output_preview={(result.output or '')[:120]!r}"
+            f"output_text={(result.output or '')[:120]!r}"
         )
     counts = Counter(bundle.names())
     if counts:

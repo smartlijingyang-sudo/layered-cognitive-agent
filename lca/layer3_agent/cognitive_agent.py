@@ -99,7 +99,7 @@ class CognitiveAgent(AgentUnit):
             record(
                 AgentRunFinished(
                     status=result.status,
-                    output_preview=result.output or "",
+                    output_text=result.output or "",
                     steps=result.total_steps,
                     error=result.error or "",
                 )

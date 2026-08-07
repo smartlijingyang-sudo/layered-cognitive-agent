@@ -109,13 +109,13 @@ Accepted
 | 事件 | 语义 | 关键字段 |
 |---|---|---|
 | `TeamRunStarted` | 团队 run 容器开 + 场景卡 | team_id, strategy_key, mandate?, lead_role?, members, objective_preview, plan_steps |
-| `TeamRunFinished` | 团队 run 容器闭 | status, output_preview, steps |
+| `TeamRunFinished` | 团队 run 容器闭 | status, output_text, output_truncated?, steps |
 | `AgentRunStarted` | agent run 容器开（根 run 兼场景卡） | agent_role, strategy_key, objective_preview, from_role? |
-| `AgentRunFinished` | agent run 容器闭 | status, output_preview, steps, error? |
+| `AgentRunFinished` | agent run 容器闭 | status, output_text, output_truncated?, steps, error? |
 | `DelegationIssued` | **委派发起（一等公民）** | delegation_id, caller_role, callee_role, subtask_preview, mechanism(delegate\|handoff\|member_invoke), parallel_group? |
-| `DelegationCompleted` | 委派回执 | delegation_id, ok, status, output_preview, task_id? |
+| `DelegationCompleted` | 委派回执 | delegation_id, ok, status, output_text, output_truncated?, task_id? |
 | `DelegationCacheHit` | 委派幂等短路 | callee_role, subtask_preview, step |
-| `SynthesisCompleted` | **收口综合（lead board 可见化）** | method, candidate_count, output_preview |
+| `SynthesisCompleted` | **收口综合（lead board 可见化）** | method, candidate_count, output_text, output_truncated? |
 | `DecisionMade` | 决策事实 | step, action_type, rationale_preview, delegate_target?, tool_name?, confidence? |
 | `LlmCallCompleted` | LLM 调用完成（投影为 generation） | model, ok, latency_ms, prompt_preview, response_preview, prompt_tokens?, completion_tokens? |
 | `ToolInvoked` | 工具调用完成 | tool_name, arguments_preview, result_preview, ok, latency_ms, attempt |

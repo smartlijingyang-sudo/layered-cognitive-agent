@@ -47,6 +47,19 @@ MODE_HELP: dict[str, str] = {
     "solo": "单 Agent（无 Team）",
 }
 
+MODE_HAS_LEAD: dict[str, bool] = {
+    "routing": True,
+    "consult": True,
+    "board": True,
+    "pipeline": False,
+    "fan_out": False,
+    "peer_relay": False,
+    "peer_swarm": False,
+    "debate": False,
+    "graph": False,
+    "solo": False,
+}
+
 _SCENARIOS: dict[str, ModeScenario] = {
     "routing": ModeScenario(
         key="routing",

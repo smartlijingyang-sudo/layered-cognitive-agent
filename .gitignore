@@ -18,3 +18,5 @@ traces/
 repomix-output.xml
 repomix.config.json
 .qwen/tmp/
+web/node_modules/
+web/tsconfig.tsbuildinfo

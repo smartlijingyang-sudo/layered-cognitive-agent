@@ -119,8 +119,8 @@ def team_run_finished_attrs(event: TeamRunFinished) -> dict[str, Any]:
             ATTR_STATUS: event.status,
             ATTR_STEPS: event.steps,
             ATTR_ERROR: event.error,
-            ATTR_RESULT_OUTPUT: event.output_preview,
-            LANGFUSE_OBSERVATION_OUTPUT: event.output_preview,
+            ATTR_RESULT_OUTPUT: event.output_text,
+            LANGFUSE_OBSERVATION_OUTPUT: event.output_text,
         }
     )
 
@@ -146,8 +146,8 @@ def agent_run_finished_attrs(event: AgentRunFinished) -> dict[str, Any]:
             ATTR_STATUS: event.status,
             ATTR_STEPS: event.steps,
             ATTR_ERROR: event.error,
-            ATTR_RESULT_OUTPUT: event.output_preview,
-            LANGFUSE_OBSERVATION_OUTPUT: event.output_preview,
+            ATTR_RESULT_OUTPUT: event.output_text,
+            LANGFUSE_OBSERVATION_OUTPUT: event.output_text,
         }
     )
 
@@ -171,7 +171,7 @@ def delegation_completed_attrs(event: DelegationCompleted) -> dict[str, Any]:
             ATTR_OK: event.ok,
             ATTR_STATUS: event.status,
             ATTR_TASK_ID: event.task_id,
-            ATTR_RESULT_OUTPUT: event.output_preview,
+            ATTR_RESULT_OUTPUT: event.output_text,
         }
     )
 
@@ -241,7 +241,7 @@ def synthesis_completed_attrs(event: SynthesisCompleted) -> dict[str, Any]:
         {
             ATTR_SYNTHESIS_METHOD: event.method,
             ATTR_CANDIDATE_COUNT: event.candidate_count,
-            ATTR_RESULT_OUTPUT: event.output_preview,
+            ATTR_RESULT_OUTPUT: event.output_text,
         }
     )
 

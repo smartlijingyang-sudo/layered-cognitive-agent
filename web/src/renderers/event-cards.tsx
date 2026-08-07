@@ -91,7 +91,7 @@ export function SynthesisCard({ event, domain }: EventRendererProps) {
     <Card
       domain={domain}
       title={`◈ 收口综合 (${event.method})`}
-      body={event.output_preview || `${event.candidate_count} candidates`}
+      body={event.output_text || `${event.candidate_count} candidates`}
     />
   );
 }
@@ -102,7 +102,7 @@ export function DelegationCompletedCard({ event, domain }: EventRendererProps) {
     <Card
       domain={domain}
       title={`⇠ 委派回执`}
-      body={`${event.status} · ${event.output_preview || ""}`}
+      body={`${event.status} · ${event.output_text || ""}`}
     />
   );
 }
@@ -127,7 +127,7 @@ export function ContainerCard({ event, domain }: EventRendererProps) {
       <Card
         domain={domain}
         title={`run 结束 · ${event.status}`}
-        body={event.output_preview || `${event.steps} steps`}
+        body={event.output_text || `${event.steps} steps`}
       />
     );
   }
