@@ -1,0 +1,60 @@
+"""journal → SSE 帧序列化 —— 零翻译传输契约（ADR-0037 投影器族）。
+
+``StampedEvent`` 经 ``stamped_to_record`` 落盘同构序列化，再包装为
+标准 SSE 帧（``id`` = seq，``event`` = 事件类名，``data`` = JSON）。
+``domain`` 字段从 ``JOURNAL_CATALOG`` 查表附加，供前端着色分组。
+"""
+
+from __future__ import annotations
+
+import json
+
+from lca.contracts.models.observability.journal import StampedEvent
+from lca.contracts.models.observability.journal_catalog import JOURNAL_CATALOG
+from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
+
+SSE_SENTINEL: None = None
+"""队列/订阅关闭哨兵（与 ``SSEJournalProjector.close`` 对齐）。"""
+
+
+def stamped_to_sse_frame(stamped: StampedEvent) -> str:
+    """StampedEvent → SSE 文本帧（含 trailing blank line）。"""
+    event_type = type(stamped.event).__name__
+    record = stamped_to_record(stamped)
+    catalog = JOURNAL_CATALOG.get(event_type)
+    if catalog is not None:
+        record["domain"] = catalog.domain.value
+    payload = json.dumps(record, ensure_ascii=False, default=str)
+    return f"id: {stamped.seq}\nevent: {event_type}\ndata: {payload}\n\n"
+
+
+def parse_last_event_id(header_value: str | None) -> int:
+    """解析 ``Last-Event-ID`` 请求头；缺省或非法 → 0（从头回放）。"""
+    if not header_value:
+        return 0
+    try:
+        return max(0, int(header_value.strip()))
+    except ValueError:
+        return 0
+
+
+def frames_after_seq(frames: list[str], after_seq: int) -> list[str]:
+    """从已缓冲 SSE 帧列表中筛出 seq > after_seq 的帧。"""
+    if after_seq <= 0:
+        return list(frames)
+    out: list[str] = []
+    for frame in frames:
+        seq = _seq_from_frame(frame)
+        if seq is not None and seq > after_seq:
+            out.append(frame)
+    return out
+
+
+def _seq_from_frame(frame: str) -> int | None:
+    for line in frame.splitlines():
+        if line.startswith("id: "):
+            try:
+                return int(line[4:].strip())
+            except ValueError:
+                return None
+    return None
