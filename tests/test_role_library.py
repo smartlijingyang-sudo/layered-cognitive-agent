@@ -75,9 +75,11 @@ class TestFileRoleLibrary(unittest.TestCase):
             self.assertEqual(len(FileRoleLibrary().index()), 2)
 
     def test_repo_default_library_ships_real_roles(self) -> None:
-        library = FileRoleLibrary()  # 仓库内置 roles/
-        self.assertGreaterEqual(len(library.index()), 10)
-        self.assertIn("strategy/project-lead", {e.role_id for e in library.index()})
+        library = FileRoleLibrary()  # 仓库内置 roles/（agency-agents-zh）
+        self.assertGreaterEqual(len(library.index()), 200)
+        role_ids = {entry.role_id for entry in library.index()}
+        self.assertIn("design/design-ux-researcher", role_ids)
+        self.assertIn("product/product-manager", role_ids)
 
 
 if __name__ == "__main__":

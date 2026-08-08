@@ -68,6 +68,7 @@ class RoleIndexEntry:
     title: str
     department: str
     summary: str
+    emoji: str = ""
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,7 @@ class RoleCard:
     department: str
     summary: str
     backstory: str
+    emoji: str = ""
 
 
 @dataclass(frozen=True)

@@ -39,7 +39,7 @@ class TestAutoRunPath(unittest.IsolatedAsyncioTestCase):
             {
                 "selected": [
                     {"role_id": "product/product-manager"},
-                    {"role_id": "marketing/content-specialist"},
+                    {"role_id": "marketing/marketing-content-creator"},
                 ],
                 "governance": {"kind": "pipeline"},
                 "rationale": "先需求后文案",

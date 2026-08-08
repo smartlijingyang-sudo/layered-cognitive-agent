@@ -47,6 +47,7 @@ from lca.contracts.protocols.spec import OBSERVABILITY_CHOICE_CONSOLE
 from lca.layer1_cognitive.brain.decision_parser import extract_json_block
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer4_app.api import Agent, Team, TeamLead
+from lca.layer4_app.role_suggest import suggest_for_auto_repair, suggest_from_paths
 
 logger = structlog.get_logger(__name__)
 
@@ -87,6 +88,7 @@ class LLMTeamCaster(TeamCaster):
             logger.info("casting_rejected", attempt=attempt + 1, error=error)
             prompt = (
                 f"{prompt}\n\n你上一次的输出被拒绝，原因：{error}。"
+                f"{_format_casting_correction_hint(error, library)}"
                 "请按规则重新输出修正后的完整 JSON。"
             )
         raise CastingError(f"自动组队失败：{last_error}")
@@ -101,11 +103,34 @@ def render_casting_prompt(objective: str, index: tuple[RoleIndexEntry, ...]) -> 
     for department in sorted(by_department):
         lines.append(f"## {department}")
         for entry in by_department[department]:
-            lines.append(f"- {entry.role_id} | {entry.title} | {entry.summary}")
+            emoji = f"{entry.emoji} " if entry.emoji else ""
+            lines.append(f"- {entry.role_id} | {emoji}{entry.title} | {entry.summary}")
     template = load_builtin_prompt(CASTING_PROMPT_NAME)
     return template.replace(_CATALOG_PLACEHOLDER, "\n".join(lines)).replace(
         _OBJECTIVE_PLACEHOLDER, objective
     )
+
+
+def _format_casting_correction_hint(error: str, library: RoleLibrary) -> str:
+    """为重试 prompt 附加 AO 风格的「你是不是想用 X」定向替换提示。"""
+    prefix = "以下 role_id 不在角色库中："
+    if not error.startswith(prefix):
+        return ""
+    unknown = [part.strip() for part in error[len(prefix) :].split(",") if part.strip()]
+    if not unknown:
+        return ""
+    valid_ids = [entry.role_id for entry in library.index()]
+    lines: list[str] = []
+    for bad in unknown:
+        suggestions = suggest_from_paths(bad, valid_ids)
+        suggestion = suggestions[0] if suggestions else None
+        if suggestion:
+            lines.append(f'  - {bad} → 请改用 "{suggestion}"')
+        else:
+            lines.append(f"  - {bad}")
+    if not lines:
+        return ""
+    return "\n角色路径纠正（必须严格使用角色库中的 path）：\n" + "\n".join(lines) + "\n"
 
 
 def parse_casting_output(raw_output: str, library: RoleLibrary) -> tuple[CastingPlan | None, str]:
@@ -116,7 +141,46 @@ def parse_casting_output(raw_output: str, library: RoleLibrary) -> tuple[Casting
         return None, f"输出不是合法 JSON：{exc}"
     if not isinstance(data, dict):
         return None, "输出必须是 JSON 对象"
+    repaired, replacements = repair_invalid_role_ids(data, library)
+    if replacements:
+        logger.info(
+            "casting_auto_repaired_roles",
+            replacements=[{"from": src, "to": dst} for src, dst in replacements],
+        )
+        data = repaired
     return _validate_payload(data, library)
+
+
+def repair_invalid_role_ids(
+    data: dict[str, Any],
+    library: RoleLibrary,
+) -> tuple[dict[str, Any], list[tuple[str, str]]]:
+    """确定性修复幻觉 role_id（对齐 AO compose repairInvalidRolesInYaml 思路）。"""
+    raw_selected = data.get("selected")
+    if not isinstance(raw_selected, list):
+        return data, []
+
+    valid_ids = [entry.role_id for entry in library.index()]
+    if not valid_ids:
+        return data, []
+
+    replacements: list[tuple[str, str]] = []
+    new_selected: list[Any] = []
+    for item in raw_selected:
+        if not isinstance(item, dict):
+            new_selected.append(item)
+            continue
+        role_id = str(item.get("role_id", "")).strip()
+        if role_id and role_id not in valid_ids:
+            suggestion = suggest_for_auto_repair(role_id, valid_ids)
+            if suggestion:
+                replacements.append((role_id, suggestion))
+                item = {**item, "role_id": suggestion}
+        new_selected.append(item)
+
+    if not replacements:
+        return data, []
+    return {**data, "selected": new_selected}, replacements
 
 
 def _validate_payload(data: dict[str, Any], library: RoleLibrary) -> tuple[CastingPlan | None, str]:

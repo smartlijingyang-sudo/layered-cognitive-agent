@@ -126,7 +126,7 @@ class TestObservabilityGateway(unittest.TestCase):
             {
                 "selected": [
                     {"role_id": "product/product-manager"},
-                    {"role_id": "marketing/content-specialist"},
+                    {"role_id": "marketing/marketing-content-creator"},
                 ],
                 "governance": {"kind": "fan_out"},
                 "rationale": "test",
@@ -137,7 +137,7 @@ class TestObservabilityGateway(unittest.TestCase):
             {
                 "caster": [plan],
                 "产品经理": [respond("pm output")],
-                "内容专家": [respond("content output")],
+                "内容创作者": [respond("content output")],
             },
             default_respond=True,
         )

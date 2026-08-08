@@ -22,11 +22,11 @@ ROLE: caster
 ```json
 {
   "selected": [
-    {"role_id": "product/product-manager", "task_hint": "该角色在本次任务中的具体分工（可选，30字内）"}
+    {"role_id": "design/design-ux-researcher", "task_hint": "该角色在本次任务中的具体分工（可选，30字内）"}
   ],
   "governance": {
     "kind": "board",
-    "lead_role_id": "strategy/project-lead"
+    "lead_role_id": "project-management/project-manager-senior"
   },
   "rationale": "一句话说明为什么这样组队"
 }
@@ -34,7 +34,7 @@ ROLE: caster
 
 ## 选角规则
 
-- 选 2-6 个角色，role_id 必须严格来自上方角色库，禁止编造
+- 选 2-6 个角色，role_id 必须严格使用角色目录中的 path（如 "design/design-ux-researcher"），禁止编造或省略部门前缀
 - 为目标的每个关键面挑最专业的角色，避免堆叠同一部门的相似角色
 - task_hint 写该角色在本次任务中的具体分工，让成员一上手就知道自己干什么
 

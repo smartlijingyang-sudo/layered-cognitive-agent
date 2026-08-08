@@ -42,7 +42,7 @@ class TestGatewayAutoFactory(unittest.IsolatedAsyncioTestCase):
             {
                 "selected": [
                     {"role_id": "product/product-manager", "task_hint": "输出需求要点"},
-                    {"role_id": "marketing/content-specialist"},
+                    {"role_id": "marketing/marketing-content-creator"},
                 ],
                 "governance": {"kind": "pipeline"},
                 "rationale": "先产品后内容",
@@ -60,7 +60,7 @@ class TestGatewayAutoFactory(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsInstance(runnable, Team)
         roles = [member.profile.role for member in runnable.spec.members]
-        self.assertEqual(roles, ["产品经理", "内容专家"])
+        self.assertEqual(roles, ["产品经理", "内容创作者"])
         event_types = [type(stamped.event).__name__ for stamped in collector.journal.events]
         self.assertIn("CastingStarted", event_types)
         self.assertIn("CastingCompleted", event_types)

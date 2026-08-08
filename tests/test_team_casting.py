@@ -10,6 +10,7 @@ import json
 import unittest
 from typing import Any
 
+from gateway.role_library import FileRoleLibrary
 from lca.contracts.models.team.team_coordination import LeadMandate, Pipeline
 from lca.contracts.protocols.casting import (
     CastingError,
@@ -21,7 +22,12 @@ from lca.contracts.protocols.casting import (
 )
 from lca.contracts.protocols.spec import LeadSpec
 from lca.layer4_app.api import Team
-from lca.layer4_app.casting import LLMTeamCaster, build_from_casting_plan
+from lca.layer4_app.casting import (
+    LLMTeamCaster,
+    build_from_casting_plan,
+    parse_casting_output,
+    repair_invalid_role_ids,
+)
 from tests.harness.collector import InMemoryObservability
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
@@ -88,6 +94,18 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
         # 提示词携带 ROLE: caster 标记，脚本化替身按角色分发
         self.assertEqual(llm.calls[0][0], "caster")
 
+    async def test_cast_auto_repairs_unknown_role_alias(self) -> None:
+        library = FileRoleLibrary()
+        llm = _caster_llm(
+            _plan_json("pipeline", ["user-researcher", "product/product-manager"]),
+        )
+        plan = await LLMTeamCaster().cast("做用户研究", library, llm)
+        self.assertEqual(
+            [s.role_id for s in plan.selected],
+            ["design/design-ux-researcher", "product/product-manager"],
+        )
+        self.assertEqual(len(llm.calls), 1)
+
     async def test_cast_retries_after_unknown_role_then_succeeds(self) -> None:
         llm = _caster_llm(
             _plan_json("pipeline", ["ghost/role", "product/pm"]),
@@ -99,8 +117,8 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
 
     async def test_cast_raises_after_retry_exhausted(self) -> None:
         llm = _caster_llm(
-            _plan_json("pipeline", ["ghost/a", "ghost/b"]),
-            _plan_json("pipeline", ["ghost/c", "ghost/d"]),
+            _plan_json("pipeline", ["zzz/qqqqwwwweeee-xxxxyyyy", "zzz/another-nope-role"]),
+            _plan_json("pipeline", ["zzz/qqqqwwwweeee-xxxxyyyy", "zzz/another-nope-role"]),
         )
         with self.assertRaises(CastingError):
             await LLMTeamCaster().cast("写发布稿", _FixedLibrary(), llm)
@@ -141,6 +159,27 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
         llm = _caster_llm("完全不是 JSON", "还是不是 JSON")
         with self.assertRaises(CastingError):
             await LLMTeamCaster().cast("随便", _FixedLibrary(), llm)
+
+
+class TestCastingRoleRepair(unittest.TestCase):
+    def test_repair_user_researcher_alias(self) -> None:
+        library = FileRoleLibrary()
+        payload = {
+            "selected": [
+                {"role_id": "user-researcher"},
+                {"role_id": "product/product-manager"},
+            ],
+            "governance": {"kind": "pipeline"},
+        }
+        repaired, replacements = repair_invalid_role_ids(payload, library)
+        self.assertEqual(replacements, [("user-researcher", "design/design-ux-researcher")])
+        plan, error = parse_casting_output(json.dumps(repaired, ensure_ascii=False), library)
+        assert plan is not None
+        self.assertEqual(error, "")
+        self.assertEqual(
+            [s.role_id for s in plan.selected],
+            ["design/design-ux-researcher", "product/product-manager"],
+        )
 
 
 class TestBuildFromCastingPlan(unittest.TestCase):
