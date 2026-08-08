@@ -336,5 +336,59 @@ def test_completed_without_started_is_safe() -> None:
     assert _all_views(exporter) == []
 
 
+@pytest.mark.asyncio
+async def test_cross_task_attach_close_does_not_raise() -> None:
+    """attach 在子 task，close/drain 在父 task：不因 Context 不匹配而炸。
+
+    根因：ContextVar Token 不能跨 asyncio Context reset；hub.close 常在
+    与 AgentRunStarted 不同的 task（cancel 路径 / 成员 create_task 泄漏）。
+    """
+    import asyncio
+    import logging
+
+    projector, exporter = _make_projector()
+    scope = RunScope(trace_id="t", run_id="member-run")
+
+    async def member_started() -> None:
+        projector.on_event(
+            _stamped(1, _BASE_TS, scope, AgentRunStarted(agent_role="成员", objective="x"))
+        )
+
+    await asyncio.create_task(member_started())
+
+    otel_log = logging.getLogger("opentelemetry.context")
+    records: list[logging.LogRecord] = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record)
+
+    handler = _Capture()
+    otel_log.addHandler(handler)
+    try:
+        projector.close()  # 父 task drain：detach token 来自子 task
+    finally:
+        otel_log.removeHandler(handler)
+
+    assert len(_all_views(exporter)) == 1
+    assert not any("Failed to detach context" in r.getMessage() for r in records)
+
+
+def test_same_task_finish_detaches_cleanly(caplog: pytest.LogCaptureFixture) -> None:
+    """同 Context 的 start→end 正常 detach，无 OTel 噪音。"""
+    import logging
+
+    projector, exporter = _make_projector()
+    scope = RunScope(trace_id="t", run_id="r1")
+    with caplog.at_level(logging.ERROR, logger="opentelemetry.context"):
+        projector.on_event(_stamped(1, _BASE_TS, scope, TeamRunStarted(team_id="ok")))
+        projector.on_event(
+            _stamped(2, _BASE_TS + 1, scope, TeamRunFinished(status="completed", steps=1))
+        )
+        projector.close()
+    assert len(_all_views(exporter)) == 1
+    assert not any("Failed to detach context" in r.message for r in caplog.records)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

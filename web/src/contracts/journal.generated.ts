@@ -156,6 +156,14 @@ export interface StepTextDelta {
   readonly seq: number;
 }
 
+export interface SandboxOutputDelta {
+  readonly type: "SandboxOutputDelta";
+  readonly invocation_id: string;
+  readonly stream: string;
+  readonly text_delta: string;
+  readonly seq: number;
+}
+
 export interface ToolInvoked {
   readonly type: "ToolInvoked";
   readonly tool_name: string;
@@ -165,6 +173,7 @@ export interface ToolInvoked {
   readonly latency_ms: number;
   readonly attempt: number;
   readonly error: string;
+  readonly invocation_id: string;
 }
 
 export interface ToolDenied {
@@ -180,9 +189,9 @@ export interface RunInsight {
   readonly detail: string;
 }
 
-export type JournalEvent = CastingStarted | CastingCompleted | CastingFailed | TeamRunStarted | TeamRunFinished | AgentRunStarted | AgentRunFinished | DelegationIssued | DelegationCompleted | DelegationCacheHit | SynthesisCompleted | DecisionMade | StepCompleted | ActionDegraded | LlmCallCompleted | StepTextDelta | ToolInvoked | ToolDenied | RunInsight;
+export type JournalEvent = CastingStarted | CastingCompleted | CastingFailed | TeamRunStarted | TeamRunFinished | AgentRunStarted | AgentRunFinished | DelegationIssued | DelegationCompleted | DelegationCacheHit | SynthesisCompleted | DecisionMade | StepCompleted | ActionDegraded | LlmCallCompleted | StepTextDelta | SandboxOutputDelta | ToolInvoked | ToolDenied | RunInsight;
 export type JournalEventType = JournalEvent["type"];
-export const JOURNAL_EVENT_TYPES = ['CastingStarted', 'CastingCompleted', 'CastingFailed', 'TeamRunStarted', 'TeamRunFinished', 'AgentRunStarted', 'AgentRunFinished', 'DelegationIssued', 'DelegationCompleted', 'DelegationCacheHit', 'SynthesisCompleted', 'DecisionMade', 'StepCompleted', 'ActionDegraded', 'LlmCallCompleted', 'StepTextDelta', 'ToolInvoked', 'ToolDenied', 'RunInsight'] as const;
+export const JOURNAL_EVENT_TYPES = ['CastingStarted', 'CastingCompleted', 'CastingFailed', 'TeamRunStarted', 'TeamRunFinished', 'AgentRunStarted', 'AgentRunFinished', 'DelegationIssued', 'DelegationCompleted', 'DelegationCacheHit', 'SynthesisCompleted', 'DecisionMade', 'StepCompleted', 'ActionDegraded', 'LlmCallCompleted', 'StepTextDelta', 'SandboxOutputDelta', 'ToolInvoked', 'ToolDenied', 'RunInsight'] as const;
 
 export const EVENT_DOMAINS: Record<JournalEventType, VocabDomain> = {
   ActionDegraded: "event",
@@ -197,6 +206,7 @@ export const EVENT_DOMAINS: Record<JournalEventType, VocabDomain> = {
   DelegationIssued: "team",
   LlmCallCompleted: "resource",
   RunInsight: "event",
+  SandboxOutputDelta: "resource",
   StepCompleted: "event",
   StepTextDelta: "resource",
   SynthesisCompleted: "team",

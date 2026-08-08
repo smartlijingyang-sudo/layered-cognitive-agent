@@ -5,7 +5,12 @@
 
 import type { GeneratedFile } from "../domain/generated-file";
 
-const FILE_TOOL_NAMES = new Set(["write_file", "generate_file", "file_write"]);
+const FILE_TOOL_NAMES = new Set([
+  "write_file",
+  "generate_file",
+  "file_write",
+  "run_sandbox_code",
+]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (value && typeof value === "object" && !Array.isArray(value)) {

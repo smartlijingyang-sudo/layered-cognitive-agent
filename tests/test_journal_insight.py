@@ -66,6 +66,15 @@ def test_no_loop_for_varied_actions() -> None:
     assert rules.detect_loop(summary) == []
 
 
+def test_no_loop_for_normal_lead_delegation_pattern() -> None:
+    """Lead 交替 delegate/respond 不应误报（修复 DecisionMade 仅 delegate 发射的误报）。"""
+    summary = _summary(
+        actions={"r1": ["delegate", "respond", "delegate", "respond", "delegate"]},
+        runs={"r1": {"role": "Lead"}},
+    )
+    assert rules.detect_loop(summary) == []
+
+
 def test_critical_path_picks_longest_run() -> None:
     summary = _summary(
         runs={

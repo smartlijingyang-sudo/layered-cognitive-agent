@@ -56,6 +56,28 @@ _ERR_TIMEOUT = "delegate 超时"
 _SYNTHESIS_METHOD_ALL_CONSULTED = "all_consulted"
 
 
+def record_decision_made(decision: Decision, state: AgentState) -> None:
+    """发射决策事实（所有 action_type 统一入口，供 InsightEngine 循环检测）。"""
+    delegate_target = ""
+    delegate_count = 0
+    if decision.delegations:
+        first = decision.delegations[0]
+        delegate_target = first.target_role or first.target_agent_id or ""
+        delegate_count = len(decision.delegations) if len(decision.delegations) > 1 else 0
+    tool_name = decision.tool_calls[0].tool_name if decision.tool_calls else ""
+    record(
+        DecisionMade(
+            step=state.step,
+            action_type=decision.action_type,
+            rationale_preview=decision.rationale,
+            delegate_target=delegate_target,
+            delegate_count=delegate_count,
+            tool_name=tool_name,
+            confidence=decision.confidence,
+        )
+    )
+
+
 def _timeout_observation(error: str) -> Observation:
     return Observation(
         observation_id=new_id("obs"),
@@ -132,17 +154,6 @@ class DelegateOperation(Action):
         specs = list(decision.delegations)
         if not specs:
             raise ToolExecutionError(f"{decision.action_type} 动作缺少 delegations 规格")
-        first = specs[0]
-        record(
-            DecisionMade(
-                step=state.step,
-                action_type=decision.action_type,
-                rationale_preview=decision.rationale,
-                delegate_target=first.target_role or first.target_agent_id or "",
-                delegate_count=len(specs) if len(specs) > 1 else 0,
-                confidence=decision.confidence,
-            )
-        )
         if len(specs) == 1:
             return await self._execute_one(specs[0], state)
         return await self._execute_many(specs, state)

@@ -114,12 +114,86 @@ export function LlmCallCard({ event, domain }: EventRendererProps) {
   );
 }
 
+/** Registry 兜底：单条 raw delta。时间线应优先用 StepTextStreamCard。 */
 export function StepTextDeltaCard({ event, domain }: EventRendererProps) {
   if (event.type !== "StepTextDelta") return null;
   return (
     <Card
       domain={domain}
-      title={`Δ step ${event.step} · seq ${event.seq}`}
+      title={`Δ step ${event.step}`}
+      body={event.text_delta || "(empty)"}
+    />
+  );
+}
+
+/** 合并后的 step 文本流（ADR-0041 轨迹投影）。 */
+export function StepTextStreamCard({
+  stream,
+}: {
+  readonly stream: import("../projectors").StepTextStream;
+}) {
+  const role = stream.agentRole ? ` · ${stream.agentRole}` : "";
+  const chunks = stream.chunkCount > 1 ? ` · ${stream.chunkCount} chunks` : "";
+  const border = domainColor(stream.domain as Parameters<typeof domainColor>[0]);
+  return (
+    <div
+      className={cn(
+        "rounded-[var(--radius-sm)] border-l-[3px] bg-[color-mix(in_srgb,var(--bg)_65%,transparent)] px-3 py-2",
+      )}
+      style={{ borderLeftColor: border }}
+    >
+      <div className="text-sm font-semibold">{`Δ step ${stream.step}${role}${chunks}`}</div>
+      <div
+        className={cn(
+          "mt-0.5 max-h-48 overflow-auto text-sm whitespace-pre-wrap font-mono",
+          mutedText,
+        )}
+      >
+        {stream.text || "(empty)"}
+      </div>
+    </div>
+  );
+}
+
+/** 沙箱 stdout/stderr 合并流（ADR-0044）；纯文本等宽，不引入终端模拟器。 */
+export function SandboxOutputStreamCard({
+  stream,
+}: {
+  readonly stream: import("../projectors").SandboxOutputStream;
+}) {
+  const role = stream.agentRole ? ` · ${stream.agentRole}` : "";
+  const status = stream.sealed ? " · done" : " · live";
+  const label = stream.stream === "stderr" ? "stderr" : "stdout";
+  const border = domainColor(stream.domain as Parameters<typeof domainColor>[0]);
+  return (
+    <div
+      className={cn(
+        "rounded-[var(--radius-sm)] border-l-[3px] bg-[color-mix(in_srgb,var(--bg)_65%,transparent)] px-3 py-2",
+      )}
+      style={{ borderLeftColor: border }}
+    >
+      <div className="text-sm font-semibold">
+        {`沙箱 · ${label}${role}${status}`}
+      </div>
+      <pre
+        className={cn(
+          "mt-0.5 max-h-64 overflow-auto rounded bg-black/20 p-2 text-xs whitespace-pre-wrap font-mono",
+          stream.stream === "stderr" ? "text-danger" : mutedText,
+        )}
+      >
+        {stream.text || "(empty)"}
+      </pre>
+    </div>
+  );
+}
+
+/** Registry 兜底：单条 sandbox raw delta。时间线应优先用 SandboxOutputStreamCard。 */
+export function SandboxOutputDeltaCard({ event, domain }: EventRendererProps) {
+  if (event.type !== "SandboxOutputDelta") return null;
+  return (
+    <Card
+      domain={domain}
+      title={`沙箱 Δ ${event.stream} · ${event.invocation_id}`}
       body={event.text_delta || "(empty)"}
     />
   );

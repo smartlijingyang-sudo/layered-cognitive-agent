@@ -106,6 +106,13 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **RespondOperation** / **UseToolOperation** / **DelegateOperation** / **HandoffOperation** | 内置行动实现（delegate/handoff 行动 ≠ PeerRelay 协调机制） |
 | **SafeExecutor** | 权限 + 重试 + 缓存后执行工具 |
 | **ToolRegistry** / **Tool** / **ToolPermissionManifest** | 工具注册与权限 |
+| **Sandbox** / **SandboxResult** / **SandboxFile** | 隔离代码执行协议与终态结果（ADR-0044） |
+| **E2BSandboxAdapter** | E2B 云端 Firecracker microVM（生产默认，需 `E2B_API_KEY`） |
+| **LocalSandboxAdapter** | microsandbox 本地 microVM（`LCA_SANDBOX_BACKEND=local`，可选组 `sandbox-local`） |
+| **MockSandboxAdapter** | 进程内受限 `exec` 测试替身——**非安全边界**（仅测试 / 显式 `prefer_mock`） |
+| **SandboxCodeTool** (`run_sandbox_code`) | 沙箱代码执行工具：挂载附件、多文件产物、铸造 invocation_id |
+| **SandboxOutputDelta** | 沙箱执行期 stdout/stderr 增量 journal 事件（standard 可见，进 trace 不进 chat 答案） |
+| **LCA_SANDBOX_BACKEND** | 沙箱后端显式开关：`local` \| `e2b` \| `mock`（未设则有 key 用 E2B，否则不挂载工具） |
 | **RetryPolicy** / **CacheConfig** | 重试与缓存配置 |
 | **BrainFactory** / **SimpleBrainFactory** | Brain 工厂（注册表用 NamedRegistry） |
 | **Synthesizer** / **ConcatSynthesizer** | 并行结果聚合协议 / 默认拼接实现 |

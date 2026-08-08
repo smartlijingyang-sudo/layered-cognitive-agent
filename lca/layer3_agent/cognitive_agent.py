@@ -88,23 +88,42 @@ class CognitiveAgent(AgentUnit):
                     from_role=ctx.from_role if ctx else "",
                 )
             )
-            result = await _run_agent_with_closed_container(
-                self.runtime,
-                text,
-                ctx,
-                max_steps=self.max_steps,
-                max_wall_clock_seconds=self.max_wall_clock_seconds,
-                agent_role=role,
-            )
-            record(
-                AgentRunFinished(
-                    status=result.status,
-                    output_text=result.output or "",
-                    steps=result.total_steps,
-                    error=result.error or "",
+            # 默认 CANCELED：CancelledError 是 BaseException，不会进 except Exception。
+            # finally 保证任何退出路径都发射 Finished，OTel attach 在同 task 配对 detach。
+            finish_status = TaskStatus.CANCELED.value
+            finish_output = ""
+            finish_steps = 0
+            finish_error = ""
+            try:
+                result = await self.runtime.run(
+                    text,
+                    ctx,
+                    max_steps=self.max_steps,
+                    max_wall_clock_seconds=self.max_wall_clock_seconds,
+                    agent_role=role,
                 )
-            )
-            return result
+                finish_status = (
+                    result.status.value
+                    if isinstance(result.status, TaskStatus)
+                    else str(result.status)
+                )
+                finish_output = result.output or ""
+                finish_steps = result.total_steps
+                finish_error = result.error or ""
+                return result
+            except Exception as err:
+                finish_status = TaskStatus.FAILED.value
+                finish_error = f"{type(err).__name__}: {err}"
+                raise
+            finally:
+                record(
+                    AgentRunFinished(
+                        status=finish_status,
+                        output_text=finish_output,
+                        steps=finish_steps,
+                        error=finish_error,
+                    )
+                )
 
     async def resume(
         self,
@@ -125,28 +144,3 @@ class CognitiveAgent(AgentUnit):
         runtime = self.runtime
         if isinstance(runtime, HasHooks):
             runtime.hooks.register(hook_name, hook_fn)
-
-
-async def _run_agent_with_closed_container(
-    runtime: Runtime,
-    text: str,
-    ctx: RunContext | None,
-    *,
-    max_steps: int,
-    max_wall_clock_seconds: int | None,
-    agent_role: str,
-) -> Result:
-    """runtime 执行；异常路径补发失败收尾事件，保证 run 容器必闭（投影不泄漏）。"""
-    try:
-        return await runtime.run(
-            text,
-            ctx,
-            max_steps=max_steps,
-            max_wall_clock_seconds=max_wall_clock_seconds,
-            agent_role=agent_role,
-        )
-    except Exception as err:
-        record(
-            AgentRunFinished(status=TaskStatus.FAILED.value, error=f"{type(err).__name__}: {err}")
-        )
-        raise

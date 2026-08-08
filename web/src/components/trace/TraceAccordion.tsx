@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import type { StampedEvent } from "../../contracts";
 import type { TraceState, Verbosity } from "../../projectors";
-import { shouldShowEvent } from "../../projectors";
+import { buildTraceTimeline } from "../../projectors";
 import { renderSequenceDiagram } from "../../domain/sequence-diagram";
 import { renderMermaidSvg } from "../../lib/use-mermaid-render";
 import { InsightSummary } from "./InsightSummary";
@@ -17,7 +17,10 @@ function traceSummary(trace: TraceState): string {
     const roles = trace.casting.selectedRoles.join("、");
     return `✓ 已组队 · ${trace.casting.governanceKind} · ${roles}`;
   }
+  const liveSandbox = trace.sandboxStreams.some((s) => !s.sealed);
   const parts = [
+    liveSandbox ? "沙箱执行中…" : null,
+    trace.sandboxStreams.length && !liveSandbox ? "沙箱输出" : null,
     trace.teamRun ? `${trace.teamRun.teamId} · ${trace.teamRun.mandate}` : null,
     trace.status ? `状态 ${trace.status}` : null,
     trace.delegations.length ? `委派 ${trace.delegations.length}` : null,
@@ -36,12 +39,18 @@ export function TraceAccordion({
   readonly verbosity: Verbosity;
 }) {
   const [open, setOpen] = useState(false);
-  const visible = useMemo(
-    () => events.filter((e) => shouldShowEvent(e.event.type, verbosity)),
-    [events, verbosity],
+  const hasLiveSandbox = trace.sandboxStreams.some((s) => !s.sealed);
+  const timeline = useMemo(
+    () => buildTraceTimeline(events, trace.stepStreams, verbosity, trace.sandboxStreams),
+    [events, trace.stepStreams, trace.sandboxStreams, verbosity],
   );
   const diagram = useMemo(() => renderSequenceDiagram(events), [events]);
   const diagramRef = useRef<HTMLDivElement>(null);
+
+  // Auto-expand when sandbox starts streaming so process visibility is not buried.
+  useEffect(() => {
+    if (hasLiveSandbox) setOpen(true);
+  }, [hasLiveSandbox]);
 
   useEffect(() => {
     if (!open || !diagram || !diagramRef.current) return;
@@ -109,8 +118,13 @@ export function TraceAccordion({
             </Tabs.List>
             <Tabs.Content value="timeline" className="outline-none">
               <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-3">
-                <JournalRail events={visible} onSelect={() => undefined} />
-                <TracePanel events={events} trace={trace} verbosity={verbosity} />
+                <JournalRail timeline={timeline} onSelect={() => undefined} />
+                <TracePanel
+                  events={events}
+                  trace={trace}
+                  verbosity={verbosity}
+                  showHeader={false}
+                />
               </div>
             </Tabs.Content>
             {diagram ? (

@@ -89,6 +89,12 @@ llm-openai = [
 observability-langfuse = [
     "langfuse>=3.0",
 ]
+sandbox-e2b = [
+    "e2b-code-interpreter>=1.0",
+]
+sandbox-local = [
+    "microsandbox>=0.6,<0.7",
+]
 web = [
     "starlette>=0.46",
     "uvicorn>=0.34",

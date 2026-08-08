@@ -17,6 +17,7 @@ from lca.contracts.protocols import (
 from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
+from lca.layer1_cognitive.body.action_handlers import record_decision_made
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 
 
@@ -73,6 +74,7 @@ class SimpleBody(Body):
         handler = self.action_registry.get(decision.action_type)
         if handler is None:
             raise UnregisteredActionError(decision.action_type)
+        record_decision_made(decision, state)
         observation = await handler.execute(decision, state)
         return self._propagate_degradation(decision, observation)
 

@@ -21,6 +21,7 @@ from lca.contracts.models.observability.journal import (
     JournalEvent,
     LlmCallCompleted,
     RunInsight,
+    SandboxOutputDelta,
     StepCompleted,
     StepTextDelta,
     SynthesisCompleted,
@@ -52,6 +53,7 @@ JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
         ActionDegraded,
         LlmCallCompleted,
         StepTextDelta,
+        SandboxOutputDelta,
         ToolInvoked,
         ToolDenied,
         RunInsight,
@@ -151,6 +153,12 @@ JOURNAL_CATALOG: dict[str, VocabDef] = {
         "lca.layer0_infra.observability.adapters",
         required=("step", "seq"),
         desc="认知步 LLM 增量文本（中性）",
+    ),
+    "SandboxOutputDelta": _journal(
+        VocabDomain.RESOURCE,
+        "lca.layer0_infra.sandbox",
+        required=("invocation_id", "stream", "seq"),
+        desc="沙箱执行增量输出（stdout/stderr）",
     ),
     "ToolInvoked": _journal(
         VocabDomain.RESOURCE,

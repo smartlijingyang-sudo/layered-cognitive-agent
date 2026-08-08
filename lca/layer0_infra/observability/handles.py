@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -111,7 +112,10 @@ class SpanHandle:
             self._otel.set_attribute(key, value)
         self._otel.end()
         if self._ctx_token is not None:
-            otel_context.detach(self._ctx_token)
+            # Token 仅在创建它的 Context 有效；跨 task 退出时静默跳过
+            # （避免 OTel detach 打出 "Failed to detach context" traceback）。
+            with contextlib.suppress(ValueError):
+                self._ctx_token.var.reset(self._ctx_token)
 
 
 class NullSpanHandle:

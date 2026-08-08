@@ -88,6 +88,7 @@ class ObservabilityHub(ObservabilityBackend):
         insight.bind_journal(self._journal.record)
         self._scorer: Any = None
         self._bridges: list[Any] = []
+        self._closed = False
 
     # ── 属性 ────────────────────────────────────────────
     @property
@@ -168,6 +169,9 @@ class ObservabilityHub(ObservabilityBackend):
         self._journal.flush()
 
     def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
         self.flush()
         for processor in self._processors:
             processor.shutdown()

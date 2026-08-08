@@ -4,7 +4,6 @@ import type {
   JournalEvent,
   LlmCallCompleted,
   RunInsight,
-  StepTextDelta,
   ToolInvoked,
 } from "../contracts";
 import type { GeneratedFile } from "../domain/generated-file";
@@ -36,6 +35,45 @@ export interface RunInfo {
   readonly toolCalls?: number;
 }
 
+/**
+ * 同一 (run_id, step) 的 StepTextDelta 归约结果。
+ * journal 保持 token 级真相；轨迹投影只暴露合并后的流（ADR-0041）。
+ */
+export interface StepTextStream {
+  readonly key: string;
+  readonly runId: string;
+  readonly step: number;
+  readonly agentRole: string;
+  readonly text: string;
+  readonly chunkCount: number;
+  /** StepTextDelta.seq 最大值，供兜底排序校验。 */
+  readonly lastDeltaSeq: number;
+  /** 首条 delta 的 journal seq，作为时间线锚点与稳定 React key。 */
+  readonly anchorJournalSeq: number;
+  readonly domain: string;
+  /** 按 delta.seq 索引的分片，供乱序到达时重拼。 */
+  readonly deltas: ReadonlyMap<number, string>;
+}
+
+/**
+ * 同一 (run_id, invocation_id, stream) 的 SandboxOutputDelta 归约结果（ADR-0044）。
+ * ToolInvoked(invocation_id) 到达后 sealed，不再接受新分片。
+ */
+export interface SandboxOutputStream {
+  readonly key: string;
+  readonly runId: string;
+  readonly invocationId: string;
+  readonly stream: "stdout" | "stderr" | string;
+  readonly agentRole: string;
+  readonly text: string;
+  readonly chunkCount: number;
+  readonly lastDeltaSeq: number;
+  readonly anchorJournalSeq: number;
+  readonly domain: string;
+  readonly sealed: boolean;
+  readonly deltas: ReadonlyMap<number, string>;
+}
+
 export interface TraceState {
   readonly phase: RunPhase;
   readonly casting?: CastingInfo;
@@ -51,7 +89,10 @@ export interface TraceState {
   readonly decisions: readonly DecisionMade[];
   readonly toolCalls: readonly ToolInvoked[];
   readonly llmCalls: readonly LlmCallCompleted[];
-  readonly stepTextDeltas: readonly StepTextDelta[];
+  /** 按首现顺序的合并文本流（非逐 token 列表）。 */
+  readonly stepStreams: readonly StepTextStream[];
+  /** 沙箱执行期 stdout/stderr 合并流。 */
+  readonly sandboxStreams: readonly SandboxOutputStream[];
   readonly insights: readonly RunInsight[];
   readonly synthesisText?: string;
   readonly status?: string;
@@ -64,7 +105,8 @@ export const EMPTY_TRACE_STATE: TraceState = {
   decisions: [],
   toolCalls: [],
   llmCalls: [],
-  stepTextDeltas: [],
+  stepStreams: [],
+  sandboxStreams: [],
   insights: [],
 };
 
@@ -102,7 +144,7 @@ export function shouldShowEvent(eventType: JournalEvent["type"], verbosity: Verb
       eventType === "RunInsight"
     );
   }
-  // 此处 verbosity 已被收窄为 "standard"：StepTextDelta 仅 verbose 档可见
+  // standard：StepTextDelta 仅 verbose；SandboxOutputDelta 默认可见（过程可见性）
   if (eventType === "StepTextDelta") return false;
   return eventType !== "StepCompleted" && eventType !== "ActionDegraded";
 }

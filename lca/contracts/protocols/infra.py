@@ -11,6 +11,7 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.decision import AgentCard, Observation
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.models.core.sandbox import SandboxResult
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
 
@@ -50,6 +51,26 @@ class Tool(Protocol):
     def validate(self, args: dict[str, Any]) -> str | None:
         """可选前置校验：返回 None 表示合法，返回错误字符串表示非法。"""
         return None  # pragma: no cover
+
+
+@runtime_checkable
+class Sandbox(Protocol):
+    """代码沙箱：隔离执行用户/模型生成的代码，可选挂载输入文件。
+
+    ``**kwargs`` 透传扩展元数据（如 ``invocation_id``），镜像
+    ``LLMAdapter.stream`` 惯例，避免 Protocol 破坏性扩签。
+    执行期 stdout/stderr 增量由具体适配器经 journal ``record`` 发射
+    （见 ``SandboxOutputDelta``），本协议只承诺终态 ``SandboxResult``。
+    """
+
+    async def run(
+        self,
+        code: str,
+        language: str = "python",
+        files: dict[str, bytes] | None = None,
+        timeout_s: int = 60,
+        **kwargs: Any,
+    ) -> SandboxResult: ...
 
 
 @runtime_checkable

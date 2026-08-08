@@ -3,6 +3,13 @@
 从 ``otel_projector`` 拆出的状态机机制件：run/delegation 容器按关联 id
 索引（开/关/查父），run 容器额外 attach 进 ambient（机制平面 span 归位）。
 投影器只负责事件语义分派，span 生命周期全部委托本索引。
+
+**attach Token 与 asyncio**：``contextvars.Token`` 只能在创建它的
+Context 里 ``reset``。成员经 ``asyncio.create_task`` 跑在独立 Context；
+若 attach 发生在子 task、``end``/``hub.close`` 在另一 task（cancel 路径、
+泄漏兜底），直接 ``otel_context.detach`` 会触发
+「Token was created in a different Context」。ambient 本就 per-task 隔离，
+跨 Context detach 是安全 no-op（见 ``_safe_detach``）。
 """
 
 from __future__ import annotations
@@ -15,6 +22,20 @@ from opentelemetry import trace as otel_trace
 if TYPE_CHECKING:
     from opentelemetry.context import Token
     from opentelemetry.trace import Span, Tracer
+
+
+def _safe_detach(token: Token) -> None:
+    """在当前 Context 有效时 unwind ambient；跨 Context 则静默跳过。
+
+    不调用 ``otel_context.detach``：其在失败时会 ``logger.exception``
+    打出整段 traceback，即使异常被吞掉。直接 ``token.var.reset`` 与
+    OTel ContextVarsRuntimeContext 等价，且由我们控制 ValueError。
+    """
+    try:
+        token.var.reset(token)
+    except ValueError:
+        # Token 属于另一个 asyncio Context；该 Context 已结束或隔离，无需 unwind。
+        return
 
 
 class SpanContainerIndex:
@@ -66,7 +87,7 @@ class SpanContainerIndex:
         self.forget(span)
         token = self._attach_tokens.pop(key, None)
         if token is not None:
-            otel_context.detach(token)
+            _safe_detach(token)
 
     def run_span(self, run_id: str) -> Span | None:
         return self._runs.get(run_id)
@@ -82,12 +103,12 @@ class SpanContainerIndex:
         self._own_span_ids.discard(format(span.get_span_context().span_id, "016x"))
 
     def drain_leaked(self) -> list[Span]:
-        """泄漏兜底：关闭所有未收尾容器（含 detach）。"""
+        """泄漏兜底：关闭所有未收尾容器（含 safe detach）。"""
         leaked = [*self._runs.values(), *self._delegations.values()]
         for key in (*self._runs, *self._delegations):
             token = self._attach_tokens.pop(key, None)
             if token is not None:
-                otel_context.detach(token)
+                _safe_detach(token)
         for span in leaked:
             self.forget(span)
         self._runs.clear()

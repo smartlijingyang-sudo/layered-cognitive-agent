@@ -9,6 +9,8 @@ Phase C 文件能力：``POST /conversations/{id}/attachments`` 上传、
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 from collections.abc import AsyncIterator
 
@@ -170,8 +172,11 @@ async def cancel_run(request: Request) -> JSONResponse:
     session.status = RunStatus.CANCELED
     if session.task is not None and not session.task.done():
         session.task.cancel()
-    session.hub.close()
-    session.emit(None)
+        # 等 execute_run 的 finally 收尾（TeamRunFinished + hub.close + emit）。
+        # 不可在此 hub.close：attach token 在 run task / 成员 task，此处 detach
+        # 会跨 asyncio Context，且 Finished 尚未发射导致 container 泄漏。
+        with contextlib.suppress(asyncio.CancelledError):
+            await session.task
     _conversations.update_turn_status(run_id, RunStatus.CANCELED.value)
     return JSONResponse({"status": RunStatus.CANCELED.value}, headers=CORS_HEADERS)
 

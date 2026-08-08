@@ -125,6 +125,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 latency_ms=latency_ms,
                 attempt=attempt,
                 error="" if obs.success else (obs.error or ""),
+                invocation_id=str((obs.extra or {}).get("invocation_id", "") or ""),
             )
         )
 

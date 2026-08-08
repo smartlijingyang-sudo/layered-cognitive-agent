@@ -45,4 +45,33 @@ describe("filesFromToolResultPreview", () => {
   it("returns empty on failure", () => {
     expect(filesFromToolResultPreview("write_file", "{}", false)).toEqual([]);
   });
+
+  it("parses multi-file sandbox payload (record.files)", () => {
+    const preview = JSON.stringify({
+      stdout: "ok\n",
+      stderr: "",
+      files: [
+        {
+          name: "chart.png",
+          mimeType: "image/png",
+          sizeBytes: 12,
+          url: "/files/a",
+          previewable: false,
+          attachmentId: "file_a",
+        },
+        {
+          name: "out.csv",
+          mimeType: "text/csv",
+          sizeBytes: 4,
+          url: "/files/b",
+          previewable: false,
+          attachmentId: "file_b",
+        },
+      ],
+    });
+    const files = filesFromToolResultPreview("run_sandbox_code", preview, true);
+    expect(files).toHaveLength(2);
+    expect(files[0]?.name).toBe("chart.png");
+    expect(files[1]?.name).toBe("out.csv");
+  });
 });

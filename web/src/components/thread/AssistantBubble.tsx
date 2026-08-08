@@ -69,9 +69,21 @@ export function AssistantBubble({
             label={
               trace.phase === "casting"
                 ? "正在从角色库挑选合适团队…"
-                : "团队成员正在协作生成回答…"
+                : trace.sandboxStreams.some((s) => !s.sealed)
+                  ? "沙箱正在执行代码…"
+                  : "团队成员正在协作生成回答…"
             }
           />
+        ) : null}
+
+        {trace.sandboxStreams.some((s) => !s.sealed) ? (
+          <div className="mb-2 max-h-28 overflow-auto rounded border border-border bg-black/15 p-2 font-mono text-xs text-[var(--text-muted)] whitespace-pre-wrap">
+            {trace.sandboxStreams
+              .filter((s) => !s.sealed)
+              .map((s) => s.text)
+              .join("")
+              .slice(-800) || "…"}
+          </div>
         ) : null}
 
         {!showTyping && hasAnswer ? (

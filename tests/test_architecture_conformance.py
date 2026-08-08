@@ -71,6 +71,13 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.llm_adapter.api_style.LLMApiStyle": (
         "L0 wire-protocol 配置枚举，非跨层契约 (ADR-0038)"
     ),
+    "lca.layer0_infra.sandbox.streaming.SandboxStreamEmitter": (
+        "沙箱适配器内部 seq 发射器，非可插拔组件 (ADR-0044)"
+    ),
+    "lca.layer0_infra.file_store.LocalFileStore": (
+        "FileStore Protocol 定义在 L0 本模块，非 contracts.protocols (ADR-0043)"
+    ),
+    "lca.layer0_infra.file_store.StoredFile": ("文件产物元数据值对象，纯数据结构 (ADR-0043)"),
     "lca.layer0_infra.llm_adapter.openai_compat._chat_completions._ChatCompletionsStrategy": (
         "OpenAICompatAdapter 内部 Strategy，模块私有 (ADR-0038)"
     ),

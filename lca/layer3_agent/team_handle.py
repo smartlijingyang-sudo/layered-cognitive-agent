@@ -64,23 +64,32 @@ class TeamHandle(TeamUnit):
                     plan_steps=plan_steps_joined(self._profile.strategy_key, self._profile.mandate),
                 )
             )
-            result = await _run_with_closed_container(self._strategy, text)
-            record(
-                TeamRunFinished(
-                    status=result.status,
-                    output_text=result.output or "",
-                    steps=result.total_steps,
+            # 默认 CANCELED：CancelledError 是 BaseException，不会进 except Exception。
+            # finally 保证任何退出路径都发射 Finished，OTel attach 在同 task 配对 detach。
+            finish_status = TaskStatus.CANCELED.value
+            finish_output = ""
+            finish_steps = 0
+            finish_error = ""
+            try:
+                result = await self._strategy.run(text)
+                finish_status = (
+                    result.status.value
+                    if isinstance(result.status, TaskStatus)
+                    else str(result.status)
                 )
-            )
-            return result
-
-
-async def _run_with_closed_container(strategy: TeamStrategy, text: str) -> Result:
-    """策略执行；异常路径补发失败收尾事件，保证 run 容器必闭（投影不泄漏）。"""
-    try:
-        return await strategy.run(text)
-    except Exception as err:
-        record(
-            TeamRunFinished(status=TaskStatus.FAILED.value, error=f"{type(err).__name__}: {err}")
-        )
-        raise
+                finish_output = result.output or ""
+                finish_steps = result.total_steps
+                return result
+            except Exception as err:
+                finish_status = TaskStatus.FAILED.value
+                finish_error = f"{type(err).__name__}: {err}"
+                raise
+            finally:
+                record(
+                    TeamRunFinished(
+                        status=finish_status,
+                        output_text=finish_output,
+                        steps=finish_steps,
+                        error=finish_error,
+                    )
+                )

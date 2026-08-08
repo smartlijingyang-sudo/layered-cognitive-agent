@@ -258,6 +258,16 @@ class StepTextDelta(JournalEvent):
 
 
 @dataclass(frozen=True)
+class SandboxOutputDelta(JournalEvent):
+    """沙箱执行期的原始增量输出行（stdout/stderr 各自成流，seq 跨流全局单调）。"""
+
+    invocation_id: str = ""
+    stream: str = "stdout"  # "stdout" | "stderr"
+    text_delta: str = field(default="", metadata={"journal_kind": "content"})
+    seq: int = 0
+
+
+@dataclass(frozen=True)
 class LlmCallCompleted(JournalEvent):
     """LLM 调用完成（OTel 投影为 generation，gen_ai 语义约定）。"""
 
@@ -282,6 +292,7 @@ class ToolInvoked(JournalEvent):
     latency_ms: int = 0
     attempt: int = 1
     error: str = ""
+    invocation_id: str = ""  # optional link to in-flight streaming deltas
 
 
 @dataclass(frozen=True)
