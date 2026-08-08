@@ -1,4 +1,5 @@
 import type { StampedEvent } from "../contracts/stamped";
+import { extractUserFacingAnswer } from "../lib/extract-decision-text";
 import { EMPTY_CHAT_STATE, type ChatState, type RunPhase } from "./types";
 
 /** 面向用户的终态动作 — 其 StepTextDelta 可提交到对话主线（answer-delta 投影层）。 */
@@ -10,6 +11,8 @@ interface StepBuffer {
 
 interface ChatProjectorInternal extends ChatState {
   readonly pendingSteps: ReadonlyMap<string, StepBuffer>;
+  /** 已确认落盘的回答（不含当前 step 流式预览）。 */
+  readonly committedAnswer: string;
 }
 
 function phaseFromStatus(status: ChatState["status"], prev: RunPhase): RunPhase {
@@ -54,15 +57,30 @@ function commitStepBuffer(
   const buffer = state.pendingSteps.get(key);
   if (!buffer) return state;
   const deltaList = orderedDeltaText(buffer);
-  const text = deltaList.join("");
+  const raw = deltaList.join("");
+  const text = extractUserFacingAnswer(raw) ?? raw;
   const nextPending = new Map(state.pendingSteps);
   nextPending.delete(key);
+  const committedAnswer = state.committedAnswer
+    ? `${state.committedAnswer}${text}`
+    : text;
   return {
     ...state,
     pendingSteps: nextPending,
-    answerDeltas: [...state.answerDeltas, ...deltaList],
-    answer: state.answer ? `${state.answer}${text}` : text,
+    committedAnswer,
+    answerDeltas: text ? [...state.answerDeltas, text] : [...state.answerDeltas],
+    answer: committedAnswer,
   };
+}
+
+function previewFromPendingStep(
+  state: ChatProjectorInternal,
+  runId: string,
+  step: number,
+): string | null {
+  const buffer = state.pendingSteps.get(stepBufferKey(runId, step));
+  if (!buffer) return null;
+  return extractUserFacingAnswer(orderedDeltaText(buffer).join(""), { allowPartial: true });
 }
 
 function discardStepBuffer(
@@ -74,7 +92,12 @@ function discardStepBuffer(
   if (!state.pendingSteps.has(key)) return state;
   const nextPending = new Map(state.pendingSteps);
   nextPending.delete(key);
-  return { ...state, pendingSteps: nextPending };
+  return {
+    ...state,
+    pendingSteps: nextPending,
+    answer: state.committedAnswer,
+    answerDeltas: state.committedAnswer ? [state.committedAnswer] : [],
+  };
 }
 
 function commitAllRunBuffers(
@@ -91,9 +114,14 @@ function commitAllRunBuffers(
   return next;
 }
 
+function finalizeAnswerText(raw: string): string {
+  return extractUserFacingAnswer(raw) ?? raw;
+}
+
 const EMPTY_INTERNAL: ChatProjectorInternal = {
   ...EMPTY_CHAT_STATE,
   pendingSteps: new Map(),
+  committedAnswer: "",
 };
 
 /** 对话主线：问题 + 已确认 answer-delta 流 + 终态 output_text。 */
@@ -124,11 +152,13 @@ export function reduceChat(state: ChatProjectorInternal, stamped: StampedEvent):
     case "TeamRunFinished": {
       const committed = commitAllRunBuffers(state, runId);
       const status = e.status === "completed" ? "completed" : "failed";
+      const answer = finalizeAnswerText(e.output_text || committed.answer);
       return {
         ...committed,
         status,
         phase: status === "completed" ? "completed" : "failed",
-        answer: e.output_text || committed.answer,
+        committedAnswer: answer,
+        answer,
         errorMessage: e.error || committed.errorMessage,
       };
     }
@@ -141,9 +171,11 @@ export function reduceChat(state: ChatProjectorInternal, stamped: StampedEvent):
       const committed = commitAllRunBuffers(state, runId);
       if (e.output_text) {
         const status = e.status === "completed" ? "completed" : "failed";
+        const answer = finalizeAnswerText(e.output_text);
         return {
           ...committed,
-          answer: e.output_text,
+          committedAnswer: answer,
+          answer,
           status,
           phase: status === "completed" ? "completed" : "failed",
         };
@@ -160,17 +192,23 @@ export function reduceChat(state: ChatProjectorInternal, stamped: StampedEvent):
     }
     case "SynthesisCompleted": {
       const committed = commitAllRunBuffers(state, runId);
+      const answer = finalizeAnswerText(e.output_text || committed.answer);
       return {
         ...committed,
         phase: "synthesizing",
-        answer: e.output_text || committed.answer,
+        committedAnswer: answer,
+        answer,
       };
     }
-    case "StepTextDelta":
-      return {
-        ...state,
-        pendingSteps: appendBuffer(state.pendingSteps, runId, e.step, e.seq, e.text_delta),
-      };
+    case "StepTextDelta": {
+      const pendingSteps = appendBuffer(state.pendingSteps, runId, e.step, e.seq, e.text_delta);
+      const preview = previewFromPendingStep({ ...state, pendingSteps }, runId, e.step);
+      if (!preview) {
+        return { ...state, pendingSteps };
+      }
+      const answer = state.committedAnswer ? `${state.committedAnswer}${preview}` : preview;
+      return { ...state, pendingSteps, answer, answerDeltas: [preview] };
+    }
     case "DecisionMade":
       if (USER_FACING_TERMINAL_ACTIONS.has(e.action_type)) {
         return commitStepBuffer(state, runId, e.step);
@@ -194,7 +232,7 @@ export class ChatProjector {
   }
 
   snapshot(): ChatState {
-    const { pendingSteps: _pending, ...publicState } = this.state;
+    const { pendingSteps: _pending, committedAnswer: _committed, ...publicState } = this.state;
     return publicState;
   }
 }

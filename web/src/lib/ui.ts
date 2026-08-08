@@ -13,7 +13,7 @@ export const inputField = cn(
 
 export const btnPrimary = cn(
   "inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border-0 px-3.5 py-2 font-semibold",
-  "bg-[var(--accent)] text-teal-950 disabled:cursor-not-allowed disabled:opacity-50",
+  "bg-[var(--accent)] text-white disabled:cursor-not-allowed disabled:opacity-50",
   focusRing,
 );
 

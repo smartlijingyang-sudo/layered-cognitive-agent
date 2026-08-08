@@ -1,20 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { revealChunks } from "../../projectors/chat-projector";
 
-export function ProgressiveReveal({
-  text,
-  deltas,
-  active,
-}: {
-  readonly text: string;
-  readonly deltas?: readonly string[];
-  readonly active: boolean;
-}) {
-  const chunks = useMemo(() => revealChunks(text, deltas ?? []), [text, deltas]);
-  const [visibleCount, setVisibleCount] = useState(active ? 0 : chunks.length);
+/** 渐进展示文本：真实 delta 序列即时全显，无 delta 时按句假流式。 */
+export function useProgressiveReveal(
+  text: string,
+  deltas: readonly string[] | undefined,
+  active: boolean,
+): string {
+  const deltaList = deltas ?? [];
+  const chunks = useMemo(() => revealChunks(text, deltaList), [text, deltaList]);
+  const hasRealDeltas = deltaList.length > 0;
+  const [visibleCount, setVisibleCount] = useState(active && !hasRealDeltas ? 0 : chunks.length);
 
   useEffect(() => {
-    if (!active) {
+    if (!active || hasRealDeltas) {
       setVisibleCount(chunks.length);
       return;
     }
@@ -29,8 +28,20 @@ export function ProgressiveReveal({
       }
     }, 420);
     return () => window.clearInterval(timer);
-  }, [active, chunks]);
+  }, [active, chunks, hasRealDeltas]);
 
-  const visible = chunks.slice(0, visibleCount).join("");
-  return <span>{visible || text}</span>;
+  return chunks.slice(0, visibleCount).join("") || text;
+}
+
+export function ProgressiveReveal({
+  text,
+  deltas,
+  active,
+}: {
+  readonly text: string;
+  readonly deltas?: readonly string[];
+  readonly active: boolean;
+}) {
+  const visible = useProgressiveReveal(text, deltas, active);
+  return <span>{visible}</span>;
 }

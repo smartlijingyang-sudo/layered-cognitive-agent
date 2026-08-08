@@ -2,7 +2,7 @@
 
 ## 状态
 
-Proposed
+Accepted
 
 ## 背景
 
@@ -174,3 +174,6 @@ ADR-0002 固定的 perceive→think→act→observe→reflect→update 顺序冲
   n=1 是唯一生产路径这一前提不变）。
 - **呼应:** `docs/proposals/0001-frontend-productization.md` §3.6 第 1 点为
   「假流式」预留的接口位置、§6 第 4 行「真实逐 token 流式」待办。
+- **落地:** `docs/proposals/0002-lobehub-parity-polish.md` §2.1/§2.3 前端
+  投影层在语义边界持久化与流式 Markdown 渲染，与本 ADR 的 answer-delta 归属
+  判定一致。

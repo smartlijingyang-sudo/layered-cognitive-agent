@@ -1,7 +1,9 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Copy, Check } from "lucide-react";
+import { normalizeChatMarkdown } from "../../lib/normalize-chat-markdown";
+import { sanitizeAssistantDisplayText } from "../../lib/extract-decision-text";
 import { cn } from "../../lib/cn";
 import { focusRing, mutedText } from "../../lib/ui";
 
@@ -15,11 +17,11 @@ function CodeBlock({ children, className }: { readonly children: ReactNode; read
   }, [text]);
 
   return (
-    <div className="code-block relative">
+    <div className="code-block relative my-3">
       <button
         type="button"
         className={cn(
-          "absolute top-2 right-2 rounded-md border border-white/10 bg-white/10 p-1 text-inherit",
+          "absolute top-2 right-2 rounded-md border border-white/10 bg-white/10 p-1 text-inherit opacity-70 transition-opacity hover:opacity-100",
           focusRing,
         )}
         onClick={() => void onCopy()}
@@ -34,16 +36,39 @@ function CodeBlock({ children, className }: { readonly children: ReactNode; read
   );
 }
 
-export function MarkdownContent({ text }: { readonly text: string }) {
-  if (!text.trim()) {
-    return <p className={mutedText}>等待回答…</p>;
+export function MarkdownContent({
+  text,
+  streaming = false,
+}: {
+  readonly text: string;
+  readonly streaming?: boolean;
+}) {
+  const sanitized = useMemo(
+    () => sanitizeAssistantDisplayText(text, streaming),
+    [text, streaming],
+  );
+  const normalized = useMemo(
+    () => normalizeChatMarkdown(sanitized, streaming ? "streaming" : "final"),
+    [sanitized, streaming],
+  );
+
+  if (!normalized.trim()) {
+    return <p className={cn("m-0", mutedText)}>等待回答…</p>;
   }
+
   return (
     <div className="markdown-body">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           pre: ({ children }) => <>{children}</>,
+          p: ({ children }) => <p className="md-p">{children}</p>,
+          ul: ({ children }) => <ul className="md-ul">{children}</ul>,
+          ol: ({ children }) => <ol className="md-ol">{children}</ol>,
+          li: ({ children }) => <li className="md-li">{children}</li>,
+          h1: ({ children }) => <h1 className="md-h1">{children}</h1>,
+          h2: ({ children }) => <h2 className="md-h2">{children}</h2>,
+          h3: ({ children }) => <h3 className="md-h3">{children}</h3>,
           code: ({ className, children, ...props }) => {
             const isBlock = Boolean(className);
             if (isBlock) {
@@ -51,7 +76,7 @@ export function MarkdownContent({ text }: { readonly text: string }) {
             }
             return (
               <code
-                className="rounded bg-[color-mix(in_srgb,var(--surface)_80%,var(--text)_5%)] px-1 py-0.5 font-mono text-[0.92em]"
+                className="rounded bg-[color-mix(in_srgb,var(--surface)_80%,var(--text)_5%)] px-1 py-0.5 font-mono text-[0.9em]"
                 {...props}
               >
                 {children}
@@ -60,7 +85,7 @@ export function MarkdownContent({ text }: { readonly text: string }) {
           },
         }}
       >
-        {text}
+        {normalized}
       </ReactMarkdown>
     </div>
   );

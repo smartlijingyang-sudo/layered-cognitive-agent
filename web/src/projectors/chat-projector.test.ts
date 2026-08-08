@@ -29,7 +29,7 @@ function stamp<E extends StampedRecord["event"]>(
 describe("chat projector", () => {
   it("buffers StepTextDelta until user-facing DecisionMade commits answer-delta", () => {
     let state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", pendingSteps: new Map() },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", pendingSteps: new Map(), committedAnswer: "" },
       stamp(1, { type: "StepTextDelta", step: 0, text_delta: "hel", seq: 0 }),
     );
     expect(state.answer).toBe("");
@@ -46,13 +46,13 @@ describe("chat projector", () => {
       stamp(3, { type: "DecisionMade", step: 0, action_type: "respond", rationale_preview: "", delegate_target: "", delegate_count: 0, tool_name: "", confidence: 1 }),
     );
     expect(state.answer).toBe("hello");
-    expect(state.answerDeltas).toEqual(["hel", "lo"]);
+    expect(state.answerDeltas).toEqual(["hello"]);
     expect(state.pendingSteps.size).toBe(0);
   });
 
   it("discards buffered deltas for non-user-facing decisions", () => {
     let state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", pendingSteps: new Map() },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", pendingSteps: new Map(), committedAnswer: "" },
       stamp(1, { type: "StepTextDelta", step: 1, text_delta: "delegate json", seq: 0 }),
     );
     state = reduceChat(
@@ -66,7 +66,7 @@ describe("chat projector", () => {
 
   it("tracks casting phase through CastingCompleted", () => {
     let state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "casting", pendingSteps: new Map() },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "casting", pendingSteps: new Map(), committedAnswer: "" },
       stamp(1, { type: "CastingStarted", objective_preview: "写文案" }),
     );
     expect(state.phase).toBe("casting");
@@ -86,12 +86,27 @@ describe("chat projector", () => {
 
   it("marks failed on CastingFailed", () => {
     const state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "casting", pendingSteps: new Map() },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "casting", pendingSteps: new Map(), committedAnswer: "" },
       stamp(1, { type: "CastingFailed", error: "自动组队失败" }),
     );
     expect(state.status).toBe("failed");
     expect(state.phase).toBe("failed");
     expect(state.errorMessage).toBe("自动组队失败");
+  });
+
+  it("extracts response_text from decision JSON on commit", () => {
+    const json =
+      '{"action_type":"respond","response_text":"你好，这是正式回答。"}';
+    let state = reduceChat(
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", pendingSteps: new Map(), committedAnswer: "" },
+      stamp(1, { type: "StepTextDelta", step: 0, text_delta: json, seq: 0 }),
+    );
+    state = reduceChat(
+      state,
+      stamp(2, { type: "DecisionMade", step: 0, action_type: "respond", rationale_preview: "", delegate_target: "", delegate_count: 0, tool_name: "", confidence: 1 }),
+    );
+    expect(state.answer).toBe("你好，这是正式回答。");
+    expect(state.answer).not.toContain("action_type");
   });
 
   it("exports user-facing terminal action set", () => {

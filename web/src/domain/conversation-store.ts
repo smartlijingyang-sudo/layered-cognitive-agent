@@ -4,6 +4,8 @@ import type { Conversation } from "./conversation";
 const STORAGE_KEY = "lca.conversations.v1";
 const ACTIVE_KEY = "lca.activeConversationId";
 
+/** 当前唯一生效的会话读路径（hydrate 只读此处；后端 SQLite 尚未接入）。 */
+
 export async function loadConversations(): Promise<Conversation[]> {
   const stored = await get<Conversation[]>(STORAGE_KEY);
   return stored ?? [];

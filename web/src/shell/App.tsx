@@ -3,6 +3,7 @@ import { JournalLog } from "../journal-log/journal-log";
 import { ChatProjector, TraceProjector } from "../projectors";
 import { FetchSseTransport } from "../transport";
 import { AppLayout } from "../components/layout/AppLayout";
+import { ChatError, ChatMain } from "../components/layout/ChatMain";
 import { ConversationSidebar } from "../components/sidebar/ConversationSidebar";
 import { ThreadView } from "../components/thread/ThreadView";
 import { Composer } from "../components/composer/Composer";
@@ -15,8 +16,8 @@ import {
   useAppStore,
 } from "../store/app-store";
 import { createTurn } from "../domain/conversation";
-import { cn } from "../lib/cn";
-import { mutedText } from "../lib/ui";
+import { shouldPersistTurnOnEvent } from "../lib/persist-turn";
+import type { ChatState } from "../projectors";
 import "./app.css";
 
 export default function App() {
@@ -44,7 +45,6 @@ export default function App() {
     [],
   );
 
-  const [chat, setChat] = useState(chatProjector.snapshot());
   const [trace, setTrace] = useState(traceProjector.snapshot());
 
   useEffect(() => {
@@ -75,7 +75,6 @@ export default function App() {
       log.clear();
       store.clearLiveEvents();
       chatProjector.start(question);
-      setChat(chatProjector.snapshot());
       traceProjector.reset();
       setTrace(traceProjector.snapshot());
       transport.resetCursor();
@@ -90,16 +89,32 @@ export default function App() {
         await store.appendTurn({ ...pendingTurn, status: "running" });
         store.setActiveRun(runId);
 
-        const unsub = log.subscribe((stamped) => {
-          store.appendLiveEvent(stamped);
-          const nextChat = chatProjector.onEvent(stamped);
-          setChat(nextChat);
-          setTrace(traceProjector.onEvent(stamped));
-          void store.updateActiveTurn({
+        const syncTurnFromChat = (nextChat: ChatState, stamped: import("../contracts").StampedEvent) => {
+          const patch = {
             status: mapRunStatus(nextChat.status === "idle" ? "running" : nextChat.status),
             answer: nextChat.answer,
             answerDeltas: nextChat.answerDeltas,
-          });
+          };
+          if (shouldPersistTurnOnEvent(stamped)) {
+            void store.updateActiveTurn(patch);
+          } else {
+            store.patchActiveTurn(patch);
+          }
+        };
+
+        const unsub = log.subscribe((stamped) => {
+          store.appendLiveEvent(stamped);
+          const prevChat = chatProjector.snapshot();
+          const nextChat = chatProjector.onEvent(stamped);
+          setTrace(traceProjector.onEvent(stamped));
+
+          const turnChanged =
+            prevChat.answer !== nextChat.answer ||
+            prevChat.status !== nextChat.status ||
+            prevChat.answerDeltas !== nextChat.answerDeltas;
+          if (turnChanged) {
+            syncTurnFromChat(nextChat, stamped);
+          }
         });
 
         await transport.connect(runId, (event) => log.append(event));
@@ -199,40 +214,33 @@ export default function App() {
         />
       }
       main={
-        <>
-          <ThreadView
-            conversation={conversation}
-            liveEvents={store.liveEvents}
-            trace={trace}
-            verbosity={store.settings.verbosity}
-            developerMode={store.settings.developerMode}
-            mode={store.settings.mode}
-            onExampleSelect={handleExampleSelect}
-          />
-          {store.error ? (
-            <div
-              className={cn(
-                "rounded-[var(--radius-md)] border border-danger/35 bg-danger/10 px-3 py-2.5 text-danger",
-              )}
-            >
-              {store.error}
-            </div>
-          ) : null}
-          <Composer
-            mode={store.settings.mode}
-            onModeChange={store.setMode}
-            onSubmit={(question) => void handleSubmit(question)}
-            onStop={() => void handleStop()}
-            busy={busy}
-            canStop={busy && Boolean(store.activeRunId ?? turn?.runId)}
-            llmAvailable={llmAvailable}
-          />
-          {!store.settings.developerMode && chat.phase !== "idle" ? (
-            <p className={cn("text-sm", mutedText)}>
-              运行阶段：{chat.phase === "completed" ? "已完成" : chat.phase === "failed" ? "失败" : "进行中"}
-            </p>
-          ) : null}
-        </>
+        <ChatMain
+          messages={
+            <>
+              <ThreadView
+                conversation={conversation}
+                liveEvents={store.liveEvents}
+                trace={trace}
+                verbosity={store.settings.verbosity}
+                developerMode={store.settings.developerMode}
+                mode={store.settings.mode}
+                onExampleSelect={handleExampleSelect}
+              />
+              {store.error ? <ChatError>{store.error}</ChatError> : null}
+            </>
+          }
+          footer={
+            <Composer
+              mode={store.settings.mode}
+              onModeChange={store.setMode}
+              onSubmit={(question) => void handleSubmit(question)}
+              onStop={() => void handleStop()}
+              busy={busy}
+              canStop={busy && Boolean(store.activeRunId ?? turn?.runId)}
+              llmAvailable={llmAvailable}
+            />
+          }
+        />
       }
       tracePanel={tracePanel}
       sidebarOpen={store.sidebarOpen}

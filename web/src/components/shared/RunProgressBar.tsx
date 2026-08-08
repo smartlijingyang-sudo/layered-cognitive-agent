@@ -24,6 +24,21 @@ export function RunProgressBar({
   readonly compact?: boolean;
 }) {
   if (phase === "idle" || phase === "failed") return null;
+
+  if (compact) {
+    const label = PHASES.find((s) => s.key === phase)?.label ?? phaseStatusLabel(phase);
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 text-[11px] text-text-muted"
+        role="status"
+        aria-live="polite"
+      >
+        <span className="inline-block size-1.5 animate-pulse rounded-full bg-accent" />
+        {label}
+      </span>
+    );
+  }
+
   const active = phaseIndex(phase);
 
   return (

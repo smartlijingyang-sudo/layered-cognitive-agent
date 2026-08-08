@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ModePicker } from "./ModePicker";
-import { SendHorizontal, Square } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import { AUTO_MODE_KEY } from "../../contracts/modes.generated";
-import { btnPrimary, btnSecondary, inputField } from "../../lib/ui";
+import { btnPrimary, btnSecondary } from "../../lib/ui";
 import { cn } from "../../lib/cn";
 
 export function Composer({
@@ -35,45 +35,72 @@ export function Composer({
     }
   };
 
+  const send = () => {
+    if (disabled || !question.trim()) return;
+    onSubmit(question.trim());
+    setQuestion("");
+  };
+
   return (
-    <div className="mt-auto flex flex-col gap-2.5 border-t border-border pt-4">
-      <div className="flex flex-wrap gap-3">
-        <ModePicker value={mode} onChange={onModeChange} disabled={busy} />
-      </div>
-      <textarea
-        className={cn(inputField, "min-h-[5.5rem] resize-y")}
-        rows={3}
-        placeholder={
-          llmAvailable === false
-            ? "LLM 未配置，请在服务端设置 LLM_API_KEY"
-            : mode === AUTO_MODE_KEY
-              ? "描述你的问题，系统将自动选角组队（Enter 发送，Shift+Enter 换行）"
-              : "输入问题，Enter 发送，Shift+Enter 换行"
-        }
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-      />
-      <div className="flex justify-end">
-        {canStop ? (
-          <button type="button" className={btnSecondary} onClick={onStop}>
-            <Square size={14} /> 停止生成
-          </button>
-        ) : (
-          <button
-            type="button"
-            className={btnPrimary}
-            disabled={disabled || !question.trim()}
-            onClick={() => {
-              onSubmit(question.trim());
-              setQuestion("");
-            }}
-          >
-            <SendHorizontal size={14} /> {busy ? "生成中…" : "发送"}
-          </button>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+      <ModePicker value={mode} onChange={onModeChange} disabled={busy} />
+      <div
+        className={cn(
+          "relative rounded-[var(--radius-xl)] border border-border/80 bg-surface",
+          "shadow-[0_2px_12px_color-mix(in_srgb,var(--text)_4%,transparent)]",
+          "ring-1 ring-border/30 transition-shadow focus-within:ring-accent/35",
         )}
+      >
+        <textarea
+          className={cn(
+            "block w-full resize-none border-0 bg-transparent px-4 py-3.5 pr-14",
+            "text-[0.9375rem] leading-relaxed text-text outline-none",
+            "placeholder:text-[var(--text-faint)] disabled:cursor-not-allowed disabled:opacity-50",
+            "min-h-[3.25rem] max-h-[12rem]",
+          )}
+          rows={2}
+          placeholder={
+            llmAvailable === false
+              ? "LLM 未配置，请在服务端设置 LLM_API_KEY"
+              : mode === AUTO_MODE_KEY
+                ? "描述问题，Enter 发送 · Shift+Enter 换行"
+                : "输入问题，Enter 发送"
+          }
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+        />
+        <div className="absolute bottom-2.5 right-2.5">
+          {canStop ? (
+            <button
+              type="button"
+              className={cn(btnSecondary, "size-9 justify-center rounded-full p-0")}
+              onClick={onStop}
+              aria-label="停止生成"
+            >
+              <Square size={14} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={cn(
+                btnPrimary,
+                "size-9 justify-center rounded-full p-0 shadow-sm",
+                "disabled:opacity-40",
+              )}
+              disabled={disabled || !question.trim()}
+              onClick={send}
+              aria-label="发送"
+            >
+              <ArrowUp size={16} strokeWidth={2.5} />
+            </button>
+          )}
+        </div>
       </div>
+      <p className="m-0 text-center text-[11px] text-[var(--text-faint)]">
+        LCA 可展示团队协作过程 · 历史保存在本机
+      </p>
     </div>
   );
 }

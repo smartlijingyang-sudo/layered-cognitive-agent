@@ -1,4 +1,8 @@
-"""Starlette 观测网关 —— POST 建 run、GET SSE 订阅（薄 HTTP 面）。"""
+"""Starlette 观测网关 —— POST 建 run、GET SSE 订阅（薄 HTTP 面）。
+
+会话历史：前端读路径为浏览器 IndexedDB；``ConversationStore``（SQLite）与
+``/conversations`` 路由为跨设备同步预留，见 ``gateway/conversation_store.py``。
+"""
 
 from __future__ import annotations
 

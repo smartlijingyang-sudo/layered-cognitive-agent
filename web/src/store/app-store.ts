@@ -44,6 +44,8 @@ interface AppState {
   selectConversation: (id: string) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
   appendTurn: (turn: Turn) => Promise<void>;
+  /** 仅更新内存态，不写 IndexedDB（流式过程中的高频 patch）。 */
+  patchActiveTurn: (patch: Partial<Turn>) => void;
   updateActiveTurn: (patch: Partial<Turn>) => Promise<void>;
   setActiveRun: (runId: string | null, events?: readonly StampedEvent[]) => void;
   appendLiveEvent: (event: StampedEvent) => void;
@@ -128,18 +130,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ conversations });
   },
 
-  updateActiveTurn: async (patch) => {
+  patchActiveTurn: (patch) => {
     const activeId = get().activeConversationId;
     if (!activeId) return;
-    const conversations = updateConversation(get().conversations, activeId, (c) => {
-      if (c.turns.length === 0) return c;
-      const turns = [...c.turns];
-      const last = turns[turns.length - 1];
-      turns[turns.length - 1] = { ...last, ...patch };
-      return { ...c, turns };
+    set({
+      conversations: updateConversation(get().conversations, activeId, (c) => {
+        if (c.turns.length === 0) return c;
+        const turns = [...c.turns];
+        const last = turns[turns.length - 1];
+        turns[turns.length - 1] = { ...last, ...patch };
+        return { ...c, turns };
+      }),
     });
-    await saveConversations(conversations);
-    set({ conversations });
+  },
+
+  updateActiveTurn: async (patch) => {
+    get().patchActiveTurn(patch);
+    await saveConversations(get().conversations);
   },
 
   setActiveRun: (activeRunId, events) =>

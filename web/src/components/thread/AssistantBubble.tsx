@@ -1,14 +1,13 @@
 import type { Turn } from "../../domain/conversation";
 import type { TraceState, Verbosity } from "../../projectors";
+import { Bot } from "lucide-react";
 import { phaseStatusLabel } from "../shared/RunProgressBar";
 import { MarkdownContent } from "../shared/MarkdownContent";
-import { ProgressiveReveal } from "../shared/ProgressiveReveal";
 import { RunProgressBar } from "../shared/RunProgressBar";
 import { TypingIndicator } from "../shared/TypingIndicator";
 import { TraceAccordion } from "../trace/TraceAccordion";
 import { TeamCompositionBanner } from "./TeamCompositionBanner";
 import { cn } from "../../lib/cn";
-import { elevatedSurface, mutedText } from "../../lib/ui";
 
 function turnStatusLabel(turn: Turn, trace: TraceState): string {
   if (turn.status === "failed") return "失败";
@@ -31,58 +30,61 @@ export function AssistantBubble({
   readonly developerMode: boolean;
 }) {
   const streaming = turn.status === "running" || turn.status === "pending";
-  const deltas = turn.answerDeltas ?? [];
   const hasAnswer = Boolean(turn.answer.trim());
   const showTyping = streaming && !hasAnswer && trace.phase !== "failed";
-  const body =
-    turn.status === "running" && !developerMode && hasAnswer ? (
-      <ProgressiveReveal text={turn.answer} deltas={deltas} active={streaming} />
-    ) : (
-      turn.answer
-    );
+  const showStatus = streaming || turn.status === "failed" || turn.status === "canceled";
 
   return (
-    <article className={cn(elevatedSurface, "border-l-[3px] border-l-run px-4 py-3.5")}>
-      <header className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <span className={cn("text-xs", mutedText)}>助手 · {turnStatusLabel(turn, trace)}</span>
-        {streaming ? <RunProgressBar phase={trace.phase} compact /> : null}
-      </header>
+    <div className="flex gap-3">
+      <div
+        className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/12 text-accent ring-1 ring-accent/20"
+        aria-hidden
+      >
+        <Bot size={16} strokeWidth={2} />
+      </div>
 
-      {trace.casting && turn.mode === "auto" ? (
-        <div className="mb-3">
-          <TeamCompositionBanner casting={trace.casting} />
-        </div>
-      ) : null}
+      <div className="min-w-0 flex-1">
+        {showStatus ? (
+          <div className="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span className="text-xs font-medium text-[var(--text-faint)]">
+              助手 · {turnStatusLabel(turn, trace)}
+            </span>
+            {streaming ? <RunProgressBar phase={trace.phase} compact /> : null}
+          </div>
+        ) : null}
 
-      {trace.castingError ? (
-        <p className="m-0 mb-2 text-sm text-danger">{trace.castingError}</p>
-      ) : null}
+        {trace.casting && turn.mode === "auto" && streaming ? (
+          <div className="mb-3">
+            <TeamCompositionBanner casting={trace.casting} />
+          </div>
+        ) : null}
 
-      {showTyping ? (
-        <TypingIndicator
-          label={
-            trace.phase === "casting"
-              ? "正在从角色库挑选合适团队…"
-              : "团队成员正在协作生成回答…"
-          }
-        />
-      ) : null}
+        {trace.castingError ? (
+          <p className="m-0 mb-2 text-sm text-danger">{trace.castingError}</p>
+        ) : null}
 
-      {!showTyping && (developerMode || turn.status === "completed") && hasAnswer ? (
-        <MarkdownContent text={turn.answer} />
-      ) : null}
+        {showTyping ? (
+          <TypingIndicator
+            label={
+              trace.phase === "casting"
+                ? "正在从角色库挑选合适团队…"
+                : "团队成员正在协作生成回答…"
+            }
+          />
+        ) : null}
 
-      {!showTyping && !hasAnswer && turn.status === "failed" ? (
-        <p className={cn("m-0 text-sm", mutedText)}>未能生成回答，请查看下方轨迹或重试。</p>
-      ) : null}
+        {!showTyping && hasAnswer ? (
+          <MarkdownContent text={turn.answer} streaming={streaming && !developerMode} />
+        ) : null}
 
-      {!showTyping && hasAnswer && turn.status === "running" && !developerMode ? (
-        <div className="markdown-body">
-          <p className="m-0">{body}</p>
-        </div>
-      ) : null}
+        {!showTyping && !hasAnswer && turn.status === "failed" ? (
+          <p className={cn("m-0 text-sm text-[var(--text-muted)]")}>
+            未能生成回答，请查看下方轨迹或重试。
+          </p>
+        ) : null}
 
-      <TraceAccordion events={events} trace={trace} verbosity={verbosity} />
-    </article>
+        <TraceAccordion events={events} trace={trace} verbosity={verbosity} />
+      </div>
+    </div>
   );
 }
