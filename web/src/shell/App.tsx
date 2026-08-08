@@ -10,12 +10,18 @@ import { Composer } from "../components/composer/Composer";
 import { DeveloperTracePanel } from "../components/trace/DeveloperTracePanel";
 import { createRun, cancelRun, fetchHealth, fetchRunSummary } from "../api/runs";
 import {
+  FileApiNotAvailableError,
+  uploadAttachment,
+} from "../api/files";
+import {
   activeConversation,
   activeTurn,
   mapRunStatus,
   useAppStore,
 } from "../store/app-store";
 import { createTurn } from "../domain/conversation";
+import type { LocalAttachment } from "../domain/generated-file";
+import { toPersistableAttachments } from "../domain/generated-file";
 import { shouldPersistTurnOnEvent } from "../lib/persist-turn";
 import type { ChatState } from "../projectors";
 import "./app.css";
@@ -67,7 +73,11 @@ export default function App() {
   }, [store]);
 
   const handleSubmit = useCallback(
-    async (question: string, modeOverride?: string) => {
+    async (
+      question: string,
+      modeOverride?: string,
+      attachments: readonly LocalAttachment[] = [],
+    ) => {
       store.setError(null);
       setBusy(true);
       const conversationId = await ensureConversation();
@@ -80,12 +90,48 @@ export default function App() {
       transport.resetCursor();
 
       try {
+        const uploadedAttachments: LocalAttachment[] = [];
+        const attachmentIds: string[] = [];
+        for (const att of attachments) {
+          if (att.ref?.attachmentId) {
+            attachmentIds.push(att.ref.attachmentId);
+            uploadedAttachments.push(att);
+            continue;
+          }
+          if (!att.file) {
+            uploadedAttachments.push(att);
+            continue;
+          }
+          try {
+            const ref = await uploadAttachment(conversationId, att.file);
+            attachmentIds.push(ref.attachmentId);
+            uploadedAttachments.push({
+              ...att,
+              status: "uploaded",
+              ref,
+              error: undefined,
+            });
+          } catch (err) {
+            const message =
+              err instanceof FileApiNotAvailableError
+                ? "上传端点不可用，已跳过该附件"
+                : err instanceof Error
+                  ? err.message
+                  : "上传失败";
+            uploadedAttachments.push({ ...att, status: "error", error: message });
+          }
+        }
+
         const { run_id: runId, trace_id: traceId } = await createRun({
           question,
           mode,
           conversation_id: conversationId,
+          attachment_ids: attachmentIds,
         });
-        const pendingTurn = createTurn(runId, traceId, question, mode);
+        const pendingTurn = {
+          ...createTurn(runId, traceId, question, mode),
+          attachments: toPersistableAttachments(uploadedAttachments),
+        };
         await store.appendTurn({ ...pendingTurn, status: "running" });
         store.setActiveRun(runId);
 
@@ -94,6 +140,7 @@ export default function App() {
             status: mapRunStatus(nextChat.status === "idle" ? "running" : nextChat.status),
             answer: nextChat.answer,
             answerDeltas: nextChat.answerDeltas,
+            files: nextChat.files.length ? nextChat.files : undefined,
           };
           if (shouldPersistTurnOnEvent(stamped)) {
             void store.updateActiveTurn(patch);
@@ -233,11 +280,14 @@ export default function App() {
             <Composer
               mode={store.settings.mode}
               onModeChange={store.setMode}
-              onSubmit={(question) => void handleSubmit(question)}
+              onSubmit={(question, attachments) =>
+                void handleSubmit(question, undefined, attachments)
+              }
               onStop={() => void handleStop()}
               busy={busy}
               canStop={busy && Boolean(store.activeRunId ?? turn?.runId)}
               llmAvailable={llmAvailable}
+              conversationId={store.activeConversationId ?? undefined}
             />
           }
         />

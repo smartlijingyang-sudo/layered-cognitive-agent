@@ -5,6 +5,7 @@ from __future__ import annotations
 from itertools import pairwise
 from typing import Any
 
+from gateway.default_tools import production_tools
 from gateway.mode_catalog import (
     AgentRoleTemplate,
     ModeDefinition,
@@ -52,7 +53,7 @@ def _build_agent(
         role=template.role,
         goal=template.goal,
         backstory=template.backstory,
-        tools=[],
+        tools=production_tools(),
         llm=llm,
         max_steps=max_steps,
         observability=observability,

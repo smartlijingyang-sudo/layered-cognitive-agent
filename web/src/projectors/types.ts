@@ -7,6 +7,7 @@ import type {
   StepTextDelta,
   ToolInvoked,
 } from "../contracts";
+import type { GeneratedFile } from "../domain/generated-file";
 
 export type Verbosity = "minimal" | "standard" | "verbose";
 
@@ -75,6 +76,8 @@ export interface ChatState {
   readonly phase: RunPhase;
   readonly errorMessage?: string;
   readonly teamId?: string;
+  /** File products projected from write_file / A2A file parts (Phase C). */
+  readonly files: readonly GeneratedFile[];
 }
 
 export const EMPTY_CHAT_STATE: ChatState = {
@@ -83,6 +86,7 @@ export const EMPTY_CHAT_STATE: ChatState = {
   answerDeltas: [],
   status: "idle",
   phase: "idle",
+  files: [],
 };
 
 export function shouldShowEvent(eventType: JournalEvent["type"], verbosity: Verbosity): boolean {

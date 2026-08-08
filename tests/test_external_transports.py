@@ -150,6 +150,46 @@ class TestA2ATransportPollAndReceive(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(obs.success)
         self.assertEqual(obs.payload, "Hello from A2A")
 
+    async def test_receive_result_extracts_file_parts(self) -> None:
+        transport = A2ATransport()
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(
+            return_value={
+                "status": {"state": "completed"},
+                "artifacts": [
+                    {
+                        "parts": [
+                            {"kind": "text", "text": "see file"},
+                            {
+                                "kind": "file",
+                                "file": {
+                                    "name": "chart.html",
+                                    "mimeType": "text/html",
+                                    "uri": "https://cdn.example/chart.html",
+                                    "sizeBytes": 42,
+                                },
+                            },
+                        ]
+                    },
+                ],
+            }
+        )
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        transport._client = mock_client
+        transport._task_endpoints["task_file"] = "http://agent:8080"
+
+        obs = await transport.receive_result("task_file")
+        self.assertTrue(obs.success)
+        self.assertEqual(obs.payload, "see file")
+        files = obs.extra.get("files")
+        self.assertIsInstance(files, list)
+        self.assertEqual(files[0]["name"], "chart.html")
+        self.assertEqual(files[0]["mimeType"], "text/html")
+        self.assertEqual(files[0]["url"], "https://cdn.example/chart.html")
+
 
 class TestMCPTransportProtocol(unittest.TestCase):
     """MCPTransport 满足 AgentTransport Protocol。"""

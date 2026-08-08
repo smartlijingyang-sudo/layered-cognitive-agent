@@ -1,5 +1,7 @@
 import type { StampedEvent } from "../contracts/stamped";
+import type { GeneratedFile } from "../domain/generated-file";
 import { extractUserFacingAnswer } from "../lib/extract-decision-text";
+import { filesFromToolResultPreview } from "../lib/parse-generated-file";
 import { EMPTY_CHAT_STATE, type ChatState, type RunPhase } from "./types";
 
 /** 面向用户的终态动作 — 其 StepTextDelta 可提交到对话主线（answer-delta 投影层）。 */
@@ -214,9 +216,33 @@ export function reduceChat(state: ChatProjectorInternal, stamped: StampedEvent):
         return commitStepBuffer(state, runId, e.step);
       }
       return discardStepBuffer(state, runId, e.step);
+    case "ToolInvoked": {
+      const extracted = filesFromToolResultPreview(e.tool_name, e.result_preview, e.ok);
+      if (!extracted.length) return state;
+      return {
+        ...state,
+        files: mergeGeneratedFiles(state.files, extracted),
+      };
+    }
     default:
       return state;
   }
+}
+
+function mergeGeneratedFiles(
+  existing: readonly GeneratedFile[],
+  incoming: readonly GeneratedFile[],
+): readonly GeneratedFile[] {
+  const keyOf = (f: GeneratedFile) => `${f.name}|${f.mimeType}|${f.url ?? ""}`;
+  const seen = new Set(existing.map(keyOf));
+  const next = [...existing];
+  for (const file of incoming) {
+    const key = keyOf(file);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(file);
+  }
+  return next;
 }
 
 export class ChatProjector {

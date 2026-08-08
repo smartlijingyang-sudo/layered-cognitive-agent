@@ -1,10 +1,10 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
-import mermaid from "mermaid";
 import type { StampedEvent } from "../../contracts";
 import type { TraceState, Verbosity } from "../../projectors";
 import { shouldShowEvent } from "../../projectors";
 import { renderSequenceDiagram } from "../../domain/sequence-diagram";
+import { renderMermaidSvg } from "../../lib/use-mermaid-render";
 import { InsightSummary } from "./InsightSummary";
 import { JournalRail } from "./JournalRail";
 import { TracePanel } from "../../renderers/trace-panel";
@@ -44,16 +44,24 @@ export function TraceAccordion({
   const diagramRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    mermaid.initialize({ startOnLoad: false, theme: "dark" });
-  }, []);
-
-  useEffect(() => {
     if (!open || !diagram || !diagramRef.current) return;
+    let cancelled = false;
     const render = async () => {
-      const { svg } = await mermaid.render(`seq-${Date.now()}`, diagram);
-      if (diagramRef.current) diagramRef.current.innerHTML = svg;
+      try {
+        const svg = await renderMermaidSvg(diagram, `seq-${Date.now()}`);
+        if (!cancelled && diagramRef.current) {
+          diagramRef.current.innerHTML = svg;
+        }
+      } catch {
+        if (!cancelled && diagramRef.current) {
+          diagramRef.current.textContent = "时序图渲染失败";
+        }
+      }
     };
     void render();
+    return () => {
+      cancelled = true;
+    };
   }, [open, diagram]);
 
   if (events.length === 0) return null;

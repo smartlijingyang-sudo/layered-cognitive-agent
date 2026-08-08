@@ -1,5 +1,10 @@
 /** 对话领域模型 —— 与 gateway 解耦的纯类型。 */
 
+import type { GeneratedFile, LocalAttachment } from "./generated-file";
+
+export type { GeneratedFile, LocalAttachment };
+export type { AttachmentRef } from "./generated-file";
+
 export type TurnStatus = "pending" | "running" | "completed" | "failed" | "canceled";
 
 export interface Turn {
@@ -10,6 +15,10 @@ export interface Turn {
   readonly status: TurnStatus;
   readonly answer: string;
   readonly answerDeltas?: readonly string[];
+  /** Agent-generated file products (A2A file-part shape). Optional until backend lands. */
+  readonly files?: readonly GeneratedFile[];
+  /** User attachments associated with this turn (local and/or uploaded refs). */
+  readonly attachments?: readonly LocalAttachment[];
   readonly createdAt: number;
 }
 

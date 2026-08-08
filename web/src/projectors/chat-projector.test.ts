@@ -29,7 +29,7 @@ function stamp<E extends StampedRecord["event"]>(
 describe("chat projector", () => {
   it("buffers StepTextDelta until user-facing DecisionMade commits answer-delta", () => {
     let state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", pendingSteps: new Map(), committedAnswer: "" },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", files: [], pendingSteps: new Map(), committedAnswer: "" },
       stamp(1, { type: "StepTextDelta", step: 0, text_delta: "hel", seq: 0 }),
     );
     expect(state.answer).toBe("");
@@ -52,7 +52,7 @@ describe("chat projector", () => {
 
   it("discards buffered deltas for non-user-facing decisions", () => {
     let state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", pendingSteps: new Map(), committedAnswer: "" },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", files: [], pendingSteps: new Map(), committedAnswer: "" },
       stamp(1, { type: "StepTextDelta", step: 1, text_delta: "delegate json", seq: 0 }),
     );
     state = reduceChat(
@@ -66,7 +66,7 @@ describe("chat projector", () => {
 
   it("tracks casting phase through CastingCompleted", () => {
     let state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "casting", pendingSteps: new Map(), committedAnswer: "" },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "casting", files: [], pendingSteps: new Map(), committedAnswer: "" },
       stamp(1, { type: "CastingStarted", objective_preview: "写文案" }),
     );
     expect(state.phase).toBe("casting");
@@ -86,7 +86,7 @@ describe("chat projector", () => {
 
   it("marks failed on CastingFailed", () => {
     const state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "casting", pendingSteps: new Map(), committedAnswer: "" },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "casting", files: [], pendingSteps: new Map(), committedAnswer: "" },
       stamp(1, { type: "CastingFailed", error: "自动组队失败" }),
     );
     expect(state.status).toBe("failed");
@@ -98,7 +98,7 @@ describe("chat projector", () => {
     const json =
       '{"action_type":"respond","response_text":"你好，这是正式回答。"}';
     let state = reduceChat(
-      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", pendingSteps: new Map(), committedAnswer: "" },
+      { question: "q", answer: "", answerDeltas: [], status: "running", phase: "collaborating", files: [], pendingSteps: new Map(), committedAnswer: "" },
       stamp(1, { type: "StepTextDelta", step: 0, text_delta: json, seq: 0 }),
     );
     state = reduceChat(
@@ -113,4 +113,41 @@ describe("chat projector", () => {
     expect(USER_FACING_TERMINAL_ACTIONS.has("respond")).toBe(true);
     expect(USER_FACING_TERMINAL_ACTIONS.has("delegate")).toBe(false);
   });
+
+  it("projects write_file ToolInvoked result into chat.files", () => {
+    const preview = JSON.stringify({
+      name: "out.html",
+      mimeType: "text/html",
+      url: "/files/f1",
+      sizeBytes: 9,
+      previewable: true,
+      previewHtml: "<p>x</p>",
+    });
+    const state = reduceChat(
+      {
+        question: "q",
+        answer: "",
+        answerDeltas: [],
+        status: "running",
+        phase: "collaborating",
+        files: [],
+        pendingSteps: new Map(),
+        committedAnswer: "",
+      },
+      stamp(1, {
+        type: "ToolInvoked",
+        tool_name: "write_file",
+        arguments_preview: "{}",
+        result_preview: preview,
+        ok: true,
+        latency_ms: 1,
+        attempt: 1,
+        error: "",
+      }),
+    );
+    expect(state.files).toHaveLength(1);
+    expect(state.files[0]?.name).toBe("out.html");
+    expect(state.files[0]?.url).toBe("/files/f1");
+  });
 });
+

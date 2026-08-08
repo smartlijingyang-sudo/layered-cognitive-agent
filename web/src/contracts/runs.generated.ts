@@ -6,6 +6,7 @@ export interface CreateRunRequest {
   readonly question: string;
   readonly mode: string;
   readonly conversation_id: string | null;
+  readonly attachment_ids: readonly string[];
 }
 
 export interface CreateRunResponse {

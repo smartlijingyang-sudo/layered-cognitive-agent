@@ -26,6 +26,53 @@ from lca.contracts.protocols import AgentTransport
 _DEFAULT_POLL_INTERVAL_S = 0.1
 
 
+def _map_a2a_file_part(part: dict[str, Any]) -> dict[str, Any] | None:
+    """Map A2A artifact file/data part → GeneratedFile-shaped dict.
+
+    Supports common A2A shapes::
+
+        {"kind": "file", "file": {"name": "...", "mimeType": "...", "uri": "..."}}
+        {"kind": "file", "name": "...", "mimeType": "...", "uri": "..."}
+        {"kind": "data", "data": "...", "mimeType": "...", "name": "..."}
+    """
+    nested = part.get("file")
+    source: dict[str, Any] = nested if isinstance(nested, dict) else part
+
+    name = str(source.get("name") or source.get("filename") or "artifact").strip() or "artifact"
+    mime = str(
+        source.get("mimeType")
+        or source.get("mime_type")
+        or source.get("mediaType")
+        or "application/octet-stream"
+    )
+    url = source.get("uri") or source.get("url") or source.get("bytesUrl")
+    size_raw = source.get("sizeBytes") or source.get("size_bytes") or source.get("size")
+    size_bytes: int | None
+    try:
+        size_bytes = int(size_raw) if size_raw is not None else None
+    except (TypeError, ValueError):
+        size_bytes = None
+
+    # Inline base64 / raw data without URI — keep a data-URL only for small text
+    if not url and isinstance(source.get("bytes"), str) and source["bytes"]:
+        # Opaque reference only; callers download out-of-band if needed
+        url = None
+    if not url and isinstance(part.get("data"), str) and part.get("kind") == "data":
+        # Non-downloadable inline data: still expose name/mime for the card
+        url = None
+
+    result: dict[str, Any] = {
+        "name": name,
+        "mimeType": mime,
+        "previewable": mime.lower().startswith("text/html"),
+    }
+    if url:
+        result["url"] = str(url)
+    if size_bytes is not None:
+        result["sizeBytes"] = size_bytes
+    return result
+
+
 class A2ATransport(AgentTransport):
     """Google A2A 协议传输实现。
 
@@ -143,16 +190,37 @@ class A2ATransport(AgentTransport):
 
             artifacts = data.get("artifacts", [])
             output_parts: list[str] = []
+            file_parts: list[dict[str, Any]] = []
             for artifact in artifacts:
                 for part in artifact.get("parts", []):
-                    if part.get("kind") == "text":
-                        output_parts.append(part.get("text", ""))
+                    kind = str(part.get("kind") or part.get("type") or "").lower()
+                    if kind == "text":
+                        output_parts.append(str(part.get("text", "")))
+                    elif kind in {"file", "data"}:
+                        mapped = _map_a2a_file_part(part)
+                        if mapped is not None:
+                            file_parts.append(mapped)
+
+            extra: dict[str, Any] = {
+                "a2a_task_id": task_id,
+                "raw_response": data,
+            }
+            if file_parts:
+                extra["files"] = file_parts
+
+            text_payload = "\n".join(output_parts) if output_parts else None
+            # Prefer text for legacy payload; surface files only in extra when both exist.
+            payload: Any = text_payload
+            if payload is None and len(file_parts) == 1:
+                payload = file_parts[0]
+            elif payload is None and file_parts:
+                payload = {"files": file_parts}
 
             return Observation(
                 observation_id=new_id("obs"),
                 success=True,
-                payload="\n".join(output_parts) if output_parts else None,
-                extra={"a2a_task_id": task_id, "raw_response": data},
+                payload=payload,
+                extra=extra,
             )
         except httpx.HTTPError as exc:
             return Observation(

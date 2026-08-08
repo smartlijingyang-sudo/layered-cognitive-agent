@@ -3,6 +3,7 @@ import type { TraceState, Verbosity } from "../../projectors";
 import { Bot } from "lucide-react";
 import { phaseStatusLabel } from "../shared/RunProgressBar";
 import { MarkdownContent } from "../shared/MarkdownContent";
+import { GeneratedFileList } from "../shared/GeneratedFileCard";
 import { RunProgressBar } from "../shared/RunProgressBar";
 import { TypingIndicator } from "../shared/TypingIndicator";
 import { TraceAccordion } from "../trace/TraceAccordion";
@@ -75,6 +76,10 @@ export function AssistantBubble({
 
         {!showTyping && hasAnswer ? (
           <MarkdownContent text={turn.answer} streaming={streaming && !developerMode} />
+        ) : null}
+
+        {turn.files && turn.files.length > 0 ? (
+          <GeneratedFileList files={turn.files} />
         ) : null}
 
         {!showTyping && !hasAnswer && turn.status === "failed" ? (

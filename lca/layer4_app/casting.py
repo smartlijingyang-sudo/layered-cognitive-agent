@@ -44,6 +44,8 @@ from lca.contracts.protocols.casting import (
 from lca.contracts.protocols.infra import LLMAdapter
 from lca.contracts.protocols.observability import ObservabilityBackend
 from lca.contracts.protocols.spec import OBSERVABILITY_CHOICE_CONSOLE
+from lca.layer0_infra.tools.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.write_file_tool import WriteFileTool
 from lca.layer1_cognitive.brain.decision_parser import extract_json_block
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer4_app.api import Agent, Team, TeamLead
@@ -257,7 +259,7 @@ def build_from_casting_plan(
             role=card.title,
             goal=goal,
             backstory=card.backstory,
-            tools=[],
+            tools=[CalculatorTool(), WriteFileTool()],
             llm=llm,
             observability=observability,
         )

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { ModePicker } from "./ModePicker";
+import { AttachmentUpload } from "./AttachmentUpload";
 import { ArrowUp, Square } from "lucide-react";
 import { AUTO_MODE_KEY } from "../../contracts/modes.generated";
+import type { LocalAttachment } from "../../domain/generated-file";
 import { btnPrimary, btnSecondary } from "../../lib/ui";
 import { cn } from "../../lib/cn";
 
@@ -13,32 +15,37 @@ export function Composer({
   busy,
   canStop,
   llmAvailable,
+  conversationId,
 }: {
   readonly mode: string;
   readonly onModeChange: (mode: string) => void;
-  readonly onSubmit: (question: string) => void;
+  readonly onSubmit: (question: string, attachments: readonly LocalAttachment[]) => void;
   readonly onStop: () => void;
   readonly busy: boolean;
   readonly canStop: boolean;
   readonly llmAvailable: boolean | null;
+  readonly conversationId?: string;
 }) {
   const [question, setQuestion] = useState("");
+  const [attachments, setAttachments] = useState<readonly LocalAttachment[]>([]);
   const disabled = busy || llmAvailable === false;
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       if (!disabled && question.trim()) {
-        onSubmit(question.trim());
+        onSubmit(question.trim(), attachments);
         setQuestion("");
+        setAttachments([]);
       }
     }
   };
 
   const send = () => {
     if (disabled || !question.trim()) return;
-    onSubmit(question.trim());
+    onSubmit(question.trim(), attachments);
     setQuestion("");
+    setAttachments([]);
   };
 
   return (
@@ -51,6 +58,15 @@ export function Composer({
           "ring-1 ring-border/30 transition-shadow focus-within:ring-accent/35",
         )}
       >
+        <div className="border-b border-border/50 px-3 pt-3">
+          <AttachmentUpload
+            attachments={attachments}
+            onChange={setAttachments}
+            conversationId={conversationId}
+            disabled={disabled}
+            autoUpload={false}
+          />
+        </div>
         <textarea
           className={cn(
             "block w-full resize-none border-0 bg-transparent px-4 py-3.5 pr-14",
@@ -100,6 +116,7 @@ export function Composer({
       </div>
       <p className="m-0 text-center text-[11px] text-[var(--text-faint)]">
         LCA 可展示团队协作过程 · 历史保存在本机
+        {attachments.length > 0 ? " · 附件暂存于本机（上传端点待后端）" : ""}
       </p>
     </div>
   );
