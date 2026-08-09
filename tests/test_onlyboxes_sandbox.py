@@ -12,11 +12,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from lca.contracts.models.core.sandbox import SANDBOX_MOUNT_ROOT
 from lca.layer0_infra.sandbox.factory import resolve_sandbox, sandbox_backend
 from lca.layer0_infra.sandbox.onlyboxes_adapter import (
-    _ARTIFACT_BEGIN,
-    _ARTIFACT_END,
     OnlyboxesSandboxAdapter,
     _build_wrapped_code,
-    _strip_artifacts,
+)
+from lca.layer0_infra.sandbox.onlyboxes_artifacts import (
+    ARTIFACT_BEGIN,
+    ARTIFACT_END,
+    strip_artifacts,
 )
 
 
@@ -24,15 +26,15 @@ def _artifact_block(files: list[tuple[str, bytes]]) -> str:
     payload = [
         {"name": name, "b64": base64.b64encode(data).decode("ascii")} for name, data in files
     ]
-    return _ARTIFACT_BEGIN + json.dumps(payload) + _ARTIFACT_END
+    return ARTIFACT_BEGIN + json.dumps(payload) + ARTIFACT_END
 
 
 class StripArtifactsTests(unittest.TestCase):
     def test_extracts_files_and_cleans_stdout(self) -> None:
         stdout = "hello\n" + _artifact_block([("out.txt", b"abc")]) + "\n"
-        cleaned, files, diags = _strip_artifacts(stdout)
+        cleaned, files, diags = strip_artifacts(stdout)
         self.assertIn("hello", cleaned)
-        self.assertNotIn(_ARTIFACT_BEGIN, cleaned)
+        self.assertNotIn(ARTIFACT_BEGIN, cleaned)
         self.assertEqual(diags, [])
         self.assertEqual(len(files), 1)
         self.assertEqual(files[0].name, "out.txt")
@@ -42,7 +44,7 @@ class StripArtifactsTests(unittest.TestCase):
         wrapped = _build_wrapped_code('print("x")', {"input.bin": b"\x00\x01"})
         self.assertIn(SANDBOX_MOUNT_ROOT, wrapped)
         self.assertIn("input.bin", wrapped)
-        self.assertIn(_ARTIFACT_BEGIN, wrapped)
+        self.assertIn(ARTIFACT_BEGIN, wrapped)
 
 
 class FactoryTests(unittest.TestCase):
@@ -114,7 +116,7 @@ class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.exit_code, 0)
         self.assertIn("2", result.stdout)
-        self.assertNotIn(_ARTIFACT_BEGIN, result.stdout)
+        self.assertNotIn(ARTIFACT_BEGIN, result.stdout)
         self.assertEqual(len(result.generated_files), 1)
         self.assertEqual(result.generated_files[0].name, "echo.csv")
         self.assertEqual(result.generated_files[0].data, b"a,b\n")

@@ -116,9 +116,13 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **RetryPolicy** / **CacheConfig** | 重试与缓存配置 |
 | **BrainFactory** / **SimpleBrainFactory** | Brain 工厂（注册表用 NamedRegistry） |
 | **Synthesizer** / **ConcatSynthesizer** | 并行结果聚合协议 / 默认拼接实现 |
-| **LLMAdapter** / **OpenAICompatAdapter** / **MockLLMAdapter** / **TelemetryLLMAdapter** | 多厂商 LLM 适配协议与实现（Telemetry 为装饰器） |
+| **LLMAdapter** / **OpenAICompatAdapter** / **MockLLMAdapter** / **TelemetryLLMAdapter** | 多厂商 LLM 适配协议与实现（Telemetry 为装饰器）；gateway 装配侧含 production resolver、mode definition、gateway collector |
+| **LLMSettings** | LLM 生成参数配置（pydantic-settings，`LLM_*` env；含 temperature / max_tokens / thinking） |
 | **LLMStreamEvent** / **LLMStreamEventType** | provider-neutral 流式事件契约；``COMPLETED.response`` 与同次 ``complete()`` 返回值一致 |
 | **LLMApiStyle** | OpenAICompatAdapter 内部 wire-protocol 选择（Responses 默认 / Chat Completions opt-in） |
+| **FinishReason** | LLM 生成结束原因归一（stop / length / tool_calls …）；`length` + tool_call → incomplete（ADR-0047） |
+| **ToolArgumentsOutcome** | 工具 arguments wire 三态：Ok / Incomplete / Invalid（ADR-0047） |
+| **tool_wire_status** / **tool_wire_gate** | Decision.extra 工具 wire 状态与 Body 执行闸门；incomplete 禁止执行、软失败回灌 loop（ADR-0047） |
 | **AgentTransport** / **TransportRegistry** / **InternalTransport** / **A2ATransport** / **MCPTransport** | 传输协议、注册与实现 |
 | **ComponentRegistry** / **NamedRegistry** | DI / 按名注册表（ComponentRegistry 是 category → NamedRegistry 的组合器） |
 | **RegistryKeyError** | 注册表硬查询失败异常（继承 ValueError） |

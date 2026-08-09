@@ -20,9 +20,9 @@ from lca.layer0_infra.observability import ObservabilityHub, bind
 from lca.layer0_infra.tools.write_file_tool import WriteFileTool
 from lca.layer1_cognitive.body.safe_executor import (
     SimpleSafeExecutor,
-    _tool_files,
     _tool_output_preview,
 )
+from lca.layer1_cognitive.body.tool_result_preview import tool_files
 
 
 class _Collector:
@@ -69,7 +69,7 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
                 ]
             },
         )
-        files = _tool_files(obs)
+        files = tool_files(obs)
         self.assertEqual(len(files), 1)
         self.assertNotIn("previewHtml", files[0])
         self.assertEqual(files[0]["name"], "a.html")

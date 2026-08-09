@@ -6,11 +6,11 @@ import base64
 import json
 import unittest
 
-from lca.layer0_infra.sandbox.onlyboxes_adapter import (
-    _ARTIFACT_BEGIN,
-    _ARTIFACT_END,
-    _build_wrapped_code,
-    _strip_artifacts,
+from lca.layer0_infra.sandbox.onlyboxes_adapter import _build_wrapped_code
+from lca.layer0_infra.sandbox.onlyboxes_artifacts import (
+    ARTIFACT_BEGIN,
+    ARTIFACT_END,
+    strip_artifacts,
 )
 from lca.layer0_infra.sandbox.output_collect import sandbox_output_dir
 
@@ -28,11 +28,11 @@ class OnlyboxesRoundtripHelpersTests(unittest.TestCase):
     def test_strip_artifacts_respects_caps_via_try_append(self) -> None:
         # One small file harvests cleanly.
         block = (
-            _ARTIFACT_BEGIN
+            ARTIFACT_BEGIN
             + json.dumps([{"name": "ok.bin", "b64": base64.b64encode(b"data").decode("ascii")}])
-            + _ARTIFACT_END
+            + ARTIFACT_END
         )
-        cleaned, files, diags = _strip_artifacts("out\n" + block)
+        cleaned, files, diags = strip_artifacts("out\n" + block)
         self.assertIn("out", cleaned)
         self.assertEqual(len(files), 1)
         self.assertEqual(files[0].data, b"data")
