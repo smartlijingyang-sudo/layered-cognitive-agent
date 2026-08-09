@@ -11,15 +11,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from lca.contracts.models.core.sandbox import SANDBOX_MOUNT_ROOT
 from lca.layer0_infra.sandbox.factory import resolve_sandbox, sandbox_backend
-from lca.layer0_infra.sandbox.onlyboxes_adapter import (
-    OnlyboxesSandboxAdapter,
-    _build_wrapped_code,
-    _strip_surrogates,
-)
+from lca.layer0_infra.sandbox.onlyboxes_adapter import OnlyboxesSandboxAdapter
 from lca.layer0_infra.sandbox.onlyboxes_artifacts import (
     ARTIFACT_BEGIN,
     ARTIFACT_END,
     strip_artifacts,
+)
+from lca.layer0_infra.sandbox.onlyboxes_bootstrap import (
+    _strip_surrogates,
+)
+from lca.layer0_infra.sandbox.onlyboxes_bootstrap import (
+    build_wrapped_code as _build_wrapped_code,
 )
 
 

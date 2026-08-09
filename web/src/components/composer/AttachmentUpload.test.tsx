@@ -92,6 +92,7 @@ describe("AttachmentUpload", () => {
       />,
     );
     expect(screen.getByTestId("attachment-chip")).toBeTruthy();
+    // LobeHub FileItem card (local/pending) shows full filename
     expect(screen.getByText("a.txt")).toBeTruthy();
   });
 });

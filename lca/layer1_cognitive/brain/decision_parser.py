@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
@@ -44,19 +44,87 @@ _TOOL_WIRE_EXTRA_KEYS: tuple[str, ...] = (
 _BLOCKING_WIRE_STATUSES: frozenset[str] = frozenset({TOOL_WIRE_INCOMPLETE, TOOL_WIRE_INVALID})
 
 
+def _extract_balanced_object(text: str) -> str | None:
+    """从首个 ``{`` 起做字符串感知的花括号匹配，避免 response_text 内嵌套 ``` 破坏提取。"""
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for index in range(start, len(text)):
+        ch = text[index]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+    return None
+
+
 def extract_json_block(raw_output: str) -> str:
-    """从 LLM 原始输出提取 JSON 文本：优先 ```json 围栏，其次裸 {...} 块。
+    """从 LLM 原始输出提取 JSON 文本。
+
+    优先字符串感知的裸 ``{...}``（正确处理 response_text 内代码围栏）；
+    其次整段可 parse 的文本；最后才用 ```json 围栏（可能被内嵌围栏截断）。
 
     归一化管线的公共第一步；DecisionParser 与 L4 自动组队
     （LLMTeamCaster）共用，禁止各自复制提取逻辑。
     """
+    balanced = _extract_balanced_object(raw_output)
+    if balanced is not None:
+        return balanced.strip()
+    stripped = raw_output.strip()
+    if stripped.startswith("{") and stripped.endswith("}"):
+        return stripped
     m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", raw_output, re.DOTALL)
     if m:
         return m.group(1).strip()
-    m = re.search(r"\{.*\}", raw_output, re.DOTALL)
+    return stripped
+
+
+def _salvage_response_text(raw_output: str) -> str:
+    """解析失败时尽量抽出用户可见正文，禁止把整包 raw JSON 当回复（ADR-0045/0049）。"""
+    # 1) 再试一次平衡提取 + loads
+    for candidate in (extract_json_block(raw_output), raw_output.strip()):
+        try:
+            data = json.loads(candidate)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            continue
+        if isinstance(data, dict):
+            for key in ("response_text", "response", "text"):
+                value = data.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value
+    # 2) 宽松正则：抓 "response_text": "..." 到下一顶级键或结束
+    m = re.search(
+        r'"response_text"\s*:\s*"(?P<body>(?:\\.|[^"\\])*)"',
+        raw_output,
+        re.DOTALL,
+    )
     if m:
-        return m.group(0)
-    return raw_output.strip()
+        try:
+            return cast("str", json.loads(f'"{m.group("body")}"'))
+        except (json.JSONDecodeError, ValueError):
+            return m.group("body").encode("utf-8").decode("unicode_escape")
+    # 3) 去掉 JSON 外壳提示后的 markdown 正文
+    stripped = raw_output.strip()
+    if stripped.startswith("{"):
+        return (
+            "系统未能解析模型输出为结构化决策；以下为原始要点摘录（已降级）：\n\n" + stripped[:2000]
+        )
+    return stripped
 
 
 class SimpleDecisionParser(DecisionParser):
@@ -85,7 +153,7 @@ class SimpleDecisionParser(DecisionParser):
             return Decision(
                 decision_id=new_id("dec"),
                 action_type=ActionType.RESPOND,
-                response_text=raw_output,
+                response_text=_salvage_response_text(raw_output),
                 rationale="解析失败兜底",
                 confidence=_PARSE_FAILURE_CONFIDENCE,
             )
@@ -94,7 +162,7 @@ class SimpleDecisionParser(DecisionParser):
             return Decision(
                 decision_id=new_id("dec"),
                 action_type=ActionType.RESPOND,
-                response_text=raw_output,
+                response_text=_salvage_response_text(raw_output),
                 rationale="解析失败兜底：根节点非对象",
                 confidence=_PARSE_FAILURE_CONFIDENCE,
             )

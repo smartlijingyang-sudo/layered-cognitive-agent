@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.budget import DEFAULT_MIN_USABLE_PARTIAL_CHARS
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.team.member_status import MemberStatus
 from lca.contracts.models.team.role_team import RoleProfile
@@ -24,15 +25,21 @@ class LeadStrategy(TeamStrategy):
         roster: tuple[RoleProfile, ...],
         board: MemberStatus | None,
         delegate_max_attempts: int,
+        min_usable_partial_chars: int = DEFAULT_MIN_USABLE_PARTIAL_CHARS,
     ) -> None:
         self._lead = lead
         self._roster = roster
         self._board = board
         self._delegate_max_attempts = delegate_max_attempts
+        self._min_usable_partial_chars = min_usable_partial_chars
 
     async def run(self, objective: str) -> Result:
         duty = (
-            ConsultDuty(member_status=self._board, max_attempts=self._delegate_max_attempts)
+            ConsultDuty(
+                member_status=self._board,
+                max_attempts=self._delegate_max_attempts,
+                min_usable_partial_chars=self._min_usable_partial_chars,
+            )
             if self._board is not None
             else None
         )

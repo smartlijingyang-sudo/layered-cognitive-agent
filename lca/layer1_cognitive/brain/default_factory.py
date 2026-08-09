@@ -9,6 +9,7 @@ from lca.contracts.protocols import Brain, LLMAdapter, Tool
 from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.layer1_cognitive.body.action_catalog import format_allowed_actions_desc
 from lca.layer1_cognitive.brain.critic import SimpleCritic
+from lca.layer1_cognitive.brain.decision_gates import build_workspace_agent_gate
 from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
@@ -30,6 +31,7 @@ class SimpleBrainFactory:
         *,
         action_registry: ActionRegistryProtocol | None = None,
         tools: list[Tool] | None = None,
+        available_skills: str = "",
         **_ignored: Any,
     ) -> Brain:
         allowed_actions_desc = ""
@@ -49,9 +51,11 @@ class SimpleBrainFactory:
                 "routing_prompt": load_builtin_prompt("routing_prompt"),
             },
             allowed_actions_desc=allowed_actions_desc,
+            available_skills=available_skills,
         )
         return ModularBrain(
             reasoner=reasoner,
             decision_parser=SimpleDecisionParser(action_registry=action_registry),
             critic=SimpleCritic(),
+            agent_gates=build_workspace_agent_gate(),
         )

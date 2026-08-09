@@ -14,6 +14,7 @@ import structlog
 from lca.contracts.atoms.enums import SnapshotReason
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms import HookRegistry
+from lca.contracts.models.core.activation import ActivatedSkill
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.lifecycle import TaskStatus
@@ -30,6 +31,8 @@ from lca.contracts.protocols import (
     StopRule,
 )
 from lca.layer0_infra.observability import get_span_context
+from lca.layer0_infra.skills.activation_scope import get_newly_activated
+from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
 
 _log = structlog.get_logger("lca.runtime_loop")
 
@@ -126,6 +129,8 @@ class CognitiveRuntime(Runtime):
                 await self.hooks.trigger(
                     "post_act", state, decision=decision, observation=observation
                 )
+                # ── Phase 3.5: Sync activation state ──
+                self._sync_activated_skills(state)
                 # ── Phase 4: Reflect ──
                 await self.hooks.trigger("pre_reflect", state, observation=observation)
                 reflection = await self.brain.reflect(state, observation)
@@ -162,7 +167,20 @@ class CognitiveRuntime(Runtime):
                     state.status = stop.status
                 break
         await self.hooks.trigger("on_complete", state)
+        self._apply_artifact_closure(state)
         return Result.from_state(state)
+
+    @staticmethod
+    def _apply_artifact_closure(state: AgentState) -> None:
+        """Synthesize user-facing output from workspace ledger when loop exits without respond."""
+        if state.final_output:
+            return
+        closure = synthesize_artifact_closure()
+        if not closure:
+            return
+        state.final_output = closure
+        if state.status == TaskStatus.WORKING:
+            state.status = TaskStatus.COMPLETED
 
     async def _checkpoint(
         self, state: AgentState, reason: SnapshotReason = SnapshotReason.PERIODIC
@@ -171,3 +189,16 @@ class CognitiveRuntime(Runtime):
         ref = await self.state_store.save(state)
         snap.state_ref = ref
         return snap
+
+    @staticmethod
+    def _sync_activated_skills(state: AgentState) -> None:
+        """Sync contextvar activation_scope → AgentState (one-way)."""
+        newly = get_newly_activated(state.activated_skills)
+        for skill in newly:
+            state.activated_skills.append(
+                ActivatedSkill(
+                    skill_id=skill.skill_id,
+                    name=skill.name,
+                    activated_at_step=state.step,
+                )
+            )

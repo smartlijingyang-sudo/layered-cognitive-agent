@@ -280,6 +280,7 @@ class AgentComposer:
         if spec.brain not in factory_reg:
             raise ValueError(f"Unknown brain: {spec.brain!r}. Available: {factory_reg.list()}")
         tools_desc = ", ".join(t.name for t in spec.tools) or "(no tools available)"
+        available_skills = self._render_available_skills()
         factory = factory_reg.resolve(spec.brain)
         instrumented_llm: LLMAdapter = TelemetryLLMAdapter(_unwrap_llm(spec.llm))
         resolved: Brain = factory(
@@ -288,8 +289,23 @@ class AgentComposer:
             tools_desc,
             action_registry=action_registry,
             tools=list(spec.tools),
+            available_skills=available_skills,
         )
         return resolved
+
+    @staticmethod
+    def _render_available_skills() -> str:
+        """Render installed skill catalog for prompt injection."""
+        from lca.layer0_infra.skills.factory import resolve_skill_store
+
+        try:
+            store = resolve_skill_store()
+            installed = store.list_installed()
+        except Exception:
+            return "（技能库不可用）"
+        if not installed:
+            return "（本地无已安装 skill，用 search_skill 从 Market 搜索）"
+        return "\n".join(f"- {e.skill_id}: {e.name}" for e in installed)
 
     @staticmethod
     def _build_hooks(event_bus: EventBus) -> SimpleHookRegistry:
@@ -320,6 +336,7 @@ class AgentComposer:
             evaluation_pipeline=brain.evaluation_pipeline,
             skill_router=brain.skill_router,
             decision_gate=decision_gate,
+            agent_gates=brain.agent_gates,
         )
 
     def _resolve_decision_gate(self, name: DecisionGateName) -> DecisionGate | None:

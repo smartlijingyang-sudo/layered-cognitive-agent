@@ -6,12 +6,12 @@ import base64
 import json
 import unittest
 
-from lca.layer0_infra.sandbox.onlyboxes_adapter import _build_wrapped_code
 from lca.layer0_infra.sandbox.onlyboxes_artifacts import (
     ARTIFACT_BEGIN,
     ARTIFACT_END,
     strip_artifacts,
 )
+from lca.layer0_infra.sandbox.onlyboxes_bootstrap import build_wrapped_code as _build_wrapped_code
 from lca.layer0_infra.sandbox.output_collect import sandbox_output_dir
 
 

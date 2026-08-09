@@ -11,6 +11,7 @@ import { isMermaidLanguage, parseCodeLanguage } from "../../lib/code-language";
 import { highlightCode } from "../../lib/highlight-code";
 import { useMermaidRender } from "../../lib/use-mermaid-render";
 import { cn } from "../../lib/cn";
+import { LobeIcon } from "../../lib/icons";
 import { focusRing, mutedText } from "../../lib/ui";
 
 function CopyButton({ text }: { readonly text: string }) {
@@ -31,7 +32,7 @@ function CopyButton({ text }: { readonly text: string }) {
       onClick={() => void onCopy()}
       aria-label="复制代码"
     >
-      {copied ? <Check size={14} /> : <Copy size={14} />}
+      {copied ? <LobeIcon icon={Check} size="sm" /> : <LobeIcon icon={Copy} size="sm" />}
     </button>
   );
 }

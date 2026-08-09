@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc *)",
+      "send_message"
+    ]
+  },
+  "$version": 4
+}

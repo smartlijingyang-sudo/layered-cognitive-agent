@@ -84,8 +84,8 @@ import datetime
 class BrandConfig:
     primary_color: str = "#1a56db"
     secondary_color: str = "#6b7280"
-    font_family: str = "SourceHanSansSC"  # 思源黑体
-    font_path: str = "/usr/share/fonts/SourceHanSansSC-Regular.ttf"
+    font_family: str = "WenQuanYi Zen Hei"  # 沙箱预装 CJK 字体（ADR-0044）
+    font_path: str = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
     logo_path: str = "assets/logo.png"
 
 

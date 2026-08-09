@@ -11,6 +11,7 @@ const FILE_TOOL_NAMES = new Set([
   "generate_file",
   "file_write",
   "run_sandbox_code",
+  "sandbox_execute",
 ]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {

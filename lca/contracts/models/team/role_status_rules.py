@@ -13,7 +13,11 @@ from __future__ import annotations
 
 from lca.contracts.atoms.enums import RoleStatus
 
-_TERMINAL_STATUSES: frozenset[RoleStatus] = frozenset({RoleStatus.DONE, RoleStatus.FAILED})
+_TERMINAL_STATUSES: frozenset[RoleStatus] = frozenset(
+    {RoleStatus.DONE, RoleStatus.DONE_PARTIAL, RoleStatus.FAILED}
+)
+_SUCCESS_STATUSES: frozenset[RoleStatus] = frozenset({RoleStatus.DONE, RoleStatus.DONE_PARTIAL})
+_FULL_SUCCESS_STATUSES: frozenset[RoleStatus] = frozenset({RoleStatus.DONE})
 
 
 def is_terminal_status(status: RoleStatus) -> bool:
@@ -22,5 +26,10 @@ def is_terminal_status(status: RoleStatus) -> bool:
 
 
 def is_success_status(status: RoleStatus) -> bool:
-    """是否成功终态(done)。"""
-    return status == RoleStatus.DONE
+    """是否成功终态（完整 DONE 或可用部分 DONE_PARTIAL）。"""
+    return status in _SUCCESS_STATUSES
+
+
+def is_full_success_status(status: RoleStatus) -> bool:
+    """是否完整成功终态（仅 DONE，不含 partial）。"""
+    return status in _FULL_SUCCESS_STATUSES

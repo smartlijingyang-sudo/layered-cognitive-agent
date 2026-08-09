@@ -16,6 +16,7 @@ import type { GeneratedFile } from "../../domain/generated-file";
 import { fileIconKind, formatByteSize } from "../../lib/file-mime-icon";
 import { fileDownloadUrl, filePreviewUrl } from "../../lib/file-preview-url";
 import { cn } from "../../lib/cn";
+import { ICON_STROKE, LobeIcon } from "../../lib/icons";
 import { focusRing, mutedText } from "../../lib/ui";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 
@@ -118,7 +119,7 @@ export function GeneratedFileCard({ file }: { readonly file: GeneratedFile }) {
             className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-soft)] text-[var(--text)]"
             aria-hidden
           >
-            <Icon size={18} strokeWidth={1.75} />
+            <LobeIcon icon={Icon} size="lg" strokeWidth={ICON_STROKE} />
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="m-0 truncate text-sm font-medium text-[var(--text)]" title={file.name}>
@@ -143,7 +144,7 @@ export function GeneratedFileCard({ file }: { readonly file: GeneratedFile }) {
               onClick={openPreview}
               data-testid="generated-file-preview-btn"
             >
-              <Eye size={13} />
+              <LobeIcon icon={Eye} size="sm" />
               预览
             </button>
           ) : null}
@@ -159,12 +160,12 @@ export function GeneratedFileCard({ file }: { readonly file: GeneratedFile }) {
               data-testid="generated-file-download"
               onClick={(e) => e.stopPropagation()}
             >
-              <Download size={13} />
+              <LobeIcon icon={Download} size="sm" />
               下载
             </a>
           ) : (
             <span className={cn("inline-flex items-center gap-1.5 px-2 py-1 text-xs", mutedText)}>
-              <ExternalLink size={13} />
+              <LobeIcon icon={ExternalLink} size="sm" />
               暂无下载地址
             </span>
           )}

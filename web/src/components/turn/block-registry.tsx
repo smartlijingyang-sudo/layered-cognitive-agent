@@ -6,6 +6,7 @@ import {
   Users,
 } from "lucide-react";
 import type {
+  ActivityBlock,
   CastingBlock,
   DecisionProcessBlock,
   DelegationBlock,
@@ -16,10 +17,14 @@ import type {
   TurnProcessBlock,
 } from "../../projectors/types";
 import { cn } from "../../lib/cn";
+import { LobeIcon } from "../../lib/icons";
 import { mutedText } from "../../lib/ui";
 import { ThinkingPanel } from "./ThinkingPanel";
 import { ToolCallCard } from "./ToolCallCard";
 import { SandboxPanel } from "./SandboxPanel";
+import { WorkflowCollapse } from "./WorkflowCollapse";
+import { StatusBlock } from "./StatusBlock";
+import { WORKFLOW_MULTI_TOOL_THRESHOLD } from "./workflow-constants";
 
 function SimpleCard({
   icon,
@@ -61,7 +66,7 @@ function CastingCard({ block }: { readonly block: CastingBlock }) {
   if (block.status === "running") {
     return (
       <SimpleCard
-        icon={<Users size={14} />}
+        icon={<LobeIcon icon={Users} size="sm" />}
         title="◎ 智能选角"
         body={block.objectivePreview || "正在分析问题并挑选角色…"}
       />
@@ -70,7 +75,7 @@ function CastingCard({ block }: { readonly block: CastingBlock }) {
   if (block.status === "error") {
     return (
       <SimpleCard
-        icon={<Users size={14} />}
+        icon={<LobeIcon icon={Users} size="sm" />}
         title="✗ 组队失败"
         body={block.error}
         tone="error"
@@ -86,7 +91,14 @@ function CastingCard({ block }: { readonly block: CastingBlock }) {
   ]
     .filter(Boolean)
     .join("\n");
-  return <SimpleCard icon={<Users size={14} />} title="✓ 组队完成" body={body} tone="success" />;
+  return (
+    <SimpleCard
+      icon={<LobeIcon icon={Users} size="sm" />}
+      title="✓ 组队完成"
+      body={body}
+      tone="success"
+    />
+  );
 }
 
 function DecisionCard({ block }: { readonly block: DecisionProcessBlock }) {
@@ -96,7 +108,7 @@ function DecisionCard({ block }: { readonly block: DecisionProcessBlock }) {
     block.confidence != null ? ` · 置信 ${(block.confidence * 100).toFixed(0)}%` : "";
   return (
     <SimpleCard
-      icon={<Sparkles size={14} />}
+      icon={<LobeIcon icon={Sparkles} size="sm" />}
       title={`决策 · step ${block.step}${block.agentRole ? ` · ${block.agentRole}` : ""}`}
       body={`${block.actionType}${target}${tool}${conf}${
         block.rationalePreview ? `\n${block.rationalePreview}` : ""
@@ -109,7 +121,7 @@ function DelegationCard({ block }: { readonly block: DelegationBlock }) {
   const running = block.status === "running";
   return (
     <SimpleCard
-      icon={<ArrowRightLeft size={14} />}
+      icon={<LobeIcon icon={ArrowRightLeft} size="sm" />}
       title={running ? `⇢ 委派 → ${block.calleeRole}` : `⇠ ${block.calleeRole} 完成`}
       body={
         running
@@ -124,24 +136,97 @@ function DelegationCard({ block }: { readonly block: DelegationBlock }) {
 function InsightCard({ block }: { readonly block: InsightBlock }) {
   return (
     <SimpleCard
-      icon={<Lightbulb size={14} />}
+      icon={<LobeIcon icon={Lightbulb} size="sm" />}
       title={block.summary || block.insightKind}
       body={block.detail || undefined}
     />
   );
 }
 
+function ActivityCard({ block }: { readonly block: ActivityBlock }) {
+  const variant = block.status === "running" ? "neural" : "thinking-done";
+  return (
+    <div className="flex items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
+      <StatusBlock variant={variant} />
+      <span className="text-sm text-[var(--text-muted)]">{block.detail}</span>
+    </div>
+  );
+}
+
 export interface BlockRenderContext {
-  /** Sandbox streams keyed by invocationId for nesting under tools. */
   readonly sandboxesByInvocation: ReadonlyMap<string, SandboxBlock>;
-  /** Invocation ids already rendered under a tool card. */
   readonly nestedSandboxIds: ReadonlySet<string>;
 }
 
+type RenderSegment =
+  | { kind: "single"; block: TurnProcessBlock }
+  | {
+      kind: "workflow";
+      tools: ToolBlock[];
+      thinkingMs: number;
+      /** Non-tool blocks interleaved in the tool run (thinking between tools). */
+      interleaved: TurnProcessBlock[];
+    };
+
 /**
- * Render a process block. Sandbox blocks nested under a matching tool are skipped
- * when rendered via the tool card (see ProcessBlocks).
+ * Partition process into single blocks vs multi-tool WorkflowCollapse segments.
+ * LobeHub: multi-tool → WorkflowCollapse; single tool → inline ToolCallCard.
  */
+export function partitionProcessSegments(
+  blocks: readonly TurnProcessBlock[],
+): RenderSegment[] {
+  const segments: RenderSegment[] = [];
+  let i = 0;
+
+  while (i < blocks.length) {
+    const b = blocks[i]!;
+
+    // Tool/sandbox cluster — thinking stays as its own row (LobeHub: 已深度思考 before 工具)
+    if (b.kind === "tool" || b.kind === "sandbox") {
+      const cluster: TurnProcessBlock[] = [];
+      while (i < blocks.length) {
+        const cur = blocks[i]!;
+        if (cur.kind === "tool" || cur.kind === "sandbox") {
+          cluster.push(cur);
+          i += 1;
+          continue;
+        }
+        break;
+      }
+
+      const tools = cluster.filter((c): c is ToolBlock => c.kind === "tool");
+      const thinkingMs = blocks
+        .filter((c): c is ThinkingBlock => c.kind === "thinking")
+        .reduce((s, t) => s + (t.durationMs ?? 0), 0);
+
+      if (tools.length >= WORKFLOW_MULTI_TOOL_THRESHOLD) {
+        segments.push({
+          kind: "workflow",
+          tools,
+          thinkingMs,
+          interleaved: cluster,
+        });
+      } else {
+        for (const c of cluster) {
+          segments.push({ kind: "single", block: c });
+        }
+      }
+      continue;
+    }
+
+    if (b.kind === "thinking") {
+      segments.push({ kind: "single", block: b });
+      i += 1;
+      continue;
+    }
+
+    segments.push({ kind: "single", block: b });
+    i += 1;
+  }
+
+  return segments;
+}
+
 export function renderProcessBlock(
   block: TurnProcessBlock,
   ctx: BlockRenderContext,
@@ -168,13 +253,14 @@ export function renderProcessBlock(
       return <DecisionCard key={block.id} block={block as DecisionProcessBlock} />;
     case "insight":
       return <InsightCard key={block.id} block={block as InsightBlock} />;
+    case "activity":
+      return <ActivityCard key={block.id} block={block as ActivityBlock} />;
     default:
       return null;
   }
 }
 
-/** Render ordered process blocks with tool↔sandbox nesting. */
-export function ProcessBlocks({ blocks }: { readonly blocks: readonly TurnProcessBlock[] }) {
+function buildContext(blocks: readonly TurnProcessBlock[]): BlockRenderContext {
   const sandboxesByInvocation = new Map<string, SandboxBlock>();
   for (const b of blocks) {
     if (b.kind === "sandbox" && b.invocationId) {
@@ -187,10 +273,36 @@ export function ProcessBlocks({ blocks }: { readonly blocks: readonly TurnProces
       nestedSandboxIds.add(b.invocationId);
     }
   }
-  const ctx: BlockRenderContext = { sandboxesByInvocation, nestedSandboxIds };
+  return { sandboxesByInvocation, nestedSandboxIds };
+}
+
+/** Render ordered process blocks with WorkflowCollapse for multi-tool runs. */
+export function ProcessBlocks({ blocks }: { readonly blocks: readonly TurnProcessBlock[] }) {
+  const ctx = buildContext(blocks);
+  const segments = partitionProcessSegments(blocks);
+
   return (
     <div className="grid gap-2.5">
-      {blocks.map((block) => renderProcessBlock(block, ctx))}
+      {segments.map((seg, idx) => {
+        if (seg.kind === "workflow") {
+          const key = `wf-${seg.tools[0]?.id ?? idx}`;
+          return (
+            <WorkflowCollapse
+              key={key}
+              tools={seg.tools}
+              thinkingDurationMs={seg.thinkingMs || undefined}
+            >
+              {seg.interleaved.map((block) => {
+                if (block.kind === "sandbox" && ctx.nestedSandboxIds.has(block.invocationId)) {
+                  return null;
+                }
+                return renderProcessBlock(block, ctx);
+              })}
+            </WorkflowCollapse>
+          );
+        }
+        return renderProcessBlock(seg.block, ctx);
+      })}
     </div>
   );
 }

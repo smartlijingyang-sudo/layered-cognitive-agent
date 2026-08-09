@@ -15,6 +15,7 @@ from lca.contracts.atoms.semantic_keys import (
 )
 from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation
 from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.models.team.consultation import ConsultationDisposition
 from lca.contracts.models.team.role_status_rules import is_success_status, is_terminal_status
 from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols import SupportsShortcut
@@ -494,42 +495,41 @@ class TestNextRoleStatus:
     """Table-driven exhaustive test for the retry classification pure function."""
 
     @pytest.mark.parametrize(
-        "success,failure_kind,attempts_after,max_attempts,expected",
+        "disposition,usable,attempts_after,max_attempts,expected",
         [
-            # success → always DONE
-            (True, "execution", 0, 3, "done"),
-            (True, "validation", 0, 3, "done"),
-            (True, "transient", 0, 3, "done"),
-            # validation → always FAILED immediately
-            (False, "validation", 0, 3, "failed"),
-            (False, "validation", 1, 3, "failed"),
-            (False, "validation", 2, 3, "failed"),
-            # execution/transient → PENDING until max, then FAILED
-            (False, "execution", 1, 3, "pending"),
-            (False, "execution", 2, 3, "pending"),
-            (False, "execution", 3, 3, "failed"),
-            (False, "transient", 1, 3, "pending"),
-            (False, "transient", 2, 3, "pending"),
-            (False, "transient", 3, 3, "failed"),
-            # default fallback kind (missing) → treated as execution
-            (False, "unknown_kind", 1, 3, "pending"),
-            (False, "unknown_kind", 3, 3, "failed"),
+            # completed + usable → DONE
+            (ConsultationDisposition.COMPLETED, True, 0, 3, "done"),
+            (ConsultationDisposition.COMPLETED, True, 2, 3, "done"),
+            # partial + usable → DONE_PARTIAL
+            (ConsultationDisposition.PARTIAL, True, 0, 3, "done_partial"),
+            # validation → FAILED immediately
+            (ConsultationDisposition.VALIDATION_FAILED, False, 0, 3, "failed"),
+            (ConsultationDisposition.VALIDATION_FAILED, False, 2, 3, "failed"),
+            # error/timeout → PENDING until max, then FAILED
+            (ConsultationDisposition.ERROR, False, 1, 3, "pending"),
+            (ConsultationDisposition.ERROR, False, 2, 3, "pending"),
+            (ConsultationDisposition.ERROR, False, 3, 3, "failed"),
+            (ConsultationDisposition.TIMEOUT, False, 1, 3, "pending"),
+            (ConsultationDisposition.TIMEOUT, False, 3, 3, "failed"),
             # max_attempts = 1 → first failure is terminal
-            (False, "execution", 1, 1, "failed"),
-            (False, "transient", 1, 1, "failed"),
+            (ConsultationDisposition.ERROR, False, 1, 1, "failed"),
+            (ConsultationDisposition.TIMEOUT, False, 1, 1, "failed"),
+            # completed but not usable → retry path
+            (ConsultationDisposition.COMPLETED, False, 1, 3, "pending"),
+            (ConsultationDisposition.COMPLETED, False, 3, 3, "failed"),
         ],
     )
     def test_classification(
         self,
-        success: bool,
-        failure_kind: str,
+        disposition: ConsultationDisposition,
+        usable: bool,
         attempts_after: int,
         max_attempts: int,
         expected: str,
     ) -> None:
         result = _next_role_status(
-            success=success,
-            failure_kind=failure_kind,
+            disposition=disposition,
+            usable=usable,
             attempts_after=attempts_after,
             max_attempts=max_attempts,
         )

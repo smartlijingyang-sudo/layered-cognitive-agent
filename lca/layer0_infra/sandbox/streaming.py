@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from lca.contracts.models.observability.journal import SandboxOutputDelta
 from lca.layer0_infra.observability import record
+from lca.layer0_infra.text.safe_boundary import sanitize_stream_text
 
 STREAM_STDOUT = "stdout"
 STREAM_STDERR = "stderr"
@@ -28,7 +29,7 @@ class SandboxStreamEmitter:
         """Record one chunk; no-ops when invocation_id is empty (non-streamed runs)."""
         if not self._invocation_id:
             return
-        chunk = text if text is not None else ""
+        chunk = sanitize_stream_text(text if text is not None else "")
         if chunk == "":
             return
         record(

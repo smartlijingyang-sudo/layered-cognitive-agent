@@ -22,13 +22,32 @@ DEFAULT_A2A_TIMEOUT_S: float = 30.0
 """Default HTTP timeout (seconds) for A2A transport."""
 
 DEFAULT_DELEGATION_TIMEOUT_S: float = 300.0
-"""Default timeout (seconds) for send_and_wait / member invocation."""
+"""Default timeout (seconds) for send_and_wait / member invocation.
+
+单一事实源：Body / MemberInvoker / gate 短路一律引用本常量，
+禁止在实现层再私藏第二套默认超时（ADR-0049）。
+"""
 
 DEFAULT_MAX_WALL_CLOCK_SECONDS: int = 300
-"""Default wall-clock timeout for agent / team runs (seconds)."""
+"""Default wall-clock timeout for a single agent invocation (seconds)."""
+
+DEFAULT_RUN_WALL_CLOCK_SECONDS: int = 900
+"""Gateway run-level wall clock — shared by team pipeline members (ADR-0051)."""
+
+TERMINAL_RESERVE_STEPS: int = 1
+"""Steps reserved for terminal respond; tool actions capped at max_steps - this."""
+
+TOOL_LOOP_BREAK_THRESHOLD: int = 3
+"""Consecutive identical tool failures before circuit breaker gate fires."""
 
 # Minimum step budget when an agent is composed as team lead.
 LEAD_MIN_MAX_STEPS: int = 20
+
+# partial 证据达到该字符数才标 usable（避免把半个 token 当视角覆盖）
+DEFAULT_MIN_USABLE_PARTIAL_CHARS: int = 80
+
+# 超时收割后给成员任务收口的宽限秒数
+DEFAULT_TIMEOUT_HARVEST_GRACE_S: float = 2.0
 
 
 @dataclass(frozen=True)
@@ -37,6 +56,18 @@ class BudgetLimits:
 
     max_steps: int
     max_wall_clock_seconds: int
+
+
+@dataclass(frozen=True)
+class DelegationBudget:
+    """单次委派的资源切片（资源平面，ADR-0049）。
+
+    由 RunBudget 派生或由 DelegationSpec 显式覆盖；Body 不得私藏默认。
+    """
+
+    timeout_s: float = DEFAULT_DELEGATION_TIMEOUT_S
+    max_attempts: int = 3
+    min_usable_partial_chars: int = DEFAULT_MIN_USABLE_PARTIAL_CHARS
 
 
 def create_budget(
@@ -58,3 +89,23 @@ def create_budget(
         max_tokens=max_tokens,
         max_cost_usd=max_cost_usd,
     )
+
+
+def resolve_delegation_timeout_s(
+    *,
+    explicit_timeout_s: float | None = None,
+    deadline_remaining_s: float | None = None,
+    run_wall_clock_remaining_s: float | None = None,
+    default_timeout_s: float = DEFAULT_DELEGATION_TIMEOUT_S,
+) -> float:
+    """解析本轮委派可用秒数：显式 > deadline 剩余 > min(默认, run 剩余) > 默认。
+
+    返回值始终 ``>= 0``；0 表示已无预算，调用方应立即失败而不派发。
+    """
+    if explicit_timeout_s is not None:
+        return max(0.0, float(explicit_timeout_s))
+    if deadline_remaining_s is not None:
+        return max(0.0, float(deadline_remaining_s))
+    if run_wall_clock_remaining_s is not None:
+        return max(0.0, min(default_timeout_s, float(run_wall_clock_remaining_s)))
+    return max(0.0, float(default_timeout_s))

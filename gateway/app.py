@@ -13,6 +13,7 @@ import asyncio
 import contextlib
 import json
 from collections.abc import AsyncIterator
+from urllib.parse import quote
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -41,6 +42,14 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type, Last-Event-ID",
     "Access-Control-Expose-Headers": "Content-Type, Content-Disposition",
 }
+
+
+def _content_disposition(disposition_type: str, filename: str) -> str:
+    """Build Content-Disposition header safe for non-ASCII filenames (RFC 5987)."""
+    ascii_name = filename.encode("ascii", "replace").decode("ascii")
+    encoded = quote(filename, safe="")
+    return f"{disposition_type}; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded}"
+
 
 _MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
@@ -87,7 +96,7 @@ def _question_with_attachments(question: str, attachment_ids: list[str]) -> str:
         return question
     lines = [
         "[用户附件]",
-        "（沙箱 run_sandbox_code 会自动挂载到 /mnt/data/<文件名>，无需再传 attachment_ids）",
+        "（沙箱 sandbox_execute / run_sandbox_code 自动挂载到 /mnt/data/<文件名>；分析前先 sandbox_inspect）",
     ]
     for attachment_id in attachment_ids:
         meta = _file_store.get(attachment_id)
@@ -342,7 +351,7 @@ async def download_file(request: Request) -> Response:
             media_type=meta.mime_type,
             headers={
                 **CORS_HEADERS,
-                "Content-Disposition": f'inline; filename="{meta.name}"',
+                "Content-Disposition": _content_disposition("inline", meta.name),
                 "Content-Length": str(len(data)),
                 "Cache-Control": "private, max-age=3600",
             },
@@ -353,7 +362,7 @@ async def download_file(request: Request) -> Response:
         media_type=meta.mime_type,
         headers={
             **CORS_HEADERS,
-            "Content-Disposition": f'attachment; filename="{meta.name}"',
+            "Content-Disposition": _content_disposition("attachment", meta.name),
             "Content-Length": str(len(data)),
         },
     )

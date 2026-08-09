@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from lca.contracts.models.team.consultation import ConsultationOutcome
 from lca.contracts.models.team.delegation import DelegationResult
 from lca.contracts.models.team.member_status import MemberStatus
 from lca.contracts.models.team.role_team import RoleProfile
@@ -24,20 +25,26 @@ from lca.contracts.models.team.role_team import RoleProfile
 
 @dataclass
 class ConsultDuty:
-    """咨询义务（consult / board 授权专属）：必问成员状态板 + 委派重试计数。
+    """咨询义务（consult / board）：进度板 + 证据账本 + 重试计数。
+
+    正交两平面（ADR-0049）:
+    - ``member_status``：控制面进度（还要不要问）
+    - ``outcomes``：证据平面（综合时用什么）
 
     ``max_attempts`` 由组合期注入（唯一默认值见
     ``lca.contracts.protocols.spec.DEFAULT_DELEGATE_MAX_ATTEMPTS``），
     契约层不私藏重试策略。
 
     Mutability（一次 run 内）:
-    - 循环中变更: ``member_status``（整体替换）、``attempts``
-    - 注入后固定: ``max_attempts``
+    - 循环中变更: ``member_status``、``attempts``、``outcomes``
+    - 注入后固定: ``max_attempts``、``min_usable_partial_chars``
     """
 
     member_status: MemberStatus
     max_attempts: int
     attempts: dict[str, int] = field(default_factory=dict)
+    outcomes: list[ConsultationOutcome] = field(default_factory=list)
+    min_usable_partial_chars: int = 80
 
 
 @dataclass
@@ -45,8 +52,8 @@ class TeamAwareness:
     """Lead 一次 run 的团队实时认知：名册 + 委派回报记录 + 可选咨询义务。
 
     仅 lead run 持有；solo / member 的 awareness 槽为 None。
-    ``results`` 只在自由 routing（无 consult_duty）下累积——义务路径的
-    应答进度由状态板表达，回报记录不参与，避免双份事实源。
+    - 自由 routing（无 consult_duty）：``results`` 是委派事实源
+    - 义务路径：进度在状态板，证据在 ``consult_duty.outcomes``（ADR-0049）
     """
 
     teammates: list[RoleProfile] = field(default_factory=list)

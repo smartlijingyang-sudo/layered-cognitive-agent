@@ -68,6 +68,9 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.member_status.required_action.RequiredAction": (
         "纯数据声明（gate 裁决结果），非可插拔组件"
     ),
+    "lca.layer1_cognitive.member_status.consult_policy.ConsultNextAction": (
+        "纯数据声明（ConsultPolicy 下一步），非可插拔组件 (ADR-0049)"
+    ),
     "lca.layer0_infra.llm_adapter.api_style.LLMApiStyle": (
         "L0 wire-protocol 配置枚举，非跨层契约 (ADR-0038)"
     ),
@@ -92,6 +95,15 @@ EXEMPT: dict[str, str] = {
     ),
     "lca.layer0_infra.llm_adapter.settings.LLMSettings": (
         "pydantic-settings 生成参数配置模型，非可插拔组件"
+    ),
+    "lca.layer0_infra.skills.settings.SkillSettings": (
+        "pydantic-settings 技能库配置模型，非可插拔组件 (ADR-0048)"
+    ),
+    "lca.layer0_infra.skills.url_sources.ParsedSkillUrl": (
+        "URL 解析结果值对象，纯数据结构 (ADR-0048)"
+    ),
+    "lca.layer0_infra.skills.marketplace.LobeHubMarketClient": (
+        "Market HTTP 辅助客户端，SkillImporter 内部依赖 (ADR-0048)"
     ),
     "lca.layer0_infra.llm_adapter.tool_arguments.ToolArgumentsOk": (
         "tool arguments wire 三态 Outcome 值对象，纯数据结构 (ADR-0047)"
@@ -129,6 +141,27 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.observability.journal.journal_io.JournalFormatError": ("异常类型"),
     "lca.layer0_infra.observability.journal.otel_span_index.SpanContainerIndex": (
         "OtelProjector 内部容器索引机制件（同 _IsolatedExporter 先例）"
+    ),
+    "lca.layer0_infra.observability.llm_stream_activity.LlmStreamActivityTracker": (
+        "LLM 流活动心跳内部 tracker，非可插拔组件 (ADR-0051)"
+    ),
+    "lca.layer0_infra.workspace.artifact_ledger.ArtifactLedger": (
+        "Run 级产物账本，Workspace 内部数据结构 (ADR-0051)"
+    ),
+    "lca.layer0_infra.workspace.scope.RunWorkspace": (
+        "Run 级 workspace 上下文值对象，非可插拔组件 (ADR-0051)"
+    ),
+    "lca.layer1_cognitive.brain.decision_gates.chained.ChainedDecisionGate": (
+        "DecisionGate 组合器，Protocol 在 contracts.protocols.cognition (ADR-0051)"
+    ),
+    "lca.layer1_cognitive.brain.decision_gates.terminal_respond.TerminalRespondGate": (
+        "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0051)"
+    ),
+    "lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker.ToolLoopBreakerGate": (
+        "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0051)"
+    ),
+    "lca.layer0_infra.skills.market_auth._CachedToken": (
+        "Market OAuth token 缓存值对象，纯内部数据结构 (ADR-0048)"
     ),
 }
 

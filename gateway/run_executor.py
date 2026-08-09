@@ -6,14 +6,23 @@ import asyncio
 from collections.abc import Sequence
 from typing import Any
 
+import structlog
+
 from gateway.collector import GatewayCollector
 from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
 from gateway.mode_catalog import AUTO_MODE_KEY, DEFAULT_MODE
 from gateway.run_registry import RunRegistry, RunSession, RunStatus
 from gateway.team_factory import build_runnable, build_runnable_auto
 from lca.contracts.atoms.ids import new_id
+from lca.layer0_infra.file_store import get_default_file_store
+from lca.layer0_infra.sandbox.factory import resolve_sandbox
+from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime
 from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
+from lca.layer0_infra.tools.run_finalizer import finalize_run, run_id_scope
+from lca.layer0_infra.workspace import run_workspace_scope
 from lca.layer4_app.api import Agent, Team
+
+_log = structlog.get_logger(__name__)
 
 _default_llm_resolver: LLMResolver = ProductionLLMResolver()
 
@@ -44,8 +53,30 @@ async def execute_run(
         return
     session.status = RunStatus.RUNNING
     try:
-        # Bind run attachments for the whole task (contextvars copy across create_task).
-        with run_attachment_scope(session.attachment_ids):
+        # Bind run_id + attachments for the whole task (contextvars copy across create_task).
+        with (
+            run_id_scope(session.run_id),
+            run_attachment_scope(session.attachment_ids),
+            run_workspace_scope(session.run_id),
+        ):
+            sandbox = resolve_sandbox()
+            if sandbox is not None and session.attachment_ids:
+                try:
+                    runtime = await bind_sandbox_runtime(
+                        session.run_id,
+                        sandbox,
+                        get_default_file_store(),
+                        session.attachment_ids,
+                    )
+                    mount_err = await runtime.ensure_ready()
+                    if mount_err is not None:
+                        session.status = RunStatus.FAILED
+                        session.error = mount_err.error_summary or mount_err.error
+                        return
+                except Exception as exc:
+                    _log.warning(
+                        "sandbox_runtime_bind_failed", run_id=session.run_id, error=str(exc)
+                    )
             llm = get_llm_resolver().resolve(mode=mode)
             runnable: Agent | Team
             # 全仓库唯一按 mode 分支处：auto 需先 await 选角，无法并入同步
@@ -71,6 +102,8 @@ async def execute_run(
         session.status = RunStatus.FAILED
         session.error = f"{type(exc).__name__}: {exc}"
     finally:
+        # Release run-scoped resources (sandbox sessions, …) before closing hub.
+        await finalize_run(session.run_id)
         session.hub.close()
         session.emit(None)
 

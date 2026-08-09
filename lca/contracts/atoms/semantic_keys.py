@@ -17,6 +17,14 @@ OBS_MEMBER_SUBTASKS = "member_subtasks"
 OBS_RESULT_KIND = "result_kind"
 OBS_CACHE_HIT = "cache_hit"
 OBS_HANDOFF = "handoff"
+# 委派完成质量（ADR-0049 证据平面）
+OBS_COMPLETION_QUALITY = "completion_quality"
+OBS_DELEGATION_ID = "delegation_id"
+
+# completion_quality 取值
+COMPLETION_FULL = "full"
+COMPLETION_PARTIAL = "partial"
+COMPLETION_EMPTY = "empty"
 
 # MemoryRecord.metadata（委派结果归属）
 META_ROLE = "role"

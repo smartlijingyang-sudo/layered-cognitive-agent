@@ -1,0 +1,46 @@
+"""Tests for MIME/format → skill routing (ADR-0051 Phase 2)."""
+
+from __future__ import annotations
+
+from lca.layer0_infra.skills.format_routing import (
+    enrich_inspect_profile,
+    format_suggested_skills_prompt,
+    skills_for_filename,
+    suggested_skills_from_profile,
+)
+
+
+class TestFormatRouting:
+    def test_pdf_filename_maps_to_pdf_skill(self) -> None:
+        assert "anthropics-skills-pdf" in skills_for_filename("report.pdf")
+
+    def test_doc_maps_to_docx_skill(self) -> None:
+        assert "anthropics-skills-docx" in skills_for_filename("legacy.doc")
+
+    def test_xlsx_has_no_default_skill(self) -> None:
+        assert skills_for_filename("data.xlsx") == ()
+
+    def test_enrich_inspect_profile_adds_suggested_skills(self) -> None:
+        profile = {
+            "profiles": {
+                "a.pdf": {"type": "pdf", "mime": "application/pdf"},
+            }
+        }
+        enriched = enrich_inspect_profile(profile)
+        entry = enriched["profiles"]["a.pdf"]
+        assert "anthropics-skills-pdf" in entry["suggested_skills"]
+
+    def test_suggested_skills_prompt_lists_matches(self) -> None:
+        profile = enrich_inspect_profile(
+            {
+                "profiles": {
+                    "x.docx": {
+                        "type": "docx",
+                        "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    }
+                }
+            }
+        )
+        prompt = format_suggested_skills_prompt(profile)
+        assert "anthropics-skills-docx" in prompt
+        assert suggested_skills_from_profile(profile) == ("anthropics-skills-docx",)

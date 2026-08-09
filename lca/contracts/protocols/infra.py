@@ -11,7 +11,13 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.decision import AgentCard, Observation
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
-from lca.contracts.models.core.sandbox import SandboxResult
+from lca.contracts.models.core.sandbox import (
+    MountManifest,
+    SandboxExecResult,
+    SandboxResult,
+    SessionConfig,
+    SessionInfo,
+)
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
 
@@ -57,6 +63,9 @@ class Tool(Protocol):
 class Sandbox(Protocol):
     """代码沙箱：隔离执行用户/模型生成的代码，可选挂载输入文件。
 
+    支持可选的有状态会话（session）——容器跨调用存活，变量/包/文件系统保持。
+    不支持会话的适配器保留默认实现（返回 None），调用方优雅降级为无状态模式。
+
     ``**kwargs`` 透传扩展元数据（如 ``invocation_id``），镜像
     ``LLMAdapter.stream`` 惯例，避免 Protocol 破坏性扩签。
     执行期 stdout/stderr 增量由具体适配器经 journal ``record`` 发射
@@ -71,6 +80,57 @@ class Sandbox(Protocol):
         timeout_s: int = 60,
         **kwargs: Any,
     ) -> SandboxResult: ...
+
+    async def create_session(self, config: SessionConfig | None = None) -> SessionInfo | None:
+        """创建有状态会话。不支持时返回 None，调用方降级为无状态 run。"""
+        ...
+
+    async def run_in_session(
+        self,
+        session_id: str,
+        code: str,
+        language: str = "python",
+        timeout_s: int = 60,
+        **kwargs: Any,
+    ) -> SandboxResult:
+        """在已有会话中执行代码。会话状态（变量、包、文件）跨调用保持。"""
+        ...
+
+    async def destroy_session(self, session_id: str) -> None:
+        """销毁会话并释放资源。幂等——重复调用不报错。"""
+        ...
+
+
+@runtime_checkable
+class SandboxRuntime(Protocol):
+    """Run-bound sandbox runtime — mount, inspect, execute (ADR-0050)."""
+
+    @property
+    def manifest(self) -> MountManifest: ...
+
+    @property
+    def inspect_profile(self) -> dict[str, object] | None: ...
+
+    @property
+    def environment_ready(self) -> bool: ...
+
+    async def ensure_ready(
+        self, explicit_ids: list[str] | None = None
+    ) -> SandboxExecResult | None: ...
+
+    async def inspect(self, *, force: bool = False) -> SandboxExecResult: ...
+
+    async def execute(
+        self,
+        code: str,
+        *,
+        language: str = "python",
+        timeout_s: int | None = None,
+        invocation_id: str = "",
+        explicit_attachment_ids: list[str] | None = None,
+    ) -> SandboxExecResult: ...
+
+    async def destroy(self) -> None: ...
 
 
 @runtime_checkable

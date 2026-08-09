@@ -17,6 +17,7 @@ from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import StopOutcome, StopOutcomePolicy
+from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
 
 
 class DefaultStopOutcomePolicy(StopOutcomePolicy):
@@ -64,16 +65,18 @@ class DefaultStopOutcomePolicy(StopOutcomePolicy):
         self, observation: Observation | None, state: AgentState
     ) -> StopOutcome:
         last_ok = observation is not None and observation.success
-        final_output = None
+        final_output = synthesize_artifact_closure()
         if (
-            last_ok
+            final_output is None
+            and last_ok
             and state.final_output is None
             and observation is not None
             and isinstance(observation.payload, str)
         ):
             final_output = observation.payload
+        status = TaskStatus.COMPLETED if (last_ok or final_output) else TaskStatus.FAILED
         return StopOutcome(
             should_stop=True,
             final_output=final_output,
-            status=TaskStatus.COMPLETED if last_ok else TaskStatus.FAILED,
+            status=status,
         )

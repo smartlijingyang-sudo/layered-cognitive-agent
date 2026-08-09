@@ -1,4 +1,8 @@
-"""Agent 传输层 —— 进程内传输实现（对齐 A2A 异步任务模型）。"""
+"""Agent 传输层 —— 进程内传输实现（对齐 A2A 异步任务模型）。
+
+ADR-0049：``wait_result`` 在 deadline 到期时 **harvest** 成员 partial，
+返回带 ``completion_quality`` 的 Observation，而不是 silent cancel + raise。
+"""
 
 from __future__ import annotations
 
@@ -7,15 +11,23 @@ from collections.abc import Awaitable, Callable
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.semantic_keys import (
+    COMPLETION_EMPTY,
+    COMPLETION_FULL,
+    COMPLETION_PARTIAL,
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
+    FAILURE_KIND_TRANSIENT,
     FAILURE_KIND_VALIDATION,
+    OBS_COMPLETION_QUALITY,
 )
+from lca.contracts.models.core.budget import DEFAULT_TIMEOUT_HARVEST_GRACE_S
 from lca.contracts.models.core.decision import AgentCard, Observation
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.protocols import AgentTransport
 
 AgentHandler = Callable[[str], Awaitable[Observation]]
+
+_ERR_TIMEOUT = "delegate 超时"
 
 
 def _fail_observation(error: str, *, failure_kind: str = FAILURE_KIND_EXECUTION) -> Observation:
@@ -26,6 +38,28 @@ def _fail_observation(error: str, *, failure_kind: str = FAILURE_KIND_EXECUTION)
         error=error,
         extra={FAILURE_KIND: failure_kind},
     )
+
+
+def _timeout_observation(*, payload: object = None) -> Observation:
+    quality = COMPLETION_PARTIAL if payload else COMPLETION_EMPTY
+    return Observation(
+        observation_id=new_id("obs"),
+        success=False,
+        payload=payload,
+        error=_ERR_TIMEOUT,
+        extra={
+            FAILURE_KIND: FAILURE_KIND_TRANSIENT,
+            OBS_COMPLETION_QUALITY: quality,
+        },
+    )
+
+
+def _tag_full_success(observation: Observation) -> Observation:
+    if observation.success and OBS_COMPLETION_QUALITY not in (observation.extra or {}):
+        extra = dict(observation.extra or {})
+        extra[OBS_COMPLETION_QUALITY] = COMPLETION_FULL
+        observation.extra = extra
+    return observation
 
 
 class InternalTransport(AgentTransport):
@@ -83,7 +117,11 @@ class InternalTransport(AgentTransport):
 
         async def _safe_run() -> Observation:
             try:
-                return await handler(subtask)
+                return _tag_full_success(await handler(subtask))
+            except asyncio.CancelledError:
+                # 成员 handler 应自行 catch 并返回 partial Observation；
+                # 若仍冒泡，转为空超时结果，避免 Future 以 CancelledError 结束。
+                return _timeout_observation()
             except Exception as exc:
                 return _fail_observation(str(exc))
 
@@ -118,12 +156,39 @@ class InternalTransport(AgentTransport):
         if timeout_s is None:
             return await fut
         try:
-            return await asyncio.wait_for(fut, timeout=timeout_s)
+            return await asyncio.wait_for(asyncio.shield(fut), timeout=timeout_s)
         except asyncio.TimeoutError:
-            # 取消孤儿任务，防止资源泄漏
+            return await self._harvest_on_timeout(task_id, fut)
+
+    async def _harvest_on_timeout(
+        self, task_id: str, fut: asyncio.Future[Observation]
+    ) -> Observation:
+        """deadline 到期：取消任务并收割 partial Observation。"""
+        if not fut.done():
             fut.cancel()
+        try:
+            result = await asyncio.wait_for(fut, timeout=DEFAULT_TIMEOUT_HARVEST_GRACE_S)
+            if isinstance(result, Observation):
+                if result.success:
+                    return result
+                # 已是失败/partial：确保超时语义与 quality
+                extra = dict(result.extra or {})
+                extra.setdefault(FAILURE_KIND, FAILURE_KIND_TRANSIENT)
+                if result.payload:
+                    extra[OBS_COMPLETION_QUALITY] = COMPLETION_PARTIAL
+                else:
+                    extra.setdefault(OBS_COMPLETION_QUALITY, COMPLETION_EMPTY)
+                result.extra = extra
+                if not result.error:
+                    result.error = _ERR_TIMEOUT
+                return result
+        except (TimeoutError, asyncio.CancelledError, asyncio.InvalidStateError):
+            pass
+        except Exception as exc:
+            return _fail_observation(str(exc))
+        finally:
             self._tasks.pop(task_id, None)
-            raise
+        return _timeout_observation()
 
     async def aclose(self) -> None:
         """取消所有未完成任务，清空 _tasks，释放资源。"""

@@ -9,9 +9,10 @@ export default defineConfig({
     port: 5180,
     strictPort: true,
     proxy: {
-      "/runs": { target: "http://127.0.0.1:8765", changeOrigin: true },
-      "/health": { target: "http://127.0.0.1:8765", changeOrigin: true },
-      "/conversations": { target: "http://127.0.0.1:8765", changeOrigin: true },
+      "/runs": { target: "http://0.0.0.0:8765", changeOrigin: true },
+      "/health": { target: "http://0.0.0.0:8765", changeOrigin: true },
+      "/conversations": { target: "http://0.0.0.0:8765", changeOrigin: true },
+      "/files": { target: "http://0.0.0.0:8765", changeOrigin: true },
     },
   },
 });

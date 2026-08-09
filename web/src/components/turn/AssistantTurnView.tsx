@@ -7,13 +7,24 @@ import { TypingIndicator } from "../shared/TypingIndicator";
 import { TeamCompositionBanner } from "../thread/TeamCompositionBanner";
 import { ProcessFold } from "./ProcessFold";
 import { ProcessBlocks } from "./block-registry";
-import { Bot } from "lucide-react";
-import { cn } from "../../lib/cn";
+import { AgentAvatar } from "../shared/AgentAvatar";
+
+function runningActivityDetail(timeline: TurnTimeline): string | undefined {
+  for (let i = timeline.process.length - 1; i >= 0; i -= 1) {
+    const block = timeline.process[i];
+    if (block?.kind === "activity" && block.status === "running" && block.detail.trim()) {
+      return block.detail;
+    }
+  }
+  return undefined;
+}
 
 function phaseLabel(timeline: TurnTimeline, turn: Turn): string {
+  const activity = runningActivityDetail(timeline);
   if (turn.status === "failed" || timeline.status === "failed") return "失败";
   if (turn.status === "canceled") return "已取消";
   if (turn.status === "completed" || timeline.status === "completed") return "已完成";
+  if (activity) return activity;
   if (timeline.phase === "casting") return "智能选角";
   if (timeline.phase === "synthesizing") return "综合收口";
   if (timeline.process.some((b) => b.kind === "sandbox" && b.status === "running")) {
@@ -30,7 +41,7 @@ function phaseLabel(timeline: TurnTimeline, turn: Turn): string {
 
 /**
  * LobeHub-aligned assistant turn:
- * process blocks (optional ProcessFold when done) + final answer always outside.
+ * process (optional ProcessFold when done) + final answer always outside.
  */
 export function AssistantTurnView({
   turn,
@@ -54,19 +65,12 @@ export function AssistantTurnView({
 
   return (
     <div className="flex gap-3">
-      <div
-        className={cn(
-          "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full",
-          "bg-[var(--fill-hover)] text-[var(--text-muted)] ring-1 ring-[var(--border)]",
-        )}
-        aria-hidden
-      >
-        <Bot size={16} strokeWidth={2} />
-      </div>
+      {/* LobeHub ChatItem: square img 32×32 /avatars/lobe-ai.png */}
+      <AgentAvatar size={32} className="mt-0.5" />
 
-      <div className="min-w-0 flex-1">
+      <div className="lobe-assistant-turn min-w-0 flex-1">
         {streaming || turn.status === "failed" || turn.status === "canceled" ? (
-          <div className="mb-2 text-xs font-medium text-[var(--text-faint)]">
+          <div className="mb-1.5 text-[11px] font-medium tracking-wide text-[var(--text-faint)]">
             助手 · {phaseLabel(timeline, turn)}
           </div>
         ) : null}
@@ -87,9 +91,10 @@ export function AssistantTurnView({
         {showTyping ? (
           <TypingIndicator
             label={
-              timeline.phase === "casting"
+              runningActivityDetail(timeline) ??
+              (timeline.phase === "casting"
                 ? "正在从角色库挑选合适团队…"
-                : "团队成员正在协作生成回答…"
+                : "团队成员正在协作生成回答…")
             }
           />
         ) : null}
@@ -110,7 +115,7 @@ export function AssistantTurnView({
         ) : null}
 
         {hasAnswer ? (
-          <div className="min-w-0">
+          <div className="lobe-final-answer min-w-0">
             <MarkdownContent
               text={answer}
               streaming={streaming && timeline.finalAnswerStreaming}

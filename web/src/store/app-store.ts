@@ -50,6 +50,8 @@ interface AppState {
   setError: (error: string | null) => void;
   newConversation: () => Promise<string>;
   selectConversation: (id: string) => Promise<void>;
+  /** Clear active conversation → home welcome on the right (LobeHub home). */
+  goHome: () => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
   appendTurn: (turn: Turn) => Promise<void>;
   /** 仅更新内存态，不写 IndexedDB（流式过程中的高频 patch）。 */
@@ -122,6 +124,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectConversation: async (id) => {
     await saveActiveConversationId(id);
     set({ activeConversationId: id, liveEvents: [], activeRunId: null });
+  },
+
+  goHome: async () => {
+    await saveActiveConversationId(null);
+    set({ activeConversationId: null, liveEvents: [], activeRunId: null });
   },
 
   deleteConversation: async (id) => {

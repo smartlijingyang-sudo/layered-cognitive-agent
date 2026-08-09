@@ -13,6 +13,7 @@ import { extractUserFacingAnswer } from "../lib/extract-decision-text";
 import { filesFromToolInvoked } from "../lib/parse-generated-file";
 import { USER_FACING_TERMINAL_ACTIONS } from "./chat-projector";
 import type {
+  ActivityBlock,
   CastingBlock,
   DecisionProcessBlock,
   DelegationBlock,
@@ -86,6 +87,15 @@ interface InsightEntry {
   readonly order: number;
 }
 
+interface ActivityEntry {
+  readonly id: string;
+  readonly phase: string;
+  readonly detail: string;
+  readonly step?: number;
+  readonly status: ActivityBlock["status"];
+  readonly order: number;
+}
+
 interface InternalState {
   readonly phase: RunPhase;
   readonly status: TurnTimeline["status"];
@@ -102,6 +112,7 @@ interface InternalState {
   readonly delegations: ReadonlyMap<string, DelegationEntry>;
   readonly decisions: readonly DecisionEntry[];
   readonly insights: readonly InsightEntry[];
+  readonly activities: readonly ActivityEntry[];
   readonly finalAnswer: string;
   readonly committedAnswer: string;
   readonly pendingStepText: ReadonlyMap<string, string>;
@@ -123,6 +134,7 @@ const EMPTY_INTERNAL: InternalState = {
   delegations: new Map(),
   decisions: [],
   insights: [],
+  activities: [],
   finalAnswer: "",
   committedAnswer: "",
   pendingStepText: new Map(),
@@ -135,8 +147,8 @@ function nextOrder(state: InternalState): { order: number; orderSeq: number } {
   return { order: state.orderSeq, orderSeq: state.orderSeq + 1 };
 }
 
-function stepKey(runId: string, step: number): string {
-  return `${runId}:${step}`;
+function stepKey(runId: string, step: number, channel = "decision"): string {
+  return `${runId}:${step}:${channel}`;
 }
 
 function toolKey(invocationId: string, toolName: string, fallback: string): string {
@@ -304,8 +316,12 @@ export function reduceTurnTimeline(state: InternalState, stamped: StampedEvent):
         e.output_text ||
         finished.committedAnswer ||
         finished.finalAnswer;
+      const closedActivities = finished.activities.map((a) =>
+        a.status === "running" ? { ...a, status: "done" as const } : a,
+      );
       return {
         ...finished,
+        activities: closedActivities,
         status,
         phase: status === "completed" ? "completed" : "failed",
         finalAnswer: answer,
@@ -331,12 +347,12 @@ export function reduceTurnTimeline(state: InternalState, stamped: StampedEvent):
       );
     }
     case "StepTextDelta": {
-      const key = stepKey(runId, e.step);
+      const channel = e.channel ?? "decision";
+      const key = stepKey(runId, e.step, channel);
       const prev = state.pendingStepText.get(key) ?? "";
       const nextPending = new Map(state.pendingStepText);
       nextPending.set(key, prev + e.text_delta);
       const raw = nextPending.get(key) ?? "";
-      const preview = extractUserFacingAnswer(raw, { allowPartial: true });
       let next: InternalState = {
         ...state,
         pendingStepText: nextPending,
@@ -346,11 +362,50 @@ export function reduceTurnTimeline(state: InternalState, stamped: StampedEvent):
         thinkingStartedTs: state.thinkingStartedTs ?? ts,
       };
       next = markAssistantStep(next, runId, e.step);
-      if (preview) {
-        const answer = state.committedAnswer ? `${state.committedAnswer}${preview}` : preview;
-        return { ...next, finalAnswer: answer };
+      if (channel === "answer") {
+        const preview = extractUserFacingAnswer(raw, { allowPartial: true }) ?? raw.trim();
+        if (preview) {
+          const answer = state.committedAnswer ? `${state.committedAnswer}${preview}` : preview;
+          return { ...next, finalAnswer: answer };
+        }
       }
       return next;
+    }
+    case "LlmCallStarted": {
+      const { order, orderSeq } = nextOrder(state);
+      const activity: ActivityEntry = {
+        id: `activity:llm:${e.step}:${order}`,
+        phase: "llm_thinking",
+        detail: `${e.model} 思考中…`,
+        step: e.step,
+        status: "running",
+        order,
+      };
+      return {
+        ...state,
+        orderSeq,
+        activities: [...state.activities.filter((a) => a.status !== "running"), activity],
+        status: "running",
+        startedTs: state.startedTs ?? ts,
+      };
+    }
+    case "RunActivity": {
+      const { order, orderSeq } = nextOrder(state);
+      const activity: ActivityEntry = {
+        id: `activity:${e.phase}:${e.step}:${e.seq}`,
+        phase: e.phase,
+        detail: e.detail,
+        step: e.step,
+        status: "running",
+        order,
+      };
+      return {
+        ...state,
+        orderSeq,
+        activities: [...state.activities.filter((a) => a.status !== "running"), activity],
+        status: "running",
+        startedTs: state.startedTs ?? ts,
+      };
     }
     case "ReasoningDelta": {
       return appendThinking(
@@ -381,9 +436,9 @@ export function reduceTurnTimeline(state: InternalState, stamped: StampedEvent):
     }
     case "DecisionMade": {
       let next = markAssistantStep(state, runId, e.step);
-      const pendingKey = stepKey(runId, e.step);
       const nextPending = new Map(next.pendingStepText);
-      nextPending.delete(pendingKey);
+      nextPending.delete(stepKey(runId, e.step, "decision"));
+      nextPending.delete(stepKey(runId, e.step, "answer"));
 
       if (e.rationale_preview?.trim()) {
         next = appendThinking(next, e.rationale_preview.trim(), ts);
@@ -391,7 +446,9 @@ export function reduceTurnTimeline(state: InternalState, stamped: StampedEvent):
 
       if (USER_FACING_TERMINAL_ACTIONS.has(e.action_type)) {
         const canonical = e.response_text?.trim() ?? "";
-        const fromPending = state.pendingStepText.get(pendingKey);
+        const fromAnswer = state.pendingStepText.get(stepKey(runId, e.step, "answer"));
+        const fromDecision = state.pendingStepText.get(stepKey(runId, e.step, "decision"));
+        const fromPending = fromAnswer ?? fromDecision;
         const fallback = fromPending
           ? (extractUserFacingAnswer(fromPending) ?? fromPending)
           : "";
@@ -508,13 +565,17 @@ export function reduceTurnTimeline(state: InternalState, stamped: StampedEvent):
       const tools = new Map(state.tools);
       if (prev && prev.id !== key) tools.delete(prev.id);
       tools.set(entry.id, entry);
-      return {
+      const afterTools = {
         ...state,
         orderSeq,
         tools,
-        status: "running",
+        status: "running" as const,
         startedTs: state.startedTs ?? ts,
       };
+      if (state.thinkingContent.trim() || state.thinkingStatus === "running") {
+        return finishThinking(afterTools, ts);
+      }
+      return afterTools;
     }
     case "ToolInvoked": {
       const key = toolKey(e.invocation_id, e.tool_name, `${ts}:${state.orderSeq}`);
@@ -651,15 +712,18 @@ export function reduceTurnTimeline(state: InternalState, stamped: StampedEvent):
       return { ...state, orderSeq, insights: [...state.insights, insight] };
     }
     case "LlmCallCompleted": {
-      // Lightweight thinking signal when we only have call meta
+      const closedActivities = state.activities.map((a) =>
+        a.status === "running" && a.phase === "llm_thinking" ? { ...a, status: "done" as const } : a,
+      );
       if (state.thinkingStatus === "idle" && state.status === "running") {
         return {
           ...state,
+          activities: closedActivities,
           thinkingStatus: "running",
           thinkingStartedTs: state.thinkingStartedTs ?? ts - e.latency_ms,
         };
       }
-      return state;
+      return { ...state, activities: closedActivities };
     }
     default:
       return state;
@@ -696,6 +760,18 @@ function buildProcess(state: InternalState): TurnProcessBlock[] {
     };
     void durationMs;
     items.push({ order: -90, block: thinking });
+  }
+
+  for (const a of state.activities) {
+    const block: ActivityBlock = {
+      kind: "activity",
+      id: a.id,
+      status: a.status,
+      phase: a.phase,
+      detail: a.detail,
+      step: a.step,
+    };
+    items.push({ order: a.order, block });
   }
 
   for (const d of state.decisions) {

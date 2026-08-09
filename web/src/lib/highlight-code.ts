@@ -34,11 +34,19 @@ type SupportedLang = (typeof SUPPORTED_LANGS)[number];
 type Highlighter = {
   codeToHtml: (
     code: string,
-    options: { lang: string; theme: string },
+    options: {
+      lang: string;
+      themes: { light: string; dark: string };
+      defaultColor: false;
+    },
   ) => string;
   loadLanguage: (lang: string) => Promise<void>;
   getLoadedLanguages: () => string[];
 };
+
+/** Dual-theme pair consumed by CSS via `--shiki-light` / `--shiki-dark`. */
+const LIGHT_THEME = "github-light";
+const DARK_THEME = "github-dark";
 
 let highlighterPromise: Promise<Highlighter> | null = null;
 
@@ -59,7 +67,7 @@ async function getHighlighter(): Promise<Highlighter> {
   if (!highlighterPromise) {
     highlighterPromise = import("shiki").then(async (mod) => {
       const highlighter = await mod.createHighlighter({
-        themes: ["github-dark"],
+        themes: [LIGHT_THEME, DARK_THEME],
         langs: [...SUPPORTED_LANGS],
       });
       return highlighter as Highlighter;
@@ -71,6 +79,9 @@ async function getHighlighter(): Promise<Highlighter> {
 /**
  * Highlight `code` for `language`. Returns highlighted HTML, or `null` on any failure.
  * Never throws — callers must keep the plain code path.
+ *
+ * Output carries both themes as CSS variables (`--shiki-light` / `--shiki-dark`);
+ * the active one is selected purely by `[data-theme]` CSS, no JS on theme switch.
  */
 export async function highlightCode(
   code: string,
@@ -87,7 +98,11 @@ export async function highlightCode(
         // fall through to text
       }
     }
-    return highlighter.codeToHtml(code, { lang, theme: "github-dark" });
+    return highlighter.codeToHtml(code, {
+      lang,
+      themes: { light: LIGHT_THEME, dark: DARK_THEME },
+      defaultColor: false,
+    });
   } catch {
     return null;
   }

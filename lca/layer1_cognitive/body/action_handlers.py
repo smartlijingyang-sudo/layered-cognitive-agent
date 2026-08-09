@@ -15,8 +15,11 @@ import asyncio
 from lca.contracts.atoms.enums import MemoryRecordKind
 from lca.contracts.atoms.ids import new_id, remaining_seconds
 from lca.contracts.atoms.semantic_keys import (
+    COMPLETION_EMPTY,
+    COMPLETION_PARTIAL,
     FAILURE_KIND,
     FAILURE_KIND_TRANSIENT,
+    OBS_COMPLETION_QUALITY,
     OBS_HANDOFF,
     OBS_MEMBER_RESULTS,
     OBS_MEMBER_SUBTASKS,
@@ -24,11 +27,16 @@ from lca.contracts.atoms.semantic_keys import (
     OBS_TASK_ID,
     OBS_TASK_IDS,
 )
+from lca.contracts.models.core.budget import (
+    DEFAULT_DELEGATION_TIMEOUT_S,
+    resolve_delegation_timeout_s,
+)
 from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation
 from lca.contracts.models.core.lifecycle import AgentCard
 from lca.contracts.models.core.result import ToolExecutionError
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import DecisionMade, SynthesisCompleted
+from lca.contracts.models.team.consultation import SynthesisMethod, usable_outcomes
 from lca.contracts.models.team.delegation_context import delegator_scope
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
 from lca.contracts.protocols import (
@@ -45,16 +53,19 @@ from lca.layer1_cognitive.body.delegation_cache import (
     tag_delegation_extra,
 )
 from lca.layer1_cognitive.body.tool_wire_gate import tool_wire_block_observation
+from lca.layer1_cognitive.member_status.consult_policy import (
+    classify_synthesis,
+    run_wall_clock_remaining_s,
+)
 from lca.layer1_cognitive.member_status.required_action import compute_required_action
 from lca.layer1_cognitive.member_status.tracking import (
     duty_board,
+    duty_consult,
     record_delegation_return,
 )
 
-_DEFAULT_DELEGATE_TIMEOUT_S = 30.0
 _ERR_DEADLINE_EXPIRED = "delegate 超时(deadline 已过期)"
 _ERR_TIMEOUT = "delegate 超时"
-_SYNTHESIS_METHOD_ALL_CONSULTED = "all_consulted"
 
 
 def record_decision_made(decision: Decision, state: AgentState) -> None:
@@ -81,26 +92,42 @@ def record_decision_made(decision: Decision, state: AgentState) -> None:
     )
 
 
-def _timeout_observation(error: str) -> Observation:
+def _timeout_observation(error: str, *, payload: object = None) -> Observation:
+    quality = COMPLETION_PARTIAL if payload else COMPLETION_EMPTY
     return Observation(
         observation_id=new_id("obs"),
         success=False,
-        payload=None,
+        payload=payload,
         error=error,
-        extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
+        extra={
+            FAILURE_KIND: FAILURE_KIND_TRANSIENT,
+            OBS_COMPLETION_QUALITY: quality,
+        },
+    )
+
+
+def resolve_spec_timeout_s(spec: DelegationSpec, state: AgentState) -> float:
+    """委派超时唯一解析入口（ADR-0049）：spec > deadline > run 剩余 ∩ 默认。"""
+    deadline_rem: float | None = None
+    if spec.deadline is not None:
+        deadline_rem = remaining_seconds(spec.deadline)
+    return resolve_delegation_timeout_s(
+        explicit_timeout_s=spec.timeout_s,
+        deadline_remaining_s=deadline_rem,
+        run_wall_clock_remaining_s=run_wall_clock_remaining_s(state.budget),
+        default_timeout_s=DEFAULT_DELEGATION_TIMEOUT_S,
     )
 
 
 class RespondOperation(Action):
     """处理 respond 动作：直接返回文本响应。
 
-    board/consult 收口可见化：lead 在全部必问成员应答后产出终版响应时，
-    record ``SynthesisCompleted``（与 ``MustConsultAllMembers`` 的
-    may_respond 判据同源，叙事与守门不变量绝不漂移）。
+    board/consult 收口可见化：lead 在全部必问成员终态后产出终版响应时，
+    record ``SynthesisCompleted``，method 按证据完备度命名（ADR-0049）。
     """
 
     async def execute(self, decision: Decision, state: AgentState) -> Observation:
-        self._record_synthesis_if_all_consulted(decision, state)
+        self._record_synthesis(decision, state)
         return Observation(
             observation_id=new_id("obs"),
             success=True,
@@ -109,16 +136,23 @@ class RespondOperation(Action):
         )
 
     @staticmethod
-    def _record_synthesis_if_all_consulted(decision: Decision, state: AgentState) -> None:
+    def _record_synthesis(decision: Decision, state: AgentState) -> None:
         board = duty_board(state)
         if board is None:
             return
         if compute_required_action(board).kind != "may_respond":
             return
+        duty = duty_consult(state)
+        if duty is not None:
+            method = classify_synthesis(board, duty.outcomes)
+            candidate_count = len(usable_outcomes(duty.outcomes))
+        else:
+            method = SynthesisMethod.FULL
+            candidate_count = len(board.required_roles)
         record(
             SynthesisCompleted(
-                method=_SYNTHESIS_METHOD_ALL_CONSULTED,
-                candidate_count=len(board.required_roles),
+                method=method.value,
+                candidate_count=candidate_count,
                 output_text=decision.response_text or "",
             )
         )
@@ -196,7 +230,11 @@ class DelegateOperation(Action):
         task_ids: list[str] = []
         for spec, obs in zip(specs, observations, strict=True):
             key = spec.target_role or spec.target_agent_id or obs.observation_id
-            member_payload[str(key)] = obs.payload if obs.success else obs.error
+            # 失败但有 partial 时保留证据，不把 error 字符串盖住正文（ADR-0049）
+            if obs.success or obs.payload is not None:
+                member_payload[str(key)] = obs.payload
+            else:
+                member_payload[str(key)] = obs.error
             member_subtasks[str(key)] = spec.subtask
             task_ids.append(str(obs.extra.get(OBS_TASK_ID, obs.observation_id)))
 
@@ -221,12 +259,12 @@ class DelegateOperation(Action):
 
     async def _invoke(self, spec: DelegationSpec, state: AgentState) -> Observation:
         transport, agent_card = self._resolve_target(spec, state)
-        timeout_s = self._timeout_for(spec)
+        timeout_s = resolve_spec_timeout_s(spec, state)
         if timeout_s <= 0:
             return _timeout_observation(_ERR_DEADLINE_EXPIRED)
         try:
             with delegator_scope(state.agent_role):
-                return await send_and_wait(
+                observation = await send_and_wait(
                     transport,
                     agent_card,
                     spec.subtask,
@@ -235,12 +273,8 @@ class DelegateOperation(Action):
                 )
         except TimeoutError:
             return _timeout_observation(_ERR_TIMEOUT)
-
-    @staticmethod
-    def _timeout_for(spec: DelegationSpec) -> float:
-        if spec.deadline:
-            return remaining_seconds(spec.deadline)
-        return _DEFAULT_DELEGATE_TIMEOUT_S
+        # transport 已 harvest 时直接透传（含 partial payload）
+        return observation
 
     def _resolve_target(
         self, spec: DelegationSpec, state: AgentState

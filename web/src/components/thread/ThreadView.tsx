@@ -1,11 +1,5 @@
 import { useEffect, useRef } from "react";
-import {
-  AUTO_EXAMPLE_PROMPTS,
-  AUTO_MODE_KEY,
-  EXAMPLE_PROMPTS,
-} from "../../contracts/modes.generated";
 import type { Conversation } from "../../domain/conversation";
-import { AUTO_MODE_HELP } from "../../lib/modes";
 import { useStickToBottom } from "../../lib/use-stick-to-bottom";
 import { ChatMessages } from "../layout/ChatMain";
 import { UserBubble } from "./UserBubble";
@@ -14,64 +8,12 @@ import type { StampedEvent } from "../../contracts";
 import type { TraceState, TurnTimeline, Verbosity } from "../../projectors";
 import { EMPTY_TURN_TIMELINE } from "../../projectors";
 import { cn } from "../../lib/cn";
+import { LobeIcon } from "../../lib/icons";
 import { focusRing } from "../../lib/ui";
-import { ChevronDown, Sparkles } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { TraceAccordion } from "../trace/TraceAccordion";
-
-function WelcomePanel({
-  title,
-  subtitle,
-  prompts,
-  onExampleSelect,
-}: {
-  readonly title: string;
-  readonly subtitle: string;
-  readonly prompts: readonly { readonly key: string; readonly text: string }[];
-  readonly onExampleSelect?: (prompt: string, exampleMode: string) => void;
-}) {
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-7 py-12 text-center">
-      <div
-        className={cn(
-          "inline-flex size-14 items-center justify-center rounded-[var(--radius-xl)]",
-          "bg-[var(--fill-hover)] text-[var(--text)] ring-1 ring-[var(--border)]",
-        )}
-      >
-        <Sparkles size={26} strokeWidth={1.75} />
-      </div>
-      <div className="max-w-lg">
-        <h2 className="m-0 text-[1.75rem] font-semibold tracking-tight text-[var(--text)]">
-          {title}
-        </h2>
-        <p className="m-0 mt-2.5 text-[0.9375rem] leading-relaxed text-[var(--text-muted)]">
-          {subtitle}
-        </p>
-      </div>
-      <div className="grid w-full gap-2.5 sm:grid-cols-2">
-        {prompts.map(({ key, text }) => (
-          <button
-            key={`${key}-${text}`}
-            type="button"
-            className={cn(
-              "cursor-pointer rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-3.5 text-left",
-              "text-[0.875rem] leading-snug text-[var(--text-muted)] transition-all",
-              "hover:border-[var(--text-faint)] hover:bg-[var(--fill-hover)] hover:text-[var(--text)]",
-              "shadow-[var(--shadow-card)]",
-              focusRing,
-            )}
-            onClick={() => onExampleSelect?.(text, key)}
-          >
-            {text}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function autoWelcomePrompts() {
-  return AUTO_EXAMPLE_PROMPTS.map((text) => ({ key: AUTO_MODE_KEY, text }));
-}
+import { HomeWelcome } from "../home/HomeWelcome";
+import { TopicWelcome } from "../home/TopicWelcome";
 
 function ConversationThread({
   conversation,
@@ -122,7 +64,6 @@ function ConversationThread({
             : cached
               ? {
                   ...cached,
-                  // Prefer persisted answer text if journal projection empty.
                   finalAnswer: cached.finalAnswer || turn.answer,
                   files: cached.files.length ? cached.files : (turn.files ?? []),
                 }
@@ -133,7 +74,7 @@ function ConversationThread({
                   files: turn.files ?? [],
                 };
           return (
-            <div key={turn.runId} className="flex flex-col gap-5">
+            <div key={turn.runId} className="lobe-turn-pair flex flex-col gap-5">
               <UserBubble turn={turn} />
               <AssistantTurnView turn={turn} timeline={timeline} />
               {developerMode && isLast && events.length > 0 ? (
@@ -149,15 +90,16 @@ function ConversationThread({
           <button
             type="button"
             className={cn(
-              "sticky bottom-2 z-10 mx-auto flex size-9 cursor-pointer items-center justify-center",
+              "sticky bottom-3 z-10 mx-auto flex size-9 cursor-pointer items-center justify-center",
               "rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]",
-              "shadow-[var(--shadow-popover)] hover:bg-[var(--fill-hover)]",
+              "shadow-[var(--shadow-popover)] transition-all hover:bg-[var(--fill-hover)] hover:text-[var(--text)]",
+              "animate-fade-in",
               focusRing,
             )}
             onClick={() => scrollToBottom()}
             aria-label="回到底部"
           >
-            <ChevronDown size={16} />
+            <LobeIcon icon={ChevronDown} size="md" />
           </button>
         ) : null}
       </div>
@@ -173,8 +115,8 @@ export function ThreadView({
   trace,
   verbosity,
   developerMode,
-  mode,
-  onExampleSelect,
+  homeActive,
+  onOpenModePicker,
 }: {
   readonly conversation: Conversation | null;
   readonly liveEvents: readonly StampedEvent[];
@@ -183,32 +125,17 @@ export function ThreadView({
   readonly trace: TraceState;
   readonly verbosity: Verbosity;
   readonly developerMode: boolean;
-  readonly mode: string;
+  readonly mode?: string;
+  readonly homeActive?: boolean;
+  readonly onOpenModePicker?: () => void;
   readonly onExampleSelect?: (prompt: string, exampleMode: string) => void;
 }) {
-  const isEmpty = !conversation || conversation.turns.length === 0;
+  if (homeActive) {
+    return <HomeWelcome agentTitle="LCA" onAgentClick={onOpenModePicker} />;
+  }
 
-  if (isEmpty) {
-    if (mode === AUTO_MODE_KEY) {
-      return (
-        <WelcomePanel
-          title="有什么可以帮忙的？"
-          subtitle={AUTO_MODE_HELP}
-          prompts={autoWelcomePrompts()}
-          onExampleSelect={onExampleSelect}
-        />
-      );
-    }
-    const prompts =
-      (EXAMPLE_PROMPTS as Record<string, readonly string[]>)[mode] ?? [];
-    return (
-      <WelcomePanel
-        title="开始对话"
-        subtitle="选择示例或直接在下方输入问题"
-        prompts={prompts.map((text: string) => ({ key: mode, text }))}
-        onExampleSelect={onExampleSelect}
-      />
-    );
+  if (!conversation || conversation.turns.length === 0) {
+    return <TopicWelcome agentTitle="LCA" />;
   }
 
   return (

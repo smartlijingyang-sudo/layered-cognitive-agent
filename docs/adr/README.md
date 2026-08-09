@@ -27,6 +27,10 @@
 | [0045](0045-decision-canonical-intent-shape.md) | Decision 意图形状归一 — Canonical Model + Journal 规范正文 | Accepted |
 | [0046](0046-sandbox-file-roundtrip-contract.md) | 沙箱文件往返契约 — `/mnt/data` 输入 + `/mnt/data/outputs` 产出 | Accepted |
 | [0047](0047-tool-call-wire-anticorruption.md) | 工具调用 Wire 防腐 — finish_reason + 三态 Outcome + 执行闸门 | Accepted |
+| [0048](0048-operational-skill-library.md) | 操作技能库 — Role/Skill 分离 + 网络拉取 + 五工具面 | Accepted |
+| [0049](0049-consultation-resource-and-evidence-planes.md) | 咨询资源平面 + 证据平面 — 闭合 board 协作 | Accepted |
+| [0050](0050-run-bound-sandbox-runtime.md) | Run-Bound Sandbox Runtime — 单一执行平面 + Inspect/Execute 分离 | Accepted |
+| [0051](0051-run-workspace-plane.md) | Run Workspace Plane — 统一运行平面（Artifact/Deadline/Completion/Gate） | Accepted |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

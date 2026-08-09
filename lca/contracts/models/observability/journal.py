@@ -262,6 +262,25 @@ class StepTextDelta(JournalEvent):
     step: int = 0
     text_delta: str = field(default="", metadata={"journal_kind": "content"})
     seq: int = 0
+    channel: str = "decision"  # StreamChannel: decision | answer
+
+
+@dataclass(frozen=True)
+class LlmCallStarted(JournalEvent):
+    """LLM 调用开始 — 供 SSE 活动心跳锚点（ADR-0051 Phase 2）。"""
+
+    step: int = 0
+    model: str = ""
+
+
+@dataclass(frozen=True)
+class RunActivity(JournalEvent):
+    """Run 级活动心跳 — LLM 等待 / 工具执行中的进度信号。"""
+
+    phase: str = ""  # RunActivityPhase value
+    step: int = 0
+    detail: str = ""
+    seq: int = 0
 
 
 @dataclass(frozen=True)

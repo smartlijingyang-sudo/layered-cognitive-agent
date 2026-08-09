@@ -89,11 +89,25 @@ class TestTypedWorkingMemory(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(working[0].kind, MemoryRecordKind.GENERIC)
         self.assertTrue(working[0].content.startswith("TOOL_RESULT:"))
 
-    async def test_failed_observation_is_not_written_to_working(self) -> None:
+    async def test_failed_observation_recorded_as_tool_error(self) -> None:
         mem = SimpleMemorySystem()
-        obs = Observation(observation_id="obs_5", success=False, payload="oops")
-        await mem.update(_state(), obs, _reflection())
-        self.assertEqual(mem.query(MemoryLayer.WORKING), [])
+        obs = Observation(
+            observation_id="obs_5", success=False, payload=None, error="ValueError: empty df"
+        )
+        reflection = Reflection(
+            reflection_id="ref_5",
+            verdict=ReflectionVerdict.NEEDS_CORRECTION,
+            lesson="步骤0失败(工具执行失败): ValueError: empty df",
+        )
+        await mem.update(_state(), obs, reflection)
+        working = mem.query(MemoryLayer.WORKING)
+        self.assertEqual(len(working), 1)
+        self.assertIn("TOOL_ERROR:", working[0].content)
+        self.assertIn("ValueError: empty df", working[0].content)
+        # episodic should include the lesson text after '|'
+        episodic = mem.query(MemoryLayer.EPISODIC)
+        self.assertEqual(len(episodic), 1)
+        self.assertIn("ValueError: empty df", episodic[0].content)
 
 
 if __name__ == "__main__":

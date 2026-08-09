@@ -19,14 +19,20 @@ function phaseIndex(phase: RunPhase): number {
 export function RunProgressBar({
   phase,
   compact,
+  activityDetail,
 }: {
   readonly phase: RunPhase;
   readonly compact?: boolean;
+  /** Latest RunActivity / LlmCallStarted detail — overrides generic phase label. */
+  readonly activityDetail?: string;
 }) {
   if (phase === "idle" || phase === "failed") return null;
 
   if (compact) {
-    const label = PHASES.find((s) => s.key === phase)?.label ?? phaseStatusLabel(phase);
+    const label =
+      activityDetail?.trim() ||
+      PHASES.find((s) => s.key === phase)?.label ||
+      phaseStatusLabel(phase);
     return (
       <span
         className="inline-flex items-center gap-1.5 text-[11px] text-text-muted"

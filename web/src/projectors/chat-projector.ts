@@ -24,8 +24,8 @@ function phaseFromStatus(status: ChatState["status"], prev: RunPhase): RunPhase 
   return "idle";
 }
 
-function stepBufferKey(runId: string, step: number): string {
-  return `${runId}:${step}`;
+function stepBufferKey(runId: string, step: number, channel = "decision"): string {
+  return `${runId}:${step}:${channel}`;
 }
 
 function orderedDeltaText(buffer: StepBuffer): readonly string[] {
@@ -40,8 +40,9 @@ function appendBuffer(
   step: number,
   seq: number,
   textDelta: string,
+  channel = "decision",
 ): ReadonlyMap<string, StepBuffer> {
-  const key = stepBufferKey(runId, step);
+  const key = stepBufferKey(runId, step, channel);
   const prev = pending.get(key) ?? { deltas: new Map() };
   const nextDeltas = new Map(prev.deltas);
   nextDeltas.set(seq, textDelta);
@@ -56,9 +57,9 @@ function commitAnswerText(
   step: number,
   text: string,
 ): ChatProjectorInternal {
-  const key = stepBufferKey(runId, step);
   const nextPending = new Map(state.pendingSteps);
-  nextPending.delete(key);
+  nextPending.delete(stepBufferKey(runId, step, "decision"));
+  nextPending.delete(stepBufferKey(runId, step, "answer"));
   if (!text) {
     return { ...state, pendingSteps: nextPending, answer: state.committedAnswer };
   }
@@ -89,8 +90,9 @@ function commitStepAnswer(
   if (canonical) {
     return commitAnswerText(state, runId, step, canonical);
   }
-  const key = stepBufferKey(runId, step);
-  const buffer = state.pendingSteps.get(key);
+  const key = stepBufferKey(runId, step, "answer");
+  const buffer =
+    state.pendingSteps.get(key) ?? state.pendingSteps.get(stepBufferKey(runId, step, "decision"));
   if (!buffer) return state;
   const raw = orderedDeltaText(buffer).join("");
   const text = extractUserFacingAnswer(raw) ?? raw;
@@ -102,9 +104,12 @@ function previewFromPendingStep(
   runId: string,
   step: number,
 ): string | null {
-  const buffer = state.pendingSteps.get(stepBufferKey(runId, step));
+  const buffer =
+    state.pendingSteps.get(stepBufferKey(runId, step, "answer")) ??
+    state.pendingSteps.get(stepBufferKey(runId, step, "decision"));
   if (!buffer) return null;
-  return extractUserFacingAnswer(orderedDeltaText(buffer).join(""), { allowPartial: true });
+  const raw = orderedDeltaText(buffer).join("");
+  return extractUserFacingAnswer(raw, { allowPartial: true }) ?? (raw.trim() || null);
 }
 
 function discardStepBuffer(
@@ -112,10 +117,15 @@ function discardStepBuffer(
   runId: string,
   step: number,
 ): ChatProjectorInternal {
-  const key = stepBufferKey(runId, step);
-  if (!state.pendingSteps.has(key)) return state;
   const nextPending = new Map(state.pendingSteps);
-  nextPending.delete(key);
+  nextPending.delete(stepBufferKey(runId, step, "decision"));
+  nextPending.delete(stepBufferKey(runId, step, "answer"));
+  if (
+    !state.pendingSteps.has(stepBufferKey(runId, step, "decision")) &&
+    !state.pendingSteps.has(stepBufferKey(runId, step, "answer"))
+  ) {
+    return state;
+  }
   return {
     ...state,
     pendingSteps: nextPending,
@@ -129,11 +139,16 @@ function commitAllRunBuffers(
   runId: string,
 ): ChatProjectorInternal {
   let next = state;
+  const steps = new Set<number>();
   for (const key of state.pendingSteps.keys()) {
-    if (key.startsWith(`${runId}:`)) {
-      const step = Number(key.slice(runId.length + 1));
-      next = commitStepAnswer(next, runId, step);
-    }
+    if (!key.startsWith(`${runId}:`)) continue;
+    const rest = key.slice(runId.length + 1);
+    const stepPart = rest.split(":")[0];
+    const step = Number(stepPart);
+    if (Number.isFinite(step)) steps.add(step);
+  }
+  for (const step of steps) {
+    next = commitStepAnswer(next, runId, step);
   }
   return next;
 }
@@ -225,7 +240,11 @@ export function reduceChat(state: ChatProjectorInternal, stamped: StampedEvent):
       };
     }
     case "StepTextDelta": {
-      const pendingSteps = appendBuffer(state.pendingSteps, runId, e.step, e.seq, e.text_delta);
+      const channel = e.channel ?? "decision";
+      const pendingSteps = appendBuffer(state.pendingSteps, runId, e.step, e.seq, e.text_delta, channel);
+      if (channel !== "answer") {
+        return { ...state, pendingSteps };
+      }
       const preview = previewFromPendingStep({ ...state, pendingSteps }, runId, e.step);
       if (!preview) {
         return { ...state, pendingSteps };
@@ -233,6 +252,23 @@ export function reduceChat(state: ChatProjectorInternal, stamped: StampedEvent):
       const answer = state.committedAnswer ? `${state.committedAnswer}${preview}` : preview;
       return { ...state, pendingSteps, answer, answerDeltas: [preview] };
     }
+    case "RunActivity":
+      if (e.detail) {
+        return { ...state, activityDetail: e.detail, status: "running" };
+      }
+      return state;
+    case "LlmCallStarted":
+      return {
+        ...state,
+        activityDetail: `${e.model} 思考中…`,
+        status: "running",
+      };
+    case "ToolStarted":
+      return {
+        ...state,
+        activityDetail: `执行工具 ${e.tool_name}…`,
+        status: "running",
+      };
     case "DecisionMade":
       if (USER_FACING_TERMINAL_ACTIONS.has(e.action_type)) {
         // Journal-as-Truth：规范正文优先于原始 token 缓冲（ADR-0045）

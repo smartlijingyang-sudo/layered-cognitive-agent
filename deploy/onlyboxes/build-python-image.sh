@@ -1,22 +1,40 @@
 #!/usr/bin/env bash
 # Build / refresh the Onlyboxes pythonExec guest image used by LCA.
 # Default tag matches WORKER_PYTHON_EXEC_DOCKER_IMAGE in onlyboxes-worker-docker.service.
+#
+# Usage:
+#   ./build-python-image.sh              # fast rebuild (cache-friendly)
+#   ./build-python-image.sh --refresh    # force-pull base image first
+#   ./build-python-image.sh --skip-smoke # skip post-build smoke tests
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 IMAGE_TAG="${ONLYBOXES_PYTHON_IMAGE:-onlyboxes-python-local:3.11}"
 
+PULL_FLAG=""
+SMOKE=true
+for arg in "$@"; do
+  case "$arg" in
+    --refresh)   PULL_FLAG="--pull" ;;
+    --skip-smoke) SMOKE=false ;;
+    *) echo "Unknown option: $arg" >&2; exit 1 ;;
+  esac
+done
+
 echo "==> Building ${IMAGE_TAG}"
 docker build \
-  --pull \
+  ${PULL_FLAG} \
   -f "${ROOT}/Dockerfile.python" \
   -t "${IMAGE_TAG}" \
   "${ROOT}"
 
-echo "==> Smoke: import preinstalled packages inside image"
-docker run --rm "${IMAGE_TAG}" python -c '
-import importlib
-import warnings
+if $SMOKE; then
+  echo "==> Smoke: import check + matplotlib CJK rendering"
+  docker run --rm "${IMAGE_TAG}" python -c '
+import importlib, warnings
+from pathlib import Path
+
+# 1. import all preinstalled packages
 mods = [
     "pandas", "numpy", "openpyxl", "xlsxwriter", "matplotlib",
     "seaborn", "PIL", "scipy", "requests", "tabulate",
@@ -25,12 +43,8 @@ for m in mods:
     importlib.import_module(m)
     print(f"  {m}: OK")
 print("all preinstalled packages importable")
-'
 
-echo "==> Smoke: matplotlib CJK glyphs (no DejaVu missing-glyph warning)"
-docker run --rm "${IMAGE_TAG}" python -c '
-import warnings
-from pathlib import Path
+# 2. matplotlib CJK glyph check
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -50,6 +64,7 @@ assert not glyph, f"CJK font still missing: {glyph[0].message if glyph else None
 assert out.is_file() and out.stat().st_size > 0
 print("  matplotlib CJK: OK", out.stat().st_size, "bytes")
 '
+fi
 
 echo "==> Done. Worker picks up the new tag on next pythonExec container start."
 echo "    Image: ${IMAGE_TAG}"

@@ -68,11 +68,16 @@ class SimpleMemorySystem(MemorySystem):
             self._private_layers[MemoryLayer.WORKING] = self._private_layers[MemoryLayer.WORKING][
                 -_DEFAULT_MAX_WORKING:
             ]
+        episodic_content = (
+            f"step={state.step} success={observation.success} verdict={reflection.verdict}"
+        )
+        if reflection.lesson and not observation.success:
+            episodic_content += f" | {reflection.lesson}"
         self._append_record(
             MemoryLayer.EPISODIC,
             MemoryRecord(
                 record_id=new_id("mem"),
-                content=f"step={state.step} success={observation.success} verdict={reflection.verdict}",
+                content=episodic_content,
                 memory_type=MemoryLayer.EPISODIC,
                 importance=0.5,
                 source_trace_id=state.trace_id,
@@ -88,12 +93,32 @@ class SimpleMemorySystem(MemorySystem):
         Delegation results become one attributed record per member instead of a
         ``TOOL_RESULT:`` blob, so the lead can see *who answered what*.
         Tool results keep the ``TOOL_RESULT:`` prefix (mock-LLM parses it).
+        Failed observations are recorded as ``TOOL_ERROR:`` so the LLM can see
+        what went wrong and correct its next action (ReAct observation channel).
         """
-        if observation.payload is None or not observation.success:
+        if observation.payload is None and observation.success:
             return []
         kind = observation.extra.get(OBS_RESULT_KIND, MemoryRecordKind.GENERIC)
+        # 委派结果：失败但可能带 partial 证据，仍走类型化写入（ADR-0049）
         if kind == MemoryRecordKind.DELEGATION_RESULT:
             return self._delegation_records(state, observation)
+        if not observation.success:
+            error_detail = observation.error or "unknown error"
+            partial = observation.payload
+            content = f"TOOL_ERROR: {error_detail}"
+            if isinstance(partial, str) and partial.strip():
+                content = f"{content}\nPARTIAL: {partial}"
+            return [
+                MemoryRecord(
+                    record_id=new_id("mem"),
+                    content=content,
+                    memory_type=MemoryLayer.WORKING,
+                    importance=0.9,
+                    source_trace_id=state.trace_id,
+                    kind=MemoryRecordKind.GENERIC,
+                    metadata={META_STEP: state.step},
+                )
+            ]
         if kind == MemoryRecordKind.RESPONSE:
             content = f"MY_RESPONSE: {observation.payload}"
         elif kind == MemoryRecordKind.TOOL_RESULT:

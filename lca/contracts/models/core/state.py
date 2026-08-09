@@ -8,6 +8,7 @@ from typing import Any
 
 from lca.contracts.atoms.enums import SnapshotReason
 from lca.contracts.atoms.ids import new_id, utc_now
+from lca.contracts.models.core.activation import ActivatedSkill
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.team.team_awareness import TeamAwareness
@@ -73,6 +74,7 @@ class AgentState:
     final_output: Any | None = None
     last_error: str | None = None
     active_template: str | None = None
+    activated_skills: list[ActivatedSkill] = field(default_factory=list)
 
     def snapshot(self, reason: SnapshotReason = SnapshotReason.PERIODIC) -> StateSnapshot:
         """Append a checkpoint and return its reference."""

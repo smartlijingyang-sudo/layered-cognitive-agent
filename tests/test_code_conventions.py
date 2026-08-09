@@ -53,6 +53,12 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "_promote_lead 由 test_refactor_guards 直接 import，"
         "progressive-disclosure 检查 def compose / def compose_team 子串"
     ),
+    "lca/layer1_cognitive/body/action_handlers.py": (
+        "Body 动作分发单模块（委派/工具/记忆/收口）；ADR-0049 证据平面与 harvest 同文件"
+    ),
+    "lca/layer1_cognitive/brain/decision_parser.py": (
+        "Decision 防腐层归一化管线单入口（ADR-0045）；拆分会破坏 parse 内聚性"
+    ),
 }
 
 

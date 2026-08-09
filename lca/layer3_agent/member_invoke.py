@@ -16,6 +16,15 @@ from lca.contracts.protocols.infra import AgentTransport
 from lca.layer0_infra.transport.invocation import send_and_wait
 
 
+def _workspace_handoff_prefix() -> str:
+    from lca.layer0_infra.workspace import get_run_workspace
+
+    workspace = get_run_workspace()
+    if workspace is None:
+        return ""
+    return workspace.artifacts.handoff_block()
+
+
 class TransportMemberInvoker(MemberInvoker):
     """组合期绑定的成员调用通道：成员角色 → transport ``send_and_wait``。"""
 
@@ -53,6 +62,9 @@ async def invoke_members_sequential(
     current_task = objective
     last_result: Result | None = None
     total_steps = 0
+    handoff = _workspace_handoff_prefix()
+    if handoff:
+        current_task = f"{current_task}\n\n{handoff}"
     for member in members:
         try:
             last_result = await stage.invoker.invoke(member, current_task)
@@ -68,6 +80,9 @@ async def invoke_members_sequential(
             return last_result
         if pass_output_as_next_task and last_result.output:
             current_task = last_result.output
+            handoff = _workspace_handoff_prefix()
+            if handoff:
+                current_task = f"{current_task}\n\n{handoff}"
     if last_result is None:
         return Result.failed("No members in team")
     last_result.total_steps = total_steps

@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
+import asyncio
 import unittest
+from typing import Any
+from unittest.mock import patch
 
 from starlette.testclient import TestClient
 
 from gateway.app import create_app
 from gateway.conversation_store import ConversationStore
 from gateway.run_registry import RunRegistry
+
+
+class _HangRunnable:
+    async def run(self, *args: Any, **kwargs: Any) -> None:
+        del args, kwargs
+        await asyncio.Event().wait()
 
 
 class GatewayRouteTests(unittest.TestCase):
@@ -24,7 +33,8 @@ class GatewayRouteTests(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertIn("llm_available", payload)
 
-    def test_create_and_cancel_run(self) -> None:
+    @patch("gateway.run_executor.build_runnable", return_value=_HangRunnable())
+    def test_create_and_cancel_run(self, _mock_build: Any) -> None:
         create = self.client.post("/runs", json={"question": "hello", "mode": "solo"})
         self.assertEqual(create.status_code, 201)
         run_id = create.json()["run_id"]

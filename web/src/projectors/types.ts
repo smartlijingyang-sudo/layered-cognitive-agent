@@ -118,6 +118,8 @@ export interface ChatState {
   readonly phase: RunPhase;
   readonly errorMessage?: string;
   readonly teamId?: string;
+  /** Latest RunActivity.detail for progress bar / typing indicator. */
+  readonly activityDetail?: string;
   /** File products projected from write_file / A2A file parts (Phase C). */
   readonly files: readonly GeneratedFile[];
 }
@@ -212,10 +214,20 @@ export interface InsightBlock {
   readonly detail: string;
 }
 
+export interface ActivityBlock {
+  readonly kind: "activity";
+  readonly id: string;
+  readonly status: "running" | "done";
+  readonly phase: string;
+  readonly detail: string;
+  readonly step?: number;
+}
+
 /** Process-side blocks (everything except final answer). */
 export type TurnProcessBlock =
   | CastingBlock
   | ThinkingBlock
+  | ActivityBlock
   | ToolBlock
   | SandboxBlock
   | DelegationBlock

@@ -11,6 +11,7 @@ from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
 from lca.contracts.models.observability.journal import (
     LlmCallCompleted,
+    LlmCallStarted,
     ReasoningCompleted,
     ReasoningDelta,
     StepTextDelta,
@@ -134,9 +135,12 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
         adapter = TelemetryLLMAdapter(inner)
         with self.assertRaises(RuntimeError):
             [e async for e in adapter.stream("prompt")]
-        self.assertEqual(len(self.recorded), 1)
-        self.assertFalse(self.recorded[0].ok)
-        self.assertTrue(self.recorded[0].stream)
+        completed = [e for e in self.recorded if isinstance(e, LlmCallCompleted)]
+        self.assertEqual(len(completed), 1)
+        self.assertFalse(completed[0].ok)
+        self.assertTrue(completed[0].stream)
+        started = [e for e in self.recorded if isinstance(e, LlmCallStarted)]
+        self.assertEqual(len(started), 1)
 
     async def test_stream_reasoning_deltas_and_completed(self) -> None:
         inner = _FakeInner()

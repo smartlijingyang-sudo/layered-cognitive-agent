@@ -27,6 +27,21 @@ class DecisionGateName(str, Enum):
     NONE = "none"
 
 
+class StreamChannel(str, Enum):
+    """StepTextDelta 可见性通道（ADR-0051 Phase 2）。"""
+
+    DECISION = "decision"
+    ANSWER = "answer"
+
+
+class RunActivityPhase(str, Enum):
+    """Run 级活动相位 — SSE 心跳 / 进度条（ADR-0051 Phase 2）。"""
+
+    LLM_THINKING = "llm_thinking"
+    TOOL_RUNNING = "tool_running"
+    SANDBOX_EXEC = "sandbox_exec"
+
+
 class ActionScope(str, Enum):
     """Which built-in actions a Body may execute (construction-time closed set)."""
 
@@ -110,11 +125,16 @@ class MessageRole(str, Enum):
 
 
 class RoleStatus(str, Enum):
-    """团队委派进度状态。"""
+    """团队委派进度状态。
+
+    ``DONE_PARTIAL``：已收获可用部分证据并终止重试（证据平面 usable，
+    控制面终态；与 FAILED 不同——该视角并非完全缺失）。
+    """
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     DONE = "done"
+    DONE_PARTIAL = "done_partial"
     FAILED = "failed"
 
 

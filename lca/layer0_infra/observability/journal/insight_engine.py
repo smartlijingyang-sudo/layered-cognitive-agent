@@ -93,7 +93,12 @@ class InsightEngine(JournalProjector):
             run = summary["runs"].setdefault(run_id, {})
             run.update({"end_ts": stamped.ts, "steps": event.steps})
         elif isinstance(event, DecisionMade):
-            summary["actions"].setdefault(run_id, []).append(event.action_type)
+            action = (
+                f"{event.action_type}({event.tool_name})"
+                if event.action_type == "use_tool" and event.tool_name
+                else event.action_type
+            )
+            summary["actions"].setdefault(run_id, []).append(action)
 
     # ── 触发 ───────────────────────────────────────────
     @staticmethod

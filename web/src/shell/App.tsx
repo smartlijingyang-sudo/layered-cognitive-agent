@@ -235,14 +235,6 @@ export default function App() {
     ],
   );
 
-  const handleExampleSelect = useCallback(
-    (prompt: string, exampleMode: string) => {
-      store.setMode(exampleMode);
-      void handleSubmit(prompt, exampleMode);
-    },
-    [handleSubmit, store],
-  );
-
   const handleStop = async () => {
     const runId = store.activeRunId ?? turn?.runId;
     if (!runId) return;
@@ -263,6 +255,11 @@ export default function App() {
       />
     ) : null;
 
+  const homeActive = store.activeConversationId == null;
+  const emptyTopic =
+    !homeActive && conversation != null && conversation.turns.length === 0;
+  const composerLayout = homeActive ? "home" : emptyTopic ? "topic" : "chat";
+
   return (
     <AppLayout
       theme={store.settings.theme}
@@ -272,13 +269,23 @@ export default function App() {
       onDeveloperModeChange={store.setDeveloperMode}
       verbosity={store.settings.verbosity}
       onVerbosityChange={store.setVerbosity}
-      chatTitle={conversation?.title}
+      chatTitle={homeActive ? undefined : emptyTopic ? "新话题" : conversation?.title}
+      homeActive={homeActive}
+      onHome={() => {
+        void store.goHome();
+        store.setSidebarOpen(false);
+      }}
       sidebar={
         <ConversationSidebar
           conversations={store.conversations}
           activeId={store.activeConversationId}
+          homeActive={homeActive}
           onSelect={(id) => {
             void store.selectConversation(id);
+            store.setSidebarOpen(false);
+          }}
+          onHome={() => {
+            void store.goHome();
             store.setSidebarOpen(false);
           }}
           onNew={() => void store.newConversation()}
@@ -294,10 +301,12 @@ export default function App() {
       }
       main={
         <ChatMain
+          homeLayout={homeActive || !conversation || conversation.turns.length === 0}
+          homeColumn={homeActive}
           messages={
             <>
               <ThreadView
-                conversation={conversation}
+                conversation={homeActive ? null : conversation}
                 liveEvents={store.liveEvents}
                 liveTimeline={liveTimeline}
                 turnTimelines={store.turnTimelines}
@@ -305,7 +314,10 @@ export default function App() {
                 verbosity={store.settings.verbosity}
                 developerMode={store.settings.developerMode}
                 mode={store.settings.mode}
-                onExampleSelect={handleExampleSelect}
+                homeActive={homeActive}
+                onOpenModePicker={() => {
+                  document.getElementById("lca-mode-picker-trigger")?.click();
+                }}
               />
               {store.error ? <ChatError>{store.error}</ChatError> : null}
             </>
@@ -322,6 +334,7 @@ export default function App() {
               canStop={busy && Boolean(store.activeRunId ?? turn?.runId)}
               llmAvailable={llmAvailable}
               conversationId={store.activeConversationId ?? undefined}
+              layout={composerLayout}
             />
           }
         />

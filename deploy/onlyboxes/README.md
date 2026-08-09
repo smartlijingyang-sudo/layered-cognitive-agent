@@ -20,6 +20,7 @@ WORKER_PYTHON_EXEC_DOCKER_IMAGE=onlyboxes-python-local:3.11
 | scipy | 科学计算 |
 | requests | HTTP |
 | tabulate | 文本表 |
+| python-docx / reportlab / fpdf2 / pypdf | 文档生成（DOCX/PDF） |
 
 ## 构建
 

@@ -44,6 +44,7 @@ class ModularBrain(Brain):
         evaluation_pipeline: CandidateEvaluationPipeline | None = None,
         skill_router: SkillRouter | None = None,
         decision_gate: DecisionGate | None = None,
+        agent_gates: DecisionGate | None = None,
     ) -> None:
         self.reasoner = reasoner
         self.decision_parser = decision_parser
@@ -53,6 +54,11 @@ class ModularBrain(Brain):
         )
         self.skill_router = skill_router
         self._decision_gate: DecisionGate | None = decision_gate
+        self._agent_gates: DecisionGate | None = agent_gates
+
+    @property
+    def agent_gates(self) -> DecisionGate | None:
+        return self._agent_gates
 
     async def think(self, state: AgentState) -> Decision:
         if self._decision_gate is not None and isinstance(self._decision_gate, SupportsShortcut):
@@ -72,6 +78,8 @@ class ModularBrain(Brain):
 
         if self._decision_gate is not None:
             decision = await self._decision_gate.enforce(state, decision)
+        if self._agent_gates is not None:
+            decision = await self._agent_gates.enforce(state, decision)
         return decision
 
     async def reflect(self, state: AgentState, observation: Observation) -> Reflection:

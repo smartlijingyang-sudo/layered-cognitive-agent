@@ -14,7 +14,7 @@ from typing import Any
 
 import structlog
 
-from lca.contracts.atoms.enums import LLMStreamEventType, MemoryLayer
+from lca.contracts.atoms.enums import LLMStreamEventType, MemoryLayer, StreamChannel
 from lca.contracts.atoms.telemetry import (
     ATTR_HIT,
     ATTR_MEMORY_LAYER,
@@ -26,12 +26,15 @@ from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import (
     LlmCallCompleted,
+    LlmCallStarted,
     ReasoningCompleted,
     ReasoningDelta,
     StepTextDelta,
 )
 from lca.contracts.protocols import LLMAdapter, MemorySystem
 from lca.layer0_infra.observability.facade import record, span
+from lca.layer0_infra.observability.llm_stream_activity import LlmStreamActivityTracker
+from lca.layer0_infra.observability.stream_channel import classify_output_channel
 
 _PERF_COUNTER_SCALE = 1000
 """perf_counter 秒 → 毫秒换算。"""
@@ -111,8 +114,15 @@ class TelemetryLLMAdapter(LLMAdapter):
         step, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
         delta_seq = 0
         recorded = False
+        output_channel = StreamChannel.DECISION.value
+
+        record(LlmCallStarted(step=step, model=model))
+        activity = LlmStreamActivityTracker(step=step, model=model)
+        activity.start()
+
         try:
             async for event in self._inner.stream(prompt, **inner_kwargs):
+                activity.touch()
                 if event.type == LLMStreamEventType.COMPLETED:
                     if reasoning_text or reasoning_started is not None:
                         duration_ms = 0
@@ -158,11 +168,13 @@ class TelemetryLLMAdapter(LLMAdapter):
                 elif event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
                     delta_text = event.text or ""
                     accumulated_text += delta_text
+                    output_channel = classify_output_channel(accumulated_text)
                     record(
                         StepTextDelta(
                             step=step,
                             text_delta=delta_text,
                             seq=delta_seq,
+                            channel=output_channel,
                         )
                     )
                     delta_seq += 1
@@ -172,6 +184,8 @@ class TelemetryLLMAdapter(LLMAdapter):
                 preview = final_response.text if final_response is not None else accumulated_text
                 self._record(model, prompt, preview, False, started, 0, 0, stream=True)
             raise
+        finally:
+            await activity.close()
 
         if not recorded:
             _log.warning(

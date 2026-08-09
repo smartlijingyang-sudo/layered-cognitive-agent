@@ -75,6 +75,32 @@ def test_no_loop_for_normal_lead_delegation_pattern() -> None:
     assert rules.detect_loop(summary) == []
 
 
+def test_no_loop_for_different_tools() -> None:
+    """连续调用不同工具不应误报（use_tool 聚合需带 tool_name）。"""
+    summary = _summary(
+        actions={
+            "r1": [
+                "use_tool(calculator)",
+                "use_tool(search)",
+                "use_tool(read_file)",
+            ]
+        },
+        runs={"r1": {"role": "独立分析师"}},
+    )
+    assert rules.detect_loop(summary) == []
+
+
+def test_loop_detected_on_same_tool_repeated() -> None:
+    """同一工具连续调用 3 次仍应报循环。"""
+    summary = _summary(
+        actions={"r1": ["use_tool(calculator)", "use_tool(calculator)", "use_tool(calculator)"]},
+        runs={"r1": {"role": "独立分析师"}},
+    )
+    found = rules.detect_loop(summary)
+    assert len(found) == 1
+    assert "use_tool(calculator)" in found[0][1]
+
+
 def test_critical_path_picks_longest_run() -> None:
     summary = _summary(
         runs={

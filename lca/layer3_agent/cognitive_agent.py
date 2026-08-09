@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms import Hook
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS
@@ -14,6 +16,11 @@ from lca.contracts.models.core.message import (
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.models.observability.journal import AgentRunFinished, AgentRunStarted, RunScope
+from lca.contracts.models.team.partial_buffer import (
+    begin_partial_buffer,
+    drain_run_partial,
+    reset_partial_buffer,
+)
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import AgentUnit, Runtime
@@ -27,6 +34,7 @@ from lca.layer0_infra.observability import (
     run_scope,
     set_session,
 )
+from lca.layer0_infra.workspace import effective_agent_wall_clock, get_run_workspace
 
 _STRATEGY_KEY_SOLO = "solo"
 
@@ -79,6 +87,7 @@ class CognitiveAgent(AgentUnit):
         if ctx and ctx.session_id:
             set_session(ctx.session_id)
         with bind(self._observability), run_scope(scope):
+            partial_token = begin_partial_buffer()
             record(
                 AgentRunStarted(
                     agent_role=role,
@@ -95,11 +104,13 @@ class CognitiveAgent(AgentUnit):
             finish_steps = 0
             finish_error = ""
             try:
+                ctx = self._enrich_run_context(ctx)
+                effective_wall = effective_agent_wall_clock(self.max_wall_clock_seconds)
                 result = await self.runtime.run(
                     text,
                     ctx,
                     max_steps=self.max_steps,
-                    max_wall_clock_seconds=self.max_wall_clock_seconds,
+                    max_wall_clock_seconds=effective_wall,
                     agent_role=role,
                 )
                 finish_status = (
@@ -111,6 +122,12 @@ class CognitiveAgent(AgentUnit):
                 finish_steps = result.total_steps
                 finish_error = result.error or ""
                 return result
+            except asyncio.CancelledError:
+                # ADR-0049：deadline cancel 时收割 stream partial，不丢弃已生成正文
+                finish_status = TaskStatus.CANCELED.value
+                finish_output = drain_run_partial()
+                finish_error = "canceled"
+                raise
             except Exception as err:
                 finish_status = TaskStatus.FAILED.value
                 finish_error = f"{type(err).__name__}: {err}"
@@ -124,6 +141,7 @@ class CognitiveAgent(AgentUnit):
                         error=finish_error,
                     )
                 )
+                reset_partial_buffer(partial_token)
 
     async def resume(
         self,
@@ -139,6 +157,25 @@ class CognitiveAgent(AgentUnit):
 
     async def cancel(self) -> None:
         return None
+
+    @staticmethod
+    def _enrich_run_context(ctx: RunContext | None) -> RunContext | None:
+        workspace = get_run_workspace()
+        if workspace is None or workspace.deadline is None:
+            return ctx
+        if ctx is not None and ctx.deadline is not None:
+            return ctx
+        if ctx is None:
+            return RunContext(deadline=workspace.deadline)
+        return RunContext(
+            trace_id=ctx.trace_id,
+            session_id=ctx.session_id,
+            from_role=ctx.from_role,
+            context_refs=list(ctx.context_refs),
+            deadline=workspace.deadline,
+            team_awareness=ctx.team_awareness,
+            extra=dict(ctx.extra),
+        )
 
     def register_hook(self, hook_name: str, hook_fn: Hook) -> None:
         runtime = self.runtime

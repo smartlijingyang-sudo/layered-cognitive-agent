@@ -9,6 +9,7 @@ import type { GeneratedFile } from "../../domain/generated-file";
 import { fileIconKind } from "../../lib/file-mime-icon";
 import { fileDownloadUrl, filePreviewUrl } from "../../lib/file-preview-url";
 import { cn } from "../../lib/cn";
+import { LobeIcon } from "../../lib/icons";
 import { focusRing, mutedText } from "../../lib/ui";
 import { MarkdownContent } from "./MarkdownContent";
 
@@ -119,7 +120,7 @@ export function FilePreviewDialog({
                 focusRing,
               )}
             >
-              <Download size={14} />
+              <LobeIcon icon={Download} size="sm" />
               下载
             </a>
           ) : null}
@@ -135,7 +136,7 @@ export function FilePreviewDialog({
                 focusRing,
               )}
             >
-              <ExternalLink size={14} />
+              <LobeIcon icon={ExternalLink} size="sm" />
               新窗口
             </a>
           ) : null}
@@ -149,7 +150,7 @@ export function FilePreviewDialog({
             onClick={onClose}
             aria-label="关闭"
           >
-            <X size={16} />
+            <LobeIcon icon={X} size="md" />
           </button>
         </header>
 

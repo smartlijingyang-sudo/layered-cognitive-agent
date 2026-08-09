@@ -32,6 +32,20 @@ _log = structlog.get_logger("lca.safe_executor")
 
 _PERF_COUNTER_SCALE = 1000
 
+# Deterministic exceptions — retrying with the same args will never succeed.
+_DETERMINISTIC_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    ValueError,
+    TypeError,
+    KeyError,
+    AttributeError,
+    SyntaxError,
+    IndexError,
+    NameError,
+    NotImplementedError,
+    OverflowError,
+    ZeroDivisionError,
+)
+
 
 def _tool_output_preview(obs: Observation) -> str:
     """工具结果预览（成功取紧凑 payload，失败取错误）。"""
@@ -147,7 +161,12 @@ class SimpleSafeExecutor(SafeExecutor):
                     invocation_id=invocation_id,
                 )
                 return obs
-            if obs.extra.get(FAILURE_KIND) == FAILURE_KIND_VALIDATION:
+            failure_kind = obs.extra.get(FAILURE_KIND)
+            # Only transient errors (network timeouts, resource unavailability) are
+            # retried at the infrastructure level.  Execution errors (code bugs, bad
+            # input) are deterministic — retrying with the same args is pointless.
+            # The agent's ReAct loop handles correction via critic feedback.
+            if failure_kind != FAILURE_KIND_TRANSIENT:
                 self._record_invoked(
                     tool,
                     args_preview,
@@ -222,12 +241,19 @@ class SimpleSafeExecutor(SafeExecutor):
                 error=str(err),
                 attempt=attempt,
             )
+            # Deterministic errors (code bugs, bad input) will never succeed
+            # on retry — fail fast so the agent's ReAct loop can correct.
+            failure_kind = (
+                FAILURE_KIND_EXECUTION
+                if isinstance(err, _DETERMINISTIC_EXCEPTIONS)
+                else FAILURE_KIND_TRANSIENT
+            )
             return Observation(
                 observation_id=new_id("obs"),
                 success=False,
                 payload=None,
                 error=str(err),
-                extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
+                extra={FAILURE_KIND: failure_kind},
             )
 
     @staticmethod

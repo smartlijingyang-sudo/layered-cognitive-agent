@@ -1,8 +1,17 @@
-import { Menu, PanelLeftClose, PanelLeft, Sparkles, X } from "lucide-react";
+import {
+  ChevronRight,
+  Home,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  X,
+} from "lucide-react";
 import type { ThemeMode } from "../../store/app-store";
 import type { Verbosity } from "../../projectors";
 import { cn } from "../../lib/cn";
-import { focusRing } from "../../lib/ui";
+import { LobeIcon, HEADER_ICON_BLOCK } from "../../lib/icons";
+import { iconButton } from "../../lib/ui";
+import { AgentAvatar } from "../shared/AgentAvatar";
 
 export function AppLayout({
   theme: _theme,
@@ -18,6 +27,8 @@ export function AppLayout({
   sidebarOpen,
   onSidebarToggle,
   chatTitle,
+  homeActive,
+  onHome,
 }: {
   readonly theme: ThemeMode;
   readonly onThemeChange: (theme: ThemeMode) => void;
@@ -32,6 +43,9 @@ export function AppLayout({
   readonly sidebarOpen: boolean;
   readonly onSidebarToggle: () => void;
   readonly chatTitle?: string;
+  /** Home view: right panel shows welcome, no topic selected. */
+  readonly homeActive?: boolean;
+  readonly onHome?: () => void;
 }) {
   void _theme;
   void _onThemeChange;
@@ -42,103 +56,137 @@ export function AppLayout({
   void _onVerbosityChange;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
-      {/* Mobile overlay */}
+    <div className="lobe-app-shell flex h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {sidebarOpen ? (
         <button
           type="button"
           aria-label="关闭侧栏遮罩"
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] md:hidden"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[3px] transition-opacity md:hidden"
           onClick={onSidebarToggle}
         />
       ) : null}
 
-      {/* Sidebar — LobeHub left nav */}
       <aside
         className={cn(
-          "flex shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--sidebar-bg)]",
-          "fixed inset-y-0 left-0 z-50 w-[min(var(--sidebar-width),88vw)] transition-transform duration-200",
+          "lobe-sidebar flex shrink-0 flex-col bg-[var(--sidebar-bg)]",
+          "border-r border-[var(--border-subtle)]",
+          "fixed inset-y-0 left-0 z-50 w-[min(var(--sidebar-width),88vw)]",
+          "transition-transform duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]",
           "md:static md:z-auto md:w-[var(--sidebar-width)] md:translate-x-0",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:hidden",
+          sidebarOpen
+            ? "translate-x-0 shadow-[var(--shadow-popover)] md:shadow-none"
+            : "-translate-x-full md:hidden",
         )}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span
+        {/* LobeHub SideBarHeaderLayout: Home icon breadcrumb + panel toggle */}
+        <div className="flex shrink-0 items-center justify-between gap-1 px-1.5 py-2">
+          <div className="flex min-w-0 flex-1 items-center gap-0.5 px-1">
+            <button
+              type="button"
               className={cn(
-                "inline-flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-md)]",
-                "bg-[var(--fill-hover)] text-[var(--text)]",
+                iconButton,
+                homeActive && "bg-[var(--fill-hover)] text-[var(--text)]",
               )}
+              style={{ width: HEADER_ICON_BLOCK, height: HEADER_ICON_BLOCK }}
+              aria-label="首页"
+              aria-current={homeActive ? "page" : undefined}
+              onClick={onHome}
+              title="首页"
             >
-              <Sparkles size={15} strokeWidth={2} />
+              <LobeIcon icon={Home} size="md" />
+            </button>
+            <LobeIcon
+              icon={ChevronRight}
+              size="xs"
+              className="shrink-0 text-[var(--text-faint)]"
+            />
+            <span className="truncate px-1 text-[12px] text-[var(--text-muted)]">
+              {homeActive ? "首页" : "对话"}
             </span>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold tracking-tight">LCA</div>
-              <div className="truncate text-[11px] text-[var(--text-faint)]">团队协作</div>
-            </div>
           </div>
           <button
             type="button"
-            className={cn(
-              "inline-flex cursor-pointer items-center justify-center rounded-[var(--radius-md)] p-1.5",
-              "text-[var(--text-muted)] hover:bg-[var(--fill-hover)] md:hidden",
-              focusRing,
-            )}
+            className={cn(iconButton, "md:hidden")}
+            style={{ width: HEADER_ICON_BLOCK, height: HEADER_ICON_BLOCK }}
             aria-label="关闭侧栏"
             onClick={onSidebarToggle}
           >
-            <X size={16} />
+            <LobeIcon icon={X} size="md" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">{sidebar}</div>
+
+        <div className="lobe-sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          {sidebar}
+        </div>
       </aside>
 
-      {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* Address / title bar with agent avatar (LobeHub conversation header) */}
         <header
           className={cn(
-            "flex h-12 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3",
-            "bg-[var(--header-bg)] backdrop-blur-md md:px-4",
+            "lobe-header flex h-12 shrink-0 items-center gap-1.5 px-2 md:px-3",
+            "border-b border-[var(--border-subtle)]",
+            "bg-[var(--header-bg)] backdrop-blur-xl backdrop-saturate-150",
           )}
         >
           <button
             type="button"
-            className={cn(
-              "inline-flex cursor-pointer items-center justify-center rounded-[var(--radius-md)] p-1.5",
-              "text-[var(--text-muted)] hover:bg-[var(--fill-hover)]",
-              focusRing,
-            )}
+            className={iconButton}
+            style={{ width: HEADER_ICON_BLOCK, height: HEADER_ICON_BLOCK }}
             aria-label={sidebarOpen ? "收起侧栏" : "打开侧栏"}
             onClick={onSidebarToggle}
           >
             <span className="md:hidden">
-              {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
+              {sidebarOpen ? (
+                <LobeIcon icon={X} size="md" />
+              ) : (
+                <LobeIcon icon={Menu} size="md" />
+              )}
             </span>
             <span className="hidden md:inline">
-              {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeft size={16} />}
+              {sidebarOpen ? (
+                <LobeIcon icon={PanelLeftClose} size="md" />
+              ) : (
+                <LobeIcon icon={PanelLeftOpen} size="md" />
+              )}
             </span>
           </button>
-          <h1 className="m-0 min-w-0 flex-1 truncate text-sm font-medium text-[var(--text)]">
-            {chatTitle || "新对话"}
-          </h1>
+
+          {/* Title pill with avatar */}
+          <div
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)]",
+              "px-1.5 py-1 md:max-w-xl",
+            )}
+          >
+            <AgentAvatar size={32} title="LCA" />
+            <div className="min-w-0 flex-1">
+              <h1 className="m-0 truncate text-[13px] font-medium tracking-tight text-[var(--text)]">
+                {homeActive ? "LCA" : chatTitle || "新话题"}
+              </h1>
+              <p className="m-0 truncate text-[11px] text-[var(--text-faint)]">
+                {homeActive ? "首页" : "助手"}
+              </p>
+            </div>
+          </div>
         </header>
 
         <div
           className={cn(
             "grid min-h-0 flex-1",
-            tracePanel ? "lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]" : "grid-cols-1",
+            tracePanel ? "lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]" : "grid-cols-1",
           )}
         >
           <div className="flex min-h-0 min-w-0 flex-col">{main}</div>
           {tracePanel ? (
-            <div
+            <aside
               className={cn(
                 "hidden min-h-0 overflow-auto border-l border-[var(--border-subtle)]",
                 "bg-[var(--surface-secondary)] p-3 lg:block",
               )}
             >
               {tracePanel}
-            </div>
+            </aside>
           ) : null}
         </div>
       </div>

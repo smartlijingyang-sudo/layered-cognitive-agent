@@ -5,13 +5,13 @@
 :root {
   color-scheme: light dark;
 
-  /* Geist-like stack (LobeHub typography) */
-  --font-sans: Geist, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display",
+  /* LobeHub typography (Geist stack + Inter fallback loaded in index.html) */
+  --font-sans: Inter, Geist, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display",
     "Segoe UI", Roboto, "Helvetica Neue", Arial, "HarmonyOS Sans SC", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", ui-sans-serif, system-ui,
     sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, "Cascadia Code",
-    Consolas, "HarmonyOS Sans SC", monospace;
+  --font-mono: "IBM Plex Mono", "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    "Cascadia Code", Consolas, "HarmonyOS Sans SC", monospace;
 
   /* Domain accents (journal / trace) */
   --color-run: #10b981;
@@ -35,10 +35,15 @@
 
   --motion-fast: 180ms;
   --motion-normal: 240ms;
-  --chat-max-width: 48rem;
-  --sidebar-width: 280px;
+  --chat-max-width: 960px;
+  /* LobeHub home column — welcome + composer share width/padding */
+  --home-max-width: 960px;
+  --home-column-padding: 1rem;
+  --sidebar-width: 272px;
   --control-height: 36px;
   --control-height-sm: 28px;
+  --composer-stack-height: 7.5rem;
+  --header-height: 48px;
 }
 
 /* ── Dark (LobeHub DESIGN.dark.md defaults + LCA brand accent) ── */
@@ -88,6 +93,10 @@
   --color-danger: #f4416c;
   --color-info: #60b1ff;
   --color-thinking: #a78bfa;
+
+  /* Agent avatar plate (opaque — never wash out on chat bg) */
+  --avatar-bg: #c4f042;
+  --avatar-fg: #0a0a0a;
 }
 
 /* ── Light (LobeHub DESIGN.md) ── */
@@ -136,6 +145,10 @@
   --color-danger: #ec5e41;
   --color-info: #0072f5;
   --color-thinking: #7c3aed;
+
+  /* Agent avatar plate */
+  --avatar-bg: #379d4a;
+  --avatar-fg: #ffffff;
 }
 
 @media (prefers-reduced-motion: reduce) {

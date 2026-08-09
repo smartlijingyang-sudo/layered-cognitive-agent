@@ -56,6 +56,7 @@ from lca.contracts.protocols.infra import (
     LLMAdapter,
     SafeExecutor,
     Sandbox,
+    SandboxRuntime,
     StateStore,
     Tool,
     ToolRegistry,
@@ -71,6 +72,18 @@ from lca.contracts.protocols.memory import MemorySystem
 # ── 可观测性协议（业务层唯一发射门面）──────────────────
 from lca.contracts.protocols.observability import ObservabilityBackend, Telemetry
 
+# ── 操作技能库（与角色库平行，ADR-0048）────────────
+from lca.contracts.protocols.operational_skills import (
+    SANDBOX_SKILL_MOUNT_PREFIX,
+    SkillImporter,
+    SkillImportError,
+    SkillIndexEntry,
+    SkillNotFoundError,
+    SkillPackage,
+    SkillPackageStore,
+    SkillSearchResult,
+)
+
 # ── L3 团队编排协议 ──────────────────────────────────────
 from lca.contracts.protocols.orchestration import (
     MemberInvoker,
@@ -85,6 +98,7 @@ from lca.contracts.protocols.orchestration import (
 from lca.contracts.protocols.runtime import Runtime, StopOutcomePolicy, StopRule
 
 __all__ = [
+    "SANDBOX_SKILL_MOUNT_PREFIX",
     "AgentTransport",
     "AgentUnit",
     "Body",
@@ -114,8 +128,16 @@ __all__ = [
     "Runtime",
     "SafeExecutor",
     "Sandbox",
+    "SandboxRuntime",
     "SharedMemoryStore",
+    "SkillImportError",
+    "SkillImporter",
+    "SkillIndexEntry",
+    "SkillNotFoundError",
+    "SkillPackage",
+    "SkillPackageStore",
     "SkillRouter",
+    "SkillSearchResult",
     "StateStore",
     "StopOutcome",
     "StopOutcomePolicy",

@@ -105,8 +105,21 @@ export function normalizeChatMarkdown(
   }
 
   if (lastIndex < text.length) {
-    parts.push(normalizeProseChunk(text.slice(lastIndex), mergeShort));
+    const tail = text.slice(lastIndex);
+    // Streaming mid-flight: a fence opened but not yet closed. Prose before it
+    // is still normalized; the fence and everything after must pass through
+    // untouched, otherwise code lines get bullet/bold/heading rewrites until
+    // the closing fence arrives.
+    const openFenceIndex = tail.indexOf("```");
+    if (openFenceIndex !== -1) {
+      if (openFenceIndex > 0) {
+        parts.push(normalizeProseChunk(tail.slice(0, openFenceIndex), mergeShort));
+      }
+      parts.push(tail.slice(openFenceIndex));
+    } else {
+      parts.push(normalizeProseChunk(tail, mergeShort));
+    }
   }
 
-  return parts.filter(Boolean).join("").trimEnd();
+  return parts.filter(Boolean).join("\n\n").trimEnd();
 }

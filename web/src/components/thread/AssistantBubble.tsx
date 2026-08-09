@@ -1,6 +1,5 @@
 import type { Turn } from "../../domain/conversation";
 import type { TraceState, Verbosity } from "../../projectors";
-import { Bot } from "lucide-react";
 import { phaseStatusLabel } from "../shared/RunProgressBar";
 import { MarkdownContent } from "../shared/MarkdownContent";
 import { GeneratedFileList } from "../shared/GeneratedFileCard";
@@ -9,6 +8,7 @@ import { TypingIndicator } from "../shared/TypingIndicator";
 import { TraceAccordion } from "../trace/TraceAccordion";
 import { TeamCompositionBanner } from "./TeamCompositionBanner";
 import { cn } from "../../lib/cn";
+import { AgentAvatar } from "../shared/AgentAvatar";
 
 function turnStatusLabel(turn: Turn, trace: TraceState): string {
   if (turn.status === "failed") return "失败";
@@ -37,12 +37,7 @@ export function AssistantBubble({
 
   return (
     <div className="flex gap-3">
-      <div
-        className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/12 text-accent ring-1 ring-accent/20"
-        aria-hidden
-      >
-        <Bot size={16} strokeWidth={2} />
-      </div>
+      <AgentAvatar size={32} className="mt-0.5" />
 
       <div className="min-w-0 flex-1">
         {showStatus ? (

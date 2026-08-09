@@ -11,7 +11,16 @@ asyncio.create_task 边界，成员 run 由此派生 parent_run_id / delegation_
 from __future__ import annotations
 
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.atoms.semantic_keys import OBS_TASK_ID
+from lca.contracts.atoms.semantic_keys import (
+    COMPLETION_EMPTY,
+    COMPLETION_FULL,
+    COMPLETION_PARTIAL,
+    FAILURE_KIND,
+    FAILURE_KIND_TRANSIENT,
+    OBS_COMPLETION_QUALITY,
+    OBS_DELEGATION_ID,
+    OBS_TASK_ID,
+)
 from lca.contracts.atoms.telemetry import ATTR_CALLEE_ROLE, ATTR_OK, ATTR_PROTOCOL, SpanName
 from lca.contracts.models.core.budget import DEFAULT_DELEGATION_TIMEOUT_S
 from lca.contracts.models.core.decision import Observation
@@ -137,7 +146,20 @@ async def send_and_wait(
         ) as handle:
             wait = getattr(transport, "wait_result", None)
             if wait is not None:
-                waited = await wait(task_id, timeout_s)
+                try:
+                    waited = await wait(task_id, timeout_s)
+                except TimeoutError:
+                    # 兼容仍 raise 的 transport：无 partial 的超时 Observation
+                    waited = Observation(
+                        observation_id=new_id("obs"),
+                        success=False,
+                        payload=None,
+                        error="delegate 超时",
+                        extra={
+                            FAILURE_KIND: FAILURE_KIND_TRANSIENT,
+                            OBS_COMPLETION_QUALITY: COMPLETION_EMPTY,
+                        },
+                    )
                 if not isinstance(waited, Observation):
                     raise TypeError(
                         f"wait_result must return Observation, got {type(waited).__name__}"
@@ -146,19 +168,37 @@ async def send_and_wait(
             else:
                 observation = await transport.receive_result(task_id)
             handle.attributes[ATTR_OK] = observation.success
+    status = _delegation_status(observation)
     record(
         DelegationCompleted(
             delegation_id=delegation_id,
             ok=observation.success,
-            status=(TaskStatus.COMPLETED.value if observation.success else TaskStatus.FAILED.value),
+            status=status,
             output_text=_payload_preview(observation.payload),
             task_id=task_id,
         )
     )
     extra = dict(observation.extra or {})
     extra[OBS_TASK_ID] = task_id
+    extra[OBS_DELEGATION_ID] = delegation_id
+    if OBS_COMPLETION_QUALITY not in extra:
+        if observation.success:
+            extra[OBS_COMPLETION_QUALITY] = COMPLETION_FULL
+        elif observation.payload:
+            extra[OBS_COMPLETION_QUALITY] = COMPLETION_PARTIAL
+        else:
+            extra[OBS_COMPLETION_QUALITY] = COMPLETION_EMPTY
     observation.extra = extra
     return observation
+
+
+def _delegation_status(observation: Observation) -> str:
+    if observation.success:
+        return TaskStatus.COMPLETED.value
+    quality = str((observation.extra or {}).get(OBS_COMPLETION_QUALITY) or "")
+    if quality == COMPLETION_PARTIAL or observation.payload:
+        return TaskStatus.CANCELED.value
+    return TaskStatus.FAILED.value
 
 
 async def handoff_task_traced(

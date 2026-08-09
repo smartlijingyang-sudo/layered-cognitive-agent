@@ -269,5 +269,68 @@ describe("chat projector", () => {
     expect(state.files.map((f) => f.name)).toEqual(["chart_person.png", "report.md"]);
     expect(state.files[0]?.previewable).toBe(true);
   });
+
+  it("ignores decision-channel StepTextDelta for answer preview", () => {
+    let state = reduceChat(
+      {
+        question: "q",
+        answer: "",
+        answerDeltas: [],
+        status: "running",
+        phase: "collaborating",
+        files: [],
+        pendingSteps: new Map(),
+        committedAnswer: "",
+      },
+      stamp(1, {
+        type: "StepTextDelta",
+        step: 0,
+        text_delta: '{"action_type":"use_tool"}',
+        seq: 0,
+        channel: "decision",
+      }),
+    );
+    expect(state.answer).toBe("");
+    state = reduceChat(
+      state,
+      stamp(2, {
+        type: "StepTextDelta",
+        step: 0,
+        text_delta: "可见回答",
+        seq: 1,
+        channel: "answer",
+      }),
+    );
+    expect(state.answer).toBe("可见回答");
+  });
+
+  it("tracks activityDetail from LlmCallStarted and RunActivity", () => {
+    let state = reduceChat(
+      {
+        question: "q",
+        answer: "",
+        answerDeltas: [],
+        status: "running",
+        phase: "collaborating",
+        files: [],
+        pendingSteps: new Map(),
+        committedAnswer: "",
+      },
+      stamp(1, { type: "LlmCallStarted", step: 1, model: "qwen-plus" }),
+    );
+    expect(state.activityDetail).toContain("qwen-plus");
+
+    state = reduceChat(
+      state,
+      stamp(2, {
+        type: "RunActivity",
+        phase: "tool_running",
+        step: 1,
+        detail: "执行工具 sandbox_execute…",
+        seq: 0,
+      }),
+    );
+    expect(state.activityDetail).toBe("执行工具 sandbox_execute…");
+  });
 });
 

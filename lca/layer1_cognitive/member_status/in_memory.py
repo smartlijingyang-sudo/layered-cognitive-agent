@@ -52,6 +52,15 @@ class InMemoryMemberStatus:
         if waiting:
             return f"尚未咨询的角色: {', '.join(waiting)}"
         failed = [r for r in self.role_order if self.status[r] == RoleStatus.FAILED]
+        partial = [r for r in self.role_order if self.status[r] == RoleStatus.DONE_PARTIAL]
+        bits: list[str] = []
+        if not failed and not partial:
+            return "所有必需角色均已咨询完毕（完整证据）"
+        if partial:
+            bits.append(f"{', '.join(partial)} 仅有部分证据")
         if failed:
-            return f"{', '.join(failed)} 角色多次尝试后仍不可用,本次结论不含该视角"
-        return "所有必需角色均已咨询完毕"
+            bits.append(f"{', '.join(failed)} 角色多次尝试后仍不可用,本次结论不含该视角")
+        done = [r for r in self.role_order if self.status[r] == RoleStatus.DONE]
+        if done:
+            bits.append(f"{', '.join(done)} 已提供完整证据")
+        return "；".join(bits)

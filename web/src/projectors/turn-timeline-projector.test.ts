@@ -223,4 +223,59 @@ describe("buildTurnTimeline", () => {
     expect(tool && tool.kind === "tool" && tool.status).toBe("done");
     expect(done.foldProcess).toBe(true);
   });
+
+  it("filters decision-channel StepTextDelta from final answer preview", () => {
+    const events = [
+      stamped("AgentRunStarted", {
+        agent_role: "a",
+        strategy_key: "react",
+        objective: "x",
+        objective_preview: "x",
+        from_role: "",
+      }),
+      stamped(
+        "StepTextDelta",
+        {
+          step: 1,
+          text_delta: '{"action_type":"use_tool","tool_name":"sandbox_execute"}',
+          seq: 0,
+          channel: "decision",
+        },
+        2,
+        1100,
+      ),
+      stamped(
+        "StepTextDelta",
+        { step: 1, text_delta: "用户可见片段", seq: 1, channel: "answer" },
+        3,
+        1200,
+      ),
+    ];
+    const timeline = buildTurnTimeline(events);
+    expect(timeline.finalAnswer).toBe("用户可见片段");
+    expect(timeline.finalAnswer).not.toContain("use_tool");
+  });
+
+  it("projects RunActivity and LlmCallStarted as activity blocks", () => {
+    const events = [
+      stamped("AgentRunStarted", {
+        agent_role: "a",
+        strategy_key: "react",
+        objective: "x",
+        objective_preview: "x",
+        from_role: "",
+      }),
+      stamped("LlmCallStarted", { step: 1, model: "qwen-plus" }, 2, 1100),
+      stamped(
+        "RunActivity",
+        { phase: "llm_thinking", step: 1, detail: "qwen-plus 推理中…", seq: 0 },
+        3,
+        1150,
+      ),
+    ];
+    const timeline = buildTurnTimeline(events);
+    const activities = timeline.process.filter((b) => b.kind === "activity");
+    expect(activities.length).toBeGreaterThanOrEqual(1);
+    expect(activities.some((b) => b.kind === "activity" && b.detail.includes("推理"))).toBe(true);
+  });
 });
