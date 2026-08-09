@@ -42,3 +42,5 @@ export {
   EMPTY_TURN_TIMELINE,
   shouldShowEvent,
 } from "./types";
+export { MessageProjector } from "./message-projector";
+export type { Message, MessageKind, MessageMetadata, Turn as MessageTurn } from "./message-types";

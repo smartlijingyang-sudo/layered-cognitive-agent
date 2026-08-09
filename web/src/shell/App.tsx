@@ -3,14 +3,17 @@ import { JournalLog } from "../journal-log/journal-log";
 import {
   ChatProjector,
   EMPTY_TURN_TIMELINE,
+  MessageProjector,
   TraceProjector,
   TurnTimelineProjector,
 } from "../projectors";
+import type { MessageTurn } from "../projectors";
 import { FetchSseTransport } from "../transport";
 import { AppLayout } from "../components/layout/AppLayout";
 import { ChatError, ChatMain } from "../components/layout/ChatMain";
 import { ConversationSidebar } from "../components/sidebar/ConversationSidebar";
 import { ThreadView } from "../components/thread/ThreadView";
+import { MessageList } from "../components/thread/MessageList";
 import { Composer } from "../components/composer/Composer";
 import { DeveloperTracePanel } from "../components/trace/DeveloperTracePanel";
 import { createRun, cancelRun, fetchHealth, fetchRunSummary } from "../api/runs";
@@ -28,6 +31,7 @@ import { createTurn } from "../domain/conversation";
 import type { LocalAttachment } from "../domain/generated-file";
 import { toPersistableAttachments } from "../domain/generated-file";
 import { shouldPersistTurnOnEvent } from "../lib/persist-turn";
+import { ATTACHMENT_ONLY_QUESTION } from "../components/composer/Composer";
 import type { ChatState, TurnTimeline } from "../projectors";
 import "./app.css";
 
@@ -60,6 +64,15 @@ export default function App() {
   const [trace, setTrace] = useState(traceProjector.snapshot());
   const [liveTimeline, setLiveTimeline] = useState<TurnTimeline>(EMPTY_TURN_TIMELINE);
 
+  // Feature flag: ?message-renderer URL param or localStorage key
+  const useMessageRenderer = useMemo(() => {
+    if (new URLSearchParams(window.location.search).has("message-renderer")) return true;
+    return localStorage.getItem("message-renderer") === "true";
+  }, []);
+
+  const messageProjector = useMemo(() => new MessageProjector(), []);
+  const [messageTurn, setMessageTurn] = useState<MessageTurn | null>(null);
+
   useEffect(() => {
     document.documentElement.dataset.theme = store.settings.theme;
   }, [store.settings.theme]);
@@ -78,7 +91,9 @@ export default function App() {
     // Reset process timeline when switching conversations.
     turnTimelineProjector.reset();
     setLiveTimeline(EMPTY_TURN_TIMELINE);
-  }, [store.activeConversationId, turnTimelineProjector]);
+    messageProjector.reset();
+    setMessageTurn(null);
+  }, [store.activeConversationId, turnTimelineProjector, messageProjector]);
 
   const ensureConversation = useCallback(async () => {
     if (store.activeConversationId) return store.activeConversationId;
@@ -102,6 +117,8 @@ export default function App() {
       setLiveTimeline(EMPTY_TURN_TIMELINE);
       traceProjector.reset();
       setTrace(traceProjector.snapshot());
+      messageProjector.reset();
+      setMessageTurn(null);
       transport.resetCursor();
 
       try {
@@ -138,13 +155,18 @@ export default function App() {
         }
 
         const { run_id: runId, trace_id: traceId } = await createRun({
-          question,
+          question: question.trim() || ATTACHMENT_ONLY_QUESTION,
           mode,
           conversation_id: conversationId,
           attachment_ids: attachmentIds,
         });
         const pendingTurn = {
-          ...createTurn(runId, traceId, question, mode),
+          ...createTurn(
+            runId,
+            traceId,
+            question.trim() || ATTACHMENT_ONLY_QUESTION,
+            mode,
+          ),
           attachments: toPersistableAttachments(uploadedAttachments),
         };
         await store.appendTurn({ ...pendingTurn, status: "running" });
@@ -170,6 +192,8 @@ export default function App() {
           const nextChat = chatProjector.onEvent(stamped);
           setTrace(traceProjector.onEvent(stamped));
           setLiveTimeline(turnTimelineProjector.onEvent(stamped));
+          messageProjector.onEvent(stamped);
+          setMessageTurn(messageProjector.buildTurn(runId));
 
           const turnChanged =
             prevChat.answer !== nextChat.answer ||
@@ -213,6 +237,10 @@ export default function App() {
           await store.persistTurnJournal(runId, journalEvents);
         }
 
+        if (attachments.length > 0 && attachmentIds.length === 0) {
+          store.setError("附件未能上传，请检查网关是否在运行");
+        }
+
         if (finalStatus === "failed" && finalError && !store.error) {
           store.setError(finalError);
         }
@@ -231,6 +259,7 @@ export default function App() {
       store,
       traceProjector,
       turnTimelineProjector,
+      messageProjector,
       transport,
     ],
   );
@@ -305,20 +334,24 @@ export default function App() {
           homeColumn={homeActive}
           messages={
             <>
-              <ThreadView
-                conversation={homeActive ? null : conversation}
-                liveEvents={store.liveEvents}
-                liveTimeline={liveTimeline}
-                turnTimelines={store.turnTimelines}
-                trace={trace}
-                verbosity={store.settings.verbosity}
-                developerMode={store.settings.developerMode}
-                mode={store.settings.mode}
-                homeActive={homeActive}
-                onOpenModePicker={() => {
-                  document.getElementById("lca-mode-picker-trigger")?.click();
-                }}
-              />
+              {useMessageRenderer && messageTurn ? (
+                <MessageList turn={messageTurn} />
+              ) : (
+                <ThreadView
+                  conversation={homeActive ? null : conversation}
+                  liveEvents={store.liveEvents}
+                  liveTimeline={liveTimeline}
+                  turnTimelines={store.turnTimelines}
+                  trace={trace}
+                  verbosity={store.settings.verbosity}
+                  developerMode={store.settings.developerMode}
+                  mode={store.settings.mode}
+                  homeActive={homeActive}
+                  onOpenModePicker={() => {
+                    document.getElementById("lca-mode-picker-trigger")?.click();
+                  }}
+                />
+              )}
               {store.error ? <ChatError>{store.error}</ChatError> : null}
             </>
           }
