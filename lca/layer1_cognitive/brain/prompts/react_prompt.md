@@ -33,3 +33,15 @@ CONTEXT:
 请以 JSON 输出下一步 Decision（字段：action_type / rationale / confidence；
 use_tool 时附 tool_name+arguments；respond 时附顶层 response_text）。
 严禁把 respond 写成 use_tool 或 tool_name:"respond"——回复用户只能用 action_type:"respond"。
+
+## 输出格式
+
+你的最终回答必须使用标准 Markdown 格式：
+- 标题用 `#` / `##` / `###`，不要用 `===` 或纯文字
+- 列表用 `-` 或 `1.`，不要用 `·` 或 `•`
+- 加粗用 `**文字**`，不要用全角或其他符号
+- 引用用 `>` 前缀
+- 代码用 ``` 围栏
+- 表格用 `| col | col |` 语法
+
+不要使用 ASCII 艺术格式（如 `=====` 分隔线、`·` 子列表）。
