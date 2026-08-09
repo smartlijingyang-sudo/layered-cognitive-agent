@@ -53,12 +53,31 @@ export const sidebarItemActive = cn(
   "bg-[var(--fill-hover)] text-[var(--text)]",
 );
 
-/** Pill control in composer action bar. */
+/** Pill control in composer action bar — LobeHub AgentMode: h-28px. */
 export const composerPill = cn(
-  "inline-flex max-w-[12rem] cursor-pointer items-center gap-1.5 rounded-full",
-  "border border-[var(--border)] bg-transparent px-2.5 py-1 text-xs",
+  "inline-flex h-7 max-w-[12rem] cursor-pointer items-center gap-1.5 rounded-full",
+  "border border-[var(--border)] bg-[var(--fill-secondary)] px-2 text-xs leading-none",
   "text-[var(--text-muted)] transition-colors duration-150",
   "hover:bg-[var(--fill-hover)] hover:text-[var(--text)]",
+  "disabled:cursor-not-allowed disabled:opacity-50",
+  focusRing,
+);
+
+/** LobeHub ActionBar AgentMode trigger — icon + label + chevron, no border. */
+export const composerModePill = cn(
+  "inline-flex h-7 max-w-[12rem] cursor-pointer items-center gap-1.5 rounded-full px-2",
+  "bg-[color-mix(in_srgb,var(--fill-secondary)_72%,transparent)] text-xs leading-none",
+  "text-[var(--text-muted)] transition-colors duration-150",
+  "hover:bg-[var(--fill-secondary)] hover:text-[var(--text)]",
+  "disabled:cursor-not-allowed disabled:opacity-50",
+  focusRing,
+);
+
+/** LobeHub ControlBar ModeSelector — flat row below composer. */
+export const composerModeControlBar = cn(
+  "inline-flex h-7 max-w-[12rem] cursor-pointer items-center gap-1.5 rounded-[6px] px-2",
+  "text-xs leading-none text-[var(--text-muted)] transition-colors duration-150",
+  "hover:bg-[var(--fill-secondary)] hover:text-[var(--text)]",
   "disabled:cursor-not-allowed disabled:opacity-50",
   focusRing,
 );

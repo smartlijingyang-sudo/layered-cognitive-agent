@@ -10,9 +10,9 @@ import structlog
 
 from gateway.collector import GatewayCollector
 from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
-from gateway.mode_catalog import AUTO_MODE_KEY, DEFAULT_MODE
+from gateway.mode_catalog import DEFAULT_MODE, SOLO_MODE_KEY
 from gateway.run_registry import RunRegistry, RunSession, RunStatus
-from gateway.team_factory import build_runnable, build_runnable_auto
+from gateway.team_factory import build_runnable_team, build_solo_agent
 from lca.contracts.atoms.ids import new_id
 from lca.layer0_infra.file_store import get_default_file_store
 from lca.layer0_infra.sandbox.factory import resolve_sandbox
@@ -79,19 +79,18 @@ async def execute_run(
                     )
             llm = get_llm_resolver().resolve(mode=mode)
             runnable: Agent | Team
-            # 全仓库唯一按 mode 分支处：auto 需先 await 选角，无法并入同步
-            # build_runnable 查表路径（ADR-0042）。若未来出现第二个特殊入口，
-            # 应重构为 runner 注册表而非继续加分支。
-            if mode == AUTO_MODE_KEY:
-                runnable = await build_runnable_auto(
+            # Solo/Team 分治（ADR-0052）：solo 是裸模型（同步），team 走 LLM casting（异步）。
+            # 两种根本不同的构建机制，分支在语义上是稳定的。
+            if mode == SOLO_MODE_KEY:
+                runnable = build_solo_agent(llm, observability=session.hub)
+            else:
+                runnable = await build_runnable_team(
                     question,
                     llm,
                     observability=session.hub,
                     trace_id=session.trace_id,
                     run_id=session.run_id,
                 )
-            else:
-                runnable = build_runnable(mode, llm, observability=session.hub)
             await runnable.run(question)
         session.status = RunStatus.CANCELED if session.cancel_requested else RunStatus.COMPLETED
     except asyncio.CancelledError:

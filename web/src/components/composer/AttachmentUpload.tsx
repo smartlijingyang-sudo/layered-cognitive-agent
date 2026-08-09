@@ -31,6 +31,7 @@ import { cn } from "../../lib/cn";
 import { ICON_STROKE, LobeIcon } from "../../lib/icons";
 import { focusRing } from "../../lib/ui";
 import { PlusActionMenu } from "./PlusActionMenu";
+import type { ComposerMenuPlacement } from "./menu-position";
 
 const KIND_ICON: Record<string, LucideIcon> = {
   image: FileImage,
@@ -153,13 +154,14 @@ function FileItemCard({
     <li
       className={cn(
         "lobe-file-item relative flex h-16 w-[180px] shrink-0 items-center overflow-hidden",
-        "rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)]",
+        "rounded-lg border border-[var(--border)] bg-[var(--surface)]",
+        "shadow-[0_0_0_0.5px_var(--border-subtle)_inset,var(--shadow-card)]",
       )}
       data-testid="attachment-chip"
       title={att.error ?? att.name}
     >
       <div className="flex size-16 shrink-0 items-center justify-center p-1">
-        <div className="relative flex size-14 items-center justify-center overflow-hidden rounded-[6px] bg-[var(--fill-secondary)]">
+        <div className="relative flex size-14 items-center justify-center overflow-hidden rounded-md bg-[var(--fill-secondary)]">
           <FilePreviewThumb att={att} large />
           {uploading ? (
             <span className="absolute inset-0 flex items-center justify-center bg-black/45">
@@ -168,16 +170,20 @@ function FileItemCard({
           ) : null}
         </div>
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-1 py-1 pr-2">
-        <span className="truncate text-[12px] leading-tight text-[var(--text)]" title={att.name}>
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 py-1 pr-2">
+        <span
+          className="truncate text-xs leading-[1.25] text-[var(--text)]"
+          style={{ maxWidth: 88 }}
+          title={att.name}
+        >
           {att.name}
         </span>
-        <span className="truncate text-[11px] text-[var(--text-faint)]">
+        <span className="truncate text-xs leading-none text-[var(--text-muted)]">
           {errored
             ? att.error || "失败"
             : uploading
               ? "上传中…"
-              : sizeLabel || "已添加"}
+              : sizeLabel || ""}
         </span>
       </div>
       <button
@@ -214,18 +220,18 @@ function ContextTag({
   return (
     <li
       className={cn(
-        "inline-flex max-w-[12rem] items-center gap-1.5 rounded-full",
-        "border border-[var(--border)] bg-[var(--fill-secondary)]",
-        "py-1 pr-1 pl-1.5 text-xs",
+        "lobe-att-chip inline-flex h-7 max-w-[12rem] items-center gap-1.5",
+        "rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--fill-secondary)]",
+        "py-0 pr-1 pl-1.5 text-sm leading-none",
         errored && "border-[var(--color-danger)]/35",
       )}
       data-testid="attachment-chip"
       title={att.error ?? att.name}
     >
-      <span className="relative inline-flex size-[18px] shrink-0 items-center justify-center overflow-hidden rounded-[4px] bg-[var(--fill-hover)]">
+      <span className="lobe-att-thumb relative inline-flex size-[18px] shrink-0 items-center justify-center overflow-hidden rounded-[4px]">
         <FilePreviewThumb att={att} />
       </span>
-      <span className="min-w-0 flex-1 truncate leading-[18px] text-[var(--text)]">
+      <span className="min-w-0 flex-1 truncate text-sm leading-[18px] text-[var(--text)]">
         {basename(att.name)}
       </span>
       {errored ? (
@@ -256,6 +262,8 @@ export function AttachmentUpload({
   disabled = false,
   autoUpload = false,
   compact = false,
+  menuPlacement = "topLeft",
+  onDropFiles,
 }: {
   readonly attachments: readonly LocalAttachment[];
   readonly onChange: (next: readonly LocalAttachment[]) => void;
@@ -263,6 +271,9 @@ export function AttachmentUpload({
   readonly disabled?: boolean;
   readonly autoUpload?: boolean;
   readonly compact?: boolean;
+  readonly menuPlacement?: ComposerMenuPlacement;
+  /** Optional external drop handler (Composer drag-drop). */
+  readonly onDropFiles?: (files: FileList) => void;
 }) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -335,15 +346,48 @@ export function AttachmentUpload({
     />
   );
 
+  const ingestFiles = useCallback(
+    (fileList: FileList | File[]) => {
+      void addFiles(fileList);
+    },
+    [addFiles],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (disabled || !e.dataTransfer.files?.length) return;
+      if (onDropFiles) {
+        onDropFiles(e.dataTransfer.files);
+      } else {
+        ingestFiles(e.dataTransfer.files);
+      }
+    },
+    [disabled, ingestFiles, onDropFiles],
+  );
+
+  const dropHandlers = disabled
+    ? {}
+    : {
+        onDragOver: (e: React.DragEvent) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+        },
+        onDrop: handleDrop,
+      };
+
   if (compact) {
     return (
-      <div data-testid="attachment-upload">
+      <span className="inline-flex items-center" data-testid="attachment-upload" {...dropHandlers}>
         <PlusActionMenu
           disabled={disabled}
-          attachmentCount={attachments.length}
-          onPickFiles={(files) => void addFiles(files)}
+          attachments={attachments}
+          onPickFiles={ingestFiles}
+          onRemoveAttachment={remove}
+          menuPlacement={menuPlacement}
         />
-      </div>
+      </span>
     );
   }
 
@@ -366,10 +410,10 @@ export function AttachmentUpload({
   }
 
   return (
-    <div className="grid gap-2" data-testid="attachment-upload">
+    <div className="flex flex-col gap-0" data-testid="attachment-upload" {...dropHandlers}>
       {showCards ? (
         <ul
-          className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1"
+          className="m-0 flex list-none gap-2 overflow-x-auto p-0 py-2"
           aria-label="待处理附件"
         >
           {pending.map((att) => (
@@ -384,7 +428,7 @@ export function AttachmentUpload({
       ) : null}
       {showTags ? (
         <ul
-          className="m-0 flex list-none flex-wrap gap-1.5 p-0"
+          className="m-0 flex list-none flex-wrap gap-1 overflow-x-auto p-0 pt-2"
           aria-label="已添加附件"
         >
           {ready.map((att) => (

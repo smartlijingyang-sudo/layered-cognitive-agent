@@ -1,4 +1,4 @@
-"""Gateway auto 组队执行路径测试（ADR-0042）：mode=auto 经 run_executor 全链路。"""
+"""Gateway team 组队执行路径测试（ADR-0052）：mode=team 经 run_executor 全链路。"""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import json
 import unittest
 
 from gateway.llm_resolver import ProductionLLMResolver
-from gateway.mode_catalog import AUTO_MODE_KEY
 from gateway.run_executor import create_run_session, execute_run, set_llm_resolver
 from gateway.run_registry import RunRegistry, RunStatus
 from lca.contracts.protocols import LLMAdapter
@@ -27,14 +26,14 @@ class _ScriptedResolver:
         return self._llm
 
 
-class TestAutoRunPath(unittest.IsolatedAsyncioTestCase):
+class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.registry = RunRegistry()
 
     def tearDown(self) -> None:
         set_llm_resolver(ProductionLLMResolver())
 
-    async def test_auto_mode_casts_team_and_completes(self) -> None:
+    async def test_team_mode_casts_team_and_completes(self) -> None:
         plan = json.dumps(
             {
                 "selected": [
@@ -50,7 +49,7 @@ class TestAutoRunPath(unittest.IsolatedAsyncioTestCase):
         set_llm_resolver(_ScriptedResolver(llm))
 
         session = create_run_session(
-            self.registry, question="给新功能的发布写一句宣传文案", mode=AUTO_MODE_KEY
+            self.registry, question="给新功能的发布写一句宣传文案", mode="team"
         )
         await execute_run(
             self.registry,
@@ -63,12 +62,12 @@ class TestAutoRunPath(unittest.IsolatedAsyncioTestCase):
         self.assertIn("CastingStarted", event_types)
         self.assertIn("CastingCompleted", event_types)
 
-    async def test_auto_mode_casting_failure_fails_run(self) -> None:
+    async def test_team_mode_casting_failure_fails_run(self) -> None:
         # 两次尝试都不是合法 JSON → CastingError → run FAILED（既有错误管道收尾）
         llm = ScriptedLLMAdapter({"caster": ["完全不是 JSON"]}, default_respond=False)
         set_llm_resolver(_ScriptedResolver(llm))
 
-        session = create_run_session(self.registry, question="随便做点什么", mode=AUTO_MODE_KEY)
+        session = create_run_session(self.registry, question="随便做点什么", mode="team")
         await execute_run(
             self.registry,
             run_id=session.run_id,

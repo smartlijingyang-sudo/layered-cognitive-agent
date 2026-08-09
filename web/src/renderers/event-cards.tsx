@@ -128,6 +128,24 @@ export function ReasoningCompletedCard({ event, domain }: EventRendererProps) {
   );
 }
 
+export function LlmCallStartedCard({ event, domain }: EventRendererProps) {
+  if (event.type !== "LlmCallStarted") return null;
+  return (
+    <Card domain={domain} title={`LLM 开始 · ${event.model}`} body={`step ${event.step}`} />
+  );
+}
+
+export function RunActivityCard({ event, domain }: EventRendererProps) {
+  if (event.type !== "RunActivity") return null;
+  return (
+    <Card
+      domain={domain}
+      title={`活动 · ${event.phase}`}
+      body={`step ${event.step} · ${event.detail}`}
+    />
+  );
+}
+
 export function LlmCallCard({ event, domain }: EventRendererProps) {
   if (event.type !== "LlmCallCompleted") return null;
   const tokens =

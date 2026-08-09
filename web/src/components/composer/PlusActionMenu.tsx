@@ -1,56 +1,261 @@
 /**
- * LobeHub ChatInput Plus — uploadItems when knowledge base is disabled.
+ * LobeHub ChatInput Plus — attachments submenu.
  * @see /home/lichao/lobehub/src/features/ChatInput/ActionBar/Plus/index.tsx
  */
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { FileUp, Plus } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { ChevronRight, FileUp, LibraryBig, Plus } from "lucide-react";
+import type { LocalAttachment } from "../../domain/generated-file";
 import { cn } from "../../lib/cn";
-import { COMPOSER_ACTION_BLOCK, ICON_SIZE, LobeIcon } from "../../lib/icons";
-import { focusRing } from "../../lib/ui";
+import { COMPOSER_ACTION_BLOCK, LobeIcon } from "../../lib/icons";
+import { composerActionCircle } from "./composer-action-bar";
+import { AttachmentMenuItem } from "./AttachmentMenuItem";
+import {
+  COMPOSER_MENU_MIN_WIDTH,
+  COMPOSER_SUBMENU_WIDTH,
+  composerMenuCountChip,
+  composerMenuDivider,
+  composerMenuPanel,
+  composerMenuRowInteractive,
+  ComposerMenuIcon,
+} from "./composer-menu";
+import {
+  computeMainMenuStyle,
+  type ComposerMenuPlacement,
+} from "./menu-position";
+import { UploadMenuRow } from "./UploadMenuRow";
 
-const MENU_ICON_PX = ICON_SIZE.xl;
+const SUBMENU_HOVER_CLOSE_MS = 180;
 
 export function PlusActionMenu({
   disabled,
-  attachmentCount,
+  attachments,
   onPickFiles,
+  onRemoveAttachment,
+  menuPlacement = "topLeft",
 }: {
   readonly disabled?: boolean;
-  readonly attachmentCount: number;
+  readonly attachments: readonly LocalAttachment[];
   readonly onPickFiles: (files: FileList) => void;
+  readonly onRemoveAttachment: (id: string) => void;
+  readonly menuPlacement?: ComposerMenuPlacement;
 }) {
-  const inputId = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const submenuCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [open, setOpen] = useState(false);
+  const [submenuOpen, setSubmenuOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<
+    ReturnType<typeof computeMainMenuStyle> | null
+  >(null);
 
-  const close = useCallback(() => setOpen(false), []);
+  const attachmentCount = attachments.length;
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setSubmenuOpen(false);
+    setMenuStyle(null);
+  }, []);
+
+  const syncMenuPos = useCallback(() => {
+    const trigger = triggerRef.current;
+    const menu = menuRef.current;
+    if (!trigger) return;
+    const anchor = trigger.getBoundingClientRect();
+    const size = menu
+      ? { width: menu.offsetWidth, height: menu.offsetHeight }
+      : undefined;
+    setMenuStyle(computeMainMenuStyle(anchor, menuPlacement, size));
+  }, [menuPlacement]);
+
+  const openSubmenu = useCallback(() => {
+    if (submenuCloseTimer.current) {
+      clearTimeout(submenuCloseTimer.current);
+      submenuCloseTimer.current = null;
+    }
+    setSubmenuOpen(true);
+  }, []);
+
+  const scheduleCloseSubmenu = useCallback(() => {
+    if (submenuCloseTimer.current) clearTimeout(submenuCloseTimer.current);
+    submenuCloseTimer.current = setTimeout(() => setSubmenuOpen(false), SUBMENU_HOVER_CLOSE_MS);
+  }, []);
+
+  const toggleOpen = useCallback(() => {
+    setOpen((wasOpen) => {
+      if (wasOpen) {
+        setSubmenuOpen(false);
+        setMenuStyle(null);
+        return false;
+      }
+      if (attachments.length > 0) setSubmenuOpen(true);
+      return true;
+    });
+  }, [attachments.length]);
+
+  useEffect(() => {
+    return () => {
+      if (submenuCloseTimer.current) clearTimeout(submenuCloseTimer.current);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    syncMenuPos();
+  }, [open, syncMenuPos, attachments.length, submenuOpen]);
 
   useEffect(() => {
     if (!open) return;
+    const onLayout = () => syncMenuPos();
+    window.addEventListener("resize", onLayout);
+    window.addEventListener("scroll", onLayout, true);
+    return () => {
+      window.removeEventListener("resize", onLayout);
+      window.removeEventListener("scroll", onLayout, true);
+    };
+  }, [open, syncMenuPos]);
+
+  useEffect(() => {
+    if (!open) return;
+
     const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) close();
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      close();
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") close();
     };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
+
+    const timer = window.setTimeout(() => {
+      document.addEventListener("pointerdown", onPointerDown);
+      document.addEventListener("keydown", onKeyDown);
+    }, 0);
+
     return () => {
+      clearTimeout(timer);
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [close, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onDocDragEnter = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes("Files")) openSubmenu();
+    };
+    document.addEventListener("dragenter", onDocDragEnter);
+    return () => document.removeEventListener("dragenter", onDocDragEnter);
+  }, [open, openSubmenu]);
+
+  const menuPortal =
+    open
+      ? createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            className={cn(
+              "fixed z-[1000]",
+              composerMenuPanel,
+              menuStyle ? "visible" : "invisible",
+            )}
+            style={{
+              minWidth: COMPOSER_MENU_MIN_WIDTH,
+              left: menuStyle?.left ?? 0,
+              top: menuStyle?.top ?? 0,
+              transform: menuStyle?.transform,
+            }}
+          >
+            {/* Hover bridge: submenu absolute adjacent — LobeHub base-ui submenu. */}
+            <div
+              className="relative"
+              onMouseEnter={openSubmenu}
+              onMouseLeave={scheduleCloseSubmenu}
+            >
+              <div
+                role="menuitem"
+                aria-haspopup="menu"
+                aria-expanded={submenuOpen}
+                className={composerMenuRowInteractive}
+                onClick={() => setSubmenuOpen((v) => !v)}
+              >
+                <ComposerMenuIcon>
+                  <LobeIcon icon={LibraryBig} size={20} />
+                </ComposerMenuIcon>
+                <span className="inline-flex min-w-0 flex-1 items-center gap-2">
+                  <span className="truncate">附件</span>
+                  {attachmentCount > 0 ? (
+                    <span className={composerMenuCountChip}>{attachmentCount}</span>
+                  ) : null}
+                </span>
+                <LobeIcon
+                  icon={ChevronRight}
+                  size="md"
+                  className="lobe-submenu-chevron shrink-0 text-[var(--text-faint)]"
+                />
+              </div>
+
+              {submenuOpen ? (
+                <div
+                  role="menu"
+                  className={cn(
+                    "absolute top-0 z-[1001]",
+                    "max-h-[min(50vh,640px)] overflow-y-auto overscroll-contain",
+                    composerMenuPanel,
+                    /* overlap parent by 4px — hover bridge */
+                    "left-full -ml-1 pl-1",
+                  )}
+                  style={{ width: COMPOSER_SUBMENU_WIDTH }}
+                  data-testid="attachments-submenu"
+                  onMouseEnter={openSubmenu}
+                  onMouseLeave={scheduleCloseSubmenu}
+                >
+                  <UploadMenuRow
+                    disabled={disabled}
+                    onFiles={onPickFiles}
+                    onAfterPick={close}
+                    icon={<LobeIcon icon={FileUp} size={20} />}
+                    label="上传文件或图片"
+                  />
+
+                  {attachments.length > 0 ? (
+                    <>
+                      <div role="separator" className={composerMenuDivider} />
+                      {attachments.map((att) => (
+                        <AttachmentMenuItem
+                          key={att.id}
+                          att={att}
+                          onToggle={onRemoveAttachment}
+                        />
+                      ))}
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <div ref={rootRef} className="relative shrink-0" data-testid="plus-action-menu">
       <button
+        ref={triggerRef}
         type="button"
         className={cn(
-          "relative inline-flex cursor-pointer items-center justify-center rounded-full",
-          "text-[var(--text-muted)] transition-colors hover:bg-[var(--fill-hover)] hover:text-[var(--text)]",
+          composerActionCircle,
+          "relative cursor-pointer text-[var(--text-muted)]",
+          "transition-colors hover:bg-[var(--fill-hover)] hover:text-[var(--text)]",
           disabled && "pointer-events-none opacity-50",
-          focusRing,
         )}
         style={{ width: COMPOSER_ACTION_BLOCK, height: COMPOSER_ACTION_BLOCK }}
         title="添加文件、技能和更多上下文…"
@@ -58,7 +263,10 @@ export function PlusActionMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
+        onMouseEnter={() => {
+          if (open) openSubmenu();
+        }}
       >
         <LobeIcon icon={Plus} size="lg" />
         {attachmentCount > 0 ? (
@@ -68,52 +276,7 @@ export function PlusActionMenu({
         ) : null}
       </button>
 
-      {open ? (
-        <div
-          role="menu"
-          className={cn(
-            "absolute bottom-full left-0 z-50 mb-2 min-w-[220px] overflow-hidden",
-            "rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-elevated)]",
-            "py-1 shadow-[var(--shadow-popover)] animate-fade-in",
-          )}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            className={cn(
-              "flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[13px]",
-              "text-[var(--text)] transition-colors hover:bg-[var(--fill-hover)]",
-              focusRing,
-            )}
-            onClick={() => {
-              close();
-              inputRef.current?.click();
-            }}
-          >
-            <span
-              className="inline-flex shrink-0 items-center justify-center text-[var(--text-muted)]"
-              style={{ width: MENU_ICON_PX, height: MENU_ICON_PX }}
-            >
-              <LobeIcon icon={FileUp} size={MENU_ICON_PX} />
-            </span>
-            <span className="min-w-0 flex-1 truncate">上传文件或图片</span>
-          </button>
-        </div>
-      ) : null}
-
-      <input
-        ref={inputRef}
-        id={inputId}
-        type="file"
-        className="sr-only"
-        multiple
-        disabled={disabled}
-        data-testid="attachment-input"
-        onChange={(e) => {
-          if (e.target.files?.length) onPickFiles(e.target.files);
-          e.target.value = "";
-        }}
-      />
+      {menuPortal}
     </div>
   );
 }

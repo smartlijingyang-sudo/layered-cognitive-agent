@@ -31,6 +31,7 @@
 | [0049](0049-consultation-resource-and-evidence-planes.md) | 咨询资源平面 + 证据平面 — 闭合 board 协作 | Accepted |
 | [0050](0050-run-bound-sandbox-runtime.md) | Run-Bound Sandbox Runtime — 单一执行平面 + Inspect/Execute 分离 | Accepted |
 | [0051](0051-run-workspace-plane.md) | Run Workspace Plane — 统一运行平面（Artifact/Deadline/Completion/Gate） | Accepted |
+| [0052](0052-unified-dynamic-casting.md) | 统一动态选角 — 退役静态模式目录，solo/team 收成同一套 casting | Proposed |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

@@ -8,6 +8,7 @@ solo / member / lead 共用同一个 Reasoner（ADR-0035）：状态携带
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 
 from lca.contracts.atoms.enums import LLMStreamEventType, MemoryRecordKind
@@ -32,6 +33,23 @@ _KIND_EXCLUDE_NONE: frozenset[MemoryRecordKind] = frozenset()
 _REPORT_EXCLUDED_KINDS: frozenset[MemoryRecordKind] = frozenset(
     {MemoryRecordKind.DELEGATION_RESULT}
 )
+
+_EMPTY_FIELD_RE = re.compile(r"^[A-Z_]+: \s*$", re.MULTILINE)
+"""匹配 prompt 模板渲染后内联字段值为空的行（如 'GOAL: \\n'），solo 裸模型场景需要剥离。
+
+只匹配 ``LABEL: ``（冒号后有空格但无内容）——区分于 ``LABEL:\\n{content}``
+块标签（如 TEAMMATES:/MEMBER_STATUS: 后接多行内容，不应剥离）。
+"""
+
+
+def _strip_empty_prompt_fields(prompt: str) -> str:
+    """剥离 prompt 中值为空的字段行（ADR-0052 solo 裸模型）。
+
+    模板 ``ROLE: {role}\\nGOAL: {goal}\\nBACKSTORY: {backstory}`` 在 solo 场景
+    goal/backstory 为空时会渲染成 ``GOAL: \\nBACKSTORY: \\n``，浪费 token 且
+    干扰模型。此函数把这类空行整行移除。
+    """
+    return _EMPTY_FIELD_RE.sub("", prompt).strip("\n")
 
 
 def build_teammates_text(profiles: list[RoleProfile]) -> str:
@@ -240,6 +258,7 @@ async def _complete_candidates(
     step: int,
 ) -> list[str]:
     prompt = templates[template_name].format(**variables)
+    prompt = _strip_empty_prompt_fields(prompt)
     annotate(**{ATTR_PROMPT_TEMPLATE: template_name})
     count = max(1, n)
     if count == 1:

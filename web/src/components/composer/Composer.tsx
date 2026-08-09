@@ -1,21 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ModePicker } from "./ModePicker";
 import { AttachmentUpload } from "./AttachmentUpload";
-import { ArrowUp, Square } from "lucide-react";
+import {
+  COMPOSER_ACTION_BAR_CLASS,
+  ComposerSendButton,
+  ComposerStopButton,
+} from "./composer-action-bar";
 import type { LocalAttachment } from "../../domain/generated-file";
 import { cn } from "../../lib/cn";
-import {
-  COMPOSER_ACTION_BLOCK,
-  ICON_SIZE,
-  ICON_STROKE_BOLD,
-  LobeIcon,
-} from "../../lib/icons";
-import { focusRing } from "../../lib/ui";
 import { AgentAvatar } from "../shared/AgentAvatar";
 
 const MAX_TEXTAREA_PX = 320;
 /** LobeHub home editor min-height ~88px total chrome; textarea body ~46px+ */
 const MIN_TEXTAREA_PX = 56;
+/** Default prompt when user sends attachments without text. */
+export const ATTACHMENT_ONLY_QUESTION = "请阅读并分析以上附件。";
 /**
  * Browsers (Safari) may fire `compositionend` before the confirming Enter
  * keydown, leaving `isComposing` false. Suppress Enter within this window
@@ -50,9 +49,14 @@ export function Composer({
   const [question, setQuestion] = useState("");
   const [attachments, setAttachments] = useState<readonly LocalAttachment[]>([]);
   const [dragging, setDragging] = useState(false);
+  const dragDepthRef = useRef(0);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const compositionEndRef = useRef(0);
-  const disabled = busy || llmAvailable === false;
+  const busyOnly = busy;
+  const sendBlocked = busy || llmAvailable === false;
+  const canAddAttachments = !busyOnly;
+  const canSend =
+    !sendBlocked && (question.trim().length > 0 || attachments.length > 0);
   const modeInActionBar = layout === "home" || layout === "chat";
   const modeInControlBar = layout === "topic";
 
@@ -74,8 +78,8 @@ export function Composer({
         Date.now() - compositionEndRef.current < IME_SETTLE_MS;
       if (event.nativeEvent.isComposing || justFinishedComposing) return;
       event.preventDefault();
-      if (!disabled && question.trim()) {
-        onSubmit(question.trim(), attachments);
+      if (canSend) {
+        onSubmit(question.trim() || ATTACHMENT_ONLY_QUESTION, attachments);
         setQuestion("");
         setAttachments([]);
       }
@@ -83,15 +87,16 @@ export function Composer({
   };
 
   const send = () => {
-    if (disabled || !question.trim()) return;
-    onSubmit(question.trim(), attachments);
+    if (!canSend) return;
+    onSubmit(question.trim() || ATTACHMENT_ONLY_QUESTION, attachments);
     setQuestion("");
     setAttachments([]);
   };
 
   const onDropFiles = (files: FileList | null) => {
+    dragDepthRef.current = 0;
     setDragging(false);
-    if (!files?.length || disabled) return;
+    if (!files?.length || !canAddAttachments) return;
     const added: LocalAttachment[] = Array.from(files).map((file) => ({
       id: `att-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       name: file.name,
@@ -126,10 +131,18 @@ export function Composer({
         data-testid="chat-input"
         onDragEnter={(e) => {
           e.preventDefault();
-          if (!disabled) setDragging(true);
+          if (!canAddAttachments) return;
+          dragDepthRef.current += 1;
+          setDragging(true);
         }}
-        onDragOver={(e) => e.preventDefault()}
-        onDragLeave={() => setDragging(false)}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (canAddAttachments) e.dataTransfer.dropEffect = "copy";
+        }}
+        onDragLeave={() => {
+          dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+          if (dragDepthRef.current === 0) setDragging(false);
+        }}
         onDrop={(e) => {
           e.preventDefault();
           onDropFiles(e.dataTransfer.files);
@@ -142,13 +155,14 @@ export function Composer({
         ) : null}
 
         {attachments.length > 0 ? (
-          <div className="border-b border-[var(--border-subtle)] px-3 pt-3">
+          <div className="px-2 py-2">
             <AttachmentUpload
               attachments={attachments}
               onChange={setAttachments}
               conversationId={conversationId}
-              disabled={disabled}
-              autoUpload={false}
+              disabled={!canAddAttachments}
+              autoUpload={Boolean(conversationId)}
+              onDropFiles={onDropFiles}
             />
           </div>
         ) : null}
@@ -156,7 +170,7 @@ export function Composer({
         <textarea
           ref={taRef}
           className={cn(
-            "block w-full resize-none border-0 bg-transparent px-4 pt-3.5 pb-2",
+            "block w-full resize-none border-0 bg-transparent px-3 pt-2 pb-0",
             "text-[0.875rem] leading-[1.4] text-[var(--text)] outline-none",
             "placeholder:text-[var(--text-faint)] disabled:cursor-not-allowed disabled:opacity-50",
           )}
@@ -169,67 +183,40 @@ export function Composer({
           onCompositionEnd={() => {
             compositionEndRef.current = Date.now();
           }}
-          disabled={disabled}
+          disabled={sendBlocked}
         />
 
-        <div className="flex items-center justify-between gap-2 px-2 pb-2 pr-2">
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 pl-1.5">
-            <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
-              {layout === "topic" ? (
-                <span className="inline-flex shrink-0 items-center justify-center p-0.5">
-                  <AgentAvatar size={20} title="LCA" />
-                </span>
-              ) : null}
-              {modeInActionBar ? (
-                <ModePicker value={mode} onChange={onModeChange} disabled={busy} />
-              ) : null}
-            </div>
+        <div className={COMPOSER_ACTION_BAR_CLASS}>
+          <div className="flex min-h-8 min-w-0 items-center gap-1 overflow-x-auto">
+            {layout === "topic" ? (
+              <span className="inline-flex shrink-0 items-center justify-center">
+                <AgentAvatar size={20} title="LCA" />
+              </span>
+            ) : null}
+            {modeInActionBar ? (
+              <ModePicker
+                value={mode}
+                onChange={onModeChange}
+                disabled={busy}
+                menuPlacement={layout === "home" ? "bottomLeft" : "topLeft"}
+              />
+            ) : null}
             <AttachmentUpload
               attachments={attachments}
               onChange={setAttachments}
               conversationId={conversationId}
-              disabled={disabled}
-              autoUpload={false}
+              disabled={!canAddAttachments}
+              autoUpload={Boolean(conversationId)}
               compact
+              menuPlacement={layout === "home" ? "bottomLeft" : "topLeft"}
+              onDropFiles={onDropFiles}
             />
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="inline-flex items-center">
             {canStop ? (
-              <button
-                type="button"
-                className={cn(
-                  "inline-flex cursor-pointer items-center justify-center rounded-full",
-                  "border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text)]",
-                  "transition-colors hover:bg-[var(--fill-hover)]",
-                  focusRing,
-                )}
-                style={{ width: COMPOSER_ACTION_BLOCK - 4, height: COMPOSER_ACTION_BLOCK - 4 }}
-                onClick={onStop}
-                aria-label="停止生成"
-              >
-                <LobeIcon icon={Square} size="xs" fill="currentColor" />
-              </button>
+              <ComposerStopButton onClick={onStop} />
             ) : (
-              <button
-                type="button"
-                className={cn(
-                  "inline-flex cursor-pointer items-center justify-center rounded-full border-0",
-                  "bg-[var(--accent)] text-[var(--accent-fg)] shadow-sm",
-                  "transition-transform active:scale-95",
-                  "disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100",
-                  focusRing,
-                )}
-                style={{ width: COMPOSER_ACTION_BLOCK - 4, height: COMPOSER_ACTION_BLOCK - 4 }}
-                disabled={disabled || !question.trim()}
-                onClick={send}
-                aria-label="发送"
-              >
-                <LobeIcon
-                  icon={ArrowUp}
-                  size={ICON_SIZE.md}
-                  strokeWidth={ICON_STROKE_BOLD}
-                />
-              </button>
+              <ComposerSendButton disabled={!canSend} onClick={send} />
             )}
           </div>
         </div>
@@ -237,7 +224,13 @@ export function Composer({
 
       {modeInControlBar ? (
         <div className="flex items-center justify-between gap-2 px-1">
-          <ModePicker value={mode} onChange={onModeChange} disabled={busy} variant="chat" />
+          <ModePicker
+            value={mode}
+            onChange={onModeChange}
+            disabled={busy}
+            variant="chat"
+            menuPlacement="topLeft"
+          />
         </div>
       ) : null}
 

@@ -1,38 +1,28 @@
 import {
   ALL_MODES,
-  AUTO_MODE_HELP,
-  AUTO_MODE_KEY,
   MODE_HELP,
+  SOLO_MODE_KEY,
   type Mode,
 } from "../contracts/modes.generated";
 
-export { AUTO_MODE_KEY, AUTO_MODE_HELP };
+export { SOLO_MODE_KEY };
 
-export const MODE_LABELS: Record<Mode, string> = {
-  routing: "routing · 委派收口",
-  consult: "consult · 咨询决策",
-  board: "board · 全员咨询",
-  pipeline: "pipeline · 顺序接力",
-  fan_out: "fan_out · 并行合成",
-  peer_relay: "peer_relay · 点对点接力",
-  peer_swarm: "peer_swarm · 对等 swarm",
-  debate: "debate · 多轮辩论",
-  graph: "graph · 执行图",
-  solo: "solo · 单 Agent",
+const MODE_LABELS: Record<Mode, string> = {
+  solo: "直接问",
+  team: "组队做",
 };
 
 export function modeLabel(mode: string): string {
-  if (mode === AUTO_MODE_KEY) return "智能组队";
   if (mode in MODE_LABELS) return MODE_LABELS[mode as Mode];
   return mode;
 }
 
 export function modeHelp(mode: string): string {
-  if (mode === AUTO_MODE_KEY) return AUTO_MODE_HELP;
+  if (mode === SOLO_MODE_KEY) return "系统直接回答，不组队";
   if (mode in MODE_HELP) return MODE_HELP[mode as Mode];
   return "选择协作模式";
 }
 
 export function isKnownMode(mode: string): boolean {
-  return mode === AUTO_MODE_KEY || (ALL_MODES as readonly string[]).includes(mode);
+  return (ALL_MODES as readonly string[]).includes(mode);
 }

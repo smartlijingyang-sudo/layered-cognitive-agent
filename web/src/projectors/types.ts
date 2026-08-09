@@ -248,6 +248,8 @@ export interface TurnTimeline {
   readonly status: "idle" | "running" | "completed" | "failed";
   readonly errorMessage?: string;
   readonly files: readonly GeneratedFile[];
+  /** Latest RunActivity / LlmCallStarted detail for phase label (not a process card). */
+  readonly activityDetail?: string;
   /** Whether ProcessFold should collapse process under one header. */
   readonly foldProcess: boolean;
 }
@@ -276,7 +278,20 @@ export function shouldShowEvent(eventType: JournalEvent["type"], verbosity: Verb
       eventType === "RunInsight"
     );
   }
-  // standard：token 级 delta 仅 verbose；过程事件默认可见
-  if (eventType === "StepTextDelta" || eventType === "ReasoningDelta") return false;
+  // standard：token 级 delta 与机制平面心跳仅 verbose；过程叙事默认可见
+  if (verbosity === "standard") {
+    const mechanismOnly = new Set([
+      "StepTextDelta",
+      "ReasoningDelta",
+      "ReasoningCompleted",
+      "LlmCallStarted",
+      "LlmCallCompleted",
+      "RunActivity",
+      "ToolStarted",
+      "StepCompleted",
+      "ActionDegraded",
+    ]);
+    if (mechanismOnly.has(eventType)) return false;
+  }
   return eventType !== "StepCompleted" && eventType !== "ActionDegraded";
 }

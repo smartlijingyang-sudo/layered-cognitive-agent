@@ -43,6 +43,8 @@ export const HEADER_ICON_GLYPH = ICON_SIZE.md;
 /** Composer action hit target: block 32 / glyph 16–18. */
 export const COMPOSER_ACTION_BLOCK = 32;
 export const COMPOSER_ACTION_GLYPH = ICON_SIZE.lg;
+/** LobeHub @lobehub/editor SendButton default size — matches action block. */
+export const COMPOSER_SEND_BLOCK = COMPOSER_ACTION_BLOCK;
 
 export type LobeIconProps = Omit<LucideProps, "size" | "strokeWidth" | "ref"> & {
   readonly icon: LucideIcon;

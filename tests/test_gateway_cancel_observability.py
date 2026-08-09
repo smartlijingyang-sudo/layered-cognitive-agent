@@ -47,7 +47,7 @@ async def test_execute_run_cancel_no_otel_detach_noise(caplog: pytest.LogCapture
     registry = RunRegistry()
     session = create_run_session(registry, question="hang", mode="solo")
 
-    with patch("gateway.run_executor.build_runnable", return_value=_HangAgent(session.hub)):
+    with patch("gateway.run_executor.build_solo_agent", return_value=_HangAgent(session.hub)):
         task = schedule_run(registry, session)
         await asyncio.sleep(0)
         task.cancel()

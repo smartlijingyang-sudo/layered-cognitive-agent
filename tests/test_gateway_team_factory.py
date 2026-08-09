@@ -1,43 +1,37 @@
-"""Gateway team_factory 单元测试。"""
+"""Gateway team_factory 单元测试（ADR-0052）。"""
 
 from __future__ import annotations
 
 import json
 import unittest
 
-from gateway.mode_catalog import ALL_MODES, get_mode_definition
-from gateway.team_factory import build_runnable, build_runnable_auto
+from gateway.mode_catalog import ALL_MODES
+from gateway.team_factory import build_runnable_team, build_solo_agent
 from lca.layer4_app.api import Agent, Team
 from tests.harness.collector import InMemoryObservability
-from tests.harness.scripted_llm import ScriptedLLMAdapter, respond
+from tests.harness.scripted_llm import ScriptedLLMAdapter
+
+
+class TestGatewaySoloFactory(unittest.TestCase):
+    def test_solo_returns_bare_agent_with_minimal_role(self) -> None:
+        llm = ScriptedLLMAdapter({}, default_respond=True)
+        collector = InMemoryObservability()
+        agent = build_solo_agent(llm, observability=collector)
+        self.assertIsInstance(agent, Agent)
+        self.assertEqual(agent.role_profile.role, "助手")
+        self.assertEqual(agent.role_profile.goal, "")
+        self.assertEqual(agent.role_profile.backstory, "")
 
 
 class TestGatewayTeamFactory(unittest.TestCase):
-    def test_all_modes_build_without_probe_names(self) -> None:
-        llm = ScriptedLLMAdapter({"独立分析师": [respond("ok")]}, default_respond=True)
-        collector = InMemoryObservability()
-        for mode in ALL_MODES:
-            with self.subTest(mode=mode):
-                runnable = build_runnable(mode, llm, observability=collector)
-                if mode == "solo":
-                    self.assertIsInstance(runnable, Agent)
-                    self.assertEqual(runnable.role_profile.role, "独立分析师")
-                else:
-                    self.assertIsInstance(runnable, Team)
-                    roles = {m.profile.role for m in runnable.spec.members}
-                    self.assertNotIn("Alice", roles)
-                    self.assertNotIn("Bob", roles)
-
-    def test_board_mode_has_lead_and_two_members(self) -> None:
-        definition = get_mode_definition("board")
-        self.assertTrue(definition.has_lead)
-        self.assertEqual(len(definition.member_roles), 2)
+    def test_all_modes_are_team(self) -> None:
+        self.assertEqual(ALL_MODES, ("team",))
 
 
-class TestGatewayAutoFactory(unittest.IsolatedAsyncioTestCase):
-    """build_runnable_auto：真实角色库 + 脚本化选角（ADR-0042）。"""
+class TestGatewayTeamCastingFactory(unittest.IsolatedAsyncioTestCase):
+    """build_runnable_team：真实角色库 + 脚本化选角（ADR-0042/0052）。"""
 
-    async def test_auto_builds_team_from_role_library(self) -> None:
+    async def test_team_builds_team_from_role_library(self) -> None:
         plan = json.dumps(
             {
                 "selected": [
@@ -51,12 +45,12 @@ class TestGatewayAutoFactory(unittest.IsolatedAsyncioTestCase):
         )
         llm = ScriptedLLMAdapter({"caster": [plan]}, default_respond=True)
         collector = InMemoryObservability()
-        runnable = await build_runnable_auto(
+        runnable = await build_runnable_team(
             "写一份发布方案",
             llm,
             observability=collector,
-            trace_id="trace-auto",
-            run_id="run-auto",
+            trace_id="trace-team",
+            run_id="run-team",
         )
         self.assertIsInstance(runnable, Team)
         roles = [member.profile.role for member in runnable.spec.members]

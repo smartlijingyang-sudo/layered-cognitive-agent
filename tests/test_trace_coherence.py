@@ -15,8 +15,8 @@ import unittest
 
 from lca.contracts.atoms.telemetry import ATTR_AGENT_ROLE, ATTR_MODEL, ATTR_PROMPT_PREVIEW, SpanName
 from tests.harness.collector import TraceBundle
-from tests.harness.modes import scripted_llm_for_mode
 from tests.harness.runner import run_team_scripted
+from tests.harness.scripted_llm import ScriptedLLMAdapter, respond
 
 
 def _ancestors(bundle: TraceBundle, span) -> list:
@@ -38,7 +38,13 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
         from lca import Agent
         from lca.contracts.models.team.team_coordination import Pipeline
 
-        llm = scripted_llm_for_mode("pipeline")
+        llm = ScriptedLLMAdapter(
+            {
+                "研究员": [respond("研究结果")],
+                "撰稿人": [respond("撰稿完成")],
+            },
+            default_respond=True,
+        )
         members = [
             Agent(role="研究员", goal="研究", backstory="", tools=[], llm=llm),
             Agent(role="撰稿人", goal="撰稿", backstory="", tools=[], llm=llm),

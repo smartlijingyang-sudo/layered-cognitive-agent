@@ -1,18 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { JournalLog } from "../journal-log/journal-log";
 import {
-  ChatProjector,
-  EMPTY_TURN_TIMELINE,
   MessageProjector,
   TraceProjector,
-  TurnTimelineProjector,
 } from "../projectors";
 import type { MessageTurn } from "../projectors";
 import { FetchSseTransport } from "../transport";
 import { AppLayout } from "../components/layout/AppLayout";
 import { ChatError, ChatMain } from "../components/layout/ChatMain";
 import { ConversationSidebar } from "../components/sidebar/ConversationSidebar";
-import { ThreadView } from "../components/thread/ThreadView";
 import { MessageList } from "../components/thread/MessageList";
 import { Composer } from "../components/composer/Composer";
 import { DeveloperTracePanel } from "../components/trace/DeveloperTracePanel";
@@ -32,7 +28,6 @@ import type { LocalAttachment } from "../domain/generated-file";
 import { toPersistableAttachments } from "../domain/generated-file";
 import { shouldPersistTurnOnEvent } from "../lib/persist-turn";
 import { ATTACHMENT_ONLY_QUESTION } from "../components/composer/Composer";
-import type { ChatState, TurnTimeline } from "../projectors";
 import "./app.css";
 
 export default function App() {
@@ -43,8 +38,6 @@ export default function App() {
   const [busy, setBusy] = useState(false);
 
   const log = useMemo(() => new JournalLog(), []);
-  const chatProjector = useMemo(() => new ChatProjector(), []);
-  const turnTimelineProjector = useMemo(() => new TurnTimelineProjector(), []);
   const traceProjector = useMemo(
     () => new TraceProjector(store.settings.verbosity),
     [store.settings.verbosity],
@@ -62,13 +55,6 @@ export default function App() {
   );
 
   const [trace, setTrace] = useState(traceProjector.snapshot());
-  const [liveTimeline, setLiveTimeline] = useState<TurnTimeline>(EMPTY_TURN_TIMELINE);
-
-  // Feature flag: ?message-renderer URL param or localStorage key
-  const useMessageRenderer = useMemo(() => {
-    if (new URLSearchParams(window.location.search).has("message-renderer")) return true;
-    return localStorage.getItem("message-renderer") === "true";
-  }, []);
 
   const messageProjector = useMemo(() => new MessageProjector(), []);
   const [messageTurn, setMessageTurn] = useState<MessageTurn | null>(null);
@@ -88,12 +74,9 @@ export default function App() {
   }, [store.settings.verbosity, traceProjector]);
 
   useEffect(() => {
-    // Reset process timeline when switching conversations.
-    turnTimelineProjector.reset();
-    setLiveTimeline(EMPTY_TURN_TIMELINE);
     messageProjector.reset();
     setMessageTurn(null);
-  }, [store.activeConversationId, turnTimelineProjector, messageProjector]);
+  }, [store.activeConversationId, messageProjector]);
 
   const ensureConversation = useCallback(async () => {
     if (store.activeConversationId) return store.activeConversationId;
@@ -112,9 +95,6 @@ export default function App() {
       const mode = modeOverride ?? store.settings.mode;
       log.clear();
       store.clearLiveEvents();
-      chatProjector.start(question);
-      turnTimelineProjector.reset();
-      setLiveTimeline(EMPTY_TURN_TIMELINE);
       traceProjector.reset();
       setTrace(traceProjector.snapshot());
       messageProjector.reset();
@@ -172,51 +152,42 @@ export default function App() {
         await store.appendTurn({ ...pendingTurn, status: "running" });
         store.setActiveRun(runId);
 
-        const syncTurnFromChat = (nextChat: ChatState, stamped: import("../contracts").StampedEvent) => {
-          const patch = {
-            status: mapRunStatus(nextChat.status === "idle" ? "running" : nextChat.status),
-            answer: nextChat.answer,
-            answerDeltas: nextChat.answerDeltas,
-            files: nextChat.files.length ? nextChat.files : undefined,
-          };
-          if (shouldPersistTurnOnEvent(stamped)) {
-            void store.updateActiveTurn(patch);
-          } else {
-            store.patchActiveTurn(patch);
-          }
-        };
-
         const unsub = log.subscribe((stamped) => {
           store.appendLiveEvent(stamped);
-          const prevChat = chatProjector.snapshot();
-          const nextChat = chatProjector.onEvent(stamped);
           setTrace(traceProjector.onEvent(stamped));
-          setLiveTimeline(turnTimelineProjector.onEvent(stamped));
           messageProjector.onEvent(stamped);
           setMessageTurn(messageProjector.buildTurn(runId));
 
-          const turnChanged =
-            prevChat.answer !== nextChat.answer ||
-            prevChat.status !== nextChat.status ||
-            prevChat.answerDeltas !== nextChat.answerDeltas;
-          if (turnChanged) {
-            syncTurnFromChat(nextChat, stamped);
+          if (shouldPersistTurnOnEvent(stamped)) {
+            const msgs = messageProjector.getMessages();
+            const answerMsg = [...msgs].reverse().find((m) => m.kind === "answer" && m.status === "done");
+            const patch = {
+              status: mapRunStatus(answerMsg ? "completed" : "running"),
+              answer: answerMsg?.content ?? "",
+            };
+            void store.updateActiveTurn(patch);
+          } else {
+            const msgs = messageProjector.getMessages();
+            const answerMsg = [...msgs].reverse().find((m) => m.kind === "answer");
+            if (answerMsg) {
+              store.patchActiveTurn({ answer: answerMsg.content });
+            }
           }
         });
 
         await transport.connect(runId, (event) => log.append(event));
         unsub();
 
-        const finalChat = chatProjector.snapshot();
-        let finalStatus = mapRunStatus(finalChat.status === "idle" ? "running" : finalChat.status);
-        let finalAnswer = finalChat.answer;
-        let finalError = finalChat.errorMessage;
+        const finalTurn = messageProjector.buildTurn(runId);
+        const answerMsg = [...finalTurn.messages].reverse().find((m) => m.kind === "answer");
+        let finalStatus = mapRunStatus(finalTurn.status === "running" ? "running" : finalTurn.status);
+        let finalAnswer = answerMsg?.content ?? "";
 
         if (finalStatus === "running" || finalStatus === "pending") {
           const summary = await fetchRunSummary(runId);
           if (summary?.status === "failed") {
             finalStatus = "failed";
-            finalError = summary.error ?? finalError ?? "运行失败";
+            store.setError(summary.error ?? "运行失败");
           } else if (summary?.status === "completed") {
             finalStatus = "completed";
           } else if (summary?.status === "canceled") {
@@ -227,11 +198,9 @@ export default function App() {
         await store.updateActiveTurn({
           status: finalStatus,
           answer: finalAnswer,
-          answerDeltas: finalChat.answerDeltas,
-          files: finalChat.files.length ? finalChat.files : undefined,
         });
 
-        // Snapshot process journal for historical ProcessFold replay.
+        // Snapshot process journal for historical replay.
         const journalEvents = useAppStore.getState().liveEvents;
         if (journalEvents.length > 0) {
           await store.persistTurnJournal(runId, journalEvents);
@@ -241,8 +210,8 @@ export default function App() {
           store.setError("附件未能上传，请检查网关是否在运行");
         }
 
-        if (finalStatus === "failed" && finalError && !store.error) {
-          store.setError(finalError);
+        if (finalStatus === "failed" && !store.error) {
+          store.setError(finalTurn.errorMessage ?? "运行失败");
         }
       } catch (error) {
         store.setError(error instanceof Error ? error.message : String(error));
@@ -253,12 +222,10 @@ export default function App() {
       }
     },
     [
-      chatProjector,
       ensureConversation,
       log,
       store,
       traceProjector,
-      turnTimelineProjector,
       messageProjector,
       transport,
     ],
@@ -334,24 +301,9 @@ export default function App() {
           homeColumn={homeActive}
           messages={
             <>
-              {useMessageRenderer && messageTurn ? (
+              {messageTurn ? (
                 <MessageList turn={messageTurn} />
-              ) : (
-                <ThreadView
-                  conversation={homeActive ? null : conversation}
-                  liveEvents={store.liveEvents}
-                  liveTimeline={liveTimeline}
-                  turnTimelines={store.turnTimelines}
-                  trace={trace}
-                  verbosity={store.settings.verbosity}
-                  developerMode={store.settings.developerMode}
-                  mode={store.settings.mode}
-                  homeActive={homeActive}
-                  onOpenModePicker={() => {
-                    document.getElementById("lca-mode-picker-trigger")?.click();
-                  }}
-                />
-              )}
+              ) : null}
               {store.error ? <ChatError>{store.error}</ChatError> : null}
             </>
           }

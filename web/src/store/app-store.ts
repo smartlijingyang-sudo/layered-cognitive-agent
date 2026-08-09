@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { StampedEvent } from "../contracts";
-import { AUTO_MODE_KEY } from "../contracts/modes.generated";
+import { SOLO_MODE_KEY } from "../contracts/modes.generated";
 import type { Conversation, Turn, TurnStatus } from "../domain/conversation";
 import {
   createConversation,
@@ -15,11 +15,9 @@ import {
 } from "../domain/conversation-store";
 import {
   deleteTurnJournals,
-  loadTurnJournal,
   saveTurnJournal,
 } from "../domain/turn-journal-store";
-import type { TurnTimeline, Verbosity } from "../projectors";
-import { buildTurnTimeline, EMPTY_TURN_TIMELINE } from "../projectors";
+import type { Verbosity } from "../projectors";
 
 export type ThemeMode = "light" | "dark";
 
@@ -39,8 +37,6 @@ interface AppState {
   readonly error: string | null;
   readonly activeRunId: string | null;
   readonly liveEvents: readonly StampedEvent[];
-  /** Historical turn timelines keyed by runId (from persisted journals). */
-  readonly turnTimelines: Readonly<Record<string, TurnTimeline>>;
   hydrate: () => Promise<void>;
   setTheme: (theme: ThemeMode) => void;
   setVerbosity: (verbosity: Verbosity) => void;
@@ -60,9 +56,8 @@ interface AppState {
   setActiveRun: (runId: string | null, events?: readonly StampedEvent[]) => void;
   appendLiveEvent: (event: StampedEvent) => void;
   clearLiveEvents: () => void;
-  /** Persist SSE journal for a finished turn and cache its timeline projection. */
+  /** Persist SSE journal for a finished turn. */
   persistTurnJournal: (runId: string, events: readonly StampedEvent[]) => Promise<void>;
-  ensureTurnTimelines: (runIds: readonly string[]) => Promise<void>;
 }
 
 function updateConversation(
@@ -80,14 +75,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     theme: "dark",
     verbosity: "standard",
     developerMode: false,
-    mode: AUTO_MODE_KEY,
+    mode: SOLO_MODE_KEY,
   },
   hydrated: false,
   sidebarOpen: true,
   error: null,
   activeRunId: null,
   liveEvents: [],
-  turnTimelines: {},
 
   hydrate: async () => {
     const conversations = await loadConversations();
@@ -99,8 +93,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeId = conversations[0]?.id ?? null;
     }
     set({ conversations, activeConversationId: activeId, hydrated: true });
-    const runIds = conversations.flatMap((c) => c.turns.map((t) => t.runId));
-    await get().ensureTurnTimelines(runIds);
   },
 
   setTheme: (theme) => set((s) => ({ settings: { ...s.settings, theme } })),
@@ -141,16 +133,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (removed) {
       await deleteTurnJournals(removed.turns.map((t) => t.runId));
     }
-    const nextTimelines = { ...get().turnTimelines };
-    for (const turn of removed?.turns ?? []) {
-      delete nextTimelines[turn.runId];
-    }
     set({
       conversations,
       activeConversationId,
       liveEvents: [],
       activeRunId: null,
-      turnTimelines: nextTimelines,
     });
   },
 
@@ -194,37 +181,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   persistTurnJournal: async (runId, events) => {
     if (!runId || events.length === 0) return;
     await saveTurnJournal(runId, events);
-    const timeline = buildTurnTimeline(events);
-    set((s) => ({
-      turnTimelines: { ...s.turnTimelines, [runId]: timeline },
-    }));
-  },
-
-  ensureTurnTimelines: async (runIds) => {
-    const missing = runIds.filter((id) => id && !get().turnTimelines[id]);
-    if (!missing.length) return;
-    const loaded: Record<string, TurnTimeline> = {};
-    await Promise.all(
-      missing.map(async (runId) => {
-        const events = await loadTurnJournal(runId);
-        if (events?.length) {
-          loaded[runId] = buildTurnTimeline(events);
-        }
-      }),
-    );
-    if (Object.keys(loaded).length === 0) return;
-    set((s) => ({ turnTimelines: { ...s.turnTimelines, ...loaded } }));
   },
 }));
-
-export function turnTimelineFor(
-  state: AppState,
-  runId: string,
-): TurnTimeline | undefined {
-  return state.turnTimelines[runId];
-}
-
-export { EMPTY_TURN_TIMELINE };
 
 export function activeConversation(state: AppState): Conversation | null {
   if (!state.activeConversationId) return null;

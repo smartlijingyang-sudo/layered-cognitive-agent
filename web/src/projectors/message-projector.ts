@@ -477,3 +477,18 @@ export class MessageProjector {
     return sortMessages([...this.state.messages.values()].map(freeze));
   }
 }
+
+/* ── Shared utilities (moved from chat-projector) ───────────────── */
+
+/** 假流式 fallback：无真实 delta 时按句切分（ADR-0041 过渡态）。 */
+export function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[。！？.!?])\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** 优先消费真实 delta 序列，否则回退 splitSentences。 */
+export function revealChunks(text: string, deltas: readonly string[]): readonly string[] {
+  return deltas.length > 0 ? deltas : splitSentences(text);
+}

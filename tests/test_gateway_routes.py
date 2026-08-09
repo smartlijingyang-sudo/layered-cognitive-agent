@@ -33,7 +33,7 @@ class GatewayRouteTests(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertIn("llm_available", payload)
 
-    @patch("gateway.run_executor.build_runnable", return_value=_HangRunnable())
+    @patch("gateway.run_executor.build_solo_agent", return_value=_HangRunnable())
     def test_create_and_cancel_run(self, _mock_build: Any) -> None:
         create = self.client.post("/runs", json={"question": "hello", "mode": "solo"})
         self.assertEqual(create.status_code, 201)

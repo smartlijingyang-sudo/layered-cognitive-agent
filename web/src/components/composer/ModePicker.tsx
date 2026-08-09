@@ -1,15 +1,30 @@
-import type { ReactNode } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
-import {
-  ALL_MODES,
-  AUTO_MODE_KEY,
-  MODE_HAS_LEAD,
-} from "../../contracts/modes.generated";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import type { LucideIcon } from "lucide-react";
+import { ChevronDown, MessageCircle, Users } from "lucide-react";
+import { ALL_MODES, SOLO_MODE_KEY } from "../../contracts/modes.generated";
 import { modeHelp, modeLabel } from "../../lib/modes";
-import { ChevronDown, MessageCircle, X } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { LobeIcon } from "../../lib/icons";
-import { composerPill, elevatedSurface, focusRing, iconButton, mutedText } from "../../lib/ui";
+import {
+  composerModeControlBar,
+  composerModePill,
+  elevatedSurface,
+  focusRing,
+  mutedText,
+} from "../../lib/ui";
+import {
+  computeMainMenuStyle,
+  type ComposerMenuPlacement,
+} from "./menu-position";
+
+const MODE_ICONS: Record<string, LucideIcon> = {
+  solo: MessageCircle,
+  team: Users,
+};
+
+const MODE_PICKER_MIN_WIDTH = 280;
+const MODE_PICKER_MAX_WIDTH = 320;
 
 export function ModePicker({
   value,
@@ -17,150 +32,197 @@ export function ModePicker({
   disabled,
   variant = "mode",
   triggerId = "lca-mode-picker-trigger",
+  menuPlacement = "bottomLeft",
 }: {
   readonly value: string;
   readonly onChange: (mode: string) => void;
   readonly disabled?: boolean;
-  /** `mode` — action bar pill with mode name; `chat` — control bar "对话" row. */
+  /** `mode` — action bar pill; `chat` — control bar row below composer. */
   readonly variant?: "mode" | "chat";
   readonly triggerId?: string;
+  readonly menuPlacement?: ComposerMenuPlacement;
 }) {
-  return (
-    <Dialog.Root>
-      <Dialog.Trigger asChild>
-        <button
-          type="button"
-          id={triggerId}
-          className={composerPill}
-          disabled={disabled}
-          title={modeHelp(value)}
-        >
-          {variant === "chat" ? (
-            <>
-              <LobeIcon icon={MessageCircle} size="sm" />
-              <span className="truncate font-medium">对话</span>
-            </>
-          ) : (
-            <span className="truncate font-medium">{modeLabel(value)}</span>
-          )}
-          <LobeIcon icon={ChevronDown} size="xs" className="shrink-0 opacity-60" />
-        </button>
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] animate-fade-in" />
-        <Dialog.Content
-          className={cn(
-            elevatedSurface,
-            "fixed top-1/2 left-1/2 z-50 max-h-[min(80vh,640px)] w-[min(560px,calc(100vw-2rem))]",
-            "-translate-x-1/2 -translate-y-1/2 overflow-auto p-4 shadow-[var(--shadow-modal)]",
-            "animate-fade-in",
-            focusRing,
-          )}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <Dialog.Title className="m-0 text-[15px] font-semibold tracking-tight">
-                协作模式
-              </Dialog.Title>
-              <Dialog.Description className={cn("m-0 mt-0.5 text-xs", mutedText)}>
-                选择团队如何协作完成任务
-              </Dialog.Description>
-            </div>
-            <Dialog.Close asChild>
-              <button type="button" className={iconButton} aria-label="关闭">
-                <LobeIcon icon={X} size="md" />
-              </button>
-            </Dialog.Close>
-          </div>
+  const listboxId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<
+    ReturnType<typeof computeMainMenuStyle> | null
+  >(null);
 
-          <div className="mt-4 grid gap-2">
-            <ModeOption
-              selected={value === AUTO_MODE_KEY}
-              title={modeLabel(AUTO_MODE_KEY)}
-              help={modeHelp(AUTO_MODE_KEY)}
-              badge={<Badge tone="brand">推荐</Badge>}
-              onClick={() => onChange(AUTO_MODE_KEY)}
-            />
+  const CurrentIcon = MODE_ICONS[value] ?? MessageCircle;
+
+  const syncMenuPos = useCallback(() => {
+    const trigger = triggerRef.current;
+    const panel = panelRef.current;
+    if (!trigger) return;
+    const anchor = trigger.getBoundingClientRect();
+    const size = panel
+      ? { width: panel.offsetWidth, height: panel.offsetHeight }
+      : { width: MODE_PICKER_MIN_WIDTH, height: 160 };
+    setMenuStyle(computeMainMenuStyle(anchor, menuPlacement, size));
+  }, [menuPlacement]);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setMenuStyle(null);
+  }, []);
+
+  const selectMode = useCallback(
+    (mode: string) => {
+      onChange(mode);
+      close();
+    },
+    [close, onChange],
+  );
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    syncMenuPos();
+  }, [open, syncMenuPos, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onLayout = () => syncMenuPos();
+    window.addEventListener("resize", onLayout);
+    window.addEventListener("scroll", onLayout, true);
+    return () => {
+      window.removeEventListener("resize", onLayout);
+      window.removeEventListener("scroll", onLayout, true);
+    };
+  }, [open, syncMenuPos]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      close();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [close, open]);
+
+  const triggerClass = variant === "chat" ? composerModeControlBar : composerModePill;
+
+  const popover =
+    open
+      ? createPortal(
+          <div
+            ref={panelRef}
+            id={listboxId}
+            role="listbox"
+            aria-label="协作模式"
+            className={cn(
+              "fixed z-[1000] overflow-hidden p-1",
+              elevatedSurface,
+              "shadow-[var(--shadow-popover)] animate-fade-in",
+              menuStyle ? "visible" : "invisible",
+            )}
+            style={{
+              width: `min(${MODE_PICKER_MAX_WIDTH}px, calc(100vw - 2rem))`,
+              minWidth: MODE_PICKER_MIN_WIDTH,
+              left: menuStyle?.left ?? 0,
+              top: menuStyle?.top ?? 0,
+              transform: menuStyle?.transform,
+            }}
+          >
             {ALL_MODES.map((mode) => (
-              <ModeOption
+              <ModeOptionRow
                 key={mode}
+                mode={mode}
                 selected={mode === value}
-                title={modeLabel(mode)}
-                help={modeHelp(mode)}
-                badge={
-                  MODE_HAS_LEAD[mode] ? (
-                    <Badge tone="team">有主导</Badge>
-                  ) : mode === "solo" ? (
-                    <Badge tone="muted">单 Agent</Badge>
-                  ) : null
-                }
-                onClick={() => onChange(mode)}
+                onSelect={() => selectMode(mode)}
               />
             ))}
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
+          </div>,
+          document.body,
+        )
+      : null;
 
-function Badge({
-  children,
-  tone,
-}: {
-  readonly children: string;
-  readonly tone: "brand" | "team" | "muted";
-}) {
   return (
-    <span
-      className={cn(
-        "rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
-        tone === "brand" &&
-          "border-[var(--brand)]/30 bg-[var(--brand-soft)] text-[var(--brand)]",
-        tone === "team" &&
-          "border-[var(--color-team)]/25 bg-[color-mix(in_srgb,var(--color-team)_10%,transparent)] text-[var(--color-team)]",
-        tone === "muted" &&
-          "border-[var(--border)] bg-[var(--fill-secondary)] text-[var(--text-muted)]",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-function ModeOption({
-  selected,
-  title,
-  help,
-  badge,
-  onClick,
-}: {
-  readonly selected: boolean;
-  readonly title: string;
-  readonly help: string;
-  readonly badge?: ReactNode;
-  readonly onClick: () => void;
-}) {
-  return (
-    <Dialog.Close asChild>
+    <div ref={rootRef} className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
-        className={cn(
-          "cursor-pointer rounded-[var(--radius-lg)] border p-3 text-left transition-all duration-150",
-          "bg-[var(--surface)]",
-          selected
-            ? "border-[var(--accent)] shadow-[0_0_0_1px_var(--accent)]"
-            : "border-[var(--border)] hover:border-[var(--text-faint)] hover:bg-[var(--fill-hover)]",
-          focusRing,
-        )}
-        onClick={onClick}
+        id={triggerId}
+        className={triggerClass}
+        disabled={disabled}
+        title={modeHelp(value)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <strong className="text-[13px] font-semibold text-[var(--text)]">{title}</strong>
-          {badge}
-        </div>
-        <p className={cn("m-0 mt-1 text-[12px] leading-relaxed", mutedText)}>{help}</p>
+        <LobeIcon icon={CurrentIcon} size="sm" className="shrink-0" />
+        <span className="truncate font-medium">{modeLabel(value)}</span>
+        <LobeIcon icon={ChevronDown} size="xs" className="shrink-0 opacity-60" />
       </button>
-    </Dialog.Close>
+      {popover}
+    </div>
+  );
+}
+
+function ModeOptionRow({
+  mode,
+  selected,
+  onSelect,
+}: {
+  readonly mode: string;
+  readonly selected: boolean;
+  readonly onSelect: () => void;
+}) {
+  const Icon = MODE_ICONS[mode] ?? MessageCircle;
+  const help = modeHelp(mode);
+  const badge =
+    mode === SOLO_MODE_KEY ? (
+      <span className="rounded-full border border-[var(--border)] bg-[var(--fill-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+        默认
+      </span>
+    ) : null;
+
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      className={cn(
+        "flex w-full cursor-pointer items-center gap-3 rounded-[var(--radius-md)] px-2 py-2.5 text-left transition-colors duration-150",
+        selected ? "bg-[var(--fill-secondary)]" : "hover:bg-[var(--fill-hover)]",
+        focusRing,
+      )}
+      onClick={onSelect}
+    >
+      <span
+        className={cn(
+          "inline-flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-md)]",
+          "border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-muted)]",
+        )}
+      >
+        <LobeIcon icon={Icon} size="md" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium leading-snug text-[var(--text)]">
+            {modeLabel(mode)}
+          </span>
+          {badge}
+        </span>
+        {help ? (
+          <span className={cn("mt-0.5 block text-xs leading-snug", mutedText)}>{help}</span>
+        ) : null}
+      </span>
+    </button>
   );
 }

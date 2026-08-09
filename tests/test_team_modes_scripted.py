@@ -1,11 +1,10 @@
-"""全模式 scripted 测试：跑通 + 失败时 AssertionError 内嵌链路 digest 可定位。
+"""Team mode scripted 测试（ADR-0052）：team 模式跑通 + trace 断言。
 
-观测性不另出报告文件；pytest 失败输出即诊断面（span 直方图 / 路径探针 / 全树）。
+个体协作策略（pipeline/debate/fan_out 等）的测试走 edge case 测试和
+tests/fixtures/team_scenarios/*.yaml + tests/support/scenario_loader.py。
 """
 
 from __future__ import annotations
-
-from pathlib import Path
 
 import pytest
 
@@ -19,6 +18,7 @@ from lca.contracts.models.team.team_coordination import (
     STRATEGY_KEY_PEER_SWARM,
     STRATEGY_KEY_PIPELINE,
     FanOut,
+    LeadMandate,
     PeerRelay,
     PeerSwarm,
     Pipeline,
@@ -37,91 +37,9 @@ from tests.harness.trace_assert import (
     assert_trace_expect,
 )
 
-CATALOG = Path(__file__).resolve().parent / "fixtures" / "team_scenarios" / "all_modes_catalog.yaml"
-
-# 每模式：结果 + 必须出现的 span + 父子路径 + 不变量（失败即带 digest）
+# team 模式（board 治理探针）的期望
 MODE_EXPECT: dict[str, dict] = {
-    "pipeline": {
-        "result": {"status": "completed", "min_steps": 1},
-        "trace": {
-            "must_include_spans": [
-                SpanName.RUN_TEAM.value,
-                SpanName.DELEGATION.value,
-                SpanName.LOOP_PHASE_THINK.value,
-                SpanName.LLM_CHAT.value,
-            ],
-            "parent_root": SpanName.RUN_TEAM.value,
-            "parent_leaf": SpanName.LLM_CHAT.value,
-        },
-        "invariants": ["team_root", "pipeline_sequential"],
-    },
-    "fan_out": {
-        "result": {"status": "completed"},
-        "trace": {
-            "must_include_spans": [
-                SpanName.RUN_TEAM.value,
-                SpanName.DELEGATION.value,
-                SpanName.TEAM_SYNTHESIS.value,
-                SpanName.LLM_CHAT.value,
-            ],
-            "parent_root": SpanName.RUN_TEAM.value,
-            "parent_leaf": SpanName.LLM_CHAT.value,
-        },
-        "invariants": ["fan_out_all_members"],
-    },
-    "peer_relay": {
-        "result": {"status": "completed"},
-        "trace": {
-            "must_include_spans": [
-                SpanName.RUN_TEAM.value,
-                SpanName.DELEGATION.value,
-                SpanName.LLM_CHAT.value,
-            ],
-            "parent_root": SpanName.RUN_TEAM.value,
-            "parent_leaf": SpanName.LLM_CHAT.value,
-        },
-        "invariants": ["team_root"],
-    },
-    "peer_swarm": {
-        "result": {"status": "completed"},
-        "trace": {
-            "must_include_spans": [
-                SpanName.RUN_TEAM.value,
-                SpanName.TEAM_ROUND.value,
-                SpanName.LLM_CHAT.value,
-            ],
-            "parent_root": SpanName.RUN_TEAM.value,
-            "parent_leaf": SpanName.LLM_CHAT.value,
-        },
-        "invariants": ["swarm_rounds"],
-    },
-    "debate": {
-        "result": {"status": "completed"},
-        "trace": {
-            "must_include_spans": [
-                SpanName.RUN_TEAM.value,
-                SpanName.TEAM_ROUND.value,
-                SpanName.LLM_CHAT.value,
-            ],
-            "parent_root": SpanName.RUN_TEAM.value,
-            "parent_leaf": SpanName.LLM_CHAT.value,
-        },
-        "invariants": ["swarm_rounds"],
-    },
-    "graph": {
-        "result": {"status": "completed"},
-        "trace": {
-            "must_include_spans": [
-                SpanName.RUN_TEAM.value,
-                SpanName.DELEGATION.value,
-                SpanName.LLM_CHAT.value,
-            ],
-            "parent_root": SpanName.RUN_TEAM.value,
-            "parent_leaf": SpanName.LLM_CHAT.value,
-        },
-        "invariants": ["team_root"],
-    },
-    "routing": {
+    "team": {
         "result": {"status": "completed"},
         "trace": {
             "must_include_spans": [
@@ -134,48 +52,6 @@ MODE_EXPECT: dict[str, dict] = {
             "parent_leaf": SpanName.LLM_CHAT.value,
         },
         "invariants": ["team_root", "board_consults_members", "lead_transport_chain"],
-    },
-    "consult": {
-        "result": {"status": "completed"},
-        "trace": {
-            "must_include_spans": [
-                SpanName.RUN_TEAM.value,
-                SpanName.DELEGATION.value,
-                SpanName.TRANSPORT_REQUEST.value,
-                SpanName.LLM_CHAT.value,
-            ],
-            "parent_root": SpanName.RUN_TEAM.value,
-            "parent_leaf": SpanName.LLM_CHAT.value,
-        },
-        "invariants": ["team_root", "board_consults_members", "lead_transport_chain"],
-    },
-    "board": {
-        "result": {"status": "completed"},
-        "trace": {
-            "must_include_spans": [
-                SpanName.RUN_TEAM.value,
-                SpanName.DELEGATION.value,
-                SpanName.TRANSPORT_REQUEST.value,
-                SpanName.LLM_CHAT.value,
-            ],
-            "parent_root": SpanName.RUN_TEAM.value,
-            "parent_leaf": SpanName.LLM_CHAT.value,
-        },
-        "invariants": ["team_root", "board_consults_members", "lead_transport_chain"],
-    },
-    "solo": {
-        "result": {"status": "completed"},
-        "trace": {
-            "must_include_spans": [
-                SpanName.RUN_AGENT.value,
-                SpanName.LOOP_PHASE_THINK.value,
-                SpanName.LLM_CHAT.value,
-            ],
-            "parent_root": SpanName.RUN_AGENT.value,
-            "parent_leaf": SpanName.LLM_CHAT.value,
-            "require_shared_trace_id": True,
-        },
-        "invariants": [],
     },
 }
 
@@ -196,28 +72,15 @@ def _assert_mode(mode: str, outcome) -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ALL_MODES)
 async def test_mode_happy_path_scripted(mode: str) -> None:
-    """每种模式 happy path：结构 + 链路；失败时 digest 在 AssertionError 里。"""
+    """team 模式 happy path：结构 + 链路；失败时 digest 在 AssertionError 里。"""
     outcome = await run_mode(mode, _llm_for_mode(mode), objective=f"probe {mode}")
     _assert_mode(mode, outcome)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "mode",
-    [
-        "routing",
-        "consult",
-        "board",
-        "pipeline",
-        "fan_out",
-        "peer_relay",
-        "peer_swarm",
-        "debate",
-        "graph",
-    ],
-)
+@pytest.mark.parametrize("mode", ALL_MODES)
 async def test_mode_chain_visible(mode: str) -> None:
-    """每模式额外确认：run.team→llm 可走通且 digest 字段齐全（用于人工读失败）。"""
+    """team 模式额外确认：run.team→llm 可走通且 digest 字段齐全。"""
     outcome = await run_mode(mode, _llm_for_mode(mode), objective=f"chain {mode}")
     digest = format_case_digest(outcome.bundle, title=mode, result=outcome.result)
     assert "span_hist:" in digest
@@ -227,24 +90,8 @@ async def test_mode_chain_visible(mode: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_catalog_yaml_lists_all_modes() -> None:
-    """YAML 目录声明的 mode 集合与 ALL_MODES 对齐（solo 除外由代码跑）。"""
-    from tests.support.scenario_loader import load_scenario
-
-    assert CATALOG.is_file(), f"missing catalog {CATALOG}"
-    spec = load_scenario(CATALOG)
-    modes_in_yaml = {
-        c.assertions.get("mode") for c in spec.cases.values() if c.assertions.get("mode")
-    }
-    assert modes_in_yaml == set(ALL_MODES), f"yaml modes {modes_in_yaml} != {set(ALL_MODES)}"
-    # teams: 3 lead + 6 coordination
-    assert "lead_routing" in spec.teams and "coord_pipeline" in spec.teams
-    assert "coord_graph" in spec.teams
-
-
-@pytest.mark.asyncio
-async def test_lead_board_parent_chain_to_member_llm() -> None:
-    outcome = await run_mode("board", _llm_for_mode("board"), objective="board chain probe")
+async def test_team_parent_chain_to_member_llm() -> None:
+    outcome = await run_mode("team", _llm_for_mode("team"), objective="team chain probe")
     assert_must_include_spans(
         outcome.bundle,
         [
@@ -276,20 +123,11 @@ async def test_lead_board_parent_chain_to_member_llm() -> None:
         if s.attributes.get("agent_role")
     }
     assert "Lead" in roles and len(roles) >= 2, format_case_digest(
-        outcome.bundle, title="board roles", result=outcome.result
+        outcome.bundle, title="team roles", result=outcome.result
     )
 
 
-@pytest.mark.asyncio
-async def test_pipeline_parent_chain_to_loop() -> None:
-    outcome = await run_mode("pipeline", _llm_for_mode("pipeline"))
-    assert_parent_chain_walkable(
-        outcome.bundle,
-        SpanName.RUN_TEAM.value,
-        SpanName.LOOP_PHASE_THINK.value,
-        result=outcome.result,
-    )
-    assert_shared_trace_id(outcome.bundle, outcome.result)
+# ── Edge case tests（直接构造 team，不依赖 mode catalog） ─────────────
 
 
 @pytest.mark.asyncio
@@ -326,7 +164,6 @@ async def test_edge_peer_relay_first_wins() -> None:
     result = await team.run("relay")
     assert result.status == "completed", format_case_digest(col.bundle(), result=result)
     invokes = col.bundle().by_name(SpanName.DELEGATION.value)
-    # first completed stops — typically 1 invoke
     assert len(invokes) >= 1, format_case_digest(col.bundle(), result=result)
 
 
@@ -376,7 +213,8 @@ async def test_edge_illegal_team_construction() -> None:
 
 
 @pytest.mark.asyncio
-async def test_mode_catalog_completeness() -> None:
+async def test_orchestration_registry_completeness() -> None:
+    """L3 编排策略注册表完整 —— 九词治理表（ADR-0030）不受 gateway 模式简化影响。"""
     registered = set(build_default_registries().orchestration.list_strategies())
     expected = {
         STRATEGY_KEY_LEAD,
@@ -388,17 +226,6 @@ async def test_mode_catalog_completeness() -> None:
         STRATEGY_KEY_GRAPH,
     }
     assert registered == expected
-    lead_modes = {"routing", "consult", "board"}
-    coord_modes = {
-        STRATEGY_KEY_PIPELINE,
-        STRATEGY_KEY_FAN_OUT,
-        STRATEGY_KEY_PEER_RELAY,
-        STRATEGY_KEY_PEER_SWARM,
-        STRATEGY_KEY_DEBATE,
-        STRATEGY_KEY_GRAPH,
-    }
-    assert lead_modes | coord_modes <= set(ALL_MODES) - {"solo"}
-    assert set(MODE_EXPECT) == set(ALL_MODES)
 
 
 @pytest.mark.asyncio
@@ -415,17 +242,12 @@ async def test_llm_chat_span_emitted() -> None:
 
 @pytest.mark.asyncio
 async def test_routing_duplicate_delegation_is_idempotent() -> None:
-    """字面重复的 (角色, 子任务) 委派被回报记录幂等短路。
-
-    Lead 第一次 fan-out 全部成功返回后，第二次发出完全相同的两条委派——应命中
-    ``delegate.cache_hit`` 而不是再次走 transport 重跑成员。
-    """
+    """字面重复的 (角色, 子任务) 委派被回报记录幂等短路。"""
     col = InMemoryObservability()
     llm = ScriptedLLMAdapter(
         {
             "Lead": [
                 multi_delegate([("Alice", "analyze"), ("Bob", "review")]),
-                # 字面重复：同角色同子任务，应短路复用已返回的结果
                 multi_delegate([("Alice", "analyze"), ("Bob", "review")]),
                 respond("lead final"),
             ],
@@ -434,13 +256,28 @@ async def test_routing_duplicate_delegation_is_idempotent() -> None:
         },
         default_respond=True,
     )
-    outcome = await run_mode("routing", llm, collector=col, objective="dedup probe")
-    digest = format_case_digest(col.bundle(), title="routing-dedup", result=outcome.result)
 
-    # ADR-0037：cache hit 投影为 EVENT 观测（journal DelegationCacheHit）
+    def _a(role: str, steps: int = 5) -> Agent:
+        return Agent(
+            role=role,
+            goal="g",
+            backstory="b",
+            tools=[],
+            llm=llm,
+            max_steps=steps,
+            observability=col,
+        )
+
+    team = Team(
+        members=[_a("Alice"), _a("Bob")],
+        lead=TeamLead(_a("Lead", steps=15), LeadMandate.ROUTING),
+        observability=col,
+    )
+    result = await team.run("dedup probe")
+    digest = format_case_digest(col.bundle(), title="routing-dedup", result=result)
+
     cache_hits = col.bundle().by_name(SpanName.DELEGATE_CACHE_HIT.value)
     assert len(cache_hits) == 2, digest
-    # 只有第一轮真正走 transport（Alice/Bob 各一次）
     transports = col.bundle().by_name(SpanName.TRANSPORT_REQUEST.value)
     assert len(transports) == 2, digest
-    assert outcome.result.status.value == "completed", digest
+    assert result.status.value == "completed", digest

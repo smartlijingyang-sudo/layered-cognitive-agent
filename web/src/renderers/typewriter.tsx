@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { splitSentences } from "../projectors/chat-projector";
+import { splitSentences } from "../projectors/message-projector";
 
 import { mutedText } from "../lib/ui";
 

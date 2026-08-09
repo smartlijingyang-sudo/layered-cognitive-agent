@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { revealChunks } from "../../projectors/chat-projector";
+import { revealChunks } from "../../projectors/message-projector";
 
 /** 渐进展示文本：真实 delta 序列即时全显，无 delta 时按句假流式。 */
 export function useProgressiveReveal(

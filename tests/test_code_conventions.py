@@ -59,6 +59,10 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/layer1_cognitive/brain/decision_parser.py": (
         "Decision 防腐层归一化管线单入口（ADR-0045）；拆分会破坏 parse 内聚性"
     ),
+    "lca/layer1_cognitive/brain/reasoner.py": (
+        "PromptReasoner 单模块承载模板渲染 + LLM 调用 + 流式增量（ADR-0041）；"
+        "ADR-0052 新增 _strip_empty_prompt_fields 用于 solo 裸模型空字段剥离"
+    ),
 }
 
 

@@ -6,11 +6,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.models.core.result import Result
-from lca.contracts.models.team.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.models.team.team_coordination import (
     Debate,
     FanOut,
-    Graph,
     LeadMandate,
     PeerRelay,
     PeerSwarm,
@@ -37,7 +35,6 @@ _PROBE_PROFILES: dict[str, tuple[str, str]] = {
     "Alice": ("从技术视角评估风险与可行性", "资深工程师，关注兼容性、性能与稳定性"),
     "Bob": ("从业务视角评估价值与合规风险", "业务负责人，关注用户接受度、转化与合规"),
     "Carol": ("补充执行与运营视角", "运营专家，关注落地与资源配置"),
-    "Solo": ("独立完成任务并给出结论", "独立贡献者"),
 }
 
 
@@ -111,24 +108,6 @@ async def run_agent_scripted(
     return RunOutcome(result=result, bundle=col.bundle(), collector=col)
 
 
-def build_linear_graph(role_names: list[str]) -> ExecutionGraph:
-    """Simple entry → agents → exit chain for graph coordination tests."""
-    from itertools import pairwise
-
-    g = ExecutionGraph()
-    g.add_node(GraphNode(id="entry", type=NodeType.ENTRY))
-    g.add_node(GraphNode(id="exit", type=NodeType.EXIT))
-    ids = ["entry"]
-    for i, role in enumerate(role_names):
-        nid = f"n{i}"
-        ids.append(nid)
-        g.add_node(GraphNode(id=nid, type=NodeType.AGENT, config={"role": role}))
-    ids.append("exit")
-    for a, b in pairwise(ids):
-        g.add_edge(GraphEdge(source=a, target=b, type=EdgeType.FIXED))
-    return g
-
-
 async def run_mode(
     mode: str,
     llm: LLMAdapter,
@@ -154,47 +133,17 @@ async def run_mode(
 
     a = _agent("Alice")
     b = _agent("Bob")
-    c = _agent("Carol")
 
-    if mode == "pipeline":
-        team = Team(members=[a, b, c], coordination=Pipeline(), observability=col)
-    elif mode == "fan_out":
-        team = Team(members=[a, b, c], coordination=FanOut(), observability=col)
-    elif mode == "peer_relay":
-        team = Team(members=[a, b], coordination=PeerRelay(), observability=col)
-    elif mode == "peer_swarm":
-        team = Team(
-            members=[a, b],
-            coordination=PeerSwarm(max_rounds=max_rounds),
-            observability=col,
-        )
-    elif mode == "debate":
-        team = Team(
-            members=[a, b],
-            coordination=Debate(max_rounds=max_rounds),
-            observability=col,
-        )
-    elif mode == "graph":
-        g = build_linear_graph(["Alice", "Bob"])
-        team = Team(
-            members=[a, b],
-            coordination=Graph(execution_graph=g),
-            observability=col,
-        )
-    elif mode in ("routing", "consult", "board"):
+    if mode == "team":
+        # 确定性探针：board 治理（Lead + Alice + Bob），对齐 harness 场景卡
         lead_agent = _agent("Lead", steps=15)
-        mandate = LeadMandate(mode)
         team = Team(
             members=[a, b],
-            lead=TeamLead(lead_agent, mandate),
+            lead=TeamLead(lead_agent, LeadMandate.BOARD),
             observability=col,
         )
-    elif mode == "solo":
-        agent = _agent("Solo")
-        result = await agent.run(objective)
-        return RunOutcome(result=result, bundle=col.bundle(), collector=col)
     else:
-        raise ValueError(f"Unknown mode {mode!r}")
+        raise ValueError(f"Unknown mode {mode!r} — only 'team' is supported (ADR-0052)")
 
     result = await team.run(objective)
     return RunOutcome(result=result, bundle=col.bundle(), collector=col)
