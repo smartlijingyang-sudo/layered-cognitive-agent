@@ -54,6 +54,11 @@ def _safe_rel_name(name: str) -> str:
     return parts[-1] if parts else "file.bin"
 
 
+def _strip_surrogates(text: str) -> str:
+    """Replace lone surrogate code points (U+D800–U+DFFF) with U+FFFD."""
+    return "".join("\ufffd" if "\ud800" <= ch <= "\udfff" else ch for ch in text)
+
+
 def _build_wrapped_code(code: str, files: dict[str, bytes] | None) -> str:
     """Bootstrap mounts + harvest outputs around user code."""
     mount_items: list[tuple[str, str]] = []
@@ -64,7 +69,8 @@ def _build_wrapped_code(code: str, files: dict[str, bytes] | None) -> str:
     mounts_literal = json.dumps(mount_items, ensure_ascii=False)
     out_dir = sandbox_output_dir()
     # Keep user source as a triple-quoted string + exec so indentation is free.
-    user_literal = json.dumps(code)
+    # Strip surrogate code points first — compile() requires valid UTF-8.
+    user_literal = json.dumps(_strip_surrogates(code))
 
     return f"""# --- LCA Onlyboxes bootstrap (do not edit) ---
 import base64 as _lca_b64
