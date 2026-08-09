@@ -17,6 +17,13 @@ export {
   upsertStepStream,
 } from "./trace-projector";
 export type { TraceTimelineItem } from "./trace-projector";
+export {
+  TurnTimelineProjector,
+  buildTurnTimeline,
+  projectTurnTimeline,
+  reduceTurnTimeline,
+  shouldFoldProcess,
+} from "./turn-timeline-projector";
 export type {
   CastingInfo,
   ChatState,
@@ -24,6 +31,14 @@ export type {
   SandboxOutputStream,
   StepTextStream,
   TraceState,
+  TurnBlockStatus,
+  TurnProcessBlock,
+  TurnTimeline,
   Verbosity,
 } from "./types";
-export { EMPTY_CHAT_STATE, EMPTY_TRACE_STATE, shouldShowEvent } from "./types";
+export {
+  EMPTY_CHAT_STATE,
+  EMPTY_TRACE_STATE,
+  EMPTY_TURN_TIMELINE,
+  shouldShowEvent,
+} from "./types";

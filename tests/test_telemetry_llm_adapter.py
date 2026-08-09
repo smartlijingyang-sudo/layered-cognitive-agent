@@ -9,7 +9,12 @@ from unittest import mock
 
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
-from lca.contracts.models.observability.journal import LlmCallCompleted, StepTextDelta
+from lca.contracts.models.observability.journal import (
+    LlmCallCompleted,
+    ReasoningCompleted,
+    ReasoningDelta,
+    StepTextDelta,
+)
 from lca.contracts.protocols import LLMAdapter
 from lca.layer0_infra.observability.adapters import TelemetryLLMAdapter
 
@@ -18,6 +23,7 @@ class _FakeInner(LLMAdapter):
     name = "fake-inner"
     fail: bool = False
     omit_completed: bool = False
+    emit_reasoning: bool = False
 
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         if self.fail:
@@ -31,6 +37,9 @@ class _FakeInner(LLMAdapter):
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
         if self.fail:
             raise RuntimeError("stream boom")
+        if self.emit_reasoning:
+            yield LLMStreamEvent(type=LLMStreamEventType.REASONING_TEXT_DELTA, text="想")
+            yield LLMStreamEvent(type=LLMStreamEventType.REASONING_TEXT_DELTA, text="一下")
         yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text="hel")
         yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text="lo")
         if not self.omit_completed:
@@ -44,7 +53,7 @@ class _FakeInner(LLMAdapter):
 
 class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.recorded: list[LlmCallCompleted | StepTextDelta] = []
+        self.recorded: list[Any] = []
         self.record_patcher = mock.patch(
             "lca.layer0_infra.observability.adapters.record",
             side_effect=lambda event: self.recorded.append(event),
@@ -128,6 +137,23 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.recorded), 1)
         self.assertFalse(self.recorded[0].ok)
         self.assertTrue(self.recorded[0].stream)
+
+    async def test_stream_reasoning_deltas_and_completed(self) -> None:
+        inner = _FakeInner()
+        inner.emit_reasoning = True
+        adapter = TelemetryLLMAdapter(inner)
+        events = [e async for e in adapter.stream("prompt", step=3)]
+        self.assertEqual(len(events), 5)
+        reasoning = [e for e in self.recorded if isinstance(e, ReasoningDelta)]
+        self.assertEqual(len(reasoning), 2)
+        self.assertEqual(reasoning[0].step, 3)
+        self.assertEqual(reasoning[0].text_delta, "想")
+        self.assertEqual(reasoning[1].seq, 1)
+        done = [e for e in self.recorded if isinstance(e, ReasoningCompleted)]
+        self.assertEqual(len(done), 1)
+        self.assertEqual(done[0].step, 3)
+        self.assertEqual(done[0].content_preview, "想一下")
+        self.assertGreaterEqual(done[0].duration_ms, 0)
 
 
 if __name__ == "__main__":

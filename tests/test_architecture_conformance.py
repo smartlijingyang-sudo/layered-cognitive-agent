@@ -87,6 +87,21 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.llm_adapter.openai_compat._shared._RawToolCall": (
         "L0 内部 tool_call 归一化 NamedTuple，非可插拔组件 (ADR-0038)"
     ),
+    "lca.layer0_infra.llm_adapter.openai_compat._shared.ThinkTagStreamSplitter": (
+        "流式 content 拆分器，adapter 内部状态机 (ADR-0038)"
+    ),
+    "lca.layer0_infra.llm_adapter.settings.LLMSettings": (
+        "pydantic-settings 生成参数配置模型，非可插拔组件"
+    ),
+    "lca.layer0_infra.llm_adapter.tool_arguments.ToolArgumentsOk": (
+        "tool arguments wire 三态 Outcome 值对象，纯数据结构 (ADR-0047)"
+    ),
+    "lca.layer0_infra.llm_adapter.tool_arguments.ToolArgumentsIncomplete": (
+        "tool arguments wire 三态 Outcome 值对象，纯数据结构 (ADR-0047)"
+    ),
+    "lca.layer0_infra.llm_adapter.tool_arguments.ToolArgumentsInvalid": (
+        "tool arguments wire 三态 Outcome 值对象，纯数据结构 (ADR-0047)"
+    ),
     # ── 可观测性子系统（OTel 骨干重建后）──
     "lca.layer0_infra.observability.facade.SpanContext": ("correlation 值对象，非可插拔组件"),
     "lca.layer0_infra.observability.handles.SpanHandle": ("span 句柄内部类型，非公共组件"),

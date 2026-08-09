@@ -78,17 +78,26 @@ def _parse_attachment_ids(body: dict) -> list[str]:
 
 
 def _question_with_attachments(question: str, attachment_ids: list[str]) -> str:
-    """Embed attachment metadata so agents can cite / read file context."""
+    """Embed attachment metadata so agents can cite / read file context.
+
+    Run-level ids are also stored on the session and auto-mounted into the
+    sandbox at ``/mnt/data/<name>``; the model need not re-pass attachment_ids.
+    """
     if not attachment_ids:
         return question
-    lines = ["[用户附件]"]
+    lines = [
+        "[用户附件]",
+        "（沙箱 run_sandbox_code 会自动挂载到 /mnt/data/<文件名>，无需再传 attachment_ids）",
+    ]
     for attachment_id in attachment_ids:
         meta = _file_store.get(attachment_id)
         if meta is None:
             lines.append(f"- (missing) {attachment_id}")
             continue
         lines.append(
-            f"- {meta.name} ({meta.mime_type}, {meta.size_bytes} B) url={meta.url} id={meta.attachment_id}"
+            f"- {meta.name} → /mnt/data/{meta.name} "
+            f"({meta.mime_type}, {meta.size_bytes} B) "
+            f"url={meta.url} id={meta.attachment_id}"
         )
         preview = (
             _file_store.read_text_preview(attachment_id)
@@ -141,7 +150,12 @@ async def create_run(request: Request) -> JSONResponse:
         )
 
     effective_question = _question_with_attachments(question, attachment_ids)
-    session = create_run_session(_registry, question=effective_question, mode=mode)
+    session = create_run_session(
+        _registry,
+        question=effective_question,
+        mode=mode,
+        attachment_ids=attachment_ids,
+    )
     schedule_run(_registry, session)
 
     if conversation_id_str:
@@ -317,14 +331,20 @@ async def download_file(request: Request) -> Response:
     if meta is None or data is None:
         return JSONResponse({"error": "file not found"}, status_code=404, headers=CORS_HEADERS)
 
-    # Optional HTML preview content for sandboxed iframe (text/html only)
-    if request.query_params.get("preview") == "1" and meta.previewable:
+    # Inline for in-app preview (iframe / <img> / markdown fetch). Prefer
+    # preview=1; images always inline so thumbnails work without query.
+    want_inline = request.query_params.get("preview") == "1" or meta.mime_type.lower().startswith(
+        "image/"
+    )
+    if want_inline and (meta.previewable or meta.mime_type.lower().startswith("image/")):
         return Response(
             content=data,
             media_type=meta.mime_type,
             headers={
                 **CORS_HEADERS,
                 "Content-Disposition": f'inline; filename="{meta.name}"',
+                "Content-Length": str(len(data)),
+                "Cache-Control": "private, max-age=3600",
             },
         )
 

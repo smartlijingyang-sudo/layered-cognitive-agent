@@ -1,16 +1,16 @@
-"""Sandbox resolver — explicit backend switch; no silent fake capability.
+"""Sandbox resolver — Onlyboxes only (no E2B / mock / microsandbox).
 
 Production tool wiring (``build_default_tools``) **omits** the sandbox tool when
-no real backend is selected (ProductionLLMResolver pattern: no fake capability).
+console URL or access token is missing (no fake capability).
 
-Selection order:
-1. ``LCA_SANDBOX_BACKEND=local`` → microsandbox microVM (no cloud key).
-2. ``LCA_SANDBOX_BACKEND=e2b`` or default with ``E2B_API_KEY`` → E2B cloud.
-3. ``prefer_mock=True`` (or ``LCA_SANDBOX_BACKEND=mock``) → in-process test double.
-4. Otherwise ``None`` (caller omits sandbox-backed tools).
+Required env (after ``load_dotenv_if_present``):
+- ``ONLYBOXES_BASE_URL`` — console HTTP base, e.g. ``http://127.0.0.1:8089``
+- ``ONLYBOXES_ACCESS_TOKEN`` — dashboard access token (``obx_...``)
 
-``MockSandboxAdapter`` is **not** a security boundary — only a unit-test / demo
-stand-in (ADR-0044).
+Optional:
+- ``LCA_SANDBOX_BACKEND`` — if set to anything other than ``onlyboxes`` / empty,
+  still only Onlyboxes is supported; unknown values log a warning and return
+  ``None`` unless Onlyboxes credentials are present (credentials win).
 """
 
 from __future__ import annotations
@@ -23,19 +23,22 @@ from lca.layer0_infra.llm_adapter.factory import load_dotenv_if_present
 
 _log = logging.getLogger(__name__)
 
-_ENV_E2B_API_KEY = "E2B_API_KEY"
+_ENV_BASE_URL = "ONLYBOXES_BASE_URL"
+_ENV_ACCESS_TOKEN = "ONLYBOXES_ACCESS_TOKEN"  # noqa: S105
 _ENV_SANDBOX_BACKEND = "LCA_SANDBOX_BACKEND"
-
-_BACKEND_LOCAL = "local"
-_BACKEND_E2B = "e2b"
-_BACKEND_MOCK = "mock"
+_BACKEND_ONLYBOXES = "onlyboxes"
 
 
-def e2b_api_key() -> str | None:
-    """Return configured E2B API key, if any (loads nearest ``.env`` first)."""
+def onlyboxes_base_url() -> str | None:
     load_dotenv_if_present()
-    key = os.getenv(_ENV_E2B_API_KEY)
-    return key if key else None
+    value = os.getenv(_ENV_BASE_URL, "").strip()
+    return value or None
+
+
+def onlyboxes_access_token() -> str | None:
+    load_dotenv_if_present()
+    value = os.getenv(_ENV_ACCESS_TOKEN, "").strip()
+    return value or None
 
 
 def sandbox_backend() -> str:
@@ -44,50 +47,31 @@ def sandbox_backend() -> str:
     return os.getenv(_ENV_SANDBOX_BACKEND, "").strip().lower()
 
 
-def resolve_sandbox(
-    *,
-    api_key: str | None = None,
-    prefer_mock: bool = False,
-) -> Sandbox | None:
-    """Resolve a Sandbox implementation.
+def resolve_sandbox() -> Sandbox | None:
+    """Resolve the Onlyboxes sandbox, or ``None`` when not configured.
 
     Returns:
-        ``LocalSandboxAdapter`` when ``LCA_SANDBOX_BACKEND=local``;
-        ``E2BSandboxAdapter`` when a key is available (or backend=e2b with key);
-        ``MockSandboxAdapter`` when ``prefer_mock=True`` / ``backend=mock``;
-        ``None`` when neither (caller should omit sandbox-backed tools).
+        ``OnlyboxesSandboxAdapter`` when base URL + access token are set;
+        ``None`` otherwise (caller omits sandbox-backed tools).
     """
     backend = sandbox_backend()
+    if backend and backend not in {_BACKEND_ONLYBOXES, ""}:
+        _log.warning(
+            "LCA_SANDBOX_BACKEND=%s is unsupported; only 'onlyboxes' is available",
+            backend,
+        )
 
-    if backend == _BACKEND_LOCAL:
-        from lca.layer0_infra.sandbox.local_adapter import LocalSandboxAdapter
-
-        _log.info("LCA_SANDBOX_BACKEND=local; using LocalSandboxAdapter (microsandbox)")
-        return LocalSandboxAdapter()
-
-    if backend == _BACKEND_MOCK:
-        from lca.layer0_infra.sandbox.mock_adapter import MockSandboxAdapter
-
-        _log.info("LCA_SANDBOX_BACKEND=mock; using MockSandboxAdapter (test double)")
-        return MockSandboxAdapter()
-
-    resolved = api_key if api_key is not None else e2b_api_key()
-    if backend == _BACKEND_E2B and not resolved:
-        _log.warning("LCA_SANDBOX_BACKEND=e2b but E2B_API_KEY is unset")
-        if prefer_mock:
-            from lca.layer0_infra.sandbox.mock_adapter import MockSandboxAdapter
-
-            return MockSandboxAdapter()
+    base = onlyboxes_base_url()
+    token = onlyboxes_access_token()
+    if not base or not token:
+        _log.info(
+            "Onlyboxes not configured (need %s + %s); sandbox tool omitted",
+            _ENV_BASE_URL,
+            _ENV_ACCESS_TOKEN,
+        )
         return None
 
-    if resolved:
-        from lca.layer0_infra.sandbox.e2b_adapter import E2BSandboxAdapter
+    from lca.layer0_infra.sandbox.onlyboxes_adapter import OnlyboxesSandboxAdapter
 
-        return E2BSandboxAdapter(api_key=resolved)
-
-    if prefer_mock:
-        from lca.layer0_infra.sandbox.mock_adapter import MockSandboxAdapter
-
-        _log.info("No E2B_API_KEY; using MockSandboxAdapter (prefer_mock=True)")
-        return MockSandboxAdapter()
-    return None
+    _log.info("Using OnlyboxesSandboxAdapter base_url=%s", base)
+    return OnlyboxesSandboxAdapter(base_url=base, access_token=token)

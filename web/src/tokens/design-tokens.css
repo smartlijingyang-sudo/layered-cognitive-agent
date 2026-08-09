@@ -1,59 +1,141 @@
+/**
+ * LCA design tokens — semantic contract aligned with LobeHub DESIGN.md / DESIGN.dark.md.
+ * Components must consume variable names, never hard-coded theme hex.
+ */
 :root {
   color-scheme: light dark;
 
-  --font-sans: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* Geist-like stack (LobeHub typography) */
+  --font-sans: Geist, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display",
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, "HarmonyOS Sans SC", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, "Cascadia Code",
+    Consolas, "HarmonyOS Sans SC", monospace;
 
+  /* Domain accents (journal / trace) */
   --color-run: #10b981;
   --color-team: #8b5cf6;
   --color-cognitive: #3b82f6;
   --color-resource: #f59e0b;
   --color-event: #64748b;
   --color-danger: #ef4444;
+  --color-success: #379d4a;
+  --color-warning: #ee9e0b;
+  --color-info: #0072f5;
+  --color-thinking: #7c3aed;
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  /* Radius scale (LobeHub: 4 / 6 / 8 / 12) */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
 
   --motion-fast: 180ms;
+  --motion-normal: 240ms;
   --chat-max-width: 48rem;
+  --sidebar-width: 280px;
+  --control-height: 36px;
+  --control-height-sm: 28px;
 }
 
+/* ── Dark (LobeHub DESIGN.dark.md defaults + LCA brand accent) ── */
 [data-theme="dark"] {
-  --bg: #0a0a0b;
-  --surface: #141416;
-  --surface-elevated: #1c1c1f;
-  --chat-bg: #101012;
-  --composer-bg: color-mix(in srgb, var(--surface) 88%, transparent);
-  --border: #2a2a2e;
-  --border-subtle: #1f1f23;
-  --text: #ececef;
-  --text-muted: #8b8b93;
-  --text-faint: #63636b;
-  --accent: #10b981;
-  --user-bubble: color-mix(in srgb, var(--color-cognitive) 18%, var(--surface-elevated));
-  --assistant-text: #e4e4e8;
-  --list-marker: var(--accent);
-  --header-bg: color-mix(in srgb, var(--surface) 92%, transparent);
+  --bg: #000000;
+  --surface: #0d0d0d;
+  --surface-secondary: #070707;
+  --surface-elevated: #1a1a1a;
+  --chat-bg: #000000;
+  --composer-bg: color-mix(in srgb, var(--surface) 86%, transparent);
+  --sidebar-bg: #0a0a0a;
+  --header-bg: color-mix(in srgb, var(--surface) 88%, transparent);
+
+  --border: #202020;
+  --border-subtle: #1a1a1a;
+
+  --text: #ffffff;
+  --text-muted: #aaaaaa;
+  --text-faint: #6f6f6f;
+  --text-disabled: #555555;
+
+  --fill: rgba(255, 255, 255, 0.16);
+  --fill-secondary: rgba(255, 255, 255, 0.1);
+  --fill-hover: rgba(255, 255, 255, 0.1);
+  --fill-active: rgba(255, 255, 255, 0.02);
+
+  --accent: #eeeeee;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --accent-fg: #0a0a0a;
+  --brand: #c4f042;
+  --brand-soft: rgba(196, 240, 66, 0.12);
+
+  --user-bubble: #1a1a1a;
+  --assistant-text: #ffffff;
+  --list-marker: var(--text-muted);
+
+  --code-bg: #111111;
+  --code-fg: #e6edf3;
+
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 20px -6px rgba(0, 0, 0, 0.55);
+  --shadow-popover: 0 8px 16px -4px rgba(0, 0, 0, 0.2);
+  --shadow-modal: 0 20px 20px -8px rgba(0, 0, 0, 0.24);
+
+  --color-success: #c4f042;
+  --color-warning: #ffb224;
+  --color-danger: #f4416c;
+  --color-info: #60b1ff;
+  --color-thinking: #a78bfa;
 }
 
+/* ── Light (LobeHub DESIGN.md) ── */
 [data-theme="light"] {
-  --bg: #f5f5f7;
+  --bg: #f8f8f8;
   --surface: #ffffff;
-  --surface-elevated: #fafafa;
-  --chat-bg: #fbfbfc;
-  --composer-bg: color-mix(in srgb, var(--surface) 90%, transparent);
-  --border: #e4e4e8;
-  --border-subtle: #efefef;
-  --text: #18181b;
-  --text-muted: #71717a;
-  --text-faint: #a1a1aa;
-  --accent: #059669;
-  --user-bubble: color-mix(in srgb, var(--color-cognitive) 8%, #ffffff);
-  --assistant-text: #27272a;
-  --list-marker: var(--accent);
+  --surface-secondary: #fbfbfb;
+  --surface-elevated: #ffffff;
+  --chat-bg: #f8f8f8;
+  --composer-bg: color-mix(in srgb, var(--surface) 92%, transparent);
+  --sidebar-bg: #fbfbfb;
   --header-bg: color-mix(in srgb, var(--surface) 94%, transparent);
+
+  --border: #e3e3e3;
+  --border-subtle: #eeeeee;
+
+  --text: #080808;
+  --text-muted: #666666;
+  --text-faint: #999999;
+  --text-disabled: #bbbbbb;
+
+  --fill: rgba(0, 0, 0, 0.12);
+  --fill-secondary: rgba(0, 0, 0, 0.06);
+  --fill-hover: rgba(0, 0, 0, 0.06);
+  --fill-active: rgba(0, 0, 0, 0.015);
+
+  --accent: #222222;
+  --accent-soft: rgba(0, 0, 0, 0.06);
+  --accent-fg: #ffffff;
+  --brand: #379d4a;
+  --brand-soft: rgba(55, 157, 74, 0.1);
+
+  --user-bubble: #f0f0f0;
+  --assistant-text: #080808;
+  --list-marker: var(--text-muted);
+
+  --code-bg: #f6f6f6;
+  --code-fg: #24292f;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-popover: 0 8px 16px -4px rgba(0, 0, 0, 0.12);
+  --shadow-modal: 0 20px 20px -8px rgba(0, 0, 0, 0.16);
+
+  --color-success: #379d4a;
+  --color-warning: #ee9e0b;
+  --color-danger: #ec5e41;
+  --color-info: #0072f5;
+  --color-thinking: #7c3aed;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -72,9 +154,11 @@
   --breakpoint-md: 960px;
   --breakpoint-lg: 1280px;
 
+  --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);

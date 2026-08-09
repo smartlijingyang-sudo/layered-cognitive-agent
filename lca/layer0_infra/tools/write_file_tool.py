@@ -93,7 +93,9 @@ class WriteFileTool(Tool):
             )
 
         latency_ms = int((time.monotonic() - start) * 1000)
-        # A2A file-part shape (camelCase keys for frontend GeneratedFile)
+        # A2A file-part shape (camelCase keys for frontend GeneratedFile).
+        # Never embed full body / previewHtml here — journal result_preview is
+        # truncated (~2k); UI loads content via url for preview.
         payload = {
             "name": stored.name,
             "mimeType": stored.mime_type,
@@ -102,8 +104,6 @@ class WriteFileTool(Tool):
             "previewable": stored.previewable,
             "attachmentId": stored.attachment_id,
         }
-        if stored.previewable and mime_type.lower().startswith("text/html"):
-            payload["previewHtml"] = content
         return Observation(
             observation_id=new_id("obs"),
             success=True,

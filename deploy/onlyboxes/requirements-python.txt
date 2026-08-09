@@ -1,0 +1,13 @@
+# Onlyboxes pythonExec guest image baseline (ADR-0044).
+# Keep in sync with SANDBOX_PREINSTALLED_PYTHON_PACKAGES in
+# lca/contracts/models/core/sandbox.py and SandboxCodeTool description.
+pandas>=2.2,<4
+numpy>=1.26,<3
+openpyxl>=3.1,<4
+xlsxwriter>=3.2,<4
+matplotlib>=3.8,<4
+seaborn>=0.13,<1
+pillow>=10,<13
+scipy>=1.11,<2
+requests>=2.31,<3
+tabulate>=0.9,<1

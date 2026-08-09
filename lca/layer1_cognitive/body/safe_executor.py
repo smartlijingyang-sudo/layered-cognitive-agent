@@ -1,4 +1,4 @@
-"""SafeExecutor — permission → validate → cache → retry → execute."""
+"""SafeExecutor — permission → validate → ToolStarted → cache → retry → execute → ToolInvoked."""
 
 from __future__ import annotations
 
@@ -18,10 +18,15 @@ from lca.contracts.atoms.semantic_keys import (
 )
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ToolExecutionError
-from lca.contracts.models.observability.journal import ToolDenied, ToolInvoked
+from lca.contracts.models.observability.journal import ToolDenied, ToolInvoked, ToolStarted
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.layer0_infra.observability import record
+from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
+from lca.layer1_cognitive.body.tool_result_preview import (
+    compact_payload_for_preview,
+    tool_files,
+)
 
 _log = structlog.get_logger("lca.safe_executor")
 
@@ -29,9 +34,13 @@ _PERF_COUNTER_SCALE = 1000
 
 
 def _tool_output_preview(obs: Observation) -> str:
-    """工具结果预览（成功取 payload，失败取错误）。"""
+    """工具结果预览（成功取紧凑 payload，失败取错误）。"""
     if obs.success:
-        return json.dumps(obs.payload, ensure_ascii=False, default=str)
+        return json.dumps(
+            compact_payload_for_preview(obs.payload),
+            ensure_ascii=False,
+            default=str,
+        )
     return obs.error or ""
 
 
@@ -39,8 +48,12 @@ def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
 
 
+def _args_preview(args: dict[str, Any]) -> str:
+    return json.dumps(args, ensure_ascii=False, default=str)
+
+
 class SimpleSafeExecutor(SafeExecutor):
-    """Permission → validate → cache → retry → sandbox execute."""
+    """Permission → validate → ToolStarted → cache → retry → sandbox execute → ToolInvoked."""
 
     def __init__(self, permission_manifest: ToolPermissionManifest):
         self.permission_manifest = permission_manifest
@@ -70,11 +83,48 @@ class SimpleSafeExecutor(SafeExecutor):
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
 
+        invocation_id = new_id("inv")
+        args_preview = _args_preview(args)
+        record(
+            ToolStarted(
+                tool_name=tool.name,
+                arguments_preview=args_preview,
+                invocation_id=invocation_id,
+            )
+        )
+
+        with tool_invocation_scope(invocation_id):
+            return await self._execute_with_retry(
+                tool,
+                args,
+                retry_policy=retry_policy,
+                cache_config=cache_config,
+                invocation_id=invocation_id,
+                args_preview=args_preview,
+            )
+
+    async def _execute_with_retry(
+        self,
+        tool: Tool,
+        args: dict[str, Any],
+        *,
+        retry_policy: RetryPolicy,
+        cache_config: CacheConfig,
+        invocation_id: str,
+        args_preview: str,
+    ) -> Observation:
         cache_key = f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
         if cache_config.enabled and cache_key in self._cache:
             cached = self._cache[cache_key]
             # 缓存命中也是一次「调用」——冗余检测必须看见它，否则被短路掩盖
-            self._record_invoked(tool, args, cached, latency_ms=0, attempt=0)
+            self._record_invoked(
+                tool,
+                args_preview,
+                cached,
+                latency_ms=0,
+                attempt=0,
+                invocation_id=invocation_id,
+            )
             return cached
 
         started = time.perf_counter()
@@ -89,12 +139,22 @@ class SimpleSafeExecutor(SafeExecutor):
                 if cache_config.enabled:
                     self._cache[cache_key] = obs
                 self._record_invoked(
-                    tool, args, obs, latency_ms=_elapsed_ms(started), attempt=attempts_used
+                    tool,
+                    args_preview,
+                    obs,
+                    latency_ms=_elapsed_ms(started),
+                    attempt=attempts_used,
+                    invocation_id=invocation_id,
                 )
                 return obs
             if obs.extra.get(FAILURE_KIND) == FAILURE_KIND_VALIDATION:
                 self._record_invoked(
-                    tool, args, obs, latency_ms=_elapsed_ms(started), attempt=attempts_used
+                    tool,
+                    args_preview,
+                    obs,
+                    latency_ms=_elapsed_ms(started),
+                    attempt=attempts_used,
+                    invocation_id=invocation_id,
                 )
                 return obs
             last_obs = obs
@@ -105,7 +165,12 @@ class SimpleSafeExecutor(SafeExecutor):
 
         if last_obs is not None:
             self._record_invoked(
-                tool, args, last_obs, latency_ms=_elapsed_ms(started), attempt=attempts_used
+                tool,
+                args_preview,
+                last_obs,
+                latency_ms=_elapsed_ms(started),
+                attempt=attempts_used,
+                invocation_id=invocation_id,
             )
         detail = f"，最后错误: {last_error}" if last_error else ""
         raise ToolExecutionError(
@@ -114,18 +179,27 @@ class SimpleSafeExecutor(SafeExecutor):
 
     @staticmethod
     def _record_invoked(
-        tool: Tool, args: dict[str, Any], obs: Observation, *, latency_ms: int, attempt: int
+        tool: Tool,
+        args_preview: str,
+        obs: Observation,
+        *,
+        latency_ms: int,
+        attempt: int,
+        invocation_id: str,
     ) -> None:
+        # Prefer sandbox/tool-provided id; fall back to SafeExecutor-assigned id.
+        resolved_id = str((obs.extra or {}).get("invocation_id", "") or "") or invocation_id
         record(
             ToolInvoked(
                 tool_name=tool.name,
-                arguments_preview=json.dumps(args, ensure_ascii=False, default=str),
+                arguments_preview=args_preview,
                 result_preview=_tool_output_preview(obs),
                 ok=obs.success,
                 latency_ms=latency_ms,
                 attempt=attempt,
                 error="" if obs.success else (obs.error or ""),
-                invocation_id=str((obs.extra or {}).get("invocation_id", "") or ""),
+                invocation_id=resolved_id,
+                files=tool_files(obs),
             )
         )
 

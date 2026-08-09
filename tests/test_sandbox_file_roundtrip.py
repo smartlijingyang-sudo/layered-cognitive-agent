@@ -1,0 +1,43 @@
+"""ADR-0046 path contract tests for Onlyboxes artifact harvest helpers."""
+
+from __future__ import annotations
+
+import base64
+import json
+import unittest
+
+from lca.layer0_infra.sandbox.onlyboxes_adapter import (
+    _ARTIFACT_BEGIN,
+    _ARTIFACT_END,
+    _build_wrapped_code,
+    _strip_artifacts,
+)
+from lca.layer0_infra.sandbox.output_collect import sandbox_output_dir
+
+
+class OnlyboxesRoundtripHelpersTests(unittest.TestCase):
+    def test_build_wrapped_includes_output_dir_and_mounts(self) -> None:
+        wrapped = _build_wrapped_code(
+            'open("/mnt/data/outputs/x.txt","wb").write(b"z")',
+            {"a.csv": b"1,2\n"},
+        )
+        self.assertIn(sandbox_output_dir(), wrapped)
+        self.assertIn("a.csv", wrapped)
+        self.assertIn("print(", wrapped)
+
+    def test_strip_artifacts_respects_caps_via_try_append(self) -> None:
+        # One small file harvests cleanly.
+        block = (
+            _ARTIFACT_BEGIN
+            + json.dumps([{"name": "ok.bin", "b64": base64.b64encode(b"data").decode("ascii")}])
+            + _ARTIFACT_END
+        )
+        cleaned, files, diags = _strip_artifacts("out\n" + block)
+        self.assertIn("out", cleaned)
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0].data, b"data")
+        self.assertEqual(diags, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

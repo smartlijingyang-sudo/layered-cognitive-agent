@@ -202,6 +202,8 @@ def decision_made_attrs(event: DecisionMade) -> dict[str, Any]:
             ATTR_DELEGATE_COUNT: event.delegate_count,
             ATTR_TOOL_NAME: event.tool_name,
             ATTR_CONFIDENCE: event.confidence,
+            ATTR_RESULT_OUTPUT: event.response_text,
+            LANGFUSE_OBSERVATION_OUTPUT: event.response_text,
         }
     )
 

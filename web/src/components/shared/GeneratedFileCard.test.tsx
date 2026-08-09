@@ -28,6 +28,23 @@ describe("GeneratedFileCard", () => {
     expect(iframe.tagName).toBe("IFRAME");
     expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
     expect(iframe.getAttribute("srcdoc") ?? iframe.getAttribute("srcDoc")).toContain("Preview");
+    expect(screen.getByTestId("generated-file-preview-btn")).toBeTruthy();
+  });
+
+  it("shows image thumbnail when mime is image", () => {
+    render(
+      <GeneratedFileCard
+        file={{
+          name: "chart.png",
+          mimeType: "image/png",
+          url: "/files/chart",
+          previewable: true,
+          sizeBytes: 100,
+        }}
+      />,
+    );
+    const thumb = screen.getByTestId("generated-file-thumb");
+    expect(thumb.getAttribute("src")).toContain("preview=1");
   });
 
   it("shows no-download affordance when url missing", () => {

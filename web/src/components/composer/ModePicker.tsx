@@ -7,7 +7,7 @@ import {
 import { modeHelp, modeLabel } from "../../lib/modes";
 import { X } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { elevatedSurface, focusRing, iconButton, inputField, mutedText } from "../../lib/ui";
+import { elevatedSurface, focusRing, iconButton, mutedText } from "../../lib/ui";
 
 export function ModePicker({
   value,
@@ -23,11 +23,16 @@ export function ModePicker({
       <Dialog.Trigger asChild>
         <button
           type="button"
-          className={cn(inputField, "max-w-md cursor-pointer text-left")}
+          className={cn(
+            "inline-flex max-w-[11rem] cursor-pointer items-center gap-1.5 rounded-full border border-[var(--border)]",
+            "bg-transparent px-2.5 py-1 text-xs text-[var(--text-muted)]",
+            "hover:bg-[var(--fill-hover)] hover:text-[var(--text)]",
+            focusRing,
+          )}
           disabled={disabled}
+          title={modeHelp(value)}
         >
-          <span className="block font-semibold">{modeLabel(value)}</span>
-          <span className={cn("block text-sm", mutedText)}>{modeHelp(value)}</span>
+          <span className="truncate font-medium">{modeLabel(value)}</span>
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>

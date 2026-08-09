@@ -9,11 +9,13 @@ export interface GeneratedFile {
   readonly sizeBytes?: number;
   /** Backend-downloadable URI when available. */
   readonly url?: string;
-  /** When true, UI may show a sandboxed HTML preview. */
+  /** FileStore id when available (stable key / meta fetch). */
+  readonly attachmentId?: string;
+  /** When true, UI may open in-app preview (md / image / html / text). */
   readonly previewable?: boolean;
   /**
    * Optional inline HTML for `iframe srcDoc` (fixture / mock path).
-   * Prefer over fetching when content is already in memory.
+   * Prefer URL fetch for production products so journal stays small.
    */
   readonly previewHtml?: string;
 }

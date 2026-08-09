@@ -1,0 +1,174 @@
+"""ToolInvoked.files is the durable product channel (not result_preview JSON)."""
+
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from lca.contracts.models.core.decision import Observation
+from lca.contracts.models.observability.journal import (
+    RunScope,
+    StampedEvent,
+    ToolInvoked,
+    run_scope,
+)
+from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
+from lca.layer0_infra.file_store import LocalFileStore
+from lca.layer0_infra.observability import ObservabilityHub, bind
+from lca.layer0_infra.tools.write_file_tool import WriteFileTool
+from lca.layer1_cognitive.body.safe_executor import (
+    SimpleSafeExecutor,
+    _tool_files,
+    _tool_output_preview,
+)
+
+
+class _Collector:
+    def __init__(self) -> None:
+        self.received: list[StampedEvent] = []
+
+    def on_event(self, stamped: StampedEvent) -> None:
+        self.received.append(stamped)
+
+    def flush(self) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
+class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.store = LocalFileStore(Path(self._tmp.name))
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_tool_files_strips_preview_html(self) -> None:
+        obs = Observation(
+            observation_id="obs_1",
+            success=True,
+            payload={
+                "name": "a.html",
+                "mimeType": "text/html",
+                "url": "/files/a",
+                "previewHtml": "<html>huge</html>",
+            },
+            extra={
+                "files": [
+                    {
+                        "name": "a.html",
+                        "mimeType": "text/html",
+                        "url": "/files/a",
+                        "previewHtml": "<html>huge</html>",
+                        "attachmentId": "file_a",
+                    }
+                ]
+            },
+        )
+        files = _tool_files(obs)
+        self.assertEqual(len(files), 1)
+        self.assertNotIn("previewHtml", files[0])
+        self.assertEqual(files[0]["name"], "a.html")
+
+    def test_result_preview_stays_compact_with_large_streams(self) -> None:
+        obs = Observation(
+            observation_id="obs_1",
+            success=True,
+            payload={
+                "stdout": "S" * 5000,
+                "stderr": "E" * 5000,
+                "files": [
+                    {
+                        "name": "chart.png",
+                        "mimeType": "image/png",
+                        "url": "/files/c",
+                        "previewable": True,
+                    }
+                ],
+                "exit_code": 0,
+            },
+            extra={
+                "files": [
+                    {
+                        "name": "chart.png",
+                        "mimeType": "image/png",
+                        "url": "/files/c",
+                        "previewable": True,
+                    }
+                ]
+            },
+        )
+        preview = _tool_output_preview(obs)
+        self.assertLess(len(preview), 2000)
+        parsed = json.loads(preview)
+        self.assertEqual(parsed["files"][0]["name"], "chart.png")
+
+    async def test_write_file_emits_structured_files_on_tool_invoked(self) -> None:
+        collector = _Collector()
+        hub = ObservabilityHub([], journal_projectors=[collector])
+        tool = WriteFileTool(store=self.store)
+        executor = SimpleSafeExecutor(
+            permission_manifest=ToolPermissionManifest(allowed_tools=["write_file"])
+        )
+        with bind(hub), run_scope(RunScope(trace_id="t", run_id="r")):
+            obs = await executor.execute(
+                tool,
+                {
+                    "name": "report.md",
+                    "content": "# Title\n\nbody",
+                    "mime_type": "text/markdown",
+                },
+                RetryPolicy(max_retries=0),
+                CacheConfig(enabled=False),
+            )
+        self.assertTrue(obs.success)
+        invoked = [s.event for s in collector.received if isinstance(s.event, ToolInvoked)]
+        self.assertEqual(len(invoked), 1)
+        inv = invoked[0]
+        self.assertTrue(inv.ok)
+        self.assertGreaterEqual(len(inv.files), 1)
+        self.assertEqual(inv.files[0]["name"], "report.md")
+        self.assertTrue(inv.files[0].get("previewable"))
+        parsed = json.loads(inv.result_preview)
+        self.assertEqual(parsed["name"], "report.md")
+        self.assertNotIn("previewHtml", parsed)
+
+    async def test_journal_does_not_truncate_files_field(self) -> None:
+        """files is non-string → AttributePolicy leaves it intact through record()."""
+        collector = _Collector()
+        hub = ObservabilityHub([], journal_projectors=[collector])
+        many = tuple(
+            {
+                "name": f"chart_{i}.png",
+                "mimeType": "image/png",
+                "url": f"/files/f{i}",
+                "previewable": True,
+                "attachmentId": f"file_{i}",
+            }
+            for i in range(8)
+        )
+        with bind(hub), run_scope(RunScope(trace_id="t", run_id="r")):
+            from lca.layer0_infra.observability import record
+
+            record(
+                ToolInvoked(
+                    tool_name="run_sandbox_code",
+                    result_preview='{"stdout": "' + ("x" * 3000),
+                    ok=True,
+                    files=many,
+                )
+            )
+        invoked = [s.event for s in collector.received if isinstance(s.event, ToolInvoked)]
+        self.assertEqual(len(invoked), 1)
+        self.assertEqual(len(invoked[0].files), 8)
+        self.assertEqual(invoked[0].files[7]["name"], "chart_7.png")
+        # preview still truncated as a string
+        self.assertLessEqual(len(invoked[0].result_preview), 2010)
+
+
+if __name__ == "__main__":
+    unittest.main()

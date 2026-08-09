@@ -1,25 +1,23 @@
-import { Menu, X, Sparkles } from "lucide-react";
-import * as Switch from "@radix-ui/react-switch";
-import { LlmBadge } from "../shared/LlmBadge";
-import { ThemeToggle } from "../shared/ThemeToggle";
+import { Menu, PanelLeftClose, PanelLeft, Sparkles, X } from "lucide-react";
 import type { ThemeMode } from "../../store/app-store";
 import type { Verbosity } from "../../projectors";
 import { cn } from "../../lib/cn";
-import { focusRing, inputField, mutedText } from "../../lib/ui";
+import { focusRing } from "../../lib/ui";
 
 export function AppLayout({
-  theme,
-  onThemeChange,
-  llmAvailable,
-  developerMode,
-  onDeveloperModeChange,
-  verbosity,
-  onVerbosityChange,
+  theme: _theme,
+  onThemeChange: _onThemeChange,
+  llmAvailable: _llmAvailable,
+  developerMode: _developerMode,
+  onDeveloperModeChange: _onDeveloperModeChange,
+  verbosity: _verbosity,
+  onVerbosityChange: _onVerbosityChange,
   sidebar,
   main,
   tracePanel,
   sidebarOpen,
   onSidebarToggle,
+  chatTitle,
 }: {
   readonly theme: ThemeMode;
   readonly onThemeChange: (theme: ThemeMode) => void;
@@ -33,73 +31,19 @@ export function AppLayout({
   readonly tracePanel: React.ReactNode | null;
   readonly sidebarOpen: boolean;
   readonly onSidebarToggle: () => void;
+  readonly chatTitle?: string;
 }) {
-  return (
-    <div className="flex h-screen flex-col overflow-hidden bg-bg text-text">
-      <header
-        className={cn(
-          "relative z-[60] flex shrink-0 items-center justify-between gap-4 border-b border-border/70 px-4 py-2.5 backdrop-blur-md md:px-5",
-        )}
-        style={{ background: "var(--header-bg)" }}
-      >
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className={cn(
-              "inline-flex cursor-pointer items-center justify-center rounded-[var(--radius-md)] p-2 text-text-muted hover:bg-surface-elevated md:hidden",
-              focusRing,
-            )}
-            aria-label={sidebarOpen ? "关闭侧栏" : "打开侧栏"}
-            onClick={onSidebarToggle}
-          >
-            {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-          <div className="flex items-center gap-2.5">
-            <span className="inline-flex size-8 items-center justify-center rounded-[var(--radius-md)] bg-accent/15 text-accent">
-              <Sparkles size={16} />
-            </span>
-            <div>
-              <h1 className="m-0 text-[0.9375rem] font-semibold tracking-tight">LCA</h1>
-              <p className={cn("m-0 text-xs", mutedText)}>团队协作对话</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5 md:gap-3">
-          <LlmBadge available={llmAvailable} />
-          <label className="hidden items-center gap-2 text-xs sm:inline-flex">
-            <span className={mutedText}>开发者</span>
-            <Switch.Root
-              className={cn(
-                "relative h-5 w-9 rounded-full bg-border data-[state=checked]:bg-accent",
-                focusRing,
-              )}
-              checked={developerMode}
-              onCheckedChange={onDeveloperModeChange}
-            >
-              <Switch.Thumb
-                className={cn(
-                  "block size-4 translate-x-0.5 rounded-full bg-white shadow-sm transition-transform duration-200",
-                  "data-[state=checked]:translate-x-[18px]",
-                )}
-              />
-            </Switch.Root>
-          </label>
-          <label className="hidden items-center gap-2 text-xs md:inline-flex">
-            <span className={mutedText}>详细度</span>
-            <select
-              className={cn(inputField, "w-auto min-w-[6.5rem] py-1 text-xs")}
-              value={verbosity}
-              onChange={(e) => onVerbosityChange(e.target.value as Verbosity)}
-            >
-              <option value="minimal">简洁</option>
-              <option value="standard">标准</option>
-              <option value="verbose">完整</option>
-            </select>
-          </label>
-          <ThemeToggle theme={theme} onChange={onThemeChange} />
-        </div>
-      </header>
+  void _theme;
+  void _onThemeChange;
+  void _llmAvailable;
+  void _developerMode;
+  void _onDeveloperModeChange;
+  void _verbosity;
+  void _onVerbosityChange;
 
+  return (
+    <div className="flex h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+      {/* Mobile overlay */}
       {sidebarOpen ? (
         <button
           type="button"
@@ -109,30 +53,94 @@ export function AppLayout({
         />
       ) : null}
 
-      <div
+      {/* Sidebar — LobeHub left nav */}
+      <aside
         className={cn(
-          "grid min-h-0 flex-1 grid-cols-1",
-          tracePanel
-            ? "lg:grid-cols-[260px_minmax(0,1fr)_minmax(280px,340px)]"
-            : "md:grid-cols-[260px_minmax(0,1fr)]",
+          "flex shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--sidebar-bg)]",
+          "fixed inset-y-0 left-0 z-50 w-[min(var(--sidebar-width),88vw)] transition-transform duration-200",
+          "md:static md:z-auto md:w-[var(--sidebar-width)] md:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:hidden",
         )}
       >
-        <div
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              className={cn(
+                "inline-flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-md)]",
+                "bg-[var(--fill-hover)] text-[var(--text)]",
+              )}
+            >
+              <Sparkles size={15} strokeWidth={2} />
+            </span>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold tracking-tight">LCA</div>
+              <div className="truncate text-[11px] text-[var(--text-faint)]">团队协作</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex cursor-pointer items-center justify-center rounded-[var(--radius-md)] p-1.5",
+              "text-[var(--text-muted)] hover:bg-[var(--fill-hover)] md:hidden",
+              focusRing,
+            )}
+            aria-label="关闭侧栏"
+            onClick={onSidebarToggle}
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">{sidebar}</div>
+      </aside>
+
+      {/* Main column */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header
           className={cn(
-            "overflow-auto border-r border-border/70 bg-surface p-3",
-            "fixed inset-y-0 left-0 z-50 w-[min(280px,88vw)] pt-[3.75rem] shadow-2xl transition-transform duration-200 md:shadow-none",
-            "md:static md:z-auto md:w-auto md:pt-3",
-            sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+            "flex h-12 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3",
+            "bg-[var(--header-bg)] backdrop-blur-md md:px-4",
           )}
         >
-          {sidebar}
+          <button
+            type="button"
+            className={cn(
+              "inline-flex cursor-pointer items-center justify-center rounded-[var(--radius-md)] p-1.5",
+              "text-[var(--text-muted)] hover:bg-[var(--fill-hover)]",
+              focusRing,
+            )}
+            aria-label={sidebarOpen ? "收起侧栏" : "打开侧栏"}
+            onClick={onSidebarToggle}
+          >
+            <span className="md:hidden">
+              {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
+            </span>
+            <span className="hidden md:inline">
+              {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeft size={16} />}
+            </span>
+          </button>
+          <h1 className="m-0 min-w-0 flex-1 truncate text-sm font-medium text-[var(--text)]">
+            {chatTitle || "新对话"}
+          </h1>
+        </header>
+
+        <div
+          className={cn(
+            "grid min-h-0 flex-1",
+            tracePanel ? "lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]" : "grid-cols-1",
+          )}
+        >
+          <div className="flex min-h-0 min-w-0 flex-col">{main}</div>
+          {tracePanel ? (
+            <div
+              className={cn(
+                "hidden min-h-0 overflow-auto border-l border-[var(--border-subtle)]",
+                "bg-[var(--surface-secondary)] p-3 lg:block",
+              )}
+            >
+              {tracePanel}
+            </div>
+          ) : null}
         </div>
-        <div className="flex min-h-0 min-w-0 flex-col">{main}</div>
-        {tracePanel ? (
-          <div className="hidden min-h-0 overflow-auto border-l border-border/70 bg-surface p-3 lg:block">
-            {tracePanel}
-          </div>
-        ) : null}
       </div>
     </div>
   );

@@ -45,9 +45,21 @@ class LocalFileStoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(obs.payload["name"], "report.md")
         self.assertEqual(obs.payload["mimeType"], "text/markdown")
         self.assertIn("url", obs.payload)
+        self.assertTrue(obs.payload["previewable"])
+        self.assertNotIn("previewHtml", obs.payload)
         self.assertIn("files", obs.extra)
         attachment_id = str(obs.payload["attachmentId"])
         self.assertEqual(self.store.read_bytes(attachment_id), b"# Hi\n\nbody")
+
+    def test_previewable_matrix_for_products(self) -> None:
+        md = self.store.put(data=b"# x", name="a.md", mime_type="text/markdown")
+        png = self.store.put(data=b"\x89PNG", name="c.png", mime_type="image/png")
+        html = self.store.put(data=b"<html></html>", name="r.html", mime_type="text/html")
+        bin_ = self.store.put(data=b"\x00\x01", name="x.bin", mime_type="application/octet-stream")
+        self.assertTrue(md.previewable)
+        self.assertTrue(png.previewable)
+        self.assertTrue(html.previewable)
+        self.assertFalse(bin_.previewable)
 
     async def test_write_file_tool_rejects_empty_name(self) -> None:
         tool = WriteFileTool(store=self.store)

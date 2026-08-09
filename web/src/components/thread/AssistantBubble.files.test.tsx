@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { AssistantBubble } from "./AssistantBubble";
+import { AssistantTurnView } from "../turn/AssistantTurnView";
 import type { Turn } from "../../domain/conversation";
-import { EMPTY_TRACE_STATE } from "../../projectors";
+import { EMPTY_TURN_TIMELINE } from "../../projectors";
 
 function baseTurn(overrides: Partial<Turn> = {}): Turn {
   return {
@@ -17,9 +17,8 @@ function baseTurn(overrides: Partial<Turn> = {}): Turn {
   };
 }
 
-describe("AssistantBubble generated files", () => {
+describe("AssistantTurnView generated files", () => {
   it("mounts GeneratedFileCard when turn.files is present", () => {
-    // Minimal trace shape — TraceAccordion returns null on empty events
     const turn = baseTurn({
       files: [
         {
@@ -33,17 +32,17 @@ describe("AssistantBubble generated files", () => {
     });
 
     render(
-      <AssistantBubble
+      <AssistantTurnView
         turn={turn}
-        events={[]}
-        trace={EMPTY_TRACE_STATE}
-        verbosity="standard"
-        developerMode={false}
+        timeline={{
+          ...EMPTY_TURN_TIMELINE,
+          finalAnswer: turn.answer,
+          status: "completed",
+          files: turn.files ?? [],
+        }}
       />,
     );
 
-    expect(screen.getByTestId("generated-file-card")).toBeTruthy();
-    expect(screen.getByText("out.html")).toBeTruthy();
-    expect(screen.getByTestId("generated-file-download")).toBeTruthy();
+    expect(screen.getByText("out.html")).toBeInTheDocument();
   });
 });

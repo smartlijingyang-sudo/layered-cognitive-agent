@@ -1,7 +1,7 @@
 import type { StampedEvent } from "../contracts/stamped";
 import type { GeneratedFile } from "../domain/generated-file";
 import { extractUserFacingAnswer } from "../lib/extract-decision-text";
-import { filesFromToolResultPreview } from "../lib/parse-generated-file";
+import { filesFromToolInvoked } from "../lib/parse-generated-file";
 import { EMPTY_CHAT_STATE, type ChatState, type RunPhase } from "./types";
 
 /** 面向用户的终态动作 — 其 StepTextDelta 可提交到对话主线（answer-delta 投影层）。 */
@@ -50,19 +50,18 @@ function appendBuffer(
   return next;
 }
 
-function commitStepBuffer(
+function commitAnswerText(
   state: ChatProjectorInternal,
   runId: string,
   step: number,
+  text: string,
 ): ChatProjectorInternal {
   const key = stepBufferKey(runId, step);
-  const buffer = state.pendingSteps.get(key);
-  if (!buffer) return state;
-  const deltaList = orderedDeltaText(buffer);
-  const raw = deltaList.join("");
-  const text = extractUserFacingAnswer(raw) ?? raw;
   const nextPending = new Map(state.pendingSteps);
   nextPending.delete(key);
+  if (!text) {
+    return { ...state, pendingSteps: nextPending, answer: state.committedAnswer };
+  }
   const committedAnswer = state.committedAnswer
     ? `${state.committedAnswer}${text}`
     : text;
@@ -70,9 +69,32 @@ function commitStepBuffer(
     ...state,
     pendingSteps: nextPending,
     committedAnswer,
-    answerDeltas: text ? [...state.answerDeltas, text] : [...state.answerDeltas],
+    answerDeltas: [...state.answerDeltas, text],
     answer: committedAnswer,
   };
+}
+
+/**
+ * 提交某 step 的用户可见回答。
+ * 权威源：DecisionMade.response_text（后端防腐层已归一，ADR-0045）。
+ * 回退：从 StepTextDelta 缓冲提取（流式兼容 / 旧事件无 response_text）。
+ */
+function commitStepAnswer(
+  state: ChatProjectorInternal,
+  runId: string,
+  step: number,
+  canonicalResponseText?: string,
+): ChatProjectorInternal {
+  const canonical = canonicalResponseText?.trim() ?? "";
+  if (canonical) {
+    return commitAnswerText(state, runId, step, canonical);
+  }
+  const key = stepBufferKey(runId, step);
+  const buffer = state.pendingSteps.get(key);
+  if (!buffer) return state;
+  const raw = orderedDeltaText(buffer).join("");
+  const text = extractUserFacingAnswer(raw) ?? raw;
+  return commitAnswerText(state, runId, step, text);
 }
 
 function previewFromPendingStep(
@@ -110,7 +132,7 @@ function commitAllRunBuffers(
   for (const key of state.pendingSteps.keys()) {
     if (key.startsWith(`${runId}:`)) {
       const step = Number(key.slice(runId.length + 1));
-      next = commitStepBuffer(next, runId, step);
+      next = commitStepAnswer(next, runId, step);
     }
   }
   return next;
@@ -213,11 +235,17 @@ export function reduceChat(state: ChatProjectorInternal, stamped: StampedEvent):
     }
     case "DecisionMade":
       if (USER_FACING_TERMINAL_ACTIONS.has(e.action_type)) {
-        return commitStepBuffer(state, runId, e.step);
+        // Journal-as-Truth：规范正文优先于原始 token 缓冲（ADR-0045）
+        return commitStepAnswer(state, runId, e.step, e.response_text);
       }
       return discardStepBuffer(state, runId, e.step);
     case "ToolInvoked": {
-      const extracted = filesFromToolResultPreview(e.tool_name, e.result_preview, e.ok);
+      const extracted = filesFromToolInvoked({
+        toolName: e.tool_name,
+        resultPreview: e.result_preview,
+        ok: e.ok,
+        files: e.files,
+      });
       if (!extracted.length) return state;
       return {
         ...state,

@@ -1,7 +1,7 @@
 """Sandbox execution-stream journal emissions (sole record site for SandboxOutputDelta).
 
-Adapters (E2B / local / Mock) call into this module so AST emitter guards stay
-package-scoped and all implementations share one seq/stream convention.
+Adapters call into this module so AST emitter guards stay package-scoped and all
+implementations share one seq/stream convention.
 """
 
 from __future__ import annotations

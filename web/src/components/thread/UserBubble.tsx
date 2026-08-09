@@ -19,14 +19,14 @@ export function UserBubble({ turn }: { readonly turn: Turn }) {
             <li
               key={att.id}
               className={cn(
-                "inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/60",
-                "bg-surface px-2.5 py-1 text-[11px] text-text-muted",
+                "inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border)]",
+                "bg-[var(--surface)] px-2.5 py-1 text-[11px] text-[var(--text-muted)]",
               )}
               data-testid="user-attachment-chip"
               title={att.error ?? att.name}
             >
-              <Paperclip size={11} className="shrink-0 text-accent" aria-hidden />
-              <span className="max-w-[9rem] truncate text-text">{att.name}</span>
+              <Paperclip size={11} className="shrink-0 text-[var(--text-faint)]" aria-hidden />
+              <span className="max-w-[9rem] truncate text-[var(--text)]">{att.name}</span>
               {formatByteSize(att.sizeBytes) ? (
                 <span className="text-[var(--text-faint)]">{formatByteSize(att.sizeBytes)}</span>
               ) : null}
@@ -36,10 +36,10 @@ export function UserBubble({ turn }: { readonly turn: Turn }) {
       ) : null}
       <article
         className={cn(
-          "max-w-[min(100%,85%)] rounded-[var(--radius-xl)] rounded-br-[var(--radius-sm)]",
+          "max-w-[min(100%,85%)] rounded-[var(--radius-xl)] rounded-br-[var(--radius-xs)]",
           "bg-[var(--user-bubble)] px-4 py-3",
-          "text-[0.9375rem] leading-[1.65] text-text shadow-sm",
-          "ring-1 ring-border/40",
+          "text-[0.9375rem] leading-[1.65] text-[var(--text)]",
+          "ring-1 ring-[var(--border)]",
         )}
       >
         <p className="m-0 whitespace-pre-wrap break-words">{turn.question}</p>

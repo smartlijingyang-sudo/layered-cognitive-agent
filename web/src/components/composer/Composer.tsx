@@ -4,8 +4,8 @@ import { AttachmentUpload } from "./AttachmentUpload";
 import { ArrowUp, Square } from "lucide-react";
 import { AUTO_MODE_KEY } from "../../contracts/modes.generated";
 import type { LocalAttachment } from "../../domain/generated-file";
-import { btnPrimary, btnSecondary } from "../../lib/ui";
 import { cn } from "../../lib/cn";
+import { focusRing } from "../../lib/ui";
 
 export function Composer({
   mode,
@@ -49,28 +49,30 @@ export function Composer({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-      <ModePicker value={mode} onChange={onModeChange} disabled={busy} />
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
       <div
         className={cn(
-          "relative rounded-[var(--radius-xl)] border border-border/80 bg-surface",
-          "shadow-[0_2px_12px_color-mix(in_srgb,var(--text)_4%,transparent)]",
-          "ring-1 ring-border/30 transition-shadow focus-within:ring-accent/35",
+          "rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)]",
+          "shadow-[var(--shadow-popover)] transition-shadow",
+          "focus-within:border-[var(--text-faint)] focus-within:shadow-[var(--shadow-modal)]",
         )}
       >
-        <div className="border-b border-border/50 px-3 pt-3">
-          <AttachmentUpload
-            attachments={attachments}
-            onChange={setAttachments}
-            conversationId={conversationId}
-            disabled={disabled}
-            autoUpload={false}
-          />
-        </div>
+        {attachments.length > 0 ? (
+          <div className="border-b border-[var(--border-subtle)] px-3 pt-3">
+            <AttachmentUpload
+              attachments={attachments}
+              onChange={setAttachments}
+              conversationId={conversationId}
+              disabled={disabled}
+              autoUpload={false}
+            />
+          </div>
+        ) : null}
+
         <textarea
           className={cn(
-            "block w-full resize-none border-0 bg-transparent px-4 py-3.5 pr-14",
-            "text-[0.9375rem] leading-relaxed text-text outline-none",
+            "block w-full resize-none border-0 bg-transparent px-4 py-3.5",
+            "text-[0.9375rem] leading-relaxed text-[var(--text)] outline-none",
             "placeholder:text-[var(--text-faint)] disabled:cursor-not-allowed disabled:opacity-50",
             "min-h-[3.25rem] max-h-[12rem]",
           )}
@@ -87,36 +89,57 @@ export function Composer({
           onKeyDown={handleKeyDown}
           disabled={disabled}
         />
-        <div className="absolute bottom-2.5 right-2.5">
-          {canStop ? (
-            <button
-              type="button"
-              className={cn(btnSecondary, "size-9 justify-center rounded-full p-0")}
-              onClick={onStop}
-              aria-label="停止生成"
-            >
-              <Square size={14} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className={cn(
-                btnPrimary,
-                "size-9 justify-center rounded-full p-0 shadow-sm",
-                "disabled:opacity-40",
-              )}
-              disabled={disabled || !question.trim()}
-              onClick={send}
-              aria-label="发送"
-            >
-              <ArrowUp size={16} strokeWidth={2.5} />
-            </button>
-          )}
+
+        {/* Action bar — LobeHub ChatInput bottom row */}
+        <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+            <ModePicker value={mode} onChange={onModeChange} disabled={busy} />
+            <AttachmentUpload
+              attachments={attachments}
+              onChange={setAttachments}
+              conversationId={conversationId}
+              disabled={disabled}
+              autoUpload={false}
+              compact
+            />
+          </div>
+          <div className="shrink-0">
+            {canStop ? (
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex size-9 cursor-pointer items-center justify-center rounded-full",
+                  "border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text)]",
+                  "hover:bg-[var(--fill-hover)]",
+                  focusRing,
+                )}
+                onClick={onStop}
+                aria-label="停止生成"
+              >
+                <Square size={12} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex size-9 cursor-pointer items-center justify-center rounded-full border-0",
+                  "bg-[var(--accent)] text-[var(--accent-fg)] shadow-sm",
+                  "disabled:cursor-not-allowed disabled:opacity-35",
+                  focusRing,
+                )}
+                disabled={disabled || !question.trim()}
+                onClick={send}
+                aria-label="发送"
+              >
+                <ArrowUp size={16} strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
-      <p className="m-0 text-center text-[11px] text-[var(--text-faint)]">
-        LCA 可展示团队协作过程 · 历史保存在本机
-        {attachments.length > 0 ? " · 附件暂存于本机（上传端点待后端）" : ""}
+      <p className="m-0 text-center text-[10px] text-[var(--text-faint)]">
+        LCA · 历史保存在本机
+        {attachments.length > 0 ? " · 含附件" : ""}
       </p>
     </div>
   );

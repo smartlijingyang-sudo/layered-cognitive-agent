@@ -107,12 +107,12 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **SafeExecutor** | 权限 + 重试 + 缓存后执行工具 |
 | **ToolRegistry** / **Tool** / **ToolPermissionManifest** | 工具注册与权限 |
 | **Sandbox** / **SandboxResult** / **SandboxFile** | 隔离代码执行协议与终态结果（ADR-0044） |
-| **E2BSandboxAdapter** | E2B 云端 Firecracker microVM（生产默认，需 `E2B_API_KEY`） |
-| **LocalSandboxAdapter** | microsandbox 本地 microVM（`LCA_SANDBOX_BACKEND=local`，可选组 `sandbox-local`） |
-| **MockSandboxAdapter** | 进程内受限 `exec` 测试替身——**非安全边界**（仅测试 / 显式 `prefer_mock`） |
-| **SandboxCodeTool** (`run_sandbox_code`) | 沙箱代码执行工具：挂载附件、多文件产物、铸造 invocation_id |
+| **OnlyboxesSandboxAdapter** | Onlyboxes console `pythonExec`（需 `ONLYBOXES_BASE_URL` + `ONLYBOXES_ACCESS_TOKEN`） |
+| **SandboxCodeTool** (`run_sandbox_code`) | 沙箱代码执行工具：挂载附件、多文件产物、铸造 invocation_id；预装包见 `SANDBOX_PREINSTALLED_PYTHON_PACKAGES` / `deploy/onlyboxes` |
+| **run_attachment_scope** | 本 run 用户附件 id 的 ambient 作用域；Gateway CreateRun → execute_run 绑定，SandboxCodeTool 自动挂载到 `/mnt/data/<name>`（ADR-0046） |
+| **SANDBOX_PREINSTALLED_PYTHON_PACKAGES** | Onlyboxes pythonExec 镜像 baseline 预装包清单（与 `deploy/onlyboxes/requirements-python.txt` 对齐） |
 | **SandboxOutputDelta** | 沙箱执行期 stdout/stderr 增量 journal 事件（standard 可见，进 trace 不进 chat 答案） |
-| **LCA_SANDBOX_BACKEND** | 沙箱后端显式开关：`local` \| `e2b` \| `mock`（未设则有 key 用 E2B，否则不挂载工具） |
+| **LCA_SANDBOX_BACKEND** | 可选；仅 `onlyboxes` 受支持。缺省时只要 Onlyboxes 凭证齐全即挂载 `run_sandbox_code` |
 | **RetryPolicy** / **CacheConfig** | 重试与缓存配置 |
 | **BrainFactory** / **SimpleBrainFactory** | Brain 工厂（注册表用 NamedRegistry） |
 | **Synthesizer** / **ConcatSynthesizer** | 并行结果聚合协议 / 默认拼接实现 |
@@ -140,7 +140,8 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **SimpleMemorySystem** | MemorySystem 默认实现 |
 | **PromptReasoner** | Reasoner 默认实现（team-shape agnostic，solo/member/lead 统一） |
 | **SimpleCritic** | Critic 默认实现 |
-| **SimpleDecisionParser** | DecisionParser 默认实现 |
+| **SimpleDecisionParser** | DecisionParser 默认实现（JSON 提取 → 意图形状归一 → 别名 → 降级） |
+| **Intent Shape / normalize_intent_shape** | 决策意图形状归一（伪工具→行动、response_text 提升；ADR-0045 Canonical Model） |
 | **SimpleEventBus** | EventBus 默认实现 |
 | **SimpleHookRegistry** | HookRegistry 默认实现 |
 | **SimpleSafeExecutor** | SafeExecutor 默认实现 |

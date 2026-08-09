@@ -27,6 +27,8 @@ from lca.contracts.models.observability.journal import (  # noqa: E402
     DelegationMechanism,
     JournalEvent,
     LlmCallCompleted,
+    ReasoningCompleted,
+    ReasoningDelta,
     RunInsight,
     SandboxOutputDelta,
     StepCompleted,
@@ -36,6 +38,7 @@ from lca.contracts.models.observability.journal import (  # noqa: E402
     TeamRunStarted,
     ToolDenied,
     ToolInvoked,
+    ToolStarted,
 )
 from lca.contracts.models.observability.journal_catalog import (  # noqa: E402
     JOURNAL_CATALOG,
@@ -56,8 +59,16 @@ def _ts_type(field_type: object) -> str:
     if isinstance(field_type, type) and field_type in _PY_TO_TS:
         return _PY_TO_TS[field_type]
     origin = typing.get_origin(field_type)
-    if origin is tuple:
-        return "readonly string[]"
+    if origin is tuple or origin is list:
+        args = typing.get_args(field_type)
+        if args:
+            inner = args[0]
+            inner_origin = typing.get_origin(inner)
+            if inner_origin is dict:
+                return "readonly Record<string, unknown>[]"
+            if inner is str:
+                return "readonly string[]"
+        return "readonly unknown[]"
     if isinstance(field_type, type) and issubclass(field_type, JournalEvent):
         return "never"
     if isinstance(field_type, type) and issubclass(field_type, enum.Enum):
@@ -107,7 +118,10 @@ def generate() -> str:
         ActionDegraded,
         LlmCallCompleted,
         StepTextDelta,
+        ReasoningDelta,
+        ReasoningCompleted,
         SandboxOutputDelta,
+        ToolStarted,
         ToolInvoked,
         ToolDenied,
         RunInsight,

@@ -44,6 +44,7 @@ from lca.layer1_cognitive.body.delegation_cache import (
     cached_delegation_observation,
     tag_delegation_extra,
 )
+from lca.layer1_cognitive.body.tool_wire_gate import tool_wire_block_observation
 from lca.layer1_cognitive.member_status.required_action import compute_required_action
 from lca.layer1_cognitive.member_status.tracking import (
     duty_board,
@@ -74,6 +75,8 @@ def record_decision_made(decision: Decision, state: AgentState) -> None:
             delegate_count=delegate_count,
             tool_name=tool_name,
             confidence=decision.confidence,
+            # 规范正文：已经过 DecisionParser 形状归一（ADR-0045）
+            response_text=decision.response_text or "",
         )
     )
 
@@ -122,7 +125,11 @@ class RespondOperation(Action):
 
 
 class UseToolOperation(Action):
-    """处理 use_tool 动作：查找工具 → 权限校验 → 执行。"""
+    """处理 use_tool 动作：wire 闸门 → 查找工具 → 权限校验 → 执行。
+
+    ADR-0047：``tool_wire_status`` 为 incomplete/invalid 时**禁止执行**，
+    返回 ``Observation(success=False)`` 回灌 loop（不抛、不 respond 收口）。
+    """
 
     def __init__(self, tool_registry: ToolRegistry, safe_executor: SafeExecutor) -> None:
         self._tool_registry = tool_registry
@@ -131,6 +138,9 @@ class UseToolOperation(Action):
     async def execute(self, decision: Decision, state: AgentState) -> Observation:
         if not decision.tool_calls:
             raise ToolExecutionError("use_tool 需要至少一个 tool_call")
+        wire_block = tool_wire_block_observation(decision)
+        if wire_block is not None:
+            return wire_block
         tc = decision.tool_calls[0]
         tool = self._tool_registry.get(tc.tool_name)
         if tool is None:

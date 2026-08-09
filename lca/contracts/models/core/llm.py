@@ -26,11 +26,14 @@ class LLMResponse:
 
     ``text`` 为生成文本；``model`` 为实际响应模型（可能异于请求模型）；
     ``usage`` 缺省 None（流式或 provider 不支持时）。
+    ``finish_reason`` 为归一化结束原因（见 :class:`~lca.contracts.atoms.enums.FinishReason`）；
+    provider 未提供时为 None。
     """
 
     text: str
     model: str = ""
     usage: TokenUsage | None = None
+    finish_reason: str | None = None
 
 
 @dataclass(frozen=True)

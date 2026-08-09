@@ -9,14 +9,14 @@ from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
 from lca.contracts.protocols import Tool
 from lca.layer0_infra.llm_adapter.openai_compat._shared import (
-    DEFAULT_MAX_TOKENS,
-    DEFAULT_TEMPERATURE,
     _RawToolCall,
     build_llm_response,
-    strip_observability_kwargs,
+    build_request_generation,
 )
 
 _RESPONSE_OUTPUT_TEXT_DELTA = "response.output_text.delta"
+_RESPONSE_REASONING_TEXT_DELTA = "response.reasoning_text.delta"
+_RESPONSE_REASONING_SUMMARY_DELTA = "response.reasoning_summary_text.delta"
 _RESPONSE_FUNCTION_ARGS_DELTA = "response.function_call_arguments.delta"
 _RESPONSE_COMPLETED = "response.completed"
 
@@ -53,6 +53,16 @@ class _ResponsesStrategy:
                     type=LLMStreamEventType.OUTPUT_TEXT_DELTA,
                     text=event.delta,
                 )
+            elif event_type in (
+                _RESPONSE_REASONING_TEXT_DELTA,
+                _RESPONSE_REASONING_SUMMARY_DELTA,
+            ):
+                delta_text = getattr(event, "delta", None) or ""
+                if delta_text:
+                    yield LLMStreamEvent(
+                        type=LLMStreamEventType.REASONING_TEXT_DELTA,
+                        text=delta_text,
+                    )
             elif event_type == _RESPONSE_FUNCTION_ARGS_DELTA:
                 yield LLMStreamEvent(
                     type=LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA,
@@ -68,14 +78,21 @@ class _ResponsesStrategy:
 
     def _build_request_kwargs(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         tools = kwargs.pop("tools", None)
-        kwargs = strip_observability_kwargs(kwargs)
+        model = kwargs.pop("model", self._model)
+        generation = build_request_generation(
+            model=model,
+            has_tools=bool(tools),
+            kwargs=kwargs,
+        )
+        # Responses API 用 max_output_tokens；其余生成参数保持一致
+        max_tokens = generation.pop("max_tokens", None)
         api_kwargs: dict[str, Any] = {
-            "model": kwargs.pop("model", self._model),
+            "model": model,
             "input": prompt,
-            "temperature": kwargs.pop("temperature", DEFAULT_TEMPERATURE),
-            "max_output_tokens": kwargs.pop("max_tokens", DEFAULT_MAX_TOKENS),
-            **kwargs,
+            **generation,
         }
+        if max_tokens is not None:
+            api_kwargs["max_output_tokens"] = max_tokens
         if tools:
             api_kwargs["tools"] = [to_openai_responses_tool_spec(t) for t in tools]
         return api_kwargs
@@ -89,7 +106,31 @@ class _ResponsesStrategy:
             tool_call=self._extract_tool_call(response),
             model=model,
             usage=usage,
+            finish_reason=self._extract_finish_reason(response),
         )
+
+    @staticmethod
+    def _extract_finish_reason(response: Any) -> str | None:
+        """Responses API: status + incomplete_details.reason → finish_reason 信号。"""
+        status = getattr(response, "status", None)
+        if status is None:
+            return None
+        status_s = str(status).strip().lower()
+        if status_s == "incomplete":
+            details = getattr(response, "incomplete_details", None)
+            reason = getattr(details, "reason", None) if details is not None else None
+            if reason:
+                return str(reason)
+            return "length"
+        if status_s in ("failed", "cancelled"):
+            return "error"
+        if status_s == "completed":
+            # 有 function_call 时对齐 Chat 的 tool_calls 语义
+            for item in getattr(response, "output", []) or []:
+                if getattr(item, "type", None) == "function_call":
+                    return "tool_calls"
+            return "stop"
+        return status_s
 
     @staticmethod
     def _extract_tool_call(response: Any) -> _RawToolCall | None:

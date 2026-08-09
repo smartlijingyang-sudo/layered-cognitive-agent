@@ -149,8 +149,24 @@ class LLMStreamEventType(str, Enum):
     """LLM 流式事件类型 —— 值与 OpenAI Responses SSE ``type`` 字符串对齐。"""
 
     OUTPUT_TEXT_DELTA = "response.output_text.delta"
+    REASONING_TEXT_DELTA = "response.reasoning_text.delta"
     FUNCTION_CALL_ARGUMENTS_DELTA = "response.function_call_arguments.delta"
     COMPLETED = "response.completed"
+
+
+class FinishReason(str, Enum):
+    """LLM 生成结束原因 —— 归一化各 provider 的 finish/stop/status 信号。
+
+    ``LENGTH`` 表示输出被 max_tokens 截断；与 tool_call 并存时，
+    tool arguments 必须视为 **incomplete**（ADR-0047），禁止当完整调用执行。
+    """
+
+    STOP = "stop"
+    LENGTH = "length"
+    TOOL_CALLS = "tool_calls"
+    CONTENT_FILTER = "content_filter"
+    ERROR = "error"
+    UNKNOWN = "unknown"
 
 
 class ComponentKind(str, Enum):

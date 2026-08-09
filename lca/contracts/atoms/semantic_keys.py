@@ -26,8 +26,19 @@ META_TASK_ID = "task_id"
 
 # Decision.extra
 EVAL_CONFLICTS = "eval_conflicts"
+# 工具调用 wire 防腐（ADR-0047）：adapter 写入 JSON 顶层，parser 拷入 Decision.extra
+TOOL_WIRE_STATUS = "tool_wire_status"
+TOOL_WIRE_REASON = "tool_wire_reason"
+TOOL_WIRE_RAW_PREVIEW = "tool_wire_raw_preview"
+TOOL_WIRE_FINISH_REASON = "tool_wire_finish_reason"
+
+# tool_wire_status 取值
+TOOL_WIRE_OK = "ok"
+TOOL_WIRE_INCOMPLETE = "incomplete"
+TOOL_WIRE_INVALID = "invalid"
 
 # failure_kind 取值
 FAILURE_KIND_VALIDATION = "validation"
 FAILURE_KIND_EXECUTION = "execution"
 FAILURE_KIND_TRANSIENT = "transient"
+FAILURE_KIND_TOOL_WIRE = "tool_wire"

@@ -81,6 +81,23 @@ class GatewayAttachmentTests(unittest.TestCase):
         # 201 when LLM available via ScriptedLLMResolver
         self.assertEqual(response.status_code, 201, response.text)
         self.assertIn("run_id", response.json())
+        session = self.registry.get(response.json()["run_id"])
+        assert session is not None
+        self.assertEqual(session.attachment_ids, (stored.attachment_id,))
+        # Question embeds guest path so the model writes correct open() paths.
+        self.assertIn(f"/mnt/data/{stored.name}", session.question)
+        self.assertIn("自动挂载", session.question)
+
+    def test_create_run_session_stores_attachment_ids(self) -> None:
+        from gateway.run_executor import create_run_session
+
+        session = create_run_session(
+            self.registry,
+            question="q",
+            mode="solo",
+            attachment_ids=[" file_a ", "", "file_b"],
+        )
+        self.assertEqual(session.attachment_ids, ("file_a", "file_b"))
 
 
 if __name__ == "__main__":

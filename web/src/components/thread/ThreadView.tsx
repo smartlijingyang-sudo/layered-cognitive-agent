@@ -8,13 +8,15 @@ import type { Conversation } from "../../domain/conversation";
 import { AUTO_MODE_HELP } from "../../lib/modes";
 import { useStickToBottom } from "../../lib/use-stick-to-bottom";
 import { ChatMessages } from "../layout/ChatMain";
-import { AssistantBubble } from "./AssistantBubble";
 import { UserBubble } from "./UserBubble";
+import { AssistantTurnView } from "../turn/AssistantTurnView";
 import type { StampedEvent } from "../../contracts";
-import type { TraceState, Verbosity } from "../../projectors";
+import type { TraceState, TurnTimeline, Verbosity } from "../../projectors";
+import { EMPTY_TURN_TIMELINE } from "../../projectors";
 import { cn } from "../../lib/cn";
 import { focusRing } from "../../lib/ui";
 import { ChevronDown, Sparkles } from "lucide-react";
+import { TraceAccordion } from "../trace/TraceAccordion";
 
 function WelcomePanel({
   title,
@@ -28,13 +30,22 @@ function WelcomePanel({
   readonly onExampleSelect?: (prompt: string, exampleMode: string) => void;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 py-8 text-center">
-      <div className="inline-flex size-14 items-center justify-center rounded-[var(--radius-xl)] bg-accent/12 text-accent ring-1 ring-accent/20">
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-7 py-12 text-center">
+      <div
+        className={cn(
+          "inline-flex size-14 items-center justify-center rounded-[var(--radius-xl)]",
+          "bg-[var(--fill-hover)] text-[var(--text)] ring-1 ring-[var(--border)]",
+        )}
+      >
         <Sparkles size={26} strokeWidth={1.75} />
       </div>
       <div className="max-w-lg">
-        <h2 className="m-0 text-2xl font-semibold tracking-tight">{title}</h2>
-        <p className="m-0 mt-2 text-[0.9375rem] leading-relaxed text-[var(--text-muted)]">{subtitle}</p>
+        <h2 className="m-0 text-[1.75rem] font-semibold tracking-tight text-[var(--text)]">
+          {title}
+        </h2>
+        <p className="m-0 mt-2.5 text-[0.9375rem] leading-relaxed text-[var(--text-muted)]">
+          {subtitle}
+        </p>
       </div>
       <div className="grid w-full gap-2.5 sm:grid-cols-2">
         {prompts.map(({ key, text }) => (
@@ -42,9 +53,10 @@ function WelcomePanel({
             key={`${key}-${text}`}
             type="button"
             className={cn(
-              "cursor-pointer rounded-[var(--radius-lg)] border border-border/70 bg-surface p-3.5 text-left",
+              "cursor-pointer rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-3.5 text-left",
               "text-[0.875rem] leading-snug text-[var(--text-muted)] transition-all",
-              "hover:border-accent/40 hover:bg-surface-elevated hover:text-text hover:shadow-sm",
+              "hover:border-[var(--text-faint)] hover:bg-[var(--fill-hover)] hover:text-[var(--text)]",
+              "shadow-[var(--shadow-card)]",
               focusRing,
             )}
             onClick={() => onExampleSelect?.(text, key)}
@@ -64,18 +76,22 @@ function autoWelcomePrompts() {
 function ConversationThread({
   conversation,
   liveEvents,
+  liveTimeline,
+  turnTimelines,
   trace,
   verbosity,
   developerMode,
 }: {
   readonly conversation: Conversation;
   readonly liveEvents: readonly StampedEvent[];
+  readonly liveTimeline: TurnTimeline;
+  readonly turnTimelines: Readonly<Record<string, TurnTimeline>>;
   readonly trace: TraceState;
   readonly verbosity: Verbosity;
   readonly developerMode: boolean;
 }) {
   const lastTurn = conversation.turns[conversation.turns.length - 1];
-  const scrollKey = `${lastTurn?.runId ?? ""}:${lastTurn?.answer.length ?? 0}:${liveEvents.length}:${trace.phase}`;
+  const scrollKey = `${lastTurn?.runId ?? ""}:${lastTurn?.answer.length ?? 0}:${liveEvents.length}:${liveTimeline.process.length}:${liveTimeline.phase}`;
   const { bottomRef, scrollToBottom, pinForNewTurn, showScrollButton } = useStickToBottom(scrollKey);
   const prevTurnCountRef = useRef(conversation.turns.length);
 
@@ -92,36 +108,59 @@ function ConversationThread({
         {conversation.turns.map((turn, index) => {
           const isLast = index === conversation.turns.length - 1;
           const events = isLast ? liveEvents : [];
+          const historicalStatus =
+            turn.status === "completed"
+              ? ("completed" as const)
+              : turn.status === "failed"
+                ? ("failed" as const)
+                : turn.status === "running" || turn.status === "pending"
+                  ? ("running" as const)
+                  : ("idle" as const);
+          const cached = turnTimelines[turn.runId];
+          const timeline: TurnTimeline = isLast
+            ? liveTimeline
+            : cached
+              ? {
+                  ...cached,
+                  // Prefer persisted answer text if journal projection empty.
+                  finalAnswer: cached.finalAnswer || turn.answer,
+                  files: cached.files.length ? cached.files : (turn.files ?? []),
+                }
+              : {
+                  ...EMPTY_TURN_TIMELINE,
+                  finalAnswer: turn.answer,
+                  status: historicalStatus,
+                  files: turn.files ?? [],
+                };
           return (
             <div key={turn.runId} className="flex flex-col gap-5">
               <UserBubble turn={turn} />
-              <AssistantBubble
-                turn={turn}
-                events={events}
-                trace={isLast ? trace : trace}
-                verbosity={verbosity}
-                developerMode={developerMode}
-              />
+              <AssistantTurnView turn={turn} timeline={timeline} />
+              {developerMode && isLast && events.length > 0 ? (
+                <div className="pl-11">
+                  <TraceAccordion events={events} trace={trace} verbosity={verbosity} />
+                </div>
+              ) : null}
             </div>
           );
         })}
-        <div ref={bottomRef} aria-hidden className="h-px shrink-0" />
+        <div ref={bottomRef} />
+        {showScrollButton ? (
+          <button
+            type="button"
+            className={cn(
+              "sticky bottom-2 z-10 mx-auto flex size-9 cursor-pointer items-center justify-center",
+              "rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]",
+              "shadow-[var(--shadow-popover)] hover:bg-[var(--fill-hover)]",
+              focusRing,
+            )}
+            onClick={() => scrollToBottom()}
+            aria-label="回到底部"
+          >
+            <ChevronDown size={16} />
+          </button>
+        ) : null}
       </div>
-      {showScrollButton ? (
-        <button
-          type="button"
-          className={cn(
-            "fixed bottom-[7.5rem] left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-1.5",
-            "rounded-full border border-border/80 bg-surface px-3.5 py-2 text-sm shadow-lg",
-            "text-text backdrop-blur-md transition-opacity",
-            focusRing,
-          )}
-          onClick={scrollToBottom}
-        >
-          <ChevronDown size={16} />
-          回到底部
-        </button>
-      ) : null}
     </ChatMessages>
   );
 }
@@ -129,6 +168,8 @@ function ConversationThread({
 export function ThreadView({
   conversation,
   liveEvents,
+  liveTimeline,
+  turnTimelines,
   trace,
   verbosity,
   developerMode,
@@ -137,40 +178,34 @@ export function ThreadView({
 }: {
   readonly conversation: Conversation | null;
   readonly liveEvents: readonly StampedEvent[];
+  readonly liveTimeline: TurnTimeline;
+  readonly turnTimelines: Readonly<Record<string, TurnTimeline>>;
   readonly trace: TraceState;
   readonly verbosity: Verbosity;
   readonly developerMode: boolean;
   readonly mode: string;
   readonly onExampleSelect?: (prompt: string, exampleMode: string) => void;
 }) {
-  if (!conversation) {
+  const isEmpty = !conversation || conversation.turns.length === 0;
+
+  if (isEmpty) {
+    if (mode === AUTO_MODE_KEY) {
+      return (
+        <WelcomePanel
+          title="有什么可以帮忙的？"
+          subtitle={AUTO_MODE_HELP}
+          prompts={autoWelcomePrompts()}
+          onExampleSelect={onExampleSelect}
+        />
+      );
+    }
     const prompts =
-      mode === AUTO_MODE_KEY
-        ? autoWelcomePrompts()
-        : (EXAMPLE_PROMPTS[mode as keyof typeof EXAMPLE_PROMPTS] ?? []).map((text) => ({
-            key: mode,
-            text,
-          }));
+      (EXAMPLE_PROMPTS as Record<string, readonly string[]>)[mode] ?? [];
     return (
       <WelcomePanel
         title="开始对话"
-        subtitle={
-          mode === AUTO_MODE_KEY
-            ? `智能组队 · ${AUTO_MODE_HELP} 选示例或直接在下方输入。`
-            : "从左侧新建对话，或在下方输入第一条消息。"
-        }
-        prompts={prompts}
-        onExampleSelect={onExampleSelect}
-      />
-    );
-  }
-
-  if (conversation.turns.length === 0) {
-    return (
-      <WelcomePanel
-        title={conversation.title}
-        subtitle="试试下方示例，或直接输入你的问题"
-        prompts={autoWelcomePrompts()}
+        subtitle="选择示例或直接在下方输入问题"
+        prompts={prompts.map((text: string) => ({ key: mode, text }))}
         onExampleSelect={onExampleSelect}
       />
     );
@@ -180,6 +215,8 @@ export function ThreadView({
     <ConversationThread
       conversation={conversation}
       liveEvents={liveEvents}
+      liveTimeline={liveTimeline}
+      turnTimelines={turnTimelines}
       trace={trace}
       verbosity={verbosity}
       developerMode={developerMode}

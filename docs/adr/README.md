@@ -24,6 +24,9 @@
 | [0042](0042-role-library-and-auto-casting.md) | 角色库与自动组队 — 一句话 → 自动选角 → 既有 Team 执行 | Accepted |
 | [0043](0043-markdown-files-charts-without-lobehub-ui.md) | Markdown/文件产物/图表能力扩展；不引入 @lobehub/ui | Accepted |
 | [0044](0044-code-sandbox-adapters.md) | 代码沙箱适配器 — E2B / local microVM / Mock 多后端 | Accepted |
+| [0045](0045-decision-canonical-intent-shape.md) | Decision 意图形状归一 — Canonical Model + Journal 规范正文 | Accepted |
+| [0046](0046-sandbox-file-roundtrip-contract.md) | 沙箱文件往返契约 — `/mnt/data` 输入 + `/mnt/data/outputs` 产出 | Accepted |
+| [0047](0047-tool-call-wire-anticorruption.md) | 工具调用 Wire 防腐 — finish_reason + 三态 Outcome + 执行闸门 | Accepted |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

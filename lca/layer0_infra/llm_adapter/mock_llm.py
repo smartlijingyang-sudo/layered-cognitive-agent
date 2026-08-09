@@ -14,6 +14,13 @@ from lca.contracts.protocols import LLMAdapter
 
 # Minimum token count (numbers + operators) to qualify as an arithmetic expression.
 _MIN_ARITHMETIC_TOKENS = 3
+_REASONING_CHUNK_SIZE = 12
+
+
+def _chunk_text(text: str, *, size: int = _REASONING_CHUNK_SIZE) -> list[str]:
+    if size <= 0 or not text:
+        return [text] if text else []
+    return [text[i : i + size] for i in range(0, len(text), size)]
 
 
 class MockLLMAdapter(LLMAdapter):
@@ -73,9 +80,26 @@ class MockLLMAdapter(LLMAdapter):
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
         response = await self.complete(prompt, **kwargs)
+        # Emit rationale as reasoning stream so UI Thinking panel works offline.
+        reasoning = self._extract_rationale(response.text)
+        if reasoning:
+            # Chunk for typewriter-like reasoning panel (not single giant blob).
+            for piece in _chunk_text(reasoning, size=12):
+                yield LLMStreamEvent(type=LLMStreamEventType.REASONING_TEXT_DELTA, text=piece)
         for char in response.text:
             yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=char)
         yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
+
+    @staticmethod
+    def _extract_rationale(response_text: str) -> str:
+        try:
+            payload = json.loads(response_text)
+        except json.JSONDecodeError:
+            return ""
+        if not isinstance(payload, dict):
+            return ""
+        rationale = payload.get("rationale")
+        return rationale.strip() if isinstance(rationale, str) else ""
 
     @staticmethod
     def _extract_arithmetic_expression(prompt: str) -> str | None:

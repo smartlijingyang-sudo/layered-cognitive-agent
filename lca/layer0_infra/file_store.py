@@ -60,11 +60,41 @@ def _safe_filename(name: str) -> str:
 
 
 def _is_previewable(mime_type: str, name: str) -> bool:
-    mime = mime_type.lower()
-    if mime.startswith("text/html"):
-        return True
+    """UI may open an in-app preview (iframe / markdown / image), not download-only.
+
+    Aligns with LobeHub FilePreview coverage for common agent products.
+    """
+    mime = mime_type.lower().split(";")[0].strip()
     lower = name.lower()
-    return lower.endswith(".html") or lower.endswith(".htm")
+    if mime.startswith("image/"):
+        return True
+    if mime.startswith("text/"):
+        return True
+    if mime in {
+        "application/json",
+        "application/javascript",
+        "application/xml",
+        "application/xhtml+xml",
+    }:
+        return True
+    return lower.endswith(
+        (
+            ".html",
+            ".htm",
+            ".md",
+            ".markdown",
+            ".txt",
+            ".csv",
+            ".json",
+            ".xml",
+            ".svg",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".webp",
+        )
+    )
 
 
 class LocalFileStore:

@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 # ── 关联骨架 ─────────────────────────────────────────────
 
@@ -216,7 +217,11 @@ class SynthesisCompleted(JournalEvent):
 
 @dataclass(frozen=True)
 class DecisionMade(JournalEvent):
-    """决策事实（think 相位产出）。"""
+    """决策事实（think 相位产出）。
+
+    ``response_text`` 为防腐层归一后的用户可见正文（仅终态 respond 等有值）；
+    投影层提交对话主线时以此为权威源（ADR-0045），勿再解析原始 LLM JSON。
+    """
 
     step: int = 0
     action_type: str = ""
@@ -225,6 +230,8 @@ class DecisionMade(JournalEvent):
     delegate_count: int = 0
     tool_name: str = ""
     confidence: float = 0.0
+    response_text: str = field(default="", metadata={"journal_kind": "content"})
+    output_truncated: bool = False
 
 
 @dataclass(frozen=True)
@@ -258,6 +265,24 @@ class StepTextDelta(JournalEvent):
 
 
 @dataclass(frozen=True)
+class ReasoningDelta(JournalEvent):
+    """模型思维链/reasoning 增量（与 StepTextDelta 分离，供 Thinking 面板投影）。"""
+
+    step: int = 0
+    text_delta: str = field(default="", metadata={"journal_kind": "content"})
+    seq: int = 0
+
+
+@dataclass(frozen=True)
+class ReasoningCompleted(JournalEvent):
+    """单次 LLM 调用的 reasoning 段结束（携带累计时长，供「已深度思考」标题）。"""
+
+    step: int = 0
+    duration_ms: int = 0
+    content_preview: str = field(default="", metadata={"journal_kind": "content"})
+
+
+@dataclass(frozen=True)
 class SandboxOutputDelta(JournalEvent):
     """沙箱执行期的原始增量输出行（stdout/stderr 各自成流，seq 跨流全局单调）。"""
 
@@ -282,8 +307,22 @@ class LlmCallCompleted(JournalEvent):
 
 
 @dataclass(frozen=True)
+class ToolStarted(JournalEvent):
+    """工具调用开始（执行前；与 ToolInvoked 经 invocation_id 关联）。"""
+
+    tool_name: str = ""
+    arguments_preview: str = ""
+    invocation_id: str = ""
+
+
+@dataclass(frozen=True)
 class ToolInvoked(JournalEvent):
-    """工具调用完成。"""
+    """工具调用完成。
+
+    ``files`` 是产物元数据一等字段（A2A file-part 列表），供 UI 投影使用。
+    不得依赖 ``result_preview`` 字符串解析还原 files——preview 受 2k 截断，
+    会破坏 JSON；本字段为 tuple/list，journal 引擎不截断非字符串。
+    """
 
     tool_name: str = ""
     arguments_preview: str = ""
@@ -293,6 +332,7 @@ class ToolInvoked(JournalEvent):
     attempt: int = 1
     error: str = ""
     invocation_id: str = ""  # optional link to in-flight streaming deltas
+    files: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)

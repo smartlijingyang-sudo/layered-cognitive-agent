@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { JournalLog } from "../journal-log/journal-log";
-import { ChatProjector, TraceProjector } from "../projectors";
+import {
+  ChatProjector,
+  EMPTY_TURN_TIMELINE,
+  TraceProjector,
+  TurnTimelineProjector,
+} from "../projectors";
 import { FetchSseTransport } from "../transport";
 import { AppLayout } from "../components/layout/AppLayout";
 import { ChatError, ChatMain } from "../components/layout/ChatMain";
@@ -23,7 +28,7 @@ import { createTurn } from "../domain/conversation";
 import type { LocalAttachment } from "../domain/generated-file";
 import { toPersistableAttachments } from "../domain/generated-file";
 import { shouldPersistTurnOnEvent } from "../lib/persist-turn";
-import type { ChatState } from "../projectors";
+import type { ChatState, TurnTimeline } from "../projectors";
 import "./app.css";
 
 export default function App() {
@@ -35,6 +40,7 @@ export default function App() {
 
   const log = useMemo(() => new JournalLog(), []);
   const chatProjector = useMemo(() => new ChatProjector(), []);
+  const turnTimelineProjector = useMemo(() => new TurnTimelineProjector(), []);
   const traceProjector = useMemo(
     () => new TraceProjector(store.settings.verbosity),
     [store.settings.verbosity],
@@ -52,6 +58,7 @@ export default function App() {
   );
 
   const [trace, setTrace] = useState(traceProjector.snapshot());
+  const [liveTimeline, setLiveTimeline] = useState<TurnTimeline>(EMPTY_TURN_TIMELINE);
 
   useEffect(() => {
     document.documentElement.dataset.theme = store.settings.theme;
@@ -66,6 +73,12 @@ export default function App() {
     traceProjector.reset();
     setTrace(traceProjector.snapshot());
   }, [store.settings.verbosity, traceProjector]);
+
+  useEffect(() => {
+    // Reset process timeline when switching conversations.
+    turnTimelineProjector.reset();
+    setLiveTimeline(EMPTY_TURN_TIMELINE);
+  }, [store.activeConversationId, turnTimelineProjector]);
 
   const ensureConversation = useCallback(async () => {
     if (store.activeConversationId) return store.activeConversationId;
@@ -85,6 +98,8 @@ export default function App() {
       log.clear();
       store.clearLiveEvents();
       chatProjector.start(question);
+      turnTimelineProjector.reset();
+      setLiveTimeline(EMPTY_TURN_TIMELINE);
       traceProjector.reset();
       setTrace(traceProjector.snapshot());
       transport.resetCursor();
@@ -154,6 +169,7 @@ export default function App() {
           const prevChat = chatProjector.snapshot();
           const nextChat = chatProjector.onEvent(stamped);
           setTrace(traceProjector.onEvent(stamped));
+          setLiveTimeline(turnTimelineProjector.onEvent(stamped));
 
           const turnChanged =
             prevChat.answer !== nextChat.answer ||
@@ -188,7 +204,14 @@ export default function App() {
           status: finalStatus,
           answer: finalAnswer,
           answerDeltas: finalChat.answerDeltas,
+          files: finalChat.files.length ? finalChat.files : undefined,
         });
+
+        // Snapshot process journal for historical ProcessFold replay.
+        const journalEvents = useAppStore.getState().liveEvents;
+        if (journalEvents.length > 0) {
+          await store.persistTurnJournal(runId, journalEvents);
+        }
 
         if (finalStatus === "failed" && finalError && !store.error) {
           store.setError(finalError);
@@ -207,6 +230,7 @@ export default function App() {
       log,
       store,
       traceProjector,
+      turnTimelineProjector,
       transport,
     ],
   );
@@ -248,6 +272,7 @@ export default function App() {
       onDeveloperModeChange={store.setDeveloperMode}
       verbosity={store.settings.verbosity}
       onVerbosityChange={store.setVerbosity}
+      chatTitle={conversation?.title}
       sidebar={
         <ConversationSidebar
           conversations={store.conversations}
@@ -258,6 +283,13 @@ export default function App() {
           }}
           onNew={() => void store.newConversation()}
           onDelete={(id) => void store.deleteConversation(id)}
+          theme={store.settings.theme}
+          onThemeChange={store.setTheme}
+          llmAvailable={llmAvailable}
+          developerMode={store.settings.developerMode}
+          onDeveloperModeChange={store.setDeveloperMode}
+          verbosity={store.settings.verbosity}
+          onVerbosityChange={store.setVerbosity}
         />
       }
       main={
@@ -267,6 +299,8 @@ export default function App() {
               <ThreadView
                 conversation={conversation}
                 liveEvents={store.liveEvents}
+                liveTimeline={liveTimeline}
+                turnTimelines={store.turnTimelines}
                 trace={trace}
                 verbosity={store.settings.verbosity}
                 developerMode={store.settings.developerMode}

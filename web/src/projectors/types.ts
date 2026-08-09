@@ -131,6 +131,126 @@ export const EMPTY_CHAT_STATE: ChatState = {
   files: [],
 };
 
+// ── Turn timeline (LobeHub-style process + final answer) ──────────────
+
+export type TurnBlockStatus = "pending" | "running" | "done" | "error";
+
+export interface CastingBlock {
+  readonly kind: "casting";
+  readonly id: string;
+  readonly status: TurnBlockStatus;
+  readonly objectivePreview?: string;
+  readonly governanceKind?: string;
+  readonly leadRole?: string;
+  readonly selectedRoles?: readonly string[];
+  readonly rationale?: string;
+  readonly error?: string;
+}
+
+export interface ThinkingBlock {
+  readonly kind: "thinking";
+  readonly id: string;
+  readonly status: "running" | "done";
+  readonly content: string;
+  readonly durationMs?: number;
+}
+
+export interface ToolBlock {
+  readonly kind: "tool";
+  readonly id: string;
+  readonly status: TurnBlockStatus;
+  readonly toolName: string;
+  readonly argumentsPreview: string;
+  readonly resultPreview: string;
+  readonly ok?: boolean;
+  readonly latencyMs?: number;
+  readonly error?: string;
+  readonly invocationId: string;
+  readonly agentRole?: string;
+}
+
+export interface SandboxBlock {
+  readonly kind: "sandbox";
+  readonly id: string;
+  readonly status: TurnBlockStatus;
+  readonly invocationId: string;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly sealed: boolean;
+  readonly agentRole?: string;
+}
+
+export interface DelegationBlock {
+  readonly kind: "delegation";
+  readonly id: string;
+  readonly status: TurnBlockStatus;
+  readonly calleeRole: string;
+  readonly subtaskPreview: string;
+  readonly fromRole?: string;
+  readonly resultPreview?: string;
+}
+
+export interface DecisionProcessBlock {
+  readonly kind: "decision";
+  readonly id: string;
+  readonly status: "done";
+  readonly step: number;
+  readonly actionType: string;
+  readonly toolName?: string;
+  readonly delegateTarget?: string;
+  readonly rationalePreview?: string;
+  readonly agentRole?: string;
+  readonly confidence?: number;
+}
+
+export interface InsightBlock {
+  readonly kind: "insight";
+  readonly id: string;
+  readonly status: "done";
+  readonly insightKind: string;
+  readonly summary: string;
+  readonly detail: string;
+}
+
+/** Process-side blocks (everything except final answer). */
+export type TurnProcessBlock =
+  | CastingBlock
+  | ThinkingBlock
+  | ToolBlock
+  | SandboxBlock
+  | DelegationBlock
+  | DecisionProcessBlock
+  | InsightBlock;
+
+/**
+ * Journal → user-facing turn layout (LobeHub ProcessFold + final answer).
+ * Pure projection; never invents semantics beyond journal facts.
+ */
+export interface TurnTimeline {
+  readonly process: readonly TurnProcessBlock[];
+  readonly finalAnswer: string;
+  readonly finalAnswerStreaming: boolean;
+  readonly stepCount: number;
+  readonly durationMs?: number;
+  readonly phase: RunPhase;
+  readonly status: "idle" | "running" | "completed" | "failed";
+  readonly errorMessage?: string;
+  readonly files: readonly GeneratedFile[];
+  /** Whether ProcessFold should collapse process under one header. */
+  readonly foldProcess: boolean;
+}
+
+export const EMPTY_TURN_TIMELINE: TurnTimeline = {
+  process: [],
+  finalAnswer: "",
+  finalAnswerStreaming: false,
+  stepCount: 0,
+  phase: "idle",
+  status: "idle",
+  files: [],
+  foldProcess: false,
+};
+
 export function shouldShowEvent(eventType: JournalEvent["type"], verbosity: Verbosity): boolean {
   if (verbosity === "verbose") return true;
   if (verbosity === "minimal") {
@@ -144,7 +264,7 @@ export function shouldShowEvent(eventType: JournalEvent["type"], verbosity: Verb
       eventType === "RunInsight"
     );
   }
-  // standard：StepTextDelta 仅 verbose；SandboxOutputDelta 默认可见（过程可见性）
-  if (eventType === "StepTextDelta") return false;
+  // standard：token 级 delta 仅 verbose；过程事件默认可见
+  if (eventType === "StepTextDelta" || eventType === "ReasoningDelta") return false;
   return eventType !== "StepCompleted" && eventType !== "ActionDegraded";
 }

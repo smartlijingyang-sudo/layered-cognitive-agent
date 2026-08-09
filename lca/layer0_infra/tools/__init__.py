@@ -2,6 +2,11 @@
 
 from lca.layer0_infra.tools.calculator_tool import CalculatorTool
 from lca.layer0_infra.tools.default_set import build_default_tools
+from lca.layer0_infra.tools.run_attachment_scope import (
+    get_current_run_attachment_ids,
+    merge_attachment_ids,
+    run_attachment_scope,
+)
 from lca.layer0_infra.tools.sandbox_code_tool import SANDBOX_TOOL_NAME, SandboxCodeTool
 from lca.layer0_infra.tools.weather_tool import WeatherTool
 from lca.layer0_infra.tools.write_file_tool import WriteFileTool
@@ -13,4 +18,7 @@ __all__ = [
     "WeatherTool",
     "WriteFileTool",
     "build_default_tools",
+    "get_current_run_attachment_ids",
+    "merge_attachment_ids",
+    "run_attachment_scope",
 ]

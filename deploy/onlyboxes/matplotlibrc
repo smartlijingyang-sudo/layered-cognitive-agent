@@ -1,0 +1,5 @@
+# Default matplotlib config for LCA onlyboxes pythonExec guest.
+# Chinese / CJK labels in agent plots must not fall back to DejaVu Sans alone.
+font.family: sans-serif
+font.sans-serif: WenQuanYi Zen Hei, Noto Sans CJK SC, Noto Sans CJK JP, Droid Sans Fallback, DejaVu Sans
+axes.unicode_minus: False

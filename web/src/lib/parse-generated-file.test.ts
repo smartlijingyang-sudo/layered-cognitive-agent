@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { filesFromToolResultPreview, parseGeneratedFile } from "./parse-generated-file";
+import {
+  filesFromToolInvoked,
+  filesFromToolResultPreview,
+  parseGeneratedFile,
+} from "./parse-generated-file";
 
 describe("parseGeneratedFile", () => {
   it("maps A2A / write_file shaped objects", () => {
@@ -8,14 +12,16 @@ describe("parseGeneratedFile", () => {
       mimeType: "text/markdown",
       sizeBytes: 12,
       url: "/files/x",
-      previewable: false,
+      previewable: true,
+      attachmentId: "file_x",
     });
     expect(file).toEqual({
       name: "out.md",
       mimeType: "text/markdown",
       sizeBytes: 12,
       url: "/files/x",
-      previewable: false,
+      attachmentId: "file_x",
+      previewable: true,
       previewHtml: undefined,
     });
   });
@@ -23,6 +29,15 @@ describe("parseGeneratedFile", () => {
   it("accepts snake_case mime_type", () => {
     const file = parseGeneratedFile({ name: "a.txt", mime_type: "text/plain" });
     expect(file?.mimeType).toBe("text/plain");
+  });
+
+  it("infers previewable for images when flag omitted", () => {
+    const file = parseGeneratedFile({
+      name: "c.png",
+      mimeType: "image/png",
+      url: "/files/c",
+    });
+    expect(file?.previewable).toBe(true);
   });
 });
 
@@ -56,7 +71,7 @@ describe("filesFromToolResultPreview", () => {
           mimeType: "image/png",
           sizeBytes: 12,
           url: "/files/a",
-          previewable: false,
+          previewable: true,
           attachmentId: "file_a",
         },
         {
@@ -64,7 +79,7 @@ describe("filesFromToolResultPreview", () => {
           mimeType: "text/csv",
           sizeBytes: 4,
           url: "/files/b",
-          previewable: false,
+          previewable: true,
           attachmentId: "file_b",
         },
       ],
@@ -73,5 +88,25 @@ describe("filesFromToolResultPreview", () => {
     expect(files).toHaveLength(2);
     expect(files[0]?.name).toBe("chart.png");
     expect(files[1]?.name).toBe("out.csv");
+  });
+});
+
+describe("filesFromToolInvoked", () => {
+  it("uses structured files even when result_preview is invalid JSON", () => {
+    const files = filesFromToolInvoked({
+      toolName: "run_sandbox_code",
+      resultPreview: '{"stdout": "truncated...',
+      ok: true,
+      files: [
+        {
+          name: "chart.png",
+          mimeType: "image/png",
+          url: "/files/a",
+          previewable: true,
+        },
+      ],
+    });
+    expect(files).toHaveLength(1);
+    expect(files[0]?.name).toBe("chart.png");
   });
 });

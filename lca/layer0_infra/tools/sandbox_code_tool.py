@@ -15,10 +15,16 @@ from lca.contracts.atoms.semantic_keys import (
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.sandbox import (
     DEFAULT_SANDBOX_TIMEOUT_S,
+    SANDBOX_PREINSTALLED_PYTHON_PACKAGES,
     SANDBOX_PREVIEW_CHAR_LIMIT,
 )
 from lca.contracts.protocols import Sandbox, Tool
 from lca.layer0_infra.file_store import FileStore, LocalFileStore, get_default_file_store
+from lca.layer0_infra.tools.run_attachment_scope import (
+    get_current_run_attachment_ids,
+    merge_attachment_ids,
+)
+from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
 
 SANDBOX_TOOL_NAME = "run_sandbox_code"
 
@@ -56,10 +62,18 @@ class SandboxCodeTool(Tool):
 
     name = SANDBOX_TOOL_NAME
     description = (
-        "在隔离沙箱中执行代码（默认 Python），可选挂载已上传附件到 /mnt/data，"
-        "返回 stdout/stderr 与生成文件产物。"
+        "在隔离沙箱中执行代码（默认 Python）。本 run 用户已上传的附件会自动"
+        "挂载到 /mnt/data/<原文件名>（只读输入），无需再传 attachment_ids；"
+        "也可通过 attachment_ids 显式补充。把要产出的文件写到 "
+        "/mnt/data/outputs/<文件名>，执行结束后会自动收集为可下载产物——"
+        "写到其它位置的文件不会被收集。返回 stdout/stderr 与生成文件产物。"
+        "预装第三方包（可直接 import，勿重复 pip install）: "
+        + ", ".join(SANDBOX_PREINSTALLED_PYTHON_PACKAGES)
+        + "。缺包时优先用 stdlib 或改代码，不要对同一 import 错误盲目重试。"
+        "画图中文标签：环境已预置 WenQuanYi/CJK 字体与 MATPLOTLIBRC，"
+        "不要把 font.sans-serif 强制设为仅 DejaVu Sans（会导致中文缺字警告与乱码）。"
         "参数: code（必填）、language（可选，默认 python）、"
-        "attachment_ids（可选，FileStore 中的附件 id 列表）、"
+        "attachment_ids（可选，额外挂载的 FileStore 附件 id；run 级附件已自动包含）、"
         "timeout_s（可选，秒）。"
     )
     parameters: ClassVar[dict[str, Any]] = {
@@ -77,7 +91,9 @@ class SandboxCodeTool(Tool):
             "attachment_ids": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "要挂载进沙箱 /mnt/data 的附件 id 列表",
+                "description": (
+                    "额外挂载到 /mnt/data 的附件 id；本 run 用户上传附件已自动挂载，通常可省略"
+                ),
             },
             "timeout_s": {
                 "type": "integer",
@@ -113,6 +129,10 @@ class SandboxCodeTool(Tool):
                     return "attachment_ids 各项必须是非空字符串"
                 if not self._store.exists(item.strip()):
                     return f"附件不存在: {item}"
+        # Run-scoped ambient mounts are part of the effective input set.
+        for aid in get_current_run_attachment_ids():
+            if not self._store.exists(aid):
+                return f"run 附件不存在: {aid}"
         timeout_s = args.get("timeout_s")
         if timeout_s is not None and not isinstance(timeout_s, (int, float)):
             return "timeout_s 必须是数字"
@@ -123,7 +143,8 @@ class SandboxCodeTool(Tool):
         code = str(args["code"])
         language = str(args.get("language") or "python").strip() or "python"
         raw_ids = args.get("attachment_ids") or []
-        attachment_ids = [str(i).strip() for i in raw_ids if str(i).strip()]
+        explicit_ids = [str(i).strip() for i in raw_ids if str(i).strip()]
+        attachment_ids = merge_attachment_ids(explicit_ids)
         timeout_raw = args.get("timeout_s", DEFAULT_SANDBOX_TIMEOUT_S)
         try:
             timeout_s = int(timeout_raw)
@@ -146,7 +167,8 @@ class SandboxCodeTool(Tool):
                 )
             mount_files[meta.name] = data
 
-        invocation_id = new_id("sbx")
+        # Prefer SafeExecutor-assigned id so ToolStarted/deltas/ToolInvoked share a key.
+        invocation_id = get_current_tool_invocation_id() or new_id("sbx")
         result = await self._sandbox.run(
             code=code,
             language=language,

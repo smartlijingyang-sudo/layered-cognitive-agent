@@ -40,6 +40,8 @@ class RunSession:
     hub: ObservabilityHub
     question: str
     mode: str
+    # CreateRun 附件 id：execute 时 bind 进 run_attachment_scope，沙箱自动挂载。
+    attachment_ids: tuple[str, ...] = field(default_factory=tuple)
     status: RunStatus = RunStatus.PENDING
     error: str = ""
     task: asyncio.Task[Any] | None = None

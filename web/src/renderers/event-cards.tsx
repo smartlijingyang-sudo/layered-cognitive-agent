@@ -88,6 +88,17 @@ export function DecisionCard({ event, domain }: EventRendererProps) {
   );
 }
 
+export function ToolStartedCard({ event, domain }: EventRendererProps) {
+  if (event.type !== "ToolStarted") return null;
+  return (
+    <Card
+      domain={domain}
+      title={`工具开始 · ${event.tool_name}`}
+      body={event.arguments_preview || event.invocation_id || "(running)"}
+    />
+  );
+}
+
 export function ToolCallCard({ event, domain }: EventRendererProps) {
   if (event.type !== "ToolInvoked") return null;
   return (
@@ -95,6 +106,24 @@ export function ToolCallCard({ event, domain }: EventRendererProps) {
       domain={domain}
       title={`工具 · ${event.tool_name}`}
       body={`${event.ok ? "ok" : "FAIL"} · ${event.latency_ms}ms`}
+    />
+  );
+}
+
+export function ReasoningDeltaCard({ event, domain }: EventRendererProps) {
+  if (event.type !== "ReasoningDelta") return null;
+  return (
+    <Card domain={domain} title={`思考 Δ step ${event.step}`} body={event.text_delta || "(empty)"} />
+  );
+}
+
+export function ReasoningCompletedCard({ event, domain }: EventRendererProps) {
+  if (event.type !== "ReasoningCompleted") return null;
+  return (
+    <Card
+      domain={domain}
+      title={`思考完成 · step ${event.step}`}
+      body={`${event.duration_ms}ms${event.content_preview ? `\n${event.content_preview}` : ""}`}
     />
   );
 }

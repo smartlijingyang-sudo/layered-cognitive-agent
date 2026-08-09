@@ -24,7 +24,12 @@ from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.observability.journal import LlmCallCompleted, StepTextDelta
+from lca.contracts.models.observability.journal import (
+    LlmCallCompleted,
+    ReasoningCompleted,
+    ReasoningDelta,
+    StepTextDelta,
+)
 from lca.contracts.protocols import LLMAdapter, MemorySystem
 from lca.layer0_infra.observability.facade import record, span
 
@@ -99,6 +104,9 @@ class TelemetryLLMAdapter(LLMAdapter):
         model = _model_label(self._inner)
         started = time.perf_counter()
         accumulated_text = ""
+        reasoning_text = ""
+        reasoning_started: float | None = None
+        reasoning_seq = 0
         final_response: LLMResponse | None = None
         step, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
         delta_seq = 0
@@ -106,6 +114,19 @@ class TelemetryLLMAdapter(LLMAdapter):
         try:
             async for event in self._inner.stream(prompt, **inner_kwargs):
                 if event.type == LLMStreamEventType.COMPLETED:
+                    if reasoning_text or reasoning_started is not None:
+                        duration_ms = 0
+                        if reasoning_started is not None:
+                            duration_ms = int(
+                                (time.perf_counter() - reasoning_started) * _PERF_COUNTER_SCALE
+                            )
+                        record(
+                            ReasoningCompleted(
+                                step=step,
+                                duration_ms=duration_ms,
+                                content_preview=reasoning_text,
+                            )
+                        )
                     final_response = event.response
                     if final_response is not None:
                         prompt_tokens, completion_tokens = _usage_of(final_response)
@@ -120,6 +141,20 @@ class TelemetryLLMAdapter(LLMAdapter):
                             stream=True,
                         )
                         recorded = True
+                elif event.type == LLMStreamEventType.REASONING_TEXT_DELTA:
+                    delta_text = event.text or ""
+                    if delta_text:
+                        if reasoning_started is None:
+                            reasoning_started = time.perf_counter()
+                        reasoning_text += delta_text
+                        record(
+                            ReasoningDelta(
+                                step=step,
+                                text_delta=delta_text,
+                                seq=reasoning_seq,
+                            )
+                        )
+                        reasoning_seq += 1
                 elif event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
                     delta_text = event.text or ""
                     accumulated_text += delta_text

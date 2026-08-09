@@ -20,6 +20,8 @@ from lca.contracts.models.observability.journal import (
     DelegationIssued,
     JournalEvent,
     LlmCallCompleted,
+    ReasoningCompleted,
+    ReasoningDelta,
     RunInsight,
     SandboxOutputDelta,
     StepCompleted,
@@ -29,6 +31,7 @@ from lca.contracts.models.observability.journal import (
     TeamRunStarted,
     ToolDenied,
     ToolInvoked,
+    ToolStarted,
 )
 from lca.contracts.models.observability.telemetry_catalog import VocabDef, VocabDomain, VocabKind
 
@@ -53,7 +56,10 @@ JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
         ActionDegraded,
         LlmCallCompleted,
         StepTextDelta,
+        ReasoningDelta,
+        ReasoningCompleted,
         SandboxOutputDelta,
+        ToolStarted,
         ToolInvoked,
         ToolDenied,
         RunInsight,
@@ -154,11 +160,29 @@ JOURNAL_CATALOG: dict[str, VocabDef] = {
         required=("step", "seq"),
         desc="认知步 LLM 增量文本（中性）",
     ),
+    "ReasoningDelta": _journal(
+        VocabDomain.RESOURCE,
+        "lca.layer0_infra.observability.adapters",
+        required=("step", "seq"),
+        desc="模型思维链增量",
+    ),
+    "ReasoningCompleted": _journal(
+        VocabDomain.RESOURCE,
+        "lca.layer0_infra.observability.adapters",
+        required=("step",),
+        desc="模型思维链段结束",
+    ),
     "SandboxOutputDelta": _journal(
         VocabDomain.RESOURCE,
         "lca.layer0_infra.sandbox",
         required=("invocation_id", "stream", "seq"),
         desc="沙箱执行增量输出（stdout/stderr）",
+    ),
+    "ToolStarted": _journal(
+        VocabDomain.RESOURCE,
+        "lca.layer1_cognitive.body.safe_executor",
+        required=("tool_name", "invocation_id"),
+        desc="工具调用开始",
     ),
     "ToolInvoked": _journal(
         VocabDomain.RESOURCE,

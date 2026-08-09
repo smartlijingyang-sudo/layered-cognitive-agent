@@ -1,0 +1,37 @@
+# Onlyboxes pythonExec worker image — data/analysis baseline for LCA run_sandbox_code.
+# Build: ./deploy/onlyboxes/build-python-image.sh
+# Tag expected by systemd worker: onlyboxes-python-local:3.11
+FROM python:3.11-slim
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    UV_SYSTEM_PYTHON=1
+
+# Runtime libs for matplotlib / pillow; CJK fonts for Chinese plot labels.
+# Without a CJK face, matplotlib warns: Glyph N missing from font(s) DejaVu Sans.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libfreetype6 \
+        libpng16-16t64 \
+        libjpeg62-turbo \
+        fontconfig \
+        fonts-wqy-zenhei \
+    && fc-cache -f \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-python.txt /tmp/requirements-python.txt
+COPY matplotlibrc /etc/matplotlibrc
+
+ENV MATPLOTLIBRC=/etc/matplotlibrc
+
+RUN pip install --no-cache-dir "uv>=0.6" \
+    && uv pip install --system --no-cache -r /tmp/requirements-python.txt \
+    && rm -f /tmp/requirements-python.txt \
+    && python -c "import pandas,numpy,openpyxl,matplotlib,PIL,scipy,requests,seaborn,tabulate,xlsxwriter; print('ok', pandas.__version__)" \
+    && python -c "from matplotlib import font_manager as fm; names={f.name for f in fm.fontManager.ttflist}; assert any('WenQuanYi' in n or 'Noto Sans CJK' in n for n in names), sorted(n for n in names if 'DejaVu' not in n)[:20]; print('cjk-font: ok')"
+
+WORKDIR /workspace
+CMD ["python3"]

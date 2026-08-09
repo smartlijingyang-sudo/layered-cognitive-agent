@@ -58,6 +58,7 @@ class _MockToolCallDelta:
 class _MockDelta:
     content: str | None = None
     tool_calls: list[_MockToolCallDelta] | None = None
+    reasoning_content: str | None = None
 
 
 @dataclass
@@ -302,6 +303,146 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
         payload = json.loads(completed.response.text)
         self.assertEqual(payload["action_type"], "use_tool")
         self.assertEqual(payload["tool_name"], "calculator")
+
+    async def test_chat_stream_reasoning_content_field(self) -> None:
+        client = self._patch_client()
+        complete_response = _MockChatResponse(
+            choices=[_MockChatChoice(message=_MockChatMessage(content='{"a":1}'))],
+            usage=_MockUsage(),
+        )
+
+        async def _stream(**kwargs: Any):
+            if kwargs.get("stream"):
+
+                async def _gen():
+                    yield _MockChatChunk(
+                        choices=[_MockChoice(delta=_MockDelta(reasoning_content="先分析问题"))]
+                    )
+                    yield _MockChatChunk(choices=[_MockChoice(delta=_MockDelta(content='{"a":1}'))])
+                    yield _MockChatChunk(choices=[], model="gpt-test", usage=_MockUsage())
+
+                return _gen()
+            return complete_response
+
+        client.chat.completions.create.side_effect = _stream
+        with mock.patch("openai.AsyncOpenAI", return_value=client):
+            adapter = OpenAICompatAdapter(
+                api_key="sk-test",
+                api=LLMApiStyle.CHAT_COMPLETIONS,
+            )
+            events = [e async for e in adapter.stream("prompt")]
+
+        reasoning = [e for e in events if e.type == LLMStreamEventType.REASONING_TEXT_DELTA]
+        content = [e for e in events if e.type == LLMStreamEventType.OUTPUT_TEXT_DELTA]
+        self.assertEqual("".join(e.text for e in reasoning), "先分析问题")
+        self.assertEqual("".join(e.text for e in content), '{"a":1}')
+
+    async def test_chat_stream_think_tags_split_to_reasoning(self) -> None:
+        client = self._patch_client()
+        complete_response = _MockChatResponse(
+            choices=[_MockChatChoice(message=_MockChatMessage(content="answer"))],
+            usage=_MockUsage(),
+        )
+
+        async def _stream(**kwargs: Any):
+            if kwargs.get("stream"):
+
+                async def _gen():
+                    yield _MockChatChunk(
+                        choices=[_MockChoice(delta=_MockDelta(content="<think>逐步"))]
+                    )
+                    yield _MockChatChunk(
+                        choices=[_MockChoice(delta=_MockDelta(content="推理</think>answer"))]
+                    )
+                    yield _MockChatChunk(choices=[], model="gpt-test", usage=_MockUsage())
+
+                return _gen()
+            return complete_response
+
+        client.chat.completions.create.side_effect = _stream
+        with mock.patch("openai.AsyncOpenAI", return_value=client):
+            adapter = OpenAICompatAdapter(
+                api_key="sk-test",
+                api=LLMApiStyle.CHAT_COMPLETIONS,
+            )
+            events = [e async for e in adapter.stream("prompt")]
+
+        reasoning = "".join(
+            e.text for e in events if e.type == LLMStreamEventType.REASONING_TEXT_DELTA
+        )
+        content = "".join(e.text for e in events if e.type == LLMStreamEventType.OUTPUT_TEXT_DELTA)
+        completed = next(e for e in events if e.type == LLMStreamEventType.COMPLETED)
+        self.assertEqual(reasoning, "逐步推理")
+        self.assertEqual(content, "answer")
+        assert completed.response is not None
+        self.assertEqual(completed.response.text, "answer")
+
+    async def test_responses_stream_reasoning_text_delta(self) -> None:
+        client = self._patch_client()
+
+        class _Resp:
+            model = "gpt-resp"
+            output_text = "final"
+            output = ()
+            usage = _MockUsage(input_tokens=4, output_tokens=2)
+
+        @dataclass
+        class _ReasoningDelta:
+            type: str = "response.reasoning_text.delta"
+            delta: str = "思考中"
+
+        @dataclass
+        class _TextDelta:
+            type: str = "response.output_text.delta"
+            delta: str = "final"
+
+        @dataclass
+        class _Completed:
+            type: str = "response.completed"
+            response: _Resp = None  # type: ignore[assignment]
+
+        async def _stream(**kwargs: Any):
+            if kwargs.get("stream"):
+
+                async def _gen():
+                    yield _ReasoningDelta()
+                    yield _TextDelta()
+                    done = _Completed()
+                    done.response = _Resp()
+                    yield done
+
+                return _gen()
+            return _Resp()
+
+        client.responses.create.side_effect = _stream
+        with mock.patch("openai.AsyncOpenAI", return_value=client):
+            adapter = OpenAICompatAdapter(api_key="sk-test", api=LLMApiStyle.RESPONSES)
+            events = [e async for e in adapter.stream("prompt")]
+
+        reasoning = [e for e in events if e.type == LLMStreamEventType.REASONING_TEXT_DELTA]
+        self.assertEqual(len(reasoning), 1)
+        self.assertEqual(reasoning[0].text, "思考中")
+
+    async def test_chat_request_includes_qwen_params_and_parallel_tools(self) -> None:
+        client = self._patch_client()
+        client.chat.completions.create = mock.AsyncMock(
+            return_value=_MockChatResponse(
+                choices=[_MockChatChoice(message=_MockChatMessage(content="ok"))]
+            )
+        )
+        with mock.patch("openai.AsyncOpenAI", return_value=client):
+            adapter = OpenAICompatAdapter(
+                api_key="sk-test",
+                model="qwen3.7-plus",
+                api=LLMApiStyle.CHAT_COMPLETIONS,
+            )
+            await adapter.complete("prompt", tools=[_FakeTool()])
+        kwargs = client.chat.completions.create.await_args.kwargs
+        self.assertTrue(kwargs["parallel_tool_calls"])
+        self.assertIn("top_p", kwargs)
+        self.assertEqual(kwargs["extra_body"]["enable_thinking"], True)
+        self.assertEqual(kwargs["extra_body"]["top_k"], 20)
+        self.assertEqual(kwargs["tools"][0]["function"]["name"], "calculator")
 
     async def test_responses_usage_mapping(self) -> None:
         client = self._patch_client()

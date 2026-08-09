@@ -27,4 +27,5 @@ CONTEXT:
 当 action_type 为 "delegate" 时：
 - 单目标：target_role, subtask
 - 多目标：delegations 数组（每项含 target_role 与 subtask）
-当 action_type 为 "respond" 时，必须包含 response_text。
+当 action_type 为 "respond" 时，必须包含顶层 response_text。
+严禁把 respond 写成 use_tool / tool_name:"respond"；回复用户只能用 action_type:"respond"。

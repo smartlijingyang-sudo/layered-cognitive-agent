@@ -31,12 +31,15 @@ export function AttachmentUpload({
   disabled = false,
   /** When true and conversationId is set, attempt real upload via api/files. */
   autoUpload = false,
+  /** Icon-only control for composer action bar (chips rendered elsewhere). */
+  compact = false,
 }: {
   readonly attachments: readonly LocalAttachment[];
   readonly onChange: (next: readonly LocalAttachment[]) => void;
   readonly conversationId?: string;
   readonly disabled?: boolean;
   readonly autoUpload?: boolean;
+  readonly compact?: boolean;
 }) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +116,42 @@ export function AttachmentUpload({
     [addFiles, disabled],
   );
 
+  if (compact) {
+    return (
+      <div className="relative" data-testid="attachment-upload">
+        <label
+          htmlFor={inputId}
+          className={cn(
+            "inline-flex size-8 cursor-pointer items-center justify-center rounded-[var(--radius-md)]",
+            "text-[var(--text-muted)] hover:bg-[var(--fill-hover)] hover:text-[var(--text)]",
+            disabled && "pointer-events-none opacity-50",
+            focusRing,
+          )}
+          title="添加附件"
+        >
+          <Paperclip size={15} />
+          {attachments.length > 0 ? (
+            <span className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[var(--accent)] text-[9px] font-medium text-[var(--accent-fg)]">
+              {attachments.length}
+            </span>
+          ) : null}
+        </label>
+        <input
+          ref={inputRef}
+          id={inputId}
+          type="file"
+          className="sr-only"
+          multiple
+          disabled={disabled}
+          onChange={(e) => {
+            if (e.target.files?.length) void addFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-2" data-testid="attachment-upload">
       {attachments.length > 0 ? (
@@ -121,18 +160,18 @@ export function AttachmentUpload({
             <li
               key={att.id}
               className={cn(
-                "flex max-w-full items-center gap-2 rounded-full border border-border bg-surface px-2.5 py-1 text-xs",
+                "flex max-w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs",
               )}
               data-testid="attachment-chip"
             >
-              <FileIcon size={12} className="shrink-0 text-accent" aria-hidden />
-              <span className="max-w-[10rem] truncate text-text" title={att.name}>
+              <FileIcon size={12} className="shrink-0 text-[var(--text-muted)]" aria-hidden />
+              <span className="max-w-[10rem] truncate text-[var(--text)]" title={att.name}>
                 {att.name}
               </span>
               <span className={mutedText}>{formatByteSize(att.sizeBytes)}</span>
               {att.status === "error" ? (
                 <span
-                  className="inline-flex items-center gap-0.5 text-danger"
+                  className="inline-flex items-center gap-0.5 text-[var(--color-danger)]"
                   title={att.error}
                 >
                   <AlertCircle size={12} />
@@ -141,7 +180,7 @@ export function AttachmentUpload({
               <button
                 type="button"
                 className={cn(
-                  "inline-flex size-5 items-center justify-center rounded-full text-text-muted hover:bg-border/60 hover:text-text",
+                  "inline-flex size-5 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--fill-hover)] hover:text-[var(--text)]",
                   focusRing,
                 )}
                 onClick={() => remove(att.id)}
@@ -160,8 +199,8 @@ export function AttachmentUpload({
         className={cn(
           "flex items-center gap-2 rounded-[var(--radius-md)] border border-dashed px-3 py-2 transition-colors",
           dragging
-            ? "border-accent bg-accent/5"
-            : "border-border/70 bg-transparent",
+            ? "border-[var(--accent)] bg-[var(--fill-hover)]"
+            : "border-[var(--border)] bg-transparent",
           disabled && "pointer-events-none opacity-50",
         )}
         onDragEnter={(e) => {
@@ -182,7 +221,7 @@ export function AttachmentUpload({
         <label
           htmlFor={inputId}
           className={cn(
-            "inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-text-muted hover:text-text",
+            "inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]",
             focusRing,
             "rounded-sm",
           )}

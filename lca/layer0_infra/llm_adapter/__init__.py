@@ -11,11 +11,19 @@ from typing import Any
 from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
 from lca.layer0_infra.llm_adapter.factory import load_dotenv_if_present, resolve_llm_adapter
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from lca.layer0_infra.llm_adapter.settings import (
+    LLMSettings,
+    clear_llm_settings_cache,
+    get_llm_settings,
+)
 
 __all__ = [
     "LLMApiStyle",
+    "LLMSettings",
     "MockLLMAdapter",
     "OpenAICompatAdapter",
+    "clear_llm_settings_cache",
+    "get_llm_settings",
     "load_dotenv_if_present",
     "resolve_llm_adapter",
 ]

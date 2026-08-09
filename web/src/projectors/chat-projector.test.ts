@@ -43,10 +43,60 @@ describe("chat projector", () => {
 
     state = reduceChat(
       state,
-      stamp(3, { type: "DecisionMade", step: 0, action_type: "respond", rationale_preview: "", delegate_target: "", delegate_count: 0, tool_name: "", confidence: 1 }),
+      stamp(3, {
+        type: "DecisionMade",
+        step: 0,
+        action_type: "respond",
+        rationale_preview: "",
+        delegate_target: "",
+        delegate_count: 0,
+        tool_name: "",
+        confidence: 1,
+        response_text: "",
+        output_truncated: false,
+      }),
     );
     expect(state.answer).toBe("hello");
     expect(state.answerDeltas).toEqual(["hello"]);
+    expect(state.pendingSteps.size).toBe(0);
+  });
+
+  it("prefers DecisionMade.response_text over raw delta JSON (ADR-0045)", () => {
+    const malformed = JSON.stringify({
+      action_type: "use_tool",
+      tool_name: "respond",
+      arguments: { response_text: "缓冲里的旧提取" },
+    });
+    let state = reduceChat(
+      {
+        question: "q",
+        answer: "",
+        answerDeltas: [],
+        status: "running",
+        phase: "collaborating",
+        files: [],
+        pendingSteps: new Map(),
+        committedAnswer: "",
+      },
+      stamp(1, { type: "StepTextDelta", step: 0, text_delta: malformed, seq: 0 }),
+    );
+    state = reduceChat(
+      state,
+      stamp(2, {
+        type: "DecisionMade",
+        step: 0,
+        action_type: "respond",
+        rationale_preview: "",
+        delegate_target: "",
+        delegate_count: 0,
+        tool_name: "",
+        confidence: 0.95,
+        response_text: "规范正文：来自防腐层",
+        output_truncated: false,
+      }),
+    );
+    expect(state.answer).toBe("规范正文：来自防腐层");
+    expect(state.answer).not.toContain("use_tool");
     expect(state.pendingSteps.size).toBe(0);
   });
 
@@ -57,7 +107,18 @@ describe("chat projector", () => {
     );
     state = reduceChat(
       state,
-      stamp(2, { type: "DecisionMade", step: 1, action_type: "delegate", rationale_preview: "", delegate_target: "x", delegate_count: 1, tool_name: "", confidence: 0.9 }),
+      stamp(2, {
+        type: "DecisionMade",
+        step: 1,
+        action_type: "delegate",
+        rationale_preview: "",
+        delegate_target: "x",
+        delegate_count: 1,
+        tool_name: "",
+        confidence: 0.9,
+        response_text: "",
+        output_truncated: false,
+      }),
     );
     expect(state.answer).toBe("");
     expect(state.answerDeltas).toEqual([]);
@@ -103,7 +164,18 @@ describe("chat projector", () => {
     );
     state = reduceChat(
       state,
-      stamp(2, { type: "DecisionMade", step: 0, action_type: "respond", rationale_preview: "", delegate_target: "", delegate_count: 0, tool_name: "", confidence: 1 }),
+      stamp(2, {
+        type: "DecisionMade",
+        step: 0,
+        action_type: "respond",
+        rationale_preview: "",
+        delegate_target: "",
+        delegate_count: 0,
+        tool_name: "",
+        confidence: 1,
+        response_text: "",
+        output_truncated: false,
+      }),
     );
     expect(state.answer).toBe("你好，这是正式回答。");
     expect(state.answer).not.toContain("action_type");
@@ -121,7 +193,6 @@ describe("chat projector", () => {
       url: "/files/f1",
       sizeBytes: 9,
       previewable: true,
-      previewHtml: "<p>x</p>",
     });
     const state = reduceChat(
       {
@@ -143,11 +214,60 @@ describe("chat projector", () => {
         latency_ms: 1,
         attempt: 1,
         error: "",
+        invocation_id: "",
+        files: [],
       }),
     );
     expect(state.files).toHaveLength(1);
     expect(state.files[0]?.name).toBe("out.html");
     expect(state.files[0]?.url).toBe("/files/f1");
+  });
+
+  it("prefers structured ToolInvoked.files when result_preview JSON is truncated", () => {
+    const state = reduceChat(
+      {
+        question: "q",
+        answer: "",
+        answerDeltas: [],
+        status: "running",
+        phase: "collaborating",
+        files: [],
+        pendingSteps: new Map(),
+        committedAnswer: "",
+      },
+      stamp(1, {
+        type: "ToolInvoked",
+        tool_name: "run_sandbox_code",
+        arguments_preview: "{}",
+        result_preview: '{"stdout": "' + "x".repeat(2100),
+        ok: true,
+        latency_ms: 10,
+        attempt: 1,
+        error: "",
+        invocation_id: "inv_1",
+        files: [
+          {
+            name: "chart_person.png",
+            mimeType: "image/png",
+            sizeBytes: 100,
+            url: "/files/file_chart",
+            previewable: true,
+            attachmentId: "file_chart",
+          },
+          {
+            name: "report.md",
+            mimeType: "text/markdown",
+            sizeBytes: 50,
+            url: "/files/file_md",
+            previewable: true,
+            attachmentId: "file_md",
+          },
+        ],
+      }),
+    );
+    expect(state.files).toHaveLength(2);
+    expect(state.files.map((f) => f.name)).toEqual(["chart_person.png", "report.md"]);
+    expect(state.files[0]?.previewable).toBe(true);
   });
 });
 

@@ -169,6 +169,8 @@ describe("trace projector", () => {
         delegate_count: 0,
         tool_name: "",
         confidence: 1,
+        response_text: "",
+        output_truncated: false,
       }),
       stamp(2, { type: "StepTextDelta", step: 0, text_delta: "hel", seq: 0 }),
       stamp(3, { type: "StepTextDelta", step: 0, text_delta: "lo", seq: 1 }),
@@ -237,6 +239,7 @@ describe("trace projector", () => {
         attempt: 1,
         error: "",
         invocation_id: "sbx_1",
+        files: [],
       }),
       stamp(5, {
         type: "SandboxOutputDelta",
