@@ -5,7 +5,6 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Copy, Check } from "lucide-react";
 import "katex/dist/katex.min.css";
-import { normalizeChatMarkdown } from "../../lib/normalize-chat-markdown";
 import { sanitizeAssistantDisplayText } from "../../lib/extract-decision-text";
 import { isMermaidLanguage, parseCodeLanguage } from "../../lib/code-language";
 import { highlightCode } from "../../lib/highlight-code";
@@ -158,12 +157,8 @@ export function MarkdownContent({
     () => sanitizeAssistantDisplayText(text, streaming),
     [text, streaming],
   );
-  const normalized = useMemo(
-    () => normalizeChatMarkdown(sanitized, streaming ? "streaming" : "final"),
-    [sanitized, streaming],
-  );
 
-  if (!normalized.trim()) {
+  if (!sanitized.trim()) {
     return <p className={cn("m-0", mutedText)}>等待回答…</p>;
   }
 
@@ -197,7 +192,7 @@ export function MarkdownContent({
           },
         }}
       >
-        {normalized}
+        {sanitized}
       </ReactMarkdown>
     </div>
   );
