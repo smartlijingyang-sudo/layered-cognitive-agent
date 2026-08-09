@@ -141,6 +141,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         timeout_s: int | None = None,
         invocation_id: str = "",
         explicit_attachment_ids: list[str] | None = None,
+        extra_files: dict[str, bytes] | None = None,
     ) -> SandboxExecResult:
         """Execute user code in the run-bound environment."""
         if not self._ready:
@@ -159,6 +160,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             language=language,
             timeout_s=budget,
             invocation_id=invocation_id,
+            extra_files=extra_files,
         )
         if raw.success:
             return sandbox_exec_result_from(
@@ -232,7 +234,11 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         language: str = "python",
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
         invocation_id: str = "",
+        extra_files: dict[str, bytes] | None = None,
     ) -> SandboxResult:
+        mount_files = self._mount_files
+        if extra_files:
+            mount_files = {**self._mount_files, **extra_files}
         if self._session is not None and not self._stateless:
             return await self._sandbox.run_in_session(
                 session_id=self._session.session_id,
@@ -240,12 +246,12 @@ class RunBoundSandboxRuntime(SandboxRuntime):
                 language=language,
                 timeout_s=timeout_s,
                 invocation_id=invocation_id,
-                files=self._mount_files or None,
+                files=mount_files or None,
             )
         return await self._sandbox.run(
             code=code,
             language=language,
-            files=self._mount_files or None,
+            files=mount_files or None,
             timeout_s=timeout_s,
             invocation_id=invocation_id,
         )

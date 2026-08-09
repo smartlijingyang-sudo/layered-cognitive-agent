@@ -1,5 +1,6 @@
 /**
  * LobeHub-style tool display names, workflow summary, and arg headlines.
+ * User-facing labels never mention "sandbox" — execution is "run command" / execScript.
  */
 
 import type { ToolBlock, TurnProcessBlock } from "../../projectors/types";
@@ -13,34 +14,31 @@ import {
 
 /** Verb-style Chinese labels (workflow summary + tool title). */
 export const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  // Sandbox / code
   run_code: "执行了代码",
-  run_sandbox_code: "执行了代码",
+  run_sandbox_code: "运行了命令",
   sandbox_execute: "运行了命令",
-  sandbox_inspect: "探查了沙箱",
+  sandbox_inspect: "探查了文件",
   calculator: "完成了计算",
   write_file: "写入了文件",
   export_file: "导出了文件",
   read_file: "读取了文件",
   get_weather: "查询了天气",
-  // Skills (ADR-0048)
   search_skill: "搜索了技能",
   import_skill: "导入了技能",
   activate_skill: "启用了技能",
   read_skill_reference: "读取了技能资源",
-  run_skill_script: "执行了技能脚本",
-  // Generic / legacy
+  run_skill_script: "运行了命令",
   activate_tools: "启用了工具",
   run_command: "运行了命令",
   execute_code: "执行了代码",
 };
 
-/** Short API-style labels for tool row (Inspector). */
+/** Short API-style labels for tool row (Inspector) — LobeHub apiName.display */
 export const TOOL_API_LABELS: Record<string, string> = {
   run_code: "执行代码",
-  run_sandbox_code: "沙箱执行",
-  sandbox_execute: "执行命令",
-  sandbox_inspect: "沙箱探查",
+  run_sandbox_code: "运行命令",
+  sandbox_execute: "运行命令",
+  sandbox_inspect: "探查文件",
   calculator: "计算器",
   write_file: "写入文件",
   export_file: "导出文件",
@@ -49,11 +47,15 @@ export const TOOL_API_LABELS: Record<string, string> = {
   search_skill: "搜索技能",
   import_skill: "导入技能",
   activate_skill: "启用技能",
-  read_skill_reference: "读取技能资源",
-  run_skill_script: "执行技能脚本",
+  read_skill_reference: "读取资源",
+  run_skill_script: "运行命令",
   activate_tools: "启用工具",
-  run_command: "执行命令",
+  run_command: "运行命令",
+  execute_code: "执行代码",
 };
+
+/** Internal execution-plane tools — hide from workflow if ever leaked into journal. */
+export const INTERNAL_UI_TOOLS = new Set(["sandbox_inspect"]);
 
 function toTitleCase(apiName: string): string {
   return apiName
@@ -94,7 +96,6 @@ export function parseToolArgs(raw: string | undefined): Record<string, unknown> 
   return { value: raw };
 }
 
-/** Prefer human-readable summary for collapsed titles (not raw command/code). */
 const HUMAN_SUMMARY_KEYS = [
   "description",
   "summary",
@@ -107,7 +108,6 @@ const HUMAN_SUMMARY_KEYS = [
   "stepMessage",
 ] as const;
 
-/** Keys for executable payload in expand body. */
 const COMMAND_KEYS = ["command", "cmd", "shell"] as const;
 const CODE_KEYS = ["code", "expression", "source"] as const;
 
@@ -172,10 +172,6 @@ export function areWorkflowToolsComplete(tools: readonly ToolBlock[]): boolean {
   return tools.every((t) => t.status === "done" || t.status === "error");
 }
 
-/**
- * Completed workflow title, e.g.
- * "15 次调用：启用了工具, 搜索了技能, 运行了命令 · 思考了 12s"
- */
 export function getWorkflowSummaryText(
   tools: readonly ToolBlock[],
   thinkingDurationMs?: number,
@@ -257,17 +253,18 @@ export function extractSkillId(args: Record<string, unknown>): string {
   return "";
 }
 
+/** LobeHub RunCommand / execScript — collapsed row shows command chip, not raw code block. */
 export function isCommandLikeTool(toolName: string): boolean {
-  return toolName === "run_skill_script" || toolName === "run_command";
+  return (
+    toolName === "run_skill_script" ||
+    toolName === "run_command" ||
+    toolName === "sandbox_execute" ||
+    toolName === "run_sandbox_code"
+  );
 }
 
 export function isCodeLikeTool(toolName: string): boolean {
-  return (
-    toolName === "run_code" ||
-    toolName === "run_sandbox_code" ||
-    toolName === "sandbox_execute" ||
-    toolName === "calculator"
-  );
+  return toolName === "run_code" || toolName === "calculator";
 }
 
 export function isSkillLikeTool(toolName: string): boolean {
@@ -277,4 +274,18 @@ export function isSkillLikeTool(toolName: string): boolean {
     toolName === "activate_skill" ||
     toolName === "read_skill_reference"
   );
+}
+
+/** One-line command/code preview for inspector chip (LobeHub getRunCommandDisplayCommand). */
+export function getRunCommandDisplayText(args: Record<string, unknown>): string {
+  const human = getToolHumanSummary(args);
+  if (human) return human;
+  const command = extractCommand(args);
+  if (command) return truncateDetail(command.replaceAll(/\s+/g, " "), TOOL_FIRST_DETAIL_MAX_CHARS);
+  const code = extractCode(args);
+  if (code) {
+    const oneLine = code.replaceAll(/\s+/g, " ").trim();
+    return truncateDetail(oneLine, TOOL_FIRST_DETAIL_MAX_CHARS);
+  }
+  return "";
 }

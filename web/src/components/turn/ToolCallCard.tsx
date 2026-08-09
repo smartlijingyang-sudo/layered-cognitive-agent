@@ -6,6 +6,7 @@ import {
   Package,
   Search,
   Sparkles,
+  SquareTerminal,
   X,
 } from "lucide-react";
 import type { SandboxBlock, ToolBlock } from "../../projectors/types";
@@ -16,7 +17,7 @@ import { cn } from "../../lib/cn";
 import { focusRing } from "../../lib/ui";
 import { AnsiOutput } from "./AnsiOutput";
 import { CodeHighlight } from "./CodeHighlight";
-import { SandboxPanel } from "./SandboxPanel";
+import { SandboxPanel as ExecutionOutput } from "./SandboxPanel";
 import { StatusBlock } from "./StatusBlock";
 import {
   extractCode,
@@ -26,6 +27,7 @@ import {
   getToolDisplayName,
   getToolFirstDetail,
   getToolHumanSummary,
+  getRunCommandDisplayText,
   isCodeLikeTool,
   isCommandLikeTool,
   isSkillLikeTool,
@@ -68,9 +70,7 @@ function ToolInspectorTitle({
 }) {
   const args = useMemo(() => parseToolArgs(block.argumentsPreview), [block.argumentsPreview]);
   const apiLabel = getToolApiLabel(block.toolName);
-  const displayLabel = getToolDisplayName(block.toolName);
-  const human = getToolHumanSummary(args);
-  const detail = human || getToolFirstDetail(block);
+  const commandText = getRunCommandDisplayText(args);
 
   if (isCommandLikeTool(block.toolName) || isCodeLikeTool(block.toolName)) {
     return (
@@ -80,12 +80,12 @@ function ToolInspectorTitle({
           running && "lobe-shiny",
         )}
       >
-        <span className="shrink-0 text-[var(--text-muted)]">{displayLabel}</span>
-        {detail ? (
-          <>
-            <span className="shrink-0 text-[var(--text-faint)]">·</span>
-            <span className="min-w-0 truncate text-[var(--text)]">{detail}</span>
-          </>
+        <span className="shrink-0 text-[var(--text-muted)]">{apiLabel}</span>
+        {commandText ? (
+          <span className="lobe-tool-chip min-w-0 max-w-[min(100%,20rem)]">
+            <LobeIcon icon={SquareTerminal} size="xs" className="shrink-0 text-[var(--text-faint)]" />
+            <span className="lobe-tool-chip-text">{commandText}</span>
+          </span>
         ) : null}
         {!running && block.status === "done" && block.ok !== false ? (
           <LobeIcon icon={Check} size="sm" className="shrink-0 text-[var(--color-success)]" />
@@ -98,7 +98,8 @@ function ToolInspectorTitle({
   }
 
   if (isSkillLikeTool(block.toolName)) {
-    const skill = extractSkillId(args) || detail;
+    const skill = extractSkillId(args) || getToolFirstDetail(block);
+    const displayLabel = getToolDisplayName(block.toolName);
     const icon =
       block.toolName === "search_skill" ? (
         <LobeIcon icon={Search} size="xs" className="text-[var(--text-faint)]" />
@@ -127,6 +128,7 @@ function ToolInspectorTitle({
   }
 
   // Generic: Plugin › api (param)
+  const detail = getToolFirstDetail(block);
   return (
     <div
       className={cn(
@@ -159,8 +161,8 @@ function ToolExpandBody({
 }) {
   const args = useMemo(() => parseToolArgs(block.argumentsPreview), [block.argumentsPreview]);
 
-  if (isCommandLikeTool(block.toolName)) {
-    const command = extractCommand(args);
+  if (isCommandLikeTool(block.toolName) || isCodeLikeTool(block.toolName)) {
+    const command = extractCommand(args) || extractCode(args);
     const output =
       sandbox?.stdout ||
       (block.resultPreview?.trim() && !block.resultPreview.trim().startsWith("{")
@@ -168,27 +170,17 @@ function ToolExpandBody({
         : "");
     const stderr = sandbox?.stderr || "";
     return (
-      <div className="lobe-tool-detail grid gap-2">
+      <div className="lobe-tool-detail lobe-run-command-block">
         {command ? (
-          <section>
-            <h4 className="lobe-tool-section-label">命令</h4>
-            <CodeHighlight code={command} language="sh" />
-          </section>
-        ) : null}
-        {output ? (
-          <section>
-            <h4 className="lobe-tool-section-label">输出</h4>
-            <AnsiOutput text={output} />
-          </section>
-        ) : null}
-        {stderr.trim() ? (
-          <section>
-            <h4 className="lobe-tool-section-label">错误</h4>
-            <AnsiOutput text={stderr} tone="error" />
-          </section>
+          <CodeHighlight code={command} language={isCommandLikeTool(block.toolName) ? "sh" : "python"} maxHeightClass="max-h-[200px]" />
         ) : null}
         {sandbox && !sandbox.sealed && !output ? (
-          <SandboxPanel block={sandbox} compact />
+          <ExecutionOutput block={sandbox} />
+        ) : null}
+        {output ? <AnsiOutput text={output} maxHeightClass="max-h-[200px]" /> : null}
+        {stderr.trim() ? <AnsiOutput text={stderr} tone="error" maxHeightClass="max-h-[200px]" /> : null}
+        {block.error?.trim() ? (
+          <p className="m-0 text-sm text-[var(--color-danger)]">{block.error}</p>
         ) : null}
       </div>
     );
@@ -227,47 +219,6 @@ function ToolExpandBody({
     );
   }
 
-  if (isCodeLikeTool(block.toolName)) {
-    const code = extractCode(args);
-    const lang = block.toolName === "calculator" ? "text" : "python";
-    const output =
-      sandbox?.stdout ||
-      (block.resultPreview?.trim() && !block.resultPreview.trim().startsWith("{")
-        ? block.resultPreview
-        : "");
-    return (
-      <div className="lobe-tool-detail grid gap-2">
-        {code ? (
-          <section>
-            <h4 className="lobe-tool-section-label">
-              {block.toolName === "sandbox_execute" ? "代码" : "输入"}
-            </h4>
-            <CodeHighlight code={code} language={lang} />
-          </section>
-        ) : null}
-        {sandbox && !sandbox.sealed ? <SandboxPanel block={sandbox} compact /> : null}
-        {output ? (
-          <section>
-            <h4 className="lobe-tool-section-label">输出</h4>
-            <AnsiOutput text={output} />
-          </section>
-        ) : null}
-        {sandbox?.stderr?.trim() ? (
-          <section>
-            <h4 className="lobe-tool-section-label">错误</h4>
-            <AnsiOutput text={sandbox.stderr} tone="error" />
-          </section>
-        ) : null}
-        {!output && block.resultPreview?.trim() ? (
-          <section>
-            <h4 className="lobe-tool-section-label">结果</h4>
-            <AnsiOutput text={tryPrettyJson(block.resultPreview)} />
-          </section>
-        ) : null}
-      </div>
-    );
-  }
-
   // Generic args + result
   return (
     <div className="grid gap-2">
@@ -283,7 +234,7 @@ function ToolExpandBody({
           />
         </section>
       ) : null}
-      {sandbox ? <SandboxPanel block={sandbox} compact /> : null}
+      {sandbox ? <ExecutionOutput block={sandbox} /> : null}
       {block.error?.trim() ? (
         <p className="m-0 text-sm text-[var(--color-danger)]">{block.error}</p>
       ) : null}

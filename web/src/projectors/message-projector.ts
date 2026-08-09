@@ -38,6 +38,8 @@ interface InternalState {
   buffers: Map<string, string>;
   /** Step-text deltas keyed by stepChannelKey(runId, step, channel). */
   stepBuffers: Map<string, string>;
+  /** Live stdout/stderr keyed by tool invocation_id (LobeHub tool_state). */
+  execBuffers: Map<string, { stdout: string; stderr: string; sealed: boolean }>;
   turnStatus: "running" | "completed" | "failed";
   turnMode: "solo" | "team";
   teamId?: string;
@@ -55,6 +57,7 @@ function createEmptyState(): InternalState {
     messages: new Map(),
     buffers: new Map(),
     stepBuffers: new Map(),
+    execBuffers: new Map(),
     turnStatus: "running",
     turnMode: "solo",
     question: "",
@@ -95,8 +98,40 @@ function toolMessageKey(invocationId: string, toolName: string, fallback: string
   return `tool:${toolName}:${fallback}`;
 }
 
-function sandboxMessageKey(invocationId: string, stream: string): string {
-  return `sandbox:${invocationId || "unknown"}:${stream}`;
+function applyExecBufferToTool(msg: MutableMessage, buf: { stdout: string; stderr: string; sealed: boolean }): void {
+  msg.metadata = {
+    ...msg.metadata,
+    stdout: buf.stdout || undefined,
+    stderr: buf.stderr || undefined,
+    sealed: buf.sealed,
+  };
+}
+
+function findToolByInvocation(state: InternalState, invocationId: string): MutableMessage | undefined {
+  if (!invocationId) return undefined;
+  for (const msg of state.messages.values()) {
+    if (msg.kind === "tool_call" && msg.metadata?.invocationId === invocationId) {
+      return msg;
+    }
+  }
+  return undefined;
+}
+
+function upsertExecBuffer(
+  state: InternalState,
+  invocationId: string,
+  stream: string,
+  delta: string,
+): { stdout: string; stderr: string; sealed: boolean } {
+  const prev = state.execBuffers.get(invocationId) ?? { stdout: "", stderr: "", sealed: false };
+  if (prev.sealed) return prev;
+  const next = {
+    ...prev,
+    stdout: stream === "stdout" ? prev.stdout + delta : prev.stdout,
+    stderr: stream === "stderr" ? prev.stderr + delta : prev.stderr,
+  };
+  state.execBuffers.set(invocationId, next);
+  return next;
 }
 
 /* ── MessageProjector ───────────────────────────────────────────── */
@@ -201,17 +236,19 @@ export class MessageProjector {
       /* ── Tool calls ──────────────────────────────────────────── */
       case "ToolStarted": {
         const id = toolMessageKey(e.invocation_id, e.tool_name, `${ts}:${nextSeq(s)}`);
-        s.messages.set(
-          id,
-          makeMsg(id, "tool_call", ts, {
-            agentRole: role || undefined,
-            metadata: {
-              toolName: e.tool_name,
-              argumentsPreview: e.arguments_preview,
-              invocationId: e.invocation_id,
-            },
-          }),
-        );
+        const msg = makeMsg(id, "tool_call", ts, {
+          agentRole: role || undefined,
+          metadata: {
+            toolName: e.tool_name,
+            argumentsPreview: e.arguments_preview,
+            invocationId: e.invocation_id,
+          },
+        });
+        s.messages.set(id, msg);
+        const pending = s.execBuffers.get(e.invocation_id);
+        if (pending) {
+          applyExecBufferToTool(msg, pending);
+        }
         s.startedAt ??= ts;
         break;
       }
@@ -219,7 +256,6 @@ export class MessageProjector {
         const id = toolMessageKey(e.invocation_id, e.tool_name, `${ts}:${s.seq}`);
         let msg = s.messages.get(id);
         if (!msg) {
-          // ToolInvoked without prior ToolStarted — create completed message
           const fallbackId = toolMessageKey(e.invocation_id, e.tool_name, `invoked:${nextSeq(s)}`);
           msg = makeMsg(fallbackId, "tool_call", ts, {
             agentRole: role || undefined,
@@ -230,6 +266,14 @@ export class MessageProjector {
         msg.streaming = false;
         msg.completedAt = ts;
         msg.content = e.result_preview;
+        const execBuf = s.execBuffers.get(e.invocation_id) ?? {
+          stdout: "",
+          stderr: "",
+          sealed: false,
+        };
+        execBuf.sealed = true;
+        s.execBuffers.set(e.invocation_id, execBuf);
+        applyExecBufferToTool(msg, execBuf);
         msg.metadata = {
           ...msg.metadata,
           toolName: e.tool_name,
@@ -239,39 +283,19 @@ export class MessageProjector {
           ok: e.ok,
           error: e.error || undefined,
           invocationId: e.invocation_id,
+          files: e.files?.length ? e.files : msg.metadata?.files,
+          sealed: true,
         };
         break;
       }
 
-      /* ── Sandbox ─────────────────────────────────────────────── */
+      /* ── Execution output (merged into tool_call — LobeHub tool_state) ─ */
       case "SandboxOutputDelta": {
-        const id = sandboxMessageKey(e.invocation_id, e.stream);
-        let msg = s.messages.get(id);
-        if (!msg) {
-          msg = makeMsg(id, "sandbox", ts, {
-            agentRole: role || undefined,
-            metadata: { invocationId: e.invocation_id },
-          });
-          s.messages.set(id, msg);
+        const buf = upsertExecBuffer(s, e.invocation_id, e.stream, e.text_delta);
+        const tool = findToolByInvocation(s, e.invocation_id);
+        if (tool) {
+          applyExecBufferToTool(tool, buf);
         }
-        const bufKey = `sandbox:${e.invocation_id}:${e.stream}`;
-        const buf = (s.buffers.get(bufKey) ?? "") + e.text_delta;
-        s.buffers.set(bufKey, buf);
-
-        // Build content from all stream buffers for this invocation
-        const stdoutBuf = s.buffers.get(`sandbox:${e.invocation_id}:stdout`) ?? "";
-        const stderrBuf = s.buffers.get(`sandbox:${e.invocation_id}:stderr`) ?? "";
-        const parts: string[] = [];
-        if (stdoutBuf) parts.push(stdoutBuf);
-        if (stderrBuf) parts.push(`[stderr]\n${stderrBuf}`);
-        msg.content = parts.join("\n");
-
-        msg.metadata = {
-          ...msg.metadata,
-          invocationId: e.invocation_id,
-          stdout: stdoutBuf || undefined,
-          stderr: stderrBuf || undefined,
-        };
         s.startedAt ??= ts;
         break;
       }

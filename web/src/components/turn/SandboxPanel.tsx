@@ -1,14 +1,11 @@
 import { useEffect, useRef } from "react";
-import { Terminal } from "lucide-react";
 import type { SandboxBlock } from "../../projectors/types";
 import { cn } from "../../lib/cn";
-import { LobeIcon } from "../../lib/icons";
 import { NeuralNetworkLoading } from "../shared/NeuralNetworkLoading";
 import { AnsiOutput } from "./AnsiOutput";
 
 /**
- * Live sandbox stdout/stderr panel (ADR-0044 stream projection).
- * LobeHub RunCommand-adjacent terminal chrome.
+ * Live command stdout/stderr (LobeHub RunCommand Render — no "sandbox" chrome).
  */
 export function SandboxPanel({
   block,
@@ -29,30 +26,24 @@ export function SandboxPanel({
 
   return (
     <div
+      ref={ref}
       className={cn(
-        "overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)]",
-        compact ? "bg-transparent" : "bg-[var(--surface)]",
+        "lobe-run-command-block overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)]",
+        compact ? "bg-transparent" : "bg-[var(--surface)] p-2",
       )}
     >
-      <div className="flex items-center gap-1.5 border-b border-[var(--border-subtle)] px-2.5 py-1.5">
-        <LobeIcon icon={Terminal} size="xs" className="text-[var(--text-faint)]" />
-        <span className="text-xs text-[var(--text-muted)]">
-          沙箱 {live ? "· 执行中" : "· 完成"}
-          {block.agentRole ? ` · ${block.agentRole}` : ""}
-        </span>
-        {live ? <NeuralNetworkLoading size={14} className="ml-auto" /> : null}
-      </div>
-      <div ref={ref} className="max-h-56 overflow-auto p-2">
-        {block.stdout.trim() ? <AnsiOutput text={block.stdout} /> : null}
-        {block.stderr.trim() ? (
-          <div className={block.stdout.trim() ? "mt-2" : undefined}>
-            <AnsiOutput text={block.stderr} tone="error" />
-          </div>
-        ) : null}
-        {!hasOut ? (
-          <p className="m-0 font-mono text-xs text-[var(--text-faint)]">{live ? "…" : "(empty)"}</p>
-        ) : null}
-      </div>
+      {block.stdout.trim() ? <AnsiOutput text={block.stdout} /> : null}
+      {block.stderr.trim() ? (
+        <div className={block.stdout.trim() ? "mt-2" : undefined}>
+          <AnsiOutput text={block.stderr} tone="error" />
+        </div>
+      ) : null}
+      {!hasOut && live ? (
+        <div className="flex items-center gap-2 px-1 py-0.5">
+          <NeuralNetworkLoading size={14} />
+          <span className="font-mono text-xs text-[var(--text-faint)]">…</span>
+        </div>
+      ) : null}
     </div>
   );
 }

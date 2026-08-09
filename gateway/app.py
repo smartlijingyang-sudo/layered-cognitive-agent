@@ -96,7 +96,7 @@ def _question_with_attachments(question: str, attachment_ids: list[str]) -> str:
         return question
     lines = [
         "[用户附件]",
-        "（沙箱 sandbox_execute / run_sandbox_code 自动挂载到 /mnt/data/<文件名>；分析前先 sandbox_inspect）",
+        "（附件已挂载到 /mnt/data/<文件名>；分析前先 activate_skill 加载对应 skill，再用 run_skill_script 执行命令）",
     ]
     for attachment_id in attachment_ids:
         meta = _file_store.get(attachment_id)

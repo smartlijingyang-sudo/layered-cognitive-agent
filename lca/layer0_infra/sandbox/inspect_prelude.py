@@ -28,12 +28,14 @@ for dirpath, _, filenames in _o.walk(root):
                     df = xl.parse(s)
                     nan_rows = int(df.isna().all(axis=1).sum())
                     cols = [str(c) for c in df.columns.tolist()]
+                    sample_rows = df.head(3).to_dict(orient="records")
                     sheets[s] = {
                         "rows": int(len(df)),
                         "columns": cols,
                         "column_count": len(cols),
                         "nan_rows": nan_rows,
                         "dtypes": {str(k): str(v) for k, v in df.dtypes.items()},
+                        "sample": sample_rows,
                     }
                 out["profiles"][fn] = {"type": "excel", "sheets": sheets}
             except Exception as exc:

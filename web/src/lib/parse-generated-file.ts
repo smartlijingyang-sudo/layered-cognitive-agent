@@ -12,6 +12,7 @@ const FILE_TOOL_NAMES = new Set([
   "file_write",
   "run_sandbox_code",
   "sandbox_execute",
+  "run_skill_script",
 ]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {

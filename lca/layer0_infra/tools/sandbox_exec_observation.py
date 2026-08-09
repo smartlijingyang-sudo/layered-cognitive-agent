@@ -35,6 +35,8 @@ def build_exec_observation(
     result: SandboxExecResult,
     invocation_id: str,
     start: float,
+    *,
+    tool_name: str = "sandbox_execute",
 ) -> Observation:
     """Build a structured Observation from ``SandboxExecResult``."""
     file_parts: list[dict[str, Any]] = []
@@ -104,7 +106,7 @@ def build_exec_observation(
         latency_ms=latency_ms,
         extra={"invocation_id": invocation_id, "files": file_parts},
     )
-    _record_workspace_artifacts(file_parts, "sandbox_execute")
+    _record_workspace_artifacts(file_parts, tool_name)
     return obs
 
 

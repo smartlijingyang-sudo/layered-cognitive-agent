@@ -128,6 +128,7 @@ class SandboxRuntime(Protocol):
         timeout_s: int | None = None,
         invocation_id: str = "",
         explicit_attachment_ids: list[str] | None = None,
+        extra_files: dict[str, bytes] | None = None,
     ) -> SandboxExecResult: ...
 
     async def destroy(self) -> None: ...

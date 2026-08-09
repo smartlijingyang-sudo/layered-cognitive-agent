@@ -693,10 +693,18 @@ describe("MessageProjector", () => {
     });
   });
 
-  /* 8. Sandbox messages */
-  describe("sandbox messages", () => {
-    it("should create and accumulate sandbox messages on SandboxOutputDelta", () => {
+  /* 8. Execution output merged into tool_call (LobeHub tool_state) */
+  describe("execution output on tool_call", () => {
+    it("should attach SandboxOutputDelta stdout/stderr to matching tool_call", () => {
       const proj = new MessageProjector();
+      proj.onEvent(
+        makeStamped({
+          type: "ToolStarted",
+          tool_name: "run_skill_script",
+          arguments_preview: '{"command":"python analyze.py"}',
+          invocation_id: "inv-sb",
+        }),
+      );
       proj.onEvent(
         makeStamped({
           type: "SandboxOutputDelta",
@@ -710,28 +718,33 @@ describe("MessageProjector", () => {
         makeStamped({
           type: "SandboxOutputDelta",
           invocation_id: "inv-sb",
-          stream: "stdout",
-          text_delta: "line 2\n",
-          seq: 1,
-        }),
-      );
-      proj.onEvent(
-        makeStamped({
-          type: "SandboxOutputDelta",
-          invocation_id: "inv-sb",
           stream: "stderr",
           text_delta: "warning!",
           seq: 0,
         }),
       );
+      proj.onEvent(
+        makeStamped({
+          type: "ToolInvoked",
+          tool_name: "run_skill_script",
+          arguments_preview: '{"command":"python analyze.py"}',
+          result_preview: "done",
+          ok: true,
+          latency_ms: 100,
+          attempt: 1,
+          error: "",
+          invocation_id: "inv-sb",
+          files: [],
+        }),
+      );
 
       const msgs = proj.getMessages();
-      const stdout = msgs.find((m) => m.id.includes("sandbox:inv-sb:stdout"));
-      const stderr = msgs.find((m) => m.id.includes("sandbox:inv-sb:stderr"));
-      expect(stdout).toBeDefined();
-      expect(stdout!.content).toContain("line 1\nline 2\n");
-      expect(stderr).toBeDefined();
-      expect(stderr!.content).toContain("warning!");
+      expect(msgs.filter((m) => m.kind === "sandbox")).toHaveLength(0);
+      const tool = findByKind(msgs, "tool_call");
+      expect(tool).toBeDefined();
+      expect(tool!.metadata?.stdout).toContain("line 1\n");
+      expect(tool!.metadata?.stderr).toContain("warning!");
+      expect(tool!.metadata?.sealed).toBe(true);
     });
   });
 

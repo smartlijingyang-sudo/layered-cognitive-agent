@@ -1,4 +1,4 @@
-"""run_skill_script — execScript with skill bundle mounted in sandbox."""
+"""run_skill_script — execScript with skill bundle mounted (LobeHub-aligned)."""
 
 from __future__ import annotations
 
@@ -12,9 +12,11 @@ from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
 from lca.contracts.protocols import Sandbox, Tool
 from lca.contracts.protocols.operational_skills import SkillNotFoundError, SkillPackageStore
 from lca.layer0_infra.file_store import FileStore, LocalFileStore, get_default_file_store
+from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
 from lca.layer0_infra.skills.activation_scope import resolve_skill_for_exec
 from lca.layer0_infra.skills.exec_bootstrap import build_skill_exec_code, skill_mount_files
-from lca.layer0_infra.tools.sandbox_observation import build_observation
+from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
+from lca.layer0_infra.tools.sandbox_exec_observation import build_exec_observation
 from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
 
 RUN_SKILL_SCRIPT_TOOL = "run_skill_script"
@@ -23,8 +25,9 @@ RUN_SKILL_SCRIPT_TOOL = "run_skill_script"
 class SkillExecTool(Tool):
     name = RUN_SKILL_SCRIPT_TOOL
     description = (
-        "在沙箱中执行 skill 捆绑脚本/命令：自动挂载 skill 资源目录为 cwd，"
-        "可选安装 requirements.txt。需先 activate_skill。"
+        "在已激活 skill 的工作目录中执行 shell 命令（execScript）。"
+        "需先 activate_skill；附件已挂载到 /mnt/data/<文件名>。"
+        "分析 Excel/CSV 等：先 activate 对应 skill，再在此执行 skill 文档中的命令或脚本。"
         "参数: command（shell 命令）、skill_id（可选，默认最近激活）、"
         "install_requirements（可选，默认 true）、timeout_s。"
     )
@@ -92,15 +95,27 @@ class SkillExecTool(Tool):
         )
         mounts = skill_mount_files(activated.skill_id, resources)
         invocation_id = get_current_tool_invocation_id() or new_id("skl")
-        result = await self._sandbox.run(
-            code=code,
+
+        runtime = await ensure_sandbox_runtime(
+            self._sandbox,
+            self._file_store,
+            attachment_ids=get_current_run_attachment_ids(),
+        )
+        result = await runtime.execute(
+            code,
             language="python",
-            files=mounts or None,
             timeout_s=timeout_s,
             invocation_id=invocation_id,
+            extra_files=mounts or None,
         )
 
-        obs = build_observation(self._file_store, result, invocation_id, start)
+        obs = build_exec_observation(
+            self._file_store,
+            result,
+            invocation_id,
+            start,
+            tool_name=RUN_SKILL_SCRIPT_TOOL,
+        )
         if isinstance(obs.payload, dict):
             obs.payload["skill_id"] = activated.skill_id
             obs.payload["command"] = command

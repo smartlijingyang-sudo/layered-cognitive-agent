@@ -29,6 +29,24 @@ export function toToolBlock(msg: Message): ToolBlock {
   };
 }
 
+/** Live execution output attached to a tool_call (LobeHub pluginState). */
+export function toExecOutputBlock(msg: Message): SandboxBlock | undefined {
+  const stdout = msg.metadata?.stdout ?? "";
+  const stderr = msg.metadata?.stderr ?? "";
+  if (!stdout && !stderr && !msg.metadata?.invocationId) return undefined;
+  if (!stdout && !stderr && msg.metadata?.sealed) return undefined;
+  return {
+    kind: "sandbox",
+    id: `${msg.id}:exec`,
+    status: msg.metadata?.sealed ? "done" : "running",
+    invocationId: msg.metadata?.invocationId ?? "",
+    stdout,
+    stderr,
+    sealed: msg.metadata?.sealed ?? false,
+    agentRole: msg.agentRole,
+  };
+}
+
 /** Convert a sandbox-kind Message into a SandboxBlock for SandboxPanel. */
 export function toSandboxBlock(msg: Message): SandboxBlock {
   return {

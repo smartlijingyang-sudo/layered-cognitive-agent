@@ -190,7 +190,7 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         assert isinstance(obs.payload, dict)
         self.assertEqual(obs.payload.get("error_kind"), "user_code")
 
-    def test_build_default_tools_includes_sandbox_suite(self) -> None:
+    def test_build_default_tools_excludes_raw_sandbox_tools(self) -> None:
         with (
             patch.dict(
                 os.environ, {"ONLYBOXES_BASE_URL": "http://x", "ONLYBOXES_ACCESS_TOKEN": "obx_x"}
@@ -200,9 +200,10 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         ):
             tools = build_default_tools(self.store)
         names = {t.name for t in tools}
-        self.assertIn(SANDBOX_INSPECT_TOOL_NAME, names)
-        self.assertIn(SANDBOX_EXECUTE_TOOL_NAME, names)
-        self.assertIn(SANDBOX_TOOL_NAME, names)
+        self.assertNotIn(SANDBOX_INSPECT_TOOL_NAME, names)
+        self.assertNotIn(SANDBOX_EXECUTE_TOOL_NAME, names)
+        self.assertNotIn(SANDBOX_TOOL_NAME, names)
+        self.assertIn("run_skill_script", names)
 
     async def test_open_path_roundtrip_to_outputs(self) -> None:
         code = (

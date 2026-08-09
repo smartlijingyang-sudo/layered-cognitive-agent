@@ -25,7 +25,8 @@ class SkillActivateTool(Tool):
     name = ACTIVATE_SKILL_TOOL
     description = (
         "激活已安装的操作 skill，将其 SKILL.md 操作指南注入当前上下文。"
-        "与角色身份无关；任意 agent 执行中均可调用。"
+        "分析附件（Excel/PDF 等）时优先激活匹配 skill（如 anthropics-skills-xlsx），"
+        "再通过 run_skill_script 执行 skill 文档中的命令。"
         "参数: skill_id（安装时的 identifier 或 import 返回的 skill_id）。"
     )
     parameters: ClassVar[dict[str, Any]] = {

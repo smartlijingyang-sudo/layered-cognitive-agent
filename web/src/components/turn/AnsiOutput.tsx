@@ -16,10 +16,12 @@ export function stripAnsi(text: string): string {
 export function AnsiOutput({
   text,
   className,
+  maxHeightClass = "max-h-[200px]",
   tone = "default",
 }: {
   readonly text: string;
   readonly className?: string;
+  readonly maxHeightClass?: string;
   readonly tone?: "default" | "error";
 }) {
   const cleaned = useMemo(() => stripAnsi(text), [text]);
@@ -28,7 +30,8 @@ export function AnsiOutput({
   return (
     <pre
       className={cn(
-        "m-0 max-h-[200px] overflow-auto rounded-[var(--radius-sm)] p-2",
+        "m-0 overflow-auto rounded-[var(--radius-sm)] border border-[var(--border-subtle)] p-2",
+        maxHeightClass,
         "font-mono text-xs leading-[1.6] whitespace-pre-wrap break-words",
         "bg-[var(--fill-secondary)]",
         tone === "error" ? "text-[var(--color-danger)]" : "text-[var(--text)]",

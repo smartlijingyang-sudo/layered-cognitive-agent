@@ -86,7 +86,9 @@ class GatewayAttachmentTests(unittest.TestCase):
         self.assertEqual(session.attachment_ids, (stored.attachment_id,))
         # Question embeds guest path so the model writes correct open() paths.
         self.assertIn(f"/mnt/data/{stored.name}", session.question)
-        self.assertIn("自动挂载", session.question)
+        self.assertIn("已挂载", session.question)
+        self.assertIn("activate_skill", session.question)
+        self.assertIn("run_skill_script", session.question)
 
     def test_create_run_session_stores_attachment_ids(self) -> None:
         from gateway.run_executor import create_run_session

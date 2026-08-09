@@ -234,6 +234,15 @@ class TestDefaultTools(unittest.TestCase):
         self.assertIn("activate_skill", names)
         self.assertIn("read_skill_reference", names)
         self.assertNotIn("run_skill_script", names)
+        self.assertNotIn("sandbox_execute", names)
+        self.assertNotIn("sandbox_inspect", names)
+
+    def test_build_default_tools_includes_run_skill_script_when_sandbox(self) -> None:
+        with patch("lca.layer0_infra.tools.default_set.resolve_sandbox") as mock_sbx:
+            mock_sbx.return_value = object()
+            names = {t.name for t in build_default_tools()}
+        self.assertIn("run_skill_script", names)
+        self.assertNotIn("sandbox_execute", names)
 
     def test_sanitize_skill_id(self) -> None:
         self.assertEqual(sanitize_skill_id("anthropics-skills-pdf"), "anthropics-skills-pdf")

@@ -587,6 +587,20 @@
     border-top: 1px dashed var(--border-subtle);
   }
 
+  /* LobeHub RunCommand expand body — outlined block, capped scroll */
+  .lobe-run-command-block {
+    display: grid;
+    gap: 8px;
+    max-width: 100%;
+    padding-inline: 8px 0;
+  }
+
+  .lobe-run-command-block .lobe-code-highlight {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
   .lobe-skill-body {
     font-size: 13px;
     line-height: 1.65;

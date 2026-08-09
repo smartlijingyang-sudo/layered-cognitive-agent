@@ -35,9 +35,9 @@
 
   --motion-fast: 180ms;
   --motion-normal: 240ms;
-  --chat-max-width: 960px;
+  --chat-max-width: 48rem;
   /* LobeHub home column — welcome + composer share width/padding */
-  --home-max-width: 960px;
+  --home-max-width: 48rem;
   --home-column-padding: 1rem;
   --sidebar-width: 272px;
   --control-height: 36px;

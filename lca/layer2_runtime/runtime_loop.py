@@ -172,13 +172,15 @@ class CognitiveRuntime(Runtime):
 
     @staticmethod
     def _apply_artifact_closure(state: AgentState) -> None:
-        """Synthesize user-facing output from workspace ledger when loop exits without respond."""
-        if state.final_output:
-            return
+        """Append workspace deliverables to final output (LobeHub workRegistration-style)."""
         closure = synthesize_artifact_closure()
         if not closure:
             return
-        state.final_output = closure
+        if state.final_output:
+            if closure.strip() not in state.final_output:
+                state.final_output = state.final_output.rstrip() + "\n\n" + closure
+        else:
+            state.final_output = closure
         if state.status == TaskStatus.WORKING:
             state.status = TaskStatus.COMPLETED
 

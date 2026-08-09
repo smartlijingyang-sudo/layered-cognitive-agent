@@ -37,6 +37,7 @@ export interface MessageMetadata {
   readonly detail?: string;
   readonly method?: string;
   readonly candidateCount?: number;
+  readonly files?: readonly unknown[];
 }
 
 export interface Message {
