@@ -14,6 +14,7 @@ from lca.layer0_infra.sandbox.factory import resolve_sandbox, sandbox_backend
 from lca.layer0_infra.sandbox.onlyboxes_adapter import (
     OnlyboxesSandboxAdapter,
     _build_wrapped_code,
+    _strip_surrogates,
 )
 from lca.layer0_infra.sandbox.onlyboxes_artifacts import (
     ARTIFACT_BEGIN,
@@ -45,6 +46,17 @@ class StripArtifactsTests(unittest.TestCase):
         self.assertIn(SANDBOX_MOUNT_ROOT, wrapped)
         self.assertIn("input.bin", wrapped)
         self.assertIn(ARTIFACT_BEGIN, wrapped)
+
+    def test_strip_surrogates_replaces_lone_surrogates(self) -> None:
+        text = "hello\ud800world\udfff"
+        cleaned = _strip_surrogates(text)
+        self.assertEqual(cleaned, "hello\ufffdworld\ufffd")
+        cleaned.encode("utf-8")
+
+    def test_build_wrapped_code_handles_surrogates(self) -> None:
+        code = 'print("\ud800")'
+        wrapped = _build_wrapped_code(code, None)
+        wrapped.encode("utf-8")
 
 
 class FactoryTests(unittest.TestCase):

@@ -199,7 +199,7 @@ class SandboxCodeTool(Tool):
         for label, body in (("stdout", result.stdout), ("stderr", result.stderr)):
             if len(body) > SANDBOX_PREVIEW_CHAR_LIMIT:
                 stored = self._store.put(
-                    data=body.encode("utf-8"),
+                    data=body.encode("utf-8", errors="replace"),
                     name=f"{invocation_id}_{label}.log",
                     mime_type=_LOG_MIME,
                 )
