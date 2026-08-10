@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import unittest
 
+from lca.contracts.atoms.enums import StreamChannel
 from lca.contracts.models.observability.journal import (
     DelegationIssued,
     RunScope,
     StampedEvent,
+    StepTextDelta,
     TeamRunFinished,
     TeamRunStarted,
 )
@@ -69,6 +71,62 @@ class TestSseProjector(unittest.TestCase):
         self.assertEqual(len(received), 2)
         self.assertIn("TeamRunStarted", received[0])
         self.assertIsNone(received[1])
+
+
+class TestSseProjectorStepTextDeltaFilter(unittest.TestCase):
+    def test_decision_channel_filtered(self) -> None:
+        """decision channel 的 StepTextDelta 不应出现在 SSE 输出中。"""
+        received: list[str | None] = []
+        projector = SSEJournalProjector(received.append)
+        scope = RunScope(trace_id="t", run_id="r")
+
+        # decision channel — 应被过滤
+        projector.on_event(
+            StampedEvent(
+                seq=1,
+                ts=1.0,
+                scope=scope,
+                event=StepTextDelta(
+                    step=0, text_delta="raw token", seq=0, channel=StreamChannel.DECISION.value
+                ),
+            )
+        )
+        # answer channel — 应通过
+        projector.on_event(
+            StampedEvent(
+                seq=2,
+                ts=2.0,
+                scope=scope,
+                event=StepTextDelta(
+                    step=0, text_delta="visible text", seq=1, channel=StreamChannel.ANSWER.value
+                ),
+            )
+        )
+
+        # 只有 answer channel 的帧（+ close 的 None）
+        non_none = [f for f in received if f is not None]
+        self.assertEqual(len(non_none), 1)
+        self.assertIn("visible text", non_none[0])
+        self.assertNotIn("raw token", non_none[0])
+
+    def test_answer_channel_passes_through(self) -> None:
+        """answer channel 的 StepTextDelta 正常通过。"""
+        received: list[str | None] = []
+        projector = SSEJournalProjector(received.append)
+        scope = RunScope(trace_id="t", run_id="r")
+        projector.on_event(
+            StampedEvent(
+                seq=1,
+                ts=1.0,
+                scope=scope,
+                event=StepTextDelta(
+                    step=0, text_delta="hello", seq=0, channel=StreamChannel.ANSWER.value
+                ),
+            )
+        )
+        non_none = [f for f in received if f is not None]
+        self.assertEqual(len(non_none), 1)
+        self.assertIn("hello", non_none[0])
 
 
 if __name__ == "__main__":

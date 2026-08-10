@@ -10,7 +10,8 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Callable
 
-from lca.contracts.models.observability.journal import RunInsight, StampedEvent
+from lca.contracts.atoms.enums import StreamChannel
+from lca.contracts.models.observability.journal import RunInsight, StampedEvent, StepTextDelta
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.observability.journal.sse_frames import stamped_to_sse_frame
 
@@ -32,6 +33,12 @@ class SSEJournalProjector(JournalProjector):
             # RunInsight 可丢弃：InsightEngine 回注，非协作叙事关键路径
             with contextlib.suppress(Exception):
                 self._emit(stamped_to_sse_frame(stamped))
+            return
+        # 过滤 decision channel 的 StepTextDelta — 只转发 answer channel
+        if (
+            isinstance(stamped.event, StepTextDelta)
+            and stamped.event.channel == StreamChannel.DECISION.value
+        ):
             return
         self._emit(stamped_to_sse_frame(stamped))
 
