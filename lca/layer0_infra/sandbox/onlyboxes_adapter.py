@@ -126,28 +126,33 @@ class OnlyboxesSandboxAdapter(Sandbox):
         path: str,
         *,
         session_id: str = "",
+        timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
     ) -> None:
         """Write text content to *path* via base64 chunking."""
         data = content.encode("utf-8")
-        await self._write_file_chunked(data, path, session_id)
+        await self._write_file_chunked(data, path, session_id, timeout_s=timeout_s)
 
     async def _write_file_chunked(
         self,
         data: bytes,
         path: str,
         session_id: str,
+        *,
+        timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
     ) -> None:
         """Write binary data to *path* in base64-encoded chunks."""
         # Truncate target and ensure parent directory exists.
         await self._exec_terminal(
             f"mkdir -p \"$(dirname '{path}')\" && : > '{path}'",
             session_id=session_id,
+            timeout_s=timeout_s,
         )
         for offset in range(0, max(len(data), 1), WRITE_CHUNK_BYTES):
             chunk = base64.b64encode(data[offset : offset + WRITE_CHUNK_BYTES]).decode("ascii")
             await self._exec_terminal(
                 f"printf '%s' '{chunk}' | base64 -d >> '{path}'",
                 session_id=session_id,
+                timeout_s=timeout_s,
             )
 
     # ── Sandbox protocol: write_files ───────────────────────────────
@@ -190,7 +195,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
 
         # Chunked binary writes.
         for _name, data, path in chunk_files:
-            await self._write_file_chunked(data, path, session_id)
+            await self._write_file_chunked(data, path, session_id, timeout_s=timeout_s)
 
         return SandboxResult(success=True, exit_code=0)
 
@@ -209,7 +214,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
         runner = _LANG_RUNNER.get(lang_key, _DEFAULT_RUNNER)
 
         code_path = f"/tmp/lca-code-{new_id('code')}.{ext}"  # noqa: S108
-        await self._write_text_file(code, code_path, session_id="")
+        await self._write_text_file(code, code_path, session_id="", timeout_s=timeout_s)
         return await self._exec_terminal(
             f"{runner} '{code_path}'",
             timeout_s=timeout_s,
@@ -242,7 +247,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
         runner = _LANG_RUNNER.get(lang_key, _DEFAULT_RUNNER)
 
         code_path = f"/tmp/lca-code-{new_id('code')}.{ext}"  # noqa: S108
-        await self._write_text_file(code, code_path, session_id=session_id)
+        await self._write_text_file(code, code_path, session_id=session_id, timeout_s=timeout_s)
         return await self._exec_terminal(
             f"{runner} '{code_path}'",
             session_id=session_id,
