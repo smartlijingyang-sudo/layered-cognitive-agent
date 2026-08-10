@@ -10,11 +10,15 @@ from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDAT
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
 from lca.contracts.protocols import Sandbox, Tool
-from lca.contracts.protocols.operational_skills import SkillNotFoundError, SkillPackageStore
+from lca.contracts.protocols.operational_skills import (
+    SANDBOX_SKILL_MOUNT_PREFIX,
+    SkillNotFoundError,
+    SkillPackageStore,
+)
 from lca.layer0_infra.file_store import FileStore, LocalFileStore, get_default_file_store
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
 from lca.layer0_infra.skills.activation_scope import resolve_skill_for_exec
-from lca.layer0_infra.skills.exec_bootstrap import build_skill_exec_code, skill_mount_files
+from lca.layer0_infra.skills.exec_bootstrap import build_skill_exec_code
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.sandbox_exec_observation import build_exec_observation
 from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
@@ -93,7 +97,8 @@ class SkillExecTool(Tool):
             command=command,
             install_requirements=install_req,
         )
-        mounts = skill_mount_files(activated.skill_id, resources)
+        prefix = f"{SANDBOX_SKILL_MOUNT_PREFIX}/{activated.skill_id}"
+        mounts = {f"{prefix}/{rel}": data for rel, data in resources.items()}
         invocation_id = get_current_tool_invocation_id() or new_id("skl")
 
         runtime = await ensure_sandbox_runtime(

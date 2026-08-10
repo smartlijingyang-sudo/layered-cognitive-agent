@@ -17,7 +17,6 @@ from lca.contracts.models.core.sandbox import (
     SandboxErrorKind,
     SandboxExecResult,
     SandboxResult,
-    SessionConfig,
     SessionInfo,
 )
 from lca.contracts.protocols import Sandbox, SandboxRuntime
@@ -57,6 +56,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         self._manifest = MountManifest()
         self._inspect_profile: dict[str, Any] | None = None
         self._ready = False
+        self._staged_file_keys: set[str] = set()
 
     @property
     def run_id(self) -> str:
@@ -80,12 +80,8 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         self._manifest = build_mount_manifest(self._store, self._mount_files)
 
         if self._session is None and not self._stateless:
-            config = SessionConfig(
-                timeout_s=self._default_timeout_s,
-                files=self._mount_files,
-            )
             try:
-                self._session = await self._sandbox.create_session(config)
+                self._session = await self._sandbox.create_session()
             except Exception:
                 _log.debug("sandbox_session_create_failed", exc_info=True)
                 self._session = None
@@ -236,9 +232,15 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         invocation_id: str = "",
         extra_files: dict[str, bytes] | None = None,
     ) -> SandboxResult:
-        mount_files = self._mount_files
-        if extra_files:
-            mount_files = {**self._mount_files, **extra_files}
+        # Phase 1: Stage files incrementally (only new files)
+        all_files: dict[str, bytes | str] = {**self._mount_files, **(extra_files or {})}
+        new_files = {k: v for k, v in all_files.items() if k not in self._staged_file_keys}
+        if new_files:
+            session_id = self._session.session_id if self._session else ""
+            await self._sandbox.write_files(new_files, base_dir="/mnt/data", session_id=session_id)
+            self._staged_file_keys.update(new_files.keys())
+
+        # Phase 2: Execute code (no files parameter)
         if self._session is not None and not self._stateless:
             return await self._sandbox.run_in_session(
                 session_id=self._session.session_id,
@@ -246,12 +248,10 @@ class RunBoundSandboxRuntime(SandboxRuntime):
                 language=language,
                 timeout_s=timeout_s,
                 invocation_id=invocation_id,
-                files=mount_files or None,
             )
         return await self._sandbox.run(
             code=code,
             language=language,
-            files=mount_files or None,
             timeout_s=timeout_s,
             invocation_id=invocation_id,
         )

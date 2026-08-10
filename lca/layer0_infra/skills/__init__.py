@@ -12,7 +12,6 @@ from lca.layer0_infra.skills.disk_store import DiskSkillPackageStore
 from lca.layer0_infra.skills.exec_bootstrap import (
     build_skill_exec_code,
     skill_mount_dir,
-    skill_mount_files,
 )
 from lca.layer0_infra.skills.factory import resolve_skill_importer, resolve_skill_store
 from lca.layer0_infra.skills.http_importer import HttpSkillImporter
@@ -30,5 +29,4 @@ __all__ = [
     "resolve_skill_importer",
     "resolve_skill_store",
     "skill_mount_dir",
-    "skill_mount_files",
 ]

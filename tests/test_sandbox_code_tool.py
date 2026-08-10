@@ -156,6 +156,7 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
             await tool.execute({"code": 'print("one")'})
             await tool.execute({"code": 'print("two")'})
         self.assertEqual(len(self.sandbox.created_sessions), 1)
+        # 3 calls: 1 inspect (ensure_ready) + 2 user code
         self.assertEqual(len(self.sandbox.session_run_calls), 3)
         await unbind_sandbox_runtime(rid)
         self.assertEqual(self.sandbox.destroyed_sessions, ["sess_1"])
@@ -210,7 +211,8 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
             f'data = open("{SANDBOX_MOUNT_ROOT}/input.csv", "rb").read()\n'
             f'open("{SANDBOX_MOUNT_ROOT}/{SANDBOX_OUTPUT_SUBDIR}/echo.csv", "wb").write(data)\n'
         )
-        result = await self.sandbox.run(code, files={"input.csv": b"a,b\n1,2\n"})
+        await self.sandbox.write_files({"input.csv": b"a,b\n1,2\n"})
+        result = await self.sandbox.run(code)
         self.assertTrue(result.success)
         self.assertEqual(len(result.generated_files), 1)
         self.assertEqual(result.generated_files[0].name, "echo.csv")

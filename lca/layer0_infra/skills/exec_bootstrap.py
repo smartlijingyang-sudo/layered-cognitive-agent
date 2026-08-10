@@ -6,6 +6,7 @@ import json
 
 from lca.contracts.models.core.sandbox import SANDBOX_MOUNT_ROOT
 from lca.contracts.protocols.operational_skills import SANDBOX_SKILL_MOUNT_PREFIX
+from lca.layer0_infra.credentials.sandbox_env import build_sandbox_env_preamble
 
 
 def skill_mount_dir(skill_id: str) -> str:
@@ -27,12 +28,13 @@ if _req.is_file():
         cwd={mount!r},
     )
 """
+    env_preamble = build_sandbox_env_preamble()
     return f"""
 import os as _lca_os
 import subprocess as _lca_sp
 import sys as _lca_sys
 from pathlib import Path as _lca_Path
-
+{env_preamble}
 _lca_root = {mount!r}
 _lca_os.makedirs(_lca_root, exist_ok=True)
 _lca_os.chdir(_lca_root)
@@ -51,15 +53,3 @@ if _lca_proc.stderr:
 if _lca_proc.returncode:
     raise SystemExit(_lca_proc.returncode)
 """
-
-
-def skill_mount_files(
-    skill_id: str,
-    resource_files: dict[str, bytes],
-) -> dict[str, bytes]:
-    """Map store resources to Sandbox ``files`` mount keys."""
-    prefix = f"{SANDBOX_SKILL_MOUNT_PREFIX}/{skill_id}"
-    mounts: dict[str, bytes] = {}
-    for rel, data in resource_files.items():
-        mounts[f"{prefix}/{rel}"] = data
-    return mounts
