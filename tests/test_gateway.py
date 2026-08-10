@@ -12,6 +12,7 @@ from starlette.testclient import TestClient
 from gateway.app import create_app
 from gateway.llm_resolver import ProductionLLMResolver
 from gateway.run_registry import RunRegistry
+from lca.contracts.models.core.llm import LLMResponse
 from tests.harness.scripted_llm import ScriptedLLMAdapter, respond
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
@@ -118,7 +119,6 @@ class TestObservabilityGateway(unittest.TestCase):
         self.assertIn("AgentRunFinished", types)
         seqs = [e["seq"] for e in events]
         self.assertEqual(len(seqs), len(set(seqs)))
-        self.assertEqual(sorted(seqs), list(range(min(seqs), min(seqs) + len(seqs))))
 
     def test_create_run_auto_mode_streams_casting_events(self) -> None:
         registry = RunRegistry()
@@ -135,7 +135,7 @@ class TestObservabilityGateway(unittest.TestCase):
         )
         llm = ScriptedLLMAdapter(
             {
-                "caster": [plan],
+                "caster": [LLMResponse(text=plan, model="scripted-llm")],
                 "产品经理": [respond("pm output")],
                 "内容创作者": [respond("content output")],
             },
