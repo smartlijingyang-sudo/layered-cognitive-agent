@@ -1,20 +1,26 @@
-"""Onlyboxes-backed sandbox — console REST + pythonExec.
+"""Onlyboxes-backed sandbox — unified terminalExec channel.
 
 Auth: ``Authorization: Bearer <access token>`` against console HTTP.
-Execution: ``POST /api/v1/tasks`` capability ``pythonExec`` (stateless) or
-``POST /api/v1/sessions`` (run-bound persistent sessions, ADR-0050).
+Execution: all operations go through ``POST /api/v1/commands/terminal``
+(aligned with LobeHub ``execTerminal`` pattern).
 
-Input files are staged under ``/mnt/data/<name>`` by bootstrap preamble;
-products under ``/mnt/data/outputs/`` are harvested via base64 artifact block.
+File writing uses two strategies:
+- URL strings → ``curl -fsSL <url> -o <path>``
+- Binary data → 48 KB base64 chunks via ``printf '%s' '<b64>' | base64 -d >> '<path>'``
+
+Code execution writes source to ``/tmp/lca-code-<id>.<ext>`` then runs the
+appropriate interpreter, avoiding ``ARG_MAX`` crashes from inline base64.
 """
 
 from __future__ import annotations
 
+import base64
 from typing import Any
 
 import httpx
 import structlog
 
+from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.sandbox import (
     DEFAULT_SANDBOX_TIMEOUT_S,
     SandboxResult,
@@ -23,26 +29,38 @@ from lca.contracts.models.core.sandbox import (
 )
 from lca.contracts.protocols import Sandbox
 from lca.layer0_infra.sandbox.onlyboxes_bootstrap import (
-    CAPABILITY_PYTHON,
-    PYTHON_LANGUAGES,
     auth_headers,
-    build_wrapped_code,
-    parse_exec_response,
+    parse_terminal_response,
+    safe_rel_name,
     timeout_ms,
-    wait_ms,
-)
-from lca.layer0_infra.sandbox.onlyboxes_session import (
-    http_create_session,
-    http_destroy_session,
-    http_run_in_session,
 )
 from lca.layer0_infra.sandbox.streaming import SandboxStreamEmitter
 
 _log = structlog.get_logger(__name__)
 
+# ── constants ───────────────────────────────────────────────────────
+
+WRITE_CHUNK_BYTES: int = 48 * 1024
+DEFAULT_LEASE_TTL_SEC: int = 900
+
+_TERMINAL_ENDPOINT: str = "/api/v1/commands/terminal"
+
+_LANG_EXTENSION: dict[str, str] = {
+    "python": "py",
+    "javascript": "js",
+    "typescript": "ts",
+}
+_LANG_RUNNER: dict[str, str] = {
+    "python": "python3",
+    "javascript": "node",
+    "typescript": "npx --yes tsx",
+}
+_DEFAULT_EXTENSION: str = "py"
+_DEFAULT_RUNNER: str = "python3"
+
 
 class OnlyboxesSandboxAdapter(Sandbox):
-    """HTTP client for Onlyboxes console pythonExec + sessions."""
+    """HTTP client for Onlyboxes console — unified terminalExec channel."""
 
     name = "onlyboxes-sandbox"
 
@@ -56,41 +74,37 @@ class OnlyboxesSandboxAdapter(Sandbox):
         self._base_url = base_url.rstrip("/")
         self._access_token = access_token
         self._client = client
+        self._lease_ttl_sec = DEFAULT_LEASE_TTL_SEC
 
-    async def run(
+    # ── internal: terminal execution ────────────────────────────────
+
+    async def _exec_terminal(
         self,
-        code: str,
-        language: str = "python",
-        files: dict[str, bytes] | None = None,
+        command: str,
+        *,
+        session_id: str = "",
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
-        **kwargs: Any,
+        invocation_id: str = "",
     ) -> SandboxResult:
-        if language and language.lower() not in PYTHON_LANGUAGES:
-            return SandboxResult(
-                success=False,
-                exit_code=1,
-                error=f"OnlyboxesSandboxAdapter supports python only, got {language!r}",
-            )
-
-        invocation_id = str(kwargs.get("invocation_id", "") or "")
+        """Unified terminal execution channel — aligned with LobeHub execTerminal."""
         emitter = SandboxStreamEmitter(invocation_id)
-        wrapped = build_wrapped_code(code, files)
         t_ms = timeout_ms(timeout_s)
-        w_ms = wait_ms(timeout_s)
-        body = {
-            "capability": CAPABILITY_PYTHON,
-            "input": {"code": wrapped, "timeout_ms": t_ms},
-            "mode": "sync",
-            "wait_ms": w_ms,
-            "timeout_ms": t_ms,
-        }
 
         owns_client = self._client is None
-        client = self._client or httpx.AsyncClient(timeout=httpx.Timeout((t_ms / 1000.0) + 15.0))
+        client = self._client or httpx.AsyncClient(
+            timeout=httpx.Timeout((t_ms / 1000.0) + 15.0),
+        )
         try:
+            body = {
+                "command": command,
+                "create_if_missing": True,
+                "lease_ttl_sec": self._lease_ttl_sec,
+                "session_id": session_id,
+                "timeout_ms": t_ms,
+            }
             try:
                 response = await client.post(
-                    f"{self._base_url}/api/v1/tasks",
+                    f"{self._base_url}{_TERMINAL_ENDPOINT}",
                     headers=auth_headers(self._access_token),
                     json=body,
                 )
@@ -99,18 +113,120 @@ class OnlyboxesSandboxAdapter(Sandbox):
                 emitter.emit_stderr(err + "\n")
                 return SandboxResult(success=False, exit_code=1, error=err, stderr=err + "\n")
 
-            return parse_exec_response(response, emitter)
+            return parse_terminal_response(response, emitter)
         finally:
             if owns_client:
                 await client.aclose()
 
-    async def create_session(self, config: SessionConfig | None = None) -> SessionInfo | None:
-        return await http_create_session(
-            self._base_url,
-            self._access_token,
-            config or SessionConfig(),
-            self._client,
+    # ── internal: file writing helpers ──────────────────────────────
+
+    async def _write_text_file(
+        self,
+        content: str,
+        path: str,
+        *,
+        session_id: str = "",
+    ) -> None:
+        """Write text content to *path* via base64 chunking."""
+        data = content.encode("utf-8")
+        await self._write_file_chunked(data, path, session_id)
+
+    async def _write_file_chunked(
+        self,
+        data: bytes,
+        path: str,
+        session_id: str,
+    ) -> None:
+        """Write binary data to *path* in base64-encoded chunks."""
+        # Truncate target and ensure parent directory exists.
+        await self._exec_terminal(
+            f"mkdir -p \"$(dirname '{path}')\" && : > '{path}'",
+            session_id=session_id,
         )
+        for offset in range(0, max(len(data), 1), WRITE_CHUNK_BYTES):
+            chunk = base64.b64encode(data[offset : offset + WRITE_CHUNK_BYTES]).decode("ascii")
+            await self._exec_terminal(
+                f"printf '%s' '{chunk}' | base64 -d >> '{path}'",
+                session_id=session_id,
+            )
+
+    # ── Sandbox protocol: write_files ───────────────────────────────
+
+    async def write_files(
+        self,
+        files: dict[str, bytes | str],
+        *,
+        base_dir: str = "/mnt/data",
+        session_id: str = "",
+        timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
+    ) -> SandboxResult:
+        """Write files to sandbox disk.
+
+        * ``str`` values starting with ``http(s)://`` → ``curl`` download.
+        * ``bytes`` values → 48 KB base64-chunked write.
+        """
+        curl_cmds: list[str] = []
+        chunk_files: list[tuple[str, bytes, str]] = []
+
+        for name, source in files.items():
+            path = f"{base_dir}/{safe_rel_name(name)}"
+            if isinstance(source, str) and source.startswith(("http://", "https://")):
+                curl_cmds.append(f"curl -fsSL '{source}' -o '{path}'")
+            else:
+                raw = source if isinstance(source, bytes) else source.encode("utf-8")
+                chunk_files.append((name, raw, path))
+
+        # Batch curl downloads in a single terminal call with idempotency marker.
+        if curl_cmds:
+            marker = f"{base_dir}/.lca-files-initialized"
+            joined = " && ".join(curl_cmds)
+            cmd = (
+                f"mkdir -p '{base_dir}'; "
+                f"if [ ! -f '{marker}' ]; then {joined} && touch '{marker}'; fi"
+            )
+            result = await self._exec_terminal(cmd, session_id=session_id, timeout_s=timeout_s)
+            if not result.success:
+                return result
+
+        # Chunked binary writes.
+        for _name, data, path in chunk_files:
+            await self._write_file_chunked(data, path, session_id)
+
+        return SandboxResult(success=True, exit_code=0)
+
+    # ── Sandbox protocol: run ───────────────────────────────────────
+
+    async def run(
+        self,
+        code: str,
+        language: str = "python",
+        timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
+        **kwargs: Any,
+    ) -> SandboxResult:
+        """Execute code by writing to a temp file then running the interpreter."""
+        lang_key = language.lower() if language else "python"
+        ext = _LANG_EXTENSION.get(lang_key, _DEFAULT_EXTENSION)
+        runner = _LANG_RUNNER.get(lang_key, _DEFAULT_RUNNER)
+
+        code_path = f"/tmp/lca-code-{new_id('code')}.{ext}"  # noqa: S108
+        await self._write_text_file(code, code_path, session_id="")
+        return await self._exec_terminal(
+            f"{runner} '{code_path}'",
+            timeout_s=timeout_s,
+            invocation_id=str(kwargs.get("invocation_id", "") or ""),
+        )
+
+    # ── Sandbox protocol: sessions ──────────────────────────────────
+
+    async def create_session(
+        self,
+        config: SessionConfig | None = None,
+    ) -> SessionInfo | None:
+        """Lightweight: no-op command triggers container creation."""
+        result = await self._exec_terminal(":", timeout_s=30)
+        if result.success:
+            return SessionInfo(session_id="terminal-session", container_id="")
+        return None
 
     async def run_in_session(
         self,
@@ -120,31 +236,48 @@ class OnlyboxesSandboxAdapter(Sandbox):
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
         **kwargs: Any,
     ) -> SandboxResult:
-        if language and language.lower() not in PYTHON_LANGUAGES:
-            return SandboxResult(
-                success=False,
-                exit_code=1,
-                error=f"OnlyboxesSandboxAdapter supports python only, got {language!r}",
-            )
-        files = kwargs.get("files")
-        file_map = files if isinstance(files, dict) else None
-        invocation_id = str(kwargs.get("invocation_id", "") or "")
-        return await http_run_in_session(
-            self._base_url,
-            self._access_token,
-            session_id,
-            code,
-            language,
-            timeout_s,
-            self._client,
-            invocation_id=invocation_id,
-            files=file_map,
+        """Execute code within an existing session."""
+        lang_key = language.lower() if language else "python"
+        ext = _LANG_EXTENSION.get(lang_key, _DEFAULT_EXTENSION)
+        runner = _LANG_RUNNER.get(lang_key, _DEFAULT_RUNNER)
+
+        code_path = f"/tmp/lca-code-{new_id('code')}.{ext}"  # noqa: S108
+        await self._write_text_file(code, code_path, session_id=session_id)
+        return await self._exec_terminal(
+            f"{runner} '{code_path}'",
+            session_id=session_id,
+            timeout_s=timeout_s,
+            invocation_id=str(kwargs.get("invocation_id", "") or ""),
         )
 
     async def destroy_session(self, session_id: str) -> None:
-        await http_destroy_session(
-            self._base_url,
-            self._access_token,
-            session_id,
-            self._client,
+        """DELETE /api/v1/sessions/{id}. Idempotent."""
+        owns_client = self._client is None
+        client = self._client or httpx.AsyncClient(timeout=httpx.Timeout(15.0))
+        try:
+            await client.delete(
+                f"{self._base_url}/api/v1/sessions/{session_id}",
+                headers=auth_headers(self._access_token),
+            )
+        except httpx.HTTPError:
+            _log.debug("session_destroy_error", session_id=session_id, exc_info=True)
+        finally:
+            if owns_client:
+                await client.aclose()
+
+    # ── Extended: run_terminal (backward compat for computer runtime) ─
+
+    async def run_terminal(
+        self,
+        command: str,
+        *,
+        timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
+        **kwargs: Any,
+    ) -> SandboxResult:
+        """Native shell via terminalExec channel."""
+        invocation_id = str(kwargs.get("invocation_id", "") or "")
+        return await self._exec_terminal(
+            command,
+            timeout_s=timeout_s,
+            invocation_id=invocation_id,
         )

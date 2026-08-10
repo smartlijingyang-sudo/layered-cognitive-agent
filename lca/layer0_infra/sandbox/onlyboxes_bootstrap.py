@@ -17,6 +17,7 @@ from lca.contracts.models.core.sandbox import (
     SANDBOX_MOUNT_ROOT,
     SandboxResult,
 )
+from lca.layer0_infra.credentials.sandbox_env import build_sandbox_env_preamble
 from lca.layer0_infra.sandbox.onlyboxes_artifacts import (
     ARTIFACT_BEGIN,
     ARTIFACT_END,
@@ -30,6 +31,7 @@ from lca.layer0_infra.text.safe_boundary import sanitize_stream_text
 
 PYTHON_LANGUAGES: frozenset[str] = frozenset({"python", "py"})
 CAPABILITY_PYTHON = "pythonExec"
+CAPABILITY_TERMINAL = "terminalExec"
 TASK_MODE_SYNC = "sync"
 MAX_WAIT_MS = 60_000
 MAX_TIMEOUT_MS = 600_000
@@ -76,6 +78,7 @@ def build_wrapped_code(code: str, files: dict[str, bytes] | None) -> str:
     mounts_literal = json.dumps(mount_items, ensure_ascii=False)
     out_dir = sandbox_output_dir()
     user_literal = json.dumps(_strip_surrogates(code))
+    env_preamble = build_sandbox_env_preamble()
 
     return f"""# --- LCA Onlyboxes bootstrap (do not edit) ---
 import base64 as _lca_b64
@@ -83,7 +86,7 @@ import json as _lca_json
 import os as _lca_os
 import traceback as _lca_tb
 from pathlib import Path as _lca_Path
-
+{env_preamble}
 _LCA_MOUNT = {SANDBOX_MOUNT_ROOT!r}
 _LCA_OUT = {out_dir!r}
 _LCA_MOUNTS = {mounts_literal}
@@ -212,4 +215,54 @@ def parse_exec_response(response: httpx.Response, emitter: SandboxStreamEmitter)
         success=success,
         generated_files=tuple(generated),
         error=error_text if not success else "",
+    )
+
+
+def parse_terminal_response(
+    response: httpx.Response,
+    emitter: SandboxStreamEmitter,
+) -> SandboxResult:
+    """Parse ``POST /api/v1/commands/terminal`` response.
+
+    Expected JSON shape: ``{"exit_code": int, "stdout": str,
+    "stderr": str, "session_id": str}``.
+    """
+    text = response.text
+    try:
+        payload: Any = json.loads(text) if text else {}
+    except json.JSONDecodeError:
+        err = f"Onlyboxes non-JSON response HTTP {response.status_code}: {text[:300]}"
+        emitter.emit_stderr(err + "\n")
+        return SandboxResult(success=False, exit_code=1, error=err, stderr=err + "\n")
+
+    if not isinstance(payload, dict):
+        err = f"Onlyboxes unexpected payload type: {type(payload).__name__}"
+        return SandboxResult(success=False, exit_code=1, error=err)
+
+    if response.status_code >= 400:
+        message = str(payload.get("error") or f"HTTP {response.status_code}")
+        emitter.emit_stderr(message + "\n")
+        return SandboxResult(success=False, exit_code=1, error=message, stderr=message + "\n")
+
+    try:
+        exit_code = int(payload.get("exit_code", 0))
+    except (TypeError, ValueError):
+        exit_code = 1
+
+    stdout = str(payload.get("stdout") or "")
+    stderr = str(payload.get("stderr") or "")
+
+    if stdout:
+        emitter.emit_stdout(stdout)
+    if stderr:
+        emitter.emit_stderr(stderr)
+
+    success = exit_code == 0
+    error_text = "" if success else (stderr.strip() or f"exit_code={exit_code}")
+    return SandboxResult(
+        stdout=stdout,
+        stderr=stderr,
+        exit_code=exit_code,
+        success=success,
+        error=error_text,
     )

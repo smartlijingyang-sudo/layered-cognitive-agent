@@ -32,6 +32,18 @@ def _artifact_block(files: list[tuple[str, bytes]]) -> str:
     return ARTIFACT_BEGIN + json.dumps(payload) + ARTIFACT_END
 
 
+def _terminal_ok_response() -> MagicMock:
+    """Build a mock response matching POST /api/v1/commands/terminal success."""
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.text = json.dumps({"exit_code": 0, "stdout": "", "stderr": ""})
+    resp.ok = True
+    return resp
+
+
+# ── bootstrap / artifact unit tests ─────────────────────────────────
+
+
 class StripArtifactsTests(unittest.TestCase):
     def test_extracts_files_and_cleans_stdout(self) -> None:
         stdout = "hello\n" + _artifact_block([("out.txt", b"abc")]) + "\n"
@@ -59,6 +71,9 @@ class StripArtifactsTests(unittest.TestCase):
         code = 'print("\ud800")'
         wrapped = _build_wrapped_code(code, None)
         wrapped.encode("utf-8")
+
+
+# ── factory tests ────────────────────────────────────────────────────
 
 
 class FactoryTests(unittest.TestCase):
@@ -102,17 +117,15 @@ class FactoryTests(unittest.TestCase):
         self.assertEqual(sandbox_backend(), "onlyboxes")
 
 
+# ── adapter tests (unified terminalExec channel) ────────────────────
+
+
 class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
-    async def test_python_exec_success_and_artifacts(self) -> None:
-        stdout = "2\n" + _artifact_block([("echo.csv", b"a,b\n")])
+    async def test_run_uses_terminal_endpoint(self) -> None:
+        """run() should write code to /tmp then execute via terminalExec."""
         response = MagicMock()
         response.status_code = 200
-        response.text = json.dumps(
-            {
-                "status": "succeeded",
-                "result": {"output": stdout, "stderr": "", "exit_code": 0},
-            }
-        )
+        response.text = json.dumps({"exit_code": 0, "stdout": "42\n", "stderr": ""})
         client = AsyncMock()
         client.post = AsyncMock(return_value=response)
         client.aclose = AsyncMock()
@@ -122,33 +135,20 @@ class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
             access_token="obx_token",  # noqa: S106
             client=client,
         )
-        result = await adapter.run(
-            'print(1+1)\nopen("/mnt/data/outputs/echo.csv","wb").write(b"a,b\\n")',
-            files={"in.csv": b"x"},
-            invocation_id="sbx_1",
-        )
+        result = await adapter.run("print(42)", invocation_id="sbx_1")
+
         self.assertTrue(result.success)
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("2", result.stdout)
-        self.assertNotIn(ARTIFACT_BEGIN, result.stdout)
-        self.assertEqual(len(result.generated_files), 1)
-        self.assertEqual(result.generated_files[0].name, "echo.csv")
-        self.assertEqual(result.generated_files[0].data, b"a,b\n")
+        self.assertEqual(result.stdout, "42\n")
 
-        call_kwargs = client.post.await_args
-        self.assertIn("/api/v1/tasks", call_kwargs.args[0])
-        body: dict[str, Any] = call_kwargs.kwargs["json"]
-        self.assertEqual(body["capability"], "pythonExec")
-        self.assertIn("in.csv", body["input"]["code"])
+        # All calls go through /api/v1/commands/terminal
+        for call in client.post.await_args_list:
+            self.assertIn("/api/v1/commands/terminal", call.args[0])
 
-    async def test_rejects_non_python(self) -> None:
-        adapter = OnlyboxesSandboxAdapter(
-            base_url="http://obx.example",
-            access_token="tok",  # noqa: S106
-        )
-        result = await adapter.run("console.log(1)", language="javascript")
-        self.assertFalse(result.success)
-        self.assertIn("python only", result.error)
+        # Last call should be the python3 execution command
+        last_body: dict[str, Any] = client.post.await_args_list[-1].kwargs["json"]
+        self.assertIn("python3", last_body["command"])
+        self.assertIn("/tmp/lca-code-", last_body["command"])  # noqa: S108
 
     async def test_http_error_surface(self) -> None:
         response = MagicMock()
@@ -165,6 +165,184 @@ class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
         result = await adapter.run("print(1)")
         self.assertFalse(result.success)
         self.assertIn("token", result.error.lower())
+
+    async def test_run_terminal_delegates_to_exec_terminal(self) -> None:
+        """run_terminal() should go through _exec_terminal."""
+        response = MagicMock()
+        response.status_code = 200
+        response.text = json.dumps({"exit_code": 0, "stdout": "ok\n", "stderr": ""})
+        client = AsyncMock()
+        client.post = AsyncMock(return_value=response)
+        client.aclose = AsyncMock()
+
+        adapter = OnlyboxesSandboxAdapter(
+            base_url="http://obx.example",
+            access_token="tok",  # noqa: S106
+            client=client,
+        )
+        result = await adapter.run_terminal("ls -la", invocation_id="term_1")
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.stdout, "ok\n")
+        call_body: dict[str, Any] = client.post.await_args.kwargs["json"]
+        self.assertEqual(call_body["command"], "ls -la")
+        self.assertTrue(call_body["create_if_missing"])
+
+    async def test_create_session_returns_session_info(self) -> None:
+        """create_session() should issue a no-op command and return SessionInfo."""
+        response = MagicMock()
+        response.status_code = 200
+        response.text = json.dumps({"exit_code": 0, "stdout": "", "stderr": ""})
+        client = AsyncMock()
+        client.post = AsyncMock(return_value=response)
+        client.aclose = AsyncMock()
+
+        adapter = OnlyboxesSandboxAdapter(
+            base_url="http://obx.example",
+            access_token="tok",  # noqa: S106
+            client=client,
+        )
+        session = await adapter.create_session()
+
+        self.assertIsNotNone(session)
+        self.assertEqual(session.session_id, "terminal-session")
+        call_body: dict[str, Any] = client.post.await_args.kwargs["json"]
+        self.assertEqual(call_body["command"], ":")
+
+    async def test_destroy_session_sends_delete(self) -> None:
+        client = AsyncMock()
+        client.delete = AsyncMock()
+        client.aclose = AsyncMock()
+
+        adapter = OnlyboxesSandboxAdapter(
+            base_url="http://obx.example",
+            access_token="tok",  # noqa: S106
+            client=client,
+        )
+        await adapter.destroy_session("sess-123")
+
+        client.delete.assert_awaited_once()
+        self.assertIn("/api/v1/sessions/sess-123", client.delete.await_args.args[0])
+
+
+# ── write_files tests ────────────────────────────────────────────────
+
+
+class WriteFilesTests(unittest.IsolatedAsyncioTestCase):
+    async def test_write_files_chunks_large_file(self) -> None:
+        """大于 48KB 的文件应分块写入。"""
+        adapter = OnlyboxesSandboxAdapter(base_url="http://fake", access_token="tok")  # noqa: S106
+        calls: list[dict] = []
+
+        async def mock_post(url: str, **kwargs: Any) -> MagicMock:
+            calls.append({"url": url, "body": kwargs.get("json", {})})
+            return _terminal_ok_response()
+
+        adapter._client = MagicMock()
+        adapter._client.post = AsyncMock(side_effect=mock_post)
+
+        data = b"x" * (48 * 1024 + 1000)  # slightly larger than one chunk
+        result = await adapter.write_files({"big.bin": data}, base_dir="/mnt/data")
+
+        self.assertTrue(result.success)
+        # At least 2 terminal calls: mkdir+truncate + at least 1 chunk
+        self.assertGreaterEqual(len(calls), 2)
+        # All requests go through /api/v1/commands/terminal
+        for call in calls:
+            self.assertIn("/api/v1/commands/terminal", call["url"])
+
+        # Verify base64 chunking: at least one call should contain base64 pipe
+        b64_calls = [c for c in calls if "base64 -d" in c["body"].get("command", "")]
+        self.assertGreaterEqual(len(b64_calls), 2)  # 49152 bytes → 2 chunks
+
+    async def test_write_files_url_uses_curl(self) -> None:
+        """URL 类型的文件应生成 curl 命令。"""
+        adapter = OnlyboxesSandboxAdapter(base_url="http://fake", access_token="tok")  # noqa: S106
+        calls: list[dict] = []
+
+        async def mock_post(url: str, **kwargs: Any) -> MagicMock:
+            calls.append({"url": url, "body": kwargs.get("json", {})})
+            return _terminal_ok_response()
+
+        adapter._client = MagicMock()
+        adapter._client.post = AsyncMock(side_effect=mock_post)
+
+        result = await adapter.write_files(
+            {"data.csv": "https://example.com/data.csv"},
+            base_dir="/mnt/data",
+        )
+
+        self.assertTrue(result.success)
+        # Should have a curl command
+        curl_calls = [c for c in calls if "curl" in c["body"].get("command", "")]
+        self.assertEqual(len(curl_calls), 1)
+        self.assertIn("https://example.com/data.csv", curl_calls[0]["body"]["command"])
+
+    async def test_write_files_mixed_url_and_bytes(self) -> None:
+        """Mixed URL and bytes files should use both strategies."""
+        adapter = OnlyboxesSandboxAdapter(base_url="http://fake", access_token="tok")  # noqa: S106
+        calls: list[dict] = []
+
+        async def mock_post(url: str, **kwargs: Any) -> MagicMock:
+            calls.append({"url": url, "body": kwargs.get("json", {})})
+            return _terminal_ok_response()
+
+        adapter._client = MagicMock()
+        adapter._client.post = AsyncMock(side_effect=mock_post)
+
+        result = await adapter.write_files(
+            {
+                "remote.csv": "https://example.com/data.csv",
+                "local.bin": b"small",
+            },
+            base_dir="/mnt/data",
+        )
+
+        self.assertTrue(result.success)
+        curl_calls = [c for c in calls if "curl" in c["body"].get("command", "")]
+        b64_calls = [c for c in calls if "base64 -d" in c["body"].get("command", "")]
+        self.assertEqual(len(curl_calls), 1)
+        self.assertGreaterEqual(len(b64_calls), 1)
+
+    async def test_write_files_empty_dict(self) -> None:
+        """Empty files dict should succeed without any terminal calls."""
+        adapter = OnlyboxesSandboxAdapter(base_url="http://fake", access_token="tok")  # noqa: S106
+        client = AsyncMock()
+        client.post = AsyncMock()
+        client.aclose = AsyncMock()
+        adapter._client = client
+
+        result = await adapter.write_files({})
+
+        self.assertTrue(result.success)
+        client.post.assert_not_awaited()
+
+
+# ── run_in_session tests ─────────────────────────────────────────────
+
+
+class RunInSessionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_run_in_session_uses_session_id(self) -> None:
+        """run_in_session should pass session_id in terminal body."""
+        response = MagicMock()
+        response.status_code = 200
+        response.text = json.dumps({"exit_code": 0, "stdout": "ok", "stderr": ""})
+        client = AsyncMock()
+        client.post = AsyncMock(return_value=response)
+        client.aclose = AsyncMock()
+
+        adapter = OnlyboxesSandboxAdapter(
+            base_url="http://obx.example",
+            access_token="tok",  # noqa: S106
+            client=client,
+        )
+        result = await adapter.run_in_session("sess-abc", "print(1)")
+
+        self.assertTrue(result.success)
+        # All calls should carry the session_id
+        for call in client.post.await_args_list:
+            body: dict[str, Any] = call.kwargs["json"]
+            self.assertEqual(body["session_id"], "sess-abc")
 
 
 if __name__ == "__main__":
