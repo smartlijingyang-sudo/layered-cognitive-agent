@@ -19,9 +19,7 @@ from lca.layer0_infra.sandbox.onlyboxes_artifacts import (
 )
 from lca.layer0_infra.sandbox.onlyboxes_bootstrap import (
     _strip_surrogates,
-)
-from lca.layer0_infra.sandbox.onlyboxes_bootstrap import (
-    build_wrapped_code as _build_wrapped_code,
+    build_minimal_bootstrap,
 )
 
 
@@ -55,11 +53,12 @@ class StripArtifactsTests(unittest.TestCase):
         self.assertEqual(files[0].name, "out.txt")
         self.assertEqual(files[0].data, b"abc")
 
-    def test_wrapped_code_embeds_mounts(self) -> None:
-        wrapped = _build_wrapped_code('print("x")', {"input.bin": b"\x00\x01"})
-        self.assertIn(SANDBOX_MOUNT_ROOT, wrapped)
-        self.assertIn("input.bin", wrapped)
-        self.assertIn(ARTIFACT_BEGIN, wrapped)
+    def test_minimal_bootstrap_has_no_file_embedding(self) -> None:
+        bootstrap = build_minimal_bootstrap('print("x")')
+        self.assertNotIn(SANDBOX_MOUNT_ROOT, bootstrap)
+        self.assertNotIn("base64", bootstrap)
+        self.assertIn("exec(compile(", bootstrap)
+        self.assertIn("numpy", bootstrap)
 
     def test_strip_surrogates_replaces_lone_surrogates(self) -> None:
         text = "hello\ud800world\udfff"
@@ -67,10 +66,10 @@ class StripArtifactsTests(unittest.TestCase):
         self.assertEqual(cleaned, "hello\ufffdworld\ufffd")
         cleaned.encode("utf-8")
 
-    def test_build_wrapped_code_handles_surrogates(self) -> None:
+    def test_build_minimal_bootstrap_handles_surrogates(self) -> None:
         code = 'print("\ud800")'
-        wrapped = _build_wrapped_code(code, None)
-        wrapped.encode("utf-8")
+        bootstrap = build_minimal_bootstrap(code)
+        bootstrap.encode("utf-8")
 
 
 # ── factory tests ────────────────────────────────────────────────────

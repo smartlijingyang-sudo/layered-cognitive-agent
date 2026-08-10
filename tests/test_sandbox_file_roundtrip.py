@@ -11,19 +11,15 @@ from lca.layer0_infra.sandbox.onlyboxes_artifacts import (
     ARTIFACT_END,
     strip_artifacts,
 )
-from lca.layer0_infra.sandbox.onlyboxes_bootstrap import build_wrapped_code as _build_wrapped_code
-from lca.layer0_infra.sandbox.output_collect import sandbox_output_dir
+from lca.layer0_infra.sandbox.onlyboxes_bootstrap import build_minimal_bootstrap
 
 
 class OnlyboxesRoundtripHelpersTests(unittest.TestCase):
-    def test_build_wrapped_includes_output_dir_and_mounts(self) -> None:
-        wrapped = _build_wrapped_code(
-            'open("/mnt/data/outputs/x.txt","wb").write(b"z")',
-            {"a.csv": b"1,2\n"},
-        )
-        self.assertIn(sandbox_output_dir(), wrapped)
-        self.assertIn("a.csv", wrapped)
-        self.assertIn("print(", wrapped)
+    def test_build_minimal_bootstrap_includes_exec_and_patches(self) -> None:
+        bootstrap = build_minimal_bootstrap('print("hello")')
+        self.assertIn("exec(compile(", bootstrap)
+        self.assertIn("numpy", bootstrap)
+        self.assertIn("print(", bootstrap)
 
     def test_strip_artifacts_respects_caps_via_try_append(self) -> None:
         # One small file harvests cleanly.
