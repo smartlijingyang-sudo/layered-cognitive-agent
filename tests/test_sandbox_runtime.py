@@ -29,7 +29,8 @@ class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
             with run_id_scope("run_lc"):
                 obs = await tool.execute({"code": 'print("hello")'})
             self.assertTrue(obs.success)
-            self.assertEqual(len(sandbox.session_run_calls), 1)
+            # 2 calls: 1 from _run_inspect_internal pre-check + 1 user code
+            self.assertEqual(len(sandbox.session_run_calls), 2)
 
             await finalize_run("run_lc")
             self.assertEqual(sandbox.destroyed_sessions, ["sess_1"])
@@ -49,7 +50,8 @@ class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
                 tool = SandboxExecuteTool(sandbox=sandbox, store=store)
                 obs = await tool.execute({"code": 'print("stateless")'})
             self.assertTrue(obs.success)
-            self.assertEqual(len(sandbox.run_calls), 1)
+            # 2 calls: 1 from _run_inspect_internal pre-check + 1 user code
+            self.assertEqual(len(sandbox.run_calls), 2)
             self.assertEqual(len(sandbox.created_sessions), 0)
         finally:
             tmp.cleanup()

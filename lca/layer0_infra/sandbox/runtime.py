@@ -101,6 +101,10 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         if mount_err is not None:
             return mount_err
 
+        inspect_result = await self._run_inspect_internal()
+        if inspect_result is not None and not inspect_result.success:
+            return inspect_result
+
         self._ready = True
         return None
 

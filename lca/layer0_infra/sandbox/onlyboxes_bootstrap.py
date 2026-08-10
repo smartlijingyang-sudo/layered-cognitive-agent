@@ -1,7 +1,7 @@
 """Onlyboxes shared constants, code bootstrap, and response parsing.
 
-Extracted from ``onlyboxes_adapter`` so that both the stateless adapter and
-the session module can share these without circular imports.
+Extracted from ``onlyboxes_adapter`` to keep bootstrap logic, parsing,
+and constants in a single shared module.
 """
 
 from __future__ import annotations
