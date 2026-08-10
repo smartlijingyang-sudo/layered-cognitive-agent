@@ -29,7 +29,7 @@ class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
             with run_id_scope("run_lc"):
                 obs = await tool.execute({"code": 'print("hello")'})
             self.assertTrue(obs.success)
-            self.assertEqual(len(sandbox.session_run_calls), 2)
+            self.assertEqual(len(sandbox.session_run_calls), 1)
 
             await finalize_run("run_lc")
             self.assertEqual(sandbox.destroyed_sessions, ["sess_1"])
@@ -49,10 +49,45 @@ class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
                 tool = SandboxExecuteTool(sandbox=sandbox, store=store)
                 obs = await tool.execute({"code": 'print("stateless")'})
             self.assertTrue(obs.success)
-            self.assertEqual(len(sandbox.run_calls), 2)
+            self.assertEqual(len(sandbox.run_calls), 1)
             self.assertEqual(len(sandbox.created_sessions), 0)
         finally:
             tmp.cleanup()
+
+
+class TestInlineSandboxWriteFiles(unittest.IsolatedAsyncioTestCase):
+    """write_files Protocol method — file staging separated from execution."""
+
+    async def test_write_files_bytes_staged_to_vfs(self) -> None:
+        sandbox = InlineSandbox()
+        result = await sandbox.write_files({"data.csv": b"a,b\n1,2\n"})
+        self.assertTrue(result.success)
+        self.assertEqual(len(sandbox.write_files_calls), 1)
+        self.assertIn("data.csv", sandbox.write_files_calls[0])
+
+    async def test_write_files_with_session(self) -> None:
+        sandbox = InlineSandbox()
+        info = await sandbox.create_session()
+        assert info is not None
+        sid = info.session_id
+        await sandbox.write_files({"input.txt": b"hello"}, session_id=sid)
+        # File should be in session VFS
+        self.assertIn("/mnt/data/input.txt", sandbox._sessions[sid])
+
+    async def test_write_files_str_url_not_written(self) -> None:
+        """str values are URLs — InlineSandbox skips them (no curl in tests)."""
+        sandbox = InlineSandbox()
+        result = await sandbox.write_files({"remote.csv": "https://example.com/data.csv"})
+        self.assertTrue(result.success)
+        self.assertEqual(len(sandbox.write_files_calls), 1)
+        # str values are not written to VFS (only bytes are)
+
+    async def test_run_no_longer_accepts_files(self) -> None:
+        """run() signature no longer has files parameter."""
+        sandbox = InlineSandbox()
+        result = await sandbox.run('print("ok")')
+        self.assertTrue(result.success)
+        self.assertEqual(sandbox.run_calls, ['print("ok")'])
 
 
 if __name__ == "__main__":

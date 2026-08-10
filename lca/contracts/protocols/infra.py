@@ -66,17 +66,31 @@ class Sandbox(Protocol):
     支持可选的有状态会话（session）——容器跨调用存活，变量/包/文件系统保持。
     不支持会话的适配器保留默认实现（返回 None），调用方优雅降级为无状态模式。
 
+    文件写入与代码执行分离：先调 ``write_files`` 将文件落盘，再调
+    ``run`` / ``run_in_session`` 执行代码。``write_files`` 的 ``files``
+    字典中，``bytes`` 值走分块写入，``str`` 值视为 URL 走 curl 下载。
+
     ``**kwargs`` 透传扩展元数据（如 ``invocation_id``），镜像
     ``LLMAdapter.stream`` 惯例，避免 Protocol 破坏性扩签。
     执行期 stdout/stderr 增量由具体适配器经 journal ``record`` 发射
     （见 ``SandboxOutputDelta``），本协议只承诺终态 ``SandboxResult``。
     """
 
+    async def write_files(
+        self,
+        files: dict[str, bytes | str],
+        *,
+        base_dir: str = "/mnt/data",
+        session_id: str = "",
+        timeout_s: int = 60,
+    ) -> SandboxResult:
+        """写文件到沙箱磁盘。str 值走 curl 下载，bytes 值走分块写入。"""
+        ...
+
     async def run(
         self,
         code: str,
         language: str = "python",
-        files: dict[str, bytes] | None = None,
         timeout_s: int = 60,
         **kwargs: Any,
     ) -> SandboxResult: ...

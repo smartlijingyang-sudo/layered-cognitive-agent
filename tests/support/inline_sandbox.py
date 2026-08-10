@@ -29,29 +29,49 @@ class InlineSandbox:
         self.session_run_calls: list[tuple[str, str]] = []
         self.created_sessions: list[str] = []
         self.destroyed_sessions: list[str] = []
+        self.write_files_calls: list[dict[str, bytes | str]] = []
         self._counter = 0
         self._sessions: dict[str, dict[str, bytes]] = {}
+
+    async def write_files(
+        self,
+        files: dict[str, bytes | str],
+        *,
+        base_dir: str = SANDBOX_MOUNT_ROOT,
+        session_id: str = "",
+        timeout_s: int = 60,
+    ) -> SandboxResult:
+        del timeout_s
+        self.write_files_calls.append(files)
+        from lca.layer0_infra.sandbox.onlyboxes_bootstrap import safe_rel_name
+
+        vfs = self._sessions[session_id] if session_id and session_id in self._sessions else {}
+        for name, source in files.items():
+            if isinstance(source, bytes):
+                vfs[f"{base_dir}/{safe_rel_name(name)}"] = source
+        if session_id:
+            self._sessions.setdefault(session_id, {}).update(vfs)
+        return SandboxResult(success=True, exit_code=0)
 
     async def run(
         self,
         code: str,
         language: str = "python",
-        files: dict[str, bytes] | None = None,
         timeout_s: int = 60,
         **kwargs: Any,
     ) -> SandboxResult:
         del language, timeout_s
         self.run_calls.append(code)
-        vfs = self._seed_vfs(files)
-        return self._exec(code, vfs, str(kwargs.get("invocation_id", "") or ""))
+        return self._exec(code, {}, str(kwargs.get("invocation_id", "") or ""))
 
     async def create_session(self, config: SessionConfig | None = None) -> SessionInfo | None:
+        del config
         if not self.session_ok:
             return None
         self._counter += 1
         sid = f"sess_{self._counter}"
         self.created_sessions.append(sid)
-        self._sessions[sid] = self._seed_vfs(config.files if config else None)
+        self._sessions[sid] = {}
         return SessionInfo(session_id=sid, container_id=f"ctr_{sid}")
 
     async def run_in_session(
@@ -65,22 +85,26 @@ class InlineSandbox:
         del language, timeout_s
         self.session_run_calls.append((session_id, code))
         vfs = self._sessions.setdefault(session_id, {})
-        extra = kwargs.get("files")
-        if isinstance(extra, dict):
-            for name, data in extra.items():
-                vfs[f"{SANDBOX_MOUNT_ROOT}/{name}"] = data
         return self._exec(code, vfs, str(kwargs.get("invocation_id", "") or ""))
 
     async def destroy_session(self, session_id: str) -> None:
         self.destroyed_sessions.append(session_id)
         self._sessions.pop(session_id, None)
 
-    @staticmethod
-    def _seed_vfs(files: dict[str, bytes] | None) -> dict[str, bytes]:
-        vfs: dict[str, bytes] = {}
-        for name, data in (files or {}).items():
-            vfs[f"{SANDBOX_MOUNT_ROOT}/{name}"] = data
-        return vfs
+    async def run_terminal(
+        self,
+        command: str,
+        *,
+        timeout_s: int = 60,
+        **kwargs: Any,
+    ) -> SandboxResult:
+        del timeout_s
+        from lca.layer0_infra.computer.guest import build_shell_script
+
+        return await self.run(
+            build_shell_script(command=command),
+            invocation_id=str(kwargs.get("invocation_id", "") or ""),
+        )
 
     def _exec(self, code: str, vfs: dict[str, bytes], invocation_id: str) -> SandboxResult:
         emitter = SandboxStreamEmitter(invocation_id)
