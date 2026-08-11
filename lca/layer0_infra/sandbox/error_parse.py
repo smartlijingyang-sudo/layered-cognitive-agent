@@ -37,7 +37,11 @@ def classify_execution_error(
         return (
             SandboxErrorKind.USER_CODE,
             f"FileNotFoundError: {guest_path}",
-            "调用 sandbox_inspect 获取 /mnt/data 实际路径，不要猜测文件名",
+            (
+                "路径不存在。先用 list_files 查看 /mnt/data；"
+                "写入前 os.makedirs(os.path.dirname(path), exist_ok=True) 或使用 write_file(createDirectories=true)；"
+                "产出文件应写到 /mnt/data/outputs/"
+            ),
             failed_at_line,
             partial,
         )
@@ -57,7 +61,7 @@ def classify_execution_error(
         return (
             SandboxErrorKind.USER_CODE,
             f"KeyError: 列/键 '{col}' 不存在",
-            "调用 sandbox_inspect 查看实际 columns，不要猜测列名",
+            "用 list_files / read_file 查看实际数据结构，不要猜测列名",
             failed_at_line,
             partial,
         )

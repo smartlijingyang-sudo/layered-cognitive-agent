@@ -129,8 +129,15 @@ class JournalOpenAiProjector:
     def __post_init__(self) -> None:
         self._tools = ToolProjection(
             emit_lca=self._emit_lca_events,
-            emit_delta=self._emit_delta,
+            emit_delta=self._emit_delta_parts,
         )
+
+    def _emit_delta_parts(self, parts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Adapt ToolProjection list-of-deltas callback to ``_emit_delta``."""
+        chunks: list[dict[str, Any]] = []
+        for part in parts:
+            chunks.extend(self._emit_delta(part))
+        return chunks
 
     # ── Frame dispatch ──────────────────────────────────────
 

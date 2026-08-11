@@ -19,9 +19,7 @@ from lca.layer0_infra.tools.skills._format import format_skill_index_rows
 SEARCH_SKILL_TOOL = "search_skill"
 
 _DEGRADED_PREFIX = "（已放宽搜索条件）"
-_SANDBOX_FALLBACK = (
-    "无匹配 skill。建议用 sandbox_execute 直接编码实现，或尝试更简短的关键词重新搜索。"
-)
+_SANDBOX_FALLBACK = "无匹配 skill。建议用 execute_code 直接编码实现，或尝试更简短的关键词重新搜索。"
 
 
 class SkillSearchTool(Tool):

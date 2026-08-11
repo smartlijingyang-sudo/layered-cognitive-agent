@@ -21,6 +21,7 @@ from lca.contracts.models.core.sandbox import (
 )
 from lca.contracts.protocols import Sandbox, SandboxRuntime
 from lca.layer0_infra.file_store import FileStore
+from lca.layer0_infra.sandbox.bootstrap import SANDBOX_INIT_TIMEOUT_S, sandbox_output_path
 from lca.layer0_infra.sandbox.error_parse import classify_execution_error
 from lca.layer0_infra.sandbox.exec_result import sandbox_exec_result_from
 from lca.layer0_infra.sandbox.inspect_prelude import INSPECT_SCRIPT, parse_inspect_stdout
@@ -89,6 +90,10 @@ class RunBoundSandboxRuntime(SandboxRuntime):
                 self._stateless = True
                 _log.info("sandbox_runtime_stateless_fallback", run_id=self._run_id)
 
+        workspace_err = await self._ensure_workspace_dirs()
+        if workspace_err is not None:
+            return workspace_err
+
         mount_err = await verify_mount_or_error(
             self._execute_raw,
             manifest=self._manifest,
@@ -103,6 +108,28 @@ class RunBoundSandboxRuntime(SandboxRuntime):
 
         self._ready = True
         return None
+
+    async def _ensure_workspace_dirs(self) -> SandboxExecResult | None:
+        """Create ``/mnt/data/outputs`` via staged marker file (all backends)."""
+
+        session_id = self._session.session_id if self._session else ""
+        timeout_s = min(30, SANDBOX_INIT_TIMEOUT_S, self._default_timeout_s)
+        result = await self._sandbox.write_files(
+            {".workspace-initialized": b""},
+            base_dir=sandbox_output_path(),
+            session_id=session_id,
+            timeout_s=timeout_s,
+        )
+        if result.success:
+            return None
+        return sandbox_exec_result_from(
+            result,
+            error_kind=SandboxErrorKind.INFRA,
+            error_summary=result.error or "sandbox workspace init failed",
+            suggested_fix="检查 Onlyboxes worker 是否可用",
+            mount_manifest=self._manifest,
+            environment_ready=False,
+        )
 
     async def inspect(self, *, force: bool = False) -> SandboxExecResult:
         """Return structured file listing and tabular profiles."""

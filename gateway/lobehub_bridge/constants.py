@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.sandbox import (
+    SANDBOX_INIT_MAX_FILE_BYTES,
+    SANDBOX_INIT_MAX_FILES,
+)
+
 # Guest mount directory inside Onlyboxes / cloud sandbox.
 SANDBOX_UPLOADED_FILES_DIR = "/mnt/data"
 
 # Skip individual files larger than this when ingesting (LobeHub SANDBOX_INIT_MAX_FILE_SIZE).
-MAX_INGEST_FILE_BYTES = 100 * 1024 * 1024
+MAX_INGEST_FILE_BYTES = SANDBOX_INIT_MAX_FILE_BYTES
 
 # Hard cap on how many uploaded files are ingested per run (LobeHub SANDBOX_INIT_MAX_FILES).
-MAX_INGEST_FILES = 50
+MAX_INGEST_FILES = SANDBOX_INIT_MAX_FILES
 
 # Per-file HTTP download timeout (seconds).
 FILE_DOWNLOAD_TIMEOUT_S = 120

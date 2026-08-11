@@ -18,13 +18,16 @@ PRIOR_CONVERSATION:
 {activated_skills}
 </activated_skills>
 
+{cloud_sandbox}
+
 CONTEXT:
 {context}
 
 ## 工具与技能
-- <tools> 中的工具通过 function calling 直接调用
-- <available_skills> 中的技能用于文档/格式/沙箱操作（xlsx/pdf 等），需先 activate_skill 再执行
+- <tools> 中的工具通过 function calling 直接调用（含 execute_code / export_file 等沙箱工具）
+- <available_skills> 中的技能用于文档/格式专项指南（xlsx/pdf 等），需先 activate_skill
 - <activated_skills> 中的技能已激活，直接按其指南步骤执行
+- 沙箱产出文件写到 /mnt/data/outputs/，完成后用 export_file 导出（见上方 cloud sandbox 指南）
 
 ## 联网搜索路由
 {search_routing}

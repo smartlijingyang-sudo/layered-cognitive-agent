@@ -21,6 +21,14 @@ NEXT_DEV_LOCK="${LOBE_DIR}/.next/dev/lock"
 
 log() { printf '[lobehub-stack] %s\n' "$*"; }
 
+_python() {
+  if command -v uv >/dev/null 2>&1; then
+    uv run python "$@"
+  else
+    python3 "$@"
+  fi
+}
+
 _kill_pid_tree() {
   local pid="$1"
   local sig="${2:-TERM}"
@@ -44,7 +52,7 @@ _collect_lobehub_dev_pids() {
 
   if [[ -f "${NEXT_DEV_LOCK}" ]]; then
     lock_pid="$(
-      python3 - "${NEXT_DEV_LOCK}" <<'PY' 2>/dev/null || true
+      _python - "${NEXT_DEV_LOCK}" <<'PY' 2>/dev/null || true
 import json
 import sys
 from pathlib import Path
@@ -148,7 +156,7 @@ prepare_lobehub_dev() {
 _infra_port_open() {
   local host="$1"
   local port="$2"
-  python3 - "${host}" "${port}" <<'PY' 2>/dev/null
+  _python - "${host}" "${port}" <<'PY' 2>/dev/null
 import socket
 import sys
 
@@ -162,7 +170,7 @@ _infra_targets_from_env() {
   local env_file="${LOBE_DIR}/.env"
   [[ -f "${env_file}" ]] || env_file="${LOBE_ENV}"
   [[ -f "${env_file}" ]] || return 0
-  python3 - "${env_file}" <<'PY'
+  _python - "${env_file}" <<'PY'
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -335,7 +343,7 @@ apply_lca_lobehub_patches() {
   if [[ ! -f "${LOBE_DIR}/package.json" ]]; then
     return 0
   fi
-  python3 "${ROOT}/deploy/lobehub/patch_lobehub.py"
+  _python "${ROOT}/deploy/lobehub/patch_lobehub.py"
 }
 
 stop_gateway() {

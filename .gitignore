@@ -21,3 +21,8 @@ lobehub-ui/
 .lobehub-upstream/
 .lobehub-stack/
 .lca-state/
+
+# Runtime artifacts
+output/
+.coverage.*.pid*
+web/

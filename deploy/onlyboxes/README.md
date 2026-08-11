@@ -1,12 +1,30 @@
-# Onlyboxes pythonExec 镜像（LCA）
+# Onlyboxes sandbox images (LCA + LobeHub terminalExec)
 
-生产 worker（`onlyboxes-worker-docker.service`）通过环境变量挂载镜像：
+LobeHub 原生只走 **terminalExec**（`POST /api/v1/commands/terminal`）。Worker 通过
+`WORKER_TERMINAL_EXEC_DOCKER_IMAGE` 选择终端运行时镜像；`pythonExec` 镜像为 Legacy。
+
+## 正规路径（terminalExec — 当前生产通道）
+
+| 路径 | 作用 |
+|---|---|
+| `deploy/onlyboxes/Dockerfile.terminal` | terminal 运行时（基于 `onlyboxes-runtime` + 数据栈） |
+| `deploy/onlyboxes/build-terminal-image.sh` | 构建 `onlyboxes-terminal-local:lca` |
+| `deploy/onlyboxes/configure-terminal-runtime.sh` | 写入 systemd drop-in 并重启 worker |
+
+```bash
+# 优先使用官方 LobeHub 变体；不可用时本地构建
+./deploy/onlyboxes/configure-terminal-runtime.sh
+```
+
+官方 Onlyboxes 文档亦推荐 LobeHub 场景使用 `coolfan1024/onlyboxes-runtime:lobehub`。
+
+## Legacy（pythonExec — 已不由 LCA 代码使用）
+
+Worker 环境变量示例（保留供对照，LCA adapter 已不调用）：
 
 ```text
 WORKER_PYTHON_EXEC_DOCKER_IMAGE=onlyboxes-python-local:3.11
 ```
-
-本目录是该镜像的**正规定义**（ADR-0044）：含数据分析常用包，避免运行时 `pip install`。
 
 ## 预装包
 

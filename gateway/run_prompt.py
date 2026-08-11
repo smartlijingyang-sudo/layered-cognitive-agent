@@ -29,7 +29,8 @@ def _question_with_attachments(
         "[用户附件]",
         (
             f"（附件已挂载到 {SANDBOX_MOUNT_ROOT}/<文件名>；"
-            "分析前先 activate_skill 加载对应 skill，再用 run_skill_script 执行命令）"
+            "用 list_files / read_file 查看，execute_code 或 write_file 处理；"
+            "专项格式任务可 activate_skill 加载对应 skill）"
         ),
     ]
     for attachment_id in attachment_ids:

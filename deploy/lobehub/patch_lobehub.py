@@ -400,6 +400,273 @@ def p_streaming_handler() -> bool:
     return True
 
 
+def p_lca_tool_result_merge() -> bool:
+    """Upgrade LCA tool SSE handler — ChatToolResult shape for LobeHub tool cards."""
+    rel = "src/store/chat/agents/StreamingHandler.ts"
+    text = _read(rel)
+    if "mergeLcaToolResult" in text:
+        return False
+    if "handleLcaToolEvent" not in text:
+        return False
+    text = text.replace(
+        "  type ChatToolPayload,\n  type MessageContentPart,",
+        "  type ChatToolPayload,\n  type ChatToolResult,\n  type MessageContentPart,",
+        1,
+    )
+    old_handler = """  private handleLcaToolEvent(event: LcaStreamToolEvent): void {
+    if (event.type === 'run_error') {
+      this.lcaRunError = event.message;
+      if (event.closed_loop) this.lcaClosedLoop = true;
+      return;
+    }
+    if ('closed_loop' in event && event.closed_loop) this.lcaClosedLoop = true;
+
+    if (event.type === 'tool_started') {
+      const wireName =
+        event.wire_name || `${event.identifier}____${event.api_name}`;
+      const toolCalls = [
+        {
+          function: { arguments: event.arguments || '{}', name: wireName },
+          id: event.tool_call_id,
+          type: 'function' as const,
+        },
+      ];
+      for (const tool of this.callbacks.transformToolCalls(toolCalls)) {
+        this.lcaToolsById.set(tool.id, tool);
+      }
+      this.tools = [...this.lcaToolsById.values()];
+      this.callbacks.onToolCallsUpdate(this.tools);
+      this.callbacks.toggleToolCallingStreaming(this.context.messageId, [true]);
+      if (!this.lcaClosedLoop) this.isFunctionCall = true;
+      this.endReasoningIfNeeded();
+      return;
+    }
+
+    if (event.type === 'tool_result' || event.type === 'tool_state') {
+      const existing = this.lcaToolsById.get(event.tool_call_id);
+      if (!existing) return;
+      const updated: ChatToolPayload = { ...existing };
+      if (event.type === 'tool_result') {
+        if (event.content) updated.result = event.content;
+        if (event.error) updated.error = event.error;
+        if (event.state) updated.state = { ...(updated.state ?? {}), ...event.state };
+      } else {
+        updated.state = { ...(updated.state ?? {}), ...event.state };
+      }
+      this.lcaToolsById.set(event.tool_call_id, updated);
+      this.tools = [...this.lcaToolsById.values()];
+      this.callbacks.onToolCallsUpdate(this.tools);
+    }
+  }"""
+    new_handler = """  private mergeLcaToolResult(
+    existing: ChatToolPayload,
+    patch: {
+      content?: string;
+      error?: string;
+      state?: Record<string, unknown>;
+    },
+  ): ChatToolPayload {
+    const prev: ChatToolResult =
+      existing.result &&
+      typeof existing.result === 'object' &&
+      existing.result !== null &&
+      'content' in existing.result
+        ? (existing.result as ChatToolResult)
+        : typeof existing.result === 'string'
+          ? { content: existing.result, id: existing.id }
+          : { content: '', id: existing.id };
+    const mergedState = {
+      ...(prev.state ?? {}),
+      ...(patch.state ?? {}),
+    };
+    const streamText =
+      patch.content ||
+      (typeof mergedState.output === 'string' ? mergedState.output : '') ||
+      (typeof mergedState.stdout === 'string' ? mergedState.stdout : '') ||
+      prev.content ||
+      '';
+    return {
+      ...existing,
+      result: {
+        id: prev.id ?? existing.id,
+        content: streamText,
+        error: patch.error ?? prev.error,
+        state: Object.keys(mergedState).length > 0 ? mergedState : prev.state,
+      },
+    };
+  }
+
+  private handleLcaToolEvent(event: LcaStreamToolEvent): void {
+    if (event.type === 'run_error') {
+      this.lcaRunError = event.message;
+      if (event.closed_loop) this.lcaClosedLoop = true;
+      return;
+    }
+    if ('closed_loop' in event && event.closed_loop) this.lcaClosedLoop = true;
+
+    if (event.type === 'tool_started') {
+      const wireName =
+        event.wire_name || `${event.identifier}____${event.api_name}`;
+      const toolCalls = [
+        {
+          function: { arguments: event.arguments || '{}', name: wireName },
+          id: event.tool_call_id,
+          type: 'function' as const,
+        },
+      ];
+      for (const tool of this.callbacks.transformToolCalls(toolCalls)) {
+        this.lcaToolsById.set(tool.id, tool);
+      }
+      this.tools = [...this.lcaToolsById.values()];
+      this.callbacks.onToolCallsUpdate(this.tools);
+      this.callbacks.toggleToolCallingStreaming(this.context.messageId, [true]);
+      if (!this.lcaClosedLoop) this.isFunctionCall = true;
+      this.endReasoningIfNeeded();
+      return;
+    }
+
+    if (event.type === 'tool_result' || event.type === 'tool_state') {
+      const existing = this.lcaToolsById.get(event.tool_call_id);
+      if (!existing) return;
+      const content =
+        event.type === 'tool_result'
+          ? event.content
+          : 'content' in event
+            ? (event as { content?: string }).content
+            : undefined;
+      const updated = this.mergeLcaToolResult(existing, {
+        content,
+        error: event.type === 'tool_result' ? event.error : undefined,
+        state: event.state,
+      });
+      this.lcaToolsById.set(event.tool_call_id, updated);
+      this.tools = [...this.lcaToolsById.values()];
+      this.callbacks.onToolCallsUpdate(this.tools);
+    }
+  }"""
+    if old_handler not in text:
+        return False
+    text = text.replace(old_handler, new_handler, 1)
+    _write(rel, text)
+    return True
+
+
+def p_lca_streaming_types() -> bool:
+    """Extend LCA stream tool event types for live sandbox stdout."""
+    rel = "src/store/chat/agents/types/streaming.ts"
+    text = _read(rel)
+    if "tool_state_content" in text:
+        return False
+    text = text.replace(
+        """  | {
+      snapshot_seq?: number;
+      state: Record<string, unknown>;
+      tool_call_id: string;
+      type: 'tool_state';
+    }""",
+        """  | {
+      content?: string;
+      snapshot_seq?: number;
+      state: Record<string, unknown>;
+      tool_call_id: string;
+      type: 'tool_state';
+    }""",
+        1,
+    )
+    text = text.replace(
+        """  | {
+      closed_loop?: boolean;
+      content?: string;
+      error?: string;
+      state?: Record<string, unknown>;
+      tool_call_id: string;
+      type: 'tool_result';
+    }""",
+        """  | {
+      closed_loop?: boolean;
+      content?: string;
+      error?: string;
+      files?: Array<Record<string, unknown>>;
+      state?: Record<string, unknown>;
+      tool_call_id: string;
+      type: 'tool_result';
+    }""",
+        1,
+    )
+    if "tool_state_content" not in text:
+        text = text.replace(
+            "export type LcaStreamToolEvent =",
+            "// tool_state_content: LCA sandbox live stdout\nexport type LcaStreamToolEvent =",
+            1,
+        )
+    _write(rel, text)
+    return True
+
+
+def p_sandbox_generated_files() -> bool:
+    """Show harvested sandbox files on executeCode tool cards."""
+    rel = "packages/builtin-tool-cloud-sandbox/src/client/Render/ExecuteCode/index.tsx"
+    text = _read(rel)
+    if "GeneratedFilesStrip" in text:
+        return False
+    text = text.replace(
+        "import { Block, Flexbox, Highlighter } from '@lobehub/ui';",
+        "import { Block, Flexbox, Highlighter, Text } from '@lobehub/ui';\nimport { Button } from 'antd';",
+        1,
+    )
+    insert = """
+interface GeneratedFilePart {
+  attachmentId?: string;
+  mimeType?: string;
+  name?: string;
+  previewable?: boolean;
+  url?: string;
+}
+
+const GeneratedFilesStrip = memo<{ files?: GeneratedFilePart[] }>(({ files }) => {
+  if (!files?.length) return null;
+  return (
+    <Flexbox gap={4}>
+      <Text style={{ fontSize: 12, opacity: 0.65 }}>Generated files</Text>
+      <Flexbox gap={4} horizontal wrap>
+        {files.map((file) => {
+          const label = file.name || 'file';
+          const href = file.url;
+          if (!href) return null;
+          return (
+            <Button
+              href={href}
+              key={`${label}-${href}`}
+              rel="noopener noreferrer"
+              size="small"
+              target="_blank"
+              type={file.previewable ? 'primary' : 'default'}
+            >
+              {label}
+            </Button>
+          );
+        })}
+      </Flexbox>
+    </Flexbox>
+  );
+});
+
+GeneratedFilesStrip.displayName = 'GeneratedFilesStrip';
+"""
+    text = text.replace(
+        "const styles = createStaticStyles(({ css }) => ({",
+        insert + "\nconst styles = createStaticStyles(({ css }) => ({",
+        1,
+    )
+    text = text.replace(
+        "          {pluginState?.stderr && (\n            <Highlighter wrap language={'text'} showLanguage={false} variant={'filled'}>\n              {pluginState.stderr}\n            </Highlighter>\n          )}\n        </Block>",
+        "          {pluginState?.stderr && (\n            <Highlighter wrap language={'text'} showLanguage={false} variant={'filled'}>\n              {pluginState.stderr}\n            </Highlighter>\n          )}\n          <GeneratedFilesStrip files={(pluginState as { files?: GeneratedFilePart[] })?.files} />\n        </Block>",
+        1,
+    )
+    _write(rel, text)
+    return True
+
+
 def p_client_transport() -> bool:
     rel = "src/store/chat/agents/transports/ClientLLMTransport.ts"
     text = _read(rel)
@@ -875,6 +1142,17 @@ def p_market_fork() -> bool:
 # ── 6. Dev UX ──────────────────────────────────────────────────────────
 
 
+def p_turbopack_dev() -> bool:
+    rel = "scripts/devStartupSequence.mts"
+    text = _read(rel)
+    if "'--turbo'" in text:
+        return False
+    old = "spawn('bunx', ['next', 'dev', '-p', String(nextPort)]"
+    new = "spawn('bunx', ['next', 'dev', '--turbo', '-p', String(nextPort)]"
+    _write(rel, _replace_once(text, old, new, label="turbopack_dev"))
+    return True
+
+
 def p_lan_dev() -> bool:
     rel = "src/libs/spaHtml/index.ts"
     text = _read(rel)
@@ -962,6 +1240,27 @@ PATCHES: list[PatchMeta] = [
         ("src/store/chat/agents/StreamingHandler.ts",),
         "medium",
         "runtime",
+    ),
+    PatchMeta(
+        "lca_tool_result_merge",
+        "Merge LCA tool SSE into ChatToolResult for sandbox cards",
+        ("src/store/chat/agents/StreamingHandler.ts",),
+        "high",
+        "runtime",
+    ),
+    PatchMeta(
+        "lca_streaming_types",
+        "Extend LcaStreamToolEvent for live stdout + files",
+        ("src/store/chat/agents/types/streaming.ts",),
+        "low",
+        "runtime",
+    ),
+    PatchMeta(
+        "sandbox_generated_files",
+        "Show harvested sandbox files on executeCode cards",
+        ("packages/builtin-tool-cloud-sandbox/src/client/Render/ExecuteCode/index.tsx",),
+        "medium",
+        "ui",
     ),
     PatchMeta(
         "client_transport",
@@ -1062,6 +1361,13 @@ PATCHES: list[PatchMeta] = [
         "low",
         "devux",
     ),
+    PatchMeta(
+        "turbopack_dev",
+        "Enable Turbopack for faster dev compilation",
+        ("scripts/devStartupSequence.mts",),
+        "low",
+        "devux",
+    ),
 ]
 
 _PATCH_FUNCS: dict[str, callable] = {
@@ -1072,6 +1378,9 @@ _PATCH_FUNCS: dict[str, callable] = {
     "fetch_sse": p_fetch_sse,
     "streaming_types": p_streaming_types,
     "streaming_handler": p_streaming_handler,
+    "lca_tool_result_merge": p_lca_tool_result_merge,
+    "lca_streaming_types": p_lca_streaming_types,
+    "sandbox_generated_files": p_sandbox_generated_files,
     "client_transport": p_client_transport,
     "llm_transport_type": p_llm_transport_type,
     "call_llm_finalizer": p_call_llm_finalizer,
@@ -1084,6 +1393,7 @@ _PATCH_FUNCS: dict[str, callable] = {
     "topic_route": p_topic_route,
     "market_fork": p_market_fork,
     "lan_dev": p_lan_dev,
+    "turbopack_dev": p_turbopack_dev,
 }
 
 # Verify markers: (file_to_check, marker_string) — read-only check
@@ -1098,6 +1408,12 @@ _VERIFY_MARKERS: dict[str, tuple[str, str]] = {
     "fetch_sse": ("packages/fetch-sse/src/fetchSSE.ts", "lca_tool_event"),
     "streaming_types": ("src/store/chat/agents/types/streaming.ts", "LcaStreamToolEvent"),
     "streaming_handler": ("src/store/chat/agents/StreamingHandler.ts", "lcaClosedLoop"),
+    "lca_tool_result_merge": ("src/store/chat/agents/StreamingHandler.ts", "mergeLcaToolResult"),
+    "lca_streaming_types": ("src/store/chat/agents/types/streaming.ts", "tool_state_content"),
+    "sandbox_generated_files": (
+        "packages/builtin-tool-cloud-sandbox/src/client/Render/ExecuteCode/index.tsx",
+        "GeneratedFilesStrip",
+    ),
     "client_transport": ("src/store/chat/agents/transports/ClientLLMTransport.ts", "lcaClosedLoop"),
     "llm_transport_type": ("packages/agent-runtime/src/transport/llm.ts", "lcaClosedLoop"),
     "call_llm_finalizer": (
@@ -1128,6 +1444,10 @@ _VERIFY_MARKERS: dict[str, tuple[str, str]] = {
         "isLocalDevNoAuth",
     ),
     "lan_dev": ("src/libs/spaHtml/index.ts", "VITE_DEV_HOST"),
+    "turbopack_dev": (
+        "scripts/devStartupSequence.mts",
+        "'--turbo'",
+    ),
 }
 
 

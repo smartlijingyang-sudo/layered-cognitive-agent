@@ -160,8 +160,8 @@ class TestJournalProjectorToolWire(unittest.TestCase):
             "id: 1\nevent: ToolStarted\n"
             'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
             '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            '"event_type":"ToolStarted","event":{"tool_name":"run_skill_script",'
-            '"arguments_preview":"{\\"command\\":\\"make\\"}","invocation_id":"inv-3"}}\n\n'
+            '"event_type":"ToolStarted","event":{"tool_name":"execute_code",'
+            '"arguments_preview":"{\\"code\\":\\"print(1)\\",\\"language\\":\\"python\\"}","invocation_id":"inv-3"}}\n\n'
         )
         projector.project_frame(start)
         delta = (
@@ -169,12 +169,14 @@ class TestJournalProjectorToolWire(unittest.TestCase):
             'data: {"schema":"journal.v1","seq":2,"ts":2.0,'
             '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
             '"event_type":"SandboxOutputDelta","event":{"invocation_id":"inv-3","stream":"stdout",'
-            '"text_delta":"building","seq":1}}\n\n'
+            '"text_delta":"1\\n","seq":1}}\n\n'
         )
         chunks = projector.project_frame(delta)
         event = chunks[0]["lca"]["events"][0]
         self.assertEqual(event["type"], "tool_state")
-        self.assertEqual(event["state"]["stdout"], "building")
+        self.assertEqual(event["state"]["stdout"], "1\n")
+        self.assertEqual(event["state"]["code"], "print(1)")
+        self.assertEqual(event.get("content"), "1\n")
 
     def test_tool_stream_only_ends_with_stop(self) -> None:
         projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")

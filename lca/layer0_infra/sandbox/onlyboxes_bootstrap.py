@@ -16,7 +16,6 @@ from lca.contracts.models.core.sandbox import SandboxResult
 from lca.layer0_infra.credentials.sandbox_env import build_sandbox_env_preamble
 from lca.layer0_infra.sandbox.onlyboxes_artifacts import strip_artifacts
 from lca.layer0_infra.sandbox.streaming import SandboxStreamEmitter
-from lca.layer0_infra.text.safe_boundary import sanitize_stream_text
 
 # ── constants ───────────────────────────────────────────────────────
 
@@ -91,80 +90,6 @@ except SystemExit as _lca_se:
 """
 
 
-# ── response parser ─────────────────────────────────────────────────
-
-
-def parse_exec_response(response: httpx.Response, emitter: SandboxStreamEmitter) -> SandboxResult:
-    """Parse an Onlyboxes exec/session response into a SandboxResult."""
-    text = response.text
-    try:
-        payload: Any = json.loads(text) if text else {}
-    except json.JSONDecodeError:
-        err = f"Onlyboxes non-JSON response HTTP {response.status_code}: {text[:300]}"
-        emitter.emit_stderr(err + "\n")
-        return SandboxResult(success=False, exit_code=1, error=err, stderr=err + "\n")
-
-    if not isinstance(payload, dict):
-        err = f"Onlyboxes unexpected payload type: {type(payload).__name__}"
-        return SandboxResult(success=False, exit_code=1, error=err)
-
-    if response.status_code >= 400 and "result" not in payload:
-        err_msg = payload.get("error")
-        if isinstance(err_msg, dict):
-            message = str(err_msg.get("message") or err_msg.get("code") or err_msg)
-        else:
-            message = str(err_msg or f"HTTP {response.status_code}")
-        emitter.emit_stderr(message + "\n")
-        return SandboxResult(success=False, exit_code=1, error=message, stderr=message + "\n")
-
-    status = str(payload.get("status") or "")
-    raw_result = payload.get("result")
-    result_obj: dict[str, Any] = raw_result if isinstance(raw_result, dict) else {}
-    raw_error = payload.get("error")
-    task_error: dict[str, Any] | None = raw_error if isinstance(raw_error, dict) else None
-
-    stdout_raw = sanitize_stream_text(
-        str(result_obj.get("output") or result_obj.get("stdout") or "")
-    )
-    stderr_raw = sanitize_stream_text(str(result_obj.get("stderr") or ""))
-    exit_code_raw = result_obj.get("exit_code")
-    try:
-        exit_code = (
-            int(exit_code_raw)
-            if exit_code_raw is not None
-            else (0 if status == STATUS_SUCCEEDED else 1)
-        )
-    except (TypeError, ValueError):
-        exit_code = 1
-
-    cleaned_stdout, generated, diags = strip_artifacts(stdout_raw)
-    if diags:
-        stderr_raw = stderr_raw + "".join(diags)
-    if cleaned_stdout:
-        emitter.emit_stdout(cleaned_stdout)
-    if stderr_raw:
-        emitter.emit_stderr(stderr_raw)
-
-    if task_error:
-        error_text = str(task_error.get("message") or task_error.get("code") or task_error)
-    elif exit_code != 0:
-        error_text = stderr_raw.strip() or f"exit_code={exit_code}"
-    elif status and status != STATUS_SUCCEEDED:
-        error_text = f"Onlyboxes task status={status!r}"
-    else:
-        error_text = ""
-
-    success = exit_code == 0 and status in {STATUS_SUCCEEDED, ""} and task_error is None
-    return SandboxResult(
-        stdout=cleaned_stdout,
-        stderr=stderr_raw,
-        exit_code=exit_code,
-        success=success,
-        generated_files=tuple(generated),
-        error=error_text if not success else "",
-    )
-
-
 def parse_terminal_response(
     response: httpx.Response,
     emitter: SandboxStreamEmitter,
@@ -199,7 +124,7 @@ def parse_terminal_response(
     stdout = str(payload.get("stdout") or "")
     stderr = str(payload.get("stderr") or "")
 
-    # ADR-0046 alignment: harvest artifact block (same as parse_exec_response)
+    # ADR-0046 alignment: harvest artifact marker block from stdout
     cleaned_stdout, generated, diags = strip_artifacts(stdout)
     if diags:
         stderr = stderr + "".join(diags)

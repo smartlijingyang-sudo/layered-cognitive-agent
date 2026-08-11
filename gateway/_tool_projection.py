@@ -12,14 +12,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from gateway.lobehub_bridge._wire_helpers import parse_args_json, safe_json_string
+from gateway.lobehub_bridge.file_urls import absolutize_file_parts
 from gateway.lobehub_bridge.lca_sse_extension import (
     lca_tool_result_event,
     lca_tool_started_event,
     lca_tool_state_event,
 )
-from gateway.lobehub_bridge.tool_wire import (
-    TOOL_RESULT_PREVIEW_LIMIT,
+from gateway.lobehub_bridge.lobehub_adapter import (
     build_tool_plugin_state,
     resolve_tool_wire,
     split_wire_name,
@@ -27,6 +26,11 @@ from gateway.lobehub_bridge.tool_wire import (
     tool_result_preview_limit,
     transform_tool_arguments,
 )
+from gateway.lobehub_bridge.lobehub_adapter.json_helpers import (
+    parse_args_json,
+    safe_json_string,
+)
+from gateway.lobehub_bridge.lobehub_adapter.protocol import TOOL_RESULT_PREVIEW_LIMIT
 from lca.contracts.models.observability.journal import (
     SandboxOutputDelta,
     ToolDenied,
@@ -133,12 +137,18 @@ class ToolProjection:
         if wire.api_name == "executeCode":
             state["output"] = buf.stdout
             state["language"] = args.get("language", "python")
+            code = args.get("code")
+            if isinstance(code, str) and code:
+                state["code"] = code
         else:
-            state["command"] = args.get("command", "")
+            command = args.get("command", "")
+            state["command"] = command
+            state["output"] = buf.stdout or buf.stderr
         lca_event = lca_tool_state_event(
             tool_call_id=tool_call_id,
             state=state,
             snapshot_seq=buf.seq,
+            content=buf.stdout or buf.stderr,
         )
         return self.emit_lca([lca_event])
 
@@ -179,16 +189,23 @@ class ToolProjection:
             if exec_buf:
                 if exec_buf.stdout:
                     state["stdout"] = exec_buf.stdout
+                    state.setdefault("output", exec_buf.stdout)
                 if exec_buf.stderr:
                     state["stderr"] = exec_buf.stderr
+            file_parts = absolutize_file_parts(event.files or ())
+            if file_parts:
+                state["files"] = file_parts
             content = tool_result_content(
                 preview, ok=event.ok, error=event.error, lca_tool_name=lca_name
             )
+            if not content and state.get("output"):
+                content = str(state["output"])[:limit]
             lca_event = lca_tool_result_event(
                 tool_call_id=tool_call_id,
                 content=content,
                 state=state,
                 error=event.error if not event.ok else None,
+                files=file_parts,
             )
             return self.emit_lca([lca_event])
 
@@ -197,11 +214,11 @@ class ToolProjection:
             text = f"\n\n> **{event.tool_name}** ✅ ({event.latency_ms}ms)\n> {preview}\n"
         else:
             text = f"\n\n> **{event.tool_name}** ❌ {event.error}\n"
-        return self.emit_delta({"content": text})
+        return self.emit_delta([{"content": text}])
 
     def project_denied(self, event: ToolDenied) -> list[Chunk]:
         text = f"\n\n> **{event.tool_name}** ⛔ {event.reason}\n"
-        return self.emit_delta({"content": text})
+        return self.emit_delta([{"content": text}])
 
 
 # ── Shared utility ──────────────────────────────────────────

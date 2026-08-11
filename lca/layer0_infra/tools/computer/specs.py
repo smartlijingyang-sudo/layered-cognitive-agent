@@ -8,6 +8,7 @@ from typing import Any
 
 from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
 from lca.layer0_infra.computer.runtime import ComputerOpResult, ComputerRuntime
+from lca.layer0_infra.tools.computer.descriptions import DESCRIPTIONS
 from lca.layer0_infra.tools.computer.handlers import (
     _op_edit_file,
     _op_execute_code,
@@ -38,6 +39,24 @@ GET_COMMAND_OUTPUT = "get_command_output"
 KILL_COMMAND = "kill_command"
 EXPORT_FILE = "export_file"
 
+COMPUTER_TOOL_NAMES: frozenset[str] = frozenset(
+    {
+        EXECUTE_CODE,
+        RUN_COMMAND,
+        LIST_FILES,
+        READ_FILE,
+        WRITE_FILE,
+        EDIT_FILE,
+        SEARCH_FILES,
+        MOVE_FILES,
+        GREP_CONTENT,
+        GLOB_FILES,
+        GET_COMMAND_OUTPUT,
+        KILL_COMMAND,
+        EXPORT_FILE,
+    }
+)
+
 OpFn = Callable[[ComputerRuntime, dict[str, Any]], Awaitable[ComputerOpResult]]
 
 
@@ -54,7 +73,7 @@ class ComputerToolSpec:
 _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ComputerToolSpec(
         name=EXECUTE_CODE,
-        description="在隔离沙箱中执行代码。工作区 /mnt/data。参数: description, language, code。",
+        description=DESCRIPTIONS[EXECUTE_CODE],
         parameters={
             "type": "object",
             "properties": {
@@ -68,7 +87,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=RUN_COMMAND,
-        description="在沙箱执行 shell 命令。参数: description, command, background, timeout。",
+        description=DESCRIPTIONS[RUN_COMMAND],
         parameters={
             "type": "object",
             "properties": {
@@ -83,7 +102,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=LIST_FILES,
-        description="列出沙箱目录。参数 directoryPath。",
+        description=DESCRIPTIONS[LIST_FILES],
         parameters={
             "type": "object",
             "properties": {"directoryPath": {"type": "string"}},
@@ -94,7 +113,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=READ_FILE,
-        description="读取沙箱文件。参数 path, startLine, endLine。",
+        description=DESCRIPTIONS[READ_FILE],
         parameters={
             "type": "object",
             "properties": {
@@ -109,7 +128,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=WRITE_FILE,
-        description="写入沙箱文件。参数 path, content, createDirectories。",
+        description=DESCRIPTIONS[WRITE_FILE],
         parameters={
             "type": "object",
             "properties": {
@@ -123,7 +142,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=EDIT_FILE,
-        description="精确替换文件内容。参数 path, search, replace, all。",
+        description=DESCRIPTIONS[EDIT_FILE],
         parameters={
             "type": "object",
             "properties": {
@@ -138,7 +157,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=SEARCH_FILES,
-        description="搜索沙箱文件。参数 directory, keyword, fileType。",
+        description=DESCRIPTIONS[SEARCH_FILES],
         parameters={
             "type": "object",
             "properties": {
@@ -153,7 +172,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=MOVE_FILES,
-        description="移动/重命名文件。参数 operations。",
+        description=DESCRIPTIONS[MOVE_FILES],
         parameters={
             "type": "object",
             "properties": {
@@ -175,7 +194,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=GREP_CONTENT,
-        description="正则搜索内容。参数 pattern, directory。",
+        description=DESCRIPTIONS[GREP_CONTENT],
         parameters={
             "type": "object",
             "properties": {
@@ -191,7 +210,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=GLOB_FILES,
-        description="Glob 匹配文件。参数 pattern, directory。",
+        description=DESCRIPTIONS[GLOB_FILES],
         parameters={
             "type": "object",
             "properties": {
@@ -205,7 +224,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=GET_COMMAND_OUTPUT,
-        description="获取后台命令输出。参数 commandId。",
+        description=DESCRIPTIONS[GET_COMMAND_OUTPUT],
         parameters={
             "type": "object",
             "properties": {"commandId": {"type": "string"}},
@@ -216,7 +235,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=KILL_COMMAND,
-        description="终止后台命令。参数 commandId。",
+        description=DESCRIPTIONS[KILL_COMMAND],
         parameters={
             "type": "object",
             "properties": {"commandId": {"type": "string"}},
@@ -226,7 +245,7 @@ _COMPUTER_TOOL_SPECS: tuple[ComputerToolSpec, ...] = (
     ),
     ComputerToolSpec(
         name=EXPORT_FILE,
-        description="导出沙箱文件供下载。参数 path。",
+        description=DESCRIPTIONS[EXPORT_FILE],
         parameters={
             "type": "object",
             "properties": {"path": {"type": "string"}},

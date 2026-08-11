@@ -27,13 +27,15 @@ def build_computer_observation(
 ) -> Observation:
     """Build an Observation from a ComputerOpResult, storing generated files."""
     latency_ms = int((time.monotonic() - start) * 1000)
+    plugin_state = dict(result.state)
     payload: dict[str, Any] = {
-        **result.state,
+        "state": plugin_state,
         "content": result.content,
         "summary": _truncate(result.content),
     }
     if result.exec_result is not None:
         payload["exit_code"] = result.exec_result.exit_code
+        plugin_state.setdefault("exitCode", result.exec_result.exit_code)
 
     # File pipeline: store generated files and record in workspace ledger
     file_parts: list[dict[str, Any]] = []

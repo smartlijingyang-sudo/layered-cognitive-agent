@@ -102,6 +102,33 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         self.assertEqual(files[0]["mimeType"], "application/pdf")
         self.assertIn("url", files[0])
         self.assertIn("attachmentId", files[0])
+        state = (obs.payload or {}).get("state", {})
+        self.assertEqual(state.get("output"), "output text")
+
+    def test_plugin_state_from_nested_state(self) -> None:
+        import os
+        import tempfile
+        from pathlib import Path
+
+        from lca.layer0_infra.computer.runtime import ComputerOpResult
+        from lca.layer0_infra.file_store import LocalFileStore
+        from lca.layer0_infra.tools.computer.observations import build_computer_observation
+        from lca.layer1_cognitive.body.tool_result_preview import tool_plugin_state
+
+        result = ComputerOpResult(
+            success=True,
+            content="42",
+            state={"output": "42", "code": "print(42)", "language": "python", "success": True},
+            generated_files=(),
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = LocalFileStore(root=Path(os.path.join(tmpdir, "files")))
+            obs = build_computer_observation(
+                result, tool_name="execute_code", start=0.0, store=store
+            )
+        plugin = tool_plugin_state(obs)
+        self.assertEqual(plugin.get("code"), "print(42)")
+        self.assertEqual(plugin.get("output"), "42")
 
     def test_no_files_when_empty(self) -> None:
         import os

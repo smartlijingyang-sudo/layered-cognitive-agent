@@ -393,11 +393,10 @@ class ExecuteCodeArtifactTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_scanner_injected_in_code(self) -> None:
         """The code passed to the sandbox should contain the artifact scanner."""
-        from lca.layer0_infra.computer.runtime_exec import _ARTIFACT_SCANNER
+        from lca.layer0_infra.sandbox.artifact_scanner import GUEST_ARTIFACT_SCANNER
 
-        # Verify the scanner constant exists and targets /mnt/data/outputs
-        self.assertIn("/mnt/data/outputs", _ARTIFACT_SCANNER)
-        self.assertIn("__LCA_ONLYBOXES_ARTIFACTS__", _ARTIFACT_SCANNER)
+        self.assertIn("/mnt/data/outputs", GUEST_ARTIFACT_SCANNER)
+        self.assertIn("__LCA_ONLYBOXES_ARTIFACTS__", GUEST_ARTIFACT_SCANNER)
 
 
 if __name__ == "__main__":

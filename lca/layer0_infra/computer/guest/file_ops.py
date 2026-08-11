@@ -65,6 +65,30 @@ else:
     return wrap_guest_body(body)
 
 
+def build_read_bytes_script(*, path: str) -> str:
+    """Read file as base64 bytes — for export_file (binary-safe)."""
+    body = f"""
+import base64 as _b64
+import mimetypes as _mt
+path = {json.dumps(path)}
+target = _resolve(path)
+if not target.is_file():
+    result = {{"success": False, "error": f"not a file: {{path}}", "path": path}}
+else:
+    raw = target.read_bytes()
+    mime, _ = _mt.guess_type(target.name)
+    result = {{
+        "success": True,
+        "path": path,
+        "filename": target.name,
+        "b64": _b64.b64encode(raw).decode("ascii"),
+        "size": len(raw),
+        "mimeType": mime or "application/octet-stream",
+    }}
+"""
+    return wrap_guest_body(body)
+
+
 def build_write_file_script(
     *,
     path: str,

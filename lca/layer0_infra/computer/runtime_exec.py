@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import textwrap
 from typing import Any, Protocol
 
 from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
@@ -11,6 +10,7 @@ from lca.layer0_infra.computer.guest import (
     build_background_kill_script,
     build_background_poll_script,
     build_background_start_script,
+    build_read_bytes_script,
     build_shell_script,
 )
 from lca.layer0_infra.computer.runtime import (
@@ -18,35 +18,10 @@ from lca.layer0_infra.computer.runtime import (
     TerminalCapableSandbox,
     _normalize_path,
 )
+from lca.layer0_infra.sandbox.artifact_scanner import wrap_code_with_artifact_scanner
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
-
-# ADR-0046 compliant: only scans /mnt/data/outputs/ (not /mnt/data/ root)
-_ARTIFACT_SCANNER = """
-import os as _os, json as _json, base64 as _b64, mimetypes as _mt
-try:
-    _scan_files = []
-    _output_dir = "/mnt/data/outputs"
-    if _os.path.isdir(_output_dir):
-        for _fname in _os.listdir(_output_dir):
-            _fpath = _os.path.join(_output_dir, _fname)
-            if _os.path.isfile(_fpath):
-                try:
-                    with open(_fpath, "rb") as _fh:
-                        _raw = _fh.read()
-                    _scan_files.append({
-                        "name": _fname,
-                        "b64": _b64.b64encode(_raw).decode(),
-                        "mime_type": _mt.guess_type(_fname)[0] or "application/octet-stream",
-                    })
-                except Exception:
-                    pass
-    if _scan_files:
-        print("__LCA_ONLYBOXES_ARTIFACTS__" + _json.dumps(_scan_files) + "__END_LCA_ARTIFACTS__")
-except Exception:
-    pass
-"""
 
 
 class _GuestOpHost(Protocol):
@@ -90,13 +65,7 @@ class ComputerRuntimeExecMixin:
         )
         inv = get_current_tool_invocation_id() or "execute_code"
 
-        # Inject ADR-0046 compliant artifact scanner via try/finally
-        wrapped_code = (
-            "try:\n"
-            + textwrap.indent(code, "    ")
-            + "\nfinally:\n"
-            + textwrap.indent(_ARTIFACT_SCANNER, "    ")
-        )
+        wrapped_code = wrap_code_with_artifact_scanner(code)
 
         exec_result = await runtime.execute(
             wrapped_code,
@@ -202,21 +171,31 @@ class ComputerRuntimeExecMixin:
         return result
 
     async def export_file(self: _GuestOpHost, *, path: str) -> ComputerOpResult:
-        read = await self.read_file(path=_normalize_path(path))
+        import base64
+
+        normalized = _normalize_path(path)
+        read = await self._guest_op(build_read_bytes_script(path=normalized))
         if not read.success:
             return read
-        content = str(read.state.get("content") or "")
-        filename = str(read.state.get("filename") or path.rsplit("/", 1)[-1] or "export.bin")
-        stored = self._store.put(
-            data=content.encode("utf-8"),
-            name=filename,
-            mime_type="application/octet-stream",
-        )
+        b64_raw = read.state.get("b64")
+        if not isinstance(b64_raw, str) or not b64_raw:
+            err = str(read.state.get("error") or "export read failed")
+            return ComputerOpResult(
+                success=False,
+                content=err,
+                state={"success": False, "error": err, "path": normalized},
+                error=err,
+            )
+        data = base64.b64decode(b64_raw)
+        filename = str(read.state.get("filename") or normalized.rsplit("/", 1)[-1] or "export.bin")
+        mime_type = str(read.state.get("mimeType") or "application/octet-stream")
+        stored = self._store.put(data=data, name=filename, mime_type=mime_type)
         state = {
             "success": True,
-            "path": path,
+            "path": normalized,
             "filename": stored.name,
             "downloadUrl": stored.url,
+            "mimeType": mime_type,
             "size": stored.size_bytes,
         }
         return ComputerOpResult(

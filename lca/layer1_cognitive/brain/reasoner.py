@@ -209,14 +209,25 @@ def _prior_conversation_text(state: AgentState) -> str:
     return format_prior_conversation(tuple(turns))
 
 
+def _cloud_sandbox_block(tools: Sequence[Tool]) -> str:
+    if not tools:
+        return ""
+    from lca.layer1_cognitive.brain.sandbox_prompt import build_cloud_sandbox_prompt
+
+    return build_cloud_sandbox_prompt(tools)
+
+
 def _role_prompt_vars(
     role_profile: RoleProfile,
     tools_desc: str,
     state: AgentState,
     context_lines: str,
     *,
+    tools: Sequence[Tool] | None = None,
     available_skills: str = "",
 ) -> dict[str, str]:
+    tool_list = tools or ()
+    cloud_sandbox = _cloud_sandbox_block(tool_list)
     return {
         "role": role_profile.role,
         "goal": role_profile.goal,
@@ -228,6 +239,7 @@ def _role_prompt_vars(
         "available_skills": available_skills or "（无技能库）",
         "activated_skills": _format_activated_skills(state),
         "search_routing": search_routing_hint(tavily_available=any_search_provider_available()),
+        "cloud_sandbox": cloud_sandbox,
     }
 
 
@@ -296,6 +308,7 @@ class PromptReasoner(Reasoner):
             self.tools_desc,
             state,
             _context_lines(state, exclude_kinds=exclusions),
+            tools=self.tools,
             available_skills=self.available_skills,
         )
         template_name = state.active_template or _DEFAULT_TEMPLATE

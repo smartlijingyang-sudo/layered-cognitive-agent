@@ -59,6 +59,7 @@ def lca_tool_result_event(
     content: str,
     state: dict[str, Any] | None = None,
     error: str | None = None,
+    files: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     event: dict[str, Any] = {
         "type": "tool_result",
@@ -67,6 +68,8 @@ def lca_tool_result_event(
     }
     if state:
         event["state"] = state
+    if files:
+        event["files"] = files
     if error:
         event["error"] = error
     return event
@@ -77,13 +80,17 @@ def lca_tool_state_event(
     tool_call_id: str,
     state: dict[str, Any],
     snapshot_seq: int,
+    content: str = "",
 ) -> dict[str, Any]:
-    return {
+    event: dict[str, Any] = {
         "type": "tool_state",
         "tool_call_id": tool_call_id,
         "state": state,
         "snapshot_seq": snapshot_seq,
     }
+    if content:
+        event["content"] = content
+    return event
 
 
 def merge_lca_extension(body: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any]:

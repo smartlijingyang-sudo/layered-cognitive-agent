@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1
+# Onlyboxes terminalExec runtime — LCA + LobeHub cloud-sandbox baseline.
+#
+# Aligns with LobeHub native: terminalExec is the sole execution channel; this
+# image must carry the same Python data/doc stack as deploy/onlyboxes/requirements-python.txt.
+#
+# Build:
+#   ./deploy/onlyboxes/build-terminal-image.sh
+# Worker env:
+#   WORKER_TERMINAL_EXEC_DOCKER_IMAGE=onlyboxes-terminal-local:lca
+FROM coolfan1024/onlyboxes-runtime:default
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
+USER root
+
+COPY requirements-python.txt /tmp/requirements-python.txt
+COPY matplotlibrc /etc/matplotlibrc
+ENV MATPLOTLIBRC=/etc/matplotlibrc
+
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install --no-cache-dir -r /tmp/requirements-python.txt \
+    && rm -f /tmp/requirements-python.txt \
+    && python3 -c "import reportlab,pandas,numpy,openpyxl; print('terminal-runtime ok')"
+
+WORKDIR /workspace

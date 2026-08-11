@@ -65,19 +65,14 @@ async def execute_run(
             search_run_scope(),
         ):
             sandbox = resolve_sandbox()
-            if sandbox is not None and session.attachment_ids:
+            if sandbox is not None:
                 try:
-                    runtime = await bind_sandbox_runtime(
+                    await bind_sandbox_runtime(
                         session.run_id,
                         sandbox,
                         get_default_file_store(),
                         session.attachment_ids,
                     )
-                    mount_err = await runtime.ensure_ready()
-                    if mount_err is not None:
-                        session.status = RunStatus.FAILED
-                        session.error = mount_err.error_summary or mount_err.error
-                        return
                 except Exception as exc:
                     _log.warning(
                         "sandbox_runtime_bind_failed", run_id=session.run_id, error=str(exc)

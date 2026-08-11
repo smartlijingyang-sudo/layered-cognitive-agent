@@ -28,6 +28,7 @@ from lca.contracts.models.core.sandbox import (
     SessionInfo,
 )
 from lca.contracts.protocols import Sandbox
+from lca.layer0_infra.sandbox.bootstrap import SANDBOX_FILES_INIT_MARKER
 from lca.layer0_infra.sandbox.onlyboxes_bootstrap import (
     auth_headers,
     parse_terminal_response,
@@ -183,7 +184,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
 
         # Batch curl downloads in a single terminal call with idempotency marker.
         if curl_cmds:
-            marker = f"{base_dir}/.lca-files-initialized"
+            marker = SANDBOX_FILES_INIT_MARKER
             joined = " && ".join(curl_cmds)
             cmd = (
                 f"mkdir -p '{base_dir}'; "

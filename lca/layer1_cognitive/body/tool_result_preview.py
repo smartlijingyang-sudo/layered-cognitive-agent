@@ -53,6 +53,27 @@ def tool_files(obs: Observation) -> tuple[dict[str, Any], ...]:
     return ()
 
 
+_COMPUTER_STATE_KEYS = frozenset(
+    {
+        "code",
+        "command",
+        "commandId",
+        "executionEnv",
+        "exitCode",
+        "exit_code",
+        "error",
+        "errorDetail",
+        "files",
+        "isBackground",
+        "language",
+        "output",
+        "stderr",
+        "stdout",
+        "success",
+    }
+)
+
+
 def tool_plugin_state(obs: Observation) -> dict[str, Any]:
     """LobeHub tool card state — never serialized into truncated result_preview."""
     payload = obs.payload
@@ -61,6 +82,13 @@ def tool_plugin_state(obs: Observation) -> dict[str, Any]:
     nested = payload.get("state")
     if isinstance(nested, dict):
         return dict(nested)
+    # Legacy computer observations spread state at payload top level.
+    if any(key in payload for key in _COMPUTER_STATE_KEYS):
+        return {
+            key: payload[key]
+            for key in _COMPUTER_STATE_KEYS
+            if key in payload and payload[key] is not None
+        }
     return {}
 
 

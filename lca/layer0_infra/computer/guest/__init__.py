@@ -4,6 +4,7 @@ from lca.layer0_infra.computer.guest.file_ops import (
     build_edit_file_script,
     build_list_files_script,
     build_move_files_script,
+    build_read_bytes_script,
     build_read_file_script,
     build_write_file_script,
 )
@@ -29,6 +30,7 @@ __all__ = [
     "build_grep_content_script",
     "build_list_files_script",
     "build_move_files_script",
+    "build_read_bytes_script",
     "build_read_file_script",
     "build_search_files_script",
     "build_shell_script",
