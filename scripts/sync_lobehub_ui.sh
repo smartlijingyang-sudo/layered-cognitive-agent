@@ -84,11 +84,7 @@ EOF
 
 echo "[sync] manifest: ${DEST}/.lca-origin.json"
 
-# 局域网 dev 补丁（Vite 资源 URL 不用 localhost）
-"${ROOT}/deploy/lobehub/patch-lan-dev.sh" 2>/dev/null || true
-# LCA 集成补丁（默认模型 / OpenAI guard / lca.events closed-loop）
-rm -f "${DEST}/.lca-qwen-defaults-patched" "${DEST}/.lca-integration-patched" 2>/dev/null || true
-"${ROOT}/deploy/lobehub/patch-lca-qwen-defaults.sh"
-"${ROOT}/deploy/lobehub/patch-lca-integration.py"
+# 统一补丁引擎（幂等，含 LAN dev / 默认模型 / lca.events closed-loop / 认证 / 路由）
+python3 "${ROOT}/deploy/lobehub/patch_lobehub.py" --reset
 echo "[sync] 下一步: cd lobehub-ui && bun install && bun run dev"
 echo "         或: ./scripts/start_lobehub_stack.sh dev"

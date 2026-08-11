@@ -335,10 +335,7 @@ apply_lca_lobehub_patches() {
   if [[ ! -f "${LOBE_DIR}/package.json" ]]; then
     return 0
   fi
-  LCA_DEFAULT_MODEL="${LCA_DEFAULT_MODEL:-solo}" \
-  LCA_DEFAULT_MINI_MODEL="${LCA_DEFAULT_MINI_MODEL:-solo}" \
-    "${ROOT}/deploy/lobehub/patch-lca-qwen-defaults.sh"
-  python3 "${ROOT}/deploy/lobehub/patch-lca-integration.py"
+  python3 "${ROOT}/deploy/lobehub/patch_lobehub.py"
 }
 
 stop_gateway() {

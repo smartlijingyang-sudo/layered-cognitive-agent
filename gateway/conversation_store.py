@@ -1,8 +1,7 @@
 """Conversation 持久化 —— SQLite 最小形态（BE-4）。
 
-当前生效的读路径在浏览器端 IndexedDB（``web/src/domain/conversation-store.ts``）。
-本模块与 ``GET /conversations`` 系列接口为后续跨设备同步预留；前端 ``hydrate()``
-尚未接入此处，create_run 写入的后端 turn 记录目前仅作服务端审计/恢复预备。
+本模块与 ``GET /conversations`` 系列接口为后续跨设备同步预留；
+create_run 写入的后端 turn 记录目前仅作服务端审计/恢复预备。
 """
 
 from __future__ import annotations

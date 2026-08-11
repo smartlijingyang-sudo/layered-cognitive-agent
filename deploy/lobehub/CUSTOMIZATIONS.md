@@ -4,7 +4,7 @@
 >
 > **基准版本**：LobeHub v2.2.13（`.lobehub-upstream/` 为 pristine 源码，`lobehub-ui/` 为定制后的工作副本）
 >
-> **应用方式**：`patch-lca-integration.py` 幂等 patch + 手动改动（标注 `[手动]`）
+> **应用方式**：`patch_lobehub.py` 统一补丁引擎（19 个幂等 patch，支持 `apply` / `verify` / `list`）
 
 ---
 
@@ -37,7 +37,7 @@ LCA Agent/Team Runtime → 上游 LLM
 
 ### 1.1 `packages/model-runtime/src/core/streams/openai/openai.ts`
 
-**Patch 函数**：`patch_openai_stream()`
+**Patch 名称**：`openai_stream`
 
 在 `transformOpenAIStream` 的 chunk 处理最前面插入 LCA 扩展提取：
 
@@ -58,7 +58,9 @@ if (lcaExt?.events?.length) {
 
 **锚点**：`  try {\n    // maybe need another structure to add support for multiple choices`
 
-### 1.2 `packages/model-runtime/src/core/streams/qwen.ts` `[手动]`
+### 1.2 `packages/model-runtime/src/core/streams/qwen.ts`
+
+**Patch 名称**：`qwen_stream`
 
 与 1.1 相同的 patch，但插入位置在 `transformQwenStream` 的 usage 检查之后、`chunk.choices[0]` 之前：
 
@@ -81,7 +83,7 @@ if (lcaExt?.events?.length) {
 
 ### 1.3 `packages/model-runtime/src/core/streams/protocol.ts`
 
-**Patch 函数**：`patch_protocol()`
+**Patch 名称**：`protocol`
 
 两处改动：
 
@@ -98,7 +100,7 @@ case 'lca_tool_event': {
 
 ### 1.4 `packages/model-runtime/src/types/chat.ts`
 
-**Patch 函数**：`patch_chat_callbacks()`
+**Patch 名称**：`chat_callbacks`
 
 在 `ChatStreamCallbacks` 接口中加：
 
@@ -111,7 +113,7 @@ onLcaToolEvent?: (event: Record<string, unknown>) => Promise<void> | void;
 
 ### 1.5 `packages/fetch-sse/src/fetchSSE.ts`
 
-**Patch 函数**：`patch_fetch_sse()`
+**Patch 名称**：`fetch_sse`
 
 两处改动：
 
@@ -134,7 +136,7 @@ case 'lca_tool_event': {
 
 ### 2.1 `src/store/chat/agents/types/streaming.ts`
 
-**Patch 函数**：`patch_streaming_types()`
+**Patch 名称**：`streaming_types`
 
 四处改动：
 
@@ -145,7 +147,7 @@ case 'lca_tool_event': {
 
 ### 2.2 `src/store/chat/agents/StreamingHandler.ts`
 
-**Patch 函数**：`patch_streaming_handler()`
+**Patch 名称**：`streaming_handler`
 
 改动：
 
@@ -163,7 +165,7 @@ case 'lca_tool_event': {
 
 ### 2.3 `src/store/chat/agents/transports/ClientLLMTransport.ts`
 
-**Patch 函数**：`patch_client_llm_transport()`
+**Patch 名称**：`client_transport`
 
 三处改动：
 
@@ -176,13 +178,13 @@ onLcaToolEvent: (event) => handler.handleChunk({ event, type: 'lca_tool_event' }
 
 ### 2.4 `packages/agent-runtime/src/transport/llm.ts`
 
-**Patch 函数**：`patch_llm_transport_type()`
+**Patch 名称**：`llm_transport_type`
 
 `StreamingResult` 类型加 `lcaClosedLoop?: boolean`
 
 ### 2.5 `packages/agent-runtime/src/executors/callLlmFinalizer.ts`
 
-**Patch 函数**：`patch_call_llm_finalizer()`
+**Patch 名称**：`call_llm_finalizer`
 
 ```typescript
 // 改前：
@@ -197,7 +199,15 @@ hasToolsCalling: !output.lcaClosedLoop && output.toolsCalling.length > 0,
 
 ## 三、Provider 路由
 
-### 3.1 `packages/model-runtime/src/providers/openai/index.ts` `[手动]`
+### 3.1 `packages/business/const/src/llm.ts`
+
+**Patch 名称**：`default_model`
+
+默认模型和 provider 改为 `solo` / `openai`（正则替换 `DEFAULT_MODEL`、`DEFAULT_PROVIDER`、`DEFAULT_MINI_MODEL`、`DEFAULT_MINI_PROVIDER`）。
+
+### 3.2 `packages/model-runtime/src/providers/openai/index.ts`
+
+**Patch 名称**：`openai_guard`
 
 LCA 虚拟模型（`solo`/`team`/`auto`）强制走 `chat/completions`，绕过 OpenAI 的 `responses` API：
 
@@ -209,7 +219,9 @@ if (!isLcaGatewayModel && (isResponsesAPIModel(model) || enabledSearch)) {
 }
 ```
 
-### 3.2 `packages/model-bank/src/modelProviders/index.ts` `[手动]`
+### 3.3 `packages/model-bank/src/modelProviders/index.ts`
+
+**Patch 名称**：`provider_order`
 
 OpenAI provider 排到 `DEFAULT_MODEL_PROVIDER_LIST` 第一位：
 
@@ -225,7 +237,9 @@ OpenAIProvider,
 
 > 去掉 Better Auth 登录，使用静态 dev user。
 
-### 4.1 `src/layout/AuthProvider/localDevNoAuth.ts` `[新增文件]`
+### 4.1 `src/layout/AuthProvider/localDevNoAuth.ts`
+
+**Patch 名称**：`dev_auth_files`（新增 3 个文件）
 
 ```typescript
 export const isLocalDevNoAuth = (): boolean => {
@@ -237,23 +251,27 @@ export const getLocalDevUserId = (): string =>
   process.env.NEXT_PUBLIC_MOCK_DEV_USER_ID || 'local-dev-user';
 ```
 
-### 4.2 `src/layout/AuthProvider/LocalDevAuth/index.tsx` `[新增文件]`
+### 4.2 `src/layout/AuthProvider/LocalDevAuth/index.tsx`
+
+**Patch 名称**：`dev_auth_files`（同上）
 
 无登录 UI wrapper，children + `LocalDevUserUpdater`。
 
-### 4.3 `src/layout/AuthProvider/LocalDevUserUpdater.tsx` `[新增文件]`
+### 4.3 `src/layout/AuthProvider/LocalDevUserUpdater.tsx`
+
+**Patch 名称**：`dev_auth_files`（同上）
 
 `useLayoutEffect` 注入静态 dev user 到 `useUserStore`。
 
 ### 4.4 `src/layout/AuthProvider/index.vite.tsx`
 
-**Patch 函数**：`patch_local_dev_no_auth()`
+**Patch 名称**：`dev_auth_vite`
 
 `ENABLE_MOCK_DEV_USER` 时用 `LocalDevAuth` 替代 `BetterAuth`。
 
 ### 4.5 `src/libs/next/proxy/define-config.ts`
 
-**Patch 函数**：`patch_middleware_mock_dev_user()`
+**Patch 名称**：`middleware_mock_user`
 
 middleware 跳过 Better Auth session gate：
 
@@ -271,25 +289,25 @@ if (mockDevFlag === '1' || mockDevFlag === 'true') {
 
 ### 5.1 `src/features/AgentSidebar/utils/agentPathname.ts`
 
-**Patch 函数**：`patch_topic_route_sync()`
+**Patch 名称**：`topic_route`
 
 新增 `AGENT_CHAT_SUB_ROUTES` 集合 + `resolveAgentChatRouteTopicId()` 函数。
 
 ### 5.2 `src/routes/(main)/agent/features/Conversation/ChatHydration/useChatRouteSync.ts`
 
-**Patch 函数**：`patch_topic_route_sync()`
+**Patch 名称**：`topic_route`
 
 用 `resolveAgentChatRouteTopicId` 替代直接读 `params.topicId`。
 
 ### 5.3 `src/routes/(main)/agent/_layout/AgentIdSync.tsx`
 
-**Patch 函数**：`patch_topic_route_sync()`
+**Patch 名称**：`topic_route`
 
 同上。
 
 ### 5.4 `src/routes/(main)/community/(detail)/agent/features/Sidebar/ActionButton/ForkAndChat.tsx`
 
-**Patch 函数**：`patch_local_dev_market_fork()`
+**Patch 名称**：`market_fork`
 
 本地 HTTP 无 secure context → 跳过 Market OIDC，直接 local fork：
 
@@ -300,13 +318,31 @@ if (!localDevFork && !isAuthenticated) { ... }
 
 ### 5.5 `src/routes/(main)/community/(detail)/group_agent/features/Sidebar/ActionButton/ForkGroupAndChat.tsx`
 
-**Patch 函数**：`patch_local_dev_market_fork()`
+**Patch 名称**：`market_fork`
 
 同 5.4。
 
 ---
 
-## 六、Gateway 端（LCA 侧）
+## 六、Dev UX
+
+### 6.1 `src/libs/spaHtml/index.ts`
+
+**Patch 名称**：`lan_dev`
+
+Vite dev 资源 URL 使用 `VITE_DEV_HOST` 环境变量（而非硬编码 `localhost`），支持局域网访问：
+
+```typescript
+export const resolveCiteDevOrigin = () => {
+  const host = process.env.VITE_DEV_HOST || 'localhost';
+  const port = Number(process.env.VITE_DEV_PORT) || 9876;
+  return `http://${host}:${port}`;
+};
+```
+
+---
+
+## 七、Gateway 端（LCA 侧）
 
 > 不是 LobeHub 代码，但是 LobeHub 集成的关键组成部分。
 
@@ -320,7 +356,7 @@ if (!localDevFork && !isAuthenticated) { ... }
 
 ---
 
-## 七、环境配置
+## 八、环境配置
 
 `.env.lca` → 复制到 `lobehub-ui/.env`：
 
@@ -346,38 +382,40 @@ NEXT_PUBLIC_MOCK_DEV_USER_ID=local-dev-user
 
 ## 如何新增定制
 
-1. **确定改动层次**：流式协议 / Agent 运行时 / Provider 路由 / 认证 / 路由适配
-2. **优先用 patch 函数**：在 `patch-lca-integration.py` 中新增幂等 patch 函数
-3. **锚点选择**：选择上下游代码中稳定的文本作为锚点（`if anchor not in text: raise SystemExit`）
-4. **标记 `[手动]`**：无法自动 patch 的改动在本文档中标注
+1. **确定改动层次**：流式协议 / Agent 运行时 / Provider 路由 / 认证 / 路由适配 / Dev UX
+2. **在 `patch_lobehub.py` 中新增 patch 函数**：遵循 `p_xxx()` 命名，返回 `bool`（True=applied, False=skipped）
+3. **注册到 `PATCHES` 清单**：填写 name / description / files / risk / category
+4. **添加 verify marker**：在 `_VERIFY_MARKERS` 中注册 (file, marker_string)
 5. **更新本文档**：记录文件路径、改动内容、锚点、原因
-6. **验证**：`diff -rq .lobehub-upstream/ lobehub-ui/` 确认改动范围
+6. **验证**：`python3 deploy/lobehub/patch_lobehub.py verify` 确认所有 patch 状态
 
 ---
 
 ## 文件索引
 
-| # | 文件（相对 lobehub-ui/） | 层次 | Patch 函数 |
+| # | 文件（相对 lobehub-ui/） | 层次 | Patch 名称 |
 |---|--------------------------|------|------------|
-| 1 | `packages/model-runtime/src/core/streams/openai/openai.ts` | 流式协议 | `patch_openai_stream` |
-| 2 | `packages/model-runtime/src/core/streams/qwen.ts` | 流式协议 | `[手动]` |
-| 3 | `packages/model-runtime/src/core/streams/protocol.ts` | 流式协议 | `patch_protocol` |
-| 4 | `packages/model-runtime/src/types/chat.ts` | 流式协议 | `patch_chat_callbacks` |
-| 5 | `packages/fetch-sse/src/fetchSSE.ts` | 流式协议 | `patch_fetch_sse` |
-| 6 | `src/store/chat/agents/types/streaming.ts` | Agent 运行时 | `patch_streaming_types` |
-| 7 | `src/store/chat/agents/StreamingHandler.ts` | Agent 运行时 | `patch_streaming_handler` |
-| 8 | `src/store/chat/agents/transports/ClientLLMTransport.ts` | Agent 运行时 | `patch_client_llm_transport` |
-| 9 | `packages/agent-runtime/src/transport/llm.ts` | Agent 运行时 | `patch_llm_transport_type` |
-| 10 | `packages/agent-runtime/src/executors/callLlmFinalizer.ts` | Agent 运行时 | `patch_call_llm_finalizer` |
-| 11 | `packages/model-runtime/src/providers/openai/index.ts` | Provider 路由 | `[手动]` |
-| 12 | `packages/model-bank/src/modelProviders/index.ts` | Provider 路由 | `[手动]` |
-| 13 | `src/layout/AuthProvider/localDevNoAuth.ts` | 认证 | `[新增]` |
-| 14 | `src/layout/AuthProvider/LocalDevAuth/index.tsx` | 认证 | `[新增]` |
-| 15 | `src/layout/AuthProvider/LocalDevUserUpdater.tsx` | 认证 | `[新增]` |
-| 16 | `src/layout/AuthProvider/index.vite.tsx` | 认证 | `patch_local_dev_no_auth` |
-| 17 | `src/libs/next/proxy/define-config.ts` | 认证 | `patch_middleware_mock_dev_user` |
-| 18 | `src/features/AgentSidebar/utils/agentPathname.ts` | 路由适配 | `patch_topic_route_sync` |
-| 19 | `src/routes/(main)/agent/features/Conversation/ChatHydration/useChatRouteSync.ts` | 路由适配 | `patch_topic_route_sync` |
-| 20 | `src/routes/(main)/agent/_layout/AgentIdSync.tsx` | 路由适配 | `patch_topic_route_sync` |
-| 21 | `src/routes/(main)/community/.../ForkAndChat.tsx` | 路由适配 | `patch_local_dev_market_fork` |
-| 22 | `src/routes/(main)/community/.../ForkGroupAndChat.tsx` | 路由适配 | `patch_local_dev_market_fork` |
+| 1 | `packages/model-runtime/src/core/streams/openai/openai.ts` | 流式协议 | `openai_stream` |
+| 2 | `packages/model-runtime/src/core/streams/qwen.ts` | 流式协议 | `qwen_stream` |
+| 3 | `packages/model-runtime/src/core/streams/protocol.ts` | 流式协议 | `protocol` |
+| 4 | `packages/model-runtime/src/types/chat.ts` | 流式协议 | `chat_callbacks` |
+| 5 | `packages/fetch-sse/src/fetchSSE.ts` | 流式协议 | `fetch_sse` |
+| 6 | `src/store/chat/agents/types/streaming.ts` | Agent 运行时 | `streaming_types` |
+| 7 | `src/store/chat/agents/StreamingHandler.ts` | Agent 运行时 | `streaming_handler` |
+| 8 | `src/store/chat/agents/transports/ClientLLMTransport.ts` | Agent 运行时 | `client_transport` |
+| 9 | `packages/agent-runtime/src/transport/llm.ts` | Agent 运行时 | `llm_transport_type` |
+| 10 | `packages/agent-runtime/src/executors/callLlmFinalizer.ts` | Agent 运行时 | `call_llm_finalizer` |
+| 11 | `packages/business/const/src/llm.ts` | Provider 路由 | `default_model` |
+| 12 | `packages/model-runtime/src/providers/openai/index.ts` | Provider 路由 | `openai_guard` |
+| 13 | `packages/model-bank/src/modelProviders/index.ts` | Provider 路由 | `provider_order` |
+| 14 | `src/layout/AuthProvider/localDevNoAuth.ts` | 认证 | `dev_auth_files` |
+| 15 | `src/layout/AuthProvider/LocalDevAuth/index.tsx` | 认证 | `dev_auth_files` |
+| 16 | `src/layout/AuthProvider/LocalDevUserUpdater.tsx` | 认证 | `dev_auth_files` |
+| 17 | `src/layout/AuthProvider/index.vite.tsx` | 认证 | `dev_auth_vite` |
+| 18 | `src/libs/next/proxy/define-config.ts` | 认证 | `middleware_mock_user` |
+| 19 | `src/features/AgentSidebar/utils/agentPathname.ts` | 路由适配 | `topic_route` |
+| 20 | `src/routes/(main)/agent/features/Conversation/ChatHydration/useChatRouteSync.ts` | 路由适配 | `topic_route` |
+| 21 | `src/routes/(main)/agent/_layout/AgentIdSync.tsx` | 路由适配 | `topic_route` |
+| 22 | `src/routes/(main)/community/.../ForkAndChat.tsx` | 路由适配 | `market_fork` |
+| 23 | `src/routes/(main)/community/.../ForkGroupAndChat.tsx` | 路由适配 | `market_fork` |
+| 24 | `src/libs/spaHtml/index.ts` | Dev UX | `lan_dev` |

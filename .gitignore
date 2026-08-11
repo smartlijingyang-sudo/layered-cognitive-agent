@@ -14,12 +14,10 @@ build/
 .coverage
 .import_linter_cache/
 traces/
-.observability-ui/
 repomix-output.xml
 repomix.config.json
 .qwen/tmp/
-web/node_modules/
-web/tsconfig.tsbuildinfo
 lobehub-ui/
 .lobehub-upstream/
 .lobehub-stack/
+.lca-state/

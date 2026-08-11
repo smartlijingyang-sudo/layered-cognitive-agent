@@ -1,8 +1,7 @@
 """Incremental user-visible text extraction from streaming Decision JSON.
 
-Mirror of ``web/src/lib/extract-decision-text.ts`` (ADR-0045). The LCA
-cognitive loop emits structured Decision JSON; only ``response_text`` (and
-plain prose fallbacks) may surface as OpenAI ``delta.content`` for LobeHub.
+The LCA cognitive loop emits structured Decision JSON; only ``response_text``
+(and plain prose fallbacks) may surface as OpenAI ``delta.content`` for LobeHub.
 
 Architecture:
 - ``StepTextDelta`` channel ``decision`` — raw LLM tokens (journal / replay)

@@ -28,7 +28,7 @@
 `dev` / `sync` 会自动：
 
 1. 从官方 tag 同步 `lobehub-ui/`（若需要）
-2. **自动打 LCA 补丁**（`deploy/lobehub/patch-lca-qwen-defaults.sh` + `patch-lca-integration.py`）
+2. **自动打 LCA 补丁**（`deploy/lobehub/patch_lobehub.py` — 统一补丁引擎，19 个幂等 patch）
 3. 启动 gateway（**Python 代码比进程新时自动重启**）
 4. 启动 LobeHub dev
 
@@ -41,7 +41,9 @@
 若只改了 LCA 补丁脚本、未 sync 官方 UI：
 
 ```bash
-python3 deploy/lobehub/patch-lca-integration.py   # 或 patch-lca-qwen-defaults.sh
+python3 deploy/lobehub/patch_lobehub.py          # apply all
+python3 deploy/lobehub/patch_lobehub.py verify   # dry-run check
+python3 deploy/lobehub/patch_lobehub.py list     # show manifest
 # LobeHub dev 需手动刷新 / 重启 dev 进程
 ```
 
