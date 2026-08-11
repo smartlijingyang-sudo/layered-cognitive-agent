@@ -105,12 +105,12 @@ def parse_terminal_response(
     success = exit_code == 0
     error_text = "" if success else (stderr.strip() or f"exit_code={exit_code}")
     return SandboxResult(
-        stdout=cleaned_stdout,            # was: stdout
+        stdout=cleaned_stdout,  # was: stdout
         stderr=stderr,
         exit_code=exit_code,
         success=success,
         error=error_text,
-        generated_files=tuple(generated), # new
+        generated_files=tuple(generated),  # new
     )
 ```
 
@@ -179,7 +179,9 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = LocalFileStore(root=os.path.join(tmpdir, "files"))
-            obs = build_computer_observation(result, tool_name="execute_code", start=0.0, store=store)
+            obs = build_computer_observation(
+                result, tool_name="execute_code", start=0.0, store=store
+            )
 
         self.assertTrue(obs.success)
         files = (obs.extra or {}).get("files", [])
@@ -204,7 +206,9 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = LocalFileStore(root=os.path.join(tmpdir, "files"))
-            obs = build_computer_observation(result, tool_name="execute_code", start=0.0, store=store)
+            obs = build_computer_observation(
+                result, tool_name="execute_code", start=0.0, store=store
+            )
 
         self.assertTrue(obs.success)
         self.assertNotIn("files", obs.extra or {})
@@ -226,6 +230,7 @@ from lca.contracts.models.core.sandbox import (
     SandboxExecResult,
     SandboxFile,  # new import
 )
+
 
 @dataclass(frozen=True)
 class ComputerOpResult:
@@ -338,8 +343,12 @@ def _instantiate_computer_tool(
         start = time.monotonic()
         result = await spec.handler(runtime, args)
         return build_computer_observation(
-            result, tool_name=spec.name, start=start, store=store,  # pass store
+            result,
+            tool_name=spec.name,
+            start=start,
+            store=store,  # pass store
         )
+
     # ... rest unchanged
 ```
 
@@ -408,7 +417,7 @@ In `lca/layer0_infra/computer/runtime_exec.py`:
 import textwrap
 
 # ADR-0046 compliant: only scans /mnt/data/outputs/
-_ARTIFACT_SCANNER = '''
+_ARTIFACT_SCANNER = """
 import os as _os, json as _json, base64 as _b64, mimetypes as _mt
 try:
     _scan_files = []
@@ -431,7 +440,7 @@ try:
         print("__LCA_ONLYBOXES_ARTIFACTS__" + _json.dumps(_scan_files) + "__END_LCA_ARTIFACTS__")
 except Exception:
     pass
-'''
+"""
 ```
 
 Modify `execute_code()`:
@@ -479,9 +488,7 @@ async def execute_code(
     }
     if not ok:
         state["error"] = exec_result.error_summary or exec_result.error
-    content = (
-        exec_result.stdout or exec_result.stderr or ("ok" if ok else state.get("error", ""))
-    )
+    content = exec_result.stdout or exec_result.stderr or ("ok" if ok else state.get("error", ""))
     return ComputerOpResult(
         success=ok,
         content=str(content),
@@ -529,6 +536,7 @@ Add to `tests/test_file_store_and_write_tool.py`:
 ```python
 def test_pdf_is_previewable() -> None:
     from lca.layer0_infra.file_store import _is_previewable
+
     assert _is_previewable("application/pdf") is True
 ```
 
@@ -547,7 +555,7 @@ if mime in {
     "application/javascript",
     "application/xml",
     "application/xhtml+xml",
-    "application/pdf",        # new
+    "application/pdf",  # new
 }:
     return True
 ```

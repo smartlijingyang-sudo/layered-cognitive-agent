@@ -75,12 +75,12 @@ def parse_terminal_response(response, emitter):
         emitter.emit_stderr(stderr)
     ...
     return SandboxResult(
-        stdout=cleaned_stdout,           # 改：用 cleaned
+        stdout=cleaned_stdout,  # 改：用 cleaned
         stderr=stderr,
         exit_code=exit_code,
         success=success,
         error=error_text,
-        generated_files=tuple(generated), # 新增
+        generated_files=tuple(generated),  # 新增
     )
 ```
 
@@ -97,7 +97,7 @@ def parse_terminal_response(response, emitter):
 **修复**: 在用户代码后追加 artifact scanner，通过 `try/finally` 保证即使代码异常也能 harvest。
 
 ```python
-_ARTIFACT_SCANNER = '''
+_ARTIFACT_SCANNER = """
 import os as _os, json as _json, base64 as _b64, mimetypes as _mt
 try:
     _scan_files = []
@@ -120,7 +120,7 @@ try:
         print("__LCA_ONLYBOXES_ARTIFACTS__" + _json.dumps(_scan_files) + "__END_LCA_ARTIFACTS__")
 except Exception:
     pass
-'''
+"""
 ```
 
 **ADR-0046 合规**: 仅扫描 `/mnt/data/outputs/`（`SANDBOX_OUTPUT_SUBDIR`），与 Mock / E2B / Local 三个后端行为一致。不扫描 `/mnt/data/` 根目录，避免：
@@ -171,6 +171,7 @@ class ComputerOpResult:
 ```python
 from lca.layer0_infra.tools.sandbox_observation import _stored_part
 from lca.layer0_infra.workspace.scope import get_run_workspace
+
 
 def build_computer_observation(result, *, tool_name, start, store):
     ...
@@ -223,7 +224,7 @@ if mime in {
     "application/javascript",
     "application/xml",
     "application/xhtml+xml",
-    "application/pdf",        # 新增
+    "application/pdf",  # 新增
 }:
     return True
 ```
