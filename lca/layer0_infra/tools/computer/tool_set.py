@@ -58,7 +58,7 @@ def _instantiate_computer_tool(
     async def execute(_self: Tool, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
         result = await spec.handler(runtime, args)
-        return build_computer_observation(result, tool_name=spec.name, start=start)
+        return build_computer_observation(result, tool_name=spec.name, start=start, store=store)
 
     tool_cls = type(
         f"ComputerTool_{spec.name}",

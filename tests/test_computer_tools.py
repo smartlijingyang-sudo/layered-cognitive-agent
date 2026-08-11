@@ -63,5 +63,67 @@ class TestDefaultToolsComputer(unittest.TestCase):
         self.assertNotIn("sandbox_inspect", names)
 
 
+class TestBuildComputerObservationFiles(unittest.TestCase):
+    """build_computer_observation should pipe generated_files into Observation.extra['files']."""
+
+    def test_files_in_extra_when_generated(self) -> None:
+        import os
+        import tempfile
+        from pathlib import Path
+
+        from lca.contracts.models.core.sandbox import SandboxFile
+        from lca.layer0_infra.computer.runtime import ComputerOpResult
+        from lca.layer0_infra.file_store import LocalFileStore
+        from lca.layer0_infra.tools.computer.observations import build_computer_observation
+
+        result = ComputerOpResult(
+            success=True,
+            content="output text",
+            state={"output": "output text"},
+            generated_files=(
+                SandboxFile(name="primes.pdf", mime_type="application/pdf", data=b"%PDF-1.4"),
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = LocalFileStore(root=Path(os.path.join(tmpdir, "files")))
+            obs = build_computer_observation(
+                result, tool_name="execute_code", start=0.0, store=store
+            )
+
+        self.assertTrue(obs.success)
+        files = (obs.extra or {}).get("files", [])
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]["name"], "primes.pdf")
+        self.assertEqual(files[0]["mimeType"], "application/pdf")
+        self.assertIn("url", files[0])
+        self.assertIn("attachmentId", files[0])
+
+    def test_no_files_when_empty(self) -> None:
+        import os
+        import tempfile
+        from pathlib import Path
+
+        from lca.layer0_infra.computer.runtime import ComputerOpResult
+        from lca.layer0_infra.file_store import LocalFileStore
+        from lca.layer0_infra.tools.computer.observations import build_computer_observation
+
+        result = ComputerOpResult(
+            success=True,
+            content="ok",
+            state={},
+            generated_files=(),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = LocalFileStore(root=Path(os.path.join(tmpdir, "files")))
+            obs = build_computer_observation(
+                result, tool_name="execute_code", start=0.0, store=store
+            )
+
+        self.assertTrue(obs.success)
+        self.assertNotIn("files", obs.extra or {})
+
+
 if __name__ == "__main__":
     unittest.main()

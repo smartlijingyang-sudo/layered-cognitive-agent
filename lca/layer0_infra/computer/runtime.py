@@ -10,6 +10,7 @@ from lca.contracts.models.core.sandbox import (
     DEFAULT_SANDBOX_TIMEOUT_S,
     SANDBOX_MOUNT_ROOT,
     SandboxExecResult,
+    SandboxFile,
 )
 from lca.contracts.protocols import Sandbox
 from lca.layer0_infra.computer.constants import COMPUTER_WORKSPACE_ROOT
@@ -48,6 +49,7 @@ class ComputerOpResult:
     state: dict[str, Any]
     error: str = ""
     exec_result: SandboxExecResult | None = None
+    generated_files: tuple[SandboxFile, ...] = ()
 
 
 class _ComputerRuntimeBase:
