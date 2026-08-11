@@ -1,4 +1,4 @@
-"""Sandbox runtime tools + SandboxCodeTool alias (ADR-0050)."""
+"""Sandbox runtime tools (ADR-0050)."""
 
 from __future__ import annotations
 
@@ -26,7 +26,6 @@ from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime, unbind_
 from lca.layer0_infra.tools.default_set import build_default_tools
 from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
 from lca.layer0_infra.tools.run_finalizer import finalize_run, run_id_scope
-from lca.layer0_infra.tools.sandbox_code_tool import SANDBOX_TOOL_NAME, SandboxCodeTool
 from lca.layer0_infra.tools.sandbox_runtime_tools import (
     SANDBOX_EXECUTE_TOOL_NAME,
     SANDBOX_INSPECT_TOOL_NAME,
@@ -116,15 +115,6 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         assert isinstance(profile, dict)
         self.assertGreaterEqual(len(profile.get("files", [])), 1)
 
-    async def test_sandbox_code_tool_alias(self) -> None:
-        rid = await self._bind()
-        tool = SandboxCodeTool(sandbox=self.sandbox, store=self.store)
-        with run_id_scope(rid):
-            obs = await tool.execute({"code": 'print("alias-ok")'})
-        self.assertTrue(obs.success)
-        assert isinstance(obs.payload, dict)
-        self.assertIn("alias-ok", obs.payload["stdout"])
-
     async def test_auto_mounts_run_attachment_scope(self) -> None:
         stored = self.store.put(
             data=b"xlsx-bytes",
@@ -163,11 +153,11 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_safe_executor_propagates_invocation_id(self) -> None:
         rid = await self._bind()
-        tool = SandboxCodeTool(sandbox=self.sandbox, store=self.store)
+        tool = SandboxExecuteTool(sandbox=self.sandbox, store=self.store)
         collector = _Collector()
         hub = ObservabilityHub([], journal_projectors=[collector])
         executor = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=[SANDBOX_TOOL_NAME, SANDBOX_EXECUTE_TOOL_NAME])
+            ToolPermissionManifest(allowed_tools=[SANDBOX_EXECUTE_TOOL_NAME])
         )
         with bind(hub), run_scope(RunScope(trace_id="t", run_id=rid)), run_id_scope(rid):
             obs = await executor.execute(
@@ -203,7 +193,6 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         names = {t.name for t in tools}
         self.assertNotIn(SANDBOX_INSPECT_TOOL_NAME, names)
         self.assertNotIn(SANDBOX_EXECUTE_TOOL_NAME, names)
-        self.assertNotIn(SANDBOX_TOOL_NAME, names)
         self.assertIn("run_skill_script", names)
 
     async def test_open_path_roundtrip_to_outputs(self) -> None:

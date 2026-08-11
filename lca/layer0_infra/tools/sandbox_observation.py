@@ -1,4 +1,4 @@
-"""Build an Observation from a SandboxResult — extracted to keep sandbox_code_tool slim."""
+"""Build an Observation from a SandboxResult."""
 
 from __future__ import annotations
 

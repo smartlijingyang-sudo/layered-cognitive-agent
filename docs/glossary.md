@@ -108,11 +108,11 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **ToolRegistry** / **Tool** / **ToolPermissionManifest** | 工具注册与权限 |
 | **Sandbox** / **SandboxResult** / **SandboxFile** | 隔离代码执行协议与终态结果（ADR-0044） |
 | **OnlyboxesSandboxAdapter** | Onlyboxes console `pythonExec`（需 `ONLYBOXES_BASE_URL` + `ONLYBOXES_ACCESS_TOKEN`） |
-| **SandboxCodeTool** (`run_sandbox_code`) | 沙箱代码执行工具：挂载附件、多文件产物、铸造 invocation_id；预装包见 `SANDBOX_PREINSTALLED_PYTHON_PACKAGES` / `deploy/onlyboxes` |
-| **run_attachment_scope** | 本 run 用户附件 id 的 ambient 作用域；Gateway CreateRun → execute_run 绑定，SandboxCodeTool 自动挂载到 `/mnt/data/<name>`（ADR-0046） |
+| **SandboxExecuteTool** (`sandbox_execute`) | 沙箱代码执行工具（内部/测试）：挂载附件、多文件产物、铸造 invocation_id；预装包见 `SANDBOX_PREINSTALLED_PYTHON_PACKAGES` / `deploy/onlyboxes`。Agent 面使用 computer tools（`execute_code` 等） |
+| **run_attachment_scope** | 本 run 用户附件 id 的 ambient 作用域；Gateway CreateRun → execute_run 绑定，沙箱工具自动挂载到 `/mnt/data/<name>`（ADR-0046） |
 | **SANDBOX_PREINSTALLED_PYTHON_PACKAGES** | Onlyboxes pythonExec 镜像 baseline 预装包清单（与 `deploy/onlyboxes/requirements-python.txt` 对齐） |
 | **SandboxOutputDelta** | 沙箱执行期 stdout/stderr 增量 journal 事件（standard 可见，进 trace 不进 chat 答案） |
-| **LCA_SANDBOX_BACKEND** | 可选；仅 `onlyboxes` 受支持。缺省时只要 Onlyboxes 凭证齐全即挂载 `run_sandbox_code` |
+| **LCA_SANDBOX_BACKEND** | 可选；仅 `onlyboxes` 受支持。缺省时只要 Onlyboxes 凭证齐全即挂载沙箱工具 |
 | **RetryPolicy** / **CacheConfig** | 重试与缓存配置 |
 | **BrainFactory** / **SimpleBrainFactory** | Brain 工厂（注册表用 NamedRegistry） |
 | **Synthesizer** / **ConcatSynthesizer** | 并行结果聚合协议 / 默认拼接实现 |
@@ -216,6 +216,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | DecisionParser / SimpleDecisionParser | 已删除；原生 function calling 直接产出 Decision，无需 JSON 文本解析（对齐 LobeHub 极简决策管线） |
 | CandidateEvaluationPipeline | 已删除；Brain 直接由 Reasoner → Decision 构建，无候选评估管线 |
 | DegradationPolicy / GracefulDegradation | 已删除；越界 action 降级逻辑已内化至防腐层 |
+| SandboxCodeTool / `run_sandbox_code` | 已删除；三层别名链末端（`sandbox_execute` → `run_sandbox_code` → `execute_code`）。Agent 面统一用 computer tools（`execute_code` 等），内部测试直接用 `SandboxExecuteTool` |
 
 ## 禁止复活
 

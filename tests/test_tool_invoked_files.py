@@ -156,7 +156,7 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
 
             record(
                 ToolInvoked(
-                    tool_name="run_sandbox_code",
+                    tool_name="sandbox_execute",
                     result_preview='{"stdout": "' + ("x" * 3000),
                     ok=True,
                     files=many,
