@@ -19,6 +19,11 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import StopOutcome, StopOutcomePolicy
 from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
 
+# Consecutive tool failures before a respond → likely false completion.
+# Following LobeHub's forceFinish pattern: don't accept "done" when the
+# agent actually failed to produce anything.
+_FALSE_COMPLETION_WINDOW = 3
+
 
 class DefaultStopOutcomePolicy(StopOutcomePolicy):
     """默认单步结果判定策略。
@@ -27,6 +32,7 @@ class DefaultStopOutcomePolicy(StopOutcomePolicy):
     - HANDOFF 动作 → 立即停止（COMPLETED）
     - RESPOND 动作或降级成功 → 提取 final_output，
       除非 reflection 判定 NEEDS_CORRECTION 则继续循环
+    - RESPOND 但近期工具连续失败 → 视为虚假完成，继续循环
     - 其他 → 继续循环
     """
 
@@ -54,6 +60,10 @@ class DefaultStopOutcomePolicy(StopOutcomePolicy):
             ):
                 final_output = observation.payload
             should_stop = reflection.verdict != ReflectionVerdict.NEEDS_CORRECTION
+            # False-completion guard: if the model says "done" but the last N
+            # tool calls all failed, it's giving up — not completing.
+            if should_stop and _recent_tool_failures(state) >= _FALSE_COMPLETION_WINDOW:
+                should_stop = False
             return StopOutcome(
                 should_stop=should_stop,
                 final_output=final_output,
@@ -80,3 +90,18 @@ class DefaultStopOutcomePolicy(StopOutcomePolicy):
             final_output=final_output,
             status=status,
         )
+
+
+def _recent_tool_failures(state: AgentState) -> int:
+    """Count consecutive failed tool calls at the tail of history.
+
+    Only counts USE_TOOL turns — stops counting at the first non-tool turn
+    (e.g. a prior respond or delegate).
+    """
+    failures = 0
+    for turn in reversed(state.history):
+        if turn.decision.action_type != ActionType.USE_TOOL:
+            break
+        if turn.observation is not None and not turn.observation.success:
+            failures += 1
+    return failures

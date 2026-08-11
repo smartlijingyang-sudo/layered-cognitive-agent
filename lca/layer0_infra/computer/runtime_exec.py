@@ -118,7 +118,7 @@ class ComputerRuntimeExecMixin:
                 attachment_ids=get_current_run_attachment_ids(),
             )
             await runtime.ensure_ready()
-            terminal_result = await self._sandbox.run_terminal(
+            terminal_result = await runtime.run_terminal(
                 command,
                 timeout_s=timeout_s,
                 invocation_id=inv,

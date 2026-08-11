@@ -37,6 +37,9 @@ from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_c
 
 _log = structlog.get_logger("lca.runtime_loop")
 
+_LOOP_WARNING_WM_KEY = "loop_warning"
+_LOOP_CONSECUTIVE_THRESHOLD = 3
+
 
 class CognitiveRuntime(Runtime):
     """核心认知循环实现（ADR-0002）。
@@ -154,6 +157,8 @@ class CognitiveRuntime(Runtime):
                 )
                 # ── Phase 3.5: Sync activation state ──
                 self._sync_activated_skills(state)
+                # ── Phase 3.6: Loop intervention ──
+                self._detect_and_inject_loop_warning(state, decision, observation)
                 # ── Phase 4: Reflect ──
                 await self.hooks.trigger("pre_reflect", state, observation=observation)
                 reflection = await self.brain.reflect(state, observation)
@@ -229,4 +234,47 @@ class CognitiveRuntime(Runtime):
                     name=skill.name,
                     activated_at_step=state.step,
                 )
+            )
+
+    # ── Loop intervention (Phase 3.6) ──────────────────────────────
+
+    @staticmethod
+    def _detect_and_inject_loop_warning(
+        state: AgentState,
+        decision: Decision | None,
+        observation: Observation | None,
+    ) -> None:
+        """Inline loop detection — injects warning into working_memory for next think phase."""
+        if decision is None or decision.action_type != ActionType.USE_TOOL:
+            return
+        tool_calls = decision.tool_calls or []
+        if not tool_calls:
+            return
+        current_tool = tool_calls[0].tool_name
+
+        # Count consecutive calls to the same tool in history
+        consecutive = 0
+        for turn in reversed(state.history):
+            if (
+                turn.decision.action_type == ActionType.USE_TOOL
+                and turn.decision.tool_calls
+                and turn.decision.tool_calls[0].tool_name == current_tool
+            ):
+                consecutive += 1
+            else:
+                break
+
+        if consecutive >= _LOOP_CONSECUTIVE_THRESHOLD:
+            tool_failed = observation is not None and not observation.success
+            msg = (
+                f"⚠️ 你已连续 {consecutive} 次调用工具 {current_tool}"
+                f"{'，且最近调用失败' if tool_failed else ''}。"
+                f"请换一种方法或工具，不要继续重复相同的调用。"
+            )
+            state.working_memory[_LOOP_WARNING_WM_KEY] = msg
+            _log.info(
+                "loop_intervention",
+                tool=current_tool,
+                consecutive=consecutive,
+                failed=tool_failed,
             )

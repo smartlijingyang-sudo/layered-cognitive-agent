@@ -17,7 +17,7 @@ from lca.contracts.atoms.semantic_keys import (
     FAILURE_KIND_VALIDATION,
 )
 from lca.contracts.models.core.decision import Observation
-from lca.contracts.models.core.result import ToolExecutionError
+from lca.contracts.models.core.result import ApprovalPendingError, ToolExecutionError
 from lca.contracts.models.observability.journal import ToolDenied, ToolInvoked, ToolStarted
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols import SafeExecutor, Tool
@@ -227,6 +227,13 @@ class SimpleSafeExecutor(SafeExecutor):
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:
         try:
             return await tool.execute(args)
+        except ApprovalPendingError:
+            # Control-flow signal (HIL pause) — must propagate to the runtime
+            # loop, NOT be converted to an Observation.  Follows the LobeHub
+            # pattern: intervention is a pre-execution policy decision, not a
+            # mid-execution failure.  Retrying would be semantically wrong —
+            # the tool is waiting for external input, not broken.
+            raise
         except ToolExecutionError as err:
             return Observation(
                 observation_id=new_id("obs"),

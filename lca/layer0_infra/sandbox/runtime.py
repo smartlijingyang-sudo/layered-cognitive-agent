@@ -179,6 +179,27 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             inspect_profile=self._inspect_profile,
         )
 
+    async def run_terminal(
+        self,
+        command: str,
+        *,
+        timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
+        invocation_id: str = "",
+    ) -> SandboxResult:
+        """Shell command through the session — filesystem state persists across calls.
+
+        Follows the same session-affinity principle as ``execute()``: commands
+        within a single run share the same backend session, so ``pip install``
+        in step N is visible to ``import`` in step N+1.
+        """
+        session_id = self._session.session_id if self._session else ""
+        return await self._sandbox.run_terminal(
+            command,
+            timeout_s=timeout_s,
+            invocation_id=invocation_id,
+            session_id=session_id,
+        )
+
     async def destroy(self) -> None:
         """Release backend session (idempotent)."""
         if self._session is not None:

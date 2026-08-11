@@ -242,6 +242,21 @@ def _with_subtasks(variables: dict[str, str], state: AgentState) -> dict[str, st
     return enriched
 
 
+def _with_loop_warning(variables: dict[str, str], state: AgentState) -> dict[str, str]:
+    """Inject loop-intervention warning into the prompt context if present.
+
+    The runtime loop injects this into working_memory when it detects
+    consecutive same-tool calls (Phase 3.6).  The model sees it on the
+    next think phase and can change strategy.
+    """
+    warning = state.working_memory.get("loop_warning")
+    if not warning:
+        return variables
+    enriched = dict(variables)
+    enriched["context"] = enriched["context"] + f"\n\n{warning}"
+    return enriched
+
+
 class PromptReasoner(Reasoner):
     """Default Reasoner: render prompt template and call the LLM.
 
@@ -288,6 +303,7 @@ class PromptReasoner(Reasoner):
             variables.update(build_awareness_variables(awareness))
             template_name = state.active_template or default_template_for(awareness)
         variables = _with_subtasks(variables, state)
+        variables = _with_loop_warning(variables, state)
         prompt = self._templates[template_name].format(**variables)
         prompt = _strip_empty_prompt_fields(prompt)
         annotate(**{ATTR_PROMPT_TEMPLATE: template_name})

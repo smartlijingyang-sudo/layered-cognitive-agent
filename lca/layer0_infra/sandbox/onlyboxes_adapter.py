@@ -279,10 +279,12 @@ class OnlyboxesSandboxAdapter(Sandbox):
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
         **kwargs: Any,
     ) -> SandboxResult:
-        """Native shell via terminalExec channel."""
+        """Native shell via terminalExec channel — session-aware."""
         invocation_id = str(kwargs.get("invocation_id", "") or "")
+        session_id = str(kwargs.get("session_id", "") or "")
         return await self._exec_terminal(
             command,
+            session_id=session_id,
             timeout_s=timeout_s,
             invocation_id=invocation_id,
         )

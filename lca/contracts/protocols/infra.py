@@ -114,6 +114,16 @@ class Sandbox(Protocol):
         """销毁会话并释放资源。幂等——重复调用不报错。"""
         ...
 
+    async def run_terminal(
+        self,
+        command: str,
+        *,
+        timeout_s: int = 60,
+        **kwargs: Any,
+    ) -> SandboxResult:
+        """Shell 命令执行通道。session_id 通过 kwargs 透传以保持会话亲和。"""
+        ...
+
 
 @runtime_checkable
 class SandboxRuntime(Protocol):
