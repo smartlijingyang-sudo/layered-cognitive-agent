@@ -11,13 +11,12 @@ from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_EXECUTI
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.sandbox import SANDBOX_PREVIEW_CHAR_LIMIT
 from lca.layer0_infra.file_store import FileStore
-from lca.layer0_infra.text.truncate import ASCII_ELLIPSIS, truncate_text
 
 _LOG_MIME = "text/plain"
 
 
 def _truncate_preview(text: str, limit: int = SANDBOX_PREVIEW_CHAR_LIMIT) -> str:
-    return truncate_text(text, limit, suffix=ASCII_ELLIPSIS)
+    return text if len(text) <= limit else text[:limit] + "..."
 
 
 def _stored_part(

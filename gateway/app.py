@@ -37,7 +37,6 @@ from gateway.run_executor import (
 )
 from gateway.run_prompt import compose_run_question
 from gateway.run_registry import RunRegistry, RunSession, RunStatus
-from gateway.settings import gateway_settings
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.layer0_infra.file_store import (
     LocalFileStore,
@@ -45,10 +44,12 @@ from lca.layer0_infra.file_store import (
     set_default_file_store,
 )
 
-
-def _cors() -> dict[str, str]:
-    """CORS response headers from gateway settings."""
-    return gateway_settings().cors_headers_dict()
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Last-Event-ID",
+    "Access-Control-Expose-Headers": "Content-Type, Content-Disposition",
+}
 
 
 def _content_disposition(disposition_type: str, filename: str) -> str:
@@ -57,6 +58,8 @@ def _content_disposition(disposition_type: str, filename: str) -> str:
     encoded = quote(filename, safe="")
     return f"{disposition_type}; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded}"
 
+
+_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 _registry = RunRegistry()
 _conversations = ConversationStore()
@@ -76,7 +79,7 @@ def get_file_store() -> LocalFileStore:
 
 
 async def _options(_request: Request) -> JSONResponse:
-    return JSONResponse({}, headers=_cors())
+    return JSONResponse({}, headers=CORS_HEADERS)
 
 
 def _parse_attachment_ids(body: dict) -> list[str]:
@@ -95,10 +98,12 @@ async def create_run(request: Request) -> JSONResponse:
     try:
         body = await request.json()
     except json.JSONDecodeError:
-        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=_cors())
+        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=CORS_HEADERS)
     question = str(body.get("question", "")).strip()
     if not question:
-        return JSONResponse({"error": "question is required"}, status_code=400, headers=_cors())
+        return JSONResponse(
+            {"error": "question is required"}, status_code=400, headers=CORS_HEADERS
+        )
     mode = str(body.get("mode", DEFAULT_MODE)).strip() or DEFAULT_MODE
     conversation_id = body.get("conversation_id")
     conversation_id_str = str(conversation_id).strip() if conversation_id else None
@@ -112,7 +117,7 @@ async def create_run(request: Request) -> JSONResponse:
                 "detail": f"attachment not found: {', '.join(missing)}",
             },
             status_code=400,
-            headers=_cors(),
+            headers=CORS_HEADERS,
         )
 
     if not llm_status()["llm_available"]:
@@ -122,7 +127,7 @@ async def create_run(request: Request) -> JSONResponse:
                 "detail": "LLM_API_KEY 未配置，无法创建 run。",
             },
             status_code=503,
-            headers=_cors(),
+            headers=CORS_HEADERS,
         )
 
     effective_question = compose_run_question(
@@ -152,7 +157,7 @@ async def create_run(request: Request) -> JSONResponse:
     return JSONResponse(
         {"run_id": session.run_id, "trace_id": session.trace_id},
         status_code=201,
-        headers=_cors(),
+        headers=CORS_HEADERS,
     )
 
 
@@ -160,9 +165,9 @@ async def cancel_run(request: Request) -> JSONResponse:
     run_id = request.path_params["run_id"]
     session = _registry.get(run_id)
     if session is None:
-        return JSONResponse({"error": "run not found"}, status_code=404, headers=_cors())
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=CORS_HEADERS)
     if session.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELED):
-        return JSONResponse({"status": session.status.value}, headers=_cors())
+        return JSONResponse({"status": session.status.value}, headers=CORS_HEADERS)
     session.cancel_requested = True
     session.status = RunStatus.CANCELED
     if session.task is not None and not session.task.done():
@@ -173,7 +178,7 @@ async def cancel_run(request: Request) -> JSONResponse:
         with contextlib.suppress(asyncio.CancelledError):
             await session.task
     _conversations.update_turn_status(run_id, RunStatus.CANCELED.value)
-    return JSONResponse({"status": RunStatus.CANCELED.value}, headers=_cors())
+    return JSONResponse({"status": RunStatus.CANCELED.value}, headers=CORS_HEADERS)
 
 
 async def answer_run(request: Request) -> JSONResponse:
@@ -181,32 +186,32 @@ async def answer_run(request: Request) -> JSONResponse:
     run_id = request.path_params["run_id"]
     session = _registry.get(run_id)
     if session is None:
-        return JSONResponse({"error": "run not found"}, status_code=404, headers=_cors())
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=CORS_HEADERS)
     if session.status != RunStatus.WAITING_INPUT:
         return JSONResponse(
             {"error": "run not waiting for input", "status": session.status.value},
             status_code=409,
-            headers=_cors(),
+            headers=CORS_HEADERS,
         )
     try:
         body = await request.json()
     except json.JSONDecodeError:
-        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=_cors())
+        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=CORS_HEADERS)
     answer = str(body.get("answer", "")).strip()
     if not answer:
-        return JSONResponse({"error": "answer is required"}, status_code=400, headers=_cors())
+        return JSONResponse({"error": "answer is required"}, status_code=400, headers=CORS_HEADERS)
     if session.snapshot is None or session.runnable is None:
         return JSONResponse(
             {"error": "no resume state available"},
             status_code=500,
-            headers=_cors(),
+            headers=CORS_HEADERS,
         )
     session.status = RunStatus.RUNNING
     task = asyncio.create_task(_resume_run(session, answer))
     session.task = task
     return JSONResponse(
         {"run_id": run_id, "status": "resumed"},
-        headers=_cors(),
+        headers=CORS_HEADERS,
     )
 
 
@@ -242,8 +247,8 @@ async def get_run(request: Request) -> JSONResponse:
     run_id = request.path_params["run_id"]
     summary = _registry.summary(run_id)
     if summary is None:
-        return JSONResponse({"error": "run not found"}, status_code=404, headers=_cors())
-    return JSONResponse(summary, headers=_cors())
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=CORS_HEADERS)
+    return JSONResponse(summary, headers=CORS_HEADERS)
 
 
 async def stream_events(request: Request) -> StreamingResponse:
@@ -258,7 +263,7 @@ async def stream_events(request: Request) -> StreamingResponse:
         _generate(),
         media_type="text/event-stream",
         headers={
-            **_cors(),
+            **CORS_HEADERS,
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
@@ -267,7 +272,7 @@ async def stream_events(request: Request) -> StreamingResponse:
 
 
 async def health(_request: Request) -> JSONResponse:
-    return JSONResponse({"status": "ok", **llm_status()}, headers=_cors())
+    return JSONResponse({"status": "ok", **llm_status()}, headers=CORS_HEADERS)
 
 
 async def create_conversation(request: Request) -> JSONResponse:
@@ -277,19 +282,23 @@ async def create_conversation(request: Request) -> JSONResponse:
         body = {}
     title = str(body.get("title", "")).strip()
     record = _conversations.create_conversation(title=title)
-    return JSONResponse(record, status_code=201, headers=_cors())
+    return JSONResponse(record, status_code=201, headers=CORS_HEADERS)
 
 
 async def list_conversations(_request: Request) -> JSONResponse:
-    return JSONResponse({"conversations": _conversations.list_conversations()}, headers=_cors())
+    return JSONResponse(
+        {"conversations": _conversations.list_conversations()}, headers=CORS_HEADERS
+    )
 
 
 async def get_conversation(request: Request) -> JSONResponse:
     conversation_id = request.path_params["conversation_id"]
     record = _conversations.get_conversation(conversation_id)
     if record is None:
-        return JSONResponse({"error": "conversation not found"}, status_code=404, headers=_cors())
-    return JSONResponse(record, headers=_cors())
+        return JSONResponse(
+            {"error": "conversation not found"}, status_code=404, headers=CORS_HEADERS
+        )
+    return JSONResponse(record, headers=CORS_HEADERS)
 
 
 async def add_conversation_turn(request: Request) -> JSONResponse:
@@ -297,7 +306,7 @@ async def add_conversation_turn(request: Request) -> JSONResponse:
     try:
         body = await request.json()
     except json.JSONDecodeError:
-        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=_cors())
+        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=CORS_HEADERS)
     turn = _conversations.add_turn(
         conversation_id,
         run_id=str(body.get("run_id", "")),
@@ -307,8 +316,10 @@ async def add_conversation_turn(request: Request) -> JSONResponse:
         status=str(body.get("status", RunStatus.PENDING.value)),
     )
     if turn is None:
-        return JSONResponse({"error": "conversation not found"}, status_code=404, headers=_cors())
-    return JSONResponse(turn, status_code=201, headers=_cors())
+        return JSONResponse(
+            {"error": "conversation not found"}, status_code=404, headers=CORS_HEADERS
+        )
+    return JSONResponse(turn, status_code=201, headers=CORS_HEADERS)
 
 
 async def upload_attachment(request: Request) -> JSONResponse:
@@ -322,25 +333,24 @@ async def upload_attachment(request: Request) -> JSONResponse:
     form = await request.form()
     upload = form.get("file")
     if upload is None:
-        return JSONResponse({"error": "file is required"}, status_code=400, headers=_cors())
+        return JSONResponse({"error": "file is required"}, status_code=400, headers=CORS_HEADERS)
 
     filename = getattr(upload, "filename", None) or "upload.bin"
     content_type = getattr(upload, "content_type", None) or "application/octet-stream"
     read = getattr(upload, "read", None)
     if read is None:
-        return JSONResponse({"error": "invalid file field"}, status_code=400, headers=_cors())
+        return JSONResponse({"error": "invalid file field"}, status_code=400, headers=CORS_HEADERS)
     data = await read()
     if not isinstance(data, (bytes, bytearray)):
-        return JSONResponse({"error": "invalid file bytes"}, status_code=400, headers=_cors())
+        return JSONResponse({"error": "invalid file bytes"}, status_code=400, headers=CORS_HEADERS)
     data_bytes = bytes(data)
     if len(data_bytes) == 0:
-        return JSONResponse({"error": "empty file"}, status_code=400, headers=_cors())
-    max_upload = gateway_settings().max_upload_bytes
-    if len(data_bytes) > max_upload:
+        return JSONResponse({"error": "empty file"}, status_code=400, headers=CORS_HEADERS)
+    if len(data_bytes) > _MAX_UPLOAD_BYTES:
         return JSONResponse(
-            {"error": "file too large", "detail": f"max {max_upload} bytes"},
+            {"error": "file too large", "detail": f"max {_MAX_UPLOAD_BYTES} bytes"},
             status_code=413,
-            headers=_cors(),
+            headers=CORS_HEADERS,
         )
 
     stored = _file_store.put(
@@ -358,7 +368,7 @@ async def upload_attachment(request: Request) -> JSONResponse:
             "size_bytes": stored.size_bytes,
         },
         status_code=201,
-        headers=_cors(),
+        headers=CORS_HEADERS,
     )
 
 
@@ -367,7 +377,7 @@ async def download_file(request: Request) -> Response:
     meta = _file_store.get(attachment_id)
     data = _file_store.read_bytes(attachment_id)
     if meta is None or data is None:
-        return JSONResponse({"error": "file not found"}, status_code=404, headers=_cors())
+        return JSONResponse({"error": "file not found"}, status_code=404, headers=CORS_HEADERS)
 
     # Inline for in-app preview (iframe / <img> / markdown fetch). Prefer
     # preview=1; images always inline so thumbnails work without query.
@@ -379,7 +389,7 @@ async def download_file(request: Request) -> Response:
             content=data,
             media_type=meta.mime_type,
             headers={
-                **_cors(),
+                **CORS_HEADERS,
                 "Content-Disposition": _content_disposition("inline", meta.name),
                 "Content-Length": str(len(data)),
                 "Cache-Control": "private, max-age=3600",
@@ -390,7 +400,7 @@ async def download_file(request: Request) -> Response:
         content=data,
         media_type=meta.mime_type,
         headers={
-            **_cors(),
+            **CORS_HEADERS,
             "Content-Disposition": _content_disposition("attachment", meta.name),
             "Content-Length": str(len(data)),
         },
@@ -401,7 +411,7 @@ async def get_file_meta(request: Request) -> JSONResponse:
     attachment_id = request.path_params["attachment_id"]
     meta = _file_store.get(attachment_id)
     if meta is None:
-        return JSONResponse({"error": "file not found"}, status_code=404, headers=_cors())
+        return JSONResponse({"error": "file not found"}, status_code=404, headers=CORS_HEADERS)
     return JSONResponse(
         {
             "attachment_id": meta.attachment_id,
@@ -411,7 +421,7 @@ async def get_file_meta(request: Request) -> JSONResponse:
             "size_bytes": meta.size_bytes,
             "previewable": meta.previewable,
         },
-        headers=_cors(),
+        headers=CORS_HEADERS,
     )
 
 
@@ -434,9 +444,6 @@ def create_app(
         set_llm_resolver(llm_resolver)
     else:
         set_llm_resolver(ProductionLLMResolver())
-    from gateway._deps import set_deps
-
-    set_deps(registry=_registry, file_store=_file_store)
     return Starlette(
         routes=[
             Route("/health", health, methods=["GET"]),

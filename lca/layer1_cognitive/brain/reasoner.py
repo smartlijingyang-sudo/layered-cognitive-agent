@@ -30,7 +30,6 @@ from lca.contracts.protocols import LLMAdapter, Reasoner, Tool
 from lca.layer0_infra.observability import annotate
 from lca.layer0_infra.search.router import search_routing_hint
 from lca.layer0_infra.search.service import any_search_provider_available
-from lca.layer0_infra.text.truncate import truncate_text
 from lca.layer1_cognitive.brain.conversation_prompt import format_prior_conversation
 from lca.layer1_cognitive.brain.llm_turn import execute_llm_turn
 
@@ -119,7 +118,10 @@ def _trace_lines(state: AgentState) -> list[str]:
     return lines
 
 
-_truncate = truncate_text
+def _truncate(text: str, max_len: int) -> str:
+    if len(text) <= max_len:
+        return text
+    return text[:max_len] + "…"
 
 
 def _context_lines(

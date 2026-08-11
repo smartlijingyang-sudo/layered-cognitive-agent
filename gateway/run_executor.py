@@ -1,11 +1,4 @@
-"""后台 run 执行器 —— 组装 hub（SSE + jsonl）并驱动 Team/Agent。
-
-架构决策（ADR-0053）：gateway 是 LCA 框架之上的**应用层消费者**，
-不属于 LCA 五层架构（contracts → L0 → L1 → L2 → L3 → L4）的一部分。
-因此 gateway 可以直接 import L0 基础设施（file_store、sandbox、workspace 等），
-这与 layer4_app 作为组合根直接 import 所有下层是同一模式。
-import-linter 契约仅约束 ``lca`` 包内部，不覆盖 ``gateway`` 包。
-"""
+"""后台 run 执行器 —— 组装 hub（SSE + jsonl）并驱动 Team/Agent。"""
 
 from __future__ import annotations
 
@@ -168,7 +161,12 @@ def create_run_session(
     jsonl_path = registry.jsonl_path_for(run_id)
     cleaned_ids = tuple(str(i).strip() for i in attachment_ids if str(i).strip())
 
-    hub = GatewayCollector(jsonl_path)
+    def _emit(frame: str | None) -> None:
+        if session_ref[0] is not None:
+            session_ref[0].emit(frame)
+
+    session_ref: list[RunSession | None] = [None]
+    hub = GatewayCollector(_emit, jsonl_path)
     session = RunSession(
         run_id=run_id,
         trace_id=trace_id,
@@ -180,7 +178,7 @@ def create_run_session(
         prior_turns=tuple(prior_turns),
         attachment_ids=cleaned_ids,
     )
-    hub.bind_emit(session.emit)
+    session_ref[0] = session
     registry.put(session)
     return session
 

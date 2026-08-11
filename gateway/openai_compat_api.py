@@ -16,13 +16,16 @@ from openai import APIError
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
+from gateway.journal_openai_projector import (
+    JournalOpenAiProjector,
+    collect_openai_completion,
+    resolve_lca_mode,
+    stream_openai_from_run,
+)
 from gateway.lobehub_bridge import prepare_run_from_messages
 from gateway.lobehub_bridge.request_classifier import classify_lobehub_chat_request
 from gateway.mode_catalog import DEFAULT_MODE, MODE_DEFINITIONS
 from gateway.model_registry import get_model_registry
-from gateway.openai_frame_utils import resolve_lca_mode
-from gateway.openai_projector import JournalOpenAiProjector
-from gateway.openai_stream import collect_openai_completion, stream_openai_from_run
 from gateway.openai_structured_llm import (
     StructuredLLMError,
     build_responses_payload,
@@ -34,7 +37,6 @@ from gateway.openai_structured_llm import (
     resolve_upstream_model,
 )
 from gateway.run_executor import create_run_session, llm_status, schedule_run
-from gateway.settings import gateway_settings
 from lca.contracts.atoms.ids import new_id
 
 _OPENAI_CHAT_ID_PREFIX = "chatcmpl-"
@@ -42,7 +44,11 @@ _log = structlog.get_logger(__name__)
 
 
 def _cors_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
-    base = gateway_settings().cors_headers_dict()
+    base = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    }
     if extra:
         base.update(extra)
     return base
@@ -188,7 +194,8 @@ async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | St
             chat_id=chat_id,
         )
 
-    from gateway._deps import get_file_store, get_registry
+    # Lazy import avoids circular import at module load.
+    from gateway.app import get_file_store, get_registry
 
     run_input = await prepare_run_from_messages(messages, get_file_store())
     if not run_input.user_text.strip():
