@@ -5,13 +5,13 @@ from __future__ import annotations
 import unittest
 
 from lca.contracts.atoms.enums import ComponentKind
-from lca.contracts.models.core.decision import Reflection
+from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.decision import Decision, Reflection
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.team_coordination import LeadMandate, Pipeline
 from lca.contracts.protocols import AgentUnit, Brain, TeamUnit
 from lca.contracts.protocols.spec import AgentSpec, LeadSpec
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer4_app.api import Agent, Team, TeamLead
 from lca.layer4_app.composer import TeamComposer
@@ -21,9 +21,12 @@ class _StubBrain(Brain):
     """最小 Brain 实例 —— 用于验证 spec 中的 brain 实例在重组后不丢失。"""
 
     async def think(self, state: AgentState):
-        return SimpleDecisionParser().parse(
-            '{"action_type":"respond","response_text":"stub","confidence":1.0}',
-            state,
+        return Decision(
+            decision_id=new_id("dec"),
+            action_type="respond",
+            rationale="stub",
+            confidence=1.0,
+            response_text="stub",
         )
 
     async def reflect(self, state, observation):

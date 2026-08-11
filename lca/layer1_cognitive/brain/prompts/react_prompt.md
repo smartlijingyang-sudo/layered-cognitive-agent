@@ -1,47 +1,37 @@
 ROLE: {role}
 GOAL: {goal}
 BACKSTORY: {backstory}
-AVAILABLE_TOOLS: {tools}
 USER_TASK: {task}
 
-AVAILABLE_SKILLS:
+PRIOR_CONVERSATION:
+{prior_conversation}
+
+<tools>
+{tools}
+</tools>
+
+<available_skills>
 {available_skills}
+</available_skills>
 
-SUGGESTED_SKILLS（inspect 附件格式匹配，优先于盲选）:
-{suggested_skills}
-
-ACTIVATED_SKILLS:
+<activated_skills>
 {activated_skills}
+</activated_skills>
 
 CONTEXT:
 {context}
 
-你可以选择以下行动之一：
-{allowed_actions}
+## 工具与技能
+- <tools> 中的工具通过 function calling 直接调用
+- <available_skills> 中的技能用于文档/格式/沙箱操作（xlsx/pdf 等），需先 activate_skill 再执行
+- <activated_skills> 中的技能已激活，直接按其指南步骤执行
 
-## 工具使用决策链（按优先级，从上到下匹配）
+## 联网搜索路由
+{search_routing}
 
-1. **已有 skill** — 若 ACTIVATED_SKILLS 中有匹配当前任务的 skill，直接按其 SKILL.md 步骤执行（run_skill_script / sandbox_execute）
-2. **格式匹配 skill** — 若 SUGGESTED_SKILLS 非空，必须先 activate_skill 加载对应指南（禁止对 PDF/Word 任务误激活无关 skill）
-3. **已安装 skill** — 若 AVAILABLE_SKILLS 中有匹配的，先 activate_skill 加载指南，再按步骤执行
-4. **搜索 skill** — 遇到不确定的专业操作（PDF/DOCX/PPTX、云部署、不熟悉的 API、数据处理等），用 search_skill 搜索 → import_skill 安装 → activate_skill 激活
-5. **sandbox 直接实现** — 以上均无匹配时，才用 sandbox_execute 自行编码实现
-
-禁止：在 AVAILABLE_SKILLS 有匹配时跳过 skill 直接 sandbox 编码。
-禁止：search_skill 返回结果后不执行 import → activate 流程。
-
-请以 JSON 输出下一步 Decision（字段：action_type / rationale / confidence；
-use_tool 时附 tool_name+arguments；respond 时附顶层 response_text）。
-严禁把 respond 写成 use_tool 或 tool_name:"respond"——回复用户只能用 action_type:"respond"。
-
-## 输出格式
-
-你的最终回答必须使用标准 Markdown 格式：
-- 标题用 `#` / `##` / `###`，不要用 `===` 或纯文字
-- 列表用 `-` 或 `1.`，不要用 `·` 或 `•`
-- 加粗用 `**文字**`，不要用全角或其他符号
-- 引用用 `>` 前缀
-- 代码用 ``` 围栏
-- 表格用 `| col | col |` 语法
-
-不要使用 ASCII 艺术格式（如 `=====` 分隔线、`·` 子列表）。
+## 输出规则（LobeHub GeneralChatAgent / G2A Mode A）
+- 每一步只有一次 LLM 调用：同一响应里的 text 与 tool_calls 属于同一次 completion
+- 需要工具时：使用 function calling（原生 tool_calls），不要只输出文字后再补调工具
+- 不需要工具时：直接用文字回复用户（即使 tools 已注册也允许纯 text → 本 step 结束）
+- 实时新闻/搜索：按上方联网搜索路由，优先 web_search
+- 回复使用标准 Markdown 格式

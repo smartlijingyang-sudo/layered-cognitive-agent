@@ -10,7 +10,10 @@ from lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker import ToolLoop
 
 def build_workspace_agent_gate() -> ChainedDecisionGate:
     """Workspace plane gates applied to every agent (ADR-0051)."""
-    return ChainedDecisionGate(ToolLoopBreakerGate(), TerminalRespondGate())
+    return ChainedDecisionGate(
+        ToolLoopBreakerGate(),
+        TerminalRespondGate(),
+    )
 
 
 __all__ = [

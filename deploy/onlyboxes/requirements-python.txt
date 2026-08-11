@@ -1,18 +1,51 @@
 # Onlyboxes pythonExec guest image baseline (ADR-0044).
 # Keep in sync with SANDBOX_PREINSTALLED_PYTHON_PACKAGES in
 # lca/contracts/models/core/sandbox.py and SandboxCodeTool description.
+#
+# Aligned with LobeHub cloud-sandbox systemRole.ts pre-installed set.
+# System tools (pandoc, ffmpeg) are installed via apt in Dockerfile.python.
+
+# --- data science / ML ---
 pandas>=2.2,<4
 numpy>=1.26,<3
-openpyxl>=3.1,<4
-xlsxwriter>=3.2,<4
+scipy>=1.11,<2
+scikit-learn>=1.4,<2
+
+# --- visualization ---
 matplotlib>=3.8,<4
 seaborn>=0.13,<1
+plotly>=5.18,<7
+
+# --- image / media ---
 pillow>=10,<13
-scipy>=1.11,<2
-requests>=2.31,<3
-tabulate>=0.9,<1
+opencv-python-headless>=4.8,<5
+
+# --- spreadsheet / document I/O ---
+openpyxl>=3.1,<4
+xlsxwriter>=3.2,<4
+xlrd>=2.0,<3
 python-docx>=1.1,<2
 reportlab>=4.2,<5
 fpdf2>=2.8,<4
 pypdf>=5.0,<7
 olefile>=0.47,<1
+markitdown>=0.1,<1
+
+# --- data processing / config ---
+pyyaml>=6.0,<7
+toml>=0.10,<1
+python-dotenv>=1.0,<2
+tabulate>=0.9,<1
+
+# --- network ---
+requests>=2.31,<3
+aiofiles>=23.0,<25
+anyio>=4.0,<5
+
+# --- web / server ---
+fastapi>=0.110,<1
+uvicorn>=0.27,<1
+pydantic>=2.5,<3
+
+# --- testing ---
+pytest>=8.0,<9

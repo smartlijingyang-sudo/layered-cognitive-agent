@@ -34,7 +34,7 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.protocols import LLMAdapter, MemorySystem
 from lca.layer0_infra.observability.facade import record, span
 from lca.layer0_infra.observability.llm_stream_activity import LlmStreamActivityTracker
-from lca.layer0_infra.observability.stream_channel import classify_output_channel
+from lca.layer0_infra.observability.response_text_stream import ResponseTextStreamExtractor
 
 _PERF_COUNTER_SCALE = 1000
 """perf_counter 秒 → 毫秒换算。"""
@@ -114,7 +114,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         step, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
         delta_seq = 0
         recorded = False
-        output_channel = StreamChannel.DECISION.value
+        answer_extractor = ResponseTextStreamExtractor()
 
         record(LlmCallStarted(step=step, model=model))
         activity = LlmStreamActivityTracker(step=step, model=model)
@@ -168,16 +168,26 @@ class TelemetryLLMAdapter(LLMAdapter):
                 elif event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
                     delta_text = event.text or ""
                     accumulated_text += delta_text
-                    output_channel = classify_output_channel(accumulated_text)
                     record(
                         StepTextDelta(
                             step=step,
                             text_delta=delta_text,
                             seq=delta_seq,
-                            channel=output_channel,
+                            channel=StreamChannel.DECISION.value,
                         )
                     )
                     delta_seq += 1
+                    answer_delta = answer_extractor.feed(delta_text)
+                    if answer_delta:
+                        record(
+                            StepTextDelta(
+                                step=step,
+                                text_delta=answer_delta,
+                                seq=delta_seq,
+                                channel=StreamChannel.ANSWER.value,
+                            )
+                        )
+                        delta_seq += 1
                 yield event
         except Exception:
             if not recorded:

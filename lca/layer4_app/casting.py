@@ -45,12 +45,48 @@ from lca.contracts.protocols.infra import LLMAdapter
 from lca.contracts.protocols.observability import ObservabilityBackend
 from lca.contracts.protocols.spec import OBSERVABILITY_CHOICE_CONSOLE
 from lca.layer0_infra.tools.default_set import build_default_tools
-from lca.layer1_cognitive.brain.decision_parser import extract_json_block
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer4_app.api import Agent, Team, TeamLead
 from lca.layer4_app.role_suggest import suggest_for_auto_repair, suggest_from_paths
 
 logger = structlog.get_logger(__name__)
+
+
+def _extract_json_block(raw_output: str) -> str:
+    """从 LLM 原始输出提取 JSON 文本（平衡括号匹配 → 整段 parse → ```json 围栏）。"""
+    import re
+
+    start = raw_output.find("{")
+    if start >= 0:
+        depth = 0
+        in_string = False
+        escape = False
+        for index in range(start, len(raw_output)):
+            ch = raw_output[index]
+            if in_string:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_string = False
+                continue
+            if ch == '"':
+                in_string = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return raw_output[start : index + 1].strip()
+    stripped = raw_output.strip()
+    if stripped.startswith("{") and stripped.endswith("}"):
+        return stripped
+    m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", raw_output, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    return stripped
+
 
 CASTING_PROMPT_NAME = "casting_prompt"
 _OBJECTIVE_PLACEHOLDER = "{objective}"
@@ -137,7 +173,7 @@ def _format_casting_correction_hint(error: str, library: RoleLibrary) -> str:
 def parse_casting_output(raw_output: str, library: RoleLibrary) -> tuple[CastingPlan | None, str]:
     """解析 + 白名单校验 LLM 输出；失败返回 (None, 可回喂给 LLM 的原因)。"""
     try:
-        data = json.loads(extract_json_block(raw_output))
+        data = json.loads(_extract_json_block(raw_output))
     except (json.JSONDecodeError, ValueError) as exc:
         return None, f"输出不是合法 JSON：{exc}"
     if not isinstance(data, dict):

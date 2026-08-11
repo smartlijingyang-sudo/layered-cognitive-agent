@@ -7,6 +7,7 @@ import unittest
 
 from gateway.mode_catalog import ALL_MODES
 from gateway.team_factory import build_runnable_team, build_solo_agent
+from lca.contracts.models.core.llm import LLMResponse
 from lca.layer4_app.api import Agent, Team
 from tests.harness.collector import InMemoryObservability
 from tests.harness.scripted_llm import ScriptedLLMAdapter
@@ -21,6 +22,13 @@ class TestGatewaySoloFactory(unittest.TestCase):
         self.assertEqual(agent.role_profile.role, "助手")
         self.assertEqual(agent.role_profile.goal, "")
         self.assertEqual(agent.role_profile.backstory, "")
+
+    def test_solo_excludes_search_skill_from_g2a_tools(self) -> None:
+        llm = ScriptedLLMAdapter({}, default_respond=True)
+        agent = build_solo_agent(llm, observability=InMemoryObservability())
+        names = {t.name for t in agent.spec.tools}
+        self.assertNotIn("search_skill", names)
+        self.assertIn("web_search", names)
 
 
 class TestGatewayTeamFactory(unittest.TestCase):
@@ -43,7 +51,9 @@ class TestGatewayTeamCastingFactory(unittest.IsolatedAsyncioTestCase):
             },
             ensure_ascii=False,
         )
-        llm = ScriptedLLMAdapter({"caster": [plan]}, default_respond=True)
+        llm = ScriptedLLMAdapter(
+            {"caster": [LLMResponse(text=plan, model="scripted-llm")]}, default_respond=True
+        )
         collector = InMemoryObservability()
         runnable = await build_runnable_team(
             "写一份发布方案",

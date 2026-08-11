@@ -39,10 +39,6 @@ from lca.layer1_cognitive.body.action_handlers import resolve_spec_timeout_s
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsultAllMembers
-from lca.layer1_cognitive.brain.decision_parser import (
-    SimpleDecisionParser,
-    extract_json_block,
-)
 from lca.layer1_cognitive.member_status import (
     InMemoryMemberStatus,
     classify_synthesis,
@@ -122,31 +118,6 @@ class TestResourcePlane(unittest.TestCase):
         src = Path("lca/layer1_cognitive/body/action_handlers.py").read_text(encoding="utf-8")
         self.assertNotIn("_DEFAULT_DELEGATE_TIMEOUT_S", src)
         self.assertNotIn("= 30.0", src)
-
-
-class TestJsonExtractAndSalvage(unittest.TestCase):
-    def test_nested_fence_in_response_text_still_parses(self) -> None:
-        raw = (
-            '{\n  "action_type": "respond",\n  "confidence": 0.9,\n'
-            '  "rationale": "ok",\n'
-            '  "response_text": "# title\\n\\n```\\nbox\\n```\\nend"\n}'
-        )
-        block = extract_json_block(raw)
-        import json
-
-        data = json.loads(block)
-        self.assertEqual(data["action_type"], "respond")
-        self.assertIn("```", data["response_text"])
-
-    def test_parse_failure_does_not_leak_raw_json_shell(self) -> None:
-        # 故意破坏 JSON，但保留可 salvage 的 response_text 片段
-        raw = '{"action_type": "respond", "response_text": "你好世界", "confidence": 0.9'  # 缺 }
-        d = SimpleDecisionParser().parse(raw, AgentState(trace_id="t", task="x", budget=Budget()))
-        self.assertEqual(d.action_type, "respond")
-        self.assertNotIn('"action_type"', d.response_text or "")
-        self.assertTrue(
-            (d.response_text or "").startswith("你好") or "降级" in (d.response_text or "")
-        )
 
 
 class TestPartialBuffer(unittest.TestCase):

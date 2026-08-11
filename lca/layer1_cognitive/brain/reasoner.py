@@ -4,6 +4,9 @@ solo / member / lead 共用同一个 Reasoner（ADR-0035）：状态携带
 ``TeamAwareness`` 时并入 awareness 变量并采用 awareness 默认模板，
 否则走角色 react 模板。不按会话类型分支——awareness 通过纯函数
 自行渲染提示词变量，Reasoner 只负责模板与 LLM 机制。
+
+LLM 调用语义对齐 LobeHub ``call_llm``（``brain/llm_turn``）：每 step 一次
+LLM，text-only 即 respond，禁止 forced ``tool_choice=required``。
 """
 
 from __future__ import annotations
@@ -11,9 +14,13 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
-from lca.contracts.atoms.enums import LLMStreamEventType, MemoryRecordKind
-from lca.contracts.atoms.semantic_keys import META_ROLE, META_STEP
+from lca.contracts.atoms.enums import MemoryRecordKind
 from lca.contracts.atoms.telemetry import ATTR_PROMPT_TEMPLATE
+from lca.contracts.models.core.conversation import (
+    PRIOR_CONVERSATION_WM_KEY,
+    ConversationTurn,
+)
+from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.delegation import DelegationResult
@@ -21,6 +28,10 @@ from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.team_awareness import TeamAwareness
 from lca.contracts.protocols import LLMAdapter, Reasoner, Tool
 from lca.layer0_infra.observability import annotate
+from lca.layer0_infra.search.router import search_routing_hint
+from lca.layer0_infra.search.service import any_search_provider_available
+from lca.layer1_cognitive.brain.conversation_prompt import format_prior_conversation
+from lca.layer1_cognitive.brain.llm_turn import execute_llm_turn
 
 _DEFAULT_TEMPLATE = "react_prompt"
 _HIERARCHICAL_TEMPLATE = "hierarchical_prompt"
@@ -61,11 +72,11 @@ def build_teammates_text(profiles: list[RoleProfile]) -> str:
 def _format_record_line(record: MemoryRecord) -> str:
     layer = record.memory_type.value
     if record.kind == MemoryRecordKind.DELEGATION_RESULT:
-        role = record.metadata.get(META_ROLE, "?")
-        step = record.metadata.get(META_STEP, "?")
+        role = record.metadata.get("role", "?")
+        step = record.metadata.get("step", "?")
         return f"- [{layer}] {role} 已返回(step={step}): {record.content}"
     if record.kind == MemoryRecordKind.RESPONSE:
-        step = record.metadata.get(META_STEP, "?")
+        step = record.metadata.get("step", "?")
         return f"- [{layer}] 我此前的回复(step={step}): {record.content}"
     return f"- [{layer}] {record.content}"
 
@@ -183,19 +194,24 @@ def _format_activated_skills(state: AgentState) -> str:
     )
 
 
-def _format_suggested_skills() -> str:
-    from lca.layer0_infra.skills.format_routing import format_suggested_skills_prompt
-    from lca.layer0_infra.workspace import get_run_workspace
-
-    workspace = get_run_workspace()
-    profile = workspace.inspect_profile if workspace is not None else None
-    return format_suggested_skills_prompt(profile)
+def _prior_conversation_text(state: AgentState) -> str:
+    raw = state.working_memory.get(PRIOR_CONVERSATION_WM_KEY)
+    if not isinstance(raw, list) or not raw:
+        return format_prior_conversation(())
+    turns: list[ConversationTurn] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role", "")).strip()
+        content = str(item.get("content", "")).strip()
+        if role and content:
+            turns.append(ConversationTurn(role=role, content=content))
+    return format_prior_conversation(tuple(turns))
 
 
 def _role_prompt_vars(
     role_profile: RoleProfile,
     tools_desc: str,
-    allowed_actions_desc: str,
     state: AgentState,
     context_lines: str,
     *,
@@ -207,11 +223,11 @@ def _role_prompt_vars(
         "backstory": role_profile.backstory,
         "tools": tools_desc,
         "task": state.task,
+        "prior_conversation": _prior_conversation_text(state),
         "context": context_lines,
-        "allowed_actions": allowed_actions_desc,
         "available_skills": available_skills or "（无技能库）",
-        "suggested_skills": _format_suggested_skills(),
         "activated_skills": _format_activated_skills(state),
+        "search_routing": search_routing_hint(tavily_available=any_search_provider_available()),
     }
 
 
@@ -224,47 +240,6 @@ def _with_subtasks(variables: dict[str, str], state: AgentState) -> dict[str, st
         enriched["context"] + "\n\nSubtasks:\n" + "\n".join(f"- {s}" for s in subtasks)
     )
     return enriched
-
-
-async def _stream_single_text(
-    llm: LLMAdapter,
-    tools: list[Tool],
-    prompt: str,
-    *,
-    step: int,
-) -> str:
-    from lca.contracts.models.team.partial_buffer import append_run_partial
-
-    accumulated = ""
-    final_text = ""
-    async for event in llm.stream(prompt, tools=tools, step=step):
-        if event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
-            chunk = event.text or ""
-            accumulated += chunk
-            append_run_partial(chunk)
-        elif event.type == LLMStreamEventType.COMPLETED and event.response is not None:
-            final_text = event.response.text or accumulated
-    return final_text or accumulated
-
-
-async def _complete_candidates(
-    llm: LLMAdapter,
-    tools: list[Tool],
-    templates: dict[str, str],
-    template_name: str,
-    variables: dict[str, str],
-    n: int,
-    *,
-    step: int,
-) -> list[str]:
-    prompt = templates[template_name].format(**variables)
-    prompt = _strip_empty_prompt_fields(prompt)
-    annotate(**{ATTR_PROMPT_TEMPLATE: template_name})
-    count = max(1, n)
-    if count == 1:
-        return [await _stream_single_text(llm, tools, prompt, step=step)]
-    responses = [await llm.complete(prompt, tools=tools) for _ in range(count)]
-    return [r.text for r in responses]
 
 
 class PromptReasoner(Reasoner):
@@ -284,7 +259,6 @@ class PromptReasoner(Reasoner):
         *,
         tools: Sequence[Tool] | None = None,
         templates: dict[str, str] | None = None,
-        allowed_actions_desc: str = "",
         available_skills: str = "",
     ) -> None:
         self.llm = llm
@@ -292,13 +266,12 @@ class PromptReasoner(Reasoner):
         self.tools_desc = tools_desc
         self.tools: list[Tool] = list(tools) if tools else []
         self._templates: dict[str, str] = dict(templates or {})
-        self.allowed_actions_desc = allowed_actions_desc
         self.available_skills = available_skills
 
     def register_template(self, name: str, template: str) -> None:
         self._templates[name] = template
 
-    async def generate_thoughts(self, state: AgentState, n: int = 1) -> list[str]:
+    async def generate_thoughts(self, state: AgentState) -> LLMResponse:
         awareness = state.team_awareness
         exclusions = (
             context_exclusions_for(awareness) if awareness is not None else _KIND_EXCLUDE_NONE
@@ -306,7 +279,6 @@ class PromptReasoner(Reasoner):
         variables = _role_prompt_vars(
             self.role_profile,
             self.tools_desc,
-            self.allowed_actions_desc,
             state,
             _context_lines(state, exclude_kinds=exclusions),
             available_skills=self.available_skills,
@@ -316,6 +288,15 @@ class PromptReasoner(Reasoner):
             variables.update(build_awareness_variables(awareness))
             template_name = state.active_template or default_template_for(awareness)
         variables = _with_subtasks(variables, state)
-        return await _complete_candidates(
-            self.llm, self.tools, self._templates, template_name, variables, n, step=state.step
+        prompt = self._templates[template_name].format(**variables)
+        prompt = _strip_empty_prompt_fields(prompt)
+        annotate(**{ATTR_PROMPT_TEMPLATE: template_name})
+        task = variables.get("task", "")
+        return await execute_llm_turn(
+            self.llm,
+            self.tools,
+            prompt,
+            step=state.step,
+            state=state,
+            task=task,
         )

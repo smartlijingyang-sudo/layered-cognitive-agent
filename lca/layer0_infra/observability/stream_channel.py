@@ -1,31 +1,23 @@
-"""LLM output stream channel classification (ADR-0051 Phase 2)."""
+"""LLM output stream channel classification (ADR-0051 Phase 2, LobeHub-aligned).
+
+Decision JSON is never user-facing. Raw tokens use channel ``decision``;
+user-visible streaming uses channel ``answer`` and is populated only by
+``ResponseTextStreamExtractor`` (see ``response_text_stream.py``).
+"""
 
 from __future__ import annotations
 
-from lca.contracts.atoms.enums import ActionType, StreamChannel
+from lca.contracts.atoms.enums import StreamChannel
+from lca.layer0_infra.observability.response_text_stream import ResponseTextStreamExtractor
 
-_TERMINAL_ACTIONS = frozenset(
-    {
-        ActionType.RESPOND.value,
-        ActionType.STOP.value,
-        ActionType.ASK_HUMAN.value,
-    }
-)
+__all__ = ["ResponseTextStreamExtractor", "StreamChannel", "classify_output_channel"]
 
 
 def classify_output_channel(accumulated: str) -> str:
-    """Classify streamed LLM text as decision draft vs user-facing answer."""
-    text = accumulated.lstrip()
-    if not text:
-        return StreamChannel.DECISION.value
+    """Deprecated heuristic classifier — always returns ``decision``.
 
-    if '"action_type"' in text:
-        for action in _TERMINAL_ACTIONS:
-            if f'"{action}"' in text:
-                return StreamChannel.ANSWER.value
-        return StreamChannel.DECISION.value
-
-    if text.startswith(("{", "```", "<")):
-        return StreamChannel.DECISION.value
-
-    return StreamChannel.ANSWER.value
+    Previously misclassified Decision JSON as ``answer`` once ``"respond"``
+    appeared anywhere in the stream, leaking rationale/confidence to LobeHub.
+    """
+    del accumulated
+    return StreamChannel.DECISION.value

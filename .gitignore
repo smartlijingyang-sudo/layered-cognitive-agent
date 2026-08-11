@@ -20,3 +20,6 @@ repomix.config.json
 .qwen/tmp/
 web/node_modules/
 web/tsconfig.tsbuildinfo
+lobehub-ui/
+.lobehub-upstream/
+.lobehub-stack/

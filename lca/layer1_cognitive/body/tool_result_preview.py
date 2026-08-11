@@ -7,9 +7,10 @@ from typing import Any
 from lca.contracts.models.core.decision import Observation
 
 # Keep journal result_preview well under AttributePolicy generic 2k cap while
-# remaining useful for console/LLM memory; structured files go on ToolInvoked.files.
+# remaining useful for console/LLM memory. Structured UI state lives on
+# ToolInvoked.plugin_state; file metadata on ToolInvoked.files.
 _RESULT_PREVIEW_STREAM_CHARS = 400
-_STRIP_FROM_PREVIEW = frozenset({"previewHtml", "preview_html", "content"})
+_STRIP_FROM_PREVIEW = frozenset({"previewHtml", "preview_html", "content", "state"})
 _FILE_META_KEYS = (
     "name",
     "mimeType",
@@ -50,6 +51,17 @@ def tool_files(obs: Observation) -> tuple[dict[str, Any], ...]:
     if payload.get("name") and (payload.get("mimeType") or payload.get("mime_type")):
         return (thin_file_part(payload),)
     return ()
+
+
+def tool_plugin_state(obs: Observation) -> dict[str, Any]:
+    """LobeHub tool card state — never serialized into truncated result_preview."""
+    payload = obs.payload
+    if not isinstance(payload, dict):
+        return {}
+    nested = payload.get("state")
+    if isinstance(nested, dict):
+        return dict(nested)
+    return {}
 
 
 def compact_payload_for_preview(payload: Any) -> Any:

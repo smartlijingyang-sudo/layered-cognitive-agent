@@ -19,7 +19,7 @@ from lca.layer0_infra.observability import (
     record,
     run_scope,
 )
-from lca.layer0_infra.tools.default_set import build_default_tools
+from lca.layer0_infra.tools.default_set import build_g2a_chat_tools
 from lca.layer4_app.api import Agent, Team
 from lca.layer4_app.casting import LLMTeamCaster, build_from_casting_plan
 
@@ -38,7 +38,7 @@ def build_solo_agent(
         role=SOLO_ROLE,
         goal="",
         backstory="",
-        tools=build_default_tools(),
+        tools=build_g2a_chat_tools(),
         llm=llm,
         observability=observability,
     )

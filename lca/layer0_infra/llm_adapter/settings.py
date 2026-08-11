@@ -64,9 +64,9 @@ class LLMSettings(BaseSettings):
 
     # 工具调用
     parallel_tool_calls: bool = True
-    tool_choice: str | None = None  # auto | none | required（对象形态由调用方 kwargs 覆盖）
+    tool_choice: str | None = "auto"  # auto | none | required（对象形态由调用方 kwargs 覆盖）
 
-    # 百炼 / Qwen 扩展（None = 不注入；Qwen 模型上 enable_thinking 默认 True）
+    # 百炼 / Qwen 扩展（None = 不注入；无 tools 时 enable_thinking 默认 True）
     enable_thinking: bool | None = None
     enable_search: bool | None = None
     search_strategy: str | None = None  # turbo | max | agent | agent_max
@@ -169,7 +169,8 @@ def build_generation_kwargs(
     search_options = remaining.pop("search_options", None)
 
     qwen = is_qwen_model(model)
-    # Qwen 默认：思考开启 + top_k=20（百炼文档默认）
+    # LCA now uses native tool_calls (not Decision JSON), so reasoning_content
+    # and tool_calls are independent channels — safe to enable thinking with tools.
     if enable_thinking is None and qwen:
         enable_thinking = True
     if top_k is None and qwen:

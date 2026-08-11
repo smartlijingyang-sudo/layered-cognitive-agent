@@ -213,6 +213,7 @@ export interface ToolInvoked {
   readonly error: string;
   readonly invocation_id: string;
   readonly files: readonly Record<string, unknown>[];
+  readonly plugin_state: unknown;
 }
 
 export interface ToolDenied {

@@ -79,7 +79,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **DefaultStopRule** | 默认终止裁判（``default_stop_rule.py``）；内部可组合 StopOutcomePolicy |
 | **StopOutcome** / **StopOutcomePolicy** / **DefaultStopOutcomePolicy** | 单步结果判定（DefaultStopRule 内部使用） |
 | **Brain** / **Body** / **MemorySystem** | 想 / 做 / 记 |
-| **ModularBrain** | 默认 Brain（reasoner / critic / decision_parser 可替换）；CandidateEvaluationPipeline 做 decompose → evaluate |
+| **ModularBrain** | 默认 Brain（reasoner / critic 可替换）；原生 function calling 直接产出 Decision，无需 DecisionParser |
 | **Turn** | 单步记录：decision + act result + reflection |
 | **Budget** | token / cost / steps / wall_clock 预算 |
 | **Hook** / **HookRegistry** / **EventBus** | 生命周期钩子与事件总线（业务事实经遥测桥进入 trace 管道） |
@@ -101,7 +101,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 
 | 术语 | 定义 |
 |---|---|
-| **Reasoner** / **Critic** / **DecisionParser** | 候选生成 / 自省 / 解析 |
+| **Reasoner** / **Critic** | 候选生成 / 自省 |
 | **Action** / **ActionRegistry** / **ActionType** | 行动能力与路由（内置行动类型：respond / use_tool / delegate / handoff / stop / ask_human） |
 | **RespondOperation** / **UseToolOperation** / **DelegateOperation** / **HandoffOperation** | 内置行动实现（delegate/handoff 行动 ≠ PeerRelay 协调机制） |
 | **SafeExecutor** | 权限 + 重试 + 缓存后执行工具 |
@@ -129,7 +129,6 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **team_wiring** / **build_team_transport** | L4 团队 channel 接线（与 agent 组装决策分离） |
 | **SkillRouter** / **KeywordSkillRouter** / **StaticSkillRouter** | 运行时动态选择 Prompt 模板 / 工具子集（关键词 / 静态映射） |
 | **load_builtin_prompt** | 从 ``brain/prompts/*.md`` 加载内置模板 |
-| **DegradationPolicy** / **GracefulDegradation** | 越界 action 优雅降级（防腐层归一化：解析期改写为词表内等价行动，经 Decision.degraded_from 溯源） |
 | **DelegationSpec** / **AgentCard** / **TaskStatus** | 委派规格 / 能力名片 / 任务状态机 |
 | **ApprovalPendingError** / **BudgetExceededError** / **ToolExecutionError** | 运行时异常 |
 | **MemoryRecord** / **MemoryLayer** | 记忆契约（分层参考 CoALA：working / semantic / episodic / procedural） |
@@ -144,13 +143,11 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **SimpleMemorySystem** | MemorySystem 默认实现 |
 | **PromptReasoner** | Reasoner 默认实现（team-shape agnostic，solo/member/lead 统一） |
 | **SimpleCritic** | Critic 默认实现 |
-| **SimpleDecisionParser** | DecisionParser 默认实现（JSON 提取 → 意图形状归一 → 别名 → 降级） |
 | **Intent Shape / normalize_intent_shape** | 决策意图形状归一（伪工具→行动、response_text 提升；ADR-0045 Canonical Model） |
 | **SimpleEventBus** | EventBus 默认实现 |
 | **SimpleHookRegistry** | HookRegistry 默认实现 |
 | **SimpleSafeExecutor** | SafeExecutor 默认实现 |
 | **SimpleToolRegistry** | ToolRegistry 默认实现 |
-| **CandidateEvaluationPipeline** | 候选评估管线协议（SimpleCandidateEvaluationPipeline 为默认实现） |
 | **InMemoryStateStore** | StateStore 内存实现 |
 | **CalculatorTool** / **WeatherTool** | 内置示例 Tool |
 
@@ -216,6 +213,9 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | PromptManager / SimplePromptManager | Reasoner 内建模板字典（已溶解） |
 | member_status/policy.py | member_status/required_action.py |
 | FallbackPolicy / FallbackActionPolicy / FallbackDecoratedBody | DegradationPolicy / GracefulDegradation（降级前移至防腐层解析期，Body 不再承载异常驱动的降级装饰） |
+| DecisionParser / SimpleDecisionParser | 已删除；原生 function calling 直接产出 Decision，无需 JSON 文本解析（对齐 LobeHub 极简决策管线） |
+| CandidateEvaluationPipeline | 已删除；Brain 直接由 Reasoner → Decision 构建，无候选评估管线 |
+| DegradationPolicy / GracefulDegradation | 已删除；越界 action 降级逻辑已内化至防腐层 |
 
 ## 禁止复活
 

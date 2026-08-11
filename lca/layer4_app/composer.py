@@ -45,7 +45,7 @@ from lca.contracts.protocols import (
     TeamUnit,
 )
 from lca.contracts.protocols.action import ActionRegistryProtocol
-from lca.contracts.protocols.infra import AgentTransport
+from lca.contracts.protocols.infra import AgentTransport, Tool
 from lca.contracts.protocols.spec import (
     DEFAULT_DELEGATE_MAX_ATTEMPTS,
     OBSERVABILITY_CHOICE_CONSOLE,
@@ -114,6 +114,17 @@ def _unwrap_llm(llm: LLMAdapter) -> LLMAdapter:
     if isinstance(llm, TelemetryLLMAdapter):
         return llm._inner
     return llm
+
+
+def _format_tools_xml(tools: Sequence[Tool]) -> str:
+    """Render tools as LobeHub-style XML block with name + description."""
+    if not tools:
+        return "（无可用工具）"
+    lines = []
+    for t in tools:
+        desc = t.description or t.name
+        lines.append(f'<tool name="{t.name}">{desc}</tool>')
+    return "\n".join(lines)
 
 
 def _promote_lead(lead: CognitiveAgent, policy: BudgetPolicy) -> CognitiveAgent:
@@ -279,7 +290,7 @@ class AgentComposer:
         factory_reg = self._registries.brain_factories
         if spec.brain not in factory_reg:
             raise ValueError(f"Unknown brain: {spec.brain!r}. Available: {factory_reg.list()}")
-        tools_desc = ", ".join(t.name for t in spec.tools) or "(no tools available)"
+        tools_desc = _format_tools_xml(spec.tools)
         available_skills = self._render_available_skills()
         factory = factory_reg.resolve(spec.brain)
         instrumented_llm: LLMAdapter = TelemetryLLMAdapter(_unwrap_llm(spec.llm))
@@ -331,9 +342,7 @@ class AgentComposer:
 
         return ModularBrain(
             reasoner=brain.reasoner,
-            decision_parser=brain.decision_parser,
             critic=brain.critic,
-            evaluation_pipeline=brain.evaluation_pipeline,
             skill_router=brain.skill_router,
             decision_gate=decision_gate,
             agent_gates=brain.agent_gates,

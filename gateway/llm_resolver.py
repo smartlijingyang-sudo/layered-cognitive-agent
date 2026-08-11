@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from lca.contracts.protocols import LLMAdapter
 from lca.layer0_infra.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
@@ -49,3 +49,34 @@ class ProductionLLMResolver:
         if not key:
             raise LLMUnavailableError("LLM_API_KEY 未配置。请设置环境变量或在 .env 中提供凭证。")
         return resolve_llm_adapter(api_key=key, base_url=base, model=model)
+
+
+# ── 共享异步客户端工厂 ──────────────────────────────────────
+
+_cached_async_client: Any = None
+_cached_client_key: tuple[str | None, str | None] | None = None
+
+
+def get_async_openai_client() -> Any:
+    """返回缓存的 ``AsyncOpenAI`` 客户端（按 credentials 去重）。
+
+    消除 ``openai_structured_llm.py`` 与各适配器重复创建客户端的问题。
+    延迟导入 ``openai`` SDK，避免无该依赖的环境 ImportError。
+    """
+    global _cached_async_client, _cached_client_key
+    key, base, _ = llm_credentials()
+    cache_key = (key, base)
+    if _cached_async_client is not None and _cached_client_key == cache_key:
+        return _cached_async_client
+    from openai import AsyncOpenAI
+
+    _cached_async_client = AsyncOpenAI(api_key=key, base_url=base)
+    _cached_client_key = cache_key
+    return _cached_async_client
+
+
+def clear_async_client_cache() -> None:
+    """清除缓存的异步客户端（测试 / 凭证轮换用）。"""
+    global _cached_async_client, _cached_client_key
+    _cached_async_client = None
+    _cached_client_key = None

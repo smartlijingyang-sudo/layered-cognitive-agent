@@ -45,7 +45,7 @@ class _HangAgent:
 @pytest.mark.asyncio
 async def test_execute_run_cancel_no_otel_detach_noise(caplog: pytest.LogCaptureFixture) -> None:
     registry = RunRegistry()
-    session = create_run_session(registry, question="hang", mode="solo")
+    session = create_run_session(registry, question="hang", user_text="hang", mode="solo")
 
     with patch("gateway.run_executor.build_solo_agent", return_value=_HangAgent(session.hub)):
         task = schedule_run(registry, session)

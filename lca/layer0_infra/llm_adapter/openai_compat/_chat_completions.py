@@ -14,7 +14,7 @@ from lca.layer0_infra.llm_adapter.openai_compat._shared import (
     build_llm_response,
     build_request_generation,
     extract_reasoning_text,
-    pick_first_tool_call,
+    pick_all_tool_calls,
 )
 
 
@@ -43,18 +43,20 @@ class _ChatCompletionsStrategy:
         usage = self._extract_usage(response)
         model = getattr(response, "model", "") or self._model
         finish_reason = getattr(choice, "finish_reason", None)
-        raw_tc: _RawToolCall | None = None
         text = msg.content or ""
+        raw_tool_calls: list[_RawToolCall] = []
         if msg.tool_calls:
-            tc = msg.tool_calls[0]
-            raw_tc = _RawToolCall(
-                name=tc.function.name,
-                arguments_json=tc.function.arguments,
-                call_id=tc.id or "",
-            )
+            for tc in msg.tool_calls:
+                raw_tool_calls.append(
+                    _RawToolCall(
+                        name=tc.function.name,
+                        arguments_json=tc.function.arguments,
+                        call_id=tc.id or "",
+                    )
+                )
         return build_llm_response(
             text=text,
-            tool_call=raw_tc,
+            tool_calls=raw_tool_calls or None,
             model=model,
             usage=usage,
             finish_reason=finish_reason,
@@ -66,15 +68,18 @@ class _ChatCompletionsStrategy:
         api_kwargs["stream_options"] = {"include_usage": True}
 
         accumulated_text = ""
+        reasoning_text = ""
         tool_calls: dict[int, dict[str, str]] = {}
         think_splitter = ThinkTagStreamSplitter()
         finish_reason: str | None = None
+        completed = False
 
         stream = await self._client.chat.completions.create(**api_kwargs)
         async for chunk in stream:
             if not chunk.choices:
                 for kind, piece in think_splitter.flush():
                     if kind == "reasoning":
+                        reasoning_text += piece
                         yield LLMStreamEvent(
                             type=LLMStreamEventType.REASONING_TEXT_DELTA,
                             text=piece,
@@ -91,12 +96,13 @@ class _ChatCompletionsStrategy:
                     type=LLMStreamEventType.COMPLETED,
                     response=build_llm_response(
                         text=accumulated_text,
-                        tool_call=pick_first_tool_call(tool_calls),
+                        tool_calls=pick_all_tool_calls(tool_calls) or None,
                         model=model,
                         usage=usage,
                         finish_reason=finish_reason,
                     ),
                 )
+                completed = True
                 return
 
             choice = chunk.choices[0]
@@ -106,6 +112,7 @@ class _ChatCompletionsStrategy:
             delta = choice.delta
             reasoning_piece = extract_reasoning_text(delta)
             if reasoning_piece:
+                reasoning_text += reasoning_piece
                 yield LLMStreamEvent(
                     type=LLMStreamEventType.REASONING_TEXT_DELTA,
                     text=reasoning_piece,
@@ -114,6 +121,7 @@ class _ChatCompletionsStrategy:
             if delta.content:
                 for kind, piece in think_splitter.feed(delta.content):
                     if kind == "reasoning":
+                        reasoning_text += piece
                         yield LLMStreamEvent(
                             type=LLMStreamEventType.REASONING_TEXT_DELTA,
                             text=piece,
@@ -148,6 +156,32 @@ class _ChatCompletionsStrategy:
                         tool_name=entry["name"] if name_first else None,
                         arguments_delta=args_delta,
                     )
+
+        if completed:
+            return
+        for kind, piece in think_splitter.flush():
+            if kind == "reasoning":
+                reasoning_text += piece
+                yield LLMStreamEvent(
+                    type=LLMStreamEventType.REASONING_TEXT_DELTA,
+                    text=piece,
+                )
+            elif piece:
+                accumulated_text += piece
+                yield LLMStreamEvent(
+                    type=LLMStreamEventType.OUTPUT_TEXT_DELTA,
+                    text=piece,
+                )
+        yield LLMStreamEvent(
+            type=LLMStreamEventType.COMPLETED,
+            response=build_llm_response(
+                text=accumulated_text,
+                tool_calls=pick_all_tool_calls(tool_calls) or None,
+                model=self._model,
+                usage=None,
+                finish_reason=finish_reason,
+            ),
+        )
 
     def _build_request_kwargs(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         tools = kwargs.pop("tools", None)

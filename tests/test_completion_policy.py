@@ -24,7 +24,6 @@ from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
     MustConsultAllMembers,
 )
-from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.member_status import (
     InMemoryMemberStatus,
@@ -376,15 +375,7 @@ class TestModularBrainTryShortcutShortCircuit:
         )
         brain = ModularBrain(
             reasoner=reasoner,
-            decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
-        )
-        brain = ModularBrain(
-            reasoner=brain.reasoner,
-            decision_parser=brain.decision_parser,
-            critic=brain.critic,
-            evaluation_pipeline=brain.evaluation_pipeline,
-            skill_router=brain.skill_router,
             decision_gate=MustConsultAllMembers(),
         )
 

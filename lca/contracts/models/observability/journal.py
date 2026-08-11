@@ -336,12 +336,7 @@ class ToolStarted(JournalEvent):
 
 @dataclass(frozen=True)
 class ToolInvoked(JournalEvent):
-    """工具调用完成。
-
-    ``files`` 是产物元数据一等字段（A2A file-part 列表），供 UI 投影使用。
-    不得依赖 ``result_preview`` 字符串解析还原 files——preview 受 2k 截断，
-    会破坏 JSON；本字段为 tuple/list，journal 引擎不截断非字符串。
-    """
+    """工具调用完成；``files`` / ``plugin_state`` 为 UI 一等字段（journal 不截断）。"""
 
     tool_name: str = ""
     arguments_preview: str = ""
@@ -352,6 +347,7 @@ class ToolInvoked(JournalEvent):
     error: str = ""
     invocation_id: str = ""  # optional link to in-flight streaming deltas
     files: tuple[dict[str, Any], ...] = ()
+    plugin_state: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

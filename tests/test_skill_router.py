@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.skill_router import KeywordSkillRouter, StaticSkillRouter
@@ -59,23 +60,15 @@ class TestSkillRouterIntegration(unittest.IsolatedAsyncioTestCase):
         router = StaticSkillRouter("custom_prompt")
 
         reasoner = MagicMock()
-        reasoner.generate_thoughts = AsyncMock(return_value=["think"])
-        decision_parser = MagicMock()
+        reasoner.generate_thoughts = AsyncMock(return_value=LLMResponse(text="think"))
         mock_decision = MagicMock()
         mock_decision.rationale = "test"
-        decision_parser.parse = MagicMock(return_value=mock_decision)
-
-        evaluation_pipeline = MagicMock()
-        evaluation_pipeline.decompose = AsyncMock(return_value=[])
-        evaluation_pipeline.evaluate = AsyncMock(return_value=mock_decision)
 
         critic = MagicMock()
 
         brain = ModularBrain(
             reasoner=reasoner,
-            decision_parser=decision_parser,
             critic=critic,
-            evaluation_pipeline=evaluation_pipeline,
             skill_router=router,
         )
 
@@ -87,23 +80,15 @@ class TestSkillRouterIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_think_without_router_no_template(self) -> None:
         """无 SkillRouter 时，working_memory 不设 active_template。"""
         reasoner = MagicMock()
-        reasoner.generate_thoughts = AsyncMock(return_value=["think"])
-        decision_parser = MagicMock()
+        reasoner.generate_thoughts = AsyncMock(return_value=LLMResponse(text="think"))
         mock_decision = MagicMock()
         mock_decision.rationale = "test"
-        decision_parser.parse = MagicMock(return_value=mock_decision)
-
-        evaluation_pipeline = MagicMock()
-        evaluation_pipeline.decompose = AsyncMock(return_value=[])
-        evaluation_pipeline.evaluate = AsyncMock(return_value=mock_decision)
 
         critic = MagicMock()
 
         brain = ModularBrain(
             reasoner=reasoner,
-            decision_parser=decision_parser,
             critic=critic,
-            evaluation_pipeline=evaluation_pipeline,
         )
 
         state = _make_state("test")
@@ -116,23 +101,15 @@ class TestSkillRouterIntegration(unittest.IsolatedAsyncioTestCase):
         router = StaticSkillRouter("t")
 
         reasoner = MagicMock()
-        reasoner.generate_thoughts = AsyncMock(return_value=["x"])
-        decision_parser = MagicMock()
+        reasoner.generate_thoughts = AsyncMock(return_value=LLMResponse(text="x"))
         mock_decision = MagicMock()
         mock_decision.rationale = "x"
-        decision_parser.parse = MagicMock(return_value=mock_decision)
-
-        evaluation_pipeline = MagicMock()
-        evaluation_pipeline.decompose = AsyncMock(return_value=[])
-        evaluation_pipeline.evaluate = AsyncMock(return_value=mock_decision)
 
         critic = MagicMock()
 
         brain = ModularBrain(
             reasoner=reasoner,
-            decision_parser=decision_parser,
             critic=critic,
-            evaluation_pipeline=evaluation_pipeline,
             skill_router=router,
         )
 

@@ -22,7 +22,7 @@ from lca.layer1_cognitive.body.safe_executor import (
     SimpleSafeExecutor,
     _tool_output_preview,
 )
-from lca.layer1_cognitive.body.tool_result_preview import tool_files
+from lca.layer1_cognitive.body.tool_result_preview import tool_files, tool_plugin_state
 
 
 class _Collector:
@@ -168,6 +168,59 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(invoked[0].files[7]["name"], "chart_7.png")
         # preview still truncated as a string
         self.assertLessEqual(len(invoked[0].result_preview), 2010)
+
+    def test_tool_plugin_state_extracts_structured_state(self) -> None:
+        obs = Observation(
+            observation_id="obs_1",
+            success=True,
+            payload={
+                "text": "summary for llm",
+                "state": {
+                    "query": "today news",
+                    "resultNumbers": 2,
+                    "results": [
+                        {"title": "A", "url": "https://a.example", "content": "x" * 500},
+                        {"title": "B", "url": "https://b.example", "content": "y" * 500},
+                    ],
+                    "success": True,
+                },
+            },
+        )
+        state = tool_plugin_state(obs)
+        self.assertEqual(state["resultNumbers"], 2)
+        self.assertEqual(len(state["results"]), 2)
+        preview = _tool_output_preview(obs)
+        self.assertLess(len(preview), 2000)
+        parsed = json.loads(preview)
+        self.assertNotIn("state", parsed)
+
+    async def test_journal_preserves_plugin_state_through_policy(self) -> None:
+        collector = _Collector()
+        hub = ObservabilityHub([], journal_projectors=[collector])
+        plugin_state = {
+            "query": "news",
+            "resultNumbers": 3,
+            "results": [
+                {"title": f"Hit {i}", "url": f"https://ex/{i}", "content": "z" * 400}
+                for i in range(3)
+            ],
+            "success": True,
+        }
+        with bind(hub), run_scope(RunScope(trace_id="t", run_id="r")):
+            from lca.layer0_infra.observability import record
+
+            record(
+                ToolInvoked(
+                    tool_name="web_search",
+                    result_preview='{"text": "' + ("t" * 3000) + '"}',
+                    ok=True,
+                    plugin_state=plugin_state,
+                )
+            )
+        invoked = [s.event for s in collector.received if isinstance(s.event, ToolInvoked)]
+        self.assertEqual(len(invoked), 1)
+        self.assertEqual(len(invoked[0].plugin_state["results"]), 3)
+        self.assertEqual(invoked[0].plugin_state["results"][2]["url"], "https://ex/2")
 
 
 if __name__ == "__main__":

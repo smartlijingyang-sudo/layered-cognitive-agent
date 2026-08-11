@@ -5,28 +5,14 @@ from __future__ import annotations
 import json
 from typing import Any, NamedTuple
 
-from lca.contracts.atoms.semantic_keys import (
-    TOOL_WIRE_FINISH_REASON,
-    TOOL_WIRE_INCOMPLETE,
-    TOOL_WIRE_INVALID,
-    TOOL_WIRE_OK,
-    TOOL_WIRE_RAW_PREVIEW,
-    TOOL_WIRE_REASON,
-    TOOL_WIRE_STATUS,
-)
-from lca.contracts.models.core.llm import LLMResponse, TokenUsage
+from lca.contracts.models.core.llm import LLMResponse, NativeToolCall, TokenUsage
 from lca.layer0_infra.llm_adapter.settings import (
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
     build_generation_kwargs,
 )
 from lca.layer0_infra.llm_adapter.tool_arguments import (
-    ToolArgumentsIncomplete,
-    ToolArgumentsInvalid,
-    ToolArgumentsOk,
     finish_reason_value,
-    raw_preview,
-    resolve_tool_arguments,
 )
 
 # 再导出，供策略模块与测试引用
@@ -37,6 +23,7 @@ __all__ = [
     "build_llm_response",
     "build_request_generation",
     "extract_reasoning_text",
+    "pick_all_tool_calls",
     "pick_first_tool_call",
     "strip_observability_kwargs",
 ]
@@ -180,94 +167,47 @@ class _RawToolCall(NamedTuple):
     call_id: str
 
 
-_WIRE_RATIONALE_INCOMPLETE = (
-    "tool_arguments_incomplete: provider truncated or JSON unclosed; "
-    "do not execute; shorten args / split steps and retry"
-)
-_WIRE_RATIONALE_INVALID = (
-    "tool_arguments_invalid: arguments JSON unusable; do not execute; fix format and retry"
-)
-
-
-def _encode_tool_decision(
-    *,
-    tool_name: str,
-    rationale: str,
-    outcome: ToolArgumentsOk | ToolArgumentsIncomplete | ToolArgumentsInvalid,
-    finish_reason: str | None,
-) -> str:
-    """将 wire Outcome 编码为规范 Decision JSON（永不抛）。
-
-    - Ok → use_tool + 真 arguments + tool_wire_status=ok
-    - Incomplete/Invalid → 仍 use_tool（保留 tool_name，arguments={}），
-      写入 tool_wire_* 供 Parser/Body 闸门软失败；**禁止** respond 收口。
-    """
-    fr = finish_reason_value(finish_reason) or finish_reason
-    if isinstance(outcome, ToolArgumentsOk):
-        payload: dict[str, Any] = {
-            "action_type": "use_tool",
-            "tool_name": tool_name,
-            "arguments": outcome.arguments,
-            "rationale": rationale,
-            TOOL_WIRE_STATUS: TOOL_WIRE_OK,
-        }
-        if fr:
-            payload[TOOL_WIRE_FINISH_REASON] = fr
-        return json.dumps(payload, ensure_ascii=False)
-
-    if isinstance(outcome, ToolArgumentsIncomplete):
-        status = TOOL_WIRE_INCOMPLETE
-        rationale_text = _WIRE_RATIONALE_INCOMPLETE
-    else:
-        status = TOOL_WIRE_INVALID
-        rationale_text = _WIRE_RATIONALE_INVALID
-
-    payload = {
-        "action_type": "use_tool",
-        "tool_name": tool_name,
-        "arguments": {},
-        "rationale": rationale_text if not rationale else f"{rationale_text}; {rationale}",
-        TOOL_WIRE_STATUS: status,
-        TOOL_WIRE_REASON: outcome.reason,
-        TOOL_WIRE_RAW_PREVIEW: raw_preview(outcome.raw),
-    }
-    if fr:
-        payload[TOOL_WIRE_FINISH_REASON] = fr
-    if outcome.detail:
-        payload["tool_wire_detail"] = outcome.detail
-    return json.dumps(payload, ensure_ascii=False)
+def _parse_tool_arguments(arguments_json: str) -> dict[str, Any]:
+    """Parse tool call arguments JSON; return empty dict on failure."""
+    try:
+        parsed = json.loads(arguments_json or "{}")
+        return parsed if isinstance(parsed, dict) else {}
+    except (json.JSONDecodeError, ValueError):
+        return {}
 
 
 def build_llm_response(
     *,
     text: str,
-    tool_call: _RawToolCall | None,
+    tool_call: _RawToolCall | None = None,
+    tool_calls: list[_RawToolCall] | None = None,
     model: str,
     usage: TokenUsage | None,
     finish_reason: str | None = None,
 ) -> LLMResponse:
     """两 Strategy 的 complete() 尾部与 stream() 终态共用此构造函数。
 
-    tool arguments 经 :func:`resolve_tool_arguments` 三态分类后编码；
-    坏 JSON / length 截断**永不** ``json.loads`` 抛穿 agent loop（ADR-0047）。
+    原生透传 tool_calls —— 不再编码为 JSON Decision 文本。
+    支持单 tool_call（向后兼容）或 tool_calls 列表。
     """
     fr_norm = finish_reason_value(finish_reason)
-    if tool_call is not None:
-        outcome = resolve_tool_arguments(
-            tool_call.arguments_json,
-            finish_reason=finish_reason,
-        )
-        text = _encode_tool_decision(
-            tool_name=tool_call.name,
-            rationale=text or "",
-            outcome=outcome,
-            finish_reason=finish_reason,
-        )
+    native_tool_calls: list[NativeToolCall] = []
+    raw_list = tool_calls if tool_calls is not None else ([tool_call] if tool_call else [])
+    for raw in raw_list:
+        if raw is not None:
+            native_tool_calls.append(
+                NativeToolCall(
+                    call_id=raw.call_id,
+                    name=raw.name,
+                    arguments=_parse_tool_arguments(raw.arguments_json),
+                )
+            )
     return LLMResponse(
         text=text,
         model=model,
         usage=usage,
         finish_reason=fr_norm,
+        tool_calls=native_tool_calls,
     )
 
 
@@ -284,3 +224,21 @@ def pick_first_tool_call(
         arguments_json=first.get("arguments", ""),
         call_id=first.get("id", ""),
     )
+
+
+def pick_all_tool_calls(
+    tool_calls: dict[int, dict[str, str]],
+) -> list[_RawToolCall]:
+    """Collect all accumulated streaming tool calls into a list."""
+    result: list[_RawToolCall] = []
+    for index in sorted(tool_calls):
+        entry = tool_calls[index]
+        if entry.get("name"):
+            result.append(
+                _RawToolCall(
+                    name=entry["name"],
+                    arguments_json=entry.get("arguments", ""),
+                    call_id=entry.get("id", ""),
+                )
+            )
+    return result

@@ -17,7 +17,6 @@ from lca.layer1_cognitive.body.action_catalog import build_default_action_regist
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 
 
 def _build_registry() -> ActionRegistry:
@@ -54,16 +53,6 @@ class TestActionRegistryCompleteness:
         registry = _build_registry()
         assert registry.get("research_plan") is None
         assert registry.get("nonexistent") is None
-
-    def test_prompt_contains_allowed_actions_placeholder(self) -> None:
-        """Prompt 模板包含 {allowed_actions} 占位符，由 Reasoner 从 Registry 动态注入。"""
-        react_prompt = load_builtin_prompt("react_prompt")
-        hierarchical_prompt = load_builtin_prompt("hierarchical_prompt")
-
-        assert "{allowed_actions}" in react_prompt, "react_prompt 缺少 {allowed_actions} 占位符"
-        assert "{allowed_actions}" in hierarchical_prompt, (
-            "hierarchical_prompt 缺少 {allowed_actions} 占位符"
-        )
 
     def test_is_registered(self) -> None:
         registry = _build_registry()

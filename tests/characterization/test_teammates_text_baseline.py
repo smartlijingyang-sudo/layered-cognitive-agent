@@ -139,7 +139,7 @@ class TestPromptReasonerSolo:
             templates={"react_prompt": "just {task}"},
         )
         state = AgentState(trace_id="t1", task="test", budget=Budget())
-        await reasoner.generate_thoughts(state, n=1)
+        await reasoner.generate_thoughts(state)
         assert len(llm.prompts) == 1
         assert "just test" in llm.prompts[0]
 
@@ -163,7 +163,7 @@ class TestPromptReasonerAwareness:
             budget=Budget(),
             team_awareness=_awareness([_make_profile("coder", "write code")]),
         )
-        await reasoner.generate_thoughts(state, n=1)
+        await reasoner.generate_thoughts(state)
         prompt = llm.prompts[0]
         assert "coder" in prompt
         assert "write code" in prompt
@@ -188,5 +188,5 @@ class TestPromptReasonerAwareness:
             team_awareness=_awareness([_make_profile("coder")]),
             active_template="custom",
         )
-        await reasoner.generate_thoughts(state, n=1)
+        await reasoner.generate_thoughts(state)
         assert llm.prompts[0] == "CUSTOM test"

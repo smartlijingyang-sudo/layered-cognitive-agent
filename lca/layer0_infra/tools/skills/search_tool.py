@@ -11,6 +11,8 @@ from lca.contracts.models.core.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.operational_skills import SkillImportError, SkillSearchResult
+from lca.layer0_infra.search.service import any_search_provider_available
+from lca.layer0_infra.search.skill_policy import filter_skill_search_result
 from lca.layer0_infra.skills.http_importer import HttpSkillImporter
 from lca.layer0_infra.tools.skills._format import format_skill_index_rows
 
@@ -52,6 +54,10 @@ class SkillSearchTool(Tool):
         page_size = int(args.get("page_size") or 20)
 
         result = await self._search_with_degradation(query, page, page_size)
+        result = filter_skill_search_result(
+            result,
+            unified_search_available=any_search_provider_available(),
+        )
         body = self._format_body(result)
         latency_ms = int((time.monotonic() - start) * 1000)
         return Observation(
@@ -82,7 +88,16 @@ class SkillSearchTool(Tool):
         # Level 3: list local installed skills
         local = self._importer.store.list_installed()
         if local:
-            return SkillSearchResult(items=local, total=len(local), page=1, page_size=len(local))
+            local_result = SkillSearchResult(
+                items=local,
+                total=len(local),
+                page=1,
+                page_size=len(local),
+            )
+            return filter_skill_search_result(
+                local_result,
+                unified_search_available=any_search_provider_available(),
+            )
 
         # Fallback: empty result with guidance
         return SkillSearchResult(items=(), total=0, page=1, page_size=page_size)

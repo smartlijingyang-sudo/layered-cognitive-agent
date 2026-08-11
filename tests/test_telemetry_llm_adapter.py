@@ -90,14 +90,43 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
         events = [e async for e in adapter.stream("prompt", step=2)]
         self.assertEqual(len(events), 3)
         deltas = [e for e in self.recorded if isinstance(e, StepTextDelta)]
-        self.assertEqual(len(deltas), 2)
-        self.assertEqual(deltas[0].step, 2)
-        self.assertEqual(deltas[0].seq, 0)
-        self.assertEqual(deltas[0].text_delta, "hel")
-        self.assertEqual(deltas[1].seq, 1)
-        self.assertEqual(deltas[1].text_delta, "lo")
+        self.assertEqual(len(deltas), 4)
+        decision = [d for d in deltas if d.channel == "decision"]
+        answer = [d for d in deltas if d.channel == "answer"]
+        self.assertEqual(len(decision), 2)
+        self.assertEqual(len(answer), 2)
+        self.assertEqual("".join(d.text_delta for d in decision), "hello")
+        self.assertEqual("".join(d.text_delta for d in answer), "hello")
         completed = [e for e in self.recorded if isinstance(e, LlmCallCompleted)]
         self.assertEqual(len(completed), 1)
+
+    async def test_stream_decision_json_answer_channel_only_response_text(self) -> None:
+        class _JsonInner(_FakeInner):
+            async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
+                parts = [
+                    '{"action_type": "respond", "rationale": "x", ',
+                    '"response_text": "你',
+                    '好"}',
+                ]
+                for part in parts:
+                    yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=part)
+                yield LLMStreamEvent(
+                    type=LLMStreamEventType.COMPLETED,
+                    response=LLMResponse(text="".join(parts), model="fake-model"),
+                )
+
+        adapter = TelemetryLLMAdapter(_JsonInner())
+        _events = [e async for e in adapter.stream("prompt", step=1)]
+        decision = [
+            e for e in self.recorded if isinstance(e, StepTextDelta) and e.channel == "decision"
+        ]
+        answer = [
+            e for e in self.recorded if isinstance(e, StepTextDelta) and e.channel == "answer"
+        ]
+        self.assertGreaterEqual(len(decision), 3)
+        self.assertEqual("".join(d.text_delta for d in answer), "你好")
+        joined_answer = "".join(d.text_delta for d in answer)
+        self.assertNotIn("rationale", joined_answer)
 
     async def test_stream_uses_completed_tokens(self) -> None:
         adapter = TelemetryLLMAdapter(_FakeInner())

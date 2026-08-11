@@ -14,9 +14,13 @@ from gateway.mode_catalog import DEFAULT_MODE, SOLO_MODE_KEY
 from gateway.run_registry import RunRegistry, RunSession, RunStatus
 from gateway.team_factory import build_runnable_team, build_solo_agent
 from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
+from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.team.run_context import RunContext
 from lca.layer0_infra.file_store import get_default_file_store
 from lca.layer0_infra.sandbox.factory import resolve_sandbox
 from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime
+from lca.layer0_infra.search.scope import search_run_scope
 from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
 from lca.layer0_infra.tools.run_finalizer import finalize_run, run_id_scope
 from lca.layer0_infra.workspace import run_workspace_scope
@@ -58,6 +62,7 @@ async def execute_run(
             run_id_scope(session.run_id),
             run_attachment_scope(session.attachment_ids),
             run_workspace_scope(session.run_id),
+            search_run_scope(),
         ):
             sandbox = resolve_sandbox()
             if sandbox is not None and session.attachment_ids:
@@ -91,7 +96,24 @@ async def execute_run(
                     trace_id=session.trace_id,
                     run_id=session.run_id,
                 )
-            await runnable.run(question)
+            run_ctx = _run_context_for_session(session)
+            if isinstance(runnable, Agent):
+                result = await runnable.run(question, run_ctx)
+            else:
+                result = await runnable.run(question)
+            if result.status == TaskStatus.INPUT_REQUIRED:
+                session.status = RunStatus.WAITING_INPUT
+                session.snapshot = result.extra.get("state_snapshot")
+                session.runnable = runnable
+                session.approval_request = result.extra.get("approval_request")
+                _log.info(
+                    "run_paused_for_input",
+                    run_id=session.run_id,
+                    approval_type=session.approval_request.get("type")
+                    if session.approval_request
+                    else None,
+                )
+                return
         session.status = RunStatus.CANCELED if session.cancel_requested else RunStatus.COMPLETED
     except asyncio.CancelledError:
         session.status = RunStatus.CANCELED
@@ -101,18 +123,37 @@ async def execute_run(
         session.status = RunStatus.FAILED
         session.error = f"{type(exc).__name__}: {exc}"
     finally:
-        # Release run-scoped resources (sandbox sessions, …) before closing hub.
-        await finalize_run(session.run_id)
-        session.hub.close()
-        session.emit(None)
+        if session.status == RunStatus.WAITING_INPUT:
+            # HIL pause: keep session alive for resume, do NOT close hub or emit sentinel.
+            registry.mark_paused(session)
+        else:
+            # Release run-scoped resources (sandbox sessions, …) before closing hub.
+            await finalize_run(session.run_id)
+            session.hub.close()
+            session.emit(None)
+            registry.clear_inflight(session)
+
+
+def _run_context_for_session(session: RunSession) -> RunContext | None:
+    if not session.prior_turns:
+        return None
+    return RunContext(
+        extra={
+            PRIOR_CONVERSATION_WM_KEY: [
+                {"role": t.role, "content": t.content} for t in session.prior_turns
+            ]
+        }
+    )
 
 
 def create_run_session(
     registry: RunRegistry,
     *,
     question: str,
+    user_text: str,
     mode: str = DEFAULT_MODE,
     attachment_ids: Sequence[str] = (),
+    prior_turns: Sequence[ConversationTurn] = (),
 ) -> RunSession:
     """登记新 run 并装配 ObservabilityHub（SSE 广播 + jsonl 落盘）。"""
     run_id = new_id("run")
@@ -132,7 +173,9 @@ def create_run_session(
         jsonl_path=jsonl_path,
         hub=hub,
         question=question,
+        user_text=user_text,
         mode=mode,
+        prior_turns=tuple(prior_turns),
         attachment_ids=cleaned_ids,
     )
     session_ref[0] = session

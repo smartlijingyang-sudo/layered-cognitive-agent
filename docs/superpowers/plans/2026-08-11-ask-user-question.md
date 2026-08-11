@@ -75,18 +75,21 @@ class TestAskUserQuestionTool:
         assert result is not None  # error string
 
     def test_validate_accepts_valid_args(self, tool: AskUserQuestionTool) -> None:
-        result = tool.validate({
-            "questions": [
-                {
-                    "question": "Pick one",
-                    "options": [{"label": "A"}, {"label": "B"}],
-                }
-            ]
-        })
+        result = tool.validate(
+            {
+                "questions": [
+                    {
+                        "question": "Pick one",
+                        "options": [{"label": "A"}, {"label": "B"}],
+                    }
+                ]
+            }
+        )
         assert result is None
 
     def test_registered_in_default_tools(self) -> None:
         from lca.layer0_infra.tools.default_set import build_default_tools
+
         names = [t.name for t in build_default_tools()]
         assert "ask_user_question" in names
 ```
@@ -307,7 +310,9 @@ async def test_resume_injects_synthetic_turn(runtime, state_store):
     decision = Decision(
         action_type=ActionType.USE_TOOL,
         thought="Asking user",
-        tool_calls=[ToolCall(call_id="tc1", tool_name="ask_user_question", arguments={"questions": []})],
+        tool_calls=[
+            ToolCall(call_id="tc1", tool_name="ask_user_question", arguments={"questions": []})
+        ],
     )
     # Note: observation is None because ApprovalPendingError prevented Turn creation
     # But the checkpoint saves state BEFORE the Turn is appended.
@@ -315,6 +320,7 @@ async def test_resume_injects_synthetic_turn(runtime, state_store):
 
     ref = await state_store.save(state)
     from lca.contracts.models.core.state import StateSnapshot
+
     snapshot = StateSnapshot(state_ref=ref, step=state.step, trace_id=state.trace_id)
 
     # Resume with user's answer
@@ -351,6 +357,7 @@ async def resume(
     if input is not None:
         self._inject_user_answer(state, input)
     return await self._loop(state, max_steps)
+
 
 @staticmethod
 def _inject_user_answer(state: AgentState, answer: object) -> None:
@@ -439,9 +446,7 @@ Expected: FAIL — `ImportError: cannot import name 'lca_ask_user_event'`
 In `gateway/lobehub_bridge/lca_sse_extension.py`:
 
 ```python
-def lca_ask_user_event(
-    *, tool_call_id: str, questions: list[dict[str, Any]]
-) -> dict[str, Any]:
+def lca_ask_user_event(*, tool_call_id: str, questions: list[dict[str, Any]]) -> dict[str, Any]:
     """Signal a structured user question (HIL pause)."""
     return {
         "type": "ask_user",
@@ -488,10 +493,12 @@ def _extract_questions_from_result(result: Result) -> list[dict]:
     # For now, extract from state's last checkpoint
     return result.error_data.get("user_question", []) if hasattr(result, "error_data") else []
 
+
 def _build_ask_user_frame(session: RunSession, questions: list[dict]) -> str:
     """Build SSE frame for ask_user event."""
     import json
     from gateway.lobehub_bridge.lca_sse_extension import lca_ask_user_event
+
     event = lca_ask_user_event(tool_call_id=f"ask_{session.run_id}", questions=questions)
     body = {"choices": [{"delta": {}, "finish_reason": "stop"}]}
     body_with_ext = merge_lca_extension(body, [event])
@@ -602,7 +609,8 @@ async def resume_run(
             runnable = build_solo_agent(llm, observability=session.hub)
         else:
             runnable = await build_runnable_team(
-                session.question, llm,
+                session.question,
+                llm,
                 observability=session.hub,
                 trace_id=session.trace_id,
                 run_id=session.run_id,
@@ -768,22 +776,26 @@ from lca.contracts.models.core.result import ApprovalPendingError
 from lca.layer0_infra.tools.ask_user_question import AskUserQuestionTool
 
 
-async def test_tool_raises_and_resume_injects_answer(
-    solo_agent_with_tools, mock_llm
-):
+async def test_tool_raises_and_resume_injects_answer(solo_agent_with_tools, mock_llm):
     """Full cycle: LLM calls ask_user_question → pause → resume → LLM sees answer."""
     agent = solo_agent_with_tools(tools=[AskUserQuestionTool()])
 
     # Scripted LLM: first call asks user, second call responds with answer
     mock_llm.script(
         # Turn 1: LLM calls ask_user_question
-        tool_calls=[{
-            "name": "ask_user_question",
-            "arguments": {"questions": [{
-                "question": "Color?",
-                "options": [{"label": "Blue"}, {"label": "Red"}],
-            }]},
-        }],
+        tool_calls=[
+            {
+                "name": "ask_user_question",
+                "arguments": {
+                    "questions": [
+                        {
+                            "question": "Color?",
+                            "options": [{"label": "Blue"}, {"label": "Red"}],
+                        }
+                    ]
+                },
+            }
+        ],
         # Turn 2: LLM sees the answer and responds
         content="You chose Blue!",
     )

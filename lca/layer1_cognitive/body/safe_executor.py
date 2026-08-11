@@ -26,6 +26,7 @@ from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
 from lca.layer1_cognitive.body.tool_result_preview import (
     compact_payload_for_preview,
     tool_files,
+    tool_plugin_state,
 )
 
 _log = structlog.get_logger("lca.safe_executor")
@@ -219,6 +220,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 error="" if obs.success else (obs.error or ""),
                 invocation_id=resolved_id,
                 files=tool_files(obs),
+                plugin_state=tool_plugin_state(obs),
             )
         )
 

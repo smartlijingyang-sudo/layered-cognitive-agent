@@ -8,6 +8,7 @@ import unittest
 from gateway.llm_resolver import ProductionLLMResolver
 from gateway.run_executor import create_run_session, execute_run, set_llm_resolver
 from gateway.run_registry import RunRegistry, RunStatus
+from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
@@ -45,11 +46,16 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
             },
             ensure_ascii=False,
         )
-        llm = ScriptedLLMAdapter({"caster": [plan]}, default_respond=True)
+        llm = ScriptedLLMAdapter(
+            {"caster": [LLMResponse(text=plan, model="scripted-llm")]}, default_respond=True
+        )
         set_llm_resolver(_ScriptedResolver(llm))
 
         session = create_run_session(
-            self.registry, question="给新功能的发布写一句宣传文案", mode="team"
+            self.registry,
+            question="给新功能的发布写一句宣传文案",
+            user_text="给新功能的发布写一句宣传文案",
+            mode="team",
         )
         await execute_run(
             self.registry,
@@ -64,10 +70,18 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
 
     async def test_team_mode_casting_failure_fails_run(self) -> None:
         # 两次尝试都不是合法 JSON → CastingError → run FAILED（既有错误管道收尾）
-        llm = ScriptedLLMAdapter({"caster": ["完全不是 JSON"]}, default_respond=False)
+        llm = ScriptedLLMAdapter(
+            {"caster": [LLMResponse(text="完全不是 JSON", model="scripted-llm")]},
+            default_respond=False,
+        )
         set_llm_resolver(_ScriptedResolver(llm))
 
-        session = create_run_session(self.registry, question="随便做点什么", mode="team")
+        session = create_run_session(
+            self.registry,
+            question="随便做点什么",
+            user_text="随便做点什么",
+            mode="team",
+        )
         await execute_run(
             self.registry,
             run_id=session.run_id,

@@ -38,7 +38,7 @@ TERMINAL_RESERVE_STEPS: int = 1
 """Steps reserved for terminal respond; tool actions capped at max_steps - this."""
 
 TOOL_LOOP_BREAK_THRESHOLD: int = 3
-"""Consecutive identical tool failures before circuit breaker gate fires."""
+"""Consecutive identical tool failures or no-progress repeats before circuit breaker fires."""
 
 # Minimum step budget when an agent is composed as team lead.
 LEAD_MIN_MAX_STEPS: int = 20

@@ -70,7 +70,6 @@ class TestComposeAsLead(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(hasattr(inner, "bind_channel"))
         brain = ModularBrain(
             reasoner=MagicMock(spec=PromptReasoner),
-            decision_parser=MagicMock(),
             critic=MagicMock(),
         )
         self.assertFalse(hasattr(brain, "install_decision_gate"))

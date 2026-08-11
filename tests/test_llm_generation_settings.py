@@ -33,6 +33,16 @@ class TestBuildGenerationKwargs(unittest.TestCase):
     def tearDown(self) -> None:
         clear_llm_settings_cache()
 
+    def test_qwen_has_tools_enables_thinking_by_default(self) -> None:
+        settings = LLMSettings(enable_thinking=None, enable_search=None, top_k=None)
+        out = build_generation_kwargs(
+            model="qwen3.7-plus",
+            has_tools=True,
+            call_kwargs={},
+            settings=settings,
+        )
+        self.assertTrue(out["extra_body"]["enable_thinking"])
+
     def test_qwen_defaults_enable_thinking_and_sampling(self) -> None:
         settings = LLMSettings(enable_thinking=None, enable_search=None, top_k=None)
         out = build_generation_kwargs(
@@ -72,7 +82,7 @@ class TestBuildGenerationKwargs(unittest.TestCase):
         self.assertEqual(out["max_tokens"], 2048)
 
     def test_non_qwen_skips_qwen_extra_body_defaults(self) -> None:
-        settings = LLMSettings(enable_thinking=None, top_k=None)
+        settings = LLMSettings(enable_thinking=None, enable_search=None, top_k=None)
         out = build_generation_kwargs(
             model="gpt-4.1",
             has_tools=False,
@@ -179,6 +189,16 @@ class TestBuildGenerationKwargs(unittest.TestCase):
             settings=settings,
         )
         self.assertEqual(out["extra_body"]["repetition_penalty"], 1.1)
+
+    def test_qwen_has_tools_keeps_env_enable_thinking_true(self) -> None:
+        settings = LLMSettings(enable_thinking=True)
+        out = build_generation_kwargs(
+            model="qwen3.7-plus",
+            has_tools=True,
+            call_kwargs={},
+            settings=settings,
+        )
+        self.assertTrue(out["extra_body"]["enable_thinking"])
 
     def test_env_overrides_settings(self) -> None:
         with mock.patch.dict(

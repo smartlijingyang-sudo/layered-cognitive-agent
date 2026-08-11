@@ -17,7 +17,7 @@ class TestLoadBuiltinPrompt(unittest.TestCase):
         self.assertIn("{goal}", content)
         self.assertIn("{task}", content)
         self.assertIn("{context}", content)
-        self.assertIn("JSON", content)
+        self.assertIn("function calling", content)
 
     def test_load_hierarchical_prompt(self) -> None:
         """hierarchical_prompt.md loads and contains expected placeholders."""
@@ -25,7 +25,7 @@ class TestLoadBuiltinPrompt(unittest.TestCase):
         self.assertIn("{role}", content)
         self.assertIn("{teammates}", content)
         self.assertIn("{member_status_text}", content)
-        self.assertIn("{allowed_actions}", content)
+        self.assertIn("function calling", content)
         self.assertIn("target_role", content)
 
     def test_nonexistent_prompt_raises_clear_error(self) -> None:

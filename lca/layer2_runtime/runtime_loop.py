@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import structlog
 
-from lca.contracts.atoms.enums import SnapshotReason
+from lca.contracts.atoms.enums import ActionType, SnapshotReason
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.activation import ActivatedSkill
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, create_budget
-from lca.contracts.models.core.decision import Turn
+from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY
+from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import ApprovalPendingError, BudgetExceededError, Result
 from lca.contracts.models.core.state import AgentState, StateSnapshot
@@ -84,6 +85,8 @@ class CognitiveRuntime(Runtime):
             from_role=(ctx.from_role if ctx else ""),
             team_awareness=(ctx.team_awareness if ctx else None),
         )
+        if ctx and ctx.extra.get(PRIOR_CONVERSATION_WM_KEY):
+            state.working_memory[PRIOR_CONVERSATION_WM_KEY] = ctx.extra[PRIOR_CONVERSATION_WM_KEY]
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
 
@@ -97,6 +100,26 @@ class CognitiveRuntime(Runtime):
         state.status = TaskStatus.WORKING
         if input is not None:
             state.working_memory["resume_input"] = input
+            answer_text = input if isinstance(input, str) else str(input)
+            answer_obs = Observation(
+                observation_id=new_id("obs"),
+                success=True,
+                payload=answer_text,
+                extra={"source": "human_answer", "tool_name": "ask_user_question"},
+            )
+            answer_decision = Decision(
+                decision_id=new_id("dec"),
+                action_type=ActionType.ASK_HUMAN,
+                rationale="Human-in-the-loop answer received.",
+                confidence=1.0,
+                tool_calls=[
+                    ToolCall(call_id=new_id("tc"), tool_name="ask_user_question", arguments={}),
+                ],
+            )
+            state.history.append(
+                Turn(decision=answer_decision, observation=answer_obs),
+            )
+            state.step += 1
         return await self._loop(state, max_steps)
 
     async def _loop(self, state: AgentState, max_steps: int) -> Result:
@@ -140,12 +163,15 @@ class CognitiveRuntime(Runtime):
                     Turn(decision=decision, observation=observation, reflection=reflection)
                 )
                 await self.memory.update(state, observation, reflection)
-            except ApprovalPendingError:
+            except ApprovalPendingError as exc:
                 # 人工审批中断：保存快照后暂停循环
-                await self._checkpoint(state, reason=SnapshotReason.PRE_APPROVAL)
+                snap = await self._checkpoint(state, reason=SnapshotReason.PRE_APPROVAL)
                 state.status = TaskStatus.INPUT_REQUIRED
                 await self.hooks.trigger("on_pause", state)
-                return Result.from_state(state)
+                result = Result.from_state(state)
+                result.extra["state_snapshot"] = snap
+                result.extra["approval_request"] = exc.approval_request
+                return result
             except Exception as err:
                 # 信任边界处的兜底捕获（L2 是 Agent 最外层循环）：
                 # 任何未预料的异常都不能向上传播导致进程崩溃，

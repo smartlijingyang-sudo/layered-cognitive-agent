@@ -24,7 +24,7 @@ PYTHON_LANGUAGES: frozenset[str] = frozenset({"python", "py"})
 CAPABILITY_PYTHON = "pythonExec"
 CAPABILITY_TERMINAL = "terminalExec"
 TASK_MODE_SYNC = "sync"
-MAX_WAIT_MS = 60_000
+MAX_WAIT_MS = 120_000
 MAX_TIMEOUT_MS = 600_000
 STATUS_SUCCEEDED = "succeeded"
 

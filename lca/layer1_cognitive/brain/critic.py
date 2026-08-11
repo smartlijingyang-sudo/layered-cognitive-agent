@@ -28,10 +28,17 @@ class SimpleCritic(Critic):
 
     async def critique(self, state: AgentState, observation: Observation) -> Reflection:
         if observation.success:
+            tool_name = self._last_tool_name(state)
+            if tool_name:
+                lesson = f"{tool_name} 执行成功"
+            elif observation.payload is not None:
+                lesson = f"步骤{state.step}成功完成"
+            else:
+                lesson = None
             return Reflection(
                 reflection_id=new_id("refl"),
                 verdict=ReflectionVerdict.ON_TRACK,
-                lesson=f"步骤{state.step}成功完成" if observation.payload is not None else None,
+                lesson=lesson,
             )
         failure_kind = self._extract_failure_kind(observation)
         hint = _FAILURE_KIND_HINT.get(failure_kind, "步骤失败")
@@ -42,6 +49,15 @@ class SimpleCritic(Critic):
             lesson=lesson,
             extra={FAILURE_KIND: failure_kind},
         )
+
+    @staticmethod
+    def _last_tool_name(state: AgentState) -> str | None:
+        if not state.history:
+            return None
+        last_decision = state.history[-1].decision
+        if last_decision.tool_calls:
+            return last_decision.tool_calls[0].tool_name
+        return None
 
     @staticmethod
     def _extract_failure_kind(observation: Observation) -> str:

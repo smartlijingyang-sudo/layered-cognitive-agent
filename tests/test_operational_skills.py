@@ -234,6 +234,7 @@ class TestDefaultTools(unittest.TestCase):
         self.assertIn("activate_skill", names)
         self.assertIn("read_skill_reference", names)
         self.assertNotIn("run_skill_script", names)
+        self.assertNotIn("list_files", names)
         self.assertNotIn("sandbox_execute", names)
         self.assertNotIn("sandbox_inspect", names)
 
@@ -242,6 +243,8 @@ class TestDefaultTools(unittest.TestCase):
             mock_sbx.return_value = object()
             names = {t.name for t in build_default_tools()}
         self.assertIn("run_skill_script", names)
+        self.assertIn("list_files", names)
+        self.assertIn("run_command", names)
         self.assertNotIn("sandbox_execute", names)
 
     def test_sanitize_skill_id(self) -> None:

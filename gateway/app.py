@@ -23,13 +23,21 @@ from starlette.routing import Route
 from gateway.conversation_store import ConversationStore
 from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
 from gateway.mode_catalog import DEFAULT_MODE
+from gateway.openai_compat_api import (
+    chat_completions,
+    embeddings_create,
+    list_models,
+    responses_create,
+)
 from gateway.run_executor import (
     create_run_session,
     llm_status,
     schedule_run,
     set_llm_resolver,
 )
-from gateway.run_registry import RunRegistry, RunStatus
+from gateway.run_prompt import compose_run_question
+from gateway.run_registry import RunRegistry, RunSession, RunStatus
+from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.layer0_infra.file_store import (
     LocalFileStore,
     get_default_file_store,
@@ -67,7 +75,7 @@ def get_conversation_store() -> ConversationStore:
 
 
 def get_file_store() -> LocalFileStore:
-    return _file_store  # type: ignore[return-value]
+    return _file_store
 
 
 async def _options(_request: Request) -> JSONResponse:
@@ -84,42 +92,6 @@ def _parse_attachment_ids(body: dict) -> list[str]:
         if text:
             ids.append(text)
     return ids
-
-
-def _question_with_attachments(question: str, attachment_ids: list[str]) -> str:
-    """Embed attachment metadata so agents can cite / read file context.
-
-    Run-level ids are also stored on the session and auto-mounted into the
-    sandbox at ``/mnt/data/<name>``; the model need not re-pass attachment_ids.
-    """
-    if not attachment_ids:
-        return question
-    lines = [
-        "[用户附件]",
-        "（附件已挂载到 /mnt/data/<文件名>；分析前先 activate_skill 加载对应 skill，再用 run_skill_script 执行命令）",
-    ]
-    for attachment_id in attachment_ids:
-        meta = _file_store.get(attachment_id)
-        if meta is None:
-            lines.append(f"- (missing) {attachment_id}")
-            continue
-        lines.append(
-            f"- {meta.name} → /mnt/data/{meta.name} "
-            f"({meta.mime_type}, {meta.size_bytes} B) "
-            f"url={meta.url} id={meta.attachment_id}"
-        )
-        preview = (
-            _file_store.read_text_preview(attachment_id)
-            if isinstance(_file_store, LocalFileStore)
-            else None
-        )
-        if preview:
-            lines.append("  preview:")
-            for preview_line in preview.splitlines()[:40]:
-                lines.append(f"  | {preview_line}")
-    lines.append("")
-    lines.append(f"用户问题: {question}")
-    return "\n".join(lines)
 
 
 async def create_run(request: Request) -> JSONResponse:
@@ -158,10 +130,15 @@ async def create_run(request: Request) -> JSONResponse:
             headers=CORS_HEADERS,
         )
 
-    effective_question = _question_with_attachments(question, attachment_ids)
+    effective_question = compose_run_question(
+        question,
+        tuple(attachment_ids),
+        _file_store,
+    )
     session = create_run_session(
         _registry,
         question=effective_question,
+        user_text=question,
         mode=mode,
         attachment_ids=attachment_ids,
     )
@@ -202,6 +179,68 @@ async def cancel_run(request: Request) -> JSONResponse:
             await session.task
     _conversations.update_turn_status(run_id, RunStatus.CANCELED.value)
     return JSONResponse({"status": RunStatus.CANCELED.value}, headers=CORS_HEADERS)
+
+
+async def answer_run(request: Request) -> JSONResponse:
+    """Submit a human answer for a paused (WAITING_INPUT) run — HIL resume."""
+    run_id = request.path_params["run_id"]
+    session = _registry.get(run_id)
+    if session is None:
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=CORS_HEADERS)
+    if session.status != RunStatus.WAITING_INPUT:
+        return JSONResponse(
+            {"error": "run not waiting for input", "status": session.status.value},
+            status_code=409,
+            headers=CORS_HEADERS,
+        )
+    try:
+        body = await request.json()
+    except json.JSONDecodeError:
+        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=CORS_HEADERS)
+    answer = str(body.get("answer", "")).strip()
+    if not answer:
+        return JSONResponse({"error": "answer is required"}, status_code=400, headers=CORS_HEADERS)
+    if session.snapshot is None or session.runnable is None:
+        return JSONResponse(
+            {"error": "no resume state available"},
+            status_code=500,
+            headers=CORS_HEADERS,
+        )
+    session.status = RunStatus.RUNNING
+    task = asyncio.create_task(_resume_run(session, answer))
+    session.task = task
+    return JSONResponse(
+        {"run_id": run_id, "status": "resumed"},
+        headers=CORS_HEADERS,
+    )
+
+
+async def _resume_run(session: RunSession, answer: str) -> None:
+    """Background task: resume a paused run with the human's answer."""
+
+    try:
+        result = await session.runnable.resume(session.snapshot, input=answer)
+        if result.status == TaskStatus.INPUT_REQUIRED:
+            session.status = RunStatus.WAITING_INPUT
+            session.snapshot = result.extra.get("state_snapshot")
+            session.approval_request = result.extra.get("approval_request")
+            _registry.mark_paused(session)
+        else:
+            session.status = RunStatus.CANCELED if session.cancel_requested else RunStatus.COMPLETED
+    except asyncio.CancelledError:
+        session.status = RunStatus.CANCELED
+        raise
+    except Exception as exc:
+        session.status = RunStatus.FAILED
+        session.error = f"{type(exc).__name__}: {exc}"
+    finally:
+        if session.status != RunStatus.WAITING_INPUT:
+            from lca.layer0_infra.tools.run_finalizer import finalize_run
+
+            await finalize_run(session.run_id)
+            session.hub.close()
+            session.emit(None)
+            _registry.clear_inflight(session)
 
 
 async def get_run(request: Request) -> JSONResponse:
@@ -411,6 +450,7 @@ def create_app(
             Route("/runs", create_run, methods=["POST", "OPTIONS"]),
             Route("/runs/{run_id}", get_run, methods=["GET"]),
             Route("/runs/{run_id}/cancel", cancel_run, methods=["POST", "OPTIONS"]),
+            Route("/runs/{run_id}/answer", answer_run, methods=["POST", "OPTIONS"]),
             Route("/runs/{run_id}/events", stream_events, methods=["GET"]),
             Route("/conversations", create_conversation, methods=["POST", "OPTIONS"]),
             Route("/conversations", list_conversations, methods=["GET"]),
@@ -427,9 +467,15 @@ def create_app(
             ),
             Route("/files/{attachment_id}", download_file, methods=["GET"]),
             Route("/files/{attachment_id}/meta", get_file_meta, methods=["GET"]),
+            # LobeHub G2A OpenAI-compatible surface
+            Route("/v1/models", list_models, methods=["GET", "OPTIONS"]),
+            Route("/v1/chat/completions", chat_completions, methods=["POST", "OPTIONS"]),
+            Route("/v1/embeddings", embeddings_create, methods=["POST", "OPTIONS"]),
+            Route("/v1/responses", responses_create, methods=["POST", "OPTIONS"]),
             Route("/runs", _options, methods=["OPTIONS"]),
             Route("/runs/{run_id}/events", _options, methods=["OPTIONS"]),
             Route("/runs/{run_id}/cancel", _options, methods=["OPTIONS"]),
+            Route("/runs/{run_id}/answer", _options, methods=["OPTIONS"]),
             Route("/conversations", _options, methods=["OPTIONS"]),
             Route("/conversations/{conversation_id}/turns", _options, methods=["OPTIONS"]),
             Route(

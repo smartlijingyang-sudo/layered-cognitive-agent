@@ -19,7 +19,6 @@ from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsultAllMembers
-from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
 from lca.layer3_agent.orchestration_strategies import (
     LeadStrategy,
@@ -36,26 +35,6 @@ def _make_registry(transport: InternalTransport) -> TransportRegistry:
     reg = TransportRegistry()
     reg.register(transport)
     return reg
-
-
-class TestMultiDelegateParse(unittest.TestCase):
-    def test_parser_multi_targets(self) -> None:
-        raw = """
-        {
-          "action_type": "delegate",
-          "rationale": "fan-out",
-          "confidence": 0.9,
-          "delegations": [
-            {"target_role": "a", "subtask": "ta"},
-            {"target_role": "b", "subtask": "tb"}
-          ]
-        }
-        """
-        d = SimpleDecisionParser().parse(raw, AgentState(trace_id="t", task="x", budget=Budget()))
-        specs = list(d.delegations)
-        self.assertEqual(len(specs), 2)
-        self.assertEqual(specs[0].target_role, "a")
-        self.assertEqual(d.delegations[0].target_role, "a")
 
 
 class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):

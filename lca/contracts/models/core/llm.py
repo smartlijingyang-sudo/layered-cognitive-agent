@@ -21,19 +21,34 @@ class TokenUsage:
 
 
 @dataclass(frozen=True)
+class NativeToolCall:
+    """OpenAI 原生 function calling 返回的工具调用。
+
+    直接透传 API 的 ``tool_calls`` 字段，不做任何编解码。
+    """
+
+    call_id: str
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class LLMResponse:
     """单次 LLM 调用的结构化结果。
 
-    ``text`` 为生成文本；``model`` 为实际响应模型（可能异于请求模型）；
+    ``text`` 为生成文本（``message.content``）；``tool_calls`` 为原生工具调用
+    （``message.tool_calls``）。两者互斥：有 tool_calls 时 text 通常为空，
+    但部分 provider 可能同时返回两者。
+    ``model`` 为实际响应模型（可能异于请求模型）；
     ``usage`` 缺省 None（流式或 provider 不支持时）。
-    ``finish_reason`` 为归一化结束原因（见 :class:`~lca.contracts.atoms.enums.FinishReason`）；
-    provider 未提供时为 None。
+    ``finish_reason`` 为归一化结束原因。
     """
 
     text: str
     model: str = ""
     usage: TokenUsage | None = None
     finish_reason: str | None = None
+    tool_calls: list[NativeToolCall] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

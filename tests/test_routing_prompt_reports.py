@@ -97,7 +97,6 @@ class TestRoutingPromptMemberReports(unittest.IsolatedAsyncioTestCase):
             _profile("Lead"),
             tools_desc="(no tools available)",
             templates={"routing_prompt": load_builtin_prompt("routing_prompt")},
-            allowed_actions_desc="1. delegate 2. respond",
         )
         awareness = TeamAwareness(
             teammates=[_profile("Alice"), _profile("Bob")],

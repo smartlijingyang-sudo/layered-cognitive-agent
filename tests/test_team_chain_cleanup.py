@@ -17,7 +17,6 @@ from lca.contracts.models.team.graph import ExecutionGraph, GraphEdge, GraphNode
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.team_coordination import Graph, PeerRelay, PeerSwarm, Pipeline
 from lca.contracts.protocols import TeamAssembly
-from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer3_agent.orchestration_strategies import (
     HandoffStrategy,
     SequentialStrategy,
@@ -38,30 +37,6 @@ class TestDecisionSingleDelegationField(unittest.TestCase):
         self.assertIn("delegations", names)
         self.assertNotIn("delegate_to", names)
         self.assertNotIn("delegate_targets", names)
-
-    def test_parser_0_1_n(self) -> None:
-        parser = SimpleDecisionParser()
-        from lca.contracts.models.core.state import AgentState
-
-        state = AgentState(trace_id="t", task="x", budget=Budget())
-        empty = parser.parse('{"action_type":"respond","rationale":"r","confidence":1}', state)
-        self.assertEqual(empty.delegations, [])
-
-        single = parser.parse(
-            '{"action_type":"delegate","target_role":"a","subtask":"s","rationale":"r","confidence":1}',
-            state,
-        )
-        self.assertEqual(len(single.delegations), 1)
-        self.assertEqual(single.delegations[0].target_role, "a")
-
-        multi = parser.parse(
-            """
-            {"action_type":"delegate","rationale":"r","confidence":1,
-             "delegations":[{"target_role":"a","subtask":"1"},{"target_role":"b","subtask":"2"}]}
-            """,
-            state,
-        )
-        self.assertEqual(len(multi.delegations), 2)
 
 
 class TestTypedProcessDispatch(unittest.TestCase):
@@ -148,10 +123,7 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
             name = "mock"
 
             async def complete(self, prompt: str, **kwargs: object) -> LLMResponse:
-                return LLMResponse(
-                    text='{"action_type":"respond","response_text":"node-out",'
-                    '"rationale":"r","confidence":1.0}'
-                )
+                return LLMResponse(text="node-out")
 
             async def stream(self, prompt: str, **kwargs: object):
                 from lca.contracts.atoms.enums import LLMStreamEventType

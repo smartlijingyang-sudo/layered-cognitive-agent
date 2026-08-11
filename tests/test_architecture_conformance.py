@@ -25,6 +25,27 @@ from pathlib import Path
 #   2. 内部数据结构——不跨越模块边界、不需要运行时多态
 #   3. 异常类型——错误信号，不是可插拔组件
 EXEMPT: dict[str, str] = {
+    "lca.layer0_infra.computer.background.BackgroundCommandRecord": (
+        "后台命令追踪值对象，run-scoped 内部状态 (Computer Use)"
+    ),
+    "lca.layer0_infra.computer.background.BackgroundCommandRegistry": (
+        "后台命令 run-scoped 注册表，非跨层契约 (Computer Use)"
+    ),
+    "lca.layer0_infra.computer.runtime.ComputerOpResult": (
+        "ComputerRuntime 操作结果值对象，纯数据结构 (Computer Use)"
+    ),
+    "lca.layer0_infra.computer.runtime.ComputerRuntime": (
+        "LobeHub CloudSandboxExecutionRuntime 的 LCA 实现，Sandbox Protocol 注入 (Computer Use)"
+    ),
+    "lca.layer0_infra.computer.runtime._ComputerRuntimeBase": (
+        "ComputerRuntime 文件操作基类，模块内部组合 (Computer Use)"
+    ),
+    "lca.layer0_infra.computer.runtime_exec.ComputerRuntimeExecMixin": (
+        "ComputerRuntime shell/execute 混入，模块内部组合 (Computer Use)"
+    ),
+    "lca.layer0_infra.tools.computer.specs.ComputerToolSpec": (
+        "Computer 工具注册表条目，纯数据声明 (Computer Use)"
+    ),
     "lca.layer1_cognitive.body.action_catalog.ActionSpec": (
         "纯数据声明（action_type 元数据），非可插拔行为实现；见 ActionCatalog PR-4"
     ),
@@ -64,6 +85,9 @@ EXEMPT: dict[str, str] = {
     ),
     "lca.layer2_runtime.default_stop_rule.DefaultStopRule": (
         "StopRule 实现，Protocol 在 contracts.stop (ADR-0015)"
+    ),
+    "lca.layer2_runtime.agent_runtime.phases.AgentPhase": (
+        "LobeHub agent-runtime phase 枚举，文档契约非可插拔组件 (G2A 对齐)"
     ),
     "lca.layer1_cognitive.member_status.required_action.RequiredAction": (
         "纯数据声明（gate 裁决结果），非可插拔组件"
@@ -145,6 +169,9 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.observability.llm_stream_activity.LlmStreamActivityTracker": (
         "LLM 流活动心跳内部 tracker，非可插拔组件 (ADR-0051)"
     ),
+    "lca.layer0_infra.observability.response_text_stream.ResponseTextStreamExtractor": (
+        "LLM 流式 response_text 提取器，LobeHub 内容边界内部机制件 (ADR-0051)"
+    ),
     "lca.layer0_infra.workspace.artifact_ledger.ArtifactLedger": (
         "Run 级产物账本，Workspace 内部数据结构 (ADR-0051)"
     ),
@@ -159,6 +186,19 @@ EXEMPT: dict[str, str] = {
     ),
     "lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker.ToolLoopBreakerGate": (
         "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0051)"
+    ),
+    "lca.layer1_cognitive.brain.llm_turn.mode.LlmTurnMode": (
+        "LobeHub call_llm 模式枚举，非跨层契约 (G2A agent-runtime 对齐)"
+    ),
+    "lca.layer0_infra.search.models.SearchHit": ("Search 平面结果值对象，非可插拔组件 (ADR-0053)"),
+    "lca.layer0_infra.search.models.SearchResponse": (
+        "Search 平面响应值对象，非可插拔组件 (ADR-0053)"
+    ),
+    "lca.layer0_infra.search.models.SearchRunState": (
+        "Search run 上下文值对象，非可插拔组件 (ADR-0053)"
+    ),
+    "lca.layer0_infra.search.settings.SearchSettings": (
+        "Search 平面 pydantic-settings 配置，非可插拔组件 (ADR-0053)"
     ),
     "lca.layer0_infra.skills.market_auth._CachedToken": (
         "Market OAuth token 缓存值对象，纯内部数据结构 (ADR-0048)"

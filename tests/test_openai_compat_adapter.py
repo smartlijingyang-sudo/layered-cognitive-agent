@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import json
 import os
 import unittest
 from dataclasses import dataclass
@@ -64,6 +63,7 @@ class _MockDelta:
 @dataclass
 class _MockChoice:
     delta: _MockDelta
+    finish_reason: str | None = None
 
 
 @dataclass
@@ -299,10 +299,15 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
         completed = next(e for e in events if e.type == LLMStreamEventType.COMPLETED)
         self.assertGreaterEqual(len(fn_deltas), 1)
         assert completed.response is not None
+        # Native function calling: tool calls are in LLMResponse.tool_calls as NativeToolCall objects
+        # Text is empty when tool_calls are present
+        self.assertEqual(completed.response.text, "")
         self.assertEqual(completed.response.text, complete.text)
-        payload = json.loads(completed.response.text)
-        self.assertEqual(payload["action_type"], "use_tool")
-        self.assertEqual(payload["tool_name"], "calculator")
+        self.assertEqual(len(completed.response.tool_calls), 1)
+        tool_call = completed.response.tool_calls[0]
+        self.assertEqual(tool_call.call_id, "call_1")
+        self.assertEqual(tool_call.name, "calculator")
+        self.assertEqual(tool_call.arguments, {"expression": "1+1"})
 
     async def test_chat_stream_reasoning_content_field(self) -> None:
         client = self._patch_client()
@@ -377,6 +382,82 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
         assert completed.response is not None
         self.assertEqual(completed.response.text, "answer")
 
+    async def test_chat_stream_emits_completed_without_usage_chunk(self) -> None:
+        client = self._patch_client()
+
+        async def _stream(**kwargs: Any):
+            if kwargs.get("stream"):
+
+                async def _gen():
+                    yield _MockChatChunk(
+                        choices=[
+                            _MockChoice(
+                                delta=_MockDelta(content='{"action_type":"respond"}'),
+                                finish_reason="stop",
+                            )
+                        ]
+                    )
+
+                return _gen()
+            return _MockChatResponse(
+                choices=[
+                    _MockChatChoice(message=_MockChatMessage(content='{"action_type":"respond"}'))
+                ],
+                usage=_MockUsage(),
+            )
+
+        client.chat.completions.create.side_effect = _stream
+        with mock.patch("openai.AsyncOpenAI", return_value=client):
+            adapter = OpenAICompatAdapter(
+                api_key="sk-test",
+                api=LLMApiStyle.CHAT_COMPLETIONS,
+            )
+            events = [e async for e in adapter.stream("prompt")]
+
+        completed = [e for e in events if e.type == LLMStreamEventType.COMPLETED]
+        self.assertEqual(len(completed), 1)
+        assert completed[0].response is not None
+        self.assertIn("action_type", completed[0].response.text)
+
+    async def test_chat_stream_reasoning_only_does_not_become_response_text(self) -> None:
+        """reasoning_content 只走 ReasoningDelta，不灌进 Decision 用的 response.text。"""
+        client = self._patch_client()
+        decision_json = (
+            '{"action_type":"use_tool","tool_name":"web_search",'
+            '"arguments":{"query":"news"},"rationale":"search","confidence":0.9}'
+        )
+
+        async def _stream(**kwargs: Any):
+            if kwargs.get("stream"):
+
+                async def _gen():
+                    yield _MockChatChunk(
+                        choices=[_MockChoice(delta=_MockDelta(reasoning_content=decision_json))]
+                    )
+                    yield _MockChatChunk(
+                        choices=[_MockChoice(delta=_MockDelta(content=None), finish_reason="stop")]
+                    )
+
+                return _gen()
+            return _MockChatResponse(
+                choices=[_MockChatChoice(message=_MockChatMessage(content=decision_json))],
+                usage=_MockUsage(),
+            )
+
+        client.chat.completions.create.side_effect = _stream
+        with mock.patch("openai.AsyncOpenAI", return_value=client):
+            adapter = OpenAICompatAdapter(
+                api_key="sk-test",
+                api=LLMApiStyle.CHAT_COMPLETIONS,
+            )
+            events = [e async for e in adapter.stream("prompt")]
+
+        completed = next(e for e in events if e.type == LLMStreamEventType.COMPLETED)
+        assert completed.response is not None
+        reasoning_events = [e for e in events if e.type == LLMStreamEventType.REASONING_TEXT_DELTA]
+        self.assertTrue(reasoning_events)
+        self.assertEqual(completed.response.text, "")
+
     async def test_responses_stream_reasoning_text_delta(self) -> None:
         client = self._patch_client()
 
@@ -440,7 +521,7 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
         kwargs = client.chat.completions.create.await_args.kwargs
         self.assertTrue(kwargs["parallel_tool_calls"])
         self.assertIn("top_p", kwargs)
-        self.assertEqual(kwargs["extra_body"]["enable_thinking"], True)
+        self.assertEqual(kwargs["extra_body"]["enable_thinking"], False)
         self.assertEqual(kwargs["extra_body"]["top_k"], 20)
         self.assertEqual(kwargs["tools"][0]["function"]["name"], "calculator")
 

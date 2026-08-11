@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.team.team_coordination import (
     Debate,
@@ -42,8 +43,10 @@ def _probe_profile(role: str) -> tuple[str, str]:
     return _PROBE_PROFILES.get(role, (f"完成 {role} 的任务", f"{role} 角色"))
 
 
-def _default_scripts_for_roles(roles: list[str], lead_role: str | None) -> dict[str, list[str]]:
-    scripts: dict[str, list[str]] = {}
+def _default_scripts_for_roles(
+    roles: list[str], lead_role: str | None
+) -> dict[str, list[LLMResponse]]:
+    scripts: dict[str, list[LLMResponse]] = {}
     members = [r for r in roles if r != lead_role]
     for r in members:
         scripts[r] = [respond(f"output from {r}")]
@@ -64,7 +67,7 @@ def make_scripted_llm(
     role_keys_to_names: dict[str, str],
     *,
     lead_role_name: str | None = None,
-    scripts_by_role_name: dict[str, list[str]] | None = None,
+    scripts_by_role_name: dict[str, list[LLMResponse]] | None = None,
 ) -> ScriptedLLMAdapter:
     if scripts_by_role_name is not None:
         return ScriptedLLMAdapter(scripts_by_role_name, default_respond=True)

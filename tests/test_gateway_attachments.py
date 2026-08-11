@@ -96,6 +96,7 @@ class GatewayAttachmentTests(unittest.TestCase):
         session = create_run_session(
             self.registry,
             question="q",
+            user_text="q",
             mode="solo",
             attachment_ids=[" file_a ", "", "file_b"],
         )

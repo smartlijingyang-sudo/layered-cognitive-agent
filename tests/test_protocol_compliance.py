@@ -15,7 +15,6 @@ from lca.contracts.protocols import (
     Body,
     Brain,
     Critic,
-    DecisionParser,
     EventBus,
     Hook,
     HookRegistry,
@@ -42,7 +41,6 @@ from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 
 # L1
 from lca.layer1_cognitive.brain.critic import SimpleCritic
-from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 from lca.layer1_cognitive.event_bus import SimpleEventBus
@@ -127,7 +125,6 @@ class TestL1ProtocolCompliance(unittest.TestCase):
         reasoner = self._build_brain_deps()
         brain = ModularBrain(
             reasoner=reasoner,
-            decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
         )
         self.assertIsInstance(brain, Brain)
@@ -135,9 +132,6 @@ class TestL1ProtocolCompliance(unittest.TestCase):
     def test_simple_reasoner(self):
         reasoner = self._build_brain_deps()
         self.assertIsInstance(reasoner, Reasoner)
-
-    def test_simple_decision_parser(self):
-        self.assertIsInstance(SimpleDecisionParser(), DecisionParser)
 
     def test_simple_critic(self):
         self.assertIsInstance(SimpleCritic(), Critic)
@@ -188,7 +182,6 @@ class TestL2ProtocolCompliance(unittest.TestCase):
         reasoner = PromptReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         brain = ModularBrain(
             reasoner=reasoner,
-            decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
         )
         body = SimpleBody(
@@ -222,7 +215,6 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         reasoner = PromptReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         brain = ModularBrain(
             reasoner=reasoner,
-            decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
         )
         body = SimpleBody(
@@ -289,15 +281,19 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
         self.assertEqual(result.status, "completed")
 
     def test_agent_with_custom_brain(self):
-        from lca.contracts.models.core.decision import Reflection
+        from lca.contracts.atoms.ids import new_id
+        from lca.contracts.models.core.decision import Decision, Reflection
         from lca.contracts.models.core.state import AgentState
         from lca.layer4_app.api import Agent
 
         class StubBrain(Brain):
             async def think(self, state: AgentState):
-                return SimpleDecisionParser().parse(
-                    '{"action_type":"respond","response_text":"stub","confidence":1.0}',
-                    state,
+                return Decision(
+                    decision_id=new_id("dec"),
+                    action_type="respond",
+                    rationale="stub",
+                    confidence=1.0,
+                    response_text="stub",
                 )
 
             async def reflect(self, state, observation):

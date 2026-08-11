@@ -192,9 +192,7 @@ async def execute_run(session: RunSession, ...) -> None:
 **文件:** `gateway/lobehub_bridge/lca_sse_extension.py`
 
 ```python
-def lca_ask_user_event(
-    *, tool_call_id: str, questions: list[dict]
-) -> dict[str, Any]:
+def lca_ask_user_event(*, tool_call_id: str, questions: list[dict]) -> dict[str, Any]:
     return {
         "type": "ask_user",
         "tool_call_id": tool_call_id,
@@ -240,6 +238,7 @@ async def answer_run(request: Request) -> StreamingResponse:
         resume_run_sse(session, answer),
         media_type="text/event-stream",
     )
+
 
 async def resume_run_sse(session: RunSession, answer: str) -> AsyncIterator:
     session.status = RunStatus.RUNNING

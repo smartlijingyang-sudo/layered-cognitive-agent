@@ -5,36 +5,17 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import RoleProfile
-from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.contracts.protocols.infra import LLMAdapter, Tool
 
 
 @runtime_checkable
 class Reasoner(Protocol):
-    """思考生成器：基于当前状态产出 n 条候选思考文本（ADR-0035）。"""
+    """思考生成器：基于当前状态调用 LLM 并返回完整响应（含 text + tool_calls）。"""
 
-    async def generate_thoughts(self, state: AgentState, n: int = 1) -> list[str]: ...
-
-
-@runtime_checkable
-class DecisionParser(Protocol):
-    """LLM 原始输出 → Decision 解析器。"""
-
-    def parse(self, raw_output: str, state: AgentState) -> Decision: ...
-
-
-@runtime_checkable
-class DegradationPolicy(Protocol):
-    """越界决策降级策略：把词表外的 action_type 改写为词表内的等价行动。
-
-    防腐层的最后一道归一化——LLM "发明" action_type 是常态而非异常。
-    实现方在 ``Decision`` 上完成改写并通过 ``degraded_from`` 记录降级轨迹；
-    无法降级时必须原样返回，由 Body 以 ``UnregisteredActionError`` 拒绝。
-    """
-
-    def degrade(self, decision: Decision, action_registry: ActionRegistryProtocol) -> Decision: ...
+    async def generate_thoughts(self, state: AgentState) -> LLMResponse: ...
 
 
 @runtime_checkable
@@ -50,23 +31,6 @@ class Brain(Protocol):
 
     async def think(self, state: AgentState) -> Decision: ...
     async def reflect(self, state: AgentState, observation: Observation) -> Reflection: ...
-
-
-@runtime_checkable
-class CandidateEvaluationPipeline(Protocol):
-    """候选方案评估管线：封装 decompose → evaluate 两阶段认知评估。
-
-    decompose 将任务拆解为子任务列表；evaluate 对候选决策执行
-    predict → score → conflict check → arbitrate，返回最优决策。
-    所有评估步骤内联实现，不再依赖外部 MAP 子模块。
-    """
-
-    async def decompose(self, state: AgentState) -> list[str]: ...
-    async def evaluate(
-        self,
-        state: AgentState,
-        candidates: list[Decision],
-    ) -> Decision: ...
 
 
 @runtime_checkable
@@ -128,7 +92,6 @@ class BrainFactory(Protocol):
         role_profile: RoleProfile,
         tools_desc: str,
         *,
-        action_registry: ActionRegistryProtocol | None = None,
         tools: list[Tool] | None = None,
         **_: Any,
     ) -> Brain: ...

@@ -16,9 +16,16 @@ from lca.contracts.protocols.operational_skills import (
     SkillPackage,
     SkillPackageStore,
 )
+from lca.layer0_infra.search.service import any_search_provider_available
+from lca.layer0_infra.search.skill_policy import is_redundant_cli_search_skill
 from lca.layer0_infra.skills.activation_scope import register_activated
 
 ACTIVATE_SKILL_TOOL = "activate_skill"
+
+_REDIRECT_WEB_SEARCH_MESSAGE = (
+    "TAVILY_API_KEY 已配置：实时搜索请使用 web_search 工具（LobeHub Web Browsing 对齐），"
+    "勿激活 Tavily CLI skill。"
+)
 
 
 class SkillActivateTool(Tool):
@@ -56,14 +63,28 @@ class SkillActivateTool(Tool):
                 latency_ms=latency_ms,
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
+        if any_search_provider_available() and is_redundant_cli_search_skill(
+            skill_id=package.skill_id,
+            name=package.name,
+        ):
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=_REDIRECT_WEB_SEARCH_MESSAGE,
+                latency_ms=latency_ms,
+                extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
+            )
         register_activated(package.skill_id, package.name)
         refs = ", ".join(package.resource_paths[:20]) if package.resource_paths else "（无）"
         header = f"# Skill: {package.name} ({package.skill_id})\n\n可用资源: {refs}\n\n---\n\n"
+        body = header + package.content
         latency_ms = int((time.monotonic() - start) * 1000)
         return Observation(
             observation_id=new_id("obs"),
             success=True,
-            payload={"text": header + package.content, "skill_id": package.skill_id},
+            payload={"text": body, "skill_id": package.skill_id},
             content_type=ContentType.TEXT,
             latency_ms=latency_ms,
         )

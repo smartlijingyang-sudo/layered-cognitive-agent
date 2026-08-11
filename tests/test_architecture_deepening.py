@@ -16,11 +16,9 @@ from lca.contracts.models.team.team_coordination import Debate
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
-from lca.layer1_cognitive.body.action_handlers import RespondOperation
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.brain.critic import SimpleCritic
-from lca.layer1_cognitive.brain.decision_parser import SimpleDecisionParser
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
@@ -60,27 +58,6 @@ class TestDegradationFirstClass:
         with pytest.raises(UnregisteredActionError) as ei:
             await body.act(decision, _state())
         assert ei.value.action_type == "invented"
-
-    async def test_parser_degradation_sets_degraded_from_and_policy_stops(self) -> None:
-        registry = ActionRegistry()
-        registry.register(ActionType.RESPOND, RespondOperation())
-        parser = SimpleDecisionParser(action_registry=registry)
-        raw = (
-            '{"action_type": "research_plan", "response_text": "valid answer body",'
-            ' "rationale": "llm invented", "confidence": 0.7}'
-        )
-        decision = parser.parse(raw, _state())
-        assert decision.action_type == ActionType.RESPOND
-        assert decision.degraded_from == "research_plan"
-
-        state = _state()
-        obs = await SimpleBody(action_registry=registry).act(decision, state)
-        assert obs.success is True
-        assert obs.degraded_from == "research_plan"
-        reflection = Reflection(reflection_id="r", verdict=ReflectionVerdict.ON_TRACK)
-        outcome = DefaultStopOutcomePolicy().resolve(state, decision, obs, reflection)
-        assert outcome.should_stop is True
-        assert outcome.final_output == "valid answer body"
 
 
 class TestCheckpointResume:
@@ -161,11 +138,10 @@ class TestSkillRouterTemplate:
                 tools_desc="none",
                 templates={
                     "custom_research": "TEMPLATE_MARKER_RESEARCH\nROLE: {role}\nTASK: {task}\n"
-                    "{tools}\n{context}\n{allowed_actions}\n{goal}\n{backstory}",
+                    "{tools}\n{context}\n{goal}\n{backstory}",
                     "react_prompt": load_builtin_prompt("react_prompt"),
                 },
             ),
-            decision_parser=SimpleDecisionParser(),
             critic=SimpleCritic(),
             skill_router=StaticSkillRouter("custom_research"),
         )

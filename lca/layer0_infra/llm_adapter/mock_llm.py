@@ -9,7 +9,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from lca.contracts.atoms.enums import LLMStreamEventType
-from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, NativeToolCall
 from lca.contracts.protocols import LLMAdapter
 
 # Minimum token count (numbers + operators) to qualify as an arithmetic expression.
@@ -31,6 +31,15 @@ class MockLLMAdapter(LLMAdapter):
     def _respond(self, text: str) -> LLMResponse:
         return LLMResponse(text=text, model=self.name)
 
+    def _respond_with_tool_call(
+        self, call_id: str, name: str, arguments: dict[str, Any]
+    ) -> LLMResponse:
+        return LLMResponse(
+            text="",
+            model=self.name,
+            tool_calls=[NativeToolCall(call_id=call_id, name=name, arguments=arguments)],
+        )
+
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         await asyncio.sleep(0)
 
@@ -39,67 +48,36 @@ class MockLLMAdapter(LLMAdapter):
             tool_result = m.group(1).strip() if m else "未知"
             question = re.search(r"USER_TASK:\s*([^\n]+)", prompt)
             q = question.group(1).strip() if question else ""
-            return self._respond(
-                json.dumps(
-                    {
-                        "action_type": "respond",
-                        "response_text": f"「{q}」的答案是 {tool_result}。",
-                        "rationale": "已从工具获得精确计算结果，直接向用户作答，无需进一步调用工具。",
-                        "confidence": 0.98,
-                    },
-                    ensure_ascii=False,
-                )
-            )
+            return self._respond(f"「{q}」的答案是 {tool_result}。")
 
         expr = self._extract_arithmetic_expression(prompt)
         if expr:
-            return self._respond(
-                json.dumps(
-                    {
-                        "action_type": "use_tool",
-                        "tool_name": "calculator",
-                        "arguments": {"expression": expr},
-                        "rationale": f"用户问题是纯算术计算（{expr}），应调用 calculator 工具求精确值而非直接臆测。",
-                        "confidence": 0.95,
-                    },
-                    ensure_ascii=False,
-                )
+            return self._respond_with_tool_call(
+                call_id="mock_call_1",
+                name="calculator",
+                arguments={"expression": expr},
             )
 
-        return self._respond(
-            json.dumps(
-                {
-                    "action_type": "respond",
-                    "response_text": "这是一个通用问题，暂无可用工具，基于已有知识直接作答。",
-                    "rationale": "未检测到需要调用工具的模式，直接生成回答。",
-                    "confidence": 0.6,
-                },
-                ensure_ascii=False,
-            )
-        )
+        return self._respond("这是一个通用问题，暂无可用工具，基于已有知识直接作答。")
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
         response = await self.complete(prompt, **kwargs)
         # Emit rationale as reasoning stream so UI Thinking panel works offline.
-        reasoning = self._extract_rationale(response.text)
-        if reasoning:
-            # Chunk for typewriter-like reasoning panel (not single giant blob).
-            for piece in _chunk_text(reasoning, size=12):
-                yield LLMStreamEvent(type=LLMStreamEventType.REASONING_TEXT_DELTA, text=piece)
-        for char in response.text:
-            yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=char)
+        if response.tool_calls:
+            # For tool calls, emit the arguments as function call deltas
+            for tc in response.tool_calls:
+                args_json = json.dumps(tc.arguments, ensure_ascii=False)
+                yield LLMStreamEvent(
+                    type=LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA,
+                    tool_call_id=tc.call_id,
+                    tool_name=tc.name,
+                    arguments_delta=args_json,
+                )
+        else:
+            # For text responses, stream character by character
+            for char in response.text:
+                yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=char)
         yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
-
-    @staticmethod
-    def _extract_rationale(response_text: str) -> str:
-        try:
-            payload = json.loads(response_text)
-        except json.JSONDecodeError:
-            return ""
-        if not isinstance(payload, dict):
-            return ""
-        rationale = payload.get("rationale")
-        return rationale.strip() if isinstance(rationale, str) else ""
 
     @staticmethod
     def _extract_arithmetic_expression(prompt: str) -> str | None:

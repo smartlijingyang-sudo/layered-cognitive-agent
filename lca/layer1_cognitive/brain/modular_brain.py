@@ -1,4 +1,4 @@
-"""ModularBrain —— Brain 串联 Reasoner / Parser / Pipeline / Critic。"""
+"""ModularBrain —— Brain 串联 Reasoner / Critic，直接构建 Decision。"""
 
 from __future__ import annotations
 
@@ -6,52 +6,32 @@ from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import (
     Brain,
-    CandidateEvaluationPipeline,
     Critic,
     DecisionGate,
-    DecisionParser,
     Reasoner,
     SkillRouter,
     SupportsShortcut,
 )
-from lca.layer1_cognitive.brain.candidate_evaluation_pipeline import (
-    SimpleCandidateEvaluationPipeline,
-)
+from lca.layer1_cognitive.brain.llm_result import build_decision_from_response
 
 
 class ModularBrain(Brain):
-    """Default ``Brain``: a modular MAP-style cognitive pipeline.
-    Orchestrates five stages:
-    1. **Skill routing** (optional) — select an active prompt template.
-    2. **Task decomposition** — break the task into subtasks.
-    3. **Candidate generation** — call the Reasoner (LLM) for candidate decisions.
-    4. **Decision parsing** — parse raw LLM output into ``Decision``.
-    5. **Candidate evaluation** — score and select the best candidate.
-    Reflection is delegated to the ``Critic`` component.
+    """Default ``Brain``: Reasoner (call_llm) → llm_result → DecisionGate → Critic.
 
-    Decompose/evaluate is always delegated to a ``CandidateEvaluationPipeline``.
-    When none is injected the default ``SimpleCandidateEvaluationPipeline``
-    is used — task returned as-is, best candidate selected by max confidence
-    with content-aware conflict detection. Inject a custom pipeline for deeper
-    evaluation.
+    LobeHub ``GeneralChatAgent`` ``llm_result`` phase: native function calling
+    maps to USE_TOOL / DELEGATE / RESPOND via ``build_decision_from_response``.
     """
 
     def __init__(
         self,
         reasoner: Reasoner,
-        decision_parser: DecisionParser,
         critic: Critic,
-        evaluation_pipeline: CandidateEvaluationPipeline | None = None,
         skill_router: SkillRouter | None = None,
         decision_gate: DecisionGate | None = None,
         agent_gates: DecisionGate | None = None,
     ) -> None:
         self.reasoner = reasoner
-        self.decision_parser = decision_parser
         self.critic = critic
-        self.evaluation_pipeline: CandidateEvaluationPipeline = (
-            evaluation_pipeline or SimpleCandidateEvaluationPipeline()
-        )
         self.skill_router = skill_router
         self._decision_gate: DecisionGate | None = decision_gate
         self._agent_gates: DecisionGate | None = agent_gates
@@ -69,12 +49,8 @@ class ModularBrain(Brain):
         if self.skill_router is not None:
             state.active_template = await self.skill_router.route(state)
 
-        subtasks = await self.evaluation_pipeline.decompose(state)
-        if subtasks:
-            state.working_memory["subtasks"] = list(subtasks)
-        raw_candidates = await self.reasoner.generate_thoughts(state)
-        candidates = [self.decision_parser.parse(rc, state) for rc in raw_candidates]
-        decision = await self.evaluation_pipeline.evaluate(state, candidates)
+        response = await self.reasoner.generate_thoughts(state)
+        decision = build_decision_from_response(response)
 
         if self._decision_gate is not None:
             decision = await self._decision_gate.enforce(state, decision)

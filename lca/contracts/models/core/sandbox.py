@@ -29,21 +29,43 @@ SANDBOX_MAX_GENERATED_FILE_BYTES: int = 20 * 1024 * 1024
 # Production Onlyboxes pythonExec image baseline (deploy/onlyboxes/requirements-python.txt).
 # Ops contract for tool descriptions / prompts — not enforced by Sandbox Protocol.
 SANDBOX_PREINSTALLED_PYTHON_PACKAGES: tuple[str, ...] = (
+    # data science / ML
     "pandas",
     "numpy",
-    "openpyxl",
-    "xlsxwriter",
+    "scipy",
+    "scikit-learn",
+    # visualization
     "matplotlib",
     "seaborn",
+    "plotly",
+    # image / media
     "pillow",
-    "scipy",
-    "requests",
-    "tabulate",
+    "opencv-python-headless",
+    # spreadsheet / document I/O
+    "openpyxl",
+    "xlsxwriter",
+    "xlrd",
     "python-docx",
     "reportlab",
     "fpdf2",
     "pypdf",
     "olefile",
+    "markitdown",
+    # data processing / config
+    "pyyaml",
+    "toml",
+    "python-dotenv",
+    "tabulate",
+    # network
+    "requests",
+    "aiofiles",
+    "anyio",
+    # web / server
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    # testing
+    "pytest",
 )
 
 

@@ -79,7 +79,12 @@ def _plan_json(
 
 
 def _caster_llm(*responses: str) -> ScriptedLLMAdapter:
-    return ScriptedLLMAdapter({"caster": list(responses)}, default_respond=False)
+    from lca.contracts.models.core.llm import LLMResponse
+
+    return ScriptedLLMAdapter(
+        {"caster": [LLMResponse(text=r, model="scripted-llm") for r in responses]},
+        default_respond=False,
+    )
 
 
 class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
