@@ -86,6 +86,8 @@ def parse_terminal_response(response, emitter):
 
 **影响分析**: `run_command` 也走此路径。但 shell 命令不会输出 `__LCA_ONLYBOXES_ARTIFACTS__` 标记，`strip_artifacts()` 对无标记的 stdout 是安全的 no-op（直接返回原文 + 空列表）。
 
+**补充发现**: `OnlyboxesSandboxAdapter` 的 `run()`、`run_in_session()`、`run_terminal()` 已全部收敛到 `_exec_terminal()` → `parse_terminal_response()`。`parse_exec_response()` 虽然定义在 `onlyboxes_bootstrap.py` 中，但**全代码库无任何调用方**——它是死代码。这意味着变更 1 修复的是唯一的单点故障：一次修复同时救回 `execute_code`、`run_command`、`sandbox_execute` 三个入口。后续可清理 `parse_exec_response()` 死代码（不在本次范围内）。
+
 ### 变更 2: `execute_code()` — 注入 artifact scanner bootstrap
 
 **文件**: `lca/layer0_infra/computer/runtime_exec.py`
@@ -99,27 +101,32 @@ _ARTIFACT_SCANNER = '''
 import os as _os, json as _json, base64 as _b64, mimetypes as _mt
 try:
     _scan_files = []
-    for _root, _dirs, _files in _os.walk("/mnt/data"):
-        for _fname in _files:
-            _fpath = _os.path.join(_root, _fname)
-            try:
-                _dir_name = _os.path.basename(_root)
-                _display = _fname if _dir_name == "data" else _os.path.join(_dir_name, _fname)
-                with open(_fpath, "rb") as _fh:
-                    _raw = _fh.read()
-                _scan_files.append({
-                    "name": _display,
-                    "b64": _b64.b64encode(_raw).decode(),
-                    "mime_type": _mt.guess_type(_fname)[0] or "application/octet-stream",
-                })
-            except Exception:
-                pass
+    _output_dir = "/mnt/data/outputs"
+    if _os.path.isdir(_output_dir):
+        for _fname in _os.listdir(_output_dir):
+            _fpath = _os.path.join(_output_dir, _fname)
+            if _os.path.isfile(_fpath):
+                try:
+                    with open(_fpath, "rb") as _fh:
+                        _raw = _fh.read()
+                    _scan_files.append({
+                        "name": _fname,
+                        "b64": _b64.b64encode(_raw).decode(),
+                        "mime_type": _mt.guess_type(_fname)[0] or "application/octet-stream",
+                    })
+                except Exception:
+                    pass
     if _scan_files:
         print("__LCA_ONLYBOXES_ARTIFACTS__" + _json.dumps(_scan_files) + "__END_LCA_ARTIFACTS__")
 except Exception:
     pass
 '''
 ```
+
+**ADR-0046 合规**: 仅扫描 `/mnt/data/outputs/`（`SANDBOX_OUTPUT_SUBDIR`），与 Mock / E2B / Local 三个后端行为一致。不扫描 `/mnt/data/` 根目录，避免：
+- 把用户上传的输入文件当"新产物"重复收集
+- 把技能挂载文件（`/mnt/data/_skills/`）当产物 harvest
+- `entry_basename()` 在 `try_append_generated_file()` 中会剥离子目录路径，导致同名输入/输出文件冲突
 
 注入方式：用 `try/finally` 包裹用户代码，保证即使异常也能 harvest：
 
@@ -159,33 +166,39 @@ class ComputerOpResult:
 
 **文件 2**: `lca/layer0_infra/tools/computer/observations.py`
 
-`build_computer_observation()` 新增文件处理逻辑：
+`build_computer_observation()` 新增文件处理逻辑。**复用已有共享函数** `_stored_part()`（来自 `sandbox_observation.py`），与 `build_exec_observation()` 保持同构：
 
 ```python
-def build_computer_observation(result, *, tool_name, start):
+from lca.layer0_infra.tools.sandbox_observation import _stored_part
+from lca.layer0_infra.workspace.scope import get_run_workspace
+
+def build_computer_observation(result, *, tool_name, start, store):
     ...
     extra: dict[str, Any] = {}
     if not result.success:
         extra[FAILURE_KIND] = FAILURE_KIND_EXECUTION
 
-    # 新增：存储生成文件到 FileStore，加入 extra["files"]
-    if result.generated_files:
-        file_parts = []
-        for gen in result.generated_files:
-            stored = _store.put(data=gen.data, name=gen.name, mime_type=gen.mime_type)
-            file_parts.append({
-                "name": stored.name,
-                "mimeType": stored.mime_type,
-                "sizeBytes": stored.size_bytes,
-                "url": stored.url,
-                "previewable": stored.previewable,
-                "attachmentId": stored.attachment_id,
-            })
+    # 新增：复用 _stored_part() 存储文件，与 sandbox_exec_observation 同构
+    file_parts: list[dict[str, Any]] = []
+    for gen in result.generated_files:
+        file_parts.append(_stored_part(store, gen.data, gen.name, gen.mime_type))
+
+    if file_parts:
         extra["files"] = file_parts
+
+    # 新增：记录到 workspace artifact ledger（与 build_exec_observation 对齐）
+    if result.success and file_parts:
+        workspace = get_run_workspace()
+        if workspace is not None:
+            workspace.artifacts.record_from_tool_files(
+                file_parts, tool_name=tool_name, agent_role=""
+            )
     ...
 ```
 
-需要给 `build_computer_observation` 注入 `FileStore` 引用。当前签名不接收 `store`，需要从 `tool_set.py` 传入：
+**`previewable` 取值策略**: `_stored_part()` 默认 `previewable=True`（所有文件标记为可预览）。这与 `build_exec_observation()` 对生成文件的处理一致——只有超长 stdout/stderr 落盘为 `.log` 时才传 `previewable=False`。实际的预览能力由前端按 MIME 类型判断，`previewable` 只是 hint。
+
+**需要给 `build_computer_observation` 注入 `FileStore` 引用**。当前签名不接收 `store`，需要从 `tool_set.py` 传入：
 
 ```python
 # tool_set.py — 传入 store
@@ -195,6 +208,8 @@ async def execute(_self, args):
 ```
 
 **闭环验证**: `extra["files"]` → `tool_files(obs)` 提取 → `ToolInvoked.files` → SSE → 前端文件卡片。
+
+**Workspace artifact ledger 对齐决策**: `build_exec_observation()` 在成功路径调用 `_record_workspace_artifacts()` 将产物记入 workspace 级账本，用于 run 结束时的 `closure_text()`（"任务已完成，已生成以下文件：…"）和 pipeline 成员间的 `handoff_block()`。Computer tool 路径必须对齐——否则通过 `execute_code` 生成的文件不会出现在 run 结束摘要中。
 
 ### 变更 4: PDF 可预览
 
@@ -234,18 +249,21 @@ return ComputerOpResult(
 
 ```
 execute_code(code)
-  → 注入 _ARTIFACT_SCANNER
+  → 注入 _ARTIFACT_SCANNER（仅扫描 /mnt/data/outputs/，ADR-0046 合规）
+  → try/finally 包裹用户代码
   → runtime.execute() → adapter → parse_terminal_response()
-      → strip_artifacts() ✅ 解析标记
+      → strip_artifacts() ✅ 解析标记（变更 1）
       → SandboxResult.generated_files ✅
   → SandboxExecResult.generated_files ✅ (sandbox_exec_result_from 已传递)
   → ComputerOpResult.generated_files ✅ (变更 5)
-  → build_computer_observation()
-      → FileStore.put() 存储每个文件 ✅ (变更 3)
+  → build_computer_observation(store=...)
+      → _stored_part() 存储文件到 FileStore ✅ (变更 3，复用共享函数)
       → extra["files"] = [{name, url, mimeType, ...}] ✅
+      → workspace.artifacts.record_from_tool_files() ✅ (变更 3，ledger 对齐)
       → state["code"] = source_code ✅ (变更 2)
   → tool_files(obs) → files ✅
   → ToolInvoked.files ✅ → SSE → 前端文件卡片 ✅
+  → Run 结束 → closure_text() 包含生成文件摘要 ✅
 ```
 
 ## 测试策略
@@ -259,16 +277,29 @@ execute_code(code)
 
 ### 集成测试
 
-5. **`execute_code` 生成文件**: 代码写文件到 `/mnt/data/` → 验证 observation 包含文件元数据
-6. **`run_command` 不受影响**: 执行普通 shell 命令 → 验证行为不变
+5. **`execute_code` 生成文件**: 代码写文件到 `/mnt/data/outputs/` → 验证 observation 包含文件元数据
+6. **ADR-0046 合规**: 代码同时在 `/mnt/data/`（根目录）和 `/mnt/data/outputs/` 写文件 → 验证只有 `outputs/` 下的文件被 harvest，根目录文件被忽略
+7. **技能挂载不污染**: `activate_skill("pdf")` 后执行代码 → 验证 `/mnt/data/_skills/` 下的文件不出现在 `generated_files`
+8. **`run_command` 不受影响**: 执行普通 shell 命令 → 验证行为不变
 
 ### 端到端验证
 
-7. **素数 + PDF 场景复测**: 重新构建镜像后，执行素数程序 + PDF 生成 → 验证文件出现在 ToolInvoked.files
+9. **素数 + PDF 场景复测**: 重新构建镜像后，执行素数程序 + PDF 生成 → 验证文件出现在 ToolInvoked.files
 
 ## 不在范围内
 
 - Onlyboxes 镜像重建（运维操作，不在代码变更范围）
+- `parse_exec_response()` 死代码清理（已确认无调用方，可后续安全删除）
 - LobeHub Work 注册系统对齐（独立特性，需要 gateway + 前端联动）
 - `pip install` 自动重试机制（独立优化，需要网络策略设计）
 - 前端 PDF 内嵌渲染（依赖 LobeHub FileViewer 组件）
+
+## 修订记录
+
+- **v1** (2026-08-11): 初版设计
+- **v2** (2026-08-11): 代码核实修正
+  - 变更 2 扫描器路径从 `/mnt/data` 改为 `/mnt/data/outputs`（ADR-0046 合规）
+  - 变更 3 改为复用 `_stored_part()` 共享函数，消除重复
+  - 变更 3 补齐 workspace artifact ledger 记录（与 `build_exec_observation` 对齐）
+  - 补充 `parse_exec_response()` 死代码发现
+  - 测试策略增加 ADR-0046 合规测试和技能挂载不污染测试
