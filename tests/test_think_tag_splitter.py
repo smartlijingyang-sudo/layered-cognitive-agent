@@ -49,6 +49,50 @@ class TestThinkTagStreamSplitter(unittest.TestCase):
         self.assertEqual(merged["reasoning"], "ab")
         self.assertEqual(merged["content"], "c")
 
+    def test_orphan_close_tag_stripped(self) -> None:
+        """Orphan </think> without <think> must NOT leak into content.
+
+        This is the root cause of the LCA bug where </think> appeared
+        in the user-visible answer (step 8 of the PDF generation run).
+        """
+        s = ThinkTagStreamSplitter()
+        parts = s.feed("根据之前的工作，PDF 已经成功生成。让我确认文件并完成导出。\n")
+        parts += s.feed("</think>\n\n")
+        parts += s.flush()
+        merged: dict[str, str] = {"reasoning": "", "content": ""}
+        for kind, text in parts:
+            merged[kind] += text
+        # </think> must be stripped — content should be clean
+        self.assertNotIn("</think>", merged["content"])
+        self.assertEqual(merged["reasoning"], "")
+        self.assertIn("PDF 已经成功生成", merged["content"])
+
+    def test_orphan_close_tag_only(self) -> None:
+        """Just an orphan </think> — should produce empty output."""
+        s = ThinkTagStreamSplitter()
+        parts = s.feed("</think>") + s.flush()
+        content_parts = [t for k, t in parts if k == "content"]
+        reasoning_parts = [t for k, t in parts if k == "reasoning"]
+        self.assertEqual("".join(content_parts), "")
+        self.assertEqual("".join(reasoning_parts), "")
+
+    def test_orphan_close_after_closed_think(self) -> None:
+        """Orphan </think> after a completed <think>...
+        </think>
+
+         block — also stripped."""
+        s = ThinkTagStreamSplitter()
+        parts = s.feed("<think>thinking</think>answer")
+        parts += s.feed("</think>more")
+        parts += s.flush()
+        merged: dict[str, str] = {"reasoning": "", "content": ""}
+        for kind, text in parts:
+            merged[kind] += text
+        self.assertEqual(merged["reasoning"], "thinking")
+        self.assertNotIn("</think>", merged["content"])
+        self.assertIn("answer", merged["content"])
+        self.assertIn("more", merged["content"])
+
 
 if __name__ == "__main__":
     unittest.main()

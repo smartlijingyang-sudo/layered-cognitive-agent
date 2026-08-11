@@ -109,12 +109,21 @@ def _safe_emit_len(buf: str, tag: str) -> int:
 class ThinkTagStreamSplitter:
     """将 ``<think>...</think>`` 嵌入 content 的流拆成 reasoning / content 两路。
 
-    用于 Qwen 等把思维链塞进普通 content 的模型；无标签时全部视为 content。
+        用于 Qwen 等把思维链塞进普通 content 的模型；无标签时全部视为 content。
+
+        边界完整性保证：
+            - 成对 ``<think>...
+    </think>
+
+    ``：正常拆分
+            - 孤儿 ``</think>``（无对应开标签）：**丢弃**，不泄漏到 content
+            - 孤儿 ``<think>``（无闭标签）：flush 时作为 reasoning 输出
     """
 
     def __init__(self) -> None:
         self._buf = ""
         self._in_think = False
+        self._has_opened_think = False
 
     def feed(self, chunk: str) -> list[tuple[str, str]]:
         """返回 ``("reasoning"|"content", text)`` 片段列表。"""
@@ -137,14 +146,44 @@ class ThinkTagStreamSplitter:
                     out.append(("reasoning", self._buf[:n]))
                     self._buf = self._buf[n:]
                 break
+            # Not in think mode — check for tags
             open_at = self._buf.find(_THINK_OPEN)
-            if open_at >= 0:
-                piece = self._buf[:open_at]
+            # Also check for orphan </think> (close without open)
+            close_at = self._buf.find(_THINK_CLOSE)
+
+            # Determine which tag comes first
+            first_tag_pos = -1
+            first_tag_kind = ""
+            if open_at >= 0 and (close_at < 0 or open_at <= close_at):
+                first_tag_pos = open_at
+                first_tag_kind = "open"
+            elif close_at >= 0:
+                first_tag_pos = close_at
+                first_tag_kind = "close"
+
+            if first_tag_kind == "open":
+                # Found <think> — emit content before, enter think mode
+                piece = self._buf[:first_tag_pos]
                 if piece:
                     out.append(("content", piece))
-                self._buf = self._buf[open_at + len(_THINK_OPEN) :]
+                self._buf = self._buf[first_tag_pos + len(_THINK_OPEN) :]
                 self._in_think = True
+                self._has_opened_think = True
                 continue
+
+            if first_tag_kind == "close" and not self._has_opened_think:
+                # Orphan </think> without any prior <think> — discard it entirely
+                # This prevents </think> from leaking into user-visible content
+                self._buf = self._buf[first_tag_pos + len(_THINK_CLOSE) :]
+                continue
+
+            if first_tag_kind == "close" and self._has_opened_think:
+                # Orphan </think> after we've seen <think> before but currently not in think
+                # This is a stale close tag — discard it
+                self._buf = self._buf[first_tag_pos + len(_THINK_CLOSE) :]
+                continue
+
+            # No tags found — hold back potential partial tag prefix
             n = _safe_emit_len(self._buf, _THINK_OPEN)
             if n > 0:
                 out.append(("content", self._buf[:n]))

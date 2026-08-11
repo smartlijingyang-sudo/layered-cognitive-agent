@@ -19,9 +19,7 @@ from starlette.responses import JSONResponse, StreamingResponse
 from gateway._http import cors_headers
 from gateway.journal_openai_projector import (
     JournalOpenAiProjector,
-    collect_openai_completion,
     resolve_lca_mode,
-    stream_openai_from_run,
 )
 from gateway.lobehub_bridge import prepare_run_from_messages
 from gateway.lobehub_bridge.request_classifier import classify_lobehub_chat_request
@@ -36,6 +34,10 @@ from gateway.openai_structured_llm import (
     extract_json_schema_format,
     normalize_responses_input,
     resolve_upstream_model,
+)
+from gateway.projection.diff_projector import (
+    collect_openai_completion,
+    stream_openai_from_run,
 )
 from gateway.run_executor import create_run_session, llm_status, schedule_run
 from lca.contracts.atoms.ids import new_id

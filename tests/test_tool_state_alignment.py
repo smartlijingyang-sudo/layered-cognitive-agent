@@ -80,7 +80,7 @@ class TestArgTransformCoverage(unittest.TestCase):
         from gateway.lobehub_bridge.lobehub_adapter.tool_spec import ToolWireSpec
 
         sample_args = '{"path": "/mnt/data/test.py", "command": "ls -la"}'
-        for name, entry in TOOL_REGISTRY.items():
+        for _name, entry in TOOL_REGISTRY.items():
             if not isinstance(entry, ToolWireSpec):
                 continue
             result = entry.transform_args(parse_args_json(sample_args))

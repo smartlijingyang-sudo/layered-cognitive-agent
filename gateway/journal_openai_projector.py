@@ -1,5 +1,10 @@
 """Project LCA journal SSE frames → OpenAI chat.completion chunks (LobeHub G2A).
 
+.. deprecated::
+    This module is superseded by ``gateway.presentation`` + ``gateway.projection``.
+    New code should use ``DiffProjector`` from ``gateway.projection.diff_projector``.
+    This module is kept for passthrough scenarios (non-journal LLM proxy) only.
+
 LobeHub Mode A (closed-loop) contract:
 - ``delta.content`` — user-visible prose only (never raw Decision JSON)
 - ``delta.reasoning_content`` — Thinking panel
