@@ -35,10 +35,21 @@ WORKER_PYTHON_EXEC_DOCKER_IMAGE=onlyboxes-python-local:3.11
 | pandas / numpy | 表格与数值 |
 | openpyxl / xlsxwriter | xlsx 读/写 |
 | matplotlib / seaborn / pillow | 图表与图像（镜像预装文泉驿正黑 + `MATPLOTLIBRC`，中文坐标/标题不缺字） |
+| fonts-noto-cjk / fonts-wqy-zenhei | **CJK 字体**（reportlab 中文 PDF；路径见 Dockerfile；**禁止运行时 curl 字体**） |
 | scipy | 科学计算 |
 | requests | HTTP |
 | tabulate | 文本表 |
 | python-docx / reportlab / fpdf2 / pypdf | 文档生成（DOCX/PDF） |
+
+terminal 镜像重建后须 **清掉旧 terminalExec session 并重启 worker**，否则会继续跑无字体的 `:default` 容器：
+
+```bash
+./deploy/onlyboxes/build-terminal-image.sh
+./deploy/onlyboxes/configure-terminal-runtime.sh
+# 或手动：
+docker ps -q --filter ancestor=coolfan1024/onlyboxes-runtime:default | xargs -r docker rm -f
+sudo systemctl restart onlyboxes-worker-docker
+```
 
 ## 构建
 

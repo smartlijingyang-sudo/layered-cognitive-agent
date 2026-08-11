@@ -43,6 +43,17 @@ _SCAN_PACKAGES = [
     "gateway",
 ]
 
+# Forward glossary coverage test only checks LCA core (not gateway).
+# Gateway is a separate concern; its terms are listed in glossary.md
+# under "Gateway 概念" but not required to have bold entries.
+_GLOSSARY_COVERAGE_SCAN_PACKAGES = [
+    "lca.layer0_infra",
+    "lca.layer1_cognitive",
+    "lca.layer2_runtime",
+    "lca.layer3_agent",
+    "lca.layer4_app",
+]
+
 # ── 文件行数上限 ─────────────────────────────────────────────────────────
 _MAX_FILE_LINES = 250
 
@@ -65,13 +76,19 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     ),
     "lca/layer0_infra/skills/marketplace.py": ("Skill marketplace 单模块承载发现/加载/注册全链路"),
     "lca/layer4_app/casting.py": ("Team casting 单模块承载角色映射与团队组装"),
+    "lca/layer0_infra/sandbox/runtime.py": (
+        "Sandbox Protocol 单模块承载 session/ready/exec 全链路（ADR-0043~0047）"
+    ),
 }
 
 
-def _collect_all_concrete_classes() -> dict[str, type]:
-    """扫描 L0-L3 所有模块，收集其中定义的具体类（含 Protocol 和具体实现）。"""
+def _collect_all_concrete_classes(
+    scan_packages: list[str] | None = None,
+) -> dict[str, type]:
+    """扫描指定模块，收集其中定义的具体类（含 Protocol 和具体实现）。"""
     result: dict[str, type] = {}
-    for pkg_name in _SCAN_PACKAGES:
+    packages = scan_packages if scan_packages is not None else _SCAN_PACKAGES
+    for pkg_name in packages:
         pkg = importlib.import_module(pkg_name)
         for _importer, modname, _ispkg in pkgutil.walk_packages(
             pkg.__path__,
@@ -244,7 +261,7 @@ class TestGlossaryTermCoverage(unittest.TestCase):
 
         glossary_text = " ".join(glossary_terms).lower()
 
-        classes = _collect_all_concrete_classes()
+        classes = _collect_all_concrete_classes(_GLOSSARY_COVERAGE_SCAN_PACKAGES)
         uncovered: set[str] = set()
 
         for cls_name in sorted(classes):

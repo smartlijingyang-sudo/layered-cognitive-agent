@@ -65,6 +65,12 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **RoleProfile** | 角色画像 |
 | **TeamMessage** / **TeamAssignment** | 跨 Agent 消息 / 分工单元 |
 
+## Gateway 概念（非 LCA 核心）
+
+Gateway 层类名（不要求加粗为术语词条）：
+ArgsTransform, Artifact, ArtifactLedger, FieldMapper, GatewayCollector,
+IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
+
 ## L-Loop
 
 | 术语 | 定义 |

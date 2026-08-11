@@ -1,10 +1,24 @@
-"""工具结果预览压缩 —— SafeExecutor journal 用，避免大 payload 撑爆预览。"""
+"""工具结果预览压缩 —— SafeExecutor journal 用。
+
+职责边界：
+- ``compact_payload_for_preview`` / ``compact_args_preview`` → 可截断字符串（OTel/console）
+- ``tool_plugin_state`` / ``build_started_plugin_state`` → UI 一等 dict（不截断）
+- ``tool_files`` → 文件元数据一等字段
+
+完整 UI state 策略见 ``tool_ui_state``（Strategy Registry）。
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
 from lca.contracts.models.core.decision import Observation
+from lca.layer1_cognitive.body.tool_ui_state import (
+    build_invoked_plugin_state,
+    build_started_plugin_state,
+    compact_args_preview,
+    wire_arguments_json,
+)
 
 # Keep journal result_preview well under AttributePolicy generic 2k cap while
 # remaining useful for console/LLM memory. Structured UI state lives on
@@ -22,6 +36,17 @@ _FILE_META_KEYS = (
     "attachmentId",
     "attachment_id",
 )
+
+# Re-export for SafeExecutor / projectors
+__all__ = [
+    "build_started_plugin_state",
+    "compact_args_preview",
+    "compact_payload_for_preview",
+    "thin_file_part",
+    "tool_files",
+    "tool_plugin_state",
+    "wire_arguments_json",
+]
 
 
 def thin_file_part(part: dict[str, Any]) -> dict[str, Any]:
@@ -53,43 +78,18 @@ def tool_files(obs: Observation) -> tuple[dict[str, Any], ...]:
     return ()
 
 
-_COMPUTER_STATE_KEYS = frozenset(
-    {
-        "code",
-        "command",
-        "commandId",
-        "executionEnv",
-        "exitCode",
-        "exit_code",
-        "error",
-        "errorDetail",
-        "files",
-        "isBackground",
-        "language",
-        "output",
-        "stderr",
-        "stdout",
-        "success",
-    }
-)
+def tool_plugin_state(
+    obs: Observation,
+    *,
+    tool_name: str = "",
+    args: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """LobeHub tool card state — never serialized into truncated result_preview.
 
-
-def tool_plugin_state(obs: Observation) -> dict[str, Any]:
-    """LobeHub tool card state — never serialized into truncated result_preview."""
-    payload = obs.payload
-    if not isinstance(payload, dict):
-        return {}
-    nested = payload.get("state")
-    if isinstance(nested, dict):
-        return dict(nested)
-    # Legacy computer observations spread state at payload top level.
-    if any(key in payload for key in _COMPUTER_STATE_KEYS):
-        return {
-            key: payload[key]
-            for key in _COMPUTER_STATE_KEYS
-            if key in payload and payload[key] is not None
-        }
-    return {}
+    Delegates to the tool_ui_state Strategy Registry. Prefer ``payload.state``
+    (computer/search) or tool-specific builders (skills).
+    """
+    return build_invoked_plugin_state(tool_name, args or {}, obs)
 
 
 def compact_payload_for_preview(payload: Any) -> Any:

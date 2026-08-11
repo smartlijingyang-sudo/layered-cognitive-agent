@@ -17,13 +17,31 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 
 USER root
 
+# CJK fonts for reportlab / matplotlib Chinese PDF & plots.
+# Agent must NOT curl fonts at runtime — terminalExec image is the sole channel.
 COPY requirements-python.txt /tmp/requirements-python.txt
 COPY matplotlibrc /etc/matplotlibrc
 ENV MATPLOTLIBRC=/etc/matplotlibrc
 
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    (sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null \
+        || sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null \
+        || true) \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        fontconfig \
+        fonts-wqy-zenhei \
+        fonts-noto-cjk \
+    && fc-cache -f \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     pip install --no-cache-dir -r /tmp/requirements-python.txt \
     && rm -f /tmp/requirements-python.txt \
-    && python3 -c "import reportlab,pandas,numpy,openpyxl; print('terminal-runtime ok')"
+    && python3 -c "import reportlab,pandas,numpy,openpyxl; print('terminal-runtime ok')" \
+    && test -f /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc \
+        -o -f /usr/share/fonts/truetype/wqy/wqy-zenhei.ttc \
+    && echo 'cjk-font: ok'
 
 WORKDIR /workspace

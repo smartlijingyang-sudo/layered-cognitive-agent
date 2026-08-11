@@ -55,9 +55,23 @@ class TestToolLifecycleMap:
     def test_invalid_transition_raises(self) -> None:
         lm = ToolLifecycleMap()
         lm.start("inv_1", "execute_code", ts=100.0)
-        # STARTED → SUCCEEDED is invalid (must go through RUNNING)
+        lm.transition("inv_1", ToolLifecycleState.SUCCEEDED, ts=101.0)
+        # Terminal → anything is invalid
         with pytest.raises(InvalidTransitionError):
-            lm.transition("inv_1", ToolLifecycleState.SUCCEEDED, ts=101.0)
+            lm.transition("inv_1", ToolLifecycleState.RUNNING, ts=102.0)
+
+    def test_started_can_succeed_without_running(self) -> None:
+        """Quick tools (activate_skill) finish without a RUNNING phase."""
+        lm = ToolLifecycleMap()
+        lm.start("inv_1", "activate_skill", ts=100.0)
+        phase = lm.transition(
+            "inv_1",
+            ToolLifecycleState.SUCCEEDED,
+            ts=101.0,
+            plugin_state={"content": "# Skill\n\nbody", "id": "demo"},
+        )
+        assert phase.state == ToolLifecycleState.SUCCEEDED
+        assert phase.plugin_state["content"].startswith("# Skill")
 
     def test_started_to_denied(self) -> None:
         lm = ToolLifecycleMap()

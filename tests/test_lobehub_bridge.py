@@ -132,6 +132,23 @@ class TestLobeHubMessageParser(unittest.TestCase):
         self.assertEqual(parsed.user_text, "今天有什么新闻")
         self.assertNotIn("feedback_analysis_context", parsed.user_text)
 
+    def test_unwraps_satisfaction_judge_envelope(self) -> None:
+        """AgentSignal-style wrappers must not become the LCA objective."""
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    "Judge the user's overall satisfaction.\n"
+                    'message="分析这个自查表的内容"\n'
+                    'serializedContext=""'
+                ),
+            }
+        ]
+        parsed = parse_messages(messages)
+        self.assertEqual(parsed.user_text, "分析这个自查表的内容")
+        self.assertNotIn("Judge", parsed.user_text)
+        self.assertNotIn("serializedContext", parsed.user_text)
+
 
 class TestLobeHubFileIngest(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:

@@ -7,7 +7,8 @@ Design:
     - Frozen dataclasses (value semantics)
     - Explicit state machines (no ad-hoc flag tracking)
     - Single source of truth (TurnSnapshot)
-    - Strategy Registry for tool state builders
+    - Tool UI state production SSOT lives in layer1 ``tool_ui_state``;
+      this package assembles snapshots and re-exports thin facades
     - Centralized artifact URL resolution
 """
 
@@ -23,11 +24,9 @@ from gateway.presentation.tool_lifecycle import (
     ToolLifecycleMap,
 )
 from gateway.presentation.tool_state_builders import (
-    ToolStateBuilder,
     build_state_from_invoked,
+    build_state_from_started,
     build_tool_plugin_state,
-    get_tool_state_builder,
-    register_tool_state_builder,
 )
 from gateway.presentation.turn_snapshot import (
     PhaseKind,
@@ -46,15 +45,13 @@ __all__ = [
     "ToolLifecycleMap",
     "ToolLifecycleState",
     "ToolPhase",
-    "ToolStateBuilder",
     "Turn",
     "TurnSnapshot",
     "TurnStateMachine",
     "absolutize_file_parts",
     "absolutize_url",
     "build_state_from_invoked",
+    "build_state_from_started",
     "build_tool_plugin_state",
     "gateway_public_base",
-    "get_tool_state_builder",
-    "register_tool_state_builder",
 ]

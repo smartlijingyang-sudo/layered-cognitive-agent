@@ -327,11 +327,16 @@ class LlmCallCompleted(JournalEvent):
 
 @dataclass(frozen=True)
 class ToolStarted(JournalEvent):
-    """工具调用开始（执行前；与 ToolInvoked 经 invocation_id 关联）。"""
+    """工具调用开始（执行前；与 ToolInvoked 经 invocation_id 关联）。
+
+    ``arguments_preview`` 是截断字符串（OTel/console）；``plugin_state`` 是 UI
+    一等字段（完整 code/command 等，dict 不受 AttributePolicy 2k 截断）。
+    """
 
     tool_name: str = ""
     arguments_preview: str = ""
     invocation_id: str = ""
+    plugin_state: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

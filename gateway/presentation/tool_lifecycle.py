@@ -26,9 +26,12 @@ from gateway.presentation.turn_snapshot import (
 # ── Valid transitions ───────────────────────────────────────
 
 _VALID_TRANSITIONS: dict[ToolLifecycleState, frozenset[ToolLifecycleState]] = {
+    # Quick tools (activate_skill) may finish without a RUNNING phase.
     ToolLifecycleState.STARTED: frozenset(
         {
             ToolLifecycleState.RUNNING,
+            ToolLifecycleState.SUCCEEDED,
+            ToolLifecycleState.FAILED,
             ToolLifecycleState.DENIED,
         }
     ),
@@ -81,6 +84,7 @@ class ToolLifecycleMap:
         identifier: str = "",
         api_name: str = "",
         arguments_full: dict[str, Any] | None = None,
+        plugin_state: dict[str, Any] | None = None,
     ) -> ToolPhase:
         """Register a new tool invocation in STARTED state."""
         phase = ToolPhase(
@@ -91,6 +95,7 @@ class ToolLifecycleMap:
             api_name=api_name,
             state=ToolLifecycleState.STARTED,
             arguments_full=arguments_full or {},
+            plugin_state=plugin_state or {},
             started_at=ts,
         )
         self.invocations[invocation_id] = phase

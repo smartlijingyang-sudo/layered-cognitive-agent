@@ -292,8 +292,12 @@ class TurnStateMachine:
         self, snapshot: TurnSnapshot, event: ToolStarted, ts: float
     ) -> TurnSnapshot:
         inv_id = event.invocation_id or ""
-        # Parse arguments_preview into full dict
+        # Prefer untruncated plugin_state (code/command); preview is lossy.
         args_full = _safe_parse_json(event.arguments_preview)
+        if event.plugin_state:
+            for key in ("code", "command", "language", "description", "skill_id", "query", "path"):
+                if key in event.plugin_state and event.plugin_state[key] not in (None, ""):
+                    args_full[key] = event.plugin_state[key]
 
         # Register in lifecycle map
         self._lifecycle.start(
@@ -301,6 +305,7 @@ class TurnStateMachine:
             event.tool_name,
             ts=ts,
             arguments_full=args_full,
+            plugin_state=dict(event.plugin_state or {}),
         )
 
         # Ensure we have a current turn; if in REASONING, transition to TOOL_CALL

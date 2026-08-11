@@ -1,4 +1,9 @@
-"""SafeExecutor — permission → validate → ToolStarted → cache → retry → execute → ToolInvoked."""
+"""SafeExecutor — permission → validate → ToolStarted → cache → retry → execute → ToolInvoked.
+
+Journal dual-track (ADR-0037 + UI SSOT):
+- ``arguments_preview`` / ``result_preview``: lossy strings (console/OTel)
+- ``plugin_state`` / ``files``: full structured UI truth (not AttributePolicy-truncated)
+"""
 
 from __future__ import annotations
 
@@ -24,6 +29,8 @@ from lca.contracts.protocols import SafeExecutor, Tool
 from lca.layer0_infra.observability import record
 from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
 from lca.layer1_cognitive.body.tool_result_preview import (
+    build_started_plugin_state,
+    compact_args_preview,
     compact_payload_for_preview,
     tool_files,
     tool_plugin_state,
@@ -63,10 +70,6 @@ def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
 
 
-def _args_preview(args: dict[str, Any]) -> str:
-    return json.dumps(args, ensure_ascii=False, default=str)
-
-
 class SimpleSafeExecutor(SafeExecutor):
     """Permission → validate → ToolStarted → cache → retry → sandbox execute → ToolInvoked."""
 
@@ -99,12 +102,14 @@ class SimpleSafeExecutor(SafeExecutor):
             )
 
         invocation_id = new_id("inv")
-        args_preview = _args_preview(args)
+        args_preview = compact_args_preview(args)
+        started_state = build_started_plugin_state(tool.name, args)
         record(
             ToolStarted(
                 tool_name=tool.name,
                 arguments_preview=args_preview,
                 invocation_id=invocation_id,
+                plugin_state=started_state,
             )
         )
 
@@ -134,6 +139,7 @@ class SimpleSafeExecutor(SafeExecutor):
             # 缓存命中也是一次「调用」——冗余检测必须看见它，否则被短路掩盖
             self._record_invoked(
                 tool,
+                args,
                 args_preview,
                 cached,
                 latency_ms=0,
@@ -155,6 +161,7 @@ class SimpleSafeExecutor(SafeExecutor):
                     self._cache[cache_key] = obs
                 self._record_invoked(
                     tool,
+                    args,
                     args_preview,
                     obs,
                     latency_ms=_elapsed_ms(started),
@@ -170,6 +177,7 @@ class SimpleSafeExecutor(SafeExecutor):
             if failure_kind != FAILURE_KIND_TRANSIENT:
                 self._record_invoked(
                     tool,
+                    args,
                     args_preview,
                     obs,
                     latency_ms=_elapsed_ms(started),
@@ -186,6 +194,7 @@ class SimpleSafeExecutor(SafeExecutor):
         if last_obs is not None:
             self._record_invoked(
                 tool,
+                args,
                 args_preview,
                 last_obs,
                 latency_ms=_elapsed_ms(started),
@@ -200,6 +209,7 @@ class SimpleSafeExecutor(SafeExecutor):
     @staticmethod
     def _record_invoked(
         tool: Tool,
+        args: dict[str, Any],
         args_preview: str,
         obs: Observation,
         *,
@@ -220,7 +230,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 error="" if obs.success else (obs.error or ""),
                 invocation_id=resolved_id,
                 files=tool_files(obs),
-                plugin_state=tool_plugin_state(obs),
+                plugin_state=tool_plugin_state(obs, tool_name=tool.name, args=args),
             )
         )
 

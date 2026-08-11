@@ -30,7 +30,11 @@ def _question_with_attachments(
         (
             f"（附件已挂载到 {SANDBOX_MOUNT_ROOT}/<文件名>；"
             "用 list_files / read_file 查看，execute_code 或 write_file 处理；"
-            "专项格式任务可 activate_skill 加载对应 skill）"
+            "专项格式任务可 activate_skill 加载对应 skill。"
+            "中文 PDF/图：沙箱已预装 CJK 字体，优先 "
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc "
+            "或 /usr/share/fonts/truetype/wqy/wqy-zenhei.ttc；"
+            "禁止运行时 curl/wget 下载字体。）"
         ),
     ]
     for attachment_id in attachment_ids:

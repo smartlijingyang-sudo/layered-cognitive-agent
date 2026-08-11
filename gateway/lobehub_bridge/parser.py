@@ -84,7 +84,43 @@ def _strip_system_context(text: str) -> str:
     end = text.find(SYSTEM_CONTEXT_END)
     if end >= 0:
         text = text[:end]
-    return _strip_lobehub_runtime_xml(text).strip()
+    text = _strip_lobehub_runtime_xml(text)
+    return _unwrap_lobehub_eval_envelope(text).strip()
+
+
+_EVAL_MESSAGE_RE = re.compile(
+    r'(?is)message\s*=\s*"((?:[^"\\]|\\.)*)"',
+)
+
+
+def _unwrap_lobehub_eval_envelope(text: str) -> str:
+    """Extract real user message from AgentSignal / satisfaction-judge wrappers.
+
+    Example pollution seen in journal::
+
+        Judge the user's overall satisfaction.
+        message="分析这个自查表的内容"
+        serializedContext=""
+    """
+    stripped = text.strip()
+    if not stripped:
+        return stripped
+    lower = stripped.lower()
+    if "serializedcontext" not in lower and "overall satisfaction" not in lower:
+        return stripped
+    match = _EVAL_MESSAGE_RE.search(stripped)
+    if not match:
+        return stripped
+    inner = match.group(1)
+    # Unescape common JSON-ish sequences without treating unicode as escapes.
+    return (
+        inner.replace("\\n", "\n")
+        .replace("\\t", "\t")
+        .replace('\\"', '"')
+        .replace("\\\\", "\\")
+        .strip()
+        or stripped
+    )
 
 
 def _strip_lobehub_runtime_xml(text: str) -> str:

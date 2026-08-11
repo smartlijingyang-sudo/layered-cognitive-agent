@@ -443,10 +443,11 @@ stop_all() {
 
 usage() {
   cat <<EOF
-用法: $0 <dev|gateway|sync|stop|status|restart-gateway>
+用法: $0 <dev|gateway|sync|stop|status|restart|restart-gateway>
 
   dev              同步 v2.2.13 + 应用 LCA 补丁 + 启动 gateway + bun run dev
   gateway          仅启动 LCA OpenAI 兼容网关（代码更新时自动重启）
+  restart          全量重启：停止所有 → 重启 gateway + infra + 前端
   restart-gateway  强制重启 gateway（加载最新 Python）
   sync             强制从官方拉取 v2.2.13 到 lobehub-ui/ 并打补丁
   stop             停止 LobeHub dev + gateway
@@ -469,6 +470,7 @@ shift || true
 
 case "${cmd}" in
   dev) start_gateway; start_infra; start_lobehub_dev ;;
+  restart) stop_all; LCA_GATEWAY_FORCE_RESTART=1 start_gateway; start_infra; start_lobehub_dev ;;
   gateway) start_gateway ;;
   restart-gateway) LCA_GATEWAY_FORCE_RESTART=1 start_gateway ;;
   sync) sync_lobehub_ui ;;
