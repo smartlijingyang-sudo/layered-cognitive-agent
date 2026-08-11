@@ -1,153 +1,58 @@
 # AGENTS.md — LCA Framework
 
-## 架构约束（最容易被无意破坏，务必遵守）
-五层严格单向依赖：contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_agent，
-layer4_app 是组合根，可以依赖所有下层，但下层不能反向 import layer4_app。
-这个约束由 import-linter 强制执行，见 pyproject.toml 中 [[tool.importlinter.contracts]]。
+## 工程哲学
 
-## 环境与依赖
-- 包管理器统一用 uv，不要直接用 pip 改环境
-- 安装依赖：uv sync --all-groups
-- 新增依赖：uv add --group <lint|typecheck|test|security> <package名>
+**不打补丁，追问前提。** 遇到不合理的代码，先问：是机制本身有问题，还是在垃圾机制上做修补？
+- 看到 if/else 链 → 问"是不是缺了一个注册表或策略模式"
+- 看到重复逻辑 → 问"是不是抽象层没提对"
+- 看到 workaround → 问"被绕过的东西该不该存在"
+- 看到过深的调用链 → 问"是不是职责分错了"
+- 主动清理死代码、废弃别名、过渡方案——vulture 只是兜底，人工判断优先
+- 有更好的架构就提出来，不要沉默地往旧设计里塞新代码
 
-## 每次改完代码，必须依次跑完（顺序不能乱）
-1. uv run ruff check --fix .
-2. uv run ruff format .
-3. uv run lint-imports        # 检查五层架构契约，最容易被跳过但最重要
-4. uv run mypy lca
-5. uv run pytest
-6. uv run vulture lca --min-confidence 80  # 死代码检测（≥80% 置信度，防过渡别名等技术债堆积）
+## 架构约束
 
-## 代码风格
-- 公共函数/类必须有类型标注
-- lca/contracts 下的模型使用 stdlib dataclass，保持字段名和方法签名不变
-- 禁止硬编码 API Key / Token，一律用环境变量，通过 pydantic-settings 注入配置
+五层单向依赖：`contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_agent`
+`layer4_app` 是组合根，下层禁止反向 import。由 `lint-imports` 强制执行。
 
-## 代码设计约束（AI Coding 必须遵守）
+## 验证流水线（每次改完必跑，顺序不可乱）
 
-### 结构规模
-- 单个方法不超过 200 行（不含空行和注释），超过则拆分为子方法或提取到独立模块
-- 单个文件不超过 1500 行，超过则按职责拆分到同包下的新文件
-- 按模块/职责划分目录，每个包只暴露 `__init__.py` 中显式导出的公共接口
-
-### 内聚与耦合
-- 高内聚：一个类/模块只做一件事，相关数据和行为放在一起
-- 低耦合：模块间通过 Protocol / 接口通信，禁止直接依赖具体实现
-- 可复用：公共逻辑提取为工具函数或基类，禁止跨模块复制粘贴
-
-### 禁止魔数与硬编码
-- 禁止裸数字/字符串字面量出现在业务逻辑中，必须用命名常量或枚举
-- 配置项走 pydantic-settings / 环境变量，不要 `if env == "prod"` 硬编码
-- 禁止 if/else 链做类型/状态判断——用枚举、标签字段、注册表或策略模式替代
-
-### 设计模式优先
-- 多种实现 → 策略模式（`Protocol` + 注册表）
-- 跨 provider 适配 → 适配器模式（统一接口包装差异）
-- 复杂构建 → Builder / Factory
-- 事件通知 → 观察者 / 发布-订阅
-- 处理链 → Chain-of-Responsibility（如 middleware、handler pipeline）
-- 优先用声明式/数据驱动分发，少用命令式分支
-
-### 接口解耦
-- 层间依赖只通过 contracts 层的 Protocol / BaseModel 传递
-- 同层模块间不直接 import，通过依赖注入（构造函数参数）获取协作方
-- 新增外部集成（LLM provider、向量库、消息队列等）必须走适配器，不允许业务代码直接调用第三方 SDK
-
-### AI Coding 额外约束
-- 生成的代码必须可测试：纯函数优先，副作用隔离到边界，便于单元测试
-- 不生成 TODO / FIXME 占位——要么实现，要么不写
-- 不在生成代码中引入 `# type: ignore` 除非有注释说明原因
-- 错误处理用显式的自定义异常类，不用裸 `except Exception`
-- 日志用 structlog 结构化输出，不用 `print`
-- 异步代码中不在热路径做同步阻塞调用，需要时显式标注并说明原因
-
-## 真实 LLM 端到端测试
-
-默认 `pytest` 不跑需要 API Key 的集成测试。配置 `LLM_API_KEY` 后：`uv run pytest -m real_llm -v`。
-断言策略：验证结构化事件（`status == "completed"`、`total_steps >= N`），不验证具体文案。
-
-## 团队协作（领域语言）
-
-- `Agent`：单角色；`Team`：members + **恰好一种**协作机制。
-- 有主导者：`Team(members=..., lead=TeamLead.board(pm))`
-  - `LeadMandate`：`routing` | `consult` | `board`（全员咨询后收口）
-- 无主导者：`Team(members=..., coordination=Pipeline()|FanOut()|PeerRelay()|PeerSwarm()|Debate()|Graph(...))`
-- 场景 YAML：`lead.mandate` 或 `coordination`，禁止并存。
-- 对象图由 `TeamComposer` 封闭组装；成员调用统一 `send_and_wait`；委派仅 `Decision.delegations`。
-
-
-## 如何新增团队场景
-
-在 `tests/fixtures/team_scenarios/` 下新增 YAML 文件，结构参考 `ecommerce_launch.yaml`：
-
-```yaml
-roles:
-  - key: my_role
-    role: 角色名
-    goal: 角色目标
-    backstory: 角色背景
-    tools: [calculator]  # 可选，目前支持 calculator
-
-teams:
-  my_team:
-    lead:
-      agent: lead_role
-      mandate: board   # routing | consult | board
-    members: [role1, role2]
-  # 或无主导者：
-  # my_pipeline:
-  #   coordination: pipeline  # pipeline | fan_out | peer_relay | peer_swarm | debate
-  #   members: [role1, role2]
-
-cases:
-  my_case:
-    team: my_team
-    objective: "测试任务描述"
-    assertions:
-      status: completed
-      min_steps: 4
+```
+uv run ruff check --fix . && uv run ruff format .
+uv run lint-imports
+uv run mypy lca
+uv run pytest
+uv run vulture lca --min-confidence 80
 ```
 
-然后在测试里用 `tests/support/scenario_loader.py` 加载：
+## 编码规范
 
-```python
-from tests.support.scenario_loader import build_team, load_scenario
+- 方法 ≤200 行，文件 ≤1500 行；超过就拆
+- 公共接口必须类型标注；contracts 用 stdlib dataclass
+- 层间只通过 Protocol 通信，同层通过依赖注入协作
+- 禁止魔数、硬编码密钥、裸 `except Exception`、`print`
+- 多种实现 → `Protocol` + 注册表；外部集成 → 适配器
+- 不生成 TODO/FIXME 占位；structlog 替代 print
+- 配置走 pydantic-settings / 环境变量
 
-spec = load_scenario("tests/fixtures/team_scenarios/my_scenario.yaml")
-team = build_team(spec, "my_team", llm)
-result = await team.run("任务描述")
-```
+## 领域语言
 
-## Prompt 模板迭代
+- `Agent`：单角色；`Team`：members + **恰好一种**协作机制
+- 有主导者：`Team(lead=TeamLead.board(pm))` — mandate: `routing | consult | board`
+- 无主导者：`Team(coordination=Pipeline()|FanOut()|PeerRelay()|PeerSwarm()|Debate()|Graph(...))`
+- `lead.mandate` 与 `coordination` 禁止并存
+- 场景 YAML 见 `tests/fixtures/team_scenarios/`，加载用 `tests/support/scenario_loader.py`
 
-Prompt 模板存放在 `lca/layer1_cognitive/brain/prompts/*.md`，不触碰 Python 代码即可迭代。
-用 `load_builtin_prompt("react_prompt")` 加载，占位符用 `{role}` / `{goal}` / `{task}` 等。
+## 关键路径速查
 
-## 可观测性（Journal-as-Truth，ADR-0037）
-
-**核心范式**：执行日志（journal）是唯一真相，span 树只是投影。在语义边界 `record(JournalEvent)`，不要直接发 span 表达协作叙事。
-
-**对外入口**：`Agent/Team(observability="console")`（或 `"console+langfuse"`）。
-
-**埋点**：
-```python
-from lca.layer0_infra.observability import record, span, traced
-
-record(DelegationIssued(...))                    # 叙事平面：journal 事件
-with span(SpanName.MEMORY_READ, **attrs) as h:   # 机制平面：相位/记忆/传输
-    ...
-@traced(SpanName.TOOL_EXECUTE, capture=...)      # 装饰器（机制平面）
-```
-
-**落盘与 replay**：`observability="jsonl"` 落盘到 `traces/lca_journal.jsonl`；
-离线重放：`uv run python scripts/replay_journal.py traces/lca_journal.jsonl`
-
-**配置**：`LCA_OBS_VERBOSITY=minimal|standard|verbose`，`LCA_OBS_BACKENDS`，`LCA_OBS_SAMPLING_RATE`（pydantic-settings）。
-
-**Langfuse**（可选）：`uv sync --group observability-langfuse`，配置 `LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST`。
-
-本地探针：`uv run python scripts/run_team_mode.py`
+| 关注点 | 位置 |
+|---|---|
+| Prompt 模板 | `lca/layer1_cognitive/brain/prompts/*.md` |
+| 可观测性 | ADR-0037 Journal-as-Truth；`record()` / `span()` / `traced()` |
+| 真实 LLM 测试 | `uv run pytest -m real_llm -v`（需 `LLM_API_KEY`） |
+| 本地探针 | `uv run python scripts/run_team_mode.py` |
 
 ## 禁止事项
-- 不要在 --no-verify 情况下绕过 pre-commit 提交
-- 不要让 contracts / layer0~3 import layer4_app
+
+- 不绕过 pre-commit（`--no-verify`）
+- 不让 contracts / layer0~3 import layer4_app
