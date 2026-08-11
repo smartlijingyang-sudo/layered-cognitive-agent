@@ -61,6 +61,14 @@ class LocalFileStoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(html.previewable)
         self.assertFalse(bin_.previewable)
 
+    def test_pdf_is_previewable(self) -> None:
+        stored = self.store.put(
+            data=b"%PDF-1.4 fake",
+            name="report.pdf",
+            mime_type="application/pdf",
+        )
+        self.assertTrue(stored.previewable)
+
     async def test_write_file_tool_rejects_empty_name(self) -> None:
         tool = WriteFileTool(store=self.store)
         self.assertIsNotNone(tool.validate({"name": "  ", "content": "x"}))

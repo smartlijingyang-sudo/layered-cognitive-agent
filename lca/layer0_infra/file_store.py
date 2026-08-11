@@ -75,6 +75,7 @@ def _is_previewable(mime_type: str, name: str) -> bool:
         "application/javascript",
         "application/xml",
         "application/xhtml+xml",
+        "application/pdf",
     }:
         return True
     return lower.endswith(
