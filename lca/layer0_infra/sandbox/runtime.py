@@ -6,7 +6,9 @@ Tools delegate here; they do not manage sessions directly.
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections.abc import Sequence
 from typing import Any
 
 import structlog
@@ -16,11 +18,13 @@ from lca.contracts.models.core.sandbox import (
     MountManifest,
     SandboxErrorKind,
     SandboxExecResult,
+    SandboxFile,
     SandboxResult,
     SessionInfo,
 )
 from lca.contracts.protocols import Sandbox, SandboxRuntime
 from lca.layer0_infra.file_store import FileStore
+from lca.layer0_infra.sandbox.artifact_scanner import GUEST_ARTIFACT_SCANNER
 from lca.layer0_infra.sandbox.bootstrap import SANDBOX_INIT_TIMEOUT_S, sandbox_output_path
 from lca.layer0_infra.sandbox.error_parse import classify_execution_error
 from lca.layer0_infra.sandbox.exec_result import sandbox_exec_result_from
@@ -32,6 +36,20 @@ from lca.layer0_infra.sandbox.runtime_mount import (
 )
 
 _log = structlog.get_logger(__name__)
+
+PYTHON_LANGUAGES: frozenset[str] = frozenset({"python", "py"})
+
+# Minimal python body — ``_execute_raw`` appends ``GUEST_ARTIFACT_SCANNER``.
+_HARVEST_STUB = "pass  # LCA outputs harvest"
+
+
+def _append_artifact_scanner(code: str) -> str:
+    """Append artifact scanner so generated files are captured after execution."""
+    return code + "\n\n" + GUEST_ARTIFACT_SCANNER + "\n"
+
+
+def _file_fingerprint(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 class RunBoundSandboxRuntime(SandboxRuntime):
@@ -58,6 +76,8 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         self._inspect_profile: dict[str, Any] | None = None
         self._ready = False
         self._staged_file_keys: set[str] = set()
+        # name → sha256 of last harvested content (run-scoped; skips unchanged re-export)
+        self._output_fingerprints: dict[str, str] = {}
 
     @property
     def run_id(self) -> str:
@@ -185,6 +205,9 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             invocation_id=invocation_id,
             extra_files=extra_files,
         )
+        # Track fingerprints so a later run_terminal harvest does not re-emit
+        # the same outputs/ bytes as this execute_code call.
+        self._remember_generated(raw.generated_files)
         if raw.success:
             return sandbox_exec_result_from(
                 raw,
@@ -212,20 +235,90 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         *,
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
         invocation_id: str = "",
+        harvest_outputs: bool = True,
     ) -> SandboxResult:
         """Shell command through the session — filesystem state persists across calls.
 
         Follows the same session-affinity principle as ``execute()``: commands
         within a single run share the same backend session, so ``pip install``
         in step N is visible to ``import`` in step N+1.
+
+        After the command returns, scans ``/mnt/data/outputs`` (ADR-0046) and
+        attaches **new or changed** files to ``generated_files`` so
+        ``run_command`` (officecli etc.) gets download URLs without a separate
+        ``export_file`` call.
         """
         session_id = self._session.session_id if self._session else ""
-        return await self._sandbox.run_terminal(
+        result = await self._sandbox.run_terminal(
             command,
             timeout_s=timeout_s,
             invocation_id=invocation_id,
             session_id=session_id,
         )
+        if not harvest_outputs:
+            return result
+        try:
+            delta = await self.harvest_output_delta(
+                invocation_id=invocation_id or "run_terminal_harvest",
+                timeout_s=min(60, timeout_s, self._default_timeout_s),
+            )
+        except Exception:
+            _log.warning(
+                "run_terminal_harvest_failed",
+                run_id=self._run_id,
+                inv=invocation_id,
+                exc_info=True,
+            )
+            return result
+        if not delta:
+            return result
+        merged = tuple(result.generated_files) + delta
+        return SandboxResult(
+            stdout=result.stdout,
+            stderr=result.stderr,
+            exit_code=result.exit_code,
+            success=result.success,
+            generated_files=merged,
+            error=result.error,
+        )
+
+    async def harvest_output_delta(
+        self,
+        *,
+        invocation_id: str = "",
+        timeout_s: int | None = None,
+    ) -> tuple[SandboxFile, ...]:
+        """Scan guest ``/mnt/data/outputs``; return only new/changed files.
+
+        Idempotent for unchanged content within a run (sha256 fingerprint).
+        Harvest failures return empty — never override the shell command outcome.
+        """
+        if not self._ready:
+            mount_err = await self.ensure_ready()
+            if mount_err is not None:
+                return ()
+        budget = timeout_s if timeout_s is not None else min(60, self._default_timeout_s)
+        raw = await self._execute_raw(
+            _HARVEST_STUB,
+            language="python",
+            timeout_s=budget,
+            invocation_id=invocation_id or "harvest_outputs",
+        )
+        return self._delta_generated(raw.generated_files)
+
+    def _remember_generated(self, files: Sequence[SandboxFile]) -> None:
+        for sf in files:
+            self._output_fingerprints[sf.name] = _file_fingerprint(sf.data)
+
+    def _delta_generated(self, files: Sequence[SandboxFile]) -> tuple[SandboxFile, ...]:
+        out: list[SandboxFile] = []
+        for sf in files:
+            digest = _file_fingerprint(sf.data)
+            if self._output_fingerprints.get(sf.name) == digest:
+                continue
+            self._output_fingerprints[sf.name] = digest
+            out.append(sf)
+        return tuple(out)
 
     async def destroy(self) -> None:
         """Release backend session (idempotent)."""
@@ -289,6 +382,12 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             self._staged_file_keys.update(new_files.keys())
 
         # Phase 2: Execute code (no files parameter)
+        # Inject artifact scanner for Python so generated files in
+        # /mnt/data/outputs are captured in SandboxResult.generated_files.
+        lang_key = language.lower() if language else "python"
+        if lang_key in PYTHON_LANGUAGES:
+            code = _append_artifact_scanner(code)
+
         if self._session is not None and not self._stateless:
             return await self._sandbox.run_in_session(
                 session_id=self._session.session_id,

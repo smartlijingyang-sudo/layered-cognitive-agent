@@ -200,7 +200,7 @@ def build_run_command_state(
 def build_execute_code_state(
     args: dict[str, Any], payload: dict[str, Any], ok: bool, error: str
 ) -> dict[str, Any]:
-    """Code execution card: language, code, output, stderr, exit code."""
+    """Code execution card: language, code, description, output, stderr, exit code."""
     state: dict[str, Any] = {
         "success": ok,
         "language": first_str(args, "language") or str(payload.get("language") or "python"),
@@ -213,6 +213,9 @@ def build_execute_code_state(
     )
     if code:
         state["code"] = code
+    desc = first_str(args, "description") or first_str(payload, "description")
+    if desc:
+        state["description"] = desc
     exit_code = payload.get("exitCode", payload.get("exit_code"))
     if isinstance(exit_code, int):
         state["exitCode"] = exit_code

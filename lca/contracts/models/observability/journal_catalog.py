@@ -31,6 +31,7 @@ from lca.contracts.models.observability.journal import (
     SynthesisCompleted,
     TeamRunFinished,
     TeamRunStarted,
+    ToolCallStreaming,
     ToolDenied,
     ToolInvoked,
     ToolStarted,
@@ -63,6 +64,7 @@ JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
         ReasoningCompleted,
         RunActivity,
         SandboxOutputDelta,
+        ToolCallStreaming,
         ToolStarted,
         ToolInvoked,
         ToolDenied,
@@ -193,6 +195,12 @@ JOURNAL_CATALOG: dict[str, VocabDef] = {
         "lca.layer0_infra.sandbox",
         required=("invocation_id", "stream", "seq"),
         desc="沙箱执行增量输出（stdout/stderr）",
+    ),
+    "ToolCallStreaming": _journal(
+        VocabDomain.RESOURCE,
+        "lca.layer1_cognitive.brain.llm_turn.executor",
+        required=("tool_name",),
+        desc="LLM 正在流式生成工具调用参数（早期卡片占位，消除思考→执行空白期）",
     ),
     "ToolStarted": _journal(
         VocabDomain.RESOURCE,

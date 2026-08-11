@@ -14,8 +14,10 @@ import structlog
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.observability.journal import ToolCallStreaming
 from lca.contracts.models.team.partial_buffer import append_run_partial
 from lca.contracts.protocols import LLMAdapter, Tool
+from lca.layer0_infra.observability import record
 from lca.layer1_cognitive.brain.llm_turn.mode import LlmTurnMode
 from lca.layer1_cognitive.brain.llm_turn.policy import build_llm_call_kwargs, resolve_llm_turn_mode
 
@@ -87,6 +89,9 @@ async def _stream_turn(
 ) -> LLMResponse:
     accumulated = ""
     stream_response: LLMResponse | None = None
+    # Track tool names we've already emitted ToolCallStreaming for,
+    # so we only emit once per tool call (on first name sighting).
+    announced_tool_names: set[str] = set()
     async for event in llm.stream(prompt, tools=tools, step=step, **llm_kwargs):
         if event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
             chunk = event.text or ""
@@ -94,6 +99,21 @@ async def _stream_turn(
             append_run_partial(chunk)
         elif event.type == LLMStreamEventType.REASONING_TEXT_DELTA:
             pass
+        elif event.type == LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA:
+            # LLM is generating tool call arguments in real-time.
+            # Emit ToolCallStreaming on first sighting of the tool name
+            # so the frontend can render a tool card placeholder immediately —
+            # eliminating the dead gap between reasoning completion and
+            # tool execution start.
+            name = event.tool_name
+            if name and name not in announced_tool_names:
+                announced_tool_names.add(name)
+                record(
+                    ToolCallStreaming(
+                        tool_name=name,
+                        tool_call_id=event.tool_call_id or "",
+                    )
+                )
         elif event.type == LLMStreamEventType.COMPLETED and event.response is not None:
             stream_response = event.response
             break

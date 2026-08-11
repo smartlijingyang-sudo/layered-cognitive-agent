@@ -86,6 +86,12 @@ LCA 已有 **角色库**（`roles/` + `RoleLibrary` + `TeamCaster`，ADR-0042）
 镜像加装 `fonts-noto-cjk`（与文泉驿并存）。运行时 pip 仍仅作 skill
 `requirements.txt` 的 exec 兜底，不是主路径。
 
+### 6. 第一方 bundled skill（ADR-0054 扩展）
+
+仓库根 `skills/<skill_id>/SKILL.md` 为内容包；`ensure_bundled_skills`
+在 `resolve_skill_store()` 幂等 materialize 到 cache。首个包：`officecli`
+（Office 平面知识层；binary 在 terminal 镜像，见 ADR-0054）。
+
 ## 后果
 
 - 正向：对齐 LobeHub 三层（store / activate / exec）；Role-Skill 语义清晰；

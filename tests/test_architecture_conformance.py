@@ -187,6 +187,9 @@ EXEMPT: dict[str, str] = {
     "lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker.ToolLoopBreakerGate": (
         "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0051)"
     ),
+    "lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector.ArtifactRespondInjector": (
+        "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0051)"
+    ),
     "lca.layer1_cognitive.brain.llm_turn.mode.LlmTurnMode": (
         "LobeHub call_llm 模式枚举，非跨层契约 (G2A agent-runtime 对齐)"
     ),

@@ -30,6 +30,17 @@ SANDBOX_MAX_GENERATED_FILE_BYTES: int = 20 * 1024 * 1024
 SANDBOX_INIT_MAX_FILE_BYTES: int = 100 * 1024 * 1024
 SANDBOX_INIT_MAX_FILES: int = 50
 
+# Production Onlyboxes terminal image CLI tools (deploy/onlyboxes/Dockerfile.terminal).
+# Ops / prompt contract — not enforced by Sandbox Protocol (ADR-0054).
+SANDBOX_PREINSTALLED_CLI_TOOLS: tuple[str, ...] = (
+    "officecli",
+    "curl",
+    "wget",
+    "jq",
+    "ffmpeg",
+    "pandoc",
+)
+
 # Production Onlyboxes pythonExec image baseline (deploy/onlyboxes/requirements-python.txt).
 # Ops contract for tool descriptions / prompts — not enforced by Sandbox Protocol.
 SANDBOX_PREINSTALLED_PYTHON_PACKAGES: tuple[str, ...] = (

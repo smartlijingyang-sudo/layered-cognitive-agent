@@ -20,6 +20,10 @@ RUN_COMMAND_DESCRIPTION = (
     "Execute a shell command in the sandbox with timeout control. "
     "Default shell is /bin/sh; use bash -c for bash features. "
     "Supports background execution (background: true → commandId). "
+    f"Deliverables written under {_OUTPUTS}/ are auto-collected after the "
+    "command (same as execute_code) — no separate export_file required for "
+    "new/changed files. Background commands do not auto-harvest until "
+    "completion is polled. "
     "Parameters: description, command, background, timeout."
 )
 

@@ -114,6 +114,7 @@ class ExecutionJournal:
         永不见到 ``ActionType.XXX`` 之类的 repr 泄漏。
         """
         updates: dict[str, Any] = {}
+        has_output_truncated = any(f.name == "output_truncated" for f in dataclasses.fields(event))
         for item in dataclasses.fields(event):
             value = getattr(event, item.name)
             if isinstance(value, Enum):
@@ -125,7 +126,7 @@ class ExecutionJournal:
             if journal_kind == "content":
                 prepared, truncated = self._policy.prepare_content(item.name, value)
                 updates[item.name] = prepared if prepared is not None else ""
-                if truncated:
+                if truncated and has_output_truncated:
                     updates["output_truncated"] = True
             else:
                 prepared_map = self._policy.prepare({item.name: value})

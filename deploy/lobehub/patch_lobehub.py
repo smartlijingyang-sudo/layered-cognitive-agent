@@ -1185,6 +1185,127 @@ def p_lan_dev() -> bool:
     raise SystemExit("[lan_dev] resolveCiteDevOrigin anchor not found")
 
 
+# ── 6. File Proxy & Reasoning Segmentation ───────────────────────────
+
+
+def p_file_proxy_rewrite() -> bool:
+    """Add /files/* rewrite to next.config.ts → LCA gateway for artifact downloads."""
+    rel = "next.config.ts"
+    text = _read(rel)
+    if "LCA: file proxy" in text:
+        return False
+    old = "const nextConfig = defineConfig({"
+    new = "const _baseConfig = defineConfig({"
+    if old not in text:
+        return False
+    text = text.replace(old, new, 1)
+    old_end = "});\n\nexport default nextConfig;"
+    new_end = """});
+
+// LCA: file proxy — artifact downloads via Next.js rewrite → LCA gateway
+const nextConfig = {
+  ..._baseConfig,
+  async rewrites() {
+    const base = process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765';
+    const baseRewrites = typeof _baseConfig.rewrites === 'function'
+      ? await _baseConfig.rewrites()
+      : [];
+    return [
+      ...(Array.isArray(baseRewrites) ? baseRewrites : []),
+      {
+        source: '/files/:path*',
+        destination: `${base.replace(/\\/$/, '')}/files/:path*`,
+      },
+    ];
+  },
+};
+
+export default nextConfig;"""
+    if old_end not in text:
+        return False
+    text = text.replace(old_end, new_end, 1)
+    _write(rel, text)
+    return True
+
+
+def p_reasoning_segmentation() -> bool:
+    """Handle reasoning_start/end LCA events for per-step thinking blocks."""
+    # Step 1: Add reasoning types to LcaStreamToolEvent
+    rel_types = "src/store/chat/agents/types/streaming.ts"
+    text_types = _read(rel_types)
+    if "'reasoning_start'" not in text_types:
+        # Add reasoning event types to the LcaStreamToolEvent union
+        type_anchor = (
+            "  | { closed_loop?: boolean; code?: string; message: string; type: 'run_error' };"
+        )
+        type_insert = """  | { closed_loop?: boolean; code?: string; message: string; type: 'run_error' }
+  // LCA: per-step reasoning boundaries (gateway emits reasoning_start/end per LLM call)
+  | { step: number; type: 'reasoning_start' }
+  | { step: number; type: 'reasoning_end' };"""
+        if type_anchor not in text_types:
+            raise SystemExit("[reasoning_segmentation] type anchor not found in streaming.ts")
+        text_types = text_types.replace(type_anchor, type_insert, 1)
+        _write(rel_types, text_types)
+
+    # Step 2: Add handling in StreamingHandler
+    rel = "src/store/chat/agents/StreamingHandler.ts"
+    text = _read(rel)
+    if "'reasoning_start'" in text:
+        return False
+    if "handleLcaToolEvent" not in text:
+        return False
+    anchor = """  private handleLcaToolEvent(event: LcaStreamToolEvent): void {
+    if (event.type === 'run_error') {"""
+    insert = """  private handleLcaToolEvent(event: LcaStreamToolEvent): void {
+    // LCA: per-step reasoning segmentation
+    if (event.type === 'reasoning_start') {
+      this.endReasoningIfNeeded();
+      return;
+    }
+    if (event.type === 'reasoning_end') {
+      this.endReasoningIfNeeded();
+      return;
+    }
+
+    if (event.type === 'run_error') {"""
+    if anchor not in text:
+        return False
+    text = text.replace(anchor, insert, 1)
+    _write(rel, text)
+    return True
+
+
+def p_tool_result_files() -> bool:
+    """Pass files[] from tool_result events into ChatToolResult state."""
+    rel = "src/store/chat/agents/StreamingHandler.ts"
+    text = _read(rel)
+    if "mergeLcaToolResult" not in text:
+        return False
+    if "event.files" in text:
+        return False
+    anchor = """      const updated = this.mergeLcaToolResult(existing, {
+        content,
+        error: event.type === 'tool_result' ? event.error : undefined,
+        state: event.state,
+      });"""
+    replacement = """      const updated = this.mergeLcaToolResult(existing, {
+        content,
+        error: event.type === 'tool_result' ? event.error : undefined,
+        state: {
+          ...event.state,
+          // LCA: pass files[] from tool_result into card state
+          ...(event.type === 'tool_result' && 'files' in event && event.files
+            ? { files: event.files }
+            : {}),
+        },
+      });"""
+    if anchor not in text:
+        return False
+    text = text.replace(anchor, replacement, 1)
+    _write(rel, text)
+    return True
+
+
 # =======================================================================
 #  MANIFEST — ordered patch registry
 # =======================================================================
@@ -1368,6 +1489,31 @@ PATCHES: list[PatchMeta] = [
         "low",
         "devux",
     ),
+    # ── File Proxy & Reasoning ──
+    PatchMeta(
+        "file_proxy_rewrite",
+        "Proxy /files/* to LCA gateway for artifact downloads",
+        ("next.config.ts",),
+        "low",
+        "proxy",
+    ),
+    PatchMeta(
+        "reasoning_segmentation",
+        "Per-step reasoning blocks via reasoning_start/end events",
+        (
+            "src/store/chat/agents/types/streaming.ts",
+            "src/store/chat/agents/StreamingHandler.ts",
+        ),
+        "medium",
+        "runtime",
+    ),
+    PatchMeta(
+        "tool_result_files",
+        "Pass files[] from tool_result into card state for rendering",
+        ("src/store/chat/agents/StreamingHandler.ts",),
+        "low",
+        "runtime",
+    ),
 ]
 
 _PATCH_FUNCS: dict[str, callable] = {
@@ -1394,6 +1540,9 @@ _PATCH_FUNCS: dict[str, callable] = {
     "market_fork": p_market_fork,
     "lan_dev": p_lan_dev,
     "turbopack_dev": p_turbopack_dev,
+    "file_proxy_rewrite": p_file_proxy_rewrite,
+    "reasoning_segmentation": p_reasoning_segmentation,
+    "tool_result_files": p_tool_result_files,
 }
 
 # Verify markers: (file_to_check, marker_string) — read-only check
@@ -1447,6 +1596,15 @@ _VERIFY_MARKERS: dict[str, tuple[str, str]] = {
     "turbopack_dev": (
         "scripts/devStartupSequence.mts",
         "'--turbo'",
+    ),
+    "file_proxy_rewrite": ("next.config.ts", "LCA: file proxy"),
+    "reasoning_segmentation": (
+        "src/store/chat/agents/StreamingHandler.ts",
+        "'reasoning_start'",
+    ),
+    "tool_result_files": (
+        "src/store/chat/agents/StreamingHandler.ts",
+        "event.files",
     ),
 }
 

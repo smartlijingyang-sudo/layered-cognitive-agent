@@ -203,7 +203,7 @@ class InlineSandbox:
                     data=data,
                 )
                 for path, data in vfs.items()
-                if path.startswith(out_prefix)
+                if path.startswith(out_prefix) and not path.rsplit("/", 1)[-1].startswith(".")
             ]
             return SandboxResult(
                 stdout=stdout,

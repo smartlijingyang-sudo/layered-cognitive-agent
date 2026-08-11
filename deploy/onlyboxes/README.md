@@ -40,6 +40,10 @@ WORKER_PYTHON_EXEC_DOCKER_IMAGE=onlyboxes-python-local:3.11
 | requests | HTTP |
 | tabulate | 文本表 |
 | python-docx / reportlab / fpdf2 / pypdf | 文档生成（DOCX/PDF） |
+| **officecli**（钉版本，ADR-0054） | Word/Excel/PPT 统一 CLI；`OFFICECLI_SKIP_UPDATE=1` |
+
+Office 平面：`install-officecli.sh` 在镜像构建时安装固定版 binary；agent **禁止**运行时 curl 安装。
+升级：改 `OFFICECLI_VERSION` 后重建 terminal 镜像并跑 `build-terminal-image.sh` smoke。
 
 terminal 镜像重建后须 **清掉旧 terminalExec session 并重启 worker**，否则会继续跑无字体的 `:default` 容器：
 

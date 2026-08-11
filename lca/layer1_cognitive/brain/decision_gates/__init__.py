@@ -1,5 +1,8 @@
 """DecisionGate implementations."""
 
+from lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector import (
+    ArtifactRespondInjector,
+)
 from lca.layer1_cognitive.brain.decision_gates.chained import ChainedDecisionGate
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
     MustConsultAllMembers,
@@ -13,10 +16,12 @@ def build_workspace_agent_gate() -> ChainedDecisionGate:
     return ChainedDecisionGate(
         ToolLoopBreakerGate(),
         TerminalRespondGate(),
+        ArtifactRespondInjector(),
     )
 
 
 __all__ = [
+    "ArtifactRespondInjector",
     "ChainedDecisionGate",
     "MustConsultAllMembers",
     "TerminalRespondGate",

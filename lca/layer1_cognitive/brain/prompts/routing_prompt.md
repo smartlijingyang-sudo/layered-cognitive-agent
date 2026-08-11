@@ -1,6 +1,7 @@
 ROLE: {role}
 GOAL: {goal}
 BACKSTORY: {backstory}
+CURRENT_DATE: {current_date}
 USER_TASK: {task}
 
 <tools>

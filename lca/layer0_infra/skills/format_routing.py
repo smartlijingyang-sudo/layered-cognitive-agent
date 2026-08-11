@@ -1,27 +1,30 @@
-"""Attachment format → operational skill routing (ADR-0048 / ADR-0051)."""
+"""Attachment format → operational skill routing (ADR-0048 / ADR-0051 / ADR-0054)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-# Extension / inspect profile type → skill_id candidates (installed via ADR-0048).
+from lca.layer0_infra.skills.bundled import OFFICECLI_SKILL_ID
+
+# Extension / inspect profile type → skill_id candidates (priority order).
+# Office plane: officecli first; anthropics-* remain as library fallbacks.
 _FORMAT_SKILL_MAP: dict[str, tuple[str, ...]] = {
     "pdf": ("anthropics-skills-pdf",),
-    "legacy_word": ("anthropics-skills-docx",),
-    "docx": ("anthropics-skills-docx",),
-    "pptx": ("anthropics-skills-pptx",),
-    "xlsx": (),
-    "excel": (),
+    "legacy_word": (OFFICECLI_SKILL_ID, "anthropics-skills-docx"),
+    "docx": (OFFICECLI_SKILL_ID, "anthropics-skills-docx"),
+    "pptx": (OFFICECLI_SKILL_ID, "anthropics-skills-pptx"),
+    "xlsx": (OFFICECLI_SKILL_ID, "anthropics-skills-xlsx"),
+    "excel": (OFFICECLI_SKILL_ID, "anthropics-skills-xlsx"),
     "csv": (),
 }
 
 _EXT_SKILL_MAP: dict[str, tuple[str, ...]] = {
     ".pdf": ("anthropics-skills-pdf",),
-    ".doc": ("anthropics-skills-docx",),
-    ".docx": ("anthropics-skills-docx",),
-    ".pptx": ("anthropics-skills-pptx",),
-    ".xlsx": (),
-    ".xls": (),
+    ".doc": (OFFICECLI_SKILL_ID, "anthropics-skills-docx"),
+    ".docx": (OFFICECLI_SKILL_ID, "anthropics-skills-docx"),
+    ".pptx": (OFFICECLI_SKILL_ID, "anthropics-skills-pptx"),
+    ".xlsx": (OFFICECLI_SKILL_ID, "anthropics-skills-xlsx"),
+    ".xls": (OFFICECLI_SKILL_ID, "anthropics-skills-xlsx"),
     ".csv": (),
 }
 

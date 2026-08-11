@@ -5,6 +5,7 @@ only — never ``delta.tool_calls`` (which would trigger LobeHub's client-side
 ``call_tool → call_llm`` loop and duplicate LCA runs).
 
 Event types:
+- ``tool_call_streaming`` — LLM is generating tool call arguments (early card)
 - ``tool_started`` — UI card + wire metadata (server-executed)
 - ``tool_result`` / ``tool_state`` — result merge + live sandbox stdout
 - ``run_error`` — terminal run failure surfaced to the stream consumer
@@ -16,8 +17,56 @@ from typing import Any, Literal
 
 LCA_SSE_EXTENSION_VERSION = 1
 
-LcaToolEventType = Literal["tool_started", "tool_result", "tool_state", "run_error"]
+LcaToolEventType = Literal[
+    "tool_call_streaming",
+    "tool_started",
+    "tool_result",
+    "tool_state",
+    "run_error",
+    "reasoning_section",
+]
 LCA_CLOSED_LOOP_MARKER = True
+
+
+def lca_reasoning_section_event(
+    *,
+    step: int,
+    content: str,
+) -> dict[str, Any]:
+    """Mark a completed reasoning section (one per LLM turn).
+
+    Emitted at ``ReasoningCompleted`` so the frontend can save the current
+    thinking content as a finished "已深度思考" block and reset for the
+    next step — producing separate collapsible sections per LLM call,
+    matching native LobeHub's per-operation reasoning display.
+    """
+    return {
+        "type": "reasoning_section",
+        "step": step,
+        "content": content,
+    }
+
+
+def lca_tool_call_streaming_event(
+    *,
+    tool_name: str,
+    tool_call_id: str = "",
+) -> dict[str, Any]:
+    """Early indicator: LLM is generating tool call arguments.
+
+    Emitted while the LLM stream is still producing ``function_call_arguments``
+    deltas — before the full response completes.  The frontend renders a
+    pending tool card so the user sees progress immediately, eliminating the
+    dead gap between reasoning completion and tool execution.
+    """
+    event: dict[str, Any] = {
+        "type": "tool_call_streaming",
+        "tool_name": tool_name,
+        "closed_loop": LCA_CLOSED_LOOP_MARKER,
+    }
+    if tool_call_id:
+        event["tool_call_id"] = tool_call_id
+    return event
 
 
 def lca_tool_started_event(

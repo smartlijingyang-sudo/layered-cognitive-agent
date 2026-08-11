@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from datetime import datetime, timezone
 
 from lca.contracts.atoms.enums import MemoryRecordKind
 from lca.contracts.atoms.telemetry import ATTR_PROMPT_TEMPLATE
@@ -228,6 +229,7 @@ def _role_prompt_vars(
 ) -> dict[str, str]:
     tool_list = tools or ()
     cloud_sandbox = _cloud_sandbox_block(tool_list)
+    now = datetime.now(timezone.utc)
     return {
         "role": role_profile.role,
         "goal": role_profile.goal,
@@ -240,6 +242,7 @@ def _role_prompt_vars(
         "activated_skills": _format_activated_skills(state),
         "search_routing": search_routing_hint(tavily_available=any_search_provider_available()),
         "cloud_sandbox": cloud_sandbox,
+        "current_date": now.strftime("%Y-%m-%d %A"),
     }
 
 
@@ -266,6 +269,26 @@ def _with_loop_warning(variables: dict[str, str], state: AgentState) -> dict[str
         return variables
     enriched = dict(variables)
     enriched["context"] = enriched["context"] + f"\n\n{warning}"
+    return enriched
+
+
+def _with_artifact_context(variables: dict[str, str], state: AgentState) -> dict[str, str]:
+    """Inject workspace artifact summary into prompt context.
+
+    When the workspace already has file products, the LLM sees them and:
+    - avoids re-executing code that already produced output
+    - knows correct file paths instead of hallucinating URLs
+    """
+    from lca.layer0_infra.workspace import get_run_workspace
+
+    workspace = get_run_workspace()
+    if workspace is None:
+        return variables
+    handoff = workspace.artifacts.handoff_block()
+    if not handoff:
+        return variables
+    enriched = dict(variables)
+    enriched["context"] = enriched["context"] + f"\n\n{handoff}"
     return enriched
 
 
@@ -317,6 +340,7 @@ class PromptReasoner(Reasoner):
             template_name = state.active_template or default_template_for(awareness)
         variables = _with_subtasks(variables, state)
         variables = _with_loop_warning(variables, state)
+        variables = _with_artifact_context(variables, state)
         prompt = self._templates[template_name].format(**variables)
         prompt = _strip_empty_prompt_fields(prompt)
         annotate(**{ATTR_PROMPT_TEMPLATE: template_name})

@@ -43,6 +43,16 @@ Accepted
 - 执行结束后各 Adapter **仅** 从该目录收集文件进 `SandboxResult.generated_files`
 - 写到其它路径的文件**不**收集（本 ADR 不引入写盘路径重定向 wrapper）
 
+### 一·附、`run_command` / terminal 自动 harvest（ADR-0050 扩展）
+
+- `execute_code`：bootstrap 末尾 `GUEST_ARTIFACT_SCANNER`（既有）。
+- **`run_command`（terminal 平面）**：`RunBoundSandboxRuntime.run_terminal` 在
+  shell 返回后跑同一 scanner，将 **新或内容变更**（sha256 指纹，run 内）的
+  outputs 文件并入 `generated_files` → FileStore → 前端下载卡。
+- 多步 officecli 只在文件内容变化时再发卡片，避免每步重复导出同一 pptx。
+- 后台 `run_command(background=true)` 不在启动时 harvest；`export_file` 仍
+  用于 outputs 外路径或显式再导出。
+
 ### 二、双通道合并（E2B）
 
 E2B 在 `sandbox.kill()` **之前**：

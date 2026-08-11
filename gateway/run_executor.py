@@ -56,14 +56,18 @@ async def execute_run(
     if session is None:
         return
     session.status = RunStatus.RUNNING
+    # Capture workspace reference for artifact closure in finally (contextvar
+    # is reset when the `with` block exits, so we need a direct reference).
+    workspace_ref: list[Any] = [None]
     try:
         # Bind run_id + attachments for the whole task (contextvars copy across create_task).
         with (
             run_id_scope(session.run_id),
             run_attachment_scope(session.attachment_ids),
-            run_workspace_scope(session.run_id),
+            run_workspace_scope(session.run_id) as workspace,
             search_run_scope(),
         ):
+            workspace_ref[0] = workspace
             sandbox = resolve_sandbox()
             if sandbox is not None:
                 try:
@@ -122,11 +126,65 @@ async def execute_run(
             # HIL pause: keep session alive for resume, do NOT close hub or emit sentinel.
             registry.mark_paused(session)
         else:
+            # Safety net: if run produced files but didn't complete normally
+            # (LLM timeout, crash, cancellation), emit artifact closure so the
+            # frontend still sees the deliverables. Mirrors LobeHub workRegistration.
+            _emit_artifact_closure_if_needed(workspace_ref[0], session)
             # Release run-scoped resources (sandbox sessions, …) before closing hub.
             await finalize_run(session.run_id)
             session.hub.close()
             session.emit(None)
             registry.clear_inflight(session)
+
+
+def _emit_artifact_closure_if_needed(workspace: Any, session: RunSession) -> None:
+    """Emit artifact closure text if run produced files but didn't finish cleanly.
+
+    When the main loop completes normally, ``CognitiveRuntime._apply_artifact_closure``
+    handles this. But if the run is interrupted (LLM timeout, crash, cancellation),
+    the loop never reaches that code path. This function is the safety net: it
+    checks the workspace artifact ledger and records a final content delta so
+    the frontend still sees the deliverables.
+
+    Aligned with LobeHub ``workRegistration`` — files produced during a run
+    must always be surfaced to the user, regardless of how the run ends.
+
+    Note: we use ``session.hub.journal.record()`` directly instead of the
+    ambient ``record()`` facade, because the observability ``bind()`` context
+    has already been unwound by the time this finally block runs.
+    """
+    if workspace is None:
+        return
+    artifacts = workspace.artifacts.snapshot().artifacts
+    if not artifacts:
+        return
+    closure = workspace.artifacts.closure_text()
+    if not closure:
+        return
+    from lca.contracts.atoms.enums import StreamChannel
+    from lca.contracts.models.observability.journal import StepTextDelta
+
+    try:
+        session.hub.journal.record(
+            StepTextDelta(
+                step=-1,
+                text_delta="\n\n" + closure,
+                seq=0,
+                channel=StreamChannel.ANSWER.value,
+            )
+        )
+        _log.info(
+            "artifact_closure_emitted",
+            run_id=session.run_id,
+            artifact_count=len(artifacts),
+            status=session.status.value,
+        )
+    except Exception:
+        _log.warning(
+            "artifact_closure_emit_failed",
+            run_id=session.run_id,
+            exc_info=True,
+        )
 
 
 def _run_context_for_session(session: RunSession) -> RunContext | None:

@@ -29,6 +29,7 @@ from typing import Any
 
 from gateway._tool_projection import ToolProjection
 from gateway.lobehub_bridge.lca_sse_extension import (
+    lca_reasoning_section_event,
     merge_lca_extension,
 )
 from gateway.presentation.turn_snapshot import (
@@ -66,6 +67,9 @@ class _EmitCursor:
 
     answer_emitted: dict[int, int] = field(default_factory=dict)
     """turn_index → number of chars of answer_text already emitted."""
+
+    reasoning_section_emitted: dict[int, bool] = field(default_factory=dict)
+    """turn_index → whether a reasoning_section LCA event was emitted."""
 
     reasoning_block_open: bool = False
     """Whether a reasoning block is currently open in the SSE stream."""
@@ -248,16 +252,33 @@ class DiffProjector:
         return []
 
     def _close_reasoning_block(self) -> list[Chunk]:
-        """Close the current reasoning block (LobeHub sees end of thinking).
+        """Close the current reasoning block and emit a reasoning_section event.
 
-        LobeHub's StreamingHandler calls endReasoningIfNeeded() when it sees
-        tool_started or stop. We don't need to send an explicit marker —
-        the tool_started event from ToolProjection will trigger it.
+        The reasoning_section event carries the complete thinking text for
+        the current turn, so the frontend can save it as a finished
+        "已深度思考" block and reset for the next step — producing separate
+        collapsible sections per LLM call.
         """
         if not self._cursor.reasoning_block_open:
             return []
         self._cursor.reasoning_block_open = False
-        return []
+
+        # Emit reasoning_section with the current turn's full reasoning text
+        chunks: list[Chunk] = []
+        curr_idx = self._snapshot.current_turn_index
+        if 0 <= curr_idx < len(
+            self._snapshot.turns
+        ) and not self._cursor.reasoning_section_emitted.get(curr_idx, False):
+            turn = self._snapshot.turns[curr_idx]
+            content = turn.reasoning_text
+            if content:
+                self._cursor.reasoning_section_emitted[curr_idx] = True
+                section_event = lca_reasoning_section_event(
+                    step=turn.step,
+                    content=content,
+                )
+                chunks.extend(self._wrap_lca_events([section_event]))
+        return chunks
 
     # ── Tool event delegation ───────────────────────────────
 
@@ -268,10 +289,12 @@ class DiffProjector:
         """
         event = stamped.event
         if isinstance(event, ToolStarted):
-            # Close reasoning block before tool card (LobeHub sees tool → ends thinking)
+            # Close reasoning block before tool card — capture the
+            # reasoning_section event so it's not lost.
+            pre_chunks: list[Chunk] = []
             if self._cursor.reasoning_block_open:
-                self._close_reasoning_block()
-            return self._tools.project_started(event)
+                pre_chunks.extend(self._close_reasoning_block())
+            return pre_chunks + self._tools.project_started(event)
         if isinstance(event, SandboxOutputDelta):
             return self._tools.project_sandbox_output(event)
         if isinstance(event, ToolInvoked):

@@ -1,36 +1,47 @@
-"""Absolutize LCA file product URLs for LobeHub frontend (cross-origin dev)."""
+"""Absolutize LCA file product URLs for LobeHub frontend (cross-origin dev).
+
+The public URL for file downloads is independent of the internal proxy URL.
+``OPENAI_PROXY_URL`` is for LobeHub backend → LCA gateway communication
+(often 127.0.0.1).  ``LCA_GATEWAY_PUBLIC_URL`` is for browser-facing
+downloads (the actual IP/hostname).
+
+This module is a thin re-export facade — the canonical implementation lives
+in ``gateway.presentation.artifact_registry``.
+"""
 
 from __future__ import annotations
 
-import os
-from typing import Any
-from urllib.parse import urljoin
+from gateway.presentation.artifact_registry import (
+    absolutize_url as _absolutize_url,
+)
 
 _DEFAULT_GATEWAY_BASE = "http://127.0.0.1:8765"
 
 
 def gateway_public_base() -> str:
-    """Public HTTP base for ``GET /files/{id}`` (no trailing slash)."""
-    raw = (
-        os.environ.get("LCA_GATEWAY_PUBLIC_URL", "").strip()
-        or os.environ.get("OPENAI_PROXY_URL", "").strip().removesuffix("/v1").rstrip("/")
-        or _DEFAULT_GATEWAY_BASE
-    )
-    return raw.rstrip("/")
+    """Public HTTP base for ``GET /files/{id}`` (no trailing slash).
+
+    Delegates to ``artifact_registry.gateway_public_base()``.
+    """
+    from gateway.presentation.artifact_registry import gateway_public_base as _base
+
+    return _base()
 
 
-def absolutize_file_part(part: dict[str, Any], *, base: str | None = None) -> dict[str, Any]:
+def absolutize_file_part(part: dict, *, base: str | None = None) -> dict:
     """Return a copy with relative ``/files/…`` URLs made absolute."""
-    out = dict(part)
+    from typing import Any
+
+    out: dict[str, Any] = dict(part)
     url = out.get("url")
     if isinstance(url, str) and url.startswith("/"):
-        out["url"] = urljoin(f"{(base or gateway_public_base()).rstrip('/')}/", url.lstrip("/"))
+        out["url"] = _absolutize_url(url, base=base)
     return out
 
 
 def absolutize_file_parts(
-    parts: tuple[dict[str, Any], ...] | list[dict[str, Any]],
+    parts: tuple[dict, ...] | list[dict],
     *,
     base: str | None = None,
-) -> list[dict[str, Any]]:
+) -> list[dict]:
     return [absolutize_file_part(p, base=base) for p in parts if isinstance(p, dict)]

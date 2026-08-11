@@ -43,7 +43,7 @@ for dirpath, _, filenames in _o.walk(root):
         elif lower.endswith((".doc",)):
             out["profiles"][fn] = {
                 "type": "legacy_word",
-                "hint": "旧版 Word .doc（OLE2）；python-docx 不支持，可用 olefile 读流或 libreoffice 转 docx",
+                "hint": "旧版 Word .doc（OLE2）；优先转 docx 后用 officecli；或 olefile 探测",
                 "suggested_skills": [],
             }
         elif lower.endswith((".docx",)):
@@ -55,9 +55,15 @@ for dirpath, _, filenames in _o.walk(root):
                     "type": "docx",
                     "paragraphs": len(paras),
                     "preview": paras[:3],
+                    "hint": "Office 编辑优先 officecli（activate_skill officecli + run_command）",
                 }
             except Exception as exc:
                 out["profiles"][fn] = {"type": "docx", "error": str(exc)}
+        elif lower.endswith((".pptx",)):
+            out["profiles"][fn] = {
+                "type": "pptx",
+                "hint": "PowerPoint；activate_skill('officecli') 后 run_command 调用 officecli",
+            }
         elif lower.endswith(".pdf"):
             out["profiles"][fn] = {"type": "pdf", "hint": "PDF 输入；可用 pypdf 读取或 anthropics-skills-pdf 生成"}
         elif lower.endswith(".csv"):

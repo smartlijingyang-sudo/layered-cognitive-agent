@@ -11,6 +11,9 @@ LOBE_DIR="${ROOT}/lobehub-ui"
 RUN_DIR="${ROOT}/.lobehub-stack"
 GATEWAY_PORT="${GATEWAY_PORT:-8765}"
 LOBE_DEV_PORT="${LOBE_DEV_PORT:-3010}"
+SPA_PORT="${SPA_PORT:-9876}"
+SPA_MOBILE_PORT="${SPA_MOBILE_PORT:-3012}"
+SPA_AUTH_PORT="${SPA_AUTH_PORT:-3013}"
 LOBEHUB_RELEASE="${LOBEHUB_RELEASE:-v2.2.13}"
 
 GATEWAY_PID="${RUN_DIR}/gateway.pid"
@@ -18,6 +21,10 @@ GATEWAY_LOG="${RUN_DIR}/gateway.log"
 LOBE_DEV_PID="${RUN_DIR}/lobehub-dev.pid"
 LOBE_ENV="${ROOT}/deploy/lobehub/.env.lca"
 NEXT_DEV_LOCK="${LOBE_DIR}/.next/dev/lock"
+
+# Public URL for file downloads (browser-facing).  Defaults to the gateway's
+# actual listening host so LAN clients get reachable URLs instead of 127.0.0.1.
+GATEWAY_PUBLIC_URL="${GATEWAY_PUBLIC_URL:-http://0.0.0.0:${GATEWAY_PORT}}"
 
 log() { printf '[lobehub-stack] %s\n' "$*"; }
 
@@ -143,6 +150,58 @@ stop_lobehub_dev() {
     return 1
   fi
   return 0
+}
+
+_collect_vite_spa_pids() {
+  local -a pids=()
+  local port port_pid
+  for port in "${SPA_PORT}" "${SPA_MOBILE_PORT}" "${SPA_AUTH_PORT}"; do
+    if command -v ss >/dev/null 2>&1; then
+      port_pid="$(
+        ss -tlnp 2>/dev/null \
+          | awk -v port=":${port}" '$0 ~ port { if (match($0, /pid=([0-9]+)/, m)) { print m[1]; exit } }'
+      )"
+      [[ -n "${port_pid}" ]] && pids+=("${port_pid}")
+    fi
+  done
+  while IFS= read -r pid; do
+    [[ -n "${pid}" ]] && pids+=("${pid}")
+  done < <(pgrep -f "${LOBE_DIR}/node_modules/.bin/vite" 2>/dev/null || true)
+  local seen="" deduped=""
+  for pid in "${pids[@]}"; do
+    [[ " ${seen} " == *" ${pid} "* ]] && continue
+    seen="${seen} ${pid}"
+    deduped="${deduped} ${pid}"
+  done
+  printf '%s\n' ${deduped}
+}
+
+stop_vite_spa() {
+  local pid
+  local -a targets=()
+  while IFS= read -r pid; do
+    [[ -n "${pid}" ]] && targets+=("${pid}")
+  done < <(_collect_vite_spa_pids)
+  if [[ ${#targets[@]} -eq 0 ]]; then
+    return 0
+  fi
+  log "停止 Vite SPA（pids: ${targets[*]}）"
+  for pid in "${targets[@]}"; do
+    _kill_pid_tree "${pid}" TERM
+  done
+  local waited=0
+  while [[ ${waited} -lt 10 ]]; do
+    local still=0
+    for pid in "${targets[@]}"; do
+      kill -0 "${pid}" 2>/dev/null && still=1
+    done
+    [[ ${still} -eq 0 ]] && break
+    sleep 0.5
+    waited=$((waited + 1))
+  done
+  for pid in "${targets[@]}"; do
+    _kill_pid_tree "${pid}" KILL
+  done
 }
 
 prepare_lobehub_dev() {
@@ -389,9 +448,10 @@ start_gateway() {
       return 0
     fi
   fi
-  log "启动 LCA Gateway (OpenAI 面) :${GATEWAY_PORT}"
+  log "启动 LCA Gateway (OpenAI 面) :${GATEWAY_PORT} (public: ${GATEWAY_PUBLIC_URL})"
   (
     cd "${ROOT}"
+    export LCA_GATEWAY_PUBLIC_URL="${GATEWAY_PUBLIC_URL}"
     exec uv run python scripts/serve_observability.py --host 0.0.0.0 --port "${GATEWAY_PORT}"
   ) >>"${GATEWAY_LOG}" 2>&1 &
   echo $! >"${GATEWAY_PID}"
@@ -427,6 +487,15 @@ start_lobehub_dev() {
   export ENABLED_OPENAI="${ENABLED_OPENAI:-1}"
   export PORT="${LOBE_DEV_PORT}"
 
+  if [[ "${LOBE_CLEAN_CACHE:-0}" == "1" ]]; then
+    log "清理 Vite 依赖缓存 + .next（LOBE_CLEAN_CACHE=1）"
+    rm -rf "${LOBE_DIR}/node_modules/.vite/deps" "${LOBE_DIR}/.next"
+  elif [[ -d "${LOBE_DIR}/node_modules/.vite/deps/_metadata.json" ]]; then
+    local meta_age
+    meta_age="$(find "${LOBE_DIR}/node_modules/.vite/deps/_metadata.json" -mmin +1440 2>/dev/null)"
+    [[ -n "${meta_age}" ]] && log "提示: Vite 依赖缓存超过 24h，如遇 'outdated optimize dep' 可加 LOBE_CLEAN_CACHE=1 重启"
+  fi
+
   log "启动 LobeHub ${LOBEHUB_RELEASE} dev (OpenAI → ${OPENAI_PROXY_URL})"
   log "访问: http://127.0.0.1:${LOBE_DEV_PORT}"
   cd "${LOBE_DIR}"
@@ -438,6 +507,7 @@ start_lobehub_dev() {
 
 stop_all() {
   stop_lobehub_dev || true
+  stop_vite_spa || true
   stop_gateway
 }
 
@@ -456,10 +526,13 @@ usage() {
 环境变量:
   LOBEHUB_RELEASE   release tag（默认 v2.2.13）
   GATEWAY_PORT      LCA 网关端口（默认 8765）
+  GATEWAY_PUBLIC_URL  文件下载的公开 URL（默认 http://0.0.0.0:${GATEWAY_PORT}）
+                      浏览器用此 URL 下载文件，局域网/远程访问需设为实际 IP
   LOBE_DEV_PORT     LobeHub dev 端口（默认 3010）
   LOBE_REUSE_DEV    设为 1 时若 dev 已在运行则复用、不重启
   LOBE_SKIP_INFRA   设为 1 时跳过 docker compose
   LOBE_FORCE_INFRA  设为 1 时即使端口可达也尝试 docker compose
+  LOBE_CLEAN_CACHE  设为 1 时清除 .vite/deps + .next 缓存再启动（日常不要开，会丢失预构建加速）
   LCA_GATEWAY_FORCE_RESTART  设为 1 时强制重启 gateway
   OPENAI_PROXY_URL  LobeHub 指向的 OpenAI 兼容 URL
 EOF

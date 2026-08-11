@@ -11,16 +11,9 @@ from lca.layer0_infra.sandbox.onlyboxes_artifacts import (
     ARTIFACT_END,
     strip_artifacts,
 )
-from lca.layer0_infra.sandbox.onlyboxes_bootstrap import build_minimal_bootstrap
 
 
 class OnlyboxesRoundtripHelpersTests(unittest.TestCase):
-    def test_build_minimal_bootstrap_includes_exec_and_patches(self) -> None:
-        bootstrap = build_minimal_bootstrap('print("hello")')
-        self.assertIn("exec(compile(", bootstrap)
-        self.assertIn("numpy", bootstrap)
-        self.assertIn("print(", bootstrap)
-
     def test_strip_artifacts_respects_caps_via_try_append(self) -> None:
         # One small file harvests cleanly.
         block = (

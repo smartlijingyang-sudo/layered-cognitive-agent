@@ -1,7 +1,7 @@
-"""Onlyboxes shared constants, code bootstrap, and response parsing.
+"""Onlyboxes shared constants and response parsing.
 
-Extracted from ``onlyboxes_adapter`` to keep bootstrap logic, parsing,
-and constants in a single shared module.
+Extracted from ``onlyboxes_adapter`` to keep parsing logic and
+constants in a single shared module.
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     import httpx
 
 from lca.contracts.models.core.sandbox import SandboxResult
-from lca.layer0_infra.credentials.sandbox_env import build_sandbox_env_preamble
 from lca.layer0_infra.sandbox.onlyboxes_artifacts import strip_artifacts
 from lca.layer0_infra.sandbox.streaming import SandboxStreamEmitter
 
@@ -51,43 +50,6 @@ def auth_headers(access_token: str) -> dict[str, str]:
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
-
-
-def _strip_surrogates(text: str) -> str:
-    """Replace lone surrogate code points (U+D800–U+DFFF) with U+FFFD."""
-    return "".join("\ufffd" if "\ud800" <= ch <= "\udfff" else ch for ch in text)
-
-
-def build_minimal_bootstrap(code: str) -> str:
-    """Minimal bootstrap — no file embedding (files are pre-staged via write_files).
-
-    Provides: env preamble, numpy/pandas JSON patch, matplotlib warning
-    suppression, and ``exec`` of user code.
-    """
-    env_preamble = build_sandbox_env_preamble()
-    code_literal = json.dumps(_strip_surrogates(code))
-    return f"""# --- LCA minimal bootstrap ---
-import os as _lca_os, sys as _lca_sys, json as _lca_json
-{env_preamble}
-# numpy/pandas JSON patch
-_lca_original_dumps = _lca_json.dumps
-def _lca_numpy_dumps(obj, *args, **kwargs):
-    def _numpy_default(o):
-        if hasattr(o, "item"): return o.item()
-        raise TypeError(f"Object of type {{type(o).__name__}} is not JSON serializable")
-    kwargs.setdefault("default", _numpy_default)
-    return _lca_original_dumps(obj, *args, **kwargs)
-_lca_json.dumps = _lca_numpy_dumps
-
-import warnings as _lca_warnings
-_lca_warnings.filterwarnings("ignore", module="matplotlib.font_manager")
-
-try:
-    exec(compile({code_literal}, "<lca-user>", "exec"), {{"__name__": "__main__"}})
-except SystemExit as _lca_se:
-    if _lca_se.code not in (0, None):
-        raise
-"""
 
 
 def parse_terminal_response(

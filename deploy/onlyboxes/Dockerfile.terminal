@@ -2,7 +2,8 @@
 # Onlyboxes terminalExec runtime — LCA + LobeHub cloud-sandbox baseline.
 #
 # Aligns with LobeHub native: terminalExec is the sole execution channel; this
-# image must carry the same Python data/doc stack as deploy/onlyboxes/requirements-python.txt.
+# image must carry the same Python data/doc stack as deploy/onlyboxes/requirements-python.txt
+# plus the pinned officecli binary (ADR-0054 Office plane).
 #
 # Build:
 #   ./deploy/onlyboxes/build-terminal-image.sh
@@ -10,10 +11,16 @@
 #   WORKER_TERMINAL_EXEC_DOCKER_IMAGE=onlyboxes-terminal-local:lca
 FROM coolfan1024/onlyboxes-runtime:default
 
+# Pin OfficeCLI release — bump deliberately with smoke + skill review (ADR-0054).
+ARG OFFICECLI_VERSION=1.0.143
+ARG TARGETARCH=amd64
+
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    OFFICECLI_SKIP_UPDATE=1 \
+    OFFICECLI_VERSION=${OFFICECLI_VERSION}
 
 USER root
 
@@ -21,6 +28,7 @@ USER root
 # Agent must NOT curl fonts at runtime — terminalExec image is the sole channel.
 COPY requirements-python.txt /tmp/requirements-python.txt
 COPY matplotlibrc /etc/matplotlibrc
+COPY install-officecli.sh /tmp/install-officecli.sh
 ENV MATPLOTLIBRC=/etc/matplotlibrc
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -28,20 +36,35 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     (sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null \
         || sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null \
         || true) \
+    && (sed -i 's|archive.ubuntu.com|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null \
+        || sed -i 's|archive.ubuntu.com|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null \
+        || true) \
+    && (sed -i 's|security.ubuntu.com|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null \
+        || sed -i 's|security.ubuntu.com|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null \
+        || true) \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
         fontconfig \
         fonts-wqy-zenhei \
         fonts-noto-cjk \
     && fc-cache -f \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && fc-list :lang=zh | head -5 \
+    && fc-list :lang=zh | grep -qi "wenquanyi\|noto.*cjk" \
+    && echo 'cjk-font: ok'
 
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     pip install --no-cache-dir -r /tmp/requirements-python.txt \
     && rm -f /tmp/requirements-python.txt \
-    && python3 -c "import reportlab,pandas,numpy,openpyxl; print('terminal-runtime ok')" \
-    && test -f /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc \
-        -o -f /usr/share/fonts/truetype/wqy/wqy-zenhei.ttc \
-    && echo 'cjk-font: ok'
+    && python3 -c "import reportlab,pandas,numpy,openpyxl; print('terminal-runtime ok')"
+
+# Office plane binary (ADR-0054) — never install at agent runtime.
+RUN chmod +x /tmp/install-officecli.sh \
+    && OFFICECLI_VERSION="${OFFICECLI_VERSION}" TARGETARCH="${TARGETARCH}" \
+       /tmp/install-officecli.sh /usr/local/bin \
+    && rm -f /tmp/install-officecli.sh \
+    && officecli --version
 
 WORKDIR /workspace

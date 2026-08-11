@@ -32,8 +32,9 @@ class SkillActivateTool(Tool):
     name = ACTIVATE_SKILL_TOOL
     description = (
         "激活已安装的操作 skill，将其 SKILL.md 操作指南注入当前上下文。"
-        "分析附件（Excel/PDF 等）时优先激活匹配 skill（如 anthropics-skills-xlsx），"
-        "再通过 run_skill_script 执行 skill 文档中的命令。"
+        "Office 文档（.docx/.xlsx/.pptx）优先 activate_skill('officecli')，"
+        "再 run_command 调用预装 officecli CLI（--json）。"
+        "PDF 用 anthropics-skills-pdf；纯表分析可用 pandas 无需 skill。"
         "参数: skill_id（安装时的 identifier 或 import 返回的 skill_id）。"
     )
     parameters: ClassVar[dict[str, Any]] = {

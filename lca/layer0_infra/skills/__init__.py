@@ -1,4 +1,4 @@
-"""Operational skill package infrastructure (ADR-0048)."""
+"""Operational skill package infrastructure (ADR-0048 / ADR-0054)."""
 
 from lca.layer0_infra.skills.activation_scope import (
     ActivatedSkill,
@@ -8,6 +8,7 @@ from lca.layer0_infra.skills.activation_scope import (
     register_activated,
     resolve_skill_for_exec,
 )
+from lca.layer0_infra.skills.bundled import OFFICECLI_SKILL_ID, ensure_bundled_skills
 from lca.layer0_infra.skills.disk_store import DiskSkillPackageStore
 from lca.layer0_infra.skills.exec_bootstrap import (
     build_skill_exec_code,
@@ -17,11 +18,13 @@ from lca.layer0_infra.skills.factory import resolve_skill_importer, resolve_skil
 from lca.layer0_infra.skills.http_importer import HttpSkillImporter
 
 __all__ = [
+    "OFFICECLI_SKILL_ID",
     "ActivatedSkill",
     "DiskSkillPackageStore",
     "HttpSkillImporter",
     "activated_skills_scope",
     "build_skill_exec_code",
+    "ensure_bundled_skills",
     "get_activated_skills",
     "get_newly_activated",
     "register_activated",

@@ -1,17 +1,16 @@
-"""Guest-side artifact harvest script (ADR-0046).
+"""Guest-side artifact harvest constants.
 
-Injected after ``execute_code`` user code so ``/mnt/data/outputs`` files are
-collected via the stdout marker parsed by ``onlyboxes_artifacts.strip_artifacts``.
+Re-exports ``ARTIFACT_BEGIN`` / ``ARTIFACT_END`` markers used by
+``strip_artifacts`` to parse generated-file blocks from sandbox stdout.
 """
 
 from __future__ import annotations
 
-import textwrap
-
 from lca.layer0_infra.sandbox.bootstrap import sandbox_output_path
 from lca.layer0_infra.sandbox.onlyboxes_artifacts import ARTIFACT_BEGIN, ARTIFACT_END
 
-# Guest Python executed in a ``finally`` block after user code.
+# Guest Python executed after user code to scan /mnt/data/outputs and
+# print an artifact marker block that the host parses via ``strip_artifacts``.
 GUEST_ARTIFACT_SCANNER: str = f"""
 import os as _os, json as _json, base64 as _b64, mimetypes as _mt
 try:
@@ -19,6 +18,9 @@ try:
     _output_dir = {sandbox_output_path()!r}
     if _os.path.isdir(_output_dir):
         for _fname in sorted(_os.listdir(_output_dir)):
+            # Skip workspace markers / hidden ops files (e.g. .workspace-initialized).
+            if not _fname or _fname.startswith("."):
+                continue
             _fpath = _os.path.join(_output_dir, _fname)
             if _os.path.isfile(_fpath):
                 try:
@@ -36,13 +38,3 @@ try:
 except Exception:
     pass
 """.strip()
-
-
-def wrap_code_with_artifact_scanner(code: str) -> str:
-    """Wrap user Python so outputs under ``/mnt/data/outputs`` are harvested."""
-    return (
-        "try:\n"
-        + textwrap.indent(code, "    ")
-        + "\nfinally:\n"
-        + textwrap.indent(GUEST_ARTIFACT_SCANNER, "    ")
-    )

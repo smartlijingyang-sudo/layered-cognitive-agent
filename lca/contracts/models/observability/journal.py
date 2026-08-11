@@ -326,6 +326,18 @@ class LlmCallCompleted(JournalEvent):
 
 
 @dataclass(frozen=True)
+class ToolCallStreaming(JournalEvent):
+    """LLM 正在流式生成工具调用参数（tool call arguments still streaming）。
+
+    在 LLM 响应完成前发出，让前端尽早渲染工具卡片占位——消除思考结束到
+    工具执行之间的空白期。与 ``ToolStarted``（执行前、参数完整）互补。
+    """
+
+    tool_name: str = ""
+    tool_call_id: str = ""
+
+
+@dataclass(frozen=True)
 class ToolStarted(JournalEvent):
     """工具调用开始（执行前；与 ToolInvoked 经 invocation_id 关联）。
 

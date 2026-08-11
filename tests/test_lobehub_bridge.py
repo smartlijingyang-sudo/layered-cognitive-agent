@@ -266,7 +266,24 @@ class TestPrepareRunFromMessages(unittest.IsolatedAsyncioTestCase):
 
 
 class TestOpenAiFinishInvariant(unittest.TestCase):
-    def test_step_text_answer_channel_streams_content(self) -> None:
+    @staticmethod
+    def _llm_completed_frame() -> str:
+        return (
+            'data: {"schema":"journal.v1","seq":99,"ts":99.0,'
+            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
+            '"event_type":"LlmCallCompleted","event":{"model":"test",'
+            '"ok":true,"latency_ms":1,"prompt_tokens":0,"completion_tokens":0}}\n\n'
+        )
+
+    def _content_from(self, chunks: list[dict]) -> str:
+        return "".join(
+            c["choices"][0]["delta"].get("content", "")
+            for c in chunks
+            if "delta" in c["choices"][0]
+        )
+
+    def test_step_text_answer_channel_streams_content_after_llm_completed(self) -> None:
+        """Answer text is buffered until LlmCallCompleted (native LobeHub ordering)."""
         projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
         frame = (
             "id: 1\nevent: StepTextDelta\n"
@@ -274,8 +291,12 @@ class TestOpenAiFinishInvariant(unittest.TestCase):
             '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
             f'"event_type":"StepTextDelta","event":{{"step":1,"text_delta":"你","seq":1,"channel":"{StreamChannel.ANSWER.value}"}}}}\n\n'
         )
+        # Answer text is buffered — no content output yet
         chunks = projector.project_frame(frame)
-        self.assertEqual(chunks[0]["choices"][0]["delta"]["content"], "你")
+        self.assertEqual(self._content_from(chunks), "")
+        # LlmCallCompleted triggers the flush
+        chunks = projector.project_frame(self._llm_completed_frame())
+        self.assertEqual(self._content_from(chunks), "你")
 
     def test_decision_json_never_leaks_to_content(self) -> None:
         projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
@@ -294,11 +315,11 @@ class TestOpenAiFinishInvariant(unittest.TestCase):
         chunks: list[dict] = []
         chunks.extend(projector.project_frame(decision_frame))
         chunks.extend(projector.project_frame(answer_frame))
-        content = "".join(
-            c["choices"][0]["delta"].get("content", "")
-            for c in chunks
-            if "delta" in c["choices"][0]
-        )
+        # Answer text is buffered — not emitted yet
+        self.assertEqual(self._content_from(chunks), "")
+        # Flush via LlmCallCompleted
+        chunks.extend(projector.project_frame(self._llm_completed_frame()))
+        content = self._content_from(chunks)
         self.assertEqual(content, "你好")
         self.assertNotIn("rationale", content)
 
@@ -311,6 +332,7 @@ class TestOpenAiFinishInvariant(unittest.TestCase):
             f'"event_type":"StepTextDelta","event":{{"step":1,"text_delta":"流式","seq":0,"channel":"{StreamChannel.ANSWER.value}"}}}}\n\n'
         )
         projector.project_frame(stream_frame)
+        # DecisionMade flushes the buffered answer text, skips duplicate
         decision_frame = (
             "id: 2\nevent: DecisionMade\n"
             'data: {"schema":"journal.v1","seq":2,"ts":2.0,'
@@ -320,7 +342,9 @@ class TestOpenAiFinishInvariant(unittest.TestCase):
             '"delegate_count":0,"tool_name":"","confidence":1.0,"output_truncated":false}}\n\n'
         )
         chunks = projector.project_frame(decision_frame)
-        self.assertEqual(chunks, [])
+        # Buffered "流式" is flushed, "完整回复" is skipped (already streamed)
+        content = self._content_from(chunks)
+        self.assertEqual(content, "流式")
 
     def test_tool_stream_only_ends_with_stop(self) -> None:
         projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")

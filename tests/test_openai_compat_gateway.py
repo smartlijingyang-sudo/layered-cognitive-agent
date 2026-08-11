@@ -47,8 +47,17 @@ class TestJournalOpenAiProjector(unittest.TestCase):
             '"event_type":"ReasoningDelta","event":{"step":1,"text_delta":"思考中","seq":1}}\n\n'
         )
         chunks = projector.project_frame(frame)
-        self.assertEqual(len(chunks), 1)
-        self.assertIn("reasoning_content", chunks[0]["choices"][0]["delta"])
+        # First reasoning delta in a new step emits 2 chunks:
+        # 1) reasoning_start LCA event (step boundary for frontend splitting)
+        # 2) reasoning_content delta
+        self.assertEqual(len(chunks), 2)
+        # One chunk has reasoning_content, the other has the LCA extension
+        has_reasoning = any(
+            "reasoning_content" in c.get("choices", [{}])[0].get("delta", {}) for c in chunks
+        )
+        has_lca = any("lca" in c for c in chunks)
+        self.assertTrue(has_reasoning)
+        self.assertTrue(has_lca)
 
         finish_frame = (
             "id: 2\nevent: AgentRunFinished\n"
