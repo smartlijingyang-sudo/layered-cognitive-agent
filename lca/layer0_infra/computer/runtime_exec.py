@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import textwrap
 from typing import Any, Protocol
 
 from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
@@ -20,6 +21,32 @@ from lca.layer0_infra.computer.runtime import (
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
+
+# ADR-0046 compliant: only scans /mnt/data/outputs/ (not /mnt/data/ root)
+_ARTIFACT_SCANNER = """
+import os as _os, json as _json, base64 as _b64, mimetypes as _mt
+try:
+    _scan_files = []
+    _output_dir = "/mnt/data/outputs"
+    if _os.path.isdir(_output_dir):
+        for _fname in _os.listdir(_output_dir):
+            _fpath = _os.path.join(_output_dir, _fname)
+            if _os.path.isfile(_fpath):
+                try:
+                    with open(_fpath, "rb") as _fh:
+                        _raw = _fh.read()
+                    _scan_files.append({
+                        "name": _fname,
+                        "b64": _b64.b64encode(_raw).decode(),
+                        "mime_type": _mt.guess_type(_fname)[0] or "application/octet-stream",
+                    })
+                except Exception:
+                    pass
+    if _scan_files:
+        print("__LCA_ONLYBOXES_ARTIFACTS__" + _json.dumps(_scan_files) + "__END_LCA_ARTIFACTS__")
+except Exception:
+    pass
+"""
 
 
 class _GuestOpHost(Protocol):
@@ -62,8 +89,17 @@ class ComputerRuntimeExecMixin:
             attachment_ids=get_current_run_attachment_ids(),
         )
         inv = get_current_tool_invocation_id() or "execute_code"
+
+        # Inject ADR-0046 compliant artifact scanner via try/finally
+        wrapped_code = (
+            "try:\n"
+            + textwrap.indent(code, "    ")
+            + "\nfinally:\n"
+            + textwrap.indent(_ARTIFACT_SCANNER, "    ")
+        )
+
         exec_result = await runtime.execute(
-            code,
+            wrapped_code,
             language=lang if lang in {"python", "py"} else "python",
             timeout_s=timeout_s,
             invocation_id=inv,
@@ -75,6 +111,7 @@ class ComputerRuntimeExecMixin:
             "output": exec_result.stdout,
             "stderr": exec_result.stderr,
             "exitCode": exec_result.exit_code,
+            "code": code,  # source code always visible in tool card
         }
         if not ok:
             state["error"] = exec_result.error_summary or exec_result.error
@@ -87,6 +124,7 @@ class ComputerRuntimeExecMixin:
             state=state,
             error=str(state.get("error") or ""),
             exec_result=exec_result,
+            generated_files=exec_result.generated_files,
         )
 
     async def run_command(
