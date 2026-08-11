@@ -10,6 +10,8 @@ import re
 from enum import Enum
 from typing import Any
 
+from lca.layer0_infra.text.truncate import truncate_text
+
 _PREVIEW_KEYS = frozenset(
     {
         "prompt_preview",
@@ -39,6 +41,7 @@ _CONTENT_STR_MAX = 50_000
 _JOURNAL_KIND_CONTENT = "content"
 
 _SUFFIX = "..."
+"""Truncation suffix for observability policy — ASCII for log compatibility."""
 
 
 class Verbosity(str, Enum):
@@ -55,8 +58,8 @@ def sanitize(text: str) -> str:
 
 
 def truncate(text: str, max_len: int) -> str:
-    """超长截断。"""
-    return text if len(text) <= max_len else text[:max_len] + _SUFFIX
+    """超长截断（委托 canonical ``truncate_text``）。"""
+    return truncate_text(text, max_len, suffix=_SUFFIX)
 
 
 def safe_repr(value: Any) -> Any:

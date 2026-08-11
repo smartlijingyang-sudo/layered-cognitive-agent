@@ -11,7 +11,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from gateway.settings import gateway_settings
 from lca.contracts.models.core.conversation import ConversationTurn
+from lca.contracts.models.core.state import StateSnapshot
+from lca.contracts.protocols import AgentUnit
 from lca.layer0_infra.observability import ObservabilityHub
 from lca.layer0_infra.observability.journal.sse_frames import (
     SSE_SENTINEL,
@@ -20,8 +23,6 @@ from lca.layer0_infra.observability.journal.sse_frames import (
 )
 
 _RUNS_DIR = Path("traces/runs")
-_MAX_BUFFERED_FRAMES = 4096
-_MAX_SUBSCRIBER_QUEUE = 256
 
 
 def run_dedup_key(
@@ -90,8 +91,8 @@ class RunSession:
     cancel_requested: bool = False
     frames: list[str] = field(default_factory=list)
     # HIL pause/resume: populated when status == WAITING_INPUT.
-    snapshot: Any = None
-    runnable: Any = None
+    snapshot: StateSnapshot | None = None
+    runnable: AgentUnit | None = None
     approval_request: dict[str, Any] | None = None
     _subscribers: list[asyncio.Queue[str | None]] = field(default_factory=list)
     _closed: bool = False
@@ -101,7 +102,7 @@ class RunSession:
         if frame is None:
             self._close_subscribers()
             return
-        if len(self.frames) >= _MAX_BUFFERED_FRAMES:
+        if len(self.frames) >= gateway_settings().max_buffered_frames:
             self.frames.pop(0)
         self.frames.append(frame)
         dead: list[asyncio.Queue[str | None]] = []
@@ -128,7 +129,9 @@ class RunSession:
             yield frame
         if self._closed:
             return
-        queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_MAX_SUBSCRIBER_QUEUE)
+        queue: asyncio.Queue[str | None] = asyncio.Queue(
+            maxsize=gateway_settings().max_subscriber_queue,
+        )
         self._subscribers.append(queue)
         try:
             while True:
