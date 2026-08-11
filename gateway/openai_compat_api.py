@@ -16,6 +16,7 @@ from openai import APIError
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
+from gateway._http import cors_headers
 from gateway.journal_openai_projector import (
     JournalOpenAiProjector,
     collect_openai_completion,
@@ -41,17 +42,6 @@ from lca.contracts.atoms.ids import new_id
 
 _OPENAI_CHAT_ID_PREFIX = "chatcmpl-"
 _log = structlog.get_logger(__name__)
-
-
-def _cors_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
-    base = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    }
-    if extra:
-        base.update(extra)
-    return base
 
 
 def _lca_models_payload() -> dict[str, Any]:
@@ -103,13 +93,13 @@ def _error_response(
     err: dict[str, Any] = {"message": message, "type": error_type}
     if code:
         err["code"] = code
-    return JSONResponse({"error": err}, status_code=status_code, headers=_cors_headers())
+    return JSONResponse({"error": err}, status_code=status_code, headers=cors_headers())
 
 
 async def list_models(request: Request) -> JSONResponse:
     if request.method == "OPTIONS":
-        return JSONResponse({}, headers=_cors_headers())
-    return JSONResponse(_lca_models_payload(), headers=_cors_headers())
+        return JSONResponse({}, headers=cors_headers())
+    return JSONResponse(_lca_models_payload(), headers=cors_headers())
 
 
 async def _passthrough_chat_completion(
@@ -168,14 +158,14 @@ async def _passthrough_chat_completion(
         return StreamingResponse(
             _body(),
             media_type="text/event-stream",
-            headers=_cors_headers({"Cache-Control": "no-cache"}),
+            headers=cors_headers(**{"Cache-Control": "no-cache"}),
         )
 
     projector = JournalOpenAiProjector(chat_id=chat_id, model=model)
     if usage:
         projector._prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
         projector._completion_tokens = int(usage.get("completion_tokens", 0) or 0)
-    return JSONResponse(projector.completion_json(text), headers=_cors_headers())
+    return JSONResponse(projector.completion_json(text), headers=cors_headers())
 
 
 async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | StreamingResponse:
@@ -241,7 +231,7 @@ async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | St
         return StreamingResponse(
             _body(),
             media_type="text/event-stream",
-            headers=_cors_headers({"Cache-Control": "no-cache"}),
+            headers=cors_headers(**{"Cache-Control": "no-cache"}),
         )
 
     frame_stream = registry.event_stream(session.run_id, last_event_id_header=None)
@@ -253,12 +243,12 @@ async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | St
             error_type="server_error",
             code="lca_run_failed",
         )
-    return JSONResponse(payload, headers=_cors_headers())
+    return JSONResponse(payload, headers=cors_headers())
 
 
 async def chat_completions(request: Request) -> JSONResponse | StreamingResponse:
     if request.method == "OPTIONS":
-        return JSONResponse({}, headers=_cors_headers())
+        return JSONResponse({}, headers=cors_headers())
     try:
         body = await request.json()
     except json.JSONDecodeError:
@@ -281,7 +271,7 @@ async def chat_completions(request: Request) -> JSONResponse | StreamingResponse
 async def embeddings_create(request: Request) -> JSONResponse:
     """OpenAI-compatible embeddings — proxy to upstream LLM via LCA gateway."""
     if request.method == "OPTIONS":
-        return JSONResponse({}, headers=_cors_headers())
+        return JSONResponse({}, headers=cors_headers())
     try:
         body = await request.json()
     except json.JSONDecodeError:
@@ -317,13 +307,13 @@ async def embeddings_create(request: Request) -> JSONResponse:
             error_type="server_error",
             code="lca_embeddings_failed",
         )
-    return JSONResponse(payload, headers=_cors_headers())
+    return JSONResponse(payload, headers=cors_headers())
 
 
 async def responses_create(request: Request) -> JSONResponse | StreamingResponse:
     """OpenAI Responses API shim for LobeHub AgentSignal ``generateObject``."""
     if request.method == "OPTIONS":
-        return JSONResponse({}, headers=_cors_headers())
+        return JSONResponse({}, headers=cors_headers())
     try:
         body = await request.json()
     except json.JSONDecodeError:
@@ -374,4 +364,4 @@ async def responses_create(request: Request) -> JSONResponse | StreamingResponse
         output_text=output_text,
         usage=usage,
     )
-    return JSONResponse(payload, headers=_cors_headers())
+    return JSONResponse(payload, headers=cors_headers())

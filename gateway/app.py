@@ -20,6 +20,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
+from gateway._http import CORS_HEADERS
 from gateway.conversation_store import ConversationStore
 from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
 from gateway.mode_catalog import DEFAULT_MODE
@@ -43,13 +44,6 @@ from lca.layer0_infra.file_store import (
     get_default_file_store,
     set_default_file_store,
 )
-
-CORS_HEADERS = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Last-Event-ID",
-    "Access-Control-Expose-Headers": "Content-Type, Content-Disposition",
-}
 
 
 def _content_disposition(disposition_type: str, filename: str) -> str:
