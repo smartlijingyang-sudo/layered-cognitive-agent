@@ -199,17 +199,23 @@ def parse_terminal_response(
     stdout = str(payload.get("stdout") or "")
     stderr = str(payload.get("stderr") or "")
 
-    if stdout:
-        emitter.emit_stdout(stdout)
+    # ADR-0046 alignment: harvest artifact block (same as parse_exec_response)
+    cleaned_stdout, generated, diags = strip_artifacts(stdout)
+    if diags:
+        stderr = stderr + "".join(diags)
+
+    if cleaned_stdout:
+        emitter.emit_stdout(cleaned_stdout)
     if stderr:
         emitter.emit_stderr(stderr)
 
     success = exit_code == 0
     error_text = "" if success else (stderr.strip() or f"exit_code={exit_code}")
     return SandboxResult(
-        stdout=stdout,
+        stdout=cleaned_stdout,
         stderr=stderr,
         exit_code=exit_code,
         success=success,
         error=error_text,
+        generated_files=tuple(generated),
     )

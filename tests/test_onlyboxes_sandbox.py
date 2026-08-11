@@ -344,5 +344,46 @@ class RunInSessionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(body["session_id"], "sess-abc")
 
 
+# ── parse_terminal_response artifact harvest tests ──────────────────
+
+
+class ParseTerminalResponseHarvestTests(unittest.TestCase):
+    """parse_terminal_response() should call strip_artifacts() — ADR-0046 alignment."""
+
+    def _make_response(self, stdout: str, exit_code: int = 0) -> MagicMock:
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.text = json.dumps({"exit_code": exit_code, "stdout": stdout, "stderr": ""})
+        resp.ok = True
+        return resp
+
+    def test_harvests_artifact_block_from_stdout(self) -> None:
+        from lca.layer0_infra.sandbox.onlyboxes_bootstrap import parse_terminal_response
+        from lca.layer0_infra.sandbox.streaming import SandboxStreamEmitter
+
+        stdout = "result: 42\n" + _artifact_block([("report.pdf", b"%PDF-1.4...")])
+        emitter = SandboxStreamEmitter("inv_test")
+        result = parse_terminal_response(self._make_response(stdout), emitter)
+
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.generated_files), 1)
+        self.assertEqual(result.generated_files[0].name, "report.pdf")
+        self.assertEqual(result.generated_files[0].data, b"%PDF-1.4...")
+        # stdout should be cleaned (artifact block removed)
+        self.assertIn("result: 42", result.stdout)
+        self.assertNotIn(ARTIFACT_BEGIN, result.stdout)
+
+    def test_no_artifact_block_is_safe_noop(self) -> None:
+        from lca.layer0_infra.sandbox.onlyboxes_bootstrap import parse_terminal_response
+        from lca.layer0_infra.sandbox.streaming import SandboxStreamEmitter
+
+        emitter = SandboxStreamEmitter("inv_test")
+        result = parse_terminal_response(self._make_response("hello world\n"), emitter)
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.generated_files, ())
+        self.assertEqual(result.stdout, "hello world\n")
+
+
 if __name__ == "__main__":
     unittest.main()
