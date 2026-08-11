@@ -14,9 +14,13 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 # Runtime libs for matplotlib / pillow; CJK fonts for Chinese plot labels.
 # Without a CJK face, matplotlib warns: Glyph N missing from font(s) DejaVu Sans.
 # Cache mount avoids re-downloading .debs when this layer is invalidated.
+# Apt mirror: Tsinghua for faster builds in China.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update \
+    sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null \
+    || sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null \
+    || true \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
         libfreetype6 \
         libpng16-16t64 \
