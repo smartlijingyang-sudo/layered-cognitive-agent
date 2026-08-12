@@ -31,12 +31,12 @@ from gateway.openai_structured_llm import (
     normalize_responses_input,
     resolve_upstream_model,
 )
-from gateway.projection.openai_sse import (
-    OpenAISSEProjector,
-    collect_openai_completion,
-    stream_openai_from_run,
-)
 from gateway.run_executor import create_run_session, llm_status, schedule_run
+from gateway.stream_emitter import (
+    OpenAIStreamEmitter,
+    collect_openai_completion,
+    stream_openai_chunks,
+)
 from lca.contracts.atoms.ids import new_id
 
 _OPENAI_CHAT_ID_PREFIX = "chatcmpl-"
@@ -142,14 +142,14 @@ async def _passthrough_chat_completion(
         )
 
     if stream:
-        projector = OpenAISSEProjector(chat_id=chat_id, model=model)
+        emitter = OpenAIStreamEmitter(chat_id=chat_id, model=model)
         if usage:
-            projector._prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
-            projector._completion_tokens = int(usage.get("completion_tokens", 0) or 0)
+            emitter._prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
+            emitter._completion_tokens = int(usage.get("completion_tokens", 0) or 0)
 
         async def _body() -> Any:
-            chunks = projector._emit_delta({"content": text})
-            chunks.extend(projector._emit_finish(projector._snapshot))
+            chunks = emitter._emit_delta({"content": text})
+            chunks.extend(emitter._emit_finish())
             for chunk in chunks:
                 yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n".encode()
             yield b"data: [DONE]\n\n"
@@ -160,11 +160,11 @@ async def _passthrough_chat_completion(
             headers=cors_headers(**{"Cache-Control": "no-cache"}),
         )
 
-    projector = OpenAISSEProjector(chat_id=chat_id, model=model)
+    emitter = OpenAIStreamEmitter(chat_id=chat_id, model=model)
     if usage:
-        projector._prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
-        projector._completion_tokens = int(usage.get("completion_tokens", 0) or 0)
-    return JSONResponse(projector.completion_json(text), headers=cors_headers())
+        emitter._prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
+        emitter._completion_tokens = int(usage.get("completion_tokens", 0) or 0)
+    return JSONResponse(emitter.completion_json(text), headers=cors_headers())
 
 
 async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | StreamingResponse:
@@ -217,11 +217,10 @@ async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | St
         )
 
     if stream:
-        frame_stream = registry.event_stream(session.run_id, last_event_id_header=None)
 
         async def _body() -> Any:
-            async for chunk in stream_openai_from_run(
-                frame_stream,
+            async for chunk in stream_openai_chunks(
+                session.bus.subscribe(),
                 chat_id=chat_id,
                 model=model,
             ):
@@ -233,8 +232,7 @@ async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | St
             headers=cors_headers(**{"Cache-Control": "no-cache"}),
         )
 
-    frame_stream = registry.event_stream(session.run_id, last_event_id_header=None)
-    payload = await collect_openai_completion(frame_stream, chat_id=chat_id, model=model)
+    payload = await collect_openai_completion(session.bus.subscribe(), chat_id=chat_id, model=model)
     if session.error:
         return _error_response(
             session.error,

@@ -233,7 +233,13 @@ async def _resume_run(session: RunSession, answer: str) -> None:
 
             await finalize_run(session.run_id)
             session.hub.close()
-            session.emit(None)
+            session.close_bus()
+            if session.cancel_requested:
+                session.status = RunStatus.CANCELED
+            elif session.error:
+                session.status = RunStatus.FAILED
+            else:
+                session.status = RunStatus.COMPLETED
             _registry.clear_inflight(session)
 
 
@@ -249,9 +255,27 @@ async def stream_events(request: Request) -> StreamingResponse:
     run_id = request.path_params["run_id"]
     last_event_id = request.headers.get("last-event-id")
 
+    from lca.layer0_infra.observability.journal.sse_frames import (
+        parse_last_event_id,
+        stamped_to_sse_frame,
+    )
+
+    session = _registry.get(run_id)
+    if session is None:
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=CORS_HEADERS)
+
+    after = parse_last_event_id(last_event_id)
+
+    # Collect all buffered frames into a list (non-blocking, no async queue)
+    frames = [stamped_to_sse_frame(s).encode("utf-8") for s in session.bus.buffered_after(after)]
+
     async def _generate() -> AsyncIterator[bytes]:
-        async for frame in _registry.event_stream(run_id, last_event_id):
-            yield frame.encode("utf-8")
+        for frame in frames:
+            yield frame
+        # If run is still active, continue with live events
+        if not session.bus.is_closed:
+            async for stamped in session.bus.subscribe(after_seq=after):
+                yield stamped_to_sse_frame(stamped).encode("utf-8")
 
     return StreamingResponse(
         _generate(),

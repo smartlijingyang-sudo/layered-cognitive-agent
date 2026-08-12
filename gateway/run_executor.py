@@ -59,6 +59,7 @@ async def execute_run(
     # Capture workspace reference for artifact closure in finally (contextvar
     # is reset when the `with` block exits, so we need a direct reference).
     workspace_ref: list[Any] = [None]
+    _completed_ok = False
     try:
         # Bind run_id + attachments for the whole task (contextvars copy across create_task).
         with (
@@ -113,27 +114,40 @@ async def execute_run(
                     else None,
                 )
                 return
-        session.status = RunStatus.CANCELED if session.cancel_requested else RunStatus.COMPLETED
+            # Mark success BEFORE context managers exit (avoids hanging in
+            # __exit__ preventing the flag from being set).
+            _completed_ok = True
     except asyncio.CancelledError:
-        session.status = RunStatus.CANCELED
         session.cancel_requested = True
         raise
     except Exception as exc:
-        session.status = RunStatus.FAILED
         session.error = f"{type(exc).__name__}: {exc}"
     finally:
         if session.status == RunStatus.WAITING_INPUT:
-            # HIL pause: keep session alive for resume, do NOT close hub or emit sentinel.
+            # HIL pause: keep session alive for resume, do NOT close hub or bus.
             registry.mark_paused(session)
         else:
             # Safety net: if run produced files but didn't complete normally
             # (LLM timeout, crash, cancellation), emit artifact closure so the
             # frontend still sees the deliverables. Mirrors LobeHub workRegistration.
             _emit_artifact_closure_if_needed(workspace_ref[0], session)
-            # Release run-scoped resources (sandbox sessions, …) before closing hub.
-            await finalize_run(session.run_id)
+            # Release run-scoped resources — must not prevent bus close.
+            try:
+                await finalize_run(session.run_id)
+            except BaseException:
+                _log.warning("finalize_run_failed", run_id=session.run_id, exc_info=True)
             session.hub.close()
-            session.emit(None)
+            # Close bus BEFORE setting terminal status.  This ensures subscribers
+            # see a closed bus when they observe "completed" — avoids the race
+            # where SSE consumers enter the live-subscribe branch on an open bus
+            # that will never receive more events.
+            session.close_bus()
+            if session.cancel_requested:
+                session.status = RunStatus.CANCELED
+            elif session.error:
+                session.status = RunStatus.FAILED
+            elif _completed_ok:
+                session.status = RunStatus.COMPLETED
             registry.clear_inflight(session)
 
 
@@ -208,18 +222,16 @@ def create_run_session(
     attachment_ids: Sequence[str] = (),
     prior_turns: Sequence[ConversationTurn] = (),
 ) -> RunSession:
-    """登记新 run 并装配 ObservabilityHub（SSE 广播 + jsonl 落盘）。"""
+    """登记新 run 并装配 ObservabilityHub（EventBus 广播 + jsonl 落盘）。"""
+    from gateway.events import EventBus
+
     run_id = new_id("run")
     trace_id = new_id("trace")
     jsonl_path = registry.jsonl_path_for(run_id)
     cleaned_ids = tuple(str(i).strip() for i in attachment_ids if str(i).strip())
 
-    def _emit(frame: str | None) -> None:
-        if session_ref[0] is not None:
-            session_ref[0].emit(frame)
-
-    session_ref: list[RunSession | None] = [None]
-    hub = GatewayCollector(_emit, jsonl_path)
+    bus = EventBus()
+    hub = GatewayCollector(bus, jsonl_path)
     session = RunSession(
         run_id=run_id,
         trace_id=trace_id,
@@ -230,8 +242,8 @@ def create_run_session(
         mode=mode,
         prior_turns=tuple(prior_turns),
         attachment_ids=cleaned_ids,
+        bus=bus,
     )
-    session_ref[0] = session
     registry.put(session)
     return session
 

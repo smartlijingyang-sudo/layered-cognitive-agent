@@ -1,9 +1,13 @@
-"""Run 会话注册表 —— 多订阅者 SSE 广播 + jsonl 持久化（断线续传）。"""
+"""Run 会话注册表 —— 类型化 EventBus 广播 + jsonl 持久化（断线续传）。
+
+Refactored: 从字符串帧（``frames: list[str]``）升级为类型化事件
+（``EventBus``）。HTTP 层直接消费 ``StampedEvent``，不再需要
+parse JSON → restore event 的反序列化步骤。
+"""
 
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import hashlib
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
@@ -11,17 +15,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from gateway.events import EventBus
 from lca.contracts.models.core.conversation import ConversationTurn
 from lca.layer0_infra.observability import ObservabilityHub
-from lca.layer0_infra.observability.journal.sse_frames import (
-    SSE_SENTINEL,
-    frames_after_seq,
-    parse_last_event_id,
-)
 
 _RUNS_DIR = Path("traces/runs")
-_MAX_BUFFERED_FRAMES = 4096
-_MAX_SUBSCRIBER_QUEUE = 256
 
 
 def run_dedup_key(
@@ -52,11 +50,7 @@ class RunStatus(str, Enum):
     CANCELED = "canceled"
 
     def to_lobehub_session_status(self) -> str:
-        """映射到 LobeHub ``SessionStatus`` 词表（G2A 路径）。
-
-        LobeHub 有 ``running | waiting_input | waiting_confirmation | completed
-        | error | interrupted`` 六种状态。
-        """
+        """映射到 LobeHub ``SessionStatus`` 词表（G2A 路径）。"""
         return _LOBEHUB_STATUS_MAP[self]
 
 
@@ -72,7 +66,7 @@ _LOBEHUB_STATUS_MAP: dict[RunStatus, str] = {
 
 @dataclass
 class RunSession:
-    """单次 run 的 SSE 广播会话。"""
+    """单次 run 的 EventBus 广播会话。"""
 
     run_id: str
     trace_id: str
@@ -82,63 +76,25 @@ class RunSession:
     user_text: str
     mode: str
     prior_turns: tuple[ConversationTurn, ...] = field(default_factory=tuple)
-    # CreateRun 附件 id：execute 时 bind 进 run_attachment_scope，沙箱自动挂载。
     attachment_ids: tuple[str, ...] = field(default_factory=tuple)
     status: RunStatus = RunStatus.PENDING
     error: str = ""
     task: asyncio.Task[Any] | None = None
     cancel_requested: bool = False
-    frames: list[str] = field(default_factory=list)
+    bus: EventBus = field(default_factory=EventBus)
     # HIL pause/resume: populated when status == WAITING_INPUT.
     snapshot: Any = None
     runnable: Any = None
     approval_request: dict[str, Any] | None = None
-    _subscribers: list[asyncio.Queue[str | None]] = field(default_factory=list)
-    _closed: bool = False
 
-    def emit(self, frame: str | None) -> None:
-        """SSEJournalProjector 回调：缓冲 + 广播。"""
-        if frame is None:
-            self._close_subscribers()
-            return
-        if len(self.frames) >= _MAX_BUFFERED_FRAMES:
-            self.frames.pop(0)
-        self.frames.append(frame)
-        dead: list[asyncio.Queue[str | None]] = []
-        for queue in self._subscribers:
-            try:
-                queue.put_nowait(frame)
-            except asyncio.QueueFull:
-                dead.append(queue)
-        for queue in dead:
-            self._subscribers.remove(queue)
+    def close_bus(self) -> None:
+        """Signal all subscribers that the run has ended."""
+        self.bus.close()
 
-    def _close_subscribers(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        for queue in self._subscribers:
-            with contextlib.suppress(asyncio.QueueFull):
-                queue.put_nowait(SSE_SENTINEL)
-        self._subscribers.clear()
-
-    async def subscribe(self, last_event_id: int = 0) -> AsyncIterator[str]:
-        """回放 seq > last_event_id 的帧，再挂接实时广播。"""
-        for frame in frames_after_seq(self.frames, last_event_id):
-            yield frame
-        if self._closed:
-            return
-        queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_MAX_SUBSCRIBER_QUEUE)
-        self._subscribers.append(queue)
-        try:
-            while True:
-                item = await queue.get()
-                if item is None:
-                    break
-                yield item
-        finally:
-            if queue in self._subscribers:
-                self._subscribers.remove(queue)
+    async def event_stream(self, last_event_id: int = 0) -> AsyncIterator[Any]:
+        """Typed event stream — supports disconnect-replay via seq."""
+        async for stamped in self.bus.subscribe(after_seq=last_event_id):
+            yield stamped
 
 
 class RunRegistry:
@@ -217,11 +173,13 @@ class RunRegistry:
         self,
         run_id: str,
         last_event_id_header: str | None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[Any]:
+        """Typed event stream for an HTTP client."""
+        from lca.layer0_infra.observability.journal.sse_frames import parse_last_event_id
+
         session = self.get(run_id)
         if session is None:
-            yield 'event: error\ndata: {"message":"run not found"}\n\n'
             return
         after = parse_last_event_id(last_event_id_header)
-        async for frame in session.subscribe(after):
-            yield frame
+        async for stamped in session.bus.subscribe(after_seq=after):
+            yield stamped
