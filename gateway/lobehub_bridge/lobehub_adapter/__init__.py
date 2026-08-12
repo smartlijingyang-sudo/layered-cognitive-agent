@@ -30,6 +30,7 @@ from __future__ import annotations
 
 # ── Public API ──────────────────────────────────────────────
 from gateway.lobehub_bridge.lobehub_adapter.tool_registry import (
+    CLOUD_SANDBOX_WIRE,
     TOOL_REGISTRY,
     build_tool_plugin_state,
     resolve_tool_wire,
@@ -42,8 +43,6 @@ from gateway.lobehub_bridge.lobehub_adapter.tool_spec import (
     split_wire_name,
     wire_tool_name,
 )
-
-from gateway.lobehub_bridge.lobehub_adapter.tool_registry import CLOUD_SANDBOX_WIRE
 
 __all__ = [
     "CLOUD_SANDBOX_WIRE",

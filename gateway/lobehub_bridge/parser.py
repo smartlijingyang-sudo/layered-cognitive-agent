@@ -267,6 +267,3 @@ def _message_plain_text(content: Any) -> str:
                     parts.append(text)
         return "\n".join(parts).strip()
     return ""
-
-
-

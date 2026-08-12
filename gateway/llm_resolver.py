@@ -73,6 +73,3 @@ def get_async_openai_client() -> Any:
     _cached_async_client = AsyncOpenAI(api_key=key, base_url=base)
     _cached_client_key = cache_key
     return _cached_async_client
-
-
-

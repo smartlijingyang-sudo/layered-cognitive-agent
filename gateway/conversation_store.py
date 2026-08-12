@@ -188,5 +188,3 @@ class ConversationStore:
             "status": row["status"],
             "created_at": row["created_at"],
         }
-
-

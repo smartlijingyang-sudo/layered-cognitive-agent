@@ -170,5 +170,3 @@ class RunRegistry:
             "question": session.question,
             "error": session.error,
         }
-
-

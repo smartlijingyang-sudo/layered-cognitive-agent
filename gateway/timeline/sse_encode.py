@@ -36,6 +36,3 @@ def encode_sse(event: dict[str, Any], *, seq: int, event_type: str) -> bytes:
     payload = {"v": TIMELINE_V, **event}
     data = json.dumps(payload, ensure_ascii=False, default=str)
     return f"id: {seq}\nevent: {event_type}\ndata: {data}\n\n".encode()
-
-
-

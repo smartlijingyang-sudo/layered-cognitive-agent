@@ -263,6 +263,3 @@ class ModelRegistry:
 def get_model_registry() -> ModelRegistry:
     """进程级单例。"""
     return ModelRegistry()
-
-
-

@@ -66,6 +66,3 @@ def copy_fields(
         elif isinstance(val, (int, float)) and not isinstance(val, bool):
             out[dst] = val
     return out
-
-
-
