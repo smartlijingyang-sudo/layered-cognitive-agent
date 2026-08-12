@@ -5,16 +5,18 @@ from __future__ import annotations
 import json
 import unittest
 
-from gateway.lobehub_bridge.tool_wire import (
+from gateway.lobehub_bridge.lobehub_adapter import (
+    resolve_tool_wire,
+    tool_result_content,
+    transform_tool_arguments,
+    wire_tool_name,
+)
+from gateway.lobehub_bridge.lobehub_adapter.protocol import (
     LOBE_SKILLS_ID,
     LOBE_WEB_BROWSING_ID,
     SKILLS_API_ACTIVATE,
     SKILLS_API_EXEC,
     WEB_BROWSING_API_SEARCH,
-    resolve_tool_wire,
-    tool_result_content,
-    transform_tool_arguments,
-    wire_tool_name,
 )
 from gateway.projection.openai_sse import OpenAISSEProjector, assert_openai_finish_invariant
 

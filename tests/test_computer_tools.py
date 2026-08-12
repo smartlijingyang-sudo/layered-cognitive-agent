@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import unittest
 
-from gateway.lobehub_bridge.tool_wire import (
+from gateway.lobehub_bridge.lobehub_adapter import (
     CLOUD_SANDBOX_WIRE,
-    LOBE_CLOUD_SANDBOX_ID,
     resolve_tool_wire,
     wire_tool_name,
 )
+from gateway.lobehub_bridge.lobehub_adapter.protocol import LOBE_CLOUD_SANDBOX_ID
 from lca.layer0_infra.computer.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
 from lca.layer0_infra.computer.parse_result import parse_computer_stdout
 from lca.layer0_infra.tools.computer.tool_set import (

@@ -29,6 +29,7 @@ from gateway.projection.tool_events import ToolEventProjector
 from lca.contracts.atoms.enums import StreamChannel
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
+    AgentRunStarted,
     DelegationCompleted,
     DelegationIssued,
     LlmCallCompleted,
@@ -36,6 +37,7 @@ from lca.contracts.models.observability.journal import (
     SandboxOutputDelta,
     StepTextDelta,
     TeamRunFinished,
+    TeamRunStarted,
     ToolCallStreaming,
     ToolDenied,
     ToolInvoked,
@@ -103,6 +105,12 @@ class OpenAISSEProjector:
             return []
 
         event = stamped.event
+
+        # ── Run started: emit role chunk for immediate loading ──
+        if isinstance(event, AgentRunStarted | TeamRunStarted):
+            if not self._role_emitted:
+                return self._emit_delta({})
+            return []
 
         # ── Reasoning: accumulate + emit delta ──────────────
         if isinstance(event, ReasoningDelta):
