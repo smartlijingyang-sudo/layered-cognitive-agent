@@ -1,4 +1,4 @@
-"""Starlette 观测网关 —— POST 建 run、GET SSE 订阅（薄 HTTP 面）。
+"""Starlette 观测网关 — POST 建 run、GET SSE 订阅（薄 HTTP 面）。
 
 会话历史：前端读路径为浏览器 IndexedDB；``ConversationStore``（SQLite）与
 ``/conversations`` 路由为跨设备同步预留，见 ``gateway/conversation_store.py``。
@@ -22,6 +22,7 @@ from starlette.routing import Route
 
 from gateway._http import CORS_HEADERS
 from gateway.conversation_store import ConversationStore
+from gateway.event_stream import GapEvent
 from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
 from gateway.lobehub_bridge.prepare import compose_run_question
 from gateway.mode_catalog import DEFAULT_MODE
@@ -32,6 +33,8 @@ from gateway.openai_compat_api import (
     responses_create,
 )
 from gateway.run_executor import (
+    _active_hubs,
+    _finalize_run,
     create_run_session,
     llm_status,
     schedule_run,
@@ -168,8 +171,6 @@ async def cancel_run(request: Request) -> JSONResponse:
     if session.task is not None and not session.task.done():
         session.task.cancel()
         # 等 execute_run 的 finally 收尾（TeamRunFinished + hub.close + emit）。
-        # 不可在此 hub.close：attach token 在 run task / 成员 task，此处 detach
-        # 会跨 asyncio Context，且 Finished 尚未发射导致 container 泄漏。
         with contextlib.suppress(asyncio.CancelledError):
             await session.task
     _conversations.update_turn_status(run_id, RunStatus.CANCELED.value)
@@ -212,7 +213,7 @@ async def answer_run(request: Request) -> JSONResponse:
 
 async def _resume_run(session: RunSession, answer: str) -> None:
     """Background task: resume a paused run with the human's answer."""
-
+    success = False
     try:
         result = await session.runnable.resume(session.snapshot, input=answer)
         if result.status == TaskStatus.INPUT_REQUIRED:
@@ -221,27 +222,17 @@ async def _resume_run(session: RunSession, answer: str) -> None:
             session.approval_request = result.extra.get("approval_request")
             _registry.mark_paused(session)
         else:
+            success = True
             session.status = RunStatus.CANCELED if session.cancel_requested else RunStatus.COMPLETED
     except asyncio.CancelledError:
-        session.status = RunStatus.CANCELED
+        session.cancel_requested = True
         raise
     except Exception as exc:
         session.status = RunStatus.FAILED
         session.error = f"{type(exc).__name__}: {exc}"
     finally:
         if session.status != RunStatus.WAITING_INPUT:
-            from lca.layer0_infra.tools.run_finalizer import finalize_run
-
-            await finalize_run(session.run_id)
-            session.hub.close()
-            session.close_bus()
-            if session.cancel_requested:
-                session.status = RunStatus.CANCELED
-            elif session.error:
-                session.status = RunStatus.FAILED
-            else:
-                session.status = RunStatus.COMPLETED
-            _registry.clear_inflight(session)
+            await _finalize_run(session, _registry, _active_hubs.get(session.run_id), None, success)
 
 
 async def get_run(request: Request) -> JSONResponse:
@@ -253,6 +244,7 @@ async def get_run(request: Request) -> JSONResponse:
 
 
 async def stream_events(request: Request) -> StreamingResponse:
+    """Debug endpoint: raw event stream, no timeline projection."""
     run_id = request.path_params["run_id"]
     last_event_id = request.headers.get("last-event-id")
 
@@ -267,16 +259,11 @@ async def stream_events(request: Request) -> StreamingResponse:
 
     after = parse_last_event_id(last_event_id)
 
-    # Collect all buffered frames into a list (non-blocking, no async queue)
-    frames = [stamped_to_sse_frame(s).encode("utf-8") for s in session.bus.buffered_after(after)]
-
     async def _generate() -> AsyncIterator[bytes]:
-        for frame in frames:
-            yield frame
-        # If run is still active, continue with live events
-        if not session.bus.is_closed:
-            async for stamped in session.bus.subscribe(after_seq=after):
-                yield stamped_to_sse_frame(stamped).encode("utf-8")
+        async for item in session.stream.subscribe(after_seq=after):
+            if isinstance(item, GapEvent):
+                continue
+            yield stamped_to_sse_frame(item).encode("utf-8")
 
     return StreamingResponse(
         _generate(),
@@ -343,10 +330,7 @@ async def add_conversation_turn(request: Request) -> JSONResponse:
 
 async def upload_attachment(request: Request) -> JSONResponse:
     conversation_id = request.path_params["conversation_id"]
-    # Ensure conversation exists (create soft placeholder if frontend only has local id)
     if _conversations.get_conversation(conversation_id) is None:
-        # Accept uploads scoped to client-side conversation ids without failing:
-        # store still keys files by attachment_id; conversation_id is metadata only.
         pass
 
     form = await request.form()
@@ -398,8 +382,6 @@ async def download_file(request: Request) -> Response:
     if meta is None or data is None:
         return JSONResponse({"error": "file not found"}, status_code=404, headers=CORS_HEADERS)
 
-    # Inline for in-app preview (iframe / <img> / markdown fetch). Prefer
-    # preview=1; images always inline so thumbnails work without query.
     want_inline = request.query_params.get("preview") == "1" or meta.mime_type.lower().startswith(
         "image/"
     )

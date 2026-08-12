@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import time
 import unittest
 from unittest.mock import patch
 
 from starlette.testclient import TestClient
 
 from gateway.app import create_app
-from gateway.lobehub_bridge.parser import extract_user_question
-from gateway.mode_catalog import resolve_lca_mode
+from gateway.event_stream import EventStream
 from gateway.openai_structured_llm import (
     extract_json_schema_format,
     normalize_responses_input,
@@ -18,7 +16,6 @@ from gateway.openai_structured_llm import (
 )
 from gateway.run_registry import RunRegistry, RunSession, RunStatus, run_dedup_key
 from tests.support.gateway_scripted import ScriptedLLMResolver
-
 
 
 class TestOpenAiCompatGateway(unittest.TestCase):
@@ -30,45 +27,19 @@ class TestOpenAiCompatGateway(unittest.TestCase):
         self.assertIn("solo", ids)
         self.assertIn("team", ids)
 
-    def test_chat_completions_non_stream_requires_timeline_stream(self) -> None:
+    def test_chat_completions_agent_run_returns_400(self) -> None:
         registry = RunRegistry()
         client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
         response = client.post(
             "/v1/chat/completions",
             json={
                 "model": "solo",
-                "stream": False,
+                "stream": True,
                 "messages": [{"role": "user", "content": "hello"}],
             },
         )
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "timeline_stream_required")
-
-    def test_chat_completions_stream_is_timeline_v1(self) -> None:
-        registry = RunRegistry()
-        client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
-        with client.stream(
-            "POST",
-            "/v1/chat/completions",
-            json={
-                "model": "solo",
-                "stream": True,
-                "messages": [{"role": "user", "content": "stream probe"}],
-            },
-        ) as response:
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.headers.get("x-lca-stream"), "timeline.v1")
-            buffer = ""
-            saw_run_end = False
-            started = time.monotonic()
-            for chunk in response.iter_bytes():
-                buffer += chunk.decode("utf-8")
-                if "event: run.end" in buffer:
-                    saw_run_end = True
-                    break
-                if time.monotonic() - started > 30:
-                    break
-        self.assertTrue(saw_run_end)
+        self.assertEqual(response.json()["error"]["code"], "agent_runs_migrated")
 
     def test_chat_completions_without_llm_returns_503(self) -> None:
         registry = RunRegistry()
@@ -106,7 +77,7 @@ class TestRunRegistryDedup(unittest.TestCase):
             run_id="run_test",
             trace_id="trace_test",
             jsonl_path=registry.jsonl_path_for("run_test"),
-            hub=object(),  # type: ignore[arg-type]
+            stream=EventStream(),
             question="今天有什么新闻",
             user_text="今天有什么新闻",
             mode="solo",
@@ -122,7 +93,7 @@ class TestRunRegistryDedup(unittest.TestCase):
             run_id="run_test",
             trace_id="trace_test",
             jsonl_path=registry.jsonl_path_for("run_test"),
-            hub=object(),  # type: ignore[arg-type]
+            stream=EventStream(),
             question="hello",
             user_text="hello",
             mode="solo",
@@ -185,7 +156,7 @@ class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
 
 
 class TestOpenAiResponsesEndpoint(unittest.TestCase):
-    def test_responses_without_schema_routes_to_lca_chat(self) -> None:
+    def test_responses_without_schema_rejects_agent_run(self) -> None:
         registry = RunRegistry()
         client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
         response = client.post(
@@ -196,9 +167,8 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
                 "input": [{"role": "user", "content": "hello via responses"}],
             },
         )
-        # Agent path requires timeline stream
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "timeline_stream_required")
+        self.assertEqual(response.json()["error"]["code"], "agent_runs_migrated")
 
     def test_responses_create_returns_output_text(self) -> None:
         registry = RunRegistry()

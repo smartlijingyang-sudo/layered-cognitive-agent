@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 import time
@@ -33,7 +32,9 @@ def main() -> int:
             buf += chunk
             while "\n\n" in buf:
                 block, buf = buf.split("\n\n", 1)
-                et = next((ln[7:].strip() for ln in block.splitlines() if ln.startswith("event: ")), "")
+                et = next(
+                    (ln[7:].strip() for ln in block.splitlines() if ln.startswith("event: ")), ""
+                )
                 if et:
                     types.append(et)
                 if et == "run.end":

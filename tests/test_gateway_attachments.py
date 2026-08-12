@@ -91,16 +91,21 @@ class GatewayAttachmentTests(unittest.TestCase):
         self.assertIn("run_skill_script", session.question)
 
     def test_create_run_session_stores_attachment_ids(self) -> None:
+        import asyncio
+
         from gateway.run_executor import create_run_session
 
-        session = create_run_session(
-            self.registry,
-            question="q",
-            user_text="q",
-            mode="solo",
-            attachment_ids=[" file_a ", "", "file_b"],
-        )
-        self.assertEqual(session.attachment_ids, ("file_a", "file_b"))
+        async def _run() -> None:
+            session = create_run_session(
+                self.registry,
+                question="q",
+                user_text="q",
+                mode="solo",
+                attachment_ids=[" file_a ", "", "file_b"],
+            )
+            self.assertEqual(session.attachment_ids, ("file_a", "file_b"))
+
+        asyncio.run(_run())
 
 
 if __name__ == "__main__":

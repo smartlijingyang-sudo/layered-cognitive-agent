@@ -13,6 +13,7 @@ from gateway._http import cors_headers
 from gateway.lobehub_bridge import prepare_run_from_messages
 from gateway.mode_catalog import resolve_lca_mode
 from gateway.run_executor import create_run_session, llm_status, schedule_run
+from gateway.timeline.stream import compose_sse_stream
 from lca.layer0_infra.observability.journal.sse_frames import parse_last_event_id
 
 
@@ -99,21 +100,9 @@ async def stream_agent_timeline(request: Request) -> StreamingResponse | JSONRes
     if session is None:
         return _err("run not found", status_code=404)
 
-    buffered = session.bus.buffered_after(after)
-
     async def _gen() -> AsyncIterator[bytes]:
-        # Replay buffer through projector (stateful — single projector for whole stream)
-        from gateway.timeline.projector import TimelineProjector
-        from gateway.timeline.protocol import encode_sse_bytes
-
-        projector = TimelineProjector()
-        for stamped in buffered:
-            for ev in projector.project(stamped):
-                yield encode_sse_bytes(ev, seq=int(ev.get("seq") or stamped.seq))
-        if not session.bus.is_closed:
-            async for stamped in session.bus.subscribe(after_seq=after):
-                for ev in projector.project(stamped):
-                    yield encode_sse_bytes(ev, seq=int(ev.get("seq") or stamped.seq))
+        async for frame in compose_sse_stream(session.stream, after_seq=after):
+            yield frame
 
     return StreamingResponse(
         _gen(),

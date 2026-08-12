@@ -1,8 +1,7 @@
-"""Run 会话注册表 —— 类型化 EventBus 广播 + jsonl 持久化（断线续传）。
+"""Run 会话注册表 — EventStream 广播 + jsonl 持久化（断线续传）。
 
-Refactored: 从字符串帧（``frames: list[str]``）升级为类型化事件
-（``EventBus``）。HTTP 层直接消费 ``StampedEvent``，不再需要
-parse JSON → restore event 的反序列化步骤。
+EventStream 替代旧 EventBus。HTTP 层直接消费 StampedEvent，
+不再需要 parse JSON → restore event 的反序列化步骤。
 """
 
 from __future__ import annotations
@@ -15,9 +14,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from gateway.events import EventBus
+import structlog
+
+from gateway.event_stream import EventStream, GapEvent
 from lca.contracts.models.core.conversation import ConversationTurn
-from lca.layer0_infra.observability import ObservabilityHub
+
+_log = structlog.get_logger(__name__)
 
 _RUNS_DIR = Path("traces/runs")
 
@@ -66,12 +68,12 @@ _LOBEHUB_STATUS_MAP: dict[RunStatus, str] = {
 
 @dataclass
 class RunSession:
-    """单次 run 的 EventBus 广播会话。"""
+    """单次 run 的 EventStream 广播会话。"""
 
     run_id: str
     trace_id: str
     jsonl_path: Path
-    hub: ObservabilityHub
+    stream: EventStream
     question: str
     user_text: str
     mode: str
@@ -81,20 +83,14 @@ class RunSession:
     error: str = ""
     task: asyncio.Task[Any] | None = None
     cancel_requested: bool = False
-    bus: EventBus = field(default_factory=EventBus)
     # HIL pause/resume: populated when status == WAITING_INPUT.
     snapshot: Any = None
     runnable: Any = None
     approval_request: dict[str, Any] | None = None
 
-    def close_bus(self) -> None:
+    def close_stream(self) -> None:
         """Signal all subscribers that the run has ended."""
-        self.bus.close()
-
-    async def event_stream(self, last_event_id: int = 0) -> AsyncIterator[Any]:
-        """Typed event stream — supports disconnect-replay via seq."""
-        async for stamped in self.bus.subscribe(after_seq=last_event_id):
-            yield stamped
+        self.stream.close()
 
 
 class RunRegistry:
@@ -133,7 +129,17 @@ class RunRegistry:
             return None
         return session
 
-    def clear_inflight(self, session: RunSession) -> None:
+    def clear_inflight(self, session_or_id: RunSession | str) -> None:
+        """清理 inflight dedup 记录。
+
+        接受 RunSession 或 run_id 字符串。
+        """
+        if isinstance(session_or_id, str):
+            session = self._runs.get(session_or_id)
+            if session is None:
+                return
+        else:
+            session = session_or_id
         key = run_dedup_key(
             user_text=session.user_text,
             mode=session.mode,
@@ -181,5 +187,12 @@ class RunRegistry:
         if session is None:
             return
         after = parse_last_event_id(last_event_id_header)
-        async for stamped in session.bus.subscribe(after_seq=after):
-            yield stamped
+        async for item in session.stream.subscribe(after_seq=after):
+            if isinstance(item, GapEvent):
+                _log.warning(
+                    "debug_event_stream_buffer_gap",
+                    requested_seq=item.requested_seq,
+                    oldest_available=item.oldest_available_seq,
+                )
+                continue
+            yield item

@@ -1,8 +1,16 @@
-"""TimelineProjector whitelist — sole UI wire contract tests."""
+"""TimelineProjection + LobeHubSSEAdapter — sole UI wire contract tests.
+
+Tests the full pipeline: projection (domain mapping) + adapter (protocol translation).
+"""
 
 from __future__ import annotations
 
-from gateway.timeline import EVENT_TYPES, TimelineProjector, project_all
+from gateway.timeline import (
+    EVENT_TYPES,
+    LobeHubSSEAdapter,
+    TimelineProjection,
+    project_all,
+)
 from lca.contracts.atoms.enums import StreamChannel
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
@@ -27,6 +35,21 @@ def _s(seq: int, event: object) -> StampedEvent:
         scope=RunScope(trace_id="t", run_id="run_x"),
         event=event,
     )
+
+
+def _project_and_adapt(
+    stamped_events: list[StampedEvent],
+) -> list[dict]:
+    """Run the full pipeline: projection → adapter."""
+    proj = TimelineProjection()
+    adapter = LobeHubSSEAdapter()
+    out: list[dict] = []
+    for s in stamped_events:
+        for domain_event in proj.project(s):
+            for payload in adapter.adapt(domain_event):
+                payload.setdefault("seq", domain_event.seq)
+                out.append(payload)
+    return out
 
 
 def test_closed_event_set_and_order() -> None:
@@ -96,9 +119,13 @@ def test_decision_channel_dropped() -> None:
     assert out == []
 
 
-def test_tool_delta_keeps_code_from_args() -> None:
-    p = TimelineProjector()
-    p.project(
+def test_tool_delta_has_stdout() -> None:
+    """Tool delta carries stdout from sandbox output."""
+    proj = TimelineProjection()
+    adapter = LobeHubSSEAdapter()
+
+    # tool.start — must go through adapter to populate _pending
+    start_domain = proj.project(
         _s(
             1,
             ToolStarted(
@@ -108,20 +135,28 @@ def test_tool_delta_keeps_code_from_args() -> None:
             ),
         )
     )
-    deltas = p.project(
+    for de in start_domain:
+        adapter.adapt(de)
+
+    # tool.delta
+    deltas_domain = proj.project(
         _s(
             2,
             SandboxOutputDelta(invocation_id="inv-3", stream="stdout", text_delta="1\n", seq=1),
         )
     )
-    assert deltas
-    assert deltas[0]["type"] == "tool.delta"
-    assert deltas[0]["state"]["stdout"] == "1\n"
-    assert deltas[0]["state"]["code"] == "print(1)"
+    # Adapt through LobeHub adapter
+    adapted: list[dict] = []
+    for de in deltas_domain:
+        adapted.extend(adapter.adapt(de))
+    assert adapted
+    assert adapted[0]["type"] == "tool.delta"
+    assert adapted[0]["state"]["stdout"] == "1\n"
+    assert adapted[0]["state"]["code"] == "print(1)"
 
 
 def test_no_events_after_run_end() -> None:
-    p = TimelineProjector()
+    p = TimelineProjection()
     p.project(_s(1, AgentRunFinished(status="completed", steps=0)))
     late = p.project(_s(2, ReasoningDelta(step=1, text_delta="ghost", seq=0)))
     assert late == []

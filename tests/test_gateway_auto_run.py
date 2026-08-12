@@ -27,6 +27,14 @@ class _ScriptedResolver:
         return self._llm
 
 
+def _journal_event_types(session: RunStatus) -> set[str]:
+    """Read event types from the EventStream buffer (replaces old hub.journal access)."""
+    from gateway.run_registry import RunSession
+
+    assert isinstance(session, RunSession)
+    return {type(stamped.event).__name__ for stamped in session.stream.buffered_after()}
+
+
 class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.registry = RunRegistry()
@@ -64,7 +72,7 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
             mode=session.mode,
         )
         self.assertEqual(session.status, RunStatus.COMPLETED)
-        event_types = {type(stamped.event).__name__ for stamped in session.hub.journal.events}
+        event_types = {type(stamped.event).__name__ for stamped in session.stream.buffered_after()}
         self.assertIn("CastingStarted", event_types)
         self.assertIn("CastingCompleted", event_types)
 
@@ -91,7 +99,7 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(session.status, RunStatus.FAILED)
         assert session.error is not None
         self.assertIn("自动组队失败", session.error)
-        event_types = {type(stamped.event).__name__ for stamped in session.hub.journal.events}
+        event_types = {type(stamped.event).__name__ for stamped in session.stream.buffered_after()}
         self.assertIn("CastingStarted", event_types)
         self.assertIn("CastingFailed", event_types)
 

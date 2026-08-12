@@ -20,7 +20,7 @@ meta = PatchMeta(
     verify_marker="timeline.v1",
 )
 
-_TRANSPORT_TS = r'''import type {
+_TRANSPORT_TS = r"""import type {
   LLMAttemptExecution,
   LLMAttemptInput,
   LLMAttemptOutput,
@@ -192,6 +192,13 @@ interface Options {
   session: ClientRuntimeSession;
 }
 
+function extractQuestion(messages: readonly { role: string; content: string }[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') return messages[i].content;
+  }
+  return '';
+}
+
 /**
  * LLM transport for LCA agent runs — timeline.v1 SSE only.
  */
@@ -206,12 +213,8 @@ export class AgentTimelineTransport implements LLMTransport {
     const assistantMessageId = this.context.session.assistantMessageId;
     if (!assistantMessageId) throw new Error('timeline: missing assistant message id');
 
-    const modelParameters = input.context.modelParameters as
-      | { params?: Record<string, unknown>; options?: { signal?: AbortSignal } }
-      | undefined;
     const messages = input.context.messages ?? [];
     const base = gatewayBase();
-    const url = `${base}/v1/chat/completions`;
 
     let state = emptyState();
     const dispatch = (partial: Record<string, unknown>) => {
@@ -240,27 +243,33 @@ export class AgentTimelineTransport implements LLMTransport {
     };
 
     try {
-      const res = await fetch(url, {
+      const question = extractQuestion(messages);
+      const createRes = await fetch(`${base}/v1/agent/runs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer lca-local',
         },
-        body: JSON.stringify({
-          model: input.model,
-          stream: true,
-          messages,
-          ...(modelParameters?.params ?? {}),
-        }),
+        body: JSON.stringify({ question, model: input.model }),
         signal: operation.abortController.signal,
       });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`timeline HTTP ${res.status}: ${text.slice(0, 200)}`);
+      if (!createRes.ok) {
+        const text = await createRes.text();
+        throw new Error(`create run HTTP ${createRes.status}: ${text.slice(0, 200)}`);
+      }
+      const { run_id } = (await createRes.json()) as { run_id: string; trace_id: string };
+
+      const streamRes = await fetch(`${base}/v1/agent/runs/${run_id}/timeline`, {
+        headers: { Authorization: 'Bearer lca-local' },
+        signal: operation.abortController.signal,
+      });
+      if (!streamRes.ok) {
+        const text = await streamRes.text();
+        throw new Error(`timeline HTTP ${streamRes.status}: ${text.slice(0, 200)}`);
       }
       input.onFirstChunk?.();
 
-      for await (const { type, data } of readTimelineSse(res)) {
+      for await (const { type, data } of readTimelineSse(streamRes)) {
         state = applyEvent(state, type, data);
         publish();
         if (type === 'run.end') break;
@@ -315,7 +324,7 @@ export class AgentTimelineTransport implements LLMTransport {
     };
   }
 }
-'''
+"""
 
 
 def apply(ctx: PatchContext) -> bool:

@@ -263,12 +263,11 @@ class TestPrepareRunFromMessages(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("[对话历史]", question)
 
 
-
 class TestTimelineAnswerChannels(unittest.TestCase):
     """Answer channel reaches timeline; decision channel does not."""
 
     def test_answer_and_decision_channels(self) -> None:
-        from gateway.timeline import TimelineProjector
+        from gateway.timeline import TimelineProjection
         from lca.contracts.models.observability.journal import (
             DecisionMade,
             RunScope,
@@ -276,7 +275,7 @@ class TestTimelineAnswerChannels(unittest.TestCase):
             StepTextDelta,
         )
 
-        p = TimelineProjector()
+        p = TimelineProjection()
         scope = RunScope(trace_id="t", run_id="r")
 
         def s(seq: int, event: object) -> StampedEvent:
@@ -298,17 +297,13 @@ class TestTimelineAnswerChannels(unittest.TestCase):
         ans = p.project(
             s(
                 2,
-                StepTextDelta(
-                    step=0, text_delta="你好", channel=StreamChannel.ANSWER.value
-                ),
+                StepTextDelta(step=0, text_delta="你好", channel=StreamChannel.ANSWER.value),
             )
         )
-        self.assertEqual(ans[0]["type"], "answer.delta")
-        self.assertEqual(ans[0]["text"], "你好")
+        self.assertEqual(ans[0].type, "answer.delta")
+        self.assertEqual(ans[0].text, "你好")
         self.assertEqual(
-            p.project(
-                s(3, DecisionMade(step=0, action_type="respond", response_text="完整"))
-            ),
+            p.project(s(3, DecisionMade(step=0, action_type="respond", response_text="完整"))),
             [],
         )
 

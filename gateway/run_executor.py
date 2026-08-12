@@ -1,14 +1,20 @@
-"""后台 run 执行器 —— 组装 hub（SSE + jsonl）并驱动 Team/Agent。"""
+"""后台 run 执行器 — 组装 hub（SSE + jsonl）并驱动 Team/Agent。
+
+EventStream 替代旧 EventBus + GatewayCollector。
+JSONL 落盘从 projector 变为普通 asyncio consumer。
+"""
 
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 import structlog
 
-from gateway.collector import GatewayCollector
+from gateway.event_stream import EventStream
 from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
 from gateway.mode_catalog import DEFAULT_MODE, SOLO_MODE_KEY
 from gateway.run_registry import RunRegistry, RunSession, RunStatus
@@ -16,8 +22,13 @@ from gateway.team_factory import build_runnable_team, build_solo_agent
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
 from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.observability.journal import StampedEvent
 from lca.contracts.models.team.run_context import RunContext
+from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.file_store import get_default_file_store
+from lca.layer0_infra.observability import ObservabilityHub
+from lca.layer0_infra.observability.policy import AttributePolicy
+from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.sandbox.factory import resolve_sandbox
 from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime
 from lca.layer0_infra.search.scope import search_run_scope
@@ -29,6 +40,13 @@ from lca.layer4_app.api import Agent, Team
 _log = structlog.get_logger(__name__)
 
 _default_llm_resolver: LLMResolver = ProductionLLMResolver()
+
+# Track JSONL consumer tasks to prevent GC of dangling coroutines (RUF006).
+_jsonl_tasks: set[asyncio.Task[None]] = set()
+
+# Active ObservabilityHub instances keyed by run_id.
+# Set by execute_run, consumed by _finalize_run (including HIL resume via _resume_run).
+_active_hubs: dict[str, ObservabilityHub] = {}
 
 
 def get_llm_resolver() -> LLMResolver:
@@ -44,6 +62,71 @@ def llm_status() -> dict[str, bool]:
     return {"llm_available": get_llm_resolver().is_available()}
 
 
+# ── EventStream JournalProjector 桥 ──────────────────────────
+
+
+class _EventStreamProjector(JournalProjector):
+    """Journal → EventStream 桥接投影器。
+
+    不过滤事件——所有 StampedEvent 都发布到 EventStream。
+    过滤在 TimelineProjection 层（SSE consumer 侧）执行。
+    JSONL consumer 也订阅 EventStream，需要完整事件。
+    """
+
+    def __init__(self, stream: EventStream) -> None:
+        self._stream = stream
+
+    def on_event(self, stamped: StampedEvent) -> None:
+        self._stream.publish(stamped)
+
+    def flush(self) -> None:
+        pass
+
+    def close(self) -> None:
+        self._stream.close()
+
+
+def _create_hub_for_session(session: RunSession) -> ObservabilityHub:
+    """创建绑定到 session.stream 的 ObservabilityHub。
+
+    不含 JsonlJournalProjector——JSONL 落盘由 _jsonl_consumer 后台 task 负责。
+    """
+    resolved = ObservabilitySettings().verbosity
+    return ObservabilityHub(
+        [],
+        policy=AttributePolicy(resolved),
+        journal_projectors=[_EventStreamProjector(session.stream)],
+    )
+
+
+# ── JSONL consumer ────────────────────────────────────────
+
+
+async def _jsonl_consumer(queue: asyncio.Queue[StampedEvent | None], path: Path) -> None:
+    """JSONL 落盘 — 一个普通 consumer，不是 projector。
+
+    queue 已在调用前同步注册，不会丢失任何事件。
+    错误处理：如果 write 失败，记录 error 日志但不 raise。
+    """
+    import aiofiles
+
+    from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
+
+    try:
+        async with aiofiles.open(path, "a") as f:
+            while True:
+                stamped = await queue.get()
+                if stamped is None:
+                    break
+                line = json.dumps(stamped_to_record(stamped), default=str)
+                await f.write(line + "\n")
+    except Exception:
+        _log.exception("jsonl_consumer_failed", path=str(path))
+
+
+# ── Run 执行 ─────────────────────────────────────────────
+
+
 async def execute_run(
     registry: RunRegistry,
     *,
@@ -51,17 +134,17 @@ async def execute_run(
     question: str,
     mode: str = DEFAULT_MODE,
 ) -> None:
-    """在后台 task 中执行一次 team run，事件经 SSE + jsonl 双投影。"""
+    """在后台 task 中执行一次 team run，事件经 EventStream 广播。"""
     session = registry.get(run_id)
     if session is None:
         return
     session.status = RunStatus.RUNNING
-    # Capture workspace reference for artifact closure in finally (contextvar
-    # is reset when the `with` block exits, so we need a direct reference).
+
+    hub = _create_hub_for_session(session)
+    _active_hubs[session.run_id] = hub
     workspace_ref: list[Any] = [None]
-    _completed_ok = False
+    success = False
     try:
-        # Bind run_id + attachments for the whole task (contextvars copy across create_task).
         with (
             run_id_scope(session.run_id),
             run_attachment_scope(session.attachment_ids),
@@ -80,19 +163,19 @@ async def execute_run(
                     )
                 except Exception as exc:
                     _log.warning(
-                        "sandbox_runtime_bind_failed", run_id=session.run_id, error=str(exc)
+                        "sandbox_runtime_bind_failed",
+                        run_id=session.run_id,
+                        error=str(exc),
                     )
             llm = get_llm_resolver().resolve(mode=mode)
             runnable: Agent | Team
-            # Solo/Team 分治（ADR-0052）：solo 是裸模型（同步），team 走 LLM casting（异步）。
-            # 两种根本不同的构建机制，分支在语义上是稳定的。
             if mode == SOLO_MODE_KEY:
-                runnable = build_solo_agent(llm, observability=session.hub)
+                runnable = build_solo_agent(llm, observability=hub)
             else:
                 runnable = await build_runnable_team(
                     question,
                     llm,
-                    observability=session.hub,
+                    observability=hub,
                     trace_id=session.trace_id,
                     run_id=session.run_id,
                 )
@@ -114,9 +197,7 @@ async def execute_run(
                     else None,
                 )
                 return
-            # Mark success BEFORE context managers exit (avoids hanging in
-            # __exit__ preventing the flag from being set).
-            _completed_ok = True
+            success = True
     except asyncio.CancelledError:
         session.cancel_requested = True
         raise
@@ -124,49 +205,56 @@ async def execute_run(
         session.error = f"{type(exc).__name__}: {exc}"
     finally:
         if session.status == RunStatus.WAITING_INPUT:
-            # HIL pause: keep session alive for resume, do NOT close hub or bus.
             registry.mark_paused(session)
         else:
-            # Safety net: if run produced files but didn't complete normally
-            # (LLM timeout, crash, cancellation), emit artifact closure so the
-            # frontend still sees the deliverables. Mirrors LobeHub workRegistration.
-            _emit_artifact_closure_if_needed(workspace_ref[0], session)
-            # Release run-scoped resources — must not prevent bus close.
-            try:
-                await finalize_run(session.run_id)
-            except BaseException:
-                _log.warning("finalize_run_failed", run_id=session.run_id, exc_info=True)
-            session.hub.close()
-            # Close bus BEFORE setting terminal status.  This ensures subscribers
-            # see a closed bus when they observe "completed" — avoids the race
-            # where SSE consumers enter the live-subscribe branch on an open bus
-            # that will never receive more events.
-            session.close_bus()
-            if session.cancel_requested:
-                session.status = RunStatus.CANCELED
-            elif session.error:
-                session.status = RunStatus.FAILED
-            elif _completed_ok:
-                session.status = RunStatus.COMPLETED
-            registry.clear_inflight(session)
+            await _finalize_run(session, registry, hub, workspace_ref[0], success)
 
 
-def _emit_artifact_closure_if_needed(workspace: Any, session: RunSession) -> None:
-    """Emit artifact closure text if run produced files but didn't finish cleanly.
+async def _finalize_run(
+    session: RunSession,
+    registry: RunRegistry,
+    hub: ObservabilityHub | None,
+    workspace: Any,
+    success: bool,
+) -> None:
+    """统一的 run 终结逻辑。
 
-    When the main loop completes normally, ``CognitiveRuntime._apply_artifact_closure``
-    handles this. But if the run is interrupted (LLM timeout, crash, cancellation),
-    the loop never reaches that code path. This function is the safety net: it
-    checks the workspace artifact ledger and records a final content delta so
-    the frontend still sees the deliverables.
-
-    Aligned with LobeHub ``workRegistration`` — files produced during a run
-    must always be surfaced to the user, regardless of how the run ends.
-
-    Note: we use ``session.hub.journal.record()`` directly instead of the
-    ambient ``record()`` facade, because the observability ``bind()`` context
-    has already been unwound by the time this finally block runs.
+    调用顺序由嵌套 finally 保证（不可乱）：
+      1. artifact closure safety net（可失败，不影响后续）
+      2. finalize_run（workspace 收尾；可失败，不影响后续）
+      3. hub.close（关闭 journal + OTel；hub 为 None 时跳过）
+      4. stream.close（发送 sentinel，解除所有 subscriber 阻塞）
+      5. status 更新 + error 记录
+      6. inflight dedup 清理
     """
+    try:
+        if hub is not None:
+            _emit_artifact_closure_if_needed(workspace, session, hub)
+        await finalize_run(session.run_id)
+    except Exception:
+        _log.exception("finalize_run_pre_close_failed", run_id=session.run_id)
+    finally:
+        try:
+            if hub is not None:
+                hub.close()
+        finally:
+            try:
+                session.close_stream()
+            finally:
+                if session.cancel_requested:
+                    session.status = RunStatus.CANCELED
+                elif session.error:
+                    session.status = RunStatus.FAILED
+                elif success:
+                    session.status = RunStatus.COMPLETED
+                _active_hubs.pop(session.run_id, None)
+                registry.clear_inflight(session.run_id)
+
+
+def _emit_artifact_closure_if_needed(
+    workspace: Any, session: RunSession, hub: ObservabilityHub
+) -> None:
+    """Emit artifact closure text if run produced files but didn't finish cleanly."""
     if workspace is None:
         return
     artifacts = workspace.artifacts.snapshot().artifacts
@@ -179,7 +267,7 @@ def _emit_artifact_closure_if_needed(workspace: Any, session: RunSession) -> Non
     from lca.contracts.models.observability.journal import StepTextDelta
 
     try:
-        session.hub.journal.record(
+        hub.journal.record(
             StepTextDelta(
                 step=-1,
                 text_delta="\n\n" + closure,
@@ -222,29 +310,37 @@ def create_run_session(
     attachment_ids: Sequence[str] = (),
     prior_turns: Sequence[ConversationTurn] = (),
 ) -> RunSession:
-    """登记新 run 并装配 ObservabilityHub（EventBus 广播 + jsonl 落盘）。"""
-    from gateway.events import EventBus
-
+    """登记新 run 并装配 EventStream（SSE 广播 + JSONL 落盘）。"""
     run_id = new_id("run")
     trace_id = new_id("trace")
     jsonl_path = registry.jsonl_path_for(run_id)
     cleaned_ids = tuple(str(i).strip() for i in attachment_ids if str(i).strip())
 
-    bus = EventBus()
-    hub = GatewayCollector(bus, jsonl_path)
+    stream = EventStream()
+
+    # 同步注册 JSONL consumer queue —— 在任何 publish 发生前完成注册
+    from gateway.event_stream import _MAX_QUEUE
+
+    jsonl_queue: asyncio.Queue[StampedEvent | None] = asyncio.Queue(_MAX_QUEUE)
+    stream.register_subscriber(jsonl_queue)
+
     session = RunSession(
         run_id=run_id,
         trace_id=trace_id,
         jsonl_path=jsonl_path,
-        hub=hub,
+        stream=stream,
         question=question,
         user_text=user_text,
         mode=mode,
         prior_turns=tuple(prior_turns),
         attachment_ids=cleaned_ids,
-        bus=bus,
     )
     registry.put(session)
+
+    # 注册完成后再启动消费循环，保证不丢事件
+    _jsonl_task = asyncio.create_task(_jsonl_consumer(jsonl_queue, jsonl_path))
+    _jsonl_tasks.add(_jsonl_task)
+    _jsonl_task.add_done_callback(_jsonl_tasks.discard)
     return session
 
 
