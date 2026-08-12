@@ -21,6 +21,7 @@ meta = PatchMeta(
 )
 
 _TRANSPORT_TS = r"""import type {
+  ClassifiedLLMError,
   LLMAttemptExecution,
   LLMAttemptInput,
   LLMAttemptOutput,
@@ -34,17 +35,6 @@ import type { ChatToolPayload, ModelReasoning } from '@lobechat/types';
 import type { ChatStore } from '@/store/chat/store';
 
 import type { ClientRuntimeSession } from './ClientRuntimeStreamSink';
-
-/** Gateway base without trailing /v1 */
-function gatewayBase(): string {
-  const raw =
-    (typeof process !== 'undefined' &&
-      (process.env.NEXT_PUBLIC_LCA_GATEWAY ||
-        process.env.OPENAI_PROXY_URL ||
-        process.env.QWEN_PROXY_URL)) ||
-    'http://127.0.0.1:8765';
-  return String(raw).replace(/\/v1\/?$/, '').replace(/\/$/, '');
-}
 
 type TimelineState = {
   answer: string;
@@ -181,8 +171,17 @@ async function* readTimelineSse(
 }
 
 class AlwaysRetryOnce implements LLMRetryPolicy {
-  async shouldRetry(): Promise<boolean> {
-    return false;
+  classifyError(error: unknown): ClassifiedLLMError {
+    const message = error instanceof Error ? error.message : String(error);
+    return { kind: 'stop', message };
+  }
+
+  maxAttempts(_provider: string): number {
+    return 1;
+  }
+
+  resolveRetryBudget(_provider: string, _error: unknown): number {
+    return 0;
   }
 }
 
@@ -214,7 +213,6 @@ export class AgentTimelineTransport implements LLMTransport {
     if (!assistantMessageId) throw new Error('timeline: missing assistant message id');
 
     const messages = input.context.messages ?? [];
-    const base = gatewayBase();
 
     let state = emptyState();
     const dispatch = (partial: Record<string, unknown>) => {
@@ -244,7 +242,7 @@ export class AgentTimelineTransport implements LLMTransport {
 
     try {
       const question = extractQuestion(messages);
-      const createRes = await fetch(`${base}/v1/agent/runs`, {
+      const createRes = await fetch(`/lca-api/agent/runs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -259,7 +257,7 @@ export class AgentTimelineTransport implements LLMTransport {
       }
       const { run_id } = (await createRes.json()) as { run_id: string; trace_id: string };
 
-      const streamRes = await fetch(`${base}/v1/agent/runs/${run_id}/timeline`, {
+      const streamRes = await fetch(`/lca-api/agent/runs/${run_id}/timeline`, {
         headers: { Authorization: 'Bearer lca-local' },
         signal: operation.abortController.signal,
       });
@@ -329,14 +327,7 @@ export class AgentTimelineTransport implements LLMTransport {
 
 def apply(ctx: PatchContext) -> bool:
     rel = "src/store/chat/agents/transports/AgentTimelineTransport.ts"
-    created = ctx.create_file(rel, _TRANSPORT_TS)
-    # If file exists from prior apply, refresh content for pure timeline
-    if not created and not ctx.has_marker(rel, "timeline.v1"):
-        ctx.write(rel, _TRANSPORT_TS)
-        created = True
-    elif not created and ctx.has_marker(rel, "timeline.v1"):
-        # force rewrite for thoroughness
-        ctx.write(rel, _TRANSPORT_TS)
+    changed = ctx.write_if_changed(rel, _TRANSPORT_TS)
 
     host = "src/store/chat/agents/transports/buildClientRuntimeHost.ts"
     text = ctx.read(host)
@@ -362,4 +353,4 @@ def apply(ctx: PatchContext) -> bool:
         )
         ctx.write(host, text)
         return True
-    return created
+    return changed

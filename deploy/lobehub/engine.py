@@ -96,6 +96,20 @@ class PatchContext:
     def write(self, rel: str, text: str) -> None:
         self.path(rel).write_text(text)
 
+    def write_if_changed(self, rel: str, text: str) -> bool:
+        """Write file only when content differs. Returns True if written."""
+        p = self.path(rel)
+        try:
+            current = p.read_text()
+        except FileNotFoundError:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text)
+            return True
+        if current != text:
+            p.write_text(text)
+            return True
+        return False
+
     def has_marker(self, rel: str, marker: str) -> bool:
         try:
             return marker in self.read(rel)

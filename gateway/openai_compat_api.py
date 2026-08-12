@@ -135,20 +135,67 @@ async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | St
         return _error_response("messages must be an array", status_code=400)
 
     chat_id = f"{_OPENAI_CHAT_ID_PREFIX}{new_id('chat')}"
+
+    # Structured output (generateObject) — standard OpenAI response_format
+    if body.get("response_format") is not None:
+        return await _structured_chat_completion(body, model, messages, chat_id)
+
+    # Title generation — bypass LCA agent runs
     if classify_lobehub_chat_request(messages) == "title":
         return await _passthrough_chat_completion(
-            messages=messages,
-            model=model,
-            stream=stream,
-            chat_id=chat_id,
+            messages=messages, model=model, stream=stream, chat_id=chat_id
         )
 
     return _error_response(
         "Agent runs must use POST /v1/agent/runs + GET /v1/agent/runs/{id}/timeline. "
-        "/v1/chat/completions is reserved for title generation only.",
+        "/v1/chat/completions is reserved for title generation and structured output only.",
         status_code=400,
         code="agent_runs_migrated",
     )
+
+
+async def _structured_chat_completion(
+    body: dict[str, Any], model: str, messages: list[Any], chat_id: str
+) -> JSONResponse:
+    """Handle chat completions with response_format (generateObject)."""
+    # Filter out unsupported roles (developer) for upstream APIs
+    supported_roles = {"system", "user", "assistant", "tool", "function"}
+    filtered_messages = [
+        m for m in messages if isinstance(m, dict) and m.get("role") in supported_roles
+    ]
+
+    # Extract json_schema from either Responses-style or chat-style format
+    json_schema = extract_json_schema_format(body) or body.get("response_format")
+    if not isinstance(json_schema, dict) or json_schema.get("type") != "json_schema":
+        # Fallback to simple completion for non-JSON-schema formats
+        try:
+            text, usage = await create_simple_completion(messages=filtered_messages, model=model)
+        except (StructuredLLMError, APIError) as exc:
+            return _error_response(str(exc), status_code=502, error_type="server_error")
+    else:
+        try:
+            text, usage = await create_structured_completion(
+                messages=filtered_messages, model=model, response_format=json_schema
+            )
+        except (StructuredLLMError, APIError) as exc:
+            return _error_response(str(exc), status_code=502, error_type="server_error")
+
+    return JSONResponse(_chat_response(chat_id, text, usage), headers=cors_headers())
+
+
+def _chat_response(chat_id: str, content: str, usage: dict | None) -> dict[str, Any]:
+    return {
+        "id": chat_id,
+        "object": "chat.completion",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": usage or {},
+    }
 
 
 async def chat_completions(request: Request) -> JSONResponse | StreamingResponse:
