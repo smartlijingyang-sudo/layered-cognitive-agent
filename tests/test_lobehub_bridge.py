@@ -17,7 +17,6 @@ from gateway.lobehub_bridge.parser import parse_messages
 from gateway.lobehub_bridge.prepare import compose_run_question, prepare_run_from_messages
 from gateway.lobehub_bridge.settings import LobeHubBridgeSettings
 from gateway.lobehub_bridge.url_policy import IngestUrlPolicyError, assert_ingest_url_allowed
-from gateway.projection.openai_sse import OpenAISSEProjector, assert_openai_finish_invariant
 from lca.contracts.atoms.enums import StreamChannel
 from lca.layer0_infra.file_store import LocalFileStore
 
@@ -264,129 +263,54 @@ class TestPrepareRunFromMessages(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("[对话历史]", question)
 
 
-class TestOpenAiFinishInvariant(unittest.TestCase):
-    @staticmethod
-    def _llm_completed_frame() -> str:
-        return (
-            'data: {"schema":"journal.v1","seq":99,"ts":99.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            '"event_type":"LlmCallCompleted","event":{"model":"test",'
-            '"ok":true,"latency_ms":1,"prompt_tokens":0,"completion_tokens":0}}\n\n'
+
+class TestTimelineAnswerChannels(unittest.TestCase):
+    """Answer channel reaches timeline; decision channel does not."""
+
+    def test_answer_and_decision_channels(self) -> None:
+        from gateway.timeline import TimelineProjector
+        from lca.contracts.models.observability.journal import (
+            DecisionMade,
+            RunScope,
+            StampedEvent,
+            StepTextDelta,
         )
 
-    def _content_from(self, chunks: list[dict]) -> str:
-        return "".join(
-            c["choices"][0]["delta"].get("content", "")
-            for c in chunks
-            if "delta" in c["choices"][0]
-        )
+        p = TimelineProjector()
+        scope = RunScope(trace_id="t", run_id="r")
 
-    def _llm_started_frame(self) -> str:
-        return (
-            'data: {"schema":"journal.v1","seq":0,"ts":0.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            '"event_type":"LlmCallStarted","event":{"model":"test","step":1}}\n\n'
-        )
+        def s(seq: int, event: object) -> StampedEvent:
+            return StampedEvent(seq=seq, ts=float(seq), scope=scope, event=event)
 
-    def test_step_text_answer_channel_streams_content_immediately(self) -> None:
-        """Answer text streams immediately (no buffering in new architecture)."""
-        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
-        # LlmCallStarted creates a turn
-        projector.project_frame(self._llm_started_frame())
-        frame = (
-            "id: 1\nevent: StepTextDelta\n"
-            'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            f'"event_type":"StepTextDelta","event":{{"step":1,"text_delta":"你","seq":1,"channel":"{StreamChannel.ANSWER.value}"}}}}\n\n'
+        self.assertEqual(
+            p.project(
+                s(
+                    1,
+                    StepTextDelta(
+                        step=0,
+                        text_delta="secret",
+                        channel=StreamChannel.DECISION.value,
+                    ),
+                )
+            ),
+            [],
         )
-        # Answer text is emitted immediately — no buffering
-        chunks = projector.project_frame(frame)
-        self.assertEqual(self._content_from(chunks), "你")
-
-    def test_decision_json_never_leaks_to_content(self) -> None:
-        """Decision channel text is filtered; answer channel streams immediately."""
-        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
-        projector.project_frame(self._llm_started_frame())
-        decision_frame = (
-            "id: 1\nevent: StepTextDelta\n"
-            'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            f'"event_type":"StepTextDelta","event":{{"step":0,"text_delta":"{{\\"action_type\\": \\"respond\\", \\"rationale\\": \\"x\\", ","seq":0,"channel":"{StreamChannel.DECISION.value}"}}}}\n\n'
+        ans = p.project(
+            s(
+                2,
+                StepTextDelta(
+                    step=0, text_delta="你好", channel=StreamChannel.ANSWER.value
+                ),
+            )
         )
-        answer_frame = (
-            "id: 2\nevent: StepTextDelta\n"
-            'data: {"schema":"journal.v1","seq":2,"ts":2.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            f'"event_type":"StepTextDelta","event":{{"step":0,"text_delta":"你好","seq":1,"channel":"{StreamChannel.ANSWER.value}"}}}}\n\n'
+        self.assertEqual(ans[0]["type"], "answer.delta")
+        self.assertEqual(ans[0]["text"], "你好")
+        self.assertEqual(
+            p.project(
+                s(3, DecisionMade(step=0, action_type="respond", response_text="完整"))
+            ),
+            [],
         )
-        chunks: list[dict] = []
-        chunks.extend(projector.project_frame(decision_frame))
-        # Decision channel text is ignored by TurnBuilder — no content
-        self.assertEqual(self._content_from(chunks), "")
-        chunks.extend(projector.project_frame(answer_frame))
-        # Answer text streams immediately
-        content = self._content_from(chunks)
-        self.assertEqual(content, "你好")
-        self.assertNotIn("rationale", content)
-
-    def test_answer_text_streams_immediately_decision_made_no_duplicate(self) -> None:
-        """Answer text streams immediately; DecisionMade doesn't re-emit."""
-        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
-        projector.project_frame(self._llm_started_frame())
-        stream_frame = (
-            "id: 1\nevent: StepTextDelta\n"
-            'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            f'"event_type":"StepTextDelta","event":{{"step":1,"text_delta":"流式","seq":0,"channel":"{StreamChannel.ANSWER.value}"}}}}\n\n'
-        )
-        chunks = projector.project_frame(stream_frame)
-        # Answer text streams immediately
-        self.assertEqual(self._content_from(chunks), "流式")
-        # DecisionMade doesn't emit duplicate content
-        decision_frame = (
-            "id: 2\nevent: DecisionMade\n"
-            'data: {"schema":"journal.v1","seq":2,"ts":2.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            '"event_type":"DecisionMade","event":{"step":1,"action_type":"respond",'
-            '"response_text":"完整回复","rationale_preview":"","delegate_target":"",'
-            '"delegate_count":0,"tool_name":"","confidence":1.0,"output_truncated":false}}\n\n'
-        )
-        chunks = projector.project_frame(decision_frame)
-        # No duplicate content from DecisionMade
-        self.assertEqual(self._content_from(chunks), "")
-
-    def test_tool_stream_only_ends_with_stop(self) -> None:
-        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
-        chunks: list[dict] = []
-        tool_frame = (
-            "id: 1\nevent: ToolStarted\n"
-            'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            '"event_type":"ToolStarted","event":{"tool_name":"run_skill_script","arguments_preview":"{}",'
-            '"invocation_id":"inv-x"}}\n\n'
-        )
-        chunks.extend(projector.project_frame(tool_frame))
-        finish_frame = (
-            "id: 2\nevent: AgentRunFinished\n"
-            'data: {"schema":"journal.v1","seq":2,"ts":2.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            '"event_type":"AgentRunFinished","event":{"status":"completed","output_text":"done","steps":1}}\n\n'
-        )
-        chunks.extend(projector.project_frame(finish_frame))
-        assert_openai_finish_invariant(chunks)
-        lca_start = next(c["lca"]["events"][0] for c in chunks if "lca" in c and c["lca"]["events"])
-        self.assertEqual(lca_start["type"], "tool_started")
-        self.assertIn("lobe-skills____execScript", lca_start["wire_name"])
-
-    def test_openai_tool_calls_delta_rejected(self) -> None:
-        bad = [{"choices": [{"finish_reason": None, "delta": {"tool_calls": [{}]}}]}]
-        with self.assertRaises(ValueError):
-            assert_openai_finish_invariant(bad)
-
-    def test_tool_calls_finish_reason_rejected(self) -> None:
-        bad = [{"choices": [{"finish_reason": "tool_calls", "delta": {}}]}]
-        with self.assertRaises(ValueError):
-            assert_openai_finish_invariant(bad)
 
 
 if __name__ == "__main__":

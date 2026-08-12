@@ -1,9 +1,7 @@
-"""OpenAI-compatible HTTP surface for LobeHub G2A integration.
+"""OpenAI-compatible HTTP surface + agent timeline stream.
 
-LobeHub expects ``POST /v1/chat/completions`` (with tools + SSE streaming),
-``POST /v1/responses`` (structured ``generateObject`` for AgentSignal), and
-``GET /v1/models``. Chat routes bridge to LCA agent runs; Responses routes
-proxy structured output to the configured upstream LLM.
+- Non-agent (title / embeddings / responses): upstream OpenAI-shaped APIs.
+- Agent (solo/team): **timeline.v1 SSE only** — no chat.completion.chunk, no lca.events.
 """
 
 from __future__ import annotations
@@ -32,11 +30,7 @@ from gateway.openai_structured_llm import (
     resolve_upstream_model,
 )
 from gateway.run_executor import create_run_session, llm_status, schedule_run
-from gateway.stream_emitter import (
-    OpenAIStreamEmitter,
-    collect_openai_completion,
-    stream_openai_chunks,
-)
+from gateway.timeline.stream import stream_timeline_sse
 from lca.contracts.atoms.ids import new_id
 
 _OPENAI_CHAT_ID_PREFIX = "chatcmpl-"
@@ -44,29 +38,13 @@ _log = structlog.get_logger(__name__)
 
 
 def _lca_models_payload() -> dict[str, Any]:
-    """Expose LCA modes + configured models as OpenAI model objects.
-
-    LCA 模式（solo/team）作为虚拟模型供 LobeHub 模式选择器使用；
-    真实模型（来自 ``ModelRegistry``）供直接模型调用。
-    """
     registry = get_model_registry()
     data: list[dict[str, Any]] = []
     seen: set[str] = set()
-
-    # LCA 模式 —— 虚拟模型（触发 agent run 而非直接 LLM 调用）
     for key in [DEFAULT_MODE, *MODE_DEFINITIONS.keys()]:
         if key not in seen:
-            data.append(
-                {
-                    "id": key,
-                    "object": "model",
-                    "created": 0,
-                    "owned_by": "lca",
-                }
-            )
+            data.append({"id": key, "object": "model", "created": 0, "owned_by": "lca"})
             seen.add(key)
-
-    # 真实模型 —— 来自 ModelRegistry
     for model_def in registry.list_available():
         if model_def.id not in seen:
             data.append(
@@ -78,7 +56,6 @@ def _lca_models_payload() -> dict[str, Any]:
                 }
             )
             seen.add(model_def.id)
-
     return {"object": "list", "data": data}
 
 
@@ -108,50 +85,30 @@ async def _passthrough_chat_completion(
     stream: bool,
     chat_id: str,
 ) -> JSONResponse | StreamingResponse:
-    """LobeHub auxiliary calls (title gen, etc.) — upstream LLM only, no LCA run."""
-    normalized: list[dict[str, Any]] = []
-    for item in messages:
-        if not isinstance(item, dict):
-            continue
-        role = item.get("role")
-        if role not in {"system", "user", "assistant", "developer"}:
-            continue
-        content = item.get("content")
-        if isinstance(content, str) and content.strip():
-            normalized.append({"role": role, "content": content.strip()})
-        elif isinstance(content, list):
-            parts: list[str] = []
-            for part in content:
-                if isinstance(part, dict) and part.get("type") == "text":
-                    text = str(part.get("text", "")).strip()
-                    if text:
-                        parts.append(text)
-            if parts:
-                normalized.append({"role": role, "content": "\n".join(parts)})
-    if not normalized:
-        return _error_response("messages must include at least one non-empty turn", status_code=400)
-
+    """Title / mini helpers — real upstream OpenAI-shaped completion."""
     try:
-        text, usage = await create_simple_completion(messages=normalized, model=model)
-    except (StructuredLLMError, APIError) as exc:
-        return _error_response(
-            str(exc),
-            status_code=502,
-            error_type="server_error",
-            code="lca_passthrough_failed",
-        )
+        text, usage = await create_simple_completion(messages=messages, model=model)
+    except StructuredLLMError as exc:
+        return _error_response(str(exc), status_code=502, error_type="server_error")
+    except APIError as exc:
+        return _error_response(str(exc), status_code=502, error_type="server_error")
 
     if stream:
-        emitter = OpenAIStreamEmitter(chat_id=chat_id, model=model)
-        if usage:
-            emitter._prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
-            emitter._completion_tokens = int(usage.get("completion_tokens", 0) or 0)
 
         async def _body() -> Any:
-            chunks = emitter._emit_delta({"content": text})
-            chunks.extend(emitter._emit_finish())
-            for chunk in chunks:
-                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n".encode()
+            # Minimal OpenAI stream for non-agent only
+            chunk = {
+                "id": chat_id,
+                "object": "chat.completion.chunk",
+                "choices": [{"index": 0, "delta": {"role": "assistant", "content": text}}],
+            }
+            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n".encode()
+            stop = {
+                "id": chat_id,
+                "object": "chat.completion.chunk",
+                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+            }
+            yield f"data: {json.dumps(stop, ensure_ascii=False)}\n\n".encode()
             yield b"data: [DONE]\n\n"
 
         return StreamingResponse(
@@ -160,11 +117,19 @@ async def _passthrough_chat_completion(
             headers=cors_headers(**{"Cache-Control": "no-cache"}),
         )
 
-    emitter = OpenAIStreamEmitter(chat_id=chat_id, model=model)
-    if usage:
-        emitter._prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
-        emitter._completion_tokens = int(usage.get("completion_tokens", 0) or 0)
-    return JSONResponse(emitter.completion_json(text), headers=cors_headers())
+    body = {
+        "id": chat_id,
+        "object": "chat.completion",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": text},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": usage or {},
+    }
+    return JSONResponse(body, headers=cors_headers())
 
 
 async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | StreamingResponse:
@@ -183,7 +148,6 @@ async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | St
             chat_id=chat_id,
         )
 
-    # Lazy import avoids circular import at module load.
     from gateway.app import get_file_store, get_registry
 
     run_input = await prepare_run_from_messages(messages, get_file_store())
@@ -191,7 +155,6 @@ async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | St
         return _error_response("messages must include a non-empty user message", status_code=400)
 
     mode = resolve_lca_mode(model)
-
     registry = get_registry()
     session = registry.find_inflight_run(
         user_text=run_input.user_text,
@@ -216,31 +179,30 @@ async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | St
             user_text_preview=run_input.user_text[:80],
         )
 
-    if stream:
-
-        async def _body() -> Any:
-            async for chunk in stream_openai_chunks(
-                session.bus.subscribe(),
-                chat_id=chat_id,
-                model=model,
-            ):
-                yield chunk
-
-        return StreamingResponse(
-            _body(),
-            media_type="text/event-stream",
-            headers=cors_headers(**{"Cache-Control": "no-cache"}),
-        )
-
-    payload = await collect_openai_completion(session.bus.subscribe(), chat_id=chat_id, model=model)
-    if session.error:
+    # Agent path: timeline.v1 only (stream required for UI)
+    if not stream:
         return _error_response(
-            session.error,
-            status_code=500,
-            error_type="server_error",
-            code="lca_run_failed",
+            "LCA agent runs require stream=true (timeline.v1 SSE). "
+            "Prefer POST /v1/agent/runs + GET .../timeline.",
+            status_code=400,
+            code="timeline_stream_required",
         )
-    return JSONResponse(payload, headers=cors_headers())
+
+    async def _body() -> Any:
+        async for frame in stream_timeline_sse(session.bus.subscribe()):
+            yield frame
+
+    return StreamingResponse(
+        _body(),
+        media_type="text/event-stream",
+        headers=cors_headers(
+            **{
+                "Cache-Control": "no-cache",
+                "X-LCA-Stream": "timeline.v1",
+                "X-LCA-Run-Id": session.run_id,
+            }
+        ),
+    )
 
 
 async def chat_completions(request: Request) -> JSONResponse | StreamingResponse:
@@ -250,10 +212,8 @@ async def chat_completions(request: Request) -> JSONResponse | StreamingResponse
         body = await request.json()
     except json.JSONDecodeError:
         return _error_response("invalid JSON body", status_code=400)
-
     if not isinstance(body, dict):
         return _error_response("request body must be a JSON object", status_code=400)
-
     if not llm_status()["llm_available"]:
         return _error_response(
             "LLM_API_KEY 未配置，无法执行 LCA run。",
@@ -261,7 +221,6 @@ async def chat_completions(request: Request) -> JSONResponse | StreamingResponse
             error_type="service_unavailable",
             code="lca_llm_unavailable",
         )
-
     return await _chat_completions_from_body(body)
 
 

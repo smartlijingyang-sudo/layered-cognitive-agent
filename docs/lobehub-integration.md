@@ -40,6 +40,6 @@ LCA Agent/Team 运行时 (layer2~3)
 | `scripts/start_lobehub_stack.sh` | 联合启动编排 |
 | `deploy/lobehub/.env.lca` | LobeHub 本地 env 模板 |
 | `gateway/openai_compat_api.py` | OpenAI 兼容 HTTP 面 |
-| `web/` | 原有自研前端（过渡期保留） |
+
 
 升级：`LOBEHUB_RELEASE=v2.2.14 ./scripts/sync_lobehub_ui.sh`

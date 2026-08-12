@@ -38,6 +38,7 @@ from gateway.run_executor import (
     set_llm_resolver,
 )
 from gateway.run_registry import RunRegistry, RunSession, RunStatus
+from gateway.timeline.routes import create_agent_run, stream_agent_timeline
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.layer0_infra.file_store import (
     LocalFileStore,
@@ -490,6 +491,13 @@ def create_app(
             Route("/v1/chat/completions", chat_completions, methods=["POST", "OPTIONS"]),
             Route("/v1/embeddings", embeddings_create, methods=["POST", "OPTIONS"]),
             Route("/v1/responses", responses_create, methods=["POST", "OPTIONS"]),
+            # Agent Timeline (timeline.v1) — preferred UI stream
+            Route("/v1/agent/runs", create_agent_run, methods=["POST", "OPTIONS"]),
+            Route(
+                "/v1/agent/runs/{run_id}/timeline",
+                stream_agent_timeline,
+                methods=["GET", "OPTIONS"],
+            ),
             Route("/runs", _options, methods=["OPTIONS"]),
             Route("/runs/{run_id}/events", _options, methods=["OPTIONS"]),
             Route("/runs/{run_id}/cancel", _options, methods=["OPTIONS"]),

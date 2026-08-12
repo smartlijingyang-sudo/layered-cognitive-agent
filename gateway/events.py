@@ -1,14 +1,10 @@
-"""Typed event bus — replaces string-based SSE frame broadcasting.
+"""Typed event bus for journal StampedEvent fan-out.
 
-Before refactoring, events flowed through:
-    Journal → SSEJournalProjector → emit(SSE text frame) → RunSession
-    → OpenAISSEProjector.project_frame(frame) → parse JSON → restore event
+Flow::
 
-Now events flow through:
-    Journal → EventBusProjector → EventBus → RunSession
-    → OpenAIStreamEmitter.consume(stamped) → chunks directly
-
-No string serialization round-trip. Typed events all the way.
+    Journal → EventBusProjector → EventBus → subscribers
+      → TimelineProjector (whitelist) → timeline.v1 / OpenAI compat chunks
+      → raw /runs/{id}/events (full journal SSE, debug)
 """
 
 from __future__ import annotations

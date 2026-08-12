@@ -16,62 +16,9 @@ from gateway.openai_structured_llm import (
     normalize_responses_input,
     resolve_upstream_model,
 )
-from gateway.projection.openai_sse import (
-    OpenAISSEProjector,
-    _parse_sse_frame,
-    assert_openai_finish_invariant,
-)
 from gateway.run_registry import RunRegistry, RunSession, RunStatus, run_dedup_key
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
-
-class TestOpenAISSEProjector(unittest.TestCase):
-    def test_extract_user_question_from_string_content(self) -> None:
-        messages = [
-            {"role": "system", "content": "you are helpful"},
-            {"role": "user", "content": "今天有什么新闻"},
-        ]
-        self.assertEqual(extract_user_question(messages), "今天有什么新闻")
-
-    def test_resolve_lca_mode(self) -> None:
-        self.assertEqual(resolve_lca_mode("solo"), "solo")
-        self.assertEqual(resolve_lca_mode("team"), "team")
-        self.assertEqual(resolve_lca_mode("qwen3.7-plus"), "solo")
-
-    def test_project_reasoning_and_finish(self) -> None:
-        projector = OpenAISSEProjector(chat_id="chatcmpl-test", model="solo")
-        frame = (
-            "id: 1\nevent: ReasoningDelta\n"
-            'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            '"event_type":"ReasoningDelta","event":{"step":1,"text_delta":"思考中","seq":1}}\n\n'
-        )
-        chunks = projector.project_frame(frame)
-        # Reasoning delta emits 1 chunk: reasoning_content (no reasoning_start event)
-        self.assertEqual(len(chunks), 1)
-        has_reasoning = any(
-            "reasoning_content" in c.get("choices", [{}])[0].get("delta", {}) for c in chunks
-        )
-        self.assertTrue(has_reasoning)
-
-        finish_frame = (
-            "id: 2\nevent: AgentRunFinished\n"
-            'data: {"schema":"journal.v1","seq":2,"ts":2.0,'
-            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
-            '"event_type":"AgentRunFinished","event":{"status":"completed","output_text":"你好","steps":1}}\n\n'
-        )
-        finish_chunks = projector.project_frame(finish_frame)
-        self.assertTrue(any(c["choices"][0].get("finish_reason") == "stop" for c in finish_chunks))
-        # run_meta LCA event with steps
-        has_run_meta = any("lca" in c for c in finish_chunks)
-        self.assertTrue(has_run_meta)
-        assert_openai_finish_invariant(chunks + finish_chunks)
-
-    def test__parse_sse_frame(self) -> None:
-        frame = 'id: 1\nevent: X\ndata: {"schema":"journal.v1","seq":1}\n\n'
-        record = _parse_sse_frame(frame)
-        self.assertIsNotNone(record)
-        self.assertEqual(record["schema"], "journal.v1")
 
 
 class TestOpenAiCompatGateway(unittest.TestCase):
@@ -83,7 +30,7 @@ class TestOpenAiCompatGateway(unittest.TestCase):
         self.assertIn("solo", ids)
         self.assertIn("team", ids)
 
-    def test_chat_completions_non_stream(self) -> None:
+    def test_chat_completions_non_stream_requires_timeline_stream(self) -> None:
         registry = RunRegistry()
         client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
         response = client.post(
@@ -94,12 +41,10 @@ class TestOpenAiCompatGateway(unittest.TestCase):
                 "messages": [{"role": "user", "content": "hello"}],
             },
         )
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(payload["object"], "chat.completion")
-        self.assertTrue(payload["choices"][0]["message"]["content"])
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "timeline_stream_required")
 
-    def test_chat_completions_stream(self) -> None:
+    def test_chat_completions_stream_is_timeline_v1(self) -> None:
         registry = RunRegistry()
         client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
         with client.stream(
@@ -112,17 +57,18 @@ class TestOpenAiCompatGateway(unittest.TestCase):
             },
         ) as response:
             self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers.get("x-lca-stream"), "timeline.v1")
             buffer = ""
-            saw_done = False
+            saw_run_end = False
             started = time.monotonic()
             for chunk in response.iter_bytes():
                 buffer += chunk.decode("utf-8")
-                if "[DONE]" in buffer:
-                    saw_done = True
+                if "event: run.end" in buffer:
+                    saw_run_end = True
                     break
                 if time.monotonic() - started > 30:
                     break
-        self.assertTrue(saw_done)
+        self.assertTrue(saw_run_end)
 
     def test_chat_completions_without_llm_returns_503(self) -> None:
         registry = RunRegistry()
@@ -250,10 +196,9 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
                 "input": [{"role": "user", "content": "hello via responses"}],
             },
         )
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(payload["object"], "chat.completion")
-        self.assertTrue(payload["choices"][0]["message"]["content"])
+        # Agent path requires timeline stream
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "timeline_stream_required")
 
     def test_responses_create_returns_output_text(self) -> None:
         registry = RunRegistry()
