@@ -56,5 +56,6 @@ fi
 install -m 0755 "${TMP}" "${DEST_DIR}/officecli"
 # Stability: never auto-update inside sandbox sessions.
 export OFFICECLI_SKIP_UPDATE=1
-"${DEST_DIR}/officecli" --version
+export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 "${DEST_DIR}/officecli" --version
 echo "==> installed ${DEST_DIR}/officecli"

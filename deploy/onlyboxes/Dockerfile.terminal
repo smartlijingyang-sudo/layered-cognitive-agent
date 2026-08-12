@@ -20,7 +20,8 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONUNBUFFERED=1 \
     PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
     OFFICECLI_SKIP_UPDATE=1 \
-    OFFICECLI_VERSION=${OFFICECLI_VERSION}
+    OFFICECLI_VERSION=${OFFICECLI_VERSION} \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 
 USER root
 
@@ -49,6 +50,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         fontconfig \
         fonts-wqy-zenhei \
         fonts-noto-cjk \
+        libicu74 \
     && fc-cache -f \
     && rm -rf /var/lib/apt/lists/* \
     && fc-list :lang=zh | head -5 \
@@ -65,6 +67,6 @@ RUN chmod +x /tmp/install-officecli.sh \
     && OFFICECLI_VERSION="${OFFICECLI_VERSION}" TARGETARCH="${TARGETARCH}" \
        /tmp/install-officecli.sh /usr/local/bin \
     && rm -f /tmp/install-officecli.sh \
-    && officecli --version
+    && DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 officecli --version
 
 WORKDIR /workspace

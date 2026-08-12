@@ -28,6 +28,34 @@ LOBE_DEV_PID="${RUN_DIR}/lobehub-dev.pid"
 LOBE_ENV="${ROOT}/deploy/lobehub/.env.lca"
 NEXT_DEV_LOCK="${LOBE_DIR}/.next/dev/lock"
 
+# Browser-facing base for GET /files/{id}. Never use 0.0.0.0 (bind-only).
+_resolve_gateway_public_url() {
+  if [[ -n "${GATEWAY_PUBLIC_URL:-}" ]]; then
+    printf '%s\n' "${GATEWAY_PUBLIC_URL}"
+    return
+  fi
+  if [[ -n "${LCA_GATEWAY_PUBLIC_URL:-}" ]]; then
+    printf '%s\n' "${LCA_GATEWAY_PUBLIC_URL}"
+    return
+  fi
+  local host="${LOBE_LAN_IP:-${VITE_DEV_HOST:-}}"
+  if [[ -z "${host}" && -f "${LOBE_ENV}" ]]; then
+    # shellcheck disable=SC1090
+    host="$(grep -E '^(VITE_DEV_HOST|LOBE_LAN_IP)=' "${LOBE_ENV}" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+  fi
+  if [[ -z "${host}" ]]; then
+    host="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)"
+  fi
+  if [[ -z "${host}" ]]; then
+    host="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  fi
+  if [[ -z "${host}" || "${host}" == "0.0.0.0" ]]; then
+    host="127.0.0.1"
+  fi
+  printf 'http://%s:%s\n' "${host}" "${GATEWAY_PORT}"
+}
+GATEWAY_PUBLIC_URL="$(_resolve_gateway_public_url)"
+
 mkdir -p "${STATE_DIR}" "${RUN_DIR}"
 
 # ── 输出 ──────────────────────────────────────────────────────────────
@@ -252,13 +280,17 @@ cmd_gateway() {
       ok "gateway 已在运行 (pid $(cat "${GATEWAY_PID}"))"; return 0
     fi
   fi
-  log "启动 LCA Gateway :${GATEWAY_PORT}"
-  (cd "${ROOT}" && exec uv run python scripts/serve_observability.py --host 0.0.0.0 --port "${GATEWAY_PORT}") >>"${GATEWAY_LOG}" 2>&1 &
+  log "启动 LCA Gateway :${GATEWAY_PORT} (public: ${GATEWAY_PUBLIC_URL})"
+  (
+    cd "${ROOT}"
+    export LCA_GATEWAY_PUBLIC_URL="${GATEWAY_PUBLIC_URL}"
+    exec uv run python scripts/serve_observability.py --host 0.0.0.0 --port "${GATEWAY_PORT}"
+  ) >>"${GATEWAY_LOG}" 2>&1 &
   echo $! >"${GATEWAY_PID}"
   local i
   for i in $(seq 1 40); do
     if _http_ready "http://127.0.0.1:${GATEWAY_PORT}/health"; then
-      ok "gateway 就绪: http://127.0.0.1:${GATEWAY_PORT}"
+      ok "gateway 就绪: http://127.0.0.1:${GATEWAY_PORT} (files: ${GATEWAY_PUBLIC_URL}/files/...)"
       _save_gateway_stamp; return 0
     fi
     sleep 0.25

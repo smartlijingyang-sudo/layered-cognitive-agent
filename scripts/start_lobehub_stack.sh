@@ -22,9 +22,32 @@ LOBE_DEV_PID="${RUN_DIR}/lobehub-dev.pid"
 LOBE_ENV="${ROOT}/deploy/lobehub/.env.lca"
 NEXT_DEV_LOCK="${LOBE_DIR}/.next/dev/lock"
 
-# Public URL for file downloads (browser-facing).  Defaults to the gateway's
-# actual listening host so LAN clients get reachable URLs instead of 127.0.0.1.
-GATEWAY_PUBLIC_URL="${GATEWAY_PUBLIC_URL:-http://0.0.0.0:${GATEWAY_PORT}}"
+# Public URL for file downloads (browser-facing).
+# IMPORTANT: 0.0.0.0 is a *bind* address, not a client URL — browsers cannot
+# download from http://0.0.0.0:PORT. Prefer explicit override, then LAN IP.
+_resolve_gateway_public_url() {
+  if [[ -n "${GATEWAY_PUBLIC_URL:-}" ]]; then
+    printf '%s\n' "${GATEWAY_PUBLIC_URL}"
+    return
+  fi
+  if [[ -n "${LCA_GATEWAY_PUBLIC_URL:-}" ]]; then
+    printf '%s\n' "${LCA_GATEWAY_PUBLIC_URL}"
+    return
+  fi
+  local host="${LOBE_LAN_IP:-${VITE_DEV_HOST:-}}"
+  if [[ -z "${host}" ]]; then
+    host="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)"
+  fi
+  if [[ -z "${host}" ]]; then
+    host="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  fi
+  # Never advertise 0.0.0.0 / empty as a download host.
+  if [[ -z "${host}" || "${host}" == "0.0.0.0" ]]; then
+    host="127.0.0.1"
+  fi
+  printf 'http://%s:%s\n' "${host}" "${GATEWAY_PORT}"
+}
+GATEWAY_PUBLIC_URL="$(_resolve_gateway_public_url)"
 
 log() { printf '[lobehub-stack] %s\n' "$*"; }
 
@@ -526,8 +549,9 @@ usage() {
 环境变量:
   LOBEHUB_RELEASE   release tag（默认 v2.2.13）
   GATEWAY_PORT      LCA 网关端口（默认 8765）
-  GATEWAY_PUBLIC_URL  文件下载的公开 URL（默认 http://0.0.0.0:${GATEWAY_PORT}）
-                      浏览器用此 URL 下载文件，局域网/远程访问需设为实际 IP
+  GATEWAY_PUBLIC_URL  文件下载的公开 URL（浏览器可达；默认检测 LAN IP，
+                      如 http://10.x.x.x:8765；勿用 0.0.0.0）
+  LOBE_LAN_IP / VITE_DEV_HOST  未设 GATEWAY_PUBLIC_URL 时用于拼公开基址
   LOBE_DEV_PORT     LobeHub dev 端口（默认 3010）
   LOBE_REUSE_DEV    设为 1 时若 dev 已在运行则复用、不重启
   LOBE_SKIP_INFRA   设为 1 时跳过 docker compose

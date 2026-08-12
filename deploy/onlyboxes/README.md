@@ -12,11 +12,16 @@ LobeHub 原生只走 **terminalExec**（`POST /api/v1/commands/terminal`）。Wo
 | `deploy/onlyboxes/configure-terminal-runtime.sh` | 写入 systemd drop-in 并重启 worker |
 
 ```bash
-# 优先使用官方 LobeHub 变体；不可用时本地构建
+# 默认使用 onlyboxes-terminal-local:lca（含 officecli，ADR-0054）
+./deploy/onlyboxes/build-terminal-image.sh   # 首次 / 升级 officecli
 ./deploy/onlyboxes/configure-terminal-runtime.sh
 ```
 
-官方 Onlyboxes 文档亦推荐 LobeHub 场景使用 `coolfan1024/onlyboxes-runtime:lobehub`。
+**注意**：`coolfan1024/onlyboxes-runtime:default` / `:lobehub` **不含** `officecli`。
+LCA 生产路径必须用本目录构建的 `onlyboxes-terminal-local:lca`（或自建并设置
+`ONLYBOXES_TERMINAL_IMAGE=...`）。systemd drop-in 必须写在
+`/etc/systemd/system/onlyboxes-worker-docker.service.d/`（带 `.service.d`），
+写到 `onlyboxes-worker-docker.d/` 会被 systemd 静默忽略。
 
 ## Legacy（pythonExec — 已不由 LCA 代码使用）
 
