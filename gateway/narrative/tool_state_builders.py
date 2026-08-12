@@ -2,8 +2,8 @@
 
 SSOT for UI state production is ``lca.layer1_cognitive.body.tool_ui_state``.
 This module remains for:
-- TurnStateMachine snapshot assembly from journal events
-- Backward-compatible imports from ``gateway.presentation``
+- TurnBuilder snapshot assembly from journal events
+- Backward-compatible imports from ``gateway.narrative``
 
 When ``ToolInvoked.plugin_state`` is present, it is used as-is (journal SSOT).
 Otherwise we rebuild from previews via the same registry (legacy events).

@@ -6,12 +6,12 @@ The public URL for file downloads is independent of the internal proxy URL.
 downloads (the actual IP/hostname).
 
 This module is a thin re-export facade — the canonical implementation lives
-in ``gateway.presentation.artifact_registry``.
+in ``gateway.narrative.artifact_registry``.
 """
 
 from __future__ import annotations
 
-from gateway.presentation.artifact_registry import (
+from gateway.narrative.artifact_registry import (
     absolutize_url as _absolutize_url,
 )
 
@@ -23,7 +23,7 @@ def gateway_public_base() -> str:
 
     Delegates to ``artifact_registry.gateway_public_base()``.
     """
-    from gateway.presentation.artifact_registry import gateway_public_base as _base
+    from gateway.narrative.artifact_registry import gateway_public_base as _base
 
     return _base()
 

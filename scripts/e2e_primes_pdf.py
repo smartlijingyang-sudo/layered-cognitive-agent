@@ -16,7 +16,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from gateway.journal_openai_projector import JournalOpenAiProjector  # noqa: E402
+from gateway.projection.openai_sse import OpenAISSEProjector  # noqa: E402
 
 GATEWAY = os.getenv("LCA_GATEWAY_URL", "http://127.0.0.1:8765")
 TASK = (
@@ -128,7 +128,7 @@ def _replay_lca_types(run_id: str) -> set[str]:
     journal = Path("traces/runs") / f"{run_id}.jsonl"
     if not journal.is_file():
         return set()
-    projector = JournalOpenAiProjector(chat_id="e2e-replay", model="solo")
+    projector = OpenAISSEProjector(chat_id="e2e-replay", model="solo")
     types: set[str] = set()
     for line in journal.read_text(encoding="utf-8").splitlines():
         rec = json.loads(line)

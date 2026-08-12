@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from gateway.presentation.turn_snapshot import (
+from gateway.narrative.turn_model import (
     ToolLifecycleState,
     ToolPhase,
 )

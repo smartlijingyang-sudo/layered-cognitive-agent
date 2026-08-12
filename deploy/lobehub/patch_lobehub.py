@@ -1775,6 +1775,42 @@ def p_reasoning_multi_block() -> bool:
     return True
 
 
+def p_reasoning_lifecycle_reset() -> bool:
+    """LCA multi-step agent: allow reasoning to restart after each step.
+
+    LobeHub's native StreamingHandler assumes one reasoning cycle per message.
+    LCA agents have multiple reasoning steps. These two lines enable the
+    reasoning lifecycle to reset between steps:
+    - endReasoningIfNeeded: clear thinkingStartAt so a new cycle can start
+    - startReasoningIfNeeded: clear thinkingDuration for fresh timing
+    """
+    rel = "src/store/chat/agents/StreamingHandler.ts"
+    text = _read(rel)
+    if "LCA: reset for next reasoning cycle" in text:
+        return False
+
+    # endReasoningIfNeeded: allow new reasoning cycle to start
+    text = text.replace(
+        "        this.reasoningOperationId = undefined;\n      }\n    }\n  }",
+        "        this.reasoningOperationId = undefined;\n      }\n"
+        "      this.thinkingStartAt = undefined; // LCA: reset for next reasoning cycle\n"
+        "    }\n  }",
+        1,
+    )
+
+    # startReasoningIfNeeded: clear old duration for fresh timing
+    text = text.replace(
+        "      this.thinkingStartAt = Date.now();\n      if (!this.reasoningOperationId) {",
+        "      this.thinkingStartAt = Date.now();\n"
+        "      this.thinkingDuration = undefined; // LCA: reset for next reasoning cycle\n"
+        "      if (!this.reasoningOperationId) {",
+        1,
+    )
+
+    _write(rel, text)
+    return True
+
+
 # =======================================================================
 #  MANIFEST — ordered patch registry
 # =======================================================================
@@ -1892,6 +1928,16 @@ PATCHES: list[PatchMeta] = [
         depends_on=("streaming_types",),
         why="Sandbox tools stream live stdout and produce file artifacts",
         technical_detail="Add content field to tool_state, files[] to tool_result in LcaStreamToolEvent.",
+    ),
+    PatchMeta(
+        "reasoning_lifecycle_reset",
+        "Allow multi-step reasoning restart in StreamingHandler",
+        ("src/store/chat/agents/StreamingHandler.ts",),
+        "low",
+        "runtime",
+        depends_on=("streaming_handler",),
+        why="LCA agents have multiple reasoning steps; LobeHub native assumes one",
+        technical_detail="Reset thinkingStartAt in endReasoningIfNeeded; clear thinkingDuration in startReasoningIfNeeded.",
     ),
     PatchMeta(
         "sandbox_generated_files",
@@ -2167,6 +2213,7 @@ _PATCH_FUNCS: dict[str, callable] = {
     "lca_tool_result_merge": p_lca_tool_result_merge,
     "lca_streaming_types": p_lca_streaming_types,
     "sandbox_generated_files": p_sandbox_generated_files,
+    "reasoning_lifecycle_reset": p_reasoning_lifecycle_reset,
     "client_transport": p_client_transport,
     "llm_transport_type": p_llm_transport_type,
     "call_llm_finalizer": p_call_llm_finalizer,
@@ -2206,6 +2253,10 @@ _VERIFY_MARKERS: dict[str, tuple[str, str]] = {
     "sandbox_generated_files": (
         "packages/builtin-tool-cloud-sandbox/src/client/Render/ExecuteCode/index.tsx",
         "GeneratedFilesStrip",
+    ),
+    "reasoning_lifecycle_reset": (
+        "src/store/chat/agents/StreamingHandler.ts",
+        "LCA: reset for next reasoning cycle",
     ),
     "client_transport": ("src/store/chat/agents/transports/ClientLLMTransport.ts", "lcaClosedLoop"),
     "llm_transport_type": ("packages/agent-runtime/src/transport/llm.ts", "lcaClosedLoop"),

@@ -9,23 +9,23 @@ from unittest.mock import patch
 from starlette.testclient import TestClient
 
 from gateway.app import create_app
-from gateway.journal_openai_projector import (
-    JournalOpenAiProjector,
-    assert_openai_finish_invariant,
-    extract_user_question,
-    parse_sse_frame_record,
-    resolve_lca_mode,
-)
+from gateway.lobehub_bridge.parser import extract_user_question
+from gateway.mode_catalog import resolve_lca_mode
 from gateway.openai_structured_llm import (
     extract_json_schema_format,
     normalize_responses_input,
     resolve_upstream_model,
 )
+from gateway.projection.openai_sse import (
+    OpenAISSEProjector,
+    _parse_sse_frame,
+    assert_openai_finish_invariant,
+)
 from gateway.run_registry import RunRegistry, RunSession, RunStatus, run_dedup_key
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
 
-class TestJournalOpenAiProjector(unittest.TestCase):
+class TestOpenAISSEProjector(unittest.TestCase):
     def test_extract_user_question_from_string_content(self) -> None:
         messages = [
             {"role": "system", "content": "you are helpful"},
@@ -39,7 +39,7 @@ class TestJournalOpenAiProjector(unittest.TestCase):
         self.assertEqual(resolve_lca_mode("qwen3.7-plus"), "solo")
 
     def test_project_reasoning_and_finish(self) -> None:
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-test", model="solo")
+        projector = OpenAISSEProjector(chat_id="chatcmpl-test", model="solo")
         frame = (
             "id: 1\nevent: ReasoningDelta\n"
             'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
@@ -47,17 +47,12 @@ class TestJournalOpenAiProjector(unittest.TestCase):
             '"event_type":"ReasoningDelta","event":{"step":1,"text_delta":"思考中","seq":1}}\n\n'
         )
         chunks = projector.project_frame(frame)
-        # First reasoning delta in a new step emits 2 chunks:
-        # 1) reasoning_start LCA event (step boundary for frontend splitting)
-        # 2) reasoning_content delta
-        self.assertEqual(len(chunks), 2)
-        # One chunk has reasoning_content, the other has the LCA extension
+        # Reasoning delta emits 1 chunk: reasoning_content (no reasoning_start event)
+        self.assertEqual(len(chunks), 1)
         has_reasoning = any(
             "reasoning_content" in c.get("choices", [{}])[0].get("delta", {}) for c in chunks
         )
-        has_lca = any("lca" in c for c in chunks)
         self.assertTrue(has_reasoning)
-        self.assertTrue(has_lca)
 
         finish_frame = (
             "id: 2\nevent: AgentRunFinished\n"
@@ -67,11 +62,17 @@ class TestJournalOpenAiProjector(unittest.TestCase):
         )
         finish_chunks = projector.project_frame(finish_frame)
         self.assertTrue(any(c["choices"][0].get("finish_reason") == "stop" for c in finish_chunks))
+        # run_meta LCA event with steps
+        has_run_meta = any(
+            "lca" in c
+            for c in finish_chunks
+        )
+        self.assertTrue(has_run_meta)
         assert_openai_finish_invariant(chunks + finish_chunks)
 
-    def test_parse_sse_frame_record(self) -> None:
+    def test__parse_sse_frame(self) -> None:
         frame = 'id: 1\nevent: X\ndata: {"schema":"journal.v1","seq":1}\n\n'
-        record = parse_sse_frame_record(frame)
+        record = _parse_sse_frame(frame)
         self.assertIsNotNone(record)
         self.assertEqual(record["schema"], "journal.v1")
 

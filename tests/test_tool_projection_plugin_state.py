@@ -1,4 +1,4 @@
-"""End-to-end: journal plugin_state → ToolProjection → lca SSE events."""
+"""End-to-end: journal plugin_state → ToolEventProjector → lca SSE events."""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ import json
 import unittest
 from typing import Any
 
-from gateway._tool_projection import ToolProjection
+from gateway.projection.tool_events import ToolEventProjector
 from lca.contracts.models.observability.journal import ToolInvoked, ToolStarted
 
 
-def _collect() -> tuple[ToolProjection, list[dict[str, Any]]]:
+def _collect() -> tuple[ToolEventProjector, list[dict[str, Any]]]:
     out: list[dict[str, Any]] = []
 
     def emit_lca(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -21,10 +21,10 @@ def _collect() -> tuple[ToolProjection, list[dict[str, Any]]]:
         out.extend(deltas)
         return deltas
 
-    return ToolProjection(emit_lca=emit_lca, emit_delta=emit_delta), out
+    return ToolEventProjector(emit_lca=emit_lca, emit_delta=emit_delta), out
 
 
-class TestToolProjectionPluginState(unittest.TestCase):
+class TestToolEventProjectorPluginState(unittest.TestCase):
     def test_activate_skill_result_has_full_content(self) -> None:
         body = "# PDF Processing Guide\n\n## Overview\n\n" + ("x" * 2000)
         proj, events = _collect()

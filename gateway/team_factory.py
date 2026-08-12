@@ -12,6 +12,7 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.protocols import LLMAdapter, ObservabilityBackend
 from lca.contracts.protocols.casting import CastingError, RoleLibrary, TeamCaster
+from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     bind,
@@ -19,9 +20,14 @@ from lca.layer0_infra.observability import (
     record,
     run_scope,
 )
-from lca.layer0_infra.tools.default_set import build_g2a_chat_tools
+from lca.layer0_infra.tools.default_set import build_default_tools, build_g2a_chat_tools
 from lca.layer4_app.api import Agent, Team
 from lca.layer4_app.casting import LLMTeamCaster, build_from_casting_plan
+
+
+def production_tools(store: FileStore | None = None) -> list:
+    """Tools available to gateway / auto-casting agents."""
+    return build_default_tools(store)
 
 
 def build_solo_agent(

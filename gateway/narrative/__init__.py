@@ -12,30 +12,30 @@ Design:
     - Centralized artifact URL resolution
 """
 
-from gateway.presentation.artifact_registry import (
+from gateway.narrative.artifact_registry import (
     Artifact,
     ArtifactRegistry,
     absolutize_file_parts,
     absolutize_url,
     gateway_public_base,
 )
-from gateway.presentation.tool_lifecycle import (
+from gateway.narrative.tool_lifecycle import (
     InvalidTransitionError,
     ToolLifecycleMap,
 )
-from gateway.presentation.tool_state_builders import (
+from gateway.narrative.tool_state_builders import (
     build_state_from_invoked,
     build_state_from_started,
     build_tool_plugin_state,
 )
-from gateway.presentation.turn_snapshot import (
+from gateway.narrative.turn_builder import TurnBuilder
+from gateway.narrative.turn_model import (
     PhaseKind,
     ToolLifecycleState,
     ToolPhase,
     Turn,
     TurnSnapshot,
 )
-from gateway.presentation.turn_state_machine import TurnStateMachine
 
 __all__ = [
     "Artifact",
@@ -46,8 +46,8 @@ __all__ = [
     "ToolLifecycleState",
     "ToolPhase",
     "Turn",
+    "TurnBuilder",
     "TurnSnapshot",
-    "TurnStateMachine",
     "absolutize_file_parts",
     "absolutize_url",
     "build_state_from_invoked",

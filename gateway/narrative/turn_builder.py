@@ -23,14 +23,14 @@ import json
 import logging
 from typing import Any
 
-from gateway.presentation.artifact_registry import ArtifactRegistry
-from gateway.presentation.tool_lifecycle import (
+from gateway.narrative.artifact_registry import ArtifactRegistry
+from gateway.narrative.tool_lifecycle import (
     InvalidTransitionError,
     ToolLifecycleMap,
     ToolLifecycleState,
 )
-from gateway.presentation.tool_state_builders import build_state_from_invoked
-from gateway.presentation.turn_snapshot import (
+from gateway.narrative.tool_state_builders import build_state_from_invoked
+from gateway.narrative.turn_model import (
     PhaseKind,
     ToolPhase,
     Turn,
@@ -61,7 +61,7 @@ _log = logging.getLogger(__name__)
 # ── Public API ──────────────────────────────────────────────
 
 
-class TurnStateMachine:
+class TurnBuilder:
     """Evolves a TurnSnapshot in response to journal events.
 
     The machine is stateless — all state lives in the TurnSnapshot

@@ -267,3 +267,29 @@ def _message_plain_text(content: Any) -> str:
                     parts.append(text)
         return "\n".join(parts).strip()
     return ""
+
+
+def extract_user_question(messages: list[Any]) -> str:
+    """Extract last user message text from OpenAI-style messages."""
+    for item in reversed(messages):
+        if not isinstance(item, dict):
+            continue
+        if item.get("role") != "user":
+            continue
+        content = item.get("content")
+        if isinstance(content, str):
+            text = content.strip()
+            if text:
+                return text
+        elif isinstance(content, list):
+            parts: list[str] = []
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                if part.get("type") == "text":
+                    text = str(part.get("text", "")).strip()
+                    if text:
+                        parts.append(text)
+            if parts:
+                return "\n".join(parts)
+    return ""

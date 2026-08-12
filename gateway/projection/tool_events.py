@@ -1,7 +1,7 @@
-"""Tool lifecycle projection — extracted from JournalOpenAiProjector.
+"""Tool event projection — tool lifecycle → LCA SSE events.
 
 Owns all tool-related mutable state (pending calls, exec buffers, invocation
-IDs) and the four tool-event projection methods.
+IDs) and projects tool events to LCA SSE extension format.
 
 UI SSOT: prefer journal ``plugin_state`` (full, untruncated) over
 ``arguments_preview`` / ``result_preview`` (lossy strings). Wire arguments
@@ -17,6 +17,7 @@ from typing import Any
 
 from gateway.lobehub_bridge.file_urls import absolutize_file_parts
 from gateway.lobehub_bridge.lca_sse_extension import (
+    lca_tool_call_streaming_event,
     lca_tool_result_event,
     lca_tool_started_event,
     lca_tool_state_event,
@@ -36,6 +37,7 @@ from gateway.lobehub_bridge.lobehub_adapter.json_helpers import (
 from gateway.lobehub_bridge.lobehub_adapter.protocol import TOOL_RESULT_PREVIEW_LIMIT
 from lca.contracts.models.observability.journal import (
     SandboxOutputDelta,
+    ToolCallStreaming,
     ToolDenied,
     ToolInvoked,
     ToolStarted,
@@ -71,10 +73,11 @@ class _ExecBuffer:
 
 
 @dataclass
-class ToolProjection:
-    """Manages tool lifecycle state and projects tool events to OpenAI chunks.
+class ToolEventProjector:
+    """Projects tool lifecycle events → OpenAI SSE chunks with LCA extensions.
 
-    The main projector creates one handler and delegates the four tool event
+    Manages mutable tool state (pending calls, exec buffers, invocation IDs)
+    and delegates formatting to callback functions.
     types to it.  ``emit_lca`` and ``emit_delta`` callbacks route output back
     through the projector's chunk-formatting methods.
     """
@@ -87,6 +90,14 @@ class ToolProjection:
     _exec_buffers: dict[str, _ExecBuffer] = field(default_factory=dict)
 
     # ── Event projections ───────────────────────────────────
+
+    def project_call_streaming(self, event: ToolCallStreaming) -> list[Chunk]:
+        """LLM generating tool args — emit early card indicator."""
+        streaming_event = lca_tool_call_streaming_event(
+            tool_name=event.tool_name,
+            tool_call_id=event.tool_call_id or "",
+        )
+        return self.emit_lca([streaming_event])
 
     def project_started(self, event: ToolStarted) -> list[Chunk]:
         idx = self._tool_call_index

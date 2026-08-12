@@ -113,9 +113,9 @@ def p_xxx() -> bool:
     """一句话 docstring 说明补丁作用。"""
     rel = "path/to/file.ts"
     text = _read(rel)
-    if "marker_string" in text:   # 幂等检查
+    if "marker_string" in text:  # 幂等检查
         return False
-    anchor = "..."                 # 上游原文锚点
+    anchor = "..."  # 上游原文锚点
     if anchor not in text:
         raise SystemExit("[xxx] anchor not found")
     text = text.replace(anchor, replacement, 1)

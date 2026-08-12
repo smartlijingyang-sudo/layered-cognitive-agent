@@ -1,7 +1,7 @@
 """Golden trace replay — validates new projector against real journal data.
 
 Replays traces/runs/run_148968ffc177.jsonl (PDF generation, 10 steps,
-2 failed execute_code calls) through the new DiffProjector and verifies
+2 failed execute_code calls) through the new OpenAISSEProjector and verifies
 the SSE output matches expected LobeHub-native behavior:
 
     - Multiple reasoning blocks (not one big blob)
@@ -19,8 +19,8 @@ from pathlib import Path
 
 import pytest
 
-from gateway.presentation.turn_state_machine import TurnStateMachine
-from gateway.projection.diff_projector import DiffProjector
+from gateway.narrative.turn_builder import TurnBuilder
+from gateway.projection.openai_sse import OpenAISSEProjector
 from lca.contracts.models.observability.journal import StampedEvent
 from lca.layer0_infra.observability.journal.journal_io import record_to_stamped
 
@@ -44,11 +44,11 @@ def golden_events() -> list[StampedEvent]:
 
 
 class TestGoldenTraceStateMachine:
-    """Verify TurnStateMachine builds correct structure from real data."""
+    """Verify TurnBuilder builds correct structure from real data."""
 
     def test_creates_multiple_turns(self, golden_events: list[StampedEvent]) -> None:
         """The PDF run has 10 steps — should produce multiple turns."""
-        machine = TurnStateMachine()
+        machine = TurnBuilder()
         snapshot = machine.build_all(golden_events)
         # Should have multiple turns (not just 1)
         assert len(snapshot.turns) > 1, (
@@ -58,7 +58,7 @@ class TestGoldenTraceStateMachine:
 
     def test_steps_total_is_10(self, golden_events: list[StampedEvent]) -> None:
         """AgentRunFinished.steps=10 must be reflected."""
-        machine = TurnStateMachine()
+        machine = TurnBuilder()
         snapshot = machine.build_all(golden_events)
         assert snapshot.finished is True
         assert snapshot.steps_total == 10, (
@@ -68,7 +68,7 @@ class TestGoldenTraceStateMachine:
 
     def test_all_tools_reach_terminal(self, golden_events: list[StampedEvent]) -> None:
         """close_all at run finish should close all open tools."""
-        machine = TurnStateMachine()
+        machine = TurnBuilder()
         snapshot = machine.build_all(golden_events)
         assert snapshot.finished is True
         # After run finish, no tool should be open
@@ -79,7 +79,7 @@ class TestGoldenTraceStateMachine:
 
     def test_artifacts_collected(self, golden_events: list[StampedEvent]) -> None:
         """The successful execute_code produces a PDF file artifact."""
-        machine = TurnStateMachine()
+        machine = TurnBuilder()
         machine.build_all(golden_events)
         # Use the ArtifactRegistry
         artifacts = machine.artifacts.list_all()
@@ -94,7 +94,7 @@ class TestGoldenTraceStateMachine:
 
     def test_has_reasoning_and_answer_turns(self, golden_events: list[StampedEvent]) -> None:
         """Should have turns with reasoning text AND turns with answer text."""
-        machine = TurnStateMachine()
+        machine = TurnBuilder()
         snapshot = machine.build_all(golden_events)
         reasoning_turns = [t for t in snapshot.turns if t.reasoning_text]
         answer_turns = [t for t in snapshot.turns if t.answer_text]
@@ -103,13 +103,13 @@ class TestGoldenTraceStateMachine:
 
 
 class TestGoldenTraceProjector:
-    """Verify DiffProjector produces correct SSE from real data."""
+    """Verify OpenAISSEProjector produces correct SSE from real data."""
 
     def _replay(self, golden_events: list[StampedEvent]) -> list[dict]:
-        """Replay events through DiffProjector, collect all chunks."""
+        """Replay events through OpenAISSEProjector, collect all chunks."""
         import dataclasses
 
-        proj = DiffProjector(chat_id="chat_test", model="qwen3.7-plus")
+        proj = OpenAISSEProjector(chat_id="chat_test", model="qwen3.7-plus")
         all_chunks: list[dict] = []
         for stamped in golden_events:
             record = {

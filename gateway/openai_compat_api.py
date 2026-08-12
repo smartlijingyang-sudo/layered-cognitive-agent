@@ -17,13 +17,9 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
 from gateway._http import cors_headers
-from gateway.journal_openai_projector import (
-    JournalOpenAiProjector,
-    resolve_lca_mode,
-)
 from gateway.lobehub_bridge import prepare_run_from_messages
 from gateway.lobehub_bridge.request_classifier import classify_lobehub_chat_request
-from gateway.mode_catalog import DEFAULT_MODE, MODE_DEFINITIONS
+from gateway.mode_catalog import DEFAULT_MODE, MODE_DEFINITIONS, resolve_lca_mode
 from gateway.model_registry import get_model_registry
 from gateway.openai_structured_llm import (
     StructuredLLMError,
@@ -35,7 +31,8 @@ from gateway.openai_structured_llm import (
     normalize_responses_input,
     resolve_upstream_model,
 )
-from gateway.projection.diff_projector import (
+from gateway.projection.openai_sse import (
+    OpenAISSEProjector,
     collect_openai_completion,
     stream_openai_from_run,
 )
@@ -145,14 +142,14 @@ async def _passthrough_chat_completion(
         )
 
     if stream:
-        projector = JournalOpenAiProjector(chat_id=chat_id, model=model)
+        projector = OpenAISSEProjector(chat_id=chat_id, model=model)
         if usage:
             projector._prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
             projector._completion_tokens = int(usage.get("completion_tokens", 0) or 0)
 
         async def _body() -> Any:
             chunks = projector._emit_delta({"content": text})
-            chunks.extend(projector._emit_finish())
+            chunks.extend(projector._emit_finish(projector._snapshot))
             for chunk in chunks:
                 yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n".encode()
             yield b"data: [DONE]\n\n"
@@ -163,7 +160,7 @@ async def _passthrough_chat_completion(
             headers=cors_headers(**{"Cache-Control": "no-cache"}),
         )
 
-    projector = JournalOpenAiProjector(chat_id=chat_id, model=model)
+    projector = OpenAISSEProjector(chat_id=chat_id, model=model)
     if usage:
         projector._prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
         projector._completion_tokens = int(usage.get("completion_tokens", 0) or 0)

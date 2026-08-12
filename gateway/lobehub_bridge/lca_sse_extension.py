@@ -23,28 +23,9 @@ LcaToolEventType = Literal[
     "tool_result",
     "tool_state",
     "run_error",
-    "reasoning_section",
+    "run_meta",
 ]
 LCA_CLOSED_LOOP_MARKER = True
-
-
-def lca_reasoning_section_event(
-    *,
-    step: int,
-    content: str,
-) -> dict[str, Any]:
-    """Mark a completed reasoning section (one per LLM turn).
-
-    Emitted at ``ReasoningCompleted`` so the frontend can save the current
-    thinking content as a finished "已深度思考" block and reset for the
-    next step — producing separate collapsible sections per LLM call,
-    matching native LobeHub's per-operation reasoning display.
-    """
-    return {
-        "type": "reasoning_section",
-        "step": step,
-        "content": content,
-    }
 
 
 def lca_tool_call_streaming_event(

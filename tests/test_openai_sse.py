@@ -1,4 +1,4 @@
-"""Tests for DiffProjector — turn-based SSE projection.
+"""Tests for OpenAISSEProjector — turn-based SSE projection.
 
 Tests the projection from TurnSnapshot diff to OpenAI SSE chunks,
 verifying that:
@@ -12,19 +12,19 @@ from __future__ import annotations
 
 import json
 
-from gateway.presentation.turn_snapshot import PhaseKind, Turn, TurnSnapshot
-from gateway.projection.diff_projector import DiffProjector
+from gateway.narrative.turn_model import PhaseKind, Turn, TurnSnapshot
+from gateway.projection.openai_sse import OpenAISSEProjector
 
 
-class TestDiffProjectorBasics:
+class TestOpenAISSEProjectorBasics:
     def test_empty_frame_returns_empty(self) -> None:
-        proj = DiffProjector(chat_id="chat_1", model="test")
+        proj = OpenAISSEProjector(chat_id="chat_1", model="test")
         chunks = proj.project_frame("not-json")
         assert chunks == []
 
     def test_role_chunk_emitted_first(self) -> None:
         """First delta should include role: assistant."""
-        proj = DiffProjector(chat_id="chat_1", model="test")
+        proj = OpenAISSEProjector(chat_id="chat_1", model="test")
         # Manually inject a turn with reasoning
         turn = Turn(index=0, phase=PhaseKind.REASONING, reasoning_text="hello")
         proj._snapshot = TurnSnapshot(turns=(turn,), current_turn_index=0, started_at=100.0)
@@ -53,7 +53,7 @@ class TestDiffProjectorBasics:
 
     def test_finish_chunk_has_stop_reason(self) -> None:
         """Run finish should emit a chunk with finish_reason=stop."""
-        proj = DiffProjector(chat_id="chat_1", model="test")
+        proj = OpenAISSEProjector(chat_id="chat_1", model="test")
         proj._prompt_tokens = 100
         proj._completion_tokens = 50
 
@@ -83,7 +83,7 @@ class TestDiffProjectorBasics:
 
     def test_reasoning_content_emitted(self) -> None:
         """Reasoning deltas should produce reasoning_content in SSE."""
-        proj = DiffProjector(chat_id="chat_1", model="test")
+        proj = OpenAISSEProjector(chat_id="chat_1", model="test")
         from lca.contracts.models.observability.journal import (
             ReasoningDelta,
             RunScope,
@@ -106,10 +106,10 @@ class TestDiffProjectorBasics:
         assert "thinking..." in reasoning_chunks[0]["choices"][0]["delta"]["reasoning_content"]
 
 
-class TestDiffProjectorToolDelegation:
+class TestOpenAISSEProjectorToolDelegation:
     def test_tool_started_delegates(self) -> None:
         """ToolStarted events should be delegated to ToolProjection."""
-        proj = DiffProjector(chat_id="chat_1", model="test")
+        proj = OpenAISSEProjector(chat_id="chat_1", model="test")
         from lca.contracts.models.observability.journal import (
             RunScope,
             StampedEvent,
@@ -134,10 +134,10 @@ class TestDiffProjectorToolDelegation:
         assert len(lca_chunks) >= 1
 
 
-class TestDiffProjectorIntegration:
+class TestOpenAISSEProjectorIntegration:
     def test_full_run_scenario(self) -> None:
         """Simulate a minimal run: reasoning → tool → reasoning → answer."""
-        proj = DiffProjector(chat_id="chat_1", model="test")
+        proj = OpenAISSEProjector(chat_id="chat_1", model="test")
         from lca.contracts.atoms.enums import StreamChannel
         from lca.contracts.models.observability.journal import (
             AgentRunFinished,

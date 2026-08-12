@@ -6,7 +6,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from gateway.journal_openai_projector import JournalOpenAiProjector, assert_openai_finish_invariant
 from gateway.lobehub_bridge.file_ingest import (
     HttpxFileFetcher,
     ingest_file_refs,
@@ -15,10 +14,10 @@ from gateway.lobehub_bridge.file_ingest import (
 from gateway.lobehub_bridge.ingest_cache import IngestCache, reset_ingest_cache_for_tests
 from gateway.lobehub_bridge.models import FileRef
 from gateway.lobehub_bridge.parser import parse_messages
-from gateway.lobehub_bridge.prepare import prepare_run_from_messages
+from gateway.lobehub_bridge.prepare import compose_run_question, prepare_run_from_messages
 from gateway.lobehub_bridge.settings import LobeHubBridgeSettings
 from gateway.lobehub_bridge.url_policy import IngestUrlPolicyError, assert_ingest_url_allowed
-from gateway.run_prompt import compose_run_question
+from gateway.projection.openai_sse import OpenAISSEProjector, assert_openai_finish_invariant
 from lca.contracts.atoms.enums import StreamChannel
 from lca.layer0_infra.file_store import LocalFileStore
 
@@ -282,24 +281,32 @@ class TestOpenAiFinishInvariant(unittest.TestCase):
             if "delta" in c["choices"][0]
         )
 
-    def test_step_text_answer_channel_streams_content_after_llm_completed(self) -> None:
-        """Answer text is buffered until LlmCallCompleted (native LobeHub ordering)."""
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
+    def _llm_started_frame(self) -> str:
+        return (
+            'data: {"schema":"journal.v1","seq":0,"ts":0.0,'
+            '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
+            '"event_type":"LlmCallStarted","event":{"model":"test","step":1}}\n\n'
+        )
+
+    def test_step_text_answer_channel_streams_content_immediately(self) -> None:
+        """Answer text streams immediately (no buffering in new architecture)."""
+        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
+        # LlmCallStarted creates a turn
+        projector.project_frame(self._llm_started_frame())
         frame = (
             "id: 1\nevent: StepTextDelta\n"
             'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
             '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
             f'"event_type":"StepTextDelta","event":{{"step":1,"text_delta":"你","seq":1,"channel":"{StreamChannel.ANSWER.value}"}}}}\n\n'
         )
-        # Answer text is buffered — no content output yet
+        # Answer text is emitted immediately — no buffering
         chunks = projector.project_frame(frame)
-        self.assertEqual(self._content_from(chunks), "")
-        # LlmCallCompleted triggers the flush
-        chunks = projector.project_frame(self._llm_completed_frame())
         self.assertEqual(self._content_from(chunks), "你")
 
     def test_decision_json_never_leaks_to_content(self) -> None:
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
+        """Decision channel text is filtered; answer channel streams immediately."""
+        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
+        projector.project_frame(self._llm_started_frame())
         decision_frame = (
             "id: 1\nevent: StepTextDelta\n"
             'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
@@ -314,25 +321,28 @@ class TestOpenAiFinishInvariant(unittest.TestCase):
         )
         chunks: list[dict] = []
         chunks.extend(projector.project_frame(decision_frame))
-        chunks.extend(projector.project_frame(answer_frame))
-        # Answer text is buffered — not emitted yet
+        # Decision channel text is ignored by TurnBuilder — no content
         self.assertEqual(self._content_from(chunks), "")
-        # Flush via LlmCallCompleted
-        chunks.extend(projector.project_frame(self._llm_completed_frame()))
+        chunks.extend(projector.project_frame(answer_frame))
+        # Answer text streams immediately
         content = self._content_from(chunks)
         self.assertEqual(content, "你好")
         self.assertNotIn("rationale", content)
 
-    def test_decision_made_skipped_when_step_already_streamed(self) -> None:
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
+    def test_answer_text_streams_immediately_decision_made_no_duplicate(self) -> None:
+        """Answer text streams immediately; DecisionMade doesn't re-emit."""
+        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
+        projector.project_frame(self._llm_started_frame())
         stream_frame = (
             "id: 1\nevent: StepTextDelta\n"
             'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
             '"scope":{"trace_id":"t","run_id":"r","parent_run_id":"","delegation_id":"","agent_role":"助手"},'
             f'"event_type":"StepTextDelta","event":{{"step":1,"text_delta":"流式","seq":0,"channel":"{StreamChannel.ANSWER.value}"}}}}\n\n'
         )
-        projector.project_frame(stream_frame)
-        # DecisionMade flushes the buffered answer text, skips duplicate
+        chunks = projector.project_frame(stream_frame)
+        # Answer text streams immediately
+        self.assertEqual(self._content_from(chunks), "流式")
+        # DecisionMade doesn't emit duplicate content
         decision_frame = (
             "id: 2\nevent: DecisionMade\n"
             'data: {"schema":"journal.v1","seq":2,"ts":2.0,'
@@ -342,12 +352,11 @@ class TestOpenAiFinishInvariant(unittest.TestCase):
             '"delegate_count":0,"tool_name":"","confidence":1.0,"output_truncated":false}}\n\n'
         )
         chunks = projector.project_frame(decision_frame)
-        # Buffered "流式" is flushed, "完整回复" is skipped (already streamed)
-        content = self._content_from(chunks)
-        self.assertEqual(content, "流式")
+        # No duplicate content from DecisionMade
+        self.assertEqual(self._content_from(chunks), "")
 
     def test_tool_stream_only_ends_with_stop(self) -> None:
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
+        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
         chunks: list[dict] = []
         tool_frame = (
             "id: 1\nevent: ToolStarted\n"

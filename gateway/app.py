@@ -23,6 +23,7 @@ from starlette.routing import Route
 from gateway._http import CORS_HEADERS
 from gateway.conversation_store import ConversationStore
 from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
+from gateway.lobehub_bridge.prepare import compose_run_question
 from gateway.mode_catalog import DEFAULT_MODE
 from gateway.openai_compat_api import (
     chat_completions,
@@ -36,7 +37,6 @@ from gateway.run_executor import (
     schedule_run,
     set_llm_resolver,
 )
-from gateway.run_prompt import compose_run_question
 from gateway.run_registry import RunRegistry, RunSession, RunStatus
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.layer0_infra.file_store import (

@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import pytest
 
-from gateway.presentation.tool_lifecycle import (
+from gateway.narrative.tool_lifecycle import (
     InvalidTransitionError,
     ToolLifecycleMap,
 )
-from gateway.presentation.turn_snapshot import (
+from gateway.narrative.turn_model import (
     PhaseKind,
     ToolLifecycleState,
     ToolPhase,
@@ -175,19 +175,19 @@ class TestTurnSnapshot:
         assert s.open_tool_count == 1
 
 
-# ── TurnStateMachine ────────────────────────────────────────
+# ── TurnBuilder ────────────────────────────────────────
 
 
-class TestTurnStateMachine:
+class TestTurnBuilder:
     def test_run_started_sets_started_at(self) -> None:
-        from gateway.presentation.turn_state_machine import TurnStateMachine
+        from gateway.narrative.turn_builder import TurnBuilder
         from lca.contracts.models.observability.journal import (
             AgentRunStarted,
             RunScope,
             StampedEvent,
         )
 
-        machine = TurnStateMachine()
+        machine = TurnBuilder()
         stamped = StampedEvent(
             seq=1,
             ts=100.0,
@@ -198,14 +198,14 @@ class TestTurnStateMachine:
         assert result.started_at == 100.0
 
     def test_reasoning_delta_creates_turn(self) -> None:
-        from gateway.presentation.turn_state_machine import TurnStateMachine
+        from gateway.narrative.turn_builder import TurnBuilder
         from lca.contracts.models.observability.journal import (
             ReasoningDelta,
             RunScope,
             StampedEvent,
         )
 
-        machine = TurnStateMachine()
+        machine = TurnBuilder()
         stamped = StampedEvent(
             seq=1,
             ts=100.0,
@@ -218,14 +218,14 @@ class TestTurnStateMachine:
         assert result.turns[0].phase == PhaseKind.REASONING
 
     def test_multiple_reasoning_deltas_accumulate(self) -> None:
-        from gateway.presentation.turn_state_machine import TurnStateMachine
+        from gateway.narrative.turn_builder import TurnBuilder
         from lca.contracts.models.observability.journal import (
             ReasoningDelta,
             RunScope,
             StampedEvent,
         )
 
-        machine = TurnStateMachine()
+        machine = TurnBuilder()
         scope = RunScope(trace_id="t", run_id="r")
         snap = TurnSnapshot()
         for i, text in enumerate(["Hello ", "world", "!"]):
@@ -240,14 +240,14 @@ class TestTurnStateMachine:
         assert snap.turns[0].reasoning_text == "Hello world!"
 
     def test_run_finished_sets_steps(self) -> None:
-        from gateway.presentation.turn_state_machine import TurnStateMachine
+        from gateway.narrative.turn_builder import TurnBuilder
         from lca.contracts.models.observability.journal import (
             AgentRunFinished,
             RunScope,
             StampedEvent,
         )
 
-        machine = TurnStateMachine()
+        machine = TurnBuilder()
         stamped = StampedEvent(
             seq=10,
             ts=200.0,

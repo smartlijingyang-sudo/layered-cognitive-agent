@@ -53,3 +53,11 @@ SOLO_MODE_KEY: Final[str] = "solo"
 
 SOLO_ROLE: Final[str] = "助手"
 """Solo agent 的 role 标签 —— 纯展示用，不影响行为（对齐 LobeHub systemRole=''）。"""
+
+
+def resolve_lca_mode(model: str) -> str:
+    """Map OpenAI model id → LCA gateway mode ('solo' or 'team')."""
+    key = model.strip().lower()
+    if key in {"team", "auto"}:
+        return "team"
+    return "solo"

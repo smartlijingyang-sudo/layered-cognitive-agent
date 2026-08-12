@@ -163,7 +163,7 @@ class TurnSnapshot:
     """Complete, immutable view of the run's presentation state.
 
     This is the *single source of truth* for what the UI should show.
-    The DiffProjector computes the diff between consecutive snapshots
+    The OpenAISSEProjector computes the diff between consecutive snapshots
     to produce SSE chunks.
 
     Design: frozen dataclass → pure value → safe to diff/share/cache.

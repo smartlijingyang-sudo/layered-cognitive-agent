@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import unittest
 
-from gateway.journal_openai_projector import JournalOpenAiProjector, assert_openai_finish_invariant
 from gateway.lobehub_bridge.tool_wire import (
     LOBE_SKILLS_ID,
     LOBE_WEB_BROWSING_ID,
@@ -17,6 +16,7 @@ from gateway.lobehub_bridge.tool_wire import (
     transform_tool_arguments,
     wire_tool_name,
 )
+from gateway.projection.openai_sse import OpenAISSEProjector, assert_openai_finish_invariant
 
 
 class TestToolWireRegistry(unittest.TestCase):
@@ -55,7 +55,7 @@ class TestToolWireRegistry(unittest.TestCase):
 
 class TestJournalProjectorToolWire(unittest.TestCase):
     def test_tool_started_emits_lca_extension_not_openai_tool_calls(self) -> None:
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
+        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
         frame = (
             "id: 1\nevent: ToolStarted\n"
             'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
@@ -77,7 +77,7 @@ class TestJournalProjectorToolWire(unittest.TestCase):
         self.assertNotIn("tool_calls", delta)
 
     def test_tool_invoked_emits_lca_extension_not_markdown(self) -> None:
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
+        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
         start = (
             "id: 1\nevent: ToolStarted\n"
             'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
@@ -103,7 +103,7 @@ class TestJournalProjectorToolWire(unittest.TestCase):
         self.assertIn("state", event)
 
     def test_web_search_uses_plugin_state_not_truncated_preview(self) -> None:
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
+        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
         start = (
             "id: 1\nevent: ToolStarted\n"
             'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
@@ -155,7 +155,7 @@ class TestJournalProjectorToolWire(unittest.TestCase):
         self.assertEqual(event["state"]["results"][0]["url"], "https://a.example/news")
 
     def test_sandbox_output_delta_emits_tool_state(self) -> None:
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
+        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
         start = (
             "id: 1\nevent: ToolStarted\n"
             'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
@@ -179,7 +179,7 @@ class TestJournalProjectorToolWire(unittest.TestCase):
         self.assertEqual(event.get("content"), "1\n")
 
     def test_tool_stream_only_ends_with_stop(self) -> None:
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
+        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
         chunks: list[dict] = []
         tool_frame = (
             "id: 1\nevent: ToolStarted\n"
@@ -202,7 +202,7 @@ class TestJournalProjectorToolWire(unittest.TestCase):
         self.assertIn("____", lca_start["wire_name"])
 
     def test_failed_run_emits_run_error_event(self) -> None:
-        projector = JournalOpenAiProjector(chat_id="chatcmpl-x", model="solo")
+        projector = OpenAISSEProjector(chat_id="chatcmpl-x", model="solo")
         finish_frame = (
             "id: 1\nevent: AgentRunFinished\n"
             'data: {"schema":"journal.v1","seq":1,"ts":1.0,'
