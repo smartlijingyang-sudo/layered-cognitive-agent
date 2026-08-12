@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from gateway.lobehub_bridge.file_urls import absolutize_file_parts
@@ -55,6 +55,8 @@ from lca.contracts.models.observability.journal import (
     DelegationIssued,
     JournalEvent,
     LlmCallCompleted,
+    LlmCallStarted,
+    ReasoningCompleted,
     ReasoningDelta,
     SandboxOutputDelta,
     StampedEvent,
@@ -216,7 +218,16 @@ class OpenAIStreamEmitter:
         if isinstance(event, StepTextDelta):
             if event.channel == StreamChannel.ANSWER.value:
                 return self._handle_answer(event)
-            return []  # decision channel — not for the frontend
+            return [
+                self._lca_chunk(
+                    {},
+                    {
+                        "type": "StepTextDelta",
+                        "channel": event.channel,
+                        "text_delta": event.text_delta,
+                    },
+                )
+            ]
 
         # ── Run finished: error + output + finish chunk ─
         if isinstance(event, AgentRunFinished | TeamRunFinished):
@@ -228,6 +239,12 @@ class OpenAIStreamEmitter:
             self._completion_tokens += int(event.completion_tokens or 0)
             return []
 
+        # ── Reasoning boundaries (per-LLM-call thinking blocks) ──
+        if isinstance(event, LlmCallStarted):
+            return self._handle_llm_call_started(event)
+        if isinstance(event, ReasoningCompleted):
+            return self._handle_reasoning_completed(event)
+
         # ── Delegation: team collaboration display ──────
         if isinstance(event, DelegationIssued):
             text = f"\n\n⇢ **委派** → `{event.callee_role}`: {event.subtask_preview}\n"
@@ -238,7 +255,20 @@ class OpenAIStreamEmitter:
             return self._emit_delta({"content": f"\n\n⇠ **委派完成** {status}: {preview}\n"})
 
         # ── Tool lifecycle ──────────────────────────────
-        return self._dispatch_tool_event(event)
+        if isinstance(
+            event,
+            ToolCallStreaming | ToolStarted | SandboxOutputDelta | ToolInvoked | ToolDenied,
+        ):
+            return self._dispatch_tool_event(event)
+
+        # ── Fallback: forward unknown events as lca.events ──
+        # Never silently drop journal events — the frontend decides what to render.
+        return [
+            self._lca_chunk(
+                {},
+                {"type": type(event).__name__, **asdict(event)},
+            )
+        ]
 
     # ══════════════════════════════════════════════════
     # Reasoning & Answer handlers
@@ -263,6 +293,46 @@ class OpenAIStreamEmitter:
         delta_text = self._answer_text[self._answer_emitted :]
         self._answer_emitted = new_len
         return self._emit_delta({"content": delta_text})
+
+    def _handle_llm_call_started(self, event: LlmCallStarted) -> list[Chunk]:
+        """Emit reasoning_start to signal a new thinking block on the frontend."""
+        # Reset per-step reasoning accumulator so each LLM call gets its own
+        # reasoning section in the UI.
+        self._reasoning_text = ""
+        self._reasoning_emitted = 0
+        return [
+            self._lca_chunk(
+                {},
+                {"type": "reasoning_start", "step": event.step},
+            )
+        ]
+
+    def _handle_reasoning_completed(self, event: ReasoningCompleted) -> list[Chunk]:
+        """Emit reasoning_section with the full text for this LLM turn."""
+        # Flush any remaining reasoning text that wasn't yet sent as deltas
+        chunks: list[Chunk] = []
+        new_len = len(self._reasoning_text)
+        if new_len > self._reasoning_emitted:
+            delta_text = self._reasoning_text[self._reasoning_emitted :]
+            self._reasoning_emitted = new_len
+            chunks.append(self._emit_delta({"reasoning_content": delta_text})[0])
+
+        # Emit reasoning_section so the frontend can save this as a finished
+        # block and reset for the next step.
+        chunks.append(
+            self._lca_chunk(
+                {},
+                {
+                    "type": "reasoning_section",
+                    "step": event.step,
+                    "content": self._reasoning_text,
+                },
+            )
+        )
+        # Reset per-step accumulator for the next LLM call
+        self._reasoning_text = ""
+        self._reasoning_emitted = 0
+        return chunks
 
     # ══════════════════════════════════════════════════
     # Run lifecycle
@@ -591,13 +661,24 @@ class OpenAIStreamEmitter:
                 "completion_tokens": self._completion_tokens,
                 "total_tokens": self._prompt_tokens + self._completion_tokens,
             }
-        chunk = self._chunk({}, finish_reason="stop", usage=usage)
+
+        chunks: list[Chunk] = []
+
+        # run_meta as a separate lca-only chunk BEFORE the terminal stop.
+        # Must NOT share a chunk with finish_reason="stop" because the
+        # frontend's lca check short-circuits before processing the stop
+        # signal, causing the stream to never terminate on the client.
         if self._steps_total > 0:
-            chunk = self._lca_chunk(
-                chunk,
-                {"type": "run_meta", "steps": self._steps_total},
-            )
-        return [chunk]
+            meta_chunk = self._chunk({})
+            meta_chunk["lca"] = {
+                "v": _LCA_EXT_VERSION,
+                "events": [{"type": "run_meta", "steps": self._steps_total}],
+            }
+            chunks.append(meta_chunk)
+
+        # Clean terminal stop chunk — no lca wrapping
+        chunks.append(self._chunk({}, finish_reason="stop", usage=usage))
+        return chunks
 
     def _chunk(
         self,

@@ -147,11 +147,12 @@ _wait_for_port() {
 _wait_for_lobehub_dev() {
   local timeout_s="${1:-120}"
   local waited=0
-  log "等待 LobeHub dev 就绪 (最长 ${timeout_s}s)…"
+  log "等待 LobeHub dev 端口就绪 (最长 ${timeout_s}s)…"
+
+  # Phase 1: 等待端口监听（TCP 层，比 HTTP 快得多）
   while [[ ${waited} -lt $((timeout_s * 2)) ]]; do
-    if curl -sf --max-time 5 "http://127.0.0.1:${LOBE_DEV_PORT}/" >/dev/null 2>&1; then
-      log "LobeHub dev 就绪 ✓ (http://127.0.0.1:${LOBE_DEV_PORT})"
-      return 0
+    if ss -tln 2>/dev/null | grep -q ":${LOBE_DEV_PORT} "; then
+      break
     fi
     # 检查进程是否还活着
     local pid
@@ -165,8 +166,38 @@ _wait_for_lobehub_dev() {
     sleep 0.5
     waited=$((waited + 1))
   done
-  log "超时: LobeHub dev 在 ${timeout_s}s 内未就绪"
-  return 1
+
+  if ! ss -tln 2>/dev/null | grep -q ":${LOBE_DEV_PORT} "; then
+    log "超时: LobeHub dev 在 ${timeout_s}s 内未监听 :${LOBE_DEV_PORT}"
+    return 1
+  fi
+
+  log "端口 :${LOBE_DEV_PORT} 已监听 ✓"
+
+  # Phase 2: 后台预热首页编译（不阻塞返回）
+  # devStartupSequence.mts 内部已有 prewarm，这里额外发一个 HEAD 请求
+  # 加速首次浏览器访问；用 HEAD 而非 GET 避免等待完整页面编译
+  (
+    curl -sfI --max-time 90 "http://127.0.0.1:${LOBE_DEV_PORT}/" >/dev/null 2>&1 &
+  ) &
+
+  # Phase 3: 快速 HTTP 连通性确认（接受任何 HTTP 响应，包括 302/307）
+  local http_waited=0
+  while [[ ${http_waited} -lt 30 ]]; do
+    local http_code
+    http_code="$(curl -so /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:${LOBE_DEV_PORT}/" 2>/dev/null || echo "000")"
+    if [[ "${http_code}" != "000" ]]; then
+      log "LobeHub dev 就绪 ✓ (HTTP ${http_code}, http://127.0.0.1:${LOBE_DEV_PORT})"
+      log "首页编译在后台预热中，首次浏览器访问可能仍需数秒…"
+      return 0
+    fi
+    sleep 0.5
+    http_waited=$((http_waited + 1))
+  done
+
+  # 端口已开但 HTTP 未响应 → 仍算成功，让 prewarm 继续跑
+  log "LobeHub dev 端口已开，HTTP 尚未响应 (后台预热中) ✓"
+  return 0
 }
 
 _clean_stale_dev_state() {
@@ -588,6 +619,24 @@ start_lobehub_dev() {
   export OPENAI_API_KEY="${OPENAI_API_KEY:-lca-local}"
   export ENABLED_OPENAI="${ENABLED_OPENAI:-1}"
   export PORT="${LOBE_DEV_PORT}"
+
+  # Vite SPA 资源 URL 需要浏览器可达的 hostname；
+  # 局域网访问时 localhost 指向客户端本机，必须用 LAN IP
+  if [[ -z "${VITE_DEV_HOST:-}" ]]; then
+    local lan_ip="${LOBE_LAN_IP:-}"
+    if [[ -z "${lan_ip}" ]]; then
+      lan_ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)"
+    fi
+    if [[ -z "${lan_ip}" ]]; then
+      lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+    fi
+    if [[ -n "${lan_ip}" && "${lan_ip}" != "0.0.0.0" && "${lan_ip}" != "127.0.0.1" ]]; then
+      export VITE_DEV_HOST="${lan_ip}"
+      log "Vite SPA 资源地址: http://${VITE_DEV_HOST}:${SPA_PORT}"
+    fi
+  else
+    export VITE_DEV_HOST
+  fi
 
   if [[ "${LOBE_CLEAN_CACHE:-0}" == "1" ]]; then
     log "清理 Vite 依赖缓存 + .next（LOBE_CLEAN_CACHE=1）"

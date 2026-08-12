@@ -197,7 +197,7 @@ def p_qwen_stream() -> bool:
     text = _read(rel)
     if "LCA: emit lca.events" in text:
         return False
-    needle = "  if (chunk.choices[0]) {"
+    needle = "  const item = chunk.choices[0];"
     insert = """  /* LCA: emit lca.events before OpenAI delta handling */
   const lcaExt = (chunk as { lca?: { events?: unknown[] } }).lca;
   if (lcaExt?.events?.length) {
@@ -211,7 +211,7 @@ def p_qwen_stream() -> bool:
     );
   }
 
-  if (chunk.choices[0]) {"""
+  const item = chunk.choices[0];"""
     _write(rel, _replace_once(text, needle, insert, label="qwen_stream"))
     return True
 
