@@ -2,15 +2,27 @@
 """Unified LCA ↔ LobeHub patch engine.
 
 Single entry point for all LobeHub source customizations:
-  apply  — idempotent patch application (default)
-  verify — dry-run anchor/marker check for upgrade compatibility
-  list   — print patch manifest
+  apply    — idempotent patch application (default)
+  verify   — dry-run anchor/marker check for upgrade compatibility
+  list     — print patch manifest
+  drift    — detect unregistered source modifications (enforcement)
+  manifest — generate structured JSON manifest of all patches
+  doctor   — run all health checks (verify + drift + consistency)
 
 Usage:
   python3 deploy/lobehub/patch_lobehub.py              # apply all
   python3 deploy/lobehub/patch_lobehub.py verify       # check anchors
   python3 deploy/lobehub/patch_lobehub.py list         # show manifest
+  python3 deploy/lobehub/patch_lobehub.py drift        # detect unregistered edits
+  python3 deploy/lobehub/patch_lobehub.py manifest     # JSON manifest
+  python3 deploy/lobehub/patch_lobehub.py doctor       # full health check
   python3 deploy/lobehub/patch_lobehub.py apply openai_stream protocol  # specific
+
+Rules:
+  1. NEVER edit lobehub-ui/ directly — always via patches
+  2. Every modification must be registered as a patch function
+  3. Run `drift` after development to catch unregistered changes
+  4. Run `doctor` before committing to verify full health
 """
 
 from __future__ import annotations
@@ -36,6 +48,9 @@ class PatchMeta:
     files: tuple[str, ...]
     risk: str
     category: str
+    depends_on: tuple[str, ...] = ()
+    why: str = ""
+    technical_detail: str = ""
 
 
 @dataclass
@@ -1306,18 +1321,480 @@ def p_tool_result_files() -> bool:
     return True
 
 
+def p_reasoning_section_type() -> bool:
+    """Add reasoning_section type to LcaStreamToolEvent union."""
+    rel = "src/store/chat/agents/types/streaming.ts"
+    text = _read(rel)
+    if "reasoning_section" in text:
+        return False
+    anchor = "  | { step: number; type: 'reasoning_end' };"
+    if anchor not in text:
+        raise SystemExit(
+            "[reasoning_section_type] anchor not found — run after reasoning_segmentation"
+        )
+    replacement = (
+        "  | { step: number; type: 'reasoning_end' }\n"
+        "  // LCA: completed reasoning section — carries full text for one LLM turn\n"
+        "  | { content: string; step: number; type: 'reasoning_section' };"
+    )
+    text = text.replace(anchor, replacement, 1)
+    _write(rel, text)
+    return True
+
+
+def p_reasoning_section_handler() -> bool:
+    """Add completedReasoningSections state + multi-section logic to StreamingHandler.
+
+    8 modifications:
+      1. completedReasoningSections field
+      2. getThinkingContent() combines sections
+      3. handleReasoningChunk() multimodal branching
+      4. reasoning_section handler in handleLcaToolEvent()
+      5. notifyContentPartUpdate() multi-section
+      6. buildReasoningState() combined sections
+      7. buildFinalResult() combined sections + multimodal
+    """
+    rel = "src/store/chat/agents/StreamingHandler.ts"
+    text = _read(rel)
+    if "completedReasoningSections" in text:
+        return False
+
+    # 1. Add completedReasoningSections field
+    anchor1 = "  private reasoningParts: MessageContentPart[] = [];\n\n  // ========== Multimodal state =========="
+    if anchor1 not in text:
+        raise SystemExit("[reasoning_section_handler] anchor1 not found")
+    text = text.replace(
+        anchor1,
+        "  private reasoningParts: MessageContentPart[] = [];\n"
+        "  // Completed reasoning sections — each LLM turn's thinking is saved here\n"
+        "  // when a reasoning_section event arrives from the backend. This enables\n"
+        "  // separate collapsible blocks per step.\n"
+        "  private completedReasoningSections: { content: string; duration: number; step: number }[] = [];\n"
+        "\n  // ========== Multimodal state ==========",
+        1,
+    )
+
+    # 2. getThinkingContent() combines sections
+    anchor2 = "  getThinkingContent(): string {\n    return this.thinkingContent;\n  }"
+    if anchor2 not in text:
+        raise SystemExit("[reasoning_section_handler] anchor2 not found")
+    text = text.replace(
+        anchor2,
+        "  getThinkingContent(): string {\n"
+        "    const sections = this.completedReasoningSections.map((s) => s.content);\n"
+        "    if (this.thinkingContent) sections.push(this.thinkingContent);\n"
+        "    return sections.join('\\n\\n');\n"
+        "  }",
+        1,
+    )
+
+    # 3. handleReasoningChunk() multimodal branching
+    anchor3 = "    this.thinkingContent += chunk.text;\n\n    this.callbacks.onReasoningUpdate({ content: this.thinkingContent });\n  }"
+    if anchor3 not in text:
+        raise SystemExit("[reasoning_section_handler] anchor3 not found")
+    text = text.replace(
+        anchor3,
+        "    this.thinkingContent += chunk.text;\n"
+        "\n"
+        "    // When we have completed reasoning sections, use multimodal format\n"
+        "    // so the frontend renders each section as a separate block.\n"
+        "    if (this.completedReasoningSections.length > 0) {\n"
+        "      const parts: MessageContentPart[] = this.completedReasoningSections.map(\n"
+        "        (s) => ({ text: s.content, type: 'text' as const }),\n"
+        "      );\n"
+        "      if (this.thinkingContent) {\n"
+        "        parts.push({ text: this.thinkingContent, type: 'text' as const });\n"
+        "      }\n"
+        "      const totalDuration =\n"
+        "        this.completedReasoningSections.reduce((sum, s) => sum + (s.duration || 0), 0) +\n"
+        "        (this.thinkingDuration || 0);\n"
+        "      this.callbacks.onContentUpdate(this.output, {\n"
+        "        duration: totalDuration || undefined,\n"
+        "        isMultimodal: true,\n"
+        "        tempDisplayContent: parts,\n"
+        "      });\n"
+        "    } else {\n"
+        "      this.callbacks.onReasoningUpdate({ content: this.thinkingContent });\n"
+        "    }\n"
+        "  }",
+        1,
+    )
+
+    # 4. reasoning_section handler in handleLcaToolEvent()
+    anchor4 = (
+        "    if (event.type === 'reasoning_end') {\n"
+        "      this.endReasoningIfNeeded();\n"
+        "      return;\n"
+        "    }\n"
+        "\n"
+        "    if (event.type === 'run_error') {"
+    )
+    if anchor4 not in text:
+        raise SystemExit("[reasoning_section_handler] anchor4 not found")
+    text = text.replace(
+        anchor4,
+        "    if (event.type === 'reasoning_end') {\n"
+        "      this.endReasoningIfNeeded();\n"
+        "      return;\n"
+        "    }\n"
+        "    // LCA: reasoning_section — a completed reasoning block from one LLM turn.\n"
+        "    // Save the current thinking content as a finished section, then reset\n"
+        "    // state so the next step's reasoning starts a fresh block.\n"
+        "    if (event.type === 'reasoning_section') {\n"
+        "      const sectionEvent = event as { content: string; step: number; type: 'reasoning_section' };\n"
+        "      this.endReasoningIfNeeded();\n"
+        "      const duration = this.thinkingDuration || 0;\n"
+        "      this.completedReasoningSections.push({\n"
+        "        content: sectionEvent.content,\n"
+        "        duration,\n"
+        "        step: sectionEvent.step,\n"
+        "      });\n"
+        "      this.reasoningParts = [\n"
+        "        ...this.reasoningParts,\n"
+        "        { text: sectionEvent.content, type: 'text' },\n"
+        "      ];\n"
+        "      this.thinkingContent = '';\n"
+        "      this.thinkingStartAt = undefined;\n"
+        "      this.thinkingDuration = undefined;\n"
+        "      const totalDuration = this.completedReasoningSections.reduce(\n"
+        "        (sum, s) => sum + (s.duration || 0),\n"
+        "        0,\n"
+        "      );\n"
+        "      this.callbacks.onContentUpdate(\n"
+        "        this.output,\n"
+        "        {\n"
+        "          duration: totalDuration || undefined,\n"
+        "          isMultimodal: true,\n"
+        "          tempDisplayContent: this.reasoningParts,\n"
+        "        },\n"
+        "      );\n"
+        "      return;\n"
+        "    }\n"
+        "\n"
+        "    if (event.type === 'run_error') {",
+        1,
+    )
+
+    # 5. notifyContentPartUpdate() multi-section
+    anchor5 = (
+        "  private notifyContentPartUpdate(): void {\n"
+        "    const hasContentImages = this.contentParts.some((p) => p.type === 'image');\n"
+        "    const hasReasoningImages = this.reasoningParts.some((p) => p.type === 'image');\n"
+        "\n"
+        "    this.callbacks.onContentUpdate(\n"
+        "      this.output,\n"
+        "      hasReasoningImages\n"
+        "        ? {\n"
+        "            duration: this.thinkingDuration,\n"
+        "            isMultimodal: true,\n"
+        "            tempDisplayContent: this.reasoningParts,\n"
+        "          }\n"
+        "        : this.thinkingContent\n"
+        "          ? { content: this.thinkingContent, duration: this.thinkingDuration }\n"
+        "          : undefined,"
+    )
+    if anchor5 not in text:
+        raise SystemExit("[reasoning_section_handler] anchor5 not found")
+    text = text.replace(
+        anchor5,
+        "  private notifyContentPartUpdate(): void {\n"
+        "    const hasContentImages = this.contentParts.some((p) => p.type === 'image');\n"
+        "    const hasReasoningImages = this.reasoningParts.some((p) => p.type === 'image');\n"
+        "    const hasMultipleReasoningSections =\n"
+        "      this.completedReasoningSections.length > 0 || hasReasoningImages;\n"
+        "    const allReasoningContents = this.completedReasoningSections.map((s) => s.content);\n"
+        "    if (this.thinkingContent) allReasoningContents.push(this.thinkingContent);\n"
+        "    const combinedReasoning = allReasoningContents.join('\\n\\n');\n"
+        "    const totalReasoningDuration =\n"
+        "      this.completedReasoningSections.reduce((sum, s) => sum + (s.duration || 0), 0) +\n"
+        "      (this.thinkingDuration || 0);\n"
+        "\n"
+        "    this.callbacks.onContentUpdate(\n"
+        "      this.output,\n"
+        "      hasMultipleReasoningSections\n"
+        "        ? {\n"
+        "            duration: totalReasoningDuration || undefined,\n"
+        "            isMultimodal: true,\n"
+        "            tempDisplayContent: this.reasoningParts,\n"
+        "          }\n"
+        "        : combinedReasoning\n"
+        "          ? { content: combinedReasoning, duration: totalReasoningDuration || undefined }\n"
+        "          : undefined,",
+        1,
+    )
+
+    # 6. buildReasoningState() combined sections
+    anchor6 = (
+        "  private buildReasoningState(): ReasoningState | undefined {\n"
+        "    if (!this.thinkingContent) return undefined;\n"
+        "    return { content: this.thinkingContent, duration: this.thinkingDuration };\n"
+        "  }"
+    )
+    if anchor6 not in text:
+        raise SystemExit("[reasoning_section_handler] anchor6 not found")
+    text = text.replace(
+        anchor6,
+        "  private buildReasoningState(): ReasoningState | undefined {\n"
+        "    const sections = this.completedReasoningSections.map((s) => s.content);\n"
+        "    if (this.thinkingContent) sections.push(this.thinkingContent);\n"
+        "    const combined = sections.join('\\n\\n');\n"
+        "    if (!combined) return undefined;\n"
+        "    const totalDuration =\n"
+        "      this.completedReasoningSections.reduce((sum, s) => sum + (s.duration || 0), 0) +\n"
+        "      (this.thinkingDuration || 0);\n"
+        "    return { content: combined, duration: totalDuration || undefined };\n"
+        "  }",
+        1,
+    )
+
+    # 7. buildFinalResult() combined sections
+    anchor7 = (
+        "    // Determine final reasoning content\n"
+        "    const finalDuration =\n"
+        "      this.thinkingDuration && !isNaN(this.thinkingDuration) ? this.thinkingDuration : undefined;\n"
+        "\n"
+        "    // Get signature from finishData.reasoning (provided by backend in onFinish)\n"
+        "    const reasoningSignature = finishData.reasoning?.signature;\n"
+        "    // Hidden Responses reasoning items stay replayable without any visible content\n"
+        "    const hasResponseItems = !!finishData.reasoning?.responseItems?.length;\n"
+        "\n"
+        "    let finalReasoning: ReasoningState | undefined;\n"
+        "    if (hasReasoningImages) {\n"
+        "      finalReasoning = {\n"
+        "        content: serializePartsForStorage(this.reasoningParts),\n"
+        "        duration: finalDuration,\n"
+        "        isMultimodal: true,\n"
+        "        signature: reasoningSignature,\n"
+        "      };\n"
+        "    } else if (this.thinkingContent) {\n"
+        "      finalReasoning = {\n"
+        "        ...finishData.reasoning,\n"
+        "        content: this.thinkingContent,\n"
+        "        duration: finalDuration,\n"
+        "      };\n"
+        "    } else if (finishData.reasoning?.content || reasoningSignature || hasResponseItems) {"
+    )
+    if anchor7 not in text:
+        raise SystemExit("[reasoning_section_handler] anchor7 not found")
+    text = text.replace(
+        anchor7,
+        "    // If there are multiple reasoning sections, add any remaining\n"
+        "    // thinkingContent as a final reasoningPart\n"
+        "    if (this.completedReasoningSections.length > 0 && this.thinkingContent) {\n"
+        "      this.reasoningParts = [\n"
+        "        ...this.reasoningParts,\n"
+        "        { text: this.thinkingContent, type: 'text' },\n"
+        "      ];\n"
+        "    }\n"
+        "\n"
+        "    // Determine final reasoning content — combine all completed sections\n"
+        "    const allSectionContents = this.completedReasoningSections.map((s) => s.content);\n"
+        "    if (this.thinkingContent) allSectionContents.push(this.thinkingContent);\n"
+        "    const combinedThinkingContent = allSectionContents.join('\\n\\n');\n"
+        "\n"
+        "    const allSectionDurations = this.completedReasoningSections.map((s) => s.duration);\n"
+        "    if (this.thinkingDuration && !isNaN(this.thinkingDuration)) {\n"
+        "      allSectionDurations.push(this.thinkingDuration);\n"
+        "    }\n"
+        "    const finalDuration =\n"
+        "      allSectionDurations.length > 0\n"
+        "        ? allSectionDurations.reduce((sum, d) => sum + (d || 0), 0)\n"
+        "        : undefined;\n"
+        "\n"
+        "    // Get signature from finishData.reasoning (provided by backend in onFinish)\n"
+        "    const reasoningSignature = finishData.reasoning?.signature;\n"
+        "    // Hidden Responses reasoning items stay replayable without any visible content\n"
+        "    const hasResponseItems = !!finishData.reasoning?.responseItems?.length;\n"
+        "    const hasMultipleReasoningSections =\n"
+        "      this.completedReasoningSections.length > 0 || hasReasoningImages;\n"
+        "\n"
+        "    let finalReasoning: ReasoningState | undefined;\n"
+        "    if (hasMultipleReasoningSections) {\n"
+        "      finalReasoning = {\n"
+        "        content: serializePartsForStorage(this.reasoningParts),\n"
+        "        duration: finalDuration,\n"
+        "        isMultimodal: true,\n"
+        "        signature: reasoningSignature,\n"
+        "      };\n"
+        "    } else if (combinedThinkingContent) {\n"
+        "      finalReasoning = {\n"
+        "        ...finishData.reasoning,\n"
+        "        content: combinedThinkingContent,\n"
+        "        duration: finalDuration,\n"
+        "      };\n"
+        "    } else if (finishData.reasoning?.content || reasoningSignature || hasResponseItems) {",
+        1,
+    )
+
+    _write(rel, text)
+    return True
+
+
+def p_desktop_default_model() -> bool:
+    """Set default model/provider in desktop stubs to solo/openai."""
+    rel = "apps/desktop/stubs/business-const/src/index.ts"
+    text = _read(rel)
+    if "DEFAULT_MODEL = 'solo'" in text:
+        return False
+    text = text.replace(
+        "export const DEFAULT_MINI_MODEL = 'gpt-5.4-mini';",
+        "export const DEFAULT_MINI_MODEL = 'solo';",
+        1,
+    )
+    text = text.replace(
+        "export const DEFAULT_MODEL = 'deepseek-v4-pro';", "export const DEFAULT_MODEL = 'solo';", 1
+    )
+    text = text.replace(
+        "export const DEFAULT_PROVIDER = 'deepseek';",
+        "export const DEFAULT_PROVIDER = 'openai';",
+        1,
+    )
+    _write(rel, text)
+    return True
+
+
+def p_topic_route_test() -> bool:
+    """Add test for resolveAgentChatRouteTopicId (companion to topic_route patch)."""
+    rel = "src/features/AgentSidebar/utils/agentPathname.test.ts"
+    text = _read(rel)
+    if "resolveAgentChatRouteTopicId" in text:
+        return False
+    text = text.replace(
+        "import { buildPrefixedAgentRoutePath, parseAgentPathname } from './agentPathname';",
+        "import { buildPrefixedAgentRoutePath, parseAgentPathname, resolveAgentChatRouteTopicId } from './agentPathname';",
+        1,
+    )
+    anchor = "  it('preserves a detected prefix only when workspace navigation cannot restore it', () => {"
+    if anchor not in text:
+        raise SystemExit("[topic_route_test] anchor not found")
+    text = text.replace(
+        anchor,
+        "  it('resolveAgentChatRouteTopicId prefers params but falls back to pathname', () => {\n"
+        "    expect(resolveAgentChatRouteTopicId('/agent/agt_1/tpc_abc', 'tpc_abc')).toBe('tpc_abc');\n"
+        "    expect(resolveAgentChatRouteTopicId('/agent/agt_1/tpc_abc')).toBe('tpc_abc');\n"
+        "    expect(resolveAgentChatRouteTopicId('/agent/agt_1/profile')).toBeUndefined();\n"
+        "    expect(resolveAgentChatRouteTopicId('/agent/agt_1/tpc_abc/profile')).toBeUndefined();\n"
+        "  });\n"
+        "\n"
+        "  " + anchor,
+        1,
+    )
+    _write(rel, text)
+    return True
+
+
+def p_reasoning_multi_block() -> bool:
+    """Render multiple <Thinking> components when reasoning has multiple sections.
+
+    Upstream Reasoning.tsx renders all reasoning parts in a single <Thinking>
+    Accordion. This patch changes it to render one <Thinking> per section
+    when isMultimodal + tempDisplayContent contains multiple text parts —
+    matching LobeHub's native per-operation reasoning display.
+    """
+    rel = "src/features/Conversation/Messages/components/Reasoning.tsx"
+    text = _read(rel)
+    if "LCA: multi-block reasoning" in text:
+        return False
+
+    old_body = (
+        "const Reasoning = memo<ReasoningProps>(\n"
+        "  ({ content = '', duration, id, isMultimodal, tempDisplayContent }) => {\n"
+        "    const isReasoning = useConversationStore(messageStateSelectors.isMessageInReasoning(id));\n"
+        "    const transitionMode = useUserStore(userGeneralSettingsSelectors.transitionMode);\n"
+        "\n"
+        "    const parts = tempDisplayContent || deserializeParts(content);\n"
+        "\n"
+        "    // If parts are provided, render multimodal content\n"
+        "    const thinkingContent = isMultimodal && parts ? <RichContentRenderer parts={parts} /> : content;\n"
+        "\n"
+        "    return (\n"
+        "      <Thinking\n"
+        "        content={thinkingContent}\n"
+        "        duration={duration}\n"
+        "        thinking={isReasoning}\n"
+        "        thinkingAnimated={transitionMode === 'fadeIn' && isReasoning}\n"
+        "      />\n"
+        "    );\n"
+        "  },\n"
+        ");"
+    )
+    if old_body not in text:
+        raise SystemExit("[reasoning_multi_block] anchor not found")
+
+    new_body = (
+        "const Reasoning = memo<ReasoningProps>(\n"
+        "  ({ content = '', duration, id, isMultimodal, tempDisplayContent }) => {\n"
+        "    const isReasoning = useConversationStore(messageStateSelectors.isMessageInReasoning(id));\n"
+        "    const transitionMode = useUserStore(userGeneralSettingsSelectors.transitionMode);\n"
+        "\n"
+        "    const parts = tempDisplayContent || deserializeParts(content);\n"
+        "\n"
+        "    // LCA: multi-block reasoning — when we have multiple text parts from\n"
+        "    // completed reasoning sections, render each as a separate <Thinking>\n"
+        "    // Accordion so each LLM turn gets its own collapsible block.\n"
+        "    const textParts = isMultimodal && parts\n"
+        "      ? parts.filter((p) => p.type === 'text' && 'text' in p && p.text)\n"
+        "      : [];\n"
+        "\n"
+        "    if (textParts.length > 1) {\n"
+        "      return (\n"
+        "        <>\n"
+        "          {textParts.map((part, idx) => {\n"
+        "            const partText = 'text' in part ? (part.text as string) : '';\n"
+        "            const isLast = idx === textParts.length - 1;\n"
+        "            return (\n"
+        "              <Thinking\n"
+        "                content={partText}\n"
+        "                duration={duration}\n"
+        "                key={idx}\n"
+        "                thinking={isLast && isReasoning}\n"
+        "                thinkingAnimated={isLast && transitionMode === 'fadeIn' && isReasoning}\n"
+        "              />\n"
+        "            );\n"
+        "          })}\n"
+        "        </>\n"
+        "      );\n"
+        "    }\n"
+        "\n"
+        "    // Single-block fallback — original upstream behavior\n"
+        "    const thinkingContent = isMultimodal && parts ? <RichContentRenderer parts={parts} /> : content;\n"
+        "\n"
+        "    return (\n"
+        "      <Thinking\n"
+        "        content={thinkingContent}\n"
+        "        duration={duration}\n"
+        "        thinking={isReasoning}\n"
+        "        thinkingAnimated={transitionMode === 'fadeIn' && isReasoning}\n"
+        "      />\n"
+        "    );\n"
+        "  },\n"
+        ");"
+    )
+    text = text.replace(old_body, new_body, 1)
+    _write(rel, text)
+    return True
+
+
 # =======================================================================
 #  MANIFEST — ordered patch registry
 # =======================================================================
 
 PATCHES: list[PatchMeta] = [
-    # ── Streaming Protocol ──
+    # ── Streaming Protocol ──────────────────────────────────────────────
+    # LCA Gateway embeds tool lifecycle events in the standard OpenAI SSE
+    # stream via a `lca: { events: [...] }` extension field. These patches
+    # make LobeHub's stream transformers extract and dispatch those events.
     PatchMeta(
         "openai_stream",
         "Extract lca.events from OpenAI stream chunks",
         ("packages/model-runtime/src/core/streams/openai/openai.ts",),
         "low",
         "streaming",
+        why="LCA Gateway embeds tool events in OpenAI SSE; LobeHub must extract them",
+        technical_detail=(
+            "Insert lca.events extraction at the top of transformOpenAIStream. "
+            "Each event is emitted as a StreamProtocolChunk with type 'lca_tool_event'."
+        ),
     ),
     PatchMeta(
         "qwen_stream",
@@ -1325,6 +1802,11 @@ PATCHES: list[PatchMeta] = [
         ("packages/model-runtime/src/core/streams/qwen.ts",),
         "low",
         "streaming",
+        why="Qwen provider has its own stream transformer; needs same extraction",
+        technical_detail=(
+            "Same logic as openai_stream but in transformQwenStream. "
+            "Needed when QWEN_PROXY_URL points to LCA gateway."
+        ),
     ),
     PatchMeta(
         "protocol",
@@ -1332,6 +1814,12 @@ PATCHES: list[PatchMeta] = [
         ("packages/model-runtime/src/core/streams/protocol.ts",),
         "low",
         "streaming",
+        depends_on=("openai_stream", "qwen_stream"),
+        why="Protocol dispatcher must recognize the new chunk type",
+        technical_detail=(
+            "Add 'lca_tool_event' to StreamProtocolChunk type union and "
+            "switch case to call callbacks.onLcaToolEvent."
+        ),
     ),
     PatchMeta(
         "chat_callbacks",
@@ -1339,6 +1827,8 @@ PATCHES: list[PatchMeta] = [
         ("packages/model-runtime/src/types/chat.ts",),
         "low",
         "streaming",
+        why="Callback interface needs the new method signature",
+        technical_detail="Add onLcaToolEvent?: (event: Record<string, unknown>) => void to ChatStreamCallbacks.",
     ),
     PatchMeta(
         "fetch_sse",
@@ -1346,14 +1836,25 @@ PATCHES: list[PatchMeta] = [
         ("packages/fetch-sse/src/fetchSSE.ts",),
         "low",
         "streaming",
+        depends_on=("protocol",),
+        why="fetchSSE is the low-level SSE consumer; must forward lca_tool_event",
+        technical_detail="Add 'lca_tool_event' case to the onMessageHandle type union and switch dispatch.",
     ),
-    # ── Agent Runtime ──
+    # ── Agent Runtime ───────────────────────────────────────────────────
+    # Frontend state management for LCA's server-side tool execution model.
+    # LCA runs tools server-side (closed-loop), so the client must NOT
+    # initiate its own tool call loop.
     PatchMeta(
         "streaming_types",
         "Add LcaStreamToolEvent type + closed-loop fields",
         ("src/store/chat/agents/types/streaming.ts",),
         "low",
         "runtime",
+        why="TypeScript types for the LCA tool event protocol",
+        technical_detail=(
+            "Define LcaStreamToolEvent discriminated union (tool_started/tool_result/"
+            "tool_state/run_error). Add lcaClosedLoop and lcaRunError to StreamingResult."
+        ),
     ),
     PatchMeta(
         "streaming_handler",
@@ -1361,6 +1862,13 @@ PATCHES: list[PatchMeta] = [
         ("src/store/chat/agents/StreamingHandler.ts",),
         "medium",
         "runtime",
+        depends_on=("streaming_types",),
+        why="Core handler that converts LCA SSE events into tool card UI state",
+        technical_detail=(
+            "Add handleLcaToolEvent() method: tool_started creates ChatToolPayload cards, "
+            "tool_result/tool_state update card content, run_error records errors. "
+            "lcaClosedLoop flag prevents client-side tool loop."
+        ),
     ),
     PatchMeta(
         "lca_tool_result_merge",
@@ -1368,6 +1876,12 @@ PATCHES: list[PatchMeta] = [
         ("src/store/chat/agents/StreamingHandler.ts",),
         "high",
         "runtime",
+        depends_on=("streaming_handler",),
+        why="Tool results need structured merge into ChatToolResult shape",
+        technical_detail=(
+            "Add mergeLcaToolResult() that deep-merges state, extracts stdout from "
+            "state.output/state.stdout, and preserves error propagation."
+        ),
     ),
     PatchMeta(
         "lca_streaming_types",
@@ -1375,6 +1889,9 @@ PATCHES: list[PatchMeta] = [
         ("src/store/chat/agents/types/streaming.ts",),
         "low",
         "runtime",
+        depends_on=("streaming_types",),
+        why="Sandbox tools stream live stdout and produce file artifacts",
+        technical_detail="Add content field to tool_state, files[] to tool_result in LcaStreamToolEvent.",
     ),
     PatchMeta(
         "sandbox_generated_files",
@@ -1382,6 +1899,8 @@ PATCHES: list[PatchMeta] = [
         ("packages/builtin-tool-cloud-sandbox/src/client/Render/ExecuteCode/index.tsx",),
         "medium",
         "ui",
+        why="Sandbox code execution produces files that should be visible in the UI",
+        technical_detail="Add GeneratedFilesStrip component to render file download links from tool state.",
     ),
     PatchMeta(
         "client_transport",
@@ -1389,6 +1908,12 @@ PATCHES: list[PatchMeta] = [
         ("src/store/chat/agents/transports/ClientLLMTransport.ts",),
         "medium",
         "runtime",
+        depends_on=("streaming_handler", "chat_callbacks"),
+        why="Transport layer must connect SSE events to StreamingHandler",
+        technical_detail=(
+            "Wire onLcaToolEvent callback in ChatStreamCallbacks to handler.handleChunk. "
+            "Surface lcaRunError as transport-level error."
+        ),
     ),
     PatchMeta(
         "llm_transport_type",
@@ -1396,6 +1921,8 @@ PATCHES: list[PatchMeta] = [
         ("packages/agent-runtime/src/transport/llm.ts",),
         "low",
         "runtime",
+        why="Type propagation for closed-loop flag through the transport layer",
+        technical_detail="Add lcaClosedLoop?: boolean to the StreamingResult type in agent-runtime.",
     ),
     PatchMeta(
         "call_llm_finalizer",
@@ -1403,14 +1930,30 @@ PATCHES: list[PatchMeta] = [
         ("packages/agent-runtime/src/executors/callLlmFinalizer.ts",),
         "high",
         "runtime",
+        depends_on=("llm_transport_type",),
+        why="Prevent LobeHub's client-side tool loop from duplicating LCA's server-side execution",
+        technical_detail=(
+            "Change hasToolsCalling condition: !output.lcaClosedLoop && output.toolsCalling.length > 0. "
+            "When LCA handles tools server-side, the client must not re-invoke them."
+        ),
     ),
-    # ── Provider Routing ──
+    # ── Provider Routing ────────────────────────────────────────────────
+    # LCA uses virtual model names (solo/team/auto) routed through its
+    # gateway. These patches ensure LobeHub defaults and routing work.
     PatchMeta(
         "default_model",
         "Set default model/provider to solo/openai",
-        ("packages/business/const/src/llm.ts",),
+        (
+            "packages/business/const/src/llm.ts",
+            "apps/desktop/stubs/business-const/src/index.ts",
+        ),
         "low",
         "provider",
+        why="LCA's virtual model 'solo' must be the default for new conversations",
+        technical_detail=(
+            "Replace DEFAULT_MODEL, DEFAULT_PROVIDER, DEFAULT_MINI_MODEL, DEFAULT_MINI_PROVIDER "
+            "in both web and desktop const stubs with LCA defaults (solo/openai)."
+        ),
     ),
     PatchMeta(
         "openai_guard",
@@ -1418,6 +1961,11 @@ PATCHES: list[PatchMeta] = [
         ("packages/model-runtime/src/providers/openai/index.ts",),
         "medium",
         "provider",
+        why="LCA virtual models (solo/team/auto) must use chat/completions, not OpenAI Responses API",
+        technical_detail=(
+            "Add isLcaGatewayModel check: if model in ['solo','team','auto'], "
+            "force chat/completions path regardless of model capabilities."
+        ),
     ),
     PatchMeta(
         "provider_order",
@@ -1425,8 +1973,12 @@ PATCHES: list[PatchMeta] = [
         ("packages/model-bank/src/modelProviders/index.ts",),
         "low",
         "provider",
+        why="OpenAI provider (LCA gateway) should be the first/default option",
+        technical_detail="Reorder DEFAULT_MODEL_PROVIDER_LIST to put OpenAIProvider first.",
     ),
-    # ── Dev Auth ──
+    # ── Dev Auth ────────────────────────────────────────────────────────
+    # Local development without Better Auth. Uses a static dev user to
+    # avoid OAuth/login flows during development.
     PatchMeta(
         "dev_auth_files",
         "Create LocalDevAuth component files",
@@ -1437,6 +1989,11 @@ PATCHES: list[PatchMeta] = [
         ),
         "low",
         "auth",
+        why="Local dev needs no-auth mode; Better Auth requires HTTPS + OAuth",
+        technical_detail=(
+            "Create 3 new files: localDevNoAuth.ts (flag check), "
+            "LocalDevAuth/index.tsx (wrapper), LocalDevUserUpdater.tsx (injects static user)."
+        ),
     ),
     PatchMeta(
         "dev_auth_vite",
@@ -1444,6 +2001,9 @@ PATCHES: list[PatchMeta] = [
         ("src/layout/AuthProvider/index.vite.tsx",),
         "medium",
         "auth",
+        depends_on=("dev_auth_files",),
+        why="Vite SPA mode needs the auth provider swap",
+        technical_detail="When ENABLE_MOCK_DEV_USER is set, render LocalDevAuth instead of BetterAuth.",
     ),
     PatchMeta(
         "middleware_mock_user",
@@ -1451,8 +2011,12 @@ PATCHES: list[PatchMeta] = [
         ("src/libs/next/proxy/define-config.ts",),
         "medium",
         "auth",
+        why="Next.js middleware blocks unauthenticated requests; dev mode must bypass",
+        technical_detail="Early-return from middleware when ENABLE_MOCK_DEV_USER flag is set.",
     ),
-    # ── Route Adaptation ──
+    # ── Route Adaptation ────────────────────────────────────────────────
+    # LCA's single-agent UI has different routing semantics than LobeHub's
+    # multi-agent marketplace. These patches stabilize topic/conversation IDs.
     PatchMeta(
         "topic_route",
         "Stabilize topicId resolution from pathname",
@@ -1463,6 +2027,11 @@ PATCHES: list[PatchMeta] = [
         ),
         "medium",
         "route",
+        why="LCA needs stable topicId from URL; LobeHub's default resolution is fragile",
+        technical_detail=(
+            "Add resolveAgentChatRouteTopicId() that prefers route params over pathname parsing. "
+            "Update useChatRouteSync and AgentIdSync to use it."
+        ),
     ),
     PatchMeta(
         "market_fork",
@@ -1473,14 +2042,19 @@ PATCHES: list[PatchMeta] = [
         ),
         "low",
         "route",
+        depends_on=("dev_auth_files",),
+        why="Market fork requires OIDC which needs HTTPS; local dev is HTTP",
+        technical_detail="Check isLocalDevNoAuth() and skip OIDC redirect, directly fork to local agent.",
     ),
-    # ── Dev UX ──
+    # ── Dev UX ──────────────────────────────────────────────────────────
     PatchMeta(
         "lan_dev",
         "Use VITE_DEV_HOST for Vite dev asset URLs",
         ("src/libs/spaHtml/index.ts",),
         "low",
         "devux",
+        why="Developers need LAN access from mobile devices; hardcoded localhost prevents this",
+        technical_detail="Replace hardcoded 'localhost' with process.env.VITE_DEV_HOST in resolveCiteDevOrigin.",
     ),
     PatchMeta(
         "turbopack_dev",
@@ -1488,15 +2062,23 @@ PATCHES: list[PatchMeta] = [
         ("scripts/devStartupSequence.mts",),
         "low",
         "devux",
+        why="Turbopack significantly speeds up Next.js dev builds",
+        technical_detail="Add '--turbo' flag to the next dev command in devStartupSequence.",
     ),
-    # ── File Proxy & Reasoning ──
+    # ── File Proxy ──────────────────────────────────────────────────────
     PatchMeta(
         "file_proxy_rewrite",
         "Proxy /files/* to LCA gateway for artifact downloads",
         ("next.config.ts",),
         "low",
         "proxy",
+        why="LCA tool artifacts are served by the gateway, not LobeHub's file system",
+        technical_detail="Add Next.js rewrite rule: /files/* → LCA gateway /files/* endpoint.",
     ),
+    # ── Reasoning (per-step thinking blocks) ────────────────────────────
+    # LCA agents think in multiple steps. Each LLM call produces a separate
+    # reasoning section. These patches enable per-step collapsible UI blocks
+    # instead of merging all thinking into one block.
     PatchMeta(
         "reasoning_segmentation",
         "Per-step reasoning blocks via reasoning_start/end events",
@@ -1506,6 +2088,11 @@ PATCHES: list[PatchMeta] = [
         ),
         "medium",
         "runtime",
+        why="LCA emits reasoning_start/end per LLM call; frontend must track boundaries",
+        technical_detail=(
+            "Add reasoning_start/reasoning_end to LcaStreamToolEvent union. "
+            "Handle in handleLcaToolEvent by calling endReasoningIfNeeded()."
+        ),
     ),
     PatchMeta(
         "tool_result_files",
@@ -1513,6 +2100,59 @@ PATCHES: list[PatchMeta] = [
         ("src/store/chat/agents/StreamingHandler.ts",),
         "low",
         "runtime",
+        depends_on=("lca_tool_result_merge",),
+        why="Tool results may include generated files that need UI rendering",
+        technical_detail="Spread event.files into merged tool state when tool_result includes files[].",
+    ),
+    PatchMeta(
+        "reasoning_section_type",
+        "Add reasoning_section type to LcaStreamToolEvent union",
+        ("src/store/chat/agents/types/streaming.ts",),
+        "low",
+        "runtime",
+        depends_on=("reasoning_segmentation",),
+        why="Backend emits reasoning_section events with complete thinking text per turn",
+        technical_detail="Add { content: string; step: number; type: 'reasoning_section' } to union.",
+    ),
+    PatchMeta(
+        "reasoning_section_handler",
+        "Multi-section reasoning state: completedReasoningSections + 7 call sites",
+        ("src/store/chat/agents/StreamingHandler.ts",),
+        "high",
+        "runtime",
+        depends_on=("reasoning_section_type", "streaming_handler"),
+        why="Each LLM turn's thinking must be saved as a separate section for individual rendering",
+        technical_detail=(
+            "Add completedReasoningSections[] array. On reasoning_section event: save content, "
+            "add to reasoningParts, reset thinkingContent. Update getThinkingContent(), "
+            "handleReasoningChunk(), notifyContentPartUpdate(), buildReasoningState(), "
+            "and buildFinalResult() to handle multi-section state."
+        ),
+    ),
+    PatchMeta(
+        "reasoning_multi_block",
+        "Render multiple <Thinking> Accordions for per-step reasoning sections",
+        ("src/features/Conversation/Messages/components/Reasoning.tsx",),
+        "medium",
+        "ui",
+        depends_on=("reasoning_section_handler",),
+        why="Upstream renders all reasoning in one block; LCA needs one block per LLM turn",
+        technical_detail=(
+            "When tempDisplayContent has multiple text parts, render each as a separate "
+            "<Thinking> Accordion. Only the last block shows the 'thinking' spinner. "
+            "Falls back to single-block rendering for non-LCA messages."
+        ),
+    ),
+    # ── Misc ────────────────────────────────────────────────────────────
+    PatchMeta(
+        "topic_route_test",
+        "Add test for resolveAgentChatRouteTopicId",
+        ("src/features/AgentSidebar/utils/agentPathname.test.ts",),
+        "low",
+        "route",
+        depends_on=("topic_route",),
+        why="Test coverage for the new routing function added by topic_route patch",
+        technical_detail="Add test cases for resolveAgentChatRouteTopicId with params, pathname, and edge cases.",
     ),
 ]
 
@@ -1543,6 +2183,10 @@ _PATCH_FUNCS: dict[str, callable] = {
     "file_proxy_rewrite": p_file_proxy_rewrite,
     "reasoning_segmentation": p_reasoning_segmentation,
     "tool_result_files": p_tool_result_files,
+    "reasoning_section_type": p_reasoning_section_type,
+    "reasoning_section_handler": p_reasoning_section_handler,
+    "reasoning_multi_block": p_reasoning_multi_block,
+    "topic_route_test": p_topic_route_test,
 }
 
 # Verify markers: (file_to_check, marker_string) — read-only check
@@ -1605,6 +2249,22 @@ _VERIFY_MARKERS: dict[str, tuple[str, str]] = {
     "tool_result_files": (
         "src/store/chat/agents/StreamingHandler.ts",
         "event.files",
+    ),
+    "reasoning_section_type": (
+        "src/store/chat/agents/types/streaming.ts",
+        "reasoning_section",
+    ),
+    "reasoning_section_handler": (
+        "src/store/chat/agents/StreamingHandler.ts",
+        "completedReasoningSections",
+    ),
+    "reasoning_multi_block": (
+        "src/features/Conversation/Messages/components/Reasoning.tsx",
+        "LCA: multi-block reasoning",
+    ),
+    "topic_route_test": (
+        "src/features/AgentSidebar/utils/agentPathname.test.ts",
+        "resolveAgentChatRouteTopicId",
     ),
 }
 
@@ -1687,13 +2347,21 @@ def verify_patches(names: tuple[str, ...] = ()) -> list[PatchResult]:
     return results
 
 
-def list_patches() -> None:
-    print(f"{'#':>2}  {'Name':<24} {'Risk':<6} {'Category':<10} Description")
-    print("─" * 90)
+def list_patches(*, verbose: bool = False) -> None:
+    print(f"{'#':>2}  {'Name':<28} {'Risk':<6} {'Category':<10} Description")
+    print("─" * 100)
     for i, meta in enumerate(PATCHES, 1):
-        print(f"{i:>2}  {meta.name:<24} {meta.risk:<6} {meta.category:<10} {meta.description}")
+        deps = f" ← {','.join(meta.depends_on)}" if meta.depends_on else ""
+        print(
+            f"{i:>2}  {meta.name:<28} {meta.risk:<6} {meta.category:<10} {meta.description}{deps}"
+        )
+        if verbose and meta.why:
+            print(f"     why: {meta.why}")
+        if verbose and meta.technical_detail:
+            print(f"     how: {meta.technical_detail}")
     print(f"\nTotal: {len(PATCHES)} patches across {len({m.category for m in PATCHES})} categories")
-    print("Target: lobehub-ui/ (LobeHub v2.2.13)")
+    print(f"Upstream: LobeHub {_read_origin_release()}")
+    print("Commands: apply | verify | list [--verbose] | drift | manifest | doctor")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────
@@ -1733,8 +2401,188 @@ def _read_origin_release() -> str:
 
 
 # =======================================================================
+#  DRIFT GUARD — detect unregistered source modifications
+# =======================================================================
+
+_UPSTREAM = ROOT / ".lobehub-upstream"
+
+# Files/dirs that are expected to differ and are NOT patches
+_DRIFT_IGNORE = frozenset(
+    {
+        ".env",
+        ".lca-patched",
+        ".lca-integration-patched",
+        ".lca-qwen-defaults-patched",
+        ".lca-origin.json",
+        ".agent-tracing",
+        ".llm-generation-tracing",
+        "next-env.d.ts",
+    }
+)
+
+_DRIFT_IGNORE_PREFIXES = (
+    "node_modules/",
+    ".next/",
+    ".turbo/",
+    "dist/",
+    "coverage/",
+    ".git/",
+    "public/_spa/",
+    "public/_spa-auth/",
+    ".pytest_cache/",
+    "docker-compose/dev/data/",
+)
+
+
+def _collect_patch_covered_files() -> set[str]:
+    """Build the set of all file paths that registered patches touch."""
+    covered: set[str] = set()
+    for meta in PATCHES:
+        covered.update(meta.files)
+    return covered
+
+
+def _is_ignored(rel: str) -> bool:
+    if rel in _DRIFT_IGNORE:
+        return True
+    if any(rel.startswith(p) for p in _DRIFT_IGNORE_PREFIXES):
+        return True
+    # Also ignore nested node_modules anywhere in the path
+    return "/node_modules/" in rel or rel.endswith("/node_modules")
+
+
+def drift_guard(*, verbose: bool = False) -> list[str]:
+    """Compare upstream vs lobehub-ui and report unregistered modifications.
+
+    Returns a list of violation messages. Empty list = clean.
+    """
+    if not _UPSTREAM.is_dir():
+        return [f"upstream cache not found: {_UPSTREAM}"]
+    if not UI.is_dir():
+        return [f"lobehub-ui/ not found: {UI}"]
+
+    covered = _collect_patch_covered_files()
+    violations: list[str] = []
+
+    # Walk lobehub-ui and compare against upstream
+    for path in UI.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = str(path.relative_to(UI))
+        if _is_ignored(rel):
+            continue
+
+        upstream_path = _UPSTREAM / rel
+        if not upstream_path.is_file():
+            # New file — must be created by a patch
+            if rel not in covered:
+                violations.append(f"NEW FILE (not in any patch): {rel}")
+            continue
+
+        # Existing file — check if content differs
+        try:
+            if path.read_bytes() == upstream_path.read_bytes():
+                continue
+        except OSError:
+            continue
+
+        # File differs — must be covered by a patch
+        if rel not in covered:
+            violations.append(f"MODIFIED (not in any patch): {rel}")
+
+    if verbose:
+        if violations:
+            print(f"\n[drift] ❌ {len(violations)} unregistered modification(s):")
+            for v in violations:
+                print(f"  • {v}")
+            print("\n[drift] FIX: register these changes as patches in patch_lobehub.py")
+            print("[drift] Then run: python3 deploy/lobehub/patch_lobehub.py --reset")
+        else:
+            print("[drift] ✅ all modifications covered by registered patches")
+
+    return violations
+
+
+def generate_manifest() -> dict:
+    """Generate a structured JSON manifest of all patches."""
+    patches = []
+    for i, meta in enumerate(PATCHES, 1):
+        marker_info = _VERIFY_MARKERS.get(meta.name)
+        patches.append(
+            {
+                "index": i,
+                "name": meta.name,
+                "description": meta.description,
+                "category": meta.category,
+                "risk": meta.risk,
+                "files": list(meta.files),
+                "depends_on": list(meta.depends_on),
+                "why": meta.why,
+                "technical_detail": meta.technical_detail,
+                "verify_marker": marker_info[1] if marker_info else None,
+            }
+        )
+    return {
+        "schema_version": 1,
+        "upstream_release": _read_origin_release(),
+        "total_patches": len(PATCHES),
+        "categories": sorted({m.category for m in PATCHES}),
+        "patches": patches,
+    }
+
+
+def doctor() -> int:
+    """Run all health checks: verify + drift + consistency."""
+    print("=" * 60)
+    print("  LobeHub Patch Doctor")
+    print("=" * 60)
+
+    issues = 0
+
+    # 1. Verify all patch markers
+    print("\n── 1. Patch markers ──")
+    verify_results = verify_patches()
+    broken = [r for r in verify_results if r.status == "broken"]
+    issues += len(broken)
+
+    # 2. Drift guard
+    print("\n── 2. Drift guard ──")
+    drift_violations = drift_guard(verbose=True)
+    issues += len(drift_violations)
+
+    # 3. Consistency: every patch in PATCHES has a func and marker
+    print("\n── 3. Registry consistency ──")
+    for meta in PATCHES:
+        if meta.name not in _PATCH_FUNCS:
+            print(f"  ❌ {meta.name}: missing in _PATCH_FUNCS")
+            issues += 1
+        if meta.name not in _VERIFY_MARKERS:
+            print(f"  ⚠️  {meta.name}: no verify marker (optional)")
+
+    # 4. Dependency check
+    print("\n── 4. Dependency graph ──")
+    all_names = {m.name for m in PATCHES}
+    for meta in PATCHES:
+        for dep in meta.depends_on:
+            if dep not in all_names:
+                print(f"  ❌ {meta.name}: depends on unknown patch '{dep}'")
+                issues += 1
+
+    # Summary
+    print("\n" + "=" * 60)
+    if issues == 0:
+        print("  ✅ All checks passed")
+    else:
+        print(f"  ❌ {issues} issue(s) found")
+    print("=" * 60)
+    return issues
+
+
+# =======================================================================
 #  CLI
 # =======================================================================
+
+_COMMANDS = ("apply", "verify", "list", "drift", "manifest", "doctor")
 
 
 def main() -> None:
@@ -1742,14 +2590,17 @@ def main() -> None:
     cmd = "apply"
     names: list[str] = []
     reset = False
+    verbose = False
 
     i = 0
     while i < len(args):
         a = args[i]
-        if a in ("apply", "verify", "list"):
+        if a in _COMMANDS:
             cmd = a
         elif a == "--reset":
             reset = True
+        elif a in ("--verbose", "-v"):
+            verbose = True
         elif a in ("-h", "--help"):
             print(__doc__)
             sys.exit(0)
@@ -1758,11 +2609,20 @@ def main() -> None:
         i += 1
 
     if cmd == "list":
-        list_patches()
+        list_patches(verbose=verbose)
     elif cmd == "verify":
         results = verify_patches(tuple(names))
         broken = [r for r in results if r.status == "broken"]
         sys.exit(1 if broken else 0)
+    elif cmd == "drift":
+        violations = drift_guard(verbose=True)
+        sys.exit(1 if violations else 0)
+    elif cmd == "manifest":
+        manifest = generate_manifest()
+        print(json.dumps(manifest, indent=2, ensure_ascii=False))
+    elif cmd == "doctor":
+        issues = doctor()
+        sys.exit(1 if issues else 0)
     else:
         results = apply_patches(tuple(names), reset=reset)
         broken = [r for r in results if r.status == "broken"]

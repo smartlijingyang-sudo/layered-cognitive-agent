@@ -32,5 +32,9 @@ jobs:
         run: uv run pip-audit
       - name: 死代码扫描
         run: uv run vulture --config pyproject.toml --min-confidence 80
+      - name: LobeHub 补丁一致性检查
+        run: |
+          # Verify patch registry consistency (no lobehub-ui/ needed)
+          uv run python deploy/lobehub/patch_lobehub.py list
 
 

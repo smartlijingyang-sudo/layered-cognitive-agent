@@ -86,5 +86,15 @@ echo "[sync] manifest: ${DEST}/.lca-origin.json"
 
 # 统一补丁引擎（幂等，含 LAN dev / 默认模型 / lca.events closed-loop / 认证 / 路由）
 python3 "${ROOT}/deploy/lobehub/patch_lobehub.py" --reset
+
+# Drift guard — verify all modifications are covered by registered patches
+echo "[sync] 运行 drift guard..."
+if ! python3 "${ROOT}/deploy/lobehub/patch_lobehub.py" drift; then
+  echo "[sync] ❌ drift guard 检测到未注册的源码修改！" >&2
+  echo "[sync] 请将所有 lobehub-ui/ 修改注册为补丁。详见:" >&2
+  echo "[sync]   python3 deploy/lobehub/patch_lobehub.py doctor" >&2
+  exit 1
+fi
+
 echo "[sync] 下一步: cd lobehub-ui && bun install && bun run dev"
 echo "         或: ./scripts/start_lobehub_stack.sh dev"
