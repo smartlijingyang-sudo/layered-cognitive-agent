@@ -218,7 +218,7 @@ TOOL_REGISTRY: dict[str, ToolWireSpec | _WireFactory] = {
     ),
 }
 
-# Backward-compatible alias for tests
+# Filtered view for tests
 CLOUD_SANDBOX_WIRE: dict[str, ToolWireSpec] = {
     k: v
     for k, v in TOOL_REGISTRY.items()

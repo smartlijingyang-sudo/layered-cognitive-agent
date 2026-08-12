@@ -6,7 +6,6 @@ create_run 写入的后端 turn 记录目前仅作服务端审计/恢复预备�
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,14 +25,6 @@ class TurnRecord:
     mode: str
     status: str
     created_at: float
-
-
-@dataclass(frozen=True)
-class ConversationRecord:
-    conversation_id: str
-    title: str
-    created_at: float
-    turns: tuple[TurnRecord, ...]
 
 
 class ConversationStore:
@@ -198,8 +189,4 @@ class ConversationStore:
             "created_at": row["created_at"],
         }
 
-    def dump_json(self, conversation_id: str) -> str:
-        payload = self.get_conversation(conversation_id)
-        if payload is None:
-            return "{}"
-        return json.dumps(payload, ensure_ascii=False)
+

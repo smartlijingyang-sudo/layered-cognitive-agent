@@ -43,13 +43,7 @@ from gateway.lobehub_bridge.lobehub_adapter.tool_spec import (
     wire_tool_name,
 )
 
-# ── Backward-compatible aliases ─────────────────────────────
-
-CLOUD_SANDBOX_WIRE = {
-    k: v
-    for k, v in TOOL_REGISTRY.items()
-    if isinstance(v, ToolWireSpec) and v.identifier == "lobe-cloud-sandbox"
-}
+from gateway.lobehub_bridge.lobehub_adapter.tool_registry import CLOUD_SANDBOX_WIRE
 
 __all__ = [
     "CLOUD_SANDBOX_WIRE",

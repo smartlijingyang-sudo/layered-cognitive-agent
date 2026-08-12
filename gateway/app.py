@@ -68,10 +68,6 @@ def get_registry() -> RunRegistry:
     return _registry
 
 
-def get_conversation_store() -> ConversationStore:
-    return _conversations
-
-
 def get_file_store() -> LocalFileStore:
     return _file_store
 

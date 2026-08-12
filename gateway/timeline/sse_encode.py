@@ -38,12 +38,4 @@ def encode_sse(event: dict[str, Any], *, seq: int, event_type: str) -> bytes:
     return f"id: {seq}\nevent: {event_type}\ndata: {data}\n\n".encode()
 
 
-def encode_sse_legacy(event: dict[str, Any], *, seq: int) -> bytes:
-    """兼容旧接口的编码（不传 event_type，从 event['type'] 取）。
 
-    仅供过渡期使用，新代码应使用 encode_sse()。
-    """
-    etype = str(event.get("type", ""))
-    if etype not in EVENT_TYPES:
-        raise ValueError(f"unknown timeline event type: {etype!r}")
-    return encode_sse(event, seq=seq, event_type=etype)

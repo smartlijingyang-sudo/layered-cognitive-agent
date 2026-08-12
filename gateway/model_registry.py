@@ -265,6 +265,4 @@ def get_model_registry() -> ModelRegistry:
     return ModelRegistry()
 
 
-def clear_model_registry_cache() -> None:
-    """清除单例缓存（测试用）。"""
-    get_model_registry.cache_clear()
+

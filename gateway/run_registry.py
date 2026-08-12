@@ -8,18 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
-import structlog
-
-from gateway.event_stream import EventStream, GapEvent
+from gateway.event_stream import EventStream
 from lca.contracts.models.core.conversation import ConversationTurn
-
-_log = structlog.get_logger(__name__)
 
 _RUNS_DIR = Path("traces/runs")
 
@@ -175,24 +171,4 @@ class RunRegistry:
             "error": session.error,
         }
 
-    async def event_stream(
-        self,
-        run_id: str,
-        last_event_id_header: str | None,
-    ) -> AsyncIterator[Any]:
-        """Typed event stream for an HTTP client."""
-        from lca.layer0_infra.observability.journal.sse_frames import parse_last_event_id
 
-        session = self.get(run_id)
-        if session is None:
-            return
-        after = parse_last_event_id(last_event_id_header)
-        async for item in session.stream.subscribe(after_seq=after):
-            if isinstance(item, GapEvent):
-                _log.warning(
-                    "debug_event_stream_buffer_gap",
-                    requested_seq=item.requested_seq,
-                    oldest_available=item.oldest_available_seq,
-                )
-                continue
-            yield item

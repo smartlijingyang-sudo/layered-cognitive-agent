@@ -11,8 +11,7 @@ Architecture (ADR-0053):
 
 from gateway.timeline.lobehub_adapter import LobeHubSSEAdapter
 from gateway.timeline.projection import TimelineProjection
-from gateway.timeline.protocol import EVENT_TYPES, TIMELINE_V
-from gateway.timeline.sse_encode import encode_sse, encode_sse_legacy
+from gateway.timeline.sse_encode import EVENT_TYPES, TIMELINE_V, encode_sse
 from gateway.timeline.stream import compose_sse_stream, project_all
 from gateway.timeline.types import (
     AnswerDeltaEvent,
@@ -26,9 +25,6 @@ from gateway.timeline.types import (
     ToolStartEvent,
 )
 
-# Backward-compatible alias for existing imports
-TimelineProjector = TimelineProjection
-
 __all__ = [
     "EVENT_TYPES",
     "TIMELINE_V",
@@ -40,12 +36,10 @@ __all__ = [
     "ThinkingEndEvent",
     "TimelineEvent",
     "TimelineProjection",
-    "TimelineProjector",
     "ToolDeltaEvent",
     "ToolEndEvent",
     "ToolStartEvent",
     "compose_sse_stream",
     "encode_sse",
-    "encode_sse_legacy",
     "project_all",
 ]

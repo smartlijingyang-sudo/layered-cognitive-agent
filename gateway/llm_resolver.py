@@ -75,8 +75,4 @@ def get_async_openai_client() -> Any:
     return _cached_async_client
 
 
-def clear_async_client_cache() -> None:
-    """清除缓存的异步客户端（测试 / 凭证轮换用）。"""
-    global _cached_async_client, _cached_client_key
-    _cached_async_client = None
-    _cached_client_key = None
+

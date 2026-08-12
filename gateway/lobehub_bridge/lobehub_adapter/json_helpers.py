@@ -68,7 +68,4 @@ def copy_fields(
     return out
 
 
-def first_str_as_list(args: dict[str, Any], src: str, dst: str) -> dict[str, Any]:
-    """Extract one string field and wrap it in a single-element list."""
-    val = first_str(args, src)
-    return {dst: [val]} if val else {}
+
