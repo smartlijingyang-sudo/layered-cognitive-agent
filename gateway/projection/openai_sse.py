@@ -1,20 +1,16 @@
 """OpenAISSEProjector — journal events → OpenAI SSE chunks.
 
-Architecture::
+Direct event-to-chunk mapping. No intermediate representation.
 
-    Journal events
-        → TurnBuilder       (evolves TurnSnapshot, pure value)
-        → OpenAISSEProjector (diffs snapshots, emits SSE chunks)
-        → ToolEventProjector (delegates tool lifecycle events)
+Handles:
+    - ReasoningDelta      → reasoning_content delta (real-time)
+    - StepTextDelta       → content delta (answer channel only)
+    - AgentRunFinished    → run_error + finish chunk + steps
+    - DelegationIssued    → content (team collaboration)
+    - Tool events         → delegated to ToolEventProjector
+    - LlmCallCompleted    → token tracking
 
-Design principles:
-    - TurnSnapshot is the single source of truth for reasoning/text state
-    - _EmitTracker tracks what has been emitted to avoid duplicates
-    - Tool lifecycle delegated to ToolEventProjector
-    - Reasoning content passes through as ``reasoning_content`` deltas —
-      no block management, no section events, no buffering
-    - Run errors surface as ``lca.events`` → ``run_error``
-    - Steps total emitted in finish chunk via ``lca.events`` → ``run_meta``
+Everything else is ignored.
 """
 
 from __future__ import annotations
@@ -29,15 +25,17 @@ from gateway.lobehub_bridge.lca_sse_extension import (
     lca_run_error_event,
     merge_lca_extension,
 )
-from gateway.narrative.turn_builder import TurnBuilder
-from gateway.narrative.turn_model import Turn, TurnSnapshot
 from gateway.projection.tool_events import ToolEventProjector
+from lca.contracts.atoms.enums import StreamChannel
 from lca.contracts.models.observability.journal import (
+    AgentRunFinished,
     DelegationCompleted,
     DelegationIssued,
     LlmCallCompleted,
+    ReasoningDelta,
     SandboxOutputDelta,
-    StampedEvent,
+    StepTextDelta,
+    TeamRunFinished,
     ToolCallStreaming,
     ToolDenied,
     ToolInvoked,
@@ -51,43 +49,41 @@ Chunk = dict[str, Any]
 _ALLOWED_FINISH_REASONS = frozenset({None, "stop"})
 
 
-# ── Tracker: what has been emitted ─────────────────────────
-
-
-@dataclass
-class _EmitTracker:
-    """Tracks emitted content to avoid duplicates."""
-
-    reasoning_emitted: dict[int, int] = field(default_factory=dict)
-    """turn_index → chars of reasoning_text already emitted."""
-
-    answer_emitted: dict[int, int] = field(default_factory=dict)
-    """turn_index → chars of answer_text already emitted."""
-
-    finish_emitted: bool = False
-    role_emitted: bool = False
-
-
 # ── OpenAISSEProjector ─────────────────────────────────────
 
 
 @dataclass
 class OpenAISSEProjector:
-    """Journal events → OpenAI SSE chunks.
-
-    Uses TurnBuilder to build structured representation,
-    diffs consecutive snapshots, emits minimal SSE changes.
-    """
+    """Journal events → OpenAI SSE chunks. Direct mapping, no indirection."""
 
     chat_id: str
     model: str
 
-    _machine: TurnBuilder = field(default_factory=TurnBuilder)
-    _snapshot: TurnSnapshot = field(default_factory=TurnSnapshot)
-    _cursor: _EmitTracker = field(default_factory=_EmitTracker)
-    _tools: ToolEventProjector = field(init=False)
+    # Accumulated text
+    _reasoning_text: str = ""
+    _answer_text: str = ""
+
+    # Emission cursors (how much has been sent as SSE delta)
+    _reasoning_emitted: int = 0
+    _answer_emitted: int = 0
+
+    # Run lifecycle
+    _finished: bool = False
+    _status: str = "running"
+    _error: str = ""
+    _final_output: str = ""
+    _steps_total: int = 0
+
+    # Tokens
     _prompt_tokens: int = 0
     _completion_tokens: int = 0
+
+    # Chunk formatting state
+    _role_emitted: bool = False
+    _finish_emitted: bool = False
+
+    # Tool delegation
+    _tools: ToolEventProjector = field(init=False)
 
     def __post_init__(self) -> None:
         self._tools = ToolEventProjector(
@@ -108,12 +104,29 @@ class OpenAISSEProjector:
 
         event = stamped.event
 
-        # Token tracking
+        # ── Reasoning: accumulate + emit delta ──────────────
+        if isinstance(event, ReasoningDelta):
+            self._reasoning_text += event.text_delta or ""
+            return self._flush_reasoning()
+
+        # ── Answer text: accumulate + emit delta ────────────
+        if isinstance(event, StepTextDelta):
+            if event.channel == StreamChannel.ANSWER.value:
+                self._answer_text += event.text_delta or ""
+                return self._flush_answer()
+            return []  # decision channel — ignored
+
+        # ── Run finished: error + output + finish chunk ─────
+        if isinstance(event, AgentRunFinished | TeamRunFinished):
+            return self._handle_run_finished(event)
+
+        # ── Token tracking ──────────────────────────────────
         if isinstance(event, LlmCallCompleted):
             self._prompt_tokens += int(event.prompt_tokens or 0)
             self._completion_tokens += int(event.completion_tokens or 0)
+            return []
 
-        # Delegation events — direct content emission (team mode)
+        # ── Delegation: team collaboration display ──────────
         if isinstance(event, DelegationIssued):
             text = f"\n\n⇢ **委派** → `{event.callee_role}`: {event.subtask_preview}\n"
             return self._emit_delta({"content": text})
@@ -122,83 +135,61 @@ class OpenAISSEProjector:
             preview = _truncate(event.output_text or "", 500)
             return self._emit_delta({"content": f"\n\n⇠ **委派完成** {status}: {preview}\n"})
 
-        # Tool events — delegated to ToolEventProjector
-        tool_chunks = self._delegate_tool_events(stamped)
-        if tool_chunks is not None:
-            return tool_chunks
+        # ── Tool events: delegated ──────────────────────────
+        return self._delegate_tool_event(event)
 
-        # Evolve the turn snapshot
-        old_snapshot = self._snapshot
-        self._snapshot = self._machine.build(self._snapshot, stamped)
+    # ── Flush accumulated text as deltas ────────────────────
 
-        # Diff snapshots → emit SSE chunks
-        return self._diff(old_snapshot, self._snapshot)
+    def _flush_reasoning(self) -> list[Chunk]:
+        """Emit new reasoning text as reasoning_content delta."""
+        new_len = len(self._reasoning_text)
+        if new_len <= self._reasoning_emitted:
+            return []
+        delta_text = self._reasoning_text[self._reasoning_emitted :]
+        self._reasoning_emitted = new_len
+        return self._emit_delta({"reasoning_content": delta_text})
 
-    # ── Snapshot diffing ────────────────────────────────────
-
-    def _diff(self, old: TurnSnapshot, new: TurnSnapshot) -> list[Chunk]:
-        """Compute SSE chunks from the diff between two snapshots."""
-        chunks: list[Chunk] = []
-
-        # Current turn updated
-        if new.turns:
-            curr_idx = new.current_turn_index
-            if 0 <= curr_idx < len(new.turns):
-                curr = new.turns[curr_idx]
-                chunks.extend(self._diff_turn(curr, curr_idx))
-
-        # Run finished
-        if new.finished and not old.finished:
-            chunks.extend(self._emit_run_finished(new))
-
-        return chunks
-
-    def _diff_turn(self, turn: Turn, index: int) -> list[Chunk]:
-        """Emit chunks for reasoning and answer text deltas."""
-        chunks: list[Chunk] = []
-
-        # Reasoning: pass-through delta (no block management)
-        old_r = self._cursor.reasoning_emitted.get(index, 0)
-        if len(turn.reasoning_text) > old_r:
-            chunks.extend(self._emit_delta({"reasoning_content": turn.reasoning_text[old_r:]}))
-            self._cursor.reasoning_emitted[index] = len(turn.reasoning_text)
-
-        # Answer: pass-through delta
-        old_a = self._cursor.answer_emitted.get(index, 0)
-        if len(turn.answer_text) > old_a:
-            chunks.extend(self._emit_delta({"content": turn.answer_text[old_a:]}))
-            self._cursor.answer_emitted[index] = len(turn.answer_text)
-
-        return chunks
+    def _flush_answer(self) -> list[Chunk]:
+        """Emit new answer text as content delta."""
+        new_len = len(self._answer_text)
+        if new_len <= self._answer_emitted:
+            return []
+        delta_text = self._answer_text[self._answer_emitted :]
+        self._answer_emitted = new_len
+        return self._emit_delta({"content": delta_text})
 
     # ── Run lifecycle ───────────────────────────────────────
 
-    def _emit_run_finished(self, snapshot: TurnSnapshot) -> list[Chunk]:
-        """Emit final chunks when the run completes."""
+    def _handle_run_finished(self, event: AgentRunFinished | TeamRunFinished) -> list[Chunk]:
+        """Handle run completion: error + final output + finish chunk."""
+        self._finished = True
+        self._status = event.status or "completed"
+        self._error = event.error or ""
+        self._final_output = event.output_text or ""
+        self._steps_total = event.steps or 0
+
         chunks: list[Chunk] = []
 
-        # 🔴 Run error — failed runs must notify frontend
-        if snapshot.status == "failed" or snapshot.error:
-            error_msg = snapshot.error or f"run finished with status={snapshot.status}"
+        # 🔴 Run error
+        if self._status == "failed" or self._error:
+            error_msg = self._error or f"run finished with status={self._status}"
             chunks.extend(self._wrap_lca_events([lca_run_error_event(message=error_msg)]))
 
-        # Final output fallback
-        if snapshot.final_output and not any(self._cursor.answer_emitted.values()):
-            chunks.extend(self._emit_delta({"content": snapshot.final_output}))
+        # Final output fallback (if no answer text was streamed)
+        if self._final_output and self._answer_emitted == 0:
+            chunks.extend(self._emit_delta({"content": self._final_output}))
 
-        # Finish chunk with usage + steps
-        if not self._cursor.finish_emitted:
-            self._cursor.finish_emitted = True
-            chunks.extend(self._emit_finish(snapshot))
+        # Finish chunk
+        if not self._finish_emitted:
+            self._finish_emitted = True
+            chunks.extend(self._emit_finish())
 
         return chunks
 
     # ── Tool event delegation ───────────────────────────────
 
-    def _delegate_tool_events(self, stamped: StampedEvent) -> list[Chunk] | None:
+    def _delegate_tool_event(self, event: Any) -> list[Chunk]:
         """Delegate tool lifecycle events to ToolEventProjector."""
-        event = stamped.event
-        # 🔴 ToolCallStreaming — early card indicator
         if isinstance(event, ToolCallStreaming):
             return self._tools.project_call_streaming(event)
         if isinstance(event, ToolStarted):
@@ -209,14 +200,14 @@ class OpenAISSEProjector:
             return self._tools.project_invoked(event)
         if isinstance(event, ToolDenied):
             return self._tools.project_denied(event)
-        return None
+        return []
 
     # ── Chunk formatting ────────────────────────────────────
 
     def _emit_delta(self, delta: dict[str, Any]) -> list[Chunk]:
         """Emit a content/reasoning delta chunk."""
-        if not self._cursor.role_emitted:
-            self._cursor.role_emitted = True
+        if not self._role_emitted:
+            self._role_emitted = True
             return [self._chunk({"role": "assistant", **delta})]
         return [self._chunk(delta)]
 
@@ -233,7 +224,7 @@ class OpenAISSEProjector:
             return []
         return [merge_lca_extension(self._chunk({}), events)]
 
-    def _emit_finish(self, snapshot: TurnSnapshot) -> list[Chunk]:
+    def _emit_finish(self) -> list[Chunk]:
         """Emit the final stop chunk with usage + step count."""
         usage: dict[str, int] | None = None
         if self._prompt_tokens or self._completion_tokens:
@@ -244,10 +235,8 @@ class OpenAISSEProjector:
             }
         chunk = self._chunk({}, finish_reason="stop", usage=usage)
         # 🟡 Step count via lca.events
-        if snapshot.steps_total > 0:
-            chunk = merge_lca_extension(
-                chunk, [{"type": "run_meta", "steps": snapshot.steps_total}]
-            )
+        if self._steps_total > 0:
+            chunk = merge_lca_extension(chunk, [{"type": "run_meta", "steps": self._steps_total}])
         return [chunk]
 
     def _chunk(
@@ -352,8 +341,8 @@ async def stream_openai_from_run(
     async for frame in frame_stream:
         for chunk in projector.project_frame(frame):
             yield b"data: " + json.dumps(chunk, ensure_ascii=False).encode() + b"\n\n"
-    if not projector._cursor.finish_emitted:
-        for chunk in projector._emit_finish(projector._snapshot):
+    if not projector._finish_emitted:
+        for chunk in projector._emit_finish():
             yield b"data: " + json.dumps(chunk, ensure_ascii=False).encode() + b"\n\n"
     yield b"data: [DONE]\n\n"
 

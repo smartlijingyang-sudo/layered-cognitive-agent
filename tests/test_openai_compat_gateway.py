@@ -63,10 +63,7 @@ class TestOpenAISSEProjector(unittest.TestCase):
         finish_chunks = projector.project_frame(finish_frame)
         self.assertTrue(any(c["choices"][0].get("finish_reason") == "stop" for c in finish_chunks))
         # run_meta LCA event with steps
-        has_run_meta = any(
-            "lca" in c
-            for c in finish_chunks
-        )
+        has_run_meta = any("lca" in c for c in finish_chunks)
         self.assertTrue(has_run_meta)
         assert_openai_finish_invariant(chunks + finish_chunks)
 

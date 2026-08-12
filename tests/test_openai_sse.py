@@ -1,19 +1,29 @@
-"""Tests for OpenAISSEProjector — turn-based SSE projection.
+"""Tests for OpenAISSEProjector — direct event-to-chunk projection.
 
-Tests the projection from TurnSnapshot diff to OpenAI SSE chunks,
-verifying that:
-    - Reasoning blocks are properly bounded per turn
-    - Tool events delegate to ToolProjection
-    - Run finish emits correct stop chunk with usage
-    - stepCount comes from TurnSnapshot
+Verifies:
+    - Reasoning deltas → reasoning_content
+    - Answer text → content
+    - Tool events → delegated to ToolEventProjector
+    - Run finish → stop chunk + usage + steps
+    - Run error → lca.events run_error
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
 
-from gateway.narrative.turn_model import PhaseKind, Turn, TurnSnapshot
 from gateway.projection.openai_sse import OpenAISSEProjector
+from lca.contracts.atoms.enums import StreamChannel
+from lca.contracts.models.observability.journal import (
+    AgentRunFinished,
+    AgentRunStarted,
+    ReasoningDelta,
+    RunScope,
+    StampedEvent,
+    StepTextDelta,
+    ToolStarted,
+)
 
 
 class TestOpenAISSEProjectorBasics:
@@ -25,43 +35,24 @@ class TestOpenAISSEProjectorBasics:
     def test_role_chunk_emitted_first(self) -> None:
         """First delta should include role: assistant."""
         proj = OpenAISSEProjector(chat_id="chat_1", model="test")
-        # Manually inject a turn with reasoning
-        turn = Turn(index=0, phase=PhaseKind.REASONING, reasoning_text="hello")
-        proj._snapshot = TurnSnapshot(turns=(turn,), current_turn_index=0, started_at=100.0)
-        # Simulate a new reasoning delta
-        from lca.contracts.models.observability.journal import (
-            ReasoningDelta,
-            RunScope,
-            StampedEvent,
-        )
-
         frame = _make_frame(
             StampedEvent(
                 seq=1,
-                ts=101.0,
+                ts=100.0,
                 scope=RunScope(trace_id="t", run_id="r"),
-                event=ReasoningDelta(step=0, text_delta="world", seq=0),
+                event=ReasoningDelta(step=0, text_delta="hello", seq=0),
             )
         )
         chunks = proj.project_frame(frame)
-        # Should have at least one chunk with role or reasoning_content
-        assert any(
-            c.get("choices", [{}])[0].get("delta", {}).get("role") == "assistant"
-            or c.get("choices", [{}])[0].get("delta", {}).get("reasoning_content")
-            for c in chunks
-        )
+        # First chunk should have role: assistant
+        assert chunks[0]["choices"][0]["delta"].get("role") == "assistant"
+        assert chunks[0]["choices"][0]["delta"].get("reasoning_content") == "hello"
 
     def test_finish_chunk_has_stop_reason(self) -> None:
         """Run finish should emit a chunk with finish_reason=stop."""
         proj = OpenAISSEProjector(chat_id="chat_1", model="test")
         proj._prompt_tokens = 100
         proj._completion_tokens = 50
-
-        from lca.contracts.models.observability.journal import (
-            AgentRunFinished,
-            RunScope,
-            StampedEvent,
-        )
 
         frame = _make_frame(
             StampedEvent(
@@ -84,12 +75,6 @@ class TestOpenAISSEProjectorBasics:
     def test_reasoning_content_emitted(self) -> None:
         """Reasoning deltas should produce reasoning_content in SSE."""
         proj = OpenAISSEProjector(chat_id="chat_1", model="test")
-        from lca.contracts.models.observability.journal import (
-            ReasoningDelta,
-            RunScope,
-            StampedEvent,
-        )
-
         frame = _make_frame(
             StampedEvent(
                 seq=1,
@@ -105,17 +90,49 @@ class TestOpenAISSEProjectorBasics:
         assert len(reasoning_chunks) >= 1
         assert "thinking..." in reasoning_chunks[0]["choices"][0]["delta"]["reasoning_content"]
 
+    def test_steps_total_emitted_in_finish(self) -> None:
+        """Steps total should be in run_meta lca event on finish chunk."""
+        proj = OpenAISSEProjector(chat_id="chat_1", model="test")
+        frame = _make_frame(
+            StampedEvent(
+                seq=1,
+                ts=100.0,
+                scope=RunScope(trace_id="t", run_id="r"),
+                event=AgentRunFinished(status="completed", output_text="", steps=3),
+            )
+        )
+        chunks = proj.project_frame(frame)
+        lca_chunks = [c for c in chunks if c.get("lca")]
+        assert len(lca_chunks) >= 1
+        events = lca_chunks[0]["lca"]["events"]
+        run_meta = [e for e in events if e.get("type") == "run_meta"]
+        assert len(run_meta) == 1
+        assert run_meta[0]["steps"] == 3
+
+    def test_run_error_emitted(self) -> None:
+        """Failed run should emit run_error lca event."""
+        proj = OpenAISSEProjector(chat_id="chat_1", model="test")
+        frame = _make_frame(
+            StampedEvent(
+                seq=1,
+                ts=100.0,
+                scope=RunScope(trace_id="t", run_id="r"),
+                event=AgentRunFinished(status="failed", error="something broke", steps=0),
+            )
+        )
+        chunks = proj.project_frame(frame)
+        lca_chunks = [c for c in chunks if c.get("lca")]
+        assert len(lca_chunks) >= 1
+        events = lca_chunks[0]["lca"]["events"]
+        errors = [e for e in events if e.get("type") == "run_error"]
+        assert len(errors) == 1
+        assert "something broke" in errors[0]["message"]
+
 
 class TestOpenAISSEProjectorToolDelegation:
     def test_tool_started_delegates(self) -> None:
-        """ToolStarted events should be delegated to ToolProjection."""
+        """ToolStarted events should be delegated to ToolEventProjector."""
         proj = OpenAISSEProjector(chat_id="chat_1", model="test")
-        from lca.contracts.models.observability.journal import (
-            RunScope,
-            StampedEvent,
-            ToolStarted,
-        )
-
         frame = _make_frame(
             StampedEvent(
                 seq=1,
@@ -136,18 +153,8 @@ class TestOpenAISSEProjectorToolDelegation:
 
 class TestOpenAISSEProjectorIntegration:
     def test_full_run_scenario(self) -> None:
-        """Simulate a minimal run: reasoning → tool → reasoning → answer."""
+        """Simulate a minimal run: reasoning → answer → finish."""
         proj = OpenAISSEProjector(chat_id="chat_1", model="test")
-        from lca.contracts.atoms.enums import StreamChannel
-        from lca.contracts.models.observability.journal import (
-            AgentRunFinished,
-            AgentRunStarted,
-            ReasoningDelta,
-            RunScope,
-            StampedEvent,
-            StepTextDelta,
-        )
-
         scope = RunScope(trace_id="t", run_id="r")
         all_chunks: list[dict] = []
 
@@ -191,7 +198,7 @@ class TestOpenAISSEProjectorIntegration:
             chunks = proj.project_frame(frame)
             all_chunks.extend(chunks)
 
-        # Verify we got reasoning content
+        # Verify reasoning content
         reasoning_texts = [
             c["choices"][0]["delta"]["reasoning_content"]
             for c in all_chunks
@@ -199,7 +206,7 @@ class TestOpenAISSEProjectorIntegration:
         ]
         assert "thinking1" in "".join(reasoning_texts)
 
-        # Verify we got answer content
+        # Verify answer content
         answer_texts = [
             c["choices"][0]["delta"]["content"]
             for c in all_chunks
@@ -217,14 +224,8 @@ class TestOpenAISSEProjectorIntegration:
 # ── Helpers ─────────────────────────────────────────────────
 
 
-def _make_frame(stamped: object) -> str:
+def _make_frame(stamped: StampedEvent) -> str:
     """Convert a StampedEvent to a journal SSE frame string."""
-    import dataclasses
-
-    from lca.contracts.models.observability.journal import StampedEvent
-
-    if not isinstance(stamped, StampedEvent):
-        return ""
     record = {
         "schema": "journal.v1",
         "seq": stamped.seq,
