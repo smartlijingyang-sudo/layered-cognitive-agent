@@ -44,7 +44,6 @@ from lca.contracts.protocols import (
     TeamStage,
     TeamUnit,
 )
-from lca.contracts.protocols.action import ActionRegistryProtocol
 from lca.contracts.protocols.infra import AgentTransport, Tool
 from lca.contracts.protocols.spec import (
     DEFAULT_DELEGATE_MAX_ATTEMPTS,
@@ -191,7 +190,7 @@ class AgentComposer:
             scope=action_scope,
         )
 
-        brain = self._resolve_brain(spec, profile, action_registry)
+        brain = self._resolve_brain(spec, profile)
         if decision_gate is not None:
             brain = self._apply_lead_brain(brain, decision_gate=decision_gate)
 
@@ -279,30 +278,26 @@ class AgentComposer:
             )
         return TelemetryMemoryAdapter(mem)
 
-    def _resolve_brain(
-        self,
-        spec: AgentSpec,
-        profile: RoleProfile,
-        action_registry: ActionRegistryProtocol,
-    ) -> Brain:
+    def _resolve_brain(self, spec: AgentSpec, profile: RoleProfile) -> Brain:
         if not isinstance(spec.brain, str):
             return spec.brain
         factory_reg = self._registries.brain_factories
         if spec.brain not in factory_reg:
             raise ValueError(f"Unknown brain: {spec.brain!r}. Available: {factory_reg.list()}")
-        tools_desc = _format_tools_xml(spec.tools)
-        available_skills = self._render_available_skills()
         factory = factory_reg.resolve(spec.brain)
-        instrumented_llm: LLMAdapter = TelemetryLLMAdapter(_unwrap_llm(spec.llm))
         resolved: Brain = factory(
-            instrumented_llm,
+            self._instrument_llm(spec.llm),
             profile,
-            tools_desc,
-            action_registry=action_registry,
+            _format_tools_xml(spec.tools),
             tools=list(spec.tools),
-            available_skills=available_skills,
+            available_skills=self._render_available_skills(),
         )
         return resolved
+
+    @staticmethod
+    def _instrument_llm(llm: LLMAdapter) -> LLMAdapter:
+        """Wrap raw LLM adapter with telemetry instrumentation."""
+        return TelemetryLLMAdapter(_unwrap_llm(llm))
 
     @staticmethod
     def _render_available_skills() -> str:

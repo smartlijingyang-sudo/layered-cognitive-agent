@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.protocols import Brain, LLMAdapter, Tool
 from lca.layer1_cognitive.brain.critic import SimpleCritic
@@ -17,6 +15,7 @@ class SimpleBrainFactory:
     """默认 Brain 策略工厂。
 
     组装 Reasoner → Critic，不再需要 DecisionParser（原生 function calling）。
+    签名与 ``BrainFactory`` Protocol 严格对齐，不吞额外参数。
     """
 
     def __call__(
@@ -27,7 +26,6 @@ class SimpleBrainFactory:
         *,
         tools: list[Tool] | None = None,
         available_skills: str = "",
-        **_ignored: Any,
     ) -> Brain:
         reasoner = PromptReasoner(
             llm,

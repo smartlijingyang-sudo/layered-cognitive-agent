@@ -130,6 +130,84 @@ PY
   printf '%s\n' ${deduped}
 }
 
+_wait_for_port() {
+  local port="$1" timeout_s="${2:-10}" label="${3:-port ${port}}"
+  local waited=0
+  while [[ ${waited} -lt $((timeout_s * 2)) ]]; do
+    if ss -tln 2>/dev/null | grep -q ":${port} "; then
+      return 0
+    fi
+    sleep 0.5
+    waited=$((waited + 1))
+  done
+  log "超时: ${label} 在 ${timeout_s}s 内未监听 :${port}"
+  return 1
+}
+
+_wait_for_lobehub_dev() {
+  local timeout_s="${1:-120}"
+  local waited=0
+  log "等待 LobeHub dev 就绪 (最长 ${timeout_s}s)…"
+  while [[ ${waited} -lt $((timeout_s * 2)) ]]; do
+    if curl -sf --max-time 5 "http://127.0.0.1:${LOBE_DEV_PORT}/" >/dev/null 2>&1; then
+      log "LobeHub dev 就绪 ✓ (http://127.0.0.1:${LOBE_DEV_PORT})"
+      return 0
+    fi
+    # 检查进程是否还活着
+    local pid
+    if [[ -f "${LOBE_DEV_PID}" ]]; then
+      pid="$(tr -d '[:space:]' <"${LOBE_DEV_PID}" 2>/dev/null || true)"
+      if [[ -n "${pid}" ]] && ! kill -0 "${pid}" 2>/dev/null; then
+        log "错误: LobeHub dev 进程 (pid ${pid}) 已退出"
+        return 1
+      fi
+    fi
+    sleep 0.5
+    waited=$((waited + 1))
+  done
+  log "超时: LobeHub dev 在 ${timeout_s}s 内未就绪"
+  return 1
+}
+
+_clean_stale_dev_state() {
+  # 清理残留的 PID 文件和 Next.js dev lock，防止二次启动卡住
+  if [[ -f "${LOBE_DEV_PID}" ]]; then
+    local pid
+    pid="$(tr -d '[:space:]' <"${LOBE_DEV_PID}" 2>/dev/null || true)"
+    if [[ -n "${pid}" ]] && ! kill -0 "${pid}" 2>/dev/null; then
+      log "清理残留 PID 文件 (进程 ${pid} 已不存在)"
+      rm -f "${LOBE_DEV_PID}" 2>/dev/null || true
+    fi
+  fi
+  if [[ -f "${NEXT_DEV_LOCK}" ]]; then
+    local lock_pid
+    lock_pid="$(
+      _python - "${NEXT_DEV_LOCK}" <<'PY' 2>/dev/null || true
+import json, sys
+from pathlib import Path
+try:
+    data = json.loads(Path(sys.argv[1]).read_text())
+    pid = data.get("pid")
+    if isinstance(pid, int): print(pid)
+except Exception: pass
+PY
+    )"
+    if [[ -n "${lock_pid}" ]] && ! kill -0 "${lock_pid}" 2>/dev/null; then
+      log "清理残留 Next.js dev lock (进程 ${lock_pid} 已不存在)"
+      rm -f "${NEXT_DEV_LOCK}" 2>/dev/null || true
+    fi
+  fi
+  # 端口仍被占用但无存活进程 → 残留 socket，等内核回收
+  if ss -tln 2>/dev/null | grep -q ":${LOBE_DEV_PORT} "; then
+    local holder
+    holder="$(ss -tlnp 2>/dev/null | awk -v p=":${LOBE_DEV_PORT}" '$0~p{if(match($0,/pid=([0-9]+)/,m))print m[1];exit}')"
+    if [[ -n "${holder}" ]] && ! kill -0 "${holder}" 2>/dev/null; then
+      log "端口 ${LOBE_DEV_PORT} 有残留 socket (pid ${holder} 已僵)，等待回收…"
+      sleep 2
+    fi
+  fi
+}
+
 lobehub_dev_running() {
   curl -sf --max-time 2 "http://127.0.0.1:${LOBE_DEV_PORT}/" >/dev/null 2>&1
 }
@@ -425,7 +503,8 @@ apply_lca_lobehub_patches() {
   if [[ ! -f "${LOBE_DIR}/package.json" ]]; then
     return 0
   fi
-  _python "${ROOT}/deploy/lobehub/patch_lobehub.py"
+  # patch 脚本对 BROKEN 补丁返回 exit 1，这是警告不是致命错误
+  _python "${ROOT}/deploy/lobehub/patch_lobehub.py" || true
 }
 
 stop_gateway() {
@@ -519,19 +598,48 @@ start_lobehub_dev() {
     [[ -n "${meta_age}" ]] && log "提示: Vite 依赖缓存超过 24h，如遇 'outdated optimize dep' 可加 LOBE_CLEAN_CACHE=1 重启"
   fi
 
+  # ── 前置检查：gateway 必须可达 ──────────────────────────
+  if ! curl -sf --max-time 3 "http://127.0.0.1:${GATEWAY_PORT}/health" >/dev/null 2>&1; then
+    log "警告: gateway :${GATEWAY_PORT} 未就绪，尝试先启动 gateway…"
+    start_gateway
+    if ! _wait_for_port "${GATEWAY_PORT}" 10 "gateway"; then
+      log "错误: gateway 启动失败，LobeHub dev 无法工作 (OpenAI → :${GATEWAY_PORT}/v1)"
+      return 1
+    fi
+  fi
+
   log "启动 LobeHub ${LOBEHUB_RELEASE} dev (OpenAI → ${OPENAI_PROXY_URL})"
   log "访问: http://127.0.0.1:${LOBE_DEV_PORT}"
+
+  # ── 守护进程化启动 ──────────────────────────────────────
+  # nohup + setsid 使进程脱离当前终端，SSH 断开不会杀进程
+  local dev_log="${RUN_DIR}/lobehub-dev.log"
+  mkdir -p "${RUN_DIR}"
   cd "${LOBE_DIR}"
-  # 不用 exec，便于记录 orchestrator pid；Ctrl+C 仍会终止前台进程组
-  bun run dev &
-  echo $! >"${LOBE_DEV_PID}"
-  wait $!
+  nohup setsid bash -c 'exec bun run dev' </dev/null >"${dev_log}" 2>&1 &
+  local dev_pid=$!
+  echo "${dev_pid}" >"${LOBE_DEV_PID}"
+  disown "${dev_pid}" 2>/dev/null || true
+  log "LobeHub dev 已后台启动 (pid ${dev_pid}, log: ${dev_log})"
+
+  # ── 健康检查 ────────────────────────────────────────────
+  if _wait_for_lobehub_dev 120; then
+    return 0
+  fi
+
+  # 启动失败 → 打印日志末尾帮助诊断，清理残留
+  log "── LobeHub dev 启动失败，最近日志 ──"
+  tail -20 "${dev_log}" 2>/dev/null | while IFS= read -r line; do log "  ${line}"; done
+  log "── 尝试清理残留状态 ──"
+  stop_lobehub_dev || true
+  return 1
 }
 
 stop_all() {
   stop_lobehub_dev || true
   stop_vite_spa || true
   stop_gateway
+  _clean_stale_dev_state
 }
 
 usage() {
@@ -567,7 +675,7 @@ shift || true
 
 case "${cmd}" in
   dev) start_gateway; start_infra; start_lobehub_dev ;;
-  restart) stop_all; LCA_GATEWAY_FORCE_RESTART=1 start_gateway; start_infra; start_lobehub_dev ;;
+  restart) _clean_stale_dev_state; stop_all; LCA_GATEWAY_FORCE_RESTART=1 start_gateway; start_infra; start_lobehub_dev ;;
   gateway) start_gateway ;;
   restart-gateway) LCA_GATEWAY_FORCE_RESTART=1 start_gateway ;;
   sync) sync_lobehub_ui ;;
@@ -579,7 +687,6 @@ case "${cmd}" in
       log "gateway: 未运行"
     fi
     if lobehub_dev_running; then
-      local dev_pids
       dev_pids="$(_collect_lobehub_dev_pids | tr '\n' ' ')"
       log "lobehub dev: 运行中 (port ${LOBE_DEV_PORT}, pids:${dev_pids:- unknown})"
     else

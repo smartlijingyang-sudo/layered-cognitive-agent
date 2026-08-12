@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.llm import LLMResponse
@@ -84,7 +84,11 @@ class SkillRouter(Protocol):
 
 @runtime_checkable
 class BrainFactory(Protocol):
-    """Brain 工厂：由 NamedRegistry 按名称解析。"""
+    """Brain 工厂：由 NamedRegistry 按名称解析。
+
+    显式契约：所有参数必须声明，禁止 ``**kwargs`` 吞参。
+    新增工厂参数时同步更新此 Protocol 与所有实现。
+    """
 
     def __call__(
         self,
@@ -93,5 +97,5 @@ class BrainFactory(Protocol):
         tools_desc: str,
         *,
         tools: list[Tool] | None = None,
-        **_: Any,
+        available_skills: str = "",
     ) -> Brain: ...
