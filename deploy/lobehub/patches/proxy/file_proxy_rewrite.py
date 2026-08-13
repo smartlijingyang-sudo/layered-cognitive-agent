@@ -22,7 +22,9 @@ _VITE_MARKER = "LCA: file proxy"
 
 def apply(ctx: PatchContext) -> bool:
     changed = _patch_next(ctx)
-    return _patch_vite(ctx) or changed
+    changed = _ensure_presence_console_next(ctx) or changed
+    changed = _patch_vite(ctx) or changed
+    return _ensure_vite_ws(ctx) or changed
 
 
 def _patch_next(ctx: PatchContext) -> bool:
@@ -64,6 +66,14 @@ const nextConfig = {
         source: '/runs/:path*',
         destination: `${base.replace(/\\/$/, '')}/runs/:path*`,
       },
+      {
+        source: '/lca-api/presence/:path*',
+        destination: `${base.replace(/\\/$/, '')}/presence/:path*`,
+      },
+      {
+        source: '/lca-api/console/:path*',
+        destination: `${base.replace(/\\/$/, '')}/console/:path*`,
+      },
     ];
   },
 };
@@ -89,9 +99,61 @@ def _patch_vite(ctx: PatchContext) -> bool:
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\\/lca-api/, ''),
         target: process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765',
+        ws: true,
       },
     },"""
     if needle not in text:
         return False
     ctx.write(rel, text.replace(needle, insert, 1))
+    return True
+
+
+def _ensure_presence_console_next(ctx: PatchContext) -> bool:
+    rel = "next.config.ts"
+    text = ctx.read(rel)
+    if "lca-api/presence" in text:
+        return False
+    applied = """      {
+        source: '/runs/:path*',
+        destination: `${base.replace(/\\/$/, '')}/runs/:path*`,
+      },
+"""
+    insert_applied = """      {
+        source: '/runs/:path*',
+        destination: `${base.replace(/\\/$/, '')}/runs/:path*`,
+      },
+      {
+        source: '/lca-api/presence/:path*',
+        destination: `${base.replace(/\\/$/, '')}/presence/:path*`,
+      },
+      {
+        source: '/lca-api/console/:path*',
+        destination: `${base.replace(/\\/$/, '')}/console/:path*`,
+      },
+"""
+    if applied not in text:
+        return False
+    ctx.write(rel, text.replace(applied, insert_applied, 1))
+    return True
+
+
+def _ensure_vite_ws(ctx: PatchContext) -> bool:
+    rel = "vite.config.ts"
+    text = ctx.read(rel)
+    if "ws: true" in text and "/lca-api" in text:
+        return False
+    applied = """      '/lca-api': {
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\\/lca-api/, ''),
+        target: process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765',
+      },"""
+    new = """      '/lca-api': {
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\\/lca-api/, ''),
+        target: process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765',
+        ws: true,
+      },"""
+    if applied not in text:
+        return False
+    ctx.write(rel, text.replace(applied, new, 1))
     return True

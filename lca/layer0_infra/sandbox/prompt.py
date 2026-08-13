@@ -92,4 +92,15 @@ def render_cloud_sandbox_system_role(
 
     outputs_dir = sandbox_output_path()
     rendered = system_role_template.replace("{{sandbox_uploaded_files}}", uploaded)
-    return rendered.replace("{{sandbox_outputs_dir}}", outputs_dir).strip()
+    rendered = rendered.replace("{{sandbox_outputs_dir}}", outputs_dir).strip()
+    from lca.layer0_infra.sandbox.factory import resolve_sandbox
+
+    bound = resolve_sandbox()
+    if getattr(bound, "name", "") == "host":
+        rendered = (
+            "You are operating on the user's local computer via a connected host. "
+            f"{SANDBOX_MOUNT_ROOT} is the host workspace; absolute paths on this "
+            "machine are allowed. Prefer the real filesystem the user is talking about.\n\n"
+            + rendered
+        )
+    return rendered

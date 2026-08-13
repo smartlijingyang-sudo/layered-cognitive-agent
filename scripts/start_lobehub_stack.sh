@@ -18,6 +18,8 @@ LOBEHUB_RELEASE="${LOBEHUB_RELEASE:-v2.2.13}"
 
 GATEWAY_PID="${RUN_DIR}/gateway.pid"
 GATEWAY_LOG="${RUN_DIR}/gateway.log"
+HOST_PID="${RUN_DIR}/host.pid"
+HOST_LOG="${RUN_DIR}/host.log"
 LOBE_DEV_PID="${RUN_DIR}/lobehub-dev.pid"
 LOBE_ENV="${ROOT}/deploy/lobehub/.env.lca"
 NEXT_DEV_LOCK="${LOBE_DIR}/.next/dev/lock"
@@ -538,6 +540,67 @@ apply_lca_lobehub_patches() {
   _python "${ROOT}/deploy/lobehub/patch_lobehub.py" || true
 }
 
+stop_host() {
+  if [[ -f "${HOST_PID}" ]]; then
+    local pid
+    pid="$(cat "${HOST_PID}")"
+    kill "${pid}" 2>/dev/null || true
+    rm -f "${HOST_PID}"
+    log "已停止 host sidecar (pid ${pid})"
+  fi
+}
+
+host_needs_restart() {
+  [[ "${LCA_HOST_FORCE_RESTART:-0}" == "1" ]] && return 0
+  [[ ! -f "${HOST_PID}" ]] && return 0
+  local pid
+  pid="$(cat "${HOST_PID}" 2>/dev/null || true)"
+  [[ -z "${pid}" ]] && return 0
+  kill -0 "${pid}" 2>/dev/null || return 0
+  local proc_start newest proc_epoch newest_int
+  proc_start="$(ps -p "${pid}" -o lstart= 2>/dev/null || true)"
+  [[ -z "${proc_start}" ]] && return 0
+  newest="$(find "${ROOT}/host" "${ROOT}/gateway/presence" -name '*.py' -printf '%T@\n' 2>/dev/null | sort -n | tail -1 || true)"
+  [[ -z "${newest}" ]] && return 0
+  proc_epoch="$(date -d "${proc_start}" +%s 2>/dev/null || echo 0)"
+  newest_int="${newest%.*}"
+  [[ "${newest_int}" -gt "${proc_epoch}" ]]
+}
+
+start_host() {
+  if [[ "${LCA_HOST_DISABLE:-0}" == "1" ]]; then
+    log "host sidecar 已跳过 (LCA_HOST_DISABLE=1)"
+    return 0
+  fi
+  mkdir -p "${RUN_DIR}"
+  if [[ -f "${HOST_PID}" ]] && kill -0 "$(cat "${HOST_PID}")" 2>/dev/null; then
+    if host_needs_restart; then
+      log "host 代码已更新，重启 sidecar"
+      stop_host
+    else
+      log "host sidecar 已在运行 (pid $(cat "${HOST_PID}"))"
+      return 0
+    fi
+  fi
+  export LCA_HOST_GATEWAY="${LCA_HOST_GATEWAY:-ws://127.0.0.1:${GATEWAY_PORT}/presence/connect}"
+  export LCA_HOST_TOKEN="${LCA_HOST_TOKEN:-lca-local-host}"
+  export LCA_HOST_DEVICE_ID="${LCA_HOST_DEVICE_ID:-local-host}"
+  log "启动 host sidecar → ${LCA_HOST_GATEWAY}"
+  (
+    cd "${ROOT}"
+    exec uv run python -m host
+  ) >>"${HOST_LOG}" 2>&1 &
+  echo $! >"${HOST_PID}"
+  for _ in $(seq 1 20); do
+    if curl -sf "http://127.0.0.1:${GATEWAY_PORT}/presence/devices" 2>/dev/null | grep -q '"status": "online"'; then
+      log "host sidecar 已上线"
+      return 0
+    fi
+    sleep 0.25
+  done
+  log "host sidecar 启动中（见 ${HOST_LOG}）"
+}
+
 stop_gateway() {
   if [[ -f "${GATEWAY_PID}" ]]; then
     local pid
@@ -687,6 +750,7 @@ start_lobehub_dev() {
 stop_all() {
   stop_lobehub_dev || true
   stop_vite_spa || true
+  stop_host || true
   stop_gateway
   _clean_stale_dev_state
 }
@@ -715,6 +779,8 @@ usage() {
   LOBE_FORCE_INFRA  设为 1 时即使端口可达也尝试 docker compose
   LOBE_CLEAN_CACHE  设为 1 时清除 .vite/deps + .next 缓存再启动（日常不要开，会丢失预构建加速）
   LCA_GATEWAY_FORCE_RESTART  设为 1 时强制重启 gateway
+  LCA_HOST_DISABLE  设为 1 时不启动本机 host sidecar
+  LCA_HOST_TOKEN    host 与 gateway 共享密钥（默认 lca-local-host）
   OPENAI_PROXY_URL  LobeHub 指向的 OpenAI 兼容 URL
 EOF
 }
@@ -723,10 +789,10 @@ cmd="${1:-dev}"
 shift || true
 
 case "${cmd}" in
-  dev) start_gateway; start_infra; start_lobehub_dev ;;
-  restart) _clean_stale_dev_state; stop_all; LCA_GATEWAY_FORCE_RESTART=1 start_gateway; start_infra; start_lobehub_dev ;;
-  gateway) start_gateway ;;
-  restart-gateway) LCA_GATEWAY_FORCE_RESTART=1 start_gateway ;;
+  dev) start_gateway; start_host; start_infra; start_lobehub_dev ;;
+  restart) _clean_stale_dev_state; stop_all; LCA_GATEWAY_FORCE_RESTART=1 start_gateway; start_host; start_infra; start_lobehub_dev ;;
+  gateway) start_gateway; start_host ;;
+  restart-gateway) LCA_GATEWAY_FORCE_RESTART=1 start_gateway; LCA_HOST_FORCE_RESTART=1 start_host ;;
   sync) sync_lobehub_ui ;;
   stop) stop_all ;;
   status)
@@ -734,6 +800,11 @@ case "${cmd}" in
       log "gateway: 运行中 (pid $(cat "${GATEWAY_PID}"), port ${GATEWAY_PORT})"
     else
       log "gateway: 未运行"
+    fi
+    if [[ -f "${HOST_PID}" ]] && kill -0 "$(cat "${HOST_PID}")" 2>/dev/null; then
+      log "host: 运行中 (pid $(cat "${HOST_PID}"))"
+    else
+      log "host: 未运行"
     fi
     if lobehub_dev_running; then
       dev_pids="$(_collect_lobehub_dev_pids | tr '\n' ' ')"

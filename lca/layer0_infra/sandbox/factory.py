@@ -17,11 +17,21 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 
 from lca.contracts.protocols import Sandbox
 from lca.layer0_infra.llm_adapter.factory import load_dotenv_if_present
 
 _log = logging.getLogger(__name__)
+
+_override: Callable[[], Sandbox | None] | None = None
+
+
+def set_sandbox_resolver(resolver: Callable[[], Sandbox | None] | None) -> None:
+    """Gateway injects a preferred backend (connected host). None restores default."""
+    global _override
+    _override = resolver
+
 
 _ENV_BASE_URL = "ONLYBOXES_BASE_URL"
 _ENV_ACCESS_TOKEN = "ONLYBOXES_ACCESS_TOKEN"  # noqa: S105
@@ -48,12 +58,12 @@ def sandbox_backend() -> str:
 
 
 def resolve_sandbox() -> Sandbox | None:
-    """Resolve the Onlyboxes sandbox, or ``None`` when not configured.
+    """Prefer an injected backend (host sidecar), else Onlyboxes, else None."""
+    if _override is not None:
+        found = _override()
+        if found is not None:
+            return found
 
-    Returns:
-        ``OnlyboxesSandboxAdapter`` when base URL + access token are set;
-        ``None`` otherwise (caller omits sandbox-backed tools).
-    """
     backend = sandbox_backend()
     if backend and backend not in {_BACKEND_ONLYBOXES, ""}:
         _log.warning(
