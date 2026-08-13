@@ -28,16 +28,18 @@ After this change, `run_8988077c043e` must look like a native Codex / Claude Cod
 
 ## Native contract (do not reimplement)
 
-`@lobechat/conversation-flow` accepts both chain forms and emits one `assistantGroup`:
+`@lobechat/conversation-flow` accepts both chain forms. **We write the tool-anchored (old) form only.** Flow still folds it into one `assistantGroup`. We do not write assistant-anchored parents.
 
 ```
 user
  └─ a1  (reasoning + tools[])     parent = user
       └─ tool T1                  parent = a1, tool_call_id = invocation_id
- └─ a2  (reasoning + tools[])     parent = T1  (old) or a1 (new)
+ └─ a2  (reasoning + tools[])     parent = T1.resultMsgId
       └─ tool T2
- └─ aN  (final text)              no tools
+ └─ aN  (final text)              parent = last tool of a(N-1), or a(N-1) if that turn had no tool
 ```
+
+Several tools on one LLM turn: every `role=tool` child parents the **current** assistant. The next assistant parents the **last** of those tools.
 
 `ProcessFold` step count = distinct assistant block ids in the group (`countAssistantLlmCalls`).  
 Each assistant has its own `reasoning`. Later turns must not write earlier rows.
@@ -62,27 +64,30 @@ LcaRunDriver.ts      ledger + sync to store                (rewrite)
 lcaArtifacts.ts      markdown href rewrite only            (slim)
 ```
 
-`LcaRunDriver` is the only unit that talks to the chat store. It holds three maps and a current pointer. It does not accumulate a whole Run inside one `StreamingHandler`.
+`LcaRunDriver` is the only unit that talks to the chat store. It holds two maps and a current pointer. It does not accumulate a whole Run inside one `StreamingHandler`.
 
 ### Ledger
 
 ```
 current: { assistantId, handler, speaker } | null
+lastResultMsgId: string | null   // last sealed tool child; next same-speaker assistant parents this
 tools:   Map<invocation_id, { parentId, call, resultMsgId, pluginState, result? }>
-files:   Map<basename, ArtifactFile>   // last harvest wins; not a render path
+hrefs:   Map<basename, url>   // last-wins; only rewriteArtifactMarkdown reads this
 ```
+
+No third "files" render ledger. Tool cards show `pluginState.files` / `downloadUrl` from **that invocation**. Markdown rewrite may remap `](./name.pdf)` using `hrefs`. It does not suppress any tool card.
 
 ### Event → ledger → store
 
 | Projected kind | Ledger | Store |
 |---|---|---|
-| `open-turn` same speaker | seal current handler; new `current` | `optimisticCreateMessage({ role: 'assistant', parentId })`. First turn may reuse the send-time placeholder. `parentId` = last tool `resultMsgId` or user message. |
-| `open-turn` new speaker | seal current; reset last-tool parent | new assistant, `parentId` = user message (new group) |
+| `open-turn` same speaker | seal current handler; new `current` | `optimisticCreateMessage({ role: 'assistant', parentId })`. First turn may reuse the send-time placeholder. `parentId` = last tool `resultMsgId`, else current/previous assistant, else user. |
+| `open-turn` new speaker | seal current; forget last-tool parent | new assistant, `parentId` = user message (new group) |
 | `reasoning` / `text` | append on `current.handler` only | existing Handler callbacks on **this** `assistantId` |
 | `reasoning-end` | write `duration_ms` on current row | `dispatch { reasoning: { content, duration } }` |
-| `tool-start` | upsert `tools[id]` | write `assistant.tools[]` first, then create `role=tool` if new. `arguments` = tool inputs (`code`, `path`, `language`, `description`, …). Never drop a known `WIRE` tool because args look empty. |
+| `tool-start` | upsert `tools[id]` | write `assistant.tools[]` first, then create `role=tool` if new. First `ToolCallStreaming` with `{}` still opens a card. `arguments` = `pickArgs(plugin_state)` (see below). Never skip a known `WIRE` tool. |
 | `sandbox-delta` | append `output` / `stderr` on that tool | `updatePluginState` on `resultMsgId` |
-| `tool-invoked` | merge `plugin_state` + `files`; upsert `files` map | `optimisticUpdatePluginState`; complete/fail the `toolCalling` operation |
+| `tool-invoked` | merge full `plugin_state` + `event.files`; set `lastResultMsgId`; update `hrefs` | `optimisticUpdatePluginState` only. **Do not rewrite** `function.arguments` (started `code` must survive an invoked state that omitted it). complete/fail the `toolCalling` operation |
 | `tool-denied` | mark error | `failOperation`; no answer text |
 | `run-finished` | optional error on current row | do not treat as socket EOF |
 | `live-gap` | log | do not abort |
@@ -91,20 +96,35 @@ files:   Map<basename, ArtifactFile>   // last harvest wins; not a render path
 
 ### Arguments vs pluginState
 
-These are two fields. Stop mixing them.
+These are two fields. `ARG_OMIT` failed because it treated **inputs** (`code`, `content`, `path`) as noise.
 
-- **arguments** (JSON on `function.arguments` / `plugin.arguments`): what the model asked for. For `execute_code`: `code`, `language`, `description`. For `export_file`: `path`.
-- **pluginState**: execution result. For `execute_code`: `output`, `stderr`, `success`, `files`. For `export_file`: `success`, `filename`, `downloadUrl`, `size`, `mimeType`.
+**Rule (mechanical, in `LcaRunDriver.ts` as `RESULT_KEYS`):** a key is a result if it is in this frozen set. Everything else in `plugin_state` is an argument.
 
-`ToolStarted.plugin_state` today carries both. The projector splits: keys that are inputs go to `arguments`; the rest wait for `ToolInvoked` (or stream into `pluginState` via `SandboxOutputDelta`). A split table lives next to `WIRE`, not as a deny-list of "render noise".
+```
+RESULT_KEYS = {
+  success, executionEnv, stdout, stderr, output,
+  exitCode, exit_code, error, errorDetail,
+  files, downloadUrl, filename, mimeType, size, sizeBytes,
+  hasResources, source, title, resources,
+  resultNumbers, results, previewable, attachmentId, url
+}
+```
 
-Empty `code` is still a card (`arguments: { language }` or `{ code: '' }`). The native highlighter shows empty. The backend may later deny empty execute; that is not this spec.
+- `pickArgs(state)` = `{ k: v in state | k ∉ RESULT_KEYS }`. Empty object is allowed.
+- `tool-start` / streaming upsert writes `function.arguments = JSON.stringify(pickArgs(state))`. Create the card even when that object is `{}` (first `ToolCallStreaming` on the sample).
+- `tool-invoked` writes **the whole** invoked `plugin_state` (plus `event.files` merged into `pluginState.files`) to the tool row. Do not run `RESULT_KEYS` on the invoked state — native `ExecuteCode` / `ExportFile` read result fields from `pluginState`.
+- Do not put `RESULT_KEYS` in `wire.py`. `WIRE` stays name → (identifier, apiName). The result set is UI vocabulary, not a gateway concern.
+- `content` stays an argument when it appears on start (`write_file`). On invoke, `activate_skill` may put SKILL.md in `pluginState.content`; that is result data and stays in pluginState because we dump the full invoked state.
+
+Empty `code` is still a card. The highlighter shows empty. Denying empty execute on the backend is out of scope.
 
 ### Files
 
-On `ToolInvoked`, copy `event.files` into that tool's `pluginState.files`. `export_file` also needs `downloadUrl` + `filename` from `plugin_state` (already present on the sample). Dedup by basename in the `files` map so a later `export_file` of the same PDF does not require a second execute card. Do not call `uploadWithProgress` / `addFilesToMessage`.
+On `ToolInvoked`, copy `event.files` into **that tool's** `pluginState.files`. `export_file` keeps `downloadUrl` + `filename` from invoked `plugin_state`. Do not call `uploadWithProgress` / `addFilesToMessage`. Do not write `assistant.fileList` (group `FileListViewer` wants LobeHub file-store ids; we are not in that universe).
 
-`rewriteArtifactMarkdown` may still rewrite `](./name.pdf)` to `](/files/...)` in answer text. It must not invent `computer://` links. Existing `computer://` in model text can stay as dead text; the card is the download.
+`hrefs` is only for `rewriteArtifactMarkdown`: `](./basename)` → `](/files/...)`. Last url for a basename wins. When both `plugin_state.downloadUrl` and `event.files[].url` exist (the sample export has two ids), `hrefs` and the export card download button use `downloadUrl`; `pluginState.files` still lists `event.files`. It does not hide an execute card. Do not invent `computer://` links. Existing `computer://` in model text stays dead text; the card is the download.
+
+Keep `persistMissed` / `sealRow` retry. The placeholder-vs-store race is still real.
 
 ## Deleted machinery
 
@@ -113,8 +133,10 @@ Remove from `deploy/lobehub/patches/runtime/` and from `tests/test_journal_nativ
 - `if (assistantId && sameSpeaker) { handler = makeHandler(assistantId); return }`
 - `ARG_OMIT`, `hasRenderableArgs`, silent `return` on tool-start
 - `attachNativeFiles`, `useFileStore().uploadWithProgress`, `addFilesToMessage`
+- `latestDeliverables` / `toFileList` / `toImageList` wired into `persistRow` (group fileList path)
 - `test_same_speaker_stays_on_one_assistant`
-- any test that requires `hasRenderableArgs` / `ARG_OMIT` to exist
+- `test_user_file_list_is_latest_deliverable`
+- any test that requires `hasRenderableArgs`, `ARG_OMIT`, `addFilesToMessage`, or `uploadWithProgress` to exist (`test_artifacts_rewrite_relative_markdown` keeps only `rewriteArtifactMarkdown`)
 
 Update `docs/run-live.md` and `deploy/lobehub/CUSTOMIZATIONS.md` so both say: **one `LlmCallStarted` = one assistant row**. Same speaker continues the chain (parent = last tool). Different speaker starts a new chain (parent = user).
 
@@ -129,26 +151,24 @@ Update `docs/run-live.md` and `deploy/lobehub/CUSTOMIZATIONS.md` so both say: **
 | `waiting_input` | mark metadata on current assistant; do not auto-answer |
 | `LiveGap` | warn; continue |
 | `*Finished` then late `StepTextDelta` | still current (or last) assistant; tail close seals |
-| Reconnect | `Last-Event-ID`; ledger rebuilds from frames after that seq. Already-created message ids stay. Upsert by `invocation_id` / current turn is idempotent |
+| Reconnect | Same `runLcaJournal` `while` loop only. On socket drop, open `/live` with `Last-Event-ID` = last seen seq (exclusive). **Do not rebuild** the ledger from history and do not scan the store for old ids. In-memory `current` / `tools` stay. Tool upsert is by `invocation_id`. A replayed `LlmCallStarted` after that seq is a new turn — so the live tail must not re-send already-applied frames. Page reload is out of scope (new Driver instance, no resume). |
 | Team speaker change mid-run | seal; new assistant parented to the **user** message so flow opens a new group |
-| Two files, same basename, different url | `files` map keeps the last; each tool card still shows the files that invocation produced |
+| Two files, same basename, different url | each tool card shows the files that invocation produced; `hrefs` keeps the last url for markdown only |
 
 ## Tests
 
 Replace string-presence tests that lock the old unit with tests that lock the graph.
 
-**Driver (TypeScript, vitest next to the patch or a Node harness that imports the projector functions):**
-
-1. Replay the collapsed event sequence of `run_8988077c043e` (7× `LlmCallStarted`, 6× tool, final text). Assert create-message calls: 7 assistant (counting first reuse), 6 tool; each tool `parentId` equals its owning assistant; next assistant `parentId` equals previous tool (or previous assistant — pick one form and test it).
-2. Second `ReasoningDelta` after a new `LlmCallStarted` updates only the new assistant id.
-3. `execute_code` ToolStarted with `{ code, description, language, executionEnv }` produces `arguments` containing `code` and a tool row. `executionEnv` is not required in arguments.
-4. `export_file` ToolInvoked writes `pluginState.downloadUrl` and `filename`.
-5. No `uploadWithProgress` / `addFilesToMessage` in the module.
-
-**Python contract (`tests/test_journal_native_loop.py`):**
+**Python contract (`tests/test_journal_native_loop.py`) is the automated lock.** Patch TS is copied into `lobehub-ui/`; do not add a second vitest stack in this change.
 
 - Keep: no `JournalTransport`, no `GeneralChatAgent`, hook is `streamingExecutor`, parse/project split, Finished ≠ EOF, cancel auth.
-- Replace same-speaker / ARG_OMIT assertions with: `openTurn` always creates or reuses **once**, then subsequent same-speaker `LlmCallStarted` create a new row; `arguments` include `code` for execute_code.
+- Same speaker, second `LlmCallStarted`: source contains a new `optimisticCreateMessage` path, not `handler = makeHandler(assistantId); return`. `parentId` is `lastResultMsgId` (tool-anchored).
+- `pickArgs` / `RESULT_KEYS` exist; `code` is not in `RESULT_KEYS`; `executionEnv` / `output` / `files` / `downloadUrl` are.
+- `arguments` include `code` for execute_code (string check on `pickArgs` usage + RESULT_KEYS).
+- No `uploadWithProgress`, `addFilesToMessage`, `attachNativeFiles`.
+- `rewriteArtifactMarkdown` remains; `latestDeliverables(turnImages)` / `toFileList` in the Driver do not.
+
+Graph shape (7 assistants, tool-anchored parents) is verified by replaying the sample in the UI after `patch_lobehub.py apply --reset`, not by a new test runner.
 
 **Manual / replay against the sample jsonl:** 7 Thinking, 6 cards, one PDF download from the export card, step count 7.
 
@@ -167,6 +187,6 @@ After code change: `python3 deploy/lobehub/patch_lobehub.py apply --reset` (neve
 
 ## Success
 
-A reviewer can delete `LcaRunDriver.ts` internals and still explain the system: Journal is the book; the Driver upserts a three-map ledger; LobeHub store APIs write the native graph; builtin renders do the rest.
+A reviewer can delete `LcaRunDriver.ts` internals and still explain the system: Journal is the book; the Driver upserts a two-map ledger; LobeHub store APIs write the native graph; builtin renders do the rest.
 
 If a future bug is "thinking merged" or "card missing", the first question is "did we write a new assistant / did we put `code` in arguments" — not "which omit list ate it".
