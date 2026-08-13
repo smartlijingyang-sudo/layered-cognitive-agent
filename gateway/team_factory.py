@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from gateway.mode_catalog import SOLO_ROLE
-from gateway.role_library import FileRoleLibrary
 from lca.contracts.models.observability.journal import (
     CastingCompleted,
     CastingFailed,
@@ -20,6 +19,7 @@ from lca.layer0_infra.observability import (
     run_scope,
 )
 from lca.layer0_infra.tools.default_set import build_g2a_chat_tools
+from lca.layer3_agent.role_library import FileRoleLibrary
 from lca.layer4_app.api import Agent, Team
 from lca.layer4_app.casting import LLMTeamCaster, build_from_casting_plan
 

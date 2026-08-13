@@ -16,8 +16,10 @@ from starlette.responses import JSONResponse, StreamingResponse
 from gateway._http import cors_headers
 from gateway.lobehub_bridge.request_classifier import classify_lobehub_chat_request
 from gateway.mode_catalog import DEFAULT_MODE, MODE_DEFINITIONS
-from gateway.model_registry import get_model_registry
-from gateway.openai_structured_llm import (
+from gateway.run_executor import llm_status
+from lca.contracts.atoms.ids import new_id
+from lca.layer0_infra.llm_resolver import get_model_registry
+from lca.layer0_infra.openai_compat import (
     StructuredLLMError,
     build_responses_payload,
     create_embeddings,
@@ -27,8 +29,6 @@ from gateway.openai_structured_llm import (
     normalize_responses_input,
     resolve_upstream_model,
 )
-from gateway.run_executor import llm_status
-from lca.contracts.atoms.ids import new_id
 
 _OPENAI_CHAT_ID_PREFIX = "chatcmpl-"
 

@@ -9,12 +9,12 @@ from starlette.testclient import TestClient
 
 from gateway.app import create_app
 from gateway.event_stream import EventStream
-from gateway.openai_structured_llm import (
+from gateway.run_registry import RunRegistry, RunSession, RunStatus, run_dedup_key
+from lca.layer0_infra.openai_compat import (
     extract_json_schema_format,
     normalize_responses_input,
     resolve_upstream_model,
 )
-from gateway.run_registry import RunRegistry, RunSession, RunStatus, run_dedup_key
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
 
@@ -43,7 +43,9 @@ class TestOpenAiCompatGateway(unittest.TestCase):
 
     def test_chat_completions_without_llm_returns_503(self) -> None:
         registry = RunRegistry()
-        with patch("gateway.llm_resolver.llm_credentials", return_value=(None, None, None)):
+        with patch(
+            "lca.layer0_infra.llm_resolver.llm_credentials", return_value=(None, None, None)
+        ):
             client = TestClient(create_app(registry))
             response = client.post(
                 "/v1/chat/completions",

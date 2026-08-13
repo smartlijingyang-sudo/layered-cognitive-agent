@@ -10,7 +10,7 @@ from gateway.lobehub_bridge.lobehub_adapter import (
     resolve_tool_wire,
     wire_tool_name,
 )
-from gateway.lobehub_bridge.lobehub_adapter.protocol import LOBE_CLOUD_SANDBOX_ID
+from gateway.lobehub_bridge.lobehub_adapter.tool_spec import LOBE_CLOUD_SANDBOX_ID
 from lca.layer0_infra.computer.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
 from lca.layer0_infra.computer.parse_result import parse_computer_stdout
 from lca.layer0_infra.tools.computer.tool_set import (

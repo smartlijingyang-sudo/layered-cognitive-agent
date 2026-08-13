@@ -32,7 +32,8 @@ def apply(ctx: PatchContext) -> bool:
         raise SystemExit("[openai_guard] anchor not found")
     marker = "/* LCA: solo/team always chat/completions */"
     replacement = (
-        "      const isLcaGatewayModel = ['solo', 'team', 'auto'].includes(model);\n"
+        "      const LCA_VIRTUAL_MODELS = ['solo', 'team', 'auto'];\n"
+        "      const isLcaGatewayModel = LCA_VIRTUAL_MODELS.includes(model);\n"
         f"      {marker}\n"
         "      if (!isLcaGatewayModel && (isResponsesAPIModel(model) || enabledSearch)) {"
     )

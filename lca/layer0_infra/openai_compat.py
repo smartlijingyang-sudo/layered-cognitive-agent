@@ -6,10 +6,13 @@ import json
 import time
 from typing import Any
 
-from gateway.llm_resolver import get_async_openai_client, llm_credentials
-from gateway.model_registry import get_model_registry
 from lca.contracts.atoms.ids import new_id
 from lca.layer0_infra.llm_adapter.settings import is_qwen_model
+from lca.layer0_infra.llm_resolver import (
+    get_async_openai_client,
+    get_model_registry,
+    llm_credentials,
+)
 
 
 class StructuredLLMError(RuntimeError):

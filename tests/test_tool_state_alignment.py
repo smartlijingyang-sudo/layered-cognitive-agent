@@ -21,16 +21,18 @@ from typing import Any, ClassVar
 from gateway.lobehub_bridge.lobehub_adapter import (
     resolve_tool_wire,
 )
-from gateway.lobehub_bridge.lobehub_adapter.build_state import merge_success_state
-from gateway.lobehub_bridge.lobehub_adapter.json_helpers import parse_args_json
-from gateway.lobehub_bridge.lobehub_adapter.protocol import LOBE_CLOUD_SANDBOX_ID
+from gateway.lobehub_bridge.lobehub_adapter.tool_spec import (
+    LOBE_CLOUD_SANDBOX_ID,
+    merge_success_state,
+    parse_args_json,
+)
 
 
 class TestFieldMapperDeclarative(unittest.TestCase):
     """Verify FieldMapper produces correct results for declarative transforms."""
 
     def test_field_mapper_string_fields(self) -> None:
-        from gateway.lobehub_bridge.lobehub_adapter.adapt_arguments import adapt_read_file
+        from gateway.lobehub_bridge.lobehub_adapter.tool_registry import adapt_read_file
 
         result = adapt_read_file({"path": "/mnt/data/test.py", "startLine": 1, "endLine": 10})
         self.assertEqual(result["path"], "/mnt/data/test.py")
@@ -38,21 +40,21 @@ class TestFieldMapperDeclarative(unittest.TestCase):
         self.assertEqual(result["endLine"], 10)
 
     def test_field_mapper_skips_empty_strings(self) -> None:
-        from gateway.lobehub_bridge.lobehub_adapter.adapt_arguments import adapt_glob_files
+        from gateway.lobehub_bridge.lobehub_adapter.tool_registry import adapt_glob_files
 
         result = adapt_glob_files({"pattern": "", "directory": "/mnt"})
         self.assertNotIn("pattern", result)
         self.assertEqual(result["directory"], "/mnt")
 
     def test_field_mapper_bool_fields(self) -> None:
-        from gateway.lobehub_bridge.lobehub_adapter.adapt_arguments import adapt_grep_content
+        from gateway.lobehub_bridge.lobehub_adapter.tool_registry import adapt_grep_content
 
         result = adapt_grep_content({"pattern": "foo", "recursive": True})
         self.assertEqual(result["pattern"], "foo")
         self.assertTrue(result["recursive"])
 
     def test_field_mapper_list_fields(self) -> None:
-        from gateway.lobehub_bridge.lobehub_adapter.adapt_arguments import adapt_move_files
+        from gateway.lobehub_bridge.lobehub_adapter.tool_registry import adapt_move_files
 
         ops = [{"source": "/a", "destination": "/b"}]
         result = adapt_move_files({"operations": ops})

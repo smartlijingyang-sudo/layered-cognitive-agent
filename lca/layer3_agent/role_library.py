@@ -26,7 +26,7 @@ from lca.contracts.protocols.casting import (
 AGENCY_ROLES_DIR_ENV = "AGENCY_ROLES_DIR"
 """角色库目录环境变量；未设置时使用仓库内置 roles/。"""
 
-_DEFAULT_ROLES_DIR = Path(__file__).resolve().parent.parent / "roles"
+_DEFAULT_ROLES_DIR = Path(__file__).resolve().parent.parent.parent / "roles"
 
 _SKIP_DIRS = frozenset({"node_modules", "scripts", "integrations", "examples"})
 

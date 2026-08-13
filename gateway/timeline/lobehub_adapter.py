@@ -25,7 +25,7 @@ from gateway.lobehub_bridge.lobehub_adapter import (
     tool_result_preview_limit,
     transform_tool_arguments,
 )
-from gateway.lobehub_bridge.lobehub_adapter.json_helpers import (
+from gateway.lobehub_bridge.lobehub_adapter.tool_spec import (
     parse_args_json,
     safe_json_string,
 )

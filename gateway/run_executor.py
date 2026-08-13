@@ -15,7 +15,6 @@ from typing import Any
 import structlog
 
 from gateway.event_stream import EventStream
-from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
 from gateway.mode_catalog import DEFAULT_MODE, SOLO_MODE_KEY
 from gateway.run_registry import RunRegistry, RunSession, RunStatus
 from gateway.team_factory import build_runnable_team, build_solo_agent
@@ -26,6 +25,7 @@ from lca.contracts.models.observability.journal import StampedEvent
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.file_store import get_default_file_store
+from lca.layer0_infra.llm_resolver import LLMResolver, ProductionLLMResolver
 from lca.layer0_infra.observability import ObservabilityHub
 from lca.layer0_infra.observability.policy import AttributePolicy
 from lca.layer0_infra.observability.settings import ObservabilitySettings

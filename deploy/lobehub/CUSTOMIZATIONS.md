@@ -4,7 +4,7 @@
 >
 > **基准版本**：LobeHub v2.2.13（`.lobehub-upstream/` 为 pristine 源码，`lobehub-ui/` 为定制后的工作副本）
 >
-> **应用方式**：`patch_lobehub.py` 统一补丁引擎（19 个幂等 patch，支持 `apply` / `verify` / `list`）
+> **应用方式**：`patch_lobehub.py` 统一补丁引擎（12 个幂等 patch，支持 `apply` / `verify` / `list`）
 
 ---
 
@@ -219,18 +219,6 @@ if (!isLcaGatewayModel && (isResponsesAPIModel(model) || enabledSearch)) {
 }
 ```
 
-### 3.3 `packages/model-bank/src/modelProviders/index.ts`
-
-**Patch 名称**：`provider_order`
-
-OpenAI provider 排到 `DEFAULT_MODEL_PROVIDER_LIST` 第一位：
-
-```typescript
-/* LCA: OpenAI first */
-OpenAIProvider,
-// ... 其他 providers
-```
-
 ---
 
 ## 四、本地开发认证
@@ -304,23 +292,6 @@ if (mockDevFlag === '1' || mockDevFlag === 'true') {
 **Patch 名称**：`topic_route`
 
 同上。
-
-### 5.4 `src/routes/(main)/community/(detail)/agent/features/Sidebar/ActionButton/ForkAndChat.tsx`
-
-**Patch 名称**：`market_fork`
-
-本地 HTTP 无 secure context → 跳过 Market OIDC，直接 local fork：
-
-```typescript
-const localDevFork = isLocalDevNoAuth();
-if (!localDevFork && !isAuthenticated) { ... }
-```
-
-### 5.5 `src/routes/(main)/community/(detail)/group_agent/features/Sidebar/ActionButton/ForkGroupAndChat.tsx`
-
-**Patch 名称**：`market_fork`
-
-同 5.4。
 
 ---
 
@@ -405,17 +376,18 @@ NEXT_PUBLIC_MOCK_DEV_USER_ID=local-dev-user
 | 8 | `src/store/chat/agents/transports/ClientLLMTransport.ts` | Agent 运行时 | `client_transport` |
 | 9 | `packages/agent-runtime/src/transport/llm.ts` | Agent 运行时 | `llm_transport_type` |
 | 10 | `packages/agent-runtime/src/executors/callLlmFinalizer.ts` | Agent 运行时 | `call_llm_finalizer` |
-| 11 | `packages/business/const/src/llm.ts` | Provider 路由 | `default_model` |
+| 11 | `src/store/chat/agents/transports/AgentTimelineTransport.ts` | Agent 运行时 | `agent_timeline_transport` |
+| 12 | `src/store/chat/agents/transports/buildClientRuntimeHost.ts` | Agent 运行时 | `agent_timeline_transport` |
+| 13 | `packages/business/const/src/llm.ts` | Provider 路由 | `default_model` |
 | 12 | `packages/model-runtime/src/providers/openai/index.ts` | Provider 路由 | `openai_guard` |
-| 13 | `packages/model-bank/src/modelProviders/index.ts` | Provider 路由 | `provider_order` |
-| 14 | `src/layout/AuthProvider/localDevNoAuth.ts` | 认证 | `dev_auth_files` |
-| 15 | `src/layout/AuthProvider/LocalDevAuth/index.tsx` | 认证 | `dev_auth_files` |
-| 16 | `src/layout/AuthProvider/LocalDevUserUpdater.tsx` | 认证 | `dev_auth_files` |
-| 17 | `src/layout/AuthProvider/index.vite.tsx` | 认证 | `dev_auth_vite` |
-| 18 | `src/libs/next/proxy/define-config.ts` | 认证 | `middleware_mock_user` |
-| 19 | `src/features/AgentSidebar/utils/agentPathname.ts` | 路由适配 | `topic_route` |
-| 20 | `src/routes/(main)/agent/features/Conversation/ChatHydration/useChatRouteSync.ts` | 路由适配 | `topic_route` |
-| 21 | `src/routes/(main)/agent/_layout/AgentIdSync.tsx` | 路由适配 | `topic_route` |
-| 22 | `src/routes/(main)/community/.../ForkAndChat.tsx` | 路由适配 | `market_fork` |
-| 23 | `src/routes/(main)/community/.../ForkGroupAndChat.tsx` | 路由适配 | `market_fork` |
-| 24 | `src/libs/spaHtml/index.ts` | Dev UX | `lan_dev` |
+| 13 | `src/layout/AuthProvider/localDevNoAuth.ts` | 认证 | `dev_auth_files` |
+| 14 | `src/layout/AuthProvider/LocalDevAuth/index.tsx` | 认证 | `dev_auth_files` |
+| 15 | `src/layout/AuthProvider/LocalDevUserUpdater.tsx` | 认证 | `dev_auth_files` |
+| 16 | `src/layout/AuthProvider/index.vite.tsx` | 认证 | `dev_auth_vite` |
+| 17 | `src/libs/next/proxy/define-config.ts` | 认证 | `middleware_mock_user` |
+| 18 | `src/features/AgentSidebar/utils/agentPathname.ts` | 路由适配 | `topic_route` |
+| 19 | `src/routes/(main)/agent/features/Conversation/ChatHydration/useChatRouteSync.ts` | 路由适配 | `topic_route` |
+| 20 | `src/routes/(main)/agent/_layout/AgentIdSync.tsx` | 路由适配 | `topic_route` |
+| 21 | `next.config.ts` | 代理 | `file_proxy_rewrite` |
+| 22 | `src/libs/spaHtml/index.ts` | Dev UX | `lan_dev` |
+| 23 | `packages/builtin-tool-cloud-sandbox/src/client/Render/ExecuteCode/index.tsx` | UI | `sandbox_generated_files` |

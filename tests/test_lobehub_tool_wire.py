@@ -10,7 +10,7 @@ from gateway.lobehub_bridge.lobehub_adapter import (
     transform_tool_arguments,
     wire_tool_name,
 )
-from gateway.lobehub_bridge.lobehub_adapter.protocol import (
+from gateway.lobehub_bridge.lobehub_adapter.tool_spec import (
     LOBE_SKILLS_ID,
     LOBE_WEB_BROWSING_ID,
     SKILLS_API_ACTIVATE,

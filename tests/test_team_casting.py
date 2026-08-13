@@ -10,7 +10,6 @@ import json
 import unittest
 from typing import Any
 
-from gateway.role_library import FileRoleLibrary
 from lca.contracts.models.team.team_coordination import LeadMandate, Pipeline
 from lca.contracts.protocols.casting import (
     CastingError,
@@ -21,6 +20,7 @@ from lca.contracts.protocols.casting import (
     SelectedRole,
 )
 from lca.contracts.protocols.spec import LeadSpec
+from lca.layer3_agent.role_library import FileRoleLibrary
 from lca.layer4_app.api import Team
 from lca.layer4_app.casting import (
     LLMTeamCaster,

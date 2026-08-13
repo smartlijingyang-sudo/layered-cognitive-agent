@@ -206,6 +206,15 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.skills.market_auth._CachedToken": (
         "Market OAuth token 缓存值对象，纯内部数据结构 (ADR-0048)"
     ),
+    "lca.layer0_infra.llm_resolver.ProductionLLMResolver": (
+        "LLMResolver Protocol 的实现，纯 env 读取 + 委托 resolve_llm_adapter"
+    ),
+    "lca.layer0_infra.llm_resolver.LLMUnavailableError": ("异常类型，非可插拔组件"),
+    "lca.layer0_infra.llm_resolver.ModelDefinition": ("模型元数据值对象，纯数据结构"),
+    "lca.layer0_infra.llm_resolver.ModelRegistry": (
+        "模型路由注册表，非可插拔组件 (同 ComponentRegistry 模式)"
+    ),
+    "lca.layer0_infra.openai_compat.StructuredLLMError": ("异常类型，非可插拔组件"),
 }
 
 _SCAN_PACKAGES = [

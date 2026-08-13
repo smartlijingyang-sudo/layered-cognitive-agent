@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 import unittest
 
-from gateway.llm_resolver import ProductionLLMResolver
 from gateway.run_executor import create_run_session, execute_run, set_llm_resolver
 from gateway.run_registry import RunRegistry, RunStatus
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
+from lca.layer0_infra.llm_resolver import ProductionLLMResolver
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
 

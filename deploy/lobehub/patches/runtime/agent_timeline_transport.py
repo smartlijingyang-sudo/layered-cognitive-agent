@@ -36,6 +36,8 @@ import type { ChatStore } from '@/store/chat/store';
 
 import type { ClientRuntimeSession } from './ClientRuntimeStreamSink';
 
+const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
+
 type TimelineState = {
   answer: string;
   tools: Map<string, ChatToolPayload>;
@@ -246,7 +248,7 @@ export class AgentTimelineTransport implements LLMTransport {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: 'Bearer lca-local',
+          Authorization: `Bearer ${LCA_TOKEN}`,
         },
         body: JSON.stringify({ messages, model: input.model }),
         signal: operation.abortController.signal,

@@ -1,13 +1,10 @@
-"""Gateway model provider registry —— 模型能力目录与路由单一事实源。
+"""LLM 基础设施 —— adapter 工厂 + 模型路由 + 能力目录。
 
-职责：
-1. 静态目录 —— 已知模型 ID → 能力映射（``MODEL_CATALOG``）
-2. 配置解析 —— 从环境变量解析当前部署使用的模型
-3. 路由 —— LCA 模式名 / OpenAI 模型名 → 实际上游模型 ID
-4. 能力查询 —— ``supports_chat`` / ``supports_embeddings`` / ``supports_structured``
-
-替代原先散落在 ``openai_structured_llm.py`` 的硬编码别名 dict 与
-``resolve_upstream_model`` / ``resolve_embedding_model`` 函数。
+统一职责：
+  1. LLM Adapter 工厂 —— env 凭证 → LLMAdapter（ProductionLLMResolver）
+  2. 模型路由 —— OpenAI 模型名 / LCA 模式名 → 实际上游模型 ID（ModelRegistry）
+  3. 能力目录 —— 已知模型 → 能力映射（MODEL_CATALOG）
+  4. 共享异步客户端 —— 缓存 AsyncOpenAI 实例（get_async_openai_client）
 """
 
 from __future__ import annotations
@@ -15,9 +12,80 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Final
+from typing import Any, Final, Protocol
 
-from lca.layer0_infra.llm_adapter import load_dotenv_if_present
+from lca.contracts.protocols import LLMAdapter
+from lca.layer0_infra.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
+
+# ═══════════════════════════════════════════════════════════
+#  LLM Adapter 工厂
+# ═══════════════════════════════════════════════════════════
+
+
+class LLMUnavailableError(RuntimeError):
+    """LLM 凭证缺失，无法创建 run。"""
+
+
+class LLMResolver(Protocol):
+    """解析一次 run 使用的 LLM adapter。"""
+
+    def is_available(self) -> bool:
+        """当前 resolver 是否可接受新的 run 请求。"""
+        ...
+
+    def resolve(self, *, mode: str) -> LLMAdapter:
+        """为指定协作模式解析 LLM adapter。"""
+        ...
+
+
+def llm_credentials() -> tuple[str | None, str | None, str | None]:
+    """LLM_API_KEY 优先；兼容 CCS / Cursor 注入的 ANTHROPIC_* 变量。"""
+    load_dotenv_if_present()
+    key = os.getenv("LLM_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")
+    base = os.getenv("LLM_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL")
+    model = os.getenv("LLM_MODEL") or os.getenv("ANTHROPIC_MODEL")
+    return key, base, model
+
+
+@dataclass(frozen=True)
+class ProductionLLMResolver:
+    """生产 resolver：仅使用真实 LLM adapter，无静默降级。"""
+
+    def is_available(self) -> bool:
+        key, _, _ = llm_credentials()
+        return bool(key)
+
+    def resolve(self, *, mode: str) -> LLMAdapter:
+        del mode  # 生产路径与模式无关，保留签名便于测试替身
+        key, base, model = llm_credentials()
+        if not key:
+            raise LLMUnavailableError("LLM_API_KEY 未配置。请设置环境变量或在 .env 中提供凭证。")
+        return resolve_llm_adapter(api_key=key, base_url=base, model=model)
+
+
+# ── 共享异步客户端工厂 ──────────────────────────────────────
+
+_cached_async_client: Any = None
+_cached_client_key: tuple[str | None, str | None] | None = None
+
+
+def get_async_openai_client() -> Any:
+    """返回缓存的 ``AsyncOpenAI`` 客户端（按 credentials 去重）。"""
+    global _cached_async_client, _cached_client_key
+    key, base, _ = llm_credentials()
+    cache_key = (key, base)
+    if _cached_async_client is not None and _cached_client_key == cache_key:
+        return _cached_async_client
+    from openai import AsyncOpenAI
+
+    _cached_async_client = AsyncOpenAI(api_key=key, base_url=base)
+    _cached_client_key = cache_key
+    return _cached_async_client
+
+
+# ═══════════════════════════════════════════════════════════
+#  模型能力目录 + 路由
+# ═══════════════════════════════════════════════════════════
 
 # ── 能力词表 ────────────────────────────────────────────────
 
@@ -27,8 +95,6 @@ STRUCTURED_OUTPUT: Final = "structured_output"
 VISION: Final = "vision"
 TOOL_CALLING: Final = "tool_calling"
 STREAMING: Final = "streaming"
-
-# ── 模型定义 ────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -49,9 +115,7 @@ _QWEN_CHAT_CAPS: frozenset[str] = frozenset(
     {CHAT, STRUCTURED_OUTPUT, VISION, TOOL_CALLING, STREAMING}
 )
 
-# 注册已知模型 —— 按 provider 分组，便于扩展
 _KNOWN_MODELS: tuple[ModelDefinition, ...] = (
-    # ── Qwen (DashScope / 百炼) ──
     ModelDefinition("qwen-plus", "Qwen Plus", "dashscope", _QWEN_CHAT_CAPS),
     ModelDefinition("qwen-turbo", "Qwen Turbo", "dashscope", _QWEN_CHAT_CAPS),
     ModelDefinition("qwen-max", "Qwen Max", "dashscope", _QWEN_CHAT_CAPS),
@@ -62,7 +126,6 @@ _KNOWN_MODELS: tuple[ModelDefinition, ...] = (
         frozenset({CHAT, STRUCTURED_OUTPUT, TOOL_CALLING, STREAMING}),
         context_window=1_000_000,
     ),
-    # ── Qwen Embeddings ──
     ModelDefinition(
         "text-embedding-v3",
         "Text Embedding V3",
@@ -77,27 +140,15 @@ _KNOWN_MODELS: tuple[ModelDefinition, ...] = (
         frozenset({EMBEDDINGS}),
         context_window=2_048,
     ),
-    # ── OpenAI 标准名 → 映射到 DashScope 等价 ──
-    ModelDefinition(
-        "gpt-4o",
-        "GPT-4o (→ qwen-max)",
-        "openai",
-        _QWEN_CHAT_CAPS,
-    ),
-    ModelDefinition(
-        "gpt-4o-mini",
-        "GPT-4o Mini (→ qwen-plus)",
-        "openai",
-        _QWEN_CHAT_CAPS,
-    ),
+    ModelDefinition("gpt-4o", "GPT-4o (→ qwen-max)", "openai", _QWEN_CHAT_CAPS),
+    ModelDefinition("gpt-4o-mini", "GPT-4o Mini (→ qwen-plus)", "openai", _QWEN_CHAT_CAPS),
 )
 
-# 构建不可变目录
 MODEL_CATALOG: Final[dict[str, ModelDefinition]] = {}
 for _def in _KNOWN_MODELS:
     MODEL_CATALOG[_def.id] = _def
 
-# ── OpenAI → DashScope 别名（嵌入模型）──────────────────────
+# ── 别名映射 ────────────────────────────────────────────────
 
 _OPENAI_EMBEDDING_ALIASES: Final[dict[str, str]] = {
     "text-embedding-3-small": "text-embedding-v3",
@@ -105,10 +156,8 @@ _OPENAI_EMBEDDING_ALIASES: Final[dict[str, str]] = {
     "text-embedding-ada-002": "text-embedding-v2",
 }
 
-# LCA 模式名集合（这些不是真实模型，需要映射到配置模型）
 _LCA_MODE_NAMES: Final[frozenset[str]] = frozenset({"solo", "team", "auto"})
 
-# OpenAI 标准名 → Qwen 等价（chat 模型）
 _OPENAI_CHAT_ALIASES: Final[dict[str, str]] = {
     "gpt-4o": "qwen-max",
     "gpt-4o-mini": "qwen-plus",
@@ -120,20 +169,8 @@ _DEFAULT_CHAT_MODEL: Final[str] = "qwen-plus"
 _DEFAULT_EMBEDDING_MODEL: Final[str] = "text-embedding-v3"
 
 
-# ── 注册表 ──────────────────────────────────────────────────
-
-
 class ModelRegistry:
-    """模型路由与能力查询。
-
-    单一事实源：
-    - ``/v1/models`` 端点从 ``list_available()`` 生成响应
-    - ``/v1/chat/completions`` 通过 ``resolve_chat_model()`` 路由
-    - ``/v1/embeddings`` 通过 ``resolve_embedding_model()`` 路由
-    - ``/v1/responses`` 通过 ``resolve_chat_model()`` 路由
-
-    延迟加载环境变量（首次调用时 ``load_dotenv``），避免模块导入副作用。
-    """
+    """模型路由与能力查询。"""
 
     def __init__(self) -> None:
         self._configured_chat_model: str | None = None
@@ -147,7 +184,6 @@ class ModelRegistry:
 
     @property
     def configured_chat_model(self) -> str:
-        """当前部署的 chat 模型（``LLM_MODEL`` 环境变量或默认值）。"""
         if self._configured_chat_model is None:
             self._ensure_env()
             self._configured_chat_model = (
@@ -157,7 +193,6 @@ class ModelRegistry:
 
     @property
     def configured_embedding_model(self) -> str:
-        """当前部署的 embedding 模型（``LLM_EMBEDDING_MODEL`` 或从 chat 模型推断）。"""
         if self._configured_embedding_model is None:
             self._ensure_env()
             override = os.getenv("LLM_EMBEDDING_MODEL", "").strip()
@@ -165,26 +200,18 @@ class ModelRegistry:
                 self._configured_embedding_model = override
             else:
                 self._configured_embedding_model = _OPENAI_EMBEDDING_ALIASES.get(
-                    self.configured_chat_model.lower(),
-                    _DEFAULT_EMBEDDING_MODEL,
+                    self.configured_chat_model.lower(), _DEFAULT_EMBEDDING_MODEL
                 )
         return self._configured_embedding_model
 
     def resolve_chat_model(self, requested: str) -> str:
-        """解析请求的模型名为实际上游 chat 模型 ID。
-
-        规则：
-        1. LCA 模式名（solo/team/auto）→ 返回 ``configured_chat_model``
-        2. OpenAI 标准名（gpt-4o 等）→ 映射到 Qwen 等价
-        3. 其他 → 原样透传（假设上游支持）
-        """
+        """LCA 模式名 → configured；OpenAI 名 → Qwen 等价；其他 → 透传。"""
         normalized = requested.strip().lower()
         if normalized in _LCA_MODE_NAMES:
             return self.configured_chat_model
         return _OPENAI_CHAT_ALIASES.get(normalized, requested.strip() or self.configured_chat_model)
 
     def resolve_embedding_model(self, requested: str) -> str:
-        """解析请求的 embedding 模型名为实际上游模型 ID。"""
         normalized = requested.strip().lower()
         if normalized in _LCA_MODE_NAMES:
             return self.configured_embedding_model
@@ -193,28 +220,18 @@ class ModelRegistry:
         )
 
     def is_lca_mode(self, model_id: str) -> bool:
-        """模型 ID 是否为 LCA 模式名（非真实模型）。"""
         return model_id.strip().lower() in _LCA_MODE_NAMES
 
     def get_definition(self, model_id: str) -> ModelDefinition | None:
-        """查找模型的静态定义（目录中有注册则返回）。"""
         return MODEL_CATALOG.get(model_id)
 
     def supports(self, model_id: str, capability: str) -> bool:
-        """检查模型是否支持指定能力。未知模型保守返回 True（假设支持）。"""
         defn = self.get_definition(model_id)
         if defn is None:
             return True
         return capability in defn.capabilities
 
     def list_available(self) -> list[ModelDefinition]:
-        """列出当前部署可用的模型（用于 ``/v1/models`` 响应）。
-
-        包含：
-        - 当前配置的 chat 模型
-        - 当前配置的 embedding 模型
-        - LCA 模式（solo/team）作为虚拟模型
-        """
         seen: set[str] = set()
         result: list[ModelDefinition] = []
 
@@ -253,7 +270,6 @@ class ModelRegistry:
         return result
 
     def reset(self) -> None:
-        """重置缓存的配置（测试用）。"""
         self._configured_chat_model = None
         self._configured_embedding_model = None
         self._env_loaded = False

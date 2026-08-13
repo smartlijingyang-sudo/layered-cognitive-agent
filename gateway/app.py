@@ -1,31 +1,21 @@
-"""Starlette 观测网关 — POST 建 run、GET SSE 订阅（薄 HTTP 面）。
+"""Starlette HTTP 网关 — 薄组合根。
 
-会话历史：前端读路径为浏览器 IndexedDB；``ConversationStore``（SQLite）与
-``/conversations`` 路由为跨设备同步预留，见 ``gateway/conversation_store.py``。
-
-Phase C 文件能力：``POST /conversations/{id}/attachments`` 上传、
-``GET /files/{id}`` 下载；CreateRun 可带 ``attachment_ids``。
+职责：路由注册 + 全局单例（RunRegistry / FileStore）。
+所有业务逻辑在子模块（timeline/、openai_compat_api.py、lobehub_bridge/）。
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
-from collections.abc import AsyncIterator
 from urllib.parse import quote
 
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response, StreamingResponse
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from gateway._http import CORS_HEADERS
-from gateway.conversation_store import ConversationStore
-from gateway.event_stream import GapEvent
-from gateway.llm_resolver import LLMResolver, ProductionLLMResolver
-from gateway.lobehub_bridge.prepare import compose_run_question
-from gateway.mode_catalog import DEFAULT_MODE
 from gateway.openai_compat_api import (
     chat_completions,
     embeddings_create,
@@ -35,9 +25,7 @@ from gateway.openai_compat_api import (
 from gateway.run_executor import (
     _active_hubs,
     _finalize_run,
-    create_run_session,
     llm_status,
-    schedule_run,
     set_llm_resolver,
 )
 from gateway.run_registry import RunRegistry, RunSession, RunStatus
@@ -48,19 +36,9 @@ from lca.layer0_infra.file_store import (
     get_default_file_store,
     set_default_file_store,
 )
-
-
-def _content_disposition(disposition_type: str, filename: str) -> str:
-    """Build Content-Disposition header safe for non-ASCII filenames (RFC 5987)."""
-    ascii_name = filename.encode("ascii", "replace").decode("ascii")
-    encoded = quote(filename, safe="")
-    return f"{disposition_type}; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded}"
-
-
-_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+from lca.layer0_infra.llm_resolver import LLMResolver, ProductionLLMResolver
 
 _registry = RunRegistry()
-_conversations = ConversationStore()
 _file_store = get_default_file_store()
 
 
@@ -72,87 +50,29 @@ def get_file_store() -> LocalFileStore:
     return _file_store
 
 
+# ── HTTP helpers ──────────────────────────────────────────
+
+
+def _content_disposition(disposition_type: str, filename: str) -> str:
+    """Build Content-Disposition header safe for non-ASCII filenames (RFC 5987)."""
+    ascii_name = filename.encode("ascii", "replace").decode("ascii")
+    encoded = quote(filename, safe="")
+    return f"{disposition_type}; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded}"
+
+
 async def _options(_request: Request) -> JSONResponse:
     return JSONResponse({}, headers=CORS_HEADERS)
 
 
-def _parse_attachment_ids(body: dict) -> list[str]:
-    raw = body.get("attachment_ids") or body.get("attachmentIds") or []
-    if not isinstance(raw, list):
-        return []
-    ids: list[str] = []
-    for item in raw:
-        text = str(item).strip()
-        if text:
-            ids.append(text)
-    return ids
+# ── Run 操作 ──────────────────────────────────────────────
 
 
-async def create_run(request: Request) -> JSONResponse:
-    try:
-        body = await request.json()
-    except json.JSONDecodeError:
-        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=CORS_HEADERS)
-    question = str(body.get("question", "")).strip()
-    if not question:
-        return JSONResponse(
-            {"error": "question is required"}, status_code=400, headers=CORS_HEADERS
-        )
-    mode = str(body.get("mode", DEFAULT_MODE)).strip() or DEFAULT_MODE
-    conversation_id = body.get("conversation_id")
-    conversation_id_str = str(conversation_id).strip() if conversation_id else None
-    attachment_ids = _parse_attachment_ids(body)
-
-    missing = [aid for aid in attachment_ids if not _file_store.exists(aid)]
-    if missing:
-        return JSONResponse(
-            {
-                "error": "unknown_attachment",
-                "detail": f"attachment not found: {', '.join(missing)}",
-            },
-            status_code=400,
-            headers=CORS_HEADERS,
-        )
-
-    if not llm_status()["llm_available"]:
-        return JSONResponse(
-            {
-                "error": "llm_unavailable",
-                "detail": "LLM_API_KEY 未配置，无法创建 run。",
-            },
-            status_code=503,
-            headers=CORS_HEADERS,
-        )
-
-    effective_question = compose_run_question(
-        question,
-        tuple(attachment_ids),
-        _file_store,
-    )
-    session = create_run_session(
-        _registry,
-        question=effective_question,
-        user_text=question,
-        mode=mode,
-        attachment_ids=attachment_ids,
-    )
-    schedule_run(_registry, session)
-
-    if conversation_id_str:
-        _conversations.add_turn(
-            conversation_id_str,
-            run_id=session.run_id,
-            trace_id=session.trace_id,
-            question=question,
-            mode=mode,
-            status=RunStatus.PENDING.value,
-        )
-
-    return JSONResponse(
-        {"run_id": session.run_id, "trace_id": session.trace_id},
-        status_code=201,
-        headers=CORS_HEADERS,
-    )
+async def get_run(request: Request) -> JSONResponse:
+    run_id = request.path_params["run_id"]
+    summary = _registry.summary(run_id)
+    if summary is None:
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=CORS_HEADERS)
+    return JSONResponse(summary, headers=CORS_HEADERS)
 
 
 async def cancel_run(request: Request) -> JSONResponse:
@@ -166,10 +86,8 @@ async def cancel_run(request: Request) -> JSONResponse:
     session.status = RunStatus.CANCELED
     if session.task is not None and not session.task.done():
         session.task.cancel()
-        # 等 execute_run 的 finally 收尾（TeamRunFinished + hub.close + emit）。
         with contextlib.suppress(asyncio.CancelledError):
             await session.task
-    _conversations.update_turn_status(run_id, RunStatus.CANCELED.value)
     return JSONResponse({"status": RunStatus.CANCELED.value}, headers=CORS_HEADERS)
 
 
@@ -185,6 +103,8 @@ async def answer_run(request: Request) -> JSONResponse:
             status_code=409,
             headers=CORS_HEADERS,
         )
+    import json
+
     try:
         body = await request.json()
     except json.JSONDecodeError:
@@ -231,144 +151,7 @@ async def _resume_run(session: RunSession, answer: str) -> None:
             await _finalize_run(session, _registry, _active_hubs.get(session.run_id), None, success)
 
 
-async def get_run(request: Request) -> JSONResponse:
-    run_id = request.path_params["run_id"]
-    summary = _registry.summary(run_id)
-    if summary is None:
-        return JSONResponse({"error": "run not found"}, status_code=404, headers=CORS_HEADERS)
-    return JSONResponse(summary, headers=CORS_HEADERS)
-
-
-async def stream_events(request: Request) -> StreamingResponse:
-    """Debug endpoint: raw event stream, no timeline projection."""
-    run_id = request.path_params["run_id"]
-    last_event_id = request.headers.get("last-event-id")
-
-    from lca.layer0_infra.observability.journal.sse_frames import (
-        parse_last_event_id,
-        stamped_to_sse_frame,
-    )
-
-    session = _registry.get(run_id)
-    if session is None:
-        return JSONResponse({"error": "run not found"}, status_code=404, headers=CORS_HEADERS)
-
-    after = parse_last_event_id(last_event_id)
-
-    async def _generate() -> AsyncIterator[bytes]:
-        async for item in session.stream.subscribe(after_seq=after):
-            if isinstance(item, GapEvent):
-                continue
-            yield stamped_to_sse_frame(item).encode("utf-8")
-
-    return StreamingResponse(
-        _generate(),
-        media_type="text/event-stream",
-        headers={
-            **CORS_HEADERS,
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
-async def health(_request: Request) -> JSONResponse:
-    return JSONResponse({"status": "ok", **llm_status()}, headers=CORS_HEADERS)
-
-
-async def create_conversation(request: Request) -> JSONResponse:
-    try:
-        body = await request.json()
-    except json.JSONDecodeError:
-        body = {}
-    title = str(body.get("title", "")).strip()
-    record = _conversations.create_conversation(title=title)
-    return JSONResponse(record, status_code=201, headers=CORS_HEADERS)
-
-
-async def list_conversations(_request: Request) -> JSONResponse:
-    return JSONResponse(
-        {"conversations": _conversations.list_conversations()}, headers=CORS_HEADERS
-    )
-
-
-async def get_conversation(request: Request) -> JSONResponse:
-    conversation_id = request.path_params["conversation_id"]
-    record = _conversations.get_conversation(conversation_id)
-    if record is None:
-        return JSONResponse(
-            {"error": "conversation not found"}, status_code=404, headers=CORS_HEADERS
-        )
-    return JSONResponse(record, headers=CORS_HEADERS)
-
-
-async def add_conversation_turn(request: Request) -> JSONResponse:
-    conversation_id = request.path_params["conversation_id"]
-    try:
-        body = await request.json()
-    except json.JSONDecodeError:
-        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=CORS_HEADERS)
-    turn = _conversations.add_turn(
-        conversation_id,
-        run_id=str(body.get("run_id", "")),
-        trace_id=str(body.get("trace_id", "")),
-        question=str(body.get("question", "")),
-        mode=str(body.get("mode", DEFAULT_MODE)),
-        status=str(body.get("status", RunStatus.PENDING.value)),
-    )
-    if turn is None:
-        return JSONResponse(
-            {"error": "conversation not found"}, status_code=404, headers=CORS_HEADERS
-        )
-    return JSONResponse(turn, status_code=201, headers=CORS_HEADERS)
-
-
-async def upload_attachment(request: Request) -> JSONResponse:
-    conversation_id = request.path_params["conversation_id"]
-    if _conversations.get_conversation(conversation_id) is None:
-        pass
-
-    form = await request.form()
-    upload = form.get("file")
-    if upload is None:
-        return JSONResponse({"error": "file is required"}, status_code=400, headers=CORS_HEADERS)
-
-    filename = getattr(upload, "filename", None) or "upload.bin"
-    content_type = getattr(upload, "content_type", None) or "application/octet-stream"
-    read = getattr(upload, "read", None)
-    if read is None:
-        return JSONResponse({"error": "invalid file field"}, status_code=400, headers=CORS_HEADERS)
-    data = await read()
-    if not isinstance(data, (bytes, bytearray)):
-        return JSONResponse({"error": "invalid file bytes"}, status_code=400, headers=CORS_HEADERS)
-    data_bytes = bytes(data)
-    if len(data_bytes) == 0:
-        return JSONResponse({"error": "empty file"}, status_code=400, headers=CORS_HEADERS)
-    if len(data_bytes) > _MAX_UPLOAD_BYTES:
-        return JSONResponse(
-            {"error": "file too large", "detail": f"max {_MAX_UPLOAD_BYTES} bytes"},
-            status_code=413,
-            headers=CORS_HEADERS,
-        )
-
-    stored = _file_store.put(
-        data=data_bytes,
-        name=str(filename),
-        mime_type=str(content_type),
-        conversation_id=conversation_id,
-    )
-    return JSONResponse(
-        {
-            "attachment_id": stored.attachment_id,
-            "name": stored.name,
-            "mime_type": stored.mime_type,
-            "url": stored.url,
-            "size_bytes": stored.size_bytes,
-        },
-        status_code=201,
-        headers=CORS_HEADERS,
-    )
+# ── 文件服务 ──────────────────────────────────────────────
 
 
 async def download_file(request: Request) -> Response:
@@ -422,18 +205,25 @@ async def get_file_meta(request: Request) -> JSONResponse:
     )
 
 
+# ── 健康检查 ──────────────────────────────────────────────
+
+
+async def health(_request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ok", **llm_status()}, headers=CORS_HEADERS)
+
+
+# ── 组合根 ────────────────────────────────────────────────
+
+
 def create_app(
     registry: RunRegistry | None = None,
-    conversation_store: ConversationStore | None = None,
     llm_resolver: LLMResolver | None = None,
     file_store: LocalFileStore | None = None,
 ) -> Starlette:
-    """工厂：测试可注入独立 RunRegistry / ConversationStore / LLMResolver / FileStore。"""
-    global _registry, _conversations, _file_store
+    """工厂：测试可注入独立 RunRegistry / LLMResolver / FileStore。"""
+    global _registry, _file_store
     if registry is not None:
         _registry = registry
-    if conversation_store is not None:
-        _conversations = conversation_store
     if file_store is not None:
         _file_store = file_store
         set_default_file_store(file_store)
@@ -443,50 +233,30 @@ def create_app(
         set_llm_resolver(ProductionLLMResolver())
     return Starlette(
         routes=[
+            # 健康
             Route("/health", health, methods=["GET"]),
-            Route("/runs", create_run, methods=["POST", "OPTIONS"]),
+            # Run 操作
             Route("/runs/{run_id}", get_run, methods=["GET"]),
             Route("/runs/{run_id}/cancel", cancel_run, methods=["POST", "OPTIONS"]),
             Route("/runs/{run_id}/answer", answer_run, methods=["POST", "OPTIONS"]),
-            Route("/runs/{run_id}/events", stream_events, methods=["GET"]),
-            Route("/conversations", create_conversation, methods=["POST", "OPTIONS"]),
-            Route("/conversations", list_conversations, methods=["GET"]),
-            Route("/conversations/{conversation_id}", get_conversation, methods=["GET"]),
-            Route(
-                "/conversations/{conversation_id}/turns",
-                add_conversation_turn,
-                methods=["POST", "OPTIONS"],
-            ),
-            Route(
-                "/conversations/{conversation_id}/attachments",
-                upload_attachment,
-                methods=["POST", "OPTIONS"],
-            ),
+            # 文件
             Route("/files/{attachment_id}", download_file, methods=["GET"]),
             Route("/files/{attachment_id}/meta", get_file_meta, methods=["GET"]),
-            # LobeHub G2A OpenAI-compatible surface
+            # OpenAI 兼容
             Route("/v1/models", list_models, methods=["GET", "OPTIONS"]),
             Route("/v1/chat/completions", chat_completions, methods=["POST", "OPTIONS"]),
             Route("/v1/embeddings", embeddings_create, methods=["POST", "OPTIONS"]),
             Route("/v1/responses", responses_create, methods=["POST", "OPTIONS"]),
-            # Agent Timeline (timeline.v1) — preferred UI stream
+            # Agent Timeline（生产路径）
             Route("/v1/agent/runs", create_agent_run, methods=["POST", "OPTIONS"]),
             Route(
                 "/v1/agent/runs/{run_id}/timeline",
                 stream_agent_timeline,
                 methods=["GET", "OPTIONS"],
             ),
-            Route("/runs", _options, methods=["OPTIONS"]),
-            Route("/runs/{run_id}/events", _options, methods=["OPTIONS"]),
+            # CORS preflight
             Route("/runs/{run_id}/cancel", _options, methods=["OPTIONS"]),
             Route("/runs/{run_id}/answer", _options, methods=["OPTIONS"]),
-            Route("/conversations", _options, methods=["OPTIONS"]),
-            Route("/conversations/{conversation_id}/turns", _options, methods=["OPTIONS"]),
-            Route(
-                "/conversations/{conversation_id}/attachments",
-                _options,
-                methods=["OPTIONS"],
-            ),
         ],
     )
 
