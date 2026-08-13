@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import unittest
 
-from gateway.mode_catalog import ALL_MODES
-from gateway.team_factory import build_runnable_team, build_solo_agent
+from gateway.assemble import build_runnable_team, build_solo_agent
+from gateway.modes import ALL_MODES
 from lca.contracts.models.core.llm import LLMResponse
 from lca.layer4_app.api import Agent, Team
 from tests.harness.collector import InMemoryObservability

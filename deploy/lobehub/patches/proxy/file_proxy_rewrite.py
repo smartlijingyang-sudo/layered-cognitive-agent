@@ -47,8 +47,16 @@ const nextConfig = {
         destination: `${base.replace(/\\/$/, '')}/files/:path*`,
       },
       {
-        source: '/lca-api/:path*',
-        destination: `${base.replace(/\\/$/, '')}/v1/:path*`,
+        source: '/lca-api/runs',
+        destination: `${base.replace(/\\/$/, '')}/runs`,
+      },
+      {
+        source: '/lca-api/runs/:path*',
+        destination: `${base.replace(/\\/$/, '')}/runs/:path*`,
+      },
+      {
+        source: '/runs/:path*',
+        destination: `${base.replace(/\\/$/, '')}/runs/:path*`,
       },
     ];
   },

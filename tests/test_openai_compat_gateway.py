@@ -8,8 +8,8 @@ from unittest.mock import patch
 from starlette.testclient import TestClient
 
 from gateway.app import create_app
-from gateway.event_stream import EventStream
-from gateway.run_registry import RunRegistry, RunSession, RunStatus, run_dedup_key
+from gateway.runs.live import LiveTail
+from gateway.runs.session import RunRegistry, RunSession, RunStatus, run_dedup_key
 from lca.layer0_infra.openai_compat import (
     extract_json_schema_format,
     normalize_responses_input,
@@ -79,7 +79,7 @@ class TestRunRegistryDedup(unittest.TestCase):
             run_id="run_test",
             trace_id="trace_test",
             jsonl_path=registry.jsonl_path_for("run_test"),
-            stream=EventStream(),
+            tail=LiveTail(),
             question="今天有什么新闻",
             user_text="今天有什么新闻",
             mode="solo",
@@ -95,7 +95,7 @@ class TestRunRegistryDedup(unittest.TestCase):
             run_id="run_test",
             trace_id="trace_test",
             jsonl_path=registry.jsonl_path_for("run_test"),
-            stream=EventStream(),
+            tail=LiveTail(),
             question="hello",
             user_text="hello",
             mode="solo",
@@ -139,7 +139,7 @@ class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
     def test_embeddings_create_returns_vectors(self) -> None:
         client = TestClient(create_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
         with patch(
-            "gateway.openai_compat_api.create_embeddings",
+            "gateway.openai_shim.create_embeddings",
             return_value={
                 "object": "list",
                 "data": [{"object": "embedding", "index": 0, "embedding": [0.1, 0.2]}],
@@ -176,7 +176,7 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
         registry = RunRegistry()
         client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
         with patch(
-            "gateway.openai_compat_api.create_structured_completion",
+            "gateway.openai_shim.create_structured_completion",
             return_value=(
                 '{"satisfied": true}',
                 {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},

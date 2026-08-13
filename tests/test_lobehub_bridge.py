@@ -6,17 +6,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from gateway.lobehub_bridge.file_ingest import (
+from gateway.runs.ingest import (
+    FileRef,
     HttpxFileFetcher,
+    IngestCache,
+    IngestUrlPolicyError,
+    LobeHubBridgeSettings,
+    assert_ingest_url_allowed,
     ingest_file_refs,
+    reset_ingest_cache_for_tests,
     select_ingest_files,
 )
-from gateway.lobehub_bridge.ingest_cache import IngestCache, reset_ingest_cache_for_tests
-from gateway.lobehub_bridge.models import FileRef
-from gateway.lobehub_bridge.parser import parse_messages
-from gateway.lobehub_bridge.prepare import compose_run_question, prepare_run_from_messages
-from gateway.lobehub_bridge.settings import LobeHubBridgeSettings
-from gateway.lobehub_bridge.url_policy import IngestUrlPolicyError, assert_ingest_url_allowed
+from gateway.runs.ingress import compose_run_question, parse_messages, prepare_run_from_messages
 from lca.contracts.atoms.enums import StreamChannel
 from lca.layer0_infra.file_store import LocalFileStore
 
@@ -263,49 +264,35 @@ class TestPrepareRunFromMessages(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("[对话历史]", question)
 
 
-class TestTimelineAnswerChannels(unittest.TestCase):
-    """Answer channel reaches timeline; decision channel does not."""
+class TestLiveTailKeepsEveryChannel(unittest.TestCase):
+    """LiveTail does not filter. Decision vs answer is Transport's ignore table."""
 
-    def test_answer_and_decision_channels(self) -> None:
-        from gateway.timeline import TimelineProjection
-        from lca.contracts.models.observability.journal import (
-            DecisionMade,
-            RunScope,
-            StampedEvent,
-            StepTextDelta,
-        )
+    def test_both_channels_stay_on_the_tail(self) -> None:
+        from gateway.runs.live import LiveTail
+        from lca.contracts.models.observability.journal import RunScope, StampedEvent, StepTextDelta
 
-        p = TimelineProjection()
+        tail = LiveTail()
         scope = RunScope(trace_id="t", run_id="r")
-
-        def s(seq: int, event: object) -> StampedEvent:
-            return StampedEvent(seq=seq, ts=float(seq), scope=scope, event=event)
-
-        self.assertEqual(
-            p.project(
-                s(
-                    1,
-                    StepTextDelta(
-                        step=0,
-                        text_delta="secret",
-                        channel=StreamChannel.DECISION.value,
-                    ),
-                )
-            ),
-            [],
-        )
-        ans = p.project(
-            s(
-                2,
-                StepTextDelta(step=0, text_delta="你好", channel=StreamChannel.ANSWER.value),
+        tail.on_event(
+            StampedEvent(
+                seq=1,
+                ts=1.0,
+                scope=scope,
+                event=StepTextDelta(
+                    step=0, text_delta="secret", channel=StreamChannel.DECISION.value
+                ),
             )
         )
-        self.assertEqual(ans[0].type, "answer.delta")
-        self.assertEqual(ans[0].text, "你好")
-        self.assertEqual(
-            p.project(s(3, DecisionMade(step=0, action_type="respond", response_text="完整"))),
-            [],
+        tail.on_event(
+            StampedEvent(
+                seq=2,
+                ts=2.0,
+                scope=scope,
+                event=StepTextDelta(step=0, text_delta="你好", channel=StreamChannel.ANSWER.value),
+            )
         )
+        self.assertEqual(tail.buffer_size, 2)
+        self.assertEqual(tail.last_seq, 2)
 
 
 if __name__ == "__main__":

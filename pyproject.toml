@@ -154,7 +154,7 @@ module = "lca.layer0_infra.llm_adapter.openai_compat.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["openai", "dotenv"]
+module = ["openai", "dotenv", "yaml"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

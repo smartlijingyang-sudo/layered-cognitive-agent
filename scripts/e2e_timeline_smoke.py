@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Smoke: POST chat/completions stream=true → timeline.v1 SSE events."""
+"""Smoke: POST /runs then GET /runs/{id}/live Journal SSE."""
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
@@ -14,17 +15,22 @@ TASK = "用一句话回答：1+1等于几？"
 
 
 def main() -> int:
-    url = f"{GATEWAY}/v1/chat/completions"
-    body = {
-        "model": "solo",
-        "stream": True,
-        "messages": [{"role": "user", "content": TASK}],
-    }
+    create = httpx.post(
+        f"{GATEWAY}/runs",
+        json={"model": "solo", "messages": [{"role": "user", "content": TASK}]},
+        timeout=30.0,
+    )
+    create.raise_for_status()
+    run_id = create.json()["run_id"]
     types: list[str] = []
     deadline = time.monotonic() + 120
-    with httpx.stream("POST", url, json=body, timeout=130.0) as resp:
+    with httpx.stream(
+        "GET",
+        f"{GATEWAY}/runs/{run_id}/live",
+        headers={"Last-Event-ID": "0"},
+        timeout=130.0,
+    ) as resp:
         resp.raise_for_status()
-        assert resp.headers.get("x-lca-stream") == "timeline.v1" or True
         buf = ""
         for chunk in resp.iter_text():
             if time.monotonic() > deadline:
@@ -33,14 +39,16 @@ def main() -> int:
             while "\n\n" in buf:
                 block, buf = buf.split("\n\n", 1)
                 et = next(
-                    (ln[7:].strip() for ln in block.splitlines() if ln.startswith("event: ")), ""
+                    (ln[7:].strip() for ln in block.splitlines() if ln.startswith("event: ")),
+                    "",
                 )
                 if et:
                     types.append(et)
-                if et == "run.end":
-                    print("events:", types)
+                if et in {"AgentRunFinished", "TeamRunFinished"}:
+                    print("live events:", types)
                     return 0
-    print("incomplete events:", types, file=sys.stderr)
+    print("incomplete:", types, file=sys.stderr)
+    print(json.dumps({"run_id": run_id}, ensure_ascii=False), file=sys.stderr)
     return 1
 
 

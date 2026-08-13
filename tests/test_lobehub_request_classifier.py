@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from gateway.lobehub_bridge.request_classifier import classify_lobehub_chat_request
+from gateway.openai_shim import classify_lobehub_chat_request
 
 
 class TestLobeHubRequestClassifier(unittest.TestCase):

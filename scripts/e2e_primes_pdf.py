@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E2E smoke: primes PDF via gateway solo run (timeline.v1 SSE)."""
+"""E2E smoke: primes PDF via gateway solo run (Journal live SSE)."""
 
 from __future__ import annotations
 
@@ -18,11 +18,21 @@ TASK = (
 
 
 def main() -> int:
-    url = f"{GATEWAY}/v1/chat/completions"
-    body = {"model": "solo", "stream": True, "messages": [{"role": "user", "content": TASK}]}
+    create = httpx.post(
+        f"{GATEWAY}/runs",
+        json={"model": "solo", "messages": [{"role": "user", "content": TASK}]},
+        timeout=30.0,
+    )
+    create.raise_for_status()
+    run_id = create.json()["run_id"]
     types: list[str] = []
     deadline = time.monotonic() + 600
-    with httpx.stream("POST", url, json=body, timeout=610.0) as resp:
+    with httpx.stream(
+        "GET",
+        f"{GATEWAY}/runs/{run_id}/live",
+        headers={"Last-Event-ID": "0"},
+        timeout=610.0,
+    ) as resp:
         resp.raise_for_status()
         buf = ""
         for chunk in resp.iter_text():
@@ -37,9 +47,9 @@ def main() -> int:
                 )
                 if et:
                     types.append(et)
-                if et == "run.end":
-                    print("timeline events:", types)
-                    print("ok: tool.* count", sum(1 for t in types if t.startswith("tool.")))
+                if et in {"AgentRunFinished", "TeamRunFinished"}:
+                    print("live events:", types)
+                    print("ok: ToolStarted count", sum(1 for t in types if t == "ToolStarted"))
                     return 0
     print("incomplete:", types, file=sys.stderr)
     return 1

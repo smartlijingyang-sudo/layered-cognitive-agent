@@ -9,10 +9,21 @@ from unittest.mock import patch
 
 import pytest
 
-from gateway.run_executor import _active_hubs, create_run_session, schedule_run
-from gateway.run_registry import RunRegistry, RunStatus
+from gateway.runs.execute import create_run_session, schedule_run
+from gateway.runs.session import RunRegistry, RunStatus
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
+
+
+@pytest.fixture(autouse=True)
+def _isolate_production_backends(monkeypatch: pytest.MonkeyPatch) -> None:
+    """This test is about cancel/detach, not Langfuse flush or Onlyboxes bind."""
+    monkeypatch.setenv("LCA_OBS_INCLUDE_LANGFUSE", "false")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "")
+    monkeypatch.setenv("LCA_OBS_BACKENDS", "console")
+    monkeypatch.setenv("ONLYBOXES_BASE_URL", "")
+    monkeypatch.setenv("ONLYBOXES_ACCESS_TOKEN", "")
 
 
 class _HangRuntime:
@@ -31,14 +42,14 @@ def _role() -> RoleProfile:
 
 
 class _LazyHubAgent:
-    """execute_run 注入用：延迟取 hub，因为 hub 在 execute_run 内部创建。"""
+    """Uses the hub already hanging on the session (created at session birth)."""
 
-    def __init__(self, run_id: str) -> None:
-        self._run_id = run_id
+    def __init__(self, session: Any) -> None:
+        self._session = session
         self._inner: CognitiveAgent | None = None
 
     async def run(self, objective: str) -> Any:
-        hub = _active_hubs[self._run_id]
+        hub = self._session.hub
         self._inner = CognitiveAgent(_HangRuntime(), _role(), hub)  # type: ignore[arg-type]
         return await self._inner.run(objective)
 
@@ -48,7 +59,7 @@ async def test_execute_run_cancel_no_otel_detach_noise(caplog: pytest.LogCapture
     registry = RunRegistry()
     session = create_run_session(registry, question="hang", user_text="hang", mode="solo")
 
-    with patch("gateway.run_executor.build_solo_agent", return_value=_LazyHubAgent(session.run_id)):
+    with patch("gateway.runs.execute.build_solo_agent", return_value=_LazyHubAgent(session)):
         task = schedule_run(registry, session)
         await asyncio.sleep(0)
         task.cancel()

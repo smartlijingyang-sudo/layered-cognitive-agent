@@ -82,19 +82,19 @@ def _journal(
 JOURNAL_CATALOG: dict[str, VocabDef] = {
     "CastingStarted": _journal(
         VocabDomain.TEAM,
-        "gateway.team_factory",
+        "gateway.assemble",
         required=("objective_preview",),
         desc="自动组队选角开始",
     ),
     "CastingCompleted": _journal(
         VocabDomain.TEAM,
-        "gateway.team_factory",
+        "gateway.assemble",
         required=("governance_kind",),
         desc="自动组队选角完成",
     ),
     "CastingFailed": _journal(
         VocabDomain.TEAM,
-        "gateway.team_factory",
+        "gateway.assemble",
         required=("error",),
         desc="自动组队选角失败",
     ),

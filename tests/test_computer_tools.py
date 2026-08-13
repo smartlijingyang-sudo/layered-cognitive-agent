@@ -5,12 +5,7 @@ from __future__ import annotations
 import json
 import unittest
 
-from gateway.lobehub_bridge.lobehub_adapter import (
-    CLOUD_SANDBOX_WIRE,
-    resolve_tool_wire,
-    wire_tool_name,
-)
-from gateway.lobehub_bridge.lobehub_adapter.tool_spec import LOBE_CLOUD_SANDBOX_ID
+from gateway.runs.wire import WIRE, resolve
 from lca.layer0_infra.computer.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
 from lca.layer0_infra.computer.parse_result import parse_computer_stdout
 from lca.layer0_infra.tools.computer.tool_set import (
@@ -34,17 +29,13 @@ class TestComputerParse(unittest.TestCase):
 
 class TestCloudSandboxWire(unittest.TestCase):
     def test_run_command_wire_name(self) -> None:
-        spec = resolve_tool_wire(RUN_COMMAND, '{"command":"ls","description":"list"}')
-        assert spec is not None
-        self.assertEqual(
-            spec.wire_name,
-            wire_tool_name(LOBE_CLOUD_SANDBOX_ID, "runCommand"),
-        )
+        self.assertEqual(resolve(RUN_COMMAND), ("lobe-cloud-sandbox", "runCommand"))
 
     def test_all_computer_tools_registered(self) -> None:
-        self.assertEqual(len(CLOUD_SANDBOX_WIRE), 13)
-        for name in CLOUD_SANDBOX_WIRE:
-            self.assertIsNotNone(resolve_tool_wire(name, "{}"))
+        sandbox = [name for name, pair in WIRE.items() if pair[0] == "lobe-cloud-sandbox"]
+        self.assertEqual(len(sandbox), 13)
+        for name in sandbox:
+            self.assertIsNotNone(resolve(name))
 
 
 class TestDefaultToolsComputer(unittest.TestCase):

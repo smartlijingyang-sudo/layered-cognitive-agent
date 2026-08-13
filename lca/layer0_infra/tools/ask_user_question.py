@@ -1,10 +1,9 @@
 """AskUserQuestion — human-in-the-loop structured question tool.
 
 Raises ``ApprovalPendingError`` to pause the agent loop and wait for
-user input.  The gateway detects ``INPUT_REQUIRED`` status, emits an
-SSE ``ask_user`` event, and exposes ``POST /runs/{id}/answer`` for
-the frontend to submit the response.  The runtime then injects the
-answer as a tool Observation so the LLM sees it in context.
+user input.  The gateway sets ``status=waiting_input`` without closing
+LiveTail, and exposes ``POST /runs/{id}/answer`` for the frontend.
+The runtime then injects the answer as a tool Observation.
 
 Aligned with LobeHub's built-in AskUserQuestion intervention UI
 (``lobe-user-interaction____askUserQuestion`` wire).

@@ -150,6 +150,11 @@ class ObservabilityHub(ObservabilityBackend):
         bridge.attach(self)
         self._bridges.append(bridge)
 
+    @property
+    def bridges(self) -> tuple[Any, ...]:
+        """已挂接的外部后端桥（如 Langfuse）。只读。"""
+        return tuple(self._bridges)
+
     def score(self, name: str, value: float, attributes: dict[str, Any]) -> None:
         """评估打分：后端支持走 scorer，否则降级为事件。"""
         if self._scorer is not None:

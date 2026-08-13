@@ -1,8 +1,10 @@
 # ADR-0053: Gateway SSE 链路架构重构
 
-**状态**: Accepted  
+**状态**: Superseded  
 **日期**: 2026-08-12  
 **决策者**: 架构评审  
+**Superseded by**: `docs/superpowers/specs/2026-08-13-run-live-architecture-design.md`（Journal SSE + LiveTail + JournalTransport；`timeline.v1` 已废）
+
 
 ---
 

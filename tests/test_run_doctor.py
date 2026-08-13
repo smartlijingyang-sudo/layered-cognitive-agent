@@ -1,0 +1,109 @@
+"""doctor.v1 predicates — broken_hop is the first false hop."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from gateway.runs.doctor import diagnose
+from gateway.runs.live import LiveTail
+from gateway.runs.session import RunSession, RunStatus
+from lca.layer0_infra.observability.journal.journal_io import JOURNAL_SCHEMA_VERSION
+
+
+def _write_jsonl(path: Path, rows: list[dict]) -> None:
+    path.write_text(
+        "\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _row(seq: int, event_type: str, event: dict) -> dict:
+    return {
+        "schema": JOURNAL_SCHEMA_VERSION,
+        "seq": seq,
+        "ts": float(seq),
+        "scope": {"trace_id": "t", "run_id": "run_x"},
+        "event_type": event_type,
+        "event": event,
+    }
+
+
+def _session(*, status: RunStatus, tail: LiveTail, jsonl_path: Path) -> RunSession:
+    return RunSession(
+        run_id="run_x",
+        trace_id="t",
+        jsonl_path=jsonl_path,
+        tail=tail,
+        question="q",
+        user_text="q",
+        mode="solo",
+        status=status,
+    )
+
+
+def test_doctor_flags_h3_when_tail_closes_while_running(tmp_path: Path) -> None:
+    path = tmp_path / "run_x.jsonl"
+    _write_jsonl(
+        path,
+        [
+            _row(1, "AgentRunStarted", {"agent_role": "助手", "objective": "q"}),
+            _row(2, "ReasoningDelta", {"step": 0, "text_delta": "x", "seq": 0}),
+        ],
+    )
+    tail = LiveTail()
+    session = _session(status=RunStatus.RUNNING, tail=tail, jsonl_path=path)
+    tail.close()
+    report = diagnose(session, path)
+    assert report.schema == "doctor.v1"
+    assert report.broken_hop == "H3"
+    assert report.hops["H3"].ok is False
+
+
+def test_doctor_flags_factory_when_tool_started_without_state(tmp_path: Path) -> None:
+    path = tmp_path / "run_x.jsonl"
+    _write_jsonl(
+        path,
+        [
+            _row(1, "AgentRunStarted", {"agent_role": "助手", "objective": "q"}),
+            _row(2, "ToolStarted", {"tool_name": "web_search", "invocation_id": "inv1"}),
+            _row(3, "ToolInvoked", {"tool_name": "web_search", "invocation_id": "inv1"}),
+            _row(4, "AgentRunFinished", {"status": "completed"}),
+        ],
+    )
+    tail = LiveTail()
+    session = _session(status=RunStatus.COMPLETED, tail=tail, jsonl_path=path)
+    report = diagnose(session, path)
+    assert report.factory["ok"] is False
+    assert "web_search" in report.factory["tools_missing_plugin_state"]
+    assert report.broken_hop is None
+
+
+def test_doctor_broken_hop_is_first_false(tmp_path: Path) -> None:
+    path = tmp_path / "run_x.jsonl"
+    _write_jsonl(path, [])
+    tail = LiveTail()
+    tail.close()
+    session = _session(status=RunStatus.RUNNING, tail=tail, jsonl_path=path)
+    report = diagnose(session, path)
+    assert report.hops["H2"].ok is False
+    assert report.hops["H3"].ok is False
+    assert report.broken_hop == "H2"
+
+
+def test_doctor_works_from_jsonl_without_session(tmp_path: Path) -> None:
+    path = tmp_path / "run_x.jsonl"
+    _write_jsonl(
+        path,
+        [
+            _row(1, "AgentRunStarted", {"agent_role": "助手", "objective": "q"}),
+            _row(2, "AgentRunFinished", {"status": "completed"}),
+        ],
+    )
+    report = diagnose(None, path)
+    assert report.hops["H1"].ok is True
+    assert report.hops["H2"].ok is True
+    assert report.hops["H3"].ok is None
+    assert report.hops["H4"].ok is None
+    assert report.hops["H5"].ok is None
+    assert report.broken_hop is None

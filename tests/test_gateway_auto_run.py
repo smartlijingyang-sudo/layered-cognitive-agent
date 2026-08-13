@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import unittest
 
-from gateway.run_executor import create_run_session, execute_run, set_llm_resolver
-from gateway.run_registry import RunRegistry, RunStatus
+from gateway.runs.execute import create_run_session, execute_run, set_llm_resolver
+from gateway.runs.session import RunRegistry, RunStatus
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
 from lca.layer0_infra.llm_resolver import ProductionLLMResolver
@@ -27,12 +27,14 @@ class _ScriptedResolver:
         return self._llm
 
 
-def _journal_event_types(session: RunStatus) -> set[str]:
-    """Read event types from the EventStream buffer (replaces old hub.journal access)."""
-    from gateway.run_registry import RunSession
+def _journal_event_types(session: object) -> set[str]:
+    from gateway.runs.session import RunSession
+    from lca.layer0_infra.observability.journal.journal_io import read_journal
 
     assert isinstance(session, RunSession)
-    return {type(stamped.event).__name__ for stamped in session.stream.buffered_after()}
+    if session.hub is not None:
+        return {type(stamped.event).__name__ for stamped in session.hub.journal.events}
+    return {type(stamped.event).__name__ for stamped in read_journal(session.jsonl_path)}
 
 
 class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
@@ -72,7 +74,7 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
             mode=session.mode,
         )
         self.assertEqual(session.status, RunStatus.COMPLETED)
-        event_types = {type(stamped.event).__name__ for stamped in session.stream.buffered_after()}
+        event_types = _journal_event_types(session)
         self.assertIn("CastingStarted", event_types)
         self.assertIn("CastingCompleted", event_types)
 
@@ -99,7 +101,7 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(session.status, RunStatus.FAILED)
         assert session.error is not None
         self.assertIn("自动组队失败", session.error)
-        event_types = {type(stamped.event).__name__ for stamped in session.stream.buffered_after()}
+        event_types = _journal_event_types(session)
         self.assertIn("CastingStarted", event_types)
         self.assertIn("CastingFailed", event_types)
 

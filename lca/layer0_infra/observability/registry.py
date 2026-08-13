@@ -9,13 +9,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
+import structlog
 from opentelemetry.sdk.trace.export import SpanExporter
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from lca.contracts.protocols import JournalProjector, ObservabilityBackend
-from lca.layer0_infra.observability.exporters.langfuse import LangfuseBridge
+from lca.layer0_infra.observability.exporters.langfuse import (
+    ExporterUnavailableError,
+    LangfuseBridge,
+)
 from lca.layer0_infra.observability.hub import ObservabilityHub
 from lca.layer0_infra.observability.journal.console_projector import ConsoleJournalProjector
 from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
@@ -54,6 +58,7 @@ def create_observability(
     choice: str | ObservabilityBackend | None = None,
     *,
     settings: ObservabilitySettings | None = None,
+    extra_projectors: Sequence[JournalProjector] = (),
 ) -> ObservabilityHub:
     """唯一构造入口：字符串选择 → 装配完成的 hub。
 
@@ -61,9 +66,14 @@ def create_observability(
     - ``None``：读 settings.backends（env ``LCA_OBS_BACKENDS``）；
     - ``"a+b"``：按 ``+``/``,`` 分隔解析后端名（console 走 journal 投影器，
       jsonl/memory/langfuse 走 OTel 导出器/桥）。
+    - ``extra_projectors``：本次装配额外的 journal 读者（如 Run 的 LiveTail）。
+      与 backends 投影器同序扇出，不是平行总线。
     非 hub 的自定义 backend 实例不可作为选择传入（必须是完整 hub）。
+    Langfuse 不可用（未装 SDK / 无凭据）时跳过并记日志，不阻断其它读者。
     """
     if isinstance(choice, ObservabilityHub):
+        if extra_projectors:
+            raise TypeError("已装配的 ObservabilityHub 不能再接收 extra_projectors")
         return choice
     if isinstance(choice, ObservabilityBackend):
         raise TypeError(
@@ -82,7 +92,14 @@ def create_observability(
         exporter_factory = EXPORTER_FACTORIES.get(name)
         if exporter_factory is None:
             raise UnknownExporterError(name)
-        built = exporter_factory(cfg)
+        try:
+            built = exporter_factory(cfg)
+        except ExporterUnavailableError:
+            structlog.get_logger(__name__).warning(
+                "observability_backend_unavailable",
+                backend=name,
+            )
+            continue
         if isinstance(built, LangfuseBridge):
             bridges.append(built)
         else:
@@ -92,10 +109,16 @@ def create_observability(
         policy=AttributePolicy(cfg.verbosity, redact=cfg.redact_enabled),
         sampling_rate=cfg.sampling_rate,
         environment=cfg.environment,
-        journal_projectors=projectors,
+        journal_projectors=[*projectors, *extra_projectors],
     )
     for bridge in bridges:
-        hub.attach_bridge(bridge)
+        try:
+            hub.attach_bridge(bridge)
+        except ExporterUnavailableError:
+            structlog.get_logger(__name__).warning(
+                "observability_bridge_attach_failed",
+                backend=type(bridge).__name__,
+            )
     return hub
 
 

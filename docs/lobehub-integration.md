@@ -6,18 +6,20 @@
 
 ```text
 Browser → LobeHub v2.2.13 (lobehub-ui/, bun run dev :3010)
-              │ OpenAI client (OPENAI_PROXY_URL)
+              │ JournalTransport
+              │ POST /lca-api/runs  →  POST /runs
+              │ GET  /lca-api/runs/{id}/live
               ▼
-LCA Gateway (:8765/v1/chat/completions)  ← gateway/openai_compat_api.py
-              │
+LCA Gateway (:8765)
+              │ runs/api.py + runs/execute.py
               ▼
 LCA Agent/Team 运行时 (layer2~3)
+              │ record() → jsonl + LiveTail
 ```
 
-默认聊天模型 `solo`（LCA 后端，`LLM_MODEL` / 百炼 Qwen）。全部请求走 LCA gateway：
-- `POST /v1/chat/completions`：主聊天 + 系统 mini agent
-- `POST /v1/embeddings`：代理上游 embedding
-- `POST /v1/responses`：json_schema 结构化输出；普通 chat 回落 LCA run
+默认聊天模型 `solo`。两条路不相交：
+- `POST /runs` + `GET /runs/{id}/live`：Agent 干活
+- `POST /v1/chat/completions` / embeddings / responses：标题与系统小助手（`openai_shim`）
 
 联网搜索（ADR-0053）：`TAVILY_API_KEY` 已配 → `web_search`；否则 Qwen `enable_search` 兜底。
 
@@ -39,7 +41,7 @@ LCA Agent/Team 运行时 (layer2~3)
 | `scripts/sync_lobehub_ui.sh` | 拉取并 rsync 官方 release |
 | `scripts/start_lobehub_stack.sh` | 联合启动编排 |
 | `deploy/lobehub/.env.lca` | LobeHub 本地 env 模板 |
-| `gateway/openai_compat_api.py` | OpenAI 兼容 HTTP 面 |
+| `gateway/openai_shim.py` | OpenAI 兼容 HTTP 面（标题 / embeddings / responses） |
 
 
 升级：`LOBEHUB_RELEASE=v2.2.14 ./scripts/sync_lobehub_ui.sh`

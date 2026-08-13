@@ -15,6 +15,7 @@ from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
 from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
 from lca.layer0_infra.llm_adapter.openai_compat._chat_completions import to_openai_chat_tool_spec
 from lca.layer0_infra.llm_adapter.openai_compat._responses import to_openai_responses_tool_spec
+from lca.layer0_infra.llm_adapter.settings import clear_llm_settings_cache
 
 _HAS_OPENAI = importlib.util.find_spec("openai") is not None
 
@@ -93,6 +94,22 @@ class _MockChatResponse:
 
 @unittest.skipUnless(_HAS_OPENAI, "openai SDK not installed")
 class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._env = mock.patch.dict(os.environ, {}, clear=False)
+        self._env.start()
+        for key in (
+            "LLM_API_STYLE",
+            "LLM_ENABLE_THINKING",
+            "LLM_PARALLEL_TOOL_CALLS",
+            "LLM_TOP_K",
+        ):
+            os.environ.pop(key, None)
+        clear_llm_settings_cache()
+
+    def tearDown(self) -> None:
+        self._env.stop()
+        clear_llm_settings_cache()
+
     def _patch_client(self) -> mock.Mock:
         client = mock.Mock()
         client.chat = mock.Mock()
@@ -521,7 +538,7 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
         kwargs = client.chat.completions.create.await_args.kwargs
         self.assertTrue(kwargs["parallel_tool_calls"])
         self.assertIn("top_p", kwargs)
-        self.assertEqual(kwargs["extra_body"]["enable_thinking"], False)
+        self.assertEqual(kwargs["extra_body"]["enable_thinking"], True)
         self.assertEqual(kwargs["extra_body"]["top_k"], 20)
         self.assertEqual(kwargs["tools"][0]["function"]["name"], "calculator")
 

@@ -66,7 +66,7 @@ class LLMSettings(BaseSettings):
     parallel_tool_calls: bool = True
     tool_choice: str | None = "auto"  # auto | none | required（对象形态由调用方 kwargs 覆盖）
 
-    # 百炼 / Qwen 扩展（None = 不注入；无 tools 时 enable_thinking 默认 True）
+    # 百炼 / Qwen 扩展（None = 不注入；Qwen 默认 enable_thinking=True，与是否带 tools 无关）
     enable_thinking: bool | None = None
     enable_search: bool | None = None
     search_strategy: str | None = None  # turbo | max | agent | agent_max

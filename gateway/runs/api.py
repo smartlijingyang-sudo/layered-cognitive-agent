@@ -1,0 +1,242 @@
+"""HTTP for Runs: create, live, get, cancel, answer, doctor."""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import json
+from collections.abc import AsyncIterator
+from typing import Any
+
+from starlette.requests import Request
+from starlette.responses import JSONResponse, StreamingResponse
+
+from gateway.cors import cors_headers
+from gateway.modes import resolve_lca_mode
+from gateway.runs.doctor import diagnose
+from gateway.runs.execute import create_run_session, llm_status, resume_run, schedule_run
+from gateway.runs.ingress import prepare_run_from_messages
+from gateway.runs.live import LiveGap, LiveTail
+from gateway.runs.session import RunRegistry, RunStatus
+from lca.layer0_infra.observability.journal.sse_frames import (
+    parse_last_event_id,
+    stamped_to_sse_frame,
+)
+
+_HEARTBEAT_INTERVAL_S = 15.0
+_HEARTBEAT = b": keepalive\n\n"
+
+
+def _err(
+    message: str,
+    *,
+    status_code: int,
+    error_type: str = "invalid_request_error",
+    code: str | None = None,
+) -> JSONResponse:
+    err: dict[str, Any] = {"message": message, "type": error_type}
+    if code:
+        err["code"] = code
+    return JSONResponse({"error": err}, status_code=status_code, headers=cors_headers())
+
+
+def encode_live_gap(gap: LiveGap) -> bytes:
+    payload = json.dumps(
+        {"requested_seq": gap.requested_seq, "oldest_seq": gap.oldest_seq},
+        ensure_ascii=False,
+    )
+    return f"event: LiveGap\ndata: {payload}\n\n".encode()
+
+
+async def iter_live_sse(
+    tail: LiveTail,
+    *,
+    after_seq: int = 0,
+    heartbeat_s: float = _HEARTBEAT_INTERVAL_S,
+) -> AsyncIterator[bytes]:
+    """Journal frames + comment heartbeats. No projection, no adapter."""
+    sub = tail.subscribe(after_seq=after_seq)
+    while True:
+        try:
+            item = await asyncio.wait_for(sub.__anext__(), timeout=heartbeat_s)
+        except TimeoutError:
+            yield _HEARTBEAT
+            continue
+        except StopAsyncIteration:
+            break
+        if isinstance(item, LiveGap):
+            yield encode_live_gap(item)
+            continue
+        yield stamped_to_sse_frame(item).encode()
+
+
+async def create_run(request: Request) -> JSONResponse:
+    """POST /runs — start an LCA run; client then GETs /runs/{id}/live."""
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=cors_headers())
+    if not llm_status()["llm_available"]:
+        return _err(
+            "LLM_API_KEY 未配置，无法执行 LCA run。",
+            status_code=503,
+            error_type="service_unavailable",
+            code="lca_llm_unavailable",
+        )
+    try:
+        body = await request.json()
+    except json.JSONDecodeError:
+        return _err("invalid JSON body", status_code=400)
+    if not isinstance(body, dict):
+        return _err("request body must be a JSON object", status_code=400)
+
+    messages = body.get("messages") or []
+    if not isinstance(messages, list):
+        return _err("messages must be an array", status_code=400)
+
+    model = str(body.get("model", "solo"))
+    from gateway.app import get_file_store, get_registry
+
+    run_input = await prepare_run_from_messages(messages, get_file_store())
+    if not run_input.user_text.strip():
+        return _err("messages must include a non-empty user message", status_code=400)
+
+    mode = resolve_lca_mode(model)
+    registry = get_registry()
+    session = registry.find_inflight_run(
+        user_text=run_input.user_text,
+        mode=mode,
+        attachment_ids=run_input.attachment_ids,
+    )
+    if session is None:
+        session = create_run_session(
+            registry,
+            question=run_input.question,
+            user_text=run_input.user_text,
+            mode=mode,
+            attachment_ids=run_input.attachment_ids,
+            prior_turns=run_input.prior_turns,
+        )
+        schedule_run(registry, session)
+
+    return JSONResponse(
+        {
+            "run_id": session.run_id,
+            "trace_id": session.trace_id,
+            "live_url": f"/runs/{session.run_id}/live",
+        },
+        status_code=202,
+        headers=cors_headers(),
+    )
+
+
+async def stream_run_live(request: Request) -> StreamingResponse | JSONResponse:
+    """GET /runs/{run_id}/live — Journal SSE. Honors Last-Event-ID."""
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=cors_headers())
+    run_id = request.path_params["run_id"]
+    after = parse_last_event_id(request.headers.get("last-event-id"))
+    from gateway.app import get_registry
+
+    session = get_registry().get(run_id)
+    if session is None:
+        return _err("run not found", status_code=404)
+
+    async def _gen() -> AsyncIterator[bytes]:
+        async for frame in iter_live_sse(session.tail, after_seq=after):
+            yield frame
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers=cors_headers(
+            **{
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            }
+        ),
+    )
+
+
+async def get_run(request: Request) -> JSONResponse:
+    from gateway.app import get_registry
+
+    run_id = request.path_params["run_id"]
+    summary = get_registry().summary(run_id)
+    if summary is None:
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+    return JSONResponse(summary, headers=cors_headers())
+
+
+async def get_run_doctor(request: Request) -> JSONResponse:
+    from gateway.app import get_registry
+
+    run_id = request.path_params["run_id"]
+    registry = get_registry()
+    session = registry.get(run_id)
+    jsonl_path = session.jsonl_path if session is not None else registry.jsonl_path_for(run_id)
+    if session is None and not jsonl_path.is_file():
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+    report = diagnose(session, jsonl_path)
+    return JSONResponse(report.as_dict(), headers=cors_headers())
+
+
+async def cancel_run(request: Request) -> JSONResponse:
+    from gateway.app import get_registry
+
+    run_id = request.path_params["run_id"]
+    session = get_registry().get(run_id)
+    if session is None:
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+    if session.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELED):
+        return JSONResponse({"status": session.status.value}, headers=cors_headers())
+    session.cancel_requested = True
+    session.status = RunStatus.CANCELED
+    if session.task is not None and not session.task.done():
+        session.task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await session.task
+    return JSONResponse({"status": RunStatus.CANCELED.value}, headers=cors_headers())
+
+
+async def answer_run(request: Request) -> JSONResponse:
+    from gateway.app import get_registry
+
+    run_id = request.path_params["run_id"]
+    registry = get_registry()
+    session = registry.get(run_id)
+    if session is None:
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+    if session.status != RunStatus.WAITING_INPUT:
+        return JSONResponse(
+            {"error": "run not waiting for input", "status": session.status.value},
+            status_code=409,
+            headers=cors_headers(),
+        )
+    try:
+        body = await request.json()
+    except json.JSONDecodeError:
+        return JSONResponse({"error": "invalid JSON body"}, status_code=400, headers=cors_headers())
+    answer = str(body.get("answer", "")).strip()
+    if not answer:
+        return JSONResponse(
+            {"error": "answer is required"}, status_code=400, headers=cors_headers()
+        )
+    if session.snapshot is None or session.runnable is None:
+        return JSONResponse(
+            {"error": "no resume state available"},
+            status_code=500,
+            headers=cors_headers(),
+        )
+    session.status = RunStatus.RUNNING
+    task = asyncio.create_task(resume_run(session, registry, answer))
+    session.task = task
+    return JSONResponse({"run_id": run_id, "status": "resumed"}, headers=cors_headers())
+
+
+def health_payload(registry: RunRegistry) -> dict[str, Any]:
+    return {
+        "status": "ok",
+        **llm_status(),
+        "runs": registry.status_counts(),
+        "live": registry.live_totals(),
+    }

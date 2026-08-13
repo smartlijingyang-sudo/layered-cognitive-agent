@@ -10,7 +10,7 @@ meta = PatchMeta(
     files=("packages/agent-runtime/src/executors/callLlmFinalizer.ts",),
     risk="high",
     category="runtime",
-    depends_on=("agent_timeline_transport",),
+    depends_on=("journal_transport",),
     why="Prevent LobeHub's client-side tool loop from duplicating LCA's server-side execution",
     technical_detail=(
         "Change hasToolsCalling condition: !output.lcaClosedLoop && output.toolsCalling.length > 0. "
