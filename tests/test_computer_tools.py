@@ -26,6 +26,16 @@ class TestComputerParse(unittest.TestCase):
         assert parsed is not None
         self.assertTrue(parsed["success"])
 
+    def test_parse_prefers_marker_over_trailing_json(self) -> None:
+        inner = {"success": True, "via": "marker"}
+        stdout = (
+            f"{COMPUTER_RESULT_BEGIN}{json.dumps(inner)}{COMPUTER_RESULT_END}\n"
+            '{"success": true, "via": "line"}\n'
+        )
+        parsed = parse_computer_stdout(stdout)
+        assert parsed is not None
+        self.assertEqual(parsed["via"], "marker")
+
 
 class TestCloudSandboxWire(unittest.TestCase):
     def test_run_command_wire_name(self) -> None:
@@ -93,8 +103,80 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         self.assertEqual(files[0]["mimeType"], "application/pdf")
         self.assertIn("url", files[0])
         self.assertIn("attachmentId", files[0])
+        self.assertTrue(files[0].get("previewable"))
         state = (obs.payload or {}).get("state", {})
         self.assertEqual(state.get("output"), "output text")
+        self.assertEqual(state.get("files"), files)
+
+    def test_observation_reuses_runtime_file_parts_without_second_put(self) -> None:
+        import os
+        import tempfile
+        from pathlib import Path
+
+        from lca.contracts.models.core.sandbox import SandboxFile
+        from lca.layer0_infra.computer.runtime import ComputerOpResult
+        from lca.layer0_infra.file_store import LocalFileStore
+        from lca.layer0_infra.tools.computer.observations import build_computer_observation
+
+        existing = {
+            "name": "loan.pdf",
+            "mimeType": "application/pdf",
+            "sizeBytes": 4,
+            "url": "/files/file_already",
+            "previewable": True,
+            "attachmentId": "file_already",
+        }
+        result = ComputerOpResult(
+            success=True,
+            content="ok",
+            state={"output": "ok", "files": [existing]},
+            generated_files=(
+                SandboxFile(name="loan.pdf", mime_type="application/pdf", data=b"%PDF"),
+            ),
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = LocalFileStore(root=Path(os.path.join(tmpdir, "files")))
+            obs = build_computer_observation(
+                result, tool_name="execute_code", start=0.0, store=store
+            )
+            self.assertEqual(list(store.root.iterdir()), [])
+        files = (obs.extra or {}).get("files", [])
+        self.assertEqual(files[0]["url"], "/files/file_already")
+
+    def test_failed_office_mutation_does_not_enter_ledger(self) -> None:
+        import os
+        import tempfile
+        from pathlib import Path
+
+        from lca.layer0_infra.computer.runtime import ComputerOpResult
+        from lca.layer0_infra.file_store import LocalFileStore
+        from lca.layer0_infra.tools.computer.observations import build_computer_observation
+        from lca.layer0_infra.workspace.scope import run_workspace_scope
+
+        existing = {
+            "name": "deck.pptx",
+            "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "sizeBytes": 9890,
+            "url": "/files/file_mid",
+            "previewable": False,
+            "attachmentId": "file_mid",
+        }
+        result = ComputerOpResult(
+            success=False,
+            content="batch failed",
+            error="batch failed",
+            state={"stdout": '{"success": false}', "files": [existing]},
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = LocalFileStore(root=Path(os.path.join(tmpdir, "files")))
+            with run_workspace_scope("run_fail_harvest", wall_clock_seconds=60) as workspace:
+                obs = build_computer_observation(
+                    result, tool_name="run_command", start=0.0, store=store
+                )
+                arts = workspace.artifacts.snapshot().artifacts
+        self.assertFalse(obs.success)
+        self.assertEqual(len(arts), 0)
+        self.assertFalse((obs.extra or {}).get("files"))
 
     def test_plugin_state_from_nested_state(self) -> None:
         import os

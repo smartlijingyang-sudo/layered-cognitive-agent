@@ -1,39 +1,85 @@
-import type { ChatToolPayload, MessageToolCall, UIChatMessage } from '@lobechat/types';
+import type {
+  ChatToolPayload,
+  ChatToolPayloadWithResult,
+  MessageToolCall,
+  UIChatMessage,
+} from '@lobechat/types';
 
+import { messageService } from '@/services/message';
 import { dbMessageSelectors } from '@/store/chat/slices/message/selectors/dbMessage';
 import type { ChatStore } from '@/store/chat/store';
+import { useFileStore } from '@/store/file';
 
 import { StreamingHandler } from '../StreamingHandler';
+import {
+  collectArtifactFiles,
+  collectMarkdownDeliverables,
+  isImageArtifact,
+  latestDeliverables,
+  rewriteArtifactMarkdown,
+  toFileList,
+  toImageList,
+  type ArtifactFile,
+} from './lcaArtifacts';
 import { persistMissed, snapshotRow, type ProjectedRow } from './lcaChatRow';
+import {
+  parseSseBlock,
+  projectJournalFrame,
+  toolCallId,
+  type JournalFrame,
+  type Projected,
+} from './lcaJournal';
 import { WIRE } from './lcaWire';
 
 const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
+const TERMINAL = new Set(['canceled', 'completed', 'failed']);
 
-type JournalFrame = {
-  event: string;
-  seq?: number;
-  eventPayload?: Record<string, unknown>;
-  speaker?: string;
+type WireFile = { id?: string; mime_type?: string; name: string; size?: number; url: string };
+
+type TurnTool = {
+  call: MessageToolCall;
+  operationId?: string;
+  result?: ChatToolPayloadWithResult['result'];
+  resultMsgId?: string;
 };
 
-type Projected =
-  | { kind: 'ignore' }
-  | { kind: 'open-turn'; speaker: string }
-  | { kind: 'reasoning'; text: string }
-  | { kind: 'text'; text: string }
-  | { kind: 'tool-start'; toolName: string; state: Record<string, unknown>; idHint: string }
-  | { kind: 'sandbox-delta'; stream: string; text: string; payload: Record<string, unknown> }
-  | { kind: 'tool-invoked'; payload: Record<string, unknown>; state: Record<string, unknown> }
-  | { kind: 'tool-denied'; payload: Record<string, unknown>; reason: string }
-  | { kind: 'run-finished'; error?: string }
-  | { kind: 'live-gap' };
-
-const TERMINAL = new Set(['canceled', 'completed', 'failed']);
+const ARG_OMIT = new Set([
+  'content',
+  'error',
+  'errorDetail',
+  'executionEnv',
+  'exitCode',
+  'files',
+  'hasResources',
+  'output',
+  'resources',
+  'source',
+  'stderr',
+  'stdout',
+  'success',
+  'title',
+]);
 
 function pickArgs(state: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!state) return {};
-  const { stdout, stderr, files, output, error, success, executionEnv, ...args } = state;
+  const args: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(state)) {
+    if (!ARG_OMIT.has(key)) args[key] = value;
+  }
   return args;
+}
+
+function hasRenderableArgs(state: Record<string, unknown>): boolean {
+  return Object.keys(pickArgs(state)).length > 0;
+}
+
+/** Native renderer `content` from plugin_state. Journal previews never reach live SSE. */
+function toolCardContent(state: Record<string, unknown>): string {
+  for (const key of ['content', 'output', 'stdout'] as const) {
+    const value = state[key];
+    if (typeof value === 'string' && value) return value;
+  }
+  return '';
 }
 
 function resolveCoords(
@@ -49,12 +95,6 @@ function resolveCoords(
   return { identifier, apiName };
 }
 
-function toolCallId(payload: Record<string, unknown>, fallback: string): string {
-  const invocation = payload.invocation_id;
-  if (typeof invocation === 'string' && invocation) return invocation;
-  return fallback;
-}
-
 function findTurnTool<T extends { call: MessageToolCall }>(
   turnTools: T[],
   payload: Record<string, unknown>,
@@ -65,8 +105,6 @@ function findTurnTool<T extends { call: MessageToolCall }>(
   if (id) return undefined;
   return turnTools.at(-1);
 }
-
-type WireFile = { id?: string; mime_type?: string; name: string; size?: number; url: string };
 
 function collectWireFiles(message: UIChatMessage): WireFile[] {
   const out: WireFile[] = [];
@@ -109,40 +147,6 @@ function toWireMessages(messages: UIChatMessage[]): {
     });
 }
 
-function parseSseBlock(block: string): JournalFrame | null {
-  let eventName = '';
-  let idLine = '';
-  const dataLines: string[] = [];
-  for (const line of block.split('\n')) {
-    if (line.startsWith('id:') || line.startsWith('id: ')) idLine = line.replace(/^id:\s?/, '').trim();
-    else if (line.startsWith('event:') || line.startsWith('event: '))
-      eventName = line.replace(/^event:\s?/, '').trim();
-    else if (line.startsWith('data:') || line.startsWith('data: '))
-      dataLines.push(line.replace(/^data:\s?/, ''));
-  }
-  if (!eventName || !dataLines.length) return null;
-  try {
-    const data = JSON.parse(dataLines.join('\n')) as Record<string, unknown>;
-    const inner =
-      data.event && typeof data.event === 'object'
-        ? (data.event as Record<string, unknown>)
-        : data;
-    const scope =
-      data.scope && typeof data.scope === 'object'
-        ? (data.scope as Record<string, unknown>)
-        : {};
-    const seqFromId = Number(idLine);
-    return {
-      event: eventName,
-      seq: typeof data.seq === 'number' ? data.seq : Number.isFinite(seqFromId) ? seqFromId : undefined,
-      eventPayload: inner,
-      speaker: typeof scope.agent_role === 'string' ? scope.agent_role : '',
-    };
-  } catch {
-    return null;
-  }
-}
-
 async function* readSse(response: Response): AsyncGenerator<JournalFrame> {
   const reader = response.body?.getReader();
   if (!reader) throw new Error('live: empty body');
@@ -163,53 +167,44 @@ async function* readSse(response: Response): AsyncGenerator<JournalFrame> {
   }
 }
 
-function projectJournalFrame(frame: JournalFrame): Projected {
-  const payload = frame.eventPayload ?? {};
-  switch (frame.event) {
-    case 'LlmCallStarted':
-      return { kind: 'open-turn', speaker: frame.speaker ?? '' };
-    case 'ReasoningDelta':
-      return { kind: 'reasoning', text: String(payload.text_delta ?? '') };
-    case 'StepTextDelta':
-      if (payload.channel && payload.channel !== 'answer') return { kind: 'ignore' };
-      return { kind: 'text', text: String(payload.text_delta ?? '') };
-    case 'ToolStarted':
-      return {
-        idHint: toolCallId(payload, `call_${frame.seq ?? 0}`),
-        kind: 'tool-start',
-        state: (payload.plugin_state as Record<string, unknown> | undefined) ?? {},
-        toolName: String(payload.tool_name ?? ''),
-      };
-    case 'SandboxOutputDelta':
-      return {
-        kind: 'sandbox-delta',
-        payload,
-        stream: String(payload.stream ?? 'stdout'),
-        text: String(payload.text_delta ?? ''),
-      };
-    case 'ToolInvoked':
-      return {
-        kind: 'tool-invoked',
-        payload,
-        state: (payload.plugin_state as Record<string, unknown> | undefined) ?? {},
-      };
-    case 'ToolDenied':
-      return {
-        kind: 'tool-denied',
-        payload,
-        reason: String(payload.reason ?? payload.error ?? 'denied'),
-      };
-    case 'AgentRunFinished':
-    case 'TeamRunFinished':
-      return {
-        error: payload.error ? String(payload.error) : undefined,
-        kind: 'run-finished',
-      };
-    case 'LiveGap':
-      return { kind: 'live-gap' };
-    default:
-      return { kind: 'ignore' };
+async function attachNativeFiles(
+  get: () => ChatStore,
+  messageId: string,
+  files: ArtifactFile[],
+  operationId: string,
+  seen: Set<string>,
+): Promise<void> {
+  const pending = files.filter(
+    (file) => !isImageArtifact(file) && file.url && !seen.has(file.url),
+  );
+  if (!pending.length) return;
+
+  const fileIds: string[] = [];
+  for (const file of pending) {
+    try {
+      const response = await fetch(file.url);
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      const uploaded = await useFileStore.getState().uploadWithProgress({
+        file: new File([blob], file.name, { type: file.mimeType || blob.type }),
+        skipCheckFileType: true,
+      });
+      if (!uploaded?.id) continue;
+      seen.add(file.url);
+      fileIds.push(uploaded.id);
+    } catch {
+      console.warn('lca: native file ingest failed', file.name);
+    }
   }
+  if (!fileIds.length) return;
+
+  const ctx = get().internal_getConversationContext({ operationId });
+  const result = await messageService.addFilesToMessage(messageId, fileIds, ctx);
+  if (result?.success && result.messages) {
+    get().replaceMessages(result.messages, { action: 'lcaAttachFiles', context: ctx });
+    return;
+  }
+  await get().refreshMessages();
 }
 
 export type LcaRunOptions = {
@@ -234,7 +229,12 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
   let speaker = '';
   let firstReuse = options.reuseAssistantId;
   let handler: StreamingHandler | null = null;
-  const turnTools: { call: MessageToolCall; result?: ChatToolPayload['result'] }[] = [];
+  let journalDurationMs: number | undefined;
+  let lastToolMessageId = '';
+  const turnTools: TurnTool[] = [];
+  const artifacts: ArtifactFile[] = [];
+  const turnImages: ArtifactFile[] = [];
+  const ingestedUrls = new Set<string>();
 
   const dispatchMessage = (id: string, value: Record<string, unknown>) => {
     get().internal_dispatchMessage(
@@ -245,12 +245,12 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
 
   const resolveTurnTools = (): ChatToolPayload[] => {
     if (!turnTools.length) return [];
-    const payloads = get().internal_transformToolCalls(
-      turnTools.map((item) => item.call),
-    );
+    const payloads = get().internal_transformToolCalls(turnTools.map((item) => item.call));
     for (const payload of payloads) {
       const rec = turnTools.find((item) => item.call.id === payload.id);
-      if (rec?.result) (payload as { result?: typeof rec.result }).result = rec.result;
+      if (!rec) continue;
+      if (rec.result) (payload as { result?: typeof rec.result }).result = rec.result;
+      if (rec.resultMsgId) payload.result_msg_id = rec.resultMsgId;
     }
     return payloads;
   };
@@ -258,7 +258,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
   const currentRow = (): ProjectedRow =>
     snapshotRow(
       assistantId,
-      handler?.getOutput() ?? '',
+      rewriteArtifactMarkdown(handler?.getOutput() ?? '', artifacts),
       resolveTurnTools().length,
       Boolean(handler?.getThinkingContent()),
     );
@@ -269,7 +269,10 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     if (!payloads.length) return;
     get().internal_toggleToolCallingStreaming(
       assistantId,
-      payloads.map(() => streaming),
+      payloads.map((payload) => {
+        const rec = turnTools.find((item) => item.call.id === payload.id);
+        return streaming && !rec?.result;
+      }),
     );
     dispatchMessage(assistantId, { tools: payloads });
   };
@@ -284,7 +287,11 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         topicId: ctx.topicId,
       },
       {
-        onContentUpdate: (content, reasoning) => dispatchMessage(messageId, { content, reasoning }),
+        onContentUpdate: (content, reasoning) =>
+          dispatchMessage(messageId, {
+            content: rewriteArtifactMarkdown(content, artifacts),
+            reasoning,
+          }),
         onGroundingUpdate: (search) => dispatchMessage(messageId, { search }),
         onImagesUpdate: (imageList) => dispatchMessage(messageId, { imageList }),
         onReasoningComplete: (operationId) => get().completeOperation(operationId),
@@ -312,10 +319,20 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
 
   const persistRow = async () => {
     if (!assistantId) return;
-    const content = handler?.getOutput() ?? '';
+    const content = rewriteArtifactMarkdown(handler?.getOutput() ?? '', artifacts);
     const thinking = handler?.getThinkingContent() ?? '';
-    const duration = handler?.getThinkingDuration();
+    const duration = journalDurationMs ?? handler?.getThinkingDuration();
     const tools = resolveTurnTools();
+    const works = latestDeliverables([...turnImages, ...collectMarkdownDeliverables(content)]);
+    const imageList = toImageList(works);
+    const fileList = toFileList(works);
+    await attachNativeFiles(
+      get,
+      assistantId,
+      works,
+      options.operationId,
+      ingestedUrls,
+    );
     await get().optimisticUpdateMessageContent(
       assistantId,
       content,
@@ -326,6 +343,8 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           ? { reasoning: { content: thinking, ...(duration !== undefined ? { duration } : {}) } }
           : {}),
         ...(tools.length ? { tools } : {}),
+        ...(imageList.length ? { imageList } : {}),
+        ...(fileList.length ? { fileList } : {}),
       },
       { operationId: options.operationId },
     );
@@ -356,7 +375,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     await finishHandler();
   };
 
-  const openRow = async (nextSpeaker: string) => {
+  const openRow = async (nextSpeaker: string, parentId: string) => {
     speaker = nextSpeaker;
     let id = firstReuse;
     firstReuse = undefined;
@@ -365,7 +384,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         {
           content: '',
           model: options.model,
-          parentId: options.userMessageId ?? options.parentMessageId,
+          parentId,
           provider: 'openai',
           role: 'assistant',
           topicId: ctx.topicId,
@@ -378,44 +397,58 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     }
     if (!id) throw new Error('lca: failed to open assistant turn');
     assistantId = id;
+    journalDurationMs = undefined;
+    turnTools.length = 0;
+    turnImages.length = 0;
     get().associateMessageWithOperation(id, options.operationId);
     handler = makeHandler(id);
   };
 
-  const ensureSpeaker = async (nextSpeaker: string) => {
+  const openTurn = async (nextSpeaker: string) => {
     const sameSpeaker = !nextSpeaker || !speaker || nextSpeaker === speaker;
-    if (!assistantId) {
-      await openRow(nextSpeaker);
-      return;
-    }
-    if (sameSpeaker) {
-      if (handler) {
-        await persistRow();
-        await finishHandler();
-      }
+    if (assistantId && sameSpeaker) {
+      speaker = nextSpeaker || speaker;
+      journalDurationMs = undefined;
       handler = makeHandler(assistantId);
       return;
     }
-    await finishTurn();
-    turnTools.length = 0;
-    assistantId = '';
-    await openRow(nextSpeaker);
+    if (assistantId) await finishTurn();
+    if (!sameSpeaker) lastToolMessageId = '';
+    await openRow(
+      nextSpeaker,
+      sameSpeaker
+        ? lastToolMessageId || options.userMessageId || options.parentMessageId
+        : options.userMessageId || options.parentMessageId,
+    );
   };
 
   const ensureTurn = async () => {
-    if (!assistantId) await openRow(speaker);
+    if (!assistantId) await openRow(speaker, options.userMessageId || options.parentMessageId);
     if (!handler) handler = makeHandler(assistantId);
   };
 
   const applyProjected = async (projected: Projected): Promise<void> => {
     switch (projected.kind) {
       case 'open-turn': {
-        await ensureSpeaker(projected.speaker);
+        await openTurn(projected.speaker);
         return;
       }
       case 'reasoning': {
         await ensureTurn();
         handler?.handleChunk({ text: projected.text, type: 'reasoning' });
+        return;
+      }
+      case 'reasoning-end': {
+        if (projected.durationMs !== undefined) journalDurationMs = projected.durationMs;
+        handler?.handleChunk({ type: 'stop' });
+        if (assistantId && journalDurationMs !== undefined) {
+          const thinking = handler?.getThinkingContent() ?? '';
+          if (thinking) {
+            dispatchMessage(assistantId, {
+              reasoning: { content: thinking, duration: journalDurationMs },
+            });
+          }
+        }
         return;
       }
       case 'text': {
@@ -430,45 +463,153 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           console.warn('lca: unknown tool', projected.toolName);
           return;
         }
-        turnTools.push({
-          call: {
-            function: {
-              arguments: JSON.stringify(pickArgs(projected.state)),
-              name: `${coords.identifier}____${coords.apiName}`,
-            },
-            id: projected.idHint,
-            type: 'function',
+        const existing = turnTools.find((item) => item.call.id === projected.idHint);
+        if (existing) {
+          existing.call.function.arguments = JSON.stringify(pickArgs(projected.state));
+          handler?.handleChunk({
+            isAnimationActives: turnTools.map((item) => !item.result),
+            tool_calls: turnTools.map((item) => item.call),
+            type: 'tool_calls',
+          });
+          if (existing.resultMsgId) {
+            dispatchMessage(existing.resultMsgId, {
+              plugin: {
+                apiName: coords.apiName,
+                arguments: existing.call.function.arguments,
+                identifier: coords.identifier,
+                id: existing.call.id,
+                type: 'builtin',
+              },
+            });
+          }
+          publishTurnTools(!existing.result);
+          return;
+        }
+        if (!hasRenderableArgs(projected.state)) return;
+        const call: MessageToolCall = {
+          function: {
+            arguments: JSON.stringify(pickArgs(projected.state)),
+            name: `${coords.identifier}____${coords.apiName}`,
           },
-        });
+          id: projected.idHint,
+          type: 'function',
+        };
+        const rec: TurnTool = { call };
+        turnTools.push(rec);
         handler?.handleChunk({
           isAnimationActives: turnTools.map((item) => !item.result),
           tool_calls: turnTools.map((item) => item.call),
           type: 'tool_calls',
         });
+        const payloads = resolveTurnTools();
+        const plugin = payloads.find((item) => item.id === call.id);
+        const created = await get().optimisticCreateMessage(
+          {
+            content: '',
+            parentId: assistantId,
+            plugin: plugin ?? {
+              apiName: coords.apiName,
+              arguments: call.function.arguments,
+              identifier: coords.identifier,
+              id: call.id,
+              type: 'builtin',
+            },
+            role: 'tool',
+            tool_call_id: call.id,
+            topicId: ctx.topicId,
+            ...(ctx.agentId ? { agentId: ctx.agentId } : {}),
+            ...(ctx.threadId ? { threadId: ctx.threadId } : {}),
+          },
+          { operationId: options.operationId },
+        );
+        rec.resultMsgId = created?.id;
+        lastToolMessageId = created?.id || lastToolMessageId;
+        const { operationId: toolOpId } = get().startOperation({
+          context: {
+            agentId: ctx.agentId!,
+            groupId: ctx.groupId,
+            messageId: assistantId,
+            threadId: ctx.threadId,
+            topicId: ctx.topicId,
+          },
+          metadata: {
+            apiName: coords.apiName,
+            identifier: coords.identifier,
+            startTime: Date.now(),
+            tool_call_id: call.id,
+          },
+          parentOperationId: options.operationId,
+          type: 'toolCalling',
+        });
+        rec.operationId = toolOpId;
+        get().associateMessageWithOperation(assistantId, toolOpId);
+        if (created?.id) get().associateMessageWithOperation(created.id, toolOpId);
+        publishTurnTools(true);
+        await persistRow();
         return;
       }
       case 'sandbox-delta': {
         const rec = findTurnTool(turnTools, projected.payload);
         if (!rec) return;
         const prev = (rec.result?.state as Record<string, unknown> | undefined) ?? {};
+        const field = projected.stream === 'stderr' ? 'stderr' : 'output';
+        const nextState = {
+          ...prev,
+          [field]: `${String(prev[field] ?? '')}${projected.text}`,
+        };
         rec.result = {
           ...rec.result,
           content: rec.result?.content ?? '',
           id: rec.call.id,
-          state: { ...prev, [projected.stream]: `${String(prev[projected.stream] ?? '')}${projected.text}` },
+          state: nextState,
         };
+        if (rec.resultMsgId) {
+          get().internal_dispatchMessage(
+            { id: rec.resultMsgId, key: field, type: 'updatePluginState', value: nextState[field] },
+            { operationId: options.operationId },
+          );
+        }
         publishTurnTools(true);
         return;
       }
       case 'tool-invoked': {
         const rec = findTurnTool(turnTools, projected.payload);
         if (!rec) return;
+        const files = collectArtifactFiles(projected.files, projected.state.files);
+        for (const file of files) {
+          artifacts.push(file);
+          turnImages.push(file);
+        }
+        const state = files.length ? { ...projected.state, files } : projected.state;
         rec.result = {
-          content: String(projected.payload.result_preview ?? ''),
+          content: toolCardContent(state),
           error: projected.payload.ok === false ? String(projected.payload.error ?? '') : undefined,
           id: rec.call.id,
-          state: projected.state,
+          state,
         };
+        if (rec.resultMsgId) {
+          await get().optimisticUpdateMessageContent(
+            rec.resultMsgId,
+            rec.result.content || '',
+            undefined,
+            { operationId: options.operationId },
+          );
+          await get().optimisticUpdatePluginState(rec.resultMsgId, state, {
+            operationId: options.operationId,
+          });
+        }
+        if (rec.operationId) {
+          if (projected.payload.ok === false) {
+            get().failOperation(rec.operationId, {
+              message: String(projected.payload.error ?? 'tool failed'),
+              type: 'ToolExecutionError',
+            });
+          } else {
+            get().completeOperation(rec.operationId);
+          }
+          rec.operationId = undefined;
+        }
+        lastToolMessageId = rec.resultMsgId || lastToolMessageId;
         publishTurnTools(false);
         await persistRow();
         return;
@@ -482,6 +623,19 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           id: rec.call.id,
           state: {},
         };
+        if (rec.resultMsgId) {
+          await get().optimisticUpdateMessageContent(rec.resultMsgId, '', undefined, {
+            operationId: options.operationId,
+          });
+        }
+        if (rec.operationId) {
+          get().failOperation(rec.operationId, {
+            message: projected.reason,
+            type: 'ToolExecutionError',
+          });
+          rec.operationId = undefined;
+        }
+        lastToolMessageId = rec.resultMsgId || lastToolMessageId;
         publishTurnTools(false);
         await persistRow();
         return;

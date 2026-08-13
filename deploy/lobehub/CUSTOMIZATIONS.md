@@ -9,9 +9,9 @@
 ```
 Browser 发消息
   executeClientAgent（选择器只有 solo / team / auto）
-    → runLcaJournal          POST /runs 一次 + 投影 + sealRow
+    → runLcaJournal          POST /runs 一次 + 投影成原生消息图 + seal
     → finishLcaChat          停转圈 / 队列 / 通知（不是 AgentRuntime）
-    → 一个说话人一条 assistant；工具卡写在当前 assistant.tools
+    → 同一说话人一条 assistant；每个工具一条 role=tool 子消息（result_msg_id）
 ```
 
 Title / embeddings 仍走 `openai_shim`（`/v1/chat|embeddings|responses`），不进 Run。
@@ -22,9 +22,9 @@ Title / embeddings 仍走 `openai_shim`（`/v1/chat|embeddings|responses`），�
 
 | 补丁 | 级 | 存在理由 |
 |---|---|---|
-| `lca_run_driver` | A | 拷贝 TS 投影器 + 生成 `lcaWire.ts`；短路进 `runLcaJournal` / `finishLcaChat` |
+| `lca_run_driver` | A | 拷贝 TS 投影器 + 生成 `lcaWire.ts`；Journal → 原生 assistant/tool 图 |
+| `office_preview_local` | A | 本地 Office 产物走下载，不喂 officeapps.live.com |
 | `file_proxy_rewrite` | A | 浏览器要拿产物；rewrite `/files`、`/lca-api/runs` |
-| `sandbox_generated_files` | B | 上游 ExecuteCode 卡片不渲染 `state.files` |
 | `default_model` | C | 默认模型必须是 `solo` |
 | `lca_model_catalog` | A | 选择器只暴露 solo / team / auto，屏蔽厂商模型 |
 | `openai_guard` | B | 标题等小请求仍走 model-runtime，防止 `solo` 进 Responses |

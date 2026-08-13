@@ -1,0 +1,110 @@
+"""Accumulate streamed tool-call arguments into journal-ready snapshots.
+
+LobeHub paints the card while arguments are still incomplete. Journal must
+do the same: one ``tool_call_id`` from the first name delta through ToolInvoked.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from lca.layer1_cognitive.body.tool_ui_state import build_started_plugin_state
+
+_EMIT_EVERY_CHARS = 160
+_PARTIAL_STRING_KEYS = (
+    "code",
+    "command",
+    "description",
+    "language",
+    "skill_id",
+    "path",
+    "query",
+)
+
+
+def push_tool_call_stream(
+    slots: dict[str, dict[str, Any]],
+    *,
+    tool_name: str | None,
+    tool_call_id: str | None,
+    arguments_delta: str,
+) -> dict[str, Any] | None:
+    """Update ``slots``; return a snapshot dict when the card should refresh."""
+    key = (tool_call_id or "").strip() or (tool_name or "").strip() or "_"
+    slot = slots.setdefault(key, {"name": "", "raw": "", "emitted": -1})
+    if tool_name:
+        slot["name"] = tool_name
+    if arguments_delta:
+        slot["raw"] += arguments_delta
+    name = str(slot["name"] or "")
+    if not name:
+        return None
+    raw = str(slot["raw"] or "")
+    emitted = int(slot["emitted"])
+    if emitted >= 0 and len(raw) - emitted < _EMIT_EVERY_CHARS:
+        return None
+    slot["emitted"] = len(raw)
+    args = parse_partial_tool_args(raw)
+    return {
+        "tool_name": name,
+        "tool_call_id": (tool_call_id or key),
+        "arguments_preview": raw[:2000],
+        "plugin_state": build_started_plugin_state(name, args) if args else {},
+    }
+
+
+def parse_partial_tool_args(raw: str) -> dict[str, Any]:
+    stripped = (raw or "").strip()
+    if not stripped:
+        return {}
+    try:
+        parsed = json.loads(stripped)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        return parsed
+    out: dict[str, Any] = {}
+    for key in _PARTIAL_STRING_KEYS:
+        value = extract_partial_json_string(raw, key)
+        if value is not None:
+            out[key] = value
+    return out
+
+
+def extract_partial_json_string(raw: str, key: str) -> str | None:
+    marker = f'"{key}"'
+    idx = raw.find(marker)
+    if idx < 0:
+        return None
+    colon = raw.find(":", idx + len(marker))
+    if colon < 0:
+        return None
+    rest = raw[colon + 1 :].lstrip()
+    if not rest.startswith('"'):
+        return None
+    return _decode_json_string_prefix(rest, 1)
+
+
+def _decode_json_string_prefix(source: str, start: int) -> str:
+    parts: list[str] = []
+    escaped = False
+    for ch in source[start:]:
+        if escaped:
+            if ch == "n":
+                parts.append("\n")
+            elif ch == "t":
+                parts.append("\t")
+            elif ch == "r":
+                parts.append("\r")
+            else:
+                parts.append(ch)
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == '"':
+            break
+        parts.append(ch)
+    return "".join(parts)

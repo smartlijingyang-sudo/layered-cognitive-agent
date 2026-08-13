@@ -54,7 +54,6 @@ def _description_from_markdown(text: str, *, max_len: int = 200) -> str:
 
 def _started_execute_code(args: dict[str, Any]) -> dict[str, Any]:
     state: dict[str, Any] = {
-        "success": True,
         "executionEnv": "sandbox",
         "language": str(args.get("language") or "python"),
     }
@@ -69,7 +68,6 @@ def _started_execute_code(args: dict[str, Any]) -> dict[str, Any]:
 
 def _started_run_command(args: dict[str, Any]) -> dict[str, Any]:
     state: dict[str, Any] = {
-        "success": True,
         "executionEnv": "sandbox",
         "isBackground": bool(args.get("background", False)),
     }
@@ -84,7 +82,7 @@ def _started_run_command(args: dict[str, Any]) -> dict[str, Any]:
 
 def _started_activate_skill(args: dict[str, Any]) -> dict[str, Any]:
     skill_id = str(args.get("skill_id") or args.get("name") or "").strip()
-    state: dict[str, Any] = {"success": True, "hasResources": True, "source": "agent"}
+    state: dict[str, Any] = {"hasResources": False, "source": "agent"}
     if skill_id:
         state["id"] = skill_id
         state["name"] = skill_id
@@ -95,7 +93,7 @@ def _started_activate_skill(args: dict[str, Any]) -> dict[str, Any]:
 
 def _started_web_search(args: dict[str, Any]) -> dict[str, Any]:
     query = str(args.get("query") or "").strip()
-    state: dict[str, Any] = {"success": True, "resultNumbers": 0, "results": []}
+    state: dict[str, Any] = {"resultNumbers": 0, "results": []}
     if query:
         state["query"] = query
     return state
@@ -103,7 +101,7 @@ def _started_web_search(args: dict[str, Any]) -> dict[str, Any]:
 
 def _started_default(args: dict[str, Any]) -> dict[str, Any]:
     """Shallow copy of small primitive args for generic tools."""
-    out: dict[str, Any] = {"success": True}
+    out: dict[str, Any] = {}
     for key, value in args.items():
         if isinstance(value, (str, int, float, bool)) or value is None:
             if isinstance(value, str) and len(value) > 2_000:
@@ -118,7 +116,7 @@ def _started_default(args: dict[str, Any]) -> dict[str, Any]:
 def _invoked_activate_skill(
     args: dict[str, Any], payload: dict[str, Any], ok: bool, error: str
 ) -> dict[str, Any]:
-    """Full SKILL.md body in ``content`` — never rely on truncated result_preview."""
+    """Full SKILL.md body in ``content`` (plugin_state SSOT)."""
     skill_id = str(
         payload.get("skill_id") or args.get("skill_id") or args.get("name") or ""
     ).strip()
@@ -128,7 +126,7 @@ def _invoked_activate_skill(
     title = _title_from_markdown(text) or skill_id
     state: dict[str, Any] = {
         "success": ok,
-        "hasResources": True,
+        "hasResources": False,
         "source": "agent",
         "id": skill_id,
         "name": skill_id,
@@ -140,11 +138,12 @@ def _invoked_activate_skill(
         desc = _description_from_markdown(text)
         if desc:
             state["description"] = desc
-        if "可用资源:" in text:
-            for line in text.splitlines():
-                if "可用资源:" in line:
-                    state["resources"] = line.split("可用资源:", 1)[-1].strip()
-                    break
+    resources = payload.get("resources")
+    if isinstance(resources, (list, tuple)):
+        paths = [str(item) for item in resources if str(item).strip()]
+        if paths:
+            state["resources"] = paths
+            state["hasResources"] = True
     if error:
         state["error"] = error
     return state

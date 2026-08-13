@@ -20,9 +20,9 @@ from lca.layer1_cognitive.body.tool_ui_state import (
     wire_arguments_json,
 )
 
-# Keep journal result_preview well under AttributePolicy generic 2k cap while
-# remaining useful for console/LLM memory. Structured UI state lives on
-# ToolInvoked.plugin_state; file metadata on ToolInvoked.files.
+# Keep journal result_preview under AttributePolicy 2k (OTel/console only).
+# Never UI, never LLM history, never CONTEXT. Those channels use plugin_state,
+# files, and provider role=tool content.
 _RESULT_PREVIEW_STREAM_CHARS = 400
 _STRIP_FROM_PREVIEW = frozenset({"previewHtml", "preview_html", "content", "state"})
 _FILE_META_KEYS = (

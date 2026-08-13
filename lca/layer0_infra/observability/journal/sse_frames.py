@@ -13,6 +13,9 @@ from lca.contracts.models.observability.journal import StampedEvent
 from lca.contracts.models.observability.journal_catalog import JOURNAL_CATALOG
 from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
 
+# Lossy journal strings — jsonl/OTel only. Live UI uses plugin_state / files.
+_LIVE_REDACT_KEYS = frozenset({"result_preview", "arguments_preview"})
+
 SSE_SENTINEL: None = None
 """队列/订阅关闭哨兵（与 ``SSEJournalProjector.close`` 对齐）。"""
 
@@ -24,6 +27,11 @@ def stamped_to_sse_frame(stamped: StampedEvent) -> str:
     catalog = JOURNAL_CATALOG.get(event_type)
     if catalog is not None:
         record["domain"] = catalog.domain.value
+    event = record.get("event")
+    if isinstance(event, dict):
+        for key in _LIVE_REDACT_KEYS:
+            if key in event:
+                event[key] = ""
     payload = json.dumps(record, ensure_ascii=False, default=str)
     return f"id: {stamped.seq}\nevent: {event_type}\ndata: {payload}\n\n"
 

@@ -206,6 +206,38 @@ class TestAnthropicMessagesAdapter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.text, "chat")
         client.chat.completions.create.assert_awaited_once()
 
+    async def test_history_is_native_tool_use_not_prompt_prose(self) -> None:
+        history = [
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {"id": "toolu_1", "name": "run_command", "arguments": {"command": "ls"}}
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "toolu_1",
+                "name": "run_command",
+                "content": "a.txt",
+            },
+        ]
+        with mock.patch("httpx.AsyncClient", _FakeAsyncClient):
+            adapter = OpenAICompatAdapter(
+                api_key="sk-sp-test",
+                base_url="https://coding.dashscope.aliyuncs.com/apps/anthropic",
+                api=LLMApiStyle.ANTHROPIC,
+            )
+            await adapter.complete("continue", tools=[_FakeTool()], history=history)
+        posted = _FakeAsyncClient.last
+        assert posted is not None
+        body = posted.posts[0][1]
+        messages = body["messages"]
+        self.assertEqual(messages[0], {"role": "user", "content": "continue"})
+        self.assertEqual(messages[1]["content"][0]["type"], "tool_use")
+        self.assertEqual(messages[1]["content"][0]["id"], "toolu_1")
+        self.assertEqual(messages[2]["content"][0]["type"], "tool_result")
+        self.assertEqual(messages[2]["content"][0]["tool_use_id"], "toolu_1")
+
     async def test_complete_maps_tool_use(self) -> None:
         _FakeAsyncClient.next_payload = {
             "model": "qwen3.7-plus",

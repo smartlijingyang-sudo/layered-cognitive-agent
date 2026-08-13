@@ -23,6 +23,18 @@ def _chunk_text(text: str, *, size: int = _REASONING_CHUNK_SIZE) -> list[str]:
     return [text[i : i + size] for i in range(0, len(text), size)]
 
 
+def _last_tool_content(history: Any) -> str:
+    if not isinstance(history, list):
+        return ""
+    for item in reversed(history):
+        if not isinstance(item, dict) or item.get("role") != "tool":
+            continue
+        content = str(item.get("content") or "").strip()
+        if content:
+            return content
+    return ""
+
+
 class MockLLMAdapter(LLMAdapter):
     """确定性假 LLM，用于测试与演示；接口与真实厂商适配器完全一致。"""
 
@@ -43,9 +55,8 @@ class MockLLMAdapter(LLMAdapter):
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         await asyncio.sleep(0)
 
-        if "TOOL_RESULT:" in prompt:
-            m = re.search(r"TOOL_RESULT:\s*([^\n]+)", prompt)
-            tool_result = m.group(1).strip() if m else "未知"
+        tool_result = _last_tool_content(kwargs.get("history") or [])
+        if tool_result:
             question = re.search(r"USER_TASK:\s*([^\n]+)", prompt)
             q = question.group(1).strip() if question else ""
             return self._respond(f"「{q}」的答案是 {tool_result}。")

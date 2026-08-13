@@ -41,27 +41,27 @@ class TestRunTerminalOutputHarvest(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_run_terminal_harvests_new_outputs(self) -> None:
-        await self._stage_output("deck.pptx", b"PK-pptx-v1")
+        await self._stage_output("chart.png", b"\x89PNG-v1")
         result = await self.runtime.run_terminal("echo ok", invocation_id="t1")
         names = [f.name for f in result.generated_files]
-        self.assertIn("deck.pptx", names)
-        deck = next(f for f in result.generated_files if f.name == "deck.pptx")
-        self.assertEqual(deck.data, b"PK-pptx-v1")
+        self.assertIn("chart.png", names)
+        chart = next(f for f in result.generated_files if f.name == "chart.png")
+        self.assertEqual(chart.data, b"\x89PNG-v1")
 
     async def test_unchanged_output_not_reharvested(self) -> None:
-        await self._stage_output("deck.pptx", b"PK-same")
+        await self._stage_output("chart.png", b"\x89PNG-same")
         first = await self.runtime.run_terminal("echo 1", invocation_id="t1")
-        self.assertTrue(any(f.name == "deck.pptx" for f in first.generated_files))
+        self.assertTrue(any(f.name == "chart.png" for f in first.generated_files))
         second = await self.runtime.run_terminal("echo 2", invocation_id="t2")
-        self.assertFalse(any(f.name == "deck.pptx" for f in second.generated_files))
+        self.assertFalse(any(f.name == "chart.png" for f in second.generated_files))
 
     async def test_changed_content_is_reharvested(self) -> None:
-        await self._stage_output("deck.pptx", b"PK-v1")
+        await self._stage_output("chart.png", b"\x89PNG-v1")
         await self.runtime.run_terminal("echo 1", invocation_id="t1")
-        await self._stage_output("deck.pptx", b"PK-v2-changed")
+        await self._stage_output("chart.png", b"\x89PNG-v2-changed")
         again = await self.runtime.run_terminal("echo 2", invocation_id="t2")
-        deck = next(f for f in again.generated_files if f.name == "deck.pptx")
-        self.assertEqual(deck.data, b"PK-v2-changed")
+        chart = next(f for f in again.generated_files if f.name == "chart.png")
+        self.assertEqual(chart.data, b"\x89PNG-v2-changed")
 
     async def test_harvest_outputs_false_skips(self) -> None:
         await self._stage_output("secret.bin", b"no-auto")
@@ -100,22 +100,23 @@ class TestRunCommandSurfacesFiles(unittest.IsolatedAsyncioTestCase):
             assert runtime._session is not None
             try:
                 await sandbox.write_files(
-                    {"analysis.pptx": b"PK-deck"},
+                    {"analysis.pptx": b"PK-deck", "chart.png": b"\x89PNG"},
                     base_dir=f"{SANDBOX_MOUNT_ROOT}/{SANDBOX_OUTPUT_SUBDIR}",
                     session_id=runtime._session.session_id,
                 )
                 with run_id_scope(rid):
-                    result = await rt.run_command(command="echo done")
+                    mutate = await rt.run_command(command="echo done")
+                    close = await rt.run_command(
+                        command="officecli close /mnt/data/outputs/analysis.pptx --json"
+                    )
             finally:
                 await unbind_sandbox_runtime(rid)
 
-            # InlineSandbox shell may fail (no real /mnt/data); harvest must still attach files.
-            self.assertEqual(len(result.generated_files), 1)
-            self.assertEqual(result.generated_files[0].name, "analysis.pptx")
-            files = result.state.get("files") or []
-            self.assertEqual(len(files), 1)
-            self.assertEqual(files[0]["name"], "analysis.pptx")
-            self.assertIn("url", files[0])
+            mutate_names = {f["name"] for f in (mutate.state.get("files") or [])}
+            self.assertIn("chart.png", mutate_names)
+            self.assertNotIn("analysis.pptx", mutate_names)
+            close_names = {f["name"] for f in (close.state.get("files") or [])}
+            self.assertIn("analysis.pptx", close_names)
 
 
 if __name__ == "__main__":

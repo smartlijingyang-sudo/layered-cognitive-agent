@@ -9,6 +9,7 @@ import structlog
 
 from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S, SandboxFile
 from lca.layer0_infra.computer.background import get_background_registry
+from lca.layer0_infra.computer.cli_json import cli_json_success
 from lca.layer0_infra.computer.guest import (
     build_background_kill_script,
     build_background_poll_script,
@@ -16,15 +17,21 @@ from lca.layer0_infra.computer.guest import (
     build_read_bytes_script,
     build_shell_script,
 )
+from lca.layer0_infra.computer.office_plane import normalize_officecli_command
 from lca.layer0_infra.computer.runtime import (
     ComputerOpResult,
     TerminalCapableSandbox,
     _normalize_path,
 )
-from lca.layer0_infra.file_store import FileStore, get_default_file_store
+from lca.layer0_infra.file_store import FileStore, get_default_file_store, persist_generated_files
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
+from lca.layer0_infra.workspace.deliverable import (
+    is_office_name,
+    is_office_publish_intent,
+    visible_generated_files,
+)
 
 _log = structlog.get_logger(__name__)
 
@@ -33,22 +40,12 @@ def _store_generated_file_parts(
     store: FileStore,
     files: Sequence[SandboxFile],
 ) -> list[dict[str, Any]]:
-    """Persist harvested sandbox files and return tool-card file parts."""
-    file_parts: list[dict[str, Any]] = []
-    for sf in files:
-        try:
-            stored = store.put(data=sf.data, name=sf.name, mime_type=sf.mime_type)
-            file_parts.append(
-                {
-                    "name": stored.name,
-                    "url": stored.url,
-                    "mime_type": stored.mime_type,
-                    "size": stored.size_bytes,
-                }
-            )
-        except Exception:
-            _log.warning("auto_store_generated_file_failed", name=sf.name, exc_info=True)
-    return file_parts
+    """Persist harvested sandbox files once; canonical file-part shape."""
+    try:
+        return persist_generated_files(store, files)
+    except Exception:
+        _log.warning("auto_store_generated_file_failed", exc_info=True)
+        return []
 
 
 class _GuestOpHost(Protocol):
@@ -116,7 +113,8 @@ class ComputerRuntimeExecMixin:
         # This eliminates the need for a separate export_file call — files
         # produced in the sandbox are always accessible to the frontend.
         file_parts = _store_generated_file_parts(
-            get_default_file_store(), exec_result.generated_files
+            get_default_file_store(),
+            visible_generated_files(exec_result.generated_files, tool_name="execute_code"),
         )
         if file_parts:
             state["files"] = file_parts
@@ -156,6 +154,7 @@ class ComputerRuntimeExecMixin:
             return result
 
         if isinstance(self._sandbox, TerminalCapableSandbox):
+            command = normalize_officecli_command(command)
             runtime = await ensure_sandbox_runtime(
                 self._sandbox,
                 self._store,
@@ -167,7 +166,8 @@ class ComputerRuntimeExecMixin:
                 timeout_s=timeout_s,
                 invocation_id=inv,
             )
-            ok = terminal_result.success
+            json_ok = cli_json_success(terminal_result.stdout)
+            ok = terminal_result.success if json_ok is None else json_ok
             state: dict[str, Any] = {
                 "success": ok,
                 "command": command,
@@ -179,10 +179,19 @@ class ComputerRuntimeExecMixin:
                 "isBackground": False,
             }
             if not ok:
-                state["error"] = terminal_result.error
-            # run_terminal harvests /mnt/data/outputs (delta) → download cards
+                state["error"] = terminal_result.error or (
+                    f"exit_code={terminal_result.exit_code}" if terminal_result.exit_code else ""
+                )
             generated = terminal_result.generated_files
-            file_parts = _store_generated_file_parts(get_default_file_store(), generated)
+            if is_office_publish_intent(tool_name="run_command", command=command):
+                scanned = await runtime.scan_output_files(invocation_id=f"{inv}_office_pub")
+                generated = tuple(generated) + tuple(
+                    item for item in scanned if is_office_name(item.name)
+                )
+            file_parts = _store_generated_file_parts(
+                get_default_file_store(),
+                visible_generated_files(generated, tool_name="run_command", command=command),
+            )
             if file_parts:
                 state["files"] = file_parts
             content = terminal_result.stdout or terminal_result.stderr or command
@@ -190,7 +199,7 @@ class ComputerRuntimeExecMixin:
                 success=ok,
                 content=content,
                 state=state,
-                error=terminal_result.error,
+                error="" if ok else (state.get("error") or terminal_result.error),
                 generated_files=generated,
             )
 
@@ -205,7 +214,10 @@ class ComputerRuntimeExecMixin:
         # Guest shell path uses execute() + artifact scanner; surface files.
         if guest.exec_result is not None and guest.exec_result.generated_files:
             generated = guest.exec_result.generated_files
-            file_parts = _store_generated_file_parts(get_default_file_store(), generated)
+            file_parts = _store_generated_file_parts(
+                get_default_file_store(),
+                visible_generated_files(generated, tool_name="run_command", command=command),
+            )
             if file_parts:
                 guest.state["files"] = file_parts
             return ComputerOpResult(

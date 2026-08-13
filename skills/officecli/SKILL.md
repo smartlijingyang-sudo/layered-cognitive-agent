@@ -15,7 +15,7 @@ AI 友好的 Word / Excel / PowerPoint CLI。**二进制已预装在 terminal �
 |------|------|
 | 执行面 | 只用 `run_command`（或激活后 `run_skill_script`） |
 | 工作区 | 附件在 `/mnt/data/<文件名>`；交付物写 **`/mnt/data/outputs/`** |
-| 下载 | 写在 outputs 下的新/变更文件会在 **`run_command` 结束后自动 harvest** 到前端下载卡；一般**不必**再 `export_file` |
+| 下载 | Office 文件是 **Work**（run 结束 / `close` / `export_file` 发 **一张** 卡）。`create`/`add`/`set`/`batch` 是工作副本，不会每步发卡。图/PDF/HTML 仍即时可见 |
 | 输出 | **一律加 `--json`**（除 `help` / `view outline` 调试） |
 | 安装 | **禁止** `curl …/install.sh`；若 `officecli --version` 失败 → 报镜像缺包，勿自装 |
 | 更新 | 环境已设 `OFFICECLI_SKIP_UPDATE=1`；勿开 auto-update |
@@ -98,6 +98,16 @@ officecli close /mnt/data/outputs/deck.pptx --json
 
 交付或给 Python 读之前必须 `save`/`close`（flush）。  
 非 officecli 程序读盘前务必 flush。
+
+`officecli batch` 的 stdin **必须是 JSON 数组**，字段名是 **`props`**（不是 CLI 的 `--prop`）：
+
+```bash
+officecli batch /mnt/data/outputs/deck.pptx --json <<'BATCH'
+[{"op":"add","path":"/","type":"slide","props":{"title":"Q4","background":"1A1A2E"}}]
+BATCH
+```
+
+交付前再 `validate`。预览走 `officecli view <file> html -o /mnt/data/outputs/<stem>.preview.html --json`（LobeHub 原生 HTML 预览）。不要 `pip install python-pptx`。
 
 ## 自愈
 

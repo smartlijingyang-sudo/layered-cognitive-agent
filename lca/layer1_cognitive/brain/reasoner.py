@@ -15,7 +15,7 @@ import re
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from lca.contracts.atoms.enums import MemoryRecordKind
+from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.atoms.telemetry import ATTR_PROMPT_TEMPLATE
 from lca.contracts.models.core.conversation import (
     PRIOR_CONVERSATION_WM_KEY,
@@ -44,6 +44,10 @@ _EMPTY_REPORTS = "(尚无成员回报)"
 _KIND_EXCLUDE_NONE: frozenset[MemoryRecordKind] = frozenset()
 _REPORT_EXCLUDED_KINDS: frozenset[MemoryRecordKind] = frozenset(
     {MemoryRecordKind.DELEGATION_RESULT}
+)
+# Prompt CONTEXT is curated memory only. Tool I/O is provider history.
+_PROMPT_WORKING_KINDS: frozenset[MemoryRecordKind] = frozenset(
+    {MemoryRecordKind.DELEGATION_RESULT, MemoryRecordKind.RESPONSE}
 )
 
 _EMPTY_FIELD_RE = re.compile(r"^[A-Z_]+: \s*$", re.MULTILINE)
@@ -82,60 +86,30 @@ def _format_record_line(record: MemoryRecord) -> str:
     return f"- [{layer}] {record.content}"
 
 
-def _trace_lines(state: AgentState) -> list[str]:
-    """Render execution trace from state.history — every step's action→outcome.
-
-    This is the ReAct observation channel: the LLM must see what happened at
-    each step (tool called, success/failure, error details) to reason about
-    the next action.  Memory records are curated insights; the trace is the
-    raw execution record.  Both are needed; neither substitutes the other.
-    """
-    lines: list[str] = []
-    for turn in state.history:
-        decision = turn.decision
-        observation = turn.observation
-        step = len(lines)
-        action = decision.action_type
-        if action == "use_tool" and decision.tool_calls:
-            tool_name = decision.tool_calls[0].tool_name
-            if observation.success:
-                detail = _truncate(f"success, result={observation.payload}", 200)
-            else:
-                detail = f"failed: {observation.error or 'unknown error'}"
-            lines.append(f"- step{step}: {action}({tool_name}) → {detail}")
-        elif action == "respond":
-            snippet = _truncate(decision.response_text or "", 100)
-            lines.append(f"- step{step}: respond → {snippet}")
-        elif action == "delegate" and decision.delegations:
-            target = decision.delegations[0].target_role or "?"
-            if observation.success:
-                detail = _truncate(f"success, result={observation.payload}", 200)
-            else:
-                detail = f"failed: {observation.error or 'unknown error'}"
-            lines.append(f"- step{step}: delegate({target}) → {detail}")
-        else:
-            status = "success" if observation.success else "failed"
-            lines.append(f"- step{step}: {action} → {status}")
-    return lines
-
-
-def _truncate(text: str, max_len: int) -> str:
-    if len(text) <= max_len:
-        return text
-    return text[:max_len] + "…"
+def _is_prompt_context_record(record: MemoryRecord) -> bool:
+    """LobeHub: tool I/O is ``role=tool``. CONTEXT is insights, not a second wire."""
+    if record.kind == MemoryRecordKind.TOOL_RESULT:
+        return False
+    if record.memory_type in {
+        MemoryLayer.SEMANTIC,
+        MemoryLayer.PROCEDURAL,
+        MemoryLayer.EPISODIC,
+    }:
+        return True
+    return record.kind in _PROMPT_WORKING_KINDS
 
 
 def _context_lines(
     state: AgentState, *, exclude_kinds: frozenset[MemoryRecordKind] = _KIND_EXCLUDE_NONE
 ) -> str:
-    # Execution trace: raw action→outcome for every step (ReAct observation channel)
-    trace = _trace_lines(state)
-    # Memory records: curated insights from working/episodic/semantic/procedural
     mem_lines = [
-        _format_record_line(r) for r in state.retrieved_context if r.kind not in exclude_kinds
+        _format_record_line(record)
+        for record in state.retrieved_context
+        if isinstance(record, MemoryRecord)
+        and record.kind not in exclude_kinds
+        and _is_prompt_context_record(record)
     ]
-    parts = trace + mem_lines
-    return "\n".join(parts) or _EMPTY_CONTEXT
+    return "\n".join(mem_lines) or _EMPTY_CONTEXT
 
 
 def build_member_reports_text(results: Sequence[DelegationResult]) -> str:

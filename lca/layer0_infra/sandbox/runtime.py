@@ -41,6 +41,16 @@ PYTHON_LANGUAGES: frozenset[str] = frozenset({"python", "py"})
 
 # Minimal python body — ``_execute_raw`` appends ``GUEST_ARTIFACT_SCANNER``.
 _HARVEST_STUB = "pass  # LCA outputs harvest"
+_OFFICE_FLUSH_CMD = (
+    "if command -v officecli >/dev/null 2>&1; then "
+    "for ext in pptx docx xlsx; do "
+    'for f in /mnt/data/outputs/*."$ext"; do '
+    '[ -f "$f" ] || continue; '
+    'officecli save "$f" --json >/dev/null 2>&1 '
+    '|| officecli close "$f" --json >/dev/null 2>&1 '
+    "|| true; "
+    "done; done; fi"
+)
 
 
 def _append_artifact_scanner(code: str) -> str:
@@ -185,8 +195,14 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         invocation_id: str = "",
         explicit_attachment_ids: list[str] | None = None,
         extra_files: dict[str, bytes] | None = None,
+        harvest_artifacts: bool = True,
     ) -> SandboxExecResult:
-        """Execute user code in the run-bound environment."""
+        """Execute user code in the run-bound environment.
+
+        ``harvest_artifacts`` is for ``execute_code`` only. Structured computer
+        ops (read/list/edit) must pass False — they are JSON RPCs, not
+        deliverable producers, and the scanner would pollute their stdout.
+        """
         if not self._ready:
             mount_err = await self.ensure_ready(explicit_attachment_ids)
             if mount_err is not None:
@@ -204,6 +220,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             timeout_s=budget,
             invocation_id=invocation_id,
             extra_files=extra_files,
+            harvest_artifacts=harvest_artifacts,
         )
         # Track fingerprints so a later run_terminal harvest does not re-emit
         # the same outputs/ bytes as this execute_code call.
@@ -244,9 +261,9 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         in step N is visible to ``import`` in step N+1.
 
         After the command returns, scans ``/mnt/data/outputs`` (ADR-0046) and
-        attaches **new or changed** files to ``generated_files`` so
-        ``run_command`` (officecli etc.) gets download URLs without a separate
-        ``export_file`` call.
+        attaches **new or changed immediate products** (images/PDF/HTML).
+        Office binaries stay on disk until ``export_file`` / close / run-end
+        seal — they are Works, not per-mutation cards.
         """
         session_id = self._session.session_id if self._session else ""
         result = await self._sandbox.run_terminal(
@@ -306,6 +323,43 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         )
         return self._delta_generated(raw.generated_files)
 
+    async def scan_output_files(
+        self,
+        *,
+        invocation_id: str = "",
+        timeout_s: int | None = None,
+    ) -> tuple[SandboxFile, ...]:
+        """Read current ``/mnt/data/outputs`` bytes. Does not update fingerprints."""
+        if not self._ready:
+            mount_err = await self.ensure_ready()
+            if mount_err is not None:
+                return ()
+        budget = timeout_s if timeout_s is not None else min(60, self._default_timeout_s)
+        raw = await self._execute_raw(
+            _HARVEST_STUB,
+            language="python",
+            timeout_s=budget,
+            invocation_id=invocation_id or "scan_outputs",
+        )
+        return tuple(raw.generated_files)
+
+    async def flush_office_residents(self, *, timeout_s: int = 30) -> None:
+        """Persist officecli resident handles to disk before a Work publish."""
+        await self._flush_office_residents(timeout_s=timeout_s)
+
+    async def _flush_office_residents(self, *, timeout_s: int) -> None:
+        """Persist officecli resident handles to disk before harvest."""
+        session_id = self._session.session_id if self._session else ""
+        try:
+            await self._sandbox.run_terminal(
+                _OFFICE_FLUSH_CMD,
+                timeout_s=timeout_s,
+                invocation_id="office_flush",
+                session_id=session_id,
+            )
+        except Exception:
+            _log.debug("office_resident_flush_skipped", run_id=self._run_id, exc_info=True)
+
     def _remember_generated(self, files: Sequence[SandboxFile]) -> None:
         for sf in files:
             self._output_fingerprints[sf.name] = _file_fingerprint(sf.data)
@@ -334,7 +388,11 @@ class RunBoundSandboxRuntime(SandboxRuntime):
     async def _run_inspect_internal(self, *, force: bool = False) -> SandboxExecResult | None:
         if self._inspect_profile is not None and not force:
             return None
-        raw = await self._execute_raw(INSPECT_SCRIPT, timeout_s=min(60, self._default_timeout_s))
+        raw = await self._execute_raw(
+            INSPECT_SCRIPT,
+            timeout_s=min(60, self._default_timeout_s),
+            harvest_artifacts=False,
+        )
         profile = parse_inspect_stdout(raw.stdout)
         if profile is None:
             if not raw.success:
@@ -372,6 +430,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
         invocation_id: str = "",
         extra_files: dict[str, bytes] | None = None,
+        harvest_artifacts: bool = True,
     ) -> SandboxResult:
         # Phase 1: Stage files incrementally (only new files)
         all_files: dict[str, bytes | str] = {**self._mount_files, **(extra_files or {})}
@@ -381,11 +440,10 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             await self._sandbox.write_files(new_files, base_dir="/mnt/data", session_id=session_id)
             self._staged_file_keys.update(new_files.keys())
 
-        # Phase 2: Execute code (no files parameter)
-        # Inject artifact scanner for Python so generated files in
-        # /mnt/data/outputs are captured in SandboxResult.generated_files.
+        # Phase 2: Execute. Artifact scan is execute_code / harvest only —
+        # LobeHub file ops print one JSON object and stop.
         lang_key = language.lower() if language else "python"
-        if lang_key in PYTHON_LANGUAGES:
+        if harvest_artifacts and lang_key in PYTHON_LANGUAGES:
             code = _append_artifact_scanner(code)
 
         if self._session is not None and not self._stateless:

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol
@@ -57,6 +58,33 @@ def _safe_filename(name: str) -> str:
     base = Path(name).name.strip() or "file"
     cleaned = _SAFE_NAME_RE.sub("_", base).strip("._") or "file"
     return cleaned[:_MAX_NAME_LEN]
+
+
+def file_part_from_stored(stored: StoredFile) -> dict[str, object]:
+    """Canonical product part — one shape for plugin_state.files and ToolInvoked.files."""
+    return {
+        "name": stored.name,
+        "mimeType": stored.mime_type,
+        "sizeBytes": stored.size_bytes,
+        "url": stored.url,
+        "previewable": stored.previewable,
+        "attachmentId": stored.attachment_id,
+    }
+
+
+def persist_generated_files(store: FileStore, files: Sequence[object]) -> list[dict[str, object]]:
+    """Store harvested sandbox bytes once; return canonical file parts."""
+    parts: list[dict[str, object]] = []
+    for item in files:
+        data = getattr(item, "data", None)
+        name = getattr(item, "name", "")
+        mime = getattr(item, "mime_type", "") or "application/octet-stream"
+        if not isinstance(data, (bytes, bytearray)) or not name:
+            continue
+        parts.append(
+            file_part_from_stored(store.put(data=bytes(data), name=str(name), mime_type=str(mime)))
+        )
+    return parts
 
 
 def _is_previewable(mime_type: str, name: str) -> bool:
@@ -188,7 +216,10 @@ class LocalFileStore:
         meta = self.get(attachment_id)
         if meta is None:
             return None
-        mime = meta.mime_type.lower()
+        mime = meta.mime_type.lower().split(";", 1)[0].strip()
+        # Hint only — never dump HTML/XML the agent will read via tools.
+        if mime in {"text/html", "text/xml", "application/xml", "application/xhtml+xml"}:
+            return None
         if not (
             mime.startswith("text/")
             or mime in {"application/json", "application/javascript"}

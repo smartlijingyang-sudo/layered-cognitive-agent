@@ -153,6 +153,7 @@ class SandboxRuntime(Protocol):
         invocation_id: str = "",
         explicit_attachment_ids: list[str] | None = None,
         extra_files: dict[str, bytes] | None = None,
+        harvest_artifacts: bool = True,
     ) -> SandboxExecResult: ...
 
     async def destroy(self) -> None: ...
@@ -176,6 +177,7 @@ class SafeExecutor(Protocol):
         args: dict[str, Any],
         retry_policy: RetryPolicy,
         cache_config: CacheConfig,
+        invocation_id: str = "",
     ) -> Observation: ...
 
 

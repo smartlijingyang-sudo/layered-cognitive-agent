@@ -180,7 +180,11 @@ class UseToolOperation(Action):
         if tool is None:
             raise ToolExecutionError(f"未注册工具: {tc.tool_name}")
         observation = await self._safe_executor.execute(
-            tool, tc.arguments, RetryPolicy(), CacheConfig()
+            tool,
+            tc.arguments,
+            RetryPolicy(),
+            CacheConfig(),
+            invocation_id=tc.call_id or "",
         )
         extra = dict(observation.extra or {})
         extra.setdefault(OBS_RESULT_KIND, MemoryRecordKind.TOOL_RESULT)

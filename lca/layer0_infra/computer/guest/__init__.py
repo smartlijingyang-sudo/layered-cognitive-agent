@@ -8,7 +8,6 @@ from lca.layer0_infra.computer.guest.file_ops import (
     build_read_file_script,
     build_write_file_script,
 )
-from lca.layer0_infra.computer.guest.preamble import wrap_guest_body
 from lca.layer0_infra.computer.guest.search_ops import (
     build_glob_files_script,
     build_grep_content_script,
@@ -35,5 +34,4 @@ __all__ = [
     "build_search_files_script",
     "build_shell_script",
     "build_write_file_script",
-    "wrap_guest_body",
 ]

@@ -12,8 +12,8 @@ from dataclasses import dataclass
 
 from lca.contracts.models.core.state import Budget
 
-DEFAULT_MAX_STEPS: int = 10
-"""Default maximum reasoning steps per agent run."""
+DEFAULT_MAX_STEPS: int = 50
+"""Default maximum reasoning steps per agent run (LobeHub chat is 400 runtime steps)."""
 
 DEFAULT_TOOL_TIMEOUT_S: int = 5
 """Default timeout (seconds) for tool execution."""

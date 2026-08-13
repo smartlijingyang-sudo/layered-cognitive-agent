@@ -23,6 +23,8 @@ _PROVIDER_TOOL_MARKUP_MARKERS = (
     "</call>",
     "call_call",
     "redacted_thinking",
+    "[tool call:",
+    "[tool calls]",
 )
 
 

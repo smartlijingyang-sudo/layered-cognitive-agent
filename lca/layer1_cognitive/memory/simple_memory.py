@@ -90,52 +90,27 @@ class SimpleMemorySystem(MemorySystem):
     ) -> list[MemoryRecord]:
         """Type the observation into working-memory records.
 
-        Delegation results become one attributed record per member instead of a
-        ``TOOL_RESULT:`` blob, so the lead can see *who answered what*.
-        Tool results keep the ``TOOL_RESULT:`` prefix (mock-LLM parses it).
-        Failed observations are recorded as ``TOOL_ERROR:`` so the LLM can see
-        what went wrong and correct its next action (ReAct observation channel).
+        Delegation results become one attributed record per member.
+        Tool I/O never enters working memory — it already lives on the
+        provider ``role=tool`` message (LobeHub wire). Episodic still
+        stores the short lesson for failures.
         """
-        if observation.payload is None and observation.success:
-            return []
         kind = observation.extra.get(OBS_RESULT_KIND, MemoryRecordKind.GENERIC)
-        # 委派结果：失败但可能带 partial 证据，仍走类型化写入（ADR-0049）
         if kind == MemoryRecordKind.DELEGATION_RESULT:
             return self._delegation_records(state, observation)
-        if not observation.success:
-            error_detail = observation.error or "unknown error"
-            partial = observation.payload
-            content = f"TOOL_ERROR: {error_detail}"
-            if isinstance(partial, str) and partial.strip():
-                content = f"{content}\nPARTIAL: {partial}"
+        if kind == MemoryRecordKind.RESPONSE and observation.payload is not None:
             return [
                 MemoryRecord(
                     record_id=new_id("mem"),
-                    content=content,
+                    content=f"MY_RESPONSE: {observation.payload}",
                     memory_type=MemoryLayer.WORKING,
                     importance=0.9,
                     source_trace_id=state.trace_id,
-                    kind=MemoryRecordKind.GENERIC,
+                    kind=kind,
                     metadata={META_STEP: state.step},
                 )
             ]
-        if kind == MemoryRecordKind.RESPONSE:
-            content = f"MY_RESPONSE: {observation.payload}"
-        elif kind == MemoryRecordKind.TOOL_RESULT:
-            content = f"TOOL_RESULT: {observation.payload}"
-        else:
-            content = f"TOOL_RESULT: {observation.payload}"
-        return [
-            MemoryRecord(
-                record_id=new_id("mem"),
-                content=content,
-                memory_type=MemoryLayer.WORKING,
-                importance=0.9,
-                source_trace_id=state.trace_id,
-                kind=kind,
-                metadata={META_STEP: state.step},
-            )
-        ]
+        return []
 
     def _delegation_records(
         self, state: AgentState, observation: Observation

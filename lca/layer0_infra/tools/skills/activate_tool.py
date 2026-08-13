@@ -78,29 +78,22 @@ class SkillActivateTool(Tool):
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
         register_activated(package.skill_id, package.name)
-        refs = ", ".join(package.resource_paths[:20]) if package.resource_paths else "（无）"
-        header = f"# Skill: {package.name} ({package.skill_id})\n\n可用资源: {refs}\n\n---\n\n"
-        body = header + package.content
-        # Nested ``state`` is the LobeHub card SSOT (full SKILL.md in content).
-        # SafeExecutor also builds plugin_state via tool_ui_state registry.
-        title = package.name
-        for line in body.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("# "):
-                title = stripped[2:].strip() or title
-                break
+        body = package.content
+        summary = (package.summary or "").strip()
         state = {
             "success": True,
-            "hasResources": True,
+            "hasResources": bool(package.resource_paths),
             "source": "agent",
             "id": package.skill_id,
             "name": package.name,
             "skill_id": package.skill_id,
-            "title": title,
+            "title": package.name,
             "content": body,
         }
-        if refs and refs != "（无）":
-            state["resources"] = refs
+        if summary:
+            state["description"] = summary
+        if package.resource_paths:
+            state["resources"] = list(package.resource_paths)
         latency_ms = int((time.monotonic() - start) * 1000)
         return Observation(
             observation_id=new_id("obs"),

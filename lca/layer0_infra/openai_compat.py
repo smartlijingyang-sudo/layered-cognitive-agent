@@ -9,9 +9,10 @@ from typing import Any
 from lca.contracts.atoms.ids import new_id
 from lca.layer0_infra.llm_adapter.settings import is_qwen_model
 from lca.layer0_infra.llm_resolver import (
+    LLMUnavailableError,
     get_async_openai_client,
     get_model_registry,
-    llm_credentials,
+    llm_openai_credentials,
 )
 
 
@@ -98,12 +99,15 @@ async def create_embeddings(
     encoding_format: Any = None,
 ) -> dict[str, Any]:
     """Proxy embeddings to upstream OpenAI-compatible API."""
-    key, _, _ = llm_credentials()
+    key, _, _ = llm_openai_credentials()
     if not key:
         raise StructuredLLMError("LLM_API_KEY 未配置")
 
     upstream_model = resolve_embedding_model(model)
-    client = get_async_openai_client()
+    try:
+        client = get_async_openai_client()
+    except LLMUnavailableError as exc:
+        raise StructuredLLMError(str(exc)) from exc
     kwargs: dict[str, Any] = {"model": upstream_model, "input": raw_input}
     if dimensions is not None:
         kwargs["dimensions"] = dimensions
@@ -142,12 +146,15 @@ async def create_simple_completion(
     model: str,
 ) -> tuple[str, dict[str, Any] | None]:
     """Direct upstream chat completion — no LCA agent loop."""
-    key, _, _ = llm_credentials()
+    key, _, _ = llm_openai_credentials()
     if not key:
         raise StructuredLLMError("LLM_API_KEY 未配置")
 
     upstream_model = resolve_upstream_model(model)
-    client = get_async_openai_client()
+    try:
+        client = get_async_openai_client()
+    except LLMUnavailableError as exc:
+        raise StructuredLLMError(str(exc)) from exc
     req_messages: Any = messages
     response = await client.chat.completions.create(
         model=upstream_model,
@@ -173,14 +180,17 @@ async def create_structured_completion(
     response_format: dict[str, Any],
 ) -> tuple[str, dict[str, Any] | None]:
     """Call upstream OpenAI-compatible chat completions with json_schema output."""
-    key, _, _ = llm_credentials()
+    key, _, _ = llm_openai_credentials()
     if not key:
         raise StructuredLLMError("LLM_API_KEY 未配置")
 
     from openai import APIError
 
     upstream_model = resolve_upstream_model(model)
-    client = get_async_openai_client()
+    try:
+        client = get_async_openai_client()
+    except LLMUnavailableError as exc:
+        raise StructuredLLMError(str(exc)) from exc
     req_messages: Any = list(messages)
     req_format: Any = response_format
     try:

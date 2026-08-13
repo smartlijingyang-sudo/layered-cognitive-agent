@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import PurePosixPath
 from typing import Any
 
 from lca.contracts.models.core.workspace import ArtifactLedgerSnapshot, WorkspaceArtifact
+from lca.layer0_infra.workspace.deliverable import publishable_file_parts
 
 
 class ArtifactLedger:
@@ -12,7 +15,7 @@ class ArtifactLedger:
 
     def __init__(self) -> None:
         self._artifacts: list[WorkspaceArtifact] = []
-        self._seen: set[str] = set()
+        self._seen_names: set[str] = set()
 
     def record_file(
         self,
@@ -25,21 +28,25 @@ class ArtifactLedger:
         agent_role: str = "",
         guest_path: str = "",
     ) -> None:
-        key = f"{name}|{mime_type}|{url}|{guest_path}"
-        if key in self._seen:
-            return
-        self._seen.add(key)
-        self._artifacts.append(
-            WorkspaceArtifact(
-                name=name,
-                mime_type=mime_type,
-                url=url,
-                size_bytes=size_bytes,
-                tool_name=tool_name,
-                agent_role=agent_role,
-                guest_path=guest_path,
-            )
+        key = PurePosixPath(name).name or name
+        artifact = WorkspaceArtifact(
+            name=name,
+            mime_type=mime_type,
+            url=url,
+            size_bytes=size_bytes,
+            tool_name=tool_name,
+            agent_role=agent_role,
+            guest_path=guest_path,
         )
+        if key in self._seen_names:
+            for index, existing in enumerate(self._artifacts):
+                existing_key = PurePosixPath(existing.name).name or existing.name
+                if existing_key == key:
+                    self._artifacts[index] = artifact
+                    return
+            return
+        self._seen_names.add(key)
+        self._artifacts.append(artifact)
 
     def record_from_tool_files(
         self,
@@ -70,6 +77,27 @@ class ArtifactLedger:
                 guest_path=guest,
             )
 
+    def record_harvest(
+        self,
+        files: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None,
+        *,
+        stdout: str = "",
+        tool_name: str = "",
+        agent_role: str = "",
+        command: str = "",
+    ) -> None:
+        """User ledger: publishable harvests only, latest basename wins."""
+        self.record_from_tool_files(
+            publishable_file_parts(
+                list(files or []),
+                stdout=stdout,
+                tool_name=tool_name,
+                command=command,
+            ),
+            tool_name=tool_name,
+            agent_role=agent_role,
+        )
+
     def snapshot(self) -> ArtifactLedgerSnapshot:
         return ArtifactLedgerSnapshot(artifacts=tuple(self._artifacts))
 
@@ -80,19 +108,37 @@ class ArtifactLedger:
         return artifact_handoff_block(self.snapshot())
 
 
+def rewrite_artifact_markdown(text: str, snapshot: ArtifactLedgerSnapshot) -> str:
+    """Point relative markdown hrefs at ledger URLs. Longer names first."""
+    if not text or not snapshot.artifacts:
+        return text
+    by_name: dict[str, str] = {}
+    for art in snapshot.artifacts:
+        if not art.url:
+            continue
+        by_name.setdefault(art.name, art.url)
+        by_name.setdefault(PurePosixPath(art.name).name, art.url)
+    rewritten = text
+    for name in sorted(by_name, key=len, reverse=True):
+        url = by_name[name]
+        rewritten = re.sub(
+            rf"\]\((?:\./)?{re.escape(name)}\)",
+            f"]({url})",
+            rewritten,
+        )
+    return rewritten
+
+
 def artifact_closure_text(snapshot: ArtifactLedgerSnapshot, *, locale: str = "zh") -> str:
-    """User-facing summary when agent never explicitly responded."""
+    """Download list. Inline image preview is the rewritten answer markdown."""
     if not snapshot.artifacts:
         return ""
-    lines = (
-        ["任务已完成，已生成以下文件："]
-        if locale.startswith("zh")
-        else ["Task completed. Generated files:"]
-    )
+    lines = ["已生成以下文件："] if locale.startswith("zh") else ["Generated files:"]
     for art in snapshot.artifacts:
-        size_kb = art.size_bytes // 1024 if art.size_bytes else 0
-        link = art.url or art.guest_path or art.name
-        lines.append(f"- **{art.name}** ({art.mime_type}, {size_kb} KB) — {link}")
+        if art.url:
+            lines.append(f"- [📥 {art.name}]({art.url})")
+        else:
+            lines.append(f"- **{art.name}**")
     return "\n".join(lines)
 
 

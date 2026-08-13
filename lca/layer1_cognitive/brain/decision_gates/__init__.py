@@ -7,6 +7,7 @@ from lca.layer1_cognitive.brain.decision_gates.chained import ChainedDecisionGat
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
     MustConsultAllMembers,
 )
+from lca.layer1_cognitive.brain.decision_gates.office_works_sealer import OfficeWorksSealer
 from lca.layer1_cognitive.brain.decision_gates.terminal_respond import TerminalRespondGate
 from lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
 
@@ -15,6 +16,7 @@ def build_workspace_agent_gate() -> ChainedDecisionGate:
     """Workspace plane gates applied to every agent (ADR-0051)."""
     return ChainedDecisionGate(
         ToolLoopBreakerGate(),
+        OfficeWorksSealer(),
         TerminalRespondGate(),
         ArtifactRespondInjector(),
     )
@@ -24,6 +26,7 @@ __all__ = [
     "ArtifactRespondInjector",
     "ChainedDecisionGate",
     "MustConsultAllMembers",
+    "OfficeWorksSealer",
     "TerminalRespondGate",
     "ToolLoopBreakerGate",
     "build_workspace_agent_gate",

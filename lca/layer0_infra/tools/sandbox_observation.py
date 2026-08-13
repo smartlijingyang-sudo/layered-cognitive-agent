@@ -11,6 +11,7 @@ from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_EXECUTI
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.sandbox import SANDBOX_PREVIEW_CHAR_LIMIT
 from lca.layer0_infra.file_store import FileStore
+from lca.layer0_infra.workspace.deliverable import is_office_name
 
 _LOG_MIME = "text/plain"
 
@@ -40,6 +41,8 @@ def build_observation(
     """Build an Observation from a SandboxResult, storing generated files."""
     file_parts: list[dict[str, Any]] = []
     for gen in result.generated_files:
+        if is_office_name(getattr(gen, "name", "") or ""):
+            continue
         file_parts.append(_stored_part(store, gen.data, gen.name, gen.mime_type))
     for label, body in (("stdout", result.stdout), ("stderr", result.stderr)):
         if len(body) > SANDBOX_PREVIEW_CHAR_LIMIT:

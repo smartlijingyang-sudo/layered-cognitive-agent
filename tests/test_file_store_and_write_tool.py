@@ -61,6 +61,14 @@ class LocalFileStoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(html.previewable)
         self.assertFalse(bin_.previewable)
 
+    def test_html_has_no_text_preview(self) -> None:
+        stored = self.store.put(
+            data=b"<!DOCTYPE html><html><body>huge</body></html>",
+            name="loan_trend.html",
+            mime_type="text/html",
+        )
+        self.assertIsNone(self.store.read_text_preview(stored.attachment_id))
+
     def test_pdf_is_previewable(self) -> None:
         stored = self.store.put(
             data=b"%PDF-1.4 fake",

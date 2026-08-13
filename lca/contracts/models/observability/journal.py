@@ -369,10 +369,13 @@ class ToolCallStreaming(JournalEvent):
 
     在 LLM 响应完成前发出，让前端尽早渲染工具卡片占位——消除思考结束到
     工具执行之间的空白期。与 ``ToolStarted``（执行前、参数完整）互补。
+    ``tool_call_id`` 即后续 ToolStarted/Invoked 的 ``invocation_id``（同一张卡）。
     """
 
     tool_name: str = ""
     tool_call_id: str = ""
+    arguments_preview: str = ""
+    plugin_state: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -391,7 +394,12 @@ class ToolStarted(JournalEvent):
 
 @dataclass(frozen=True)
 class ToolInvoked(JournalEvent):
-    """工具调用完成；``files`` / ``plugin_state`` 为 UI 一等字段（journal 不截断）。"""
+    """工具调用完成。
+
+    ``plugin_state`` / ``files`` 是 UI 与产品通道（journal 不截断）。
+    ``arguments_preview`` / ``result_preview`` 只给 jsonl 与 OTel（2k 有损）。
+    Live SSE 必须抹掉两个 preview，浏览器不得读到。
+    """
 
     tool_name: str = ""
     arguments_preview: str = ""

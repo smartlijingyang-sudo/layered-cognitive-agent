@@ -61,6 +61,11 @@ class TestResponseTextStreamExtractor(unittest.TestCase):
         leaked = "call_call888\n</think>\n<call><call_name>web_search</call_name></call>"
         self.assertEqual(extractor.feed(leaked), "")
 
+    def test_bracket_tool_call_markup_not_surfaced(self) -> None:
+        extractor = ResponseTextStreamExtractor()
+        leaked = '[Tool call: run_command]\n{"command":"ls"}'
+        self.assertEqual(extractor.feed(leaked), "")
+
 
 if __name__ == "__main__":
     unittest.main()

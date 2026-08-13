@@ -4,7 +4,7 @@
   1. LLM Adapter 工厂 —— env 凭证 → LLMAdapter（ProductionLLMResolver）
   2. 模型路由 —— OpenAI 模型名 / LCA 模式名 → 实际上游模型 ID（ModelRegistry）
   3. 能力目录 —— 已知模型 → 能力映射（MODEL_CATALOG）
-  4. 共享异步客户端 —— 缓存 AsyncOpenAI 实例（get_async_openai_client）
+  4. 管家客户端 —— ``LLM_OPENAI_BASE_URL`` 上的 AsyncOpenAI（get_async_openai_client）
 """
 
 from __future__ import annotations
@@ -39,12 +39,27 @@ class LLMResolver(Protocol):
 
 
 def llm_credentials() -> tuple[str | None, str | None, str | None]:
-    """LLM_API_KEY 优先；兼容 CCS / Cursor 注入的 ANTHROPIC_* 变量。"""
+    """Agent 口：``LLM_BASE_URL`` + ``LLM_API_STYLE``（可以是 Anthropic Messages）。"""
     load_dotenv_if_present()
     key = os.getenv("LLM_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")
     base = os.getenv("LLM_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL")
     model = os.getenv("LLM_MODEL") or os.getenv("ANTHROPIC_MODEL")
     return key, base, model
+
+
+def llm_openai_credentials() -> tuple[str | None, str | None, str | None]:
+    """管家口：必须是 OpenAI 兼容 base。禁止复用 Anthropic Messages URL。"""
+    key, agent_base, model = llm_credentials()
+    openai_base = (os.getenv("LLM_OPENAI_BASE_URL") or "").strip() or None
+    if openai_base:
+        return key, openai_base, model
+    from lca.layer0_infra.llm_adapter.openai_compat._anthropic_messages import (
+        looks_like_anthropic_base_url,
+    )
+
+    if looks_like_anthropic_base_url(agent_base):
+        return key, None, model
+    return key, agent_base, model
 
 
 @dataclass(frozen=True)
@@ -70,9 +85,15 @@ _cached_client_key: tuple[str | None, str | None] | None = None
 
 
 def get_async_openai_client() -> Any:
-    """返回缓存的 ``AsyncOpenAI`` 客户端（按 credentials 去重）。"""
+    """管家面客户端：只打 OpenAI 兼容口，不打 agent 的 Anthropic Messages 口。"""
     global _cached_async_client, _cached_client_key
-    key, base, _ = llm_credentials()
+    key, base, _ = llm_openai_credentials()
+    if not base:
+        raise LLMUnavailableError(
+            "LLM_OPENAI_BASE_URL 未配置。管家面（标题 / generateObject / embeddings）"
+            "需要 OpenAI 兼容口；agent 的 LLM_BASE_URL 是 Anthropic Messages，"
+            "不能拼 /chat/completions。"
+        )
     cache_key = (key, base)
     if _cached_async_client is not None and _cached_client_key == cache_key:
         return _cached_async_client
@@ -81,6 +102,13 @@ def get_async_openai_client() -> Any:
     _cached_async_client = AsyncOpenAI(api_key=key, base_url=base)
     _cached_client_key = cache_key
     return _cached_async_client
+
+
+def reset_async_openai_client() -> None:
+    """测试用：丢掉缓存的管家客户端。"""
+    global _cached_async_client, _cached_client_key
+    _cached_async_client = None
+    _cached_client_key = None
 
 
 # ═══════════════════════════════════════════════════════════

@@ -8,6 +8,7 @@ from typing import Any
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
 from lca.contracts.protocols import Tool
+from lca.layer0_infra.llm_adapter.openai_compat._history import openai_messages_with_history
 from lca.layer0_infra.llm_adapter.openai_compat._shared import (
     ThinkTagStreamSplitter,
     _RawToolCall,
@@ -185,6 +186,7 @@ class _ChatCompletionsStrategy:
 
     def _build_request_kwargs(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         tools = kwargs.pop("tools", None)
+        history = kwargs.pop("history", None) or []
         model = kwargs.pop("model", self._model)
         generation = build_request_generation(
             model=model,
@@ -193,7 +195,9 @@ class _ChatCompletionsStrategy:
         )
         api_kwargs: dict[str, Any] = {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": openai_messages_with_history(prompt, history)
+            if history
+            else [{"role": "user", "content": prompt}],
             **generation,
         }
         if tools:

@@ -47,9 +47,12 @@ Accepted
 
 - `execute_code`：bootstrap 末尾 `GUEST_ARTIFACT_SCANNER`（既有）。
 - **`run_command`（terminal 平面）**：`RunBoundSandboxRuntime.run_terminal` 在
-  shell 返回后跑同一 scanner，将 **新或内容变更**（sha256 指纹，run 内）的
-  outputs 文件并入 `generated_files` → FileStore → 前端下载卡。
-- 多步 officecli 只在文件内容变化时再发卡片，避免每步重复导出同一 pptx。
+  shell 返回后跑同一 scanner，将 **新或内容变更** 的 **即时产物**（图 / PDF /
+  HTML 等 FileViewer 原生类型）并入 `generated_files`。
+- **Office 二进制是 Work**（对齐 LobeHub file Works）：`create`/`add`/`set`/`batch`
+  只改 `/mnt/data/outputs` 工作树；`export_file`、`officecli close|save`、或
+  run 收口 `OfficeWorksSealer` 才发布 **每个 basename 一张卡**。预览是
+  `officecli view html`（私有 `/files` 不上 officeapps.live.com）。
 - 后台 `run_command(background=true)` 不在启动时 harvest；`export_file` 仍
   用于 outputs 外路径或显式再导出。
 

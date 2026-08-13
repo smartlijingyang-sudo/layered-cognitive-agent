@@ -43,6 +43,7 @@ class TestStartedPluginState(unittest.TestCase):
         self.assertEqual(state["code"], code)
         self.assertEqual(state["language"], "python")
         self.assertEqual(state["description"], "big")
+        self.assertNotIn("success", state)
 
     def test_run_command_includes_full_command(self) -> None:
         cmd = "mkdir -p /mnt/data/fonts && curl -L -o /tmp/f.ttf https://example.com/f.ttf"
@@ -76,6 +77,8 @@ class TestInvokedPluginState(unittest.TestCase):
         self.assertIn("PDF Processing Guide", state["title"])
         self.assertTrue(state["success"])
         self.assertGreater(len(state["content"]), 1000)
+        self.assertFalse(state["hasResources"])
+        self.assertNotIn("resources", state)
 
     def test_skill_prefers_nested_state(self) -> None:
         body = "# Full\n\nbody content here"

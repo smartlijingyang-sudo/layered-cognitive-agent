@@ -10,9 +10,23 @@ from lca.layer0_infra.workspace import get_run_workspace
 
 _TERMINAL_RATIONALE = "终态步：必须向用户收口；产物已从工作区账本合成摘要。"
 
+# Last-step writes still run. Forcing respond here would ship a stale ledger
+# and discard the tool that was about to produce the deliverable.
+_PRODUCER_TOOLS = frozenset(
+    {
+        "edit_file",
+        "execute_code",
+        "export_file",
+        "run_command",
+        "sandbox_execute",
+        "write_file",
+        "write_file_local",
+    }
+)
+
 
 class TerminalRespondGate:
-    """Force respond on terminal steps when LLM still selects a tool action."""
+    """Force respond on last step for non-producing tool actions."""
 
     async def enforce(self, state: AgentState, decision: Decision) -> Decision:
         max_steps = state.budget.max_steps or 0
@@ -20,6 +34,8 @@ class TerminalRespondGate:
         if state.step < max(0, max_steps - reserve):
             return decision
         if decision.action_type in {ActionType.RESPOND, ActionType.STOP, ActionType.ASK_HUMAN}:
+            return decision
+        if _is_producer(decision):
             return decision
 
         workspace = get_run_workspace()
@@ -32,3 +48,9 @@ class TerminalRespondGate:
             confidence=decision.confidence,
             response_text=response,
         )
+
+
+def _is_producer(decision: Decision) -> bool:
+    if decision.action_type != ActionType.USE_TOOL or not decision.tool_calls:
+        return False
+    return decision.tool_calls[0].tool_name in _PRODUCER_TOOLS

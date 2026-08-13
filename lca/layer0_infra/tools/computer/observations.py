@@ -10,9 +10,12 @@ from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_EXECUTION
 from lca.contracts.models.core.decision import Observation
 from lca.layer0_infra.computer.runtime import ComputerOpResult
-from lca.layer0_infra.file_store import FileStore
+from lca.layer0_infra.file_store import FileStore, persist_generated_files
 from lca.layer0_infra.text.truncate import ASCII_ELLIPSIS, truncate_text
-from lca.layer0_infra.tools.sandbox_observation import _stored_part
+from lca.layer0_infra.workspace.deliverable import (
+    publishable_file_parts,
+    visible_generated_files,
+)
 from lca.layer0_infra.workspace.scope import get_run_workspace
 
 _COMPUTER_TRUNCATE_LIMIT = 8000
@@ -37,14 +40,23 @@ def build_computer_observation(
         payload["exit_code"] = result.exec_result.exit_code
         plugin_state.setdefault("exitCode", result.exec_result.exit_code)
 
-    # File pipeline: store generated files and record in workspace ledger
-    file_parts: list[dict[str, Any]] = []
-    for gen in result.generated_files:
-        file_parts.append(_stored_part(store, gen.data, gen.name, gen.mime_type))
+    command = str(plugin_state.get("command") or "")
+    stdout = str(plugin_state.get("stdout") or result.content or "")
+    # One put: reuse runtime-stored canonical parts, else persist generated_files.
+    file_parts = publishable_file_parts(
+        _reuse_or_persist_files(result, store, tool_name=tool_name),
+        stdout=stdout,
+        tool_name=tool_name,
+        command=command,
+    )
+    plugin_state["files"] = file_parts
 
     extra: dict[str, Any] = {}
     if file_parts:
         extra["files"] = file_parts
+        _record_harvest(file_parts, result=result, tool_name=tool_name)
+    else:
+        plugin_state.pop("files", None)
 
     if not result.success:
         extra[FAILURE_KIND] = FAILURE_KIND_EXECUTION
@@ -58,14 +70,6 @@ def build_computer_observation(
             extra=extra,
         )
 
-    # Record in workspace artifact ledger (aligned with build_exec_observation)
-    if file_parts:
-        workspace = get_run_workspace()
-        if workspace is not None:
-            workspace.artifacts.record_from_tool_files(
-                file_parts, tool_name=tool_name, agent_role=""
-            )
-
     return Observation(
         observation_id=new_id("obs"),
         success=True,
@@ -74,6 +78,47 @@ def build_computer_observation(
         latency_ms=latency_ms,
         extra=extra,
     )
+
+
+def _record_harvest(
+    file_parts: list[dict[str, Any]],
+    *,
+    result: ComputerOpResult,
+    tool_name: str,
+) -> None:
+    workspace = get_run_workspace()
+    if workspace is None:
+        return
+    state = result.state if isinstance(result.state, dict) else {}
+    stdout = str(state.get("stdout") or result.content or "")
+    workspace.artifacts.record_harvest(
+        file_parts,
+        stdout=stdout,
+        tool_name=tool_name,
+        command=str(state.get("command") or ""),
+    )
+
+
+def _reuse_or_persist_files(
+    result: ComputerOpResult,
+    store: FileStore,
+    *,
+    tool_name: str,
+) -> list[dict[str, Any]]:
+    existing = result.state.get("files") if isinstance(result.state, dict) else None
+    if isinstance(existing, list) and existing:
+        return [part for part in existing if isinstance(part, dict) and part.get("name")]
+    if result.generated_files:
+        command = str(result.state.get("command") or "") if isinstance(result.state, dict) else ""
+        return persist_generated_files(
+            store,
+            visible_generated_files(
+                result.generated_files,
+                tool_name=tool_name,
+                command=command,
+            ),
+        )
+    return []
 
 
 def _truncate(text: str, limit: int = _COMPUTER_TRUNCATE_LIMIT) -> str:

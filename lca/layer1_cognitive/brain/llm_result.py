@@ -12,6 +12,7 @@ from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, DelegationSpec, ToolCall
 from lca.contracts.models.core.llm import LLMResponse
+from lca.layer1_cognitive.brain.leaked_tool_call import recover_leaked_tool_calls
 
 _PARSE_FAILURE_USER_MESSAGE = "抱歉，模型未返回有效决策，请重试。"
 _DELEGATE_TOOL_NAME = "delegate"
@@ -19,8 +20,13 @@ _DELEGATE_TOOL_NAME = "delegate"
 
 def build_decision_from_response(response: LLMResponse) -> Decision:
     """Map native function-calling output to LCA Decision (LobeHub tool wire parity)."""
-    if response.tool_calls:
-        delegates = [tc for tc in response.tool_calls if tc.name == _DELEGATE_TOOL_NAME]
+    tool_calls = list(response.tool_calls)
+    leftover = (response.text or "").strip()
+    if not tool_calls and leftover:
+        leftover, recovered = recover_leaked_tool_calls(leftover)
+        tool_calls = recovered
+    if tool_calls:
+        delegates = [tc for tc in tool_calls if tc.name == _DELEGATE_TOOL_NAME]
         if delegates:
             specs = [
                 DelegationSpec(
@@ -37,22 +43,22 @@ def build_decision_from_response(response: LLMResponse) -> Decision:
                 confidence=1.0,
                 delegations=specs,
             )
-        tool_calls = [
+        mapped = [
             ToolCall(
                 call_id=tc.call_id or new_id("call"),
                 tool_name=tc.name,
                 arguments=tc.arguments,
             )
-            for tc in response.tool_calls
+            for tc in tool_calls
         ]
         return Decision(
             decision_id=new_id("dec"),
             action_type=ActionType.USE_TOOL.value,
             rationale="",
             confidence=1.0,
-            tool_calls=tool_calls,
+            tool_calls=mapped,
         )
-    text = (response.text or "").strip()
+    text = leftover
     if text:
         return Decision(
             decision_id=new_id("dec"),

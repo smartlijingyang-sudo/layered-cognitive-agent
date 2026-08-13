@@ -19,6 +19,7 @@ from lca.contracts.models.observability.journal import get_current_run_scope
 from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.tools.sandbox_observation import _stored_part, _truncate_preview
 from lca.layer0_infra.workspace import get_run_workspace
+from lca.layer0_infra.workspace.deliverable import is_office_name
 
 _LOG_MIME = "text/plain"
 
@@ -41,6 +42,8 @@ def build_exec_observation(
     """Build a structured Observation from ``SandboxExecResult``."""
     file_parts: list[dict[str, Any]] = []
     for gen in result.generated_files:
+        if is_office_name(gen.name):
+            continue
         file_parts.append(_stored_part(store, gen.data, gen.name, gen.mime_type))
     for label, body in (("stdout", result.stdout), ("stderr", result.stderr)):
         if len(body) > SANDBOX_PREVIEW_CHAR_LIMIT:
@@ -83,6 +86,7 @@ def build_exec_observation(
         payload["inspect_profile"] = result.inspect_profile
 
     error_text = result.error_summary or result.error or "sandbox execution failed"
+    _record_workspace_artifacts(file_parts, tool_name, stdout=result.stdout or "")
     if not result.success:
         return Observation(
             observation_id=new_id("obs"),
@@ -98,7 +102,7 @@ def build_exec_observation(
             },
         )
 
-    obs = Observation(
+    return Observation(
         observation_id=new_id("obs"),
         success=True,
         payload=payload,
@@ -106,17 +110,22 @@ def build_exec_observation(
         latency_ms=latency_ms,
         extra={"invocation_id": invocation_id, "files": file_parts},
     )
-    _record_workspace_artifacts(file_parts, tool_name)
-    return obs
 
 
-def _record_workspace_artifacts(file_parts: list[dict[str, Any]], tool_name: str) -> None:
+def _record_workspace_artifacts(
+    file_parts: list[dict[str, Any]],
+    tool_name: str,
+    *,
+    stdout: str = "",
+) -> None:
     workspace = get_run_workspace()
     if workspace is None or not file_parts:
         return
     scope = get_current_run_scope()
     role = scope.agent_role if scope is not None else ""
-    workspace.artifacts.record_from_tool_files(file_parts, tool_name=tool_name, agent_role=role)
+    workspace.artifacts.record_harvest(
+        file_parts, stdout=stdout, tool_name=tool_name, agent_role=role
+    )
 
 
 def build_inspect_observation(

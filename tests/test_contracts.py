@@ -57,7 +57,13 @@ class TestMockLLMAdapter(unittest.TestCase):
     def test_tool_result_response(self):
         llm = MockLLMAdapter()
         result = asyncio.run(
-            llm.complete("USER_TASK: 123 乘以 456\nCONTEXT:\nTOOL_RESULT: 56088\n")
+            llm.complete(
+                "USER_TASK: 123 乘以 456\nCONTEXT:\n(无历史上下文)\n",
+                history=[
+                    {"role": "assistant", "tool_calls": [{"id": "c1", "name": "calculator"}]},
+                    {"role": "tool", "tool_call_id": "c1", "content": "56088"},
+                ],
+            )
         )
         self.assertIn("56088", result.text)
         self.assertEqual(result.tool_calls, [])

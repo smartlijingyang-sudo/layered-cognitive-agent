@@ -455,8 +455,8 @@ def _question_with_attachments(
             preview = store.read_text_preview(attachment_id)
             if preview:
                 lines.append("  preview:")
-                for preview_line in preview.splitlines()[:40]:
-                    lines.append(f"  | {preview_line}")
+                for preview_line in preview.splitlines()[:8]:
+                    lines.append(f"  | {preview_line[:120]}")
 
     lines.append("")
     lines.append(f"用户问题: {question.strip()}")

@@ -14,6 +14,24 @@ from tests.support.inline_sandbox import InlineSandbox
 
 
 class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
+    async def test_harvest_flag_controls_artifact_scanner(self) -> None:
+        from lca.layer0_infra.sandbox.onlyboxes_artifacts import ARTIFACT_BEGIN
+
+        tmp = tempfile.TemporaryDirectory()
+        store = LocalFileStore(Path(tmp.name))
+        sandbox = InlineSandbox()
+        try:
+            runtime = await bind_sandbox_runtime("run_hv", sandbox, store, ())
+            err = await runtime.ensure_ready()
+            self.assertIsNone(err)
+            await runtime.execute("print(1)", harvest_artifacts=False)
+            self.assertNotIn(ARTIFACT_BEGIN, sandbox.session_run_calls[-1][1])
+            await runtime.execute("print(2)", harvest_artifacts=True)
+            self.assertIn(ARTIFACT_BEGIN, sandbox.session_run_calls[-1][1])
+        finally:
+            await runtime.destroy()
+            tmp.cleanup()
+
     async def test_bind_ensure_execute_finalize(self) -> None:
         tmp = tempfile.TemporaryDirectory()
         store = LocalFileStore(Path(tmp.name))

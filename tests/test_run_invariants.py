@@ -101,27 +101,27 @@ def test_finalize_has_one_definition() -> None:
 
 
 def test_transport_does_not_skip_tool_started() -> None:
-    source = Path("deploy/lobehub/patches/runtime/lca_run_driver.py").read_text(encoding="utf-8")
-    assert "case 'ToolStarted'" in source or 'case "ToolStarted"' in source
-    assert "type: 'tool_calls'" in source or 'type: "tool_calls"' in source
+    journal = Path("deploy/lobehub/patches/runtime/lcaJournal.ts").read_text(encoding="utf-8")
+    driver = Path("deploy/lobehub/patches/runtime/LcaRunDriver.ts").read_text(encoding="utf-8")
+    assert "case 'ToolStarted'" in journal
+    assert "type: 'tool_calls'" in driver or 'type: "tool_calls"' in driver
 
 
 def test_abort_calls_cancel_endpoint() -> None:
-    source = Path("deploy/lobehub/patches/runtime/lca_run_driver.py").read_text(encoding="utf-8")
+    source = Path("deploy/lobehub/patches/runtime/LcaRunDriver.ts").read_text(encoding="utf-8")
     assert "/cancel" in source
     assert "method: 'POST'" in source or 'method: "POST"' in source
 
 
 def test_transport_reconnects_with_last_event_id() -> None:
-    source = Path("deploy/lobehub/patches/runtime/lca_run_driver.py").read_text(encoding="utf-8")
+    source = Path("deploy/lobehub/patches/runtime/LcaRunDriver.ts").read_text(encoding="utf-8")
     assert "Last-Event-ID" in source
     assert "waiting_input" in source
     assert "String(afterSeq)" in source or "String(lastSeq)" in source
 
 
 def test_unknown_journal_event_is_ignored_not_thrown() -> None:
-    source = Path("deploy/lobehub/patches/runtime/lca_run_driver.py").read_text(encoding="utf-8")
-    assert "LlmCallStarted" not in source.split("dispatch")[0] or True
+    source = Path("deploy/lobehub/patches/runtime/lcaJournal.ts").read_text(encoding="utf-8")
     assert "default:" in source
     assert type(LlmCallStarted).__name__ == "type"
 

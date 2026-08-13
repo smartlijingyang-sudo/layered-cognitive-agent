@@ -38,7 +38,7 @@ Agent / Team
 runLcaJournal                          deploy/lobehub/patches/runtime/LcaRunDriver.ts
   parseSseBlock / readSse     订流
   projectJournalFrame         Journal → 投影值
-  ensureSpeaker / sealRow     一个说话人一条 assistant；活流 + 落库 + 对账
+  openTurn / tool 子消息      同一说话人一条 assistant；原生 conversation-flow 收组
 finishLcaChat                          patches/runtime/lcaFinishChat.ts
   停转圈 / 队列 / 话题状态 / 通知
   *Finished 不是 EOF；tail close 才 sealRow
@@ -87,18 +87,19 @@ data: { stamped_to_record(stamped) + domain }
 
 ## 前端映射
 
-入口：`executeClientAgent` 对 `solo` / `team` / `auto` 进 `runLcaJournal`，收尾走 `finishLcaChat`（LobeHub 壳，不是 AgentRuntime）。一次 POST，订一本 `/live`。一条用户回合对应一个说话人、一条 assistant 行。`StreamingHandler` 只管活流；`optimisticUpdateMessageContent` 落库；`sealRow` 发现库里仍是 `...` 就再写一次。未知 `event` 忽略。
+入口：`executeClientAgent` 对 `solo` / `team` / `auto` 进 `runLcaJournal`，收尾走 `finishLcaChat`（LobeHub 壳，不是 AgentRuntime）。一次 POST，订一本 `/live`。投影成 **原生消息图**：同一说话人一条 `assistant`，每个工具一条 `role=tool` 子消息（`result_msg_id` + `toolCalling` operation）。用户文件卡只保留同名产物的最后一版。`conversation-flow` 自己收成 `assistantGroup`。换说话人时新开一条链（parent = 用户消息）。`StreamingHandler` 只管当前块的活流；`optimisticUpdateMessageContent` 落库；`sealRow` 发现库里仍是 `...` 就再写一次。未知 `event` 忽略。
 
 | SSE `event` | 行为 |
 |---|---|
-| `LlmCallStarted` | 同一 `scope.agent_role` → 同一条 assistant；换说话人才新开一行 |
+| `LlmCallStarted` | 封上一块，新开一条 assistant。同说话人 parent = 上一条 tool；换说话人 parent = 用户消息。第一条可复用占位行 |
 | `ReasoningDelta` | `{ type: 'reasoning', text }` |
-| `ReasoningCompleted` | 忽略（下一条 text/tool 会收起 Thinking） |
-| `StepTextDelta` 且 `channel=answer` | `{ type: 'text', text }`。`decision` 丢弃 |
-| `ToolStarted` | `{ type: 'tool_calls' }`。`function.name` = `identifier____apiName`；arguments 从 `plugin_state` 抽 |
-| `SandboxOutputDelta` | 补当前卡 `result.state.stdout/stderr` |
-| `ToolInvoked` | `plugin_state` 进 `result.state`；停该卡动画 |
-| `ToolDenied` | 写 `result.error`；不进答案正文 |
+| `ReasoningCompleted` | 收起 Thinking；`duration_ms` 写入该块 `reasoning.duration` |
+| `StepTextDelta` 且 `channel=answer` | `{ type: 'text', text }`。相对路径图按 ledger/收获文件改写成 `/files/...`。`decision` 丢弃 |
+| `ToolCallStreaming` | 与 `ToolStarted` 同一张卡（`tool_call_id` = 后续 `invocation_id`）。无卡则建；有卡则更新 `arguments` / `plugin_state`（代码边生成边出现） |
+| `ToolStarted` | 同上 id：补全 `plugin_state`（完整 code/command）。新建 `role=tool` 子消息（若还没有） |
+| `SandboxOutputDelta` | 补 tool 行 `pluginState.output/stderr` 与当前卡 `result.state`；有输出后切到 Render，stdout 增量可见 |
+| `ToolInvoked` | `plugin_state` + `files` 为卡片 SSOT。Live SSE **抹掉** `result_preview` / `arguments_preview`（只留 jsonl/OTel） |
+| `ToolDenied` | 写 `result.error`；`failOperation`；不进答案正文 |
 | `AgentRunFinished` / `TeamRunFinished` | 写 error（若有）。**不关流**；`handleFinish` 发生在 tail close |
 | `LiveGap` | `console.warn`；不中断 |
 | 其它 | 忽略（Casting / Delegation / RunInsight 属于 jsonl / Langfuse） |
@@ -106,6 +107,7 @@ data: { stamped_to_record(stamped) + domain }
 工具坐标 SSOT：`gateway/runs/wire.py` 的 `WIRE`。补丁生成进 Driver；`tests/test_run_wire.py` 锁两边相等。`import_skill` 的 `plugin_state.identifier` 有值时 apiName 改为 `importFromMarket`。
 
 `plugin_state` 在 `SafeExecutor` 出厂（`tool_ui_state`）。Gateway 不改写。
+`result_preview` / `arguments_preview` 只进 jsonl 与 OTel；`stamped_to_sse_frame` 抹掉后再上 Live。浏览器和 prompt 读不到。
 
 ## 后端文件
 
@@ -128,7 +130,9 @@ gateway/
     wire.py                工具名 → (identifier, apiName)
 
 deploy/lobehub/patches/runtime/
-  LcaRunDriver.ts          投影：SSE → 气泡
+  LcaRunDriver.ts          投影：SSE → 原生 assistant/tool 图
+  lcaJournal.ts            解析 SSE / Journal → 投影值
+  lcaArtifacts.ts          文件规范化 + markdown href 改写
   lcaFinishChat.ts         LobeHub 壳：转圈 / 队列 / 通知
   lcaChatRow.ts            占位符对账
   lca_run_driver.py        拷贝 TS、生成 lcaWire.ts、挂钩

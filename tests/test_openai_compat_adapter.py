@@ -99,6 +99,7 @@ class TestOpenAICompatAdapter(unittest.IsolatedAsyncioTestCase):
         self._env.start()
         for key in (
             "LLM_API_STYLE",
+            "LLM_BASE_URL",
             "LLM_ENABLE_THINKING",
             "LLM_PARALLEL_TOOL_CALLS",
             "LLM_TOP_K",

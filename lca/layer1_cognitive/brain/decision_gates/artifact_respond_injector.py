@@ -6,11 +6,9 @@ composes narrative; the system attaches the deliverable manifest.
 
 When the LLM chooses ``respond`` and the workspace has registered artifacts,
 this gate:
-1. Strips any ``/files/file_<hex>`` references from the LLM text (hallucinated)
-2. Appends the authoritative ``closure_text()`` from the artifact ledger
-
-This ensures the user always sees correct download links regardless of what
-the LLM generates.
+1. Rewrites relative markdown hrefs (``](01_foo.png)``) to ledger URLs
+2. Strips ``/files/file_<hex>`` references that are *not* on the ledger
+3. Appends the authoritative ``closure_text()`` if it is not already present
 """
 
 from __future__ import annotations
@@ -21,19 +19,17 @@ from lca.contracts.atoms.enums import ActionType
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.state import AgentState
 from lca.layer0_infra.workspace import get_run_workspace
-from lca.layer0_infra.workspace.artifact_ledger import artifact_closure_text
+from lca.layer0_infra.workspace.artifact_ledger import (
+    artifact_closure_text,
+    rewrite_artifact_markdown,
+)
 
-# Matches hallucinated file URLs like /files/file_a1b2c3d4e5f6
-_HALLUCINATED_FILE_URL_RE = re.compile(r"\[([^\]]*)\]\(/files/file_[a-f0-9]+\)")
-_BARE_FILE_URL_RE = re.compile(r"(?<!\w)/files/file_[a-f0-9]+\b")
+_FILE_MD_RE = re.compile(r"\[([^\]]*)\]\((/files/file_[a-f0-9]+)\)")
+_BARE_FILE_URL_RE = re.compile(r"(?<!\w)(/files/file_[a-f0-9]+)\b")
 
 
 class ArtifactRespondInjector:
-    """Post-process respond decisions: append authoritative artifact block.
-
-    The LLM never needs to know or reproduce file URLs — the system injects
-    them from the workspace artifact ledger.
-    """
+    """Post-process respond decisions: rewrite paths and append the ledger."""
 
     async def enforce(self, state: AgentState, decision: Decision) -> Decision:
         if decision.action_type != ActionType.RESPOND:
@@ -48,13 +44,14 @@ class ArtifactRespondInjector:
             return decision
 
         original_text = decision.response_text or ""
-        cleaned_text = _strip_hallucinated_file_urls(original_text)
+        rewritten = rewrite_artifact_markdown(original_text, snapshot)
+        known = {art.url for art in snapshot.artifacts if art.url}
+        cleaned = _strip_unknown_file_urls(rewritten, known)
         closure = artifact_closure_text(snapshot)
-
-        if not closure:
-            return decision
-
-        merged = f"{cleaned_text}\n\n{closure}" if cleaned_text.strip() else closure
+        if closure and closure not in cleaned:
+            merged = f"{cleaned.rstrip()}\n\n{closure}" if cleaned.strip() else closure
+        else:
+            merged = cleaned
 
         return Decision(
             decision_id=decision.decision_id,
@@ -69,11 +66,16 @@ class ArtifactRespondInjector:
         )
 
 
-def _strip_hallucinated_file_urls(text: str) -> str:
-    """Remove LLM-hallucinated /files/file_<hex> references.
+def _strip_unknown_file_urls(text: str, known_urls: set[str]) -> str:
+    """Drop hallucinated /files/file_<hex> that the ledger does not own."""
 
-    Handles both markdown links ``[label](/files/file_xxx)`` and bare URLs.
-    """
-    result = _HALLUCINATED_FILE_URL_RE.sub(r"\1", text)
-    result = _BARE_FILE_URL_RE.sub("", result)
-    return result
+    def keep_md(match: re.Match[str]) -> str:
+        url = match.group(2)
+        return match.group(0) if url in known_urls else match.group(1)
+
+    def keep_bare(match: re.Match[str]) -> str:
+        url = match.group(1)
+        return url if url in known_urls else ""
+
+    result = _FILE_MD_RE.sub(keep_md, text)
+    return _BARE_FILE_URL_RE.sub(keep_bare, result)

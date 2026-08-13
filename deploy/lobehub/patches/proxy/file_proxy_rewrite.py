@@ -1,4 +1,4 @@
-"""Patch: file_proxy_rewrite — Proxy /files/* to LCA gateway for artifact downloads."""
+"""Patch: file_proxy_rewrite — Proxy /files/* and /lca-api/* to LCA gateway."""
 
 from __future__ import annotations
 
@@ -6,20 +6,26 @@ from deploy.lobehub.engine import PatchContext, PatchMeta
 
 meta = PatchMeta(
     name="file_proxy_rewrite",
-    description="Proxy /files/* to LCA gateway for artifact downloads",
-    files=("next.config.ts",),
+    description="Proxy /files/* and /lca-api/* to LCA gateway",
+    files=("next.config.ts", "vite.config.ts"),
     risk="low",
     category="proxy",
     depends_on=(),
-    why="LCA tool artifacts are served by the gateway, not LobeHub's file system",
-    technical_detail="Add Next.js rewrite rule: /files/* → LCA gateway /files/* endpoint.",
+    why="LCA tool artifacts and Run live are served by the gateway, not LobeHub",
+    technical_detail="Next rewrites and Vite proxy: /files, /lca-api/runs → gateway.",
     verify_file="next.config.ts",
     verify_marker="LCA: file proxy",
 )
 
+_VITE_MARKER = "LCA: file proxy"
+
 
 def apply(ctx: PatchContext) -> bool:
-    """Return True if applied, False if already applied (skipped)."""
+    changed = _patch_next(ctx)
+    return _patch_vite(ctx) or changed
+
+
+def _patch_next(ctx: PatchContext) -> bool:
     rel = "next.config.ts"
     text = ctx.read(rel)
     if "LCA: file proxy" in text:
@@ -67,4 +73,25 @@ export default nextConfig;"""
         return False
     text = text.replace(old_end, new_end, 1)
     ctx.write(rel, text)
+    return True
+
+
+def _patch_vite(ctx: PatchContext) -> bool:
+    rel = "vite.config.ts"
+    text = ctx.read(rel)
+    if _VITE_MARKER in text:
+        return False
+    needle = "      '/webapi': `http://localhost:${process.env.PORT || 3010}`,\n    },"
+    insert = """      '/webapi': `http://localhost:${process.env.PORT || 3010}`,
+      // LCA: file proxy
+      '/files': process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765',
+      '/lca-api': {
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\\/lca-api/, ''),
+        target: process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765',
+      },
+    },"""
+    if needle not in text:
+        return False
+    ctx.write(rel, text.replace(needle, insert, 1))
     return True

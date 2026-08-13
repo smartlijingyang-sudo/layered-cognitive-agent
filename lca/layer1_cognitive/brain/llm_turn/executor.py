@@ -20,6 +20,8 @@ from lca.contracts.protocols import LLMAdapter, Tool
 from lca.layer0_infra.observability import record
 from lca.layer1_cognitive.brain.llm_turn.mode import LlmTurnMode
 from lca.layer1_cognitive.brain.llm_turn.policy import build_llm_call_kwargs, resolve_llm_turn_mode
+from lca.layer1_cognitive.brain.tool_call_stream import push_tool_call_stream
+from lca.layer1_cognitive.brain.tool_conversation import build_tool_history
 
 _log = structlog.get_logger(__name__)
 
@@ -39,6 +41,7 @@ async def execute_llm_turn(
     """Run one LobeHub-aligned ``call_llm`` turn."""
     mode = resolve_llm_turn_mode(state)
     llm_kwargs = build_llm_call_kwargs(state=state, task=task)
+    llm_kwargs["history"] = build_tool_history(state)
     if mode == LlmTurnMode.SUMMARIZE:
         return await _summarize_after_search(llm, tools, prompt, step=step, llm_kwargs=llm_kwargs)
     return await _stream_turn(llm, tools, prompt, step=step, llm_kwargs=llm_kwargs)
@@ -89,9 +92,7 @@ async def _stream_turn(
 ) -> LLMResponse:
     accumulated = ""
     stream_response: LLMResponse | None = None
-    # Track tool names we've already emitted ToolCallStreaming for,
-    # so we only emit once per tool call (on first name sighting).
-    announced_tool_names: set[str] = set()
+    tool_slots: dict[str, dict[str, object]] = {}
     async for event in llm.stream(prompt, tools=tools, step=step, **llm_kwargs):
         if event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
             chunk = event.text or ""
@@ -100,18 +101,19 @@ async def _stream_turn(
         elif event.type == LLMStreamEventType.REASONING_TEXT_DELTA:
             pass
         elif event.type == LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA:
-            # LLM is generating tool call arguments in real-time.
-            # Emit ToolCallStreaming on first sighting of the tool name
-            # so the frontend can render a tool card placeholder immediately —
-            # eliminating the dead gap between reasoning completion and
-            # tool execution start.
-            name = event.tool_name
-            if name and name not in announced_tool_names:
-                announced_tool_names.add(name)
+            frame = push_tool_call_stream(
+                tool_slots,
+                tool_name=event.tool_name,
+                tool_call_id=event.tool_call_id,
+                arguments_delta=event.arguments_delta or "",
+            )
+            if frame is not None:
                 record(
                     ToolCallStreaming(
-                        tool_name=name,
-                        tool_call_id=event.tool_call_id or "",
+                        tool_name=str(frame["tool_name"]),
+                        tool_call_id=str(frame["tool_call_id"]),
+                        arguments_preview=str(frame["arguments_preview"]),
+                        plugin_state=dict(frame["plugin_state"]),
                     )
                 )
         elif event.type == LLMStreamEventType.COMPLETED and event.response is not None:

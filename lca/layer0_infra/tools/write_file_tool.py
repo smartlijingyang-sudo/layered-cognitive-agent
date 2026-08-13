@@ -22,8 +22,7 @@ class WriteFileTool(Tool):
     """Write text content to a downloadable file artifact.
 
     Payload is A2A-aligned file metadata (name/mimeType/url/sizeBytes) so
-    journal ``ToolInvoked.result_preview`` and the web projector can render
-    ``GeneratedFileCard`` without a parallel channel.
+    ``ToolInvoked.files`` / ``plugin_state`` can render a file card.
     """
 
     name = "write_file"
@@ -93,9 +92,7 @@ class WriteFileTool(Tool):
             )
 
         latency_ms = int((time.monotonic() - start) * 1000)
-        # A2A file-part shape (camelCase keys for frontend GeneratedFile).
-        # Never embed full body / previewHtml here — journal result_preview is
-        # truncated (~2k); UI loads content via url for preview.
+        # A2A file-part shape. Body stays on disk; UI loads via url.
         payload = {
             "name": stored.name,
             "mimeType": stored.mime_type,

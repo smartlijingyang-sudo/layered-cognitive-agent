@@ -83,6 +83,7 @@ class SimpleSafeExecutor(SafeExecutor):
         args: dict[str, Any],
         retry_policy: RetryPolicy,
         cache_config: CacheConfig,
+        invocation_id: str = "",
     ) -> Observation:
         if tool.name not in self.permission_manifest.allowed_tools:
             record(ToolDenied(tool_name=tool.name, reason="permission"))
@@ -101,7 +102,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
 
-        invocation_id = new_id("inv")
+        invocation_id = invocation_id.strip() or new_id("inv")
         args_preview = compact_args_preview(args)
         started_state = build_started_plugin_state(tool.name, args)
         record(

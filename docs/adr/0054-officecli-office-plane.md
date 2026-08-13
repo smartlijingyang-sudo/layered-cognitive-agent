@@ -23,7 +23,7 @@ API 碎片化、布局难自检、模型易在运行时 `pip/npm install` 失败
 | **Knowledge** | 操作知识 SKILL.md（LCA 适配） | 仓库 `skills/officecli/` → seed 到 SkillPackageStore |
 | **Routing** | 附件格式 → 优先 `officecli` | `format_routing.py` |
 | **Execution** | 现有 `run_command` / `run_skill_script` | 无新 Tool 类 |
-| **Harvest** | `run_command` 后自动收集 `/mnt/data/outputs`（delta） | 与 `execute_code` 同契约；见 ADR-0046 一·附 |
+| **Harvest** | 即时产物 delta；Office 在 close/export/收口发一张 Work | 见 ADR-0046 一·附 |
 
 禁止：
 

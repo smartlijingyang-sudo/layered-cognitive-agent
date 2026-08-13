@@ -23,6 +23,8 @@ meta = PatchMeta(
         f"{_UI_TRANSPORTS}/LcaRunDriver.ts",
         f"{_UI_TRANSPORTS}/lcaChatRow.ts",
         f"{_UI_TRANSPORTS}/lcaFinishChat.ts",
+        f"{_UI_TRANSPORTS}/lcaJournal.ts",
+        f"{_UI_TRANSPORTS}/lcaArtifacts.ts",
         f"{_UI_TRANSPORTS}/lcaWire.ts",
         "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts",
     ),
@@ -106,7 +108,13 @@ _RUN_BLOCK = """    /* LCA: every chat is a Run */
 
 def apply(ctx: PatchContext) -> bool:
     changed = False
-    for name in ("LcaRunDriver.ts", "lcaChatRow.ts", "lcaFinishChat.ts"):
+    for name in (
+        "LcaRunDriver.ts",
+        "lcaChatRow.ts",
+        "lcaFinishChat.ts",
+        "lcaJournal.ts",
+        "lcaArtifacts.ts",
+    ):
         if ctx.write_if_changed(
             f"{_UI_TRANSPORTS}/{name}", (_HERE / name).read_text(encoding="utf-8")
         ):

@@ -114,7 +114,7 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.llm_adapter.openai_compat._anthropic_messages._AnthropicMessagesStrategy": (
         "OpenAICompatAdapter 内部 Strategy，模块私有 (ADR-0038)"
     ),
-    "lca.layer0_infra.llm_adapter.openai_compat._anthropic_messages._AnthropicStreamDecoder": (
+    "lca.layer0_infra.llm_adapter.openai_compat._anthropic_stream._AnthropicStreamDecoder": (
         "Anthropic SSE → LLMStreamEvent 状态机，adapter 内部 (ADR-0038)"
     ),
     "lca.layer0_infra.llm_adapter.openai_compat._shared._RawToolCall": (
@@ -194,6 +194,9 @@ EXEMPT: dict[str, str] = {
         "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0051)"
     ),
     "lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector.ArtifactRespondInjector": (
+        "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0051)"
+    ),
+    "lca.layer1_cognitive.brain.decision_gates.office_works_sealer.OfficeWorksSealer": (
         "DecisionGate 实现，Protocol 在 contracts.protocols.cognition (ADR-0051)"
     ),
     "lca.layer1_cognitive.brain.llm_turn.mode.LlmTurnMode": (

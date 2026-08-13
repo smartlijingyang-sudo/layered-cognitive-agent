@@ -1,43 +1,44 @@
-"""Guest script preamble — shared sandbox-side helpers."""
+"""Static guest prelude — load JSON args, resolve paths, emit a result.
+
+No user values are interpolated here. Constants are host-side only.
+"""
 
 from __future__ import annotations
 
 from lca.layer0_infra.computer.constants import (
     BACKGROUND_CMD_DIR,
-    COMPUTER_RESULT_BEGIN,
-    COMPUTER_RESULT_END,
     COMPUTER_WORKSPACE_ROOT,
 )
 
-_GUEST_PREAMBLE = f"""
-import json as _j
-import os as _o
-import re as _re
-import glob as _glob
-import fnmatch as _fn
-import shutil as _sh
-import subprocess as _sp
-import sys as _sys
-from pathlib import Path as _P
-from datetime import datetime as _dt
+SCRIPT_PRELUDE = f"""
+import base64
+import fnmatch
+import glob
+import json
+import mimetypes
+import os
+import re
+import shutil
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
 
-_ROOT = {COMPUTER_WORKSPACE_ROOT!r}
-_BG_DIR = {BACKGROUND_CMD_DIR!r}
+ROOT = {COMPUTER_WORKSPACE_ROOT!r}
+BG_DIR = {BACKGROUND_CMD_DIR!r}
 
-def _resolve(path: str) -> _P:
-    p = _P(path)
+def load_args(encoded):
+    return json.loads(base64.b64decode(encoded).decode())
+
+def resolve(path):
+    p = Path(path or ROOT)
     if not p.is_absolute():
-        p = _P(_ROOT) / p
+        p = Path(ROOT) / p
     try:
         return p.resolve()
     except OSError:
         return p
 
-def _emit(result: dict):
-    print({COMPUTER_RESULT_BEGIN!r} + _j.dumps(result, ensure_ascii=False) + {COMPUTER_RESULT_END!r}, flush=True)
+def emit(value):
+    print(json.dumps(value, ensure_ascii=False), flush=True)
 """
-
-
-def wrap_guest_body(body: str) -> str:
-    """Wrap guest logic that must assign ``result`` dict."""
-    return _GUEST_PREAMBLE + "\n" + body.strip() + "\n\n_emit(result)\n"

@@ -24,6 +24,7 @@ class TestFactoryPluginState(unittest.TestCase):
         )
         self.assertEqual(state["language"], "python")
         self.assertEqual(state["code"], "print(1)")
+        self.assertNotIn("success", state)
 
     def test_run_command_started_has_command(self) -> None:
         state = build_started_plugin_state("run_command", {"command": "ls -la"})

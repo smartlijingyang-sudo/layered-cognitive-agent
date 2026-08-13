@@ -129,7 +129,14 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         activate = SkillActivateTool(self.store)
         act_obs = await activate.execute({"skill_id": "demo"})
         self.assertTrue(act_obs.success)
-        self.assertIn("Do work", act_obs.payload["text"])
+        self.assertEqual(act_obs.payload["text"], "Do work")
+        state = act_obs.payload["state"]
+        self.assertEqual(state["name"], "demo")
+        self.assertEqual(state["title"], "demo")
+        self.assertEqual(state["description"], "d")
+        self.assertEqual(state["resources"], ["tips.md"])
+        self.assertTrue(state["hasResources"])
+        self.assertNotIn("可用资源", act_obs.payload["text"])
 
         read_tool = SkillReadReferenceTool(self.store)
         read_obs = await read_tool.execute({"skill_id": "demo", "path": "tips.md"})

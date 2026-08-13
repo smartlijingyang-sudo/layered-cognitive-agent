@@ -77,6 +77,7 @@ class _ComputerRuntimeBase:
             language="python",
             timeout_s=timeout_s,
             invocation_id=inv,
+            harvest_artifacts=False,
         )
         payload = parse_computer_stdout(exec_result.stdout)
         if payload is None:

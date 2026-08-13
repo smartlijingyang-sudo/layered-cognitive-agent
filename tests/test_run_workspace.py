@@ -12,8 +12,13 @@ from lca.layer0_infra.workspace.artifact_ledger import (
     ArtifactLedger,
     artifact_closure_text,
     artifact_handoff_block,
+    rewrite_artifact_markdown,
 )
 from lca.layer0_infra.workspace.scope import effective_agent_wall_clock, run_workspace_scope
+from lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector import (
+    ArtifactRespondInjector,
+)
+from lca.layer1_cognitive.brain.decision_gates.office_works_sealer import OfficeWorksSealer
 from lca.layer1_cognitive.brain.decision_gates.terminal_respond import TerminalRespondGate
 from lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
 from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
@@ -38,8 +43,61 @@ class TestArtifactLedger:
             guest_path="/mnt/data/outputs/report.pdf",
         )
         snap = ledger.snapshot()
-        assert "report.pdf" in artifact_closure_text(snap)
+        closure = artifact_closure_text(snap)
+        assert "report.pdf" in closure
+        assert "](/files/file_abc)" in closure
+        assert "application/pdf" not in closure
         assert "/mnt/data/outputs/report.pdf" in artifact_handoff_block(snap)
+
+    def test_record_harvest_skips_office_mutations_and_keeps_close(self) -> None:
+        ledger = ArtifactLedger()
+        ledger.record_harvest(
+            [{"name": "deck.pptx", "url": "/files/file_empty", "sizeBytes": 8000}],
+            tool_name="run_command",
+            command="officecli create /mnt/data/outputs/deck.pptx --json",
+        )
+        assert ledger.snapshot().artifacts == ()
+        ledger.record_harvest(
+            [{"name": "deck.pptx", "url": "/files/file_v1", "sizeBytes": 9000}],
+            tool_name="run_command",
+            command="officecli add /mnt/data/outputs/deck.pptx / --type slide --json",
+        )
+        assert ledger.snapshot().artifacts == ()
+        ledger.record_harvest(
+            [{"name": "deck.pptx", "url": "/files/file_v2", "sizeBytes": 11000}],
+            tool_name="run_command",
+            command="officecli close /mnt/data/outputs/deck.pptx --json",
+        )
+        arts = ledger.snapshot().artifacts
+        assert len(arts) == 1
+        assert arts[0].url == "/files/file_v2"
+        assert "application/" not in artifact_closure_text(ledger.snapshot())
+
+    def test_same_name_keeps_latest_url(self) -> None:
+        ledger = ArtifactLedger()
+        ledger.record_file(
+            name="deck.pptx",
+            mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            url="/files/file_empty",
+            size_bytes=8000,
+        )
+        ledger.record_file(
+            name="deck.pptx",
+            mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            url="/files/file_flushed",
+            size_bytes=48000,
+        )
+        arts = ledger.snapshot().artifacts
+        assert len(arts) == 1
+        assert arts[0].url == "/files/file_flushed"
+        assert arts[0].size_bytes == 48000
+
+    def test_rewrites_relative_markdown_images(self) -> None:
+        ledger = ArtifactLedger()
+        ledger.record_file(name="01_绩效总分排名.png", mime_type="image/png", url="/files/file_aaa")
+        text = "见图：![绩效总分排名](01_绩效总分排名.png)"
+        out = rewrite_artifact_markdown(text, ledger.snapshot())
+        assert out == "见图：![绩效总分排名](/files/file_aaa)"
 
 
 class TestRunWorkspaceScope:
@@ -65,14 +123,50 @@ class TestTerminalRespondGate:
             action_type="use_tool",
             rationale="test",
             confidence=0.9,
-            tool_calls=[
-                ToolCall(call_id="c1", tool_name="sandbox_execute", arguments={"code": "1"})
-            ],
+            tool_calls=[ToolCall(call_id="c1", tool_name="web_search", arguments={"query": "x"})],
         )
         with run_workspace_scope("run_t", wall_clock_seconds=60):
             out = await gate.enforce(state, decision)
         assert out.action_type == "respond"
         assert out.response_text
+
+    async def test_last_step_still_runs_a_producer(self) -> None:
+        gate = TerminalRespondGate()
+        state = AgentState(
+            trace_id="t",
+            task="x",
+            budget=Budget(max_steps=5),
+            step=4,
+        )
+        decision = Decision(
+            decision_id="d1",
+            action_type="use_tool",
+            rationale="test",
+            confidence=0.9,
+            tool_calls=[ToolCall(call_id="c1", tool_name="execute_code", arguments={"code": "1"})],
+        )
+        with run_workspace_scope("run_t", wall_clock_seconds=60):
+            out = await gate.enforce(state, decision)
+        assert out.action_type == "use_tool"
+        assert out.tool_calls[0].tool_name == "execute_code"
+
+
+@pytest.mark.asyncio
+class TestOfficeWorksSealer:
+    async def test_respond_without_runtime_is_noop(self) -> None:
+        gate = OfficeWorksSealer()
+        state = AgentState(trace_id="t", task="x", budget=Budget(max_steps=5), step=3)
+        decision = Decision(
+            decision_id="d",
+            action_type="respond",
+            rationale="",
+            confidence=1.0,
+            response_text="done",
+        )
+        with run_workspace_scope("run_seal", wall_clock_seconds=60):
+            out = await gate.enforce(state, decision)
+        assert out.action_type == "respond"
+        assert out.response_text == "done"
 
 
 @pytest.mark.asyncio
@@ -107,6 +201,9 @@ class TestToolLoopBreakerGate:
         )
         out = await gate.enforce(state, decision)
         assert out.action_type == "respond"
+        assert "sandbox_execute" in (out.response_text or "")
+        assert err in (out.response_text or "")
+        assert "任务已完成" not in (out.response_text or "")
 
 
 class TestArtifactClosure:
@@ -120,3 +217,51 @@ class TestArtifactClosure:
             text = synthesize_artifact_closure()
             assert text is not None
             assert "a.pdf" in text
+
+
+@pytest.mark.asyncio
+class TestArtifactRespondInjector:
+    async def test_rewrites_relative_images_and_appends_links(self) -> None:
+        gate = ArtifactRespondInjector()
+        with run_workspace_scope("run_inj", wall_clock_seconds=60) as workspace:
+            workspace.artifacts.record_file(
+                name="01_绩效总分排名.png",
+                mime_type="image/png",
+                url="/files/file_aaa",
+                size_bytes=1000,
+            )
+            out = await gate.enforce(
+                AgentState(trace_id="t", task="x", budget=Budget(max_steps=5)),
+                Decision(
+                    decision_id="d",
+                    action_type="respond",
+                    rationale="",
+                    confidence=1.0,
+                    response_text="![绩效总分排名](01_绩效总分排名.png)",
+                ),
+            )
+        text = out.response_text or ""
+        assert "![绩效总分排名](/files/file_aaa)" in text
+        assert "[📥 01_绩效总分排名.png](/files/file_aaa)" in text
+
+    async def test_keeps_ledger_urls_and_drops_unknown_ones(self) -> None:
+        gate = ArtifactRespondInjector()
+        with run_workspace_scope("run_inj2", wall_clock_seconds=60) as workspace:
+            workspace.artifacts.record_file(
+                name="ok.png",
+                mime_type="image/png",
+                url="/files/file_aaa",
+            )
+            out = await gate.enforce(
+                AgentState(trace_id="t", task="x", budget=Budget(max_steps=5)),
+                Decision(
+                    decision_id="d",
+                    action_type="respond",
+                    rationale="",
+                    confidence=1.0,
+                    response_text="keep [ok](/files/file_aaa) drop [bad](/files/file_bbb)",
+                ),
+            )
+        text = out.response_text or ""
+        assert "/files/file_aaa" in text
+        assert "/files/file_bbb" not in text
