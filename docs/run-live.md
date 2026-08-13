@@ -38,7 +38,7 @@ Agent / Team
 runLcaJournal                          deploy/lobehub/patches/runtime/LcaRunDriver.ts
   parseSseBlock / readSse     订流
   projectJournalFrame         Journal → 投影值
-  openTurn / tool 子消息      同一说话人一条 assistant；原生 conversation-flow 收组
+  openTurn / tool 子消息      一次 LlmCallStarted = 一条 assistant；同说话人 parent = 上一张 tool；原生 conversation-flow 收组
 finishLcaChat                          patches/runtime/lcaFinishChat.ts
   停转圈 / 队列 / 话题状态 / 通知
   *Finished 不是 EOF；tail close 才 sealRow
@@ -87,11 +87,11 @@ data: { stamped_to_record(stamped) + domain }
 
 ## 前端映射
 
-入口：`executeClientAgent` 对 `solo` / `team` / `auto` 进 `runLcaJournal`，收尾走 `finishLcaChat`（LobeHub 壳，不是 AgentRuntime）。一次 POST，订一本 `/live`。投影成 **原生消息图**：同一说话人一条 `assistant`，每个工具一条 `role=tool` 子消息（`result_msg_id` + `toolCalling` operation）。用户文件卡只保留同名产物的最后一版。`conversation-flow` 自己收成 `assistantGroup`。换说话人时新开一条链（parent = 用户消息）。`StreamingHandler` 只管当前块的活流；`optimisticUpdateMessageContent` 落库；`sealRow` 发现库里仍是 `...` 就再写一次。未知 `event` 忽略。
+入口：`executeClientAgent` 对 `solo` / `team` / `auto` 进 `runLcaJournal`，收尾走 `finishLcaChat`（LobeHub 壳，不是 AgentRuntime）。一次 POST，订一本 `/live`。投影成 **原生消息图**：**一次 `LlmCallStarted` = 一条 `assistant`**；每个工具一条 `role=tool` 子消息（`result_msg_id` + `toolCalling` operation）。同说话人下一条 assistant 的 parent = 上一张 tool（tool-anchored）。换说话人时新开一条链（parent = 用户消息）。`conversation-flow` 自己收成 `assistantGroup`；`ProcessFold` 步数 = 组里 assistant 条数。`StreamingHandler` 只服务当前这一轮；`optimisticUpdateMessageContent` 落库；`sealRow` 发现库里仍是 `...` 就再写一次。未完成的 streaming 工具卡在换轮时 seal，避免组头 operation 卡住「共运行 N 步」。工具卡仍带 `pluginState.files`；最终一轮再写 `imageList` / `fileList`，下载块出现在折外面。未知 `event` 忽略。
 
 | SSE `event` | 行为 |
 |---|---|
-| `LlmCallStarted` | 封上一块，新开一条 assistant。同说话人 parent = 上一条 tool；换说话人 parent = 用户消息。第一条可复用占位行 |
+| `LlmCallStarted` | 封上一轮 Handler，**新开**一条 assistant。同说话人 parent = `lastResultMsgId`（否则上一轮 assistant）；换说话人 parent = 用户消息。第一条可复用占位行 |
 | `ReasoningDelta` | `{ type: 'reasoning', text }` |
 | `ReasoningCompleted` | 收起 Thinking；`duration_ms` 写入该块 `reasoning.duration` |
 | `StepTextDelta` 且 `channel=answer` | `{ type: 'text', text }`。相对路径图按 ledger/收获文件改写成 `/files/...`。`decision` 丢弃 |

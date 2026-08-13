@@ -5,17 +5,14 @@ import type {
   UIChatMessage,
 } from '@lobechat/types';
 
-import { messageService } from '@/services/message';
 import { dbMessageSelectors } from '@/store/chat/slices/message/selectors/dbMessage';
 import type { ChatStore } from '@/store/chat/store';
-import { useFileStore } from '@/store/file';
 
 import { StreamingHandler } from '../StreamingHandler';
 import {
   collectArtifactFiles,
-  collectMarkdownDeliverables,
-  isImageArtifact,
   latestDeliverables,
+  mimeFromName,
   rewriteArtifactMarkdown,
   toFileList,
   toImageList,
@@ -34,6 +31,33 @@ import { WIRE } from './lcaWire';
 const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
 const TERMINAL = new Set(['canceled', 'completed', 'failed']);
 
+const RESULT_KEYS = new Set([
+  'success',
+  'executionEnv',
+  'stdout',
+  'stderr',
+  'output',
+  'exitCode',
+  'exit_code',
+  'error',
+  'errorDetail',
+  'files',
+  'downloadUrl',
+  'filename',
+  'mimeType',
+  'size',
+  'sizeBytes',
+  'hasResources',
+  'source',
+  'title',
+  'resources',
+  'resultNumbers',
+  'results',
+  'previewable',
+  'attachmentId',
+  'url',
+]);
+
 type WireFile = { id?: string; mime_type?: string; name: string; size?: number; url: string };
 
 type TurnTool = {
@@ -43,37 +67,15 @@ type TurnTool = {
   resultMsgId?: string;
 };
 
-const ARG_OMIT = new Set([
-  'content',
-  'error',
-  'errorDetail',
-  'executionEnv',
-  'exitCode',
-  'files',
-  'hasResources',
-  'output',
-  'resources',
-  'source',
-  'stderr',
-  'stdout',
-  'success',
-  'title',
-]);
-
 function pickArgs(state: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!state) return {};
   const args: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(state)) {
-    if (!ARG_OMIT.has(key)) args[key] = value;
+    if (!RESULT_KEYS.has(key)) args[key] = value;
   }
   return args;
 }
 
-function hasRenderableArgs(state: Record<string, unknown>): boolean {
-  return Object.keys(pickArgs(state)).length > 0;
-}
-
-/** Native renderer `content` from plugin_state. Journal previews never reach live SSE. */
 function toolCardContent(state: Record<string, unknown>): string {
   for (const key of ['content', 'output', 'stdout'] as const) {
     const value = state[key];
@@ -93,17 +95,6 @@ function resolveCoords(
     return { identifier, apiName: 'importFromMarket' };
   }
   return { identifier, apiName };
-}
-
-function findTurnTool<T extends { call: MessageToolCall }>(
-  turnTools: T[],
-  payload: Record<string, unknown>,
-): T | undefined {
-  const id = toolCallId(payload, '');
-  const matched = turnTools.find((item) => item.call.id === id);
-  if (matched) return matched;
-  if (id) return undefined;
-  return turnTools.at(-1);
 }
 
 function collectWireFiles(message: UIChatMessage): WireFile[] {
@@ -167,44 +158,14 @@ async function* readSse(response: Response): AsyncGenerator<JournalFrame> {
   }
 }
 
-async function attachNativeFiles(
-  get: () => ChatStore,
-  messageId: string,
-  files: ArtifactFile[],
-  operationId: string,
-  seen: Set<string>,
-): Promise<void> {
-  const pending = files.filter(
-    (file) => !isImageArtifact(file) && file.url && !seen.has(file.url),
-  );
-  if (!pending.length) return;
-
-  const fileIds: string[] = [];
-  for (const file of pending) {
-    try {
-      const response = await fetch(file.url);
-      if (!response.ok) continue;
-      const blob = await response.blob();
-      const uploaded = await useFileStore.getState().uploadWithProgress({
-        file: new File([blob], file.name, { type: file.mimeType || blob.type }),
-        skipCheckFileType: true,
-      });
-      if (!uploaded?.id) continue;
-      seen.add(file.url);
-      fileIds.push(uploaded.id);
-    } catch {
-      console.warn('lca: native file ingest failed', file.name);
-    }
-  }
-  if (!fileIds.length) return;
-
-  const ctx = get().internal_getConversationContext({ operationId });
-  const result = await messageService.addFilesToMessage(messageId, fileIds, ctx);
-  if (result?.success && result.messages) {
-    get().replaceMessages(result.messages, { action: 'lcaAttachFiles', context: ctx });
-    return;
-  }
-  await get().refreshMessages();
+function hrefFile(name: string, url: string): ArtifactFile {
+  const mimeType = mimeFromName(name);
+  return {
+    mimeType,
+    name,
+    previewable: mimeType.startsWith('image/') || mimeType === 'application/pdf',
+    url,
+  };
 }
 
 export type LcaRunOptions = {
@@ -230,11 +191,18 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
   let firstReuse = options.reuseAssistantId;
   let handler: StreamingHandler | null = null;
   let journalDurationMs: number | undefined;
-  let lastToolMessageId = '';
-  const turnTools: TurnTool[] = [];
-  const artifacts: ArtifactFile[] = [];
-  const turnImages: ArtifactFile[] = [];
-  const ingestedUrls = new Set<string>();
+  let lastResultMsgId: string | null = null;
+  const tools = new Map<string, TurnTool>();
+  const currentTurnTools: TurnTool[] = [];
+  const hrefs = new Map<string, string>();
+
+  const hrefFiles = (): ArtifactFile[] =>
+    [...hrefs.entries()].map(([name, url]) => hrefFile(name, url));
+
+  const rememberHref = (name: string, url: string) => {
+    const base = name.split(/[/\\]/).at(-1) || name;
+    if (base && url) hrefs.set(base, url);
+  };
 
   const dispatchMessage = (id: string, value: Record<string, unknown>) => {
     get().internal_dispatchMessage(
@@ -244,10 +212,10 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
   };
 
   const resolveTurnTools = (): ChatToolPayload[] => {
-    if (!turnTools.length) return [];
-    const payloads = get().internal_transformToolCalls(turnTools.map((item) => item.call));
+    if (!currentTurnTools.length) return [];
+    const payloads = get().internal_transformToolCalls(currentTurnTools.map((item) => item.call));
     for (const payload of payloads) {
-      const rec = turnTools.find((item) => item.call.id === payload.id);
+      const rec = currentTurnTools.find((item) => item.call.id === payload.id);
       if (!rec) continue;
       if (rec.result) (payload as { result?: typeof rec.result }).result = rec.result;
       if (rec.resultMsgId) payload.result_msg_id = rec.resultMsgId;
@@ -255,10 +223,12 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     return payloads;
   };
 
+  const rewritten = (text: string) => rewriteArtifactMarkdown(text, hrefFiles());
+
   const currentRow = (): ProjectedRow =>
     snapshotRow(
       assistantId,
-      rewriteArtifactMarkdown(handler?.getOutput() ?? '', artifacts),
+      rewritten(handler?.getOutput() ?? ''),
       resolveTurnTools().length,
       Boolean(handler?.getThinkingContent()),
     );
@@ -270,11 +240,18 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     get().internal_toggleToolCallingStreaming(
       assistantId,
       payloads.map((payload) => {
-        const rec = turnTools.find((item) => item.call.id === payload.id);
+        const rec = currentTurnTools.find((item) => item.call.id === payload.id);
         return streaming && !rec?.result;
       }),
     );
     dispatchMessage(assistantId, { tools: payloads });
+  };
+
+  const findTurnTool = (payload: Record<string, unknown>): TurnTool | undefined => {
+    const id = toolCallId(payload, '');
+    if (id && tools.has(id)) return tools.get(id);
+    if (id) return undefined;
+    return currentTurnTools.at(-1);
   };
 
   const makeHandler = (messageId: string) =>
@@ -289,7 +266,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
       {
         onContentUpdate: (content, reasoning) =>
           dispatchMessage(messageId, {
-            content: rewriteArtifactMarkdown(content, artifacts),
+            content: rewritten(content),
             reasoning,
           }),
         onGroundingUpdate: (search) => dispatchMessage(messageId, { search }),
@@ -309,7 +286,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           return operationId;
         },
         onReasoningUpdate: (reasoning) => dispatchMessage(messageId, { reasoning }),
-        onToolCallsUpdate: (tools) => dispatchMessage(messageId, { tools }),
+        onToolCallsUpdate: (next) => dispatchMessage(messageId, { tools: next }),
         toggleToolCallingStreaming: (id, streaming) =>
           get().internal_toggleToolCallingStreaming(id, streaming),
         transformToolCalls: (calls) => get().internal_transformToolCalls(calls),
@@ -319,20 +296,13 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
 
   const persistRow = async () => {
     if (!assistantId) return;
-    const content = rewriteArtifactMarkdown(handler?.getOutput() ?? '', artifacts);
+    const content = rewritten(handler?.getOutput() ?? '');
     const thinking = handler?.getThinkingContent() ?? '';
     const duration = journalDurationMs ?? handler?.getThinkingDuration();
-    const tools = resolveTurnTools();
-    const works = latestDeliverables([...turnImages, ...collectMarkdownDeliverables(content)]);
-    const imageList = toImageList(works);
-    const fileList = toFileList(works);
-    await attachNativeFiles(
-      get,
-      assistantId,
-      works,
-      options.operationId,
-      ingestedUrls,
-    );
+    const turnTools = resolveTurnTools();
+    const deliverables = turnTools.length === 0 ? latestDeliverables(hrefFiles()) : [];
+    const imageList = toImageList(deliverables);
+    const fileList = toFileList(deliverables);
     await get().optimisticUpdateMessageContent(
       assistantId,
       content,
@@ -342,12 +312,31 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         ...(thinking
           ? { reasoning: { content: thinking, ...(duration !== undefined ? { duration } : {}) } }
           : {}),
-        ...(tools.length ? { tools } : {}),
+        ...(turnTools.length ? { tools: turnTools } : {}),
         ...(imageList.length ? { imageList } : {}),
-        ...(fileList.length ? { fileList } : {}),
       },
       { operationId: options.operationId },
     );
+    if (currentTurnTools.length === 0 && (imageList.length || fileList.length)) {
+      dispatchMessage(assistantId, {
+        ...(fileList.length ? { fileList } : {}),
+        ...(imageList.length ? { imageList } : {}),
+      });
+    }
+  };
+
+  const sealOpenTools = () => {
+    let dirty = false;
+    for (const rec of currentTurnTools) {
+      if (rec.result) continue;
+      rec.result = { content: '', id: rec.call.id, state: {} };
+      if (rec.operationId) {
+        get().completeOperation(rec.operationId);
+        rec.operationId = undefined;
+      }
+      dirty = true;
+    }
+    if (dirty) publishTurnTools(false);
   };
 
   const sealRow = async () => {
@@ -364,15 +353,29 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
   const finishHandler = async () => {
     if (!handler) return;
     await handler.handleFinish({
-      toolCalls: turnTools.map((item) => item.call),
+      toolCalls: currentTurnTools.map((item) => item.call),
       type: 'stop',
     });
     handler = null;
   };
 
   const finishTurn = async () => {
+    sealOpenTools();
     await sealRow();
     await finishHandler();
+  };
+
+  const publishFinalDeliverables = () => {
+    if (!assistantId) return;
+    const files = latestDeliverables(hrefFiles());
+    if (!files.length) return;
+    const imageList = toImageList(files);
+    const fileList = toFileList(files);
+    if (!imageList.length && !fileList.length) return;
+    dispatchMessage(assistantId, {
+      ...(fileList.length ? { fileList } : {}),
+      ...(imageList.length ? { imageList } : {}),
+    });
   };
 
   const openRow = async (nextSpeaker: string, parentId: string) => {
@@ -398,27 +401,20 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     if (!id) throw new Error('lca: failed to open assistant turn');
     assistantId = id;
     journalDurationMs = undefined;
-    turnTools.length = 0;
-    turnImages.length = 0;
+    currentTurnTools.length = 0;
     get().associateMessageWithOperation(id, options.operationId);
     handler = makeHandler(id);
   };
 
   const openTurn = async (nextSpeaker: string) => {
     const sameSpeaker = !nextSpeaker || !speaker || nextSpeaker === speaker;
-    if (assistantId && sameSpeaker) {
-      speaker = nextSpeaker || speaker;
-      journalDurationMs = undefined;
-      handler = makeHandler(assistantId);
-      return;
-    }
+    const prevAssistant = assistantId;
     if (assistantId) await finishTurn();
-    if (!sameSpeaker) lastToolMessageId = '';
+    if (!sameSpeaker) lastResultMsgId = null;
+    const userParent = options.userMessageId || options.parentMessageId;
     await openRow(
       nextSpeaker,
-      sameSpeaker
-        ? lastToolMessageId || options.userMessageId || options.parentMessageId
-        : options.userMessageId || options.parentMessageId,
+      sameSpeaker ? lastResultMsgId || prevAssistant || userParent : userParent,
     );
   };
 
@@ -463,12 +459,12 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           console.warn('lca: unknown tool', projected.toolName);
           return;
         }
-        const existing = turnTools.find((item) => item.call.id === projected.idHint);
+        const existing = tools.get(projected.idHint);
         if (existing) {
           existing.call.function.arguments = JSON.stringify(pickArgs(projected.state));
           handler?.handleChunk({
-            isAnimationActives: turnTools.map((item) => !item.result),
-            tool_calls: turnTools.map((item) => item.call),
+            isAnimationActives: currentTurnTools.map((item) => !item.result),
+            tool_calls: currentTurnTools.map((item) => item.call),
             type: 'tool_calls',
           });
           if (existing.resultMsgId) {
@@ -485,7 +481,6 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           publishTurnTools(!existing.result);
           return;
         }
-        if (!hasRenderableArgs(projected.state)) return;
         const call: MessageToolCall = {
           function: {
             arguments: JSON.stringify(pickArgs(projected.state)),
@@ -495,10 +490,11 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           type: 'function',
         };
         const rec: TurnTool = { call };
-        turnTools.push(rec);
+        tools.set(call.id, rec);
+        currentTurnTools.push(rec);
         handler?.handleChunk({
-          isAnimationActives: turnTools.map((item) => !item.result),
-          tool_calls: turnTools.map((item) => item.call),
+          isAnimationActives: currentTurnTools.map((item) => !item.result),
+          tool_calls: currentTurnTools.map((item) => item.call),
           type: 'tool_calls',
         });
         const payloads = resolveTurnTools();
@@ -523,7 +519,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           { operationId: options.operationId },
         );
         rec.resultMsgId = created?.id;
-        lastToolMessageId = created?.id || lastToolMessageId;
+        lastResultMsgId = created?.id || lastResultMsgId;
         const { operationId: toolOpId } = get().startOperation({
           context: {
             agentId: ctx.agentId!,
@@ -549,7 +545,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         return;
       }
       case 'sandbox-delta': {
-        const rec = findTurnTool(turnTools, projected.payload);
+        const rec = findTurnTool(projected.payload);
         if (!rec) return;
         const prev = (rec.result?.state as Record<string, unknown> | undefined) ?? {};
         const field = projected.stream === 'stderr' ? 'stderr' : 'output';
@@ -573,13 +569,17 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         return;
       }
       case 'tool-invoked': {
-        const rec = findTurnTool(turnTools, projected.payload);
-        if (!rec) return;
-        const files = collectArtifactFiles(projected.files, projected.state.files);
-        for (const file of files) {
-          artifacts.push(file);
-          turnImages.push(file);
+        const rec = findTurnTool(projected.payload);
+        if (!rec) {
+          console.warn('lca: tool-invoked with no start', projected.payload);
+          return;
         }
+        const files = collectArtifactFiles(projected.files, projected.state.files);
+        for (const file of files) rememberHref(file.name, file.url);
+        const downloadUrl =
+          typeof projected.state.downloadUrl === 'string' ? projected.state.downloadUrl : '';
+        const filename = typeof projected.state.filename === 'string' ? projected.state.filename : '';
+        if (filename && downloadUrl) rememberHref(filename, downloadUrl);
         const state = files.length ? { ...projected.state, files } : projected.state;
         rec.result = {
           content: toolCardContent(state),
@@ -609,13 +609,13 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           }
           rec.operationId = undefined;
         }
-        lastToolMessageId = rec.resultMsgId || lastToolMessageId;
+        lastResultMsgId = rec.resultMsgId || lastResultMsgId;
         publishTurnTools(false);
         await persistRow();
         return;
       }
       case 'tool-denied': {
-        const rec = findTurnTool(turnTools, projected.payload);
+        const rec = findTurnTool(projected.payload);
         if (!rec) return;
         rec.result = {
           content: '',
@@ -635,7 +635,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           });
           rec.operationId = undefined;
         }
-        lastToolMessageId = rec.resultMsgId || lastToolMessageId;
+        lastResultMsgId = rec.resultMsgId || lastResultMsgId;
         publishTurnTools(false);
         await persistRow();
         return;
@@ -726,11 +726,14 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         method: 'POST',
       }).catch(() => undefined);
       await finishTurn();
+      publishFinalDeliverables();
       return currentRow();
     }
     await finishTurn();
+    publishFinalDeliverables();
     throw error;
   }
   await finishTurn();
+  publishFinalDeliverables();
   return currentRow();
 }

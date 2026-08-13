@@ -53,20 +53,21 @@ def test_driver_projects_one_run() -> None:
     assert "const openTurn" in _DRIVER_TS
 
 
-def test_same_speaker_stays_on_one_assistant() -> None:
-    assert "case 'open-turn'" in _DRIVER_TS
+def test_each_llm_call_opens_an_assistant() -> None:
     assert "await openTurn(projected.speaker)" in _DRIVER_TS
-    assert "if (assistantId && sameSpeaker)" in _DRIVER_TS
-    assert "handler = makeHandler(assistantId)" in _DRIVER_TS
+    assert "handler = makeHandler(assistantId);\n      return" not in _DRIVER_TS
+    assert "lastResultMsgId" in _DRIVER_TS
+    assert "lastResultMsgId || prevAssistant" in _DRIVER_TS
     assert "role: 'assistant'" in _DRIVER_TS
     assert "new StreamingHandler" in _DRIVER_TS
     assert "ensureSpeaker" not in _DRIVER_TS
 
 
-def test_user_file_list_is_latest_deliverable() -> None:
-    assert "export function latestDeliverables" in _ART_TS
-    assert "latestDeliverables(turnImages)" in _DRIVER_TS
-    assert "latestDeliverables(files)" in _ART_TS
+def test_deleted_file_universe() -> None:
+    assert "attachNativeFiles" not in _DRIVER_TS
+    assert "uploadWithProgress" not in _DRIVER_TS
+    assert "addFilesToMessage" not in _DRIVER_TS
+    assert "latestDeliverables(turnImages)" not in _DRIVER_TS
 
 
 def test_tools_are_native_child_messages() -> None:
@@ -85,6 +86,20 @@ def test_tool_call_streaming_opens_the_same_card() -> None:
     assert "result_preview" not in _JOURNAL_TS
 
 
+def test_result_keys_keep_code_out_of_omit() -> None:
+    assert "const RESULT_KEYS" in _DRIVER_TS
+    assert "function pickArgs" in _DRIVER_TS
+    assert "ARG_OMIT" not in _DRIVER_TS
+    assert "hasRenderableArgs" not in _DRIVER_TS
+    start = _DRIVER_TS.index("const RESULT_KEYS")
+    block = _DRIVER_TS[start : _DRIVER_TS.index("];", start) + 2]
+    assert "'code'" not in block
+    assert "'executionEnv'" in block
+    assert "'output'" in block
+    assert "'files'" in block
+    assert "'downloadUrl'" in block
+
+
 def test_reasoning_completed_closes_thinking() -> None:
     assert "case 'ReasoningCompleted'" in _JOURNAL_TS
     assert "kind: 'reasoning-end'" in _JOURNAL_TS
@@ -95,16 +110,45 @@ def test_reasoning_completed_closes_thinking() -> None:
 def test_artifacts_rewrite_relative_markdown() -> None:
     assert "export function rewriteArtifactMarkdown" in _ART_TS
     assert "export function collectArtifactFiles" in _ART_TS
-    assert "export function toFileList" in _ART_TS
-    assert "imageList" in _DRIVER_TS
-    assert "addFilesToMessage" in _DRIVER_TS
-    assert "uploadWithProgress" in _DRIVER_TS
+    assert "rewriteArtifactMarkdown" in _DRIVER_TS
+    assert "sandbox:" in _ART_TS
+    assert "computer:" in _ART_TS
+
+
+def test_unfinished_tools_are_sealed_before_next_turn() -> None:
+    assert "const sealOpenTools" in _DRIVER_TS
+    finish = _DRIVER_TS.split("const finishTurn = async () => {", 1)[1].split("};", 1)[0]
+    assert "sealOpenTools()" in finish
+    seal = _DRIVER_TS.split("const sealOpenTools", 1)[1].split("const finishTurn", 1)[0]
+    assert "completeOperation" in seal
+    assert "publishTurnTools(false)" in seal
+
+
+def test_file_list_gateway_preview_patch_exists() -> None:
+    patch = Path("deploy/lobehub/patches/ui/file_list_gateway_preview.py").read_text(
+        encoding="utf-8"
+    )
+    customizations = Path("deploy/lobehub/CUSTOMIZATIONS.md").read_text(encoding="utf-8")
+    assert "LCA: gateway /files preview" in patch
+    assert "| `file_list_gateway_preview`" in customizations
+    assert "window.open" in patch
+
+
+def test_final_answer_gets_native_deliverable_lists() -> None:
+    persist = _DRIVER_TS.split("const persistRow = async () => {", 1)[1].split("const sealRow", 1)[
+        0
+    ]
+    assert "toImageList" in persist
+    assert "toFileList" in persist
+    assert "imageList" in persist
+    assert "fileList" in persist
+    assert "currentTurnTools.length === 0" in persist
+    assert "publishFinalDeliverables" in _DRIVER_TS
 
 
 def test_tool_stream_updates_go_through_handler() -> None:
     assert "type: 'tool_calls'" in _DRIVER_TS
-    assert "hasRenderableArgs" in _DRIVER_TS
-    assert "ARG_OMIT" in _DRIVER_TS
+    assert "JSON.stringify(pickArgs(projected.state))" in _DRIVER_TS
 
 
 def test_hooks_streaming_executor_not_runtime_host() -> None:
@@ -176,3 +220,9 @@ def test_seal_retries_when_store_still_placeholder() -> None:
     assert "persistMissed" in _DRIVER_TS
     assert "persist missed, retrying" in _DRIVER_TS
     assert "ASSISTANT_PLACEHOLDER = '...'" in _ROW_TS
+
+
+def test_invoke_does_not_rewrite_arguments() -> None:
+    invoked = _DRIVER_TS.split("case 'tool-invoked'")[1].split("case ")[0]
+    assert "function.arguments" not in invoked
+    assert "optimisticUpdatePluginState" in invoked

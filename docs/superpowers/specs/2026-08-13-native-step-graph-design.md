@@ -1,6 +1,6 @@
 # Native Step Graph Projector
 
-**Status:** Draft  
+**Status:** Implemented  
 **Date:** 2026-08-13  
 **Sample:** `traces/runs/run_8988077c043e.jsonl`（快乐通宝会员标签模型定义 3.0.xlsx → PDF）
 
@@ -120,9 +120,13 @@ Empty `code` is still a card. The highlighter shows empty. Denying empty execute
 
 ### Files
 
-On `ToolInvoked`, copy `event.files` into **that tool's** `pluginState.files`. `export_file` keeps `downloadUrl` + `filename` from invoked `plugin_state`. Do not call `uploadWithProgress` / `addFilesToMessage`. Do not write `assistant.fileList` (group `FileListViewer` wants LobeHub file-store ids; we are not in that universe).
+On `ToolInvoked`, copy `event.files` into **that tool's** `pluginState.files`. `export_file` keeps `downloadUrl` + `filename` from invoked `plugin_state`. Do not call `uploadWithProgress` / `addFilesToMessage`.
 
-`hrefs` is only for `rewriteArtifactMarkdown`: `](./basename)` → `](/files/...)`. Last url for a basename wins. When both `plugin_state.downloadUrl` and `event.files[].url` exist (the sample export has two ids), `hrefs` and the export card download button use `downloadUrl`; `pluginState.files` still lists `event.files`. It does not hide an execute card. Do not invent `computer://` links. Existing `computer://` in model text stays dead text; the card is the download.
+ProcessFold hides tool cards. Visible downloads live on the **final** (toolless) assistant: `imageList` (native gallery) + `fileList` (group `FileListViewer`). `/files` cards open the gateway URL; they are not LobeHub file-store ids. Intermediate turns do not write these lists (aggregation would duplicate).
+
+`hrefs` rewrites markdown: `](./basename)`, `sandbox://…/basename`, `computer://…/basename` → `](/files/...)`. Last url for a basename wins. When both `plugin_state.downloadUrl` and `event.files[].url` exist, `hrefs` and the export card use `downloadUrl`; `pluginState.files` still lists `event.files`.
+
+Unfinished `ToolCallStreaming` cards (a second id that never reaches `ToolInvoked`) must be sealed: complete their `toolCalling` operation before the next turn. A leftover running op on the group head blocks ProcessFold.
 
 Keep `persistMissed` / `sealRow` retry. The placeholder-vs-store race is still real.
 

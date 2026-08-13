@@ -1,4 +1,4 @@
-"""Generate the SSE / thinking / tool-card chain analysis PDF."""
+"""Generate the SSE / thinking / tool-card chain analysis PDF (v2)."""
 
 from __future__ import annotations
 

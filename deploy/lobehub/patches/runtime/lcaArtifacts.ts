@@ -1,4 +1,4 @@
-/** Journal file parts → LobeHub image/file rows and markdown hrefs. */
+/** Journal file parts → markdown href rewrite + final-answer native lists. */
 
 export type ArtifactFile = {
   attachmentId?: string;
@@ -70,7 +70,7 @@ export function collectArtifactFiles(...sources: unknown[]): ArtifactFile[] {
 /** User-facing cards: one slot per basename, last harvest wins. */
 const FILE_MD_RE = /\[(?:📥\s*)?([^\]]+)\]\((\/files\/file_[a-f0-9]+)\)/gi;
 
-function mimeFromName(name: string): string {
+export function mimeFromName(name: string): string {
   const lower = name.toLowerCase();
   if (lower.endsWith('.png')) return 'image/png';
   if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
@@ -133,7 +133,13 @@ export function rewriteArtifactMarkdown(text: string, files: ArtifactFile[]): st
     const url = byName.get(name);
     if (!url) continue;
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    next = next.replace(new RegExp(`]\\((?:\\./)?${escaped}\\)`, 'g'), `](${url})`);
+    next = next.replace(
+      new RegExp(
+        `]\\((?:(?:\\./)|(?:sandbox://[^\\s)]*?)|(?:computer://[^\\s)]*?))?${escaped}\\)`,
+        'g',
+      ),
+      `](${url})`,
+    );
   }
   return next;
 }
