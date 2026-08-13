@@ -310,6 +310,7 @@ _DRIFT_IGNORE = frozenset(
     {
         ".env",
         ".lca-patched",
+        ".lca-patch-hashes",
         ".lca-integration-patched",
         ".lca-qwen-defaults-patched",
         ".lca-origin.json",

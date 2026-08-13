@@ -366,28 +366,20 @@ NEXT_PUBLIC_MOCK_DEV_USER_ID=local-dev-user
 
 | # | 文件（相对 lobehub-ui/） | 层次 | Patch 名称 |
 |---|--------------------------|------|------------|
-| 1 | `packages/model-runtime/src/core/streams/openai/openai.ts` | 流式协议 | `openai_stream` |
-| 2 | `packages/model-runtime/src/core/streams/qwen.ts` | 流式协议 | `qwen_stream` |
-| 3 | `packages/model-runtime/src/core/streams/protocol.ts` | 流式协议 | `protocol` |
-| 4 | `packages/model-runtime/src/types/chat.ts` | 流式协议 | `chat_callbacks` |
-| 5 | `packages/fetch-sse/src/fetchSSE.ts` | 流式协议 | `fetch_sse` |
-| 6 | `src/store/chat/agents/types/streaming.ts` | Agent 运行时 | `streaming_types` |
-| 7 | `src/store/chat/agents/StreamingHandler.ts` | Agent 运行时 | `streaming_handler` |
-| 8 | `src/store/chat/agents/transports/ClientLLMTransport.ts` | Agent 运行时 | `client_transport` |
-| 9 | `packages/agent-runtime/src/transport/llm.ts` | Agent 运行时 | `llm_transport_type` |
-| 10 | `packages/agent-runtime/src/executors/callLlmFinalizer.ts` | Agent 运行时 | `call_llm_finalizer` |
-| 11 | `src/store/chat/agents/transports/AgentTimelineTransport.ts` | Agent 运行时 | `agent_timeline_transport` |
-| 12 | `src/store/chat/agents/transports/buildClientRuntimeHost.ts` | Agent 运行时 | `agent_timeline_transport` |
-| 13 | `packages/business/const/src/llm.ts` | Provider 路由 | `default_model` |
-| 12 | `packages/model-runtime/src/providers/openai/index.ts` | Provider 路由 | `openai_guard` |
-| 13 | `src/layout/AuthProvider/localDevNoAuth.ts` | 认证 | `dev_auth_files` |
-| 14 | `src/layout/AuthProvider/LocalDevAuth/index.tsx` | 认证 | `dev_auth_files` |
-| 15 | `src/layout/AuthProvider/LocalDevUserUpdater.tsx` | 认证 | `dev_auth_files` |
-| 16 | `src/layout/AuthProvider/index.vite.tsx` | 认证 | `dev_auth_vite` |
-| 17 | `src/libs/next/proxy/define-config.ts` | 认证 | `middleware_mock_user` |
-| 18 | `src/features/AgentSidebar/utils/agentPathname.ts` | 路由适配 | `topic_route` |
-| 19 | `src/routes/(main)/agent/features/Conversation/ChatHydration/useChatRouteSync.ts` | 路由适配 | `topic_route` |
-| 20 | `src/routes/(main)/agent/_layout/AgentIdSync.tsx` | 路由适配 | `topic_route` |
-| 21 | `next.config.ts` | 代理 | `file_proxy_rewrite` |
-| 22 | `src/libs/spaHtml/index.ts` | Dev UX | `lan_dev` |
-| 23 | `packages/builtin-tool-cloud-sandbox/src/client/Render/ExecuteCode/index.tsx` | UI | `sandbox_generated_files` |
+| 1 | `src/store/chat/agents/transports/AgentTimelineTransport.ts` | Agent 运行时 | `agent_timeline_transport` |
+| 2 | `src/store/chat/agents/transports/buildClientRuntimeHost.ts` | Agent 运行时 | `agent_timeline_transport` |
+| 3 | `packages/agent-runtime/src/executors/callLlmFinalizer.ts` | Agent 运行时 | `call_llm_finalizer` |
+| 4 | `packages/business/const/src/llm.ts` | Provider 路由 | `default_model` |
+| 5 | `packages/model-runtime/src/providers/openai/index.ts` | Provider 路由 | `openai_guard` |
+| 6 | `src/layout/AuthProvider/localDevNoAuth.ts` | 认证 | `dev_auth_files` |
+| 7 | `src/layout/AuthProvider/LocalDevAuth/index.tsx` | 认证 | `dev_auth_files` |
+| 8 | `src/layout/AuthProvider/LocalDevUserUpdater.tsx` | 认证 | `dev_auth_files` |
+| 9 | `src/layout/AuthProvider/index.vite.tsx` | 认证 | `dev_auth_vite` |
+| 10 | `src/libs/next/proxy/define-config.ts` | 认证 | `middleware_mock_user` |
+| 11 | `src/features/AgentSidebar/utils/agentPathname.ts` | 路由适配 | `topic_route` |
+| 12 | `src/routes/(main)/agent/features/Conversation/ChatHydration/useChatRouteSync.ts` | 路由适配 | `topic_route` |
+| 13 | `src/routes/(main)/agent/_layout/AgentIdSync.tsx` | 路由适配 | `topic_route` |
+| 14 | `src/features/AgentSidebar/utils/agentPathname.test.ts` | 路由适配 | `topic_route_test` |
+| 15 | `next.config.ts` | 代理 | `file_proxy_rewrite` |
+| 16 | `src/libs/spaHtml/index.ts` | Dev UX | `lan_dev` |
+| 17 | `packages/builtin-tool-cloud-sandbox/src/client/Render/ExecuteCode/index.tsx` | UI | `sandbox_generated_files` |
