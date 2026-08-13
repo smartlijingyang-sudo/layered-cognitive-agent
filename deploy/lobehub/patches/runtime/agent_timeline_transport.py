@@ -30,7 +30,7 @@ _TRANSPORT_TS = r"""import type {
   LLMStreamResult,
   LLMTransport,
 } from '@lobechat/agent-runtime';
-import type { ChatToolPayload, ModelReasoning } from '@lobechat/types';
+import type { ChatToolPayload, MessageContentPart, ModelReasoning } from '@lobechat/types';
 
 import type { ChatStore } from '@/store/chat/store';
 
@@ -81,14 +81,12 @@ function applyEvent(state: TimelineState, type: string, data: Record<string, unk
       return { ...state, answer: state.answer + String(data.text ?? '') };
     case 'tool.start': {
       const id = String(data.tool_call_id ?? '');
-      const wire = String(data.wire_name ?? data.name ?? 'tool');
-      const [identifier, apiName] = wire.includes('____')
-        ? (wire.split('____') as [string, string])
-        : ['lca', wire];
+      // 后端 LobeHubSSEAdapter 已经 resolve 了 wire_name → identifier/api_name
+      // 直接用，不再重新解析（避免 fallback 到 'lca'）
       const tool: ChatToolPayload = {
         id,
-        identifier,
-        apiName,
+        identifier: String(data.identifier ?? 'lca'),
+        apiName: String(data.api_name ?? data.name ?? 'tool'),
         arguments: String(data.arguments ?? '{}'),
         type: 'default',
       };
@@ -189,13 +187,7 @@ interface Options {
   get: () => ChatStore;
   operationId: string;
   session: ClientRuntimeSession;
-}
-
-function extractQuestion(messages: readonly { role: string; content: string }[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'user') return messages[i].content;
-  }
-  return '';
+  toggleToolCallingStreaming: (id: string, streaming: boolean[] | undefined) => void;
 }
 
 /**
@@ -225,14 +217,23 @@ export class AgentTimelineTransport implements LLMTransport {
     };
 
     const publish = () => {
-      const sections = [...state.thinkingSections.map((s) => s.content)];
-      if (state.currentThinking) sections.push(state.currentThinking);
-      const reasoning: ModelReasoning | undefined = sections.length
-        ? {
-            content: sections.join('\n\n'),
-            isMultimodal: sections.length > 1,
-          }
+      const sectionTexts = [...state.thinkingSections.map((s) => s.content)];
+      if (state.currentThinking) sectionTexts.push(state.currentThinking);
+
+      // 多段 reasoning：用 tempDisplayContent 让前端渲染为独立可折叠块
+      // 单段或无段：退化为普通 content 字符串
+      const reasoning: ModelReasoning | undefined = sectionTexts.length
+        ? sectionTexts.length > 1
+          ? {
+              content: sectionTexts.join('\n\n'),
+              isMultimodal: true,
+              tempDisplayContent: sectionTexts.map(
+                (text): MessageContentPart => ({ text, type: 'text' }),
+              ),
+            }
+          : { content: sectionTexts[0] }
         : undefined;
+
       dispatch({
         content: state.answer,
         reasoning,
@@ -241,14 +242,13 @@ export class AgentTimelineTransport implements LLMTransport {
     };
 
     try {
-      const question = extractQuestion(messages);
       const createRes = await fetch(`/lca-api/agent/runs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer lca-local',
         },
-        body: JSON.stringify({ question, model: input.model }),
+        body: JSON.stringify({ messages, model: input.model }),
         signal: operation.abortController.signal,
       });
       if (!createRes.ok) {
@@ -269,8 +269,17 @@ export class AgentTimelineTransport implements LLMTransport {
 
       for await (const { type, data } of readTimelineSse(streamRes)) {
         state = applyEvent(state, type, data);
+
+        // 工具调用动画：新工具到达 → 开，run 结束 → 关
+        if (type === 'tool.start') {
+          this.context.toggleToolCallingStreaming(assistantMessageId, [true]);
+        }
+
         publish();
-        if (type === 'run.end') break;
+        if (type === 'run.end') {
+          this.context.toggleToolCallingStreaming(assistantMessageId, undefined);
+          break;
+        }
       }
     } catch (error) {
       if (operation.abortController.signal.aborted) {
@@ -302,14 +311,29 @@ export class AgentTimelineTransport implements LLMTransport {
   }
 
   private toOutput(state: TimelineState, finish: string): LLMAttemptOutput {
-    const sections = [...state.thinkingSections.map((s) => s.content)];
-    if (state.currentThinking) sections.push(state.currentThinking);
-    const thinkingContent = sections.join('\n\n');
+    const sectionTexts = [...state.thinkingSections.map((s) => s.content)];
+    if (state.currentThinking) sectionTexts.push(state.currentThinking);
+    const thinkingContent = sectionTexts.join('\n\n');
+
+    // 持久化 reasoning — 多段用 tempDisplayContent，单段用 content
+    const reasoning: ModelReasoning | undefined = sectionTexts.length
+      ? sectionTexts.length > 1
+        ? {
+            content: thinkingContent,
+            isMultimodal: true,
+            tempDisplayContent: sectionTexts.map(
+              (text): MessageContentPart => ({ text, type: 'text' }),
+            ),
+          }
+        : { content: thinkingContent }
+      : undefined;
+
     return {
       content: state.answer,
       thinkingContent,
       contentParts: [],
-      reasoningParts: sections.map((text) => ({ type: 'text' as const, text })),
+      reasoningParts: sectionTexts.map((text) => ({ type: 'text' as const, text })),
+      reasoning,
       finishReason: finish,
       grounding: null,
       hasContentImages: false,
@@ -331,26 +355,48 @@ def apply(ctx: PatchContext) -> bool:
 
     host = "src/store/chat/agents/transports/buildClientRuntimeHost.ts"
     text = ctx.read(host)
+
+    # 确保 import 存在（首次 patch 或 reset 后）
     if "AgentTimelineTransport" not in text:
         text = text.replace(
             "import { ClientLLMTransport } from './ClientLLMTransport';\n",
             "import { AgentTimelineTransport } from './AgentTimelineTransport';\n"
             "import { ClientLLMTransport } from './ClientLLMTransport';\n",
         )
-        text = text.replace(
-            "      llm: new ClientLLMTransport({\n"
+        changed = True
+
+    # 确保 llm transport 实例化包含 toggleToolCallingStreaming
+    # 匹配两种状态：原版（ClientLLMTransport）或已 patch 但缺新字段
+    expected_host_snippet = (
+        "llm: new AgentTimelineTransport({\n"
+        "        get: context.get,\n"
+        "        operationId: context.operationId,\n"
+        "        session,\n"
+        "        toggleToolCallingStreaming"
+    )
+    if expected_host_snippet not in text:
+        # 还原锚点：匹配原版或已 patch 但不完整的版本
+        import re
+
+        text = re.sub(
+            r"llm: new (?:Agent|Client)LLMTransport\(\{\n"
+            r"        get: context\.get,\n"
+            r"(?:        metadata: context\.metadata,\n)?"
+            r"        operationId: context\.operationId,\n"
+            r"        session,\n"
+            r"(?:        toggleToolCallingStreaming[^}]*\n)?"
+            r"      \}\),\n",
+            "llm: new AgentTimelineTransport({\n"
             "        get: context.get,\n"
-            "        metadata: context.metadata,\n"
             "        operationId: context.operationId,\n"
             "        session,\n"
+            "        toggleToolCallingStreaming: (id, streaming) =>\n"
+            "          context.get().internal_toggleToolCallingStreaming(id, streaming),\n"
             "      }),\n",
-            "      // LCA: agent runs use timeline.v1 (not OpenAI chunks)\n"
-            "      llm: new AgentTimelineTransport({\n"
-            "        get: context.get,\n"
-            "        operationId: context.operationId,\n"
-            "        session,\n"
-            "      }),\n",
+            text,
         )
+        changed = True
+
+    if changed:
         ctx.write(host, text)
-        return True
     return changed

@@ -24,6 +24,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import cast
 
+from gateway.timeline.error_sanitizer import sanitize_error
 from gateway.timeline.types import (
     AnswerDeltaEvent,
     RunEndEvent,
@@ -292,7 +293,7 @@ def _run_end(p: TimelineProjection, s: StampedEvent) -> list[TimelineEvent]:
             status=ev.status or "completed",
             steps=ev.steps,
             output=ev.output_text or "",
-            error=ev.error or "",
+            error=sanitize_error(ev.error or ""),
         )
     )
     return out

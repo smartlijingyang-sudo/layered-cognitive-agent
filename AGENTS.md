@@ -56,3 +56,4 @@ uv run vulture lca --min-confidence 80
 
 - 不绕过 pre-commit（`--no-verify`）
 - 不让 contracts / layer0~3 import layer4_app
+- 不直接改 `lobehub-ui/` 里的文件——改对应的 patch 源（`deploy/lobehub/patches/`），再 `patch_lobehub.py apply --reset`

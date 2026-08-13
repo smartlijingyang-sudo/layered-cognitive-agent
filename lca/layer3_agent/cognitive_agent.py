@@ -130,6 +130,7 @@ class CognitiveAgent(AgentUnit):
                 raise
             except Exception as err:
                 finish_status = TaskStatus.FAILED.value
+                finish_output = drain_run_partial()
                 finish_error = f"{type(err).__name__}: {err}"
                 raise
             finally:

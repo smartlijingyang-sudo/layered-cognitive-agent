@@ -8,6 +8,7 @@ Pipeline 可组合：
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -20,6 +21,9 @@ from gateway.timeline.sse_encode import encode_sse
 from lca.contracts.models.observability.journal import StampedEvent
 
 _log = structlog.get_logger(__name__)
+
+_HEARTBEAT_INTERVAL_S = 15
+_HEARTBEAT = b": keepalive\n\n"
 
 
 async def compose_sse_stream(
@@ -38,11 +42,23 @@ async def compose_sse_stream(
       2. 投影（TimelineProjection）
       3. 适配（SSEAdapter）
       4. 编码（encode_sse）
+
+    心跳：空闲超过 _HEARTBEAT_INTERVAL_S 秒时发送 SSE 注释帧，
+    防止反向代理因超时断开长连接（LLM 推理期间无业务事件）。
     """
     proj = projection or TimelineProjection()
     adap = adapter or LobeHubSSEAdapter()
+    sub = stream.subscribe(after_seq=after_seq)
 
-    async for item in stream.subscribe(after_seq=after_seq):
+    while True:
+        try:
+            item = await asyncio.wait_for(sub.__anext__(), timeout=_HEARTBEAT_INTERVAL_S)
+        except asyncio.TimeoutError:
+            yield _HEARTBEAT
+            continue
+        except StopAsyncIteration:
+            break
+
         if isinstance(item, GapEvent):
             yield encode_sse(
                 {

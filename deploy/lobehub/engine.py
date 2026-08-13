@@ -25,7 +25,9 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import importlib
+import inspect
 import json
 import pkgutil
 import sys
@@ -40,6 +42,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 UI = ROOT / "lobehub-ui"
 STAMP_FILE = UI / ".lca-patched"
+HASH_FILE = UI / ".lca-patch-hashes"  # per-patch source hashes
 _UPSTREAM = ROOT / ".lobehub-upstream"
 
 # ── Types ──────────────────────────────────────────────────────────────
@@ -192,11 +195,31 @@ def apply_patches(names: tuple[str, ...] = (), *, reset: bool = False) -> list[P
     if not UI.is_dir():
         print("[patch] skip: lobehub-ui/ missing", file=sys.stderr)
         sys.exit(0)
-    if reset:
-        _clear_stamps()
 
     modules = discover_patches()
     patches = _filter(modules, names)
+
+    # ── Detect source changes & auto-restore ──
+    current_hashes = {pm.meta.name: _compute_patch_hash(pm) for pm in patches}
+    old_hashes = _load_hashes()
+    changed_names = {name for name, h in current_hashes.items() if old_hashes.get(name) != h}
+
+    need_restore = bool(changed_names) or reset
+    if need_restore:
+        # 只还原即将重新 apply 的 patch 的目标文件，不碰其他 patch 的文件
+        rels = _all_patch_target_files(patches)
+        restored = _restore_from_upstream(rels)
+        _clear_stamps()
+        if changed_names and not reset:
+            _log(
+                "RESTORE",
+                ",".join(sorted(changed_names)),
+                f"{restored} files restored from upstream",
+            )
+        elif reset:
+            scope = ",".join(sorted(m.meta.name for m in patches)) if names else "all"
+            _log("RESET", scope, f"{restored} files restored from upstream")
+
     results: list[PatchResult] = []
     applied_count = 0
     ctx = PatchContext()
@@ -215,6 +238,7 @@ def apply_patches(names: tuple[str, ...] = (), *, reset: bool = False) -> list[P
         _log(status.upper(), pm.meta.name)
 
     _write_stamp(results)
+    _save_hashes(current_hashes)
     print(f"\n[patch] done: {applied_count} applied, {len(results) - applied_count} skipped")
     return results
 
@@ -501,11 +525,64 @@ def _write_stamp(results: list[PatchResult]) -> None:
     STAMP_FILE.write_text(json.dumps(stamp, indent=2, ensure_ascii=False) + "\n")
 
 
+# ── Patch Source Hash & Snapshot ──────────────────────────────────────
+
+
+def _compute_patch_hash(pm: PatchModule) -> str:
+    """SHA-256 of the patch module's source file."""
+    source_path = Path(inspect.getfile(pm.apply))
+    return hashlib.sha256(source_path.read_bytes()).hexdigest()
+
+
+def _load_hashes() -> dict[str, str]:
+    if HASH_FILE.is_file():
+        try:
+            data = json.loads(HASH_FILE.read_text())
+            if isinstance(data, dict):
+                return {k: str(v) for k, v in data.items()}
+        except (json.JSONDecodeError, KeyError):
+            pass
+    return {}
+
+
+def _save_hashes(hashes: dict[str, str]) -> None:
+    HASH_FILE.write_text(json.dumps(hashes, indent=2, ensure_ascii=False) + "\n")
+
+
+def _all_patch_target_files(modules: list[PatchModule]) -> list[str]:
+    """Collect unique target file rels across all patch modules."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for pm in modules:
+        for rel in pm.meta.files:
+            if rel not in seen:
+                seen.add(rel)
+                result.append(rel)
+    return result
+
+
+def _restore_from_upstream(rels: list[str]) -> int:
+    """Restore target files from upstream cache to clean state. Returns count restored."""
+    count = 0
+    for rel in rels:
+        upstream_file = _UPSTREAM / rel
+        dst = UI / rel
+        if upstream_file.is_file():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(upstream_file.read_bytes())
+            count += 1
+    return count
+
+
 def _read_origin_release() -> str:
     origin = UI / ".lca-origin.json"
     if origin.is_file():
         try:
-            return json.loads(origin.read_text()).get("release", "unknown")
+            data = json.loads(origin.read_text())
+            if isinstance(data, dict):
+                release = data.get("release")
+                if isinstance(release, str):
+                    return release
         except (json.JSONDecodeError, KeyError):
             pass
     return "unknown"
