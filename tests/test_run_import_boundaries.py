@@ -1,4 +1,4 @@
-"""Dependency graph for gateway/runs — spec §17.1."""
+"""Dependency graph for gateway/runs — docs/run-live.md."""
 
 from __future__ import annotations
 
@@ -53,3 +53,8 @@ def test_live_does_not_import_wire_or_ingest() -> None:
     assert "gateway.runs.wire" not in text
     assert "gateway.runs.ingest" not in text
     assert "gateway.assemble" not in text
+
+
+def test_api_does_not_import_app() -> None:
+    text = _source("runs/api.py")
+    assert "gateway.app" not in text

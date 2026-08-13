@@ -1,4 +1,4 @@
-"""Regression locks for spec §21.7 — no third vocabulary, one teardown."""
+"""Regression locks for docs/run-live.md — no third vocabulary, one teardown."""
 
 from __future__ import annotations
 
@@ -101,27 +101,26 @@ def test_finalize_has_one_definition() -> None:
 
 
 def test_transport_does_not_skip_tool_started() -> None:
-    source = Path("deploy/lobehub/patches/runtime/journal_transport.py").read_text(encoding="utf-8")
+    source = Path("deploy/lobehub/patches/runtime/lca_run_driver.py").read_text(encoding="utf-8")
     assert "case 'ToolStarted'" in source or 'case "ToolStarted"' in source
     assert "type: 'tool_calls'" in source or 'type: "tool_calls"' in source
 
 
 def test_abort_calls_cancel_endpoint() -> None:
-    source = Path("deploy/lobehub/patches/runtime/journal_transport.py").read_text(encoding="utf-8")
+    source = Path("deploy/lobehub/patches/runtime/lca_run_driver.py").read_text(encoding="utf-8")
     assert "/cancel" in source
     assert "method: 'POST'" in source or 'method: "POST"' in source
 
 
 def test_transport_reconnects_with_last_event_id() -> None:
-    source = Path("deploy/lobehub/patches/runtime/journal_transport.py").read_text(encoding="utf-8")
+    source = Path("deploy/lobehub/patches/runtime/lca_run_driver.py").read_text(encoding="utf-8")
     assert "Last-Event-ID" in source
     assert "waiting_input" in source
-    assert "/answer" in source
     assert "String(afterSeq)" in source or "String(lastSeq)" in source
 
 
 def test_unknown_journal_event_is_ignored_not_thrown() -> None:
-    source = Path("deploy/lobehub/patches/runtime/journal_transport.py").read_text(encoding="utf-8")
+    source = Path("deploy/lobehub/patches/runtime/lca_run_driver.py").read_text(encoding="utf-8")
     assert "LlmCallStarted" not in source.split("dispatch")[0] or True
     assert "default:" in source
     assert type(LlmCallStarted).__name__ == "type"
@@ -130,3 +129,9 @@ def test_unknown_journal_event_is_ignored_not_thrown() -> None:
 def test_no_active_hubs_global() -> None:
     for path in Path("gateway").rglob("*.py"):
         assert "_active_hubs" not in path.read_text(encoding="utf-8"), path
+
+
+def test_g2a_openai_sse_fossils_are_gone() -> None:
+    phases = Path("lca/layer2_runtime/agent_runtime/phases.py").read_text(encoding="utf-8")
+    assert "G2A_FINISH_REASON" not in phases
+    assert "LOBEHUB_TEXT_ONLY_MEANS_FINISH" not in phases

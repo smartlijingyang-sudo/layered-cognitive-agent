@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 import json
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
@@ -18,10 +18,20 @@ from gateway.runs.execute import create_run_session, llm_status, resume_run, sch
 from gateway.runs.ingress import prepare_run_from_messages
 from gateway.runs.live import LiveGap, LiveTail
 from gateway.runs.session import RunRegistry, RunStatus
+from lca.layer0_infra.file_store import LocalFileStore
 from lca.layer0_infra.observability.journal.sse_frames import (
     parse_last_event_id,
     stamped_to_sse_frame,
 )
+
+
+def _registry_of(request: Request) -> RunRegistry:
+    return cast("RunRegistry", request.app.state.registry)
+
+
+def _file_store_of(request: Request) -> LocalFileStore:
+    return cast("LocalFileStore", request.app.state.file_store)
+
 
 _HEARTBEAT_INTERVAL_S = 15.0
 _HEARTBEAT = b": keepalive\n\n"
@@ -93,14 +103,13 @@ async def create_run(request: Request) -> JSONResponse:
         return _err("messages must be an array", status_code=400)
 
     model = str(body.get("model", "solo"))
-    from gateway.app import get_file_store, get_registry
-
-    run_input = await prepare_run_from_messages(messages, get_file_store())
+    run_input = await prepare_run_from_messages(messages, _file_store_of(request))
     if not run_input.user_text.strip():
         return _err("messages must include a non-empty user message", status_code=400)
 
     mode = resolve_lca_mode(model)
-    registry = get_registry()
+    registry = _registry_of(request)
+    registry.prune()
     session = registry.find_inflight_run(
         user_text=run_input.user_text,
         mode=mode,
@@ -134,9 +143,7 @@ async def stream_run_live(request: Request) -> StreamingResponse | JSONResponse:
         return JSONResponse({}, headers=cors_headers())
     run_id = request.path_params["run_id"]
     after = parse_last_event_id(request.headers.get("last-event-id"))
-    from gateway.app import get_registry
-
-    session = get_registry().get(run_id)
+    session = _registry_of(request).get(run_id)
     if session is None:
         return _err("run not found", status_code=404)
 
@@ -158,20 +165,18 @@ async def stream_run_live(request: Request) -> StreamingResponse | JSONResponse:
 
 
 async def get_run(request: Request) -> JSONResponse:
-    from gateway.app import get_registry
-
     run_id = request.path_params["run_id"]
-    summary = get_registry().summary(run_id)
+    registry = _registry_of(request)
+    registry.prune()
+    summary = registry.summary(run_id)
     if summary is None:
         return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
     return JSONResponse(summary, headers=cors_headers())
 
 
 async def get_run_doctor(request: Request) -> JSONResponse:
-    from gateway.app import get_registry
-
     run_id = request.path_params["run_id"]
-    registry = get_registry()
+    registry = _registry_of(request)
     session = registry.get(run_id)
     jsonl_path = session.jsonl_path if session is not None else registry.jsonl_path_for(run_id)
     if session is None and not jsonl_path.is_file():
@@ -181,10 +186,8 @@ async def get_run_doctor(request: Request) -> JSONResponse:
 
 
 async def cancel_run(request: Request) -> JSONResponse:
-    from gateway.app import get_registry
-
     run_id = request.path_params["run_id"]
-    session = get_registry().get(run_id)
+    session = _registry_of(request).get(run_id)
     if session is None:
         return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
     if session.status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELED):
@@ -199,10 +202,8 @@ async def cancel_run(request: Request) -> JSONResponse:
 
 
 async def answer_run(request: Request) -> JSONResponse:
-    from gateway.app import get_registry
-
     run_id = request.path_params["run_id"]
-    registry = get_registry()
+    registry = _registry_of(request)
     session = registry.get(run_id)
     if session is None:
         return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())

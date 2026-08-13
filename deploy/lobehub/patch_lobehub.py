@@ -10,7 +10,7 @@ Usage:
   python3 deploy/lobehub/patch_lobehub.py drift        # detect unregistered edits
   python3 deploy/lobehub/patch_lobehub.py manifest     # JSON manifest
   python3 deploy/lobehub/patch_lobehub.py doctor       # full health check
-  python3 deploy/lobehub/patch_lobehub.py apply openai_stream protocol  # specific
+  python3 deploy/lobehub/patch_lobehub.py apply lca_run_driver file_proxy_rewrite  # specific
 
 Rules:
   1. NEVER edit lobehub-ui/ directly — always via patches

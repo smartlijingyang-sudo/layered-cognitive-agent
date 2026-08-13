@@ -10,10 +10,10 @@ AgentRuntime.step loop            CognitiveRuntime._loop
   call_tool / call_tools_batch      Body.act (SafeExecutor)
   finish                            DefaultStopOutcomePolicy (RESPOND → stop)
 
-G2A Mode A (LobeHub UI → LCA gateway):
-  One outward OpenAI SSE per user send; internal loop may multi-step.
-  JournalOpenAiProjector maps journal → delta.content / tool_calls / lca.events.
-  finish_reason must always be ``stop`` (never ``tool_calls``).
+LobeHub UI → LCA gateway:
+  One Run per user send (POST /runs); internal loop may multi-step.
+  LiveTail projects journal as SSE (event = Journal class name).
+  Browser runLcaJournal maps LlmCallStarted / ReasoningDelta / Tool* onto native UI.
 """
 
 from __future__ import annotations
@@ -30,10 +30,3 @@ class AgentPhase(str, Enum):
     TOOL_RESULT = "tool_result"
     TOOLS_BATCH_RESULT = "tools_batch_result"
     FINISH = "finish"
-
-
-#: LobeHub GeneralChatAgent: no tool_calls → finish (not retry with tool_choice).
-LOBEHUB_TEXT_ONLY_MEANS_FINISH = True
-
-#: G2A outward SSE must not signal OpenAI tool-loop continuation.
-G2A_FINISH_REASON = "stop"

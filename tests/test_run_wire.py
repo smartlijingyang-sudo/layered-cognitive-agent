@@ -8,7 +8,7 @@ from pathlib import Path
 
 from gateway.runs.wire import WIRE, resolve
 
-_PATCH = Path("deploy/lobehub/patches/runtime/journal_transport.py")
+_PATCH = Path("deploy/lobehub/patches/runtime/lca_run_driver.py")
 
 
 def test_resolve_execute_code() -> None:
@@ -26,14 +26,14 @@ def test_wire_has_only_resolve_function() -> None:
 
 
 def test_generated_ts_wire_matches_python() -> None:
-    from deploy.lobehub.patches.runtime.journal_transport import render_wire_ts
+    from deploy.lobehub.patches.runtime.lca_run_driver import render_wire_ts
 
     parsed = _parse_ts_wire(render_wire_ts(WIRE))
     assert parsed == {name: list(coords) for name, coords in WIRE.items()}
 
 
 def test_patch_source_embeds_generated_table() -> None:
-    from deploy.lobehub.patches.runtime.journal_transport import render_wire_ts
+    from deploy.lobehub.patches.runtime.lca_run_driver import render_wire_ts
 
     source = _PATCH.read_text(encoding="utf-8")
     assert "/* __WIRE__ */" in source

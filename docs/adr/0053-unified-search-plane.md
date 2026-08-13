@@ -6,9 +6,9 @@ Accepted — 2026-08-10
 
 ## Context
 
-LCA gateway runs in **Mode A** (closed-loop): LobeHub UI sends **one** chat/completions
-request per user turn; LCA executes the full agent loop internally; tool UI is
-projected via ``lca.events`` only (never ``delta.tool_calls``).
+LCA gateway runs closed-loop: LobeHub UI starts **one** Run per user turn
+(``POST /runs``); LCA executes the full agent loop internally; tool UI is
+projected from Journal SSE (``GET /runs/{id}/live``). See ``docs/run-live.md``.
 
 Gaps observed in production runs (e.g. 「今天有什么新闻」):
 
@@ -18,7 +18,7 @@ Gaps observed in production runs (e.g. 「今天有什么新闻」):
 4. Qwen `LLM_ENABLE_SEARCH` exists but agent routed to broken skill CLI path.
 5. `run_command` timeout unit bug (60 interpreted as 60ms → 1s).
 6. `activate_skill` UI content truncated to 500 chars raw JSON.
-7. **Mode A tool loop misalignment**: emitting ``delta.tool_calls`` triggered LobeHub's native ``call_tool → call_llm`` loop, causing duplicate LCA runs per user turn (fixed: ``lca.events`` lifecycle only).
+7. **Client tool-loop misalignment**: emitting OpenAI ``tool_calls`` chunks triggered LobeHub's native ``call_tool → call_llm`` loop, causing duplicate LCA runs per user turn (fixed: Journal tool events only; browser does not invoke).
 
 ## Decision
 
@@ -38,11 +38,10 @@ Introduce a **Unified Search Plane** in `lca/layer0_infra/search/`:
 2. Tavily unavailable or tool failed → **`enable_search` on LLM** (Qwen native).
 3. Never install `tvly` CLI via curl when API key present (prompt + activate_skill hint).
 
-**UI projection (Mode A closed-loop):**
+**UI projection (closed-loop):**
 
-- Tool lifecycle via ``lca.events`` only: ``tool_started`` → ``tool_result`` / ``tool_state``
-- **Never** ``delta.tool_calls`` — prevents LobeHub ``GeneralChatAgent`` client tool loop
-- LobeHub ``callLlmFinalizer`` sets ``hasToolsCalling=false`` when ``lcaClosedLoop``
+- Tool lifecycle is Journal ``ToolStarted`` → ``ToolInvoked`` / ``ToolDenied``
+- Browser ``runLcaJournal`` maps those events onto native tool cards; it does not invoke
 - ``activate_skill`` / ``web_search`` content: extract ``{text}`` from payload, 32k cap
 
 **Timeout fix:**
@@ -58,6 +57,6 @@ Introduce a **Unified Search Plane** in `lca/layer0_infra/search/`:
 
 ## Alternatives Considered
 
-- **Re-enable LobeHub server tool execution** — breaks Mode A closed-loop.
+- **Re-enable LobeHub client/server tool execution** — breaks the server-owned loop.
 - **Only LLM search** — loses Tavily citations/UI state when key available.
 - **Patch tvly into Onlyboxes image** — fragile; API path is simpler.

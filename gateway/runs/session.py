@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
@@ -15,6 +16,8 @@ from lca.contracts.models.core.conversation import ConversationTurn
 from lca.layer0_infra.observability import ObservabilityHub
 
 _RUNS_DIR = Path("traces/runs")
+_DEFAULT_MAX_TERMINAL = 128
+_DEFAULT_TERMINAL_TTL_S = 3600.0
 
 
 def run_dedup_key(
@@ -41,6 +44,8 @@ class RunStatus(str, Enum):
     def to_lobehub_session_status(self) -> str:
         return _LOBEHUB_STATUS_MAP[self]
 
+
+_TERMINAL = frozenset({RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELED})
 
 _LOBEHUB_STATUS_MAP: dict[RunStatus, str] = {
     RunStatus.PENDING: "running",
@@ -73,16 +78,47 @@ class RunSession:
     snapshot: Any = None
     runnable: Any = None
     approval_request: dict[str, Any] | None = None
+    closed_at: float | None = None
 
 
 class RunRegistry:
     """The only Run index. No parallel module-level session tables."""
 
-    def __init__(self, runs_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        runs_dir: Path | None = None,
+        *,
+        max_terminal: int = _DEFAULT_MAX_TERMINAL,
+        terminal_ttl_s: float = _DEFAULT_TERMINAL_TTL_S,
+    ) -> None:
         self._runs: dict[str, RunSession] = {}
         self._inflight_by_key: dict[str, str] = {}
         self._runs_dir = runs_dir if runs_dir is not None else _RUNS_DIR
         self._runs_dir.mkdir(parents=True, exist_ok=True)
+        self._max_terminal = max_terminal
+        self._terminal_ttl_s = terminal_ttl_s
+
+    def prune(self, now: float | None = None) -> int:
+        """Drop terminal sessions past TTL or over the cap. Running/HIL stay."""
+        clock = time.time() if now is None else now
+        terminal = [session for session in self._runs.values() if session.status in _TERMINAL]
+        drop: list[str] = []
+        for session in terminal:
+            closed = session.closed_at if session.closed_at is not None else clock
+            if clock - closed >= self._terminal_ttl_s:
+                drop.append(session.run_id)
+        kept = [session for session in terminal if session.run_id not in drop]
+        kept.sort(key=lambda session: session.closed_at if session.closed_at is not None else 0.0)
+        overflow = len(kept) - self._max_terminal
+        if overflow > 0:
+            drop.extend(session.run_id for session in kept[:overflow])
+        for run_id in drop:
+            doomed = self._runs.get(run_id)
+            if doomed is None:
+                continue
+            del self._runs[run_id]
+            self.clear_inflight(doomed)
+        return len(drop)
 
     def put(self, session: RunSession) -> None:
         self._runs[session.run_id] = session

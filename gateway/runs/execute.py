@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import time
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -263,6 +264,7 @@ async def finalize(
         finally:
             _write_terminal_status(session, success)
             registry.clear_inflight(session.run_id)
+            registry.prune()
             _record_doctor(session)
 
 
@@ -273,6 +275,8 @@ def _write_terminal_status(session: RunSession, success: bool) -> None:
         session.status = RunStatus.FAILED
     elif success:
         session.status = RunStatus.COMPLETED
+    if session.status in {RunStatus.CANCELED, RunStatus.FAILED, RunStatus.COMPLETED}:
+        session.closed_at = time.time()
 
 
 def _record_doctor(session: RunSession) -> None:

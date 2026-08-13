@@ -106,6 +106,45 @@ class TestRunRegistryDedup(unittest.TestCase):
         registry.clear_inflight(session)
         self.assertIsNone(registry.find_inflight_run(user_text="hello", mode="solo"))
 
+    def test_prune_drops_old_terminal_sessions(self) -> None:
+        registry = RunRegistry(max_terminal=2, terminal_ttl_s=60)
+        for i, status in enumerate(
+            (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELED, RunStatus.RUNNING)
+        ):
+            session = RunSession(
+                run_id=f"run_{i}",
+                trace_id=f"t{i}",
+                jsonl_path=registry.jsonl_path_for(f"run_{i}"),
+                tail=LiveTail(),
+                question="q",
+                user_text=f"q{i}",
+                mode="solo",
+                status=status,
+                closed_at=100.0 if status is not RunStatus.RUNNING else None,
+            )
+            registry.put(session)
+        dropped = registry.prune(now=1000.0)
+        self.assertGreaterEqual(dropped, 3)
+        self.assertIsNone(registry.get("run_0"))
+        self.assertIsNotNone(registry.get("run_3"))
+
+    def test_prune_keeps_fresh_terminal_within_cap(self) -> None:
+        registry = RunRegistry(max_terminal=8, terminal_ttl_s=3600)
+        session = RunSession(
+            run_id="run_fresh",
+            trace_id="t",
+            jsonl_path=registry.jsonl_path_for("run_fresh"),
+            tail=LiveTail(),
+            question="q",
+            user_text="q",
+            mode="solo",
+            status=RunStatus.COMPLETED,
+            closed_at=900.0,
+        )
+        registry.put(session)
+        assert registry.prune(now=1000.0) == 0
+        self.assertIs(registry.get("run_fresh"), session)
+
 
 class TestOpenAiStructuredHelpers(unittest.TestCase):
     def test_normalize_responses_input_string(self) -> None:

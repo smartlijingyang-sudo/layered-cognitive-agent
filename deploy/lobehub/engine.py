@@ -5,8 +5,8 @@ Architecture:
     ├── patch_lobehub.py          # thin CLI entry point
     ├── engine.py                 # this file — core types + engine + CLI
     └── patches/                  # auto-discovered patch modules
-        ├── streaming/openai_stream.py
-        ├── runtime/streaming_handler.py
+        ├── runtime/lca_run_driver.py
+        ├── proxy/file_proxy_rewrite.py
         └── ...
 
 Each patch module exports:
@@ -20,7 +20,7 @@ Usage:
     python3 deploy/lobehub/patch_lobehub.py drift        # detect unregistered edits
     python3 deploy/lobehub/patch_lobehub.py manifest     # JSON manifest
     python3 deploy/lobehub/patch_lobehub.py doctor       # full health check
-    python3 deploy/lobehub/patch_lobehub.py apply openai_stream protocol  # specific
+    python3 deploy/lobehub/patch_lobehub.py apply lca_run_driver file_proxy_rewrite  # specific
 """
 
 from __future__ import annotations
@@ -126,6 +126,21 @@ class PatchContext:
             tag = label or rel
             raise SystemExit(f"[{tag}] anchor not found")
         return text.replace(anchor, insert, 1)
+
+    def replace_first_of(
+        self,
+        rel: str,
+        replacements: tuple[tuple[str, str], ...],
+        *,
+        label: str,
+    ) -> str:
+        """Try anchors in order; replace the first match. Fail with all needles listed."""
+        text = self.read(rel)
+        for anchor, insert in replacements:
+            if anchor in text:
+                return text.replace(anchor, insert, 1)
+        needles = " | ".join(repr(anchor[:80]) for anchor, _ in replacements)
+        raise SystemExit(f"[{label}] none of {len(replacements)} anchors found: {needles}")
 
     def replace_all(self, rel: str, old: str, new: str) -> str:
         text = self.read(rel)

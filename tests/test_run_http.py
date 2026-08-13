@@ -36,6 +36,12 @@ def _frames(body: str) -> list[tuple[str, dict]]:
     return out
 
 
+def test_create_app_binds_registry_on_state() -> None:
+    registry = RunRegistry()
+    app = create_app(registry, llm_resolver=ScriptedLLMResolver())
+    assert app.state.registry is registry
+
+
 def test_post_runs_202_then_live_is_journal() -> None:
     registry = RunRegistry()
     with TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver())) as client:

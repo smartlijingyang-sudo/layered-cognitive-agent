@@ -77,7 +77,7 @@ def create_app(
         set_llm_resolver(llm_resolver)
     else:
         set_llm_resolver(ProductionLLMResolver())
-    return Starlette(
+    application = Starlette(
         routes=[
             Route("/health", health, methods=["GET"]),
             Route("/runs", create_run, methods=["POST", "OPTIONS"]),
@@ -96,6 +96,9 @@ def create_app(
             Route("/runs/{run_id}/answer", _options, methods=["OPTIONS"]),
         ],
     )
+    application.state.registry = _registry
+    application.state.file_store = _file_store
+    return application
 
 
 app = create_app()
