@@ -346,7 +346,7 @@ _ensure_lobehub_env() {
   _set_env "OPENAI_API_KEY" "lca-local"
   _set_env "QWEN_PROXY_URL" "${gw}"
   _set_env "QWEN_API_KEY" "lca-local"
-  _set_env "ENABLED_QWEN" "1"
+  _set_env "ENABLED_QWEN" "0"
   _set_env "DEFAULT_AGENT_CONFIG" "model=solo;provider=openai;chatConfig.searchMode=off"
   if [[ -f "${LOBE_ENV}" ]]; then
     while IFS= read -r line; do

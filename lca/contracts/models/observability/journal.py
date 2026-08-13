@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from lca.contracts.atoms.ids import new_id
+
 # ── 关联骨架 ─────────────────────────────────────────────
 
 
@@ -50,6 +52,42 @@ _run_scope: ContextVar[RunScope | None] = ContextVar("lca_run_scope", default=No
 def get_current_run_scope() -> RunScope | None:
     """读取当前 run 关联身份；未设置返回 None（solo 且未入 run 边界）。"""
     return _run_scope.get()
+
+
+TEAM_CONTAINER_ROLE = "team"
+
+
+def adopt_run_scope(*, role: str) -> tuple[RunScope, bool]:
+    """Claim an allocated root Run, or mint a child / new root.
+
+    Gateway (and tests) may open ``RunScope(run_id=..., agent_role='')`` before
+    ``Agent`` / ``Team``.run. The first actor claims that id. Nested actors
+    (delegation, another speaker) mint a child. Returns ``(scope, is_root)``.
+    """
+    inherited = get_current_run_scope()
+    if inherited is None:
+        return RunScope(trace_id=new_id("trace"), run_id=new_id("run"), agent_role=role), True
+    claimed = bool(inherited.agent_role)
+    if (
+        inherited.run_id
+        and not inherited.parent_run_id
+        and not inherited.delegation_id
+        and not claimed
+    ):
+        return (
+            RunScope(trace_id=inherited.trace_id, run_id=inherited.run_id, agent_role=role),
+            True,
+        )
+    return (
+        RunScope(
+            trace_id=inherited.trace_id,
+            run_id=new_id("run"),
+            parent_run_id=inherited.run_id or inherited.parent_run_id,
+            delegation_id=inherited.delegation_id,
+            agent_role=role,
+        ),
+        False,
+    )
 
 
 @contextmanager

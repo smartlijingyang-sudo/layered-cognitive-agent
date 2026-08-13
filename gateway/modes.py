@@ -48,6 +48,9 @@ EXAMPLE_PROMPTS: Final[dict[str, tuple[str, ...]]] = {
 
 DEFAULT_MODE: Final[str] = "solo"
 
+LCA_UI_MODELS: Final[tuple[str, ...]] = ("solo", "team", "auto")
+"""LobeHub 模型选择器唯一对外的三个入口。真实 LLM 由 gateway 解析。"""
+
 SOLO_MODE_KEY: Final[str] = "solo"
 """Solo 入口：裸模型，零角色概念，不进 MODE_DEFINITIONS（ADR-0052）。"""
 

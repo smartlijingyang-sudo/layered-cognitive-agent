@@ -73,6 +73,42 @@ class TestLobeHubMessageParser(unittest.TestCase):
         self.assertEqual(parsed.file_refs[0].name, "a.csv")
         self.assertEqual(parsed.file_refs[0].url, "http://x/a.csv")
 
+    def test_collects_first_class_files_on_the_wire(self) -> None:
+        messages = [
+            {
+                "role": "user",
+                "content": "分析一下这个文件",
+                "files": [
+                    {
+                        "id": "f1",
+                        "name": "report.xlsx",
+                        "url": "http://minio/report.xlsx",
+                        "mime_type": "application/vnd.ms-excel",
+                        "size": 12,
+                    }
+                ],
+            }
+        ]
+        parsed = parse_messages(messages)
+        self.assertEqual(parsed.user_text, "分析一下这个文件")
+        self.assertEqual(len(parsed.file_refs), 1)
+        self.assertEqual(parsed.file_refs[0].name, "report.xlsx")
+        self.assertEqual(parsed.file_refs[0].url, "http://minio/report.xlsx")
+        self.assertEqual(parsed.file_refs[0].source, "files")
+
+    def test_collects_image_list_on_the_wire(self) -> None:
+        messages = [
+            {
+                "role": "user",
+                "content": "看图",
+                "imageList": [{"id": "img1", "alt": "chart", "url": "http://img.test/a.png"}],
+            }
+        ]
+        parsed = parse_messages(messages)
+        self.assertEqual(len(parsed.file_refs), 1)
+        self.assertEqual(parsed.file_refs[0].source, "imageList")
+        self.assertEqual(parsed.file_refs[0].name, "chart")
+
     def test_collects_image_url_parts(self) -> None:
         messages = [
             {

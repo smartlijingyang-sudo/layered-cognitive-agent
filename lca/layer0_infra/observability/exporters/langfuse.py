@@ -12,6 +12,7 @@ provider（hub 先于 bridge 存在）。未安装 ``langfuse`` 可选组时抛
 
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -80,16 +81,25 @@ class LangfuseBridge(ObservabilityBackend):
         self._client.score_current_span(name=name, value=value, data=attributes or None)
 
     def flush(self) -> None:
-        if self._client is not None:
-            try:
-                self._client.flush()
-            except Exception:
-                _log.warning("langfuse_flush_failed")
+        """No-op. The SDK worker already exports; chat teardown must not wait."""
+        return None
 
     def close(self) -> None:
-        if self._client is not None:
+        """Abandon shutdown after a short wait. Never block the caller forever."""
+        client = self._client
+        self._client = None
+        if client is None:
+            return
+        done = threading.Event()
+
+        def _shutdown() -> None:
             try:
-                self._client.shutdown()
+                client.shutdown()
             except Exception:
                 _log.warning("langfuse_shutdown_failed")
-            self._client = None
+            finally:
+                done.set()
+
+        threading.Thread(target=_shutdown, daemon=True, name="langfuse-shutdown").start()
+        if not done.wait(2.0):
+            _log.warning("langfuse_shutdown_abandoned")

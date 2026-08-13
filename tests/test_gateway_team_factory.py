@@ -14,6 +14,11 @@ from tests.harness.scripted_llm import ScriptedLLMAdapter
 
 
 class TestGatewaySoloFactory(unittest.TestCase):
+    def test_solo_uses_caller_role_name(self) -> None:
+        llm = ScriptedLLMAdapter({}, default_respond=True)
+        agent = build_solo_agent(llm, observability=InMemoryObservability(), role="小助手")
+        self.assertEqual(agent.role_profile.role, "小助手")
+
     def test_solo_returns_bare_agent_with_minimal_role(self) -> None:
         llm = ScriptedLLMAdapter({}, default_respond=True)
         collector = InMemoryObservability()

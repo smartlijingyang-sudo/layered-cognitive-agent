@@ -85,10 +85,10 @@ class ObservabilityHub(ObservabilityBackend):
         self._journal = ExecutionJournal(
             [insight, OtelProjector(self._tracer), *journal_projectors], policy=self._policy
         )
-        insight.bind_journal(self._journal.record)
         self._scorer: Any = None
         self._bridges: list[Any] = []
-        self._closed = False
+        self._released = False
+        self._disposed = False
 
     # ── 属性 ────────────────────────────────────────────
     @property
@@ -167,19 +167,33 @@ class ObservabilityHub(ObservabilityBackend):
 
     # ── 生命周期 ────────────────────────────────────────
     def flush(self) -> None:
-        for processor in self._processors:
-            processor.force_flush()
-        for bridge in self._bridges:
-            bridge.flush()
+        """Journal only. Exporters flush in dispose(), never on the chat path."""
         self._journal.flush()
 
-    def close(self) -> None:
-        if self._closed:
+    def release(self) -> None:
+        """Close journal readers (jsonl, LiveTail). Chat SSE can end here.
+
+        Must not wait for optional exporters. Gateway finalize calls this
+        before any Langfuse/OTel teardown.
+        """
+        if self._released:
             return
-        self._closed = True
-        self.flush()
+        self._released = True
+        self._journal.close()
+
+    def dispose(self) -> None:
+        """Best-effort exporter shutdown. Caller must not hold the event loop."""
+        if self._disposed:
+            return
+        self._disposed = True
+        for processor in self._processors:
+            processor.force_flush(timeout_millis=2_000)
         for processor in self._processors:
             processor.shutdown()
         for bridge in self._bridges:
             bridge.close()
-        self._journal.close()
+
+    def close(self) -> None:
+        """Tests / CLI: release live readers, then dispose exporters."""
+        self.release()
+        self.dispose()

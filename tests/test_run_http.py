@@ -80,6 +80,14 @@ def test_post_runs_202_then_live_is_journal() -> None:
         )
         if frames:
             assert "event_type" in frames[0][1]
+        events = [
+            json.loads(line)
+            for line in session.jsonl_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        started = next(row for row in events if row["event_type"] == "AgentRunStarted")
+        assert started["scope"]["run_id"] == run_id
+        assert started["scope"]["trace_id"] == body["trace_id"]
 
         doctor = client.get(f"/runs/{run_id}/doctor")
         assert doctor.status_code == 200

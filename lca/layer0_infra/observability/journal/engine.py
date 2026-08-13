@@ -105,7 +105,23 @@ class ExecutionJournal:
         self._events.append(stamped)
         for projector in self._projectors:
             projector.on_event(stamped)
+        self._emit_followups()
         return stamped
+
+    def _emit_followups(self) -> None:
+        """Projectors are readers. Follow-up events publish after fan-out.
+
+        InsightEngine used to call record() mid-fan-out, so later readers
+        saw RunInsight before AgentRunFinished (seq inversion).
+        """
+        followups: list[JournalEvent] = []
+        for projector in self._projectors:
+            inner = getattr(projector, "inner", projector)
+            drain = getattr(inner, "drain_followups", None)
+            if callable(drain):
+                followups.extend(drain())
+        for event in followups:
+            self.record(event)
 
     def _apply_policy(self, event: JournalEvent) -> JournalEvent:
         """字符串字段写入期策略强制（脱敏/预览裁剪/截断）；非字符串原样。

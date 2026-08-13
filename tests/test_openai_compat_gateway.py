@@ -19,27 +19,34 @@ from tests.support.gateway_scripted import ScriptedLLMResolver
 
 
 class TestOpenAiCompatGateway(unittest.TestCase):
-    def test_list_models_includes_solo_and_team(self) -> None:
+    def test_list_models_is_lca_ui_catalog(self) -> None:
         client = TestClient(create_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
         response = client.get("/v1/models")
         self.assertEqual(response.status_code, 200)
-        ids = {item["id"] for item in response.json()["data"]}
-        self.assertIn("solo", ids)
-        self.assertIn("team", ids)
+        ids = [item["id"] for item in response.json()["data"]]
+        self.assertEqual(ids, ["solo", "team", "auto"])
 
-    def test_chat_completions_agent_run_returns_400(self) -> None:
+    def test_chat_completions_housekeeper_passthrough(self) -> None:
         registry = RunRegistry()
         client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
-        response = client.post(
-            "/v1/chat/completions",
-            json={
-                "model": "solo",
-                "stream": True,
-                "messages": [{"role": "user", "content": "hello"}],
-            },
+        with patch(
+            "gateway.openai_shim.create_simple_completion",
+            return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2}),
+        ):
+            response = client.post(
+                "/v1/chat/completions",
+                json={
+                    "model": "solo",
+                    "stream": False,
+                    "messages": [{"role": "user", "content": "hello"}],
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["choices"][0]["message"]["content"],
+            "topic title",
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "agent_runs_migrated")
+        self.assertEqual(registry.status_counts().get("running", 0), 0)
 
     def test_chat_completions_without_llm_returns_503(self) -> None:
         registry = RunRegistry()
@@ -173,6 +180,12 @@ class TestOpenAiStructuredHelpers(unittest.TestCase):
             self.assertEqual(resolve_upstream_model("solo"), "qwen3.7-plus")
         self.assertEqual(resolve_upstream_model("gpt-5.4-mini"), "gpt-5.4-mini")
 
+    def test_resolve_embedding_model_does_not_use_chat_id(self) -> None:
+        from lca.layer0_infra.openai_compat import resolve_embedding_model
+
+        self.assertNotEqual(resolve_embedding_model("solo"), resolve_upstream_model("solo"))
+        self.assertEqual(resolve_embedding_model("text-embedding-3-small"), "text-embedding-v3")
+
 
 class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
     def test_embeddings_create_returns_vectors(self) -> None:
@@ -197,19 +210,23 @@ class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
 
 
 class TestOpenAiResponsesEndpoint(unittest.TestCase):
-    def test_responses_without_schema_rejects_agent_run(self) -> None:
+    def test_responses_without_schema_is_housekeeper(self) -> None:
         registry = RunRegistry()
         client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
-        response = client.post(
-            "/v1/responses",
-            json={
-                "model": "solo",
-                "stream": False,
-                "input": [{"role": "user", "content": "hello via responses"}],
-            },
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "agent_runs_migrated")
+        with patch(
+            "gateway.openai_shim.create_simple_completion",
+            return_value=("ok", {}),
+        ):
+            response = client.post(
+                "/v1/responses",
+                json={
+                    "model": "solo",
+                    "stream": False,
+                    "input": [{"role": "user", "content": "hello via responses"}],
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["choices"][0]["message"]["content"], "ok")
 
     def test_responses_create_returns_output_text(self) -> None:
         registry = RunRegistry()

@@ -9,7 +9,7 @@
 ```text
 Browser → LobeHub v2.2.13 (lobehub-ui/, bun run dev :3010)
               │ executeClientAgent(solo|team|auto)
-              │   → runLcaJournal
+              │   → runLcaJournal → finishLcaChat
               │ POST /lca-api/runs          →  POST /runs
               │ GET  /lca-api/runs/{id}/live
               ▼
@@ -20,10 +20,10 @@ LCA Agent/Team
               │ record() → jsonl + LiveTail
 ```
 
-默认聊天模型 `solo`。两条路不相交：
+模型选择器只暴露 `solo` / `team` / `auto`。真实 LLM 由 gateway 解析。两条路不相交：
 
 - `POST /runs` + `GET /runs/{id}/live`：Agent 干活
-- `POST /v1/chat/completions` / embeddings / responses：标题与系统小助手（`openai_shim`）
+- `POST /v1/chat/completions` / embeddings / responses：管家面（标题、话题、小助手）。直连上游，不开 Run。
 
 联网搜索（ADR-0053）：`TAVILY_API_KEY` 已配 → `web_search`；否则 Qwen `enable_search` 兜底。搜索结果同样经 Journal `ToolStarted` / `ToolInvoked` 投影，不另开协议。
 

@@ -13,7 +13,7 @@ AgentRuntime.step loop            CognitiveRuntime._loop
 LobeHub UI → LCA gateway:
   One Run per user send (POST /runs); internal loop may multi-step.
   LiveTail projects journal as SSE (event = Journal class name).
-  Browser runLcaJournal maps LlmCallStarted / ReasoningDelta / Tool* onto native UI.
+  Browser runLcaJournal maps LlmCallStarted / ReasoningDelta / Tool* onto one assistant row.
 """
 
 from __future__ import annotations

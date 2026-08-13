@@ -22,6 +22,13 @@ def _stamped(seq: int, text: str = "x") -> StampedEvent:
     )
 
 
+def test_last_seq_tracks_max_not_last_arrival() -> None:
+    tail = LiveTail()
+    tail.on_event(_stamped(5))
+    tail.on_event(_stamped(3))
+    assert tail.last_seq == 5
+
+
 def test_live_tail_is_journal_projector() -> None:
     tail = LiveTail()
     assert isinstance(tail, JournalProjector)

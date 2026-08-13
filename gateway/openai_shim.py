@@ -1,7 +1,13 @@
-"""OpenAI-compatible HTTP surface.
+"""OpenAI-compatible housekeeper surface.
 
-Title / embeddings / responses / structured output.
-Agent runs go through POST /runs — this shim must never start one.
+LobeHub title, topic, 小助手, embeddings, and generateObject hit this wire.
+It is a completion API, not an agent. It never starts a Run, never
+translates Journal into OpenAI SSE, and never 400s a valid housekeeper
+call to "protect" the Run surface.
+
+User chat is POST /runs. If a system assistant needs tools or a sandbox,
+the browser already enters executeClientAgent → runLcaJournal. Do not
+invent a second agent behind /v1/chat/completions.
 """
 
 from __future__ import annotations
@@ -14,10 +20,9 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
 from gateway.cors import cors_headers
-from gateway.modes import DEFAULT_MODE, MODE_DEFINITIONS
+from gateway.modes import DEFAULT_MODE, LCA_UI_MODELS
 from gateway.runs.execute import llm_status
 from lca.contracts.atoms.ids import new_id
-from lca.layer0_infra.llm_resolver import get_model_registry
 from lca.layer0_infra.openai_compat import (
     StructuredLLMError,
     build_responses_payload,
@@ -76,24 +81,9 @@ def classify_lobehub_chat_request(messages: list[Any]) -> LobeHubChatKind:
 
 
 def _lca_models_payload() -> dict[str, Any]:
-    registry = get_model_registry()
-    data: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for key in [DEFAULT_MODE, *MODE_DEFINITIONS.keys()]:
-        if key not in seen:
-            data.append({"id": key, "object": "model", "created": 0, "owned_by": "lca"})
-            seen.add(key)
-    for model_def in registry.list_available():
-        if model_def.id not in seen:
-            data.append(
-                {
-                    "id": model_def.id,
-                    "object": "model",
-                    "created": 0,
-                    "owned_by": model_def.provider,
-                }
-            )
-            seen.add(model_def.id)
+    data = [
+        {"id": key, "object": "model", "created": 0, "owned_by": "lca"} for key in LCA_UI_MODELS
+    ]
     return {"object": "list", "data": data}
 
 
@@ -182,17 +172,8 @@ async def _chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | St
     if body.get("response_format") is not None:
         return await _structured_chat_completion(body, model, messages, chat_id)
 
-    # Title generation — bypass LCA agent runs
-    if classify_lobehub_chat_request(messages) == "title":
-        return await _passthrough_chat_completion(
-            messages=messages, model=model, stream=stream, chat_id=chat_id
-        )
-
-    return _error_response(
-        "Agent runs must use POST /runs + GET /runs/{id}/live. "
-        "/v1/chat/completions is reserved for title generation and structured output only.",
-        status_code=400,
-        code="agent_runs_migrated",
+    return await _passthrough_chat_completion(
+        messages=messages, model=model, stream=stream, chat_id=chat_id
     )
 
 

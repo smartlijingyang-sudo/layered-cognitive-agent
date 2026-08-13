@@ -526,7 +526,7 @@ inject_qwen_from_lca_env() {
   _set_lobe_env "OPENAI_API_KEY" "lca-local"
   _set_lobe_env "QWEN_PROXY_URL" "${gateway_url}"
   _set_lobe_env "QWEN_API_KEY" "lca-local"
-  _set_lobe_env "ENABLED_QWEN" "1"
+  _set_lobe_env "ENABLED_QWEN" "0"
   _set_lobe_env "DEFAULT_AGENT_CONFIG" "${agent_config}"
 }
 

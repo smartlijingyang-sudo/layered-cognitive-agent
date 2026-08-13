@@ -102,7 +102,7 @@ async def create_embeddings(
     if not key:
         raise StructuredLLMError("LLM_API_KEY 未配置")
 
-    upstream_model = resolve_upstream_model(model)
+    upstream_model = resolve_embedding_model(model)
     client = get_async_openai_client()
     kwargs: dict[str, Any] = {"model": upstream_model, "input": raw_input}
     if dimensions is not None:

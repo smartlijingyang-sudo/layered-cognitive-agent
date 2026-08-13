@@ -35,25 +35,33 @@ Agent / Team
     record(AgentRunFinished | TeamRunFinished)
             │
             ▼
-runLcaJournal
-  parseSseBlock / readSse     订流、Last-Event-ID、id: 与多行 data
-  projectJournalFrame         Journal → 投影值（纯函数）
-  openTurn / applyProjected   气泡 + StreamingHandler
-  *Finished 不是 EOF；tail close 才 finishTurn
+runLcaJournal                          deploy/lobehub/patches/runtime/LcaRunDriver.ts
+  parseSseBlock / readSse     订流
+  projectJournalFrame         Journal → 投影值
+  ensureSpeaker / sealRow     一个说话人一条 assistant；活流 + 落库 + 对账
+finishLcaChat                          patches/runtime/lcaFinishChat.ts
+  停转圈 / 队列 / 话题状态 / 通知
+  *Finished 不是 EOF；tail close 才 sealRow
 ```
 
-两条 HTTP 面不相交：
+两条 HTTP 面不相交。意图定面，不是模型名定面。
 
 | 面 | 路径 | 谁用 |
 |---|---|---|
-| Run | `POST /runs` + `GET /runs/{id}/live` | Agent 干活 |
-| Shim | `/v1/chat/completions` `/v1/embeddings` `/v1/responses` | 标题、系统小助手 |
+| Run | `POST /runs` + `GET /runs/{id}/live` | 某个 **AgentRef** 干活。附件是 `messages[].files` |
+| Shim | `/v1/chat/completions` `/v1/embeddings` `/v1/responses` | 标题、话题、embeddings。直连上游补全，**不是 agent**，无记忆 |
+
+`POST /runs` 必带 `agent: { id, name }`。`id` 是隔离键（journal / sandbox / inflight / Langfuse session）；两个 LobeHub `agentId` 说同一句话也是两本 Run。缺省 `{ id: "solo", name: "助手" }`。
+
+`/v1` 通的是管家函数，不要在 shim 里再包一层假 agent。LobeHub 里真正的对话体（含小助手）走 `executeClientAgent`，带上自己的 `agentId`。
+
+Hub 收尾分两拍：`release()` 先关 LiveTail / jsonl（SSE 结束）；`dispose()` 在线程里关 Langfuse，超时放弃。聊天面不等导出器。
 
 ## HTTP
 
 | 方法 | 路径 | 作用 |
 |---|---|---|
-| `POST` | `/runs` | 开工。body `{ messages, model }`。202 `{ run_id, trace_id, live_url }` |
+| `POST` | `/runs` | 开工。body `{ messages, model, agent }`。202 `{ run_id, trace_id, agent, live_url }` |
 | `GET` | `/runs/{id}/live` | Journal SSE。认 `Last-Event-ID` |
 | `GET` | `/runs/{id}` | 快照：status / error / mode |
 | `GET` | `/runs/{id}/doctor` | `doctor.v1`：H1 开工、H2 记账、H3 转播。H4/H5 在浏览器 |
@@ -79,11 +87,11 @@ data: { stamped_to_record(stamped) + domain }
 
 ## 前端映射
 
-入口：`executeClientAgent` 对 `solo` / `team` / `auto` 短路进 `runLcaJournal`。一次 POST，订一本 `/live`，按 `LlmCallStarted` 开气泡。未知 `event` 忽略。
+入口：`executeClientAgent` 对 `solo` / `team` / `auto` 进 `runLcaJournal`，收尾走 `finishLcaChat`（LobeHub 壳，不是 AgentRuntime）。一次 POST，订一本 `/live`。一条用户回合对应一个说话人、一条 assistant 行。`StreamingHandler` 只管活流；`optimisticUpdateMessageContent` 落库；`sealRow` 发现库里仍是 `...` 就再写一次。未知 `event` 忽略。
 
 | SSE `event` | 行为 |
 |---|---|
-| `LlmCallStarted` | 当前气泡已有内容或工具卡 → `openTurn()`；否则确保有一条 assistant |
+| `LlmCallStarted` | 同一 `scope.agent_role` → 同一条 assistant；换说话人才新开一行 |
 | `ReasoningDelta` | `{ type: 'reasoning', text }` |
 | `ReasoningCompleted` | 忽略（下一条 text/tool 会收起 Thinking） |
 | `StepTextDelta` 且 `channel=answer` | `{ type: 'text', text }`。`decision` 丢弃 |
@@ -118,6 +126,12 @@ gateway/
     live.py                LiveTail(JournalProjector)
     doctor.py              diagnose()
     wire.py                工具名 → (identifier, apiName)
+
+deploy/lobehub/patches/runtime/
+  LcaRunDriver.ts          投影：SSE → 气泡
+  lcaFinishChat.ts         LobeHub 壳：转圈 / 队列 / 通知
+  lcaChatRow.ts            占位符对账
+  lca_run_driver.py        拷贝 TS、生成 lcaWire.ts、挂钩
 ```
 
 `layer0` 的 `stamped_to_sse_frame` 是线上编码。Gateway 的读者是 LiveTail，不另挂 `SSEJournalProjector`。

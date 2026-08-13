@@ -15,6 +15,7 @@ from gateway.cors import cors_headers
 from gateway.modes import resolve_lca_mode
 from gateway.runs.doctor import diagnose
 from gateway.runs.execute import create_run_session, llm_status, resume_run, schedule_run
+from gateway.runs.identity import parse_agent_ref
 from gateway.runs.ingress import prepare_run_from_messages
 from gateway.runs.live import LiveGap, LiveTail
 from gateway.runs.session import RunRegistry, RunStatus
@@ -108,12 +109,14 @@ async def create_run(request: Request) -> JSONResponse:
         return _err("messages must include a non-empty user message", status_code=400)
 
     mode = resolve_lca_mode(model)
+    agent = parse_agent_ref(body.get("agent"))
     registry = _registry_of(request)
     registry.prune()
     session = registry.find_inflight_run(
         user_text=run_input.user_text,
         mode=mode,
         attachment_ids=run_input.attachment_ids,
+        agent_id=agent.agent_id,
     )
     if session is None:
         session = create_run_session(
@@ -123,6 +126,7 @@ async def create_run(request: Request) -> JSONResponse:
             mode=mode,
             attachment_ids=run_input.attachment_ids,
             prior_turns=run_input.prior_turns,
+            agent=agent,
         )
         schedule_run(registry, session)
 
@@ -130,6 +134,7 @@ async def create_run(request: Request) -> JSONResponse:
         {
             "run_id": session.run_id,
             "trace_id": session.trace_id,
+            "agent": {"id": session.agent.agent_id, "name": session.agent.name},
             "live_url": f"/runs/{session.run_id}/live",
         },
         status_code=202,

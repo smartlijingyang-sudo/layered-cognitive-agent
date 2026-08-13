@@ -11,6 +11,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.live import LiveTail
 from lca.contracts.models.core.conversation import ConversationTurn
 from lca.layer0_infra.observability import ObservabilityHub
@@ -25,11 +26,16 @@ def run_dedup_key(
     user_text: str,
     mode: str,
     attachment_ids: Sequence[str] = (),
+    agent_id: str = "",
 ) -> str:
-    """Fingerprint for coalescing concurrent duplicate LobeHub requests."""
+    """Fingerprint for coalescing concurrent duplicate LobeHub requests.
+
+    ``agent_id`` is part of the key: two principals never share an inflight Run.
+    """
     normalized = " ".join(user_text.strip().split())
     attachments = ",".join(sorted(str(i).strip() for i in attachment_ids if str(i).strip()))
-    payload = f"{mode}\0{normalized}\0{attachments}".encode()
+    principal = agent_id.strip() or "solo"
+    payload = f"{mode}\0{principal}\0{normalized}\0{attachments}".encode()
     return hashlib.sha256(payload).hexdigest()[:24]
 
 
@@ -71,6 +77,7 @@ class RunSession:
     hub: ObservabilityHub | None = None
     prior_turns: tuple[ConversationTurn, ...] = field(default_factory=tuple)
     attachment_ids: tuple[str, ...] = field(default_factory=tuple)
+    agent: AgentRef = field(default_factory=default_agent_ref)
     status: RunStatus = RunStatus.PENDING
     error: str = ""
     task: asyncio.Task[Any] | None = None
@@ -126,6 +133,7 @@ class RunRegistry:
             user_text=session.user_text,
             mode=session.mode,
             attachment_ids=session.attachment_ids,
+            agent_id=session.agent.agent_id,
         )
         self._inflight_by_key[key] = session.run_id
 
@@ -135,8 +143,14 @@ class RunRegistry:
         user_text: str,
         mode: str,
         attachment_ids: Sequence[str] = (),
+        agent_id: str = "",
     ) -> RunSession | None:
-        key = run_dedup_key(user_text=user_text, mode=mode, attachment_ids=attachment_ids)
+        key = run_dedup_key(
+            user_text=user_text,
+            mode=mode,
+            attachment_ids=attachment_ids,
+            agent_id=agent_id,
+        )
         run_id = self._inflight_by_key.get(key)
         if run_id is None:
             return None
@@ -157,6 +171,7 @@ class RunRegistry:
             user_text=session.user_text,
             mode=session.mode,
             attachment_ids=session.attachment_ids,
+            agent_id=session.agent.agent_id,
         )
         if self._inflight_by_key.get(key) == session.run_id:
             self._inflight_by_key.pop(key, None)
@@ -186,6 +201,7 @@ class RunRegistry:
             "status": session.status.value,
             "session_status": session.status.to_lobehub_session_status(),
             "mode": session.mode,
+            "agent": {"id": session.agent.agent_id, "name": session.agent.name},
             "question": session.question,
             "error": session.error,
         }

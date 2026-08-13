@@ -234,6 +234,8 @@ def _collect_file_refs(messages: list[Any]) -> list[FileRef]:
     for item in messages:
         if not isinstance(item, dict):
             continue
+        for ref in _structured_file_refs(item):
+            add(ref)
         content = item.get("content")
         blobs = _content_blobs(content)
         for blob in blobs:
@@ -266,6 +268,66 @@ def _collect_file_refs(messages: list[Any]) -> list[FileRef]:
                     )
                 )
     return refs
+
+
+def _structured_file_refs(item: dict[str, Any]) -> list[FileRef]:
+    """First-class files on the Run wire. Not scraped from prompt HTML."""
+    refs: list[FileRef] = []
+    raw_files = item.get("files")
+    if raw_files is None:
+        raw_files = item.get("fileList")
+    if isinstance(raw_files, list):
+        for part in raw_files:
+            ref = _file_ref_from_mapping(part, source="files")
+            if ref is not None:
+                refs.append(ref)
+    raw_images = item.get("imageList")
+    if isinstance(raw_images, list):
+        for part in raw_images:
+            if not isinstance(part, dict):
+                continue
+            url = str(part.get("url", "")).strip()
+            if not url:
+                continue
+            name = str(part.get("alt") or part.get("name") or part.get("id") or "").strip()
+            refs.append(
+                FileRef(
+                    name=name or _name_from_url(url),
+                    url=url,
+                    mime_type=str(part.get("mime_type") or part.get("fileType") or "image/png"),
+                    lobehub_id=str(part.get("id", "")),
+                    source="imageList",
+                )
+            )
+    return refs
+
+
+def _file_ref_from_mapping(part: Any, *, source: str) -> FileRef | None:
+    if not isinstance(part, dict):
+        return None
+    url = str(part.get("url", "")).strip()
+    if not url or part.get("inaccessible"):
+        return None
+    name = str(part.get("name") or part.get("filename") or _name_from_url(url)).strip()
+    mime = str(
+        part.get("mime_type")
+        or part.get("fileType")
+        or part.get("type")
+        or "application/octet-stream"
+    ).strip()
+    size_raw = part.get("size")
+    if size_raw is None:
+        size_raw = part.get("size_bytes")
+    size_ok = isinstance(size_raw, int) or (isinstance(size_raw, str) and size_raw.isdigit())
+    size = int(size_raw) if size_ok else None
+    return FileRef(
+        name=name or "file",
+        url=url,
+        mime_type=mime or "application/octet-stream",
+        lobehub_id=str(part.get("id", "")),
+        size_bytes=size,
+        source=source,
+    )
 
 
 def _content_blobs(content: Any) -> list[str]:

@@ -1,13 +1,12 @@
 """InsightEngine —— journal 聚合 + 规则触发的投影器（ADR-0037）。
 
 在 run 收尾（团队 ``TeamRunFinished`` / solo 根 ``AgentRunFinished``）把本
-trace 的事件聚合成摘要，跑 ``insight_rules`` 注册表，把每条发现 record 回
-journal（``RunInsight``）——由此洞察自动流入一切投影（console Run Card、
-OTel span event、jsonl 落盘），无需各投影器各自实现分析。
+trace 的事件聚合成摘要，跑 ``insight_rules`` 注册表，把 ``RunInsight`` 排进
+follow-up 队列。``ExecutionJournal`` 等本条事件扇出结束后再 record——投影器
+是读者，不在 fan-out 中回写。
 
-防自激：忽略入站 ``RunInsight``（自己产的不再触发）；每 trace 只在收尾
-触发一次（收尾即 pop 摘要）。装配顺序须 insight 先于 otel/console，保证
-洞察在 run span 关闭前注入、Run Card 渲染前就位。
+防自激：忽略入站 ``RunInsight``；每 trace 只在收尾触发一次。装配顺序须
+insight 先于 otel/console，保证洞察在 run span 关闭前注入。
 """
 
 from __future__ import annotations
@@ -38,11 +37,7 @@ class InsightEngine(JournalProjector):
 
     def __init__(self) -> None:
         self._summaries: dict[str, dict[str, Any]] = {}
-        self._record: Any = None
-
-    def bind_journal(self, record: Any) -> None:
-        """延迟绑定 journal 写入端（hub 装配后注入 ``journal.record``）。"""
-        self._record = record
+        self._followups: list[JournalEvent] = []
 
     # ── JournalProjector ───────────────────────────────
     def on_event(self, stamped: StampedEvent) -> None:
@@ -58,6 +53,13 @@ class InsightEngine(JournalProjector):
 
     def close(self) -> None:
         self._summaries.clear()
+        self._followups.clear()
+
+    def drain_followups(self) -> list[JournalEvent]:
+        """Events to publish after every projector saw the current record."""
+        events = self._followups
+        self._followups = []
+        return events
 
     # ── 聚合 ───────────────────────────────────────────
     def _summary_of(self, stamped: StampedEvent) -> dict[str, Any]:
@@ -111,10 +113,10 @@ class InsightEngine(JournalProjector):
     def _emit_insights(self, stamped: StampedEvent) -> None:
         trace_id = stamped.scope.trace_id or "(unknown)"
         summary = self._summaries.pop(trace_id, None)
-        if summary is None or self._record is None:
+        if summary is None:
             return
         for kind, message, detail in insight_rules.run_all_rules(summary):
-            self._record(RunInsight(kind=kind, summary=message, detail=detail))
+            self._followups.append(RunInsight(kind=kind, summary=message, detail=detail))
 
 
 def create_insight_engine() -> InsightEngine:

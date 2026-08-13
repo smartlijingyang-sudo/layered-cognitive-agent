@@ -94,7 +94,7 @@ class LiveTail(JournalProjector):
         if self._closed:
             return
         self._frames.append(stamped)
-        self._last_seq = stamped.seq
+        self._last_seq = max(self._last_seq, stamped.seq)
         dead: list[int] = []
         for idx, sub in enumerate(self._subscribers):
             try:

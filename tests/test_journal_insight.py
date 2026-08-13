@@ -204,6 +204,27 @@ def test_insights_recorded_on_team_finish() -> None:
         hub.close()
 
 
+def test_insights_publish_after_finished_in_seq_order() -> None:
+    hub = ObservabilityHub([])
+    try:
+        with bind(hub):
+            scope = RunScope(trace_id="t", run_id="root")
+            with run_scope(scope):
+                record(AgentRunStarted(agent_role="助手", objective="x"))
+                record(
+                    LlmCallCompleted(model="m", latency_ms=10, prompt_tokens=5, completion_tokens=3)
+                )
+                record(AgentRunFinished(status="completed", steps=1))
+        names = [type(event.event).__name__ for event in hub.journal.events]
+        finished_at = names.index("AgentRunFinished")
+        assert "RunInsight" not in names[:finished_at]
+        assert "RunInsight" in names[finished_at + 1 :]
+        seqs = [event.seq for event in hub.journal.events]
+        assert seqs == sorted(seqs)
+    finally:
+        hub.close()
+
+
 def test_insights_not_double_emitted_for_member_runs() -> None:
     """成员 run 收尾不触发洞察（只在根收尾触发一次）。"""
     hub = ObservabilityHub([])

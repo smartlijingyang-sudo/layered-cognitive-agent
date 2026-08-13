@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms import Hook
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS
 from lca.contracts.models.core.lifecycle import TaskStatus
@@ -15,7 +14,11 @@ from lca.contracts.models.core.message import (
 )
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import StateSnapshot
-from lca.contracts.models.observability.journal import AgentRunFinished, AgentRunStarted, RunScope
+from lca.contracts.models.observability.journal import (
+    AgentRunFinished,
+    AgentRunStarted,
+    adopt_run_scope,
+)
 from lca.contracts.models.team.partial_buffer import (
     begin_partial_buffer,
     drain_run_partial,
@@ -28,7 +31,6 @@ from lca.contracts.protocols.capabilities import HasHooks
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     bind,
-    get_current_run_scope,
     objective_preview,
     record,
     run_scope,
@@ -74,16 +76,7 @@ class CognitiveAgent(AgentUnit):
     ) -> Result:
         text = _task_as_text(task)
         role = self.role_profile.role
-        # 关联骨架：继承委派方 scope（成员），无则为 solo 根 run。
-        inherited = get_current_run_scope()
-        top_level = inherited is None
-        scope = RunScope(
-            trace_id=inherited.trace_id if inherited else new_id("trace"),
-            run_id=new_id("run"),
-            parent_run_id=inherited.run_id if inherited else None,
-            delegation_id=inherited.delegation_id if inherited else None,
-            agent_role=role,
-        )
+        scope, top_level = adopt_run_scope(role=role)
         if ctx and ctx.session_id:
             set_session(ctx.session_id)
         with bind(self._observability), run_scope(scope):

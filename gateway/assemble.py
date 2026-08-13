@@ -28,14 +28,15 @@ def build_solo_agent(
     llm: LLMAdapter,
     *,
     observability: ObservabilityBackend,
+    role: str = SOLO_ROLE,
 ) -> Agent:
-    """Solo 裸模型（ADR-0052）：零角色概念，对齐 LobeHub systemRole=''。
+    """Solo 裸模型（ADR-0052）：身份来自 AgentRef.name，不是写死的「助手」。
 
-    role 只设一个最小标签（"助手"），goal/backstory 留空 —— prompt 渲染侧
-    空字段不渲染对应 section，等同于无 system prompt。
+    不同 LobeHub agentId 是不同 principal。goal/backstory 留空 —— prompt
+    渲染侧空字段不渲染对应 section。
     """
     return Agent(
-        role=SOLO_ROLE,
+        role=role,
         goal="",
         backstory="",
         tools=build_g2a_chat_tools(),

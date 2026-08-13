@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import ClassVar
 
@@ -75,3 +76,74 @@ def test_create_hub_for_session_attaches_langfuse_bridge(
         assert session.tail.buffer_size >= 1
     finally:
         hub.close()
+
+
+def test_release_closes_journal_before_export_dispose() -> None:
+    closed: list[str] = []
+
+    class _Bridge:
+        def attach(self, hub: object) -> None:
+            del hub
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            closed.append("bridge")
+
+    class _Probe:
+        def on_event(self, stamped: object) -> None:
+            del stamped
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            closed.append("journal")
+
+    from lca.layer0_infra.observability.hub import ObservabilityHub
+
+    hub = ObservabilityHub([], journal_projectors=(_Probe(),))
+    hub.attach_bridge(_Bridge())
+    hub.release()
+    assert closed == ["journal"]
+    hub.dispose()
+    assert closed == ["journal", "bridge"]
+
+
+class _HangExportHub:
+    released = False
+
+    def release(self) -> None:
+        self.released = True
+
+    def dispose(self) -> None:
+        time.sleep(30)
+
+
+@pytest.mark.asyncio
+async def test_finalize_releases_live_when_export_hangs(tmp_path: Path) -> None:
+    import time as time_mod
+
+    from gateway.runs.execute import finalize
+    from gateway.runs.live import LiveTail
+    from gateway.runs.session import RunRegistry, RunSession
+
+    registry = RunRegistry()
+    hub = _HangExportHub()
+    session = RunSession(
+        run_id="run_hang",
+        trace_id="trace_hang",
+        jsonl_path=tmp_path / "run_hang.jsonl",
+        tail=LiveTail(),
+        question="q",
+        user_text="q",
+        mode="solo",
+        hub=hub,  # type: ignore[arg-type]
+    )
+    registry.put(session)
+    started = time_mod.monotonic()
+    await finalize(session, registry, None, True)
+    elapsed = time_mod.monotonic() - started
+    assert hub.released
+    assert elapsed < 8

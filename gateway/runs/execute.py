@@ -15,15 +15,17 @@ import structlog
 from gateway.assemble import build_runnable_team, build_solo_agent
 from gateway.modes import DEFAULT_MODE, SOLO_MODE_KEY
 from gateway.runs.doctor import diagnose
+from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.live import LiveTail
 from gateway.runs.session import RunRegistry, RunSession, RunStatus
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
 from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.observability.journal import RunScope
 from lca.contracts.models.team.run_context import RunContext
 from lca.layer0_infra.file_store import get_default_file_store
 from lca.layer0_infra.llm_resolver import LLMResolver, ProductionLLMResolver
-from lca.layer0_infra.observability import ObservabilityHub, create_observability
+from lca.layer0_infra.observability import ObservabilityHub, create_observability, run_scope
 from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.sandbox.factory import resolve_sandbox
@@ -35,6 +37,8 @@ from lca.layer0_infra.workspace import run_workspace_scope
 from lca.layer4_app.api import Agent, Team
 
 _log = structlog.get_logger(__name__)
+
+_EXPORT_DISPOSE_TIMEOUT_S = 3.0
 
 _default_llm_resolver: LLMResolver = ProductionLLMResolver()
 
@@ -119,6 +123,7 @@ def create_run_session(
     mode: str = DEFAULT_MODE,
     attachment_ids: Sequence[str] = (),
     prior_turns: Sequence[ConversationTurn] = (),
+    agent: AgentRef | None = None,
 ) -> RunSession:
     run_id = new_id("run")
     trace_id = new_id("trace")
@@ -137,6 +142,7 @@ def create_run_session(
         mode=mode,
         prior_turns=tuple(prior_turns),
         attachment_ids=cleaned_ids,
+        agent=agent if agent is not None else default_agent_ref(),
     )
     registry.put(session)
     return session
@@ -162,6 +168,7 @@ async def execute_run(
             run_attachment_scope(session.attachment_ids),
             run_workspace_scope(session.run_id) as workspace,
             search_run_scope(),
+            run_scope(RunScope(trace_id=session.trace_id, run_id=session.run_id)),
         ):
             workspace_ref[0] = workspace
             sandbox = resolve_sandbox()
@@ -183,7 +190,7 @@ async def execute_run(
             llm = get_llm_resolver().resolve(mode=mode)
             runnable: Agent | Team
             if mode == SOLO_MODE_KEY:
-                runnable = build_solo_agent(llm, observability=hub)
+                runnable = build_solo_agent(llm, observability=hub, role=session.agent.name)
             else:
                 runnable = await build_runnable_team(
                     question,
@@ -260,12 +267,24 @@ async def finalize(
     finally:
         try:
             if session.hub is not None:
-                session.hub.close()
+                session.hub.release()
         finally:
             _write_terminal_status(session, success)
             registry.clear_inflight(session.run_id)
             registry.prune()
             _record_doctor(session)
+            if session.hub is not None:
+                await _dispose_export(session.hub)
+
+
+async def _dispose_export(hub: ObservabilityHub) -> None:
+    """Langfuse / OTel teardown off the event loop. Live readers already closed."""
+    try:
+        await asyncio.wait_for(asyncio.to_thread(hub.dispose), timeout=_EXPORT_DISPOSE_TIMEOUT_S)
+    except TimeoutError:
+        _log.warning("observability_export_dispose_timeout", hop="H3")
+    except Exception:
+        _log.warning("observability_export_dispose_failed", hop="H3", exc_info=True)
 
 
 def _write_terminal_status(session: RunSession, success: bool) -> None:
@@ -338,16 +357,16 @@ def _emit_artifact_closure_if_needed(
         )
 
 
-def _run_context_for_session(session: RunSession) -> RunContext | None:
-    if not session.prior_turns:
-        return None
-    return RunContext(
-        extra={
-            PRIOR_CONVERSATION_WM_KEY: [
-                {"role": t.role, "content": t.content} for t in session.prior_turns
-            ]
-        }
-    )
+def _run_context_for_session(session: RunSession) -> RunContext:
+    extra: dict[str, Any] = {
+        "agent_id": session.agent.agent_id,
+        "agent_name": session.agent.name,
+    }
+    if session.prior_turns:
+        extra[PRIOR_CONVERSATION_WM_KEY] = [
+            {"role": t.role, "content": t.content} for t in session.prior_turns
+        ]
+    return RunContext(session_id=session.agent.agent_id, extra=extra)
 
 
 def schedule_run(
