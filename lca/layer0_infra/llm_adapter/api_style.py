@@ -10,3 +10,4 @@ class LLMApiStyle(str, Enum):
 
     CHAT_COMPLETIONS = "chat_completions"
     RESPONSES = "responses"
+    ANTHROPIC = "anthropic"

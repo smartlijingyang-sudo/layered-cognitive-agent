@@ -111,6 +111,12 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.llm_adapter.openai_compat._responses._ResponsesStrategy": (
         "OpenAICompatAdapter 内部 Strategy，模块私有 (ADR-0038)"
     ),
+    "lca.layer0_infra.llm_adapter.openai_compat._anthropic_messages._AnthropicMessagesStrategy": (
+        "OpenAICompatAdapter 内部 Strategy，模块私有 (ADR-0038)"
+    ),
+    "lca.layer0_infra.llm_adapter.openai_compat._anthropic_messages._AnthropicStreamDecoder": (
+        "Anthropic SSE → LLMStreamEvent 状态机，adapter 内部 (ADR-0038)"
+    ),
     "lca.layer0_infra.llm_adapter.openai_compat._shared._RawToolCall": (
         "L0 内部 tool_call 归一化 NamedTuple，非可插拔组件 (ADR-0038)"
     ),

@@ -71,6 +71,7 @@ _FINISH_REASON_ALIASES: dict[str, FinishReason] = {
     "max_output_tokens": FinishReason.LENGTH,
     "incomplete": FinishReason.LENGTH,
     "tool_calls": FinishReason.TOOL_CALLS,
+    "tool_use": FinishReason.TOOL_CALLS,
     "function_call": FinishReason.TOOL_CALLS,
     "content_filter": FinishReason.CONTENT_FILTER,
     "content_filtered": FinishReason.CONTENT_FILTER,

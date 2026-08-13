@@ -1,6 +1,7 @@
 """通用 OpenAI 兼容 LLM 适配器。
 
-支持 Responses API（默认）与 Chat Completions（显式 opt-in）。
+支持 Responses API（默认）、Chat Completions，以及 Anthropic Messages
+（DashScope Coding Plan ``/apps/anthropic``）。
 可观测性由 TelemetryLLMAdapter（组合根包装）负责，本适配器只做 API 调用。
 """
 
@@ -13,6 +14,10 @@ from typing import Any
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.protocols import LLMAdapter
 from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
+from lca.layer0_infra.llm_adapter.openai_compat._anthropic_messages import (
+    _AnthropicMessagesStrategy,
+    looks_like_anthropic_base_url,
+)
 from lca.layer0_infra.llm_adapter.openai_compat._chat_completions import _ChatCompletionsStrategy
 from lca.layer0_infra.llm_adapter.openai_compat._responses import _ResponsesStrategy
 from lca.layer0_infra.llm_adapter.openai_compat._strategy import _ApiStrategy
@@ -23,12 +28,20 @@ _STRATEGIES: dict[LLMApiStyle, type[Any]] = {
 }
 
 
-def _resolve_api_style(api: LLMApiStyle | None) -> LLMApiStyle:
+def _resolve_api_style(
+    api: LLMApiStyle | None,
+    *,
+    base_url: str | None = None,
+) -> LLMApiStyle:
     if api is not None:
         return api
     raw = os.getenv("LLM_API_STYLE", "").strip().lower()
     if raw == LLMApiStyle.CHAT_COMPLETIONS.value:
         return LLMApiStyle.CHAT_COMPLETIONS
+    if raw == LLMApiStyle.ANTHROPIC.value:
+        return LLMApiStyle.ANTHROPIC
+    if looks_like_anthropic_base_url(base_url):
+        return LLMApiStyle.ANTHROPIC
     return LLMApiStyle.RESPONSES
 
 
@@ -45,16 +58,31 @@ class OpenAICompatAdapter(LLMAdapter):
         base_url: str | None = None,
         api: LLMApiStyle | None = None,
     ) -> None:
+        self._model: str = model if model is not None else os.getenv("LLM_MODEL", "gpt-4.1")
+        resolved_key = api_key if api_key is not None else os.getenv("LLM_API_KEY", "")
+        resolved_base = (
+            base_url
+            if base_url is not None
+            else os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+        )
+        if resolved_key is None:
+            resolved_key = ""
+        if resolved_base is None:
+            resolved_base = "https://api.openai.com/v1"
+        style = _resolve_api_style(api, base_url=resolved_base)
+        if style is LLMApiStyle.ANTHROPIC:
+            self._strategy: _ApiStrategy = _AnthropicMessagesStrategy(
+                api_key=resolved_key,
+                base_url=resolved_base,
+                default_model=self._model,
+            )
+            return
+
         from openai import AsyncOpenAI
 
-        self._model: str = model if model is not None else os.getenv("LLM_MODEL", "gpt-4.1")
-        client = AsyncOpenAI(
-            api_key=api_key or os.getenv("LLM_API_KEY", ""),
-            base_url=base_url or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
-        )
-        style = _resolve_api_style(api)
+        client = AsyncOpenAI(api_key=resolved_key, base_url=resolved_base)
         strategy_cls: type[Any] = _STRATEGIES[style]
-        self._strategy: _ApiStrategy = strategy_cls(client, self._model)
+        self._strategy = strategy_cls(client, self._model)
 
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         return await self._strategy.complete(prompt, **kwargs)
