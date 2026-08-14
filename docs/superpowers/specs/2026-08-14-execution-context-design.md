@@ -1,7 +1,7 @@
 # ExecutionContext — 执行上下文统一架构
 
 **日期**: 2026-08-14  
-**状态**: Draft v3 (reviewer approved)  
+**状态**: Draft v4 (reviewer approved)  
 **动机**: 消除 `/mnt/data` 虚拟路径映射层，让 agent、前端、工具、附件共享真实文件系统路径；统一 4 种执行环境（Host / Onlyboxes / SSH / Windows）为同一抽象。
 
 ---
@@ -328,10 +328,12 @@ class OnlyboxesContext:
     """Onlyboxes 容器沙箱 — Docker exec / API。"""
     
     def __init__(self, sandbox: OnlyboxesSandboxAdapter, *, 
-                 session_id: str = "", label: str = "Onlyboxes Sandbox"):
+                 session_id: str = "", label: str = "Onlyboxes Sandbox",
+                 lobe_user: str = "sandbox"):
         self._sandbox = sandbox
         self._session_id = session_id
         self._label = label
+        self._lobe_user = lobe_user
     
     @property
     def id(self) -> str:
@@ -347,6 +349,8 @@ class OnlyboxesContext:
     
     @property
     def workspace(self) -> str:
+        # Onlyboxes 是隔离容器，所有用户共享 /mnt/data
+        # lobe_user 仅用于日志和追踪，不影响实际路径
         return "/mnt/data"  # 容器内真实路径
     
     @property
@@ -527,6 +531,7 @@ class SSHContext:
         )
 
 
+@dataclass(frozen=True)
 class SSHConfig:
     """SSH 连接配置。"""
     alias: str          # 显示名 / 标识
@@ -535,15 +540,6 @@ class SSHConfig:
     port: int = 22
     key_path: str = ""  # SSH 私钥路径
     workspace: str = "" # 空则连接后探测 $HOME
-    
-    def __init__(self, alias: str, host: str, user: str, 
-                 port: int = 22, key_path: str = "", workspace: str = ""):
-        self.alias = alias
-        self.host = host
-        self.user = user
-        self.port = port
-        self.key_path = key_path
-        self.workspace = workspace
 
 
 def _shell_quote(s: str) -> str:
@@ -1017,11 +1013,6 @@ class ExecutionContextFactory:
         import os
         home = os.environ.get("USERPROFILE", "C:\\Users\\Default")
         return os.path.join(home, "LCA", lobe_user)
-    
-    def _default_windows_workspace(self) -> str:
-        import os
-        home = os.environ.get("USERPROFILE", "C:\\Users\\Default")
-        return os.path.join(home, "lca-workspace")
 
 
 # 全局注入点（由 gateway 启动时设置）
@@ -1065,7 +1056,7 @@ class ExecutionConfig(BaseSettings):
     execution_backend: str = "auto"  # auto | host | onlyboxes | ssh | windows
     
     # Host
-    host_user: str = "sandbox-user"
+    host_user: str = "sandbox"  # Phase 1 默认，旧代码用 "sandbox-user"
     host_root: str = ""  # 空 → /home/${host_user}
     host_device_id: str = "local-host"
     host_token: str = "lca-local-host"
@@ -1097,7 +1088,7 @@ def load_execution_config() -> ExecutionConfig:
 LCA_EXECUTION_BACKEND=auto
 
 # Host
-LCA_HOST_USER=sandbox-user
+LCA_HOST_USER=sandbox  # Phase 1 默认，旧代码用 sandbox-user
 LCA_HOST_ROOT=
 LCA_HOST_DEVICE_ID=local-host
 LCA_HOST_TOKEN=lca-local-host
@@ -1139,9 +1130,9 @@ Prompt 模板不再硬编码路径，而是由 `context.prompt_context()` 注入
 **Host 示例**：
 ```
 你正在 **lichao-mbp** 上操作（本机 host，backend=host）。
-工作区：`/home/sandbox-user`
-交付物写到 `/home/sandbox-user/outputs`
-附件在 `/home/sandbox-user/<文件名>`
+工作区：`/home/lca-sandbox`
+交付物写到 `/home/lca-sandbox/outputs`
+附件在 `/home/lca-sandbox/<文件名>`
 ```
 
 **Onlyboxes 示例**：
@@ -1248,8 +1239,8 @@ class ListFilesTool(Tool):
   "context_id": "local-host",
   "context_label": "lichao-mbp",
   "context_backend": "host",
-  "context_workspace": "/home/sandbox-user",
-  "context_outputs_dir": "/home/sandbox-user/outputs"
+  "context_workspace": "/home/lca-sandbox",
+  "context_outputs_dir": "/home/lca-sandbox/outputs"
 }
 ```
 
@@ -1409,7 +1400,7 @@ async def generate_download_url(
 
 ### 功能验证
 
-- [ ] Host 环境：agent 操作 `/home/sandbox-user/...`，前端显示真实路径
+- [ ] Host 环境：agent 操作 `/home/lca-sandbox/...`，前端显示真实路径
 - [ ] Onlyboxes 环境：agent 操作 `/mnt/data/...`（容器内真实路径）
 - [ ] SSH 环境：agent 操作远程真实路径，文件通过 ssh cat / scp 传输
 - [ ] Windows 环境：agent 操作 `C:\...`，PowerShell 执行
@@ -1448,11 +1439,17 @@ async def generate_download_url(
 
 **目标**：基础架构落地，per-user 接口预留
 
+**命名约定变更**：
+- **旧**：`sandbox-user`（现有代码）
+- **新**：`lca-sandbox`（Phase 1 默认）
+- **原因**：`lca-` 前缀统一命名空间，Phase 2 扩展为 `lca-{user_id}` 时无需再改
+
 **实现**：
 - `ExecutionContextFactory.resolve()` → 返回 `lobe_user="sandbox"` 的 context
 - Workspace：`/home/lca-sandbox`（Linux）/ `%USERPROFILE%\LCA\sandbox`（Windows）
 - 所有请求共享同一个 workspace
 - npm CLI：`npx @lca/host start` 创建 `lca-sandbox` 用户/目录
+- `ExecutionConfig.host_user` 默认值从 `"sandbox-user"` 改为 `"sandbox"`
 
 **验证**：
 - Host/Onlyboxes/SSH 三种环境可工作
@@ -1542,7 +1539,9 @@ const response = await fetch('/runs', {
 
 3. **OnlyboxesContext.execute()**: 参考现有 `OnlyboxesSandboxAdapter` 的 `run()`、`run_terminal()`、`write_files()` 方法构建 op dispatch。File ops 走 guest Python scripts（与现有 ComputerRuntime 一致）。
 
-4. **Auto-detect 优先级理由**: SSH > Onlyboxes 因为 SSH 暗示用户显式意图（配置了远程机器就是要用）；Onlyboxes 通常是后台默认值，不应覆盖显式配置。
+4. **Auto-detect 优先级理由**: 
+   - **Host > SSH**: 在线的 Host sidecar 意味着用户显式连接了一台机器（WebSocket 连接已建立），这是最强的意图信号
+   - **SSH > Onlyboxes**: SSH 配置暗示用户显式意图（配置了远程机器就是要用）；Onlyboxes 通常是后台默认值，不应覆盖显式配置
 
 5. **ONLYBOXES 环境变量**: `ONLYBOXES_BASE_URL` 和 `ONLYBOXES_ACCESS_TOKEN` 不使用 `LCA_` 前缀，保持与现有代码兼容。实现时不要重命名。
 
@@ -1550,7 +1549,7 @@ const response = await fetch('/runs', {
 
 ---
 
-## 11. 与 Reviewer 反馈的对应
+## 12. 与 Reviewer 反馈的对应
 
 | Reviewer Issue | 解决方案 |
 |---|---|
