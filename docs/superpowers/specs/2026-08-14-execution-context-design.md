@@ -636,9 +636,9 @@ LobeHub User: bob    →  Workspace: /home/lca-bob   (Linux) / C:\LCA\bob (Windo
 - 类似 Docker 容器，但更轻量（进程级隔离，非容器级）
 
 **命名规范**：
-- Linux: `/home/lca-{username}` 或 `/data/workspaces/{username}`
-- Windows: `C:\LCA\{username}` 或 `%USERPROFILE%\LCA\{username}`
-- 用 `lca-` 前缀区分（避免和系统用户混淆）
+- Linux: `/home/lca-{username}`（创建系统用户）
+- Windows: `%USERPROFILE%\LCA\{username}`（目录隔离，不创建系统用户）
+- 用 `lca-` 前缀（Linux）或 `LCA\` 子目录（Windows）区分
 
 **ExecutionContext.workspace 指向用户隔离空间**：
 
@@ -730,23 +730,27 @@ async function start(options: { user?: string }) {
 
 function getUserWorkspace(lobeUser: string): string {
   if (process.platform === "win32") {
-    return `C:\\LCA\\${lobeUser}`;
+    // Windows: %USERPROFILE%\LCA\{user}（目录隔离，自动创建）
+    return path.join(os.homedir(), "LCA", lobeUser);
   } else {
+    // Linux: /home/lca-{user}（系统用户隔离）
     return `/home/lca-${lobeUser}`;
   }
 }
 
 async function ensureIsolatedUser(lobeUser: string, workspace: string) {
-  const systemUser = `lca-${lobeUser}`;
-  
   if (process.platform === "win32") {
-    // Windows: 创建目录，设置权限
+    // Windows: 自动创建目录（不需要 admin，不需要创建系统用户）
     if (!await fileExists(workspace)) {
-      await exec(`mkdir ${workspace}`);
-      // TODO: 设置目录权限（限制访问）
+      await fs.mkdir(workspace, { recursive: true });
+      console.log(`Created workspace: ${workspace}`);
     }
+    // 可选：设置目录权限，限制其他用户访问
+    // await exec(`icacls "${workspace}" /inheritance:r /grant:r "%USERNAME%:(OI)(CI)F"`);
+    
   } else {
-    // Linux: 创建系统用户 + 目录
+    // Linux: 创建系统用户 + 目录（需要 sudo）
+    const systemUser = `lca-${lobeUser}`;
     if (!await userExists(systemUser)) {
       await exec(`sudo useradd --system --create-home --home-dir ${workspace} ${systemUser}`);
     }
@@ -795,29 +799,29 @@ async function connect(options: {
 **使用示例**：
 
 ```bash
-# 本机 Linux（单用户模式，创建 lca-sandbox）
+# 本机 Linux（单用户模式，自动创建 lca-sandbox 系统用户）
 npx @lca/host start
-# → 创建系统用户 lca-sandbox
+# → sudo useradd lca-sandbox
 # → workspace: /home/lca-sandbox
 
-# 本机 Linux（指定 LobeHub 用户）
+# 本机 Linux（指定 LobeHub 用户，自动创建）
 npx @lca/host start --user alice
-# → 创建系统用户 lca-alice
+# → sudo useradd lca-alice
 # → workspace: /home/lca-alice
 
-# 远程 Windows（默认 lca-sandbox）
+# 远程 Windows（自动创建目录，不需要 admin）
 npx @lca/host connect --gateway ws://10.36.6.252:8765
-# → 创建 C:\LCA\sandbox
+# → mkdir C:\Users\lichao\LCA\sandbox
 # → device_id = hostname
 
-# 远程 Windows（指定 LobeHub 用户）
+# 远程 Windows（指定 LobeHub 用户，自动创建目录）
 npx @lca/host connect --gateway ws://10.36.6.252:8765 --user bob
-# → 创建 C:\LCA\bob
+# → mkdir C:\Users\lichao\LCA\bob
 # → device_id = hostname
 
 # 多用户场景：Gateway 为每个 LobeHub 用户路由到对应 workspace
-# alice 登录 LobeHub → agent 在 /home/lca-alice 执行
-# bob 登录 LobeHub → agent 在 /home/lca-bob 执行
+# alice 登录 LobeHub → agent 在 /home/lca-alice (Linux) 或 C:\Users\lichao\LCA\alice (Windows) 执行
+# bob 登录 LobeHub → agent 在 /home/lca-bob (Linux) 或 C:\Users\lichao\LCA\bob (Windows) 执行
 ```
 
 **幂等性**：
