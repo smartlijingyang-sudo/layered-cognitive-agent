@@ -264,11 +264,18 @@ class HostContext:
 # lca/layer0_infra/execution/host_context.py
 
 class HostContext:
-    """本机 host sidecar — WebSocket RPC 到 host 进程。"""
+    """本机 host sidecar — WebSocket RPC 到 host 进程。
     
-    def __init__(self, sandbox: HostSandbox, settings: HostRuntimeSettings):
+    支持单用户和多用户模式：
+    - 单用户：lobe_user="sandbox"，workspace=/home/lca-sandbox
+    - 多用户：lobe_user="alice"，workspace=/home/lca-alice
+    """
+    
+    def __init__(self, sandbox: HostSandbox, settings: HostRuntimeSettings, 
+                 lobe_user: str = "sandbox"):
         self._sandbox = sandbox
         self._settings = settings
+        self._lobe_user = lobe_user
     
     @property
     def id(self) -> str:
@@ -284,11 +291,20 @@ class HostContext:
     
     @property
     def workspace(self) -> str:
-        return str(self._settings.workspace())
+        # per-user workspace
+        if sys.platform == "win32":
+            return str(Path(os.environ["USERPROFILE"]) / "LCA" / self._lobe_user)
+        else:
+            return f"/home/lca-{self._lobe_user}"
     
     @property
     def outputs_dir(self) -> str:
-        return str(self._settings.outputs_dir())
+        return str(Path(self.workspace) / "outputs")
+    
+    @property
+    def lobe_user(self) -> str:
+        """LobeHub 用户标识（用于多用户模式）"""
+        return self._lobe_user
     
     async def execute(self, op: str, payload: dict) -> OpResult:
         raw = await self._sandbox.computer_op(op, payload)
@@ -874,39 +890,40 @@ from lca.layer0_infra.execution.config import ExecutionConfig, load_execution_co
 class ExecutionContextFactory:
     """根据配置和运行时状态创建 ExecutionContext。
     
-    解析规则（LCA_EXECUTION_BACKEND 环境变量）：
-    - "host": 强制 Host（无在线 host → 报错）
-    - "onlyboxes": 强制 Onlyboxes（无配置 → 报错）
-    - "ssh": 强制 SSH（无配置 → 报错）
-    - "windows": 强制 Windows
-    - "auto"（默认）: 
-      1. Presence 有在线 host（sandbox capability）→ HostContext
-      2. SSH 配置存在（LCA_SSH_HOST 非空）→ SSHContext  
-      3. Onlyboxes 配置存在（ONLYBOXES_BASE_URL + TOKEN）→ OnlyboxesContext
-      4. 检测到 Windows 平台 → WindowsContext
-      5. None（无可用执行环境）
+    支持单用户和多用户模式：
+    - resolve(): 单用户模式，返回默认 context
+    - resolve_for_user(user_id): 多用户模式，返回 per-user context
     """
     
     def __init__(self, config: ExecutionConfig | None = None):
         self._config = config or load_execution_config()
     
     async def resolve(self) -> Optional[ExecutionContext]:
+        """单用户模式：返回默认 context（lobe_user="sandbox"）"""
+        return await self.resolve_for_user("sandbox")
+    
+    async def resolve_for_user(self, lobe_user: str) -> Optional[ExecutionContext]:
+        """多用户模式：返回 per-user context
+        
+        Phase 1（现在）：所有用户共享 lca-sandbox
+        Phase 2（未来）：每个用户独立的 lca-{user_id} workspace
+        """
         backend = self._config.backend
         
         if backend == "host":
-            return await self._resolve_host()
+            return await self._resolve_host(lobe_user)
         elif backend == "onlyboxes":
-            return self._resolve_onlyboxes()
+            return self._resolve_onlyboxes(lobe_user)
         elif backend == "ssh":
-            return self._resolve_ssh()
+            return self._resolve_ssh(lobe_user)
         elif backend == "windows":
-            return self._resolve_windows()
+            return self._resolve_windows(lobe_user)
         elif backend == "auto":
-            return await self._resolve_auto()
+            return await self._resolve_auto(lobe_user)
         else:
             raise ValueError(f"unknown backend: {backend}")
     
-    async def _resolve_auto(self) -> Optional[ExecutionContext]:
+    async def _resolve_auto(self, lobe_user: str) -> Optional[ExecutionContext]:
         """Auto-detect 优先级。
         
         理由：Host 在线意味着用户显式连接了一台机器（最明确意图）；
@@ -915,28 +932,28 @@ class ExecutionContextFactory:
         Windows 仅在 gateway 跑在 Windows 上且无远程 host 时触发。
         """
         # 1. Host: 检查 Presence（含远程 Windows/Linux/Mac sidecar）
-        host_ctx = await self._resolve_host()
+        host_ctx = await self._resolve_host(lobe_user)
         if host_ctx is not None:
             return host_ctx
         
         # 2. SSH: 检查配置（远程 Linux/Mac 无 sidecar 场景）
-        ssh_ctx = self._resolve_ssh()
+        ssh_ctx = self._resolve_ssh(lobe_user)
         if ssh_ctx is not None:
             return ssh_ctx
         
         # 3. Onlyboxes: 检查配置（云端容器）
-        onlyboxes_ctx = self._resolve_onlyboxes()
+        onlyboxes_ctx = self._resolve_onlyboxes(lobe_user)
         if onlyboxes_ctx is not None:
             return onlyboxes_ctx
         
         # 4. Windows: 仅当 gateway 本身跑在 Windows 上
-        windows_ctx = self._resolve_windows()
+        windows_ctx = self._resolve_windows(lobe_user)
         if windows_ctx is not None:
             return windows_ctx
         
         return None
     
-    async def _resolve_host(self) -> Optional[ExecutionContext]:
+    async def _resolve_host(self, lobe_user: str) -> Optional[ExecutionContext]:
         """检查 Presence 是否有在线 host。"""
         from gateway.presence.registry import PresenceRegistry
         from gateway.host_sandbox import HostSandbox
@@ -952,9 +969,9 @@ class ExecutionContextFactory:
         
         from lca.layer0_infra.sandbox.host_settings import load_host_settings
         settings = load_host_settings()
-        return HostContext(sandbox, settings)
+        return HostContext(sandbox, settings, lobe_user=lobe_user)
     
-    def _resolve_ssh(self) -> Optional[ExecutionContext]:
+    def _resolve_ssh(self, lobe_user: str) -> Optional[ExecutionContext]:
         if not self._config.ssh_host:
             return None
         return SSHContext(SSHConfig(
@@ -963,10 +980,18 @@ class ExecutionContextFactory:
             user=self._config.ssh_user,
             port=self._config.ssh_port,
             key_path=self._config.ssh_key_path,
-            workspace=self._config.ssh_workspace,
-        ))
+            workspace=self._get_ssh_workspace(lobe_user),
+        ), lobe_user=lobe_user)
     
-    def _resolve_onlyboxes(self) -> Optional[ExecutionContext]:
+    def _get_ssh_workspace(self, lobe_user: str) -> str:
+        """SSH workspace: 远程机器上的 per-user 目录"""
+        if self._config.ssh_workspace:
+            # 显式配置 → 用它
+            return self._config.ssh_workspace
+        # 默认：远程 home 下的 LCA/{user}
+        return f"~/LCA/{lobe_user}"
+    
+    def _resolve_onlyboxes(self, lobe_user: str) -> Optional[ExecutionContext]:
         if not self._config.onlyboxes_base_url or not self._config.onlyboxes_token:
             return None
         from lca.layer0_infra.sandbox.onlyboxes_adapter import OnlyboxesSandboxAdapter
@@ -974,9 +999,9 @@ class ExecutionContextFactory:
             base_url=self._config.onlyboxes_base_url,
             access_token=self._config.onlyboxes_token,
         )
-        return OnlyboxesContext(sandbox)
+        return OnlyboxesContext(sandbox, lobe_user=lobe_user)
     
-    def _resolve_windows(self) -> Optional[ExecutionContext]:
+    def _resolve_windows(self, lobe_user: str) -> Optional[ExecutionContext]:
         """Windows 只在 gateway 本机时使用。远程 Windows 通过 HostContext 访问。"""
         import sys
         if sys.platform != "win32":
@@ -984,8 +1009,14 @@ class ExecutionContextFactory:
         return WindowsContext(WindowsConfig(
             device_id="local-windows",
             label="Local Windows",
-            workspace=self._config.windows_workspace or self._default_windows_workspace(),
-        ))
+            workspace=self._get_windows_workspace(lobe_user),
+        ), lobe_user=lobe_user)
+    
+    def _get_windows_workspace(self, lobe_user: str) -> str:
+        """Windows workspace: %USERPROFILE%\LCA\{user}"""
+        import os
+        home = os.environ.get("USERPROFILE", "C:\\Users\\Default")
+        return os.path.join(home, "LCA", lobe_user)
     
     def _default_windows_workspace(self) -> str:
         import os
@@ -1411,7 +1442,99 @@ async def generate_download_url(
 
 ---
 
-## 10. 实现备注（来自 reviewer 建议）
+## 10. 分阶段实现策略
+
+### Phase 1（现在）：单用户模式
+
+**目标**：基础架构落地，per-user 接口预留
+
+**实现**：
+- `ExecutionContextFactory.resolve()` → 返回 `lobe_user="sandbox"` 的 context
+- Workspace：`/home/lca-sandbox`（Linux）/ `%USERPROFILE%\LCA\sandbox`（Windows）
+- 所有请求共享同一个 workspace
+- npm CLI：`npx @lca/host start` 创建 `lca-sandbox` 用户/目录
+
+**验证**：
+- Host/Onlyboxes/SSH 三种环境可工作
+- Agent 操作真实路径
+- 前端显示 context 信息
+
+### Phase 2（未来）：多用户模式
+
+**前提**：
+1. LobeHub 启用真实 auth（Better Auth，当前被 `ENABLE_MOCK_DEV_USER=1` 禁用）
+2. 前端传 `user_id` 到后端（通过 auth token）
+3. Gateway 提取 `user_id` 并路由
+
+**Gateway 改动**：
+
+```python
+# gateway/middleware/auth.py
+async def extract_user_from_request(request: Request) -> str:
+    """从 LobeHub auth header 提取 user_id"""
+    auth = request.headers.get("Authorization")
+    if not auth:
+        return "anonymous"  # 降级
+    
+    # 验证 token，提取 user_id
+    user_id = await verify_lobehub_auth(auth)
+    return user_id
+
+# gateway/runs/api.py
+async def create_run(request: Request):
+    user_id = await extract_user_from_request(request)
+    
+    # per-user context
+    factory = ExecutionContextFactory()
+    context = await factory.resolve_for_user(user_id)
+    
+    # context.workspace = /home/lca-{user_id}
+    # Agent 在该用户的隔离空间执行
+```
+
+**npm CLI 改动**：
+
+```bash
+# Phase 2：CLI 支持 per-user workspace
+npx @lca/host start --user alice
+# → 创建 lca-alice 用户/目录
+
+# 或：Gateway 自动创建（首次访问时）
+# Alice 登录 LobeHub → Gateway 检测到新用户 → 自动创建 /home/lca-alice
+```
+
+**LobeHub 前端改动**：
+
+```typescript
+// LobeHub 需要在请求中传 user_id
+// 通过 auth token 或 request header
+const response = await fetch('/runs', {
+  headers: {
+    'Authorization': `Bearer ${authToken}`,  // 包含 user_id
+    'X-User-Id': userId,  // 或显式传
+  },
+  // ...
+});
+```
+
+### 过渡期兼容
+
+**Phase 1 → Phase 2 的平滑过渡**：
+
+1. **接口不变**：`resolve_for_user(user_id)` 在 Phase 1 就存在，只是 Phase 1 总是传 `"sandbox"`
+2. **Workspace 命名**：Phase 1 用 `lca-sandbox`，Phase 2 用 `lca-{user_id}`，格式一致
+3. **无数据迁移**：Phase 1 的 `lca-sandbox` 可以继续作为默认用户的 workspace
+
+**验证标准（Phase 2）**：
+- [ ] Alice 登录 → agent 在 `/home/lca-alice` 执行
+- [ ] Bob 登录 → agent 在 `/home/lca-bob` 执行
+- [ ] Alice 看不到 Bob 的文件
+- [ ] Gateway 正确提取 user_id
+- [ ] 前端显示 "当前用户：Alice"
+
+---
+
+## 11. 实现备注（来自 reviewer 建议）
 
 1. **Observation 需要 observation_id**: `ListFilesTool.execute()` 示例中创建 `Observation` 时需要生成 `observation_id`（如 `new_id("obs")`），这是 `Observation` dataclass 的必需字段。
 
