@@ -621,6 +621,14 @@ uv run python -m host
 npx @lca/host start
 ```
 
+**重要：不再创建 `sandbox_user`**
+
+旧的 `setup_host_runtime.sh` 会创建 `sandbox_user` 系统用户来隔离 sidecar。npm CLI 不走这条路：
+- 直接用当前用户（`os.userInfo().username`）
+- workspace 在当前用户 home 下（`~/workspace`）
+- 更简单，更符合用户预期
+- 如果需要隔离，用容器（Onlyboxes）而不是本地用户
+
 **目标**：一行命令搞定，和 LobeHub 的 `npx @lobehub/cli` 一样简单。
 
 ```bash
@@ -657,15 +665,31 @@ npx @lca/host connect --gateway ws://10.36.6.252:8765 --token lca-local-host
 
 ```typescript
 // src/commands/start.ts
-async function start() {
+async function start(options: { workspace?: string }) {
   // 本机 sidecar：gateway 在本机或已知地址
   const gateway = await detectLocalGateway();  // 检查 localhost:8765
+  
+  // 默认 workspace = ~/workspace（当前用户，不创建新用户）
+  const workspace = options.workspace || path.join(os.homedir(), "workspace");
+  
+  // 幂等检查
+  if (await isAlreadyRunning()) {
+    console.log("✓ Host sidecar already running");
+    return;
+  }
+  
   await ensurePython();
   await ensureSidecarCode();
-  await writeEnv({ gateway, token: "lca-local-host" });
+  await writeEnv({ 
+    gateway, 
+    token: "lca-local-host",
+    device_id: os.hostname(),
+    workspace,
+    user: os.userInfo().username  // 当前用户，不是 sandbox_user
+  });
   await registerService();
   await startService();
-  console.log("✓ Host sidecar running");
+  console.log(`✓ Host sidecar running (workspace: ${workspace})`);
 }
 ```
 
@@ -673,15 +697,64 @@ async function start() {
 
 ```typescript
 // src/commands/connect.ts
-async function connect(options: { gateway: string; token: string }) {
+async function connect(options: { 
+  gateway: string; 
+  token: string;
+  device_id?: string;
+  workspace?: string;
+}) {
+  // 默认 device_id = hostname（每台机器自动不同）
+  const deviceId = options.device_id || os.hostname();
+  
+  // 默认 workspace = ~/workspace
+  const workspace = options.workspace || path.join(os.homedir(), "workspace");
+  
+  // 幂等检查
+  if (await isAlreadyRunning(deviceId)) {
+    console.log(`✓ Device ${deviceId} already connected`);
+    return;
+  }
+  
   await ensurePython();
   await ensureSidecarCode();
-  await writeEnv({ gateway: options.gateway, token: options.token });
-  await registerService();
+  await writeEnv({ 
+    gateway: options.gateway, 
+    token: options.token,
+    device_id: deviceId,
+    workspace,
+    user: os.userInfo().username
+  });
+  await registerService(deviceId);
   await startService();
-  console.log("✓ Connected to " + options.gateway);
+  console.log(`✓ Connected as ${deviceId} (workspace: ${workspace})`);
 }
 ```
+
+**使用示例**：
+
+```bash
+# 本机 Linux（默认 workspace = ~/workspace，device_id = hostname）
+npx @lca/host start
+
+# 本机 Linux（自定义 workspace）
+npx @lca/host start --workspace /data/lca-workspace
+
+# 远程 Windows（默认 device_id = hostname）
+npx @lca/host connect --gateway ws://10.36.6.252:8765
+
+# 远程 Windows（显式 device_id，区分多台机器）
+npx @lca/host connect --gateway ws://10.36.6.252:8765 --device-id "windows-dev-1"
+npx @lca/host connect --gateway ws://10.36.6.252:8765 --device-id "windows-dev-2"
+
+# 同一台机器多个实例（不同 workspace + device_id）
+npx @lca/host connect --gateway ws://... --device-id "win-pc-work" --workspace C:\work
+npx @lca/host connect --gateway ws://... --device-id "win-pc-personal" --workspace C:\personal
+```
+
+**幂等性**：
+- 同一 device_id 多次运行 → 检测已存在，提示 "already connected"
+- 不同 device_id → 创建新设备
+- 同一 device_id 但 workspace 变了 → 更新配置，重启服务
 
 **实现策略**：
 
