@@ -31,17 +31,20 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.computer.background.BackgroundCommandRegistry": (
         "后台命令 run-scoped 注册表，非跨层契约 (Computer Use)"
     ),
-    "lca.layer0_infra.computer.runtime.ComputerOpResult": (
-        "ComputerRuntime 操作结果值对象，纯数据结构 (Computer Use)"
+    "lca.layer0_infra.computer.op_result.ComputerOpResult": (
+        "Computer 操作结果值对象，MachineComputer / SandboxComputer 共享 (Computer Use)"
+    ),
+    "lca.layer0_infra.computer.sandbox_computer.SandboxComputer": (
+        "沙箱产品环境适配器，PlaneRef + Sandbox + guest 脚本 (Execution Planes)"
+    ),
+    "lca.layer0_infra.computer.sandbox_computer._SandboxComputerBase": (
+        "SandboxComputer 文件操作基类，模块内部组合 (Computer Use)"
     ),
     "lca.layer0_infra.computer.runtime.ComputerRuntime": (
-        "LobeHub CloudSandboxExecutionRuntime 的 LCA 实现，Sandbox Protocol 注入 (Computer Use)"
-    ),
-    "lca.layer0_infra.computer.runtime._ComputerRuntimeBase": (
-        "ComputerRuntime 文件操作基类，模块内部组合 (Computer Use)"
+        "SandboxComputer 向后兼容别名 (Computer Use)"
     ),
     "lca.layer0_infra.computer.runtime_exec.ComputerRuntimeExecMixin": (
-        "ComputerRuntime shell/execute 混入，模块内部组合 (Computer Use)"
+        "SandboxComputer shell/execute 混入，模块内部组合 (Computer Use)"
     ),
     "lca.layer0_infra.tools.computer.specs.ComputerToolSpec": (
         "Computer 工具注册表条目，纯数据声明 (Computer Use)"
@@ -224,6 +227,17 @@ EXEMPT: dict[str, str] = {
         "模型路由注册表，非可插拔组件 (同 ComponentRegistry 模式)"
     ),
     "lca.layer0_infra.openai_compat.StructuredLLMError": ("异常类型，非可插拔组件"),
+    "lca.layer0_infra.computer.machine.MachineComputer": (
+        "LobeHub LocalSystemExecutionRuntime 的 LCA 实现，注入 MachineTransport (Computer Use)"
+    ),
+    "lca.layer0_infra.plane.resolve.PlaneBindingError": ("异常类型，非可插拔组件"),
+    "lca.layer0_infra.plane.resolve.PlaneRequest": ("绑定请求值对象，纯数据，非可插拔组件"),
+    "lca.layer0_infra.sandbox.host_settings.HostRuntimeSettings": (
+        "sidecar pydantic-settings 配置，非可插拔组件"
+    ),
+    "lca.layer0_infra.sandbox.surface.ExecutionSurface": (
+        "过渡 prompt 适配器，磁盘身份已迁到 PlaneRef"
+    ),
 }
 
 _SCAN_PACKAGES = [

@@ -12,13 +12,13 @@ from gateway.console.attach import attach_session
 from gateway.console.sessions import ConsoleBook
 from gateway.cors import CORS_HEADERS
 from gateway.files import download_file, get_file_meta
-from gateway.host_sandbox import HostSandbox
 from gateway.openai_shim import (
     chat_completions,
     embeddings_create,
     list_models,
     responses_create,
 )
+from gateway.plane_bind import bind_presence
 from gateway.presence.api import list_devices
 from gateway.presence.registry import PresenceRegistry
 from gateway.presence.rpc import ExecHub
@@ -28,6 +28,7 @@ from gateway.runs.api import (
     answer_run,
     cancel_run,
     create_run,
+    get_context,
     get_run,
     get_run_doctor,
     health_payload,
@@ -41,7 +42,6 @@ from lca.layer0_infra.file_store import (
     set_default_file_store,
 )
 from lca.layer0_infra.llm_resolver import LLMResolver, ProductionLLMResolver
-from lca.layer0_infra.sandbox.factory import set_sandbox_resolver
 
 _registry = RunRegistry()
 _file_store = get_default_file_store()
@@ -98,7 +98,7 @@ def create_app(
         _consoles = consoles
     if presence_settings is not None:
         _presence_settings = presence_settings
-    set_sandbox_resolver(lambda: HostSandbox.from_presence(_presence, _exec_hub))
+    bind_presence(_presence, _exec_hub)
     if llm_resolver is not None:
         set_llm_resolver(llm_resolver)
     else:
@@ -106,6 +106,7 @@ def create_app(
     application = Starlette(
         routes=[
             Route("/health", health, methods=["GET"]),
+            Route("/context", get_context, methods=["GET", "OPTIONS"]),
             Route("/runs", create_run, methods=["POST", "OPTIONS"]),
             Route("/runs/{run_id}", get_run, methods=["GET"]),
             Route("/runs/{run_id}/live", stream_run_live, methods=["GET", "OPTIONS"]),

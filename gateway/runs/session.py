@@ -14,6 +14,7 @@ from typing import Any
 from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.live import LiveTail
 from lca.contracts.models.core.conversation import ConversationTurn
+from lca.contracts.models.core.plane import PlaneBindings
 from lca.layer0_infra.observability import ObservabilityHub
 
 _RUNS_DIR = Path("traces/runs")
@@ -86,6 +87,10 @@ class RunSession:
     runnable: Any = None
     approval_request: dict[str, Any] | None = None
     closed_at: float | None = None
+    bindings: PlaneBindings | None = None
+    device_id: str = ""
+    plane: str = ""
+    extra_plane: str = ""
 
 
 class RunRegistry:
@@ -104,6 +109,12 @@ class RunRegistry:
         self._runs_dir.mkdir(parents=True, exist_ok=True)
         self._max_terminal = max_terminal
         self._terminal_ttl_s = terminal_ttl_s
+
+    def latest_bindings(self) -> PlaneBindings | None:
+        for session in reversed(list(self._runs.values())):
+            if session.bindings is not None:
+                return session.bindings
+        return None
 
     def prune(self, now: float | None = None) -> int:
         """Drop terminal sessions past TTL or over the cap. Running/HIL stay."""

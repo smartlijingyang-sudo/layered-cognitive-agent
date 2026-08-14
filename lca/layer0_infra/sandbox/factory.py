@@ -1,7 +1,7 @@
-"""Sandbox resolver — Onlyboxes only (no E2B / mock / microsandbox).
+"""Sandbox resolver — Onlyboxes only.
 
-Production tool wiring (``build_default_tools``) **omits** the sandbox tool when
-console URL or access token is missing (no fake capability).
+Host sidecar is a machine transport, not a Sandbox. Tests may still inject a
+real Sandbox via ``set_sandbox_resolver``. Gateway must not inject Host here.
 
 Required env (after ``load_dotenv_if_present``):
 - ``ONLYBOXES_BASE_URL`` — console HTTP base, e.g. ``http://127.0.0.1:8089``
@@ -28,7 +28,7 @@ _override: Callable[[], Sandbox | None] | None = None
 
 
 def set_sandbox_resolver(resolver: Callable[[], Sandbox | None] | None) -> None:
-    """Gateway injects a preferred backend (connected host). None restores default."""
+    """Tests inject a Sandbox. Gateway must not inject Host."""
     global _override
     _override = resolver
 
@@ -58,7 +58,7 @@ def sandbox_backend() -> str:
 
 
 def resolve_sandbox() -> Sandbox | None:
-    """Prefer an injected backend (host sidecar), else Onlyboxes, else None."""
+    """Onlyboxes, or a test-injected Sandbox. Never Host."""
     if _override is not None:
         found = _override()
         if found is not None:

@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import sys
+from pathlib import Path
 from typing import Any
 
 import structlog
@@ -49,6 +51,9 @@ async def run_once(settings: HostSettings) -> None:
                     "token": settings.token,
                     "name": settings.display_name(),
                     "capabilities": ["console", "sandbox"],
+                    "platform": sys.platform,
+                    "home": str(Path.home()),
+                    "root": str(settings.workspace()),
                 }
             )
         )

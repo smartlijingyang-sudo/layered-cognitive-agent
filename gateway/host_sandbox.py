@@ -30,17 +30,29 @@ class HostSandbox:
         self._device_id = device_id
 
     @classmethod
+    def for_device(
+        cls, presence: PresenceRegistry, hub: ExecHub, device_id: str
+    ) -> HostSandbox | None:
+        device = presence.get(device_id)
+        if device is None or presence.channel(device_id) is None:
+            return None
+        if CAP_SANDBOX not in device.capabilities:
+            return None
+        return cls(presence, hub, device.device_id)
+
+    @classmethod
     def from_presence(cls, presence: PresenceRegistry, hub: ExecHub) -> HostSandbox | None:
+        """Exactly one online sandbox-capable device. Never silently pick the first of N."""
         device = presence.first_online(CAP_SANDBOX)
         if device is None:
             return None
-        return cls(presence, hub, device.device_id)
+        return cls.for_device(presence, hub, device.device_id)
 
     async def write_files(
         self,
         files: dict[str, bytes | str],
         *,
-        base_dir: str = "/mnt/data",
+        base_dir: str = "",
         session_id: str = "",
         timeout_s: int = 60,
     ) -> SandboxResult:
@@ -133,8 +145,10 @@ class HostSandbox:
         """Named local-file-shell op. ComputerRuntime uses this instead of guest Python."""
         try:
             reply = await self._raw(op, args, timeout_s=timeout_s + 5)
-        except (TimeoutError, ConnectionError) as exc:
-            return {"success": False, "error": str(exc)}
+        except TimeoutError as exc:
+            return {"success": False, "error": str(exc), "retryable": True}
+        except ConnectionError:
+            raise
         body = _result_body(reply)
         if "success" not in body:
             body["success"] = bool(reply.get("ok", False))

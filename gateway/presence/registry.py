@@ -13,6 +13,7 @@ class PresenceRegistry:
     def __init__(self) -> None:
         self._devices: dict[str, Device] = {}
         self._channels: dict[str, PresenceChannel] = {}
+        self.last_success_id: str = ""
 
     def online(self, device: Device, channel: PresenceChannel) -> None:
         now = time.time()
@@ -41,10 +42,18 @@ class PresenceRegistry:
         return self._channels.get(device_id)
 
     def first_online(self, capability: str) -> Device | None:
-        for device in self._devices.values():
-            if device.status is DeviceStatus.ONLINE and capability in device.capabilities:
-                return device
-        return None
+        online = self.online_with(capability)
+        return online[0] if len(online) == 1 else None
+
+    def online_with(self, capability: str) -> list[Device]:
+        return [
+            device
+            for device in self._devices.values()
+            if device.status is DeviceStatus.ONLINE and capability in device.capabilities
+        ]
+
+    def remember_success(self, device_id: str) -> None:
+        self.last_success_id = device_id
 
     def list_devices(self) -> list[Device]:
         return list(self._devices.values())

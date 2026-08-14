@@ -44,6 +44,13 @@ def test_python_only_copies_and_hooks() -> None:
     assert "refreshMessages" not in _DRIVER_PY
 
 
+def test_driver_sends_execution_plane() -> None:
+    assert "function planeFieldsFromAgent" in _DRIVER_TS
+    assert "...planeFieldsFromAgent(ctx.agentId)" in _DRIVER_TS
+    assert "plane: 'machine'" in _DRIVER_TS
+    assert "plane: 'sandbox'" in _DRIVER_TS
+
+
 def test_driver_projects_one_run() -> None:
     assert "POST" in _DRIVER_TS
     assert "/lca-api/runs" in _DRIVER_TS

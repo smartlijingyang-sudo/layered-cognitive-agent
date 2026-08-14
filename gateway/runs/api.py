@@ -127,6 +127,9 @@ async def create_run(request: Request) -> JSONResponse:
             attachment_ids=run_input.attachment_ids,
             prior_turns=run_input.prior_turns,
             agent=agent,
+            device_id=str(body.get("device_id") or ""),
+            plane=str(body.get("plane") or ""),
+            extra_plane=str(body.get("extra_plane") or ""),
         )
         schedule_run(registry, session)
 
@@ -138,6 +141,41 @@ async def create_run(request: Request) -> JSONResponse:
             "live_url": f"/runs/{session.run_id}/live",
         },
         status_code=202,
+        headers=cors_headers(),
+    )
+
+
+def _plane_payload(ref: object | None) -> dict[str, str] | None:
+    if ref is None:
+        return None
+    return {
+        "id": getattr(ref, "id", ""),
+        "label": getattr(ref, "label", ""),
+        "kind": ref.kind.value if getattr(ref, "kind", None) else "",
+        "root": getattr(ref, "root", ""),
+        "outputs_dir": getattr(ref, "outputs_dir", ""),
+        "platform": getattr(ref, "platform", ""),
+        "home": getattr(ref, "home", ""),
+    }
+
+
+async def get_context(request: Request) -> JSONResponse:
+    """GET /context — bound planes of latest run + online machine candidates."""
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=cors_headers())
+    presence = request.app.state.presence
+    online = [
+        device.as_dict() for device in presence.list_devices() if device.status.value == "online"
+    ]
+    latest = _registry_of(request).latest_bindings()
+    bindings = None
+    if latest is not None:
+        bindings = {
+            "primary": _plane_payload(latest.primary),
+            "secondary": _plane_payload(latest.secondary),
+        }
+    return JSONResponse(
+        {"bindings": bindings, "online_devices": online},
         headers=cors_headers(),
     )
 

@@ -7,6 +7,8 @@ import type {
 
 import { dbMessageSelectors } from '@/store/chat/slices/message/selectors/dbMessage';
 import type { ChatStore } from '@/store/chat/store';
+import { useAgentStore } from '@/store/agent';
+import { agentByIdSelectors } from '@/store/agent/selectors';
 
 import { StreamingHandler } from '../StreamingHandler';
 import {
@@ -166,6 +168,21 @@ function hrefFile(name: string, url: string): ArtifactFile {
     previewable: mimeType.startsWith('image/') || mimeType === 'application/pdf',
     url,
   };
+}
+
+export function planeFieldsFromAgent(agentId: string | undefined): {
+  device_id?: string;
+  plane?: string;
+} {
+  if (!agentId) return {};
+  const config = agentByIdSelectors.getAgencyConfigById(agentId)(useAgentStore.getState());
+  const target = config?.executionTarget;
+  const deviceId = config?.boundDeviceId;
+  if (target === 'local' || target === 'device') {
+    return deviceId ? { device_id: deviceId, plane: 'machine' } : { plane: 'machine' };
+  }
+  if (target === 'sandbox') return { plane: 'sandbox' };
+  return {};
 }
 
 export type LcaRunOptions = {
@@ -666,6 +683,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
       },
       messages: toWireMessages(options.messages),
       model: options.model,
+      ...planeFieldsFromAgent(ctx.agentId),
     }),
     headers: {
       Authorization: `Bearer ${LCA_TOKEN}`,

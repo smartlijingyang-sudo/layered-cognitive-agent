@@ -10,35 +10,52 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from lca.contracts.models.core.plane import PlaneKind
 from lca.contracts.protocols import Tool
 from lca.layer0_infra.file_store import FileStore, get_default_file_store
 from lca.layer0_infra.sandbox.prompt import render_cloud_sandbox_system_role
+from lca.layer0_infra.sandbox.surface import plane_system_role
 from lca.layer0_infra.tools.computer.specs import COMPUTER_TOOL_NAMES
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 
 _CLOUD_SANDBOX_TOOL_NAME = "lobe-cloud-sandbox"
+_LOCAL_SYSTEM_TOOL_NAME = "lobe-local-system"
 
 
 def build_cloud_sandbox_prompt(tools: Sequence[Tool]) -> str:
-    """Cloud sandbox ``<tool>`` block with ``<tool.instructions>``, or empty.
+    """Computer-environment ``<tool>`` blocks. One per registered face."""
+    names = {t.name for t in tools}
+    blocks: list[str] = []
+    if any(name in COMPUTER_TOOL_NAMES for name in names):
+        store: FileStore = get_default_file_store()
+        template = load_builtin_prompt("cloud_sandbox_system_role")
+        rendered = render_cloud_sandbox_system_role(template, store=store)
+        blocks.append(_tool_block(_CLOUD_SANDBOX_TOOL_NAME, rendered))
+    if any(name.startswith("local_") for name in names):
+        rendered = _machine_role()
+        if rendered:
+            blocks.append(_tool_block(_LOCAL_SYSTEM_TOOL_NAME, rendered))
+    return "\n".join(blocks)
 
-    Returns LobeHub-compatible XML::
 
-        <tool name="lobe-cloud-sandbox">
-        <tool.instructions>
-        {rendered system role}
-        </tool.instructions>
-        </tool>
-    """
-    if not any(t.name in COMPUTER_TOOL_NAMES for t in tools):
-        return ""
-    store: FileStore = get_default_file_store()
-    template = load_builtin_prompt("cloud_sandbox_system_role")
-    rendered = render_cloud_sandbox_system_role(template, store=store)
+def _machine_role() -> str:
+    from lca.layer0_infra.plane.machine import resolve_machine
+    from lca.layer0_infra.plane.resolve import ref_of
+    from lca.layer0_infra.plane.scope import current_bindings
+
+    bound = current_bindings()
+    machine = ref_of(bound, PlaneKind.MACHINE) if bound is not None else None
+    if machine is None:
+        machine = resolve_machine()
+    if machine is None:
+        return (
+            "You are operating on the user's machine. "
+            "Do not use /mnt/data. That path does not exist on this machine."
+        )
+    return plane_system_role(machine)
+
+
+def _tool_block(name: str, instructions: str) -> str:
     return (
-        f'<tool name="{_CLOUD_SANDBOX_TOOL_NAME}">\n'
-        f"<tool.instructions>\n"
-        f"{rendered}\n"
-        f"</tool.instructions>\n"
-        f"</tool>"
+        f'<tool name="{name}">\n<tool.instructions>\n{instructions}\n</tool.instructions>\n</tool>'
     )

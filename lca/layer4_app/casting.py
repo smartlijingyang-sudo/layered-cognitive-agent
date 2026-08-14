@@ -14,6 +14,7 @@ from typing import Any
 
 import structlog
 
+from lca.contracts.models.core.plane import PlaneBindings
 from lca.contracts.models.team.team_coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
@@ -281,6 +282,7 @@ def build_from_casting_plan(
     llm: LLMAdapter,
     *,
     observability: str | ObservabilityBackend = OBSERVABILITY_CHOICE_CONSOLE,
+    bindings: PlaneBindings | None = None,
 ) -> Team:
     """把 CastingPlan 编译成 Team —— 与手写构造同路径，无专用运行时机制。"""
     cards: dict[str, tuple[RoleCard, str | None]] = {
@@ -294,7 +296,7 @@ def build_from_casting_plan(
             role=card.title,
             goal=goal,
             backstory=card.backstory,
-            tools=build_default_tools(),
+            tools=build_default_tools(bindings=bindings),
             llm=llm,
             observability=observability,
         )

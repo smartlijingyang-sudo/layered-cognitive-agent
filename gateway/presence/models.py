@@ -23,6 +23,9 @@ class Device:
     status: DeviceStatus = DeviceStatus.OFFLINE
     connected_at: float = 0.0
     last_seen: float = 0.0
+    platform: str = ""
+    home: str = ""
+    root: str = ""
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -33,4 +36,7 @@ class Device:
             "status": self.status.value,
             "connected_at": self.connected_at,
             "last_seen": self.last_seen,
+            "platform": self.platform,
+            "home": self.home,
+            "root": self.root,
         }

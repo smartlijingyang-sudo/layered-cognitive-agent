@@ -24,6 +24,17 @@ WIRE: dict[str, tuple[str, str]] = {
     "web_search": ("lobe-web-browsing", "search"),
     "ask_user_question": ("lobe-user-interaction", "askUserQuestion"),
     "write_file_local": ("lobe-local-system", "writeFile"),
+    "local_run_command": ("lobe-local-system", "runCommand"),
+    "local_list_files": ("lobe-local-system", "listFiles"),
+    "local_read_file": ("lobe-local-system", "readFile"),
+    "local_write_file": ("lobe-local-system", "writeFile"),
+    "local_edit_file": ("lobe-local-system", "editFile"),
+    "local_search_files": ("lobe-local-system", "searchFiles"),
+    "local_move_files": ("lobe-local-system", "moveFiles"),
+    "local_grep_content": ("lobe-local-system", "grepContent"),
+    "local_glob_files": ("lobe-local-system", "globFiles"),
+    "local_get_command_output": ("lobe-local-system", "getCommandOutput"),
+    "local_kill_command": ("lobe-local-system", "killCommand"),
 }
 
 

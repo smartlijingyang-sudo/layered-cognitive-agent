@@ -1,39 +1,35 @@
-"""Execution surface is a profile: agent still sees /mnt/data."""
+"""Primary plane drives prompt. Host no longer pretends to be /mnt/data."""
 
 from __future__ import annotations
 
+from lca.contracts.models.core.plane import PlaneKind, PlaneRef
+from lca.layer0_infra.plane.resolve import PlaneBindings
+from lca.layer0_infra.plane.scope import plane_bindings_scope
 from lca.layer0_infra.sandbox.factory import set_sandbox_resolver
-from lca.layer0_infra.sandbox.surface import (
-    BACKEND_HOST,
-    current_surface,
-    environment_note,
-    skill_preamble,
-)
+from lca.layer0_infra.sandbox.surface import environment_note, skill_preamble
 
 
-class _Host:
-    name = "host"
-
-
-def test_host_surface_keeps_guest_root() -> None:
-    set_sandbox_resolver(lambda: _Host())  # type: ignore[arg-type,return-value]
-    try:
-        surface = current_surface()
-        assert surface.backend == BACKEND_HOST
-        assert surface.guest_root == "/mnt/data"
-        note = environment_note(surface)
-        assert "/mnt/data" in note
-        assert "$HOME" in note or "家目录" in skill_preamble(surface)
+def test_machine_prompt_uses_real_root() -> None:
+    plane = PlaneRef(
+        id="dev-1",
+        label="laptop",
+        kind=PlaneKind.MACHINE,
+        root="/home/lca-sandbox",
+        outputs_dir="/home/lca-sandbox/outputs",
+        platform="linux",
+    )
+    with plane_bindings_scope(PlaneBindings(primary=plane)):
+        note = environment_note()
+        assert "/home/lca-sandbox" in note
         assert "CLOUD SANDBOX" not in note
-    finally:
-        set_sandbox_resolver(None)
+        assert "/mnt/data" not in note or "does not exist" in note
+        assert "本机" in skill_preamble() or "机器" in skill_preamble()
 
 
-def test_onlyboxes_surface_default() -> None:
+def test_onlyboxes_prompt_default() -> None:
     set_sandbox_resolver(lambda: None)
     try:
-        surface = current_surface()
-        assert surface.backend == "onlyboxes"
-        assert "CLOUD SANDBOX" in environment_note(surface)
+        note = environment_note()
+        assert "CLOUD SANDBOX" in note
     finally:
         set_sandbox_resolver(None)

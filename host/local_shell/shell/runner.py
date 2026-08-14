@@ -11,7 +11,6 @@ from typing import Any
 
 from host.local_shell.file.bind import resolve_bound
 from host.local_shell.shell.process_manager import ShellProcessManager, _Proc
-from host.paths import rewrite_guest_refs
 
 _MANAGER = ShellProcessManager()
 
@@ -21,7 +20,7 @@ def process_manager() -> ShellProcessManager:
 
 
 def run_command(payload: dict[str, Any], workspace: Path, *, mount: str) -> dict[str, Any]:
-    command = rewrite_guest_refs(str(payload.get("command") or ""), workspace, mount=mount)
+    command = str(payload.get("command") or "")
     if not command:
         return {"success": False, "error": "command is required"}
     cwd_raw = payload.get("cwd")

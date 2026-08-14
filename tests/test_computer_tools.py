@@ -47,6 +47,10 @@ class TestCloudSandboxWire(unittest.TestCase):
         for name in sandbox:
             self.assertIsNotNone(resolve(name))
 
+    def test_local_tools_wire_to_local_system(self) -> None:
+        self.assertEqual(resolve("local_list_files"), ("lobe-local-system", "listFiles"))
+        self.assertIsNone(resolve("local_execute_code"))
+
 
 class TestDefaultToolsComputer(unittest.TestCase):
     def test_includes_computer_tools_when_sandbox(self) -> None:
@@ -66,6 +70,28 @@ class TestDefaultToolsComputer(unittest.TestCase):
         self.assertIn("run_skill_script", names)
         self.assertIn("write_file", names)
         self.assertNotIn("sandbox_inspect", names)
+
+    def test_both_available_without_extra_has_no_local_face(self) -> None:
+        from unittest.mock import patch
+
+        from lca.contracts.models.core.plane import PlaneKind, PlaneRef
+
+        machine = PlaneRef(
+            id="dev-1",
+            label="box",
+            kind=PlaneKind.MACHINE,
+            root="/tmp/root",  # noqa: S108
+            outputs_dir="/tmp/root/outputs",  # noqa: S108
+        )
+        with (
+            patch(
+                "lca.layer0_infra.tools.default_set.resolve_sandbox", return_value=InlineSandbox()
+            ),
+            patch("lca.layer0_infra.tools.default_set.resolve_machine", return_value=machine),
+        ):
+            names = {t.name for t in build_default_tools()}
+        self.assertIn("list_files", names)
+        self.assertNotIn("local_list_files", names)
 
 
 class TestBuildComputerObservationFiles(unittest.TestCase):

@@ -30,5 +30,6 @@ Title / embeddings 仍走 `openai_shim`（`/v1/chat|embeddings|responses`），�
 | `lca_model_catalog` | A | 选择器只暴露 solo / team / auto，屏蔽厂商模型 |
 | `openai_guard` | B | 标题等小请求仍走 model-runtime，防止 `solo` 进 Responses |
 | `host_console` | D | 本机 host sidecar 终端投影；不是 Run |
+| `execution_target` | C | 执行环境：去掉无设备；下载桌面版改为用电脑；云沙箱/自动保留 |
 
 不要再给 `StreamingHandler`、`ClientLLMTransport`、`GeneralChatAgent`、`Reasoning.tsx` 打补丁。

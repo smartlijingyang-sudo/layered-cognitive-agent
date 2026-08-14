@@ -11,8 +11,7 @@ from typing import Any
 from uuid import uuid4
 
 from host.local_shell.dispatch import FILE_OPS, dispatch_local
-from host.paths import resolve_guest_path, rewrite_guest_refs
-from lca.contracts.models.core.sandbox import SANDBOX_MOUNT_ROOT
+from host.paths import resolve_host_path
 
 _LANG_EXT = {"python": "py", "javascript": "js", "typescript": "ts"}
 _LANG_RUNNER = {
@@ -27,17 +26,18 @@ async def handle_exec(
     payload: dict[str, Any],
     workspace: Path,
     *,
-    mount: str = SANDBOX_MOUNT_ROOT,
+    mount: str = "",
 ) -> dict[str, Any]:
+    del mount
     await asyncio.to_thread(_ensure_workspace, workspace)
     if op in FILE_OPS:
-        return await asyncio.to_thread(dispatch_local, op, payload, workspace, mount=mount)
+        return await asyncio.to_thread(dispatch_local, op, payload, workspace, mount="")
     if op == "write_files":
-        return await _write_files(payload, workspace, mount=mount)
+        return await _write_files(payload, workspace)
     if op == "run":
-        return await asyncio.to_thread(_run_code, payload, workspace, mount)
+        return await asyncio.to_thread(_run_code, payload, workspace)
     if op == "run_terminal":
-        return await asyncio.to_thread(_run_terminal, payload, workspace, mount)
+        return await asyncio.to_thread(_run_terminal, payload, workspace)
     if op == "create_session":
         return {"success": True, "exit_code": 0, "session_id": uuid4().hex[:12]}
     if op == "destroy_session":
@@ -49,13 +49,13 @@ def _ensure_workspace(workspace: Path) -> None:
     (workspace / "outputs").mkdir(parents=True, exist_ok=True)
 
 
-async def _write_files(payload: dict[str, Any], workspace: Path, *, mount: str) -> dict[str, Any]:
-    base_dir = str(payload.get("base_dir") or mount)
+async def _write_files(payload: dict[str, Any], workspace: Path) -> dict[str, Any]:
+    base_dir = str(payload.get("base_dir") or workspace)
     files = payload.get("files") or {}
     if not isinstance(files, dict):
         return {"success": False, "exit_code": 1, "error": "files must be an object"}
     for name, spec in files.items():
-        dest = resolve_guest_path(f"{base_dir.rstrip('/')}/{name}", workspace, mount=mount)
+        dest = resolve_host_path(f"{base_dir.rstrip('/')}/{name}", workspace)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(await _materialize(spec))
     return {"success": True, "exit_code": 0}
@@ -74,9 +74,9 @@ async def _materialize(spec: object) -> bytes:
     return b""
 
 
-def _run_code(payload: dict[str, Any], workspace: Path, mount: str) -> dict[str, Any]:
+def _run_code(payload: dict[str, Any], workspace: Path) -> dict[str, Any]:
     language = str(payload.get("language") or "python").lower()
-    code = rewrite_guest_refs(str(payload.get("code") or ""), workspace, mount=mount)
+    code = str(payload.get("code") or "")
     timeout_s = int(payload.get("timeout_s") or 60)
     ext = _LANG_EXT.get(language, "py")
     runner = _LANG_RUNNER.get(language, ["python3"])
@@ -86,8 +86,8 @@ def _run_code(payload: dict[str, Any], workspace: Path, mount: str) -> dict[str,
     return _run_argv([*runner, str(script)], workspace, timeout_s)
 
 
-def _run_terminal(payload: dict[str, Any], workspace: Path, mount: str) -> dict[str, Any]:
-    command = rewrite_guest_refs(str(payload.get("command") or ""), workspace, mount=mount)
+def _run_terminal(payload: dict[str, Any], workspace: Path) -> dict[str, Any]:
+    command = str(payload.get("command") or "")
     timeout_s = int(payload.get("timeout_s") or 60)
     return _run_argv(command, workspace, timeout_s, shell=True)  # noqa: S604
 

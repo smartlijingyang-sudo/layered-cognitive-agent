@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
-from lca.layer0_infra.computer.runtime import ComputerOpResult, ComputerRuntime
+from lca.layer0_infra.computer.op_result import ComputerOpResult
+from lca.layer0_infra.computer.ops import SandboxExecOps
 from lca.layer0_infra.tools.computer.descriptions import DESCRIPTIONS
 from lca.layer0_infra.tools.computer.handlers import (
     _op_edit_file,
@@ -57,7 +58,7 @@ COMPUTER_TOOL_NAMES: frozenset[str] = frozenset(
     }
 )
 
-OpFn = Callable[[ComputerRuntime, dict[str, Any]], Awaitable[ComputerOpResult]]
+OpFn = Callable[[SandboxExecOps, dict[str, Any]], Awaitable[ComputerOpResult]]
 
 
 @dataclass(frozen=True)

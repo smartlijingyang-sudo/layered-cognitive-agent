@@ -62,6 +62,9 @@ async def connect_host(websocket: WebSocket) -> None:
         subject=subject,
         name=name,
         capabilities=capabilities or (CAP_CONSOLE,),
+        platform=str(hello.get("platform") or ""),
+        home=str(hello.get("home") or ""),
+        root=str(hello.get("root") or ""),
     )
     channel = WebSocketChannel(websocket)
     presence.online(device, channel)

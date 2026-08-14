@@ -18,11 +18,8 @@ from lca.layer0_infra.computer.guest import (
     build_shell_script,
 )
 from lca.layer0_infra.computer.office_plane import normalize_officecli_command
-from lca.layer0_infra.computer.runtime import (
-    ComputerOpResult,
-    TerminalCapableSandbox,
-    _normalize_path,
-)
+from lca.layer0_infra.computer.op_result import ComputerOpResult, TerminalCapableSandbox
+from lca.layer0_infra.computer.sandbox_computer import normalize_sandbox_path
 from lca.layer0_infra.file_store import FileStore, get_default_file_store, persist_generated_files
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
@@ -242,7 +239,7 @@ class ComputerRuntimeExecMixin:
     async def export_file(self: _GuestOpHost, *, path: str) -> ComputerOpResult:
         import base64
 
-        normalized = _normalize_path(path)
+        normalized = normalize_sandbox_path(path, self.plane.root)
         read = await self._guest_op(build_read_bytes_script(path=normalized))
         if not read.success:
             return read

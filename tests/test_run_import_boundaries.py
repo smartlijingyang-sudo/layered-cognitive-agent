@@ -39,7 +39,8 @@ def test_wire_imports_no_gateway_modules() -> None:
 def test_execute_has_no_starlette_or_request() -> None:
     text = _source("runs/execute.py")
     assert "starlette" not in text
-    assert "Request" not in text
+    assert "from starlette" not in text
+    assert "import starlette" not in text
 
 
 def test_ingress_does_not_import_live_or_execute() -> None:

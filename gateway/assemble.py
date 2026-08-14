@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from gateway.modes import SOLO_ROLE
+from lca.contracts.models.core.plane import PlaneBindings
 from lca.contracts.models.observability.journal import (
     CastingCompleted,
     CastingFailed,
@@ -29,6 +30,7 @@ def build_solo_agent(
     *,
     observability: ObservabilityBackend,
     role: str = SOLO_ROLE,
+    bindings: PlaneBindings | None = None,
 ) -> Agent:
     """Solo 裸模型（ADR-0052）：身份来自 AgentRef.name，不是写死的「助手」。
 
@@ -39,7 +41,7 @@ def build_solo_agent(
         role=role,
         goal="",
         backstory="",
-        tools=build_g2a_chat_tools(),
+        tools=build_g2a_chat_tools(bindings=bindings),
         llm=llm,
         observability=observability,
     )
@@ -54,6 +56,7 @@ async def build_runnable_team(
     run_id: str,
     library: RoleLibrary | None = None,
     caster: TeamCaster | None = None,
+    bindings: PlaneBindings | None = None,
 ) -> Team:
     """Team LLM casting（ADR-0042）：选角 + 治理判定 + 编译成 Team。
 
@@ -81,4 +84,10 @@ async def build_runnable_team(
                 rationale=plan.rationale,
             )
         )
-    return build_from_casting_plan(plan, resolved_library, llm, observability=observability)
+    return build_from_casting_plan(
+        plan,
+        resolved_library,
+        llm,
+        observability=observability,
+        bindings=bindings,
+    )

@@ -7,6 +7,7 @@ import json
 import re
 import time
 from collections.abc import Sequence
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,7 @@ from gateway.runs.session import RunRegistry, RunSession, RunStatus
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
 from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.plane import PlaneKind
 from lca.contracts.models.observability.journal import RunScope
 from lca.contracts.models.team.run_context import RunContext
 from lca.layer0_infra.file_store import get_default_file_store
@@ -28,6 +30,15 @@ from lca.layer0_infra.llm_resolver import LLMResolver, ProductionLLMResolver
 from lca.layer0_infra.observability import ObservabilityHub, create_observability, run_scope
 from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
 from lca.layer0_infra.observability.settings import ObservabilitySettings
+from lca.layer0_infra.plane.machine import resolve_machine, resolve_machine_transport
+from lca.layer0_infra.plane.resolve import (
+    PlaneBindingError,
+    PlaneRequest,
+    ref_of,
+    resolve_plane_bindings,
+    sandbox_ref_from,
+)
+from lca.layer0_infra.plane.scope import plane_bindings_scope
 from lca.layer0_infra.sandbox.factory import resolve_sandbox
 from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime
 from lca.layer0_infra.search.scope import search_run_scope
@@ -124,6 +135,9 @@ def create_run_session(
     attachment_ids: Sequence[str] = (),
     prior_turns: Sequence[ConversationTurn] = (),
     agent: AgentRef | None = None,
+    device_id: str = "",
+    plane: str = "",
+    extra_plane: str = "",
 ) -> RunSession:
     run_id = new_id("run")
     trace_id = new_id("trace")
@@ -143,6 +157,9 @@ def create_run_session(
         prior_turns=tuple(prior_turns),
         attachment_ids=cleaned_ids,
         agent=agent if agent is not None else default_agent_ref(),
+        device_id=device_id.strip(),
+        plane=plane.strip(),
+        extra_plane=extra_plane.strip(),
     )
     registry.put(session)
     return session
@@ -171,54 +188,68 @@ async def execute_run(
             run_scope(RunScope(trace_id=session.trace_id, run_id=session.run_id)),
         ):
             workspace_ref[0] = workspace
-            sandbox = resolve_sandbox()
-            if sandbox is not None:
-                try:
-                    await bind_sandbox_runtime(
-                        session.run_id,
-                        sandbox,
-                        get_default_file_store(),
-                        session.attachment_ids,
+            try:
+                bindings = _freeze_bindings(session)
+            except PlaneBindingError as exc:
+                session.error = str(exc)
+                return
+            session.bindings = bindings
+            sandbox = resolve_sandbox() if ref_of(bindings, PlaneKind.SANDBOX) else None
+            with plane_bindings_scope(bindings):
+                if sandbox is not None:
+                    try:
+                        await bind_sandbox_runtime(
+                            session.run_id,
+                            sandbox,
+                            get_default_file_store(),
+                            session.attachment_ids,
+                        )
+                    except Exception as exc:
+                        _log.warning(
+                            "sandbox_runtime_bind_failed",
+                            hop="H2",
+                            run_id=session.run_id,
+                            error=str(exc),
+                        )
+                await _stage_machine_attachments(session)
+                llm = get_llm_resolver().resolve(mode=mode)
+                runnable: Agent | Team
+                if mode == SOLO_MODE_KEY:
+                    runnable = build_solo_agent(
+                        llm,
+                        observability=hub,
+                        role=session.agent.name,
+                        bindings=bindings,
                     )
-                except Exception as exc:
-                    _log.warning(
-                        "sandbox_runtime_bind_failed",
+                else:
+                    runnable = await build_runnable_team(
+                        question,
+                        llm,
+                        observability=hub,
+                        trace_id=session.trace_id,
+                        run_id=session.run_id,
+                        bindings=bindings,
+                    )
+                run_ctx = _run_context_for_session(session)
+                if isinstance(runnable, Agent):
+                    result = await runnable.run(question, run_ctx)
+                else:
+                    result = await runnable.run(question)
+                if result.status == TaskStatus.INPUT_REQUIRED:
+                    session.status = RunStatus.WAITING_INPUT
+                    session.snapshot = result.extra.get("state_snapshot")
+                    session.runnable = runnable
+                    session.approval_request = result.extra.get("approval_request")
+                    _log.info(
+                        "run_paused_for_input",
                         hop="H2",
                         run_id=session.run_id,
-                        error=str(exc),
+                        approval_type=session.approval_request.get("type")
+                        if session.approval_request
+                        else None,
                     )
-            llm = get_llm_resolver().resolve(mode=mode)
-            runnable: Agent | Team
-            if mode == SOLO_MODE_KEY:
-                runnable = build_solo_agent(llm, observability=hub, role=session.agent.name)
-            else:
-                runnable = await build_runnable_team(
-                    question,
-                    llm,
-                    observability=hub,
-                    trace_id=session.trace_id,
-                    run_id=session.run_id,
-                )
-            run_ctx = _run_context_for_session(session)
-            if isinstance(runnable, Agent):
-                result = await runnable.run(question, run_ctx)
-            else:
-                result = await runnable.run(question)
-            if result.status == TaskStatus.INPUT_REQUIRED:
-                session.status = RunStatus.WAITING_INPUT
-                session.snapshot = result.extra.get("state_snapshot")
-                session.runnable = runnable
-                session.approval_request = result.extra.get("approval_request")
-                _log.info(
-                    "run_paused_for_input",
-                    hop="H2",
-                    run_id=session.run_id,
-                    approval_type=session.approval_request.get("type")
-                    if session.approval_request
-                    else None,
-                )
-                return
-            success = True
+                    return
+                success = True
     except asyncio.CancelledError:
         session.cancel_requested = True
         raise
@@ -235,7 +266,10 @@ async def resume_run(session: RunSession, registry: RunRegistry, answer: str) ->
     """HIL resume. Same finalize as execute. Must not close tail while waiting."""
     success = False
     try:
-        result = await session.runnable.resume(session.snapshot, input=answer)
+        bindings = session.bindings
+        scope = plane_bindings_scope(bindings) if bindings is not None else nullcontext()
+        with scope:
+            result = await session.runnable.resume(session.snapshot, input=answer)
         if result.status == TaskStatus.INPUT_REQUIRED:
             session.status = RunStatus.WAITING_INPUT
             session.snapshot = result.extra.get("state_snapshot")
@@ -354,6 +388,66 @@ def _emit_artifact_closure_if_needed(
             hop="H2",
             run_id=session.run_id,
             exc_info=True,
+        )
+
+
+def _freeze_bindings(session: RunSession):
+    sandbox = resolve_sandbox()
+    sandbox_ref = sandbox_ref_from(sandbox) if sandbox is not None else None
+    machine = resolve_machine(session.device_id or None)
+    bindings = resolve_plane_bindings(
+        machine,
+        sandbox_ref,
+        PlaneRequest(
+            device_id=session.device_id,
+            plane=session.plane,
+            extra_plane=session.extra_plane,
+        ),
+    )
+    machine_bound = ref_of(bindings, PlaneKind.MACHINE)
+    if machine_bound is not None:
+        _log.info(
+            "plane_bound",
+            kind=machine_bound.kind.value,
+            plane_id=machine_bound.id,
+            root=machine_bound.root,
+            role="machine",
+        )
+    if bindings.primary is not None:
+        _log.info(
+            "plane_primary",
+            kind=bindings.primary.kind.value,
+            plane_id=bindings.primary.id,
+            root=bindings.primary.root,
+        )
+    return bindings
+
+
+async def _stage_machine_attachments(session: RunSession) -> None:
+    if session.bindings is None:
+        return
+    machine = ref_of(session.bindings, PlaneKind.MACHINE)
+    if machine is None or not session.attachment_ids:
+        return
+    transport = resolve_machine_transport(machine.id)
+    if transport is None:
+        raise RuntimeError(f"machine {machine.label} offline; cannot stage attachments")
+    store = get_default_file_store()
+    files: dict[str, bytes | str] = {}
+    missing: list[str] = []
+    for attachment_id in session.attachment_ids:
+        stored = store.get(attachment_id)
+        raw = store.read_bytes(attachment_id)
+        if stored is None or raw is None:
+            missing.append(attachment_id)
+            continue
+        files[stored.name] = raw
+    if missing or not files:
+        raise RuntimeError(f"machine attachments missing in FileStore: {missing}")
+    result = await transport.write_files(files, base_dir=machine.root)
+    if getattr(result, "success", True) is False:
+        raise RuntimeError(
+            f"failed to stage attachments on {machine.label}: {getattr(result, 'error', result)}"
         )
 
 

@@ -1,11 +1,12 @@
-"""Computer tool operation handlers — map args to ComputerRuntime calls."""
+"""Computer tool operation handlers — map args to sandbox adapter calls."""
 
 from __future__ import annotations
 
 from typing import Any
 
 from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
-from lca.layer0_infra.computer.runtime import ComputerOpResult, ComputerRuntime
+from lca.layer0_infra.computer.op_result import ComputerOpResult
+from lca.layer0_infra.computer.ops import SandboxExecOps
 
 
 def _str_arg(args: dict[str, Any], *keys: str, default: str = "") -> str:
@@ -16,7 +17,7 @@ def _str_arg(args: dict[str, Any], *keys: str, default: str = "") -> str:
     return default
 
 
-async def _op_execute_code(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_execute_code(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     return await rt.execute_code(
         code=_str_arg(args, "code"),
         language=_str_arg(args, "language", default="python"),
@@ -45,7 +46,7 @@ def _resolve_command_timeout_s(args: dict[str, Any]) -> int:
     return DEFAULT_SANDBOX_TIMEOUT_S
 
 
-async def _op_run_command(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_run_command(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     timeout_s = _resolve_command_timeout_s(args)
     return await rt.run_command(
         command=_str_arg(args, "command"),
@@ -55,13 +56,13 @@ async def _op_run_command(rt: ComputerRuntime, args: dict[str, Any]) -> Computer
     )
 
 
-async def _op_list_files(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_list_files(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     return await rt.list_files(
-        directory_path=_str_arg(args, "directoryPath", "directory_path", default="/mnt/data")
+        directory_path=_str_arg(args, "directoryPath", "directory_path")
     )
 
 
-async def _op_read_file(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_read_file(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     start_line = args.get("startLine", args.get("start_line"))
     end_line = args.get("endLine", args.get("end_line"))
     return await rt.read_file(
@@ -71,7 +72,7 @@ async def _op_read_file(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOp
     )
 
 
-async def _op_write_file(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_write_file(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     content = args.get("content")
     return await rt.write_file(
         path=_str_arg(args, "path"),
@@ -82,7 +83,7 @@ async def _op_write_file(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerO
     )
 
 
-async def _op_edit_file(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_edit_file(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     return await rt.edit_file(
         path=_str_arg(args, "path"),
         search=_str_arg(args, "search"),
@@ -91,9 +92,9 @@ async def _op_edit_file(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOp
     )
 
 
-async def _op_search_files(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_search_files(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     return await rt.search_files(
-        directory=_str_arg(args, "directory", default="/mnt/data"),
+        directory=_str_arg(args, "directory"),
         keyword=_str_arg(args, "keyword"),
         file_type=_str_arg(args, "fileType", "file_type"),
         modified_after=_str_arg(args, "modifiedAfter", "modified_after"),
@@ -101,7 +102,7 @@ async def _op_search_files(rt: ComputerRuntime, args: dict[str, Any]) -> Compute
     )
 
 
-async def _op_move_files(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_move_files(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     ops = args.get("operations")
     operations: list[dict[str, str]] = []
     if isinstance(ops, list):
@@ -116,29 +117,29 @@ async def _op_move_files(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerO
     return await rt.move_files(operations=operations)
 
 
-async def _op_grep_content(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_grep_content(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     return await rt.grep_content(
         pattern=_str_arg(args, "pattern"),
-        directory=_str_arg(args, "directory", default="/mnt/data"),
+        directory=_str_arg(args, "directory"),
         file_pattern=_str_arg(args, "filePattern", "file_pattern"),
         recursive=bool(args.get("recursive", True)),
     )
 
 
-async def _op_glob_files(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_glob_files(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     return await rt.glob_files(
         pattern=_str_arg(args, "pattern"),
         directory=_str_arg(args, "directory"),
     )
 
 
-async def _op_get_command_output(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_get_command_output(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     return await rt.get_command_output(command_id=_str_arg(args, "commandId", "command_id"))
 
 
-async def _op_kill_command(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_kill_command(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     return await rt.kill_command(command_id=_str_arg(args, "commandId", "command_id"))
 
 
-async def _op_export_file(rt: ComputerRuntime, args: dict[str, Any]) -> ComputerOpResult:
+async def _op_export_file(rt: SandboxExecOps, args: dict[str, Any]) -> ComputerOpResult:
     return await rt.export_file(path=_str_arg(args, "path"))
