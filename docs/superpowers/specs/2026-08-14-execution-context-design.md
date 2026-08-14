@@ -621,13 +621,99 @@ uv run python -m host
 npx @lca/host start
 ```
 
-**重要：不再创建 `sandbox_user`**
+**重要：不再创建 `sandbox_user`（向后兼容策略）**
 
-旧的 `setup_host_runtime.sh` 会创建 `sandbox_user` 系统用户来隔离 sidecar。npm CLI 不走这条路：
-- 直接用当前用户（`os.userInfo().username`）
-- workspace 在当前用户 home 下（`~/workspace`）
-- 更简单，更符合用户预期
-- 如果需要隔离，用容器（Onlyboxes）而不是本地用户
+旧的 `setup_host_runtime.sh` 会创建 `sandbox_user` 系统用户来隔离 sidecar。npm CLI 采用更简单的策略：
+
+**默认**：直接用当前用户（`os.userInfo().username`），workspace 在 `~/workspace`。
+
+**向后兼容**：检测已有的 `sandbox_user` 配置，提供迁移选项。
+
+```typescript
+async function resolveWorkspace(options: { workspace?: string }) {
+  // 1. 显式指定 → 用它
+  if (options.workspace) return options.workspace;
+  
+  // 2. 检测已有 setup
+  const existingSetup = await detectExistingSetup();
+  
+  if (existingSetup?.type === "sandbox-user") {
+    // 已有 /home/sandbox-user 配置
+    console.log("发现已有配置: /home/sandbox-user");
+    console.log("选项:");
+    console.log("  1. 继续使用 /home/sandbox-user (推荐，保持兼容)");
+    console.log("  2. 迁移到 ~/workspace (当前用户)");
+    
+    const choice = await prompt("选择 [1/2]: ");
+    if (choice === "1") {
+      return "/home/sandbox-user";
+    } else {
+      await migrateWorkspace("/home/sandbox-user", path.join(os.homedir(), "workspace"));
+      return path.join(os.homedir(), "workspace");
+    }
+  }
+  
+  // 3. 无已有 setup → 用当前用户
+  return path.join(os.homedir(), "workspace");
+}
+```
+
+**使用场景**：
+
+```bash
+# 场景 A: 全新安装（无 sandbox_user）
+npx @lca/host start
+# → 创建 ~/workspace，用当前用户
+
+# 场景 B: 已有 sandbox_user
+npx @lca/host start
+# → 检测到 /home/sandbox-user
+# → 问用户：继续用还是迁移？
+
+# 场景 C: 显式指定（跳过检测）
+npx @lca/host start --workspace /home/sandbox-user
+# → 直接用，不问
+
+# 场景 D: 强制迁移
+npx @lca/host migrate
+# → 从 /home/sandbox-user 迁移到 ~/workspace
+# → 移动文件、更新配置、可选删除旧用户
+```
+
+**迁移命令**：
+
+```typescript
+async function migrate() {
+  const from = "/home/sandbox-user";
+  const to = path.join(os.homedir(), "workspace");
+  
+  if (!await fileExists(from)) {
+    console.log("无旧配置需要迁移");
+    return;
+  }
+  
+  console.log(`迁移 ${from} → ${to}`);
+  
+  // 1. 复制文件
+  await exec(`cp -r ${from}/* ${to}/`);
+  
+  // 2. 更新 .env
+  const env = await readEnv(from);
+  await writeEnv({ ...env, workspace: to, user: os.userInfo().username });
+  
+  // 3. 重启服务
+  await restartService();
+  
+  // 4. 可选：删除旧目录和用户
+  const cleanup = await prompt("删除旧的 /home/sandbox-user 和用户? [y/N]: ");
+  if (cleanup === "y") {
+    await exec(`sudo rm -rf ${from}`);
+    await exec(`sudo userdel sandbox-user`);
+  }
+  
+  console.log(`✓ 迁移完成`);
+}
+```
 
 **目标**：一行命令搞定，和 LobeHub 的 `npx @lobehub/cli` 一样简单。
 
@@ -648,6 +734,7 @@ npx @lca/host connect --gateway ws://10.36.6.252:8765 --token lca-local-host
 │   ├── commands/
 │   │   ├── start.ts          # `start` — 本机 sidecar
 │   │   ├── connect.ts        # `connect` — 远程 sidecar（连接指定 gateway）
+│   │   ├── migrate.ts        # `migrate` — 从 sandbox_user 迁移到当前用户
 │   │   ├── stop.ts           # `stop`
 │   │   ├── status.ts         # `status`
 │   │   └── logs.ts           # `logs`
