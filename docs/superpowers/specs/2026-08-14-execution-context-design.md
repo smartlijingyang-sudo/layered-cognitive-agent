@@ -535,28 +535,49 @@ def _shell_quote(s: str) -> str:
     return "'" + s.replace("'", "'\"'\"'") + "'"
 ```
 
-#### WindowsContext
+#### WindowsContext — 两种模式
+
+**重要澄清**：Windows 执行有两种模式，取决于 gateway 和 Windows 机器的位置关系。
+
+**模式 A：Gateway 在 Windows 本机**
+
+```
+Gateway (Windows) → subprocess: powershell.exe
+```
+
+- 不需要授权（本机执行）
+- 不需要额外进程
+- 直接 `powershell.exe` subprocess
+- 适用场景：开发者在 Windows 上本地运行整个 stack
+
+**模式 B：Gateway 远程 + Windows Host Sidecar（推荐）**
+
+```
+Gateway (Linux/Mac) → WebSocket → Windows Host Sidecar → powershell.exe
+```
+
+- Windows 机器上运行 `python -m host`（**复用现有 `host/` 代码**）
+- 需要 token 授权（`LCA_HOST_TOKEN`，和现有 host sidecar 一样）
+- Gateway 通过 Presence 发现 Windows host，自动路由
+- 适用场景：gateway 在服务器，用户的 Windows 机器是远程的
+
+**现有 `host/` 已经是跨平台 Python**：
+- `host/client.py` — WebSocket 连接
+- `host/exec.py` — 执行命令
+- `host/local_shell/` — 文件操作
+- `host/pty.py` — PTY 终端
+- 只需要在 Windows 上测试和适配路径格式
+
+**实现策略**：
+- `WindowsContext`（模式 A）只在 `sys.platform == "win32"` 且无远程 host 时使用
+- 远程 Windows 机器通过 `HostContext`（模式 B）访问，不需要单独的 `WindowsContext`
+- Factory auto-detect：Host > SSH > Onlyboxes > Windows（仅当 gateway 在 Windows 上）
 
 ```python
-# lca/layer0_infra/execution/windows_context.py
-
-import asyncio
-import subprocess
-from pathlib import PureWindowsPath
-
-
 class WindowsContext:
-    """本机 Windows PowerShell。
+    """本机 Windows PowerShell — 仅当 gateway 在 Windows 上时使用。
     
-    路径用 Windows 格式（C:\\Users\\...）。
-    编码统一 UTF-8（PowerShell 6+ 默认；Windows PowerShell 5.1 需 chcp 65001）。
-    
-    execute 映射：
-      run_command: powershell.exe -NoProfile -Command "..."
-      read_file:   Get-Content -Raw -Encoding UTF8 path
-      write_file:  Set-Content -Encoding UTF8 path value
-      list_files:  Get-ChildItem path | ConvertTo-Json
-      run (code):  python -c "code" (假设 Python 已安装)
+    远程 Windows 机器通过 HostContext（WebSocket sidecar）访问。
     """
     
     def __init__(self, config: WindowsConfig):
@@ -586,87 +607,9 @@ class WindowsContext:
         return ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"]
     
     async def execute(self, op: str, payload: dict) -> OpResult:
-        if op == "run_command":
-            return await self._run_command(payload)
-        elif op == "read_file":
-            return await self._read_file(payload)
-        elif op == "write_file":
-            return await self._write_file(payload)
-        elif op == "list_files":
-            return await self._list_files(payload)
-        elif op == "run":
-            return await self._run_code(payload)
-        else:
-            return OpResult(success=False, error=f"unsupported op for Windows: {op}")
-    
-    async def _run_command(self, payload: dict) -> OpResult:
-        command = payload.get("command", "")
-        cwd = payload.get("cwd", self.workspace)
-        
-        # PowerShell 命令：先 cd 再执行
-        ps_cmd = f"Set-Location '{cwd}'; {command}"
-        
-        proc = await asyncio.create_subprocess_exec(
-            *self._ps_argv(), ps_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout_bytes, stderr_bytes = await asyncio.wait_for(
-            proc.communicate(),
-            timeout=payload.get("timeout_s", 60)
-        )
-        
-        # UTF-8 解码，处理可能的 BOM
-        stdout = stdout_bytes.decode("utf-8-sig", errors="replace")
-        stderr = stderr_bytes.decode("utf-8-sig", errors="replace")
-        
-        return OpResult(
-            success=proc.returncode == 0,
-            content=stdout,
-            error=stderr if proc.returncode != 0 else "",
-            data={
-                "stdout": stdout,
-                "stderr": stderr,
-                "exit_code": proc.returncode or 0,
-            }
-        )
-    
-    async def _read_file(self, payload: dict) -> OpResult:
-        path = self._resolve_path(payload.get("path", ""))
-        ps_cmd = f"Get-Content -Raw -Encoding UTF8 '{path}'"
-        
-        proc = await asyncio.create_subprocess_exec(
-            *self._ps_argv(), ps_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout_bytes, stderr_bytes = await proc.communicate()
-        
-        if proc.returncode != 0:
-            return OpResult(
-                success=False,
-                error=stderr_bytes.decode("utf-8-sig", errors="replace"),
-            )
-        
-        content = stdout_bytes.decode("utf-8-sig", errors="replace")
-        lines = content.splitlines()
-        return OpResult(
-            success=True,
-            content=content,
-            data={
-                "content": content,
-                "filename": PureWindowsPath(path).name,
-                "line_count": len(lines),
-                "truncated": False,
-            }
-        )
-    
-    def _resolve_path(self, path: str) -> str:
-        """解析路径：相对路径拼到 workspace。"""
-        p = PureWindowsPath(path)
-        if p.is_absolute():
-            return str(p)
-        return str(PureWindowsPath(self.workspace) / path)
+        """直接 subprocess 到 PowerShell（本机执行，无授权）。"""
+        # 实现同 §3.4 的 WindowsContext 代码
+        ...
     
     def prompt_context(self) -> str:
         return (
@@ -675,19 +618,29 @@ class WindowsContext:
             f"交付物写到 `{self.outputs_dir}`\n"
             f"路径使用 Windows 格式。\n"
         )
-
-
-class WindowsConfig:
-    """Windows 执行环境配置。"""
-    device_id: str
-    label: str
-    workspace: str  # e.g. C:\\Users\\lichao\\workspace
-    
-    def __init__(self, device_id: str, label: str, workspace: str):
-        self.device_id = device_id
-        self.label = label
-        self.workspace = workspace
 ```
+
+**Host Sidecar 在 Windows 上的配置**：
+
+```bash
+# 在 Windows 机器上运行
+python -m host
+
+# 环境变量（.env 或系统环境变量）
+LCA_HOST_USER=lichao
+LCA_HOST_ROOT=C:\Users\lichao\workspace
+LCA_HOST_DEVICE_ID=windows-pc
+LCA_HOST_TOKEN=lca-local-host
+LCA_HOST_GATEWAY=ws://gateway-server:8765/presence/connect
+```
+
+Gateway 通过 Presence 发现这台 Windows 机器，创建 `HostContext`（不是 `WindowsContext`），通过 WebSocket RPC 执行命令。
+
+---
+
+**总结**：
+- **本机 Windows（gateway 在 Windows）**：`WindowsContext`，直接 subprocess
+- **远程 Windows**：`HostContext`，复用现有 sidecar，不需要新代码
 
 ### 3.5 Factory
 
@@ -800,6 +753,7 @@ class ExecutionContextFactory:
         return OnlyboxesContext(sandbox)
     
     def _resolve_windows(self) -> Optional[ExecutionContext]:
+        """Windows 只在 gateway 本机时使用。远程 Windows 通过 HostContext 访问。"""
         import sys
         if sys.platform != "win32":
             return None
