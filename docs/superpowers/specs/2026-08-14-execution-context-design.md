@@ -598,120 +598,114 @@ Gateway (Linux)                         Windows Machine
 
 Gateway 据此知道设备类型，前端可以显示 "Windows PC" / "Mac" / "Linux Server"。
 
-### Windows Host Sidecar 部署（远程 Windows 机器）
+### Windows Host Sidecar 部署（对齐 LobeHub CLI 体验）
 
-**场景**：Gateway 在 Linux，Windows 机器在远程（局域网或公网）。
-
-**部署流程**：
-
-1. **Windows 机器上安装 Python + uv**
-   ```powershell
-   winget install Python.Python.3.12
-   pip install uv
-   ```
-
-2. **复制 `host/` + `lca/` 到 Windows**
-   ```powershell
-   # 从 gateway 机器 scp
-   scp -r gateway:/path/to/lca/{host,lca/contracts,lca/layer0_infra/sandbox} C:\lca-host\
-   ```
-
-3. **创建 `.env` 配置**
-   ```env
-   LCA_HOST_USER=lichao
-   LCA_HOST_ROOT=C:\Users\lichao\workspace
-   LCA_HOST_DEVICE_ID=windows-pc
-   LCA_HOST_TOKEN=lca-local-host
-   LCA_HOST_GATEWAY=ws://10.36.6.252:8765/presence/connect
-   ```
-
-4. **启动 sidecar**
-   ```powershell
-   cd C:\lca-host
-   uv run python -m host
-   ```
-
-5. **开机自启（Windows Task Scheduler）**
-   ```powershell
-   $action = New-ScheduledTaskAction -Execute "uv" `
-     -Argument "run python -m host" `
-     -WorkingDirectory "C:\lca-host"
-   $trigger = New-ScheduledTaskTrigger -AtLogOn
-   Register-ScheduledTask -TaskName "LCA Host Sidecar" `
-     -Action $action -Trigger $trigger
-   ```
-
-**一键部署脚本**：`scripts/setup_windows_host.ps1`
+**目标**：一行命令搞定，和 LobeHub 的 `npx @lobehub/cli` 一样简单。
 
 ```powershell
-param(
-    [string]$GatewayUrl = "ws://10.36.6.252:8765/presence/connect",
-    [string]$DeviceId = "windows-pc",
-    [string]$Token = "lca-local-host",
-    [string]$Workspace = "$env:USERPROFILE\workspace"
-)
+# Windows 上（只需 Node.js，Python 自动处理）
+npx @lca/host connect --gateway ws://10.36.6.252:8765 --token lca-local-host
+```
 
-# 检查 Python
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
-    Write-Host "Error: Python not found" -ForegroundColor Red
-    exit 1
+**npm 包 `@lca/host`**：
+
+```
+@lca/host (npm package)
+├── bin/lca-host          # CLI 入口
+├── src/
+│   ├── connect.ts        # `connect` 命令
+│   ├── start.ts          # `start` 命令
+│   ├── python-installer  # 检查/安装 Python + uv
+│   └── sidecar/          # 打包的 Python sidecar 代码
+│       ├── host/
+│       └── lca/
+└── package.json
+```
+
+**`connect` 命令流程**：
+
+```typescript
+// src/connect.ts
+async function connect(options: { gateway: string; token: string }) {
+  // 1. 检查 Python
+  if (!hasPython()) {
+    await installPython();  // winget / download installer
+  }
+  
+  // 2. 安装 uv
+  if (!hasUv()) {
+    await run("pip install uv");
+  }
+  
+  // 3. 解压 sidecar 代码到 ~/.lca-host/
+  const hostDir = path.join(os.homedir(), ".lca-host");
+  await extractSidecar(hostDir);
+  
+  // 4. 写 .env
+  const envContent = `
+LCA_HOST_USER=${os.userInfo().username}
+LCA_HOST_ROOT=${path.join(os.homedir(), "workspace")}
+LCA_HOST_DEVICE_ID=${os.hostname()}
+LCA_HOST_TOKEN=${options.token}
+LCA_HOST_GATEWAY=${options.gateway}
+`.trim();
+  await writeFile(path.join(hostDir, ".env"), envContent);
+  
+  // 5. 注册 Windows 服务（或 Task Scheduler）
+  await registerService(hostDir);
+  
+  // 6. 启动
+  await startService();
+  
+  console.log("✓ Connected. Sidecar running.");
 }
-
-# 安装 uv
-if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-    pip install uv
-}
-
-# 创建 workspace
-New-Item -ItemType Directory -Path $Workspace -Force | Out-Null
-
-# 写入 .env
-@"
-LCA_HOST_USER=$env:USERNAME
-LCA_HOST_ROOT=$Workspace
-LCA_HOST_DEVICE_ID=$DeviceId
-LCA_HOST_TOKEN=$Token
-LCA_HOST_GATEWAY=$GatewayUrl
-"@ | Out-File -FilePath ".env" -Encoding UTF8
-
-# 注册计划任务
-$action = New-ScheduledTaskAction -Execute "uv" `
-    -Argument "run python -m host" -WorkingDirectory (Get-Location)
-$trigger = New-ScheduledTaskTrigger -AtLogOn
-Register-ScheduledTask -TaskName "LCA Host Sidecar" `
-    -Action $action -Trigger $trigger
-
-# 立即启动
-Start-ScheduledTask -TaskName "LCA Host Sidecar"
-Write-Host "Done. Sidecar starting..." -ForegroundColor Green
 ```
 
-**连接流程**：
+**其他命令**：
 
-```
-Windows Machine                          Gateway (Linux)
-┌─────────────────────┐                  ┌──────────────────────────┐
-│ python -m host      │                  │                          │
-│   ↓                 │                  │                          │
-│ Load .env           │                  │                          │
-│   ↓                 │                  │                          │
-│ WebSocket connect ──┼─────────────────►│ /presence/connect        │
-│ HELLO:              │                  │   ↓                      │
-│   device_id=win-pc  │                  │ PresenceRegistry.online()│
-│   platform=win32    │                  │   ↓                      │
-│   capabilities=...  │                  │ HostSandbox.from_presence│
-│   ↓                 │                  │   → HostContext          │
-│ run_forever()       │◄── RPC ──────────┤                          │
-│   ↓                 │   (WS messages)  │                          │
-│ subprocess / shell  │                  │                          │
-└─────────────────────┘                  └──────────────────────────┘
+```powershell
+# 查看状态
+npx @lca/host status
+
+# 停止
+npx @lca/host stop
+
+# 重启
+npx @lca/host restart
+
+# 查看日志
+npx @lca/host logs
 ```
 
-**关键特性**：
-- Windows sidecar **主动连接** gateway（outbound WebSocket）
-- 不需要 gateway 能访问 Windows（穿透 NAT/防火墙）
-- Token 认证（`LCA_HOST_TOKEN`）
-- 自动重连（`host/client.py` 的 `run_forever` 循环）
+**实现策略**：
+
+1. **MVP（Phase 3）**：npm 包只是 wrapper
+   - 检查 Python 是否已安装，未安装则提示用户手动安装
+   - 下载 sidecar 代码（从 GitHub release 或 bundle in npm）
+   - 运行 `uv run python -m host`
+   - 注册 Task Scheduler
+
+2. **V2（后续）**：更好的体验
+   - 自动安装 Python（通过 winget / embedded Python）
+   - 或用 PyInstaller 打包成单文件 .exe，完全不需要 Python
+
+**跨平台**：
+
+```bash
+# Linux / macOS
+npx @lca/host connect --gateway ws://10.36.6.252:8765 --token lca-local-host
+```
+
+同样的命令，同样的体验。npm 包检测平台，选择正确的安装策略。
+
+---
+
+**对比**：
+
+| 方式 | 步骤 | 用户体验 |
+|---|---|---|
+| 手动（§3.4 原始方案） | 5+ 步，需要懂 Python/uv/PowerShell | ❌ 复杂 |
+| `npx @lca/host connect` | 1 步 | ✅ 和 LobeHub CLI 一样 |
 
 ### 3.5 Factory
 
@@ -1176,6 +1170,7 @@ async def generate_download_url(
 | `lca/layer0_infra/skills/skill_renderer.py` | Skill 占位符替换 |
 | `gateway/runs/file_download.py` | 文件下载代理 |
 | `gateway/runs/context_api.py` | `/lca-api/context` endpoint |
+| `packages/host-sidecar/` | `@lca/host` npm 包 — 一键安装 sidecar |
 
 ---
 
