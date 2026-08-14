@@ -598,6 +598,121 @@ Gateway (Linux)                         Windows Machine
 
 Gateway 据此知道设备类型，前端可以显示 "Windows PC" / "Mac" / "Linux Server"。
 
+### Windows Host Sidecar 部署（远程 Windows 机器）
+
+**场景**：Gateway 在 Linux，Windows 机器在远程（局域网或公网）。
+
+**部署流程**：
+
+1. **Windows 机器上安装 Python + uv**
+   ```powershell
+   winget install Python.Python.3.12
+   pip install uv
+   ```
+
+2. **复制 `host/` + `lca/` 到 Windows**
+   ```powershell
+   # 从 gateway 机器 scp
+   scp -r gateway:/path/to/lca/{host,lca/contracts,lca/layer0_infra/sandbox} C:\lca-host\
+   ```
+
+3. **创建 `.env` 配置**
+   ```env
+   LCA_HOST_USER=lichao
+   LCA_HOST_ROOT=C:\Users\lichao\workspace
+   LCA_HOST_DEVICE_ID=windows-pc
+   LCA_HOST_TOKEN=lca-local-host
+   LCA_HOST_GATEWAY=ws://10.36.6.252:8765/presence/connect
+   ```
+
+4. **启动 sidecar**
+   ```powershell
+   cd C:\lca-host
+   uv run python -m host
+   ```
+
+5. **开机自启（Windows Task Scheduler）**
+   ```powershell
+   $action = New-ScheduledTaskAction -Execute "uv" `
+     -Argument "run python -m host" `
+     -WorkingDirectory "C:\lca-host"
+   $trigger = New-ScheduledTaskTrigger -AtLogOn
+   Register-ScheduledTask -TaskName "LCA Host Sidecar" `
+     -Action $action -Trigger $trigger
+   ```
+
+**一键部署脚本**：`scripts/setup_windows_host.ps1`
+
+```powershell
+param(
+    [string]$GatewayUrl = "ws://10.36.6.252:8765/presence/connect",
+    [string]$DeviceId = "windows-pc",
+    [string]$Token = "lca-local-host",
+    [string]$Workspace = "$env:USERPROFILE\workspace"
+)
+
+# 检查 Python
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+    Write-Host "Error: Python not found" -ForegroundColor Red
+    exit 1
+}
+
+# 安装 uv
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    pip install uv
+}
+
+# 创建 workspace
+New-Item -ItemType Directory -Path $Workspace -Force | Out-Null
+
+# 写入 .env
+@"
+LCA_HOST_USER=$env:USERNAME
+LCA_HOST_ROOT=$Workspace
+LCA_HOST_DEVICE_ID=$DeviceId
+LCA_HOST_TOKEN=$Token
+LCA_HOST_GATEWAY=$GatewayUrl
+"@ | Out-File -FilePath ".env" -Encoding UTF8
+
+# 注册计划任务
+$action = New-ScheduledTaskAction -Execute "uv" `
+    -Argument "run python -m host" -WorkingDirectory (Get-Location)
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+Register-ScheduledTask -TaskName "LCA Host Sidecar" `
+    -Action $action -Trigger $trigger
+
+# 立即启动
+Start-ScheduledTask -TaskName "LCA Host Sidecar"
+Write-Host "Done. Sidecar starting..." -ForegroundColor Green
+```
+
+**连接流程**：
+
+```
+Windows Machine                          Gateway (Linux)
+┌─────────────────────┐                  ┌──────────────────────────┐
+│ python -m host      │                  │                          │
+│   ↓                 │                  │                          │
+│ Load .env           │                  │                          │
+│   ↓                 │                  │                          │
+│ WebSocket connect ──┼─────────────────►│ /presence/connect        │
+│ HELLO:              │                  │   ↓                      │
+│   device_id=win-pc  │                  │ PresenceRegistry.online()│
+│   platform=win32    │                  │   ↓                      │
+│   capabilities=...  │                  │ HostSandbox.from_presence│
+│   ↓                 │                  │   → HostContext          │
+│ run_forever()       │◄── RPC ──────────┤                          │
+│   ↓                 │   (WS messages)  │                          │
+│ subprocess / shell  │                  │                          │
+└─────────────────────┘                  └──────────────────────────┘
+```
+
+**关键特性**：
+- Windows sidecar **主动连接** gateway（outbound WebSocket）
+- 不需要 gateway 能访问 Windows（穿透 NAT/防火墙）
+- Token 认证（`LCA_HOST_TOKEN`）
+- 自动重连（`host/client.py` 的 `run_forever` 循环）
+
 ### 3.5 Factory
 
 ```python
