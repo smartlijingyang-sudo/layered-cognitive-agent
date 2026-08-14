@@ -621,98 +621,49 @@ uv run python -m host
 npx @lca/host start
 ```
 
-**重要：不再创建 `sandbox_user`（向后兼容策略）**
+**核心设计：per-user 隔离空间**
 
-旧的 `setup_host_runtime.sh` 会创建 `sandbox_user` 系统用户来隔离 sidecar。npm CLI 采用更简单的策略：
+LobeHub 有用户概念，每个用户需要独立的隔离空间：
 
-**默认**：直接用当前用户（`os.userInfo().username`），workspace 在 `~/workspace`。
+```
+LobeHub User: alice  →  Workspace: /home/lca-alice (Linux) / C:\LCA\alice (Windows)
+LobeHub User: bob    →  Workspace: /home/lca-bob   (Linux) / C:\LCA\bob (Windows)
+```
 
-**向后兼容**：检测已有的 `sandbox_user` 配置，提供迁移选项。
+**安全隔离**：
+- Agent 只能访问该用户的 workspace
+- 不能访问系统用户（lichao）的其他文件
+- 类似 Docker 容器，但更轻量（进程级隔离，非容器级）
 
-```typescript
-async function resolveWorkspace(options: { workspace?: string }) {
-  // 1. 显式指定 → 用它
-  if (options.workspace) return options.workspace;
-  
-  // 2. 检测已有 setup
-  const existingSetup = await detectExistingSetup();
-  
-  if (existingSetup?.type === "sandbox-user") {
-    // 已有 /home/sandbox-user 配置
-    console.log("发现已有配置: /home/sandbox-user");
-    console.log("选项:");
-    console.log("  1. 继续使用 /home/sandbox-user (推荐，保持兼容)");
-    console.log("  2. 迁移到 ~/workspace (当前用户)");
+**命名规范**：
+- Linux: `/home/lca-{username}` 或 `/data/workspaces/{username}`
+- Windows: `C:\LCA\{username}` 或 `%USERPROFILE%\LCA\{username}`
+- 用 `lca-` 前缀区分（避免和系统用户混淆）
+
+**ExecutionContext.workspace 指向用户隔离空间**：
+
+```python
+class HostContext:
+    def __init__(self, sandbox, settings, lobe_user: str):
+        self._sandbox = sandbox
+        self._settings = settings
+        self._lobe_user = lobe_user
     
-    const choice = await prompt("选择 [1/2]: ");
-    if (choice === "1") {
-      return "/home/sandbox-user";
-    } else {
-      await migrateWorkspace("/home/sandbox-user", path.join(os.homedir(), "workspace"));
-      return path.join(os.homedir(), "workspace");
-    }
-  }
-  
-  // 3. 无已有 setup → 用当前用户
-  return path.join(os.homedir(), "workspace");
-}
+    @property
+    def workspace(self) -> str:
+        # 每个 LobeHub 用户有独立的 workspace
+        return f"/home/lca-{self._lobe_user}"  # Linux
+        # 或 self._settings.user_workspace(self._lobe_user)
 ```
 
-**使用场景**：
+**Gateway 路由**：
 
-```bash
-# 场景 A: 全新安装（无 sandbox_user）
-npx @lca/host start
-# → 创建 ~/workspace，用当前用户
-
-# 场景 B: 已有 sandbox_user
-npx @lca/host start
-# → 检测到 /home/sandbox-user
-# → 问用户：继续用还是迁移？
-
-# 场景 C: 显式指定（跳过检测）
-npx @lca/host start --workspace /home/sandbox-user
-# → 直接用，不问
-
-# 场景 D: 强制迁移
-npx @lca/host migrate
-# → 从 /home/sandbox-user 迁移到 ~/workspace
-# → 移动文件、更新配置、可选删除旧用户
-```
-
-**迁移命令**：
-
-```typescript
-async function migrate() {
-  const from = "/home/sandbox-user";
-  const to = path.join(os.homedir(), "workspace");
-  
-  if (!await fileExists(from)) {
-    console.log("无旧配置需要迁移");
-    return;
-  }
-  
-  console.log(`迁移 ${from} → ${to}`);
-  
-  // 1. 复制文件
-  await exec(`cp -r ${from}/* ${to}/`);
-  
-  // 2. 更新 .env
-  const env = await readEnv(from);
-  await writeEnv({ ...env, workspace: to, user: os.userInfo().username });
-  
-  // 3. 重启服务
-  await restartService();
-  
-  // 4. 可选：删除旧目录和用户
-  const cleanup = await prompt("删除旧的 /home/sandbox-user 和用户? [y/N]: ");
-  if (cleanup === "y") {
-    await exec(`sudo rm -rf ${from}`);
-    await exec(`sudo userdel sandbox-user`);
-  }
-  
-  console.log(`✓ 迁移完成`);
-}
+```python
+# Gateway 知道是哪个 LobeHub 用户在请求
+async def handle_request(user_id: str, ...):
+    context = await factory.resolve_for_user(user_id)
+    # context.workspace = /home/lca-{user_id}
+    # Agent 操作在这个隔离空间内
 ```
 
 **目标**：一行命令搞定，和 LobeHub 的 `npx @lobehub/cli` 一样简单。
@@ -732,9 +683,8 @@ npx @lca/host connect --gateway ws://10.36.6.252:8765 --token lca-local-host
 ├── bin/lca-host              # CLI 入口
 ├── src/
 │   ├── commands/
-│   │   ├── start.ts          # `start` — 本机 sidecar
-│   │   ├── connect.ts        # `connect` — 远程 sidecar（连接指定 gateway）
-│   │   ├── migrate.ts        # `migrate` — 从 sandbox_user 迁移到当前用户
+│   │   ├── start.ts          # `start` — 本机 sidecar（per-user 隔离）
+│   │   ├── connect.ts        # `connect` — 远程 sidecar（连接指定 gateway，per-user 隔离）
 │   │   ├── stop.ts           # `stop`
 │   │   ├── status.ts         # `status`
 │   │   └── logs.ts           # `logs`
@@ -748,39 +698,67 @@ npx @lca/host connect --gateway ws://10.36.6.252:8765 --token lca-local-host
 └── package.json
 ```
 
-**`start` 命令（本机）**：
+**`start` 命令（本机，per-user 隔离）**：
 
 ```typescript
 // src/commands/start.ts
-async function start(options: { workspace?: string }) {
-  // 本机 sidecar：gateway 在本机或已知地址
-  const gateway = await detectLocalGateway();  // 检查 localhost:8765
+async function start(options: { user?: string }) {
+  const gateway = await detectLocalGateway();
   
-  // 默认 workspace = ~/workspace（当前用户，不创建新用户）
-  const workspace = options.workspace || path.join(os.homedir(), "workspace");
+  // 单用户模式（默认）：创建 lca-sandbox 用户
+  // 多用户模式（未来）：为每个 LobeHub 用户创建独立空间
+  const lobeUser = options.user || "sandbox";
+  const workspace = getUserWorkspace(lobeUser);
   
-  // 幂等检查
-  if (await isAlreadyRunning()) {
-    console.log("✓ Host sidecar already running");
-    return;
-  }
+  // 创建隔离用户和目录（需要 sudo）
+  await ensureIsolatedUser(lobeUser, workspace);
   
   await ensurePython();
   await ensureSidecarCode();
   await writeEnv({ 
-    gateway, 
-    token: "lca-local-host",
+    gateway,
     device_id: os.hostname(),
+    lobe_user: lobeUser,
     workspace,
-    user: os.userInfo().username  // 当前用户，不是 sandbox_user
+    user: `lca-${lobeUser}`  // 隔离用户，不是系统用户
   });
+  
   await registerService();
   await startService();
-  console.log(`✓ Host sidecar running (workspace: ${workspace})`);
+  console.log(`✓ Host sidecar running (user: lca-${lobeUser}, workspace: ${workspace})`);
+}
+
+function getUserWorkspace(lobeUser: string): string {
+  if (process.platform === "win32") {
+    return `C:\\LCA\\${lobeUser}`;
+  } else {
+    return `/home/lca-${lobeUser}`;
+  }
+}
+
+async function ensureIsolatedUser(lobeUser: string, workspace: string) {
+  const systemUser = `lca-${lobeUser}`;
+  
+  if (process.platform === "win32") {
+    // Windows: 创建目录，设置权限
+    if (!await fileExists(workspace)) {
+      await exec(`mkdir ${workspace}`);
+      // TODO: 设置目录权限（限制访问）
+    }
+  } else {
+    // Linux: 创建系统用户 + 目录
+    if (!await userExists(systemUser)) {
+      await exec(`sudo useradd --system --create-home --home-dir ${workspace} ${systemUser}`);
+    }
+    if (!await fileExists(workspace)) {
+      await exec(`sudo mkdir -p ${workspace}`);
+      await exec(`sudo chown ${systemUser}:${systemUser} ${workspace}`);
+    }
+  }
 }
 ```
 
-**`connect` 命令（远程）**：
+**`connect` 命令（远程，per-user 隔离）**：
 
 ```typescript
 // src/commands/connect.ts
@@ -788,60 +766,65 @@ async function connect(options: {
   gateway: string; 
   token: string;
   device_id?: string;
-  workspace?: string;
+  user?: string;  // LobeHub 用户名
 }) {
-  // 默认 device_id = hostname（每台机器自动不同）
   const deviceId = options.device_id || os.hostname();
+  const lobeUser = options.user || "sandbox";
+  const workspace = getUserWorkspace(lobeUser);
   
-  // 默认 workspace = ~/workspace
-  const workspace = options.workspace || path.join(os.homedir(), "workspace");
-  
-  // 幂等检查
-  if (await isAlreadyRunning(deviceId)) {
-    console.log(`✓ Device ${deviceId} already connected`);
-    return;
-  }
+  // 创建隔离空间
+  await ensureIsolatedUser(lobeUser, workspace);
   
   await ensurePython();
   await ensureSidecarCode();
   await writeEnv({ 
-    gateway: options.gateway, 
+    gateway: options.gateway,
     token: options.token,
     device_id: deviceId,
+    lobe_user: lobeUser,
     workspace,
-    user: os.userInfo().username
+    user: `lca-${lobeUser}`
   });
+  
   await registerService(deviceId);
   await startService();
-  console.log(`✓ Connected as ${deviceId} (workspace: ${workspace})`);
+  console.log(`✓ Connected as ${deviceId} (user: lca-${lobeUser})`);
 }
 ```
 
 **使用示例**：
 
 ```bash
-# 本机 Linux（默认 workspace = ~/workspace，device_id = hostname）
+# 本机 Linux（单用户模式，创建 lca-sandbox）
 npx @lca/host start
+# → 创建系统用户 lca-sandbox
+# → workspace: /home/lca-sandbox
 
-# 本机 Linux（自定义 workspace）
-npx @lca/host start --workspace /data/lca-workspace
+# 本机 Linux（指定 LobeHub 用户）
+npx @lca/host start --user alice
+# → 创建系统用户 lca-alice
+# → workspace: /home/lca-alice
 
-# 远程 Windows（默认 device_id = hostname）
+# 远程 Windows（默认 lca-sandbox）
 npx @lca/host connect --gateway ws://10.36.6.252:8765
+# → 创建 C:\LCA\sandbox
+# → device_id = hostname
 
-# 远程 Windows（显式 device_id，区分多台机器）
-npx @lca/host connect --gateway ws://10.36.6.252:8765 --device-id "windows-dev-1"
-npx @lca/host connect --gateway ws://10.36.6.252:8765 --device-id "windows-dev-2"
+# 远程 Windows（指定 LobeHub 用户）
+npx @lca/host connect --gateway ws://10.36.6.252:8765 --user bob
+# → 创建 C:\LCA\bob
+# → device_id = hostname
 
-# 同一台机器多个实例（不同 workspace + device_id）
-npx @lca/host connect --gateway ws://... --device-id "win-pc-work" --workspace C:\work
-npx @lca/host connect --gateway ws://... --device-id "win-pc-personal" --workspace C:\personal
+# 多用户场景：Gateway 为每个 LobeHub 用户路由到对应 workspace
+# alice 登录 LobeHub → agent 在 /home/lca-alice 执行
+# bob 登录 LobeHub → agent 在 /home/lca-bob 执行
 ```
 
 **幂等性**：
-- 同一 device_id 多次运行 → 检测已存在，提示 "already connected"
-- 不同 device_id → 创建新设备
-- 同一 device_id 但 workspace 变了 → 更新配置，重启服务
+- 同一 device_id + 同一 user 多次运行 → 检测已存在，提示 "already connected"
+- 不同 device_id → 新设备
+- 同 device_id 但不同 user → 为该 user 创建新 workspace
+- 同 device_id + 同 user，workspace 变了 → 更新配置，重启服务
 
 **实现策略**：
 
