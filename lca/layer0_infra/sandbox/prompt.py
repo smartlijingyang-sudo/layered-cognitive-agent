@@ -73,6 +73,39 @@ def format_uploaded_files_prompt(
     return "These user-uploaded files are pre-loaded and ready to use:\n" + "\n".join(lines)
 
 
+def format_machine_uploaded_files_prompt(root: str) -> str:
+    """Render ``{{uploaded_files}}`` section for the machine system role.
+
+    Uses the run-bound attachment IDs (from ``run_attachment_scope``) and
+    lists each file at ``{root}/{filename}`` — the path the agent should use.
+    """
+    ids = get_current_run_attachment_ids()
+    if not ids:
+        return ""
+    from lca.layer0_infra.file_store import get_default_file_store
+
+    store = get_default_file_store()
+    sep = "/" if "/" in root else "\\"
+    lines: list[str] = []
+    seen: set[str] = set()
+    for attachment_id in ids:
+        meta = store.get(str(attachment_id).strip())
+        if meta is None:
+            continue
+        basename = _sanitize_guest_basename(meta.name)
+        stripped_root = root.rstrip("/\\")
+        full_path = f"{stripped_root}{sep}{basename}"
+        if full_path in seen:
+            continue
+        seen.add(full_path)
+        lines.append(f"- {full_path}{_format_bytes(meta.size_bytes)}")
+    if not lines:
+        return ""
+    return "User-uploaded files staged at working root — use these paths directly:\n" + "\n".join(
+        lines
+    )
+
+
 def render_cloud_sandbox_system_role(
     system_role_template: str,
     *,

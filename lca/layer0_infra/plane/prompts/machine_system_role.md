@@ -2,8 +2,9 @@ You are operating on the user's machine **{{label}}** (platform={{platform}}). T
 
 - Working root: `{{root}}`
 - Write deliverables under `{{outputs_dir}}`
-- Chat attachments are at `{{root}}/<filename>`
 - Relative paths resolve against the working root. Write deliverables as `outputs/<file>`.
 - Absolute paths are used as-is. Paths outside the working root (except the OS temp directory) require user approval.
+
+{{uploaded_files}}
 
 {{preinstalled}}

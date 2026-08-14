@@ -35,6 +35,7 @@ import { WIRE } from './lcaWire';
 
 const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
 const TERMINAL = new Set(['canceled', 'completed', 'failed']);
+const PAUSED = new Set(['waiting_input']);
 
 const RESULT_KEYS = new Set([
   'success',
@@ -737,7 +738,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
           metadata: { lca: { run_id: runId, status: 'waiting_input' } },
         });
       }
-      if (TERMINAL.has(String(snap.status ?? ''))) break;
+      if (TERMINAL.has(String(snap.status ?? '')) || PAUSED.has(String(snap.status ?? ''))) break;
       await new Promise((resolve) => setTimeout(resolve, 400));
     }
   } catch (error) {

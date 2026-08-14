@@ -9,7 +9,7 @@ from urllib.parse import unquote, urlparse
 
 from gateway.runs.ingest import FileFetcher, FileRef, ingest_file_refs
 from lca.contracts.models.core.conversation import ConversationTurn
-from lca.layer0_infra.file_store import FileStore, LocalFileStore
+from lca.layer0_infra.file_store import FileStore
 
 # Conversation history injected before the latest user turn.
 MAX_HISTORY_MESSAGES = 12
@@ -412,50 +412,12 @@ def compose_run_question(
 ) -> str:
     """Build the task string passed to ``Agent.run`` / ``Team.run``.
 
-    Prior conversation turns are **not** embedded here — they travel via
-    ``RunContext.extra`` / ``AgentState.working_memory`` (LobeHub messages[] parity).
+    File metadata is NOT embedded here — it belongs in the system role prompt
+    (rendered per-plane by ``plane_system_role`` / ``render_cloud_sandbox_system_role``).
+    ``attachment_ids`` is kept on the session for staging and system-role rendering.
     """
-    return _question_with_attachments(user_text, attachment_ids, store)
-
-
-def _question_with_attachments(
-    question: str, attachment_ids: tuple[str, ...], store: FileStore
-) -> str:
-    if not attachment_ids:
-        return question.strip()
-
-    lines = [
-        "[用户附件]",
-        (
-            "（附件已挂到当前工作根，文件名即相对路径；"
-            "用 list_files / read_file 查看，execute_code 或 write_file 处理；"
-            "专项格式任务可 activate_skill 加载对应 skill。"
-            "中文 PDF/图：沙箱已预装 CJK 字体（WenQuanYi Zen Hei / Noto Sans CJK SC），"
-            "matplotlib 用字体名（如 'WenQuanYi Zen Hei'）而非文件路径；"
-            "reportlab 用内置 CID 字体 STSong-Light（无需字体文件）；"
-            "禁止运行时 curl/wget 下载字体。）"
-        ),
-    ]
-    for attachment_id in attachment_ids:
-        meta = store.get(attachment_id)
-        if meta is None:
-            lines.append(f"- (missing) {attachment_id}")
-            continue
-        lines.append(
-            f"- {meta.name} "
-            f"({meta.mime_type}, {meta.size_bytes} B) "
-            f"url={meta.url} id={meta.attachment_id}"
-        )
-        if isinstance(store, LocalFileStore):
-            preview = store.read_text_preview(attachment_id)
-            if preview:
-                lines.append("  preview:")
-                for preview_line in preview.splitlines()[:8]:
-                    lines.append(f"  | {preview_line[:120]}")
-
-    lines.append("")
-    lines.append(f"用户问题: {question.strip()}")
-    return "\n".join(lines)
+    del attachment_ids, store
+    return user_text.strip()
 
 
 async def prepare_run_from_messages(
