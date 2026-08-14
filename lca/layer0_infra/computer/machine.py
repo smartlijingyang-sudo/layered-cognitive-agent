@@ -42,7 +42,7 @@ class MachineComputer:
 
     async def list_files(self, *, directory_path: str) -> ComputerOpResult:
         path = raise_if_out_of_scope(directory_path or self.plane.root, self.plane)
-        return await self._op("list_files", {"directory_path": path})
+        return await self._op("listFiles", {"directory_path": path})
 
     async def read_file(
         self,
@@ -53,7 +53,7 @@ class MachineComputer:
     ) -> ComputerOpResult:
         resolved = raise_if_out_of_scope(path or self.plane.root, self.plane)
         return await self._op(
-            "read_file",
+            "readFile",
             {"path": resolved, "start_line": start_line, "end_line": end_line},
         )
 
@@ -66,7 +66,7 @@ class MachineComputer:
     ) -> ComputerOpResult:
         resolved = raise_if_out_of_scope(path, self.plane)
         result = await self._op(
-            "write_file",
+            "writeFile",
             {
                 "path": resolved,
                 "content": content,
@@ -86,7 +86,7 @@ class MachineComputer:
     ) -> ComputerOpResult:
         resolved = raise_if_out_of_scope(path, self.plane)
         return await self._op(
-            "edit_file",
+            "editFile",
             {
                 "path": resolved,
                 "search": search,
@@ -106,7 +106,7 @@ class MachineComputer:
     ) -> ComputerOpResult:
         resolved = raise_if_out_of_scope(directory or self.plane.root, self.plane)
         return await self._op(
-            "search_files",
+            "searchFiles",
             {
                 "directory": resolved,
                 "keyword": keyword,
@@ -125,7 +125,7 @@ class MachineComputer:
                     "destination": raise_if_out_of_scope(item.get("destination", ""), self.plane),
                 }
             )
-        return await self._op("move_files", {"operations": normalized})
+        return await self._op("moveFiles", {"operations": normalized})
 
     async def grep_content(
         self,
@@ -137,7 +137,7 @@ class MachineComputer:
     ) -> ComputerOpResult:
         resolved = raise_if_out_of_scope(directory or self.plane.root, self.plane)
         return await self._op(
-            "grep_content",
+            "grepContent",
             {
                 "pattern": pattern,
                 "directory": resolved,
@@ -148,7 +148,7 @@ class MachineComputer:
 
     async def glob_files(self, *, pattern: str, directory: str = "") -> ComputerOpResult:
         resolved = raise_if_out_of_scope(directory or self.plane.root, self.plane)
-        return await self._op("glob_files", {"pattern": pattern, "directory": resolved})
+        return await self._op("globFiles", {"pattern": pattern, "directory": resolved})
 
     async def run_command(
         self,
@@ -160,7 +160,7 @@ class MachineComputer:
     ) -> ComputerOpResult:
         del description
         result = await self._op(
-            "run_command",
+            "runCommand",
             {
                 "command": command,
                 "cwd": self.plane.root,
@@ -174,13 +174,13 @@ class MachineComputer:
 
     async def get_command_output(self, *, command_id: str, timeout_s: int = 60) -> ComputerOpResult:
         return await self._op(
-            "get_command_output",
+            "getCommandOutput",
             {"command_id": command_id},
             timeout_s=timeout_s,
         )
 
     async def kill_command(self, *, command_id: str) -> ComputerOpResult:
-        return await self._op("kill_command", {"command_id": command_id})
+        return await self._op("killCommand", {"command_id": command_id})
 
     async def _op(self, op: str, args: dict[str, Any], *, timeout_s: int = 60) -> ComputerOpResult:
         try:
@@ -216,7 +216,7 @@ class MachineComputer:
         paths: list[str] = []
         if extra_path and _under_dir(extra_path, self.plane.outputs_dir, self.plane.platform):
             paths.append(extra_path)
-        listed = await self._op("list_files", {"directory_path": self.plane.outputs_dir})
+        listed = await self._op("listFiles", {"directory_path": self.plane.outputs_dir})
         for item in listed.state.get("files") or []:
             if isinstance(item, dict):
                 candidate = str(item.get("path") or item.get("name") or "")
@@ -234,7 +234,7 @@ class MachineComputer:
                     )
         published: list[dict[str, str]] = []
         for path in dict.fromkeys(paths):
-            read = await self._op("read_file", {"path": path})
+            read = await self._op("readFile", {"path": path})
             raw = read.state.get("content")
             if not isinstance(raw, str) or not raw:
                 result.state["publish_error"] = f"could not read {path} for download"

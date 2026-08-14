@@ -108,7 +108,7 @@ class CognitiveRuntime(Runtime):
                 observation_id=new_id("obs"),
                 success=True,
                 payload=answer_text,
-                extra={"source": "human_answer", "tool_name": "ask_user_question"},
+                extra={"source": "human_answer", "tool_name": "askUserQuestion"},
             )
             answer_decision = Decision(
                 decision_id=new_id("dec"),
@@ -116,7 +116,7 @@ class CognitiveRuntime(Runtime):
                 rationale="Human-in-the-loop answer received.",
                 confidence=1.0,
                 tool_calls=[
-                    ToolCall(call_id=new_id("tc"), tool_name="ask_user_question", arguments={}),
+                    ToolCall(call_id=new_id("tc"), tool_name="askUserQuestion", arguments={}),
                 ],
             )
             state.history.append(

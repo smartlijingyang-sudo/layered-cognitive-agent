@@ -15,6 +15,7 @@ OBS_TASK_IDS = "task_ids"
 OBS_MEMBER_RESULTS = "member_results"
 OBS_MEMBER_SUBTASKS = "member_subtasks"
 OBS_RESULT_KIND = "result_kind"
+OBS_TOOL_RESULTS = "tool_results"
 OBS_CACHE_HIT = "cache_hit"
 OBS_HANDOFF = "handoff"
 # 委派完成质量（ADR-0049 证据平面）

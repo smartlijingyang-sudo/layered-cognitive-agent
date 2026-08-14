@@ -2,7 +2,7 @@
 
 LobeHub Works register a resource at completion (one card, versions), not on
 every mutation. officecli's resident session is a dirty tree in
-``/mnt/data/outputs`` — create/add/set/batch are not deliverables.
+the outputs directory — create/add/set/batch are not deliverables.
 
 Images, PDF, and HTML are FileViewer-native products and publish incrementally.
 Office binaries publish only on export / close / save / run-end seal.
@@ -44,7 +44,7 @@ _IMMEDIATE_SUFFIXES = (
     ".json",
     ".xml",
 )
-_PUBLISH_TOOLS = frozenset({"export_file", "write_file", "write_file_local"})
+_PUBLISH_TOOLS = frozenset({"exportFile", "writeFile", "write_file_local"})
 _PUBLISH_VERBS = frozenset({"close", "save"})
 
 

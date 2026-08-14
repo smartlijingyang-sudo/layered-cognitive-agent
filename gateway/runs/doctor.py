@@ -63,6 +63,7 @@ class _JsonlScan:
     missing_plugin_state: tuple[str, ...]
     unpaired_tools: tuple[str, ...]
     has_finished: bool
+    journal_status: str
     exists: bool
     rows: int
 
@@ -144,6 +145,16 @@ def _hop_h2(status: str, scan: _JsonlScan) -> HopVerdict:
         return HopVerdict(ok=False, detail="jsonl empty or missing", extra=extra)
     if status in _TERMINAL and not scan.has_finished:
         return HopVerdict(ok=False, detail="terminal status without run finished", extra=extra)
+    if (
+        status in _TERMINAL
+        and scan.journal_status
+        and scan.journal_status != status
+    ):
+        return HopVerdict(
+            ok=False,
+            detail="session status disagrees with journal",
+            extra={**extra, "journal_status": scan.journal_status, "session_status": status},
+        )
     if status in _TERMINAL and scan.unpaired_tools:
         return HopVerdict(
             ok=False,
@@ -207,13 +218,14 @@ def _summary(
 
 def _scan_jsonl(path: Path) -> _JsonlScan:
     if not path.is_file():
-        return _JsonlScan(0, {}, (), (), False, False, 0)
+        return _JsonlScan(0, {}, (), (), False, "", False, 0)
     counts: Counter[str] = Counter()
     last_seq = 0
     missing: list[str] = []
     started: list[tuple[str, str]] = []
     finished: set[str] = set()
     rows = 0
+    journal_status = ""
     for raw in path.read_text(encoding="utf-8").splitlines():
         if not raw.strip():
             continue
@@ -231,6 +243,8 @@ def _scan_jsonl(path: Path) -> _JsonlScan:
             last_seq = max(last_seq, int(seq_raw))
         raw_event = record.get("event")
         event: dict[str, Any] = raw_event if isinstance(raw_event, dict) else {}
+        if event_type in _RUN_FINISHED:
+            journal_status = str(event.get("status") or "")
         if event_type == "ToolStarted":
             name = str(event.get("tool_name") or "")
             invocation = str(event.get("invocation_id") or name)
@@ -249,6 +263,7 @@ def _scan_jsonl(path: Path) -> _JsonlScan:
         missing_plugin_state=tuple(missing),
         unpaired_tools=unpaired,
         has_finished=bool(_RUN_FINISHED & set(counts)),
+        journal_status=journal_status,
         exists=True,
         rows=rows,
     )

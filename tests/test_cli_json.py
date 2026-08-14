@@ -62,14 +62,14 @@ class TestOfficePublishPolicy(unittest.TestCase):
     def test_export_file_publishes_office(self) -> None:
         parts = [{"name": "deck.pptx", "url": "/files/file_ddd"}]
         self.assertEqual(
-            publishable_file_parts(parts, tool_name="export_file"),
+            publishable_file_parts(parts, tool_name="exportFile"),
             parts,
         )
 
     def test_png_is_always_publishable(self) -> None:
         parts = [{"name": "chart.png", "url": "/files/file_eee"}]
         self.assertEqual(
-            publishable_file_parts(parts, tool_name="execute_code"),
+            publishable_file_parts(parts, tool_name="executeCode"),
             parts,
         )
 

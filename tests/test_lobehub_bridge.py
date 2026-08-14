@@ -289,7 +289,8 @@ class TestPrepareRunFromMessages(unittest.IsolatedAsyncioTestCase):
             fetcher = _StubFetcher({"http://files.example/nums.csv": (b"1,2,3", "text/csv")})
             run_input = await prepare_run_from_messages(messages, store, fetcher=fetcher)
             self.assertIn("统计附件", run_input.question)
-            self.assertIn("/mnt/data/nums.csv", run_input.question)
+            self.assertIn("nums.csv", run_input.question)
+            self.assertNotIn("/mnt/data", run_input.question)
             self.assertEqual(len(run_input.attachment_ids), 1)
 
     async def test_compose_run_question_excludes_history_block(self) -> None:

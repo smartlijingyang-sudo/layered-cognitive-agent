@@ -22,8 +22,9 @@ def test_machine_prompt_uses_real_root() -> None:
         note = environment_note()
         assert "/home/lca-sandbox" in note
         assert "CLOUD SANDBOX" not in note
-        assert "/mnt/data" not in note or "does not exist" in note
-        assert "本机" in skill_preamble() or "机器" in skill_preamble()
+        assert "/mnt/data" not in note
+        assert "outputs/" in skill_preamble()
+        assert "/mnt/data" not in skill_preamble()
 
 
 def test_onlyboxes_prompt_default() -> None:

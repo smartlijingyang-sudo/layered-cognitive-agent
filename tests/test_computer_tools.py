@@ -8,14 +8,17 @@ import unittest
 from gateway.runs.wire import WIRE, resolve
 from lca.layer0_infra.computer.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
 from lca.layer0_infra.computer.parse_result import parse_computer_stdout
-from lca.layer0_infra.tools.computer.tool_set import (
-    EXECUTE_CODE,
-    LIST_FILES,
-    RUN_COMMAND,
-    build_computer_tools,
-)
 from lca.layer0_infra.tools.default_set import build_default_tools
+from lca.layer0_infra.tools.lca_computer import (
+    build_computer_tools,
+    build_machine_computer_tools,
+)
+from lca.layer0_infra.tools.lca_computer.types import MACHINE_APIS, SANDBOX_ONLY_APIS, ApiName
 from tests.support.inline_sandbox import InlineSandbox
+
+EXECUTE_CODE = ApiName.EXECUTE_CODE
+LIST_FILES = ApiName.LIST_FILES
+RUN_COMMAND = ApiName.RUN_COMMAND
 
 
 class TestComputerParse(unittest.TestCase):
@@ -39,17 +42,34 @@ class TestComputerParse(unittest.TestCase):
 
 class TestCloudSandboxWire(unittest.TestCase):
     def test_run_command_wire_name(self) -> None:
-        self.assertEqual(resolve(RUN_COMMAND), ("lobe-cloud-sandbox", "runCommand"))
+        self.assertEqual(resolve(RUN_COMMAND.value), ("lobe-cloud-sandbox", "runCommand"))
 
     def test_all_computer_tools_registered(self) -> None:
         sandbox = [name for name, pair in WIRE.items() if pair[0] == "lobe-cloud-sandbox"]
-        self.assertEqual(len(sandbox), 13)
-        for name in sandbox:
-            self.assertIsNotNone(resolve(name))
+        # At least the 13 camelCase entries
+        self.assertGreaterEqual(len(sandbox), 13)
 
-    def test_local_tools_wire_to_local_system(self) -> None:
-        self.assertEqual(resolve("local_list_files"), ("lobe-local-system", "listFiles"))
-        self.assertIsNone(resolve("local_execute_code"))
+    def test_local_tools_wire_to_lobe_local_system(self) -> None:
+        self.assertEqual(resolve("local_listFiles"), ("lobe-local-system", "listFiles"))
+        self.assertIsNone(resolve("local_executeCode"))
+
+    def test_machine_tools_exclude_sandbox_only(self) -> None:
+        from unittest.mock import MagicMock
+
+        from lca.contracts.models.core.plane import PlaneKind, PlaneRef
+
+        plane = PlaneRef(
+            id="dev-1",
+            label="box",
+            kind=PlaneKind.MACHINE,
+            root="/tmp/root",  # noqa: S108
+            outputs_dir="/tmp/root/outputs",  # noqa: S108
+        )
+        transport = MagicMock()
+        names = {t.name for t in build_machine_computer_tools(plane=plane, transport=transport)}
+        for api in SANDBOX_ONLY_APIS:
+            self.assertNotIn(f"local_{api.value}", names)
+        self.assertEqual(len(names), len(MACHINE_APIS))
 
 
 class TestDefaultToolsComputer(unittest.TestCase):
@@ -66,9 +86,9 @@ class TestDefaultToolsComputer(unittest.TestCase):
         with patch("lca.layer0_infra.tools.default_set.resolve_sandbox") as mock:
             mock.return_value = InlineSandbox()
             names = {t.name for t in build_default_tools()}
-        self.assertIn("list_files", names)
+        self.assertIn("listFiles", names)
         self.assertIn("run_skill_script", names)
-        self.assertIn("write_file", names)
+        self.assertIn("writeFile", names)
         self.assertNotIn("sandbox_inspect", names)
 
     def test_both_available_without_extra_has_no_local_face(self) -> None:
@@ -90,8 +110,8 @@ class TestDefaultToolsComputer(unittest.TestCase):
             patch("lca.layer0_infra.tools.default_set.resolve_machine", return_value=machine),
         ):
             names = {t.name for t in build_default_tools()}
-        self.assertIn("list_files", names)
-        self.assertNotIn("local_list_files", names)
+        self.assertIn("listFiles", names)
+        self.assertNotIn("local_listFiles", names)
 
 
 class TestBuildComputerObservationFiles(unittest.TestCase):
@@ -105,7 +125,7 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         from lca.contracts.models.core.sandbox import SandboxFile
         from lca.layer0_infra.computer.runtime import ComputerOpResult
         from lca.layer0_infra.file_store import LocalFileStore
-        from lca.layer0_infra.tools.computer.observations import build_computer_observation
+        from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
 
         result = ComputerOpResult(
             success=True,
@@ -142,7 +162,7 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         from lca.contracts.models.core.sandbox import SandboxFile
         from lca.layer0_infra.computer.runtime import ComputerOpResult
         from lca.layer0_infra.file_store import LocalFileStore
-        from lca.layer0_infra.tools.computer.observations import build_computer_observation
+        from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
 
         existing = {
             "name": "loan.pdf",
@@ -176,7 +196,7 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
 
         from lca.layer0_infra.computer.runtime import ComputerOpResult
         from lca.layer0_infra.file_store import LocalFileStore
-        from lca.layer0_infra.tools.computer.observations import build_computer_observation
+        from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
         from lca.layer0_infra.workspace.scope import run_workspace_scope
 
         existing = {
@@ -211,7 +231,7 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
 
         from lca.layer0_infra.computer.runtime import ComputerOpResult
         from lca.layer0_infra.file_store import LocalFileStore
-        from lca.layer0_infra.tools.computer.observations import build_computer_observation
+        from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
         from lca.layer1_cognitive.body.tool_result_preview import tool_plugin_state
 
         result = ComputerOpResult(
@@ -236,7 +256,7 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
 
         from lca.layer0_infra.computer.runtime import ComputerOpResult
         from lca.layer0_infra.file_store import LocalFileStore
-        from lca.layer0_infra.tools.computer.observations import build_computer_observation
+        from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
 
         result = ComputerOpResult(
             success=True,

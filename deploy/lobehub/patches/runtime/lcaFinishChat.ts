@@ -37,7 +37,7 @@ export async function finishLcaChat(get: () => ChatStore, params: FinishLcaChatP
     runId: params.operationId,
     runScope,
     runtimeType: 'client' as const,
-    runtimeStatus: cancelled ? 'interrupted' : 'done',
+    runtimeStatus: cancelled ? 'interrupted' : params.projected.error ? 'error' : 'done',
   };
   const { requeued } = await lifecycle.completeRun(completeEvent);
   if (!requeued) await lifecycle.afterRunComplete(completeEvent);

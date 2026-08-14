@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from lca.layer0_infra.computer.constants import (
-    COMPUTER_WORKSPACE_ROOT,
     MAX_GLOB_RESULTS,
     MAX_GREP_MATCHES,
     MAX_SEARCH_RESULTS,
 )
 from lca.layer0_infra.computer.guest.json_script import compose_json_script
 from lca.layer0_infra.computer.guest.preamble import SCRIPT_PRELUDE
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 
 SEARCH_FILES_SCRIPT = (
     SCRIPT_PRELUDE
@@ -170,7 +170,7 @@ def build_glob_files_script(*, pattern: str, directory: str = "") -> str:
         GLOB_FILES_SCRIPT,
         {
             "pattern": pattern,
-            "directory": directory or COMPUTER_WORKSPACE_ROOT,
+            "directory": directory or ONLYBOXES.root,
             "limit": MAX_GLOB_RESULTS,
         },
     )

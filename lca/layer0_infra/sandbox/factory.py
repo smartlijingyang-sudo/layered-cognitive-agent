@@ -19,12 +19,25 @@ import logging
 import os
 from collections.abc import Callable
 
+from lca.contracts.models.core.sandbox_policy import DEFAULT_POLICY, SandboxPolicy
 from lca.contracts.protocols import Sandbox
 from lca.layer0_infra.llm_adapter.factory import load_dotenv_if_present
 
 _log = logging.getLogger(__name__)
 
 _override: Callable[[], Sandbox | None] | None = None
+_policy: SandboxPolicy = DEFAULT_POLICY
+
+
+def get_sandbox_policy() -> SandboxPolicy:
+    """Return the currently active SandboxPolicy."""
+    return _policy
+
+
+def set_sandbox_policy(policy: SandboxPolicy) -> None:
+    """Override the active SandboxPolicy (tests / composition root)."""
+    global _policy
+    _policy = policy
 
 
 def set_sandbox_resolver(resolver: Callable[[], Sandbox | None] | None) -> None:

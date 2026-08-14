@@ -79,6 +79,9 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/layer0_infra/sandbox/runtime.py": (
         "Sandbox Protocol 单模块承载 session/ready/exec 全链路（ADR-0043~0047）"
     ),
+    "lca/layer0_infra/computer/runtime_exec.py": (
+        "ComputerRuntime 执行平面单模块：code/shell/background/export + SandboxPolicy 检查"
+    ),
 }
 
 

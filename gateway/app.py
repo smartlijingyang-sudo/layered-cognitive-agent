@@ -7,10 +7,33 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 
-from gateway.console.api import create_session as create_console_session
-from gateway.console.attach import attach_session
-from gateway.console.sessions import ConsoleBook
 from gateway.cors import CORS_HEADERS
+from gateway.device_gateway.bind import bind_devices
+from gateway.device_gateway.hub import DeviceHub
+from gateway.device_gateway.registry import DeviceRegistry
+from gateway.device_gateway.routes import (
+    agent_run as device_agent_run,
+)
+from gateway.device_gateway.routes import (
+    connect_device,
+    device_status,
+)
+from gateway.device_gateway.routes import (
+    list_devices as list_gateway_devices,
+)
+from gateway.device_gateway.routes import (
+    rpc as device_rpc,
+)
+from gateway.device_gateway.routes import (
+    system_info as device_system_info,
+)
+from gateway.device_gateway.routes import (
+    tool_call as device_tool_call,
+)
+from gateway.device_gateway.routes import (
+    upload_files as device_upload_files,
+)
+from gateway.device_gateway.settings import DeviceGatewaySettings
 from gateway.files import download_file, get_file_meta
 from gateway.openai_shim import (
     chat_completions,
@@ -18,12 +41,6 @@ from gateway.openai_shim import (
     list_models,
     responses_create,
 )
-from gateway.plane_bind import bind_presence
-from gateway.presence.api import list_devices
-from gateway.presence.registry import PresenceRegistry
-from gateway.presence.rpc import ExecHub
-from gateway.presence.settings import PresenceSettings
-from gateway.presence.ws import connect_host
 from gateway.runs.api import (
     answer_run,
     cancel_run,
@@ -45,10 +62,9 @@ from lca.layer0_infra.llm_resolver import LLMResolver, ProductionLLMResolver
 
 _registry = RunRegistry()
 _file_store = get_default_file_store()
-_presence = PresenceRegistry()
-_consoles = ConsoleBook()
-_presence_settings = PresenceSettings()
-_exec_hub = ExecHub()
+_device_settings = DeviceGatewaySettings()
+_devices = DeviceRegistry(_device_settings.db_path)
+_device_hub = DeviceHub(_devices)
 
 
 def get_registry() -> RunRegistry:
@@ -65,7 +81,7 @@ async def _options(_request: Request) -> JSONResponse:
 
 async def health(request: Request) -> JSONResponse:
     payload = health_payload(_registry)
-    payload["presence"] = request.app.state.presence.summary()
+    payload["devices"] = request.app.state.devices.summary()
     return JSONResponse(payload, headers=CORS_HEADERS)
 
 
@@ -81,24 +97,19 @@ def create_app(
     registry: RunRegistry | None = None,
     llm_resolver: LLMResolver | None = None,
     file_store: LocalFileStore | None = None,
-    presence: PresenceRegistry | None = None,
-    consoles: ConsoleBook | None = None,
-    presence_settings: PresenceSettings | None = None,
+    devices: DeviceRegistry | None = None,
 ) -> Starlette:
-    """Factory: tests inject RunRegistry / LLMResolver / FileStore / Presence."""
-    global _registry, _file_store, _presence, _consoles, _presence_settings, _exec_hub
+    """Factory: tests inject RunRegistry / LLMResolver / FileStore / DeviceRegistry."""
+    global _registry, _file_store, _devices, _device_hub
     if registry is not None:
         _registry = registry
     if file_store is not None:
         _file_store = file_store
         set_default_file_store(file_store)
-    if presence is not None:
-        _presence = presence
-    if consoles is not None:
-        _consoles = consoles
-    if presence_settings is not None:
-        _presence_settings = presence_settings
-    bind_presence(_presence, _exec_hub)
+    if devices is not None:
+        _devices = devices
+        _device_hub = DeviceHub(devices)
+    bind_devices(_devices, _device_hub)
     if llm_resolver is not None:
         set_llm_resolver(llm_resolver)
     else:
@@ -119,21 +130,23 @@ def create_app(
             Route("/v1/chat/completions", chat_completions, methods=["POST", "OPTIONS"]),
             Route("/v1/embeddings", embeddings_create, methods=["POST", "OPTIONS"]),
             Route("/v1/responses", responses_create, methods=["POST", "OPTIONS"]),
-            Route("/presence/devices", list_devices, methods=["GET", "OPTIONS"]),
-            Route("/console/sessions", create_console_session, methods=["POST", "OPTIONS"]),
-            WebSocketRoute("/presence/connect", connect_host),
-            WebSocketRoute("/console/sessions/{session_id}", attach_session),
+            Route("/api/device/status", device_status, methods=["POST", "OPTIONS"]),
+            Route("/api/device/devices", list_gateway_devices, methods=["POST", "OPTIONS"]),
+            Route("/api/device/tool-call", device_tool_call, methods=["POST", "OPTIONS"]),
+            Route("/api/device/system-info", device_system_info, methods=["POST", "OPTIONS"]),
+            Route("/api/device/rpc", device_rpc, methods=["POST", "OPTIONS"]),
+            Route("/api/device/agent/run", device_agent_run, methods=["POST", "OPTIONS"]),
+            Route("/api/device/files/upload", device_upload_files, methods=["POST", "OPTIONS"]),
+            WebSocketRoute("/api/device/ws", connect_device),
             Route("/runs/{run_id}/cancel", _options, methods=["OPTIONS"]),
             Route("/runs/{run_id}/answer", _options, methods=["OPTIONS"]),
         ],
     )
     application.state.registry = _registry
     application.state.file_store = _file_store
-    application.state.presence = _presence
-    application.state.consoles = _consoles
-    application.state.host_token = _presence_settings.token
-    application.state.host_subject = _presence_settings.subject
-    application.state.exec_hub = _exec_hub
+    application.state.devices = _devices
+    application.state.device_hub = _device_hub
+    application.state.device_settings = _device_settings
     return application
 
 

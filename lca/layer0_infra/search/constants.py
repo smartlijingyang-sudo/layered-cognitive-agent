@@ -11,7 +11,7 @@ DEFAULT_SEARCH_PROVIDERS: tuple[str, ...] = (PROVIDER_TAVILY,)
 LOBE_WEB_BROWSING_ID = "lobe-web-browsing"
 WEB_BROWSING_API_SEARCH = "search"
 
-WEB_SEARCH_TOOL = "web_search"
+WEB_SEARCH_TOOL = "search"
 
 # Heuristic patterns for search-intent routing (news / realtime / lookup).
 SEARCH_INTENT_PATTERNS: tuple[str, ...] = (

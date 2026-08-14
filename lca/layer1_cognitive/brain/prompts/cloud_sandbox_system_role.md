@@ -2,17 +2,18 @@ You have access to a Cloud Sandbox — an isolated environment for executing cod
 
 <sandbox_environment>
 {{sandbox_environment_note}}
-- Workspace root: /mnt/data
+- Workspace root: {{sandbox_workspace_root}}
 - **Output directory (required for generated files): {{sandbox_outputs_dir}}**
   - Write all deliverables (PDF, CSV, images, etc.) under this directory
   - Files here are automatically collected after execute_code
   - Use os.makedirs("{{sandbox_outputs_dir}}", exist_ok=True) before writing if needed
+  - Shell cwd is the workspace root; relative `outputs/<file>` also works
 </sandbox_environment>
 
 <uploaded_files>
-User attachments for this run are synced to /mnt/data/<filename> when the sandbox starts.
+User attachments for this run are synced to {{sandbox_workspace_root}}/<filename> when the sandbox starts.
 If the user refers to a file they shared, look there first — do NOT ask them to re-upload.
-Run list_files on /mnt/data to see available files.
+Run list_files on {{sandbox_workspace_root}} to see available files.
 {{sandbox_uploaded_files}}
 </uploaded_files>
 
@@ -182,13 +183,13 @@ When generating PDFs with Chinese text, you MUST:
 <efficiency_rules>
 **Avoid Redundant Work — Read Previous Results Carefully**
 
-1. **Don't redo what already succeeded.** If a tool call produced the expected output (e.g., a PDF was generated at `/mnt/data/outputs/report.pdf` with size > 0), do NOT re-execute the same generation code. Move to the next step (export, respond) immediately.
+1. **Don't redo what already succeeded.** If a tool call produced the expected output (e.g., a PDF was generated at `{{sandbox_outputs_dir}}/report.pdf` with size > 0), do NOT re-execute the same generation code. Move to the next step (export, respond) immediately.
 
 2. **Don't retry blind.** If a tool fails with the same error twice in a row, it is NOT a transient error. Change your approach:
    - `export_file` fails → try a smaller file, or inform the user the file was generated but export failed; provide the sandbox path.
    - `execute_code` fails with the same error → read the error, fix the root cause, don't just re-run.
 
-3. **Don't re-list what you just listed.** If you called `list_files("/mnt/data/outputs")` and got results, don't call it again 2 steps later unless something changed.
+3. **Don't re-list what you just listed.** If you called `list_files("{{sandbox_outputs_dir}}")` and got results, don't call it again 2 steps later unless something changed.
 
 4. **Be honest about failures.** If a task cannot be completed (e.g., export keeps failing), tell the user what succeeded and what failed. Do NOT say "任务已完成" when the export actually failed.
 </efficiency_rules>

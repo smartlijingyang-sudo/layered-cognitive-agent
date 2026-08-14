@@ -1,15 +1,20 @@
 /** LobeHub sendMessage plants this until a real assistant body lands. */
+
+import type { ChatMessageError } from '@lobechat/types';
+
 export const ASSISTANT_PLACEHOLDER = '...';
 
 export type ProjectedRow = {
   assistantId: string;
   content: string;
+  error?: ChatMessageError;
   hasReasoning: boolean;
   toolCount: number;
 };
 
 export type StoredRow = {
   content?: string | null;
+  error?: ChatMessageError | null;
   tools?: { length: number } | null;
 };
 
@@ -21,7 +26,10 @@ export function isPlaceholderContent(content: unknown): boolean {
 
 export function persistMissed(memory: ProjectedRow, stored: StoredRow | undefined): boolean {
   if (!memory.assistantId) return false;
-  if (!stored) return !isPlaceholderContent(memory.content) || memory.toolCount > 0;
+  if (!stored) {
+    return !isPlaceholderContent(memory.content) || memory.toolCount > 0 || Boolean(memory.error);
+  }
+  if (memory.error && !stored.error) return true;
   if (!isPlaceholderContent(memory.content) && isPlaceholderContent(stored.content)) return true;
   if (memory.toolCount > 0 && !(stored.tools && stored.tools.length > 0)) return true;
   return false;
@@ -32,6 +40,7 @@ export function snapshotRow(
   content: string,
   toolCount: number,
   hasReasoning: boolean,
+  error?: ChatMessageError,
 ): ProjectedRow {
-  return { assistantId, content, hasReasoning, toolCount };
+  return { assistantId, content, ...(error ? { error } : {}), hasReasoning, toolCount };
 }

@@ -9,7 +9,7 @@ from lca.layer0_infra.search.models import SearchHit, SearchResponse
 from lca.layer0_infra.search.router import is_search_intent, resolve_llm_search_kwargs
 from lca.layer0_infra.search.scope import search_run_scope
 from lca.layer0_infra.search.service import format_search_content
-from lca.layer0_infra.search.tool import WebSearchTool
+from lca.layer0_infra.tools.web_search import build_tools as build_web_search_tools
 
 
 class TestSearchIntent(unittest.TestCase):
@@ -35,12 +35,12 @@ class TestSearchFormatting(unittest.TestCase):
 
 class TestWebSearchTool(unittest.IsolatedAsyncioTestCase):
     async def test_requires_query(self) -> None:
-        tool = WebSearchTool()
+        tool = build_web_search_tools()[0]
         obs = await tool.execute({})
         self.assertFalse(obs.success)
 
     async def test_success_payload(self) -> None:
-        tool = WebSearchTool()
+        tool = build_web_search_tools()[0]
         ok = SearchResponse(
             query="AI news",
             provider="tavily",
@@ -48,7 +48,7 @@ class TestWebSearchTool(unittest.IsolatedAsyncioTestCase):
             answer="ok",
         )
         with patch(
-            "lca.layer0_infra.search.tool.web_search",
+            "lca.layer0_infra.tools.web_search.web_search",
             new=AsyncMock(return_value=ok),
         ):
             obs = await tool.execute({"query": "AI news", "topic": "news"})

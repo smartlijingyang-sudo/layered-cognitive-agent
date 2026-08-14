@@ -15,23 +15,27 @@ from lca.contracts.protocols import Tool
 from lca.layer0_infra.file_store import FileStore, get_default_file_store
 from lca.layer0_infra.sandbox.prompt import render_cloud_sandbox_system_role
 from lca.layer0_infra.sandbox.surface import plane_system_role
-from lca.layer0_infra.tools.computer.specs import COMPUTER_TOOL_NAMES
+from lca.layer0_infra.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM_ID
+from lca.layer0_infra.tools.lca_computer.types import CLOUD_SANDBOX_APIS, MACHINE_APIS
+from lca.layer0_infra.tools.lca_sandbox import IDENTIFIER as _CLOUD_SANDBOX_ID
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 
-_CLOUD_SANDBOX_TOOL_NAME = "lobe-cloud-sandbox"
-_LOCAL_SYSTEM_TOOL_NAME = "lobe-local-system"
+_CLOUD_SANDBOX_TOOL_NAME = _CLOUD_SANDBOX_ID
+_LOCAL_SYSTEM_TOOL_NAME = _LOCAL_SYSTEM_ID
 
 
 def build_cloud_sandbox_prompt(tools: Sequence[Tool]) -> str:
     """Computer-environment ``<tool>`` blocks. One per registered face."""
     names = {t.name for t in tools}
     blocks: list[str] = []
-    if any(name in COMPUTER_TOOL_NAMES for name in names):
+    cloud_values = {api.value for api in CLOUD_SANDBOX_APIS}
+    if any(name in cloud_values for name in names):
         store: FileStore = get_default_file_store()
         template = load_builtin_prompt("cloud_sandbox_system_role")
         rendered = render_cloud_sandbox_system_role(template, store=store)
         blocks.append(_tool_block(_CLOUD_SANDBOX_TOOL_NAME, rendered))
-    if any(name.startswith("local_") for name in names):
+    machine_values = {f"local_{api.value}" for api in MACHINE_APIS}
+    if any(name in machine_values for name in names):
         rendered = _machine_role()
         if rendered:
             blocks.append(_tool_block(_LOCAL_SYSTEM_TOOL_NAME, rendered))
@@ -50,7 +54,7 @@ def _machine_role() -> str:
     if machine is None:
         return (
             "You are operating on the user's machine. "
-            "Do not use /mnt/data. That path does not exist on this machine."
+            "Working directory is the machine root. Write deliverables under outputs/."
         )
     return plane_system_role(machine)
 

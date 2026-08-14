@@ -12,6 +12,7 @@ from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.decision import AgentCard, Observation
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.sandbox import (
+    SANDBOX_MOUNT_ROOT,
     MountManifest,
     SandboxExecResult,
     SandboxResult,
@@ -80,7 +81,7 @@ class Sandbox(Protocol):
         self,
         files: dict[str, bytes | str],
         *,
-        base_dir: str = "/mnt/data",
+        base_dir: str = SANDBOX_MOUNT_ROOT,
         session_id: str = "",
         timeout_s: int = 60,
     ) -> SandboxResult:

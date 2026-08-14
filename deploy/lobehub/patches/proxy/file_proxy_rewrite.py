@@ -22,7 +22,6 @@ _VITE_MARKER = "LCA: file proxy"
 
 def apply(ctx: PatchContext) -> bool:
     changed = _patch_next(ctx)
-    changed = _ensure_presence_console_next(ctx) or changed
     changed = _patch_vite(ctx) or changed
     return _ensure_vite_ws(ctx) or changed
 
@@ -66,14 +65,6 @@ const nextConfig = {
         source: '/runs/:path*',
         destination: `${base.replace(/\\/$/, '')}/runs/:path*`,
       },
-      {
-        source: '/lca-api/presence/:path*',
-        destination: `${base.replace(/\\/$/, '')}/presence/:path*`,
-      },
-      {
-        source: '/lca-api/console/:path*',
-        destination: `${base.replace(/\\/$/, '')}/console/:path*`,
-      },
     ];
   },
 };
@@ -105,35 +96,6 @@ def _patch_vite(ctx: PatchContext) -> bool:
     if needle not in text:
         return False
     ctx.write(rel, text.replace(needle, insert, 1))
-    return True
-
-
-def _ensure_presence_console_next(ctx: PatchContext) -> bool:
-    rel = "next.config.ts"
-    text = ctx.read(rel)
-    if "lca-api/presence" in text:
-        return False
-    applied = """      {
-        source: '/runs/:path*',
-        destination: `${base.replace(/\\/$/, '')}/runs/:path*`,
-      },
-"""
-    insert_applied = """      {
-        source: '/runs/:path*',
-        destination: `${base.replace(/\\/$/, '')}/runs/:path*`,
-      },
-      {
-        source: '/lca-api/presence/:path*',
-        destination: `${base.replace(/\\/$/, '')}/presence/:path*`,
-      },
-      {
-        source: '/lca-api/console/:path*',
-        destination: `${base.replace(/\\/$/, '')}/console/:path*`,
-      },
-"""
-    if applied not in text:
-        return False
-    ctx.write(rel, text.replace(applied, insert_applied, 1))
     return True
 
 

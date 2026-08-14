@@ -26,7 +26,7 @@ from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.observability import create_observability
-from lca.layer0_infra.tools.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer4_app.api import Agent
 from lca.layer4_app.composer import TeamComposer
@@ -58,7 +58,7 @@ class LoggingMemorySystem:
 
 async def main() -> None:
     llm = MockLLMAdapter()
-    calculator = CalculatorTool()
+    calculator = build_calculator_tools()[0]
 
     # --- 方式 1: 通过注册表名字注入自定义 MemorySystem ---
     assembly = TeamComposer()

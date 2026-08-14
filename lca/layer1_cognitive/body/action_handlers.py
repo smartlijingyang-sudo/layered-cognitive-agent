@@ -11,6 +11,7 @@ DELEGATE/HANDOFF 成员调用统一走 ``send_and_wait``（与 strategy 同端�
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from lca.contracts.atoms.enums import MemoryRecordKind
 from lca.contracts.atoms.ids import new_id, remaining_seconds
@@ -26,12 +27,13 @@ from lca.contracts.atoms.semantic_keys import (
     OBS_RESULT_KIND,
     OBS_TASK_ID,
     OBS_TASK_IDS,
+    OBS_TOOL_RESULTS,
 )
 from lca.contracts.models.core.budget import (
     DEFAULT_DELEGATION_TIMEOUT_S,
     resolve_delegation_timeout_s,
 )
-from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation
+from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation, ToolCall
 from lca.contracts.models.core.lifecycle import AgentCard
 from lca.contracts.models.core.result import ToolExecutionError
 from lca.contracts.models.core.state import AgentState
@@ -175,21 +177,77 @@ class UseToolOperation(Action):
         wire_block = tool_wire_block_observation(decision)
         if wire_block is not None:
             return wire_block
-        tc = decision.tool_calls[0]
-        tool = self._tool_registry.get(tc.tool_name)
-        if tool is None:
-            raise ToolExecutionError(f"未注册工具: {tc.tool_name}")
-        observation = await self._safe_executor.execute(
-            tool,
-            tc.arguments,
-            RetryPolicy(),
-            CacheConfig(),
-            invocation_id=tc.call_id or "",
+
+        # Resolve all tools up front — fail fast before launching any execution.
+        resolved = []
+        for tc in decision.tool_calls:
+            tool = self._tool_registry.get(tc.tool_name)
+            if tool is None:
+                raise ToolExecutionError(f"未注册工具: {tc.tool_name}")
+            resolved.append((tc, tool))
+
+        if len(resolved) == 1:
+            tc, tool = resolved[0]
+            observation = await self._safe_executor.execute(
+                tool,
+                tc.arguments,
+                RetryPolicy(),
+                CacheConfig(),
+                invocation_id=tc.call_id or "",
+            )
+            extra = dict(observation.extra or {})
+            extra.setdefault(OBS_RESULT_KIND, MemoryRecordKind.TOOL_RESULT)
+            observation.extra = extra
+            return observation
+
+        # Parallel execution — asyncio.gather is the Python equivalent of
+        # LobeHub's Promise.all for concurrent tool calls.
+        observations = await asyncio.gather(
+            *[
+                self._safe_executor.execute(
+                    tool,
+                    tc.arguments,
+                    RetryPolicy(),
+                    CacheConfig(),
+                    invocation_id=tc.call_id or "",
+                )
+                for tc, tool in resolved
+            ]
         )
-        extra = dict(observation.extra or {})
-        extra.setdefault(OBS_RESULT_KIND, MemoryRecordKind.TOOL_RESULT)
-        observation.extra = extra
-        return observation
+        return _combine_tool_observations(observations, decision.tool_calls)
+
+
+def _combine_tool_observations(
+    observations: tuple[Observation, ...] | list[Observation],
+    tool_calls: list[ToolCall],
+) -> Observation:
+    """Package parallel tool results into a single Observation.
+
+    Individual observations are preserved in ``extra[OBS_TOOL_RESULTS]``
+    so ``build_tool_history`` can emit one assistant+tool message pair
+    per tool call — matching OpenAI / LobeHub native wire format.
+    """
+    observations = list(observations)
+    all_ok = all(obs.success for obs in observations)
+    errors = [obs.error for obs in observations if not obs.success]
+    extra: dict[str, Any] = {
+        OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
+        OBS_TOOL_RESULTS: [
+            {"call_id": tc.call_id, "tool_name": tc.tool_name, "observation": obs}
+            for tc, obs in zip(tool_calls, observations, strict=True)
+        ],
+    }
+    payload = {
+        "tool_count": len(observations),
+        "all_success": all_ok,
+    }
+    return Observation(
+        observation_id=new_id("obs"),
+        success=all_ok,
+        payload=payload,
+        error="; ".join(errors) if errors else "",
+        extra=extra,
+    )
 
 
 class DelegateOperation(Action):

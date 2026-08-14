@@ -7,10 +7,9 @@ from collections.abc import Sequence
 from lca.contracts.models.core.sandbox import (
     SANDBOX_INIT_MAX_FILE_BYTES,
     SANDBOX_INIT_MAX_FILES,
-    SANDBOX_MOUNT_ROOT,
 )
 from lca.layer0_infra.file_store import FileStore
-from lca.layer0_infra.sandbox.bootstrap import sandbox_output_path
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 
 _BYTE_UNITS = ("B", "KB", "MB", "GB")
@@ -35,7 +34,7 @@ def _sanitize_guest_basename(name: str) -> str:
 
 
 def sandbox_uploaded_file_path(name: str) -> str:
-    return f"{SANDBOX_MOUNT_ROOT}/{_sanitize_guest_basename(name)}"
+    return ONLYBOXES.attachment_path(_sanitize_guest_basename(name))
 
 
 def select_sandbox_init_files(
@@ -90,12 +89,13 @@ def render_cloud_sandbox_system_role(
     if store is not None and ids:
         uploaded = format_uploaded_files_prompt(store, ids)
 
-    from lca.layer0_infra.sandbox.surface import current_surface, environment_note
+    from lca.layer0_infra.sandbox.surface import environment_note
 
-    surface = current_surface()
-    outputs_dir = sandbox_output_path()
+    outputs_dir = ONLYBOXES.outputs_dir
+    root = ONLYBOXES.root
     rendered = system_role_template.replace("{{sandbox_uploaded_files}}", uploaded)
     rendered = rendered.replace("{{sandbox_outputs_dir}}", outputs_dir)
+    rendered = rendered.replace("{{sandbox_workspace_root}}", root)
     if "{{sandbox_environment_note}}" in rendered:
-        rendered = rendered.replace("{{sandbox_environment_note}}", environment_note(surface))
+        rendered = rendered.replace("{{sandbox_environment_note}}", environment_note())
     return rendered.strip()

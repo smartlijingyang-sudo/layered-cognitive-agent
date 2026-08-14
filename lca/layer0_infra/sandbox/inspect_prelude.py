@@ -1,14 +1,17 @@
-"""Guest-side inspect script — lists /mnt/data and profiles tabular files (ADR-0050)."""
+"""Guest-side inspect script — lists the sandbox root and profiles tabular files (ADR-0050)."""
 
 from __future__ import annotations
+
+from lca.contracts.models.core.sandbox import SANDBOX_OUTPUT_SUBDIR
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 
 INSPECT_SCRIPT = """
 import json as _j
 import os as _o
-root = "/mnt/data"
+root = __SANDBOX_ROOT__
 out = {"files": [], "profiles": {}}
 for dirpath, _, filenames in _o.walk(root):
-    if "/outputs" in dirpath.replace("\\\\", "/"):
+    if "/__OUTPUTS_SUBDIR__" in dirpath.replace("\\\\", "/"):
         continue
     for fn in filenames:
         fp = _o.path.join(dirpath, fn)
@@ -80,7 +83,9 @@ for dirpath, _, filenames in _o.walk(root):
             except Exception as exc:
                 out["profiles"][fn] = {"type": "csv", "error": str(exc)}
 print("__LCA_INSPECT__" + _j.dumps(out, ensure_ascii=False) + "__END_INSPECT__")
-"""
+""".replace("__SANDBOX_ROOT__", repr(ONLYBOXES.root)).replace(
+    "__OUTPUTS_SUBDIR__", SANDBOX_OUTPUT_SUBDIR
+)
 
 INSPECT_BEGIN = "__LCA_INSPECT__"
 INSPECT_END = "__END_INSPECT__"

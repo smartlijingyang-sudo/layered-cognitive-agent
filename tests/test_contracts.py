@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer0_infra.tools.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
 
 
 class TestBudget(unittest.TestCase):
@@ -34,13 +34,13 @@ class TestAgentState(unittest.TestCase):
 
 class TestCalculatorTool(unittest.TestCase):
     def test_simple_arithmetic(self):
-        tool = CalculatorTool()
+        tool = build_calculator_tools()[0]
         result = asyncio.run(tool.execute({"expression": "2 + 3 * 4"}))
         self.assertTrue(result.success)
         self.assertEqual(result.payload, 14)
 
     def test_invalid_expression(self):
-        tool = CalculatorTool()
+        tool = build_calculator_tools()[0]
         result = asyncio.run(tool.execute({"expression": "import os"}))
         self.assertFalse(result.success)
 
@@ -51,7 +51,7 @@ class TestMockLLMAdapter(unittest.TestCase):
         result = asyncio.run(llm.complete("ROLE: test\nUSER_TASK: 123 乘以 456 等于多少？\n"))
         # Native tool calling: tool calls are in LLMResponse.tool_calls
         self.assertEqual(len(result.tool_calls), 1)
-        self.assertEqual(result.tool_calls[0].name, "calculator")
+        self.assertEqual(result.tool_calls[0].name, "calculate")
         self.assertIn("123*456", result.tool_calls[0].arguments["expression"])
 
     def test_tool_result_response(self):
@@ -60,7 +60,7 @@ class TestMockLLMAdapter(unittest.TestCase):
             llm.complete(
                 "USER_TASK: 123 乘以 456\nCONTEXT:\n(无历史上下文)\n",
                 history=[
-                    {"role": "assistant", "tool_calls": [{"id": "c1", "name": "calculator"}]},
+                    {"role": "assistant", "tool_calls": [{"id": "c1", "name": "calculate"}]},
                     {"role": "tool", "tool_call_id": "c1", "content": "56088"},
                 ],
             )
@@ -103,14 +103,13 @@ class TestLLMStreamEventContract(unittest.TestCase):
 class TestEndToEnd(unittest.TestCase):
     def test_single_agent_qa(self):
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-        from lca.layer0_infra.tools.calculator_tool import CalculatorTool
         from lca.layer4_app.api import Agent
 
         agent = Agent(
             role="测试助手",
             goal="回答问题",
             backstory="测试用",
-            tools=[CalculatorTool()],
+            tools=build_calculator_tools(),
             llm=MockLLMAdapter(),
         )
         result = asyncio.run(agent.run("123 乘以 456 等于多少？"))

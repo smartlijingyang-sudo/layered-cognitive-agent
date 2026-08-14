@@ -24,6 +24,8 @@ meta = PatchMeta(
         f"{_UI_TRANSPORTS}/lcaChatRow.ts",
         f"{_UI_TRANSPORTS}/lcaFinishChat.ts",
         f"{_UI_TRANSPORTS}/lcaJournal.ts",
+        f"{_UI_TRANSPORTS}/lcaError.ts",
+        f"{_UI_TRANSPORTS}/lcaPersist.ts",
         f"{_UI_TRANSPORTS}/lcaArtifacts.ts",
         f"{_UI_TRANSPORTS}/lcaWire.ts",
         "src/store/chat/slices/agentRun/actions/transports/client/streamingExecutor.ts",
@@ -113,6 +115,8 @@ def apply(ctx: PatchContext) -> bool:
         "lcaChatRow.ts",
         "lcaFinishChat.ts",
         "lcaJournal.ts",
+        "lcaError.ts",
+        "lcaPersist.ts",
         "lcaArtifacts.ts",
     ):
         if ctx.write_if_changed(

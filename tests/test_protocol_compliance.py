@@ -32,8 +32,8 @@ from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
 from lca.layer0_infra.observability import create_observability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
-from lca.layer0_infra.tools.calculator_tool import CalculatorTool
-from lca.layer0_infra.tools.weather_tool import WeatherTool
+from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
+from lca.layer0_infra.tools.weather import build_tools as build_weather_tools
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
@@ -67,10 +67,10 @@ class TestL0ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(OpenAICompatAdapter.__new__(OpenAICompatAdapter), LLMAdapter)
 
     def test_calculator_is_tool(self):
-        self.assertIsInstance(CalculatorTool(), Tool)
+        self.assertIsInstance(build_calculator_tools()[0], Tool)
 
     def test_weather_is_tool(self):
-        self.assertIsInstance(WeatherTool(), Tool)
+        self.assertIsInstance(build_weather_tools()[0], Tool)
 
     def test_create_observability_is_backend(self):
         from lca.contracts.protocols import ObservabilityBackend
@@ -273,7 +273,7 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
             role="测试",
             goal="测试",
             backstory="测试",
-            tools=[CalculatorTool()],
+            tools=build_calculator_tools(),
             llm=MockLLMAdapter(),
             brain="default",
         )

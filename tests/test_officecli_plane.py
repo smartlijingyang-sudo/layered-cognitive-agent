@@ -35,7 +35,8 @@ class TestBundledOfficecliSkill(unittest.TestCase):
         self.assertTrue(skill_md.is_file(), f"missing {skill_md}")
         text = skill_md.read_text(encoding="utf-8")
         self.assertIn("officecli", text.lower())
-        self.assertIn("/mnt/data/outputs", text)
+        self.assertIn("outputs/", text)
+        self.assertNotIn("/mnt/data", text)
         self.assertIn("--json", text)
         self.assertNotIn("curl -fsSL", text)
 

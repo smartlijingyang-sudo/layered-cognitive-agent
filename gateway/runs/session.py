@@ -91,6 +91,7 @@ class RunSession:
     device_id: str = ""
     plane: str = ""
     extra_plane: str = ""
+    execution_target: str = ""
 
 
 class RunRegistry:

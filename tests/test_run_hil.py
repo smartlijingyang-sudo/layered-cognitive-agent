@@ -45,7 +45,7 @@ def _ask_then_reply() -> ScriptedLLMAdapter:
     return ScriptedLLMAdapter(
         {
             "助手": [
-                use_tool("ask_user_question", _ASK),
+                use_tool("askUserQuestion", _ASK),
                 respond("收到，按 A 做"),
             ]
         }

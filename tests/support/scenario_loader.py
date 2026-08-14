@@ -22,11 +22,11 @@ from lca.contracts.models.team.team_coordination import (
     Pipeline,
 )
 from lca.contracts.protocols import LLMAdapter, ObservabilityBackend, Tool
-from lca.layer0_infra.tools.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
 from lca.layer4_app.api import Agent, Team, TeamLead
 
-_TOOL_REGISTRY: dict[str, type[Tool]] = {
-    "calculator": CalculatorTool,
+_TOOL_BUILDERS: dict[str, object] = {
+    "calculator": build_calculator_tools,
 }
 
 _DEFAULT_FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "team_scenarios"
@@ -138,10 +138,10 @@ def _parse_scenario(raw: dict[str, Any]) -> ScenarioSpec:
 def _instantiate_tools(tool_names: list[str]) -> list[Tool]:
     tools: list[Tool] = []
     for name in tool_names:
-        tool_cls = _TOOL_REGISTRY.get(name)
-        if tool_cls is None:
-            raise ValueError(f"Unknown tool {name!r}. Available: {list(_TOOL_REGISTRY.keys())}")
-        tools.append(tool_cls())
+        builder = _TOOL_BUILDERS.get(name)
+        if builder is None:
+            raise ValueError(f"Unknown tool {name!r}. Available: {list(_TOOL_BUILDERS.keys())}")
+        tools.extend(builder())  # type: ignore[operator]
     return tools
 
 

@@ -94,11 +94,8 @@ class TestVocabularyGuard(unittest.TestCase):
                 if not isinstance(node, ast.Call):
                     continue
                 func = node.func
-                fname = (
-                    func.attr
-                    if isinstance(func, ast.Attribute)
-                    else (func.id if isinstance(func, ast.Name) else None)
-                )
+                # Telemetry emits are bare names (`span(...)`), not `match.span(...)`.
+                fname = func.id if isinstance(func, ast.Name) else None
                 if fname not in _EMIT_CALLS or not node.args:
                     continue
                 first = node.args[0]

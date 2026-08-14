@@ -121,13 +121,13 @@ class PlaneKind(str, Enum):
 
 @dataclass(frozen=True)
 class PlaneRef:
-    id: str              # device_id / sandbox session_id
+    id: str  # device_id / sandbox session_id
     label: str
     kind: PlaneKind
-    root: str            # 该环境内的真实可写根
-    outputs_dir: str     # root/outputs
-    platform: str = ""   # linux | darwin | win32 | ""
-    home: str = ""       # 仅 prompt：用户家目录；不是第二可写根
+    root: str  # 该环境内的真实可写根
+    outputs_dir: str  # root/outputs
+    platform: str = ""  # linux | darwin | win32 | ""
+    home: str = ""  # 仅 prompt：用户家目录；不是第二可写根
 
 
 @dataclass(frozen=True)

@@ -5,9 +5,11 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
+from lca.layer0_infra.plane.paths import outputs_under
 from lca.layer0_infra.plane.resolve import (
     PlaneBindingError,
     PlaneRequest,
+    make_sandbox_ref,
     ref_of,
     resolve_plane_bindings,
 )
@@ -21,21 +23,14 @@ def _machine(**kwargs: str) -> PlaneRef:
         label=kwargs.get("label", "laptop"),
         kind=PlaneKind.MACHINE,
         root=root,
-        outputs_dir=f"{root}/outputs",
+        outputs_dir=outputs_under(root),
         platform=kwargs.get("platform", "linux"),
         home=kwargs.get("home", "/home/lichao"),
     )
 
 
 def _sandbox() -> PlaneRef:
-    return PlaneRef(
-        id="onlyboxes",
-        label="Onlyboxes",
-        kind=PlaneKind.SANDBOX,
-        root="/mnt/data",
-        outputs_dir="/mnt/data/outputs",
-        platform="linux",
-    )
+    return make_sandbox_ref()
 
 
 def test_only_sandbox_is_primary() -> None:
@@ -122,9 +117,10 @@ def test_machine_tools_inject_local_system_role() -> None:
 
     plane = _machine()
     with plane_bindings_scope(PlaneBindings(primary=plane)):
-        text = build_cloud_sandbox_prompt([SimpleNamespace(name="local_list_files")])
+        text = build_cloud_sandbox_prompt([SimpleNamespace(name="local_listFiles")])
     assert "lobe-local-system" in text
     assert "/home/lca-sandbox" in text
+    assert "reportlab" in text
     assert "CLOUD SANDBOX" not in text
 
 

@@ -1,4 +1,4 @@
-"""Shared helpers for harvesting ``/mnt/data/outputs`` (ADR-0046).
+"""Shared helpers for harvesting sandbox outputs (ADR-0046).
 
 Adapters own provider-specific list/read; this module only normalizes paths,
 applies size/count caps, and builds ``SandboxFile`` rows with diagnostics.
@@ -12,17 +12,10 @@ from pathlib import PurePosixPath
 from lca.contracts.models.core.sandbox import (
     SANDBOX_MAX_GENERATED_FILE_BYTES,
     SANDBOX_MAX_GENERATED_FILES,
-    SANDBOX_MOUNT_ROOT,
-    SANDBOX_OUTPUT_SUBDIR,
     SandboxFile,
 )
 
 _DEFAULT_MIME = "application/octet-stream"
-
-
-def sandbox_output_dir() -> str:
-    """Absolute guest path of the harvest directory (``/mnt/data/outputs``)."""
-    return f"{SANDBOX_MOUNT_ROOT}/{SANDBOX_OUTPUT_SUBDIR}"
 
 
 def entry_basename(name_or_path: str) -> str:

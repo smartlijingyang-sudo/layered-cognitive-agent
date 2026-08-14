@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-# Guest mount prefix under SANDBOX_MOUNT_ROOT (/mnt/data/_skills/<skill_id>/…).
+# Guest mount prefix under SANDBOX_MOUNT_ROOT (_skills/<skill_id>/…).
 SANDBOX_SKILL_MOUNT_PREFIX: str = "_skills"
 
 # Import / IO caps (gateway-side enforcement).

@@ -112,6 +112,10 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **RespondOperation** / **UseToolOperation** / **DelegateOperation** / **HandoffOperation** | 内置行动实现（delegate/handoff 行动 ≠ PeerRelay 协调机制） |
 | **SafeExecutor** | 权限 + 重试 + 缓存后执行工具 |
 | **ToolRegistry** / **Tool** / **ToolPermissionManifest** | 工具注册与权限 |
+| **ToolManifest** / **ToolApi** | 一组工具的声明式清单（identifier + api surface），对齐 LobeHub BuiltinToolManifest |
+| **ExecutionTarget** / **ExecutionPlan** | 执行路由：sandbox / device / auto / none + fallback |
+| **GatewayHttpClient** | Layer0 访问 `/api/device/*` 的 HTTP 客户端 |
+| **SandboxPolicy** | 沙箱可写根 / 禁写根 / 网络 / 环境白名单 |
 | **Sandbox** / **SandboxResult** / **SandboxFile** | 隔离代码执行协议与终态结果（ADR-0044） |
 | **OnlyboxesSandboxAdapter** | Onlyboxes console `pythonExec`（需 `ONLYBOXES_BASE_URL` + `ONLYBOXES_ACCESS_TOKEN`） |
 | **SandboxExecuteTool** (`sandbox_execute`) | 沙箱代码执行工具（内部/测试）：挂载附件、多文件产物、铸造 invocation_id；预装包见 `SANDBOX_PREINSTALLED_PYTHON_PACKAGES` / `deploy/onlyboxes`。Agent 面使用 computer tools（`execute_code` 等） |
@@ -155,7 +159,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **SimpleSafeExecutor** | SafeExecutor 默认实现 |
 | **SimpleToolRegistry** | ToolRegistry 默认实现 |
 | **InMemoryStateStore** | StateStore 内存实现 |
-| **CalculatorTool** / **WeatherTool** | 内置示例 Tool |
+| **calculator** / **weather** | 内置示例 Tool 模块（manifest + executor） |
 
 ## L-Casting（自动组队，ADR-0042）
 

@@ -8,6 +8,8 @@ _RUNTIME = Path("deploy/lobehub/patches/runtime")
 _DRIVER_PY = (_RUNTIME / "lca_run_driver.py").read_text(encoding="utf-8")
 _DRIVER_TS = (_RUNTIME / "LcaRunDriver.ts").read_text(encoding="utf-8")
 _JOURNAL_TS = (_RUNTIME / "lcaJournal.ts").read_text(encoding="utf-8")
+_ERROR_TS = (_RUNTIME / "lcaError.ts").read_text(encoding="utf-8")
+_PERSIST_TS = (_RUNTIME / "lcaPersist.ts").read_text(encoding="utf-8")
 _ART_TS = (_RUNTIME / "lcaArtifacts.ts").read_text(encoding="utf-8")
 _ROW_TS = (_RUNTIME / "lcaChatRow.ts").read_text(encoding="utf-8")
 _FINISH_TS = (_RUNTIME / "lcaFinishChat.ts").read_text(encoding="utf-8")
@@ -30,6 +32,8 @@ def test_implementation_is_typescript() -> None:
     assert "export async function finishLcaChat" in _FINISH_TS
     assert (_RUNTIME / "LcaRunDriver.ts").is_file()
     assert (_RUNTIME / "lcaJournal.ts").is_file()
+    assert (_RUNTIME / "lcaError.ts").is_file()
+    assert (_RUNTIME / "lcaPersist.ts").is_file()
     assert (_RUNTIME / "lcaArtifacts.ts").is_file()
     assert (_RUNTIME / "lcaFinishChat.ts").is_file()
     assert (_RUNTIME / "lcaChatRow.ts").is_file()
@@ -40,6 +44,8 @@ def test_python_only_copies_and_hooks() -> None:
     assert "render_wire_ts" in _DRIVER_PY
     assert "finishLcaChat" in _DRIVER_PY
     assert "lcaJournal.ts" in _DRIVER_PY
+    assert "lcaError.ts" in _DRIVER_PY
+    assert "lcaPersist.ts" in _DRIVER_PY
     assert "lcaArtifacts.ts" in _DRIVER_PY
     assert "refreshMessages" not in _DRIVER_PY
 
@@ -149,7 +155,7 @@ def test_final_answer_gets_native_deliverable_lists() -> None:
     assert "toFileList" in persist
     assert "imageList" in persist
     assert "fileList" in persist
-    assert "currentTurnTools.length === 0" in persist
+    assert "turnTools.length === 0" in persist
     assert "publishFinalDeliverables" in _DRIVER_TS
 
 
@@ -233,3 +239,47 @@ def test_invoke_does_not_rewrite_arguments() -> None:
     invoked = _DRIVER_TS.split("case 'tool-invoked'")[1].split("case ")[0]
     assert "function.arguments" not in invoked
     assert "optimisticUpdatePluginState" in invoked
+
+
+def test_run_error_maps_through_native_classifier() -> None:
+    assert "export function toLcaChatMessageError" in _ERROR_TS
+    assert "refineErrorCode" in _ERROR_TS
+    assert "RateLimitExceeded" in _ERROR_TS
+    assert "AgentRuntimeError" in _ERROR_TS
+    assert "refineErrorCode" not in _JOURNAL_TS
+    assert "refineErrorCode" not in _PERSIST_TS
+    assert "AgentExecutionError" not in _DRIVER_TS
+    assert "toLcaChatMessageError" in _DRIVER_TS
+
+
+def test_assistant_row_is_one_aggregate_write() -> None:
+    assert "export async function persistAssistantRow" in _PERSIST_TS
+    assert "updateMessage(" in _PERSIST_TS
+    write = _PERSIST_TS.split("messageService.updateMessage", 1)[1].split(");", 1)[0]
+    assert "content" in write
+    assert "error" in write
+    assert "optimisticUpdateMessageError" not in _DRIVER_TS
+    assert "persistAssistantError" not in _DRIVER_TS
+    assert "sealAssistantError" not in _DRIVER_TS
+    assert "persistAssistantRow" in _DRIVER_TS
+    persist = _DRIVER_TS.split("const persistRow = async () => {", 1)[1].split("const sealRow", 1)[
+        0
+    ]
+    assert "rowError" in persist
+    finished = _DRIVER_TS.split("case 'run-finished'")[1].split("case ")[0]
+    assert "noteRowError" in finished
+    assert "persistRow" in finished
+    assert "error?: ChatMessageError" in _ROW_TS
+    assert "memory.error" in _ROW_TS
+
+
+def test_failed_run_uses_native_error_lifecycle() -> None:
+    start = _DRIVER_TS.index("} catch (error) {")
+    catch = _DRIVER_TS[start : start + 900]
+    assert "noteRowError" in catch
+    assert "ensureTurn" in catch
+    assert "throw error" not in catch
+    assert "const createRes = await fetch('/lca-api/runs'" in _DRIVER_TS.split("try {", 1)[1]
+    assert "projected.error" in _FINISH_TS
+    assert "runtimeStatus: cancelled ? 'interrupted'" in _FINISH_TS
+    assert "'error'" in _FINISH_TS

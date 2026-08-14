@@ -27,11 +27,11 @@ _PACKAGES_HINT = ", ".join(SANDBOX_PREINSTALLED_PYTHON_PACKAGES)
 
 
 class SandboxInspectTool(Tool):
-    """Structured probe of /mnt/data — files, sheets, columns, NaN counts."""
+    """Structured probe of the sandbox workspace — files, sheets, columns, NaN counts."""
 
     name = SANDBOX_INSPECT_TOOL_NAME
     description = (
-        "探查沙箱 /mnt/data 已挂载文件的结构化 profile（路径、sheets、columns、NaN 计数）。"
+        "探查沙箱工作根已挂载文件的结构化 profile（路径、sheets、columns、NaN 计数）。"
         "分析 Excel/CSV 前应先调用；run 首触沙箱时会自动 inspect，可跳过重复调用。"
     )
     parameters: ClassVar[dict[str, Any]] = {
@@ -69,8 +69,8 @@ class SandboxExecuteTool(Tool):
 
     name = SANDBOX_EXECUTE_TOOL_NAME
     description = (
-        "在 run 绑定的隔离沙箱中执行 Python。环境已挂载 run 附件到 /mnt/data/<文件名>；"
-        "产出写到 /mnt/data/outputs/ 自动收集。\n"
+        "在 run 绑定的隔离沙箱中执行 Python。环境已挂载 run 附件到工作根/<文件名>；"
+        "产出写到 outputs/ 自动收集。\n"
         f"预装包: {_PACKAGES_HINT}\n"
         "先 sandbox_inspect 了解列名与 NaN；字符串操作前 dropna().astype(str)。"
         "画图中文：已预置 WenQuanYi/CJK 字体。"

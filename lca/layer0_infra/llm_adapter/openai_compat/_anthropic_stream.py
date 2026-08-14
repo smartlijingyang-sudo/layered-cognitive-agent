@@ -215,5 +215,3 @@ def _feed_sse_line(data_lines: list[str], raw: str) -> list[dict[str, Any]]:
     if line.startswith("data:"):
         data_lines.append(line[5:].lstrip())
     return []
-
-

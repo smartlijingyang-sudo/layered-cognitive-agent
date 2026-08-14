@@ -127,66 +127,72 @@ class BackendKind(str, Enum):
 
 # ── 能力声明（Capability-driven routing） ──
 
+
 class ExecutionCapability(str, Enum):
     """环境能力声明 —— Agent/Router 按能力选择环境，不假设「什么都有」。
-    
+
     参考业界实践（E2B/Daytona/Computer Use），环境声明支持的能力集合，
     Agent 只调用声明支持的能力。新增 backend 时准确声明 capabilities。
     """
-    SHELL = "shell"              # 可执行 shell 命令
-    FILESYSTEM = "filesystem"    # 可读写文件
-    CODE_EXEC = "code_exec"      # 可执行代码（Python/JS/TS）
-    NETWORK = "network"          # 可访问网络
-    PERSISTENT = "persistent"    # 状态跨调用保持（session）
-    JOB = "job"                  # 支持异步长任务（见 §3.12）
-    STREAMING = "streaming"      # 支持流式日志订阅
+
+    SHELL = "shell"  # 可执行 shell 命令
+    FILESYSTEM = "filesystem"  # 可读写文件
+    CODE_EXEC = "code_exec"  # 可执行代码（Python/JS/TS）
+    NETWORK = "network"  # 可访问网络
+    PERSISTENT = "persistent"  # 状态跨调用保持（session）
+    JOB = "job"  # 支持异步长任务（见 §3.12）
+    STREAMING = "streaming"  # 支持流式日志订阅
 
 
 # ── 环境状态追踪（显式化，抑制漂移） ──
 
+
 @dataclass(frozen=True)
 class EnvState:
     """运行时环境状态 —— 每次 OpResult 尽量回传，防止隐式漂移。
-    
+
     业界共识：Agent 依赖「上一条 cd」的模式容易出错，
     通过显式回传 env_state，把漂移变成可观测、可恢复问题。
     """
-    cwd: str = ""                # 当前工作目录
-    user: str = ""               # 当前用户
-    shell: str = ""              # 当前 shell（bash/zsh/powershell）
+
+    cwd: str = ""  # 当前工作目录
+    user: str = ""  # 当前用户
+    shell: str = ""  # 当前 shell（bash/zsh/powershell）
     env_vars: dict[str, str] = field(default_factory=dict)  # 白名单，非全量
 
 
 # ── 标准化操作结果 ──
 
+
 @dataclass(frozen=True)
 class OpResult:
     """所有 execute() 返回的统一结构。
-    
+
     工具层只看 success + content + error。
     特定 op 的额外数据放在 data 里（类型安全的子类型见下方）。
-    
+
     增强点（参考业界 Agent Runtime 实践）：
     - truncated: 截断信号，防止上下文爆炸
     - env_state: 运行时状态回传，抑制隐式漂移
     - latency_ms: 执行耗时，供 Evaluator/Policy 使用
     """
+
     success: bool
-    content: str = ""         # 人类可读的结果文本
+    content: str = ""  # 人类可读的结果文本
     error: str = ""
     data: dict[str, Any] = field(default_factory=dict)  # op-specific 结构化数据
-    
+
     # ── 截断信号（Viewport 约束） ──
-    truncated: bool = False   # 内容是否被截断
+    truncated: bool = False  # 内容是否被截断
     truncation_reason: str = ""  # 截断原因：max_lines / max_chars / max_bytes
-    original_size: int = 0    # 原始大小（行数或字节数），供 Agent 判断是否需要二次查询
-    
+    original_size: int = 0  # 原始大小（行数或字节数），供 Agent 判断是否需要二次查询
+
     # ── 环境状态回传（显式化） ──
     env_state: EnvState | None = None  # shell op 必须回传 cwd/user
-    
+
     # ── 执行元数据 ──
-    latency_ms: int = 0       # 执行耗时
-    retryable: bool = False   # 错误是否可重试（供 Runtime 决策）
+    latency_ms: int = 0  # 执行耗时
+    retryable: bool = False  # 错误是否可重试（供 Runtime 决策）
 
 
 # 各 op 的 data 契约（文档级约束，不强制类型）：
@@ -238,11 +244,11 @@ class OpResult:
 @runtime_checkable
 class ExecutionContext(Protocol):
     """一个 agent 可以操作的计算环境。
-    
+
     身份 + 文件系统 + 执行能力 + 状态追踪。
     Agent、前端、工具、附件共享同一个 workspace。
     不存在虚拟路径映射。workspace 是那台机器上的真实路径。
-    
+
     设计原则（参考业界 Agent Runtime 实践）：
     - Capability-driven: 声明支持的能力，Agent 按能力路由
     - State explicit: 每次操作回传 env_state，抑制隐式漂移
@@ -268,7 +274,7 @@ class ExecutionContext(Protocol):
     @property
     def workspace(self) -> str:
         """真实文件系统根。Agent/前端/工具/附件全用这个。
-        
+
         - Host: /home/lca-sandbox (或 LCA_HOST_ROOT)
         - Onlyboxes: /mnt/data (容器内真实路径)
         - SSH: 远程 home 或配置路径
@@ -284,34 +290,34 @@ class ExecutionContext(Protocol):
     @property
     def capabilities(self) -> frozenset[ExecutionCapability]:
         """能力声明 —— Agent/Router 按能力选择环境，不假设「什么都有」。
-        
+
         每种 backend 准确声明支持的能力集合：
         - Host: SHELL | FILESYSTEM | CODE_EXEC | PERSISTENT | JOB | STREAMING
         - Onlyboxes: SHELL | FILESYSTEM | CODE_EXEC | PERSISTENT
         - SSH: SHELL | FILESYSTEM (CODE_EXEC 视远程环境而定)
         - Windows: SHELL | FILESYSTEM | CODE_EXEC (via PowerShell)
-        
+
         新增 backend 时必须准确声明，禁止假设「全部支持」。
         """
         ...
 
     async def execute(
-        self, 
-        op: str, 
+        self,
+        op: str,
         payload: dict[str, Any],
         *,
         viewport: "ViewportPolicy | None" = None,  # 可选：覆盖默认截断策略
     ) -> OpResult:
         """执行操作。传输细节由实现处理。
-        
-        op: 操作名（list_files, read_file, write_file, edit_file, 
+
+        op: 操作名（list_files, read_file, write_file, edit_file,
              run_command, run, move_files, rename_file, search_files,
              grep_content, glob_files）
         payload: 操作参数（各 op 的 schema 见 OpResult.data 契约）
         viewport: 可选的截断策略覆盖（默认使用环境级 ViewportPolicy）
-        
+
         返回: OpResult（统一的 success/content/error/data 结构）
-        
+
         契约：
         - shell 类 op（run_command, run）必须回传 env_state（至少 cwd）
         - 大输出必须按 ViewportPolicy 截断，并设置 truncated=True
@@ -321,7 +327,7 @@ class ExecutionContext(Protocol):
 
     def prompt_context(self) -> str:
         """生成注入 system prompt 的执行环境描述。
-        
+
         包含：label, backend, workspace, outputs_dir, capabilities
         Agent 据此知道自己在哪台机器、能做什么。
         """
@@ -330,17 +336,18 @@ class ExecutionContext(Protocol):
 
 # ── 异步 Job 支持（可选扩展） ──
 
+
 @runtime_checkable
 class AsyncJobProvider(Protocol):
     """异步长任务支持 —— 独立于 ExecutionContext 的可选协议。
-    
+
     动机：npm install / build / train 等长任务不能同步阻塞 Runtime。
     参考业界实践（E2B/Daytona），Job 是一等公民：可启动、可取消、可订阅日志。
-    
+
     ExecutionContext 若支持 Job，实现此协议（capabilities 包含 JOB）。
     Runtime 通过 isinstance(ctx, AsyncJobProvider) 检测能力。
     """
-    
+
     async def start_job(
         self,
         command: str,
@@ -355,30 +362,30 @@ class AsyncJobProvider(Protocol):
 @runtime_checkable
 class JobHandle(Protocol):
     """异步任务句柄 —— 可查询状态、订阅日志、取消、等待结果。"""
-    
+
     @property
     def job_id(self) -> str: ...
-    
+
     @property
     def status(self) -> str:
         """running | succeeded | failed | cancelled"""
         ...
-    
+
     async def get_status(self) -> str: ...
-    
+
     async def subscribe_logs(
-        self, 
+        self,
         callback: "Callable[[LogChunk], None]",
         *,
         since: int = 0,  # sequence number
     ) -> Callable[[], None]:
         """订阅日志流，返回取消订阅函数。"""
         ...
-    
+
     async def cancel(self) -> None:
         """取消任务。幂等。"""
         ...
-    
+
     async def result(self, timeout_s: float | None = None) -> OpResult:
         """等待任务完成并返回最终结果。"""
         ...
@@ -387,6 +394,7 @@ class JobHandle(Protocol):
 @dataclass(frozen=True)
 class LogChunk:
     """日志块 —— 流式订阅的最小单元。"""
+
     stream: str  # "stdout" | "stderr"
     text: str
     ts: float  # unix timestamp
@@ -420,16 +428,16 @@ Phase 2 完成后:
 ```python
 class HostContext:
     """Host 实现 — 内部持有 HostSandbox（WebSocket RPC）。"""
-    
+
     def __init__(self, sandbox: HostSandbox, settings: HostRuntimeSettings):
-        self._sandbox = sandbox   # 内部传输，不暴露给工具
+        self._sandbox = sandbox  # 内部传输，不暴露给工具
         self._settings = settings
-    
+
     async def execute(self, op: str, payload: dict) -> OpResult:
         # 委托给 HostSandbox.computer_op()
         raw = await self._sandbox.computer_op(op, payload)
         return _to_op_result(raw)
-    
+
     # 工具层只看到 ExecutionContext，不看到 Sandbox
 ```
 
@@ -454,48 +462,52 @@ class HostContext:
 ```python
 # lca/layer0_infra/execution/host_context.py
 
+
 class HostContext:
     """本机 host sidecar — WebSocket RPC 到 host 进程。
-    
+
     支持单用户和多用户模式：
     - 单用户：lobe_user="sandbox"，workspace=/home/lca-sandbox
     - 多用户：lobe_user="alice"，workspace=/home/lca-alice
-    
+
     能力声明：SHELL | FILESYSTEM | CODE_EXEC | PERSISTENT | JOB | STREAMING
     Host 是能力最完整的 backend（本地执行，无隔离限制）。
     """
-    
-    def __init__(self, sandbox: HostSandbox, settings: HostRuntimeSettings, 
-                 lobe_user: str = "sandbox"):
+
+    def __init__(
+        self, sandbox: HostSandbox, settings: HostRuntimeSettings, lobe_user: str = "sandbox"
+    ):
         self._sandbox = sandbox
         self._settings = settings
         self._lobe_user = lobe_user
-    
+
     @property
     def id(self) -> str:
         return self._settings.device_id
-    
+
     @property
     def label(self) -> str:
         return self._settings.display_name()
-    
+
     @property
     def backend(self) -> BackendKind:
         return BackendKind.HOST
-    
+
     @property
     def capabilities(self) -> frozenset[ExecutionCapability]:
         """Host 能力最完整：支持全部能力。"""
-        return frozenset({
-            ExecutionCapability.SHELL,
-            ExecutionCapability.FILESYSTEM,
-            ExecutionCapability.CODE_EXEC,
-            ExecutionCapability.NETWORK,
-            ExecutionCapability.PERSISTENT,
-            ExecutionCapability.JOB,
-            ExecutionCapability.STREAMING,
-        })
-    
+        return frozenset(
+            {
+                ExecutionCapability.SHELL,
+                ExecutionCapability.FILESYSTEM,
+                ExecutionCapability.CODE_EXEC,
+                ExecutionCapability.NETWORK,
+                ExecutionCapability.PERSISTENT,
+                ExecutionCapability.JOB,
+                ExecutionCapability.STREAMING,
+            }
+        )
+
     @property
     def workspace(self) -> str:
         # per-user workspace
@@ -503,41 +515,40 @@ class HostContext:
             return str(Path(os.environ["USERPROFILE"]) / "LCA" / self._lobe_user)
         else:
             return f"/home/lca-{self._lobe_user}"
-    
+
     @property
     def outputs_dir(self) -> str:
         return str(Path(self.workspace) / "outputs")
-    
+
     @property
     def lobe_user(self) -> str:
         """LobeHub 用户标识（用于多用户模式）"""
         return self._lobe_user
-    
+
     async def execute(
-        self, 
-        op: str, 
+        self,
+        op: str,
         payload: dict,
         *,
         viewport: "ViewportPolicy | None" = None,
     ) -> OpResult:
         raw = await self._sandbox.computer_op(op, payload)
         result = _to_op_result(raw)
-        
+
         # 强制 Viewport 截断
         policy = viewport or ViewportPolicy.default()
         result = policy.apply(result)
-        
+
         # shell 类 op 必须回传 env_state
         if op in {"run_command", "run"}:
             result = await self._attach_env_state(result)
-        
+
         return result
-    
+
     async def _attach_env_state(self, result: OpResult) -> OpResult:
         """查询并附加当前 env_state（cwd/user/shell）。"""
         probe = await self._sandbox.computer_op(
-            "run_command", 
-            {"command": "pwd && whoami && echo $SHELL"}
+            "run_command", {"command": "pwd && whoami && echo $SHELL"}
         )
         lines = probe.get("stdout", "").strip().split("\n")
         if len(lines) >= 3:
@@ -555,9 +566,9 @@ class HostContext:
                 retryable=result.retryable,
             )
         return result
-    
+
     # ── AsyncJobProvider（Phase 4 实现） ──
-    
+
     async def start_job(
         self,
         command: str,
@@ -567,7 +578,7 @@ class HostContext:
     ) -> "JobHandle":
         """启动异步任务。Host 实现通过后台进程 + 日志文件。"""
         ...
-    
+
     def prompt_context(self) -> str:
         caps = ", ".join(c.value for c in sorted(self.capabilities, key=lambda c: c.value))
         return (
@@ -584,56 +595,64 @@ class HostContext:
 ```python
 # lca/layer0_infra/execution/onlyboxes_context.py
 
+
 class OnlyboxesContext:
     """Onlyboxes 容器沙箱 — Docker exec / API。
-    
+
     能力声明：SHELL | FILESYSTEM | CODE_EXEC | PERSISTENT
     容器沙箱不支持 JOB（无后台进程管理）和 STREAMING。
     """
-    
-    def __init__(self, sandbox: OnlyboxesSandboxAdapter, *, 
-                 session_id: str = "", label: str = "Onlyboxes Sandbox",
-                 lobe_user: str = "sandbox"):
+
+    def __init__(
+        self,
+        sandbox: OnlyboxesSandboxAdapter,
+        *,
+        session_id: str = "",
+        label: str = "Onlyboxes Sandbox",
+        lobe_user: str = "sandbox",
+    ):
         self._sandbox = sandbox
         self._session_id = session_id
         self._label = label
         self._lobe_user = lobe_user
-    
+
     @property
     def id(self) -> str:
         return self._session_id or "onlyboxes"
-    
+
     @property
     def label(self) -> str:
         return self._label
-    
+
     @property
     def backend(self) -> BackendKind:
         return BackendKind.ONLYBOXES
-    
+
     @property
     def capabilities(self) -> frozenset[ExecutionCapability]:
         """Onlyboxes 支持基础执行能力，不支持 JOB/STREAMING。"""
-        return frozenset({
-            ExecutionCapability.SHELL,
-            ExecutionCapability.FILESYSTEM,
-            ExecutionCapability.CODE_EXEC,
-            ExecutionCapability.PERSISTENT,
-        })
-    
+        return frozenset(
+            {
+                ExecutionCapability.SHELL,
+                ExecutionCapability.FILESYSTEM,
+                ExecutionCapability.CODE_EXEC,
+                ExecutionCapability.PERSISTENT,
+            }
+        )
+
     @property
     def workspace(self) -> str:
         # Onlyboxes 是隔离容器，所有用户共享 /mnt/data
         # lobe_user 仅用于日志和追踪，不影响实际路径
         return "/mnt/data"  # 容器内真实路径
-    
+
     @property
     def outputs_dir(self) -> str:
         return "/mnt/data/outputs"
-    
+
     async def execute(
-        self, 
-        op: str, 
+        self,
+        op: str,
         payload: dict,
         *,
         viewport: "ViewportPolicy | None" = None,
@@ -642,21 +661,21 @@ class OnlyboxesContext:
         # file ops → guest Python scripts
         # run → sandbox.run()
         result = ...  # 委托到 sandbox adapter
-        
+
         # 强制 Viewport 截断
         policy = viewport or ViewportPolicy.default()
         result = policy.apply(result)
-        
+
         # shell 类 op 回传 env_state
         if op in {"run_command", "run"}:
             result = await self._attach_env_state(result)
-        
+
         return result
-    
+
     async def _attach_env_state(self, result: OpResult) -> OpResult:
         """查询容器内 cwd/user。"""
         ...
-    
+
     def prompt_context(self) -> str:
         caps = ", ".join(c.value for c in sorted(self.capabilities, key=lambda c: c.value))
         return (
@@ -680,48 +699,50 @@ from pathlib import PurePosixPath
 
 class SSHContext:
     """远程 SSH — ssh user@host。
-    
+
     连接策略：每次 execute 独立 ssh 调用（简单、无状态、可并发）。
     对于高频场景可后续加连接池，但 MVP 不需要。
-    
+
     文件传输：小文件走 ssh cat / ssh tee（避免 sftp 依赖）。
     大文件（>1MB）走 scp。
-    
+
     能力声明：SHELL | FILESYSTEM
     SSH 的 CODE_EXEC 和 NETWORK 取决于远程环境，不在 capabilities 中默认声明。
     """
-    
+
     def __init__(self, config: SSHConfig):
         self._config = config
-    
+
     @property
     def id(self) -> str:
         return f"ssh-{self._config.alias}"
-    
+
     @property
     def label(self) -> str:
         return self._config.alias
-    
+
     @property
     def backend(self) -> BackendKind:
         return BackendKind.SSH
-    
+
     @property
     def capabilities(self) -> frozenset[ExecutionCapability]:
         """SSH 只保证 shell 和 filesystem，其他取决于远程环境。"""
-        return frozenset({
-            ExecutionCapability.SHELL,
-            ExecutionCapability.FILESYSTEM,
-        })
-    
+        return frozenset(
+            {
+                ExecutionCapability.SHELL,
+                ExecutionCapability.FILESYSTEM,
+            }
+        )
+
     @property
     def workspace(self) -> str:
         return self._config.workspace  # 配置或探测得到
-    
+
     @property
     def outputs_dir(self) -> str:
         return f"{self.workspace}/outputs"
-    
+
     def _ssh_argv(self) -> list[str]:
         """构建 ssh 命令前缀。"""
         argv = ["ssh", "-o", "StrictHostKeyChecking=accept-new"]
@@ -731,7 +752,7 @@ class SSHContext:
             argv.extend(["-p", str(self._config.port)])
         argv.append(f"{self._config.user}@{self._config.host}")
         return argv
-    
+
     async def execute(
         self,
         op: str,
@@ -740,22 +761,22 @@ class SSHContext:
         viewport: "ViewportPolicy | None" = None,
     ) -> OpResult:
         """SSH execute 映射：
-        
+
         run_command:
           ssh host "cd workspace && command"
           → 捕获 stdout/stderr/exit_code
-        
+
         list_files:
           ssh host "ls -la path" → parse
           或 ssh host "find path -maxdepth 1 -printf ..." → structured
-        
+
         read_file:
           ssh host "cat path"
-        
+
         write_file:
           echo content | ssh host "cat > path"
           或 scp tempfile host:path（大文件）
-        
+
         run (code):
           ssh host "cd workspace && python3 -c 'code'"
         """
@@ -774,22 +795,22 @@ class SSHContext:
 
         policy = viewport or ViewportPolicy.default()
         return policy.apply(result)
-    
+
     async def _run_command(self, payload: dict) -> OpResult:
         command = payload.get("command", "")
         cwd = payload.get("cwd", self.workspace)
         full_cmd = f"cd {_shell_quote(cwd)} && {command}"
-        
+
         proc = await asyncio.create_subprocess_exec(
-            *self._ssh_argv(), full_cmd,
+            *self._ssh_argv(),
+            full_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), 
-            timeout=payload.get("timeout_s", 60)
+            proc.communicate(), timeout=payload.get("timeout_s", 60)
         )
-        
+
         # SSH 每次独立调用，cwd 就是本次显式传入的值，不探测远程隐式状态
         return OpResult(
             success=proc.returncode == 0,
@@ -805,24 +826,25 @@ class SSHContext:
             env_state=EnvState(cwd=cwd, user=self._config.user),
             retryable=proc.returncode != 0,
         )
-    
+
     async def _read_file(self, payload: dict) -> OpResult:
         path = payload.get("path", "")
         abs_path = self._resolve_path(path)
-        
+
         proc = await asyncio.create_subprocess_exec(
-            *self._ssh_argv(), f"cat {_shell_quote(abs_path)}",
+            *self._ssh_argv(),
+            f"cat {_shell_quote(abs_path)}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await proc.communicate()
-        
+
         if proc.returncode != 0:
             return OpResult(
                 success=False,
                 error=stderr.decode("utf-8", errors="replace"),
             )
-        
+
         content = stdout.decode("utf-8", errors="replace")
         lines = content.splitlines()
         return OpResult(
@@ -833,16 +855,16 @@ class SSHContext:
                 "filename": PurePosixPath(abs_path).name,
                 "line_count": len(lines),
                 "truncated": False,
-            }
+            },
         )
-    
+
     def _resolve_path(self, path: str) -> str:
         """解析相对路径到 workspace 下。"""
         p = PurePosixPath(path)
         if p.is_absolute():
             return str(p)
         return str(PurePosixPath(self.workspace) / path)
-    
+
     def prompt_context(self) -> str:
         caps = ", ".join(c.value for c in sorted(self.capabilities, key=lambda c: c.value))
         return (
@@ -857,12 +879,13 @@ class SSHContext:
 @dataclass(frozen=True)
 class SSHConfig:
     """SSH 连接配置。"""
-    alias: str          # 显示名 / 标识
+
+    alias: str  # 显示名 / 标识
     host: str
     user: str
     port: int = 22
     key_path: str = ""  # SSH 私钥路径
-    workspace: str = "" # 空则连接后探测 $HOME
+    workspace: str = ""  # 空则连接后探测 $HOME
 
 
 def _shell_quote(s: str) -> str:
@@ -1208,27 +1231,27 @@ from lca.layer0_infra.execution.config import ExecutionConfig, load_execution_co
 
 class ExecutionContextFactory:
     """根据配置和运行时状态创建 ExecutionContext。
-    
+
     支持单用户和多用户模式：
     - resolve(): 单用户模式，返回默认 context
     - resolve_for_user(user_id): 多用户模式，返回 per-user context
     """
-    
+
     def __init__(self, config: ExecutionConfig | None = None):
         self._config = config or load_execution_config()
-    
+
     async def resolve(self) -> Optional[ExecutionContext]:
         """单用户模式：返回默认 context（lobe_user="sandbox"）"""
         return await self.resolve_for_user("sandbox")
-    
+
     async def resolve_for_user(self, lobe_user: str) -> Optional[ExecutionContext]:
         """多用户模式：返回 per-user context
-        
+
         Phase 1（现在）：所有用户共享 lca-sandbox
         Phase 2（未来）：每个用户独立的 lca-{user_id} workspace
         """
         backend = self._config.backend
-        
+
         if backend == "host":
             return await self._resolve_host(lobe_user)
         elif backend == "onlyboxes":
@@ -1241,10 +1264,10 @@ class ExecutionContextFactory:
             return await self._resolve_auto(lobe_user)
         else:
             raise ValueError(f"unknown backend: {backend}")
-    
+
     async def _resolve_auto(self, lobe_user: str) -> Optional[ExecutionContext]:
         """Auto-detect 优先级。
-        
+
         理由：Host 在线意味着用户显式连接了一台机器（最明确意图）；
         SSH 配置意味着用户想连远程机器；
         Onlyboxes 通常是后台默认值，不覆盖显式配置。
@@ -1254,54 +1277,58 @@ class ExecutionContextFactory:
         host_ctx = await self._resolve_host(lobe_user)
         if host_ctx is not None:
             return host_ctx
-        
+
         # 2. SSH: 检查配置（远程 Linux/Mac 无 sidecar 场景）
         ssh_ctx = self._resolve_ssh(lobe_user)
         if ssh_ctx is not None:
             return ssh_ctx
-        
+
         # 3. Onlyboxes: 检查配置（云端容器）
         onlyboxes_ctx = self._resolve_onlyboxes(lobe_user)
         if onlyboxes_ctx is not None:
             return onlyboxes_ctx
-        
+
         # 4. Windows: 仅当 gateway 本身跑在 Windows 上
         windows_ctx = self._resolve_windows(lobe_user)
         if windows_ctx is not None:
             return windows_ctx
-        
+
         return None
-    
+
     async def _resolve_host(self, lobe_user: str) -> Optional[ExecutionContext]:
         """检查 Presence 是否有在线 host。"""
         from gateway.presence.registry import PresenceRegistry
         from gateway.host_sandbox import HostSandbox
-        
+
         # 注入 PresenceRegistry（由 gateway 启动时设置）
         registry = _get_presence_registry()
         if registry is None:
             return None
-        
+
         sandbox = HostSandbox.from_presence(registry, _get_exec_hub())
         if sandbox is None:
             return None
-        
+
         from lca.layer0_infra.sandbox.host_settings import load_host_settings
+
         settings = load_host_settings()
         return HostContext(sandbox, settings, lobe_user=lobe_user)
-    
+
     def _resolve_ssh(self, lobe_user: str) -> Optional[ExecutionContext]:
         if not self._config.ssh_host:
             return None
-        return SSHContext(SSHConfig(
-            alias=self._config.ssh_alias or self._config.ssh_host,
-            host=self._config.ssh_host,
-            user=self._config.ssh_user,
-            port=self._config.ssh_port,
-            key_path=self._config.ssh_key_path,
-            workspace=self._get_ssh_workspace(lobe_user),
-        ), lobe_user=lobe_user)
-    
+        return SSHContext(
+            SSHConfig(
+                alias=self._config.ssh_alias or self._config.ssh_host,
+                host=self._config.ssh_host,
+                user=self._config.ssh_user,
+                port=self._config.ssh_port,
+                key_path=self._config.ssh_key_path,
+                workspace=self._get_ssh_workspace(lobe_user),
+            ),
+            lobe_user=lobe_user,
+        )
+
     def _get_ssh_workspace(self, lobe_user: str) -> str:
         """SSH workspace: 远程机器上的 per-user 目录"""
         if self._config.ssh_workspace:
@@ -1309,31 +1336,37 @@ class ExecutionContextFactory:
             return self._config.ssh_workspace
         # 默认：远程 home 下的 LCA/{user}
         return f"~/LCA/{lobe_user}"
-    
+
     def _resolve_onlyboxes(self, lobe_user: str) -> Optional[ExecutionContext]:
         if not self._config.onlyboxes_base_url or not self._config.onlyboxes_token:
             return None
         from lca.layer0_infra.sandbox.onlyboxes_adapter import OnlyboxesSandboxAdapter
+
         sandbox = OnlyboxesSandboxAdapter(
             base_url=self._config.onlyboxes_base_url,
             access_token=self._config.onlyboxes_token,
         )
         return OnlyboxesContext(sandbox, lobe_user=lobe_user)
-    
+
     def _resolve_windows(self, lobe_user: str) -> Optional[ExecutionContext]:
         """Windows 只在 gateway 本机时使用。远程 Windows 通过 HostContext 访问。"""
         import sys
+
         if sys.platform != "win32":
             return None
-        return WindowsContext(WindowsConfig(
-            device_id="local-windows",
-            label="Local Windows",
-            workspace=self._get_windows_workspace(lobe_user),
-        ), lobe_user=lobe_user)
-    
+        return WindowsContext(
+            WindowsConfig(
+                device_id="local-windows",
+                label="Local Windows",
+                workspace=self._get_windows_workspace(lobe_user),
+            ),
+            lobe_user=lobe_user,
+        )
+
     def _get_windows_workspace(self, lobe_user: str) -> str:
         """Windows workspace: %USERPROFILE%\LCA\{user}"""
         import os
+
         home = os.environ.get("USERPROFILE", "C:\\Users\\Default")
         return os.path.join(home, "LCA", lobe_user)
 
@@ -1342,11 +1375,14 @@ class ExecutionContextFactory:
 _presence_registry = None
 _exec_hub = None
 
+
 def _get_presence_registry():
     return _presence_registry
 
+
 def _get_exec_hub():
     return _exec_hub
+
 
 def set_gateway_services(registry, hub):
     global _presence_registry, _exec_hub
@@ -1364,37 +1400,38 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class ExecutionConfig(BaseSettings):
     """执行环境统一配置。
-    
+
     合并 host / ssh / windows / onlyboxes 的配置，
     由 factory 按需读取。
     """
+
     model_config = SettingsConfigDict(
         env_prefix="LCA_",
         env_file=(".env", "deploy/lobehub/.env.lca"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
-    
+
     # 通用
     execution_backend: str = "auto"  # auto | host | onlyboxes | ssh | windows
-    
+
     # Host
     host_user: str = "sandbox"  # Phase 1 默认，旧代码用 "sandbox-user"
     host_root: str = ""  # 空 → /home/${host_user}
     host_device_id: str = "local-host"
     host_token: str = "lca-local-host"
-    
+
     # SSH
     ssh_host: str = ""
     ssh_user: str = ""
     ssh_port: int = 22
     ssh_key_path: str = ""
     ssh_workspace: str = ""  # 空 → 远程 $HOME
-    ssh_alias: str = ""      # 显示名，空 → ssh_host
-    
+    ssh_alias: str = ""  # 显示名，空 → ssh_host
+
     # Windows
     windows_workspace: str = ""  # 空 → USERPROFILE/lca-workspace
-    
+
     # Onlyboxes (复用现有环境变量名)
     onlyboxes_base_url: str = ""
     onlyboxes_token: str = ""
@@ -1506,12 +1543,11 @@ officecli create {outputs_dir}/report.pptx --json
 ```python
 # lca/layer0_infra/skills/skill_renderer.py
 
+
 def render_skill_content(content: str, context: ExecutionContext) -> str:
     """替换 skill 内容中的路径占位符。"""
-    return (
-        content
-        .replace("{workspace}", context.workspace)
-        .replace("{outputs_dir}", context.outputs_dir)
+    return content.replace("{workspace}", context.workspace).replace(
+        "{outputs_dir}", context.outputs_dir
     )
 ```
 
@@ -1529,18 +1565,16 @@ class ListFilesTool(Tool):
     description = "List files in a directory."
     parameters = {
         "type": "object",
-        "properties": {
-            "directory_path": {"type": "string", "description": "Directory path"}
-        },
+        "properties": {"directory_path": {"type": "string", "description": "Directory path"}},
         "required": ["directory_path"],
     }
-    
+
     def __init__(self, context: ExecutionContext):
         self._context = context
-    
+
     async def execute(self, args: dict) -> Observation:
         result = await self._context.execute("list_files", args)
-        
+
         extra: dict[str, object] = {
             "truncated": result.truncated,
             "original_size": result.original_size,
@@ -1559,7 +1593,7 @@ class ListFilesTool(Tool):
                 payload=None,
                 extra=extra,
             )
-        
+
         return Observation(
             observation_id=new_id("obs"),
             success=True,
@@ -1599,12 +1633,10 @@ class ListFilesTool(Tool):
 ```python
 # gateway/runs/file_download.py
 
-async def generate_download_url(
-    context: ExecutionContext, 
-    workspace_path: str
-) -> str:
+
+async def generate_download_url(context: ExecutionContext, workspace_path: str) -> str:
     """将 workspace 路径转为可下载的 URL。
-    
+
     策略：
     - Host / Windows: 路径在 gateway 本机，直接读文件返回
     - SSH: 通过 ssh cat 读取，流式返回
@@ -1614,15 +1646,15 @@ async def generate_download_url(
         # 直接读本地文件
         local_path = workspace_path  # workspace 就是本机路径
         return _serve_local_file(local_path)
-    
+
     elif context.backend == BackendKind.WINDOWS:
         # Windows 路径，直接读
         return _serve_local_file(workspace_path)
-    
+
     elif context.backend == BackendKind.SSH:
         # 通过 SSH 读取
         return _serve_ssh_file(context, workspace_path)
-    
+
     elif context.backend == BackendKind.ONLYBOXES:
         # 通过 Onlyboxes adapter 读取
         return _serve_onlyboxes_file(context, workspace_path)
@@ -1649,29 +1681,29 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class ViewportPolicy:
     """统一截断策略 — 在 ExecutionContext.execute() 出口强制执行。
-    
+
     业界共识（E2B / Devin / Claude Code harness）：
     - 永远不让原始输出直接进入 LLM 上下文
     - 截断信号（truncated=True）告知 Agent 还有更多数据
     - Agent 通过 offset/limit/grep 二次查询补全
     """
-    
+
     # ── stdout/stderr 截断 ──
-    max_stdout_lines: int = 500      # shell 命令最大输出行数
-    max_stderr_lines: int = 200      # stderr 通常更短
-    max_output_chars: int = 50_000   # 字符上限（兜底）
-    
+    max_stdout_lines: int = 500  # shell 命令最大输出行数
+    max_stderr_lines: int = 200  # stderr 通常更短
+    max_output_chars: int = 50_000  # 字符上限（兜底）
+
     # ── 文件内容截断 ──
-    max_file_lines: int = 2000       # read_file 最大行数
-    max_file_chars: int = 200_000    # read_file 字符上限
-    
+    max_file_lines: int = 2000  # read_file 最大行数
+    max_file_chars: int = 200_000  # read_file 字符上限
+
     # ── 列表截断 ──
-    max_list_items: int = 500        # list_files 最大条目数
-    
+    max_list_items: int = 500  # list_files 最大条目数
+
     @classmethod
     def default(cls) -> "ViewportPolicy":
         return cls()
-    
+
     @classmethod
     def permissive(cls) -> "ViewportPolicy":
         """宽松模式 — 用于 Agent 明确要求「看全部」的场景。"""
@@ -1683,10 +1715,10 @@ class ViewportPolicy:
             max_file_chars=1_000_000,
             max_list_items=2000,
         )
-    
+
     def apply(self, result: "OpResult") -> "OpResult":
         """对 OpResult 强制截断，返回新的 OpResult。
-        
+
         截断后设置：
         - truncated=True
         - truncation_reason=具体原因
@@ -1700,7 +1732,7 @@ class ViewportPolicy:
 # ExecutionContext 构造函数接受可选的 viewport_policy 参数：
 # - HostContext(..., viewport=ViewportPolicy.default())
 # - OnlyboxesContext(..., viewport=ViewportPolicy.default())
-# 
+#
 # execute() 方法也接受可选的 viewport 参数覆盖：
 # - ctx.execute("run_command", {...}, viewport=ViewportPolicy.permissive())
 #
@@ -1749,11 +1781,11 @@ Agent: execute("grep_content", {"pattern": "def.*important", "path": "huge.py"})
 ```python
 # lca/layer0_infra/execution/host_context.py (Phase 4)
 
+
 class HostJobHandle:
     """Host 的 Job 实现 — 后台进程 + 日志文件。"""
-    
-    def __init__(self, job_id: str, process: asyncio.subprocess.Process,
-                 log_path: Path):
+
+    def __init__(self, job_id: str, process: asyncio.subprocess.Process, log_path: Path):
         self._job_id = job_id
         self._process = process
         self._log_path = log_path
@@ -1761,29 +1793,29 @@ class HostJobHandle:
         self._subscribers: list[Callable] = []
         # 启动日志 tail 协程
         self._log_task = asyncio.create_task(self._tail_logs())
-    
+
     @property
     def job_id(self) -> str:
         return self._job_id
-    
+
     @property
     def status(self) -> str:
         return self._status
-    
+
     async def get_status(self) -> str:
         if self._process.returncode is not None:
             self._status = "succeeded" if self._process.returncode == 0 else "failed"
         return self._status
-    
+
     async def subscribe_logs(self, callback, *, since=0):
         self._subscribers.append(callback)
         return lambda: self._subscribers.remove(callback)
-    
+
     async def cancel(self):
         if self._process.returncode is None:
             self._process.terminate()
             self._status = "cancelled"
-    
+
     async def result(self, timeout_s=None):
         try:
             await asyncio.wait_for(self._process.wait(), timeout=timeout_s)
@@ -1800,7 +1832,7 @@ class HostJobHandle:
             },
             env_state=EnvState(cwd="...", user="..."),
         )
-    
+
     async def _tail_logs(self):
         """持续读取日志文件，推送给 subscribers。"""
         ...
@@ -1808,11 +1840,11 @@ class HostJobHandle:
 
 class HostContext:
     # ... 省略已有代码 ...
-    
+
     async def start_job(self, command, *, cwd="", env=None):
         job_id = new_id("job")
         log_path = Path(f"/tmp/lca-job-{job_id}.log")
-        
+
         process = await asyncio.create_subprocess_shell(
             command,
             cwd=cwd or self.workspace,
@@ -1820,10 +1852,10 @@ class HostContext:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
-        
+
         # 异步写入日志文件
         asyncio.create_task(self._pipe_to_log(process, log_path))
-        
+
         return HostJobHandle(job_id, process, log_path)
 ```
 
@@ -1832,29 +1864,30 @@ class HostContext:
 ```python
 # lca/layer2_runtime/runtime_loop.py (Phase 4)
 
+
 async def _handle_long_task(self, state, action):
     """长任务处理 — 不阻塞认知循环。"""
     ctx = self._execution_context
-    
+
     if not isinstance(ctx, AsyncJobProvider):
         # 不支持 Job → 降级为同步执行（带超时）
         return await ctx.execute("run_command", action.payload)
-    
+
     # 启动异步任务
     job = await ctx.start_job(
         command=action.payload["command"],
         cwd=action.payload.get("cwd", ctx.workspace),
     )
-    
+
     # 订阅日志（可选：推送到前端）
     def on_log(chunk):
         self._emit_log(state, chunk)
-    
+
     unsubscribe = await job.subscribe_logs(on_log)
-    
+
     # 继续认知循环（不等待 job 完成）
     # ... Agent 可以通过后续步骤查询 job 状态或取消
-    
+
     return Observation(
         success=True,
         payload=f"Job started: {job.job_id}",
@@ -2142,19 +2175,20 @@ async def extract_user_from_request(request: Request) -> str:
     auth = request.headers.get("Authorization")
     if not auth:
         return "anonymous"  # 降级
-    
+
     # 验证 token，提取 user_id
     user_id = await verify_lobehub_auth(auth)
     return user_id
 
+
 # gateway/runs/api.py
 async def create_run(request: Request):
     user_id = await extract_user_from_request(request)
-    
+
     # per-user context
     factory = ExecutionContextFactory()
     context = await factory.resolve_for_user(user_id)
-    
+
     # context.workspace = /home/lca-{user_id}
     # Agent 在该用户的隔离空间执行
 ```

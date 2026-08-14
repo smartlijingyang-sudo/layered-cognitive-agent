@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.tools.write_file_tool import WriteFileTool
+from lca.layer0_infra.tools.write_file import build_tools as build_write_file_tools
 
 
 class LocalFileStoreTests(unittest.IsolatedAsyncioTestCase):
@@ -35,7 +35,7 @@ class LocalFileStoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.read_bytes(stored.attachment_id), b"hello world")
 
     async def test_write_file_tool_creates_downloadable_product(self) -> None:
-        tool = WriteFileTool(store=self.store)
+        tool = build_write_file_tools(store=self.store)[0]
         self.assertIsNone(tool.validate({"name": "report.md", "content": "# Hi"}))
         obs = await tool.execute(
             {"name": "report.md", "content": "# Hi\n\nbody", "mime_type": "text/markdown"}
@@ -78,7 +78,7 @@ class LocalFileStoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(stored.previewable)
 
     async def test_write_file_tool_rejects_empty_name(self) -> None:
-        tool = WriteFileTool(store=self.store)
+        tool = build_write_file_tools(store=self.store)[0]
         self.assertIsNotNone(tool.validate({"name": "  ", "content": "x"}))
 
 

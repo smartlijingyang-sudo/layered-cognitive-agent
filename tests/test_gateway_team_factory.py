@@ -33,7 +33,7 @@ class TestGatewaySoloFactory(unittest.TestCase):
         agent = build_solo_agent(llm, observability=InMemoryObservability())
         names = {t.name for t in agent.spec.tools}
         self.assertNotIn("search_skill", names)
-        self.assertIn("web_search", names)
+        self.assertIn("search", names)
 
 
 class TestGatewayTeamFactory(unittest.TestCase):

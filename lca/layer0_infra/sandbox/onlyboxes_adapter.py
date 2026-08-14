@@ -21,6 +21,7 @@ import httpx
 import structlog
 
 from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.guest_layout import GuestLayout
 from lca.contracts.models.core.sandbox import (
     DEFAULT_SANDBOX_TIMEOUT_S,
     SandboxResult,
@@ -35,6 +36,7 @@ from lca.layer0_infra.sandbox.onlyboxes_bootstrap import (
     safe_rel_name,
     timeout_ms,
 )
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 from lca.layer0_infra.sandbox.streaming import SandboxStreamEmitter
 
 _log = structlog.get_logger(__name__)
@@ -71,11 +73,13 @@ class OnlyboxesSandboxAdapter(Sandbox):
         base_url: str,
         access_token: str,
         client: httpx.AsyncClient | None = None,
+        layout: GuestLayout | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._access_token = access_token
         self._client = client
         self._lease_ttl_sec = DEFAULT_LEASE_TTL_SEC
+        self._layout = layout if layout is not None else ONLYBOXES
 
     # ── internal: terminal execution ────────────────────────────────
 
@@ -97,7 +101,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
         )
         try:
             body = {
-                "command": command,
+                "command": self._layout.with_cwd(command),
                 "create_if_missing": True,
                 "lease_ttl_sec": self._lease_ttl_sec,
                 "session_id": session_id,
@@ -162,7 +166,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
         self,
         files: dict[str, bytes | str],
         *,
-        base_dir: str = "/mnt/data",
+        base_dir: str = "",
         session_id: str = "",
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
     ) -> SandboxResult:
@@ -173,9 +177,10 @@ class OnlyboxesSandboxAdapter(Sandbox):
         """
         curl_cmds: list[str] = []
         chunk_files: list[tuple[str, bytes, str]] = []
+        root = base_dir or self._layout.root
 
         for name, source in files.items():
-            path = f"{base_dir}/{safe_rel_name(name)}"
+            path = f"{root}/{safe_rel_name(name)}"
             if isinstance(source, str) and source.startswith(("http://", "https://")):
                 curl_cmds.append(f"curl -fsSL '{source}' -o '{path}'")
             else:
@@ -187,8 +192,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
             marker = SANDBOX_FILES_INIT_MARKER
             joined = " && ".join(curl_cmds)
             cmd = (
-                f"mkdir -p '{base_dir}'; "
-                f"if [ ! -f '{marker}' ]; then {joined} && touch '{marker}'; fi"
+                f"mkdir -p '{root}'; if [ ! -f '{marker}' ]; then {joined} && touch '{marker}'; fi"
             )
             result = await self._exec_terminal(cmd, session_id=session_id, timeout_s=timeout_s)
             if not result.success:

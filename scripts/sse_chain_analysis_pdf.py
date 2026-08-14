@@ -14,11 +14,9 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.platypus import (
     ListFlowable,
     ListItem,
-    PageBreak,
     Paragraph,
     Preformatted,
     SimpleDocTemplate,
-    Spacer,
     Table,
     TableStyle,
 )
@@ -206,7 +204,7 @@ def table(rows: list[list], col_widths: list[float], header: bool = True) -> Tab
     return grid
 
 
-def on_page(canvas, doc) -> None:  # noqa: ANN001
+def on_page(canvas, doc) -> None:
     canvas.saveState()
     canvas.setStrokeColor(RULE)
     canvas.setLineWidth(0.4)
@@ -359,8 +357,12 @@ def build() -> None:
             cell("任务被标完成，交付物是错的。", s["cell"]),
         ],
     ]
-    story.append(table(tl, [14 * mm, 18 * mm, (usable - 32 * mm) * 0.58, (usable - 32 * mm) * 0.42]))
-    story.append(P("表 2 - Journal 是步骤轨；UI 是「只留当前轮」。丢失发生在投影之后。", s["caption"]))
+    story.append(
+        table(tl, [14 * mm, 18 * mm, (usable - 32 * mm) * 0.58, (usable - 32 * mm) * 0.42])
+    )
+    story.append(
+        P("表 2 - Journal 是步骤轨；UI 是「只留当前轮」。丢失发生在投影之后。", s["caption"])
+    )
 
     # 2
     story.append(P("2. 目标画面 vs 当前契约", s["h1"]))
@@ -575,7 +577,9 @@ def build() -> None:
         ],
     ]
     story.append(table(claims, [42 * mm, 22 * mm, usable - 64 * mm]))
-    story.append(P("表 4 - 把「SSE 坏了」拆开以后，管道层全部成立，状态层和产物层不成立。", s["caption"]))
+    story.append(
+        P("表 4 - 把「SSE 坏了」拆开以后，管道层全部成立，状态层和产物层不成立。", s["caption"])
+    )
 
     # 5
     story.append(P("5. 根因按机制归类（不打补丁清单）", s["h1"]))
@@ -638,13 +642,19 @@ def build() -> None:
             cell("继续让 2.5 和用户预期各说各话", s["cell"]),
         ],
         [
-            cell("Run 级 tool ledger：按 invocation_id upsert plugin_state，dispatch 全量 tools", s["cell"]),
+            cell(
+                "Run 级 tool ledger：按 invocation_id upsert plugin_state，dispatch 全量 tools",
+                s["cell"],
+            ),
             cell("H4", s["cell_c"]),
             cell("历史工具卡和代码为什么还在", s["cell"]),
             cell("在 StreamingHandler 里 if/else 拼上一轮", s["cell"]),
         ],
         [
-            cell("若要步骤轨：每轮 LLM 落一条独立 thinking 块（或独立 assistant part），禁止覆盖同一字段", s["cell"]),
+            cell(
+                "若要步骤轨：每轮 LLM 落一条独立 thinking 块（或独立 assistant part），禁止覆盖同一字段",
+                s["cell"],
+            ),
             cell("H4/H5", s["cell_c"]),
             cell("思考如何夹在工具之间", s["cell"]),
             cell("把多轮塞进同一个 thinkingContent 字符串假装时间线", s["cell"]),
@@ -656,7 +666,10 @@ def build() -> None:
             cell("Doctor 里再加一层 id 别名映射", s["cell"]),
         ],
         [
-            cell("execute_code 缺 code -> ToolDenied；harvest 只收本次新建/指纹变化文件，outputs 按 run 隔离", s["cell"]),
+            cell(
+                "execute_code 缺 code -> ToolDenied；harvest 只收本次新建/指纹变化文件，outputs 按 run 隔离",
+                s["cell"],
+            ),
             cell("执行/沙箱", s["cell_c"]),
             cell("空调用为什么不能冒充交付", s["cell"]),
             cell("在 closure 文案里过滤「素数」这种特例", s["cell"]),
@@ -668,13 +681,18 @@ def build() -> None:
             cell("只在前端多写一个 skip", s["cell"]),
         ],
         [
-            cell("Doctor：scope==session；每张 ToolStarted 是否仍能在终态 tools 里找到；空 code 失败", s["cell"]),
+            cell(
+                "Doctor：scope==session；每张 ToolStarted 是否仍能在终态 tools 里找到；空 code 失败",
+                s["cell"],
+            ),
             cell("诊断", s["cell_c"]),
             cell("H4/H5 这次为什么不是 ok", s["cell"]),
             cell("再加一个只数 seq 的绿灯", s["cell"]),
         ],
     ]
-    story.append(table(fixes, [48 * mm, 18 * mm, (usable - 66 * mm) * 0.5, (usable - 66 * mm) * 0.5]))
+    story.append(
+        table(fixes, [48 * mm, 18 * mm, (usable - 66 * mm) * 0.5, (usable - 66 * mm) * 0.5])
+    )
     story.append(P("表 5 - 每一行都能回答「删掉它，哪个问题无法回答」。", s["caption"]))
 
     story.append(P("建议落地顺序", s["h2"]))
@@ -801,7 +819,10 @@ def build() -> None:
             cell("单槽 thinking + 整表替换 tools", s["cell"]),
         ],
         [
-            cell("docs/superpowers/specs/2026-08-13-run-live-architecture-design.md sec 2.5", s["cell"]),
+            cell(
+                "docs/superpowers/specs/2026-08-13-run-live-architecture-design.md sec 2.5",
+                s["cell"],
+            ),
             cell("「明确不做多段 Thinking」", s["cell"]),
         ],
     ]

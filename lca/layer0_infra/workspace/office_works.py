@@ -18,6 +18,7 @@ from lca.layer0_infra.file_store import (
     get_default_file_store,
     persist_generated_files,
 )
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 from lca.layer0_infra.sandbox.runtime_scope import get_sandbox_runtime
 from lca.layer0_infra.workspace.deliverable import is_office_name
 from lca.layer0_infra.workspace.scope import get_run_workspace
@@ -53,7 +54,7 @@ async def publish_office_works(runtime: Any, store: FileStore) -> list[dict[str,
         name = getattr(sandbox_file, "name", "") or ""
         if not is_office_name(name):
             continue
-        guest = f"/mnt/data/outputs/{PurePosixPath(name).name}"
+        guest = ONLYBOXES.output_file(PurePosixPath(name).name)
         if not await _office_has_content(runtime, guest):
             continue
         parts = persist_generated_files(store, (sandbox_file,))
@@ -101,7 +102,7 @@ async def _render_html_preview(
 ) -> dict[str, Any] | None:
     stem = PurePosixPath(office_name).stem
     html_name = f"{stem}.preview.html"
-    html_path = f"/mnt/data/outputs/{html_name}"
+    html_path = ONLYBOXES.output_file(html_name)
     result = await runtime.run_terminal(
         f"officecli view {shlex_quote(guest_path)} html -o {shlex_quote(html_path)} --json",
         timeout_s=60,

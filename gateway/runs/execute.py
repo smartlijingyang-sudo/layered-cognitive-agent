@@ -138,6 +138,7 @@ def create_run_session(
     device_id: str = "",
     plane: str = "",
     extra_plane: str = "",
+    execution_target: str = "",
 ) -> RunSession:
     run_id = new_id("run")
     trace_id = new_id("trace")
@@ -160,6 +161,7 @@ def create_run_session(
         device_id=device_id.strip(),
         plane=plane.strip(),
         extra_plane=extra_plane.strip(),
+        execution_target=execution_target.strip(),
     )
     registry.put(session)
     return session
@@ -249,7 +251,7 @@ async def execute_run(
                         else None,
                     )
                     return
-                success = True
+                success = result.status == TaskStatus.COMPLETED
     except asyncio.CancelledError:
         session.cancel_requested = True
         raise
@@ -276,7 +278,7 @@ async def resume_run(session: RunSession, registry: RunRegistry, answer: str) ->
             session.approval_request = result.extra.get("approval_request")
             registry.mark_paused(session)
             return
-        success = True
+        success = result.status == TaskStatus.COMPLETED
     except asyncio.CancelledError:
         session.cancel_requested = True
         raise
@@ -402,6 +404,7 @@ def _freeze_bindings(session: RunSession):
             device_id=session.device_id,
             plane=session.plane,
             extra_plane=session.extra_plane,
+            execution_target=session.execution_target,
         ),
     )
     machine_bound = ref_of(bindings, PlaneKind.MACHINE)

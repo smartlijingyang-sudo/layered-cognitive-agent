@@ -65,7 +65,7 @@ class MockLLMAdapter(LLMAdapter):
         if expr:
             return self._respond_with_tool_call(
                 call_id="mock_call_1",
-                name="calculator",
+                name="calculate",
                 arguments={"expression": expr},
             )
 

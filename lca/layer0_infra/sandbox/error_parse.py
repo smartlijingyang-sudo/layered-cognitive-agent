@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from lca.contracts.models.core.sandbox import SandboxErrorKind, SandboxResult
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 
 _USER_LINE_RE = re.compile(
     r'File "<lca-user>", line (\d+)',
@@ -38,9 +39,9 @@ def classify_execution_error(
             SandboxErrorKind.USER_CODE,
             f"FileNotFoundError: {guest_path}",
             (
-                "路径不存在。先用 list_files 查看 /mnt/data；"
+                f"路径不存在。先用 list_files 查看 {ONLYBOXES.root}；"
                 "写入前 os.makedirs(os.path.dirname(path), exist_ok=True) 或使用 write_file(createDirectories=true)；"
-                "产出文件应写到 /mnt/data/outputs/"
+                f"产出文件应写到 {ONLYBOXES.outputs_dir}/"
             ),
             failed_at_line,
             partial,

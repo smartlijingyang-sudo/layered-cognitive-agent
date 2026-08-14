@@ -30,7 +30,7 @@ class SkillExecTool(Tool):
     name = RUN_SKILL_SCRIPT_TOOL
     description = (
         "在已激活 skill 的工作目录中执行 shell 命令（execScript）。"
-        "需先 activate_skill；附件已挂载到 /mnt/data/<文件名>。"
+        "需先 activate_skill；附件已挂载到工作根/<文件名>。"
         "分析 Excel/CSV 等：先 activate 对应 skill，再在此执行 skill 文档中的命令或脚本。"
         "参数: command（shell 命令）、skill_id（可选，默认最近激活）、"
         "install_requirements（可选，默认 true）、timeout_s。"

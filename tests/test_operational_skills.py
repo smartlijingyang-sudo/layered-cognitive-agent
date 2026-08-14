@@ -130,7 +130,8 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         act_obs = await activate.execute({"skill_id": "demo"})
         self.assertTrue(act_obs.success)
         self.assertTrue(act_obs.payload["text"].endswith("Do work"))
-        self.assertIn("执行面：", act_obs.payload["text"])
+        self.assertIn("outputs/", act_obs.payload["text"])
+        self.assertNotIn("/mnt/data", act_obs.payload["text"])
         state = act_obs.payload["state"]
         self.assertEqual(state["name"], "demo")
         self.assertEqual(state["title"], "demo")
@@ -236,13 +237,13 @@ class TestDefaultTools(unittest.TestCase):
     def test_build_default_tools_includes_skill_tools(self) -> None:
         with patch("lca.layer0_infra.tools.default_set.resolve_sandbox", return_value=None):
             names = {t.name for t in build_default_tools()}
-        self.assertIn("write_file", names)
+        self.assertIn("writeFile", names)
         self.assertIn("search_skill", names)
         self.assertIn("import_skill", names)
         self.assertIn("activate_skill", names)
         self.assertIn("read_skill_reference", names)
         self.assertNotIn("run_skill_script", names)
-        self.assertNotIn("list_files", names)
+        self.assertNotIn("listFiles", names)
         self.assertNotIn("sandbox_execute", names)
         self.assertNotIn("sandbox_inspect", names)
 
@@ -251,8 +252,8 @@ class TestDefaultTools(unittest.TestCase):
             mock_sbx.return_value = object()
             names = {t.name for t in build_default_tools()}
         self.assertIn("run_skill_script", names)
-        self.assertIn("list_files", names)
-        self.assertIn("run_command", names)
+        self.assertIn("listFiles", names)
+        self.assertIn("runCommand", names)
         self.assertNotIn("sandbox_execute", names)
 
     def test_sanitize_skill_id(self) -> None:

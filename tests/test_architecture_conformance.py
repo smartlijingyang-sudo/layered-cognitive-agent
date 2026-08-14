@@ -46,8 +46,41 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.computer.runtime_exec.ComputerRuntimeExecMixin": (
         "SandboxComputer shell/execute 混入，模块内部组合 (Computer Use)"
     ),
-    "lca.layer0_infra.tools.computer.specs.ComputerToolSpec": (
-        "Computer 工具注册表条目，纯数据声明 (Computer Use)"
+    "lca.layer0_infra.tools.lca_computer.executor.LcaComputerExecutor": (
+        "manifest 驱动的 computer 执行器，内部路由 (Execution Alignment)"
+    ),
+    "lca.layer0_infra.tools.lca_computer.executor.LcaSandboxExecutor": (
+        "manifest 驱动的 sandbox 执行器，内部路由 (Execution Alignment)"
+    ),
+    "lca.layer0_infra.tools.lca_computer.types.ApiName": (
+        "camelCase API 名称枚举，纯数据声明 (Execution Alignment)"
+    ),
+    "lca.layer0_infra.tools.calculator.CalculatorExecutor": (
+        "manifest 驱动的计算器执行器 (Execution Alignment)"
+    ),
+    "lca.layer0_infra.tools.weather.WeatherExecutor": (
+        "manifest 驱动的天气执行器 (Execution Alignment)"
+    ),
+    "lca.layer0_infra.tools.web_search.WebSearchExecutor": (
+        "manifest 驱动的搜索执行器 (Execution Alignment)"
+    ),
+    "lca.layer0_infra.tools.write_file.WriteFileExecutor": (
+        "manifest 驱动的写文件执行器 (Execution Alignment)"
+    ),
+    "lca.layer0_infra.tools.ask_user.AskUserExecutor": (
+        "manifest 驱动的 HIL 执行器 (Execution Alignment)"
+    ),
+    "lca.layer0_infra.plane.execution_target.ExecutionTarget": (
+        "执行目标枚举，纯数据声明 (Execution Alignment)"
+    ),
+    "lca.layer0_infra.plane.execution_target.ExecutionPlan": (
+        "执行计划值对象，纯数据声明 (Execution Alignment)"
+    ),
+    "lca.layer0_infra.device_gateway.client.GatewayHttpClient": (
+        "device-gateway HTTP 客户端，对标 LobeHub GatewayHttpClient"
+    ),
+    "lca.layer0_infra.device_gateway.client.DeviceToolCallResult": (
+        "device-gateway 工具调用结果值对象"
     ),
     "lca.layer1_cognitive.body.action_catalog.ActionSpec": (
         "纯数据声明（action_type 元数据），非可插拔行为实现；见 ActionCatalog PR-4"
@@ -234,9 +267,6 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.plane.resolve.PlaneRequest": ("绑定请求值对象，纯数据，非可插拔组件"),
     "lca.layer0_infra.sandbox.host_settings.HostRuntimeSettings": (
         "sidecar pydantic-settings 配置，非可插拔组件"
-    ),
-    "lca.layer0_infra.sandbox.surface.ExecutionSurface": (
-        "过渡 prompt 适配器，磁盘身份已迁到 PlaneRef"
     ),
 }
 

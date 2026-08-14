@@ -143,12 +143,12 @@ class TestTerminalRespondGate:
             action_type="use_tool",
             rationale="test",
             confidence=0.9,
-            tool_calls=[ToolCall(call_id="c1", tool_name="execute_code", arguments={"code": "1"})],
+            tool_calls=[ToolCall(call_id="c1", tool_name="executeCode", arguments={"code": "1"})],
         )
         with run_workspace_scope("run_t", wall_clock_seconds=60):
             out = await gate.enforce(state, decision)
         assert out.action_type == "use_tool"
-        assert out.tool_calls[0].tool_name == "execute_code"
+        assert out.tool_calls[0].tool_name == "executeCode"
 
 
 @pytest.mark.asyncio

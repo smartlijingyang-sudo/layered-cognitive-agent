@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from lca.contracts.models.core.sandbox import (
-    SANDBOX_MOUNT_ROOT,
+    SANDBOX_OUTPUT_SUBDIR,
     MountEntry,
     MountManifest,
     SandboxErrorKind,
@@ -16,6 +16,7 @@ from lca.contracts.models.core.sandbox import (
 )
 from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.sandbox.exec_result import sandbox_exec_result_from
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 from lca.layer0_infra.tools.run_attachment_scope import merge_attachment_ids
 
 MOUNT_VERIFY_SCRIPT = """
@@ -25,7 +26,7 @@ root = {root!r}
 expected = {expected!r}
 found = {{}}
 for dirpath, _, filenames in _o.walk(root):
-    if "/outputs" in dirpath.replace("\\\\", "/"):
+    if "/{subdir}" in dirpath.replace("\\\\", "/"):
         continue
     for fn in filenames:
         fp = _o.path.join(dirpath, fn)
@@ -61,7 +62,7 @@ def build_mount_manifest(store: FileStore, mount_files: dict[str, bytes]) -> Mou
             id_by_name[meta.name] = aid
     entries: list[MountEntry] = []
     for name, data in mount_files.items():
-        guest_path = f"{SANDBOX_MOUNT_ROOT}/{name}"
+        guest_path = ONLYBOXES.attachment_path(name)
         entries.append(
             MountEntry(
                 path=guest_path,
@@ -85,8 +86,9 @@ async def verify_mount_or_error(
 
     verify = await execute(
         MOUNT_VERIFY_SCRIPT.format(
-            root=SANDBOX_MOUNT_ROOT,
+            root=ONLYBOXES.root,
             expected=[e.name for e in manifest.entries],
+            subdir=SANDBOX_OUTPUT_SUBDIR,
         ),
         timeout_s=timeout_s,
     )
@@ -113,7 +115,7 @@ async def verify_mount_or_error(
             error="mount verification failed",
             error_kind=SandboxErrorKind.MOUNT,
             error_summary=f"预期挂载缺失: {missing}",
-            suggested_fix="确认 run 附件已上传；路径为 /mnt/data/<原文件名>",
+            suggested_fix=f"确认 run 附件已上传；路径为 {ONLYBOXES.root}/<原文件名>",
             mount_manifest=manifest,
             environment_ready=False,
         )

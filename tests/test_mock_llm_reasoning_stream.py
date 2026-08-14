@@ -28,7 +28,7 @@ class TestMockLLMReasoningStream(unittest.IsolatedAsyncioTestCase):
         completed = [e for e in events if e.type == LLMStreamEventType.COMPLETED]
         self.assertTrue(tool_deltas)
         self.assertEqual(len(completed), 1)
-        self.assertEqual(tool_deltas[0].tool_name, "calculator")
+        self.assertEqual(tool_deltas[0].tool_name, "calculate")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,20 @@
+{
+  "name": "@lca/cli",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "lca": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@lca/gateway-client": "file:../gateway-client",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

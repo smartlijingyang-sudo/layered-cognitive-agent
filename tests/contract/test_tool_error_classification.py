@@ -13,7 +13,7 @@ from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ToolExecutionError, ToolInputError
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.layer0_infra.tools.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 
@@ -36,13 +36,13 @@ class TestErrorClassification:
 
 
 # ---------------------------------------------------------------------------
-# 2. CalculatorTool.validate 前置校验
+# 2. Calculator validate 前置校验
 # ---------------------------------------------------------------------------
 
 
 class TestCalculatorValidate:
     def setup_method(self) -> None:
-        self.tool = CalculatorTool()
+        self.tool = build_calculator_tools()[0]
 
     def test_empty_expression_rejected(self) -> None:
         assert self.tool.validate({"expression": ""}) is not None
@@ -73,9 +73,9 @@ class TestCalculatorValidate:
 class TestSafeExecutorValidationNoRetry:
     def setup_method(self) -> None:
         self.executor = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=["calculator"]),
+            ToolPermissionManifest(allowed_tools=["calculate"]),
         )
-        self.tool = CalculatorTool()
+        self.tool = build_calculator_tools()[0]
         self.retry_policy = RetryPolicy(max_retries=3, backoff_base_s=0.01)
         self.cache_config = CacheConfig()
 
@@ -106,9 +106,9 @@ class TestSafeExecutorValidationNoRetry:
 class TestSafeExecutorInputErrorNoRetry:
     def setup_method(self) -> None:
         self.executor = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=["calculator"]),
+            ToolPermissionManifest(allowed_tools=["calculate"]),
         )
-        self.tool = CalculatorTool()
+        self.tool = build_calculator_tools()[0]
         self.retry_policy = RetryPolicy(max_retries=3, backoff_base_s=0.01)
         self.cache_config = CacheConfig()
 
@@ -143,9 +143,9 @@ class TestSafeExecutorInputErrorNoRetry:
 class TestSafeExecutorNormalPath:
     def setup_method(self) -> None:
         self.executor = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=["calculator"]),
+            ToolPermissionManifest(allowed_tools=["calculate"]),
         )
-        self.tool = CalculatorTool()
+        self.tool = build_calculator_tools()[0]
         self.retry_policy = RetryPolicy(max_retries=3, backoff_base_s=0.01)
         self.cache_config = CacheConfig()
 

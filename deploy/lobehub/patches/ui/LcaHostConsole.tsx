@@ -3,10 +3,9 @@
 import { type CSSProperties, memo, useCallback, useEffect, useRef, useState } from 'react';
 
 type Device = {
-  capabilities: string[];
-  device_id: string;
-  name: string;
-  status: string;
+  deviceId: string;
+  hostname: string;
+  online: boolean;
 };
 
 const encodeKey = (event: KeyboardEvent): string | null => {
@@ -40,7 +39,11 @@ const LcaHostConsole = memo(() => {
 
   const refresh = useCallback(async () => {
     try {
-      const resp = await fetch('/lca-api/presence/devices');
+      const resp = await fetch('/lca-api/api/device/devices', {
+        body: JSON.stringify({}),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
       if (!resp.ok) return;
       const body = (await resp.json()) as { devices?: Device[] };
       setDevices(Array.isArray(body.devices) ? body.devices : []);
@@ -51,7 +54,7 @@ const LcaHostConsole = memo(() => {
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 3000);
+    const timer = window.setInterval(() => void refresh(), 30_000);
     return () => window.clearInterval(timer);
   }, [refresh]);
 
@@ -100,14 +103,14 @@ const LcaHostConsole = memo(() => {
     };
   }, []);
 
-  const online = devices.find((item) => item.status === 'online');
+  const online = devices.find((item) => item.online);
 
   return (
     <>
       <button
         onClick={() => {
           setOpen((value) => !value);
-          if (!open && online) void attach(online.device_id);
+          if (!open && online) void attach(online.deviceId);
         }}
         style={fabStyle}
         type="button"
@@ -117,7 +120,7 @@ const LcaHostConsole = memo(() => {
       {open ? (
         <div style={panelStyle}>
           <div style={headerStyle}>
-            <span>{online ? `${online.name} · ${status}` : 'host sidecar 未连接'}</span>
+            <span>{online ? `${online.hostname} · ${status}` : 'host sidecar 未连接'}</span>
             <button
               onClick={() => {
                 wsRef.current?.close();

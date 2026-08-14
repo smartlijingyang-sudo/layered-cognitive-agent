@@ -14,12 +14,12 @@ _TERMINAL_RATIONALE = "终态步：必须向用户收口；产物已从工作区
 # and discard the tool that was about to produce the deliverable.
 _PRODUCER_TOOLS = frozenset(
     {
-        "edit_file",
-        "execute_code",
-        "export_file",
-        "run_command",
+        "editFile",
+        "executeCode",
+        "exportFile",
+        "runCommand",
         "sandbox_execute",
-        "write_file",
+        "writeFile",
         "write_file_local",
     }
 )

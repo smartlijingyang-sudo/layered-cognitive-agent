@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 
-from lca.contracts.models.core.sandbox import SANDBOX_MOUNT_ROOT
 from lca.contracts.protocols.operational_skills import SANDBOX_SKILL_MOUNT_PREFIX
 from lca.layer0_infra.credentials.sandbox_env import build_sandbox_env_preamble
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 
 
 def skill_mount_dir(skill_id: str) -> str:
-    return f"{SANDBOX_MOUNT_ROOT}/{SANDBOX_SKILL_MOUNT_PREFIX}/{skill_id}"
+    return ONLYBOXES.join(SANDBOX_SKILL_MOUNT_PREFIX, skill_id)
 
 
 def build_skill_exec_code(*, skill_id: str, command: str, install_requirements: bool) -> str:

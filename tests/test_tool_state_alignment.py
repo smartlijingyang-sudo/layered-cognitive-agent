@@ -77,21 +77,21 @@ class TestWireCoversFactoryTools(unittest.TestCase):
             "read_skill_reference",
             "search_skill",
             "import_skill",
-            "web_search",
-            "ask_user_question",
-            "execute_code",
-            "run_command",
-            "list_files",
-            "read_file",
-            "write_file",
-            "edit_file",
-            "search_files",
-            "move_files",
-            "grep_content",
-            "glob_files",
-            "get_command_output",
-            "kill_command",
-            "export_file",
+            "search",
+            "askUserQuestion",
+            "executeCode",
+            "runCommand",
+            "listFiles",
+            "readFile",
+            "writeFile",
+            "editFile",
+            "searchFiles",
+            "moveFiles",
+            "grepContent",
+            "globFiles",
+            "getCommandOutput",
+            "killCommand",
+            "exportFile",
         }
     )
 
@@ -101,10 +101,10 @@ class TestWireCoversFactoryTools(unittest.TestCase):
 
     def test_sandbox_tools_share_identifier(self) -> None:
         for name in (
-            "execute_code",
-            "run_command",
-            "list_files",
-            "read_file",
-            "write_file",
+            "executeCode",
+            "runCommand",
+            "listFiles",
+            "readFile",
+            "writeFile",
         ):
             self.assertEqual(WIRE[name][0], "lobe-cloud-sandbox")

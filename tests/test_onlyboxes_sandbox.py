@@ -16,6 +16,7 @@ from lca.layer0_infra.sandbox.onlyboxes_artifacts import (
     ARTIFACT_END,
     strip_artifacts,
 )
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 
 
 def _artifact_block(files: list[tuple[str, bytes]]) -> str:
@@ -161,7 +162,7 @@ class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.stdout, "ok\n")
         call_body: dict[str, Any] = client.post.await_args.kwargs["json"]
-        self.assertEqual(call_body["command"], "ls -la")
+        self.assertEqual(call_body["command"], ONLYBOXES.with_cwd("ls -la"))
         self.assertTrue(call_body["create_if_missing"])
 
     async def test_create_session_returns_session_info(self) -> None:
@@ -183,7 +184,7 @@ class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(session)
         self.assertEqual(session.session_id, "terminal-session")
         call_body: dict[str, Any] = client.post.await_args.kwargs["json"]
-        self.assertEqual(call_body["command"], ":")
+        self.assertEqual(call_body["command"], ONLYBOXES.with_cwd(":"))
 
     async def test_destroy_session_sends_delete(self) -> None:
         client = AsyncMock()

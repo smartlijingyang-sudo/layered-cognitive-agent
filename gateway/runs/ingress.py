@@ -9,11 +9,7 @@ from urllib.parse import unquote, urlparse
 
 from gateway.runs.ingest import FileFetcher, FileRef, ingest_file_refs
 from lca.contracts.models.core.conversation import ConversationTurn
-from lca.contracts.models.core.sandbox import SANDBOX_MOUNT_ROOT
 from lca.layer0_infra.file_store import FileStore, LocalFileStore
-
-# Guest mount directory inside Onlyboxes / cloud sandbox.
-SANDBOX_UPLOADED_FILES_DIR = "/mnt/data"
 
 # Conversation history injected before the latest user turn.
 MAX_HISTORY_MESSAGES = 12
@@ -431,7 +427,7 @@ def _question_with_attachments(
     lines = [
         "[用户附件]",
         (
-            f"（附件已挂载到 {SANDBOX_MOUNT_ROOT}/<文件名>；"
+            "（附件已挂到当前工作根，文件名即相对路径；"
             "用 list_files / read_file 查看，execute_code 或 write_file 处理；"
             "专项格式任务可 activate_skill 加载对应 skill。"
             "中文 PDF/图：沙箱已预装 CJK 字体（WenQuanYi Zen Hei / Noto Sans CJK SC），"
@@ -445,9 +441,8 @@ def _question_with_attachments(
         if meta is None:
             lines.append(f"- (missing) {attachment_id}")
             continue
-        guest_path = f"{SANDBOX_MOUNT_ROOT}/{meta.name}"
         lines.append(
-            f"- {meta.name} → {guest_path} "
+            f"- {meta.name} "
             f"({meta.mime_type}, {meta.size_bytes} B) "
             f"url={meta.url} id={meta.attachment_id}"
         )

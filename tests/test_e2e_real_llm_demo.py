@@ -11,7 +11,7 @@ import pytest
 
 from lca.contracts.models.team.team_coordination import FanOut, PeerRelay, Pipeline
 from lca.layer0_infra.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
-from lca.layer0_infra.tools.calculator_tool import CalculatorTool
+from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
 from lca.layer4_app.api import Agent, Team, TeamLead
 
 # 加载 .env（如果存在）
@@ -87,15 +87,14 @@ class TestSingleAgentRealLLM(unittest.IsolatedAsyncioTestCase):
         logger.info("Resolved LLM adapter: %s", type(self.llm).__name__)
 
     async def test_single_agent_with_calculator(self) -> None:
-        """单 Agent 应能调用 CalculatorTool 得出正确数值结果。"""
-        _log_section("Single Agent + CalculatorTool")
+        """单 Agent 应能调用 calculator 得出正确数值结果。"""
+        _log_section("Single Agent + calculator")
 
-        calculator = CalculatorTool()
         agent = Agent(
             role="通用问答助手",
             goal="准确、简洁地回答用户提出的问题",
             backstory="擅长借助工具进行精确计算，不臆测数值结果。",
-            tools=[calculator],
+            tools=build_calculator_tools(),
             llm=self.llm,
             observability="jsonl",
         )
@@ -252,7 +251,7 @@ class TestHierarchicalTeamRealLLM(unittest.IsolatedAsyncioTestCase):
             role="定价专员",
             goal="制定合理零售定价",
             backstory="擅长成本加成定价",
-            tools=[CalculatorTool()],
+            tools=build_calculator_tools(),
             llm=self.llm,
             observability="jsonl",
         )

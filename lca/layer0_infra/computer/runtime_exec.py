@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from typing import Any, Protocol
 
 import structlog
 
 from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S, SandboxFile
+from lca.contracts.models.core.sandbox_policy import SandboxPolicy
 from lca.layer0_infra.computer.background import get_background_registry
 from lca.layer0_infra.computer.cli_json import cli_json_success
 from lca.layer0_infra.computer.guest import (
@@ -21,6 +23,7 @@ from lca.layer0_infra.computer.office_plane import normalize_officecli_command
 from lca.layer0_infra.computer.op_result import ComputerOpResult, TerminalCapableSandbox
 from lca.layer0_infra.computer.sandbox_computer import normalize_sandbox_path
 from lca.layer0_infra.file_store import FileStore, get_default_file_store, persist_generated_files
+from lca.layer0_infra.sandbox.factory import get_sandbox_policy
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
@@ -43,6 +46,33 @@ def _store_generated_file_parts(
     except Exception:
         _log.warning("auto_store_generated_file_failed", exc_info=True)
         return []
+
+
+def _check_writable(path: str, policy: SandboxPolicy) -> None:
+    """Warn or raise if *path* is outside writable_roots or inside denied_write_roots."""
+    resolved = os.path.realpath(path)
+    for root in policy.writable_roots:
+        root_resolved = os.path.realpath(root)
+        if resolved == root_resolved or resolved.startswith(root_resolved + os.sep):
+            if policy.denied_write_roots:
+                for denied in policy.denied_write_roots:
+                    denied_resolved = os.path.realpath(denied)
+                    if resolved == denied_resolved or resolved.startswith(denied_resolved + os.sep):
+                        _log.warning("sandbox_policy_denied_write", path=path, denied=denied)
+                        if policy.on_unavailable == "error":
+                            raise PermissionError(
+                                f"write denied: {path} is in denied root {denied}"
+                            )
+            return
+    if policy.on_unavailable == "error":
+        raise PermissionError(
+            f"write denied: {path} is outside writable roots {list(policy.writable_roots)}"
+        )
+    _log.warning(
+        "sandbox_policy_outside_writable",
+        path=path,
+        writable_roots=list(policy.writable_roots),
+    )
 
 
 class _GuestOpHost(Protocol):
@@ -84,7 +114,7 @@ class ComputerRuntimeExecMixin:
             self._store,
             attachment_ids=get_current_run_attachment_ids(),
         )
-        inv = get_current_tool_invocation_id() or "execute_code"
+        inv = get_current_tool_invocation_id() or "executeCode"
 
         # Artifact collection is embedded in the bootstrap template at the
         # same indentation level as user code — no wrapping needed.
@@ -111,7 +141,7 @@ class ComputerRuntimeExecMixin:
         # produced in the sandbox are always accessible to the frontend.
         file_parts = _store_generated_file_parts(
             get_default_file_store(),
-            visible_generated_files(exec_result.generated_files, tool_name="execute_code"),
+            visible_generated_files(exec_result.generated_files, tool_name="executeCode"),
         )
         if file_parts:
             state["files"] = file_parts
@@ -137,7 +167,7 @@ class ComputerRuntimeExecMixin:
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
     ) -> ComputerOpResult:
         del description
-        inv = get_current_tool_invocation_id() or "run_command"
+        inv = get_current_tool_invocation_id() or "runCommand"
         if background:
             registry = get_background_registry()
             command_id = registry.register(command=command)
@@ -180,14 +210,14 @@ class ComputerRuntimeExecMixin:
                     f"exit_code={terminal_result.exit_code}" if terminal_result.exit_code else ""
                 )
             generated = terminal_result.generated_files
-            if is_office_publish_intent(tool_name="run_command", command=command):
+            if is_office_publish_intent(tool_name="runCommand", command=command):
                 scanned = await runtime.scan_output_files(invocation_id=f"{inv}_office_pub")
                 generated = tuple(generated) + tuple(
                     item for item in scanned if is_office_name(item.name)
                 )
             file_parts = _store_generated_file_parts(
                 get_default_file_store(),
-                visible_generated_files(generated, tool_name="run_command", command=command),
+                visible_generated_files(generated, tool_name="runCommand", command=command),
             )
             if file_parts:
                 state["files"] = file_parts
@@ -213,7 +243,7 @@ class ComputerRuntimeExecMixin:
             generated = guest.exec_result.generated_files
             file_parts = _store_generated_file_parts(
                 get_default_file_store(),
-                visible_generated_files(generated, tool_name="run_command", command=command),
+                visible_generated_files(generated, tool_name="runCommand", command=command),
             )
             if file_parts:
                 guest.state["files"] = file_parts
@@ -239,6 +269,7 @@ class ComputerRuntimeExecMixin:
     async def export_file(self: _GuestOpHost, *, path: str) -> ComputerOpResult:
         import base64
 
+        _check_writable(path, get_sandbox_policy())
         normalized = normalize_sandbox_path(path, self.plane.root)
         read = await self._guest_op(build_read_bytes_script(path=normalized))
         if not read.success:

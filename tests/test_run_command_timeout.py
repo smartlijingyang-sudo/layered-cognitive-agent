@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import unittest
 
-from lca.layer0_infra.tools.computer.handlers import _resolve_command_timeout_s
+from lca.layer0_infra.tools.lca_computer.executor import (
+    _resolve_timeout_s as _resolve_command_timeout_s,
+)
 
 
 class TestRunCommandTimeout(unittest.TestCase):

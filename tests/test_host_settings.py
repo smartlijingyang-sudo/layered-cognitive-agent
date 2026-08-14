@@ -1,8 +1,7 @@
-"""Host runtime profile is the SSOT for user / workspace / guest path."""
+"""Host runtime profile is the SSOT for user and workspace."""
 
 from __future__ import annotations
 
-from lca.contracts.models.core.sandbox import SANDBOX_MOUNT_ROOT
 from lca.layer0_infra.sandbox.host_settings import HostRuntimeSettings
 
 
@@ -10,7 +9,6 @@ def test_root_derived_from_user() -> None:
     cfg = HostRuntimeSettings(user="agent-box", root="")
     assert cfg.operator() == "agent-box"
     assert cfg.workspace().as_posix() == "/home/agent-box"
-    assert cfg.guest_mount() == SANDBOX_MOUNT_ROOT
 
 
 def test_explicit_root_wins() -> None:
@@ -24,4 +22,5 @@ def test_shell_export_has_no_hardcoded_home() -> None:
     text = cfg.as_shell()
     assert "LCA_HOST_USER='box'" in text
     assert "LCA_HOST_ROOT='/home/box'" in text
-    assert "LCA_HOST_GUEST_ROOT=" in text
+    assert "LCA_HOST_OUTPUTS=" in text
+    assert "LCA_HOST_GUEST_ROOT=" not in text

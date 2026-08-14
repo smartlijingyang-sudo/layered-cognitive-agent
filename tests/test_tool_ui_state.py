@@ -37,7 +37,7 @@ class TestStartedPluginState(unittest.TestCase):
     def test_execute_code_includes_full_code(self) -> None:
         code = "x = 1\n" * 2000
         state = build_started_plugin_state(
-            "execute_code",
+            "executeCode",
             {"code": code, "language": "python", "description": "big"},
         )
         self.assertEqual(state["code"], code)
@@ -116,7 +116,7 @@ class TestInvokedPluginState(unittest.TestCase):
             error="SyntaxError: boom",
         )
         state = build_invoked_plugin_state(
-            "execute_code",
+            "executeCode",
             {"code": code, "language": "python"},
             obs,
         )

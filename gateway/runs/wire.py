@@ -1,40 +1,63 @@
-"""LCA tool name → LobeHub (identifier, apiName). Table only."""
+"""LCA tool name → LobeHub (identifier, apiName). Table only.
+
+Identifiers are LobeHub-native builtin plugin identifiers so the frontend
+resolves i18n labels and renderers without additional mapping.
+
+Computer tools split by execution context:
+- Cloud sandbox APIs → ``lobe-cloud-sandbox``
+- Local machine APIs (``local_`` prefix) → ``lobe-local-system``
+"""
 
 from __future__ import annotations
 
+from lca.layer0_infra.tools.ask_user import IDENTIFIER as _USER_INTERACTION
+from lca.layer0_infra.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM
+from lca.layer0_infra.tools.lca_sandbox import IDENTIFIER as _CLOUD_SANDBOX
+from lca.layer0_infra.tools.skills.manifest import _SKILL_STORE_IDENTIFIER as _SKILL_STORE
+from lca.layer0_infra.tools.skills.manifest import IDENTIFIER as _SKILLS
+from lca.layer0_infra.tools.web_search import IDENTIFIER as _WEB_BROWSING
+
+# Cloud sandbox computer APIs (non-prefixed tool names).
+_CS = _CLOUD_SANDBOX
+# Local machine computer APIs (local_-prefixed tool names).
+_LS = _LOCAL_SYSTEM
+
 WIRE: dict[str, tuple[str, str]] = {
-    "execute_code": ("lobe-cloud-sandbox", "executeCode"),
-    "run_command": ("lobe-cloud-sandbox", "runCommand"),
-    "list_files": ("lobe-cloud-sandbox", "listFiles"),
-    "read_file": ("lobe-cloud-sandbox", "readFile"),
-    "write_file": ("lobe-cloud-sandbox", "writeFile"),
-    "edit_file": ("lobe-cloud-sandbox", "editFile"),
-    "search_files": ("lobe-cloud-sandbox", "searchFiles"),
-    "move_files": ("lobe-cloud-sandbox", "moveFiles"),
-    "grep_content": ("lobe-cloud-sandbox", "grepContent"),
-    "glob_files": ("lobe-cloud-sandbox", "globFiles"),
-    "get_command_output": ("lobe-cloud-sandbox", "getCommandOutput"),
-    "kill_command": ("lobe-cloud-sandbox", "killCommand"),
-    "export_file": ("lobe-cloud-sandbox", "exportFile"),
-    "activate_skill": ("lobe-skills", "activateSkill"),
-    "run_skill_script": ("lobe-skills", "execScript"),
-    "read_skill_reference": ("lobe-skills", "readReference"),
-    "search_skill": ("lobe-skill-store", "searchSkill"),
-    "import_skill": ("lobe-skill-store", "importSkill"),
-    "web_search": ("lobe-web-browsing", "search"),
-    "ask_user_question": ("lobe-user-interaction", "askUserQuestion"),
-    "write_file_local": ("lobe-local-system", "writeFile"),
-    "local_run_command": ("lobe-local-system", "runCommand"),
-    "local_list_files": ("lobe-local-system", "listFiles"),
-    "local_read_file": ("lobe-local-system", "readFile"),
-    "local_write_file": ("lobe-local-system", "writeFile"),
-    "local_edit_file": ("lobe-local-system", "editFile"),
-    "local_search_files": ("lobe-local-system", "searchFiles"),
-    "local_move_files": ("lobe-local-system", "moveFiles"),
-    "local_grep_content": ("lobe-local-system", "grepContent"),
-    "local_glob_files": ("lobe-local-system", "globFiles"),
-    "local_get_command_output": ("lobe-local-system", "getCommandOutput"),
-    "local_kill_command": ("lobe-local-system", "killCommand"),
+    # ── cloud sandbox ──
+    "executeCode": (_CS, "executeCode"),
+    "runCommand": (_CS, "runCommand"),
+    "listFiles": (_CS, "listFiles"),
+    "readFile": (_CS, "readFile"),
+    "writeFile": (_CS, "writeFile"),
+    "editFile": (_CS, "editFile"),
+    "searchFiles": (_CS, "searchFiles"),
+    "moveFiles": (_CS, "moveFiles"),
+    "grepContent": (_CS, "grepContent"),
+    "globFiles": (_CS, "globFiles"),
+    "getCommandOutput": (_CS, "getCommandOutput"),
+    "killCommand": (_CS, "killCommand"),
+    "exportFile": (_CS, "exportFile"),
+    # ── local machine ──
+    "local_runCommand": (_LS, "runCommand"),
+    "local_listFiles": (_LS, "listFiles"),
+    "local_readFile": (_LS, "readFile"),
+    "local_writeFile": (_LS, "writeFile"),
+    "local_editFile": (_LS, "editFile"),
+    "local_searchFiles": (_LS, "searchFiles"),
+    "local_moveFiles": (_LS, "moveFiles"),
+    "local_grepContent": (_LS, "grepContent"),
+    "local_globFiles": (_LS, "globFiles"),
+    "local_getCommandOutput": (_LS, "getCommandOutput"),
+    "local_killCommand": (_LS, "killCommand"),
+    # ── skills ──
+    "activate_skill": (_SKILLS, "activateSkill"),
+    "run_skill_script": (_SKILLS, "execScript"),
+    "read_skill_reference": (_SKILLS, "readReference"),
+    "search_skill": (_SKILL_STORE, "searchSkill"),
+    "import_skill": (_SKILL_STORE, "importSkill"),
+    # ── web search / user interaction ──
+    "search": (_WEB_BROWSING, "search"),
+    "askUserQuestion": (_USER_INTERACTION, "askUserQuestion"),
 }
 
 

@@ -5,7 +5,7 @@
 | 协议 | 子包 | 内置实现 |
 |------|------|----------|
 | LLMAdapter | llm_adapter/ | OpenAICompatAdapter, MockLLMAdapter |
-| Tool | tools/ | CalculatorTool, WeatherTool |
+| Tool | tools/<name>/ | manifest + executor + build_tools() |
 | StateStore | state_store/ | InMemoryStateStore |
 | AgentTransport | transport/ | InternalTransport, A2ATransport, MCPTransport |
 | Telemetry (facade) | observability/ | ObservabilityHub + console/jsonl/memory/langfuse 导出器 |

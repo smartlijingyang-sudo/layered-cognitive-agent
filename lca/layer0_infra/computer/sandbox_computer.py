@@ -152,9 +152,7 @@ class _SandboxComputerBase:
         normalized = [
             {
                 "source": normalize_sandbox_path(op.get("source", ""), self.plane.root),
-                "destination": normalize_sandbox_path(
-                    op.get("destination", ""), self.plane.root
-                ),
+                "destination": normalize_sandbox_path(op.get("destination", ""), self.plane.root),
             }
             for op in operations
         ]
@@ -179,11 +177,7 @@ class _SandboxComputerBase:
         )
 
     async def glob_files(self, *, pattern: str, directory: str = "") -> ComputerOpResult:
-        norm = (
-            normalize_sandbox_path(directory, self.plane.root)
-            if directory
-            else self.plane.root
-        )
+        norm = normalize_sandbox_path(directory, self.plane.root) if directory else self.plane.root
         return await self._guest_op(build_glob_files_script(pattern=pattern, directory=norm))
 
 

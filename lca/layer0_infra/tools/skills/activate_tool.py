@@ -78,9 +78,9 @@ class SkillActivateTool(Tool):
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
         register_activated(package.skill_id, package.name)
-        from lca.layer0_infra.sandbox.surface import current_surface, skill_preamble
+        from lca.layer0_infra.sandbox.surface import skill_preamble
 
-        body = skill_preamble(current_surface()) + package.content
+        body = skill_preamble() + package.content
         summary = (package.summary or "").strip()
         state = {
             "success": True,

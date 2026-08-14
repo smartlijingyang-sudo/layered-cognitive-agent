@@ -1,4 +1,5 @@
 import type {
+  ChatMessageError,
   ChatToolPayload,
   ChatToolPayloadWithResult,
   MessageToolCall,
@@ -21,6 +22,7 @@ import {
   type ArtifactFile,
 } from './lcaArtifacts';
 import { persistMissed, snapshotRow, type ProjectedRow } from './lcaChatRow';
+import { toLcaChatMessageError } from './lcaError';
 import {
   parseSseBlock,
   projectJournalFrame,
@@ -28,6 +30,7 @@ import {
   type JournalFrame,
   type Projected,
 } from './lcaJournal';
+import { persistAssistantRow } from './lcaPersist';
 import { WIRE } from './lcaWire';
 
 const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
@@ -173,15 +176,20 @@ function hrefFile(name: string, url: string): ArtifactFile {
 export function planeFieldsFromAgent(agentId: string | undefined): {
   device_id?: string;
   plane?: string;
+  execution_target?: string;
 } {
   if (!agentId) return {};
   const config = agentByIdSelectors.getAgencyConfigById(agentId)(useAgentStore.getState());
   const target = config?.executionTarget;
   const deviceId = config?.boundDeviceId;
   if (target === 'local' || target === 'device') {
-    return deviceId ? { device_id: deviceId, plane: 'machine' } : { plane: 'machine' };
+    return deviceId
+      ? { device_id: deviceId, plane: 'machine', execution_target: 'device' }
+      : { plane: 'machine', execution_target: 'device' };
   }
-  if (target === 'sandbox') return { plane: 'sandbox' };
+  if (target === 'sandbox') return { plane: 'sandbox', execution_target: 'sandbox' };
+  if (target === 'auto') return { execution_target: 'auto' };
+  if (target === 'none') return { execution_target: 'none' };
   return {};
 }
 
@@ -205,6 +213,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
   let runId = '';
   let assistantId = '';
   let speaker = '';
+  let rowError: ChatMessageError | undefined;
   let firstReuse = options.reuseAssistantId;
   let handler: StreamingHandler | null = null;
   let journalDurationMs: number | undefined;
@@ -248,6 +257,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
       rewritten(handler?.getOutput() ?? ''),
       resolveTurnTools().length,
       Boolean(handler?.getThinkingContent()),
+      rowError,
     );
 
   const publishTurnTools = (streaming: boolean) => {
@@ -311,6 +321,11 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
       },
     );
 
+  const noteRowError = (error: unknown) => {
+    const payload = toLcaChatMessageError(error);
+    if (payload.message) rowError = payload;
+  };
+
   const persistRow = async () => {
     if (!assistantId) return;
     const content = rewritten(handler?.getOutput() ?? '');
@@ -320,26 +335,18 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     const deliverables = turnTools.length === 0 ? latestDeliverables(hrefFiles()) : [];
     const imageList = toImageList(deliverables);
     const fileList = toFileList(deliverables);
-    await get().optimisticUpdateMessageContent(
-      assistantId,
+    await persistAssistantRow(get, assistantId, {
       content,
-      {
-        model: options.model,
-        provider: 'openai',
-        ...(thinking
-          ? { reasoning: { content: thinking, ...(duration !== undefined ? { duration } : {}) } }
-          : {}),
-        ...(turnTools.length ? { tools: turnTools } : {}),
-        ...(imageList.length ? { imageList } : {}),
-      },
-      { operationId: options.operationId },
-    );
-    if (currentTurnTools.length === 0 && (imageList.length || fileList.length)) {
-      dispatchMessage(assistantId, {
-        ...(fileList.length ? { fileList } : {}),
-        ...(imageList.length ? { imageList } : {}),
-      });
-    }
+      ...(rowError ? { error: rowError } : {}),
+      ...(fileList.length ? { fileList } : {}),
+      ...(imageList.length ? { imageList } : {}),
+      model: options.model,
+      operationId: options.operationId,
+      ...(thinking
+        ? { reasoning: { content: thinking, ...(duration !== undefined ? { duration } : {}) } }
+        : {}),
+      ...(turnTools.length ? { tools: turnTools } : {}),
+    });
   };
 
   const sealOpenTools = () => {
@@ -658,11 +665,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         return;
       }
       case 'run-finished': {
-        if (projected.error && assistantId) {
-          dispatchMessage(assistantId, {
-            error: { message: projected.error, type: 'AgentExecutionError' },
-          });
-        }
+        if (projected.error) noteRowError(projected.error);
         await persistRow();
         return;
       }
@@ -675,36 +678,36 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     }
   };
 
-  const createRes = await fetch('/lca-api/runs', {
-    body: JSON.stringify({
-      agent: {
-        id: ctx.agentId || 'solo',
-        name: ctx.agentId ? String(ctx.agentId) : '助手',
-      },
-      messages: toWireMessages(options.messages),
-      model: options.model,
-      ...planeFieldsFromAgent(ctx.agentId),
-    }),
-    headers: {
-      Authorization: `Bearer ${LCA_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
-    signal,
-  });
-  if (!createRes.ok) {
-    const text = await createRes.text();
-    throw new Error(`create run HTTP ${createRes.status}: ${text.slice(0, 200)}`);
-  }
-  const created = (await createRes.json()) as { run_id: string; trace_id: string };
-  runId = created.run_id;
-  get().updateOperationMetadata(options.operationId, {
-    lca: { run_id: created.run_id, trace_id: created.trace_id },
-  });
-
   const authHeaders = { Authorization: `Bearer ${LCA_TOKEN}` };
 
   try {
+    const createRes = await fetch('/lca-api/runs', {
+      body: JSON.stringify({
+        agent: {
+          id: ctx.agentId || 'solo',
+          name: ctx.agentId ? String(ctx.agentId) : '助手',
+        },
+        messages: toWireMessages(options.messages),
+        model: options.model,
+        ...planeFieldsFromAgent(ctx.agentId),
+      }),
+      headers: {
+        Authorization: `Bearer ${LCA_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+      signal,
+    });
+    if (!createRes.ok) {
+      const text = await createRes.text();
+      throw new Error(`create run HTTP ${createRes.status}: ${text.slice(0, 200)}`);
+    }
+    const created = (await createRes.json()) as { run_id: string; trace_id: string };
+    runId = created.run_id;
+    get().updateOperationMetadata(options.operationId, {
+      lca: { run_id: created.run_id, trace_id: created.trace_id },
+    });
+
     while (!signal.aborted) {
       const streamRes = await fetch(`/lca-api/runs/${runId}/live`, {
         headers: {
@@ -739,17 +742,21 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     }
   } catch (error) {
     if (signal.aborted) {
-      await fetch(`/lca-api/runs/${runId}/cancel`, {
-        headers: authHeaders,
-        method: 'POST',
-      }).catch(() => undefined);
+      if (runId) {
+        await fetch(`/lca-api/runs/${runId}/cancel`, {
+          headers: authHeaders,
+          method: 'POST',
+        }).catch(() => undefined);
+      }
       await finishTurn();
       publishFinalDeliverables();
       return currentRow();
     }
+    noteRowError(error);
+    await ensureTurn();
     await finishTurn();
     publishFinalDeliverables();
-    throw error;
+    return currentRow();
   }
   await finishTurn();
   publishFinalDeliverables();

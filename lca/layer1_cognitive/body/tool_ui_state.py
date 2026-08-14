@@ -82,30 +82,30 @@ _WIRE_NOISE_KEYS = (
 )
 
 _STARTED_BUILDERS: dict[str, StartedBuilder] = {
-    "execute_code": _started_execute_code,
-    "run_command": _started_run_command,
+    "executeCode": _started_execute_code,
+    "runCommand": _started_run_command,
     "sandbox_execute": _started_execute_code,
     "activate_skill": _started_activate_skill,
-    "web_search": _started_web_search,
+    "search": _started_web_search,
 }
 
 _INVOKED_BUILDERS: dict[str, InvokedBuilder] = {
     "activate_skill": _invoked_activate_skill,
-    "execute_code": _invoked_from_payload_state,
-    "run_command": _invoked_from_payload_state,
+    "executeCode": _invoked_from_payload_state,
+    "runCommand": _invoked_from_payload_state,
     "sandbox_execute": _invoked_from_payload_state,
-    "list_files": _invoked_from_payload_state,
-    "read_file": _invoked_from_payload_state,
-    "write_file": _invoked_from_payload_state,
-    "edit_file": _invoked_from_payload_state,
-    "search_files": _invoked_from_payload_state,
-    "move_files": _invoked_from_payload_state,
-    "grep_content": _invoked_from_payload_state,
-    "glob_files": _invoked_from_payload_state,
-    "get_command_output": _invoked_from_payload_state,
-    "kill_command": _invoked_from_payload_state,
-    "export_file": _invoked_from_payload_state,
-    "web_search": _invoked_from_payload_state,
+    "listFiles": _invoked_from_payload_state,
+    "readFile": _invoked_from_payload_state,
+    "writeFile": _invoked_from_payload_state,
+    "editFile": _invoked_from_payload_state,
+    "searchFiles": _invoked_from_payload_state,
+    "moveFiles": _invoked_from_payload_state,
+    "grepContent": _invoked_from_payload_state,
+    "globFiles": _invoked_from_payload_state,
+    "getCommandOutput": _invoked_from_payload_state,
+    "killCommand": _invoked_from_payload_state,
+    "exportFile": _invoked_from_payload_state,
+    "search": _invoked_from_payload_state,
     "run_skill_script": _invoked_from_payload_state,
 }
 

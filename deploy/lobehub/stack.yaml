@@ -1,0 +1,96 @@
+# deploy/lobehub/stack.yaml — LobeHub + Gateway stack (SSOT)
+#
+# Routes are discovered from gateway.app.create_app().
+# surfaces[] only names, groups, and probes them.
+# A new route with no match prints under [unclassified] — do not hardcode paths.
+# A new patch module under deploy/lobehub/patches/ is auto-listed.
+# A new command or step is added here; implementation is a registered kind.
+
+name: lobehub-stack
+run_dir: .lobehub-stack
+
+gateway:
+  port: 8765
+  bind: "0.0.0.0"
+  health_path: /health
+  entry: [uv, run, python, scripts/serve_observability.py]
+  pid_file: .lobehub-stack/gateway.pid
+  log_file: .lobehub-stack/gateway.log
+  watch:
+    - gateway
+    - lca
+    - scripts/serve_observability.py
+  watch_glob: "*.py"
+
+lobehub:
+  release: v2.2.13
+  dir: lobehub-ui
+  env_template: deploy/lobehub/.env.lca
+  dev_port: 3010
+  spa_port: 9876
+  spa_mobile_port: 3012
+  spa_auth_port: 3013
+  pid_file: .lobehub-stack/lobehub-dev.pid
+  log_file: .lobehub-stack/lobehub-dev.log
+
+host:
+  user: sandbox-user
+  config_file: lca-host.yaml
+
+surfaces:
+  - id: health
+    match: "^/health$"
+    title: Health
+    purpose: Liveness + LLM + in-flight runs + device counts
+    probe: {method: GET, path: /health, expect: 200}
+  - id: context
+    match: "^/context$"
+    title: Context
+    purpose: Latest plane bindings + online machine candidates
+    probe: {method: GET, path: /context, expect: 200}
+  - id: runs
+    match: "^/runs"
+    title: Run Live
+    purpose: Agent/Team lifecycle, Journal SSE, doctor, cancel, HIL answer
+  - id: files
+    match: "^/files"
+    title: Files
+    purpose: Attachment download + metadata (browser-facing public URL)
+  - id: openai
+    match: "^/v1/"
+    title: OpenAI housekeeper
+    purpose: Title/topic/embeddings/responses — never starts a Run
+    probe: {method: GET, path: /v1/models, expect: 200}
+  - id: devices
+    match: "^/api/device"
+    title: Device gateway
+    purpose: LobeHub GatewayClient — status, RPC, tools, WS connect
+
+commands:
+  status:
+    description: Inspect the stack without changing it
+    steps: [gateway.inspect, patches.inspect, host.inspect, lobehub.inspect, infra.inspect]
+  gateway:
+    description: Start gateway if needed (reload when code is newer); provision host
+    steps: [gateway.start, gateway.inspect, host.provision, host.inspect]
+  restart-gateway:
+    description: Force-reload gateway Python and show capability status
+    steps:
+      - gateway.snapshot
+      - gateway.restart
+      - gateway.inspect
+      - patches.inspect
+      - host.provision
+      - host.inspect
+  dev:
+    description: Sync UI, patch, start gateway + infra + LobeHub dev
+    steps: [gateway.start, host.provision, host.inspect, infra.start, lobehub.dev]
+  restart:
+    description: Stop everything, then start gateway + infra + LobeHub dev
+    steps: [stack.stop, gateway.restart, host.provision, host.inspect, infra.start, lobehub.dev]
+  stop:
+    description: Stop LobeHub dev, Vite SPA, and gateway
+    steps: [stack.stop]
+  sync:
+    description: Pull official LobeHub release and apply patches
+    steps: [lobehub.sync]

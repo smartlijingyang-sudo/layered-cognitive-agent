@@ -13,6 +13,7 @@ from typing import Any
 
 import structlog
 
+from lca.contracts.models.core.guest_layout import GuestLayout
 from lca.contracts.models.core.sandbox import (
     DEFAULT_SANDBOX_TIMEOUT_S,
     MountManifest,
@@ -25,10 +26,11 @@ from lca.contracts.models.core.sandbox import (
 from lca.contracts.protocols import Sandbox, SandboxRuntime
 from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.sandbox.artifact_scanner import GUEST_ARTIFACT_SCANNER
-from lca.layer0_infra.sandbox.bootstrap import SANDBOX_INIT_TIMEOUT_S, sandbox_output_path
+from lca.layer0_infra.sandbox.bootstrap import SANDBOX_INIT_TIMEOUT_S
 from lca.layer0_infra.sandbox.error_parse import classify_execution_error
 from lca.layer0_infra.sandbox.exec_result import sandbox_exec_result_from
 from lca.layer0_infra.sandbox.inspect_prelude import INSPECT_SCRIPT, parse_inspect_stdout
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 from lca.layer0_infra.sandbox.runtime_mount import (
     build_mount_manifest,
     load_mount_files,
@@ -41,16 +43,19 @@ PYTHON_LANGUAGES: frozenset[str] = frozenset({"python", "py"})
 
 # Minimal python body — ``_execute_raw`` appends ``GUEST_ARTIFACT_SCANNER``.
 _HARVEST_STUB = "pass  # LCA outputs harvest"
-_OFFICE_FLUSH_CMD = (
-    "if command -v officecli >/dev/null 2>&1; then "
-    "for ext in pptx docx xlsx; do "
-    'for f in /mnt/data/outputs/*."$ext"; do '
-    '[ -f "$f" ] || continue; '
-    'officecli save "$f" --json >/dev/null 2>&1 '
-    '|| officecli close "$f" --json >/dev/null 2>&1 '
-    "|| true; "
-    "done; done; fi"
-)
+
+
+def _office_flush_cmd(layout: GuestLayout) -> str:
+    return (
+        "if command -v officecli >/dev/null 2>&1; then "
+        "for ext in pptx docx xlsx; do "
+        f'for f in {layout.outputs_dir}/*."$ext"; do '
+        '[ -f "$f" ] || continue; '
+        'officecli save "$f" --json >/dev/null 2>&1 '
+        '|| officecli close "$f" --json >/dev/null 2>&1 '
+        "|| true; "
+        "done; done; fi"
+    )
 
 
 def _append_artifact_scanner(code: str) -> str:
@@ -73,12 +78,14 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         run_id: str,
         attachment_ids: tuple[str, ...] = (),
         default_timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
+        layout: GuestLayout | None = None,
     ) -> None:
         self._sandbox = sandbox
         self._store = store
         self._run_id = run_id
         self._attachment_ids = attachment_ids
         self._default_timeout_s = default_timeout_s
+        self.layout = layout if layout is not None else ONLYBOXES
         self._session: SessionInfo | None = None
         self._stateless = False
         self._mount_files: dict[str, bytes] = {}
@@ -140,13 +147,13 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         return None
 
     async def _ensure_workspace_dirs(self) -> SandboxExecResult | None:
-        """Create ``/mnt/data/outputs`` via staged marker file (all backends)."""
+        """Create the harvest directory via staged marker file (all backends)."""
 
         session_id = self._session.session_id if self._session else ""
         timeout_s = min(30, SANDBOX_INIT_TIMEOUT_S, self._default_timeout_s)
         result = await self._sandbox.write_files(
             {".workspace-initialized": b""},
-            base_dir=sandbox_output_path(),
+            base_dir=self.layout.outputs_dir,
             session_id=session_id,
             timeout_s=timeout_s,
         )
@@ -260,7 +267,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         within a single run share the same backend session, so ``pip install``
         in step N is visible to ``import`` in step N+1.
 
-        After the command returns, scans ``/mnt/data/outputs`` (ADR-0046) and
+        After the command returns, scans the outputs dir (ADR-0046) and
         attaches **new or changed immediate products** (images/PDF/HTML).
         Office binaries stay on disk until ``export_file`` / close / run-end
         seal — they are Works, not per-mutation cards.
@@ -305,7 +312,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         invocation_id: str = "",
         timeout_s: int | None = None,
     ) -> tuple[SandboxFile, ...]:
-        """Scan guest ``/mnt/data/outputs``; return only new/changed files.
+        """Scan guest outputs; return only new/changed files.
 
         Idempotent for unchanged content within a run (sha256 fingerprint).
         Harvest failures return empty — never override the shell command outcome.
@@ -329,7 +336,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         invocation_id: str = "",
         timeout_s: int | None = None,
     ) -> tuple[SandboxFile, ...]:
-        """Read current ``/mnt/data/outputs`` bytes. Does not update fingerprints."""
+        """Read current outputs bytes. Does not update fingerprints."""
         if not self._ready:
             mount_err = await self.ensure_ready()
             if mount_err is not None:
@@ -352,7 +359,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         session_id = self._session.session_id if self._session else ""
         try:
             await self._sandbox.run_terminal(
-                _OFFICE_FLUSH_CMD,
+                _office_flush_cmd(self.layout),
                 timeout_s=timeout_s,
                 invocation_id="office_flush",
                 session_id=session_id,
@@ -437,7 +444,9 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         new_files = {k: v for k, v in all_files.items() if k not in self._staged_file_keys}
         if new_files:
             session_id = self._session.session_id if self._session else ""
-            await self._sandbox.write_files(new_files, base_dir="/mnt/data", session_id=session_id)
+            await self._sandbox.write_files(
+                new_files, base_dir=self.layout.root, session_id=session_id
+            )
             self._staged_file_keys.update(new_files.keys())
 
         # Phase 2: Execute. Artifact scan is execute_code / harvest only —

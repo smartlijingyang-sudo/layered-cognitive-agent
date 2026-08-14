@@ -130,6 +130,7 @@ async def create_run(request: Request) -> JSONResponse:
             device_id=str(body.get("device_id") or ""),
             plane=str(body.get("plane") or ""),
             extra_plane=str(body.get("extra_plane") or ""),
+            execution_target=str(body.get("execution_target") or body.get("executionTarget") or ""),
         )
         schedule_run(registry, session)
 
@@ -163,10 +164,8 @@ async def get_context(request: Request) -> JSONResponse:
     """GET /context — bound planes of latest run + online machine candidates."""
     if request.method == "OPTIONS":
         return JSONResponse({}, headers=cors_headers())
-    presence = request.app.state.presence
-    online = [
-        device.as_dict() for device in presence.list_devices() if device.status.value == "online"
-    ]
+    devices = request.app.state.devices
+    online = [device.as_dict() for device in devices.list_online()]
     latest = _registry_of(request).latest_bindings()
     bindings = None
     if latest is not None:

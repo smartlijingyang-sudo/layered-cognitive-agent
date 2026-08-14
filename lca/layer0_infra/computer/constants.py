@@ -1,16 +1,13 @@
-"""Computer use constants — aligned with LobeHub cloud-sandbox workspace."""
+"""Computer use constants — guest markers and result caps.
+
+Sandbox disk roots live in ``lca.layer0_infra.sandbox.paths``.
+"""
 
 from __future__ import annotations
 
 # Guest JSON marker for structured computer op results.
 COMPUTER_RESULT_BEGIN = "__LCA_COMPUTER__"
 COMPUTER_RESULT_END = "__END_COMPUTER__"
-
-# Default workspace root inside sandbox (matches SANDBOX_MOUNT_ROOT).
-COMPUTER_WORKSPACE_ROOT = "/mnt/data"
-
-# Background command metadata directory (session-persistent).
-BACKGROUND_CMD_DIR = "/mnt/data/.lca/background"
 
 # Max lines returned by read_file without explicit range.
 READ_FILE_DEFAULT_MAX_LINES = 500

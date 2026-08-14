@@ -10,7 +10,7 @@ from gateway.runs.wire import WIRE, resolve
 
 
 def test_resolve_execute_code() -> None:
-    assert resolve("execute_code") == ("lobe-cloud-sandbox", "executeCode")
+    assert resolve("executeCode") == ("lobe-cloud-sandbox", "executeCode")
 
 
 def test_unknown_tool_returns_none() -> None:

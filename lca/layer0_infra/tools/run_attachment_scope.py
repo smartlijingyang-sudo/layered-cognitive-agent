@@ -1,7 +1,7 @@
 """当前 run 用户附件 id 的 ambient 作用域。
 
 CreateRun / 入口把本轮 ``attachment_ids`` 绑到 contextvar；沙箱工具
-合并 ambient 与工具参数后挂载到 ``/mnt/data/<原文件名>``，避免依赖模型
+合并 ambient 与工具参数后挂载到沙箱工作根 ``<原文件名>``，避免依赖模型
 再传一遍 id（ADR-0046 意图：上传 → CreateRun → 沙箱挂载）。
 """
 

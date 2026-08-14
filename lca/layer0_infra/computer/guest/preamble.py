@@ -5,10 +5,7 @@ No user values are interpolated here. Constants are host-side only.
 
 from __future__ import annotations
 
-from lca.layer0_infra.computer.constants import (
-    BACKGROUND_CMD_DIR,
-    COMPUTER_WORKSPACE_ROOT,
-)
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 
 SCRIPT_PRELUDE = f"""
 import base64
@@ -24,8 +21,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-ROOT = {COMPUTER_WORKSPACE_ROOT!r}
-BG_DIR = {BACKGROUND_CMD_DIR!r}
+ROOT = {ONLYBOXES.root!r}
+BG_DIR = {ONLYBOXES.background_dir!r}
 
 def load_args(encoded):
     return json.loads(base64.b64decode(encoded).decode())

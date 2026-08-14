@@ -6,16 +6,16 @@ Re-exports ``ARTIFACT_BEGIN`` / ``ARTIFACT_END`` markers used by
 
 from __future__ import annotations
 
-from lca.layer0_infra.sandbox.bootstrap import sandbox_output_path
 from lca.layer0_infra.sandbox.onlyboxes_artifacts import ARTIFACT_BEGIN, ARTIFACT_END
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 
-# Guest Python executed after user code to scan /mnt/data/outputs and
+# Guest Python executed after user code to scan the outputs directory and
 # print an artifact marker block that the host parses via ``strip_artifacts``.
 GUEST_ARTIFACT_SCANNER: str = f"""
 import os as _os, json as _json, base64 as _b64, mimetypes as _mt
 try:
     _scan_files = []
-    _output_dir = {sandbox_output_path()!r}
+    _output_dir = {ONLYBOXES.outputs_dir!r}
     if _os.path.isdir(_output_dir):
         for _fname in sorted(_os.listdir(_output_dir)):
             # Skip workspace markers / hidden ops files (e.g. .workspace-initialized).

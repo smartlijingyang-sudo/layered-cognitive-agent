@@ -17,7 +17,7 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.layer0_infra.file_store import LocalFileStore
 from lca.layer0_infra.observability import ObservabilityHub, bind
-from lca.layer0_infra.tools.write_file_tool import WriteFileTool
+from lca.layer0_infra.tools.write_file import build_tools as build_write_file_tools
 from lca.layer1_cognitive.body.safe_executor import (
     SimpleSafeExecutor,
     _tool_output_preview,
@@ -110,9 +110,9 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
     async def test_write_file_emits_structured_files_on_tool_invoked(self) -> None:
         collector = _Collector()
         hub = ObservabilityHub([], journal_projectors=[collector])
-        tool = WriteFileTool(store=self.store)
+        tool = build_write_file_tools(store=self.store)[0]
         executor = SimpleSafeExecutor(
-            permission_manifest=ToolPermissionManifest(allowed_tools=["write_file"])
+            permission_manifest=ToolPermissionManifest(allowed_tools=["writeFile"])
         )
         with bind(hub), run_scope(RunScope(trace_id="t", run_id="r")):
             obs = await executor.execute(

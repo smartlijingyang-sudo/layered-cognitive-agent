@@ -15,7 +15,7 @@ _ENV = Path("deploy/lobehub/.env.lca").read_text(encoding="utf-8")
 def test_ui_catalog_is_solo_team_auto() -> None:
     assert LCA_UI_MODELS == ("solo", "team", "auto")
     for model in LCA_UI_MODELS:
-            assert f"id: '{model}'" in _CATALOG
+        assert f"id: '{model}'" in _CATALOG
     assert "resolveLcaChatModel" in _CATALOG
     assert "qwen" not in _CATALOG.lower()
     assert "gpt-" not in _CATALOG

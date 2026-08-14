@@ -25,9 +25,8 @@ LCA Agent/Team
 - `POST /runs` + `GET /runs/{id}/live`：Agent 干活
 - `POST /v1/chat/completions` / embeddings / responses：管家面（标题、话题、小助手）。直连上游，不开 Run。
 - `/presence/*` + `/console/*`：本机 host sidecar（在线表 + 人用终端）。
-- host 在线且声明 `sandbox` 时，`resolve_sandbox()` 优先本机执行面。
-  Agent 使用 `LCA_HOST_GUEST_ROOT`（默认契约 `/mnt/data`）。
-  物理目录与操作用户见 `HostRuntimeSettings`（`LCA_HOST_USER` / `LCA_HOST_ROOT`）。
+- 本机执行面使用设备上报的真实工作根（`HostRuntimeSettings`：`LCA_HOST_USER` / `LCA_HOST_ROOT`，默认 `/home/<user>`）。
+  沙箱执行面使用镜像契约 `SANDBOX_MOUNT_ROOT`（`/mnt/data`）。两套路径不互译。
   离线回落 Onlyboxes。准备环境：`./scripts/setup_host_runtime.sh`。
 
 联网搜索（ADR-0053）：`TAVILY_API_KEY` 已配 → `web_search`；否则 Qwen `enable_search` 兜底。搜索结果同样经 Journal `ToolStarted` / `ToolInvoked` 投影，不另开协议。
@@ -48,7 +47,9 @@ LCA Agent/Team
 | `lobehub-ui/` | 官方 v2.2.13 源码（gitignore） |
 | `.lobehub-upstream/` | 官方 git 克隆缓存（gitignore） |
 | `scripts/sync_lobehub_ui.sh` | 拉取并 rsync 官方 release |
-| `scripts/start_lobehub_stack.sh` | 联合启动编排 |
+| `deploy/lobehub/stack.yaml` | 栈配置 SSOT：端口、路径、surface 元数据、命令步骤 |
+| `deploy/lobehub/stack/` | Python 编排模块：config, types, inspect, ops, cli |
+| `scripts/start_lobehub_stack.sh` | 联合启动编排（thin wrapper → Python） |
 | `deploy/lobehub/.env.lca` | LobeHub 本地 env 模板 |
 | `gateway/openai_shim.py` | OpenAI 兼容 HTTP 面（标题 / embeddings / responses） |
 | `gateway/runs/` | Run Live：开工、Journal SSE、快照、取消、HIL |

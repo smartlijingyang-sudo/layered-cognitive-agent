@@ -7,6 +7,8 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from lca.contracts.models.core.workspace import ArtifactLedgerSnapshot, WorkspaceArtifact
+from lca.layer0_infra.plane.paths import join_under
+from lca.layer0_infra.plane.scope import current_primary
 from lca.layer0_infra.workspace.deliverable import publishable_file_parts
 
 
@@ -142,12 +144,20 @@ def artifact_closure_text(snapshot: ArtifactLedgerSnapshot, *, locale: str = "zh
     return "\n".join(lines)
 
 
+def _artifact_fallback_path(name: str) -> str:
+    """Only the bound plane may invent a path. No cross-plane guess."""
+    primary = current_primary()
+    if primary is None:
+        return name
+    return join_under(primary.outputs_dir, name)
+
+
 def artifact_handoff_block(snapshot: ArtifactLedgerSnapshot) -> str:
     """Structured block for pipeline member task injection."""
     if not snapshot.artifacts:
         return ""
     lines = ["[工作区已产出文件 — 可直接读取，勿猜测路径]"]
     for art in snapshot.artifacts:
-        path = art.guest_path or f"/mnt/data/outputs/{art.name}"
+        path = art.guest_path or _artifact_fallback_path(art.name)
         lines.append(f"- {art.name} → {path} ({art.mime_type})")
     return "\n".join(lines)

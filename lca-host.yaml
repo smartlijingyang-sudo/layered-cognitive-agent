@@ -1,0 +1,44 @@
+# lca-host.yaml — LCA Host Runtime Configuration (SSOT)
+#
+# This file is the single source of truth for the host environment.
+# Edit this file, then run:  scripts/lca-host.py provision
+#
+# Architecture:
+#   - Shared layer: system packages, tools, venv, CLI → shared across users
+#   - User layer:   each user gets an account + workspace + daemon
+#
+# See lca/layer0_infra/host_runtime/config.py for the Pydantic models.
+
+paths:
+  tool_dir: /usr/local/bin
+  cli_dir: /opt/lca
+  venv_dir: /opt/lca/venv
+  managed_path: "/opt/lca/venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
+
+gateway:
+  url: "ws://127.0.0.1:8765"
+  token: lca-local-host
+
+system_packages:
+  dnf: [pandoc, ffmpeg, jq, poppler-utils, wqy-microhei-fonts]
+
+tools:
+  names: [python3, uv, officecli]
+  python_min_version: "3.10"
+  python_candidates: [/usr/local/bin/python3.12, /usr/bin/python3.12]
+
+venv:
+  requirements_file: deploy/onlyboxes/requirements-python.txt
+  python_index: "https://pypi.tuna.tsinghua.edu.cn/simple"
+  check_imports: [pandas, numpy, matplotlib, openpyxl, reportlab, requests]
+
+cli:
+  source_dir: packages/lca-cli
+  gateway_client_dir: packages/gateway-client
+
+# ── Users ──────────────────────────────────────────────────────────
+# Each user gets: system account, home dir, outputs/, .lca/ state, daemon
+# Add more users and re-run: scripts/lca-host.py provision
+users:
+  - name: sandbox-user
+    home: /home/sandbox-user

@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.models.core.plane import PlaneBindings, PlaneKind, PlaneRef
-from lca.contracts.models.core.sandbox import SANDBOX_MOUNT_ROOT, SANDBOX_OUTPUT_SUBDIR
 from lca.contracts.protocols import Sandbox
+from lca.layer0_infra.sandbox.paths import ONLYBOXES
 
 
 class PlaneBindingError(ValueError):
@@ -18,6 +18,7 @@ class PlaneRequest:
     device_id: str = ""
     plane: str = ""
     extra_plane: str = ""
+    execution_target: str = ""
 
 
 def ref_of(bindings: PlaneBindings, kind: PlaneKind) -> PlaneRef | None:
@@ -28,17 +29,21 @@ def ref_of(bindings: PlaneBindings, kind: PlaneKind) -> PlaneRef | None:
     return None
 
 
-def sandbox_ref_from(sandbox: Sandbox) -> PlaneRef:
-    name = str(getattr(sandbox, "name", "") or "onlyboxes")
-    root = SANDBOX_MOUNT_ROOT
+def make_sandbox_ref(*, name: str = "onlyboxes") -> PlaneRef:
+    """The only writer of a sandbox PlaneRef. Disk identity is GuestLayout."""
+    ident = name.strip() or "onlyboxes"
     return PlaneRef(
-        id=name,
+        id=ident,
         label="Onlyboxes",
         kind=PlaneKind.SANDBOX,
-        root=root,
-        outputs_dir=f"{root.rstrip('/')}/{SANDBOX_OUTPUT_SUBDIR}",
+        root=ONLYBOXES.root,
+        outputs_dir=ONLYBOXES.outputs_dir,
         platform="linux",
     )
+
+
+def sandbox_ref_from(sandbox: Sandbox) -> PlaneRef:
+    return make_sandbox_ref(name=str(getattr(sandbox, "name", "") or "onlyboxes"))
 
 
 def resolve_plane_bindings(
@@ -46,10 +51,22 @@ def resolve_plane_bindings(
     sandbox: PlaneRef | None,
     request: PlaneRequest | None = None,
 ) -> PlaneBindings:
-    """Exactly one primary. secondary only when extra_plane is explicit."""
+    """Exactly one primary. secondary only when extra_plane is explicit.
+
+    ``execution_target`` (sandbox|device|auto|none) is the LobeHub-aligned
+    decision.  ``plane`` remains an explicit override when set.
+    """
     req = request if request is not None else PlaneRequest()
-    wanted = _parse_kind(req.plane)
     extra = _parse_kind(req.extra_plane)
+
+    from lca.layer0_infra.plane.execution_target import ExecutionTarget, parse_execution_target
+
+    wanted = _parse_kind(req.plane)
+    if wanted is None:
+        requested = parse_execution_target(req.execution_target)
+        if requested is ExecutionTarget.NONE:
+            return PlaneBindings(primary=None)
+        wanted = _kind_from_execution_target(req.execution_target, machine, sandbox)
 
     primary = _select_primary(machine, sandbox, wanted)
     secondary = None
@@ -60,6 +77,35 @@ def resolve_plane_bindings(
             raise PlaneBindingError("extra_plane must differ from primary")
         secondary = _require(extra, machine, sandbox)
     return PlaneBindings(primary=primary, secondary=secondary)
+
+
+def _kind_from_execution_target(
+    raw: str,
+    machine: PlaneRef | None,
+    sandbox: PlaneRef | None,
+) -> PlaneKind | None:
+    from lca.layer0_infra.plane.execution_target import (
+        ExecutionTarget,
+        parse_execution_target,
+        resolve_execution_target,
+    )
+
+    requested = parse_execution_target(raw)
+    if requested is None:
+        return None
+    plan = resolve_execution_target(
+        requested,
+        device_online=machine is not None,
+        sandbox_available=sandbox is not None,
+        device_id=machine.id if machine is not None else None,
+    )
+    if plan.target is ExecutionTarget.DEVICE:
+        return PlaneKind.MACHINE
+    if plan.target is ExecutionTarget.SANDBOX:
+        return PlaneKind.SANDBOX
+    if plan.target is ExecutionTarget.NONE:
+        return None
+    return None
 
 
 def _select_primary(
