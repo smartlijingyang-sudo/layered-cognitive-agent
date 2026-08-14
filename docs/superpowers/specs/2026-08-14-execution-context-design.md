@@ -1,7 +1,7 @@
 # ExecutionContext — 执行上下文统一架构
 
 **日期**: 2026-08-14  
-**状态**: Draft v4 (reviewer approved)  
+**状态**: Draft v5 (reviewer approved)  
 **动机**: 消除 `/mnt/data` 虚拟路径映射层，让 agent、前端、工具、附件共享真实文件系统路径；统一 4 种执行环境（Host / Onlyboxes / SSH / Windows）为同一抽象。
 
 ---
@@ -187,10 +187,10 @@ class ExecutionContext(Protocol):
     def workspace(self) -> str:
         """真实文件系统根。Agent/前端/工具/附件全用这个。
         
-        - Host: /home/sandbox-user (或 LCA_HOST_ROOT)
+        - Host: /home/lca-sandbox (或 LCA_HOST_ROOT)
         - Onlyboxes: /mnt/data (容器内真实路径)
         - SSH: 远程 home 或配置路径
-        - Windows: C:\\Users\\lichao\\workspace
+        - Windows: %USERPROFILE%\LCA\{lobe_user} (自动创建)
         """
         ...
 
@@ -1452,7 +1452,7 @@ async def generate_download_url(
 - `ExecutionConfig.host_user` 默认值从 `"sandbox-user"` 改为 `"sandbox"`
 
 **验证**：
-- Host/Onlyboxes/SSH 三种环境可工作
+- Host/Onlyboxes/SSH/Windows 四种环境可工作（Windows 通过 HostContext 远程访问）
 - Agent 操作真实路径
 - 前端显示 context 信息
 
