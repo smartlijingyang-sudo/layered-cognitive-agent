@@ -1,7 +1,7 @@
 # ExecutionContext — 执行上下文统一架构
 
 **日期**: 2026-08-14  
-**状态**: Draft  
+**状态**: Draft v2  
 **动机**: 消除 `/mnt/data` 虚拟路径映射层，让 agent、前端、工具、附件共享真实文件系统路径；统一 4 种执行环境（Host / Onlyboxes / SSH / Windows）为同一抽象。
 
 ---
@@ -77,11 +77,11 @@
 │  ExecutionContext (contracts/protocols)                      │
 │  - id: str          # 唯一标识                               │
 │  - label: str       # 显示名                                 │
-│  - backend: str     # "host" | "onlyboxes" | "ssh" | "windows"│
-│  - workspace: str   # THE real root（那台机器上的真实路径）    │
+│  - backend: BackendKind  # 类型安全的枚举                    │
+│  - workspace: str   # THE real root                         │
 │  - outputs_dir: str # workspace/outputs                      │
-│  - execute(op, payload) -> ExecResult                        │
-│  - prompt_context() -> str   # 注入 prompt 的结构化信息       │
+│  - execute(op, payload) -> OpResult                          │
+│  - prompt_context() -> str                                   │
 └─────────────────────────────────────────────────────────────┘
                             │
         ┌───────────┬───────┴───────┬──────────────┐
@@ -99,12 +99,66 @@
 └──────────┘ └──────────┘ └───────────────┘ └──────────┘
 ```
 
-### 3.2 核心 Protocol
+### 3.2 核心类型与 Protocol
 
 ```python
 # lca/contracts/protocols/execution.py
 
+from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Protocol, runtime_checkable
+
+
+class BackendKind(str, Enum):
+    HOST = "host"
+    ONLYBOXES = "onlyboxes"
+    SSH = "ssh"
+    WINDOWS = "windows"
+
+
+# ── 标准化操作结果 ──
+
+@dataclass(frozen=True)
+class OpResult:
+    """所有 execute() 返回的统一结构。
+    
+    工具层只看 success + content + error。
+    特定 op 的额外数据放在 data 里（类型安全的子类型见下方）。
+    """
+    success: bool
+    content: str = ""         # 人类可读的结果文本
+    error: str = ""
+    data: dict[str, Any] = {}  # op-specific 结构化数据
+
+
+# 各 op 的 data 契约（文档级约束，不强制类型）：
+#
+# list_files:
+#   data.files: list[{name, path, size, is_directory, type, modified_time}]
+#   data.total_count: int
+#
+# read_file:
+#   data.content: str
+#   data.filename: str
+#   data.line_count: int
+#   data.truncated: bool
+#
+# write_file:
+#   data.path: str  (written path)
+#
+# run_command:
+#   data.stdout: str
+#   data.stderr: str
+#   data.exit_code: int
+#   data.shell_id: str  (for background)
+#   data.duration_ms: int
+#
+# run (code execution):
+#   data.stdout: str
+#   data.stderr: str
+#   data.exit_code: int
+#   data.generated_files: list[{name, mime_type, size}]
+
 
 @runtime_checkable
 class ExecutionContext(Protocol):
@@ -125,10 +179,8 @@ class ExecutionContext(Protocol):
         ...
 
     @property
-    def backend(self) -> str:
-        """实现方式标识（纯元数据，不影响执行语义）。
-        "host" | "onlyboxes" | "ssh" | "windows"
-        """
+    def backend(self) -> BackendKind:
+        """类型安全的 backend 枚举。"""
         ...
 
     @property
@@ -147,13 +199,15 @@ class ExecutionContext(Protocol):
         """交付物目录 = workspace/outputs。"""
         ...
 
-    async def execute(self, op: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, op: str, payload: dict[str, Any]) -> OpResult:
         """执行操作。传输细节由实现处理。
         
-        op: 操作名（list_files, read_file, run_command, run, write_files, ...）
-        payload: 操作参数
+        op: 操作名（list_files, read_file, write_file, edit_file, 
+             run_command, run, move_files, rename_file, search_files,
+             grep_content, glob_files）
+        payload: 操作参数（各 op 的 schema 见 OpResult.data 契约）
         
-        返回: {"success": bool, ...} 结构化结果
+        返回: OpResult（统一的 success/content/error/data 结构）
         """
         ...
 
@@ -162,20 +216,56 @@ class ExecutionContext(Protocol):
         ...
 ```
 
-### 3.3 与现有 Sandbox Protocol 的关系
+### 3.3 与现有 Sandbox Protocol 的关系 — 迁移路径
 
-**Sandbox Protocol 不变。** 它是执行传输层（how to run code）。  
-**ExecutionContext 是上层抽象（who + where + how）。**
+**Sandbox Protocol 不变。** 它是底层执行传输（how to run code）。
 
-关系：
-- `ExecutionContext.execute()` 内部委托给 `Sandbox`（或自己实现传输）
-- Host: `HostContext` 内部用 WebSocket RPC（现有 `HostSandbox`）
-- Onlyboxes: `OnlyboxesContext` 内部用 Docker exec（现有 `OnlyboxesSandboxAdapter`）
-- SSH: `SSHContext` 内部用 `ssh` subprocess
-- Windows: `WindowsContext` 内部用 `powershell.exe` / `subprocess`
+**ExecutionContext 是上层抽象（who + where + how）。** 它包装 Sandbox 实例，加上身份和路径语义。
+
+**迁移路径**（解决 reviewer 指出的 coexistence 问题）：
+
+```
+Phase 1 期间:
+  - ExecutionContext 内部持有 Sandbox 引用
+  - 新工具接收 ExecutionContext
+  - 旧工具仍接收 Sandbox（通过 ComputerRuntime 适配）
+  - ComputerRuntime 内部查询 ExecutionContext 获取 workspace 路径
+  - 两套注入并存，旧工具逐步迁移
+
+Phase 2 完成后:
+  - 所有工具迁移到 ExecutionContext
+  - Sandbox Protocol 仅作为 ExecutionContext 内部传输
+  - 不再有 Sandbox 类型的外部注入
+```
+
+具体 wiring：
 
 ```python
 class HostContext:
+    """Host 实现 — 内部持有 HostSandbox（WebSocket RPC）。"""
+    
+    def __init__(self, sandbox: HostSandbox, settings: HostRuntimeSettings):
+        self._sandbox = sandbox   # 内部传输，不暴露给工具
+        self._settings = settings
+    
+    async def execute(self, op: str, payload: dict) -> OpResult:
+        # 委托给 HostSandbox.computer_op()
+        raw = await self._sandbox.computer_op(op, payload)
+        return _to_op_result(raw)
+    
+    # 工具层只看到 ExecutionContext，不看到 Sandbox
+```
+
+### 3.4 四种实现
+
+#### HostContext
+
+```python
+# lca/layer0_infra/execution/host_context.py
+
+class HostContext:
+    """本机 host sidecar — WebSocket RPC 到 host 进程。"""
+    
     def __init__(self, sandbox: HostSandbox, settings: HostRuntimeSettings):
         self._sandbox = sandbox
         self._settings = settings
@@ -189,8 +279,8 @@ class HostContext:
         return self._settings.display_name()
     
     @property
-    def backend(self) -> str:
-        return "host"
+    def backend(self) -> BackendKind:
+        return BackendKind.HOST
     
     @property
     def workspace(self) -> str:
@@ -200,35 +290,17 @@ class HostContext:
     def outputs_dir(self) -> str:
         return str(self._settings.outputs_dir())
     
-    async def execute(self, op: str, payload: dict) -> dict:
-        return await self._sandbox.computer_op(op, payload)
+    async def execute(self, op: str, payload: dict) -> OpResult:
+        raw = await self._sandbox.computer_op(op, payload)
+        return _to_op_result(raw)
     
     def prompt_context(self) -> str:
         return (
-            f"你正在 **{self.label}** 上操作（本机 host）。\n"
+            f"你正在 **{self.label}** 上操作（本机 host，backend={self.backend.value}）。\n"
             f"工作区：`{self.workspace}`\n"
             f"交付物写到 `{self.outputs_dir}`\n"
+            f"附件在 `{self.workspace}/<文件名>`\n"
         )
-```
-
-### 3.4 四种实现
-
-#### HostContext
-
-```python
-# lca/layer0_infra/execution/host_context.py
-
-class HostContext:
-    """本机 host sidecar — WebSocket RPC 到 host 进程。"""
-    
-    id: str           # device_id from settings
-    label: str        # hostname from settings
-    backend = "host"
-    workspace: str    # LCA_HOST_ROOT → /home/{user}
-    outputs_dir: str  # workspace/outputs
-    
-    # execute → HostSandbox.computer_op() (现有 WebSocket RPC)
-    # 不需要 rewrite_guest_refs — agent 直接操作真实路径
 ```
 
 #### OnlyboxesContext
@@ -239,13 +311,45 @@ class HostContext:
 class OnlyboxesContext:
     """Onlyboxes 容器沙箱 — Docker exec / API。"""
     
-    id: str           # session_id or box_id
-    label: str        # "Onlyboxes Sandbox" or configurable
-    backend = "onlyboxes"
-    workspace = "/mnt/data"  # 容器内真实路径
-    outputs_dir = "/mnt/data/outputs"
+    def __init__(self, sandbox: OnlyboxesSandboxAdapter, *, 
+                 session_id: str = "", label: str = "Onlyboxes Sandbox"):
+        self._sandbox = sandbox
+        self._session_id = session_id
+        self._label = label
     
-    # execute → OnlyboxesSandboxAdapter (现有)
+    @property
+    def id(self) -> str:
+        return self._session_id or "onlyboxes"
+    
+    @property
+    def label(self) -> str:
+        return self._label
+    
+    @property
+    def backend(self) -> BackendKind:
+        return BackendKind.ONLYBOXES
+    
+    @property
+    def workspace(self) -> str:
+        return "/mnt/data"  # 容器内真实路径
+    
+    @property
+    def outputs_dir(self) -> str:
+        return "/mnt/data/outputs"
+    
+    async def execute(self, op: str, payload: dict) -> OpResult:
+        # Onlyboxes 通过 Sandbox Protocol 执行
+        # file ops → guest Python scripts
+        # run → sandbox.run()
+        ...
+    
+    def prompt_context(self) -> str:
+        return (
+            f"你正在 **{self.label}** 上操作（云端容器，backend={self.backend.value}）。\n"
+            f"工作区：`{self.workspace}`\n"
+            f"交付物写到 `{self.outputs_dir}`\n"
+            f"这是一个隔离环境，非用户本机文件系统。\n"
+        )
 ```
 
 #### SSHContext
@@ -253,22 +357,182 @@ class OnlyboxesContext:
 ```python
 # lca/layer0_infra/execution/ssh_context.py
 
+import asyncio
+import subprocess
+from pathlib import PurePosixPath
+
+
 class SSHContext:
-    """远程 SSH — ssh user@host。"""
+    """远程 SSH — ssh user@host。
     
-    id: str           # ssh alias (e.g. "smartljy")
-    label: str        # display name
-    backend = "ssh"
-    workspace: str    # 远程真实路径（配置或 ssh 后探测）
-    outputs_dir: str  # workspace/outputs
+    连接策略：每次 execute 独立 ssh 调用（简单、无状态、可并发）。
+    对于高频场景可后续加连接池，但 MVP 不需要。
     
-    # execute → subprocess: ssh smartljy "command"
-    # file ops → sftp / scp / ssh cat
+    文件传输：小文件走 ssh cat / ssh tee（避免 sftp 依赖）。
+    大文件（>1MB）走 scp。
+    """
     
+    def __init__(self, config: SSHConfig):
+        self._config = config
+    
+    @property
+    def id(self) -> str:
+        return f"ssh-{self._config.alias}"
+    
+    @property
+    def label(self) -> str:
+        return self._config.alias
+    
+    @property
+    def backend(self) -> BackendKind:
+        return BackendKind.SSH
+    
+    @property
+    def workspace(self) -> str:
+        return self._config.workspace  # 配置或探测得到
+    
+    @property
+    def outputs_dir(self) -> str:
+        return f"{self.workspace}/outputs"
+    
+    def _ssh_argv(self) -> list[str]:
+        """构建 ssh 命令前缀。"""
+        argv = ["ssh", "-o", "StrictHostKeyChecking=accept-new"]
+        if self._config.key_path:
+            argv.extend(["-i", self._config.key_path])
+        if self._config.port != 22:
+            argv.extend(["-p", str(self._config.port)])
+        argv.append(f"{self._config.user}@{self._config.host}")
+        return argv
+    
+    async def execute(self, op: str, payload: dict) -> OpResult:
+        """SSH execute 映射：
+        
+        run_command:
+          ssh host "cd workspace && command"
+          → 捕获 stdout/stderr/exit_code
+        
+        list_files:
+          ssh host "ls -la path" → parse
+          或 ssh host "find path -maxdepth 1 -printf ..." → structured
+        
+        read_file:
+          ssh host "cat path"
+        
+        write_file:
+          echo content | ssh host "cat > path"
+          或 scp tempfile host:path（大文件）
+        
+        run (code):
+          ssh host "cd workspace && python3 -c 'code'"
+        """
+        if op == "run_command":
+            return await self._run_command(payload)
+        elif op == "read_file":
+            return await self._read_file(payload)
+        elif op == "write_file":
+            return await self._write_file(payload)
+        elif op == "list_files":
+            return await self._list_files(payload)
+        elif op == "run":
+            return await self._run_code(payload)
+        else:
+            return OpResult(success=False, error=f"unsupported op for SSH: {op}")
+    
+    async def _run_command(self, payload: dict) -> OpResult:
+        command = payload.get("command", "")
+        cwd = payload.get("cwd", self.workspace)
+        full_cmd = f"cd {_shell_quote(cwd)} && {command}"
+        
+        proc = await asyncio.create_subprocess_exec(
+            *self._ssh_argv(), full_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(), 
+            timeout=payload.get("timeout_s", 60)
+        )
+        
+        return OpResult(
+            success=proc.returncode == 0,
+            content=stdout.decode("utf-8", errors="replace"),
+            error=stderr.decode("utf-8", errors="replace") if proc.returncode != 0 else "",
+            data={
+                "stdout": stdout.decode("utf-8", errors="replace"),
+                "stderr": stderr.decode("utf-8", errors="replace"),
+                "exit_code": proc.returncode or 0,
+            }
+        )
+    
+    async def _read_file(self, payload: dict) -> OpResult:
+        path = payload.get("path", "")
+        abs_path = self._resolve_path(path)
+        
+        proc = await asyncio.create_subprocess_exec(
+            *self._ssh_argv(), f"cat {_shell_quote(abs_path)}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        
+        if proc.returncode != 0:
+            return OpResult(
+                success=False,
+                error=stderr.decode("utf-8", errors="replace"),
+            )
+        
+        content = stdout.decode("utf-8", errors="replace")
+        lines = content.splitlines()
+        return OpResult(
+            success=True,
+            content=content,
+            data={
+                "content": content,
+                "filename": PurePosixPath(abs_path).name,
+                "line_count": len(lines),
+                "truncated": False,
+            }
+        )
+    
+    def _resolve_path(self, path: str) -> str:
+        """解析相对路径到 workspace 下。"""
+        p = PurePosixPath(path)
+        if p.is_absolute():
+            return str(p)
+        return str(PurePosixPath(self.workspace) / path)
+    
+    def prompt_context(self) -> str:
+        return (
+            f"你正在 **{self.label}** 上操作（远程 SSH，backend={self.backend.value}）。\n"
+            f"工作区：`{self.workspace}`\n"
+            f"交付物写到 `{self.outputs_dir}`\n"
+            f"这是远程机器的真实文件系统。\n"
+        )
+
+
+class SSHConfig:
+    """SSH 连接配置。"""
+    alias: str          # 显示名 / 标识
     host: str
     user: str
     port: int = 22
-    key_path: str = ""  # SSH key
+    key_path: str = ""  # SSH 私钥路径
+    workspace: str = "" # 空则连接后探测 $HOME
+    
+    def __init__(self, alias: str, host: str, user: str, 
+                 port: int = 22, key_path: str = "", workspace: str = ""):
+        self.alias = alias
+        self.host = host
+        self.user = user
+        self.port = port
+        self.key_path = key_path
+        self.workspace = workspace
+
+
+def _shell_quote(s: str) -> str:
+    """Shell 转义。"""
+    return "'" + s.replace("'", "'\"'\"'") + "'"
 ```
 
 #### WindowsContext
@@ -276,19 +540,153 @@ class SSHContext:
 ```python
 # lca/layer0_infra/execution/windows_context.py
 
+import asyncio
+import subprocess
+from pathlib import PureWindowsPath
+
+
 class WindowsContext:
-    """本机 Windows PowerShell。"""
+    """本机 Windows PowerShell。
     
-    id: str           # device identifier
-    label: str        # display name
-    backend = "windows"
-    workspace: str    # C:\Users\lichao\workspace
-    outputs_dir: str  # workspace\outputs
+    路径用 Windows 格式（C:\\Users\\...）。
+    编码统一 UTF-8（PowerShell 6+ 默认；Windows PowerShell 5.1 需 chcp 65001）。
     
-    # execute → subprocess: powershell.exe -Command "..."
-    # file ops → 直接本地文件系统操作
+    execute 映射：
+      run_command: powershell.exe -NoProfile -Command "..."
+      read_file:   Get-Content -Raw -Encoding UTF8 path
+      write_file:  Set-Content -Encoding UTF8 path value
+      list_files:  Get-ChildItem path | ConvertTo-Json
+      run (code):  python -c "code" (假设 Python 已安装)
+    """
     
-    # 注意：路径用 Windows 格式，agent 看到的就是 C:\...
+    def __init__(self, config: WindowsConfig):
+        self._config = config
+    
+    @property
+    def id(self) -> str:
+        return self._config.device_id
+    
+    @property
+    def label(self) -> str:
+        return self._config.label
+    
+    @property
+    def backend(self) -> BackendKind:
+        return BackendKind.WINDOWS
+    
+    @property
+    def workspace(self) -> str:
+        return self._config.workspace
+    
+    @property
+    def outputs_dir(self) -> str:
+        return str(PureWindowsPath(self.workspace) / "outputs")
+    
+    def _ps_argv(self) -> list[str]:
+        return ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"]
+    
+    async def execute(self, op: str, payload: dict) -> OpResult:
+        if op == "run_command":
+            return await self._run_command(payload)
+        elif op == "read_file":
+            return await self._read_file(payload)
+        elif op == "write_file":
+            return await self._write_file(payload)
+        elif op == "list_files":
+            return await self._list_files(payload)
+        elif op == "run":
+            return await self._run_code(payload)
+        else:
+            return OpResult(success=False, error=f"unsupported op for Windows: {op}")
+    
+    async def _run_command(self, payload: dict) -> OpResult:
+        command = payload.get("command", "")
+        cwd = payload.get("cwd", self.workspace)
+        
+        # PowerShell 命令：先 cd 再执行
+        ps_cmd = f"Set-Location '{cwd}'; {command}"
+        
+        proc = await asyncio.create_subprocess_exec(
+            *self._ps_argv(), ps_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout_bytes, stderr_bytes = await asyncio.wait_for(
+            proc.communicate(),
+            timeout=payload.get("timeout_s", 60)
+        )
+        
+        # UTF-8 解码，处理可能的 BOM
+        stdout = stdout_bytes.decode("utf-8-sig", errors="replace")
+        stderr = stderr_bytes.decode("utf-8-sig", errors="replace")
+        
+        return OpResult(
+            success=proc.returncode == 0,
+            content=stdout,
+            error=stderr if proc.returncode != 0 else "",
+            data={
+                "stdout": stdout,
+                "stderr": stderr,
+                "exit_code": proc.returncode or 0,
+            }
+        )
+    
+    async def _read_file(self, payload: dict) -> OpResult:
+        path = self._resolve_path(payload.get("path", ""))
+        ps_cmd = f"Get-Content -Raw -Encoding UTF8 '{path}'"
+        
+        proc = await asyncio.create_subprocess_exec(
+            *self._ps_argv(), ps_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout_bytes, stderr_bytes = await proc.communicate()
+        
+        if proc.returncode != 0:
+            return OpResult(
+                success=False,
+                error=stderr_bytes.decode("utf-8-sig", errors="replace"),
+            )
+        
+        content = stdout_bytes.decode("utf-8-sig", errors="replace")
+        lines = content.splitlines()
+        return OpResult(
+            success=True,
+            content=content,
+            data={
+                "content": content,
+                "filename": PureWindowsPath(path).name,
+                "line_count": len(lines),
+                "truncated": False,
+            }
+        )
+    
+    def _resolve_path(self, path: str) -> str:
+        """解析路径：相对路径拼到 workspace。"""
+        p = PureWindowsPath(path)
+        if p.is_absolute():
+            return str(p)
+        return str(PureWindowsPath(self.workspace) / path)
+    
+    def prompt_context(self) -> str:
+        return (
+            f"你正在 **{self.label}** 上操作（本机 Windows，backend={self.backend.value}）。\n"
+            f"工作区：`{self.workspace}`\n"
+            f"交付物写到 `{self.outputs_dir}`\n"
+            f"路径使用 Windows 格式。\n"
+        )
+
+
+class WindowsConfig:
+    """Windows 执行环境配置。"""
+    device_id: str
+    label: str
+    workspace: str  # e.g. C:\\Users\\lichao\\workspace
+    
+    def __init__(self, device_id: str, label: str, workspace: str):
+        self.device_id = device_id
+        self.label = label
+        self.workspace = workspace
 ```
 
 ### 3.5 Factory
@@ -296,31 +694,202 @@ class WindowsContext:
 ```python
 # lca/layer0_infra/execution/factory.py
 
+import os
+from typing import Optional
+
+from lca.layer0_infra.execution.config import ExecutionConfig, load_execution_config
+
+
 class ExecutionContextFactory:
-    """根据配置和运行时状态创建 ExecutionContext。"""
+    """根据配置和运行时状态创建 ExecutionContext。
     
-    def resolve(self) -> ExecutionContext:
-        """优先级：
-        1. 在线 host sidecar（Presence 有 sandbox capability）→ HostContext
-        2. SSH 配置存在 → SSHContext
-        3. Onlyboxes 配置存在 → OnlyboxesContext
-        4. Windows 本地 → WindowsContext
-        5. None（无执行环境）
-        """
-        ...
+    解析规则（LCA_EXECUTION_BACKEND 环境变量）：
+    - "host": 强制 Host（无在线 host → 报错）
+    - "onlyboxes": 强制 Onlyboxes（无配置 → 报错）
+    - "ssh": 强制 SSH（无配置 → 报错）
+    - "windows": 强制 Windows
+    - "auto"（默认）: 
+      1. Presence 有在线 host（sandbox capability）→ HostContext
+      2. SSH 配置存在（LCA_SSH_HOST 非空）→ SSHContext  
+      3. Onlyboxes 配置存在（ONLYBOXES_BASE_URL + TOKEN）→ OnlyboxesContext
+      4. 检测到 Windows 平台 → WindowsContext
+      5. None（无可用执行环境）
+    """
+    
+    def __init__(self, config: ExecutionConfig | None = None):
+        self._config = config or load_execution_config()
+    
+    async def resolve(self) -> Optional[ExecutionContext]:
+        backend = self._config.backend
+        
+        if backend == "host":
+            return await self._resolve_host()
+        elif backend == "onlyboxes":
+            return self._resolve_onlyboxes()
+        elif backend == "ssh":
+            return self._resolve_ssh()
+        elif backend == "windows":
+            return self._resolve_windows()
+        elif backend == "auto":
+            return await self._resolve_auto()
+        else:
+            raise ValueError(f"unknown backend: {backend}")
+    
+    async def _resolve_auto(self) -> Optional[ExecutionContext]:
+        """Auto-detect: 优先级 host > ssh > onlyboxes > windows > None。"""
+        # 1. Host: 检查 Presence
+        host_ctx = await self._resolve_host()
+        if host_ctx is not None:
+            return host_ctx
+        
+        # 2. SSH: 检查配置
+        ssh_ctx = self._resolve_ssh()
+        if ssh_ctx is not None:
+            return ssh_ctx
+        
+        # 3. Onlyboxes: 检查配置
+        onlyboxes_ctx = self._resolve_onlyboxes()
+        if onlyboxes_ctx is not None:
+            return onlyboxes_ctx
+        
+        # 4. Windows: 检查平台
+        windows_ctx = self._resolve_windows()
+        if windows_ctx is not None:
+            return windows_ctx
+        
+        return None
+    
+    async def _resolve_host(self) -> Optional[ExecutionContext]:
+        """检查 Presence 是否有在线 host。"""
+        from gateway.presence.registry import PresenceRegistry
+        from gateway.host_sandbox import HostSandbox
+        
+        # 注入 PresenceRegistry（由 gateway 启动时设置）
+        registry = _get_presence_registry()
+        if registry is None:
+            return None
+        
+        sandbox = HostSandbox.from_presence(registry, _get_exec_hub())
+        if sandbox is None:
+            return None
+        
+        from lca.layer0_infra.sandbox.host_settings import load_host_settings
+        settings = load_host_settings()
+        return HostContext(sandbox, settings)
+    
+    def _resolve_ssh(self) -> Optional[ExecutionContext]:
+        if not self._config.ssh_host:
+            return None
+        return SSHContext(SSHConfig(
+            alias=self._config.ssh_alias or self._config.ssh_host,
+            host=self._config.ssh_host,
+            user=self._config.ssh_user,
+            port=self._config.ssh_port,
+            key_path=self._config.ssh_key_path,
+            workspace=self._config.ssh_workspace,
+        ))
+    
+    def _resolve_onlyboxes(self) -> Optional[ExecutionContext]:
+        if not self._config.onlyboxes_base_url or not self._config.onlyboxes_token:
+            return None
+        from lca.layer0_infra.sandbox.onlyboxes_adapter import OnlyboxesSandboxAdapter
+        sandbox = OnlyboxesSandboxAdapter(
+            base_url=self._config.onlyboxes_base_url,
+            access_token=self._config.onlyboxes_token,
+        )
+        return OnlyboxesContext(sandbox)
+    
+    def _resolve_windows(self) -> Optional[ExecutionContext]:
+        import sys
+        if sys.platform != "win32":
+            return None
+        return WindowsContext(WindowsConfig(
+            device_id="local-windows",
+            label="Local Windows",
+            workspace=self._config.windows_workspace or self._default_windows_workspace(),
+        ))
+    
+    def _default_windows_workspace(self) -> str:
+        import os
+        home = os.environ.get("USERPROFILE", "C:\\Users\\Default")
+        return os.path.join(home, "lca-workspace")
+
+
+# 全局注入点（由 gateway 启动时设置）
+_presence_registry = None
+_exec_hub = None
+
+def _get_presence_registry():
+    return _presence_registry
+
+def _get_exec_hub():
+    return _exec_hub
+
+def set_gateway_services(registry, hub):
+    global _presence_registry, _exec_hub
+    _presence_registry = registry
+    _exec_hub = hub
 ```
 
 ### 3.6 配置
 
-每种环境独立配置节，由 pydantic-settings 加载：
+```python
+# lca/layer0_infra/execution/config.py
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class ExecutionConfig(BaseSettings):
+    """执行环境统一配置。
+    
+    合并 host / ssh / windows / onlyboxes 的配置，
+    由 factory 按需读取。
+    """
+    model_config = SettingsConfigDict(
+        env_prefix="LCA_",
+        env_file=(".env", "deploy/lobehub/.env.lca"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+    
+    # 通用
+    execution_backend: str = "auto"  # auto | host | onlyboxes | ssh | windows
+    
+    # Host
+    host_user: str = "sandbox-user"
+    host_root: str = ""  # 空 → /home/${host_user}
+    host_device_id: str = "local-host"
+    host_token: str = "lca-local-host"
+    
+    # SSH
+    ssh_host: str = ""
+    ssh_user: str = ""
+    ssh_port: int = 22
+    ssh_key_path: str = ""
+    ssh_workspace: str = ""  # 空 → 远程 $HOME
+    ssh_alias: str = ""      # 显示名，空 → ssh_host
+    
+    # Windows
+    windows_workspace: str = ""  # 空 → USERPROFILE/lca-workspace
+    
+    # Onlyboxes (复用现有环境变量名)
+    onlyboxes_base_url: str = ""
+    onlyboxes_token: str = ""
+
+
+def load_execution_config() -> ExecutionConfig:
+    return ExecutionConfig()
+```
+
+环境变量映射：
 
 ```bash
-# .env — 通用
-LCA_EXECUTION_BACKEND=auto  # auto | host | onlyboxes | ssh | windows
+# .env
+LCA_EXECUTION_BACKEND=auto
 
 # Host
 LCA_HOST_USER=sandbox-user
-LCA_HOST_ROOT=              # 空 → /home/${LCA_HOST_USER}
+LCA_HOST_ROOT=
 LCA_HOST_DEVICE_ID=local-host
 LCA_HOST_TOKEN=lca-local-host
 
@@ -328,13 +897,14 @@ LCA_HOST_TOKEN=lca-local-host
 LCA_SSH_HOST=smartljy
 LCA_SSH_USER=smartljy
 LCA_SSH_PORT=22
-LCA_SSH_KEY=~/.ssh/id_rsa
-LCA_SSH_WORKSPACE=          # 空 → 远程 $HOME
+LCA_SSH_KEY_PATH=~/.ssh/id_rsa
+LCA_SSH_WORKSPACE=
+LCA_SSH_ALIAS=smartljy
 
 # Windows
 LCA_WINDOWS_WORKSPACE=C:\Users\lichao\workspace
 
-# Onlyboxes
+# Onlyboxes (保持现有变量名兼容)
 ONLYBOXES_BASE_URL=http://127.0.0.1:8089
 ONLYBOXES_ACCESS_TOKEN=obx_...
 ```
@@ -357,32 +927,36 @@ Prompt 模板不再硬编码路径，而是由 `context.prompt_context()` 注入
 </output_policy>
 ```
 
-Host 示例输出：
+**Host 示例**：
 ```
-你正在 **lichao-mbp** 上操作（本机 host）。
+你正在 **lichao-mbp** 上操作（本机 host，backend=host）。
 工作区：`/home/sandbox-user`
 交付物写到 `/home/sandbox-user/outputs`
+附件在 `/home/sandbox-user/<文件名>`
 ```
 
-Onlyboxes 示例输出：
+**Onlyboxes 示例**：
 ```
-你正在 **Onlyboxes Sandbox** 上操作（云端容器）。
+你正在 **Onlyboxes Sandbox** 上操作（云端容器，backend=onlyboxes）。
 工作区：`/mnt/data`
 交付物写到 `/mnt/data/outputs`
+这是一个隔离环境，非用户本机文件系统。
 ```
 
-SSH 示例输出：
+**SSH 示例**：
 ```
-你正在 **smartljy** 上操作（远程 SSH）。
+你正在 **smartljy** 上操作（远程 SSH，backend=ssh）。
 工作区：`/home/smartljy`
 交付物写到 `/home/smartljy/outputs`
+这是远程机器的真实文件系统。
 ```
 
-Windows 示例输出：
+**Windows 示例**：
 ```
-你正在 **lichao-pc** 上操作（本机 Windows）。
+你正在 **lichao-pc** 上操作（本机 Windows，backend=windows）。
 工作区：`C:\Users\lichao\workspace`
 交付物写到 `C:\Users\lichao\workspace\outputs`
+路径使用 Windows 格式。
 ```
 
 ### 3.8 Skills 参数化
@@ -397,7 +971,26 @@ Skill 不再硬编码 `/mnt/data`，改用占位符 `{workspace}` 和 `{outputs_
 officecli create {outputs_dir}/report.pptx --json
 ```
 
-Skill 激活时，根据当前 `ExecutionContext` 替换占位符。
+**占位符替换机制**：
+
+在 skill 加载时（`SkillPackageStore.get()` 或 `activate_skill` tool 执行时），
+根据当前 `ExecutionContext` 替换占位符：
+
+```python
+# lca/layer0_infra/skills/skill_renderer.py
+
+def render_skill_content(content: str, context: ExecutionContext) -> str:
+    """替换 skill 内容中的路径占位符。"""
+    return (
+        content
+        .replace("{workspace}", context.workspace)
+        .replace("{outputs_dir}", context.outputs_dir)
+    )
+```
+
+**调用点**：
+- `SkillActivateTool.execute()` 激活 skill 时调用 `render_skill_content()`
+- `run_skill_script` 执行 skill 脚本时调用 `render_skill_content()`
 
 ### 3.9 Tools
 
@@ -405,33 +998,93 @@ Skill 激活时，根据当前 `ExecutionContext` 替换占位符。
 
 ```python
 class ListFilesTool(Tool):
+    name = "list_files"
+    description = "List files in a directory."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "directory_path": {"type": "string", "description": "Directory path"}
+        },
+        "required": ["directory_path"],
+    }
+    
     def __init__(self, context: ExecutionContext):
         self._context = context
     
-    async def execute(self, args):
+    async def execute(self, args: dict) -> Observation:
         result = await self._context.execute("list_files", args)
-        # result 中的路径已经是真实路径（context.workspace 下的）
-        return Observation(...)
+        
+        if not result.success:
+            return Observation(
+                success=False,
+                error=result.error,
+                payload=None,
+            )
+        
+        return Observation(
+            success=True,
+            payload=result.data,  # {files: [...], total_count: int}
+        )
 ```
 
-工具不需要知道 backend、不需要做路径翻译。`execute()` 返回的就是真实路径。
+**工具不再知道 backend、不做路径翻译。`execute()` 返回的 `OpResult` 已经是统一结构。**
 
-### 3.10 前端
+### 3.10 前端与 Gateway 集成
 
 前端从 gateway 获取 context 信息：
 
 ```json
+// GET /lca-api/context
 {
   "context_id": "local-host",
   "context_label": "lichao-mbp",
   "context_backend": "host",
-  "context_workspace": "/home/sandbox-user"
+  "context_workspace": "/home/sandbox-user",
+  "context_outputs_dir": "/home/sandbox-user/outputs"
 }
 ```
 
-- 状态栏显示："Running on: lichao-mbp (host)"
-- 下载卡：`/home/sandbox-user/outputs/report.pdf` → gateway 转 download URL
-- 附件路径：和 agent 看到的一致
+**Gateway 如何获取 context**：
+- 调用 `ExecutionContextFactory.resolve()`
+- 结果缓存在 gateway state，Presence 变化时刷新
+
+**文件下载 URL 生成**：
+
+```python
+# gateway/runs/file_download.py
+
+async def generate_download_url(
+    context: ExecutionContext, 
+    workspace_path: str
+) -> str:
+    """将 workspace 路径转为可下载的 URL。
+    
+    策略：
+    - Host / Windows: 路径在 gateway 本机，直接读文件返回
+    - SSH: 通过 ssh cat 读取，流式返回
+    - Onlyboxes: 通过 sandbox adapter 读取
+    """
+    if context.backend == BackendKind.HOST:
+        # 直接读本地文件
+        local_path = workspace_path  # workspace 就是本机路径
+        return _serve_local_file(local_path)
+    
+    elif context.backend == BackendKind.WINDOWS:
+        # Windows 路径，直接读
+        return _serve_local_file(workspace_path)
+    
+    elif context.backend == BackendKind.SSH:
+        # 通过 SSH 读取
+        return _serve_ssh_file(context, workspace_path)
+    
+    elif context.backend == BackendKind.ONLYBOXES:
+        # 通过 Onlyboxes adapter 读取
+        return _serve_onlyboxes_file(context, workspace_path)
+```
+
+**新增模块**：
+- `gateway/runs/file_download.py`: 文件下载代理（SSH / Onlyboxes 需要远程读取）
+- `gateway/runs/context_api.py`: `/lca-api/context` endpoint
 
 ---
 
@@ -440,25 +1093,25 @@ class ListFilesTool(Tool):
 | 模块 | 动作 |
 |---|---|
 | `host/paths.py::rewrite_guest_refs` | **删除** |
-| `host/paths.py::resolve_guest_path` | **简化**为 "resolve relative to workspace" |
+| `host/paths.py::resolve_guest_path` | **简化**为 "resolve relative to workspace"，去掉 `mount` 参数 |
 | `host/local_shell/paths.py` | **简化**，去掉 `mount` 参数 |
 | `host/local_shell/dispatch.py` | 去掉 `mount` 参数 |
 | `host/local_shell/file/*.py` | 所有 handler 去掉 `mount` 参数 |
 | `host/local_shell/shell/runner.py` | 去掉 `mount` 参数 |
 | `host/exec.py` | 去掉 `mount` 参数 |
-| `lca/layer0_infra/sandbox/surface.py` | **替换**为 ExecutionContext |
-| `lca/layer0_infra/sandbox/host_settings.py` | 合并进 ExecutionContext config |
+| `lca/layer0_infra/sandbox/surface.py` | **替换**为 ExecutionContext（保留文件但内容迁移） |
+| `lca/layer0_infra/sandbox/host_settings.py` | 合并进 `ExecutionConfig` |
 | `lca/layer0_infra/computer/constants.py::COMPUTER_WORKSPACE_ROOT` | **删除**硬编码，从 context 取 |
-| `lca/layer0_infra/sandbox/bootstrap.py` | 从 context.workspace 构建路径 |
-| `lca/layer0_infra/sandbox/runtime_mount.py` | 从 context.workspace 构建路径 |
-| `lca/layer0_infra/sandbox/output_collect.py` | 从 context.outputs_dir 构建路径 |
-| `lca/layer0_infra/sandbox/inspect_prelude.py` | 从 context.workspace 构建路径 |
-| `lca/layer0_infra/sandbox/error_parse.py` | 从 context.workspace 构建路径 |
-| `lca/layer0_infra/sandbox/prompt.py` | 用 context.prompt_context() 替换硬编码 |
-| `lca/layer0_infra/computer/runtime.py::_normalize_path` | 从 context.workspace 解析 |
-| `lca/layer0_infra/computer/guest/preamble.py::ROOT` | 从 context.workspace 注入 |
+| `lca/layer0_infra/sandbox/bootstrap.py` | 从 `context.workspace` 构建路径 |
+| `lca/layer0_infra/sandbox/runtime_mount.py` | 从 `context.workspace` 构建路径 |
+| `lca/layer0_infra/sandbox/output_collect.py` | 从 `context.outputs_dir` 构建路径 |
+| `lca/layer0_infra/sandbox/inspect_prelude.py` | 从 `context.workspace` 构建路径 |
+| `lca/layer0_infra/sandbox/error_parse.py` | 从 `context.workspace` 构建错误提示 |
+| `lca/layer0_infra/sandbox/prompt.py` | 用 `context.prompt_context()` 替换硬编码 |
+| `lca/layer0_infra/computer/runtime.py::_normalize_path` | 从 `context.workspace` 解析 |
+| `lca/layer0_infra/computer/guest/preamble.py::ROOT` | 从 `context.workspace` 注入 |
 | `skills/officecli/SKILL.md` | `/mnt/data` → `{workspace}` / `{outputs_dir}` |
-| `lca/contracts/models/core/sandbox.py::SANDBOX_MOUNT_ROOT` | 保留作为 Onlyboxes 默认值，不再作为全局常量 |
+| `lca/contracts/models/core/sandbox.py::SANDBOX_MOUNT_ROOT` | 保留作为 Onlyboxes 内部常量，不再作为全局注入 |
 
 ---
 
@@ -466,14 +1119,14 @@ class ListFilesTool(Tool):
 
 | 模块 | 理由 |
 |---|---|
-| `lca/contracts/protocols/infra.py::Sandbox` | 执行传输层 Protocol，不变 |
+| `lca/contracts/protocols/infra.py::Sandbox` | 执行传输层 Protocol，不变。仅作为 ExecutionContext 内部传输 |
 | `host/local_shell/file/*.py` | 本机文件操作实现，简化后保留 |
 | `host/local_shell/shell/*.py` | 本机 shell 操作实现，简化后保留 |
 | `host/local_shell/dispatch.py` | 操作路由表，简化后保留 |
-| `gateway/host_sandbox.py` | Host → Sandbox 适配层 |
+| `gateway/host_sandbox.py` | Host → Sandbox 适配层，被 HostContext 内部使用 |
 | `gateway/presence/` | Presence 注册/路由 |
-| `lca/layer0_infra/sandbox/onlyboxes_adapter.py` | Onlyboxes 实现 |
-| `lca/layer0_infra/sandbox/factory.py` | 改为解析 ExecutionContext |
+| `lca/layer0_infra/sandbox/onlyboxes_adapter.py` | Onlyboxes Sandbox 实现，被 OnlyboxesContext 内部使用 |
+| `lca/layer0_infra/sandbox/factory.py` | 改为解析 ExecutionContext（或废弃，由新 factory 替代） |
 
 ---
 
@@ -481,53 +1134,88 @@ class ListFilesTool(Tool):
 
 | 模块 | 说明 |
 |---|---|
-| `lca/contracts/protocols/execution.py` | `ExecutionContext` Protocol |
+| `lca/contracts/protocols/execution.py` | `ExecutionContext` Protocol + `BackendKind` + `OpResult` |
 | `lca/layer0_infra/execution/__init__.py` | 包入口 |
 | `lca/layer0_infra/execution/host_context.py` | Host 实现 |
 | `lca/layer0_infra/execution/onlyboxes_context.py` | Onlyboxes 实现 |
 | `lca/layer0_infra/execution/ssh_context.py` | SSH 实现 |
 | `lca/layer0_infra/execution/windows_context.py` | Windows 实现 |
 | `lca/layer0_infra/execution/factory.py` | Context factory |
-| `lca/layer0_infra/execution/config.py` | 配置加载 |
+| `lca/layer0_infra/execution/config.py` | 统一配置（pydantic model） |
+| `lca/layer0_infra/skills/skill_renderer.py` | Skill 占位符替换 |
+| `gateway/runs/file_download.py` | 文件下载代理 |
+| `gateway/runs/context_api.py` | `/lca-api/context` endpoint |
 
 ---
 
 ## 7. 迁移策略
 
-**渐进式**，分 3 步：
+**分 3 步，每步可独立交付和测试。**
 
-1. **Phase 1: 建 Protocol + Host/Onlyboxes 实现**
-   - 新增 `ExecutionContext` Protocol
-   - 实现 `HostContext`、`OnlyboxesContext`
-   - 新增 `ExecutionContextFactory`
-   - Prompt 切换到 `context.prompt_context()`
-   - 工具切换到接收 `ExecutionContext`
-   - **不改 host sidecar 和 Onlyboxes adapter 内部**
+### Phase 1: 建 Protocol + Host/Onlyboxes 实现（核心迁移）
 
-2. **Phase 2: 去 remap 层**
-   - 删除 `rewrite_guest_refs`、`resolve_guest_path`
-   - 简化 `host/paths.py`、`local_shell/paths.py`
-   - 所有 handler 去掉 `mount` 参数
-   - Skill 参数化
+1. 新增 `ExecutionContext` Protocol + `BackendKind` + `OpResult`
+2. 实现 `HostContext`、`OnlyboxesContext`
+3. 新增 `ExecutionContextFactory` + `ExecutionConfig`
+4. 新工具接收 `ExecutionContext`；旧工具通过 `ComputerRuntime` 适配
+5. Prompt 切换到 `context.prompt_context()`
+6. `ComputerRuntime` 内部查询 context 获取 workspace
 
-3. **Phase 3: 加 SSH / Windows**
-   - 实现 `SSHContext`
-   - 实现 `WindowsContext`
-   - 端到端验证 4 种环境
+**Phase 1 结束状态**：
+- 两套注入并存（ExecutionContext + Sandbox）
+- Host 和 Onlyboxes 走真实路径
+- 旧工具仍可工作（通过适配层）
+- 新增测试覆盖 4 种 backend 的 prompt 输出
+
+### Phase 2: 去 remap 层
+
+1. 删除 `rewrite_guest_refs`、`resolve_guest_path`
+2. 简化 `host/paths.py`、`local_shell/paths.py`（去掉 `mount`）
+3. 所有 handler 去掉 `mount` 参数
+4. Skill 参数化（`{workspace}` / `{outputs_dir}`）
+5. Skill 渲染机制（`skill_renderer.py`）
+
+**Phase 2 结束状态**：
+- 不存在任何路径翻译层
+- 所有路径都是 workspace 下的真实路径
+- Skill 不含硬编码路径
+
+### Phase 3: 加 SSH / Windows
+
+1. 实现 `SSHContext`（含端到端测试）
+2. 实现 `WindowsContext`（含端到端测试）
+3. 文件下载代理（SSH / Onlyboxes 远程读取）
+4. `/lca-api/context` endpoint
+5. 前端集成 context 显示
+
+**Phase 3 结束状态**：
+- 4 种环境全部可用
+- 前端能显示当前 context 信息
+- 下载卡在 4 种环境下都能工作
 
 ---
 
 ## 8. 验证标准
 
+### 功能验证
+
 - [ ] Host 环境：agent 操作 `/home/sandbox-user/...`，前端显示真实路径
 - [ ] Onlyboxes 环境：agent 操作 `/mnt/data/...`（容器内真实路径）
-- [ ] SSH 环境：agent 操作远程真实路径，文件通过 sftp 传输
+- [ ] SSH 环境：agent 操作远程真实路径，文件通过 ssh cat / scp 传输
 - [ ] Windows 环境：agent 操作 `C:\...`，PowerShell 执行
-- [ ] 不存在任何 `/mnt/data` 硬编码（除 Onlyboxes 内部）
+- [ ] 不存在任何 `/mnt/data` 硬编码（除 Onlyboxes 内部常量）
 - [ ] 不存在 `rewrite_guest_refs` 或等价翻译层
-- [ ] Skill 不含硬编码路径
-- [ ] 前端能显示当前 context 的 id/label/backend
+- [ ] Skill 不含硬编码路径（用 `{workspace}` 占位符）
+- [ ] 前端能显示当前 context 的 id/label/backend/workspace
 - [ ] Journal 记录 context.id
+
+### 负面验证
+
+- [ ] Agent 尝试访问 `/mnt/data` 在 host 环境 → 得到 `FileNotFoundError`（不 remap）
+- [ ] Tool 收到不存在的 op → 返回结构化错误 `OpResult(success=False, error=...)`，不抛异常
+- [ ] Factory 无 backend 配置 → 返回 `None`，系统优雅降级（提示用户配置）
+- [ ] SSH host 不可达 → `OpResult(success=False, error="connection failed")`，不 crash
+- [ ] Windows PowerShell 不存在 → 启动时 warning，运行时优雅报错
 
 ---
 
@@ -536,6 +1224,23 @@ class ListFilesTool(Tool):
 1. **真实路径**: agent 操作的就是那台机器上的真实文件系统路径
 2. **单一命名空间**: 不存在 guest/host 双路径，workspace 就是 THE path
 3. **身份一等公民**: context.id + label 流入 prompt、前端、Journal
-4. **传输无关**: Protocol 只承诺 execute(op, payload)，不关心传输细节
-5. **开闭原则**: 新增 backend 只需实现 ExecutionContext Protocol
-6. **无补丁**: 不在垃圾机制上做修补，直击本质
+4. **传输无关**: Protocol 只承诺 `execute(op, payload) -> OpResult`，不关心传输细节
+5. **类型安全**: `BackendKind` 枚举 + `OpResult` 统一结构，myPy 可检查
+6. **开闭原则**: 新增 backend 只需实现 ExecutionContext Protocol
+7. **无补丁**: 不在垃圾机制上做修补，直击本质
+8. **渐进迁移**: 新旧并存，逐步切换，不 break 现有功能
+
+---
+
+## 10. 与 Reviewer 反馈的对应
+
+| Reviewer Issue | 解决方案 |
+|---|---|
+| Sandbox Protocol lifetime / migration seam | §3.3 明确 coexistence + 分阶段迁移 |
+| execute() return contract | §3.2 `OpResult` + data 契约文档 |
+| SSH/Windows under-specified | §3.4 完整实现代码 + 端到端映射 |
+| Factory resolution logic | §3.5 明确的 auto-detect 优先级 + env var 语义 |
+| backend as bare str | §3.2 `BackendKind` 枚举 |
+| Prompt/Skill placeholder | §3.7 prompt_context() + §3.8 skill_renderer.py |
+| Phase 2 replacement API | §4 简化后的路径解析 + §3.9 工具直接调 context.execute() |
+| Gateway file proxy for SSH/Windows | §3.10 file_download.py 模块 |

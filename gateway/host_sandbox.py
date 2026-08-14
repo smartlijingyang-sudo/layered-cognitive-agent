@@ -127,6 +127,19 @@ class HostSandbox:
             timeout_s=timeout_s,
         )
 
+    async def computer_op(
+        self, op: str, args: dict[str, Any], *, timeout_s: int = 60
+    ) -> dict[str, Any]:
+        """Named local-file-shell op. ComputerRuntime uses this instead of guest Python."""
+        try:
+            reply = await self._raw(op, args, timeout_s=timeout_s + 5)
+        except (TimeoutError, ConnectionError) as exc:
+            return {"success": False, "error": str(exc)}
+        body = _result_body(reply)
+        if "success" not in body:
+            body["success"] = bool(reply.get("ok", False))
+        return body
+
     async def _invoke(self, op: str, payload: dict[str, Any], *, timeout_s: int) -> SandboxResult:
         try:
             reply = await self._raw(op, payload, timeout_s=timeout_s + 5)

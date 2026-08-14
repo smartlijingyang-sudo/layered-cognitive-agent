@@ -34,12 +34,14 @@ class LocalPty:
         *,
         cols: int = 80,
         rows: int = 24,
+        home: str = "",
     ) -> None:
         self.session_id = session_id
         self._emit = emit
         self._argv = argv
         self._cols = cols
         self._rows = rows
+        self._home = home
         self._fd: int | None = None
         self._pid: int | None = None
 
@@ -47,6 +49,9 @@ class LocalPty:
         pid, fd = pty.fork()
         if pid == 0:
             os.environ.setdefault("TERM", "xterm-256color")
+            if self._home:
+                os.environ["HOME"] = self._home
+                os.chdir(self._home)
             os.execvp(self._argv[0], self._argv)  # noqa: S606
         self._pid = pid
         self._fd = fd

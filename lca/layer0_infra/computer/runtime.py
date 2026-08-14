@@ -59,6 +59,22 @@ class _ComputerRuntimeBase:
         self._sandbox = sandbox
         self._store = store
 
+    async def _maybe_local(self, op: str, args: dict[str, Any], script: str) -> ComputerOpResult:
+        local = getattr(self._sandbox, "computer_op", None)
+        if callable(local):
+            body = await local(op, args)
+            if not isinstance(body, dict):
+                body = {"success": False, "error": "invalid local result"}
+            ok = bool(body.get("success", False))
+            err = str(body.get("error") or "")
+            return ComputerOpResult(
+                success=ok,
+                content=_format_content(body) if ok or body.get("content") else err,
+                state=body,
+                error=err,
+            )
+        return await self._guest_op(script)
+
     async def _guest_op(
         self,
         script: str,
@@ -102,7 +118,11 @@ class _ComputerRuntimeBase:
 
     async def list_files(self, *, directory_path: str) -> ComputerOpResult:
         path = _normalize_path(directory_path)
-        return await self._guest_op(build_list_files_script(directory_path=path))
+        return await self._maybe_local(
+            "list_files",
+            {"directory_path": path},
+            build_list_files_script(directory_path=path),
+        )
 
     async def read_file(
         self,
@@ -111,12 +131,11 @@ class _ComputerRuntimeBase:
         start_line: int | None = None,
         end_line: int | None = None,
     ) -> ComputerOpResult:
-        return await self._guest_op(
-            build_read_file_script(
-                path=_normalize_path(path),
-                start_line=start_line,
-                end_line=end_line,
-            )
+        norm = _normalize_path(path)
+        return await self._maybe_local(
+            "read_file",
+            {"path": norm, "start_line": start_line, "end_line": end_line},
+            build_read_file_script(path=norm, start_line=start_line, end_line=end_line),
         )
 
     async def write_file(
@@ -126,12 +145,13 @@ class _ComputerRuntimeBase:
         content: str,
         create_directories: bool = True,
     ) -> ComputerOpResult:
-        return await self._guest_op(
+        norm = _normalize_path(path)
+        return await self._maybe_local(
+            "write_file",
+            {"path": norm, "content": content, "create_directories": create_directories},
             build_write_file_script(
-                path=_normalize_path(path),
-                content=content,
-                create_directories=create_directories,
-            )
+                path=norm, content=content, create_directories=create_directories
+            ),
         )
 
     async def edit_file(
@@ -142,13 +162,13 @@ class _ComputerRuntimeBase:
         replace: str,
         replace_all: bool = False,
     ) -> ComputerOpResult:
-        return await self._guest_op(
+        norm = _normalize_path(path)
+        return await self._maybe_local(
+            "edit_file",
+            {"path": norm, "search": search, "replace": replace, "replace_all": replace_all},
             build_edit_file_script(
-                path=_normalize_path(path),
-                search=search,
-                replace=replace,
-                replace_all=replace_all,
-            )
+                path=norm, search=search, replace=replace, replace_all=replace_all
+            ),
         )
 
     async def search_files(
@@ -160,14 +180,23 @@ class _ComputerRuntimeBase:
         modified_after: str = "",
         modified_before: str = "",
     ) -> ComputerOpResult:
-        return await self._guest_op(
+        norm = _normalize_path(directory)
+        return await self._maybe_local(
+            "search_files",
+            {
+                "directory": norm,
+                "keyword": keyword,
+                "file_type": file_type,
+                "modified_after": modified_after,
+                "modified_before": modified_before,
+            },
             build_search_files_script(
-                directory=_normalize_path(directory),
+                directory=norm,
                 keyword=keyword,
                 file_type=file_type,
                 modified_after=modified_after,
                 modified_before=modified_before,
-            )
+            ),
         )
 
     async def move_files(self, *, operations: list[dict[str, str]]) -> ComputerOpResult:
@@ -178,7 +207,11 @@ class _ComputerRuntimeBase:
             }
             for op in operations
         ]
-        return await self._guest_op(build_move_files_script(operations=normalized))
+        return await self._maybe_local(
+            "move_files",
+            {"operations": normalized},
+            build_move_files_script(operations=normalized),
+        )
 
     async def grep_content(
         self,
@@ -188,21 +221,29 @@ class _ComputerRuntimeBase:
         file_pattern: str = "",
         recursive: bool = True,
     ) -> ComputerOpResult:
-        return await self._guest_op(
+        norm = _normalize_path(directory)
+        return await self._maybe_local(
+            "grep_content",
+            {
+                "pattern": pattern,
+                "directory": norm,
+                "file_pattern": file_pattern,
+                "recursive": recursive,
+            },
             build_grep_content_script(
                 pattern=pattern,
-                directory=_normalize_path(directory),
+                directory=norm,
                 file_pattern=file_pattern,
                 recursive=recursive,
-            )
+            ),
         )
 
     async def glob_files(self, *, pattern: str, directory: str = "") -> ComputerOpResult:
-        return await self._guest_op(
-            build_glob_files_script(
-                pattern=pattern,
-                directory=_normalize_path(directory) if directory else COMPUTER_WORKSPACE_ROOT,
-            )
+        norm = _normalize_path(directory) if directory else COMPUTER_WORKSPACE_ROOT
+        return await self._maybe_local(
+            "glob_files",
+            {"pattern": pattern, "directory": norm},
+            build_glob_files_script(pattern=pattern, directory=norm),
         )
 
 

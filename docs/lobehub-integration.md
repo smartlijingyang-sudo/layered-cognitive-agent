@@ -25,7 +25,10 @@ LCA Agent/Team
 - `POST /runs` + `GET /runs/{id}/live`：Agent 干活
 - `POST /v1/chat/completions` / embeddings / responses：管家面（标题、话题、小助手）。直连上游，不开 Run。
 - `/presence/*` + `/console/*`：本机 host sidecar（在线表 + 人用终端）。
-- host 在线且声明 `sandbox` 时，`resolve_sandbox()` 优先本机；聊天里 Agent 的读文件/跑命令打到这台电脑。离线则回落 Onlyboxes。
+- host 在线且声明 `sandbox` 时，`resolve_sandbox()` 优先本机执行面。
+  Agent 使用 `LCA_HOST_GUEST_ROOT`（默认契约 `/mnt/data`）。
+  物理目录与操作用户见 `HostRuntimeSettings`（`LCA_HOST_USER` / `LCA_HOST_ROOT`）。
+  离线回落 Onlyboxes。准备环境：`./scripts/setup_host_runtime.sh`。
 
 联网搜索（ADR-0053）：`TAVILY_API_KEY` 已配 → `web_search`；否则 Qwen `enable_search` 兜底。搜索结果同样经 Journal `ToolStarted` / `ToolInvoked` 投影，不另开协议。
 

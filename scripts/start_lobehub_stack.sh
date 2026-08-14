@@ -582,13 +582,20 @@ start_host() {
       return 0
     fi
   fi
+  eval "$(cd "${ROOT}" && uv run python -m lca.layer0_infra.sandbox.host_settings)"
+  export LCA_HOST_USER LCA_HOST_ROOT LCA_HOST_GUEST_ROOT LCA_HOST_OUTPUTS
   export LCA_HOST_GATEWAY="${LCA_HOST_GATEWAY:-ws://127.0.0.1:${GATEWAY_PORT}/presence/connect}"
   export LCA_HOST_TOKEN="${LCA_HOST_TOKEN:-lca-local-host}"
   export LCA_HOST_DEVICE_ID="${LCA_HOST_DEVICE_ID:-local-host}"
-  log "启动 host sidecar → ${LCA_HOST_GATEWAY}"
+  export PATH="${HOME}/.local/bin:/usr/local/bin:${PATH}"
+  log "启动 host sidecar → ${LCA_HOST_GATEWAY} (workspace ${LCA_HOST_ROOT})"
   (
     cd "${ROOT}"
-    exec uv run python -m host
+    if sg "${LCA_HOST_USER}" -c true 2>/dev/null; then
+      exec sg "${LCA_HOST_USER}" -c "env PATH='${PATH}' uv run python -m host"
+    else
+      exec uv run python -m host
+    fi
   ) >>"${HOST_LOG}" 2>&1 &
   echo $! >"${HOST_PID}"
   for _ in $(seq 1 20); do

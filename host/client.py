@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from typing import Any
 
 import structlog
@@ -55,7 +56,22 @@ async def run_once(settings: HostSettings) -> None:
         welcome = _parse(raw)
         if welcome.get("type") != WELCOME:
             raise RuntimeError(f"expected welcome, got {welcome!r}")
-        _log.info("host_connected", device_id=settings.device_id, gateway=settings.gateway)
+        workspace = settings.workspace()
+        if not os.access(workspace, os.W_OK):
+            raise RuntimeError(
+                f"host workspace {workspace} is missing or not writable; "
+                "run scripts/setup_host_runtime.sh"
+            )
+        from host.health import log_host_toolchain
+
+        log_host_toolchain()
+        _log.info(
+            "host_connected",
+            device_id=settings.device_id,
+            gateway=settings.gateway,
+            workspace=str(workspace),
+            guest_root=settings.guest_mount(),
+        )
         ptys: dict[str, LocalPty] = {}
 
         async def emit(payload: dict[str, Any]) -> None:
@@ -76,6 +92,7 @@ async def run_once(settings: HostSettings) -> None:
                         settings.shell_argv(),
                         cols=int(msg.get("cols") or 80),
                         rows=int(msg.get("rows") or 24),
+                        home=str(workspace),
                     )
                     ptys[session_id] = session
                     await session.start()
@@ -97,6 +114,7 @@ async def run_once(settings: HostSettings) -> None:
                             str(msg.get("op") or ""),
                             msg.get("payload") if isinstance(msg.get("payload"), dict) else {},
                             settings.workspace(),
+                            mount=settings.guest_mount(),
                         )
                         ok = bool(result.get("success", False))
                     except (OSError, ValueError, TypeError) as exc:

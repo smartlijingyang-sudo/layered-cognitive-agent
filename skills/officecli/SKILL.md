@@ -4,10 +4,10 @@ description: "Create/read/edit/validate .docx .xlsx .pptx via preinstalled offic
 version: 1.0.0
 ---
 
-# officecli（LCA 沙箱）
+# officecli
 
-AI 友好的 Word / Excel / PowerPoint CLI。**二进制已预装在 terminal 镜像**，
-通过 `run_command` 调用。不要 `curl install`、不要 `pip install`、不要在宿主执行。
+AI 友好的 Word / Excel / PowerPoint CLI。通过 `run_command` 调用已安装的 `officecli`。
+不要 `curl install`、不要 `pip install` 现场装包。
 
 ## 硬约束（LCA）
 
@@ -17,7 +17,7 @@ AI 友好的 Word / Excel / PowerPoint CLI。**二进制已预装在 terminal �
 | 工作区 | 附件在 `/mnt/data/<文件名>`；交付物写 **`/mnt/data/outputs/`** |
 | 下载 | Office 文件是 **Work**（run 结束 / `close` / `export_file` 发 **一张** 卡）。`create`/`add`/`set`/`batch` 是工作副本，不会每步发卡。图/PDF/HTML 仍即时可见 |
 | 输出 | **一律加 `--json`**（除 `help` / `view outline` 调试） |
-| 安装 | **禁止** `curl …/install.sh`；若 `officecli --version` 失败 → 报镜像缺包，勿自装 |
+| 安装 | **禁止** `curl …/install.sh`；若 `officecli --version` 失败 → 报执行面缺包，勿自装 |
 | 更新 | 环境已设 `OFFICECLI_SKIP_UPDATE=1`；勿开 auto-update |
 | PDF | 不用 officecli；用 `anthropics-skills-pdf` / reportlab |
 | 数据分析 | 纯表计算用 pandas；officecli 负责 **xlsx 文件结构/公式/透视/图表** |
@@ -164,4 +164,4 @@ officecli load_skill excel           # 通用 Excel 细则
 
 ## 版本
 
-镜像钉选的 CLI 版本见 `officecli --version`。能力以 `officecli help` 为准。
+CLI 版本见 `officecli --version`。能力以 `officecli help` 为准。执行面（沙箱镜像或本机 host）由运行时注入，路径始终用 `/mnt/data`。

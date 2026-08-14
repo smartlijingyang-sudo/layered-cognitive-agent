@@ -129,7 +129,8 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         activate = SkillActivateTool(self.store)
         act_obs = await activate.execute({"skill_id": "demo"})
         self.assertTrue(act_obs.success)
-        self.assertEqual(act_obs.payload["text"], "Do work")
+        self.assertTrue(act_obs.payload["text"].endswith("Do work"))
+        self.assertIn("执行面：", act_obs.payload["text"])
         state = act_obs.payload["state"]
         self.assertEqual(state["name"], "demo")
         self.assertEqual(state["title"], "demo")
