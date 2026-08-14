@@ -598,12 +598,36 @@ Gateway (Linux)                         Windows Machine
 
 Gateway 据此知道设备类型，前端可以显示 "Windows PC" / "Mac" / "Linux Server"。
 
-### Windows Host Sidecar 部署（对齐 LobeHub CLI 体验）
+### Host Sidecar 部署 — 统一 CLI（所有平台）
+
+**所有平台统一用 `npx @lca/host`**。`python -m host` 是 npm 包内部实现细节，不是用户接口。
+
+| 场景 | 命令 |
+|---|---|
+| 本机 sidecar（Linux/Mac/Windows） | `npx @lca/host start` |
+| 远程 sidecar（连接到远程 gateway） | `npx @lca/host connect --gateway ws://... --token ...` |
+| 查看状态 | `npx @lca/host status` |
+| 停止 | `npx @lca/host stop` |
+| 重启 | `npx @lca/host restart` |
+| 日志 | `npx @lca/host logs` |
+
+**`start_lobehub_stack.sh` 也应改用**：
+
+```bash
+# 之前
+uv run python -m host
+
+# 之后
+npx @lca/host start
+```
 
 **目标**：一行命令搞定，和 LobeHub 的 `npx @lobehub/cli` 一样简单。
 
-```powershell
-# Windows 上（只需 Node.js，Python 自动处理）
+```bash
+# 本机 Linux/Mac
+npx @lca/host start
+
+# 远程 Windows（连接到 Linux gateway）
 npx @lca/host connect --gateway ws://10.36.6.252:8765 --token lca-local-host
 ```
 
@@ -611,70 +635,52 @@ npx @lca/host connect --gateway ws://10.36.6.252:8765 --token lca-local-host
 
 ```
 @lca/host (npm package)
-├── bin/lca-host          # CLI 入口
+├── bin/lca-host              # CLI 入口
 ├── src/
-│   ├── connect.ts        # `connect` 命令
-│   ├── start.ts          # `start` 命令
-│   ├── python-installer  # 检查/安装 Python + uv
-│   └── sidecar/          # 打包的 Python sidecar 代码
+│   ├── commands/
+│   │   ├── start.ts          # `start` — 本机 sidecar
+│   │   ├── connect.ts        # `connect` — 远程 sidecar（连接指定 gateway）
+│   │   ├── stop.ts           # `stop`
+│   │   ├── status.ts         # `status`
+│   │   └── logs.ts           # `logs`
+│   ├── platform/
+│   │   ├── python-installer  # 检查/安装 Python + uv
+│   │   ├── service-manager   # 注册 systemd / Task Scheduler / launchd
+│   │   └── shell-detector    # Windows shell 检测
+│   └── sidecar/              # 打包的 Python sidecar 代码
 │       ├── host/
 │       └── lca/
 └── package.json
 ```
 
-**`connect` 命令流程**：
+**`start` 命令（本机）**：
 
 ```typescript
-// src/connect.ts
-async function connect(options: { gateway: string; token: string }) {
-  // 1. 检查 Python
-  if (!hasPython()) {
-    await installPython();  // winget / download installer
-  }
-  
-  // 2. 安装 uv
-  if (!hasUv()) {
-    await run("pip install uv");
-  }
-  
-  // 3. 解压 sidecar 代码到 ~/.lca-host/
-  const hostDir = path.join(os.homedir(), ".lca-host");
-  await extractSidecar(hostDir);
-  
-  // 4. 写 .env
-  const envContent = `
-LCA_HOST_USER=${os.userInfo().username}
-LCA_HOST_ROOT=${path.join(os.homedir(), "workspace")}
-LCA_HOST_DEVICE_ID=${os.hostname()}
-LCA_HOST_TOKEN=${options.token}
-LCA_HOST_GATEWAY=${options.gateway}
-`.trim();
-  await writeFile(path.join(hostDir, ".env"), envContent);
-  
-  // 5. 注册 Windows 服务（或 Task Scheduler）
-  await registerService(hostDir);
-  
-  // 6. 启动
+// src/commands/start.ts
+async function start() {
+  // 本机 sidecar：gateway 在本机或已知地址
+  const gateway = await detectLocalGateway();  // 检查 localhost:8765
+  await ensurePython();
+  await ensureSidecarCode();
+  await writeEnv({ gateway, token: "lca-local-host" });
+  await registerService();
   await startService();
-  
-  console.log("✓ Connected. Sidecar running.");
+  console.log("✓ Host sidecar running");
 }
 ```
 
-**其他命令**：
+**`connect` 命令（远程）**：
 
-```powershell
-# 查看状态
-npx @lca/host status
-
-# 停止
-npx @lca/host stop
-
-# 重启
-npx @lca/host restart
-
-# 查看日志
-npx @lca/host logs
+```typescript
+// src/commands/connect.ts
+async function connect(options: { gateway: string; token: string }) {
+  await ensurePython();
+  await ensureSidecarCode();
+  await writeEnv({ gateway: options.gateway, token: options.token });
+  await registerService();
+  await startService();
+  console.log("✓ Connected to " + options.gateway);
+}
 ```
 
 **实现策略**：
@@ -683,7 +689,7 @@ npx @lca/host logs
    - 检查 Python 是否已安装，未安装则提示用户手动安装
    - 下载 sidecar 代码（从 GitHub release 或 bundle in npm）
    - 运行 `uv run python -m host`
-   - 注册 Task Scheduler
+   - 注册 systemd / Task Scheduler / launchd
 
 2. **V2（后续）**：更好的体验
    - 自动安装 Python（通过 winget / embedded Python）
