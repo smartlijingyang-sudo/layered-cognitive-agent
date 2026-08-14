@@ -535,112 +535,68 @@ def _shell_quote(s: str) -> str:
     return "'" + s.replace("'", "'\"'\"'") + "'"
 ```
 
-#### WindowsContext — 两种模式
+#### WindowsContext — 对齐 LobeHub 原生架构
 
-**重要澄清**：Windows 执行有两种模式，取决于 gateway 和 Windows 机器的位置关系。
+**关键洞察**：LobeHub 的 `@lobehub/cli` 是一个 Node.js sidecar，跑在用户机器上，通过 `@lobechat/local-file-shell` 包处理跨平台差异。我们的 `host/` sidecar 是它的 **Python 对等物**。
 
-**模式 A：Gateway 在 Windows 本机**
+**架构对齐**：
+
+| LobeHub | LCA |
+|---|---|
+| `@lobehub/cli` (Node.js sidecar) | `host/` (Python sidecar) |
+| `@lobechat/local-file-shell` | `host/local_shell/` |
+| `os.platform()` 分发 | `sys.platform` 分发 |
+| `detectWindowsShell()` | 待实现 |
+| `normalizeEnvVarRefs()` | 待实现 |
+| `windowsHide: true` | 待实现 |
+| Device registration (`platform` field) | Presence hello (`capabilities` + 待加 `platform`) |
+
+**模式 B 完整流程**（Gateway Linux → Windows 远程）：
 
 ```
-Gateway (Windows) → subprocess: powershell.exe
+Gateway (Linux)                         Windows Machine
+┌─────────────────┐                     ┌──────────────────────────┐
+│ PresenceRegistry│◄── WebSocket ──────│ python -m host           │
+│                 │                     │   host/client.py         │
+│ HostSandbox     │── RPC (WS) ───────►│   host/exec.py           │
+│                 │                     │   host/local_shell/      │
+│ HostContext     │                     │     (跨平台 Python)      │
+└─────────────────┘                     └──────────────────────────┘
 ```
 
-- 不需要授权（本机执行）
-- 不需要额外进程
-- 直接 `powershell.exe` subprocess
-- 适用场景：开发者在 Windows 上本地运行整个 stack
+**不需要 npm 进程**。现有 Python sidecar 就是 LobeHub CLI 的对等物。
 
-**模式 B：Gateway 远程 + Windows Host Sidecar（推荐）**
+**Windows 适配清单**（在 `host/` sidecar 内部）：
 
-```
-Gateway (Linux/Mac) → WebSocket → Windows Host Sidecar → powershell.exe
-```
+1. **`host/pty.py`**：`pty` 模块不存在于 Windows → 用 `subprocess` + `conpty`（Windows 10+）或降级为非交互模式
+2. **Shell 检测**：Windows 上可能是 PowerShell、cmd.exe、Git Bash → 实现 `detect_windows_shell()`
+3. **环境变量引用**：`$VAR` 在 cmd.exe 不工作 → 实现 `normalize_env_var_refs()` for `%VAR%` / `$env:VAR`
+4. **进程创建**：`windows_hide=True` 防止控制台窗口闪烁
+5. **路径格式**：`pathlib.Path` 在 Windows 上自动用 `\` → 大部分代码无需改动
 
-- Windows 机器上运行 `python -m host`（**复用现有 `host/` 代码**）
-- 需要 token 授权（`LCA_HOST_TOKEN`，和现有 host sidecar 一样）
-- Gateway 通过 Presence 发现 Windows host，自动路由
-- 适用场景：gateway 在服务器，用户的 Windows 机器是远程的
+**HostContext 就是 Windows 远程访问的 Context**：
+- 远程 Windows 机器跑 `python -m host`
+- Gateway 通过 Presence 发现它，创建 `HostContext`
+- **不需要单独的 `WindowsContext`**
+- `HostContext` 不知道远程机器是 Linux 还是 Windows — 它只是 RPC
 
-**现有 `host/` 已经是跨平台 Python**：
-- `host/client.py` — WebSocket 连接
-- `host/exec.py` — 执行命令
-- `host/local_shell/` — 文件操作
-- `host/pty.py` — PTY 终端
-- 只需要在 Windows 上测试和适配路径格式
+**WindowsContext 仅用于 gateway 本机是 Windows 的场景**（模式 A，极少用）。
 
-**实现策略**：
-- `WindowsContext`（模式 A）只在 `sys.platform == "win32"` 且无远程 host 时使用
-- 远程 Windows 机器通过 `HostContext`（模式 B）访问，不需要单独的 `WindowsContext`
-- Factory auto-detect：Host > SSH > Onlyboxes > Windows（仅当 gateway 在 Windows 上）
+**Presence 注册增加 platform 字段**：
 
 ```python
-class WindowsContext:
-    """本机 Windows PowerShell — 仅当 gateway 在 Windows 上时使用。
-    
-    远程 Windows 机器通过 HostContext（WebSocket sidecar）访问。
-    """
-    
-    def __init__(self, config: WindowsConfig):
-        self._config = config
-    
-    @property
-    def id(self) -> str:
-        return self._config.device_id
-    
-    @property
-    def label(self) -> str:
-        return self._config.label
-    
-    @property
-    def backend(self) -> BackendKind:
-        return BackendKind.WINDOWS
-    
-    @property
-    def workspace(self) -> str:
-        return self._config.workspace
-    
-    @property
-    def outputs_dir(self) -> str:
-        return str(PureWindowsPath(self.workspace) / "outputs")
-    
-    def _ps_argv(self) -> list[str]:
-        return ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"]
-    
-    async def execute(self, op: str, payload: dict) -> OpResult:
-        """直接 subprocess 到 PowerShell（本机执行，无授权）。"""
-        # 实现同 §3.4 的 WindowsContext 代码
-        ...
-    
-    def prompt_context(self) -> str:
-        return (
-            f"你正在 **{self.label}** 上操作（本机 Windows，backend={self.backend.value}）。\n"
-            f"工作区：`{self.workspace}`\n"
-            f"交付物写到 `{self.outputs_dir}`\n"
-            f"路径使用 Windows 格式。\n"
-        )
+# host/client.py HELLO 消息增加 platform
+{
+    "type": HELLO,
+    "device_id": settings.device_id,
+    "token": settings.token,
+    "name": settings.display_name(),
+    "capabilities": ["console", "sandbox"],
+    "platform": sys.platform,  # 新增：linux | darwin | win32
+}
 ```
 
-**Host Sidecar 在 Windows 上的配置**：
-
-```bash
-# 在 Windows 机器上运行
-python -m host
-
-# 环境变量（.env 或系统环境变量）
-LCA_HOST_USER=lichao
-LCA_HOST_ROOT=C:\Users\lichao\workspace
-LCA_HOST_DEVICE_ID=windows-pc
-LCA_HOST_TOKEN=lca-local-host
-LCA_HOST_GATEWAY=ws://gateway-server:8765/presence/connect
-```
-
-Gateway 通过 Presence 发现这台 Windows 机器，创建 `HostContext`（不是 `WindowsContext`），通过 WebSocket RPC 执行命令。
-
----
-
-**总结**：
-- **本机 Windows（gateway 在 Windows）**：`WindowsContext`，直接 subprocess
-- **远程 Windows**：`HostContext`，复用现有 sidecar，不需要新代码
+Gateway 据此知道设备类型，前端可以显示 "Windows PC" / "Mac" / "Linux Server"。
 
 ### 3.5 Factory
 
@@ -689,23 +645,29 @@ class ExecutionContextFactory:
             raise ValueError(f"unknown backend: {backend}")
     
     async def _resolve_auto(self) -> Optional[ExecutionContext]:
-        """Auto-detect: 优先级 host > ssh > onlyboxes > windows > None。"""
-        # 1. Host: 检查 Presence
+        """Auto-detect 优先级。
+        
+        理由：Host 在线意味着用户显式连接了一台机器（最明确意图）；
+        SSH 配置意味着用户想连远程机器；
+        Onlyboxes 通常是后台默认值，不覆盖显式配置。
+        Windows 仅在 gateway 跑在 Windows 上且无远程 host 时触发。
+        """
+        # 1. Host: 检查 Presence（含远程 Windows/Linux/Mac sidecar）
         host_ctx = await self._resolve_host()
         if host_ctx is not None:
             return host_ctx
         
-        # 2. SSH: 检查配置
+        # 2. SSH: 检查配置（远程 Linux/Mac 无 sidecar 场景）
         ssh_ctx = self._resolve_ssh()
         if ssh_ctx is not None:
             return ssh_ctx
         
-        # 3. Onlyboxes: 检查配置
+        # 3. Onlyboxes: 检查配置（云端容器）
         onlyboxes_ctx = self._resolve_onlyboxes()
         if onlyboxes_ctx is not None:
             return onlyboxes_ctx
         
-        # 4. Windows: 检查平台
+        # 4. Windows: 仅当 gateway 本身跑在 Windows 上
         windows_ctx = self._resolve_windows()
         if windows_ctx is not None:
             return windows_ctx
