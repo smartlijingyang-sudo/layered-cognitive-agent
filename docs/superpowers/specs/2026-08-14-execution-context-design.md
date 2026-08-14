@@ -1,7 +1,7 @@
 # ExecutionContext — 执行上下文统一架构
 
 **日期**: 2026-08-14  
-**状态**: Draft v2  
+**状态**: Draft v3 (reviewer approved)  
 **动机**: 消除 `/mnt/data` 虚拟路径映射层，让 agent、前端、工具、附件共享真实文件系统路径；统一 4 种执行环境（Host / Onlyboxes / SSH / Windows）为同一抽象。
 
 ---
@@ -1232,7 +1232,23 @@ async def generate_download_url(
 
 ---
 
-## 10. 与 Reviewer 反馈的对应
+## 10. 实现备注（来自 reviewer 建议）
+
+1. **Observation 需要 observation_id**: `ListFilesTool.execute()` 示例中创建 `Observation` 时需要生成 `observation_id`（如 `new_id("obs")`），这是 `Observation` dataclass 的必需字段。
+
+2. **Factory 层级隔离**: `layer0_infra/execution/factory.py` **不得**在模块顶层 import gateway 类型。所有 gateway 引用必须通过 `set_gateway_services()` 注入点传入，保持 L0 → gateway 的单向依赖清洁。
+
+3. **OnlyboxesContext.execute()**: 参考现有 `OnlyboxesSandboxAdapter` 的 `run()`、`run_terminal()`、`write_files()` 方法构建 op dispatch。File ops 走 guest Python scripts（与现有 ComputerRuntime 一致）。
+
+4. **Auto-detect 优先级理由**: SSH > Onlyboxes 因为 SSH 暗示用户显式意图（配置了远程机器就是要用）；Onlyboxes 通常是后台默认值，不应覆盖显式配置。
+
+5. **ONLYBOXES 环境变量**: `ONLYBOXES_BASE_URL` 和 `ONLYBOXES_ACCESS_TOKEN` 不使用 `LCA_` 前缀，保持与现有代码兼容。实现时不要重命名。
+
+6. **ComputerRuntime 获取 ExecutionContext**: 通过构造函数注入或 factory 查找。Phase 1 期间，`ComputerRuntime.__init__` 接受可选的 `ExecutionContext` 参数；若为 None，则通过全局 factory 查找。
+
+---
+
+## 11. 与 Reviewer 反馈的对应
 
 | Reviewer Issue | 解决方案 |
 |---|---|
