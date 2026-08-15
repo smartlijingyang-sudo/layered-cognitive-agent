@@ -70,7 +70,7 @@ class TestGatewayTeamCastingFactory(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(runnable, Team)
         roles = [member.profile.role for member in runnable.spec.members]
         self.assertEqual(roles, ["产品经理", "内容创作者"])
-        event_types = [type(stamped.event).__name__ for stamped in collector.journal.events]
+        event_types = [type(stamped.event).__name__ for stamped in collector.store.events]
         self.assertIn("CastingStarted", event_types)
         self.assertIn("CastingCompleted", event_types)
         # 产品路径不允许出现测试探针人设（Alice/Bob 只存在于 tests/harness）

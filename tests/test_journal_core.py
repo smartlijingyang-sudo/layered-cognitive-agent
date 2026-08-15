@@ -262,11 +262,4 @@ def test_read_from_zero_returns_all() -> None:
     assert len(store.read_from(0)) == 2
 
 
-# ── record() 向后兼容别名 ────────────────────────────────
-
-
-def test_record_is_alias_for_append() -> None:
-    store = RunStore()
-    stamped = store.record(TeamRunStarted(team_id="compat"))
-    assert stamped.seq == 1
-    assert len(store.events) == 1
+# ── RunStore 基本行为 ────────────────────────────────

@@ -20,13 +20,9 @@ class HandleJournalSink:
     def emit(self, event: JournalEvent) -> None:
         hub = self._hub
         if hub is None:
-            from lca.layer0_infra.observability.facade import current_hub
+            from lca.layer0_infra.observability import current_hub
 
             hub = current_hub()
         if hub is None:
             return
         hub.store.append(event)
-
-
-# 向后兼容别名
-FacadeJournalSink = HandleJournalSink

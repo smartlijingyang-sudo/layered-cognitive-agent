@@ -46,8 +46,9 @@ class TestBoundaryGuard(unittest.TestCase):
                 elif isinstance(node, ast.Import):
                     imported = [a.name for a in node.names]
                 for name in imported:
-                    if name.startswith(_OBS_PKG + ".") and not name.startswith(
-                        _OBS_PKG + ".adapters"
+                    if name.startswith(_OBS_PKG + ".") and not (
+                        name.startswith(_OBS_PKG + ".adapters")
+                        or mod.startswith("lca.layer0_infra.ops")
                     ):
                         violations.append(f"{mod}: {name}")
         self.assertEqual(

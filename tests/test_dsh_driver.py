@@ -242,7 +242,7 @@ async def test_execute_run_uses_dsh_driver(tmp_path: Path, monkeypatch: pytest.M
     async def _fake_machine_turn(**kwargs: object) -> DshTurnResult:
         from lca.layer0_infra.dsh.archive import JsonlEventArchive
         from lca.layer0_infra.dsh.projector import DshJournalProjector
-        from lca.layer0_infra.dsh.sink import FacadeJournalSink
+        from lca.layer0_infra.dsh.sink import HandleJournalSink
 
         runtime = kwargs["runtime"]
         run_id = str(kwargs["run_id"])
@@ -250,7 +250,7 @@ async def test_execute_run_uses_dsh_driver(tmp_path: Path, monkeypatch: pytest.M
         runs_dir = kwargs["runs_dir"]
         driver = DshTurnDriver(
             runtime=runtime,  # type: ignore[arg-type]
-            projector=DshJournalProjector(FacadeJournalSink()),
+            projector=DshJournalProjector(HandleJournalSink()),
             archive=JsonlEventArchive(runs_dir / f"{run_id}.dsh.jsonl"),
         )
         return driver.run(

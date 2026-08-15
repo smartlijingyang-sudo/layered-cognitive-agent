@@ -168,7 +168,9 @@ exec_rows = [
         "前端选择 DSH 后无任何流式输出",
     ],
 ]
-story.append(flow_table(exec_rows[0], exec_rows[1:], col_widths=(30 * mm, 60 * mm, 15 * mm, 60 * mm)))
+story.append(
+    flow_table(exec_rows[0], exec_rows[1:], col_widths=(30 * mm, 60 * mm, 15 * mm, 60 * mm))
+)
 story.append(Spacer(1, 18))
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -341,7 +343,9 @@ evidence_rows = [
         "（同模式）",
     ),
 ]
-story.append(flow_table(evidence_rows[0], evidence_rows[1:], col_widths=(38 * mm, 30 * mm, 40 * mm, 57 * mm)))
+story.append(
+    flow_table(evidence_rows[0], evidence_rows[1:], col_widths=(38 * mm, 30 * mm, 40 * mm, 57 * mm))
+)
 story.append(Spacer(1, 4))
 story.append(
     Paragraph(
@@ -401,7 +405,7 @@ story.append(
             "<font face='Courier'>set_event_loop()</font>，导致 run_until_complete "
             "的 context 复制行为不确定",
             "线程池中 context 复制在不同 Python 版本（3.12/3.14）表现不一致",
-            "FacadeJournalSink 依赖 ambient contextvar，而 DSH 的线程模型天然不安全",
+            "HandleJournalSink（原 FacadeJournalSink）依赖 ambient contextvar，而 DSH 的线程模型天然不安全",
         ]
     )
 )
@@ -425,7 +429,7 @@ story.append(
             "直接写入，不依赖 contextvar → 数据完整",
             "<b>主 journal (.jsonl)：</b>由 <font face='Courier'>JsonlJournalProjector</font> "
             "写入，需经过 <font face='Courier'>record()</font> → "
-            "<font face='Courier'>_hub_var.get()</font> → hub.journal → projector → 文件",
+            "<font face='Courier'>_hub_var.get()</font> → hub.store → subscriber → 文件",
             "归档有数据但 journal 为空 → 断点在 <font face='Courier'>record()</font>",
         ]
     )
@@ -441,7 +445,7 @@ story.append(
             "<b>修复 event loop 创建：</b>在 run_turn() 中添加 "
             "asyncio.set_event_loop(loop)，确保 context 正确传播。"
             "但这只是兜底，显式传递更可靠。",
-            "<b>添加诊断断言：</b>在 FacadeJournalSink.emit() 中检查 "
+            "<b>添加诊断断言：</b>在 HandleJournalSink.emit() 中检查 "
             "_hub_var.get() 是否为 None，若是则 structlog.error 而非静默返回。",
             "<b>集成测试：</b>添加 DSH 模式的 E2E 测试，验证 .jsonl 非空且包含 "
             "AgentRunStarted + StepTextDelta + AgentRunFinished 事件序列。",
@@ -461,7 +465,7 @@ story.append(Spacer(1, 6))
 story.append(Paragraph("正常模式（Agent/Team）— 事件流完整", h2))
 story.append(
     code_block(
-        "  Agent/Team.run()  ──record()──▶  hub.journal.record()\n"
+        "  Agent/Team.run()  ──record()──▶  hub.store.append()\n"
         "       │                                │\n"
         "       │ (主 event loop)                 ├──▶ LiveTail ──▶ SSE ──▶ 前端 ✓\n"
         "       │                                ├──▶ JsonlProjector ──▶ .jsonl ✓\n"

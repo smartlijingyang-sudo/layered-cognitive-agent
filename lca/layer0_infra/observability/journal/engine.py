@@ -131,10 +131,6 @@ class RunStore:
         """观察者自拉：返回 seq > after_seq 的所有已提交事件。"""
         return tuple(e for e in self._events if e.seq > after_seq)
 
-    def record(self, event: JournalEvent) -> StampedEvent:
-        """向后兼容别名——新代码请使用 ``append()``。"""
-        return self.append(event)
-
     def flush(self) -> None:
         for subscriber in self._subscribers:
             subscriber.flush()
@@ -169,7 +165,3 @@ class RunStore:
                 prepared_map = self._policy.prepare({item.name: value})
                 updates[item.name] = prepared_map.get(item.name, "")
         return dataclasses.replace(event, **updates) if updates else event
-
-
-# 向后兼容别名——渐进迁移期间保留。
-ExecutionJournal = RunStore

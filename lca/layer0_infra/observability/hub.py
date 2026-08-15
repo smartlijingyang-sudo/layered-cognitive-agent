@@ -103,11 +103,6 @@ class ObservabilityHub(ObservabilityBackend):
         return self._store
 
     @property
-    def journal(self) -> RunStore:
-        """向后兼容别名——新代码请使用 ``hub.store``。"""
-        return self._store
-
-    @property
     def provider(self) -> TracerProvider:
         return self._provider
 
