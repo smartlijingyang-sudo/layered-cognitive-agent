@@ -52,8 +52,16 @@ async def run_dsh_machine_turn(
     store: FileStore | None = None,
     runtime: DshRuntime | None = None,
     settings: DshSettings | None = None,
+    projector: DshJournalProjector | None = None,
+    archive: JsonlEventArchive | None = None,
 ) -> DshTurnResult:
-    """Drive DSH on ``machine`` and harvest ``outputs_dir`` like ``MachineComputer``."""
+    """Drive DSH on ``machine`` and harvest ``outputs_dir`` like ``MachineComputer``.
+
+    ``projector`` and ``archive`` are optional: callers that own the DSH
+    session lifecycle (e.g. ``execute_dsh_session``) pass them in so they
+    can manage finish/error semantics.  When omitted, this function creates
+    them internally (backward-compat for tests and standalone callers).
+    """
     cfg = settings if settings is not None else DshSettings()
     cwd = resolve_dsh_cwd(machine, cfg)
     active_store = store if store is not None else get_default_file_store()
@@ -67,11 +75,16 @@ async def run_dsh_machine_turn(
         store=active_store,
     )
 
-    archive_path = runs_dir / f"{run_id}.dsh.jsonl"
+    effective_projector = (
+        projector if projector is not None else DshJournalProjector(FacadeJournalSink())
+    )
+    effective_archive = (
+        archive if archive is not None else JsonlEventArchive(runs_dir / f"{run_id}.dsh.jsonl")
+    )
     driver = DshTurnDriver(
         runtime=runtime if runtime is not None else MachineDshRuntime(transport, machine, cfg),
-        projector=DshJournalProjector(FacadeJournalSink()),
-        archive=JsonlEventArchive(archive_path),
+        projector=effective_projector,
+        archive=effective_archive,
     )
     spec = DshTurnSpec(
         prompt=prompt,

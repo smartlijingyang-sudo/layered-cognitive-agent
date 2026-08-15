@@ -32,6 +32,8 @@ class DshJournalProjector:
         self._opened = False
         self._finished = False
         self._open_args: dict[str, tuple[str, str]] = {}
+        self._turn_status: str | None = None
+        self._turn_error: str = ""
         self._handlers = {
             "turn/start": self._on_turn_start,
             "step/start": self._on_step_start,
@@ -53,13 +55,18 @@ class DshJournalProjector:
         data = event.get("data")
         handler(data if isinstance(data, dict) else {})
 
-    def finish(self, *, status: str, output: str = "", error: str = "") -> None:
+    def finish(self, *, status: str | None = None, output: str = "", error: str = "") -> None:
         if self._finished:
             return
         self._ensure_open()
         self._finished = True
+        # Use recorded turn status if caller didn't provide explicit values
+        final_status = status if status is not None else (self._turn_status or "completed")
+        final_error = error if error else self._turn_error
         self._sink.emit(
-            AgentRunFinished(status=status, output_text=output, error=error, steps=self._step)
+            AgentRunFinished(
+                status=final_status, output_text=output, error=final_error, steps=self._step
+            )
         )
 
     def _next_seq(self) -> int:
@@ -163,6 +170,7 @@ class DshJournalProjector:
         )
 
     def _on_turn_end(self, data: _JSON) -> None:
+        """Record turn status but don't call finish() — caller provides actual output."""
         reason = data.get("reason")
         kind = "completed"
         error = ""
@@ -171,8 +179,8 @@ class DshJournalProjector:
             failure = reason.get("error") or reason.get("failure")
             if isinstance(failure, dict):
                 error = str(failure.get("message") or "")
-        status = "completed" if kind == "completed" else "failed"
-        self.finish(status=status, error=error)
+        self._turn_status = "completed" if kind == "completed" else "failed"
+        self._turn_error = error
 
 
 def _result_call_id(data: _JSON) -> str:
