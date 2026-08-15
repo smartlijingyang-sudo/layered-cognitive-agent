@@ -48,11 +48,20 @@ class TestStartedPluginState(unittest.TestCase):
     def test_run_command_includes_full_command(self) -> None:
         cmd = "mkdir -p /mnt/data/fonts && curl -L -o /tmp/f.ttf https://example.com/f.ttf"
         state = build_started_plugin_state(
-            "run_command",
+            "runCommand",
             {"command": cmd, "description": "Download font", "timeout": 30},
         )
         self.assertEqual(state["command"], cmd)
         self.assertEqual(state["description"], "Download font")
+        self.assertEqual(state["executionEnv"], "sandbox")
+
+    def test_local_run_command_is_machine_face(self) -> None:
+        state = build_started_plugin_state(
+            "local_runCommand",
+            {"command": "python3 -c 'print(1)'", "description": "probe"},
+        )
+        self.assertEqual(state["executionEnv"], "local")
+        self.assertEqual(state["command"], "python3 -c 'print(1)'")
 
     def test_activate_skill_started(self) -> None:
         state = build_started_plugin_state("activate_skill", {"skill_id": "anthropics-skills-pdf"})

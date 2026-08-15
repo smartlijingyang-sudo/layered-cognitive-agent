@@ -51,7 +51,8 @@ class TestCloudSandboxWire(unittest.TestCase):
 
     def test_local_tools_wire_to_lobe_local_system(self) -> None:
         self.assertEqual(resolve("local_listFiles"), ("lobe-local-system", "listFiles"))
-        self.assertIsNone(resolve("local_executeCode"))
+        # executeCode is now available on machine too
+        self.assertEqual(resolve("local_executeCode"), ("lobe-local-system", "executeCode"))
 
     def test_machine_tools_exclude_sandbox_only(self) -> None:
         from unittest.mock import MagicMock

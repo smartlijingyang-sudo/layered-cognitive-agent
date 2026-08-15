@@ -289,10 +289,12 @@ class TestPrepareRunFromMessages(unittest.IsolatedAsyncioTestCase):
             fetcher = _StubFetcher({"http://files.example/nums.csv": (b"1,2,3", "text/csv")})
             run_input = await prepare_run_from_messages(messages, store, fetcher=fetcher)
             self.assertIn("统计附件", run_input.question)
-            # File metadata lives in system role, not in the question text.
-            self.assertNotIn("nums.csv", run_input.question)
+            # File metadata lives in the user-message files_info block (LobeHub aligned).
+            self.assertIn("<files_info>", run_input.question)
+            self.assertIn("nums.csv", run_input.question)
+            # Inbox paths are no longer referenced here — only files_info.
             self.assertNotIn("/mnt/data", run_input.question)
-            self.assertNotIn("/files/", run_input.question)
+            self.assertNotIn("/home/sandbox-user", run_input.question)
             self.assertEqual(len(run_input.attachment_ids), 1)
 
     async def test_compose_run_question_excludes_history_block(self) -> None:

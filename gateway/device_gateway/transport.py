@@ -50,9 +50,12 @@ class DeviceTransport:
                 encoded[name] = {"b64": base64.b64encode(source).decode("ascii")}
             else:
                 encoded[name] = {"url": source}
+        # system=true: MachineTransport.write_files 是系统通道（附件暂存），
+        # 等价于 Sandbox.write_files()。CLI 跳过 assertWritable。
+        # 用户写入走 computer_op("writeFile", ...) — 不同的 CLI tool，有策略。
         return await self._invoke(
             "writeFiles",
-            {"files": encoded, "base_dir": base_dir},
+            {"files": encoded, "base_dir": base_dir, "system": True},
             timeout_s=timeout_s,
         )
 

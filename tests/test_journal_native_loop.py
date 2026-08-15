@@ -99,18 +99,20 @@ def test_tool_call_streaming_opens_the_same_card() -> None:
     assert "result_preview" not in _JOURNAL_TS
 
 
-def test_result_keys_keep_code_out_of_omit() -> None:
-    assert "const RESULT_KEYS" in _DRIVER_TS
+def test_invocation_args_are_an_allowlist() -> None:
+    assert "const ARG_KEYS" in _DRIVER_TS
     assert "function pickArgs" in _DRIVER_TS
+    assert "function mergeInvocationArgs" in _DRIVER_TS
+    assert "const RESULT_KEYS" not in _DRIVER_TS
     assert "ARG_OMIT" not in _DRIVER_TS
-    assert "hasRenderableArgs" not in _DRIVER_TS
-    start = _DRIVER_TS.index("const RESULT_KEYS")
+    start = _DRIVER_TS.index("const ARG_KEYS")
     block = _DRIVER_TS[start : _DRIVER_TS.index("];", start) + 2]
-    assert "'code'" not in block
-    assert "'executionEnv'" in block
-    assert "'output'" in block
-    assert "'files'" in block
-    assert "'downloadUrl'" in block
+    assert "'path'" in block
+    assert "'command'" in block
+    assert "'code'" in block
+    assert "'executionEnv'" not in block
+    assert "'stdout'" not in block
+    assert "'files'" not in block
 
 
 def test_reasoning_completed_closes_thinking() -> None:
@@ -161,6 +163,7 @@ def test_final_answer_gets_native_deliverable_lists() -> None:
 
 def test_tool_stream_updates_go_through_handler() -> None:
     assert "type: 'tool_calls'" in _DRIVER_TS
+    assert "mergeInvocationArgs(" in _DRIVER_TS
     assert "JSON.stringify(pickArgs(projected.state))" in _DRIVER_TS
 
 

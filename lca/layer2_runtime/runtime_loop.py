@@ -203,17 +203,23 @@ class CognitiveRuntime(Runtime):
 
     @staticmethod
     def _apply_artifact_closure(state: AgentState) -> None:
-        """Append workspace deliverables to final output (LobeHub workRegistration-style)."""
+        """Append workspace deliverables to final output (LobeHub workRegistration-style).
+
+        Only auto-complete to COMPLETED when there is actual output (text or
+        artifact closure).  A WORKING state with empty output stays WORKING
+        so that Result.from_state can classify it as FAILED (zero-output guard).
+        """
         closure = synthesize_artifact_closure()
-        if not closure:
-            return
-        if state.final_output:
-            if closure.strip() not in state.final_output:
-                state.final_output = state.final_output.rstrip() + "\n\n" + closure
-        else:
-            state.final_output = closure
-        if state.status == TaskStatus.WORKING:
-            state.status = TaskStatus.COMPLETED
+        if closure:
+            if state.final_output:
+                if closure.strip() not in state.final_output:
+                    state.final_output = state.final_output.rstrip() + "\n\n" + closure
+            else:
+                state.final_output = closure
+            if state.status == TaskStatus.WORKING:
+                state.status = TaskStatus.COMPLETED
+        # No closure AND no output → leave status WORKING.  Result.from_state
+        # will reclassify to FAILED with a diagnostic error.
 
     async def _checkpoint(
         self, state: AgentState, reason: SnapshotReason = SnapshotReason.PERIODIC

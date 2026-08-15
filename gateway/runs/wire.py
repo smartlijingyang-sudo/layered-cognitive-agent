@@ -25,6 +25,7 @@ _LS = _LOCAL_SYSTEM
 WIRE: dict[str, tuple[str, str]] = {
     # ── cloud sandbox ──
     "executeCode": (_CS, "executeCode"),
+    "sandbox_execute": (_CS, "executeCode"),
     "runCommand": (_CS, "runCommand"),
     "listFiles": (_CS, "listFiles"),
     "readFile": (_CS, "readFile"),
@@ -38,6 +39,7 @@ WIRE: dict[str, tuple[str, str]] = {
     "killCommand": (_CS, "killCommand"),
     "exportFile": (_CS, "exportFile"),
     # ── local machine ──
+    "local_executeCode": (_LS, "executeCode"),
     "local_runCommand": (_LS, "runCommand"),
     "local_listFiles": (_LS, "listFiles"),
     "local_readFile": (_LS, "readFile"),

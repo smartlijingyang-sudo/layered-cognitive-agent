@@ -11,9 +11,7 @@ You have access to a Cloud Sandbox — an isolated environment for executing cod
 </sandbox_environment>
 
 <uploaded_files>
-User attachments for this run are synced to {{sandbox_workspace_root}}/<filename> when the sandbox starts.
-If the user refers to a file they shared, look there first — do NOT ask them to re-upload.
-Run list_files on {{sandbox_workspace_root}} to see available files.
+{{attachment_policy}}
 {{sandbox_uploaded_files}}
 </uploaded_files>
 

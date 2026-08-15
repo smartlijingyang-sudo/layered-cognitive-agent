@@ -70,6 +70,14 @@ class Provider(ABC):
     @abstractmethod
     def status(self) -> StatusReport: ...
 
+    def heal(self, failed_check: CheckResult) -> bool:
+        """Attempt to recover a failed check. Default: cannot heal.
+
+        Override in providers that know how to self-repair (e.g. restart a daemon).
+        Returns True if the issue was resolved.
+        """
+        return False
+
     # ── shared helpers ───────────────────────────────────────────────
 
     @staticmethod

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+
+import structlog
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -91,6 +94,22 @@ async def _download_file(request: Request) -> Response:
 
 async def _get_file_meta(request: Request) -> JSONResponse:
     return await get_file_meta(request, _file_store)
+
+
+def _configure_structlog() -> None:
+    """Gateway structlog 配置：ContextVar 合并 + ISO 时间戳 + console 渲染。"""
+    structlog.configure(
+        processors=[
+            structlog.contextvars.merge_contextvars,
+            structlog.processors.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.dev.ConsoleRenderer(),
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+    )
+
+
+_configure_structlog()
 
 
 def create_app(

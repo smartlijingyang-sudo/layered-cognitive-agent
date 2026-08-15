@@ -23,6 +23,7 @@ def test_machine_prompt_uses_real_root() -> None:
         assert "/home/lca-sandbox" in note
         assert "CLOUD SANDBOX" not in note
         assert "/mnt/data" not in note
+        assert "STSong-Light" in note
         assert "outputs/" in skill_preamble()
         assert "/mnt/data" not in skill_preamble()
 

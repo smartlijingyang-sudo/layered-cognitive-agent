@@ -1,4 +1,4 @@
-"""doctor.v1 predicates — broken_hop is the first false hop."""
+"""doctor.v2 predicates — broken_hop is the first false hop."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def test_doctor_flags_h3_when_tail_closes_while_running(tmp_path: Path) -> None:
     session = _session(status=RunStatus.RUNNING, tail=tail, jsonl_path=path)
     tail.close()
     report = diagnose(session, path)
-    assert report.schema == "doctor.v1"
+    assert report.schema == "doctor.v2"
     assert report.broken_hop == "H3"
     assert report.hops["H3"].ok is False
 
@@ -67,8 +67,12 @@ def test_doctor_flags_factory_when_tool_started_without_state(tmp_path: Path) ->
         [
             _row(1, "AgentRunStarted", {"agent_role": "助手", "objective": "q"}),
             _row(2, "ToolStarted", {"tool_name": "web_search", "invocation_id": "inv1"}),
-            _row(3, "ToolInvoked", {"tool_name": "web_search", "invocation_id": "inv1"}),
-            _row(4, "AgentRunFinished", {"status": "completed"}),
+            _row(
+                3,
+                "ToolInvoked",
+                {"tool_name": "web_search", "invocation_id": "inv1", "ok": True},
+            ),
+            _row(4, "AgentRunFinished", {"status": "completed", "output_text": "done"}),
         ],
     )
     tail = LiveTail()

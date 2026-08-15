@@ -81,10 +81,6 @@ class ComputerOps(Protocol):
 
     async def kill_command(self, *, command_id: str) -> ComputerOpResult: ...
 
-
-class SandboxExecOps(ComputerOps, Protocol):
-    """Sandbox-only: code interpreter and explicit export."""
-
     async def execute_code(
         self,
         *,
@@ -93,5 +89,9 @@ class SandboxExecOps(ComputerOps, Protocol):
         description: str = "",
         timeout_s: int = 60,
     ) -> ComputerOpResult: ...
+
+
+class SandboxExecOps(ComputerOps, Protocol):
+    """Sandbox-only: explicit file export (code execution is shared now)."""
 
     async def export_file(self, *, path: str) -> ComputerOpResult: ...

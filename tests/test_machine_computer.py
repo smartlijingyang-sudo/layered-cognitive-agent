@@ -54,5 +54,18 @@ async def test_out_of_root_raises_hitl() -> None:
 
 
 @pytest.mark.asyncio
-async def test_no_execute_code_on_class() -> None:
-    assert not hasattr(MachineComputer(_plane(), _FakeTransport()), "execute_code")
+async def test_execute_code_available_on_machine() -> None:
+    """MachineComputer now supports execute_code (temp file + interpreter)."""
+    computer = MachineComputer(_plane(), _FakeTransport())
+    assert hasattr(computer, "execute_code")
+
+
+@pytest.mark.asyncio
+async def test_run_command_sends_timeout_s_and_timeout() -> None:
+    transport = _FakeTransport()
+    computer = MachineComputer(_plane(), transport)
+    await computer.run_command(command="false", timeout_s=15)
+    op, args = transport.calls[0]
+    assert op == "runCommand"
+    assert args["timeout_s"] == 15
+    assert args["timeout"] == 15

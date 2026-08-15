@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from lca.contracts.protocols import LLMAdapter
@@ -70,15 +69,20 @@ def resolve_llm_adapter(
     Returns:
         ``OpenAICompatAdapter``（有 Key 时）或 ``MockLLMAdapter``（无 Key 时）。
     """
-    resolved_key = api_key or os.getenv("LLM_API_KEY")
+    from lca.layer0_infra.llm.config import LLMProviderSettings
+
+    endpoint = LLMProviderSettings().agent_endpoint()
+    resolved_key = api_key if api_key is not None else (endpoint.api_key or None)
+    resolved_base = base_url if base_url is not None else endpoint.base_url
+    resolved_model = model if model is not None else (endpoint.model or None)
 
     if resolved_key:
         from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
 
         return OpenAICompatAdapter(
-            model=model,
+            model=resolved_model,
             api_key=resolved_key,
-            base_url=base_url,
+            base_url=resolved_base,
             api=api,
         )
 

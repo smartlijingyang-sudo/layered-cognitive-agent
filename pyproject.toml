@@ -6,11 +6,16 @@ requires-python = ">=3.10"
 dependencies = [
     "aiofiles>=24.1.0",
     "httpx>=0.28.1",
+    "openai>=2.0",
     "opentelemetry-api>=1.44.0",
     "opentelemetry-sdk>=1.44.0",
     "pydantic-settings>=2.14.2",
+    "python-dotenv>=1.0",
     "python-multipart>=0.0.32",
+    "starlette>=0.46",
     "structlog>=26.1.0",
+    "typer>=0.15.0",
+    "uvicorn[standard]>=0.30.0",
     "websockets>=14.0",
 ]
 
@@ -133,6 +138,11 @@ ignore = [
 "lca/contracts/protocols/**/*.py" = ["ARG002"]
 "lca/contracts/mechanisms.py" = ["ARG002"]
 "lca/contracts/action.py" = ["ARG002"]
+"lca/layer0_infra/ops/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
+"lca/layer0_infra/ops/config.py" = ["S105"]  # sudo_pass_file is a path, not a secret
+"lca/layer0_infra/ops/sudo.py" = ["S603"]  # privileged subprocess wrapper
+"lca/layer0_infra/ops/service.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for process management
+"lca/layer0_infra/ops/services/*.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for service management
 
 [tool.ruff.format]
 quote-style = "double"

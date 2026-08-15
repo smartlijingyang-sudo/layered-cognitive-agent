@@ -37,31 +37,35 @@ const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
 const TERMINAL = new Set(['canceled', 'completed', 'failed']);
 const PAUSED = new Set(['waiting_input']);
 
-const RESULT_KEYS = new Set([
-  'success',
-  'executionEnv',
-  'stdout',
-  'stderr',
-  'output',
-  'exitCode',
-  'exit_code',
-  'error',
-  'errorDetail',
-  'files',
-  'downloadUrl',
-  'filename',
-  'mimeType',
-  'size',
-  'sizeBytes',
-  'hasResources',
-  'source',
-  'title',
-  'resources',
-  'resultNumbers',
-  'results',
-  'previewable',
-  'attachmentId',
-  'url',
+/** Invocation arguments only. Result fields never become plugin.arguments. */
+const ARG_KEYS = new Set([
+  'path',
+  'content',
+  'command',
+  'description',
+  'language',
+  'code',
+  'skill_id',
+  'query',
+  'directoryPath',
+  'directory_path',
+  'timeout',
+  'timeout_s',
+  'background',
+  'run_in_background',
+  'createDirectories',
+  'create_directories',
+  'file_path',
+  'old_string',
+  'new_string',
+  'old_str',
+  'new_str',
+  'replace_all',
+  'search',
+  'replace',
+  'pattern',
+  'glob',
+  'scope',
 ]);
 
 type WireFile = { id?: string; mime_type?: string; name: string; size?: number; url: string };
@@ -76,10 +80,26 @@ type TurnTool = {
 function pickArgs(state: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!state) return {};
   const args: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(state)) {
-    if (!RESULT_KEYS.has(key)) args[key] = value;
+  for (const key of ARG_KEYS) {
+    if (state[key] !== undefined) args[key] = state[key];
   }
   return args;
+}
+
+function mergeInvocationArgs(
+  previous: string,
+  state: Record<string, unknown> | undefined,
+): string {
+  let prior: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(previous) as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      prior = parsed as Record<string, unknown>;
+    }
+  } catch {
+    prior = {};
+  }
+  return JSON.stringify({ ...prior, ...pickArgs(state) });
 }
 
 function toolCardContent(state: Record<string, unknown>): string {
@@ -188,6 +208,7 @@ export function planeFieldsFromAgent(agentId: string | undefined): {
       ? { device_id: deviceId, plane: 'machine', execution_target: 'device' }
       : { plane: 'machine', execution_target: 'device' };
   }
+  if (target === 'dsh') return { plane: 'machine', execution_target: 'dsh' };
   if (target === 'sandbox') return { plane: 'sandbox', execution_target: 'sandbox' };
   if (target === 'auto') return { execution_target: 'auto' };
   if (target === 'none') return { execution_target: 'none' };
@@ -486,7 +507,10 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         }
         const existing = tools.get(projected.idHint);
         if (existing) {
-          existing.call.function.arguments = JSON.stringify(pickArgs(projected.state));
+          existing.call.function.arguments = mergeInvocationArgs(
+            existing.call.function.arguments,
+            projected.state,
+          );
           handler?.handleChunk({
             isAnimationActives: currentTurnTools.map((item) => !item.result),
             tool_calls: currentTurnTools.map((item) => item.call),
@@ -732,11 +756,16 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
       const snapRes = await fetch(`/lca-api/runs/${runId}`, {
         headers: authHeaders,
       });
-      const snap = snapRes.ok ? ((await snapRes.json()) as { status?: string }) : {};
+      const snap = snapRes.ok
+        ? ((await snapRes.json()) as { status?: string; error?: string })
+        : {};
       if (snap.status === 'waiting_input' && assistantId) {
         dispatchMessage(assistantId, {
           metadata: { lca: { run_id: runId, status: 'waiting_input' } },
         });
+      }
+      if (snap.error && !rowError) {
+        noteRowError(new Error(snap.error));
       }
       if (TERMINAL.has(String(snap.status ?? '')) || PAUSED.has(String(snap.status ?? ''))) break;
       await new Promise((resolve) => setTimeout(resolve, 400));

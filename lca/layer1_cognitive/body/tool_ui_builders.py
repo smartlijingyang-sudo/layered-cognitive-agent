@@ -66,9 +66,9 @@ def _started_execute_code(args: dict[str, Any]) -> dict[str, Any]:
     return state
 
 
-def _started_run_command(args: dict[str, Any]) -> dict[str, Any]:
+def _started_run_command(args: dict[str, Any], *, execution_env: str = "sandbox") -> dict[str, Any]:
     state: dict[str, Any] = {
-        "executionEnv": "sandbox",
+        "executionEnv": execution_env,
         "isBackground": bool(args.get("background", False)),
     }
     for key in ("command", "description"):
@@ -78,6 +78,14 @@ def _started_run_command(args: dict[str, Any]) -> dict[str, Any]:
             if trimmed:
                 state[key] = trimmed
     return state
+
+
+def _started_run_command_sandbox(args: dict[str, Any]) -> dict[str, Any]:
+    return _started_run_command(args, execution_env="sandbox")
+
+
+def _started_run_command_machine(args: dict[str, Any]) -> dict[str, Any]:
+    return _started_run_command(args, execution_env="local")
 
 
 def _started_activate_skill(args: dict[str, Any]) -> dict[str, Any]:

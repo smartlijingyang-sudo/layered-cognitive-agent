@@ -32,7 +32,7 @@ def _requirements_names(path: Path) -> set[str]:
 def test_machine_manifest_excludes_sandbox_only_apis() -> None:
     machine_api_names = {api.name for api in MACHINE_MANIFEST.api}
     assert SANDBOX_ONLY_APIS.isdisjoint(machine_api_names)
-    assert len(machine_api_names) == 11
+    assert len(machine_api_names) == 12  # executeCode now available on machine too
 
 
 def test_cloud_manifest_includes_all_apis() -> None:
@@ -48,9 +48,5 @@ def test_key_imports_subset_of_catalog() -> None:
 def test_requirements_txt_covers_preinstall_catalog() -> None:
     req_path = Path("deploy/onlyboxes/requirements-python.txt")
     listed = _requirements_names(req_path)
-    missing = [
-        pkg
-        for pkg in SANDBOX_PREINSTALLED_PYTHON_PACKAGES
-        if pkg.lower() not in listed
-    ]
+    missing = [pkg for pkg in SANDBOX_PREINSTALLED_PYTHON_PACKAGES if pkg.lower() not in listed]
     assert not missing, f"requirements-python.txt missing: {missing}"

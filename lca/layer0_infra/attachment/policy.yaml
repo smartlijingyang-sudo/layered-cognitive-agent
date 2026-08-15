@@ -1,0 +1,35 @@
+# Attachment identity policy — SSOT for files_info + machine inbox.
+# Env overrides: LCA_ATTACHMENT_* (see settings.py).
+
+system_context_open: "<!-- SYSTEM CONTEXT (NOT PART OF USER QUERY) -->"
+system_context_close: "<!-- END SYSTEM CONTEXT -->"
+system_context_open_prefix: "<!-- SYSTEM CONTEXT"
+inbox_dir: ".lca/inbox"
+inline_max_bytes: 8192
+inline_mime_prefixes:
+  - "text/"
+  - "application/json"
+  - "application/xml"
+inline_name_suffixes:
+  - ".md"
+  - ".txt"
+  - ".csv"
+  - ".json"
+  - ".yaml"
+  - ".yml"
+  - ".xml"
+  - ".html"
+  - ".htm"
+files_instruction: |
+  following part contains context information injected by the system. Please follow these instructions:
+
+  1. Always prioritize handling user-visible content.
+  2. the context is only required when user's queries rely on it.
+machine_policy: |
+  This turn's attachments are declared in the user message <files_info>.
+  Staged copies live only under `{inbox_dir}/<run_id>/`.
+  Other files on this machine are not this turn's upload.
+sandbox_policy: |
+  This turn's attachments are declared in the user message <files_info>.
+  Session copies are under `{workspace_root}/<filename>`.
+  Do not treat other workspace files as the user's upload.

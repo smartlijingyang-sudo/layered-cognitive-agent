@@ -8,30 +8,22 @@
 |---|---|
 | `lobehub-ui/` | 可运行的 LobeHub 源码（gitignore，由脚本生成） |
 | `.lobehub-upstream/` | 官方 v2.2.13 git 缓存（gitignore，只读参考） |
-| `.lobehub-stack/` | gateway/frontend 进程 pid + 日志（gitignore） |
+| `.lca-ops/` | gateway/lobehub pid + 日志 |
 | `deploy/lobehub/.env.lca` | 环境变量模板（**提交进 git**） |
-| `deploy/lobehub/stack.yaml` | 栈配置 SSOT：端口、路径、surface 元数据、命令步骤 |
-| `deploy/lobehub/stack/` | Python 编排模块：config, types, inspect, ops, cli |
+| `lca-ops.yaml` | 栈配置 SSOT |
+| `scripts/lca-ops` | 唯一入口 |
 
 ## 启动
 
 ```bash
-./scripts/start_lobehub_stack.sh dev
+./scripts/lca-ops          # 手册
+./scripts/lca-ops dev      # 第一次 / 全停之后
+./scripts/lca-ops status
+./scripts/lca-ops heal     # 有问题自己修
+./scripts/lca-ops logs     # gateway，默认 tail -f
 ```
 
-自动执行：同步 `lobehub-ui/` → 打 LCA 补丁 → 启动 gateway(:8765) → 启动 LobeHub dev(:3010)。
-
-重启全部：`./scripts/start_lobehub_stack.sh restart`  
-停止全部：`./scripts/start_lobehub_stack.sh stop`  
-状态检查：`./scripts/start_lobehub_stack.sh status`
-
-## 架构
-
-**YAML 驱动，步骤注册。** `stack.yaml` 定义命令和步骤，`cli.py` 的 `STEPS` 注册表实现步骤。
-新增路由自动出现在 `[unclassified]` 块；新增 patch 自动列出；新增命令只需编辑 YAML + 注册步骤。
-
-输出格式与 `lca-host` 对齐：分区状态报告、emoji 图标、彩色终端输出。
-`--json` 提供机器可读报告。
+`dev`：补丁 + gateway :8765 + LobeHub :3010 + daemon。日常用 `heal`，不要先 `restart`。
 
 ## 补丁机制
 
@@ -55,7 +47,7 @@
    - Next.js / Vite HMR 自动热更新（无需重启前端）
 
 3. 若改了 next.config.ts 相关 patch → 需重启前端
-   bash scripts/start_lobehub_stack.sh restart
+   ./scripts/lca-ops lobehub restart
 ```
 
 ### Patch 模块结构

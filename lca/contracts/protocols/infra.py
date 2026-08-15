@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from lca.contracts.atoms.enums import LLMStreamEventType
@@ -21,6 +21,13 @@ from lca.contracts.models.core.sandbox import (
 )
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
+
+
+@runtime_checkable
+class DshRuntime(Protocol):
+    """External DeepSeek Harness turn runner. Driver, not a plane."""
+
+    def run_turn(self, spec: Any, on_event: Any) -> Any: ...
 
 
 @runtime_checkable
@@ -158,6 +165,19 @@ class SandboxRuntime(Protocol):
     ) -> SandboxExecResult: ...
 
     async def destroy(self) -> None: ...
+
+
+@runtime_checkable
+class AttachmentIdentity(Protocol):
+    """This-turn file identity: user-message document + isolated machine inbox."""
+
+    def compose_question(self, user_text: str, attachment_ids: Sequence[str]) -> str: ...
+
+    def stage_payload(self, run_id: str, attachment_ids: Sequence[str]) -> dict[str, bytes]: ...
+
+    def listed_paths(
+        self, root: str, run_id: str, attachment_ids: Sequence[str]
+    ) -> tuple[str, ...]: ...
 
 
 @runtime_checkable

@@ -25,7 +25,8 @@ from lca.layer1_cognitive.body.tool_ui_builders import (
     _started_activate_skill,
     _started_default,
     _started_execute_code,
-    _started_run_command,
+    _started_run_command_machine,
+    _started_run_command_sandbox,
     _started_web_search,
 )
 
@@ -83,7 +84,9 @@ _WIRE_NOISE_KEYS = (
 
 _STARTED_BUILDERS: dict[str, StartedBuilder] = {
     "executeCode": _started_execute_code,
-    "runCommand": _started_run_command,
+    "local_executeCode": _started_execute_code,
+    "runCommand": _started_run_command_sandbox,
+    "local_runCommand": _started_run_command_machine,
     "sandbox_execute": _started_execute_code,
     "activate_skill": _started_activate_skill,
     "search": _started_web_search,
@@ -92,7 +95,13 @@ _STARTED_BUILDERS: dict[str, StartedBuilder] = {
 _INVOKED_BUILDERS: dict[str, InvokedBuilder] = {
     "activate_skill": _invoked_activate_skill,
     "executeCode": _invoked_from_payload_state,
+    "local_executeCode": _invoked_from_payload_state,
     "runCommand": _invoked_from_payload_state,
+    "local_runCommand": _invoked_from_payload_state,
+    "local_writeFile": _invoked_from_payload_state,
+    "local_readFile": _invoked_from_payload_state,
+    "local_listFiles": _invoked_from_payload_state,
+    "local_editFile": _invoked_from_payload_state,
     "sandbox_execute": _invoked_from_payload_state,
     "listFiles": _invoked_from_payload_state,
     "readFile": _invoked_from_payload_state,

@@ -1,8 +1,8 @@
 """lca-computer manifest — declarative tool identity + API surface.
 
 LobeHub alignment:
-  - ``MACHINE_MANIFEST``   → ``lobe-local-system``   (11 file/shell APIs)
-  - ``CLOUD_SANDBOX_MANIFEST`` → ``lobe-cloud-sandbox`` (11 + executeCode + exportFile)
+  - ``MACHINE_MANIFEST``   → ``lobe-local-system``   (12 file/shell/code APIs)
+  - ``CLOUD_SANDBOX_MANIFEST`` → ``lobe-cloud-sandbox`` (13 + exportFile)
 
 Shared API modules live under ``apis/``.
 """
@@ -55,7 +55,10 @@ _ALL_API_SPECS: dict[ApiName, tuple[str, bool]] = {
     ApiName.GREP_CONTENT: (_grep_content.DESCRIPTION, _grep_content.IS_IDEMPOTENT),
     ApiName.GLOB_FILES: (_glob_files.DESCRIPTION, _glob_files.IS_IDEMPOTENT),
     ApiName.RUN_COMMAND: (_run_command.DESCRIPTION, _run_command.IS_IDEMPOTENT),
-    ApiName.GET_COMMAND_OUTPUT: (_get_command_output.DESCRIPTION, _get_command_output.IS_IDEMPOTENT),
+    ApiName.GET_COMMAND_OUTPUT: (
+        _get_command_output.DESCRIPTION,
+        _get_command_output.IS_IDEMPOTENT,
+    ),
     ApiName.KILL_COMMAND: (_kill_command.DESCRIPTION, _kill_command.IS_IDEMPOTENT),
     ApiName.EXECUTE_CODE: (_execute_code.DESCRIPTION, _execute_code.IS_IDEMPOTENT),
     ApiName.EXPORT_FILE: (_export_file.DESCRIPTION, _export_file.IS_IDEMPOTENT),

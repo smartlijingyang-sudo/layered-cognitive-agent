@@ -97,4 +97,4 @@ if ! python3 "${ROOT}/deploy/lobehub/patch_lobehub.py" drift; then
 fi
 
 echo "[sync] 下一步: cd lobehub-ui && bun install && bun run dev"
-echo "         或: ./scripts/start_lobehub_stack.sh dev"
+echo "         或: ./scripts/lca-ops dev"

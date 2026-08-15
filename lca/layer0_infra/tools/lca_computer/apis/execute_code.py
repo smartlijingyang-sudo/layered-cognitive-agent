@@ -18,6 +18,8 @@ def parameters() -> dict[str, Any]:
 
 
 DESCRIPTION = (
-    "在沙箱中执行代码。参数：description，language（python/javascript/typescript），code。"
+    "执行代码（支持 machine 和 sandbox 模式）。"
+    "参数：description，language（python/javascript/typescript），code。"
+    "在 machine 模式下通过临时文件 + 解释器执行；sandbox 模式使用原生沙箱运行时。"
 )
 IS_IDEMPOTENT = False

@@ -20,6 +20,13 @@ class TestParsePartialToolArgs(unittest.TestCase):
         args = parse_partial_tool_args('{"code": "import matplotlib\\nprint("')
         self.assertTrue(args["code"].startswith("import matplotlib"))
 
+    def test_write_file_keeps_path_and_partial_content(self) -> None:
+        args = parse_partial_tool_args(
+            '{"path": "/home/sandbox-user/outputs/a.html", "content": "<!DOCTYPE html>'
+        )
+        self.assertEqual(args["path"], "/home/sandbox-user/outputs/a.html")
+        self.assertTrue(args["content"].startswith("<!DOCTYPE html>"))
+
 
 class TestPushToolCallStream(unittest.TestCase):
     def test_first_name_opens_card(self) -> None:

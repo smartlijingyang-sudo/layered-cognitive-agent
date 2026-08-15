@@ -1,7 +1,7 @@
 # lca-host.yaml — LCA Host Runtime Configuration (SSOT)
 #
 # This file is the single source of truth for the host environment.
-# Edit this file, then run:  scripts/lca-host.py provision
+# Edit this file, then run:  ./scripts/lca-ops provision
 #
 # Architecture:
 #   - Shared layer: system packages, tools, venv, CLI → shared across users
@@ -38,7 +38,7 @@ cli:
 
 # ── Users ──────────────────────────────────────────────────────────
 # Each user gets: system account, home dir, outputs/, .lca/ state, daemon
-# Add more users and re-run: scripts/lca-host.py provision
+# Add more users and re-run: ./scripts/lca-ops provision
 users:
   - name: sandbox-user
     home: /home/sandbox-user

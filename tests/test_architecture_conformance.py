@@ -254,11 +254,16 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.llm_resolver.ProductionLLMResolver": (
         "LLMResolver Protocol 的实现，纯 env 读取 + 委托 resolve_llm_adapter"
     ),
-    "lca.layer0_infra.llm_resolver.LLMUnavailableError": ("异常类型，非可插拔组件"),
-    "lca.layer0_infra.llm_resolver.ModelDefinition": ("模型元数据值对象，纯数据结构"),
-    "lca.layer0_infra.llm_resolver.ModelRegistry": (
+    "lca.layer0_infra.llm.catalog.ModelRegistry": (
         "模型路由注册表，非可插拔组件 (同 ComponentRegistry 模式)"
     ),
+    "lca.layer0_infra.llm.catalog.ModelDefinition": ("模型元数据值对象，纯数据结构"),
+    "lca.layer0_infra.llm.config.LLMFace": ("LLM 调用面枚举，纯数据声明"),
+    "lca.layer0_infra.llm.config.ResolvedEndpoint": ("解析后的 provider 端点值对象，纯数据"),
+    "lca.layer0_infra.llm.config.LLMProviderSettings": (
+        "pydantic-settings provider 身份配置，非可插拔组件"
+    ),
+    "lca.layer0_infra.llm.openai_client.LLMUnavailableError": ("异常类型，非可插拔组件"),
     "lca.layer0_infra.openai_compat.StructuredLLMError": ("异常类型，非可插拔组件"),
     "lca.layer0_infra.computer.machine.MachineComputer": (
         "LobeHub LocalSystemExecutionRuntime 的 LCA 实现，注入 MachineTransport (Computer Use)"
@@ -267,6 +272,43 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.plane.resolve.PlaneRequest": ("绑定请求值对象，纯数据，非可插拔组件"),
     "lca.layer0_infra.sandbox.host_settings.HostRuntimeSettings": (
         "sidecar pydantic-settings 配置，非可插拔组件"
+    ),
+    "lca.layer0_infra.dsh.settings.DshSettings": ("DSH driver pydantic-settings，非可插拔组件"),
+    "lca.layer0_infra.dsh.models.DshNotification": ("DSH JSON-RPC 通知值对象，纯数据"),
+    "lca.layer0_infra.dsh.models.DshTurnResult": ("DSH 一轮结果值对象，纯数据"),
+    "lca.layer0_infra.dsh.mapping.ToolProjection": ("DSH 工具投影值对象，纯数据"),
+    "lca.layer0_infra.dsh.driver.DshTurnSpec": ("DSH 一轮输入值对象，纯数据"),
+    "lca.layer0_infra.dsh.driver.DshTurnDriver": (
+        "DSH 一轮编排器，协议缝在 DshRuntime (DSH compare driver)"
+    ),
+    "lca.layer0_infra.dsh.projector.DshJournalProjector": (
+        "DSH session → Journal 投影器，内部策略表 (DSH compare driver)"
+    ),
+    "lca.layer0_infra.dsh.archive.JsonlEventArchive": (
+        "DSH 原始通知归档，文件后端 (DSH compare driver)"
+    ),
+    "lca.layer0_infra.dsh.sink.FacadeJournalSink": (
+        "Journal record() 适配器，非跨层组件 (DSH compare driver)"
+    ),
+    "lca.layer0_infra.dsh.runtime.DshUnavailableError": ("异常类型，非可插拔组件"),
+    # ── 附件身份平面（LobeHub files_info 对齐，run-scoped inbox）──
+    "lca.layer0_infra.attachment.settings.AttachmentPolicyDocument": (
+        "policy.yaml 值对象，配置数据，非可插拔组件"
+    ),
+    "lca.layer0_infra.attachment.settings.AttachmentSettings": (
+        "pydantic-settings 配置模型，非可插拔组件"
+    ),
+    "lca.layer0_infra.attachment.layout.AttachmentLayout": (
+        "路径派生工具，纯函数聚合，非可插拔组件"
+    ),
+    "lca.layer0_infra.attachment.files_info.FilesInfoFile": (
+        "files_info XML 节点值对象，纯数据"
+    ),
+    "lca.layer0_infra.attachment.files_info.FilesInfoDocument": (
+        "files_info 文档值对象，纯数据"
+    ),
+    "lca.layer0_infra.attachment.service.FileStoreAttachmentIdentity": (
+        "AttachmentIdentity Protocol 的 FileStore 实现 (LobeHub files_info 对齐)"
     ),
 }
 

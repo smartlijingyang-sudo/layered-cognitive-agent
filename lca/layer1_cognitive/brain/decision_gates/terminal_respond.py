@@ -21,6 +21,11 @@ _PRODUCER_TOOLS = frozenset(
         "sandbox_execute",
         "writeFile",
         "write_file_local",
+        "local_runCommand",
+        "local_writeFile",
+        "local_editFile",
+        "local_executeCode",
+        "local_readFile",
     }
 )
 

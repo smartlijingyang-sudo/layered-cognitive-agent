@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# LCA Platform Orchestrator — unified service management.
+#
+# This is the single entry point for managing the entire LCA development platform:
+# - Infrastructure (postgres, redis, s3)
+# - Gateway (LCA API server)
+# - LobeHub (Next.js frontend)
+# - Daemon (sandbox-user CLI connect)
+#
+# Usage:
+#     lca-ops dev              # Start full dev environment
+#     lca-ops restart          # Restart all services
+#     lca-ops stop             # Stop all services
+#     lca-ops status           # Show status
+#     lca-ops heal             # Auto-recover unhealthy services
+#     lca-ops gateway start    # Manage gateway
+#     lca-ops lobehub start    # Manage LobeHub
+#     lca-ops infra start      # Manage infrastructure
+#     lca-ops daemon start     # Manage daemon
+#
+# Use --json for agent-friendly JSON output.
+
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${ROOT}"
+
+if command -v uv >/dev/null 2>&1; then
+  exec uv run python3 -m lca.layer0_infra.ops.cli "$@"
+fi
+exec python3 -m lca.layer0_infra.ops.cli "$@"

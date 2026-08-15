@@ -31,7 +31,12 @@ def _resolve_timeout_s(args: dict[str, Any], default: int = 60) -> int:
 
 
 class LcaComputerExecutor:
-    """Routes tool calls to a ComputerOps backend."""
+    """Routes tool calls to a ComputerOps backend.
+
+    All methods map directly to ``ComputerOps`` — both MachineComputer and
+    SandboxComputer implement the same interface.  execute_code is now
+    available on both backends.
+    """
 
     def __init__(self, ops: ComputerOps) -> None:
         self._ops = ops
@@ -133,33 +138,30 @@ class LcaComputerExecutor:
             command_id=_str_arg(params, "commandId", "command_id"),
         )
 
-
-class LcaSandboxExecutor(LcaComputerExecutor):
-    """Extends computer executor with sandbox-only APIs (executeCode, exportFile)."""
-
-    def __init__(self, ops: ComputerOps) -> None:
-        super().__init__(ops)
-        self._sandbox_ops = ops
-
-    async def invoke(self, api_name: str, params: dict[str, Any]) -> ComputerOpResult:
-        if api_name == ApiName.EXECUTE_CODE:
-            return await self.execute_code(params)
-        if api_name == ApiName.EXPORT_FILE:
-            return await self.export_file(params)
-        return await super().invoke(api_name, params)
-
     async def execute_code(self, params: dict[str, Any]) -> ComputerOpResult:
         from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S
 
-        return await self._sandbox_ops.execute_code(
+        return await self._ops.execute_code(
             code=_str_arg(params, "code"),
             language=_str_arg(params, "language", default="python"),
             description=_str_arg(params, "description"),
             timeout_s=int(params.get("timeout_s", DEFAULT_SANDBOX_TIMEOUT_S)),
         )
 
+
+class LcaSandboxExecutor(LcaComputerExecutor):
+    """Extends computer executor with sandbox-only APIs (exportFile).
+
+    execute_code is now in the base class since MachineComputer supports it too.
+    """
+
+    async def invoke(self, api_name: str, params: dict[str, Any]) -> ComputerOpResult:
+        if api_name == ApiName.EXPORT_FILE:
+            return await self.export_file(params)
+        return await super().invoke(api_name, params)
+
     async def export_file(self, params: dict[str, Any]) -> ComputerOpResult:
-        return await self._sandbox_ops.export_file(
+        return await self._ops.export_file(
             path=_str_arg(params, "path"),
         )
 
@@ -176,4 +178,5 @@ _DISPATCH: dict[str, Any] = {
     ApiName.RUN_COMMAND: LcaComputerExecutor.run_command,
     ApiName.GET_COMMAND_OUTPUT: LcaComputerExecutor.get_command_output,
     ApiName.KILL_COMMAND: LcaComputerExecutor.kill_command,
+    ApiName.EXECUTE_CODE: LcaComputerExecutor.execute_code,
 }

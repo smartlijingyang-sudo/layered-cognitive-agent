@@ -1,0 +1,20 @@
+# Prompt notes for {{preinstalled}}. Package/CLI inventory stays in
+# lca.contracts.models.core.sandbox — this file is how the agent should use them.
+
+shared:
+  notes:
+    - >-
+      Chinese PDF/charts: reportlab CID font STSong-Light
+      (`UnicodeCIDFont('STSong-Light')` — no TTF hunt, no /usr/share/fonts scan).
+      matplotlib: 'WenQuanYi Micro Hei' if present.
+
+planes:
+  machine:
+    header: Host machine pre-installed software (shared venv + system packages)
+    notes:
+      - Use `python3` or `python` (venv); do **not** pip-install at runtime — packages are pre-provisioned.
+      - "`executeCode` / `exportFile` are **not** available on the machine face; use `runCommand`."
+  sandbox:
+    header: Cloud sandbox pre-installed software
+    notes:
+      - Use `executeCode` for Python/JS/TS; deliverables under outputs/.

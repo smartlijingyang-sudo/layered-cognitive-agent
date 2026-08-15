@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import Budget
@@ -76,7 +77,12 @@ class Result:
 
     @classmethod
     def from_state(cls, state: AgentState) -> Result:
-        """Summarize a final AgentState into a Result."""
+        """Summarize a final AgentState into a Result.
+
+        Zero-output guard: a state that is still WORKING with no final_output
+        means the loop exhausted its budget without producing anything — that
+        is FAILED, not COMPLETED.  Silent failure is worse than explicit failure.
+        """
         status = TaskStatus.COMPLETED if state.status == TaskStatus.WORKING else state.status
         final_output = state.final_output
         output: str | None
@@ -84,6 +90,16 @@ class Result:
             output = final_output
         else:
             output = str(final_output)
+        if (
+            status == TaskStatus.COMPLETED
+            and not (output or "").strip()
+            and not _is_handoff_completion(state)
+        ):
+            status = TaskStatus.FAILED
+            state.last_error = (
+                "Agent 运行结束但未产生任何输出。"
+                "可能原因: 工具循环失败、代码执行错误、模型未正确响应。"
+            )
         return cls(
             trace_id=state.trace_id,
             status=status,
@@ -93,6 +109,15 @@ class Result:
             budget_used=state.budget,
             error=state.last_error,
         )
+
+
+def _is_handoff_completion(state: AgentState) -> bool:
+    """HANDOFF is a valid terminal action even when response_text is empty."""
+    if not state.history:
+        return False
+    last = state.history[-1]
+    decision = getattr(last, "decision", None)
+    return decision is not None and decision.action_type == ActionType.HANDOFF
 
 
 class ApprovalPendingError(Exception):

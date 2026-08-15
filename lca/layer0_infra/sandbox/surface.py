@@ -36,17 +36,20 @@ def skill_preamble() -> str:
 
 def plane_system_role(plane: PlaneRef) -> str:
     if plane.kind is PlaneKind.MACHINE:
-        from lca.contracts.models.core.preinstall import render_preinstalled_block
+        from lca.layer0_infra.plane.preinstall_prompt import render_preinstalled_block
         from lca.layer0_infra.plane.prompts import load_plane_prompt
         from lca.layer0_infra.sandbox.prompt import format_machine_uploaded_files_prompt
 
         template = load_plane_prompt("machine_system_role")
         uploaded = format_machine_uploaded_files_prompt(plane.root)
+        from lca.layer0_infra.attachment import get_attachment_policy
+
         rendered = (
             template.replace("{{label}}", plane.label)
             .replace("{{platform}}", plane.platform or "unknown")
             .replace("{{root}}", plane.root)
             .replace("{{outputs_dir}}", plane.outputs_dir)
+            .replace("{{attachment_policy}}", get_attachment_policy().machine_policy_text())
             .replace("{{uploaded_files}}", uploaded)
             .replace("{{preinstalled}}", render_preinstalled_block(plane=PlaneKind.MACHINE))
         )

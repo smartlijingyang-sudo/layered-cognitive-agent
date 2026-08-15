@@ -1,0 +1,49 @@
+# lca-ops.yaml — LCA Platform Configuration (SSOT)
+#
+# Single source of truth for all LCA platform services.
+# This replaces: stack.yaml + lca-host.yaml + .env.lca fragmentation.
+#
+# Load order: defaults → this file → environment variables.
+
+# ── Gateway (LCA API server) ──────────────────────────────────────────
+gateway:
+  host: "127.0.0.1"
+  port: 8765
+  bind: "0.0.0.0"
+  health_path: /health
+  entry: ["uv", "run", "python", "scripts/serve_observability.py"]
+  watch:
+    - gateway
+    - lca
+
+# ── LobeHub (Next.js frontend) ────────────────────────────────────────
+lobehub:
+  host: "127.0.0.1"
+  release: v2.2.13
+  dir: lobehub-ui
+  dev_port: 3010
+  env_template: deploy/lobehub/.env.lca
+
+# ── Infrastructure (docker-compose) ───────────────────────────────────
+infra:
+  host: "127.0.0.1"
+  compose_dir: lobehub-ui/docker-compose/dev
+  services:
+    - postgresql
+    - redis
+    - rustfs
+    - rustfs-init
+  ports:
+    postgres: 25432
+    redis: 6379
+
+# ── Daemon (sandbox-user CLI connect) ─────────────────────────────────
+daemon:
+  gateway_ws_url: ""  # empty = derive from gateway config
+  user: sandbox-user
+  workspace: /home/sandbox-user
+  host_config: lca-host.yaml
+
+# ── Runtime state ─────────────────────────────────────────────────────
+run_dir: .lca-ops
+sudo_pass_file: .lobehub-stack/sudo.pass

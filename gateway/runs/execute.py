@@ -16,6 +16,7 @@ import structlog
 from gateway.assemble import build_runnable_team, build_solo_agent
 from gateway.modes import DEFAULT_MODE, SOLO_MODE_KEY
 from gateway.runs.doctor import diagnose
+from gateway.runs.dsh_execute import execute_dsh_session
 from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.live import LiveTail
 from gateway.runs.session import RunRegistry, RunSession, RunStatus
@@ -23,11 +24,24 @@ from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.plane import PlaneKind
-from lca.contracts.models.observability.journal import RunScope
+from lca.contracts.models.observability.journal import (
+    AttachmentStagingCompleted,
+    AttachmentStagingFailed,
+    AttachmentStagingStarted,
+    RunScope,
+)
 from lca.contracts.models.team.run_context import RunContext
+from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
+from lca.layer0_infra.dsh.routing import is_dsh_driver
 from lca.layer0_infra.file_store import get_default_file_store
 from lca.layer0_infra.llm_resolver import LLMResolver, ProductionLLMResolver
-from lca.layer0_infra.observability import ObservabilityHub, create_observability, run_scope
+from lca.layer0_infra.observability import (
+    ObservabilityHub,
+    bind,
+    create_observability,
+    record,
+    run_scope,
+)
 from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.plane.machine import resolve_machine, resolve_machine_transport
@@ -95,6 +109,14 @@ def sanitize_error(error: str) -> str:
         if pattern.search(error):
             return replacement
     return error
+
+
+def format_user_error(error: str, *, run_id: str, trace_id: str) -> str:
+    """结构化错误消息：用户可读原因 + debug 上下文。"""
+    sanitized = sanitize_error(error)
+    if sanitized == error:
+        return f"{sanitized}（run: {run_id}, trace: {trace_id}）"
+    return f"{sanitized}\nrun: {run_id} | trace: {trace_id}"
 
 
 def assemble_run_hub(
@@ -189,6 +211,10 @@ async def execute_run(
             search_run_scope(),
             run_scope(RunScope(trace_id=session.trace_id, run_id=session.run_id)),
         ):
+            structlog.contextvars.bind_contextvars(
+                run_id=session.run_id,
+                trace_id=session.trace_id,
+            )
             workspace_ref[0] = workspace
             try:
                 bindings = _freeze_bindings(session)
@@ -196,6 +222,12 @@ async def execute_run(
                 session.error = str(exc)
                 return
             session.bindings = bindings
+            if is_dsh_driver(session.execution_target):
+                # DSH skips Agent/Team, so this is the run-edge bind for record().
+                with bind(hub):
+                    await execute_dsh_session(session)
+                success = not session.error
+                return
             sandbox = resolve_sandbox() if ref_of(bindings, PlaneKind.SANDBOX) else None
             with plane_bindings_scope(bindings):
                 if sandbox is not None:
@@ -252,12 +284,29 @@ async def execute_run(
                     )
                     return
                 success = result.status == TaskStatus.COMPLETED
+                if not success and not session.error and result.error:
+                    session.error = format_user_error(
+                        result.error,
+                        run_id=session.run_id,
+                        trace_id=session.trace_id,
+                    )
     except asyncio.CancelledError:
         session.cancel_requested = True
         raise
     except Exception as exc:
-        session.error = sanitize_error(f"{type(exc).__name__}: {exc}")
+        _log.exception(
+            "run_failed",
+            run_id=session.run_id,
+            trace_id=session.trace_id,
+            error_type=type(exc).__name__,
+        )
+        session.error = format_user_error(
+            f"{type(exc).__name__}: {exc}",
+            run_id=session.run_id,
+            trace_id=session.trace_id,
+        )
     finally:
+        structlog.contextvars.clear_contextvars()
         if session.status == RunStatus.WAITING_INPUT:
             registry.mark_paused(session)
         else:
@@ -279,11 +328,27 @@ async def resume_run(session: RunSession, registry: RunRegistry, answer: str) ->
             registry.mark_paused(session)
             return
         success = result.status == TaskStatus.COMPLETED
+        if not success and not session.error and result.error:
+            session.error = format_user_error(
+                result.error,
+                run_id=session.run_id,
+                trace_id=session.trace_id,
+            )
     except asyncio.CancelledError:
         session.cancel_requested = True
         raise
     except Exception as exc:
-        session.error = sanitize_error(f"{type(exc).__name__}: {exc}")
+        _log.exception(
+            "run_resume_failed",
+            run_id=session.run_id,
+            trace_id=session.trace_id,
+            error_type=type(exc).__name__,
+        )
+        session.error = format_user_error(
+            f"{type(exc).__name__}: {exc}",
+            run_id=session.run_id,
+            trace_id=session.trace_id,
+        )
     await finalize(session, registry, None, success)
 
 
@@ -397,6 +462,7 @@ def _freeze_bindings(session: RunSession):
     sandbox = resolve_sandbox()
     sandbox_ref = sandbox_ref_from(sandbox) if sandbox is not None else None
     machine = resolve_machine(session.device_id or None)
+    target = "device" if is_dsh_driver(session.execution_target) else session.execution_target
     bindings = resolve_plane_bindings(
         machine,
         sandbox_ref,
@@ -404,7 +470,7 @@ def _freeze_bindings(session: RunSession):
             device_id=session.device_id,
             plane=session.plane,
             extra_plane=session.extra_plane,
-            execution_target=session.execution_target,
+            execution_target=target,
         ),
     )
     machine_bound = ref_of(bindings, PlaneKind.MACHINE)
@@ -427,6 +493,7 @@ def _freeze_bindings(session: RunSession):
 
 
 async def _stage_machine_attachments(session: RunSession) -> None:
+    """附件暂存——系统 bootstrap 通道，等价于 Sandbox.write_files()。"""
     if session.bindings is None:
         return
     machine = ref_of(session.bindings, PlaneKind.MACHINE)
@@ -436,22 +503,58 @@ async def _stage_machine_attachments(session: RunSession) -> None:
     if transport is None:
         raise RuntimeError(f"machine {machine.label} offline; cannot stage attachments")
     store = get_default_file_store()
-    files: dict[str, bytes | str] = {}
-    missing: list[str] = []
-    for attachment_id in session.attachment_ids:
-        stored = store.get(attachment_id)
-        raw = store.read_bytes(attachment_id)
-        if stored is None or raw is None:
-            missing.append(attachment_id)
-            continue
-        files[stored.name] = raw
-    if missing or not files:
-        raise RuntimeError(f"machine attachments missing in FileStore: {missing}")
-    result = await transport.write_files(files, base_dir=machine.root)
-    if getattr(result, "success", True) is False:
+    files = FileStoreAttachmentIdentity(store).stage_payload(session.run_id, session.attachment_ids)
+    if not files:
         raise RuntimeError(
-            f"failed to stage attachments on {machine.label}: {getattr(result, 'error', result)}"
+            f"machine attachments missing in FileStore: {list(session.attachment_ids)}"
         )
+    total_bytes = sum(len(v) for v in files.values())
+    record(
+        AttachmentStagingStarted(
+            plane_id=machine.id,
+            file_count=len(files),
+            total_bytes=total_bytes,
+            run_id=session.run_id,
+        )
+    )
+    started = time.monotonic()
+    try:
+        result = await transport.write_files(files, base_dir=machine.root)
+    except Exception as exc:
+        _log.exception(
+            "attachment_staging_transport_error",
+            run_id=session.run_id,
+            plane_id=machine.id,
+        )
+        record(
+            AttachmentStagingFailed(
+                plane_id=machine.id,
+                error=f"{type(exc).__name__}: {exc}",
+                failed_paths=tuple(files.keys()),
+                run_id=session.run_id,
+            )
+        )
+        raise
+    duration_ms = (time.monotonic() - started) * 1000
+    if getattr(result, "success", True) is False:
+        error_msg = str(getattr(result, "error", result))
+        record(
+            AttachmentStagingFailed(
+                plane_id=machine.id,
+                error=error_msg,
+                failed_paths=tuple(files.keys()),
+                run_id=session.run_id,
+            )
+        )
+        raise RuntimeError(f"附件暂存失败（{len(files)} 个文件）: {error_msg}")
+    record(
+        AttachmentStagingCompleted(
+            plane_id=machine.id,
+            file_count=len(files),
+            total_bytes=total_bytes,
+            duration_ms=duration_ms,
+        )
+    )
 
 
 def _run_context_for_session(session: RunSession) -> RunContext:

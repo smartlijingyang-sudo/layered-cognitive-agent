@@ -24,7 +24,9 @@ class ApiName(str, Enum):
         return self.value
 
 
-SANDBOX_ONLY_APIS: frozenset[ApiName] = frozenset({ApiName.EXECUTE_CODE, ApiName.EXPORT_FILE})
+# exportFile is sandbox-only (file download mechanism is specific to sandbox).
+# executeCode is now available on both machine and sandbox backends.
+SANDBOX_ONLY_APIS: frozenset[ApiName] = frozenset({ApiName.EXPORT_FILE})
 
 COMPUTER_APIS: frozenset[ApiName] = frozenset(ApiName)
 

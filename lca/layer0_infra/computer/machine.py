@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, Protocol
 
 from lca.contracts.models.core.plane import PlaneRef
+from lca.layer0_infra.computer.machine_exec import MachineExecMixin
 from lca.layer0_infra.computer.op_result import ComputerOpResult
 from lca.layer0_infra.file_store import FileStore, get_default_file_store
 from lca.layer0_infra.plane.scope import raise_if_out_of_scope
 
 
 class MachineTransport(Protocol):
+    """Machine plane 传输——系统通道。
+
+    ``write_files`` 的所有调用方都是受信的基础设施操作（附件暂存），
+    等价于 ``Sandbox.write_files()``——Protocol 本身就是信任边界。
+    用户写入走 ``MachineComputer.write_file()`` tool call（CLI ``writeFile``
+    单数），有独立的 ``assertWritable`` 策略。
+    """
+
     async def computer_op(
         self, op: str, args: dict[str, Any], *, timeout_s: int = 60
     ) -> dict[str, Any]: ...
@@ -27,8 +35,8 @@ class MachineTransport(Protocol):
     ) -> Any: ...
 
 
-class MachineComputer:
-    """File/shell/search on a machine PlaneRef. No execute_code / export_file."""
+class MachineComputer(MachineExecMixin):
+    """File/shell/search/code on a machine PlaneRef. No export_file."""
 
     def __init__(
         self,
@@ -166,6 +174,7 @@ class MachineComputer:
                 "cwd": self.plane.root,
                 "background": background,
                 "timeout_s": timeout_s,
+                "timeout": timeout_s,
             },
             timeout_s=timeout_s,
         )
@@ -209,54 +218,6 @@ class MachineComputer:
             content = _format(body) if ok or body.get("content") else err
         body.setdefault("plane", _plane_state(self.plane))
         return ComputerOpResult(success=ok, content=content, state=body, error=err)
-
-    async def _publish_outputs(self, result: ComputerOpResult, *, extra_path: str = "") -> None:
-        if not result.success:
-            return
-        paths: list[str] = []
-        if extra_path and _under_dir(extra_path, self.plane.outputs_dir, self.plane.platform):
-            paths.append(extra_path)
-        listed = await self._op("listFiles", {"directory_path": self.plane.outputs_dir})
-        for item in listed.state.get("files") or []:
-            if isinstance(item, dict):
-                candidate = str(item.get("path") or item.get("name") or "")
-                if candidate and _under_dir(
-                    candidate
-                    if candidate.startswith("/")
-                    else f"{self.plane.outputs_dir}/{candidate}",
-                    self.plane.outputs_dir,
-                    self.plane.platform,
-                ):
-                    paths.append(
-                        candidate
-                        if candidate.startswith(self.plane.outputs_dir)
-                        else f"{self.plane.outputs_dir.rstrip('/')}/{candidate}"
-                    )
-        published: list[dict[str, str]] = []
-        for path in dict.fromkeys(paths):
-            read = await self._op("readFile", {"path": path})
-            raw = read.state.get("content")
-            if not isinstance(raw, str) or not raw:
-                result.state["publish_error"] = f"could not read {path} for download"
-                continue
-            name = path.replace("\\", "/").rsplit("/", 1)[-1]
-            stored = self._store.put(
-                data=raw.encode("utf-8"),
-                name=name,
-                mime_type="application/octet-stream",
-            )
-            published.append({"filename": name, "url": f"/files/{stored.attachment_id}"})
-        if published:
-            result.state.setdefault("files", [])
-            if isinstance(result.state["files"], list):
-                result.state["files"].extend(published)
-
-
-def _under_dir(path: str, directory: str, platform: str) -> bool:
-    del platform
-    left = os.path.normpath(path)
-    right = os.path.normpath(directory)
-    return left == right or left.startswith(right + os.sep)
 
 
 def _plane_state(plane: PlaneRef) -> dict[str, str]:

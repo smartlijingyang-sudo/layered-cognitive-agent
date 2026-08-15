@@ -15,6 +15,7 @@ _EMIT_EVERY_CHARS = 160
 _PARTIAL_STRING_KEYS = (
     "code",
     "command",
+    "content",
     "description",
     "language",
     "skill_id",

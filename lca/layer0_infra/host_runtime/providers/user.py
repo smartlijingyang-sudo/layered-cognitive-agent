@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 from lca.layer0_infra.host_runtime.config import HostRuntimeConfig, UserConfig
-from lca.layer0_infra.host_runtime.providers import Provider, StatusReport
+from lca.layer0_infra.host_runtime.providers import CheckResult, Provider, StatusReport
 
 
 class UserProvider(Provider):
@@ -312,6 +312,13 @@ exec node {self._cli_js} connect \\
                 report.warn("gateway", "unreachable")
 
         return report
+
+    def heal(self, failed_check: CheckResult) -> bool:
+        """Restart the daemon if it's down."""
+        if failed_check.name == "daemon" and self.user:
+            self.stop_daemon()
+            return self.start_daemon()
+        return False
 
     @staticmethod
     def _pid_alive(pid: int) -> bool:

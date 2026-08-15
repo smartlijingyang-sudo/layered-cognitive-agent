@@ -11,6 +11,9 @@ from lca.contracts.models.observability.journal import (
     ActionDegraded,
     AgentRunFinished,
     AgentRunStarted,
+    AttachmentStagingCompleted,
+    AttachmentStagingFailed,
+    AttachmentStagingStarted,
     CastingCompleted,
     CastingFailed,
     CastingStarted,
@@ -68,6 +71,9 @@ JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
         ToolStarted,
         ToolInvoked,
         ToolDenied,
+        AttachmentStagingStarted,
+        AttachmentStagingCompleted,
+        AttachmentStagingFailed,
         RunInsight,
     )
 }
@@ -219,6 +225,24 @@ JOURNAL_CATALOG: dict[str, VocabDef] = {
         "lca.layer1_cognitive.body.safe_executor",
         required=("tool_name",),
         desc="工具调用被拒",
+    ),
+    "AttachmentStagingStarted": _journal(
+        VocabDomain.RESOURCE,
+        "gateway.runs.execute",
+        required=("plane_id", "file_count"),
+        desc="附件暂存开始（host → machine bootstrap channel）",
+    ),
+    "AttachmentStagingCompleted": _journal(
+        VocabDomain.RESOURCE,
+        "gateway.runs.execute",
+        required=("plane_id", "file_count"),
+        desc="附件暂存完成",
+    ),
+    "AttachmentStagingFailed": _journal(
+        VocabDomain.RESOURCE,
+        "gateway.runs.execute",
+        required=("plane_id", "error"),
+        desc="附件暂存失败（路径拒绝、传输超时、IO 错误）",
     ),
     "RunInsight": _journal(
         VocabDomain.EVENT,

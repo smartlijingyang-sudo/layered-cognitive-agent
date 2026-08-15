@@ -50,6 +50,8 @@ from lca.contracts.protocols.embodiment import Body
 # ── L0 基础设施协议 ──────────────────────────────────────
 from lca.contracts.protocols.infra import (
     AgentTransport,
+    AttachmentIdentity,
+    DshRuntime,
     LLMAdapter,
     SafeExecutor,
     Sandbox,
@@ -98,6 +100,7 @@ __all__ = [
     "SANDBOX_SKILL_MOUNT_PREFIX",
     "AgentTransport",
     "AgentUnit",
+    "AttachmentIdentity",
     "Body",
     "Brain",
     "BrainFactory",
@@ -106,6 +109,7 @@ __all__ = [
     "ComponentRegistryProtocol",
     "Critic",
     "DecisionGate",
+    "DshRuntime",
     "EventBus",
     "HasHooks",
     "Hook",

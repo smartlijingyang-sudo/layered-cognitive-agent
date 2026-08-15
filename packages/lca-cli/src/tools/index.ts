@@ -1,43 +1,10 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
+import { executeCode } from './execute-code.js';
 import { assertWritable } from './policy.js';
-
-const execFileAsync = promisify(execFile);
-
-type ToolResult = {
-  content: string;
-  success: boolean;
-  error?: string;
-  state?: unknown;
-};
-
-/**
- * Build a child-process env that guarantees /usr/local/bin and the shared
- * venv (if present) are on PATH.  System users created by `useradd --system`
- * (e.g. sandbox-user) inherit a bare PATH that misses /usr/local/bin where
- * python3.12, node, officecli and uv live.
- */
-function buildExecEnv(): NodeJS.ProcessEnv {
-  const extra = ['/usr/local/bin', '/usr/bin', '/bin'];
-  const current = process.env['PATH'] || '';
-  const parts = current.split(path.delimiter).filter(Boolean);
-  const merged = [...new Set([...extra, ...parts])].join(path.delimiter);
-
-  const env: NodeJS.ProcessEnv = { ...process.env, PATH: merged };
-
-  // Activate the shared venv so `python3` / `pip` resolve to 3.12 + packages.
-  const venvDir = '/opt/lca/venv';
-  if (!env['VIRTUAL_ENV']) {
-    env['VIRTUAL_ENV'] = venvDir;
-    env['PATH'] = `${venvDir}/bin:${env['PATH']}`;
-  }
-
-  return env;
-}
+import { runCommand } from './run-command.js';
+import type { ToolResult } from './shell-result.js';
 
 function parseArgs(raw: string | Record<string, unknown>): Record<string, unknown> {
   if (typeof raw === 'string') {
@@ -101,28 +68,22 @@ export async function executeToolCall(
         assertWritable(file, workspace);
         await fs.mkdir(path.dirname(file), { recursive: Boolean(args.createDirectories ?? args.create_directories ?? true) });
         await fs.writeFile(file, String(args.content ?? ''), 'utf8');
-        return { success: true, content: `wrote ${file}` };
+        return { success: true, content: `wrote ${file}`, path: file };
       }
       case 'writeFiles': {
         const files = (args.files || {}) as Record<string, { b64?: string; url?: string }>;
         const base = String(args.base_dir || workspace);
+        const isSystem = Boolean(args.system);
         for (const [name, source] of Object.entries(files)) {
           const dest = resolvePath(base, name);
-          assertWritable(dest, workspace);
+          if (!isSystem) assertWritable(dest, workspace);
           await fs.mkdir(path.dirname(dest), { recursive: true });
           if (source.b64) await fs.writeFile(dest, Buffer.from(source.b64, 'base64'));
         }
         return { success: true, content: `wrote ${Object.keys(files).length} files` };
       }
-      case 'runCommand': {
-        const command = String(args.command || '');
-        const { stdout, stderr } = await execFileAsync('/bin/sh', ['-c', command], {
-          cwd: workspace,
-          env: buildExecEnv(),
-          timeout: Number(args.timeout || 60) * 1000,
-        });
-        return { success: true, content: stdout, state: { stdout, stderr, command } };
-      }
+      case 'runCommand':
+        return runCommand(args, workspace);
       case 'editFile': {
         const file = resolvePath(workspace, String(args.path || ''));
         assertWritable(file, workspace);
@@ -194,25 +155,8 @@ export async function executeToolCall(
       case 'killCommand': {
         return { success: false, content: '', error: 'background commands are not supported in CLI mode' };
       }
-      case 'executeCode': {
-        const code = String(args.code || '');
-        const language = String(args.language || 'javascript');
-        const env = buildExecEnv();
-        if (language === 'python' || language === 'python3') {
-          const { stdout } = await execFileAsync('python3', ['-c', code], {
-            cwd: workspace,
-            env,
-            timeout: Number(args.timeout || 30) * 1000,
-          });
-          return { success: true, content: stdout };
-        }
-        const { stdout } = await execFileAsync('node', ['-e', code], {
-          cwd: workspace,
-          env,
-          timeout: Number(args.timeout || 30) * 1000,
-        });
-        return { success: true, content: stdout };
-      }
+      case 'executeCode':
+        return executeCode(args, workspace);
       case 'exportFile': {
         const file = resolvePath(workspace, String(args.path || ''));
         const buf = await fs.readFile(file);

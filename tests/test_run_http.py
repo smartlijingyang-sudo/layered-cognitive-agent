@@ -92,7 +92,7 @@ def test_post_runs_202_then_live_is_journal() -> None:
         doctor = client.get(f"/runs/{run_id}/doctor")
         assert doctor.status_code == 200
         report = doctor.json()
-        assert report["schema"] == "doctor.v1"
+        assert report["schema"] == "doctor.v2"
         assert report["run_id"] == run_id
 
         health = client.get("/health")

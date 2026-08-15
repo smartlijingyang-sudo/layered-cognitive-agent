@@ -9,15 +9,12 @@ from urllib.parse import unquote, urlparse
 
 from gateway.runs.ingest import FileFetcher, FileRef, ingest_file_refs
 from lca.contracts.models.core.conversation import ConversationTurn
+from lca.layer0_infra.attachment import FileStoreAttachmentIdentity, get_attachment_policy
 from lca.layer0_infra.file_store import FileStore
 
 # Conversation history injected before the latest user turn.
 MAX_HISTORY_MESSAGES = 12
 MAX_HISTORY_CHARS = 6000
-
-# Markers LobeHub context engine injects into user-visible content.
-SYSTEM_CONTEXT_BEGIN = "<!-- SYSTEM CONTEXT"
-SYSTEM_CONTEXT_END = "<!-- END SYSTEM CONTEXT -->"
 
 # LobeHub agent runtime injects tool/agent XML into user turns — strip for LCA prompt.
 AVAILABLE_TOOLS_BEGIN = "<available_tools"
@@ -117,7 +114,7 @@ def parse_messages(messages: list[Any]) -> ParsedMessages:
 
     user_text = _extract_last_user_text(messages)
     file_refs = _collect_file_refs(messages)
-    prior_turns = extract_prior_turns(messages, plain_text_fn=_message_plain_text)
+    prior_turns = extract_prior_turns(messages, plain_text_fn=_history_plain_text)
     return ParsedMessages(
         user_text=user_text,
         file_refs=tuple(file_refs),
@@ -152,10 +149,13 @@ def _visible_user_text(content: Any) -> str:
 
 
 def _strip_system_context(text: str) -> str:
-    begin = text.find(SYSTEM_CONTEXT_BEGIN)
+    policy = get_attachment_policy()
+    begin = text.find(policy.system_context_open)
+    if begin < 0:
+        begin = text.find(policy.system_context_open_prefix)
     if begin >= 0:
         text = text[:begin]
-    end = text.find(SYSTEM_CONTEXT_END)
+    end = text.find(policy.system_context_close)
     if end >= 0:
         text = text[:end]
     text = _strip_lobehub_runtime_xml(text)
@@ -405,19 +405,30 @@ def _message_plain_text(content: Any) -> str:
     return ""
 
 
+def _history_plain_text(content: Any) -> str:
+    """Keep LobeHub <files_info> in prior turns; drop runtime tool/agent XML only."""
+    if isinstance(content, str):
+        return _strip_lobehub_runtime_xml(_unwrap_lobehub_eval_envelope(content)).strip()
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, dict) and part.get("type") == "text":
+                text = _strip_lobehub_runtime_xml(
+                    _unwrap_lobehub_eval_envelope(str(part.get("text", "")))
+                ).strip()
+                if text:
+                    parts.append(text)
+        return "\n".join(parts).strip()
+    return ""
+
+
 def compose_run_question(
     user_text: str,
     attachment_ids: tuple[str, ...],
     store: FileStore,
 ) -> str:
-    """Build the task string passed to ``Agent.run`` / ``Team.run``.
-
-    File metadata is NOT embedded here — it belongs in the system role prompt
-    (rendered per-plane by ``plane_system_role`` / ``render_cloud_sandbox_system_role``).
-    ``attachment_ids`` is kept on the session for staging and system-role rendering.
-    """
-    del attachment_ids, store
-    return user_text.strip()
+    """User text plus this-turn <files_info> (LobeHub message identity)."""
+    return FileStoreAttachmentIdentity(store).compose_question(user_text, attachment_ids)
 
 
 async def prepare_run_from_messages(

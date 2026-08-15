@@ -1,6 +1,6 @@
-"""HostEnvironment — orchestrates providers to provision / destroy / inspect.
+"""HostEnvironment — orchestrates providers to provision / destroy / inspect / heal.
 
-One class, three operations.  Providers are composed, not inherited.
+One class, four operations.  Providers are composed, not inherited.
 """
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ from __future__ import annotations
 import sys
 
 from lca.layer0_infra.host_runtime.config import HostRuntimeConfig, UserConfig
-from lca.layer0_infra.host_runtime.providers import Provider, StatusReport
+from lca.layer0_infra.host_runtime.providers import ItemStatus, Provider, StatusReport
 from lca.layer0_infra.host_runtime.providers.shared import (
     PackagesProvider,
     PathProvider,
@@ -109,6 +109,37 @@ class HostEnvironment:
             reports.append(cli.status())
 
         return reports
+
+    # ── heal ──────────────────────────────────────────────────────────
+
+    def heal(self, user_name: str | None = None) -> tuple[list[StatusReport], list[str]]:
+        """Detect failures and attempt self-repair.
+
+        Returns (reports, healed) where healed lists the checks that were recovered.
+        """
+        reports = self.status(user_name)
+        healed: list[str] = []
+
+        # Build a provider lookup: map provider name → provider instance
+        providers_by_name: dict[str, Provider] = {}
+        for p in self._shared:
+            providers_by_name[p.name] = p
+        users = [self._resolve_user(user_name)] if user_name else self.config.users
+        for user in users:
+            for p in self._user_providers(user):
+                providers_by_name[p.name] = p
+            cli = CLIProvider(self.config, user)
+            providers_by_name[cli.name] = cli
+
+        for report in reports:
+            provider = providers_by_name.get(report.provider)
+            if provider is None:
+                continue
+            for check in report.checks:
+                if check.status in {ItemStatus.MISSING, ItemStatus.ERROR} and provider.heal(check):
+                    healed.append(f"{report.provider}:{check.name}")
+
+        return reports, healed
 
     # ── helpers ───────────────────────────────────────────────────────
 

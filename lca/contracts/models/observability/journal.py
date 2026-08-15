@@ -421,6 +421,39 @@ class ToolDenied(JournalEvent):
     reason: str = ""
 
 
+# ── 基础设施事件（附件暂存 / bootstrap）───────────────────
+
+
+@dataclass(frozen=True)
+class AttachmentStagingStarted(JournalEvent):
+    """附件暂存开始（host → machine bootstrap channel）。"""
+
+    plane_id: str = ""
+    file_count: int = 0
+    total_bytes: int = 0
+    run_id: str = ""
+
+
+@dataclass(frozen=True)
+class AttachmentStagingCompleted(JournalEvent):
+    """附件暂存完成。"""
+
+    plane_id: str = ""
+    file_count: int = 0
+    total_bytes: int = 0
+    duration_ms: float = 0
+
+
+@dataclass(frozen=True)
+class AttachmentStagingFailed(JournalEvent):
+    """附件暂存失败（路径拒绝、传输超时、IO 错误）。"""
+
+    plane_id: str = ""
+    error: str = ""
+    failed_paths: tuple[str, ...] = ()
+    run_id: str = ""
+
+
 # ── 洞察事件（InsightEngine 回注）───────────────────────
 
 

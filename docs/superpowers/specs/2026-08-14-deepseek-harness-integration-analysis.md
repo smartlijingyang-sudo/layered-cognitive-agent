@@ -1,117 +1,277 @@
 # DeepSeek Harness (DSH) 对 LCA 的价值与融入方案
 
-**日期**: 2026-08-14
-**状态**: 分析草案
+**日期**: 2026-08-15（整合完善）
+**状态**: 分析草案（Canonical 候选）
+**关联**: [2026-08-15-dsh-compare-driver-design.md](./2026-08-15-dsh-compare-driver-design.md)、[lobehub-integration.md](../../lobehub-integration.md)
+
+---
+
+## 定位：各守其位
+
+| | **DSH** | **LCA（本仓库）** |
+|---|---|---|
+| 是什么 | DeepSeek 开源 **coding agent harness**（Cordis 插件树 + Web/CLI/headless） | 分层认知 agent **产品栈**（Gateway + Agent/Team + Journal + LobeHub） |
+| 前端 | 自带轻量 Web UI（Developer Preview） | **LobeHub v2.2.13**（成熟 chat、上传、artifact、插件） |
+| 强项 | agent loop、tool pipeline、session log、provider 互换、compaction、subagent | Run Live、多执行面、附件管道、Team 协作、工具卡片投影 |
+| 语言 | TypeScript（+ Python SDK 子进程） | Python（+ LobeHub TS 补丁） |
+
+**结论（2026-08-15 验证）：**
+
+- DSH **不能**整体替换 LCA 产品体验（无通用文件上传、无 artifact/deliverable 卡片、HTTP LAN 下 `crypto.randomUUID` 等 product gap）。
+- DSH **应该**作为 **runtime 教科书 + 可选 execution driver**，LobeHub 继续当唯一 product shell。
+- 价值在 **抄设计、抄管线**，不抄 Web UI，不搬 TS 源码。
+
+私有 fork（upstream 分离、LAN 部署 patch）见 `~/deepseek-harness/FORK.md` 与 `deploy/lan/`；与本仓库代码无直接依赖，仅供对照阅读与 driver 开发。
 
 ---
 
 ## 它是什么
 
-DeepSeek Harness 是 DeepSeek AI 开源的 **agent harness**（智能体运行框架），基于 Cordis 插件系统，核心理念是「一切皆插件」。它是 TypeScript 生态中一个工程成熟度极高的项目，包含完整的 agent 循环、工具管线、会话持久化、子 agent 编排、沙箱隔离、技能系统、工作流引擎等。同时提供了一个 **Python SDK**（`deepseek-harness-sdk`），可以通过 JSON-RPC stdio 以子进程方式驱动 DSH 运行时。
+DeepSeek Harness 基于 Cordis，核心理念是「**一切皆插件**」：model adapter、tool registry、session log、agent loop 本身都可从配置层替换，无 privileged core。
+
+工程上包含：完整 turn/step 生命周期、guarded tool pipeline、append-only session log、多 provider LLM seam、subagent 多后端、compaction、permission preset、skill/workflow/plan、Landlock/E2B 沙箱等。
+
+**Python 接入**：`deepseek-harness-sdk` 经 JSON-RPC stdio 驱动 DSH 子进程；LCA 已在 `lca/layer0_infra/dsh/` 落地 `DshTurnDriver`（notify → `{run_id}.dsh.jsonl` + Journal 投影）。
 
 ---
 
-## 一、与 LCA 现有架构的对应关系
+## 一、与 LCA 架构的对应关系（总表）
 
-| LCA 概念 | DSH 对应概念 | 成熟度差距 |
+| LCA 概念 | DSH 对应 | 成熟度差距 | DSH 入口 |
+|---|---|---|---|
+| `LLMAdapter` | `ctx.llm` + `LlmAdapter` | 重试、reasoning、stream idle、empty retry、discovery | `packages/llm/llm`、`llm-pi-ai`、`llm-retry` |
+| `Tool` Protocol | `ctx.tools` + `ToolDefinition` | guarded pipeline、pre/post、presentCall/Result | `docs/tool-execution-pipeline.md` |
+| `Sandbox` / 执行面 | `ctx.sandbox` + `ctx.fs` + `ctx.shell` | Provider 互换（local/sandbox/e2b） | `packages/fs/*`、`packages/sandbox/*` |
+| Skill | `ctx.skills` + `tool-skill` | catalog 搜索 + activate 注入 | `packages/skill/*` |
+| Journal | `SessionEvent` + persistence | model-visible ⟺ logged；derive 历史 | `docs/subsystems/session.md` |
+| Execution Planes | Capability Seam | 同构：换 Provider 不换 Tool schema | `docs/capability-seams.md` |
+| Agent Loop | `ctx.agentLoop` | waterfall：pre-step → tool pipeline → turn-stopping | `docs/architecture.md` |
+| Team / 子 Agent | `ctx.subagents` | 多 provider、continuable、report | `docs/subsystems/subagent.md` |
+| 工作流 | `ctx.workflowEngine` | Rhai + worker-thread | `packages/workflow/*` |
+| 权限 / HIL | `permission-presets` + `ctx.approval` | preset _bundle_ sandbox+approval，session 级 pin | `packages/interaction/permission-presets` |
+| 上下文压缩 | `ctx.compaction` | pressure + tool-pairing 边界 + surface replace | `packages/compaction/*` |
+| 工具 UI | `presentCall` / `presentResult` | 定义级 UI hook | 各 `tool-*` + `tool_ui` 投影 |
+| 产品附件/产出 | （弱）仅图片 composer | LCA 强：FileStore、artifact、LobeHub 下载 | `packages/attachment/*`（images only） |
+
+---
+
+## 二、可借鉴机制（分项详解）
+
+### 2.1 Capability Seam：三角色（顶层设计，P1）
+
+DSH 每个能力固定三角色；LCA Protocol 多为 Definition + 实现绑死。
+
+| 角色 | DSH 例 | LCA 目标 |
 |---|---|---|
-| `LLMAdapter` Protocol | `ctx.llm` seam + `LlmAdapter` 抽象类 | DSH 更完整：多 provider 路由、可配置重试策略、reasoning effort、stream chunk 协议、provider 发现 |
-| `Tool` Protocol | `ctx.tools` + `ToolDefinition` | DSH 更完整：guarded execution pipeline、pre/post policy、并发控制、tool schema 自动注入 prompt |
-| `Sandbox` Protocol | `ctx.sandbox` + `ctx.fs` + `ctx.shell` + E2B | DSH 更完整：capability seam 三角色（Definition/Provider/Consumer）、sandbox policy、filesystem observation policy |
-| Skill 系统 | `ctx.skills` + `skill-filesystem` + `tool-skill` | 概念相似，DSH 的 skill catalog 搜索 + activate 链路更完整 |
-| Journal / 可观测性 | `SessionEvent` 日志 + `session/persistence` | DSH 的 append-only session log 是模型历史的唯一事实源，有 replay 保证 |
-| Execution Planes | Capability Seam 架构 | LCA 正在做的 machine/sandbox 切分，DSH 已经有成熟方案（fs-local / fs-sandbox / fs-e2b 共享同一 `ctx.fs`） |
-| Agent Loop | `ctx.agentLoop` + turn/step 生命周期 | DSH 有完整的 waterfall 事件拦截链（pre-step → request → stream → pre-execute → execute → post-execute → turn-stopping） |
-| 子 Agent | `ctx.subagents` seam | DSH 远超 LCA：多 provider 共存（spawn/fork/acp/codex/claude-code）、continuable 子 agent、activation 生命周期 |
-| 工作流 | `ctx.workflowEngine` | LCA 目前没有，DSH 有 worker-thread provider + Rhai 脚本引擎 |
+| Service Definition | `ctx.fs`、`ctx.shell` | `ComputerOps`、`Sandbox` Protocol（加厚） |
+| Service Provider | `fs-local` / `fs-sandbox` / `fs-e2b` | `MachineComputer` / `SandboxComputer` / 可选 `DshComputer` |
+| Consumer | `tool-fs` read/write/edit | `computer_tool_set()` 从 Tool 类拆出 |
 
----
+与 `execution-planes-design` 同构：**Consumer 对模型不变，Provider 随 execution_target 切换**。DSH 是该模式的参考实现。
 
-## 二、四种融入路径（由浅入深）
+### 2.2 Session Log 与 Journal（P1–P2）
 
-### 路径 A：DSH 作为 LCA 的「高级工具后端」（最低成本）
+DSH 硬规则：**model-visible ⟺ logged**；LLM 历史由 log **derive**，不单独存副本。
 
-**做什么**：通过 Python SDK 把 DSH 当子进程启动，用它的工具能力（bash、filesystem、terminal、grep/glob、web_search/web_fetch）补全 LCA 的工具短板。
+| 机制 | DSH | LCA 现状 | 借鉴动作 |
+|---|---|---|---|
+| 生命周期 | `turn/start` → `step/*` → `turn/end` | Run 级，turn/step 边界模糊 | Journal 引入 turn/step 帧或元数据 |
+| 工具时序 | `tool/call` **先于** execute 落 log | 多事后投影 | pending card 可对齐 call 事件 |
+| 流式 | `assistant/chunk` + `assistant/message` 双轨 | SSE 投影够用，缺 replay 语义 | 长 run 可考虑 chunk 归档 |
+| 对照源 | JSONL/SQLite 单一事实源 | Journal + 可选 jsonl | **已做**：`DshTurnDriver` 双轨 `{run_id}.dsh.jsonl` + Journal |
 
-```python
-# LCA 的 Tool adapter 委托给 DSH
-class DshBackedTool:
-    """把 DSH 的某个工具桥接为 LCA 的 Tool Protocol。"""
-    async def execute(self, args):
-        with DeepSeekHarness() as harness:
-            result = harness.run(...)  # 通过 DSH 的完整工具管线执行
+```text
+DshTurnDriver（已实现）:
+  on_event → archive.append + projector.feed
+  finish → Journal 终态
 ```
 
-**价值**：
-- LCA 立即获得 ripgrep-backed `glob`/`grep`、persistent PTY terminal、read-before-write 文件系统策略、sandbox policy 等
-- 不改 LCA 内部架构，只增加一个 Tool 适配层
-- DSH 的 E2B 沙箱可以作为 LCA `Sandbox` Protocol 的一个新实现
+长期：Journal 事件词汇向 DSH `SessionEventMap` 靠拢，保证 fork/replay/compaction 同一套语义。
 
-**风险**：两个独立 agent 循环各管各的，上下文不共享。
+### 2.3 Tool Execution Pipeline（P1，工程差距最大）
 
-### 路径 B：借鉴 Capability Seam 模式，重构 LCA 的 Protocol 层
+管道（`docs/tool-execution-pipeline.md`）：
 
-**做什么**：DSH 最精华的设计是 **Capability Seam**（能力缝）——每个能力三角色完整：
-
-- **Service Definition**：声明接口（如 `ctx.fs`）
-- **Service Provider**：实现接口（如 `fs-local`, `fs-sandbox`, `fs-e2b`）
-- **Consumer**：模型面向的工具（如 `tool-fs` 的 `read`/`write`/`edit`）
-
-LCA 目前的 Protocol 只有 Definition + Provider 两个角色，Consumer（Tool）和 Provider 是硬绑的。
-
-**具体落地**：
-
-```
-当前 LCA:
-  Tool = name + description + parameters + execute()  # 定义和消费一体
-
-借鉴 DSH 后:
-  ComputerOps(Protocol)       # Service Definition
-  MachineComputer             # Service Provider（sidecar 传输）
-  SandboxComputer             # Service Provider（沙箱传输）
-  computer_tool_set()         # Consumer（组装模型面向的工具集）
+```text
+tool/call → presentCall → pre-execute → guards → approval
+  → execute(timeout) → tool body → fs/write-intent
+  → post-execute → finalizeContent → tools/result → tool/result → presentResult
 ```
 
-这与你当前 `execution-planes-design.md` 的方向一致——DSH 验证了这条路径是可行的，并提供了参考实现。
+LCA：`tool_ui_state` / `tool_ui_builders` 管**展示**；execute 侧 approval 分散在 `ask_user`、`plane.scope` 等，**无统一 pre/post 管道**。
 
-### 路径 C：DSH 作为 LCA 的「前端 agent harness」（推荐探索）
-
-**做什么**：让 LCA 的 layer1_cognitive（认知层）作为 DSH 的一个 **Cordis 插件** 挂载，利用 DSH 成熟的 agent loop、工具管线、会话管理，同时保留 LCA 的认知决策能力。
-
-```
-DSH (agent loop + tools + session + subagent)
-  └── LCA Plugin (ctx 上注册)
-        ├── layer1 的 brain 决策门（terminal_respond 等）
-        ├── layer0 的 Sandbox / Computer 能力作为 DSH Provider
-        └── Journal 作为 DSH session telemetry backend
-```
-
-**价值**：
-- 直接获得 DSH 的 agent loop（waterfall 拦截链、compaction、retry、subagent 编排）
-- LCA 的认知层变成可插拔的决策门，专注于「什么时候停下来」「怎么拆解任务」
-- DSH 的 Web UI 可以成为 LCA 的前端（替代或补充 LobeHub）
-- Python SDK 允许 LCA 的 Python 代码作为 DSH 的 Python runtime 存在
-
-### 路径 D：全面对齐 DSH 的架构模式（长期演进）
-
-这是最彻底的方案，分阶段演进：
-
-| 阶段 | 做什么 | 收获 |
+| DSH 包/机制 | 行为 | LCA 落点 |
 |---|---|---|
-| **1. Session Log 化** | 把 LCA 的 Journal 对齐 DSH 的 append-only `SessionEvent` 模式，保证「model-visible ⟺ logged」 | 可复现、可 replay、可 fork session |
-| **2. Waterfall 事件链** | 在 agent loop 中引入 pre-step / request / stream / tool-execute 等 waterfall 拦截点 | 认知决策门变成事件监听器，而非硬编码分支 |
-| **3. Subagent Seam** | 引入 `ctx.subagents` 级别的多 provider 子 agent 系统 | LCA 的 Team 协作机制获得 spawn/fork/acp 多种后端 |
-| **4. Workflow Engine** | 引入 DSH 的工作流引擎概念 | 多 agent 编排变成声明式脚本，而非代码级硬编排 |
+| `tool-fs` | read-before-write | layer0 写/编辑工具前查「是否读过」 |
+| `tool-call-timeout-policy` | cooperative timeout + 硬 kill | bash/沙箱/DSH 子进程统一 |
+| `tools/post-execute` | additionalContexts FIFO 注入 | 工具链上下文不进 result 字符串 |
+| `presentCall` / `presentResult` | 定义级 UI hook | 吸收进 `tool_ui_builders`，挂钩 execute 前后 |
+| Code Mode `run_code` | 子调用重进完整 pipeline | 复杂多步可选模式 |
+
+### 2.4 权限 Preset（P2）
+
+`permission-presets`：sandbox mode + approval policy **绑成 preset**（如 `workspace-write`、`danger-full-access`），**创建 session 时 pin 进 log**，之后改 settings 不影响已开 session。
+
+LCA：`path_needs_approval`、HIL `approval_request`、plane 分散；缺「用户选一档权限模型」的产品抽象。
+
+**借鉴**：LobeHub 输入栏「权限档位」chip → Run 首帧写入 Journal → 映射 Onlyboxes/machine 策略表。
+
+### 2.5 执行面与文件工具（P1）
+
+Provider 互换示例：
+
+```text
+ctx.fs ← fs-local | fs-sandbox | fs-e2b
+ctx.shell ← bash-local | sandbox-wrapped
+```
+
+| DSH 包 | 借鉴点 |
+|---|---|
+| `tool-fs-search` | 内置 `@vscode/ripgrep`，不依赖宿主机 `rg` |
+| `spill-local` | grep/glob 超限结果落盘，模型看摘要 + locator |
+| `tool-bash` | sandbox + background job |
+| `tool-terminal` | **持久 PTY**（非每次 bash -c） |
+| `sandbox-policy` | per-session 不可变 workspace root |
+
+与 LCA `machine` / `sandbox` / `dsh` 三 execution_target **同构**；DSH 是 provider 切换的完整样本。
+
+### 2.6 Compaction + Token Meter（P2，LCA 空白）
+
+`ctx.compaction`：`compactIfNeeded(pressure|context-overflow)`、`compactNow`；**tool-pairing 边界**（压缩点不切断未闭合 tool call/result）；摘要以 `surfaceOp: replace` 写回 surface，log 全保留。
+
+LCA：ingress `MAX_HISTORY_CHARS` 截断；**无**摘要替换 + tool 配对保护。
+
+**最小落地**：pressure 检测 → 旧 turn 摘要 → 保证 tool call/result 不跨边界截断。
+
+### 2.7 LLM Adapter 工程细节（P2）
+
+| 能力 | DSH | LCA |
+|---|---|---|
+| 多 provider 路由 | settings 热更新 `llm-pi-ai` | `llm_resolver` + OPENAI/Anthropic face |
+| 重试 | `llm-retry` normal/always | 弱 |
+| Credential | ref 分层：env → yaml → project/user `.env` |  mainly `.env` |
+| Discovery | catalog + custom provider | 手动 |
+
+**借鉴**：credential ref（settings 只存引用）；provider 级 `api` 字段文档化（与 Qwen 双 face 对齐）。
+
+### 2.8 Subagent / Team（P3）
+
+`ctx.subagents` **多 provider 共存**：spawn-in-process、fork、acp、codex、claude-code、dsh-sdk；continuable 子 agent；`send_message` / `interrupt_agent` / `report`。
+
+LCA Team：routing/board/pipeline 在 layer1，无「spawn 独立 coding 子进程并多轮对话」seam。
+
+**借鉴（不替换 Team）**：FanOut 成员可选 DSH one-shot；长任务简化为「子 Run + 独立 run_id」。
+
+### 2.9 Agent Preset（P3）
+
+DSH preset = 每 session 选能力裁剪（工具集、prompt 段、skill 层）。Web UI 选「标准 / 极简」。
+
+LCA：Agent YAML + execution_target；缺 per-run 轻量/重量工具面产品入口。
+
+**借鉴**：LobeHub chip「研究型 / 编码型 / 只读型」→ tool allowlist + prompt pack → Run 元数据。
+
+### 2.10 Skill / Workflow / Plan（P4）
+
+| DSH | LCA |
+|---|---|
+| `tool-skill` activate 链路 | role/skill 概念，无统一 activate |
+| `workflowEngine` + Rhai | 无声明式脚本编排 |
+| `plan-mode` 落 log | 无一等 plan 对象 |
+
+Workflow 补 Team **固定 SOP** 场景；非替代 Pipeline/FanOut。
+
+### 2.11 工程纪律（持续）
+
+| 实践 | DSH | LCA 可跟 |
+|---|---|---|
+| 生成 catalog | tool/config/persistence catalog | Journal 事件 catalog codegen |
+| Snapshot 测试 | headless/ACP golden，无 key CI | 投影快照测试扩展 |
+| Agent Notes | `.agents/notes/` 记 WHY | ADR + superpowers specs |
+| `dsh --dump-config` | 组合树可 diff | `lca-ops` 暴露 effective config |
 
 ---
 
-## 三、立即可用的具体收益
+## 三、明确不从 DSH Web 借鉴的（产品边界）
 
-不管选哪条路径，以下东西**现在就能用**：
+| 能力 | DSH Web | LCA + LobeHub |
+|---|---|---|
+| 文件上传 | **仅图片**（`ui-attachment` README 写明 deferred） | 完整 file + `<file>` 解析 + FileStore |
+| 生成物展示 | 工具 result card，无 artifact 下载流 | `lcaArtifacts`、`collectArtifactFiles`、下载链接 |
+| 前端成熟度 | Developer Preview | 产品化 v2.2.13 |
+| LAN HTTP | 非安全上下文需 UUID 回退（已 fork patch） | Gateway + 既有部署 |
 
-### 1. Python SDK 子进程模式
+**路径 C 修订**：DSH Web **不**作为 LCA 前端替代；仅作 harness 对照与 driver 源码阅读。前端永远是 LobeHub。
 
-`pip install deepseek-harness-sdk`，5 行代码获得完整的 agent + 工具链：
+---
+
+## 四、四种融入路径（由浅入深，修订版）
+
+### 路径 A：DSH 作为 execution driver（**当前 Canonical，最低风险**）
+
+见 [2026-08-15-dsh-compare-driver-design.md](./2026-08-15-dsh-compare-driver-design.md)。
+
+```text
+chip「用 DSH」→ POST /runs {execution_target: dsh}
+  → DshTurnDriver（跳过 Agent/Team 主循环）
+  → Qwen 走 LLM_OPENAI_COMPAT
+  → Journal SSE → LobeHub 卡片
+  → {run_id}.dsh.jsonl 对照
+```
+
+**价值**：LobeHub 壳不变；白嫖 DSH tool pipeline + session；附件/artifact 仍走 LCA ingress。
+
+**风险**：双 agent 循环语义要对齐（整题转发、不拆工具）；投影器需持续跟进 DSH 事件形状。
+
+### 路径 B：借鉴 Capability Seam，重构 Protocol 层（P1，与 execution planes 合并）
+
+```
+ComputerOps(Protocol)
+  ├─ MachineComputer / SandboxComputer / DshComputer
+  └─ computer_tool_set()   # Consumer，与 Provider 解耦
+```
+
+不改五层单向依赖；只拆 Tool 里 Definition 与 Consumer。
+
+### 路径 C：LCA 认知层挂 DSH 插件（**降级为长期探索，非推荐主路径**）
+
+layer1 决策门作 Cordis 插件；layer0 Provider 注入 DSH。**前提**：仍经 LobeHub + Gateway，不用 DSH Web 替壳。
+
+### 路径 D：全面对齐 DSH 架构模式（长期）
+
+| 阶段 | 内容 | 收获 |
+|---|---|---|
+| 1. Session Log 化 | Journal ↔ SessionEvent；model-visible ⟺ logged | replay、fork |
+| 2. Waterfall | pre-step / tool pre-post / turn-stopping | 决策门事件化 |
+| 3. Subagent seam | 多 provider 子 agent | Team 增强 |
+| 4. Workflow | 声明式脚本 | 固定 SOP |
+
+---
+
+## 五、借鉴优先级路线图
+
+| 优先级 | 借鉴项 | DSH 入口 | LCA 落点 | 路径 |
+|---|---|---|---|---|
+| **P0** | DSH execution driver | SDK + `dsh/` 包 | `dsh_execute.py`、`DshTurnDriver` | A（进行中） |
+| **P1** | Tool pipeline | `tool-execution-pipeline.md` | layer0 tools middleware | B |
+| **P1** | read-before-write | `tool-fs` | write/edit 工具 | B |
+| **P1** | grep/glob + spill | `tool-fs-search`、`spill-local` | search/glob 工具 | A/B |
+| **P1** | Capability Seam 三角色 | `capability-seams.md` | `ComputerOps` + Consumer 拆分 | B |
+| **P2** | Permission preset | `permission-presets` | Run 级 HIL 档位 | B |
+| **P2** | Compaction | `compaction-basic` | Journal 压缩 | D.1 |
+| **P2** | Credential ref 分层 | `credentials-local` | Gateway settings | B |
+| **P2** | Session turn/step 语义 | `session.md` | Journal 帧 | D.1 |
+| **P3** | Subagent multi-provider | `subagent.md` | Team 可选 DSH spawn | D.3 |
+| **P3** | Agent preset | `agent-presets` | LobeHub chip | B |
+| **P4** | Workflow / plan | `workflow/*` | 固定 SOP | D.4 |
+| **—** | Cordis 插件树替换五层 | — | **不做** | — |
+| **—** | DSH Web 替 LobeHub | — | **不做** | — |
+| **—** | 搬运 TS 源码 | — | **不做** | — |
+
+---
+
+## 六、立即可用的具体收益（不变，补入口）
+
+### Python SDK
 
 ```python
 from deepseek_harness import DeepSeekHarness
@@ -120,48 +280,64 @@ with DeepSeekHarness(provider="deepseek-official", model="deepseek-v4-flash") as
     result = h.run("列出当前目录的所有 Python 文件并统计行数")
 ```
 
-### 2. 工具实现对标
+LCA 侧优先走 `DshRuntime` Protocol，而非散落 subprocess。
 
-DSH 的工具实现模式可以直接参考：
+### 工具实现必读
 
-- `tool-fs`：read-before-write 策略（写文件前必须先读，防止覆盖）
-- `tool-fs-search`：ripgrep + spill store（大结果集自动溢出到文件）
-- `tool-bash`：sandbox + background job（沙箱策略 + 后台任务管理）
-- `tool-terminal`：persistent PTY session（持久终端会话）
+- `tool-fs`：read-before-write
+- `tool-fs-search`：ripgrep + spill
+- `tool-bash`：sandbox + background job
+- `tool-terminal`：persistent PTY
 
-### 3. Session 持久化方案
+### Session 持久化
 
-DSH 的 JSONL / SQLite 双后端 + projection 缓存 + 标题生成，比 LCA 目前的 Journal 更接近生产可用。
+JSONL/SQLite + projection 缓存 + 标题生成 — 对照 `{run_id}.dsh.jsonl` 与 Journal 双轨设计。
 
-### 4. Compaction（上下文压缩）
+### Compaction / LLM 细节
 
-DSH 有完整的 `ctx.compaction` seam：pressure 检测 → tool-result pruning → summary 生成，LCA 目前缺失这个能力。
-
-### 5. LLM Adapter 的工程细节
-
-- 重试策略（normal/always 两种模式）
-- reasoning effort 选择
-- stream idle timeout
-- empty response retry
-- provider model discovery
-
-这些在 LCA 的 `LLMAdapter` 里都是空白。
+见 §2.6、§2.7。
 
 ---
 
-## 四、不建议做的
+## 七、不建议做的
 
-- **不要替换 LCA 的分层架构** — LCA 的 `contracts → layer0 → layer1 → layer2 → layer3` 单向依赖是好的设计，DSH 的 Cordis 插件树是另一种组织方式，两者可以共存
-- **不要搬运 DSH 的 TypeScript 代码** — 两个项目语言不同，价值在于架构模式和设计决策，不在于直接复用代码
-- **不要同时启动所有路径** — DSH 还在 developer preview，API 会 breaking change，建议先以路径 A 或 B 做最小验证
+- **不替换 LCA 五层架构** — 与 Cordis 插件树共存，不合并
+- **不搬 DSH TypeScript 代码** — 抄模式，Python 重写
+- **不用 DSH Web 替 LobeHub** — 附件、artifact、Team 依赖现有产品层
+- **不同时开所有路径** — DSH Developer Preview，API 会变；主路径 **A**，结构债用 **B** 渐进还
+- **不把 DSH 当完整 coding agent 产品** — 它是 harness；LCA 是 product
 
 ---
 
-## 五、推荐行动
+## 八、推荐行动（修订）
 
-| 优先级 | 行动 | 时间 |
+| 优先级 | 行动 | 产出 |
 |---|---|---|
-| **P0** | 安装 `deepseek-harness-sdk`，跑通 Python SDK 的 headless 模式，体会它的 agent loop 和工具链 | 半天 |
-| **P1** | 读 DSH 的 `capability-seams.md` + `subagent.md` + `llm-streaming.md`，与 LCA 的 `contracts/protocols/` 逐条对比，找到最大差距 | 1-2 天 |
-| **P2** | 选一个具体点（比如 Tool guarded execution pipeline 或 Compaction seam），在 LCA 中实现对应设计 | 1 周 |
-| **P3** | 写一个 ADR，记录从 DSH 学到的设计决策以及在 LCA 中的落地方案 | 持续 |
+| **P0** | 完成 `execution_target: dsh` 端到端（LobeHub chip → gateway → projector） | 可对比跑通 |
+| **P1** | 读 DSH `architecture.md`、`tool-execution-pipeline.md`、`session.md`；更新 `contracts/protocols/` 差距清单 | 差距表进 ADR |
+| **P1** | 拆 `computer_tool_set()` Consumer 原型 | PR 级 refactor |
+| **P2** | 实现 tool pre/post 钩子 + read-before-write 一条链 | 单工具 vertical slice |
+| **P2** | Journal compaction 设计稿（tool-pairing 规则） | spec |
+| **P3** | 本文档升 ADR；每落地一项在 ADR 勾掉 | 可追溯 |
+
+---
+
+## 九、参考链接（DSH 源码树）
+
+| 主题 | 路径 |
+|---|---|
+| 架构总览 | `deepseek-harness/docs/architecture.md` |
+| 工具管道 | `deepseek-harness/docs/tool-execution-pipeline.md` |
+| Session | `deepseek-harness/docs/subsystems/session.md` |
+| Subagent | `deepseek-harness/docs/subsystems/subagent.md` |
+| Capability seams | `deepseek-harness/docs/capability-seams.md` |
+| Fork 约定 | `deepseek-harness/FORK.md` |
+| LAN 部署 | `deepseek-harness/deploy/lan/README.zh.md` |
+
+LCA 已实现：
+
+| 模块 | 路径 |
+|---|---|
+| DSH driver | `lca/layer0_infra/dsh/driver.py` |
+| 对比跑道 spec | `docs/superpowers/specs/2026-08-15-dsh-compare-driver-design.md` |
+| LobeHub 集成 | `docs/lobehub-integration.md` |

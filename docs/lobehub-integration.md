@@ -27,15 +27,15 @@ LCA Agent/Team
 - `/presence/*` + `/console/*`：本机 host sidecar（在线表 + 人用终端）。
 - 本机执行面使用设备上报的真实工作根（`HostRuntimeSettings`：`LCA_HOST_USER` / `LCA_HOST_ROOT`，默认 `/home/<user>`）。
   沙箱执行面使用镜像契约 `SANDBOX_MOUNT_ROOT`（`/mnt/data`）。两套路径不互译。
-  离线回落 Onlyboxes。准备环境：`./scripts/setup_host_runtime.sh`。
+  离线回落 Onlyboxes。准备环境：`./scripts/lca-ops daemon ensure`。
 
 联网搜索（ADR-0053）：`TAVILY_API_KEY` 已配 → `web_search`；否则 Qwen `enable_search` 兜底。搜索结果同样经 Journal `ToolStarted` / `ToolInvoked` 投影，不另开协议。
 
 ## 快速开始
 
 ```bash
-./scripts/sync_lobehub_ui.sh          # 拉取 v2.2.13 到 lobehub-ui/
-./scripts/start_lobehub_stack.sh dev  # 联合启动 gateway + LobeHub dev
+./scripts/sync_lobehub_ui.sh   # 拉取 v2.2.13 到 lobehub-ui/
+./scripts/lca-ops dev          # infra + gateway + LobeHub + daemon
 ```
 
 环境模板：`deploy/lobehub/.env.lca` → 自动复制为 `lobehub-ui/.env`
@@ -47,9 +47,9 @@ LCA Agent/Team
 | `lobehub-ui/` | 官方 v2.2.13 源码（gitignore） |
 | `.lobehub-upstream/` | 官方 git 克隆缓存（gitignore） |
 | `scripts/sync_lobehub_ui.sh` | 拉取并 rsync 官方 release |
-| `deploy/lobehub/stack.yaml` | 栈配置 SSOT：端口、路径、surface 元数据、命令步骤 |
-| `deploy/lobehub/stack/` | Python 编排模块：config, types, inspect, ops, cli |
-| `scripts/start_lobehub_stack.sh` | 联合启动编排（thin wrapper → Python） |
+| `lca-ops.yaml` | 栈配置 SSOT：端口、路径、服务 |
+| `lca/layer0_infra/ops/` | 编排实现 |
+| `scripts/lca-ops` | 唯一入口：status / heal / logs / dev |
 | `deploy/lobehub/.env.lca` | LobeHub 本地 env 模板 |
 | `gateway/openai_shim.py` | OpenAI 兼容 HTTP 面（标题 / embeddings / responses） |
 | `gateway/runs/` | Run Live：开工、Journal SSE、快照、取消、HIL |

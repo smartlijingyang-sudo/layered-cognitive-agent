@@ -8,13 +8,12 @@ host ``check_imports``, and conformance tests.
 
 from __future__ import annotations
 
-from lca.contracts.models.core.plane import PlaneKind
 from lca.contracts.models.core.sandbox import (
     SANDBOX_PREINSTALLED_CLI_TOOLS,
     SANDBOX_PREINSTALLED_PYTHON_PACKAGES,
 )
 
-# Subset verified on every host provision (`lca-host.py status`).
+# Subset verified on every host provision (`./scripts/lca-ops status`).
 KEY_PYTHON_IMPORTS: tuple[str, ...] = (
     "pandas",
     "numpy",
@@ -40,38 +39,9 @@ def python_import_name(package: str) -> str:
     return _IMPORT_ALIASES.get(package, package.replace("-", "_").split("[")[0])
 
 
-def render_preinstalled_block(*, plane: PlaneKind) -> str:
-    """Render ``<preinstalled_software>`` body for agent system roles."""
-    py = ", ".join(SANDBOX_PREINSTALLED_PYTHON_PACKAGES)
-    cli = ", ".join(SANDBOX_PREINSTALLED_CLI_TOOLS)
-    header = {
-        PlaneKind.SANDBOX: "Cloud sandbox pre-installed software",
-        PlaneKind.MACHINE: "Host machine pre-installed software (shared venv + system packages)",
-    }.get(plane, "Pre-installed software")
-    lines = [
-        f"**{header}**",
-        f"- Python packages (pip/venv): {py}",
-        f"- CLI tools: {cli}",
-    ]
-    if plane is PlaneKind.MACHINE:
-        lines.append(
-            "- Use `python3` or `python` (venv); do **not** pip-install at runtime — packages are pre-provisioned."
-        )
-        lines.append(
-            "- `executeCode` / `exportFile` are **not** available on the machine face; use cloud sandbox or `runCommand`."
-        )
-    else:
-        lines.append("- Use `executeCode` for Python/JS/TS; deliverables under outputs/.")
-        lines.append(
-            "- Chinese PDF/charts: matplotlib font 'WenQuanYi Zen Hei'; reportlab CID font STSong-Light."
-        )
-    return "\n".join(lines)
-
-
 __all__ = [
     "KEY_PYTHON_IMPORTS",
     "SANDBOX_PREINSTALLED_CLI_TOOLS",
     "SANDBOX_PREINSTALLED_PYTHON_PACKAGES",
     "python_import_name",
-    "render_preinstalled_block",
 ]

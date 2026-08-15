@@ -70,40 +70,33 @@ def format_uploaded_files_prompt(
 
     if not lines:
         return ""
-    return "These user-uploaded files are pre-loaded and ready to use:\n" + "\n".join(lines)
+    return "This turn's session copies:\n" + "\n".join(lines)
 
 
 def format_machine_uploaded_files_prompt(root: str) -> str:
-    """Render ``{{uploaded_files}}`` section for the machine system role.
-
-    Uses the run-bound attachment IDs (from ``run_attachment_scope``) and
-    lists each file at ``{root}/{filename}`` — the path the agent should use.
-    """
+    """Render ``{{uploaded_files}}`` — run-scoped inbox paths only."""
     ids = get_current_run_attachment_ids()
     if not ids:
         return ""
+    from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
     from lca.layer0_infra.file_store import get_default_file_store
+    from lca.layer0_infra.tools.run_finalizer import get_current_run_id
 
+    identity = FileStoreAttachmentIdentity(get_default_file_store())
+    paths = identity.listed_paths(root, get_current_run_id(), ids)
+    if not paths:
+        return ""
     store = get_default_file_store()
-    sep = "/" if "/" in root else "\\"
-    lines: list[str] = []
-    seen: set[str] = set()
+    size_by_name = {}
     for attachment_id in ids:
         meta = store.get(str(attachment_id).strip())
-        if meta is None:
-            continue
-        basename = _sanitize_guest_basename(meta.name)
-        stripped_root = root.rstrip("/\\")
-        full_path = f"{stripped_root}{sep}{basename}"
-        if full_path in seen:
-            continue
-        seen.add(full_path)
-        lines.append(f"- {full_path}{_format_bytes(meta.size_bytes)}")
-    if not lines:
-        return ""
-    return "User-uploaded files staged at working root — use these paths directly:\n" + "\n".join(
-        lines
-    )
+        if meta is not None:
+            size_by_name[_sanitize_guest_basename(meta.name)] = meta.size_bytes
+    lines: list[str] = []
+    for path in paths:
+        basename = path.replace("\\", "/").rsplit("/", 1)[-1]
+        lines.append(f"- {path}{_format_bytes(size_by_name.get(basename))}")
+    return "This turn's staged copies (inbox only):\n" + "\n".join(lines)
 
 
 def render_cloud_sandbox_system_role(
@@ -126,9 +119,14 @@ def render_cloud_sandbox_system_role(
 
     outputs_dir = ONLYBOXES.outputs_dir
     root = ONLYBOXES.root
+    from lca.layer0_infra.attachment import get_attachment_policy
+
     rendered = system_role_template.replace("{{sandbox_uploaded_files}}", uploaded)
     rendered = rendered.replace("{{sandbox_outputs_dir}}", outputs_dir)
     rendered = rendered.replace("{{sandbox_workspace_root}}", root)
+    rendered = rendered.replace(
+        "{{attachment_policy}}", get_attachment_policy().sandbox_policy_text(root)
+    )
     if "{{sandbox_environment_note}}" in rendered:
         rendered = rendered.replace("{{sandbox_environment_note}}", environment_note())
     return rendered.strip()

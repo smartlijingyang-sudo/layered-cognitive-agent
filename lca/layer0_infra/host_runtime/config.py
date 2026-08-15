@@ -30,7 +30,9 @@ class PathConfig(BaseModel):
     venv_dir: str = "/opt/lca/venv"
     profile_d: str = "/etc/profile.d/lca.sh"
     etc_environment: str = "/etc/environment"
-    managed_path: str = "/opt/lca/venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
+    managed_path: str = (
+        "/opt/lca/venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
+    )
 
 
 class GatewayConfig(BaseModel):
@@ -175,7 +177,7 @@ DEFAULT_YAML = """\
 # lca-host.yaml — LCA Host Runtime Configuration (SSOT)
 #
 # This file is the single source of truth for the host environment.
-# Edit this file, then run:  scripts/lca-host.py provision
+# Edit this file, then run:  ./scripts/lca-ops provision
 #
 # Architecture:
 #   - Shared layer: system packages, tools, venv, CLI → shared across users
@@ -212,7 +214,7 @@ cli:
 
 # ── Users ──────────────────────────────────────────────────────────
 # Each user gets: system account, home dir, outputs/, .lca/ state, daemon
-# Add more users and re-run: scripts/lca-host.py provision
+# Add more users and re-run: ./scripts/lca-ops provision
 users:
   - name: sandbox-user
     home: /home/sandbox-user

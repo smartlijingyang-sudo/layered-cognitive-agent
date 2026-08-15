@@ -99,7 +99,7 @@ def _observation_content(observation: Observation) -> str:
         return _clip_tool_content(payload)
     if not isinstance(payload, dict):
         return _clip_tool_content(json.dumps(payload, ensure_ascii=False, default=str))
-    for key in ("text", "summary", "output", "stdout", "content"):
+    for key in ("text", "summary", "output", "stdout", "stderr", "content"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
             return _clip_tool_content(value)

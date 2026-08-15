@@ -6,12 +6,16 @@ import importlib.resources
 
 
 def load_plane_prompt(name: str) -> str:
+    return load_plane_data(f"{name}.md")
+
+
+def load_plane_data(filename: str) -> str:
     try:
         return (
             importlib.resources.files("lca.layer0_infra.plane.prompts")
-            .joinpath(f"{name}.md")
+            .joinpath(filename)
             .read_text(encoding="utf-8")
         )
     except (FileNotFoundError, TypeError) as exc:
-        msg = f"Plane prompt template {name!r} not found"
+        msg = f"Plane prompt resource {filename!r} not found"
         raise FileNotFoundError(msg) from exc
