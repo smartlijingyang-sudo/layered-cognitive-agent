@@ -16,10 +16,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.platypus import (
-    ListFlowable,
-    ListItem,
     Paragraph,
-    Preformatted,
     SimpleDocTemplate,
     Table,
     TableStyle,
