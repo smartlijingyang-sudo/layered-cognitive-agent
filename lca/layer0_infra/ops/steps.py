@@ -195,12 +195,15 @@ def daemon_stop(ctx: PipelineContext) -> None:
 
 # ── Composite Steps ───────────────────────────────────────────────────
 
+STATUS_SERVICES = ("infra", "gateway", "lobehub", "daemon", "onlyboxes", "dsh")
+STOP_SERVICES = ("daemon", "lobehub", "gateway", "infra")
+
 
 @register_step("stack.status")
 def stack_status(ctx: PipelineContext) -> None:
     """Show status, then tell the operator what to run next."""
     states = []
-    for name in ["infra", "gateway", "lobehub", "daemon"]:
+    for name in STATUS_SERVICES:
         svc = ctx.registry.get(name)
         state = svc.state()
         states.append((name, state))
@@ -231,7 +234,7 @@ def stack_heal(ctx: PipelineContext) -> None:
     """Heal every service. Do the work here — do not bounce the operator."""
     ctx.console.info("Healing services...")
     leftover: list[str] = []
-    for name in ["infra", "gateway", "lobehub", "daemon"]:
+    for name in STATUS_SERVICES:
         svc = ctx.registry.get(name)
         try:
             state = svc.heal()
@@ -253,7 +256,7 @@ def stack_heal(ctx: PipelineContext) -> None:
 @register_step("stack.stop")
 def stack_stop(ctx: PipelineContext) -> None:
     """Stop all services in reverse order."""
-    for name in ["daemon", "lobehub", "gateway", "infra"]:
+    for name in STOP_SERVICES:
         svc = ctx.registry.get(name)
         state = svc.stop()
         ctx.console.service_state(name, state)

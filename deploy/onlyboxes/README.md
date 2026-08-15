@@ -5,6 +5,11 @@ LobeHub 原生只走 **terminalExec**（`POST /api/v1/commands/terminal`）。Wo
 
 ## 正规路径（terminalExec — 当前生产通道）
 
+Guest 磁盘根 **必须是 `/mnt/data`**（`GuestLayout.onlyboxes()`、LobeHub
+`SANDBOX_UPLOADED_FILES_DIR`、ADR-0046）。镜像 `WORKDIR` 即该根；**不是**
+上游 `onlyboxes-runtime` 默认的 `/workspace`。构建后 `smoke-guest-layout.sh`
+会校验此契约。
+
 | 路径 | 作用 |
 |---|---|
 | `deploy/onlyboxes/Dockerfile.terminal` | terminal 运行时（基于 `onlyboxes-runtime` + 数据栈） |

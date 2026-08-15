@@ -323,22 +323,22 @@ def _ensure_dsh_locales(ctx: PatchContext) -> bool:
             "locales/zh-CN/chat.json",
             '"heteroAgent.executionTarget.localDesc": "通过本机 sidecar 操作这台电脑"',
             '"heteroAgent.executionTarget.localDesc": "通过本机 sidecar 操作这台电脑",\n'
-            '  "heteroAgent.executionTarget.dsh": "用 DSH",\n'
-            '  "heteroAgent.executionTarget.dshDesc": "整题交给 DSH（Qwen），事件投影回本会话"',
+            '  "heteroAgent.executionTarget.dsh": "用电脑 (DSH)",\n'
+            '  "heteroAgent.executionTarget.dshDesc": "与用电脑相同工作区（sandbox-user）；agent loop 走 DSH SDK"',
         ),
         (
             "locales/en-US/chat.json",
             '"heteroAgent.executionTarget.localDesc": "Run on this machine through the local sidecar"',
             '"heteroAgent.executionTarget.localDesc": "Run on this machine through the local sidecar",\n'
-            '  "heteroAgent.executionTarget.dsh": "Use DSH",\n'
-            '  "heteroAgent.executionTarget.dshDesc": "Forward the whole turn to DSH (Qwen) and project events here"',
+            '  "heteroAgent.executionTarget.dsh": "Use computer (DSH)",\n'
+            '  "heteroAgent.executionTarget.dshDesc": "Same sandbox-user workspace as use-computer; agent loop via DSH SDK"',
         ),
         (
             "packages/locales/src/default/chat.ts",
             "'heteroAgent.executionTarget.localDesc': 'Run on this machine through the local sidecar'",
             "'heteroAgent.executionTarget.localDesc': 'Run on this machine through the local sidecar',\n"
-            "    'heteroAgent.executionTarget.dsh': 'Use DSH',\n"
-            "    'heteroAgent.executionTarget.dshDesc': 'Forward the whole turn to DSH (Qwen) and project events here'",
+            "    'heteroAgent.executionTarget.dsh': 'Use computer (DSH)',\n"
+            "    'heteroAgent.executionTarget.dshDesc': 'Same sandbox-user workspace as use-computer; agent loop via DSH SDK'",
         ),
     )
     changed = False

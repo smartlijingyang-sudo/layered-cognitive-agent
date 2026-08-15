@@ -25,13 +25,15 @@ LCA 开发平台编排  ./scripts/lca-ops
 日常只记三句
   ./scripts/lca-ops status     看现在怎样
   ./scripts/lca-ops heal       有问题就修，不用再拆命令
-  ./scripts/lca-ops logs       看日志（默认 gateway）
+  ./scripts/lca-ops logs       跟 journal（思考 / 工具 / 步）
 
 ────────────────────────────────
 全站
 ────────────────────────────────
 status
-  看 infra / gateway / lobehub / daemon。异常会写出原因。
+  看 infra / gateway / lobehub / daemon / onlyboxes / dsh。异常会写出原因。
+  onlyboxes 未钉 LCA terminal 镜像时会提示 configure-terminal-runtime。
+  dsh 未建镜像时会提示 build-dsh-image。
   ./scripts/lca-ops status
   ./scripts/lca-ops status --json          给 agent 用
 
@@ -54,16 +56,11 @@ stop
 ────────────────────────────────
 日志  logs
 ────────────────────────────────
-文件
-  gateway    .lca-ops/gateway.log     API / uvicorn
-  lobehub    .lca-ops/lobehub.log     Next.js / bun dev
-  daemon     /home/sandbox-user/.lca/daemon.log
-
-  ./scripts/lca-ops logs                 gateway，默认 tail -f
-  ./scripts/lca-ops logs lobehub         前端，同样跟着刷
+  ./scripts/lca-ops logs                 journal 实况（思考 / 决策 / 工具 / 步）
+  ./scripts/lca-ops logs lobehub         Next.js 进程日志
   ./scripts/lca-ops logs daemon          sandbox 连接器
-  ./scripts/lca-ops logs -n 200          先打 200 行再跟着刷
-  ./scripts/lca-ops logs -F              只打一次，不跟随
+
+  只有一种模式：跟着刷。journal 不是文件，是 gateway 里正在跑的 Run。
 
 ────────────────────────────────
 单服务
@@ -203,7 +200,7 @@ def status(
     quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
     config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
 ) -> None:
-    """看四个服务现在怎样。异常会写出原因。heal 会自己修。"""
+    """看五个服务现在怎样。异常会写出原因。heal 会自己修。"""
     ctx = _make_context(json_mode, quiet, config)
     pipeline = build_pipeline("status", ["stack.status"])
     pipeline.execute(ctx)
@@ -259,7 +256,7 @@ def gateway(
             "  日志    .lca-ops/gateway.log\n"
             "  动作    start | stop | restart | status\n"
             "  例子    ./scripts/lca-ops gateway restart\n"
-            "          ./scripts/lca-ops logs gateway -f\n"
+            "          ./scripts/lca-ops logs\n"
         )
         raise typer.Exit(0)
     ctx = _make_context(json_mode, quiet, config)
@@ -293,7 +290,7 @@ def lobehub(
             "  动作    start | stop | restart | status | ensure\n"
             "  ensure  同步源码、打补丁、写 .env、bun install\n"
             "  例子    ./scripts/lca-ops lobehub restart\n"
-            "          ./scripts/lca-ops logs lobehub -n 100\n"
+            "          ./scripts/lca-ops logs lobehub\n"
         )
         raise typer.Exit(0)
     ctx = _make_context(json_mode, quiet, config)
@@ -388,39 +385,157 @@ def daemon(
 
 @app.command()
 def logs(
-    service: str = typer.Argument(
-        "gateway",
-        help="gateway | lobehub | daemon。默认跟着刷",
+    target: str = typer.Argument(
+        "",
+        help="空=journal 实况；lobehub | daemon = 进程日志",
     ),
-    follow: bool = typer.Option(
-        True, "--follow/--no-follow", "-f/-F", help="默认跟着刷；-F 只打一次"
-    ),
-    lines: int = typer.Option(50, "--lines", "-n", help="先打最近多少行再跟着刷"),
     config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
 ) -> None:
-    """默认 tail -f。gateway=.lca-ops/gateway.log  lobehub=.lca-ops/lobehub.log"""
+    """跟着刷。默认是 journal（思考/工具/步），不是 gateway.log。"""
+    ops_config = OpsConfig.load(config)
+    if target in {"", "journal", "gateway"}:
+        _follow_journal(ops_config)
+        return
     import subprocess
 
-    ops_config = OpsConfig.load(config)
-    state_dir = ops_config.state_dir
     log_map = {
-        "gateway": state_dir / "gateway.log",
-        "lobehub": state_dir / "lobehub.log",
+        "lobehub": ops_config.state_dir / "lobehub.log",
         "daemon": Path(f"/home/{ops_config.daemon.user}/.lca/daemon.log"),
     }
-    if service not in log_map:
-        print(f"Unknown service: {service}. Use: {', '.join(log_map)}")
+    if target not in log_map:
+        print(f"Unknown target: {target}. Use: journal, lobehub, daemon")
         raise typer.Exit(1)
-
-    log_file = log_map[service]
+    log_file = log_map[target]
     if not log_file.exists():
         print(f"No log yet: {log_file}")
         raise typer.Exit(1)
+    subprocess.run(["/usr/bin/tail", "-f", str(log_file)])
 
-    cmd = ["tail", "-f" if follow else f"-n{lines}", str(log_file)]
-    if follow:
-        cmd = ["tail", "-f", "-n", str(lines), str(log_file)]
-    subprocess.run(cmd)
+
+def _follow_journal(ops_config: OpsConfig) -> None:
+    """Resilient journal SSE consumer with reconnection and rich rendering.
+
+    Three-layer architecture:
+    - Transport: SSE connection with auto-reconnect + Last-Event-ID
+    - Domain: SSE record → StampedEvent adapter
+    - Render: ConsoleJournalProjector (scenario cards, run cards, etc.)
+
+    Death detection: if no cognitive events arrive for 30s (only heartbeats),
+    proactively reconnect. This catches zombie connections from subscriber eviction.
+    """
+    import time as _time
+
+    import httpx
+
+    from lca.layer0_infra.observability.journal.console_projector import (
+        ConsoleJournalProjector,
+    )
+    from lca.layer0_infra.ops.journal_log import (
+        extract_seq_from_record,
+        parse_sse_block,
+        sse_record_to_stamped,
+    )
+
+    url = f"{ops_config.gateway.base_url}/journal/live"
+    projector = ConsoleJournalProjector()
+    last_seq = 0
+    last_cognitive_ts = _time.monotonic()
+    backoff = 1.0
+    death_timeout = 30.0
+    max_backoff = 30.0
+
+    # Cognitive event types that reset the death timer.
+    cognitive_events = frozenset(
+        {
+            "AgentRunStarted",
+            "AgentRunFinished",
+            "TeamRunStarted",
+            "TeamRunFinished",
+            "DecisionMade",
+            "StepCompleted",
+            "LlmCallStarted",
+            "LlmCallCompleted",
+            "ReasoningCompleted",
+            "ToolStarted",
+            "ToolInvoked",
+            "ToolDenied",
+            "DelegationIssued",
+            "DelegationCompleted",
+            "DelegationCacheHit",
+            "ActionDegraded",
+            "RunInsight",
+            "CastingStarted",
+            "CastingCompleted",
+            "CastingFailed",
+            "SynthesisCompleted",
+            "AttachmentStagingStarted",
+            "AttachmentStagingCompleted",
+            "AttachmentStagingFailed",
+        }
+    )
+
+    while True:
+        try:
+            headers = {"Accept": "text/event-stream"}
+            if last_seq > 0:
+                headers["Last-Event-ID"] = str(last_seq)
+            with (
+                httpx.Client(timeout=httpx.Timeout(None, connect=5.0, read=60.0)) as client,
+                client.stream("GET", url, headers=headers) as resp,
+            ):
+                if resp.status_code == 404:
+                    print("gateway 还没有 /journal/live，先 ./scripts/lca-ops gateway restart")
+                    raise typer.Exit(1)
+                if resp.status_code != 200:
+                    print(f"gateway 拒绝 journal 订阅（HTTP {resp.status_code}）")
+                    raise typer.Exit(1)
+
+                # Connected — reset backoff.
+                backoff = 1.0
+                buf = ""
+                for chunk in resp.iter_text():
+                    buf += chunk
+                    while "\n\n" in buf:
+                        block, buf = buf.split("\n\n", 1)
+                        record = parse_sse_block(block)
+                        if record is None:
+                            continue
+
+                        # Check for death: only heartbeats for 30s.
+                        event_type = record.get("event_type", "")
+                        if event_type in cognitive_events:
+                            last_cognitive_ts = _time.monotonic()
+
+                        # Track seq for reconnection.
+                        seq = extract_seq_from_record(record)
+                        if seq > last_seq:
+                            last_seq = seq
+
+                        # Convert to StampedEvent and feed projector.
+                        stamped = sse_record_to_stamped(record)
+                        if stamped is not None:
+                            projector.on_event(stamped)
+
+                    # Death detection: check between chunks.
+                    if _time.monotonic() - last_cognitive_ts > death_timeout:
+                        print(f"\n⚠ journal 流 30 秒无认知事件，主动重连（seq={last_seq}）...")
+                        break
+
+        except httpx.ConnectError:
+            print(f"\n⚠ gateway 连接失败，{backoff:.0f}s 后重试...")
+        except httpx.RemoteProtocolError:
+            print(f"\n⚠ SSE 协议错误，{backoff:.0f}s 后重试...")
+        except (httpx.ReadError, httpx.ReadTimeout, httpx.StreamError) as exc:
+            print(f"\n⚠ 流中断（{type(exc).__name__}），{backoff:.0f}s 后从 seq={last_seq} 续播...")
+        except KeyboardInterrupt:
+            projector.close()
+            raise typer.Exit(0) from None
+        except Exception as exc:
+            print(f"\n⚠ 未知错误（{type(exc).__name__}: {exc}），{backoff:.0f}s 后重试...")
+
+        # Exponential backoff with cap.
+        _time.sleep(backoff)
+        backoff = min(backoff * 2, max_backoff)
 
 
 # ── Entry Point ───────────────────────────────────────────────────────

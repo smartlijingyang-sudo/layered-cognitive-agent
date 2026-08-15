@@ -26,10 +26,13 @@ files_instruction: |
   1. Always prioritize handling user-visible content.
   2. the context is only required when user's queries rely on it.
 machine_policy: |
-  This turn's attachments are declared in the user message <files_info>.
-  Staged copies live only under `{inbox_dir}/<run_id>/`.
-  Other files on this machine are not this turn's upload.
+  User uploads are declared in the user message <files_info> (identity only — name, type, size).
+  Staged copies for this run are listed below with exact paths.
+  Use those paths for read/edit commands. Do not assume files sit at the working root by filename alone.
+  Deliverables still go under outputs/.
+machine_uploaded_files_list_header: "This turn's staged copies (run-scoped inbox):"
 sandbox_policy: |
-  This turn's attachments are declared in the user message <files_info>.
-  Session copies are under `{workspace_root}/<filename>`.
-  Do not treat other workspace files as the user's upload.
+  User uploads are declared in the user message <files_info> (identity only).
+  Session copies are synced into the workspace root by filename and listed below.
+  If unsure, run listFiles on the workspace root first.
+sandbox_uploaded_files_list_header: "These user-uploaded files are pre-loaded and ready to use:"

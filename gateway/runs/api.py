@@ -64,6 +64,7 @@ async def iter_live_sse(
     *,
     after_seq: int = 0,
     heartbeat_s: float = _HEARTBEAT_INTERVAL_S,
+    redact: bool = True,
 ) -> AsyncIterator[bytes]:
     """Journal frames + comment heartbeats. No projection, no adapter."""
     sub = tail.subscribe(after_seq=after_seq)
@@ -78,7 +79,7 @@ async def iter_live_sse(
         if isinstance(item, LiveGap):
             yield encode_live_gap(item)
             continue
-        yield stamped_to_sse_frame(item).encode()
+        yield stamped_to_sse_frame(item, redact=redact).encode()
 
 
 async def create_run(request: Request) -> JSONResponse:
@@ -176,6 +177,30 @@ async def get_context(request: Request) -> JSONResponse:
     return JSONResponse(
         {"bindings": bindings, "online_devices": online},
         headers=cors_headers(),
+    )
+
+
+async def stream_journal_live(request: Request) -> StreamingResponse | JSONResponse:
+    """GET /journal/live — every Run's journal, process-wide. For lca-ops logs."""
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=cors_headers())
+    after = parse_last_event_id(request.headers.get("last-event-id"))
+    tail = _registry_of(request).journal.tail
+
+    async def _gen() -> AsyncIterator[bytes]:
+        async for frame in iter_live_sse(tail, after_seq=after, redact=False):
+            yield frame
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers=cors_headers(
+            **{
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            }
+        ),
     )
 
 

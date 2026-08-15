@@ -24,6 +24,7 @@ class DshSettings(BaseSettings):
     provider: str = "deepseek-official"
     cwd: str = ""
     cordis: str = ""
+    system_prompt: str = ""
     request_timeout_seconds: float = Field(default=180.0, gt=0)
 
     def resolved_model(self) -> str:

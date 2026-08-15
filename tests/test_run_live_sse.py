@@ -12,6 +12,7 @@ from lca.contracts.models.observability.journal import (
     ReasoningDelta,
     RunScope,
     StampedEvent,
+    ToolInvoked,
     ToolStarted,
 )
 from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
@@ -90,6 +91,29 @@ async def test_tool_started_plugin_state_is_not_rewritten() -> None:
     frames = [frame async for frame in iter_live_sse(tail, after_seq=0, heartbeat_s=30)]
     _, _, payload = _parse_frame(frames[0])
     assert payload["event"]["plugin_state"] == state
+
+
+@pytest.mark.asyncio
+async def test_ops_stream_keeps_preview_strings() -> None:
+    tail = LiveTail()
+    tail.on_event(
+        _stamped(
+            1,
+            ToolInvoked(
+                tool_name="ls",
+                arguments_preview="ls -la",
+                result_preview="ok",
+                invocation_id="i",
+            ),
+        )
+    )
+    tail.close()
+    frames = [
+        frame async for frame in iter_live_sse(tail, after_seq=0, heartbeat_s=30, redact=False)
+    ]
+    _, _, payload = _parse_frame(frames[0])
+    assert payload["event"]["arguments_preview"] == "ls -la"
+    assert payload["event"]["result_preview"] == "ok"
 
 
 @pytest.mark.asyncio

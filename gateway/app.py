@@ -52,6 +52,7 @@ from gateway.runs.api import (
     get_run,
     get_run_doctor,
     health_payload,
+    stream_journal_live,
     stream_run_live,
 )
 from gateway.runs.execute import set_llm_resolver
@@ -137,6 +138,7 @@ def create_app(
         routes=[
             Route("/health", health, methods=["GET"]),
             Route("/context", get_context, methods=["GET", "OPTIONS"]),
+            Route("/journal/live", stream_journal_live, methods=["GET", "OPTIONS"]),
             Route("/runs", create_run, methods=["POST", "OPTIONS"]),
             Route("/runs/{run_id}", get_run, methods=["GET"]),
             Route("/runs/{run_id}/live", stream_run_live, methods=["GET", "OPTIONS"]),

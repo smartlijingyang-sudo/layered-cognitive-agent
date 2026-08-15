@@ -33,7 +33,7 @@ class SandboxPromptTests(unittest.TestCase):
             meta = store.put(data=b"hello", name="data.csv", mime_type="text/csv")
             text = format_uploaded_files_prompt(store, [meta.attachment_id])
             self.assertIn(sandbox_uploaded_file_path("data.csv"), text)
-            self.assertIn("session copies", text)
+            self.assertIn("pre-loaded and ready to use", text)
 
 
 if __name__ == "__main__":

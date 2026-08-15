@@ -53,5 +53,7 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     && python -c "import pandas,numpy,openpyxl,matplotlib,PIL,scipy,requests,seaborn,tabulate,xlsxwriter,docx,reportlab,fpdf,pypdf,sklearn,plotly,cv2,xlrd,yaml,toml,dotenv,markitdown,fastapi,uvicorn,pydantic,aiofiles,anyio,pytest; print('ok', pandas.__version__)" \
     && python -c "from matplotlib import font_manager as fm; names={f.name for f in fm.fontManager.ttflist}; assert any('WenQuanYi' in n or 'Noto Sans CJK' in n for n in names), sorted(n for n in names if 'DejaVu' not in n)[:20]; print('cjk-font: ok')"
 
-WORKDIR /workspace
+# Guest disk layout — must match GuestLayout.onlyboxes() and LobeHub /mnt/data.
+RUN mkdir -p /mnt/data/outputs /mnt/data/.lca/background
+WORKDIR /mnt/data
 CMD ["python3"]

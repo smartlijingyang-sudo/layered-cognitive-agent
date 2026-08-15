@@ -30,8 +30,14 @@ def environment_note() -> str:
 
 
 def skill_preamble() -> str:
-    """Path-agnostic reminder. Absolute roots live only in the system role."""
-    return "当前工作目录是工作根。交付物写相对路径 outputs/。\n"
+    """Deliverable hint plus staged attachment paths (same SSOT as system role)."""
+    from lca.layer0_infra.attachment.prompt import format_skill_attachment_block
+
+    lines = ["当前工作目录是工作根。交付物写相对路径 outputs/。"]
+    attachment_block = format_skill_attachment_block()
+    if attachment_block:
+        lines.append(attachment_block)
+    return "\n".join(lines) + "\n"
 
 
 def plane_system_role(plane: PlaneRef) -> str:

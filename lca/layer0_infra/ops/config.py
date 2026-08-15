@@ -63,6 +63,53 @@ class InfraConfig(BaseModel):
     ports: dict[str, int] = Field(default_factory=lambda: {"postgres": 25432, "redis": 6379})
 
 
+class OnlyboxesConfig(BaseModel):
+    """Onlyboxes terminalExec worker + LCA runtime image."""
+
+    worker_service: str = "onlyboxes-worker-docker"
+    terminal_image: str = "onlyboxes-terminal-local:lca"
+    stale_image: str = "coolfan1024/onlyboxes-runtime:default"
+    env_key: str = "WORKER_TERMINAL_EXEC_DOCKER_IMAGE"
+    configure_script: str = "deploy/onlyboxes/configure-terminal-runtime.sh"
+    build_script: str = "deploy/onlyboxes/build-terminal-image.sh"
+
+    @property
+    def dropin_path(self) -> Path:
+        """systemd drop-in that actually loads (unit.service.d, not unit.d)."""
+        return Path(
+            f"/etc/systemd/system/{self.worker_service}.service.d/lca-terminal-runtime.conf"
+        )
+
+    @property
+    def legacy_dropin_dir(self) -> Path:
+        """Path older scripts wrote; systemd ignores it."""
+        return Path(f"/etc/systemd/system/{self.worker_service}.d")
+
+    @property
+    def configure_cmd(self) -> str:
+        return f"./{self.configure_script}"
+
+    @property
+    def build_and_configure_cmd(self) -> str:
+        return f"./{self.build_script} && ./{self.configure_script}"
+
+
+class DshConfig(BaseModel):
+    """DSH (DeepSeek Harness) SDK — installed in the shared LCA venv."""
+
+    venv_dir: str = "/opt/lca/venv"
+    install_script: str = "deploy/dsh/install-dsh-sdk.sh"
+    sdk_package: str = "deepseek-harness-sdk"
+
+    @property
+    def install_cmd(self) -> str:
+        return f"./{self.install_script}"
+
+    @property
+    def sdk_python(self) -> Path:
+        return Path(self.venv_dir) / "bin" / "python3"
+
+
 class DaemonConfig(BaseModel):
     """Agent CLI daemon (sandbox-user connect)."""
 
@@ -88,6 +135,8 @@ class OpsConfig(BaseModel):
     lobehub: LobeHubConfig = Field(default_factory=LobeHubConfig)
     infra: InfraConfig = Field(default_factory=InfraConfig)
     daemon: DaemonConfig = Field(default_factory=DaemonConfig)
+    onlyboxes: OnlyboxesConfig = Field(default_factory=OnlyboxesConfig)
+    dsh: DshConfig = Field(default_factory=DshConfig)
     run_dir: str = ".lca-ops"
     sudo_pass_file: str = ".lobehub-stack/sudo.pass"
 
@@ -122,7 +171,17 @@ class OpsConfig(BaseModel):
         if dev_port := os.environ.get("LOBE_DEV_PORT"):
             lh = lh.model_copy(update={"dev_port": int(dev_port)})
 
-        return self.model_copy(update={"gateway": gw, "lobehub": lh})
+        ob = self.onlyboxes
+        if image := os.environ.get("ONLYBOXES_TERMINAL_IMAGE"):
+            ob = ob.model_copy(update={"terminal_image": image})
+        if service := os.environ.get("ONLYBOXES_WORKER_SERVICE"):
+            ob = ob.model_copy(update={"worker_service": service})
+
+        dsh = self.dsh
+        if venv := os.environ.get("DSH_VENV_DIR"):
+            dsh = dsh.model_copy(update={"venv_dir": venv})
+
+        return self.model_copy(update={"gateway": gw, "lobehub": lh, "onlyboxes": ob, "dsh": dsh})
 
     @property
     def root(self) -> Path:

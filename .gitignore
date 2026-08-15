@@ -30,3 +30,6 @@ web/
 # Node modules
 packages/*/node_modules/
 node_modules/
+
+# Runtime state (daemon manifests, logs, pids)
+.lca-ops/

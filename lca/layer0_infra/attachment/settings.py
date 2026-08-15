@@ -24,7 +24,9 @@ class AttachmentPolicyDocument(BaseModel):
     inline_name_suffixes: tuple[str, ...]
     files_instruction: str
     machine_policy: str
+    machine_uploaded_files_list_header: str
     sandbox_policy: str
+    sandbox_uploaded_files_list_header: str
 
     @field_validator("inline_mime_prefixes", "inline_name_suffixes", mode="before")
     @classmethod
@@ -41,7 +43,7 @@ class AttachmentPolicyDocument(BaseModel):
         return any(lowered.endswith(suffix.lower()) for suffix in self.inline_name_suffixes)
 
     def machine_policy_text(self) -> str:
-        return self.machine_policy.format(inbox_dir=self.inbox_dir).strip()
+        return self.machine_policy.strip()
 
     def sandbox_policy_text(self, workspace_root: str) -> str:
         return self.sandbox_policy.format(workspace_root=workspace_root).strip()

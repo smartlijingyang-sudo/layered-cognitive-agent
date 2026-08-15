@@ -144,7 +144,7 @@ class LobeHubService:
             status = ServiceStatus.DEGRADED
             detail = "process alive but dev server not responding"
             why = f"{self._config.dev_url} is not answering yet"
-            next_action = "./scripts/lca-ops logs lobehub -n 80"
+            next_action = "./scripts/lca-ops logs lobehub"
         elif not source_ok:
             status = ServiceStatus.STOPPED
             detail = "source missing"

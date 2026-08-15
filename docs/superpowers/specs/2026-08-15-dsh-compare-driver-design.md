@@ -8,7 +8,7 @@
 
 一次 Run 只有一个 **driver**。`用电脑` / `云沙箱` 选磁盘；`用 DSH` 选谁当 agent。DSH 不是第三种 plane。
 
-整题转发，不拆工具。事件分两层：Journal 投影给 LobeHub；原始 DSH JSONL 留给对照。
+整题转发，不拆工具。LCA 只配 SDK（``cwd`` / ``cordis`` / ``LCA_*`` env）；DSH 自带 skill prompt 与 ``workspaceContext``，不与 LCA ``plane_system_role`` / ``activate_skill`` 熔合。事件分两层：Journal 投影给 LobeHub；原始 DSH JSONL 留给对照。
 
 模型 / 密钥只读 ``lca.layer0_infra.llm.config``（``LLM_MODEL`` / ``LLM_API_KEY``）。DSH 走 ``OPENAI_COMPAT`` 面（``LLM_OPENAI_BASE_URL``）。`DSH_*` 只剩进程参数。`provider=deepseek-official` 是 DSH 适配器路由名。
 
@@ -30,9 +30,10 @@
 ## 数据流
 
 ```
-chip 用 DSH → POST /runs {execution_target:dsh}
-  → execute_run 跳过 Agent/Team
-  → DshTurnDriver + Qwen 兼容口
-  → Journal SSE → 现成卡片
-  → {run_id}.dsh.jsonl
+chip 用电脑 (DSH) → POST /runs {execution_target:dsh, plane:machine}
+  → 与用电脑同一条 Run 管道（ingress / staging / finalize）
+  → DshTurnDriver 替换 Agent/Team loop
+  → DshJournalProjector → Journal SSE → LobeHub 卡片
+  → harvest outputs_dir → workspace.artifacts 闭包
+  → {run_id}.dsh.jsonl 对照
 ```

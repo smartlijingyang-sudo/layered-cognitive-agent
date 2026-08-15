@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 
 from lca.contracts.models.core.attachment import AttachmentRecord
@@ -10,6 +11,15 @@ from lca.layer0_infra.attachment.files_info import FilesInfoDocument
 from lca.layer0_infra.attachment.layout import AttachmentLayout
 from lca.layer0_infra.attachment.settings import AttachmentPolicyDocument, get_attachment_policy
 from lca.layer0_infra.file_store import FileStore
+
+_HTML_DOCTYPE = re.compile(rb"^\s*<!doctype\s+html", re.IGNORECASE)
+_HTML_TAG = re.compile(rb"<html[\s>]", re.IGNORECASE)
+
+
+def _looks_like_html(content: bytes) -> bool:
+    """Heuristic: does the content look like an HTML document?"""
+    head = content[:512]
+    return bool(_HTML_DOCTYPE.search(head) or _HTML_TAG.search(head))
 
 
 class FileStoreAttachmentIdentity(AttachmentIdentity):
@@ -86,5 +96,9 @@ class FileStoreAttachmentIdentity(AttachmentIdentity):
             return None
         raw = self._store.read_bytes(attachment_id)
         if raw is None or len(raw) > self._policy.inline_max_bytes:
+            return None
+        # Inline Gate: reject HTML content masquerading as other types.
+        # This catches SPA fallback pages and expired-URL error pages.
+        if not mime_type.startswith("text/html") and _looks_like_html(raw):
             return None
         return raw.decode("utf-8", errors="replace")

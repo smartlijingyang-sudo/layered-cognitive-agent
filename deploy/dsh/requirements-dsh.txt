@@ -1,0 +1,4 @@
+# DSH (DeepSeek Harness) SDK — the Python adapter + native runtime binary.
+# Pinned to rc6 to match upstream release cadence.
+
+deepseek-harness-sdk==0.1.0rc6

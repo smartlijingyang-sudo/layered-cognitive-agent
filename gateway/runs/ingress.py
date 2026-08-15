@@ -108,18 +108,32 @@ _DATA_URI_RE = re.compile(r"^data:([^;,]+)?;base64,", re.IGNORECASE)
 
 
 def parse_messages(messages: list[Any]) -> ParsedMessages:
-    """Extract user text, file refs, and compact history from OpenAI messages."""
+    """Extract user text, file refs, and compact history from OpenAI messages.
+
+    File refs are collected only from the last user message (Ingress Gate).
+    Historical messages carry conversation context but NOT file references —
+    expired URLs from prior turns cause HTML corruption, not re-download.
+    """
     if not messages:
         return ParsedMessages(user_text="")
 
     user_text = _extract_last_user_text(messages)
-    file_refs = _collect_file_refs(messages)
+    last_user = _last_user_message(messages)
+    file_refs = _collect_file_refs([last_user] if last_user is not None else [])
     prior_turns = extract_prior_turns(messages, plain_text_fn=_history_plain_text)
     return ParsedMessages(
         user_text=user_text,
         file_refs=tuple(file_refs),
         prior_turns=prior_turns,
     )
+
+
+def _last_user_message(messages: list[Any]) -> dict[str, Any] | None:
+    """Return the last user-role message object, or None."""
+    for item in reversed(messages):
+        if isinstance(item, dict) and item.get("role") == "user":
+            return item
+    return None
 
 
 def _extract_last_user_text(messages: list[Any]) -> str:

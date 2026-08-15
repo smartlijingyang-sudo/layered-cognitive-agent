@@ -1,54 +1,61 @@
-"""Run a DSH turn inside an existing RunSession / Journal scope."""
+"""Gateway adapter: DSH driver on the same machine plane as use-computer."""
 
 from __future__ import annotations
-
-import asyncio
-from pathlib import Path
 
 import structlog
 
 from gateway.runs.session import RunSession
-from lca.contracts.models.core.plane import PlaneKind
+from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.protocols import DshRuntime
-from lca.layer0_infra.dsh.archive import JsonlEventArchive
-from lca.layer0_infra.dsh.driver import DshTurnDriver, DshTurnSpec
-from lca.layer0_infra.dsh.projector import DshJournalProjector
-from lca.layer0_infra.dsh.runtime import DshUnavailableError, SdkDshRuntime
+from lca.layer0_infra.computer.machine import MachineTransport
+from lca.layer0_infra.dsh.machine_runtime import MachineDshRuntime
+from lca.layer0_infra.dsh.run import run_dsh_machine_turn
+from lca.layer0_infra.dsh.runtime import DshUnavailableError
 from lca.layer0_infra.dsh.settings import DshSettings
-from lca.layer0_infra.dsh.sink import FacadeJournalSink
+from lca.layer0_infra.plane.machine import resolve_machine_transport
 from lca.layer0_infra.plane.resolve import ref_of
 
 _log = structlog.get_logger(__name__)
 
 
-def default_runtime(settings: DshSettings) -> DshRuntime:
-    return SdkDshRuntime(settings)
+def default_runtime(
+    settings: DshSettings,
+    *,
+    transport: MachineTransport,
+    machine: PlaneRef,
+) -> DshRuntime:
+    """DSH runs on the machine — SDK lives in sandbox-user's environment."""
+    return MachineDshRuntime(transport, machine, settings)
 
 
 async def execute_dsh_session(session: RunSession) -> None:
-    """Drive ``session`` through DSH. Caller owns run_scope / finalize."""
-    settings = DshSettings()
-    try:
-        cwd = _cwd_for(session, settings)
-    except DshUnavailableError as exc:
-        session.error = str(exc)
+    """Replace Agent/Team loop only — caller owns staging, scopes, finalize."""
+    bindings = session.bindings
+    if bindings is None:
+        session.error = "plane bindings missing for DSH"
+        return
+    machine = ref_of(bindings, PlaneKind.MACHINE)
+    if machine is None:
+        session.error = "用 DSH 需要本机执行面（sandbox-user sidecar 在线）"
+        return
+    transport = resolve_machine_transport(machine.id)
+    if transport is None:
+        session.error = f"machine {machine.label} offline; cannot run DSH"
         return
 
-    archive_path = Path(session.jsonl_path).with_name(f"{session.run_id}.dsh.jsonl")
-    session_root = str(archive_path.parent)
-    driver = DshTurnDriver(
-        runtime=default_runtime(settings),
-        projector=DshJournalProjector(FacadeJournalSink()),
-        archive=JsonlEventArchive(archive_path),
-    )
-    spec = DshTurnSpec(
-        prompt=session.question,
-        session_id=session.run_id,
-        cwd=cwd,
-        session_root=session_root,
-    )
+    settings = DshSettings()
     try:
-        result = await asyncio.to_thread(driver.run, spec)
+        result = await run_dsh_machine_turn(
+            run_id=session.run_id,
+            question=session.question,
+            prior_turns=session.prior_turns,
+            machine=machine,
+            transport=transport,
+            runs_dir=session.jsonl_path.parent,
+            attachment_ids=session.attachment_ids,
+            runtime=default_runtime(settings, transport=transport, machine=machine),
+            settings=settings,
+        )
     except DshUnavailableError as exc:
         session.error = str(exc)
         _log.warning("dsh_unavailable", run_id=session.run_id, error=str(exc))
@@ -59,14 +66,3 @@ async def execute_dsh_session(session: RunSession) -> None:
         return
     if result.finish_reason not in {None, "completed"}:
         session.error = session.error or (result.finish_reason or "dsh error")
-
-
-def _cwd_for(session: RunSession, settings: DshSettings) -> str:
-    if settings.cwd.strip():
-        return settings.cwd.strip()
-    bindings = getattr(session, "bindings", None)
-    if bindings is not None:
-        machine = ref_of(bindings, PlaneKind.MACHINE)
-        if machine is not None and machine.root:
-            return machine.root
-    raise DshUnavailableError("用 DSH 需要本机工作根（sidecar 在线或 DSH_CWD）")

@@ -9,14 +9,14 @@ version: 1.1.0
 AI 友好的 Word / Excel / PowerPoint CLI。通过 `run_command` 调用已安装的 `officecli`。
 不要 `curl install`、不要 `pip install` 现场装包。
 
-工作目录已是工作根。交付物写相对路径 `outputs/`。附件用原文件名。
+工作目录已是工作根。交付物写相对路径 `outputs/`。附件路径见 system role / skill 注入的 staged copies 列表，使用列出的绝对路径。
 
 ## 硬约束（LCA）
 
 | 规则 | 说明 |
 |------|------|
 | 执行面 | 只用 `run_command`（或激活后 `run_skill_script`） |
-| 工作区 | 附件是工作根下的文件名；交付物写 **`outputs/`** |
+| 工作区 | 附件用 **staged copies 绝对路径**（非工作根裸文件名）；交付物写 **`outputs/`** |
 | 下载 | Office 文件是 **Work**（run 结束 / `close` / `export_file` 发 **一张** 卡）。`create`/`add`/`set`/`batch` 是工作副本，不会每步发卡。图/PDF/HTML 仍即时可见 |
 | 输出 | **一律加 `--json`**（除 `help` / `view outline` 调试） |
 | 安装 | **禁止** `curl …/install.sh`；若 `officecli --version` 失败 → 报执行面缺包，勿自装 |

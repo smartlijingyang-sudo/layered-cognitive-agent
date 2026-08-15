@@ -20,7 +20,7 @@
 ./scripts/lca-ops dev      # 第一次 / 全停之后
 ./scripts/lca-ops status
 ./scripts/lca-ops heal     # 有问题自己修
-./scripts/lca-ops logs     # gateway，默认 tail -f
+./scripts/lca-ops logs     # journal 实况（思考 / 工具 / 步）
 ```
 
 `dev`：补丁 + gateway :8765 + LobeHub :3010 + daemon。日常用 `heal`，不要先 `restart`。

@@ -1,15 +1,19 @@
 """Service implementations."""
 
 from lca.layer0_infra.ops.services.daemon import DaemonService
+from lca.layer0_infra.ops.services.dsh import DshService
 from lca.layer0_infra.ops.services.gateway import GatewayService
 from lca.layer0_infra.ops.services.infra import InfraService
 from lca.layer0_infra.ops.services.lobehub import LobeHubService
+from lca.layer0_infra.ops.services.onlyboxes import OnlyboxesService
 
 __all__ = [
     "DaemonService",
+    "DshService",
     "GatewayService",
     "InfraService",
     "LobeHubService",
+    "OnlyboxesService",
     "build_registry",
 ]
 
@@ -28,4 +32,6 @@ def build_registry(config):
     registry.register(
         DaemonService(config.daemon, config.gateway, config.state_dir, config.root, sudo)
     )
+    registry.register(OnlyboxesService(config.onlyboxes, config.root))
+    registry.register(DshService(config.dsh, config.root))
     return registry

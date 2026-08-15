@@ -47,6 +47,7 @@ class MachineComputer(MachineExecMixin):
         self.plane = plane
         self._transport = transport
         self._store = store if store is not None else get_default_file_store()
+        self._output_fingerprints: dict[str, str] = {}
 
     async def list_files(self, *, directory_path: str) -> ComputerOpResult:
         path = raise_if_out_of_scope(directory_path or self.plane.root, self.plane)
@@ -81,8 +82,7 @@ class MachineComputer(MachineExecMixin):
                 "create_directories": create_directories,
             },
         )
-        await self._publish_outputs(result, extra_path=resolved)
-        return result
+        return await self._with_outputs(result, extra_path=resolved, tool_name="writeFile")
 
     async def edit_file(
         self,
@@ -178,8 +178,7 @@ class MachineComputer(MachineExecMixin):
             },
             timeout_s=timeout_s,
         )
-        await self._publish_outputs(result)
-        return result
+        return await self._with_outputs(result, tool_name="runCommand", command=command)
 
     async def get_command_output(self, *, command_id: str, timeout_s: int = 60) -> ComputerOpResult:
         return await self._op(
@@ -190,6 +189,27 @@ class MachineComputer(MachineExecMixin):
 
     async def kill_command(self, *, command_id: str) -> ComputerOpResult:
         return await self._op("killCommand", {"command_id": command_id})
+
+    async def _with_outputs(
+        self,
+        result: ComputerOpResult,
+        *,
+        extra_path: str = "",
+        tool_name: str = "",
+        command: str = "",
+    ) -> ComputerOpResult:
+        from lca.layer0_infra.computer.machine_harvest import attach_harvested_outputs
+
+        return await attach_harvested_outputs(
+            result,
+            computer_op=self._transport.computer_op,
+            plane=self.plane,
+            store=self._store,
+            seen=self._output_fingerprints,
+            extra_path=extra_path,
+            tool_name=tool_name,
+            command=command,
+        )
 
     async def _op(self, op: str, args: dict[str, Any], *, timeout_s: int = 60) -> ComputerOpResult:
         try:

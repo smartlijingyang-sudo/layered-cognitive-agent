@@ -7,6 +7,7 @@ from typing import Any
 from lca.contracts.atoms.enums import StreamChannel
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
+    AgentRunStarted,
     LlmCallStarted,
     ReasoningCompleted,
     ReasoningDelta,
@@ -69,6 +70,7 @@ class DshJournalProjector:
         if self._opened:
             return
         self._opened = True
+        self._sink.emit(AgentRunStarted(agent_role="dsh", strategy_key="dsh"))
         self._sink.emit(LlmCallStarted(step=self._step, model="dsh"))
 
     def _on_turn_start(self, data: _JSON) -> None:

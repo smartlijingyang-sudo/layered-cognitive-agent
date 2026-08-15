@@ -20,15 +20,19 @@ SSE_SENTINEL: None = None
 """队列/订阅关闭哨兵（与 ``SSEJournalProjector.close`` 对齐）。"""
 
 
-def stamped_to_sse_frame(stamped: StampedEvent) -> str:
-    """StampedEvent → SSE 文本帧（含 trailing blank line）。"""
+def stamped_to_sse_frame(stamped: StampedEvent, *, redact: bool = True) -> str:
+    """StampedEvent → SSE 文本帧（含 trailing blank line）。
+
+    ``redact=True``（LobeHub live）：抹掉 preview 字符串。
+    ``redact=False``（ops journal）：保留预览，给终端 debug。
+    """
     event_type = type(stamped.event).__name__
     record = stamped_to_record(stamped)
     catalog = JOURNAL_CATALOG.get(event_type)
     if catalog is not None:
         record["domain"] = catalog.domain.value
     event = record.get("event")
-    if isinstance(event, dict):
+    if redact and isinstance(event, dict):
         for key in _LIVE_REDACT_KEYS:
             if key in event:
                 event[key] = ""

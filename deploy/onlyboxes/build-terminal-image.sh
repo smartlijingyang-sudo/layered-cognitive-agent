@@ -13,6 +13,9 @@ docker build \
   -t "${IMAGE_TAG}" \
   "${ROOT}/deploy/onlyboxes"
 
+echo "==> Smoke test (GuestLayout /mnt/data contract)"
+"${ROOT}/deploy/onlyboxes/smoke-guest-layout.sh" "${IMAGE_TAG}"
+
 echo "==> Smoke test (reportlab + pandas)"
 docker run --rm "${IMAGE_TAG}" python3 -c \
   "import reportlab,pandas,numpy,openpyxl; print('ok', reportlab.Version, pandas.__version__)"
@@ -20,9 +23,9 @@ docker run --rm "${IMAGE_TAG}" python3 -c \
 echo "==> Smoke test (officecli — ADR-0054)"
 docker run --rm "${IMAGE_TAG}" sh -c \
   'officecli --version && test -n "$OFFICECLI_SKIP_UPDATE" && \
-   officecli create /tmp/smoke.pptx --json && \
-   officecli add /tmp/smoke.pptx / --type slide --prop title=Smoke --json && \
-   officecli validate /tmp/smoke.pptx --json && \
+   officecli create outputs/smoke.pptx --json && \
+   officecli add outputs/smoke.pptx / --type slide --prop title=Smoke --json && \
+   officecli validate outputs/smoke.pptx --json && \
    echo officecli-smoke-ok'
 
 echo "==> Done. Set worker env:"

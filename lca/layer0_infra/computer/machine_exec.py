@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import time
 from typing import Any, Protocol
 
@@ -27,6 +26,8 @@ _LANGUAGE_INTERPRETER: dict[str, str] = {
 class _MachineOp(Protocol):
     plane: Any
     _store: FileStore
+    _transport: Any
+    _output_fingerprints: dict[str, str]
 
     async def _op(
         self, op: str, args: dict[str, Any], *, timeout_s: int = 60
@@ -44,26 +45,30 @@ class MachineExecMixin:
         description: str = "",
         timeout_s: int = 60,
     ) -> ComputerOpResult:
-        """Write a temp script, run it, then delete it.
+        """Write a temp script via the system channel, run it, then delete it.
 
-        Avoids the two-step writeFile + runCommand loop and keeps encoding
-        at the transport boundary.
+        Sidecar ``writeFile`` denies ``.lca/`` (agent-facing). Temp scripts are
+        infrastructure — same trust boundary as attachment staging.
         """
         del description
+        from lca.layer0_infra.computer.machine_harvest import attach_harvested_outputs
+
         nonce = hashlib.sha256(f"{code}:{time.monotonic()}".encode()).hexdigest()[:12]
         ext = _LANGUAGE_EXT.get(language.lower(), "py")
-        temp_path = f"{self.plane.root}/.lca/exec_{nonce}.{ext}"
+        rel = f".lca/exec_{nonce}.{ext}"
+        temp_path = f"{str(self.plane.root).rstrip('/')}/{rel}"
 
-        write_result = await self._op(
-            "writeFile",
-            {"path": temp_path, "content": code, "create_directories": True},
+        written = await self._transport.write_files(
+            {rel: code.encode("utf-8")},
+            base_dir=self.plane.root,
         )
-        if not write_result.success:
+        if written is not None and getattr(written, "success", True) is False:
+            err = str(getattr(written, "error", "") or "write temp file failed")
             return ComputerOpResult(
                 success=False,
                 content="",
-                state={"error": f"write temp file failed: {write_result.error}"},
-                error=write_result.error or "write temp file failed",
+                state={"error": f"write temp file failed: {err}"},
+                error=err,
             )
 
         interpreter = _LANGUAGE_INTERPRETER.get(language.lower(), "python3")
@@ -86,53 +91,11 @@ class MachineExecMixin:
                 state={**exec_result.state, "language": language, "temp_path": temp_path},
                 error=exec_result.error or exec_result.content or "code execution failed",
             )
-        return exec_result
-
-    async def _publish_outputs(
-        self: _MachineOp, result: ComputerOpResult, *, extra_path: str = ""
-    ) -> None:
-        if not result.success:
-            return
-        paths: list[str] = []
-        outputs_dir = self.plane.outputs_dir
-        if extra_path and _under_dir(extra_path, outputs_dir):
-            paths.append(extra_path)
-        listed = await self._op("listFiles", {"directory_path": outputs_dir})
-        for item in listed.state.get("files") or []:
-            if not isinstance(item, dict):
-                continue
-            candidate = str(item.get("path") or item.get("name") or "")
-            if not candidate:
-                continue
-            resolved = candidate if candidate.startswith("/") else f"{outputs_dir}/{candidate}"
-            if not _under_dir(resolved, outputs_dir):
-                continue
-            paths.append(
-                candidate
-                if candidate.startswith(outputs_dir)
-                else f"{outputs_dir.rstrip('/')}/{candidate}"
-            )
-        published: list[dict[str, str]] = []
-        for path in dict.fromkeys(paths):
-            read = await self._op("readFile", {"path": path})
-            raw = read.state.get("content")
-            if not isinstance(raw, str) or not raw:
-                result.state["publish_error"] = f"could not read {path} for download"
-                continue
-            name = path.replace("\\", "/").rsplit("/", 1)[-1]
-            stored = self._store.put(
-                data=raw.encode("utf-8"),
-                name=name,
-                mime_type="application/octet-stream",
-            )
-            published.append({"filename": name, "url": f"/files/{stored.attachment_id}"})
-        if published:
-            result.state.setdefault("files", [])
-            if isinstance(result.state["files"], list):
-                result.state["files"].extend(published)
-
-
-def _under_dir(path: str, directory: str) -> bool:
-    left = os.path.normpath(path)
-    right = os.path.normpath(directory)
-    return left == right or left.startswith(right + os.sep)
+        return await attach_harvested_outputs(
+            exec_result,
+            computer_op=self._transport.computer_op,
+            plane=self.plane,
+            store=self._store,
+            seen=self._output_fingerprints,
+            tool_name="executeCode",
+        )

@@ -29,6 +29,9 @@ docker build \
   "${ROOT}"
 
 if $SMOKE; then
+  echo "==> Smoke: GuestLayout /mnt/data contract"
+  "${ROOT}/smoke-guest-layout.sh" "${IMAGE_TAG}"
+
   echo "==> Smoke: import check + matplotlib CJK rendering"
   docker run --rm "${IMAGE_TAG}" python -c '
 import importlib, warnings

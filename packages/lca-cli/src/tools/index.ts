@@ -55,7 +55,11 @@ export async function executeToolCall(
       case 'listFiles': {
         const dir = resolvePath(workspace, String(args.directoryPath || args.directory_path || workspace));
         const entries = await fs.readdir(dir, { withFileTypes: true });
-        const files = entries.map((e) => ({ name: e.name, isDirectory: e.isDirectory() }));
+        const files = entries.map((e) => ({
+          name: e.name,
+          path: path.join(dir, e.name),
+          isDirectory: e.isDirectory(),
+        }));
         return { success: true, content: JSON.stringify(files), state: { files } };
       }
       case 'readFile': {
@@ -160,8 +164,7 @@ export async function executeToolCall(
       case 'exportFile': {
         const file = resolvePath(workspace, String(args.path || ''));
         const buf = await fs.readFile(file);
-        const b64 = buf.toString('base64');
-        return { success: true, content: b64 };
+        return { success: true, content: buf.toString('base64') };
       }
       default:
         return { success: false, content: '', error: `unknown apiName: ${apiName}` };

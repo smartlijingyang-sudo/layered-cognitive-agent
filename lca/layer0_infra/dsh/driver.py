@@ -16,6 +16,7 @@ class DshTurnSpec:
     session_id: str
     cwd: str
     session_root: str
+    harness_env: dict[str, str] | None = None
 
 
 class DshTurnDriver:

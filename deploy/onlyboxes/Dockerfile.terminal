@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 # Onlyboxes terminalExec runtime — LCA + LobeHub cloud-sandbox baseline.
 #
-# Aligns with LobeHub native: terminalExec is the sole execution channel; this
-# image must carry the same Python data/doc stack as deploy/onlyboxes/requirements-python.txt
-# plus the pinned officecli binary (ADR-0054 Office plane).
+# Guest disk root MUST be /mnt/data (GuestLayout.onlyboxes(), LobeHub
+# SANDBOX_UPLOADED_FILES_DIR). terminalExec cwd is the contract root — not
+# the upstream onlyboxes-runtime default /workspace.
 #
 # Build:
 #   ./deploy/onlyboxes/build-terminal-image.sh
@@ -69,4 +69,7 @@ RUN chmod +x /tmp/install-officecli.sh \
     && rm -f /tmp/install-officecli.sh \
     && DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 officecli --version
 
-WORKDIR /workspace
+# Guest disk layout — must match GuestLayout.onlyboxes() and LobeHub
+# SANDBOX_UPLOADED_FILES_DIR (/mnt/data). Not /workspace.
+RUN mkdir -p /mnt/data/outputs /mnt/data/.lca/background
+WORKDIR /mnt/data

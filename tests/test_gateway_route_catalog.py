@@ -16,6 +16,7 @@ from gateway.app import create_app
 SURFACES: tuple[tuple[str, str], ...] = (
     ("health", r"^/health$"),
     ("context", r"^/context$"),
+    ("journal", r"^/journal"),
     ("runs", r"^/runs"),
     ("files", r"^/files"),
     ("openai", r"^/v1/"),

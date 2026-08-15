@@ -1,8 +1,14 @@
-"""Attachment ingest: SSRF policy, cache, download, data URI."""
+"""Attachment ingest: SSRF policy, integrity gates, cache, download, data URI.
+
+Every file that enters the FileStore passes through integrity gates.
+Pipeline: fetch → integrity check → store → cache.
+If any gate rejects, the file is skipped — never stored as corrupt data.
+"""
 
 from __future__ import annotations
 
 import base64
+import hashlib
 import ipaddress
 import json
 import re
@@ -27,6 +33,87 @@ from lca.layer0_infra.file_store import FileStore
 MAX_INGEST_FILE_BYTES = SANDBOX_INIT_MAX_FILE_BYTES
 MAX_INGEST_FILES = SANDBOX_INIT_MAX_FILES
 FILE_DOWNLOAD_TIMEOUT_S = 120
+
+# ── Integrity Gates ──────────────────────────────────────────────────────
+
+# Magic bytes for common file types.
+# Used to detect content-type mismatches (e.g. HTML served instead of PDF).
+_MAGIC_BYTES: dict[str, bytes] = {
+    "application/pdf": b"%PDF",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": b"PK\x03\x04",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": b"PK\x03\x04",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": b"PK\x03\x04",
+    "application/zip": b"PK\x03\x04",
+    "image/png": b"\x89PNG",
+    "image/jpeg": b"\xff\xd8\xff",
+    "image/gif": b"GIF8",
+}
+
+# HTML detection thresholds.
+_HTML_DOCTYPE = re.compile(rb"^\s*<!doctype\s+html", re.IGNORECASE)
+_HTML_TAG = re.compile(rb"<html[\s>]", re.IGNORECASE)
+
+
+class FileIntegrityError(Exception):
+    """Raised when downloaded content fails integrity validation."""
+
+
+def _looks_like_html(content: bytes) -> bool:
+    """Heuristic: does the content look like an HTML document?"""
+    head = content[:512]
+    return bool(_HTML_DOCTYPE.search(head) or _HTML_TAG.search(head))
+
+
+def validate_file_integrity(
+    content: bytes,
+    declared_mime: str,
+    actual_mime: str,
+    name: str,
+) -> None:
+    """Validate downloaded content matches declared type.
+
+    Raises ``FileIntegrityError`` if content is corrupt or mismatched.
+    Gates:
+    1. If declared as non-HTML but content is HTML → reject (SPA fallback detection)
+    2. If declared mime has known magic bytes, verify content starts with them
+    3. If HTTP content-type is HTML but declared is not → reject
+    """
+    # Gate 1: HTML content detection.
+    # If user uploaded a PDF/PPTX/Markdown but we got HTML, the server
+    # likely returned a SPA fallback or error page.
+    if _looks_like_html(content) and not declared_mime.startswith("text/html"):
+        raise FileIntegrityError(
+            f"content is HTML but declared mime is {declared_mime!r} "
+            f"(name={name!r}) — likely SPA fallback or error page"
+        )
+
+    # Gate 2: HTTP content-type cross-check.
+    # If the HTTP response says text/html but we declared application/pdf, reject.
+    if (
+        actual_mime.startswith("text/html")
+        and not declared_mime.startswith("text/html")
+        and declared_mime not in {"", "application/octet-stream"}
+    ):
+        raise FileIntegrityError(
+            f"HTTP content-type is {actual_mime!r} but declared mime is {declared_mime!r}"
+        )
+
+    # Gate 3: Magic bytes verification.
+    expected_magic = _MAGIC_BYTES.get(declared_mime)
+    if (
+        expected_magic is not None
+        and len(content) >= len(expected_magic)
+        and not content[: len(expected_magic)].startswith(expected_magic)
+    ):
+        raise FileIntegrityError(f"magic bytes mismatch for {declared_mime!r} (name={name!r})")
+
+
+def content_hash(content: bytes) -> str:
+    """SHA-256 hex digest for integrity verification."""
+    return hashlib.sha256(content).hexdigest()
+
+
+# ── FileRef / IngestResult ───────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -142,6 +229,8 @@ class IngestCacheEntry:
     name: str
     size_bytes: int
     ingested_at: float
+    content_hash: str = ""
+    """SHA-256 hex digest. Empty for legacy entries (pre-integrity)."""
 
 
 class IngestCache:
@@ -162,20 +251,45 @@ class IngestCache:
         self._load()
 
     def resolve(self, ref: FileRef) -> str | None:
-        """Return a valid cached ``attachment_id`` or ``None``."""
+        """Return a valid cached ``attachment_id`` or ``None``.
+
+        Verifies content integrity: if the cache has a content_hash and the
+        stored bytes don't match, the entry is invalidated.
+        """
         key = _cache_key(ref)
         with self._lock:
             entry = self._entries.get(key)
         if entry is None:
             return None
-        if not self._store.exists(entry.attachment_id):
+        stored = self._store.get(entry.attachment_id)
+        if stored is None:
             with self._lock:
                 self._entries.pop(key, None)
                 self._persist_unlocked()
             return None
+        # Cache Gate: verify content hash if recorded.
+        if entry.content_hash:
+            raw = self._store.read_bytes(entry.attachment_id)
+            if raw is not None and content_hash(raw) != entry.content_hash:
+                _log.warning(
+                    "ingest_cache_integrity_mismatch",
+                    name=ref.name,
+                    attachment_id=entry.attachment_id,
+                )
+                with self._lock:
+                    self._entries.pop(key, None)
+                    self._persist_unlocked()
+                return None
         return entry.attachment_id
 
-    def remember(self, ref: FileRef, attachment_id: str, *, size_bytes: int) -> None:
+    def remember(
+        self,
+        ref: FileRef,
+        attachment_id: str,
+        *,
+        size_bytes: int,
+        content_hash: str = "",
+    ) -> None:
         key = _cache_key(ref)
         entry = IngestCacheEntry(
             attachment_id=attachment_id,
@@ -184,6 +298,7 @@ class IngestCache:
             name=ref.name,
             size_bytes=size_bytes,
             ingested_at=time.time(),
+            content_hash=content_hash,
         )
         with self._lock:
             self._entries[key] = entry
@@ -214,6 +329,7 @@ class IngestCache:
                     name=str(value.get("name", "")),
                     size_bytes=int(value.get("size_bytes", 0)),
                     ingested_at=float(value.get("ingested_at", 0.0)),
+                    content_hash=str(value.get("content_hash", "")),
                 )
             except (KeyError, TypeError, ValueError):
                 continue
@@ -324,7 +440,11 @@ async def ingest_file_refs(
     cache: IngestCache | None = None,
     settings: LobeHubBridgeSettings | None = None,
 ) -> IngestResult:
-    """Download referenced files and persist into LCA FileStore (best-effort)."""
+    """Download referenced files and persist into LCA FileStore (best-effort).
+
+    Each file passes through integrity gates before storage.
+    Corrupt or mismatched content is rejected, never stored.
+    """
     cfg = settings if settings is not None else bridge_settings()
     active_fetcher = fetcher if fetcher is not None else HttpxFileFetcher(cfg)
     active_cache = cache if cache is not None else get_ingest_cache(store, cfg)
@@ -343,6 +463,12 @@ async def ingest_file_refs(
             _log.warning("lobehub_file_ingest_blocked", name=ref.name, url=ref.url, error=str(exc))
             skipped.append(ref.name)
             continue
+        except FileIntegrityError as exc:
+            _log.warning(
+                "lobehub_file_ingest_integrity", name=ref.name, url=ref.url, error=str(exc)
+            )
+            skipped.append(ref.name)
+            continue
         except Exception as exc:
             _log.warning("lobehub_file_ingest_failed", name=ref.name, url=ref.url, error=str(exc))
             skipped.append(ref.name)
@@ -357,7 +483,12 @@ async def ingest_file_refs(
             name=ref.name,
             mime_type=mime or ref.mime_type,
         )
-        active_cache.remember(ref, stored.attachment_id, size_bytes=len(data))
+        active_cache.remember(
+            ref,
+            stored.attachment_id,
+            size_bytes=len(data),
+            content_hash=content_hash(data),
+        )
         attachment_ids.append(stored.attachment_id)
 
     return IngestResult(attachment_ids=tuple(attachment_ids), skipped=tuple(skipped))
@@ -367,13 +498,28 @@ async def _load_bytes(
     ref: FileRef,
     fetcher: FileFetcher,
 ) -> tuple[bytes, str]:
+    """Download file bytes with integrity validation.
+
+    Returns (content, mime_type). The mime_type is the *actual* content-type
+    from the HTTP response, not the declared type. Integrity gates ensure
+    the content matches what was expected.
+
+    Raises FileIntegrityError if content is corrupt.
+    """
     url = ref.url.strip()
     if url.startswith("data:"):
-        return _decode_data_uri(url)
-    data, mime = await fetcher.fetch(url)
-    if ref.mime_type and ref.mime_type not in {"", "undefined", "plain/txt"}:
-        return data, ref.mime_type
-    return data, mime
+        data, mime = _decode_data_uri(url)
+        validate_file_integrity(data, ref.mime_type, mime, ref.name)
+        return data, mime
+    data, actual_mime = await fetcher.fetch(url)
+    # Use declared mime if it's specific and not generic.
+    # But always validate against actual content-type from HTTP.
+    declared = ref.mime_type
+    if declared and declared not in {"", "undefined", "plain/txt"}:
+        validate_file_integrity(data, declared, actual_mime, ref.name)
+        return data, declared
+    validate_file_integrity(data, actual_mime, actual_mime, ref.name)
+    return data, actual_mime
 
 
 def _decode_data_uri(url: str) -> tuple[bytes, str]:

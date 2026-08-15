@@ -31,6 +31,7 @@ from lca.contracts.models.observability.journal import (
     RunScope,
 )
 from lca.contracts.models.team.run_context import RunContext
+from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
 from lca.layer0_infra.dsh.routing import is_dsh_driver
 from lca.layer0_infra.file_store import get_default_file_store
@@ -124,14 +125,16 @@ def assemble_run_hub(
     jsonl_path: Path,
     tail: LiveTail,
     settings: ObservabilitySettings | None = None,
+    extra_projectors: Sequence[JournalProjector] = (),
 ) -> ObservabilityHub:
-    """Langfuse via create_observability; jsonl + tail as extra projectors."""
+    """Langfuse via create_observability; jsonl + tail + ops journal as readers."""
     cfg = settings if settings is not None else ObservabilitySettings()
     names = [name for name in cfg.backend_names() if name not in _GATEWAY_SKIP_BACKENDS]
+    extra = [JsonlJournalProjector(jsonl_path), tail, *extra_projectors]
     return create_observability(
         "+".join(names),
         settings=cfg,
-        extra_projectors=(JsonlJournalProjector(jsonl_path), tail),
+        extra_projectors=tuple(extra),
     )
 
 
@@ -167,7 +170,11 @@ def create_run_session(
     jsonl_path = registry.jsonl_path_for(run_id)
     cleaned_ids = tuple(str(i).strip() for i in attachment_ids if str(i).strip())
     tail = LiveTail()
-    hub = assemble_run_hub(jsonl_path=jsonl_path, tail=tail)
+    hub = assemble_run_hub(
+        jsonl_path=jsonl_path,
+        tail=tail,
+        extra_projectors=(registry.journal.bind(),),
+    )
     session = RunSession(
         run_id=run_id,
         trace_id=trace_id,
@@ -222,13 +229,8 @@ async def execute_run(
                 session.error = str(exc)
                 return
             session.bindings = bindings
-            if is_dsh_driver(session.execution_target):
-                # DSH skips Agent/Team, so this is the run-edge bind for record().
-                with bind(hub):
-                    await execute_dsh_session(session)
-                success = not session.error
-                return
-            sandbox = resolve_sandbox() if ref_of(bindings, PlaneKind.SANDBOX) else None
+            dsh = is_dsh_driver(session.execution_target)
+            sandbox = resolve_sandbox() if ref_of(bindings, PlaneKind.SANDBOX) and not dsh else None
             with plane_bindings_scope(bindings):
                 if sandbox is not None:
                     try:
@@ -246,50 +248,55 @@ async def execute_run(
                             error=str(exc),
                         )
                 await _stage_machine_attachments(session)
-                llm = get_llm_resolver().resolve(mode=mode)
-                runnable: Agent | Team
-                if mode == SOLO_MODE_KEY:
-                    runnable = build_solo_agent(
-                        llm,
-                        observability=hub,
-                        role=session.agent.name,
-                        bindings=bindings,
-                    )
-                else:
-                    runnable = await build_runnable_team(
-                        question,
-                        llm,
-                        observability=hub,
-                        trace_id=session.trace_id,
-                        run_id=session.run_id,
-                        bindings=bindings,
-                    )
-                run_ctx = _run_context_for_session(session)
-                if isinstance(runnable, Agent):
-                    result = await runnable.run(question, run_ctx)
-                else:
-                    result = await runnable.run(question)
-                if result.status == TaskStatus.INPUT_REQUIRED:
-                    session.status = RunStatus.WAITING_INPUT
-                    session.snapshot = result.extra.get("state_snapshot")
-                    session.runnable = runnable
-                    session.approval_request = result.extra.get("approval_request")
-                    _log.info(
-                        "run_paused_for_input",
-                        hop="H2",
-                        run_id=session.run_id,
-                        approval_type=session.approval_request.get("type")
-                        if session.approval_request
-                        else None,
-                    )
-                    return
-                success = result.status == TaskStatus.COMPLETED
-                if not success and not session.error and result.error:
-                    session.error = format_user_error(
-                        result.error,
-                        run_id=session.run_id,
-                        trace_id=session.trace_id,
-                    )
+                with bind(hub):
+                    if dsh:
+                        await execute_dsh_session(session)
+                        success = not session.error
+                    else:
+                        llm = get_llm_resolver().resolve(mode=mode)
+                        runnable: Agent | Team
+                        if mode == SOLO_MODE_KEY:
+                            runnable = build_solo_agent(
+                                llm,
+                                observability=hub,
+                                role=session.agent.name,
+                                bindings=bindings,
+                            )
+                        else:
+                            runnable = await build_runnable_team(
+                                question,
+                                llm,
+                                observability=hub,
+                                trace_id=session.trace_id,
+                                run_id=session.run_id,
+                                bindings=bindings,
+                            )
+                        run_ctx = _run_context_for_session(session)
+                        if isinstance(runnable, Agent):
+                            result = await runnable.run(question, run_ctx)
+                        else:
+                            result = await runnable.run(question)
+                        if result.status == TaskStatus.INPUT_REQUIRED:
+                            session.status = RunStatus.WAITING_INPUT
+                            session.snapshot = result.extra.get("state_snapshot")
+                            session.runnable = runnable
+                            session.approval_request = result.extra.get("approval_request")
+                            _log.info(
+                                "run_paused_for_input",
+                                hop="H2",
+                                run_id=session.run_id,
+                                approval_type=session.approval_request.get("type")
+                                if session.approval_request
+                                else None,
+                            )
+                            return
+                        success = result.status == TaskStatus.COMPLETED
+                        if not success and not session.error and result.error:
+                            session.error = format_user_error(
+                                result.error,
+                                run_id=session.run_id,
+                                trace_id=session.trace_id,
+                            )
     except asyncio.CancelledError:
         session.cancel_requested = True
         raise

@@ -76,7 +76,7 @@ uv run vulture lca --min-confidence 80
 
 | 关注点 | 位置 |
 |---|---|
-| 开发栈入口 | `./scripts/lca-ops`（无参=手册）。`status` / `heal` / `logs`（默认 tail -f） |
+| 开发栈入口 | `./scripts/lca-ops`（无参=手册）。`status` / `heal` / `logs`（journal 实况） |
 | Prompt 模板 | `lca/layer1_cognitive/brain/prompts/*.md` |
 | 可观测性 | ADR-0037 Journal-as-Truth；`record()` / `span()` / `traced()` |
 | 真实 LLM 测试 | `uv run pytest -m real_llm -v`（需 `LLM_API_KEY`） |
