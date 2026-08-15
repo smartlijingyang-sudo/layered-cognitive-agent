@@ -196,11 +196,17 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.observability.view.SpanView": ("ReadableSpan 投影值对象，非组件"),
     "lca.layer0_infra.observability.exporters.langfuse.ExporterUnavailableError": ("异常类型"),
     "lca.layer0_infra.observability.registry.UnknownExporterError": ("异常类型"),
-    # ── 执行日志（ADR-0037 Journal-as-Truth）──
-    "lca.layer0_infra.observability.journal.engine.ExecutionJournal": (
-        "journal 引擎，子系统内部写入端；投影器侧协议为 JournalProjector"
+    # ── RunStore（ADR-0055 唯一写入仲裁）──
+    "lca.layer0_infra.observability.journal.engine.RunStore": (
+        "唯一写入仲裁，subscriber 侧协议为 JournalProjector"
     ),
     "lca.layer0_infra.observability.journal.engine.UnregisteredJournalEventError": ("异常类型"),
+    "lca.layer0_infra.observability.journal.reducer.RunState": (
+        "纯数据派生结果（ADR-0055 fold_run_state 输出）"
+    ),
+    "lca.layer0_infra.observability.journal.reducer.RunStatus": (
+        "纯数据枚举（ADR-0055 派生状态词表）"
+    ),
     "lca.layer0_infra.observability.journal.console_projector._TraceState": (
         "console 投影内部累加器（同 _RunDigest 先例）"
     ),
@@ -287,8 +293,8 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.dsh.archive.JsonlEventArchive": (
         "DSH 原始通知归档，文件后端 (DSH compare driver)"
     ),
-    "lca.layer0_infra.dsh.sink.FacadeJournalSink": (
-        "Journal record() 适配器，非跨层组件 (DSH compare driver)"
+    "lca.layer0_infra.dsh.sink.HandleJournalSink": (
+        "Journal store.append() 适配器，非跨层组件 (DSH compare driver)"
     ),
     "lca.layer0_infra.dsh.runtime.DshUnavailableError": ("异常类型，非可插拔组件"),
     # ── 附件身份平面（LobeHub files_info 对齐，run-scoped inbox）──
@@ -301,12 +307,8 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.attachment.layout.AttachmentLayout": (
         "路径派生工具，纯函数聚合，非可插拔组件"
     ),
-    "lca.layer0_infra.attachment.files_info.FilesInfoFile": (
-        "files_info XML 节点值对象，纯数据"
-    ),
-    "lca.layer0_infra.attachment.files_info.FilesInfoDocument": (
-        "files_info 文档值对象，纯数据"
-    ),
+    "lca.layer0_infra.attachment.files_info.FilesInfoFile": ("files_info XML 节点值对象，纯数据"),
+    "lca.layer0_infra.attachment.files_info.FilesInfoDocument": ("files_info 文档值对象，纯数据"),
     "lca.layer0_infra.attachment.service.FileStoreAttachmentIdentity": (
         "AttachmentIdentity Protocol 的 FileStore 实现 (LobeHub files_info 对齐)"
     ),

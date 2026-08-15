@@ -142,7 +142,7 @@ def test_projector_maps_reasoning_text_and_bash() -> None:
     )
     projector.feed(_session_event("turn/end", {"turn": 1, "reason": {"kind": "completed"}}))
     # Caller explicitly finishes the projector with actual output (new contract)
-    projector.finish(status="completed", output="hi")
+    projector.emit_terminal_event(status="completed", output="hi")
 
     kinds = [type(event).__name__ for event in sink.events]
     assert kinds[0] == "AgentRunStarted"

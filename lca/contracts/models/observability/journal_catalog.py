@@ -1,11 +1,19 @@
-"""journal 事件词表登记簿 —— JOURNAL_EVENT_CLASSES / JOURNAL_CATALOG（ADR-0037）。
+"""journal 事件词表登记簿 —— JOURNAL_EVENT_CLASSES / JOURNAL_CATALOG / JOURNAL_CATALOG_META。
+
+词表治理（ADR-0037）+ 数据分类声明（ADR-0055 N6）。
 
 与 ``telemetry_catalog.py`` 同构：每个 journal 事件类登记域（domain）/
 唯一发射模块（emitter）/ 必备字段。守卫测试强制「一事件一发射点」；
-新增事件 = journal.py 一个 dataclass + 本文件一行登记，缺一即 CI 失败。
+新增事件 = journal.py 一个 dataclass + 本文件一行登记 + 一行分类，缺一即 CI 失败。
+
+``JournalSchemaMeta`` 是 schema 级声明——所有该类型的实例共享同一份元数据，
+决定投递保证（durability）、受众过滤（audience）、敏感等级和保留策略。
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Literal
 
 from lca.contracts.models.observability.journal import (
     ActionDegraded,
@@ -76,6 +84,67 @@ JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
         AttachmentStagingFailed,
         RunInsight,
     )
+}
+
+
+# ── 数据分类声明（ADR-0055 N6）──────────────────────────
+
+
+@dataclass(frozen=True)
+class JournalSchemaMeta:
+    """Schema 级元数据：所有该类型的实例共享同一份分类声明。
+
+    - ``durability``：required = 不可静默丢失；best_effort = 高压时可丢。
+    - ``audience``：end_user = SSE live 可见；operator = 运维可见；
+      auditor = 审计可见；restricted = 不进 SSE live 帧。
+    - ``sensitivity``：public / internal / confidential。
+    - ``retention_class``：保留策略标识（default / short / permanent）。
+    """
+
+    durability: Literal["required", "best_effort"]
+    audience: Literal["end_user", "operator", "auditor", "restricted"]
+    sensitivity: Literal["public", "internal", "confidential"]
+    retention_class: str = "default"
+
+
+JOURNAL_CATALOG_META: dict[str, JournalSchemaMeta] = {
+    # 容器事件
+    "TeamRunStarted": JournalSchemaMeta("required", "auditor", "internal"),
+    "TeamRunFinished": JournalSchemaMeta("required", "auditor", "internal"),
+    "AgentRunStarted": JournalSchemaMeta("required", "auditor", "internal"),
+    "AgentRunFinished": JournalSchemaMeta("required", "auditor", "internal"),
+    # 选角
+    "CastingStarted": JournalSchemaMeta("best_effort", "operator", "internal"),
+    "CastingCompleted": JournalSchemaMeta("required", "auditor", "internal"),
+    "CastingFailed": JournalSchemaMeta("required", "auditor", "internal"),
+    # 协作
+    "DelegationIssued": JournalSchemaMeta("required", "auditor", "internal"),
+    "DelegationCompleted": JournalSchemaMeta("required", "auditor", "internal"),
+    "DelegationCacheHit": JournalSchemaMeta("best_effort", "operator", "internal"),
+    "SynthesisCompleted": JournalSchemaMeta("required", "operator", "internal"),
+    # 认知事实
+    "DecisionMade": JournalSchemaMeta("required", "operator", "internal"),
+    "StepCompleted": JournalSchemaMeta("best_effort", "operator", "internal"),
+    "ActionDegraded": JournalSchemaMeta("required", "operator", "internal"),
+    # 资源事实（高压增量 — best_effort）
+    "StepTextDelta": JournalSchemaMeta("best_effort", "end_user", "public", "short"),
+    "ReasoningDelta": JournalSchemaMeta("best_effort", "restricted", "confidential", "short"),
+    "ReasoningCompleted": JournalSchemaMeta("best_effort", "restricted", "confidential", "short"),
+    "RunActivity": JournalSchemaMeta("best_effort", "end_user", "public", "short"),
+    "SandboxOutputDelta": JournalSchemaMeta("best_effort", "end_user", "public", "short"),
+    "LlmCallStarted": JournalSchemaMeta("best_effort", "operator", "internal", "short"),
+    # 资源事实（关键 — required）
+    "LlmCallCompleted": JournalSchemaMeta("required", "operator", "internal"),
+    "ToolCallStreaming": JournalSchemaMeta("best_effort", "end_user", "public", "short"),
+    "ToolStarted": JournalSchemaMeta("required", "operator", "internal"),
+    "ToolInvoked": JournalSchemaMeta("required", "operator", "internal"),
+    "ToolDenied": JournalSchemaMeta("required", "auditor", "internal"),
+    # 附件暂存
+    "AttachmentStagingStarted": JournalSchemaMeta("best_effort", "operator", "internal"),
+    "AttachmentStagingCompleted": JournalSchemaMeta("best_effort", "operator", "internal"),
+    "AttachmentStagingFailed": JournalSchemaMeta("required", "operator", "internal"),
+    # 洞察
+    "RunInsight": JournalSchemaMeta("best_effort", "operator", "internal"),
 }
 
 

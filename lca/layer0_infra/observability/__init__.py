@@ -52,7 +52,9 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.models.observability.journal_catalog import (
     JOURNAL_CATALOG,
+    JOURNAL_CATALOG_META,
     JOURNAL_EVENT_CLASSES,
+    JournalSchemaMeta,
 )
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.observability.exporters.langfuse import ExporterUnavailableError
@@ -72,9 +74,12 @@ from lca.layer0_infra.observability.facade import (
 )
 from lca.layer0_infra.observability.hub import ObservabilityHub
 from lca.layer0_infra.observability.journal import (
-    ExecutionJournal,
     OtelProjector,
+    RunState,
+    RunStatus,
+    RunStore,
     UnregisteredJournalEventError,
+    fold_run_state,
 )
 from lca.layer0_infra.observability.langfuse_conventions import (
     FRAMEWORK_TAG,
@@ -108,6 +113,7 @@ from lca.layer0_infra.observability.view import SpanView
 __all__ = [
     "FRAMEWORK_TAG",
     "JOURNAL_CATALOG",
+    "JOURNAL_CATALOG_META",
     "JOURNAL_EVENT_CLASSES",
     "LANGFUSE_ENVIRONMENT",
     "LANGFUSE_OBSERVATION_INPUT",
@@ -132,10 +138,10 @@ __all__ = [
     "DelegationCompleted",
     "DelegationIssued",
     "DelegationMechanism",
-    "ExecutionJournal",
     "ExporterUnavailableError",
     "JournalEvent",
     "JournalProjector",
+    "JournalSchemaMeta",
     "LlmCallCompleted",
     "LlmCallStarted",
     "ObservabilityHub",
@@ -146,6 +152,9 @@ __all__ = [
     "RunActivity",
     "RunInsight",
     "RunScope",
+    "RunState",
+    "RunStatus",
+    "RunStore",
     "SpanContext",
     "SpanView",
     "StampedEvent",
@@ -167,6 +176,7 @@ __all__ = [
     "create_observability",
     "detached_span",
     "event",
+    "fold_run_state",
     "get_current_run_scope",
     "get_span_context",
     "langfuse_span_visible",

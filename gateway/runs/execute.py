@@ -40,6 +40,7 @@ from lca.layer0_infra.observability import (
     ObservabilityHub,
     bind,
     create_observability,
+    fold_run_state,
     record,
     run_scope,
 )
@@ -365,7 +366,11 @@ async def finalize(
     workspace: Any,
     success: bool,
 ) -> None:
-    """The only teardown. Nested finally. HIL must not call this."""
+    """The only teardown. Nested finally. HIL must not call this.
+
+    终态从 journal 推导（fold_run_state），不再独立写 status——消灭双 owner。
+    cancel_requested 是 session 级信号，覆盖推导结果。
+    """
     try:
         if session.hub is not None:
             _emit_artifact_closure_if_needed(workspace, session, session.hub)
@@ -377,7 +382,7 @@ async def finalize(
             if session.hub is not None:
                 session.hub.release()
         finally:
-            _write_terminal_status(session, success)
+            _derive_terminal_status(session, success)
             registry.clear_inflight(session.run_id)
             registry.prune()
             _record_doctor(session)
@@ -395,15 +400,45 @@ async def _dispose_export(hub: ObservabilityHub) -> None:
         _log.warning("observability_export_dispose_failed", hop="H3", exc_info=True)
 
 
-def _write_terminal_status(session: RunSession, success: bool) -> None:
+def _derive_terminal_status(session: RunSession, success: bool) -> None:
+    """终态推导：优先从 journal 事件流推导，fallback 到 session 信号。
+
+    不变量 N3：状态是事件流的纯函数。cancel_requested 和 session.error
+    是 session 级信号，在推导结果之上覆盖（处理 run 异常早退、无 finish 事件的场景）。
+    """
     if session.cancel_requested:
         session.status = RunStatus.CANCELED
     elif session.error:
         session.status = RunStatus.FAILED
-    elif success:
-        session.status = RunStatus.COMPLETED
+    elif session.hub is not None:
+        derived = fold_run_state(session.hub.store.events)
+        session.status = _journal_to_session_status(derived.status)
+    else:
+        _fallback_terminal_status(session, success)
     if session.status in {RunStatus.CANCELED, RunStatus.FAILED, RunStatus.COMPLETED}:
         session.closed_at = time.time()
+
+
+def _journal_to_session_status(journal_status: object) -> RunStatus:
+    """映射 journal reducer 的 RunStatus 到 session 的 RunStatus。"""
+    from lca.layer0_infra.observability.journal.reducer import RunStatus as JRunStatus
+
+    mapping = {
+        JRunStatus.COMPLETED: RunStatus.COMPLETED,
+        JRunStatus.FAILED: RunStatus.FAILED,
+        JRunStatus.CANCELED: RunStatus.CANCELED,
+        JRunStatus.RUNNING: RunStatus.COMPLETED,  # 无 finish 事件但 teardown 到达 → 视为完成
+        JRunStatus.WAITING_INPUT: RunStatus.WAITING_INPUT,
+    }
+    return mapping.get(journal_status, RunStatus.COMPLETED)  # type: ignore[arg-type]
+
+
+def _fallback_terminal_status(session: RunSession, success: bool) -> None:
+    """Hub 不存在时的 fallback——保持旧行为。"""
+    if session.error:
+        session.status = RunStatus.FAILED
+    elif success:
+        session.status = RunStatus.COMPLETED
 
 
 def _record_doctor(session: RunSession) -> None:
@@ -441,7 +476,7 @@ def _emit_artifact_closure_if_needed(
     from lca.contracts.models.observability.journal import StepTextDelta
 
     try:
-        hub.journal.record(
+        hub.store.append(
             StepTextDelta(
                 step=-1,
                 text_delta="\n\n" + closure,

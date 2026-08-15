@@ -126,16 +126,16 @@ def event(name: object, **attributes: Any) -> None:
 
 
 def record(event: JournalEvent) -> None:
-    """记录 journal 事件（叙事平面，ADR-0037）。
+    """记录 journal 事件（叙事平面，ADR-0055）。
 
     与 span/event 并列的第四种发射形态：事件必须是 ``JournalEvent``
     子类实例（词表守卫强制）；关联骨架（trace/run/parent/delegation id）
-    由引擎从 ambient ``RunScope`` 盖章，发射点不需要提供。未 bind 时 no-op。
+    由 RunStore 从 ambient ``RunScope`` 盖章，发射点不需要提供。未 bind 时 no-op。
     """
     hub = _hub_var.get()
     if hub is None:
         return
-    hub.journal.record(event)
+    hub.store.append(event)
 
 
 def annotate(**attributes: Any) -> None:

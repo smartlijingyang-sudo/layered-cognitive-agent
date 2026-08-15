@@ -56,7 +56,7 @@ async def test_agent_run_finished_on_cancelled_error() -> None:
         await task
     hub.close()
 
-    finished = [e for e in hub.journal.events if isinstance(e.event, AgentRunFinished)]
+    finished = [e for e in hub.store.events if isinstance(e.event, AgentRunFinished)]
     assert len(finished) == 1
     assert finished[0].event.status == TaskStatus.CANCELED.value
 
@@ -85,6 +85,6 @@ async def test_team_run_finished_on_cancelled_error() -> None:
         await task
     hub.close()
 
-    finished = [e for e in hub.journal.events if isinstance(e.event, TeamRunFinished)]
+    finished = [e for e in hub.store.events if isinstance(e.event, TeamRunFinished)]
     assert len(finished) == 1
     assert finished[0].event.status == TaskStatus.CANCELED.value

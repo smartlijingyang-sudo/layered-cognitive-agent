@@ -167,10 +167,10 @@ def restart(
         [
             "stack.stop",
             "infra.ensure",
-            "daemon.restart",
             "gateway.restart",
             "lobehub.ensure",
             "lobehub.start",
+            "daemon.restart",
         ],
     )
     pipeline.execute(ctx)

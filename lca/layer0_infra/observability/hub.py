@@ -1,7 +1,7 @@
 """ObservabilityHub —— 可观测性唯一门面对象。
 
 持有 OTel TracerProvider（遥测骨干）+ 导出器集合 + 属性策略 +
-执行日志（ExecutionJournal，ADR-0037）；业务层通过包根 ambient API
+RunStore（ADR-0055 唯一写入仲裁）；业务层通过包根 ambient API
 （bind/span/event/record）间接使用本类，永不直接接触 OTel 或后端。
 
 导出器故障隔离：每个导出器包在 ``_IsolatedExporter`` 中，
@@ -29,7 +29,7 @@ from lca.layer0_infra.observability.handles import (
     SpanHandle,
     _IsolatedExporter,
 )
-from lca.layer0_infra.observability.journal.engine import ExecutionJournal
+from lca.layer0_infra.observability.journal.engine import RunStore
 from lca.layer0_infra.observability.journal.insight_engine import InsightEngine
 from lca.layer0_infra.observability.journal.otel_projector import OtelProjector
 from lca.layer0_infra.observability.langfuse_conventions import (
@@ -77,14 +77,16 @@ class ObservabilityHub(ObservabilityBackend):
             self._processors.append(processor)
         self._tracer = self._provider.get_tracer(_TRACER_NAME)
         self._policy = policy if policy is not None else AttributePolicy()
-        # journal 永远在线（ADR-0037）。投影器顺序即语义：
-        # InsightEngine 先行（收尾时把 RunInsight 回注 journal，须在 OTel 关闭
-        # run span、console 渲染 Run Card 之前完成），随后 OtelProjector（span
-        # 平面由叙事驱动），最后按后端配置装配其余投影器（console/jsonl...）。
+        # RunStore 永远在线（ADR-0055）。subscriber 顺序即语义：
+        # InsightEngine 先行（收尾时把 RunInsight 通过 store.append 注入，
+        # 须在 OTel 关闭 run span、console 渲染 Run Card 之前完成），
+        # 随后 OtelProjector（span 平面由叙事驱动），
+        # 最后按后端配置装配其余 subscriber（console/jsonl...）。
         insight = InsightEngine()
-        self._journal = ExecutionJournal(
+        self._store = RunStore(
             [insight, OtelProjector(self._tracer), *journal_projectors], policy=self._policy
         )
+        insight.bind_store(self._store)
         self._scorer: Any = None
         self._bridges: list[Any] = []
         self._released = False
@@ -96,9 +98,14 @@ class ObservabilityHub(ObservabilityBackend):
         return self._policy
 
     @property
-    def journal(self) -> ExecutionJournal:
-        """执行日志（ADR-0037）：叙事平面唯一写入端。"""
-        return self._journal
+    def store(self) -> RunStore:
+        """RunStore（ADR-0055）：唯一写入仲裁。"""
+        return self._store
+
+    @property
+    def journal(self) -> RunStore:
+        """向后兼容别名——新代码请使用 ``hub.store``。"""
+        return self._store
 
     @property
     def provider(self) -> TracerProvider:
@@ -168,10 +175,10 @@ class ObservabilityHub(ObservabilityBackend):
     # ── 生命周期 ────────────────────────────────────────
     def flush(self) -> None:
         """Journal only. Exporters flush in dispose(), never on the chat path."""
-        self._journal.flush()
+        self._store.flush()
 
     def release(self) -> None:
-        """Close journal readers (jsonl, LiveTail). Chat SSE can end here.
+        """Close store subscribers (jsonl, LiveTail). Chat SSE can end here.
 
         Must not wait for optional exporters. Gateway finalize calls this
         before any Langfuse/OTel teardown.
@@ -179,7 +186,7 @@ class ObservabilityHub(ObservabilityBackend):
         if self._released:
             return
         self._released = True
-        self._journal.close()
+        self._store.close()
 
     def dispose(self) -> None:
         """Best-effort exporter shutdown. Caller must not hold the event loop."""

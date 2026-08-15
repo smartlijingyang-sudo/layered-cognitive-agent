@@ -1,7 +1,8 @@
-"""执行日志核心引擎守卫（ADR-0037 Stage 0）。
+"""执行日志核心引擎守卫（ADR-0055 RunStore）。
 
-覆盖：关联骨架盖章 / 词表 fail-fast / 写入期策略强制 / 投影器扇出与
-故障隔离 / facade record() / RunScope 跨 asyncio.create_task 传播。
+覆盖：关联骨架盖章 / 词表 fail-fast / 写入期策略强制 / subscriber 扇出与
+故障隔离 / facade record() / RunScope 跨 asyncio.create_task 传播 /
+commit-before-observe / read_from 自拉。
 """
 
 from __future__ import annotations
@@ -23,8 +24,8 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
 from lca.layer0_infra.observability import (
-    ExecutionJournal,
     ObservabilityHub,
+    RunStore,
     UnregisteredJournalEventError,
     bind,
     record,
@@ -33,7 +34,7 @@ from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
 
 
 class _Collector:
-    """测试投影器：按序收集盖章记录。"""
+    """测试 subscriber：按序收集盖章记录。"""
 
     def __init__(self) -> None:
         self.received: list[StampedEvent] = []
@@ -54,7 +55,7 @@ class _Collector:
 
 
 def test_record_stamps_ambient_run_scope() -> None:
-    journal = ExecutionJournal()
+    store = RunStore()
     scope = RunScope(
         trace_id="trace-1",
         run_id="run-lead",
@@ -63,24 +64,24 @@ def test_record_stamps_ambient_run_scope() -> None:
         agent_role="客户成功总监",
     )
     with run_scope(scope):
-        stamped = journal.record(TeamRunStarted(team_id="team-lead"))
+        stamped = store.append(TeamRunStarted(team_id="team-lead"))
     assert stamped.scope == scope
     assert stamped.seq == 1
     assert stamped.ts > 0
 
 
 def test_record_without_scope_stamps_empty() -> None:
-    journal = ExecutionJournal()
-    stamped = journal.record(TeamRunStarted(team_id="team-x"))
+    store = RunStore()
+    stamped = store.append(TeamRunStarted(team_id="team-x"))
     assert stamped.scope == RunScope()
     assert stamped.scope.parent_run_id is None
 
 
 def test_seq_monotonic_and_events_append_only() -> None:
-    journal = ExecutionJournal()
-    journal.record(TeamRunStarted())
-    journal.record(TeamRunStarted())
-    seqs = [s.seq for s in journal.events]
+    store = RunStore()
+    store.append(TeamRunStarted())
+    store.append(TeamRunStarted())
+    seqs = [s.seq for s in store.events]
     assert seqs == [1, 2]
 
 
@@ -92,7 +93,7 @@ def test_unregistered_event_raises() -> None:
         pass
 
     with pytest.raises(UnregisteredJournalEventError):
-        ExecutionJournal().record(RogueEvent())
+        RunStore().append(RogueEvent())
 
 
 def test_catalog_classes_are_constructible_defaults() -> None:
@@ -106,8 +107,8 @@ def test_catalog_classes_are_constructible_defaults() -> None:
 
 
 def test_secret_in_journal_field_redacted_at_record() -> None:
-    journal = ExecutionJournal()
-    stamped = journal.record(
+    store = RunStore()
+    stamped = store.append(
         LlmCallCompleted(model="stub", prompt_preview="key=sk-1234567890abcdef 正常内容")
     )
     event = stamped.event
@@ -118,8 +119,8 @@ def test_secret_in_journal_field_redacted_at_record() -> None:
 
 def test_enum_fields_normalized_at_record() -> None:
     """枚举字段（str 混入词表枚举）写入期归一为纯值，杜绝 repr 泄漏。"""
-    journal = ExecutionJournal()
-    stamped = journal.record(
+    store = RunStore()
+    stamped = store.append(
         DelegationIssued(
             delegation_id="dlg-9",
             callee_role="架构师",
@@ -133,25 +134,25 @@ def test_enum_fields_normalized_at_record() -> None:
 
 
 def test_minimal_verbosity_drops_previews_in_journal() -> None:
-    journal = ExecutionJournal(policy=AttributePolicy(Verbosity.MINIMAL))
-    stamped = journal.record(LlmCallCompleted(model="stub", prompt_preview="长" * 5000))
+    store = RunStore(policy=AttributePolicy(Verbosity.MINIMAL))
+    stamped = store.append(LlmCallCompleted(model="stub", prompt_preview="长" * 5000))
     event = stamped.event
     assert isinstance(event, LlmCallCompleted)
     assert event.prompt_preview == ""
 
 
-# ── 投影器扇出与故障隔离 ─────────────────────────────────
+# ── subscriber 扇出与故障隔离 ─────────────────────────────
 
 
-def test_projectors_receive_events_in_order() -> None:
+def test_subscribers_receive_events_in_order() -> None:
     collector = _Collector()
-    journal = ExecutionJournal([collector])
-    journal.record(TeamRunStarted(team_id="a"))
-    journal.record(TeamRunStarted(team_id="b"))
+    store = RunStore([collector])
+    store.append(TeamRunStarted(team_id="a"))
+    store.append(TeamRunStarted(team_id="b"))
     assert [s.event.team_id for s in collector.received] == ["a", "b"]  # type: ignore[attr-defined]
 
 
-def test_failing_projector_does_not_break_journal() -> None:
+def test_failing_subscriber_does_not_break_store() -> None:
     class Exploding:
         def on_event(self, stamped: StampedEvent) -> None:
             raise RuntimeError("boom")
@@ -163,16 +164,16 @@ def test_failing_projector_does_not_break_journal() -> None:
             raise RuntimeError("boom")
 
     good = _Collector()
-    journal = ExecutionJournal([Exploding(), good])
-    stamped = journal.record(TeamRunStarted(team_id="ok"))  # 不被打断
+    store = RunStore([Exploding(), good])
+    stamped = store.append(TeamRunStarted(team_id="ok"))  # 不被打断
     assert stamped.seq == 1
     assert len(good.received) == 1
-    journal.flush()
-    journal.close()
+    store.flush()
+    store.close()
     assert good.closed
 
 
-def test_hub_lifecycle_flushes_and_closes_journal() -> None:
+def test_hub_lifecycle_flushes_and_closes_store() -> None:
     collector = _Collector()
     hub = ObservabilityHub([], journal_projectors=[collector])
     with bind(hub):
@@ -191,10 +192,10 @@ def test_facade_record_routes_through_hub() -> None:
     try:
         with bind(hub), run_scope(RunScope(run_id="r-1")):
             record(TeamRunStarted(team_id="via-facade"))
-        assert len(hub.journal.events) == 1
-        assert hub.journal.events[0].scope.run_id == "r-1"
+        assert len(hub.store.events) == 1
+        assert hub.store.events[0].scope.run_id == "r-1"
     finally:
-        hub.close()  # 容器必闭：投影 attach 不泄漏到后续测试
+        hub.close()
 
 
 def test_facade_record_noop_without_hub() -> None:
@@ -216,3 +217,56 @@ async def test_run_scope_propagates_into_created_tasks() -> None:
         task = asyncio.create_task(member())
         await task
     assert captured == [scope]
+
+
+# ── commit-before-observe（ADR-0055 N1）──────────────────
+
+
+def test_commit_before_observe_subscriber_sees_committed_event() -> None:
+    """subscriber 看到的事件已在 log 中。"""
+    store = RunStore()
+
+    class AssertingSubscriber:
+        def on_event(self, stamped: StampedEvent) -> None:
+            # 此时 store.events 必须已包含该事件
+            assert stamped in store.events
+
+        def flush(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    store._subscribers = [AssertingSubscriber()]
+    store.append(TeamRunStarted(team_id="n1-test"))
+
+
+# ── read_from 自拉 ───────────────────────────────────────
+
+
+def test_read_from_returns_events_after_seq() -> None:
+    store = RunStore()
+    store.append(TeamRunStarted(team_id="a"))
+    store.append(TeamRunStarted(team_id="b"))
+    store.append(TeamRunStarted(team_id="c"))
+    tail = store.read_from(1)
+    assert len(tail) == 2
+    assert tail[0].seq == 2
+    assert tail[1].seq == 3
+
+
+def test_read_from_zero_returns_all() -> None:
+    store = RunStore()
+    store.append(TeamRunStarted())
+    store.append(TeamRunStarted())
+    assert len(store.read_from(0)) == 2
+
+
+# ── record() 向后兼容别名 ────────────────────────────────
+
+
+def test_record_is_alias_for_append() -> None:
+    store = RunStore()
+    stamped = store.record(TeamRunStarted(team_id="compat"))
+    assert stamped.seq == 1
+    assert len(store.events) == 1

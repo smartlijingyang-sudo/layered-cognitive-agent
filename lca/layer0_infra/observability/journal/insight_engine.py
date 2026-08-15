@@ -1,17 +1,19 @@
-"""InsightEngine —— journal 聚合 + 规则触发的投影器（ADR-0037）。
+"""InsightEngine —— post-commit subscriber，聚合事件，收尾时产出 insight（ADR-0055 N4）。
 
 在 run 收尾（团队 ``TeamRunFinished`` / solo 根 ``AgentRunFinished``）把本
-trace 的事件聚合成摘要，跑 ``insight_rules`` 注册表，把 ``RunInsight`` 排进
-follow-up 队列。``ExecutionJournal`` 等本条事件扇出结束后再 record——投影器
-是读者，不在 fan-out 中回写。
+trace 的事件聚合成摘要，跑 ``insight_rules`` 注册表，把 ``RunInsight``
+通过 ``store.append()`` 正常写入——与任何其他事件走同一路径。
 
-防自激：忽略入站 ``RunInsight``；每 trace 只在收尾触发一次。装配顺序须
-insight 先于 otel/console，保证洞察在 run span 关闭前注入。
+不变量 N4：subscriber 是纯读者。产出的 RunInsight 走正常 append 路径，
+不再通过 drain_followups 回写。
+
+防自激：忽略入站 ``RunInsight``；每 trace 只在收尾触发一次。
+装配顺序须 insight 先于 otel/console，保证洞察在 run span 关闭前注入。
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
@@ -27,17 +29,28 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.observability.journal import insight_rules
 
+if TYPE_CHECKING:
+    from lca.layer0_infra.observability.journal.engine import RunStore
+
 
 def _new_summary() -> dict[str, Any]:
     return {"tool_calls": [], "llm_calls": [], "runs": {}, "actions": {}}
 
 
 class InsightEngine(JournalProjector):
-    """聚合 journal 事件，run 收尾触发洞察规则并回注 RunInsight。"""
+    """Post-commit subscriber：聚合事件，收尾时产出 insight。
+
+    须通过 ``bind_store`` 绑定 store 后才能产出 insight。
+    未绑定时仍正常聚合（向后兼容），但不会产出 RunInsight。
+    """
 
     def __init__(self) -> None:
+        self._store: RunStore | None = None
         self._summaries: dict[str, dict[str, Any]] = {}
-        self._followups: list[JournalEvent] = []
+
+    def bind_store(self, store: RunStore) -> None:
+        """绑定 store 引用——在 hub 构造后调用，解决循环依赖。"""
+        self._store = store
 
     # ── JournalProjector ───────────────────────────────
     def on_event(self, stamped: StampedEvent) -> None:
@@ -53,13 +66,6 @@ class InsightEngine(JournalProjector):
 
     def close(self) -> None:
         self._summaries.clear()
-        self._followups.clear()
-
-    def drain_followups(self) -> list[JournalEvent]:
-        """Events to publish after every projector saw the current record."""
-        events = self._followups
-        self._followups = []
-        return events
 
     # ── 聚合 ───────────────────────────────────────────
     def _summary_of(self, stamped: StampedEvent) -> dict[str, Any]:
@@ -107,7 +113,6 @@ class InsightEngine(JournalProjector):
     def _is_finish(stamped: StampedEvent, event: JournalEvent) -> bool:
         if isinstance(event, TeamRunFinished):
             return True
-        # solo 根 run 的收尾（成员 run 有 parent_run_id，不触发）
         return isinstance(event, AgentRunFinished) and stamped.scope.parent_run_id is None
 
     def _emit_insights(self, stamped: StampedEvent) -> None:
@@ -115,8 +120,11 @@ class InsightEngine(JournalProjector):
         summary = self._summaries.pop(trace_id, None)
         if summary is None:
             return
+        store = self._store
+        if store is None:
+            return
         for kind, message, detail in insight_rules.run_all_rules(summary):
-            self._followups.append(RunInsight(kind=kind, summary=message, detail=detail))
+            store.append(RunInsight(kind=kind, summary=message, detail=detail))
 
 
 def create_insight_engine() -> InsightEngine:

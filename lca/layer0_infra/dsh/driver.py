@@ -39,7 +39,7 @@ class DshTurnDriver:
 
         result = self._runtime.run_turn(spec, on_event)
         status = "completed" if result.finish_reason in {None, "completed"} else "failed"
-        self._projector.finish(
+        self._projector.emit_terminal_event(
             status=status,
             output=result.final_response,
             error="" if status == "completed" else (result.finish_reason or "error"),

@@ -218,7 +218,7 @@ class TestJournalVocabularyGuard(unittest.TestCase):
     def _collect_record_emissions(self) -> dict[str, set[str]]:
         """事件类名 → 发射模块集合（仅统计裸 ``record(...)`` 调用）。
 
-        属性调用（``hub.journal.record(...)`` / ``self._journal.record(...)``）
+        属性调用（``hub.store.append(...)`` / ``self._store.append(...)``）
         是引擎内部接线，不算业务发射点；发射点一律从包根 import 裸调用。
         """
         emissions: dict[str, set[str]] = {}

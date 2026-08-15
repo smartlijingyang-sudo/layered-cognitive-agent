@@ -6,6 +6,7 @@ import structlog
 
 from gateway.runs.session import RunSession
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
+from lca.contracts.models.observability.journal import AgentRunFinished
 from lca.contracts.protocols import DshRuntime
 from lca.layer0_infra.computer.machine import MachineTransport
 from lca.layer0_infra.dsh.archive import JsonlEventArchive
@@ -15,7 +16,7 @@ from lca.layer0_infra.dsh.projector import DshJournalProjector
 from lca.layer0_infra.dsh.run import run_dsh_machine_turn
 from lca.layer0_infra.dsh.runtime import DshUnavailableError
 from lca.layer0_infra.dsh.settings import DshSettings
-from lca.layer0_infra.dsh.sink import FacadeJournalSink
+from lca.layer0_infra.dsh.sink import HandleJournalSink
 from lca.layer0_infra.plane.machine import resolve_machine_transport
 from lca.layer0_infra.plane.resolve import ref_of
 
@@ -37,8 +38,15 @@ async def execute_dsh_session(session: RunSession) -> None:
 
     Lifecycle contract: always emit AgentRunStarted + AgentRunFinished so the
     LiveTail/SSE stream has feedback for the frontend, even on early failure.
+
+    终态通过 store.append(AgentRunFinished) 写入，不通过独立状态路径——
+    消灭双 owner（ADR-0055 不变量 N3）。
     """
-    projector = DshJournalProjector(FacadeJournalSink())
+    from lca.layer0_infra.observability.facade import current_hub
+
+    hub = current_hub()
+    sink = HandleJournalSink(hub=hub)
+    projector = DshJournalProjector(sink)
     archive = JsonlEventArchive(session.jsonl_path.parent / f"{session.run_id}.dsh.jsonl")
     result: DshTurnResult | None = None
 
@@ -89,9 +97,24 @@ async def execute_dsh_session(session: RunSession) -> None:
                 finish_reason=result.finish_reason,
             )
     finally:
-        status = "failed" if session.error else "completed"
-        projector.finish(
+        # 终态通过 sink → store.append 写入（单一 owner）
+        _emit_dsh_terminal_event(hub, session, result)
+
+
+def _emit_dsh_terminal_event(
+    hub: object, session: RunSession, result: DshTurnResult | None
+) -> None:
+    """通过 store.append 写入 AgentRunFinished——唯一终态路径。"""
+    if hub is None:
+        return
+    status = "failed" if session.error else "completed"
+    output = result.final_response if result and not session.error else ""
+    # 通过 sink 发射（走 store.append 路径）
+    sink = HandleJournalSink(hub=hub)
+    sink.emit(
+        AgentRunFinished(
             status=status,
-            output=result.final_response if result and not session.error else "",
+            output_text=output,
             error=session.error or "",
         )
+    )

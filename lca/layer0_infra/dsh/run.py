@@ -22,7 +22,7 @@ from lca.layer0_infra.dsh.projector import DshJournalProjector
 from lca.layer0_infra.dsh.prompt import compose_dsh_prompt
 from lca.layer0_infra.dsh.runtime import DshUnavailableError
 from lca.layer0_infra.dsh.settings import DshSettings
-from lca.layer0_infra.dsh.sink import FacadeJournalSink
+from lca.layer0_infra.dsh.sink import HandleJournalSink
 from lca.layer0_infra.file_store import FileStore, get_default_file_store
 
 _log = structlog.get_logger(__name__)
@@ -76,7 +76,7 @@ async def run_dsh_machine_turn(
     )
 
     effective_projector = (
-        projector if projector is not None else DshJournalProjector(FacadeJournalSink())
+        projector if projector is not None else DshJournalProjector(HandleJournalSink())
     )
     effective_archive = (
         archive if archive is not None else JsonlEventArchive(runs_dir / f"{run_id}.dsh.jsonl")

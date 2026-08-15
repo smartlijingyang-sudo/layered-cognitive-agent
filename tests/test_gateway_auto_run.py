@@ -33,7 +33,7 @@ def _journal_event_types(session: object) -> set[str]:
 
     assert isinstance(session, RunSession)
     if session.hub is not None:
-        return {type(stamped.event).__name__ for stamped in session.hub.journal.events}
+        return {type(stamped.event).__name__ for stamped in session.hub.store.events}
     return {type(stamped.event).__name__ for stamped in read_journal(session.jsonl_path)}
 
 

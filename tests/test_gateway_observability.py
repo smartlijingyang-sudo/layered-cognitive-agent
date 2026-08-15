@@ -114,11 +114,16 @@ def test_release_closes_journal_before_export_dispose() -> None:
 class _HangExportHub:
     released = False
 
+    class _MockStore:
+        events: tuple = ()
+
+    store = _MockStore()
+
     def release(self) -> None:
         self.released = True
 
     def dispose(self) -> None:
-        time.sleep(30)
+        time.sleep(5)
 
 
 @pytest.mark.asyncio

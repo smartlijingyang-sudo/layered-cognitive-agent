@@ -62,17 +62,24 @@ class LobeHubService:
         if pid is None:
             return ServiceState(status=ServiceStatus.STOPPED, detail="spawn failed")
 
-        # Wait for ready
-        for _ in range(60):
+        # Wait for ready — require consecutive successes so we don't
+        # report ready during a brief compilation window.
+        needed = 3
+        consec = 0
+        for _ in range(120):
             time.sleep(0.5)
             if http_ready(f"{self._config.dev_url}/", timeout=1.0):
-                self._state.write_pid(self.name, pid)
-                return ServiceState(
-                    status=ServiceStatus.RUNNING,
-                    pid=pid,
-                    port=self._config.dev_port,
-                    detail="dev server ready",
-                )
+                consec += 1
+                if consec >= needed:
+                    self._state.write_pid(self.name, pid)
+                    return ServiceState(
+                        status=ServiceStatus.RUNNING,
+                        pid=pid,
+                        port=self._config.dev_port,
+                        detail="dev server ready",
+                    )
+            else:
+                consec = 0
 
         return ServiceState(
             status=ServiceStatus.STOPPED,
@@ -132,14 +139,31 @@ class LobeHubService:
         checks.append(HealthCheck("source", source_ok, str(self._dir)))
 
         # Patches applied?
+        deploy_dir = self._root / "deploy" / "lobehub"
         patches_ok = (self._dir / ".lca-patched").exists()
-        checks.append(HealthCheck("patches", patches_ok))
+        patch_count = self._count_patches(deploy_dir)
+        patch_drift = self._state.detect_changes("patches", [deploy_dir], "*")
+        if not patches_ok:
+            patch_detail = f"{patch_count} patches, NOT applied"
+        elif patch_drift.has_changes:
+            patch_detail = f"{patch_count} patches, stale ({patch_drift.summary})"
+        else:
+            patch_detail = f"{patch_count} patches, up-to-date"
+        checks.append(
+            HealthCheck("patches", patches_ok and not patch_drift.has_changes, patch_detail)
+        )
 
         why = ""
         next_action = ""
+        patches_stale = patches_ok and patch_drift.has_changes
+        patches_missing = not patches_ok
         if process_ok and dev_ok:
             status = ServiceStatus.RUNNING
             detail = "healthy"
+            if patches_stale or patches_missing:
+                detail = f"healthy (patches need reapply — {patch_detail})"
+                why = "patch source changed since last apply"
+                next_action = "./scripts/lca-ops lobehub ensure"
         elif process_ok:
             status = ServiceStatus.DEGRADED
             detail = "process alive but dev server not responding"
@@ -167,15 +191,16 @@ class LobeHubService:
         )
 
     def heal(self) -> ServiceState:
-        """Auto-recover: start if stopped, ensure_ready if needed."""
+        """Auto-recover: start if stopped, re-apply patches if stale."""
         current = self.state()
-        if current.is_running:
+        if current.is_running and not current.next_action:
             return current
 
-        # Check if setup is needed
-        if not self._dir.exists() or not (self._dir / "package.json").exists():
-            self.ensure_ready()
+        # Patches stale or missing → stop, re-ensure, restart
+        if current.is_running:
+            self.stop()
 
+        self.ensure_ready()
         return self.start()
 
     # ── Setup Internals ───────────────────────────────────────────────
@@ -205,11 +230,23 @@ class LobeHubService:
         except Exception:
             return False
 
+    @staticmethod
+    def _count_patches(deploy_dir: Path) -> int:
+        """Count patch module files (excluding __init__ and __pycache__)."""
+        patches_dir = deploy_dir / "patches"
+        if not patches_dir.is_dir():
+            return 0
+        return sum(
+            1
+            for f in patches_dir.rglob("*.py")
+            if f.name != "__init__.py" and "__pycache__" not in f.parts
+        )
+
     def _ensure_patches(self) -> bool:
         """Apply patches if source changed."""
         # Check if patches need reapplication
         deploy_dir = self._root / "deploy" / "lobehub"
-        if not self._state.has_hash_changed("patches", [deploy_dir]):
+        if not self._state.has_changed("patches", [deploy_dir], "*"):
             return False
 
         # Apply patches
@@ -224,7 +261,7 @@ class LobeHubService:
                 capture_output=True,
                 timeout=60,
             )
-            self._state.save_hash("patches", [deploy_dir])
+            self._state.save_snapshot("patches", [deploy_dir], "*")
             return True
         except Exception:
             return False

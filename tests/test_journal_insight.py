@@ -195,7 +195,7 @@ def test_insights_recorded_on_team_finish() -> None:
                 record(AgentRunFinished(status="completed", steps=2))
             with run_scope(team_scope):
                 record(TeamRunFinished(status="completed", steps=2))
-        insights = [e.event for e in hub.journal.events if isinstance(e.event, RunInsight)]
+        insights = [e.event for e in hub.store.events if isinstance(e.event, RunInsight)]
         kinds = {i.kind for i in insights}
         assert rules.INSIGHT_REDUNDANT_TOOL in kinds
         assert rules.INSIGHT_CRITICAL_PATH in kinds
@@ -215,11 +215,11 @@ def test_insights_publish_after_finished_in_seq_order() -> None:
                     LlmCallCompleted(model="m", latency_ms=10, prompt_tokens=5, completion_tokens=3)
                 )
                 record(AgentRunFinished(status="completed", steps=1))
-        names = [type(event.event).__name__ for event in hub.journal.events]
+        names = [type(event.event).__name__ for event in hub.store.events]
         finished_at = names.index("AgentRunFinished")
         assert "RunInsight" not in names[:finished_at]
         assert "RunInsight" in names[finished_at + 1 :]
-        seqs = [event.seq for event in hub.journal.events]
+        seqs = [event.seq for event in hub.store.events]
         assert seqs == sorted(seqs)
     finally:
         hub.close()
@@ -240,7 +240,7 @@ def test_insights_not_double_emitted_for_member_runs() -> None:
             with run_scope(member_scope):
                 record(AgentRunStarted(agent_role="A", objective="x"))
                 record(AgentRunFinished(status="completed", steps=1))
-        insights = [e.event for e in hub.journal.events if isinstance(e.event, RunInsight)]
+        insights = [e.event for e in hub.store.events if isinstance(e.event, RunInsight)]
         assert insights == []
     finally:
         hub.close()

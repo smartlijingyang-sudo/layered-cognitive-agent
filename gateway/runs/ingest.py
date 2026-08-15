@@ -432,6 +432,30 @@ def select_ingest_files(refs: tuple[FileRef, ...]) -> tuple[FileRef, ...]:
     return tuple(selected)
 
 
+_LOCAL_FILE_URL_RE = re.compile(r"^/files/([a-z]+_[a-z0-9]+)$", re.IGNORECASE)
+
+
+def _try_resolve_local_file(ref: FileRef, store: FileStore) -> str | None:
+    """Resolve a relative ``/files/{id}`` URL directly against the local FileStore.
+
+    First-principles: if the URL points to our own store, the file is already
+    local — no HTTP round-trip needed. Returns the attachment_id if found.
+    """
+    url = ref.url.strip()
+    match = _LOCAL_FILE_URL_RE.match(url)
+    if match is None:
+        # Also handle lobehub_id match — LobeHub may set id=file_xxx with a relative url
+        lobehub_id = ref.lobehub_id.strip()
+        if lobehub_id and store.exists(lobehub_id):
+            return lobehub_id
+        return None
+
+    attachment_id = match.group(1)
+    if store.exists(attachment_id):
+        return attachment_id
+    return None
+
+
 async def ingest_file_refs(
     refs: tuple[FileRef, ...],
     store: FileStore,
@@ -440,7 +464,11 @@ async def ingest_file_refs(
     cache: IngestCache | None = None,
     settings: LobeHubBridgeSettings | None = None,
 ) -> IngestResult:
-    """Download referenced files and persist into LCA FileStore (best-effort).
+    """Mirror remote LobeHub files into LCA FileStore (best-effort).
+
+    First-principles: if the URL points to our own FileStore (relative path
+    like ``/files/file_xxx``), resolve directly — the file is already local.
+    Only fall back to HTTP fetch for genuine external URLs.
 
     Each file passes through integrity gates before storage.
     Corrupt or mismatched content is rejected, never stored.
@@ -452,6 +480,13 @@ async def ingest_file_refs(
     skipped: list[str] = []
 
     for ref in select_ingest_files(refs):
+        # ── First-principles: resolve local files directly ──
+        local_id = _try_resolve_local_file(ref, store)
+        if local_id is not None:
+            attachment_ids.append(local_id)
+            _log.debug("file_resolved_locally", name=ref.name, attachment_id=local_id)
+            continue
+
         cached_id = active_cache.resolve(ref)
         if cached_id is not None:
             attachment_ids.append(cached_id)
@@ -460,7 +495,13 @@ async def ingest_file_refs(
         try:
             data, mime = await _load_bytes(ref, active_fetcher)
         except IngestUrlPolicyError as exc:
-            _log.warning("lobehub_file_ingest_blocked", name=ref.name, url=ref.url, error=str(exc))
+            _log.error(
+                "lobehub_file_ingest_blocked",
+                name=ref.name,
+                url=ref.url,
+                error=str(exc),
+                hint="relative URLs must resolve to a local FileStore entry",
+            )
             skipped.append(ref.name)
             continue
         except FileIntegrityError as exc:

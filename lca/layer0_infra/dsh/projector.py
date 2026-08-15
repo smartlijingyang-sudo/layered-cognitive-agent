@@ -55,12 +55,17 @@ class DshJournalProjector:
         data = event.get("data")
         handler(data if isinstance(data, dict) else {})
 
-    def finish(self, *, status: str | None = None, output: str = "", error: str = "") -> None:
+    def emit_terminal_event(
+        self, *, status: str | None = None, output: str = "", error: str = ""
+    ) -> None:
+        """Translate DSH turn result into a Journal AgentRunFinished via sink.
+
+        Not an independent state write — goes through ``sink.emit`` → ``store.append``.
+        """
         if self._finished:
             return
         self._ensure_open()
         self._finished = True
-        # Use recorded turn status if caller didn't provide explicit values
         final_status = status if status is not None else (self._turn_status or "completed")
         final_error = error if error else self._turn_error
         self._sink.emit(

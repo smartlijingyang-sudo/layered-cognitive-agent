@@ -1,13 +1,21 @@
-"""ExecutionJournal —— 执行日志核心引擎（ADR-0037 Journal-as-Truth）。
+"""RunStore —— 唯一写入仲裁（ADR-0055 不变量 N1, N2）。
 
-单一职责：append-only 日志的写入端。
-``record(JournalEvent)`` 流水线：
-    ① 词表校验 —— 未登记事件类 fail-fast（显式异常）；
-    ② 关联骨架盖章 —— ambient ``RunScope``（trace/run/parent/delegation id）；
-    ③ 属性策略写入期强制 —— 字符串字段统一脱敏/截断（发射点不需要自觉）；
-    ④ 顺序扇出投影器 —— 故障隔离：单投影器异常只记 structlog，不中断 run。
+Append-only run fact log。一个 run 的所有事实只通过一个入口写入。
 
-日志流在内存中全量保留（per hub），供 InsightEngine 与终态投影消费。
+写入流水线：
+    ① 词表校验 —— 未登记事件类 fail-fast；
+    ② 关联骨架盖章 —— ambient RunScope 或显式 scope；
+    ③ 属性策略写入期强制 —— 字符串字段统一脱敏/截断；
+    ④ 原子入 log（commit boundary）；
+    ⑤ post-commit 通知所有 subscriber（失败隔离，不影响 append 返回值）。
+
+关键不变量：
+- N1 append-before-observe：subscriber 永不可见未提交事件。
+- N2 seq = log.length：序号由 log 长度唯一确定，连续不跳跃。
+
+设计来源：DSH Session.append()（同步原子 + post-commit 通知）、
+EventStore expected-version CAS（并发控制）、
+Kafka consumer-managed offset（观察者自拉）。
 """
 
 from __future__ import annotations
@@ -41,8 +49,8 @@ class UnregisteredJournalEventError(TypeError):
         super().__init__(f"未登记的 journal 事件 {event_type.__name__}；词表：{known}")
 
 
-class _IsolatedProjector(JournalProjector):
-    """故障隔离包装：投影异常只记日志，永不向上传播（与导出器同构）。"""
+class _IsolatedSubscriber(JournalProjector):
+    """故障隔离包装：subscriber 异常只记日志，永不向上传播。"""
 
     def __init__(self, inner: JournalProjector) -> None:
         self._inner = inner
@@ -56,8 +64,8 @@ class _IsolatedProjector(JournalProjector):
             self._inner.on_event(stamped)
         except Exception:
             _log.warning(
-                "journal_projector_failed",
-                projector=type(self._inner).__name__,
+                "journal_subscriber_failed",
+                subscriber=type(self._inner).__name__,
                 event_type=type(stamped.event).__name__,
             )
 
@@ -65,36 +73,48 @@ class _IsolatedProjector(JournalProjector):
         try:
             self._inner.flush()
         except Exception:
-            _log.warning("journal_flush_failed", projector=type(self._inner).__name__)
+            _log.warning("journal_flush_failed", subscriber=type(self._inner).__name__)
 
     def close(self) -> None:
         try:
             self._inner.close()
         except Exception:
-            _log.warning("journal_close_failed", projector=type(self._inner).__name__)
+            _log.warning("journal_close_failed", subscriber=type(self._inner).__name__)
 
 
-class ExecutionJournal:
-    """append-only 执行日志：盖章 → 策略强制 → 扇出投影器。"""
+class RunStore:
+    """Append-only run fact log。不变量 N1 + N2。
+
+    一个 run 的所有事实只通过 ``append()`` 写入。写入后立即通知所有
+    subscriber；subscriber 异常被隔离，不影响 append 返回值。
+    """
 
     def __init__(
         self,
-        projectors: Sequence[JournalProjector] = (),
+        subscribers: Sequence[JournalProjector] = (),
         *,
         policy: AttributePolicy | None = None,
     ) -> None:
-        self._projectors = [_IsolatedProjector(p) for p in projectors]
+        self._subscribers = [_IsolatedSubscriber(s) for s in subscribers]
         self._policy = policy if policy is not None else AttributePolicy()
         self._events: list[StampedEvent] = []
         self._seq = 0
 
     @property
     def events(self) -> tuple[StampedEvent, ...]:
-        """已记录的盖章事件流（只读快照）。"""
+        """已提交事件的只读快照。"""
         return tuple(self._events)
 
-    def record(self, event: JournalEvent) -> StampedEvent:
-        """记录一条 journal 事件并扇出投影器（返回盖章记录）。"""
+    @property
+    def seq(self) -> int:
+        """下一条事件的 seq（= len(log)）。"""
+        return self._seq
+
+    def append(self, event: JournalEvent) -> StampedEvent:
+        """原子写入：校验 → 盖章 → 策略 → 入 log → post-commit 通知。
+
+        subscriber 通知在 append 成功后，subscriber 失败不影响返回值。
+        """
         event_type = type(event)
         if event_type.__name__ not in JOURNAL_EVENT_CLASSES:
             raise UnregisteredJournalEventError(event_type)
@@ -102,26 +122,27 @@ class ExecutionJournal:
         scope = get_current_run_scope() or RunScope()
         sanitized = self._apply_policy(event)
         stamped = StampedEvent(seq=self._seq, ts=time.time(), scope=scope, event=sanitized)
-        self._events.append(stamped)
-        for projector in self._projectors:
-            projector.on_event(stamped)
-        self._emit_followups()
+        self._events.append(stamped)  # ← commit boundary
+        for subscriber in self._subscribers:
+            subscriber.on_event(stamped)
         return stamped
 
-    def _emit_followups(self) -> None:
-        """Projectors are readers. Follow-up events publish after fan-out.
+    def read_from(self, after_seq: int) -> Sequence[StampedEvent]:
+        """观察者自拉：返回 seq > after_seq 的所有已提交事件。"""
+        return tuple(e for e in self._events if e.seq > after_seq)
 
-        InsightEngine used to call record() mid-fan-out, so later readers
-        saw RunInsight before AgentRunFinished (seq inversion).
-        """
-        followups: list[JournalEvent] = []
-        for projector in self._projectors:
-            inner = getattr(projector, "inner", projector)
-            drain = getattr(inner, "drain_followups", None)
-            if callable(drain):
-                followups.extend(drain())
-        for event in followups:
-            self.record(event)
+    def record(self, event: JournalEvent) -> StampedEvent:
+        """向后兼容别名——新代码请使用 ``append()``。"""
+        return self.append(event)
+
+    def flush(self) -> None:
+        for subscriber in self._subscribers:
+            subscriber.flush()
+
+    def close(self) -> None:
+        self.flush()
+        for subscriber in self._subscribers:
+            subscriber.close()
 
     def _apply_policy(self, event: JournalEvent) -> JournalEvent:
         """字符串字段写入期策略强制（脱敏/预览裁剪/截断）；非字符串原样。
@@ -149,11 +170,6 @@ class ExecutionJournal:
                 updates[item.name] = prepared_map.get(item.name, "")
         return dataclasses.replace(event, **updates) if updates else event
 
-    def flush(self) -> None:
-        for projector in self._projectors:
-            projector.flush()
 
-    def close(self) -> None:
-        self.flush()
-        for projector in self._projectors:
-            projector.close()
+# 向后兼容别名——渐进迁移期间保留。
+ExecutionJournal = RunStore

@@ -20,6 +20,7 @@ from lca.layer0_infra.ops.service import (
     HealthCheck,
     ServiceState,
     ServiceStatus,
+    http_ready,
     pid_alive,
 )
 from lca.layer0_infra.ops.state import StateStore
@@ -62,6 +63,10 @@ class DaemonService:
         """Resolve gateway health check URL."""
         return f"{self._gateway.base_url}{self._gateway.health_path}"
 
+    def _is_gateway_healthy(self) -> bool:
+        """Check if gateway is accepting connections."""
+        return http_ready(self._gateway_health_url, timeout=1.0)
+
     # ── Lifecycle ─────────────────────────────────────────────────────
 
     def start(self) -> ServiceState:
@@ -76,6 +81,18 @@ class DaemonService:
             return ServiceState(
                 status=ServiceStatus.STOPPED,
                 detail="CLI not deployed to /opt/lca",
+            )
+
+        # Wait for gateway to accept connections — daemon crashes instantly
+        # on ECONNREFUSED with no retry, so we must gate on gateway health.
+        for _ in range(40):
+            if self._is_gateway_healthy():
+                break
+            time.sleep(0.5)
+        else:
+            return ServiceState(
+                status=ServiceStatus.STOPPED,
+                detail="gateway not reachable",
             )
 
         pid = self._spawn()
@@ -161,17 +178,8 @@ class DaemonService:
         checks.append(HealthCheck("daemon", process_ok, f"pid={pid}" if pid else "not running"))
 
         # Gateway reachable?
-        try:
-            result = subprocess.run(
-                ["curl", "-sf", "--max-time", "2", self._gateway_health_url],
-                capture_output=True,
-                timeout=5,
-            )
-            gw_ok = result.returncode == 0
-            checks.append(HealthCheck("gateway", gw_ok, "reachable" if gw_ok else "unreachable"))
-        except Exception:
-            checks.append(HealthCheck("gateway", False, "unreachable"))
-            gw_ok = False
+        gw_ok = self._is_gateway_healthy()
+        checks.append(HealthCheck("gateway", gw_ok, "reachable" if gw_ok else "unreachable"))
 
         if cli_ok and process_ok:
             status = ServiceStatus.RUNNING
