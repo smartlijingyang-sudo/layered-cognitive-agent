@@ -98,7 +98,22 @@ def mount_default_providers(ctx: CapabilityHub) -> CapabilityHub:
 
 
 def register_seam_catalog() -> None:
-    """三角色目录：Definition / Provider / Consumer。缺一不算 seam。"""
+    """三角色目录：Definition / Provider / Consumer。缺一不算 seam。
+
+    .. deprecated::
+        Loader._validate_seam_completeness() replaces this function.
+        Transition: plugin modules declare seam info in PluginManifest,
+        and the Loader validates completeness during reconcile.
+        This function is kept for backward compatibility during Phase A.
+    """
+    import warnings
+
+    warnings.warn(
+        "register_seam_catalog() is deprecated; "
+        "Loader(check_seam_completeness=True) handles seam validation",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     register_seam(LlmService, SeamKey.LLM.value, SeamRole.DEFINITION)
     register_seam(MockLLMAdapter, SeamKey.LLM.value, SeamRole.PROVIDER)
     register_seam(PromptReasoner, SeamKey.LLM.value, SeamRole.CONSUMER)
@@ -159,6 +174,15 @@ def register_seam_catalog() -> None:
 
 
 def boot_capabilities() -> CapabilityHub:
-    """Definition + default Providers + catalog. Composer 的标准入口。"""
-    register_seam_catalog()
+    """Definition + default Providers + catalog. Composer 的标准入口。
+
+    .. note::
+        Legacy path. New code should use profile-driven plugin loading
+        via ``Loader.load()`` with ``AgentComposer.compose(scope=...)``.
+    """
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        register_seam_catalog()
     return mount_default_providers(new_capability_hub())
