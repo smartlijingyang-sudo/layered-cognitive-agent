@@ -591,6 +591,60 @@ def _stream_live(
 # ── Entry Point ───────────────────────────────────────────────────────
 
 
+@app.command()
+def inspect_tree(
+    profile: Path = typer.Argument(
+        Path("profiles/web-standard.yaml"),
+        help="Profile YAML path to inspect",
+    ),
+) -> None:
+    """Show the resolved plugin tree for a profile."""
+    import asyncio
+
+    from lca.layer0_infra.plugin.include._profile import ProfileLoader
+    from lca.layer0_infra.plugin.loader._loader import Loader
+
+    if not profile.exists():
+        print(f"Profile not found: {profile}")
+        raise typer.Exit(1)
+
+    pl = ProfileLoader()
+    entries = pl.load_profile(profile)
+
+    async def _boot():
+        loader = Loader(check_seam_completeness=True)
+        return await loader.load(entries)
+
+    tree = asyncio.run(_boot())
+
+    print(f"Profile: {profile}")
+    print(f"Plugins: {len(tree.entries)}")
+    print()
+    for handle_id, handle in tree.host.handles.items():
+        state = handle.state.value
+        provides = handle.spec.provides or "—"
+        print(f"  {handle_id}")
+        print(f"    state: {state}")
+        print(f"    provides: {provides}")
+        print(f"    inject: {handle.injected or '—'}")
+        print(f"    effects: {len(handle.effects)}")
+
+        # Show manifest info if available
+        original = getattr(
+            next((e for e in tree.entries if e.id == handle_id), None),
+            "_original_module",
+            None,
+        )
+        if original is not None:
+            manifest = getattr(original, "manifest", None)
+            if manifest is not None:
+                print(f"    kind: {manifest.kind.value}")
+                if manifest.seam_key:
+                    print(f"    seam: {manifest.seam_key}")
+    print()
+    print("Seam completeness: PASS")
+
+
 def main() -> None:
     """Entry point for scripts/lca-ops."""
     app()

@@ -113,13 +113,55 @@ def _configure_structlog() -> None:
 _configure_structlog()
 
 
+def _load_harness_profile(application: Starlette, profile_path: str) -> None:
+    """Load harness plugin tree from profile YAML and attach to app.state.
+
+    Phase A: The plugin tree is available but not yet used for routing.
+    It enables ``AgentComposer.compose(scope=...)`` and ``lca inspect tree``.
+    """
+    import asyncio
+    from pathlib import Path
+
+    from lca.layer0_infra.plugin.include._profile import ProfileLoader
+    from lca.layer0_infra.plugin.loader._loader import Loader
+
+    path = Path(profile_path)
+    if not path.exists():
+        structlog.get_logger("lca.gateway").warning("profile_not_found", profile=profile_path)
+        return
+
+    pl = ProfileLoader()
+    entries = pl.load_profile(path)
+    loader = Loader(check_seam_completeness=True)
+
+    try:
+        tree = asyncio.get_event_loop().run_until_complete(loader.load(entries))
+    except RuntimeError:
+        # No running event loop yet (startup) — create one
+        tree = asyncio.run(loader.load(entries))
+
+    application.state.plugin_tree = tree
+    application.state.profile_path = profile_path
+    structlog.get_logger("lca.gateway").info(
+        "harness_profile_loaded",
+        profile=profile_path,
+        plugins=len(tree.entries),
+    )
+
+
 def create_app(
     registry: RunRegistry | None = None,
     llm_resolver: LLMResolver | None = None,
     file_store: LocalFileStore | None = None,
     devices: DeviceRegistry | None = None,
+    profile_path: str | None = None,
 ) -> Starlette:
-    """Factory: tests inject RunRegistry / LLMResolver / FileStore / DeviceRegistry."""
+    """Factory: tests inject RunRegistry / LLMResolver / FileStore / DeviceRegistry.
+
+    When *profile_path* is provided (or ``LCA_PROFILE`` env var is set),
+    the gateway loads the harness plugin tree and stores it in
+    ``app.state.plugin_tree`` for use by scope-driven composition.
+    """
     global _registry, _file_store, _devices, _device_hub
     if registry is not None:
         _registry = registry
@@ -168,6 +210,14 @@ def create_app(
     application.state.devices = _devices
     application.state.device_hub = _device_hub
     application.state.device_settings = _device_settings
+
+    # ── Harness plugin tree (Phase A) ──
+    import os as _os
+
+    resolved_profile = profile_path or _os.environ.get("LCA_PROFILE")
+    if resolved_profile is not None:
+        _load_harness_profile(application, resolved_profile)
+
     return application
 
 
