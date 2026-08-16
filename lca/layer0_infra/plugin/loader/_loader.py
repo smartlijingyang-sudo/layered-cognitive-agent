@@ -214,6 +214,66 @@ class Loader:
             if seam_key not in consumers:
                 log.warning("seam_no_consumer", seam_key=seam_key)
 
+    @staticmethod
+    def _check_seam_completeness(handles: list[Any]) -> None:
+        """Validate seam triangle completeness from PluginHandle manifests.
+
+        Takes a list of handles with ``manifest`` attribute (PluginManifest).
+        Used for direct handle-based validation during reconcile.
+
+        Rules:
+        - Each DEFINITION must have at least one PROVIDER for its seam_key.
+        - PROVIDER must reference a known DEFINITION.
+        - DEFINITIONs with no CONSUMER are warned (not errored).
+
+        Raises:
+            SeamCompletenessError: If validation fails.
+        """
+        from lca.contracts.harness.plugin import PluginKind
+
+        definitions: dict[str, Any] = {}  # seam_key → handle
+        providers: dict[str, list[Any]] = {}  # seam_key → [handles]
+        consumers: dict[str, list[Any]] = {}  # seam_key → [handles]
+
+        for h in handles:
+            m = h.manifest
+            if m.kind == PluginKind.DEFINITION and m.seam_key:
+                definitions[m.seam_key] = h
+            elif m.kind == PluginKind.PROVIDER and m.seam_key:
+                providers.setdefault(m.seam_key, []).append(h)
+            elif m.kind == PluginKind.CONSUMER and m.seam_key:
+                consumers.setdefault(m.seam_key, []).append(h)
+
+        errors: list[str] = []
+
+        # Every DEFINITION must have at least one PROVIDER
+        for key, defn in definitions.items():
+            if key not in providers:
+                errors.append(f"Seam '{key}' defined by {defn.entry_id} has no provider")
+
+        # Every PROVIDER must reference a known DEFINITION
+        for key in providers:
+            if key not in definitions:
+                ids = [h.entry_id for h in providers[key]]
+                errors.append(f"Provider for unknown seam '{key}': {ids}")
+
+        if errors:
+            raise SeamCompletenessError(
+                f"seam completeness check failed: {'; '.join(errors)}"
+            )
+
+        # Warn about definitions without consumers (not errors)
+        import structlog
+
+        log = structlog.get_logger("lca.plugin")
+        for seam_key, defn in definitions.items():
+            if seam_key not in consumers:
+                log.warning(
+                    "seam_no_consumer",
+                    seam_key=seam_key,
+                    definition=defn.entry_id,
+                )
+
     # ── Spec building ─────────────────────────────────────
 
     @staticmethod
