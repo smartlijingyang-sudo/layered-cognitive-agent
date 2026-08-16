@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal
+from typing import Literal, Protocol
 
 
 class ScopeKind(Enum):
@@ -85,6 +85,17 @@ class CapabilityGrant:
     """E.g. ``"tool.execute"``, ``"session.append"``, ``"agent.create"``."""
 
     scope: ScopeKind = ScopeKind.AGENT
+
+
+class PluginContext(Protocol):
+    """Runtime context passed to a plugin's ``apply()`` function.
+
+    Provides access to harness services via ``require()``.
+    """
+
+    def require(self, service_key: str) -> object:
+        """Return the service registered under ``service_key``."""
+        ...
 
 
 @dataclass(frozen=True)
