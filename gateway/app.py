@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import structlog
 from starlette.applications import Starlette
@@ -126,8 +127,7 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
 
     path = Path(profile_path)
     if not path.exists():
-        structlog.get_logger("lca.gateway").warning("profile_not_found", profile=profile_path)
-        return
+        raise FileNotFoundError(f"harness profile not found: {profile_path}")
 
     try:
         tree = asyncio.get_event_loop().run_until_complete(boot_profile(path))
@@ -135,7 +135,13 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
         # No running event loop yet (startup) — create one
         tree = asyncio.run(boot_profile(path))
 
+    from lca.contracts.harness.plugin import ScopeKind
+    from lca.harness.kernel.scope import ScopedPluginHost
+
     application.state.plugin_tree = tree
+    application.state.plugin_host = ScopedPluginHost.wrap(
+        tree.host, ScopeKind.PROFILE, Path(profile_path).stem
+    )
     application.state.profile_path = profile_path
     structlog.get_logger("lca.gateway").info(
         "harness_profile_loaded",
@@ -210,6 +216,8 @@ def create_app(
     import os as _os
 
     resolved_profile = profile_path or _os.environ.get("LCA_PROFILE")
+    if resolved_profile is None and Path("profiles/web-standard.yaml").exists():
+        resolved_profile = "profiles/web-standard.yaml"
     if resolved_profile is not None:
         _load_harness_profile(application, resolved_profile)
 

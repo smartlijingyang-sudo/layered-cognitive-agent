@@ -174,17 +174,21 @@ class Loader:
                     manifest = getattr(original, "manifest", None)
             if not isinstance(manifest, PluginManifest):
                 continue
-            if not manifest.seam_key:
-                continue
 
-            if manifest.kind == PluginKind.DEFINITION:
+            for ep in manifest.extension_points:
+                definitions[ep.seam_key] = entry.id
+
+            if manifest.kind == PluginKind.DEFINITION and manifest.seam_key:
                 definitions[manifest.seam_key] = entry.id
-                # Also check extension_points for additional seam declarations
-                for ep in manifest.extension_points:
-                    definitions[ep.seam_key] = entry.id
             elif manifest.kind == PluginKind.PROVIDER:
-                providers.setdefault(manifest.seam_key, []).append(entry.id)
-            elif manifest.kind == PluginKind.CONSUMER:
+                if manifest.seam_key:
+                    providers.setdefault(manifest.seam_key, []).append(entry.id)
+                for key in manifest.provides:
+                    providers.setdefault(key, []).append(entry.id)
+            elif manifest.kind == PluginKind.SERVICE:
+                for key in manifest.provides:
+                    providers.setdefault(key, []).append(entry.id)
+            elif manifest.kind == PluginKind.CONSUMER and manifest.seam_key:
                 consumers.setdefault(manifest.seam_key, []).append(entry.id)
 
         errors: list[str] = []

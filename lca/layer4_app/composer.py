@@ -13,6 +13,8 @@ from collections.abc import Sequence
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from lca.contracts.harness.plugin import ScopeKind
+
 if TYPE_CHECKING:
     from lca.harness.kernel.scope import ScopedPluginHost
 
@@ -219,7 +221,10 @@ class AgentComposer:
         the legacy ``boot_capabilities()`` path.
         """
         profile = spec.profile
-        ctx = self._resolve_capability_context(scope)
+        compose_scope = (
+            _isolate_agent_scope(scope, spec.profile.role) if scope is not None else None
+        )
+        ctx = self._resolve_capability_context(compose_scope)
         hub = create_observability(spec.observability)
         mem = self._resolve_memory(spec.memory, shared_store, ctx.require(SeamKey.MEMORY.value))
         state_store = self._resolve_state_store(
@@ -425,6 +430,51 @@ class AgentComposer:
         if scope is not None:
             return _ScopeAsCapabilityContext(scope)
         return boot_capabilities()
+
+
+def _isolate_agent_scope(parent: ScopedPluginHost, role: str) -> ScopedPluginHost:
+    """Fork an agent scope and shadow services that compose() mutates.
+
+    Profile-scoped LlmService / ToolsService / TransportService / MemoryService /
+    StateStoreService stay shared for lookup of factories; the child gets
+    fresh instances so two compose() calls cannot overwrite each other.
+    """
+    from lca.layer0_infra.capability.llm import LlmService
+    from lca.layer0_infra.capability.memory import MemoryService
+    from lca.layer0_infra.capability.state_store import StateStoreService
+    from lca.layer0_infra.capability.tools import ToolsService
+    from lca.layer0_infra.capability.transport import TransportService
+    from lca.layer0_infra.plugin.kernel._handle import PluginHandle
+    from lca.layer0_infra.plugin.kernel._spec import PluginSpec
+
+    child = parent.fork(ScopeKind.AGENT, f"agent:{role}")
+    spec = PluginSpec(name="compose-shadow", apply=lambda _ctx, _cfg: None)
+    handle = PluginHandle(
+        entry_id=f"compose-shadow:{child.scope_id}",
+        spec=spec,
+        config={},
+        injected=(),
+    )
+    child.host.register_handle(handle)
+
+    child.provide(handle, "llm", LlmService())
+    child.provide(handle, "tools", ToolsService())
+    child.provide(handle, "transport", TransportService())
+
+    mem = MemoryService()
+    parent_mem = parent.get("memory")
+    if parent_mem is not None:
+        for name in parent_mem.providers.names():
+            mem.register(name, parent_mem.providers.get(name))
+    child.provide(handle, "memory", mem)
+
+    stores = StateStoreService()
+    parent_stores = parent.get("state_store")
+    if parent_stores is not None:
+        for name in parent_stores.providers.names():
+            stores.register(name, parent_stores.providers.get(name))
+    child.provide(handle, "state_store", stores)
+    return child
 
 
 class TeamComposer(AgentComposer):

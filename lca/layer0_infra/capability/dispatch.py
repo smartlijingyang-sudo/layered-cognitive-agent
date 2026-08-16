@@ -36,6 +36,14 @@ class ProviderDispatch(Generic[T]):
             raise RuntimeError(f"{self._seam}: no provider registered")
         return self._providers[self._active]
 
+    def get(self, name: str) -> T:
+        """Look up a provider without changing the active selection."""
+        if name not in self._providers:
+            raise KeyError(
+                f"{self._seam}: unknown provider {name!r}; have {sorted(self._providers)}"
+            )
+        return self._providers[name]
+
     def names(self) -> list[str]:
         return list(self._providers)
 

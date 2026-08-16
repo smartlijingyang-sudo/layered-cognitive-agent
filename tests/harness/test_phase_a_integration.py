@@ -28,7 +28,7 @@ from lca.harness.kernel.compat import manifest_from_spec
 from lca.harness.kernel.scope import ScopedPluginHost, ServiceNotFoundError
 from lca.layer0_infra.plugin.include._profile import ProfileLoader
 from lca.layer0_infra.plugin.kernel._spec import PluginSpec
-from lca.layer0_infra.plugin.loader._loader import Loader
+from lca.layer0_infra.plugin.loader._loader import Loader, SeamCompletenessError
 
 PROFILE_PATH = Path("profiles/web-standard.yaml")
 
@@ -225,6 +225,66 @@ class TestComposerScope:
 
         asyncio.run(_test())
 
+    def test_scope_compose_does_not_mutate_parent_services(self):
+        from lca.harness.profile.boot import boot_profile
+        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.layer4_app.composer import AgentComposer
+        from tests.support.agent_specs import make_spec
+
+        async def _test():
+            tree = await boot_profile(PROFILE_PATH)
+            parent = ScopedPluginHost.wrap(tree.host, ScopeKind.PROFILE, "web-standard")
+            parent_llm = parent.resolve("llm")
+            before = list(parent_llm.providers.names())
+
+            composer = AgentComposer()
+            composer.compose(make_spec("a", MockLLMAdapter()), scope=parent)
+            composer.compose(make_spec("b", MockLLMAdapter()), scope=parent)
+
+            assert parent.resolve("llm") is parent_llm
+            assert parent_llm.providers.names() == before
+            assert "spec" not in parent_llm.providers.names()
+
+        asyncio.run(_test())
+
+    def test_legacy_and_scope_paths_equivalent_calculator(self):
+        from dataclasses import replace
+
+        from lca.contracts.models.team.role_team import ToolPermissionManifest
+        from lca.harness.profile.boot import boot_profile
+        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
+        from lca.layer4_app.composer import AgentComposer
+        from tests.support.agent_specs import make_spec
+
+        tools = tuple(build_calculator_tools())
+        spec = replace(
+            make_spec("tester", MockLLMAdapter(), max_steps=8),
+            tools=tools,
+            profile=replace(
+                make_spec("tester", MockLLMAdapter()).profile,
+                tool_permission_manifest=ToolPermissionManifest(
+                    allowed_tools=[t.name for t in tools]
+                ),
+            ),
+        )
+
+        async def _test():
+            tree = await boot_profile(PROFILE_PATH)
+            scope = ScopedPluginHost.wrap(tree.host, ScopeKind.PROFILE, "web-standard")
+            composer = AgentComposer()
+            legacy = composer.compose(spec)
+            scoped = composer.compose(spec, scope=scope)
+            question = "123 乘以 456 等于多少？"
+            r1 = await legacy.run(question)
+            r2 = await scoped.run(question)
+            assert r1.status == r2.status == "completed"
+            assert r1.output is not None and r2.output is not None
+            assert "56088" in r1.output
+            assert "56088" in r2.output
+
+        asyncio.run(_test())
+
 
 # ── A.7: Seam completeness + deprecation ─────────────────────────────
 
@@ -236,7 +296,16 @@ class TestSeamCompleteness:
             entries = pl.load_profile(PROFILE_PATH)
             loader = Loader(check_seam_completeness=True)
             tree = await loader.load(entries)
-            assert len(tree.entries) == 11
+            assert len(tree.entries) == 1 + len(EXPECTED_SEAM_KEYS)
+
+        asyncio.run(_test())
+
+    def test_missing_llm_provider_fails_completeness(self):
+        async def _test():
+            pl = ProfileLoader()
+            entries = [e for e in pl.load_profile(PROFILE_PATH) if e.id != "lca.llm.service"]
+            with pytest.raises(SeamCompletenessError, match="llm"):
+                await Loader(check_seam_completeness=True).load(entries)
 
         asyncio.run(_test())
 
