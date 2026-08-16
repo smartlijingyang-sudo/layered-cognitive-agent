@@ -17,6 +17,7 @@ from lca.contracts.harness.plugin import ScopeKind
 
 if TYPE_CHECKING:
     from lca.harness.kernel.scope import ScopedPluginHost
+    from lca.harness.middleware import InMemoryMiddlewareRegistry
 
 from lca.contracts.atoms.enums import (
     ActionScope,
@@ -258,13 +259,15 @@ class AgentComposer:
             transport_registry=transport_registry,
             action_registry=action_registry,
         )
+        hooks = self._build_hooks()
         runtime = CognitiveRuntime(
             brain,
             body,
             consume("memory", mem, CognitiveRuntime),
-            self._build_hooks(),
+            hooks,
             consume("state_store", state_store, CognitiveRuntime),
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+            middleware_registry=self._build_middleware_registry(hooks),
         )
         return CognitiveAgent(
             runtime,
@@ -394,6 +397,19 @@ class AgentComposer:
             hooks.register(event_name, default_logging_hook)
             hooks.register(event_name, journal_hook)
         return hooks
+
+    @staticmethod
+    def _build_middleware_registry(hooks: SimpleHookRegistry) -> InMemoryMiddlewareRegistry:
+        from lca.harness.middleware import InMemoryMiddlewareRegistry
+        from lca.layer2_runtime.hook_middleware import install_hook_bridge
+        from lca.layer2_runtime.loop_intervention_mw import install_loop_intervention
+
+        registry = InMemoryMiddlewareRegistry()
+        # Hook bridge: maps middleware phases to legacy hooks
+        install_hook_bridge(registry, hooks)
+        # Loop intervention: replaces inline detection in runtime
+        install_loop_intervention(registry)
+        return registry
 
     @staticmethod
     def _apply_lead_brain(brain: Brain, *, decision_gate: DecisionGate) -> Brain:

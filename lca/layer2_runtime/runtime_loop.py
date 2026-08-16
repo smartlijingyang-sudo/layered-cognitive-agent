@@ -34,11 +34,22 @@ from lca.contracts.protocols import (
 from lca.layer0_infra.observability import get_span_context
 from lca.layer0_infra.skills.activation_scope import get_newly_activated
 from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
+from lca.layer2_runtime.hook_middleware import HOOK_SEAMS, middleware_bag
+from lca.layer2_runtime.loop_intervention_mw import (
+    _LOOP_CONSECUTIVE_THRESHOLD,
+    _LOOP_WARNING_WM_KEY,
+)
 
 _log = structlog.get_logger("lca.runtime_loop")
 
-_LOOP_WARNING_WM_KEY = "loop_warning"
-_LOOP_CONSECUTIVE_THRESHOLD = 3
+_SEAM_TO_HOOK = dict(HOOK_SEAMS)
+
+
+class _PhaseCtx:
+    session_id = ""
+
+    def record(self, event_data: object) -> None:
+        return None
 
 
 class CognitiveRuntime(Runtime):
@@ -56,6 +67,7 @@ class CognitiveRuntime(Runtime):
         hooks: HookRegistry,
         state_store: StateStore,
         stop_rule: StopRule,
+        middleware_registry: object | None = None,
     ) -> None:
         self.brain = brain
         self.body = body
@@ -63,6 +75,7 @@ class CognitiveRuntime(Runtime):
         self.hooks = hooks
         self.state_store = state_store
         self.stop_rule = stop_rule
+        self._mw = middleware_registry
 
     async def run(
         self,
@@ -92,6 +105,24 @@ class CognitiveRuntime(Runtime):
             state.working_memory[PRIOR_CONVERSATION_WM_KEY] = ctx.extra[PRIOR_CONVERSATION_WM_KEY]
         await self.hooks.trigger("on_start", state)
         return await self._loop(state, max_steps)
+
+    async def _emit(
+        self, seam_key: str, phase: str, state: AgentState, ctx: _PhaseCtx
+    ) -> AgentState:
+        if self._mw is not None:
+            result = await self._mw.run(seam_key, phase, state, ctx)
+            return result if result is not None else state
+        hook_name = _SEAM_TO_HOOK.get(seam_key)
+        if hook_name is None:
+            return state
+        bag = middleware_bag(state)
+        kwargs = {
+            key: bag[key]
+            for key in ("decision", "observation", "reflection", "error")
+            if key in bag
+        }
+        await self.hooks.trigger(hook_name, state, **kwargs)
+        return state
 
     async def resume(
         self,
@@ -141,28 +172,35 @@ class CognitiveRuntime(Runtime):
             state.step = step
             state.budget.used_steps = step
             try:
+                ctx = _PhaseCtx()
+                await self._emit("agent.pre_step", "step", state, ctx)
                 # ── Phase 1: Perceive ──
-                await self.hooks.trigger("pre_perceive", state)
+                state = await self._emit("agent.before_perceive", "perceive", state, ctx)
                 state = await self.memory.perceive(state)
-                await self.hooks.trigger("post_perceive", state)
+                state = await self._emit("agent.after_perceive", "perceive", state, ctx)
                 # ── Phase 2: Think ──
-                await self.hooks.trigger("pre_think", state)
+                state = await self._emit("agent.before_think", "think", state, ctx)
                 decision = await self.brain.think(state)
-                await self.hooks.trigger("post_think", state, decision=decision)
+                middleware_bag(state)["decision"] = decision
+                state = await self._emit("agent.after_think", "think", state, ctx)
                 # ── Phase 3: Act ──
-                await self.hooks.trigger("pre_act", state, decision=decision)
+                state = await self._emit("agent.before_act", "act", state, ctx)
                 observation = await self.body.act(decision, state)
-                await self.hooks.trigger(
-                    "post_act", state, decision=decision, observation=observation
-                )
+                bag = middleware_bag(state)
+                bag["decision"] = decision
+                bag["observation"] = observation
+                state = await self._emit("agent.after_act", "act", state, ctx)
                 # ── Phase 3.5: Sync activation state ──
                 self._sync_activated_skills(state)
-                # ── Phase 3.6: Loop intervention ──
-                self._detect_and_inject_loop_warning(state, decision, observation)
+                # ── Phase 3.6: Loop intervention (legacy path if no middleware) ──
+                if self._mw is None:
+                    self._detect_and_inject_loop_warning(state, decision, observation)
                 # ── Phase 4: Reflect ──
-                await self.hooks.trigger("pre_reflect", state, observation=observation)
+                state = await self._emit("agent.before_reflect", "reflect", state, ctx)
                 reflection = await self.brain.reflect(state, observation)
-                await self.hooks.trigger("post_reflect", state, reflection=reflection)
+                middleware_bag(state)["reflection"] = reflection
+                state = await self._emit("agent.after_reflect", "reflect", state, ctx)
+                await self._emit("agent.before_turn_end", "turn_end", state, ctx)
                 # ── Phase 5: Record ──
                 state.history.append(
                     Turn(decision=decision, observation=observation, reflection=reflection)
