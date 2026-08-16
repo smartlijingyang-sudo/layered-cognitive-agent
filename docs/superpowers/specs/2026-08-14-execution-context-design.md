@@ -1031,7 +1031,7 @@ async def handle_request(user_id: str, ...):
 npx @lca/host start
 
 # 远程 Windows（连接到 Linux gateway）
-npx @lca/host connect --gateway ws://10.36.6.252:8765 --token lca-local-host
+npx @lca/host connect --gateway ws://localhost:8765 --token lca-local-host
 ```
 
 **npm 包 `@lca/host`**：
@@ -1168,12 +1168,12 @@ npx @lca/host start --user alice
 # → workspace: /home/lca-alice
 
 # 远程 Windows（自动创建目录，不需要 admin）
-npx @lca/host connect --gateway ws://10.36.6.252:8765
+npx @lca/host connect --gateway ws://localhost:8765
 # → mkdir C:\Users\lichao\LCA\sandbox
 # → device_id = hostname
 
 # 远程 Windows（指定 LobeHub 用户，自动创建目录）
-npx @lca/host connect --gateway ws://10.36.6.252:8765 --user bob
+npx @lca/host connect --gateway ws://localhost:8765 --user bob
 # → mkdir C:\Users\lichao\LCA\bob
 # → device_id = hostname
 
@@ -1204,7 +1204,7 @@ npx @lca/host connect --gateway ws://10.36.6.252:8765 --user bob
 
 ```bash
 # Linux / macOS
-npx @lca/host connect --gateway ws://10.36.6.252:8765 --token lca-local-host
+npx @lca/host connect --gateway ws://localhost:8765 --token lca-local-host
 ```
 
 同样的命令，同样的体验。npm 包检测平台，选择正确的安装策略。
