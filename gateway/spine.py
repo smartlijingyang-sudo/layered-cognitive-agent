@@ -9,6 +9,7 @@ from lca.harness.agent.registry import AgentRegistry
 from lca.harness.command.gateway import CommandGateway
 from lca.harness.projection.registry import InMemoryProjectionRegistry
 from lca.harness.projection.web import ActivityProjection, ConversationProjection
+from lca.harness.skills import SkillsProjection
 from lca.layer4_app.harness_bridge import build_live_agent
 
 _registry: AgentRegistry | None = None
@@ -25,6 +26,7 @@ def bind_session_spine(
     projections = InMemoryProjectionRegistry()
     projections.register(ConversationProjection())
     projections.register(ActivityProjection())
+    projections.register(SkillsProjection())
     registry = AgentRegistry(
         sessions_dir=sessions_dir,
         projections=projections,

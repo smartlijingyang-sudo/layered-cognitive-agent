@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
+from lca.contracts.atoms.enums import ContentType
+from lca.contracts.models.core.decision import Observation
+from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols.tool_pipeline import (
     ExecuteNextFn,
     ToolDefinition,
@@ -13,6 +18,7 @@ from lca.contracts.protocols.tool_pipeline import (
     ToolPreDecision,
 )
 from lca.layer0_infra.tool_pipeline import DefaultToolExecutionPipeline
+from lca.layer1_cognitive.body.pipeline_safe_executor import PipelineSafeExecutor
 
 
 class _EchoProvider:
@@ -36,6 +42,25 @@ class _ModelRenderer:
             "description": definition.description,
             "parameters": definition.parameters,
         }
+
+
+class _LegacyEchoTool:
+    name = "legacy_echo"
+    description = "Echo through the legacy SafeExecutor interface."
+    parameters: ClassVar[dict[str, object]] = {"type": "object"}
+    is_idempotent = True
+    default_timeout_s = 30
+
+    async def execute(self, args: dict[str, object]) -> Observation:
+        return Observation(
+            observation_id="obs-1",
+            success=True,
+            payload=args["message"],
+            content_type=ContentType.TEXT,
+        )
+
+    def validate(self, args: dict[str, object]) -> str | None:
+        return None if isinstance(args.get("message"), str) else "message is required"
 
 
 @pytest.mark.asyncio
@@ -129,3 +154,18 @@ async def test_denied_policy_prevents_provider_execution() -> None:
 
     assert result.ok is False
     assert result.error == "pre-execute denied: approval required"
+
+
+@pytest.mark.asyncio
+async def test_legacy_safe_executor_uses_provider_pipeline_contract() -> None:
+    executor = PipelineSafeExecutor(ToolPermissionManifest(allowed_tools=["legacy_echo"]))
+
+    result = await executor.execute(
+        _LegacyEchoTool(),
+        {"message": "hello"},
+        RetryPolicy(max_retries=0),
+        CacheConfig(enabled=False),
+    )
+
+    assert result.success is True
+    assert result.payload == "hello"

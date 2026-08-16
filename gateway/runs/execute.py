@@ -13,12 +13,11 @@ from typing import Any
 
 import structlog
 
-from gateway.assemble import build_runnable_team, build_solo_agent
-from gateway.modes import DEFAULT_MODE, SOLO_MODE_KEY
+from gateway.modes import DEFAULT_MODE
 from gateway.runs.doctor import diagnose
-from gateway.runs.dsh_execute import execute_dsh_session
 from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.live import LiveTail
+from gateway.runs.loop_drivers import DEFAULT_RUN_DRIVERS
 from gateway.runs.session import RunRegistry, RunSession, RunStatus
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
@@ -33,7 +32,6 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
-from lca.layer0_infra.dsh.routing import is_dsh_driver
 from lca.layer0_infra.file_store import get_default_file_store
 from lca.layer0_infra.llm_resolver import LLMResolver, ProductionLLMResolver
 from lca.layer0_infra.observability import (
@@ -61,7 +59,6 @@ from lca.layer0_infra.search.scope import search_run_scope
 from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
 from lca.layer0_infra.tools.run_finalizer import finalize_run, run_id_scope
 from lca.layer0_infra.workspace import run_workspace_scope
-from lca.layer4_app.api import Agent, Team
 
 _log = structlog.get_logger(__name__)
 
@@ -274,8 +271,12 @@ async def execute_run(
                 session.error = str(exc)
                 return
             session.bindings = bindings
-            dsh = is_dsh_driver(session.execution_target)
-            sandbox = resolve_sandbox() if ref_of(bindings, PlaneKind.SANDBOX) and not dsh else None
+            driver = DEFAULT_RUN_DRIVERS.resolve(session.execution_target)
+            sandbox = (
+                resolve_sandbox()
+                if ref_of(bindings, PlaneKind.SANDBOX) and driver.uses_sandbox
+                else None
+            )
             with plane_bindings_scope(bindings):
                 if sandbox is not None:
                     try:
@@ -294,55 +295,38 @@ async def execute_run(
                         )
                 await _stage_machine_attachments(session)
                 with bind(hub):
-                    if dsh:
-                        await execute_dsh_session(session)
-                        success = not session.error
-                    else:
-                        llm = get_llm_resolver().resolve(mode=mode)
-                        runnable: Agent | Team
-                        if mode == SOLO_MODE_KEY:
-                            runnable = build_solo_agent(
-                                llm,
-                                observability=hub,
-                                role=session.agent.name,
-                                bindings=bindings,
-                            )
-                        else:
-                            runnable = await build_runnable_team(
-                                question,
-                                llm,
-                                observability=hub,
-                                trace_id=session.trace_id,
-                                run_id=session.run_id,
-                                bindings=bindings,
-                            )
-                        run_ctx = _run_context_for_session(session)
-                        if isinstance(runnable, Agent):
-                            result = await runnable.run(question, run_ctx)
-                        else:
-                            result = await runnable.run(question)
-                        if result.status == TaskStatus.INPUT_REQUIRED:
-                            session.status = RunStatus.WAITING_INPUT
-                            session.snapshot = result.extra.get("state_snapshot")
-                            session.runnable = runnable
-                            session.approval_request = result.extra.get("approval_request")
-                            _log.info(
-                                "run_paused_for_input",
-                                hop="H2",
-                                run_id=session.run_id,
-                                approval_type=session.approval_request.get("type")
-                                if session.approval_request
-                                else None,
-                            )
-                            return
-                        success = result.status == TaskStatus.COMPLETED
-                        _maybe_shadow_session(session, question, result)
-                        if not success and not session.error and result.error:
-                            session.error = format_user_error(
-                                result.error,
-                                run_id=session.run_id,
-                                trace_id=session.trace_id,
-                            )
+                    outcome = await driver.execute(
+                        session,
+                        question=question,
+                        mode=mode,
+                        hub=hub,
+                        bindings=bindings,
+                        run_context=_run_context_for_session(session),
+                        llm_resolver=get_llm_resolver(),
+                    )
+                    if outcome.waiting_input:
+                        session.status = RunStatus.WAITING_INPUT
+                        session.snapshot = outcome.snapshot
+                        session.runnable = outcome.resumable
+                        session.approval_request = outcome.approval_request
+                        _log.info(
+                            "run_paused_for_input",
+                            hop="H2",
+                            run_id=session.run_id,
+                            approval_type=session.approval_request.get("type")
+                            if session.approval_request
+                            else None,
+                        )
+                        return
+                    success = outcome.success
+                    if outcome.result is not None:
+                        _maybe_shadow_session(session, question, outcome.result)
+                    if not success and not session.error and outcome.error:
+                        session.error = format_user_error(
+                            outcome.error,
+                            run_id=session.run_id,
+                            trace_id=session.trace_id,
+                        )
     except asyncio.CancelledError:
         session.cancel_requested = True
         raise
@@ -549,7 +533,9 @@ def _freeze_bindings(session: RunSession):
     sandbox = resolve_sandbox()
     sandbox_ref = sandbox_ref_from(sandbox) if sandbox is not None else None
     machine = resolve_machine(session.device_id or None)
-    target = "device" if is_dsh_driver(session.execution_target) else session.execution_target
+    target = DEFAULT_RUN_DRIVERS.resolve(session.execution_target).plane_target
+    if target is None:
+        target = session.execution_target
     bindings = resolve_plane_bindings(
         machine,
         sandbox_ref,

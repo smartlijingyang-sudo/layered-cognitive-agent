@@ -38,9 +38,11 @@ from lca.contracts.models.observability.journal import ToolDenied, ToolInvoked, 
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.contracts.protocols.tool_pipeline import (
+    ToolDefinition,
     ToolExecutionContext,
     ToolExecutionResult,
     ToolPreDecision,
+    ToolProvider,
 )
 from lca.layer0_infra.observability import record
 from lca.layer0_infra.tool_pipeline import DefaultToolExecutionPipeline
@@ -104,29 +106,39 @@ class PipelineSafeExecutor(SafeExecutor):
     def __init__(self, permission_manifest: ToolPermissionManifest):
         self.permission_manifest = permission_manifest
         self._cache: dict[str, Observation] = {}
-        self._pipeline = DefaultToolExecutionPipeline()
-        self._setup_pipeline()
 
-    def _setup_pipeline(self) -> None:
-        """配置管线的各个阶段。"""
-        # Stage 1: pre-execute（权限检查、参数校验）
-        self._pipeline.add_pre_execute(self._pre_execute_check)
+    def _pipeline_for(
+        self, tool: Tool, retry_policy: RetryPolicy, cache_config: CacheConfig
+    ) -> DefaultToolExecutionPipeline:
+        """Bind one legacy Tool to the provider-based pipeline for this invocation.
 
-        # Stage 2: guards（单调守卫，当前为空，可扩展）
-        # 示例：可以添加预算检查守卫
-        # self._pipeline.add_guard(self._budget_guard)
+        The legacy executor receives a concrete ``Tool`` at call time, while the
+        new pipeline owns stable declarations and providers.  A fresh pipeline
+        prevents concurrent calls of the same legacy tool from replacing each
+        other's provider binding.
+        """
+        pipeline = DefaultToolExecutionPipeline()
+        pipeline.register_tool(
+            ToolDefinition(
+                name=tool.name,
+                description=tool.description,
+                parameters=tool.parameters,
+                is_idempotent=tool.is_idempotent,
+                default_timeout_ms=tool.default_timeout_s * 1000,
+            ),
+            _LegacyToolProvider(self, tool, retry_policy, cache_config),
+        )
+        pipeline.add_pre_execute(self._pre_execute_check(tool))
+        return pipeline
 
-        # Stage 3: execute（实际执行）
-        self._pipeline.set_executor(self._execute_with_retry)
+    def _pre_execute_check(self, tool: Tool):
+        async def check(ctx: ToolExecutionContext) -> ToolPreDecision:
+            return self._check_permission_and_args(tool, ctx.args)
 
-        # Stage 4 & 5: post-execute 和 finalize 在 _execute_with_retry 内部处理
+        return check
 
-    async def _pre_execute_check(self, ctx: ToolExecutionContext) -> ToolPreDecision:
+    def _check_permission_and_args(self, tool: Tool, args: dict[str, Any]) -> ToolPreDecision:
         """Stage 1: 权限检查和参数校验。"""
-        tool = ctx.tool
-        args = ctx.args
-
-        # 权限检查
         if tool.name not in self.permission_manifest.allowed_tools:
             record(ToolDenied(tool_name=tool.name, reason="permission"))
             return ToolPreDecision(
@@ -142,14 +154,15 @@ class PipelineSafeExecutor(SafeExecutor):
 
         return ToolPreDecision(kind="allow")
 
-    async def _execute_with_retry(self, ctx: ToolExecutionContext) -> ToolExecutionResult:
+    async def _execute_with_retry(
+        self,
+        tool: Tool,
+        args: dict[str, Any],
+        retry_policy: RetryPolicy,
+        cache_config: CacheConfig,
+        invocation_id: str,
+    ) -> ToolExecutionResult:
         """Stage 3: 实际执行（含重试、缓存）。"""
-        tool = ctx.tool
-        args = ctx.args
-        retry_policy = ctx.retry_policy
-        cache_config = ctx.cache_config
-        invocation_id = ctx.invocation_id
-
         args_preview = compact_args_preview(args)
         started_state = build_started_plugin_state(tool.name, args)
 
@@ -258,17 +271,9 @@ class PipelineSafeExecutor(SafeExecutor):
         """执行工具调用（通过管线）。"""
         invocation_id = invocation_id.strip() or new_id("inv")
 
-        # 构造管线上下文
-        ctx = ToolExecutionContext(
-            tool=tool,
-            args=args,
-            invocation_id=invocation_id,
-            retry_policy=retry_policy,
-            cache_config=cache_config,
+        result = await self._pipeline_for(tool, retry_policy, cache_config).execute(
+            tool.name, args, invocation_id=invocation_id
         )
-
-        # 执行管线
-        result = await self._pipeline.run(ctx)
 
         # 如果管线返回 deny，抛出异常
         if (
@@ -362,4 +367,31 @@ class PipelineSafeExecutor(SafeExecutor):
                 files=tool_files(obs),
                 plugin_state=tool_plugin_state(obs, tool_name=tool.name, args=args),
             )
+        )
+
+
+class _LegacyToolProvider(ToolProvider):
+    """Adapts the legacy Tool/SafeExecutor call shape to ToolProvider."""
+
+    provider_id = "legacy-safe-executor"
+
+    def __init__(
+        self,
+        executor: PipelineSafeExecutor,
+        tool: Tool,
+        retry_policy: RetryPolicy,
+        cache_config: CacheConfig,
+    ) -> None:
+        self._executor = executor
+        self._tool = tool
+        self._retry_policy = retry_policy
+        self._cache_config = cache_config
+
+    async def execute(self, ctx: ToolExecutionContext) -> ToolExecutionResult:
+        return await self._executor._execute_with_retry(
+            self._tool,
+            ctx.args,
+            self._retry_policy,
+            self._cache_config,
+            ctx.invocation_id,
         )
