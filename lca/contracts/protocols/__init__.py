@@ -98,11 +98,14 @@ from lca.contracts.protocols.runtime import Runtime, StopOutcomePolicy, StopRule
 
 # ── 工具执行管线（DSH-inspired 五阶段管线）────────────
 from lca.contracts.protocols.tool_pipeline import (
+    ToolDefinition,
     ToolExecutionContext,
     ToolExecutionPipeline,
     ToolExecutionResult,
     ToolPostDecision,
     ToolPreDecision,
+    ToolProvider,
+    ToolRenderer,
 )
 
 __all__ = [
@@ -158,11 +161,14 @@ __all__ = [
     "TeamUnit",
     "Telemetry",
     "Tool",
+    "ToolDefinition",
     "ToolExecutionContext",
     "ToolExecutionPipeline",
     "ToolExecutionResult",
     "ToolPostDecision",
     "ToolPreDecision",
+    "ToolProvider",
     "ToolRegistry",
+    "ToolRenderer",
     "TransportRegistryProtocol",
 ]

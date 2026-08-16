@@ -20,7 +20,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 # ── 决策类型 ─────────────────────────────────────────────
@@ -42,6 +43,19 @@ class ToolPostDecision:
     content: Any = None  # 替换内容（accept 时）或反馈（block 时）
 
 
+@dataclass(frozen=True)
+class ToolDefinition:
+    """Provider-independent tool declaration exposed to a model and UI."""
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+    result_schema: dict[str, Any] = field(default_factory=dict)
+    version: str = "1.0.0"
+    is_idempotent: bool = False
+    default_timeout_ms: int = 30_000
+
+
 # ── 执行上下文 ───────────────────────────────────────────
 
 
@@ -53,6 +67,8 @@ class ToolExecutionContext:
     args: dict[str, Any]
     invocation_id: str = ""
     agent_role: str = ""
+    definition: ToolDefinition | None = None
+    provider_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -67,11 +83,31 @@ class ToolExecutionResult:
 
 # ── 管线阶段回调类型 ────────────────────────────────────
 
-PreExecuteFn = Any  # async (ctx: ToolExecutionContext) -> ToolPreDecision
-GuardFn = Any  # (ctx: ToolExecutionContext) -> str | None  (deny reason or None)
-ExecuteFn = Any  # async (ctx: ToolExecutionContext) -> ToolExecutionResult
-PostExecuteFn = Any  # async (ctx, result) -> ToolPostDecision
-FinalizeFn = Any  # (result: ToolExecutionResult) -> ToolExecutionResult
+PreExecuteFn = Callable[[ToolExecutionContext], Awaitable[ToolPreDecision]]
+GuardFn = Callable[[ToolExecutionContext], str | None]
+ExecuteFn = Callable[[ToolExecutionContext], Awaitable[ToolExecutionResult]]
+ExecuteNextFn = Callable[[ToolExecutionContext], Awaitable[ToolExecutionResult]]
+ExecuteMiddlewareFn = Callable[
+    [ToolExecutionContext, ExecuteNextFn], Awaitable[ToolExecutionResult]
+]
+PostExecuteFn = Callable[[ToolExecutionContext, ToolExecutionResult], Awaitable[ToolPostDecision]]
+FinalizeFn = Callable[[ToolExecutionResult], ToolExecutionResult]
+
+
+@runtime_checkable
+class ToolProvider(Protocol):
+    """Binds a definition to one concrete execution environment."""
+
+    provider_id: str
+
+    async def execute(self, ctx: ToolExecutionContext) -> ToolExecutionResult: ...
+
+
+@runtime_checkable
+class ToolRenderer(Protocol):
+    """Renders a definition without observing its concrete provider."""
+
+    def render(self, definition: ToolDefinition) -> Any: ...
 
 
 # ── 管线协议 ─────────────────────────────────────────────
@@ -93,12 +129,51 @@ class ToolExecutionPipeline(Protocol):
         """设置核心执行函数（tool body）。"""
         ...
 
+    def register_tool(self, definition: ToolDefinition, provider: ToolProvider) -> None:
+        """Register one definition and its active provider binding."""
+        ...
+
+    def register_provider(self, tool_name: str, provider: ToolProvider) -> None:
+        """Replace the provider binding while retaining the definition."""
+        ...
+
+    def set_renderer(self, renderer: ToolRenderer) -> None:
+        """Configure the provider-independent model/UI renderer."""
+        ...
+
+    def render(self, tool_name: str) -> Any:
+        """Render one registered definition."""
+        ...
+
+    async def execute(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        invocation_id: str = "",
+        agent_role: str = "",
+    ) -> ToolExecutionResult:
+        """Execute a registered provider through the complete policy pipeline."""
+        ...
+
     def add_pre_execute(self, fn: PreExecuteFn) -> None:
         """注册 pre-execute 拦截器（可叠加，按注册顺序执行）。"""
         ...
 
     def add_guard(self, fn: GuardFn) -> None:
         """注册单调守卫（只 deny 或 abstain，第一个 deny 赢）。"""
+        ...
+
+    def add_approval_policy(self, fn: PreExecuteFn) -> None:
+        """Register an approval policy at ``tools.pre_execute``."""
+        ...
+
+    def add_sandbox_guard(self, fn: GuardFn) -> None:
+        """Register a sandbox guard at ``tools.pre_execute``."""
+        ...
+
+    def add_execute(self, fn: ExecuteMiddlewareFn) -> None:
+        """Register around-dispatch middleware at ``tools.execute``."""
         ...
 
     def add_post_execute(self, fn: PostExecuteFn) -> None:
