@@ -370,6 +370,9 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.plugin.kernel._types.PluginState": (
         "插件状态枚举：值类型 (Plugin Tree)"
     ),
+    "lca.layer0_infra.plugin.loader._loader.SeamCompletenessError": (
+        "Seam 完整性校验异常：Loader 内部控制流 (Harness Spine)"
+    ),
 }
 
 _SCAN_PACKAGES = [
