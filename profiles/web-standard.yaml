@@ -1,0 +1,8 @@
+# web-standard profile — default deployment configuration.
+# Bundles: base-spine (core services)
+# Patch: LLM provider selection, session persistence
+
+bundles:
+  - bundles/base-spine.yaml
+
+patch: []

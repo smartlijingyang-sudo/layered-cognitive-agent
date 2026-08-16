@@ -1,0 +1,48 @@
+# base-spine bundle — core capability services for LCA runtime.
+# Each entry maps to a plugin module under lca/plugins/.
+# This replaces the hardcoded boot_capabilities() path.
+
+insert:
+  - id: lca.seam.definitions
+    name: lca.plugins.seam_definitions
+    config: {}
+
+  - id: lca.llm.service
+    name: lca.plugins.llm_service
+    config: {}
+
+  - id: lca.sandbox.service
+    name: lca.plugins.sandbox_service
+    config: {}
+
+  - id: lca.memory.service
+    name: lca.plugins.memory_service
+    config: {}
+
+  - id: lca.state_store.service
+    name: lca.plugins.state_store_service
+    config: {}
+
+  - id: lca.search.service
+    name: lca.plugins.search_service
+    config: {}
+
+  - id: lca.tools.service
+    name: lca.plugins.tools_service
+    config: {}
+
+  - id: lca.transport.service
+    name: lca.plugins.transport_service
+    config: {}
+
+  - id: lca.skills.service
+    name: lca.plugins.skills_service
+    config: {}
+
+  - id: lca.file_store.service
+    name: lca.plugins.file_store_service
+    config: {}
+
+  - id: lca.observability.service
+    name: lca.plugins.observability_service
+    config: {}
