@@ -40,18 +40,26 @@ class ReplayLiveAgent:
     def status(self) -> str:
         return "idle"
     
+    async def replay_all(self) -> list[SessionEvent]:
+        """Replay all events from journal in seq order.
+
+        Returns:
+            All recorded SessionEvents sorted by ascending seq.
+        """
+        events = await self.session_store.read_from(0)
+        return sorted(events, key=lambda e: e.seq)
+
     async def followup(self, message: UserMessage) -> MessageReceipt:
         """Return the next recorded response from the journal.
-        
+
         Args:
             message: User message (ignored in replay mode)
-            
+
         Returns:
             MessageReceipt with replayed content
         """
-        # Find the next assistant message in the journal
-        events = await self.session_store.read_from(0)
-        
+        events = await self.replay_all()
+
         for event in events:
             if event.type == "message.accepted.v1" and event.data.get("role") == "assistant":
                 return MessageReceipt(
@@ -59,7 +67,7 @@ class ReplayLiveAgent:
                     session_id=self.session_id,
                     seq=event.seq,
                 )
-        
+
         # No recorded response found
         return MessageReceipt(
             message_id="",
