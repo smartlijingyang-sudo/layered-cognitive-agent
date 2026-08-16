@@ -113,6 +113,7 @@ def _maybe_shadow_session(session: RunSession, question: str, result: Any) -> No
     proj = projections()
     if registry is None or proj is None:
         return
+
     import asyncio
 
     async def _run() -> None:
