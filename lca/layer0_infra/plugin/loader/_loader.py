@@ -63,6 +63,11 @@ class Loader:
                 config=entry.config,
                 injected=injected,
             )
+            # Attach manifest for seam-completeness validation (if present)
+            original_mod = getattr(entry, "_original_module", None) or entry.module
+            manifest = getattr(original_mod, "manifest", None)
+            if manifest is not None:
+                handle.manifest = manifest  # type: ignore[attr-defined]
             entry.module = spec  # keep resolved spec for diagnostics
             host.register_handle(handle)
 
@@ -77,7 +82,7 @@ class Loader:
 
         # Seam completeness check (if enabled)
         if self._check_seam:
-            self._validate_seam_completeness(active)
+            self._check_seam_completeness(list(host.handles.values()))
 
         # Build disposer list (one per activated plugin)
         disposers: list[tuple[str, Any]] = []
@@ -145,81 +150,33 @@ class Loader:
 
     # ── Seam completeness ────────────────────────────────
 
-    @staticmethod
-    def _validate_seam_completeness(entries: list[PluginEntry]) -> None:
-        """Validate seam triangle completeness from PluginManifest declarations.
+    def _validate_seam_completeness(self, entries: list[PluginEntry]) -> None:
+        """Deprecated: entries-based seam check.
 
-        Reads the ``manifest`` attribute from each entry's original module.
-        Only entries with a ``PluginManifest`` participate in this check.
-
-        Rules:
-        - Each DEFINITION must have at least one PROVIDER for its seam_key.
-        - PROVIDER/CONSUMER seam_keys must reference a known DEFINITION.
-        - DEFINITIONs with no CONSUMER are warned (not errored).
+        .. deprecated::
+            Delegates to :meth:`_check_seam_completeness`. Kept for
+            backward compatibility — new code should call the handle-based
+            version directly.
         """
-        from lca.contracts.harness.plugin import PluginKind, PluginManifest
+        from types import SimpleNamespace
 
-        definitions: dict[str, str] = {}  # seam_key → entry_id
-        providers: dict[str, list[str]] = {}  # seam_key → [entry_ids]
-        consumers: dict[str, list[str]] = {}  # seam_key → [entry_ids]
-
+        shim_handles: list[Any] = []
         for entry in entries:
-            mod = entry.module
-            # The original module (before _build_spec replaces it) may have manifest
-            manifest: PluginManifest | None = getattr(mod, "manifest", None)
+            mod = getattr(entry, "_original_module", None) or entry.module
+            manifest = getattr(mod, "manifest", None)
             if manifest is None:
-                # Also check the original module stored on the entry
-                original = getattr(entry, "_original_module", None)
-                if original is not None:
-                    manifest = getattr(original, "manifest", None)
-            if not isinstance(manifest, PluginManifest):
                 continue
+            shim_handles.append(
+                SimpleNamespace(manifest=manifest, entry_id=entry.id)
+            )
+        self._check_seam_completeness(shim_handles)
 
-            for ep in manifest.extension_points:
-                definitions[ep.seam_key] = entry.id
+    def _check_seam_completeness(self, handles: list[Any]) -> None:
+        """Validate seam triangle completeness from handle manifests.
 
-            if manifest.kind == PluginKind.DEFINITION and manifest.seam_key:
-                definitions[manifest.seam_key] = entry.id
-            elif manifest.kind == PluginKind.PROVIDER:
-                if manifest.seam_key:
-                    providers.setdefault(manifest.seam_key, []).append(entry.id)
-                for key in manifest.provides:
-                    providers.setdefault(key, []).append(entry.id)
-            elif manifest.kind == PluginKind.SERVICE:
-                for key in manifest.provides:
-                    providers.setdefault(key, []).append(entry.id)
-            elif manifest.kind == PluginKind.CONSUMER and manifest.seam_key:
-                consumers.setdefault(manifest.seam_key, []).append(entry.id)
-
-        errors: list[str] = []
-
-        # Every DEFINITION must have at least one PROVIDER
-        for seam_key, defn_id in definitions.items():
-            if seam_key not in providers:
-                errors.append(f"Seam '{seam_key}' defined by {defn_id} has no provider")
-
-        # Every PROVIDER must reference a known DEFINITION
-        for seam_key, provider_ids in providers.items():
-            if seam_key not in definitions:
-                errors.append(f"Provider for unknown seam '{seam_key}': {provider_ids}")
-
-        if errors:
-            raise SeamCompletenessError(f"seam completeness check failed: {'; '.join(errors)}")
-
-        # Warn about definitions without consumers (not errors)
-        import structlog
-
-        log = structlog.get_logger("lca.plugin")
-        for seam_key in definitions:
-            if seam_key not in consumers:
-                log.warning("seam_no_consumer", seam_key=seam_key)
-
-    @staticmethod
-    def _check_seam_completeness(handles: list[Any]) -> None:
-        """Validate seam triangle completeness from PluginHandle manifests.
-
-        Takes a list of handles with ``manifest`` attribute (PluginManifest).
-        Used for direct handle-based validation during reconcile.
+        Master implementation. Takes an iterable of handle-like objects
+        exposing ``manifest`` (PluginManifest) and ``entry_id`` (str).
+        Handles without a ``manifest`` attribute are skipped.
 
         Rules:
         - Each DEFINITION must have at least one PROVIDER for its seam_key.
@@ -236,13 +193,26 @@ class Loader:
         consumers: dict[str, list[Any]] = {}  # seam_key → [handles]
 
         for h in handles:
-            m = h.manifest
-            if m.kind == PluginKind.DEFINITION and m.seam_key:
-                definitions[m.seam_key] = h
-            elif m.kind == PluginKind.PROVIDER and m.seam_key:
-                providers.setdefault(m.seam_key, []).append(h)
-            elif m.kind == PluginKind.CONSUMER and m.seam_key:
-                consumers.setdefault(m.seam_key, []).append(h)
+            m = getattr(h, "manifest", None)
+            if m is None:
+                continue
+            kind = getattr(m, "kind", None)
+            seam_key = getattr(m, "seam_key", None)
+            # extension_points (e.g. BUNDLE declarations) act as definitions
+            for ep in getattr(m, "extension_points", ()) or ():
+                ep_key = getattr(ep, "seam_key", None)
+                if ep_key:
+                    definitions.setdefault(ep_key, h)
+            if kind == PluginKind.DEFINITION and seam_key:
+                definitions[seam_key] = h
+            elif kind == PluginKind.PROVIDER and seam_key:
+                providers.setdefault(seam_key, []).append(h)
+            elif kind == PluginKind.SERVICE:
+                # SERVICE plugins act as providers for their `provides` keys
+                for key in getattr(m, "provides", ()) or ():
+                    providers.setdefault(key, []).append(h)
+            elif kind == PluginKind.CONSUMER and seam_key:
+                consumers.setdefault(seam_key, []).append(h)
 
         errors: list[str] = []
 
