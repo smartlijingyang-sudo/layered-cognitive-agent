@@ -1,5 +1,7 @@
 """Search service plugin — provides the ``search`` capability seam."""
 
+from typing import Any
+
 from lca.contracts.harness.plugin import PluginKind, PluginManifest
 
 manifest = PluginManifest(
@@ -14,7 +16,7 @@ name = "lca.search.service"
 provides = "search"
 
 
-def apply(ctx, config):
+def apply(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.capability.search import SearchService
     from lca.layer0_infra.search.providers.tavily import search_tavily
 

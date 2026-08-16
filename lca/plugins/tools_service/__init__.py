@@ -1,5 +1,7 @@
 """Tools service plugin — provides the ``tools`` capability seam."""
 
+from typing import Any
+
 from lca.contracts.harness.plugin import PluginKind, PluginManifest
 
 manifest = PluginManifest(
@@ -14,7 +16,7 @@ name = "lca.tools.service"
 provides = "tools"
 
 
-def apply(ctx, config):
+def apply(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.capability.tools import ToolsService
 
     service = ToolsService()

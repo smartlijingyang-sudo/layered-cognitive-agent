@@ -36,6 +36,9 @@ class PluginEntry:
     inject: tuple[str, ...] | dict[str, Any] | None = None
     """Override inject from YAML (if present, replaces module's inject)."""
 
+    _original_module: Any = None
+    """Module object before Loader replaces ``module`` with PluginSpec."""
+
 
 @dataclass
 class BootedTree:

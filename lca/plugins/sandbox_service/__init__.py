@@ -1,5 +1,7 @@
 """Sandbox service plugin — provides the ``sandbox`` capability seam."""
 
+from typing import Any
+
 from lca.contracts.harness.plugin import PluginKind, PluginManifest
 
 manifest = PluginManifest(
@@ -14,7 +16,7 @@ name = "lca.sandbox.service"
 provides = "sandbox"
 
 
-def apply(ctx, config):
+def apply(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.capability.sandbox import SandboxService
     from lca.layer0_infra.sandbox.factory import resolve_sandbox
 

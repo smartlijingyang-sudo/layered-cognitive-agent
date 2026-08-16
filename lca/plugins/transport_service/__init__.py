@@ -1,5 +1,7 @@
 """Transport service plugin — provides the ``transport`` capability seam."""
 
+from typing import Any
+
 from lca.contracts.harness.plugin import PluginKind, PluginManifest
 
 manifest = PluginManifest(
@@ -14,7 +16,7 @@ name = "lca.transport.service"
 provides = "transport"
 
 
-def apply(ctx, config):
+def apply(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.capability.transport import TransportService
     from lca.layer0_infra.transport.a2a_transport import A2ATransport
     from lca.layer0_infra.transport.agent_transport import InternalTransport

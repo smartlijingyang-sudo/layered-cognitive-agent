@@ -608,33 +608,20 @@ def inspect_tree(
         print(f"Profile not found: {profile}")
         raise typer.Exit(1)
 
-    pl = ProfileLoader()
-    entries = pl.load_profile(profile)
-
-    async def _boot():
-        loader = Loader(check_seam_completeness=True)
-        return await loader.load(entries)
-
-    tree = asyncio.run(_boot())
+    entries = ProfileLoader().load_profile(profile)
+    tree = asyncio.run(Loader(check_seam_completeness=True).load(entries))
 
     print(f"Profile: {profile}")
     print(f"Plugins: {len(tree.entries)}")
     print()
+    entries_by_id = {entry.id: entry for entry in tree.entries}
     for handle_id, handle in tree.host.handles.items():
-        state = handle.state.value
-        provides = handle.spec.provides or "—"
         print(f"  {handle_id}")
-        print(f"    state: {state}")
-        print(f"    provides: {provides}")
+        print(f"    state: {handle.state.value}")
+        print(f"    provides: {handle.spec.provides or '—'}")
         print(f"    inject: {handle.injected or '—'}")
         print(f"    effects: {len(handle.effects)}")
-
-        # Show manifest info if available
-        original = getattr(
-            next((e for e in tree.entries if e.id == handle_id), None),
-            "_original_module",
-            None,
-        )
+        original = getattr(entries_by_id.get(handle_id), "_original_module", None)
         if original is not None:
             manifest = getattr(original, "manifest", None)
             if manifest is not None:

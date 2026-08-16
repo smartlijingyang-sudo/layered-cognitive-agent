@@ -1,5 +1,7 @@
 """LLM service plugin — provides the ``llm`` capability seam."""
 
+from typing import Any
+
 from lca.contracts.harness.plugin import PluginKind, PluginManifest
 
 manifest = PluginManifest(
@@ -14,7 +16,7 @@ name = "lca.llm.service"
 provides = "llm"
 
 
-def apply(ctx, config):
+def apply(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.capability.llm import LlmService
     from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 

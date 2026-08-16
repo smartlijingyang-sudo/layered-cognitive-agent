@@ -1,5 +1,7 @@
 """Observability service plugin — provides the ``observability`` capability seam."""
 
+from typing import Any
+
 from lca.contracts.harness.plugin import PluginKind, PluginManifest
 
 manifest = PluginManifest(
@@ -14,7 +16,7 @@ name = "lca.observability.service"
 provides = "observability"
 
 
-def apply(ctx, config):
+def apply(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.capability.observability import ObservabilityService
     from lca.layer0_infra.observability.registry import create_observability
 

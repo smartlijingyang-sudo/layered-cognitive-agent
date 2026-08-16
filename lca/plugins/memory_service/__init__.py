@@ -1,5 +1,7 @@
 """Memory service plugin — provides the ``memory`` capability seam."""
 
+from typing import Any
+
 from lca.contracts.harness.plugin import PluginKind, PluginManifest
 
 manifest = PluginManifest(
@@ -14,7 +16,7 @@ name = "lca.memory.service"
 provides = "memory"
 
 
-def apply(ctx, config):
+def apply(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.capability.memory import MemoryService
     from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 

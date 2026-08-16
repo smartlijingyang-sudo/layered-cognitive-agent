@@ -93,7 +93,7 @@ class PluginManifest:
 
     Fully declarative: everything the Loader needs to know about a plugin
     is captured here. Legacy ``PluginSpec`` modules are adapted via
-    ``compat.manifest_from_spec()``.
+    ``lca.harness.kernel.compat.manifest_from_spec()``.
     """
 
     id: str

@@ -6,6 +6,8 @@ extension points (seam keys) that the LCA capability system uses.
 Spec reference: §4 A.7 of ``docs/specs/harness-spine-spec.md``.
 """
 
+from typing import Any
+
 from lca.contracts.harness.plugin import (
     ExtensionPoint,
     PluginKind,
@@ -34,5 +36,5 @@ manifest = PluginManifest(
 name = "lca.seam.definitions"
 
 
-def apply(ctx, config):
+def apply(ctx: Any, config: Any) -> None:
     """No-op: this plugin is pure declaration."""

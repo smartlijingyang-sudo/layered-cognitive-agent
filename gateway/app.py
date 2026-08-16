@@ -122,23 +122,18 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
     import asyncio
     from pathlib import Path
 
-    from lca.layer0_infra.plugin.include._profile import ProfileLoader
-    from lca.layer0_infra.plugin.loader._loader import Loader
+    from lca.harness.profile.boot import boot_profile
 
     path = Path(profile_path)
     if not path.exists():
         structlog.get_logger("lca.gateway").warning("profile_not_found", profile=profile_path)
         return
 
-    pl = ProfileLoader()
-    entries = pl.load_profile(path)
-    loader = Loader(check_seam_completeness=True)
-
     try:
-        tree = asyncio.get_event_loop().run_until_complete(loader.load(entries))
+        tree = asyncio.get_event_loop().run_until_complete(boot_profile(path))
     except RuntimeError:
         # No running event loop yet (startup) — create one
-        tree = asyncio.run(loader.load(entries))
+        tree = asyncio.run(boot_profile(path))
 
     application.state.plugin_tree = tree
     application.state.profile_path = profile_path

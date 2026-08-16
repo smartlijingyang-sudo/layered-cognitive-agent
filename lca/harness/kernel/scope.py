@@ -107,6 +107,22 @@ class ScopedPluginHost:
 
     # ── Scope forking ─────────────────────────────────────
 
+    @classmethod
+    def wrap(
+        cls,
+        host: PluginHost,
+        scope_kind: ScopeKind,
+        scope_id: str,
+    ) -> ScopedPluginHost:
+        """Adopt an already-booted ``PluginHost`` as a root scope.
+
+        Used after ``Loader.load()``: the loaded service table becomes
+        the deployment/profile scope without copying records.
+        """
+        scope = cls(None, scope_kind, scope_id)
+        scope._host = host
+        return scope
+
     def fork(self, scope_kind: ScopeKind, scope_id: str) -> ScopedPluginHost:
         """Create a child scope.
 

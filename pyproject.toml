@@ -60,6 +60,20 @@ forbidden_modules = [
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
+    "lca.harness",
+    "lca.plugins",
+]
+
+# ── 契约 4: harness 实现不得反向依赖认知/运行时/组合根 ──
+[[tool.importlinter.contracts]]
+name = "harness: 不得依赖 L1–L4"
+type = "forbidden"
+source_modules = ["lca.harness"]
+forbidden_modules = [
+    "lca.layer1_cognitive",
+    "lca.layer2_runtime",
+    "lca.layer3_agent",
+    "lca.layer4_app",
 ]
 
 [dependency-groups]

@@ -18,13 +18,13 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.harness.compat import manifest_from_spec
 from lca.contracts.harness.plugin import (
     ExtensionPoint,
     PluginKind,
     PluginManifest,
     ScopeKind,
 )
+from lca.harness.kernel.compat import manifest_from_spec
 from lca.harness.kernel.scope import ScopedPluginHost, ServiceNotFoundError
 from lca.layer0_infra.plugin.include._profile import ProfileLoader
 from lca.layer0_infra.plugin.kernel._spec import PluginSpec
@@ -213,15 +213,10 @@ class TestComposerScope:
         from tests.support.agent_specs import make_spec
 
         async def _test():
-            pl = ProfileLoader()
-            entries = pl.load_profile(PROFILE_PATH)
-            loader = Loader()
-            tree = await loader.load(entries)
+            from lca.harness.profile.boot import boot_profile
 
-            scope = ScopedPluginHost(None, ScopeKind.DEPLOYMENT, "deploy")
-            profile_scope = scope.fork(ScopeKind.PROFILE, "web-standard")
-            for key in tree.host._services:
-                profile_scope.host._services[key] = tree.host._services[key]
+            tree = await boot_profile(PROFILE_PATH, check_seam_completeness=False)
+            profile_scope = ScopedPluginHost.wrap(tree.host, ScopeKind.PROFILE, "web-standard")
 
             composer = AgentComposer()
             spec = make_spec("tester", MockLLMAdapter())
@@ -266,3 +261,28 @@ class TestSeamCompleteness:
             assert len(deprecation_warnings) == 0
         assert hub is not None
         assert hub.require("llm") is not None
+
+
+class TestInspectAndBoot:
+    def test_boot_profile_and_format_tree(self):
+        from lca.harness.diagnostics.inspect import format_plugin_tree, inspect_profile_tree
+
+        async def _test():
+            tree = await inspect_profile_tree(PROFILE_PATH)
+            dump = format_plugin_tree(tree, profile=str(PROFILE_PATH))
+            assert "lca.llm.service" in dump
+            assert "provides: llm" in dump
+            assert "Seam completeness: PASS" in dump
+
+        asyncio.run(_test())
+
+    def test_wrap_reuses_loaded_host(self):
+        from lca.harness.profile.boot import boot_profile
+
+        async def _test():
+            tree = await boot_profile(PROFILE_PATH)
+            scope = ScopedPluginHost.wrap(tree.host, ScopeKind.PROFILE, "web-standard")
+            assert scope.resolve("llm") is not None
+            assert scope.host is tree.host
+
+        asyncio.run(_test())

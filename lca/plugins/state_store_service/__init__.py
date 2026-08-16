@@ -1,5 +1,7 @@
 """State store service plugin — provides the ``state_store`` capability seam."""
 
+from typing import Any
+
 from lca.contracts.harness.plugin import PluginKind, PluginManifest
 
 manifest = PluginManifest(
@@ -14,7 +16,7 @@ name = "lca.state_store.service"
 provides = "state_store"
 
 
-def apply(ctx, config):
+def apply(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.capability.state_store import StateStoreService
     from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 
