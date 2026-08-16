@@ -1,0 +1,12 @@
+title = "LCA gitleaks config"
+
+[allowlist]
+  description = "test fixtures and bundled output"
+  paths = [
+    '''tests/''',
+    '''repomix-output\.xml''',
+  ]
+  regexes = [
+    '''sk-1234567890abcdef''',
+    '''lca\.conversations\.v1''',
+  ]
