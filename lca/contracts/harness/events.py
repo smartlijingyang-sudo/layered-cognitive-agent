@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.harness.session import session_event
+from lca.contracts.harness.skill import SkillCatalogEntry
 
 
 @session_event("session.created.v1", visibility="audit")
@@ -71,6 +72,29 @@ class ContextInjected:
     source: str
     content_ref: str
     model_visible: bool = True
+
+
+@session_event("skill.catalog.published.v1", visibility="audit")
+@dataclass(frozen=True)
+class SkillCatalogPublished:
+    entries: tuple[SkillCatalogEntry, ...]
+    digest: str
+    source: str = "pre_step"
+
+
+@session_event("skill.loaded.v1", visibility="audit")
+@dataclass(frozen=True)
+class SkillLoaded:
+    skill_id: str
+    content_hash: str
+    invocation: str
+
+
+@session_event("skill.user_invoked.v1", visibility="audit")
+@dataclass(frozen=True)
+class SkillUserInvoked:
+    skill_id: str
+    raw_text: str
 
 
 @session_event("model.requested.v1", visibility="audit")
