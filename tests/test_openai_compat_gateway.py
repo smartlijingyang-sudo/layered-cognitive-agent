@@ -12,6 +12,7 @@ from gateway.runs.live import LiveTail
 from gateway.runs.session import RunRegistry, RunSession, RunStatus, run_dedup_key
 from lca.layer0_infra.openai_compat import (
     extract_json_schema_format,
+    normalize_chat_messages,
     normalize_responses_input,
     resolve_upstream_model,
 )
@@ -157,6 +158,27 @@ class TestOpenAiStructuredHelpers(unittest.TestCase):
     def test_normalize_responses_input_string(self) -> None:
         messages = normalize_responses_input("hello")
         self.assertEqual(messages, [{"role": "user", "content": "hello"}])
+
+    def test_normalize_responses_input_maps_developer_to_system(self) -> None:
+        messages = normalize_responses_input(
+            [{"role": "developer", "content": "be concise"}],
+        )
+        self.assertEqual(messages, [{"role": "system", "content": "be concise"}])
+
+    def test_normalize_chat_messages_maps_developer_to_system(self) -> None:
+        messages = normalize_chat_messages(
+            [
+                {"role": "developer", "content": "housekeeper rules"},
+                {"role": "user", "content": "hello"},
+            ],
+        )
+        self.assertEqual(
+            messages,
+            [
+                {"role": "system", "content": "housekeeper rules"},
+                {"role": "user", "content": "hello"},
+            ],
+        )
 
     def test_extract_json_schema_format(self) -> None:
         body = {

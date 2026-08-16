@@ -29,7 +29,7 @@ class ProcessJournal:
         self.tail.on_event(replace(stamped, seq=self._seq))
 
 
-class _BoundProcessJournal:
+class _BoundProcessJournal(JournalProjector):
     def __init__(self, owner: ProcessJournal) -> None:
         self._owner = owner
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 
 from lca.contracts.protocols import DshRuntime
@@ -32,12 +33,11 @@ class DshTurnDriver:
         self._projector = projector
         self._archive = archive
 
-    def run(self, spec: DshTurnSpec) -> DshTurnResult:
-        def on_event(notification: DshNotification) -> None:
-            self._archive.append(notification)
-            self._projector.feed(notification)
+    def _on_event(self, notification: DshNotification) -> None:
+        self._archive.append(notification)
+        self._projector.feed(notification)
 
-        result = self._runtime.run_turn(spec, on_event)
+    def _finish(self, result: DshTurnResult) -> DshTurnResult:
         status = "completed" if result.finish_reason in {None, "completed"} else "failed"
         self._projector.emit_terminal_event(
             status=status,
@@ -45,3 +45,16 @@ class DshTurnDriver:
             error="" if status == "completed" else (result.finish_reason or "error"),
         )
         return result
+
+    def run(self, spec: DshTurnSpec) -> DshTurnResult:
+        result = self._runtime.run_turn(spec, self._on_event)
+        return self._finish(result)
+
+    async def run_async(self, spec: DshTurnSpec) -> DshTurnResult:
+        runtime = self._runtime
+        run_async = getattr(runtime, "run_turn_async", None)
+        if callable(run_async):
+            result = await run_async(spec, self._on_event)
+        else:
+            result = await asyncio.to_thread(self._runtime.run_turn, spec, self._on_event)
+        return self._finish(result)

@@ -312,6 +312,64 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.attachment.service.FileStoreAttachmentIdentity": (
         "AttachmentIdentity Protocol 的 FileStore 实现 (LobeHub files_info 对齐)"
     ),
+    # ── Plugin Tree Runtime (2026-08-16) ───────────────────────
+    "lca.layer0_infra.plugin.kernel._context.PluginContext": (
+        "插件运行上下文：mount/effect/child 基础设施，不是可插拔组件 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._host.PluginHost": (
+        "插件数据容器：服务表 + 事件总线 + handle 注册表 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._handle.PluginHandle": (
+        "插件运行时状态 (Fiber)：值对象 + 效果累积 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._service.Service": (
+        "Service 基类：构造即注册模式 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._service_record.ServiceRecord": (
+        "服务归属记录：值对象 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._spec.PluginSpec": (
+        "插件描述符：值对象 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._effect_meta.EffectMeta": (
+        "诊断树节点：值对象 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._disposable.DisposableList": (
+        "O(1) 可销毁集合：基础设施 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._events.EventBus": (
+        "5-mode 事件总线：基础设施 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.loader._entry.BootedTree": (
+        "Loader 加载后的产物：值对象 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.loader._entry.PluginEntry": (
+        "profile YAML 行数据类：值对象 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.loader._loader.Loader": (
+        "插件拓扑加载器：组合根基础设施 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.loader._loader.LoaderError": (
+        "加载异常：错误信号 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.include._profile.ProfileError": (
+        "profile 组合异常：错误信号 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.include._profile.ProfileLoader": (
+        "Profile 加载器：组合根基础设施 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._events._ListenerRecord": (
+        "事件监听器记录：内部数据类 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._types.DependencyUnavailable": (
+        "依赖不可用异常：错误信号 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._types.PluginError": (
+        "插件运行时异常：错误信号 (Plugin Tree)"
+    ),
+    "lca.layer0_infra.plugin.kernel._types.PluginState": (
+        "插件状态枚举：值类型 (Plugin Tree)"
+    ),
 }
 
 _SCAN_PACKAGES = [

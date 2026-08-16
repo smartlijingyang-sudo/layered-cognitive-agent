@@ -178,6 +178,41 @@ def pid_alive(pid: int) -> bool:
         return True
 
 
+def pid_on_port(port: int) -> int | None:
+    """Return a PID listening on ``port``, or None if none found."""
+    import re
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["fuser", f"{port}/tcp"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        combined = f"{result.stdout} {result.stderr}"
+        for match in re.finditer(r"\b(\d+)\b", combined):
+            pid = int(match.group(1))
+            if pid != port:
+                return pid
+    except Exception:
+        pass
+
+    try:
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        for line in result.stdout.strip().split("\n"):
+            if line.strip():
+                return int(line.strip())
+    except Exception:
+        pass
+    return None
+
+
 def http_ready(url: str, timeout: float = 2.0) -> bool:
     """Check if an HTTP endpoint is reachable.
 

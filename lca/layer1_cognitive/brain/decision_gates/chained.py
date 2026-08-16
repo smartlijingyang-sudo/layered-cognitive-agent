@@ -7,7 +7,7 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
 
 
-class ChainedDecisionGate:
+class ChainedDecisionGate(DecisionGate):
     """Apply gates sequentially; each gate may rewrite the decision."""
 
     def __init__(self, *gates: DecisionGate) -> None:

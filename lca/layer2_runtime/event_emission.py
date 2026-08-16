@@ -1,15 +1,23 @@
-"""认知循环生命周期 Hook 事件发射工厂。
+"""认知循环 → journal 直接发射（开闭原则，ADR-0037）+ Waterfall 拦截（DSH-inspired）。
 
-L2 层职责：
-    提供 make_event_emitting_hook 工厂函数，
-    将认知循环的关键事件（action_degraded、step_completed）
-    发射到 EventBus，实现横切可观测性。
+认知循环的横切事实（action_degraded / step_completed）由 hook 捕获后
+直接构造 ``JournalEvent`` 实例，通过 ``JournalEmitFn`` 回调写入 journal。
 
-    Hook 事件名的单一事实源是 ``HookEvent`` 枚举（``lca.contracts.atoms.enums``）。
-    新增对外事件只需：
-    1. 写一个 _derive_xxx 函数
+**不再经过 EventBus 中转**：EventBus 是泛型 dict 载荷，丢失类型安全；
+telemetry_bridge 桥接层是纯粹的间接浪费——emit/subscribe/record 三点一线，
+中间总线毫无存在必要。
+
+Waterfall 拦截（DSH-inspired）：
+    在事件发射前，可以通过 waterfall 链进行拦截/修改/过滤。
+    每个 waterfall listener 可以：
+    - 修改事件字段（enrichment）
+    - 返回 None 过滤掉事件（filtering）
+    - 透传给下一个 listener
+
+新增对外事件只需：
+    1. 写一个 _derive_xxx 纯函数
     2. 在 _DERIVATIONS 表中注册一行
-    无需修改分支逻辑（开闭原则）。
+无需修改分支逻辑（开闭原则）。
 """
 
 from __future__ import annotations
@@ -19,70 +27,98 @@ from typing import Any
 
 from lca.contracts.atoms.enums import ActionType, HookEvent
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols import EventBus
+from lca.contracts.models.observability.journal import (
+    ActionDegraded,
+    JournalEvent,
+    StepCompleted,
+)
 
-# ── 对外事件名（EventBus payload） ──
-EVENT_ACTION_DEGRADED = "action_degraded"
-EVENT_STEP_COMPLETED = "step_completed"
+# ── journal 发射回调类型 ──
+JournalEmitFn = Callable[[JournalEvent], None]
+"""接收已构造的 JournalEvent 并写入 journal 的回调。
+组合根注入 ``lca.layer0_infra.observability.facade.record``。"""
 
-# ── payload 键 ──
-_KEY_ORIGINAL_ACTION_TYPE = "original_action_type"
-_KEY_DEGRADED_TO = "degraded_to"
-_KEY_STEP = "step"
-_KEY_STATUS = "status"
+# ── Waterfall 拦截器类型（DSH-inspired）──
+JournalEventWaterfallFn = Callable[[JournalEvent, AgentState], JournalEvent | None]
+"""Waterfall 拦截器：接收事件和状态，返回修改后的事件或 None（过滤）。
+用于事件发射前的拦截/修改/过滤链。"""
 
-# ── 事件派生：hook 事件名 → (对外事件名, payload) 提取函数 ──
+# ── 事件派生：hook 事件名 → JournalEvent 构造 ──
 
-EventDerivation = Callable[[AgentState, dict[str, Any]], tuple[str, dict[str, Any]] | None]
+Derivation = Callable[[AgentState, dict[str, Any]], JournalEvent | None]
 
 
-def _derive_action_degraded(
-    state: AgentState, kwargs: dict[str, Any]
-) -> tuple[str, dict[str, Any]] | None:
+def _derive_action_degraded(state: AgentState, kwargs: dict[str, Any]) -> JournalEvent | None:
     observation = kwargs.get("observation")
     if (
         observation is not None
         and getattr(observation, "success", False)
         and getattr(observation, "degraded_from", None)
     ):
-        # 降级目标取改写后的 decision.action_type（respond / use_tool 均可能）；
-        # decision 缺省时退回历史默认 respond。
         decision = kwargs.get("decision")
         degraded_to = getattr(decision, "action_type", None) or ActionType.RESPOND.value
-        return (
-            EVENT_ACTION_DEGRADED,
-            {
-                _KEY_ORIGINAL_ACTION_TYPE: observation.degraded_from,
-                _KEY_DEGRADED_TO: degraded_to,
-                _KEY_STEP: state.step,
-            },
+        return ActionDegraded(
+            original_action_type=observation.degraded_from,
+            degraded_to=degraded_to,
+            step=state.step,
         )
     return None
 
 
-def _derive_step_completed(
-    state: AgentState, kwargs: dict[str, Any]
-) -> tuple[str, dict[str, Any]] | None:
-    return (
-        EVENT_STEP_COMPLETED,
-        {_KEY_STEP: state.step, _KEY_STATUS: state.status},
+def _derive_step_completed(state: AgentState, kwargs: dict[str, Any]) -> JournalEvent | None:
+    status = state.status
+    return StepCompleted(
+        step=state.step,
+        status=getattr(status, "value", str(status)),
+        action_type=kwargs.get("action_type", ""),
     )
 
 
-_DERIVATIONS: dict[str, EventDerivation] = {
+_DERIVATIONS: dict[str, Derivation] = {
     HookEvent.POST_ACT: _derive_action_degraded,
     HookEvent.POST_REFLECT: _derive_step_completed,
 }
 
 
-def make_event_emitting_hook(event_bus: EventBus) -> Callable[..., Awaitable[None]]:
+def make_journal_emitting_hook(
+    emit: JournalEmitFn,
+    *,
+    waterfall: list[JournalEventWaterfallFn] | None = None,
+) -> Callable[..., Awaitable[None]]:
+    """构造认知循环 → journal 直写 hook，支持 waterfall 拦截。
+
+    ``emit`` 由组合根注入（通常是 ``facade.record``），L2 不依赖 L0。
+
+    ``waterfall`` 是可选的拦截器链（DSH-inspired）：
+    - 每个拦截器可以修改事件或返回 None 过滤掉事件
+    - 拦截器按顺序执行，前一个的输出是后一个的输入
+    - 任何拦截器返回 None 则事件不会被发射
+
+    用法示例：
+        # 添加事件过滤
+        def filter_sensitive(event: JournalEvent, state: AgentState) -> JournalEvent | None:
+            if isinstance(event, ActionDegraded) and "secret" in event.original_action_type:
+                return None  # 过滤掉敏感事件
+            return event
+
+        hook = make_journal_emitting_hook(emit, waterfall=[filter_sensitive])
+    """
+
     async def _hook(event_name: str, state: AgentState, **kwargs: Any) -> None:
         derive = _DERIVATIONS.get(event_name)
         if derive is None:
             return
-        result = derive(state, kwargs)
-        if result is not None:
-            name, payload = result
-            event_bus.emit(name, payload, state.trace_id)
+        event = derive(state, kwargs)
+        if event is None:
+            return
+
+        # Waterfall 拦截链（DSH-inspired）
+        if waterfall:
+            for interceptor in waterfall:
+                event = interceptor(event, state)
+                if event is None:
+                    return  # 事件被过滤
+
+        emit(event)
 
     return _hook

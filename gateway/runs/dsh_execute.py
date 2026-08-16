@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import structlog
 
+from gateway.device_gateway.bind import device_hub
+from gateway.device_gateway.streaming_dsh_runtime import StreamingDshRuntime
 from gateway.runs.session import RunSession
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.models.observability.journal import AgentRunFinished
 from lca.contracts.protocols import DshRuntime
 from lca.layer0_infra.computer.machine import MachineTransport
 from lca.layer0_infra.dsh.archive import JsonlEventArchive
-from lca.layer0_infra.dsh.machine_runtime import MachineDshRuntime
 from lca.layer0_infra.dsh.models import DshTurnResult
 from lca.layer0_infra.dsh.projector import DshJournalProjector
 from lca.layer0_infra.dsh.run import run_dsh_machine_turn
@@ -29,7 +30,12 @@ def default_runtime(
     transport: MachineTransport,
     machine: PlaneRef,
 ) -> DshRuntime:
-    """DSH runs on the machine — SDK lives in sandbox-user's environment."""
+    """DSH on machine: stream notifications via daemon WebSocket when hub is bound."""
+    hub = device_hub()
+    if hub is not None:
+        return StreamingDshRuntime(hub, machine.id, settings)
+    from lca.layer0_infra.dsh.machine_runtime import MachineDshRuntime
+
     return MachineDshRuntime(transport, machine, settings)
 
 
@@ -47,6 +53,7 @@ async def execute_dsh_session(session: RunSession) -> None:
     hub = current_hub()
     sink = HandleJournalSink(hub=hub)
     projector = DshJournalProjector(sink)
+    projector.ensure_open()
     archive = JsonlEventArchive(session.jsonl_path.parent / f"{session.run_id}.dsh.jsonl")
     result: DshTurnResult | None = None
 

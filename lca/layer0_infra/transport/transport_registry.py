@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols import AgentTransport
+from lca.contracts.protocols import AgentTransport, TransportRegistryProtocol
 from lca.layer0_infra.component_registry import NamedRegistry, RegistryKeyError
 
 
@@ -14,7 +14,7 @@ class TransportNotFoundError(RegistryKeyError):
         super().__init__(protocol, "传输协议", available)
 
 
-class TransportRegistry(NamedRegistry[AgentTransport]):
+class TransportRegistry(NamedRegistry[AgentTransport], TransportRegistryProtocol):
     """按 protocol_name 注册和解析 AgentTransport 实现。
 
     注册时校验 key 与实现自报的 protocol_name 一致，

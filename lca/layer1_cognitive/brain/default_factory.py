@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lca.contracts.mechanisms import consume
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.protocols import Brain, LLMAdapter, Tool
 from lca.layer1_cognitive.brain.critic import SimpleCritic
@@ -28,7 +29,7 @@ class SimpleBrainFactory:
         available_skills: str = "",
     ) -> Brain:
         reasoner = PromptReasoner(
-            llm,
+            consume("llm", llm, PromptReasoner),
             role_profile,
             tools_desc,
             tools=tools,

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -93,7 +92,7 @@ async def run_dsh_machine_turn(
         session_root=str(runs_dir),
         harness_env=harness_env,
     )
-    result = await asyncio.to_thread(driver.run, spec)
+    result = await driver.run_async(spec)
     try:
         parts = await harvest_machine_outputs(
             machine=machine,

@@ -11,7 +11,7 @@ RunStore（ADR-0055 唯一写入仲裁）；业务层通过包根 ambient API
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 import structlog
 from opentelemetry import trace as otel_trace
@@ -42,6 +42,21 @@ _log = structlog.get_logger("lca.observability")
 _TRACER_NAME = "lca"
 _SERVICE_NAME_KEY = "service.name"
 _DEFAULT_SERVICE_NAME = "lca"
+
+
+@runtime_checkable
+class ScorerFn(Protocol):
+    """后端评估打分回调。"""
+
+    def __call__(self, name: str, value: float, attributes: dict[str, Any]) -> None: ...
+
+
+@runtime_checkable
+class BackendBridge(Protocol):
+    """外部后端桥（如 Langfuse）：接管 provider 导出与生命周期。"""
+
+    def attach(self, hub: ObservabilityHub) -> None: ...
+    def close(self) -> None: ...
 
 
 class ObservabilityHub(ObservabilityBackend):
@@ -77,18 +92,23 @@ class ObservabilityHub(ObservabilityBackend):
             self._processors.append(processor)
         self._tracer = self._provider.get_tracer(_TRACER_NAME)
         self._policy = policy if policy is not None else AttributePolicy()
-        # RunStore 永远在线（ADR-0055）。subscriber 顺序即语义：
-        # InsightEngine 先行（收尾时把 RunInsight 通过 store.append 注入，
-        # 须在 OTel 关闭 run span、console 渲染 Run Card 之前完成），
-        # 随后 OtelProjector（span 平面由叙事驱动），
-        # 最后按后端配置装配其余 subscriber（console/jsonl...）。
-        insight = InsightEngine()
+        # RunStore 永远在线（ADR-0055）。subscriber 通过延迟工厂解析：
+        # 工厂捕获 hub 引用，首次 append() 时构造 subscriber 列表，
+        # 此时 self._store 已赋值，InsightEngine 可直接接收 store。
+        # subscriber 顺序即语义：InsightEngine 先行（收尾时把 RunInsight
+        # 通过 store.append 注入，须在 OTel 关闭 run span、console 渲染
+        # Run Card 之前完成），随后 OtelProjector，最后按后端配置装配其余。
+        hub = self
         self._store = RunStore(
-            [insight, OtelProjector(self._tracer), *journal_projectors], policy=self._policy
+            lambda: [
+                InsightEngine(hub.store),
+                OtelProjector(hub._tracer),
+                *journal_projectors,
+            ],
+            policy=self._policy,
         )
-        insight.bind_store(self._store)
-        self._scorer: Any = None
-        self._bridges: list[Any] = []
+        self._scorer: ScorerFn | None = None
+        self._bridges: list[BackendBridge] = []
         self._released = False
         self._disposed = False
 
@@ -143,17 +163,17 @@ class ObservabilityHub(ObservabilityBackend):
         span = self._tracer.start_span(name, attributes=prepared)
         span.end()
 
-    def register_scorer(self, scorer: Any) -> None:
+    def register_scorer(self, scorer: ScorerFn) -> None:
         """后端评估钩子（Langfuse 导出器装配时注入）。"""
         self._scorer = scorer
 
-    def attach_bridge(self, bridge: Any) -> None:
+    def attach_bridge(self, bridge: BackendBridge) -> None:
         """挂接外部后端桥（如 LangfuseBridge）：接管 provider 导出与生命周期。"""
         bridge.attach(self)
         self._bridges.append(bridge)
 
     @property
-    def bridges(self) -> tuple[Any, ...]:
+    def bridges(self) -> tuple[BackendBridge, ...]:
         """已挂接的外部后端桥（如 Langfuse）。只读。"""
         return tuple(self._bridges)
 

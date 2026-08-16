@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from lca.contracts.protocols import DshRuntime
 from lca.layer0_infra.dsh.driver import DshTurnSpec
@@ -15,10 +16,16 @@ class DshUnavailableError(RuntimeError):
 
 
 class SdkDshRuntime(DshRuntime):
-    """Local SDK execution — for development only.  Production uses MachineDshRuntime."""
+    """Local SDK execution — gateway dev or machine daemon via ``turn_config``."""
 
-    def __init__(self, settings: DshSettings) -> None:
-        self._settings = settings
+    def __init__(
+        self,
+        settings: DshSettings | None = None,
+        *,
+        turn_config: dict[str, Any] | None = None,
+    ) -> None:
+        self._settings = settings or DshSettings()
+        self._turn_config = dict(turn_config or {})
 
     def run_turn(
         self,
@@ -34,24 +41,30 @@ class SdkDshRuntime(DshRuntime):
             ) from exc
 
         kwargs: dict[str, object] = {
-            "provider": self._settings.provider,
-            "model": self._settings.resolved_model(),
+            "provider": self._turn_config.get("provider", self._settings.provider),
+            "model": self._turn_config.get("model", self._settings.resolved_model()),
             "cwd": spec.cwd,
             "session_root": spec.session_root,
-            "request_timeout_seconds": self._settings.request_timeout_seconds,
+            "request_timeout_seconds": self._turn_config.get(
+                "request_timeout_seconds",
+                self._settings.request_timeout_seconds,
+            ),
         }
-        if spec.harness_env:
-            kwargs["env"] = dict(spec.harness_env)
-        max_tokens = self._settings.resolved_max_tokens()
+        harness_env = spec.harness_env
+        if isinstance(self._turn_config.get("harness_env"), dict):
+            harness_env = {**dict(harness_env or {}), **self._turn_config["harness_env"]}
+        if harness_env:
+            kwargs["env"] = dict(harness_env)
+        max_tokens = self._turn_config.get("max_tokens", self._settings.resolved_max_tokens())
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
-        cordis = self._settings.resolved_cordis()
+        cordis = self._turn_config.get("cordis", self._settings.resolved_cordis())
         if cordis is not None:
             kwargs["cordis"] = cordis
-        api_key = self._settings.resolved_api_key()
+        api_key = self._turn_config.get("api_key", self._settings.resolved_api_key())
         if api_key:
             kwargs["api_key"] = api_key
-        base_url = self._settings.resolved_base_url()
+        base_url = self._turn_config.get("base_url", self._settings.resolved_base_url())
         if base_url:
             kwargs["base_url"] = base_url
 

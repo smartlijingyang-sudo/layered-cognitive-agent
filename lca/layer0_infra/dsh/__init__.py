@@ -5,13 +5,6 @@ env paths); DSH owns agent loop, skills, and workspaceContext. Journal
 projection is the only LobeHub-facing adapter.
 """
 
-from lca.layer0_infra.dsh.driver import DshTurnDriver, DshTurnSpec
-from lca.layer0_infra.dsh.models import DshNotification, DshTurnResult
-from lca.layer0_infra.dsh.prompt import compose_dsh_prompt
-from lca.layer0_infra.dsh.routing import is_dsh_driver
-from lca.layer0_infra.dsh.run import run_dsh_machine_turn
-from lca.layer0_infra.dsh.settings import DshSettings
-
 __all__ = [
     "DshNotification",
     "DshSettings",
@@ -22,3 +15,26 @@ __all__ = [
     "is_dsh_driver",
     "run_dsh_machine_turn",
 ]
+
+_LAZY_IMPORTS = {
+    "DshTurnDriver": ("lca.layer0_infra.dsh.driver", "DshTurnDriver"),
+    "DshTurnSpec": ("lca.layer0_infra.dsh.driver", "DshTurnSpec"),
+    "DshNotification": ("lca.layer0_infra.dsh.models", "DshNotification"),
+    "DshTurnResult": ("lca.layer0_infra.dsh.models", "DshTurnResult"),
+    "compose_dsh_prompt": ("lca.layer0_infra.dsh.prompt", "compose_dsh_prompt"),
+    "is_dsh_driver": ("lca.layer0_infra.dsh.routing", "is_dsh_driver"),
+    "run_dsh_machine_turn": ("lca.layer0_infra.dsh.run", "run_dsh_machine_turn"),
+    "DshSettings": ("lca.layer0_infra.dsh.settings", "DshSettings"),
+}
+
+
+def __getattr__(name: str):
+    if name not in _LAZY_IMPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr = _LAZY_IMPORTS[name]
+    import importlib
+
+    module = importlib.import_module(module_name)
+    value = getattr(module, attr)
+    globals()[name] = value
+    return value

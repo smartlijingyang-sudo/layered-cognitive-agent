@@ -20,7 +20,8 @@ from lca.contracts.atoms.enums import (
     HookEvent,
     MemoryLayer,
 )
-from lca.contracts.mechanisms import ComponentRegistryProtocol
+from lca.contracts.mechanisms import ComponentRegistryProtocol, consume
+from lca.contracts.mechanisms.capability import SeamKey
 from lca.contracts.mechanisms.registries import Registries
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.team_coordination import (
@@ -34,7 +35,6 @@ from lca.contracts.protocols import (
     BrainFactory,
     BudgetPolicy,
     DecisionGate,
-    EventBus,
     LLMAdapter,
     MemorySystem,
     ObservabilityBackend,
@@ -54,36 +54,41 @@ from lca.contracts.protocols.spec import (
     TeamSpec,
     strategy_key_for_governance,
 )
+from lca.layer0_infra.capability.llm import LlmService
+from lca.layer0_infra.capability.memory import MemoryService
+from lca.layer0_infra.capability.state_store import StateStoreService
+from lca.layer0_infra.capability.tools import ToolsService
+from lca.layer0_infra.capability.transport import TransportService
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     TeamTraceProfile,
     create_observability,
     team_id_for,
 )
+from lca.layer0_infra.observability import record as _journal_record
 from lca.layer0_infra.observability.adapters import TelemetryLLMAdapter, TelemetryMemoryAdapter
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
+from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
-from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
-from lca.layer2_runtime.event_emission import make_event_emitting_hook
+from lca.layer2_runtime.event_emission import make_journal_emitting_hook
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.member_invoke import TransportMemberInvoker
 from lca.layer3_agent.orchestration_registry import OrchestrationFactory
 from lca.layer3_agent.team_handle import TeamHandle
-from lca.layer4_app.defaults import EVENT_BUS_SIMPLE, build_default_registries
+from lca.layer4_app.capability_boot import boot_capabilities
+from lca.layer4_app.defaults import build_default_registries
 from lca.layer4_app.policies import LEAD_BUDGET_POLICY_KEY
 from lca.layer4_app.team_wiring import (
     build_default_transport_registry,
     build_team_transport,
 )
-from lca.layer4_app.telemetry_bridge import install_telemetry_bridge, make_bus_drain_hook
 
 __all__ = [
     "AgentComposer",
@@ -167,20 +172,21 @@ class AgentComposer:
     ) -> CognitiveAgent:
         """Assemble a complete CognitiveAgent from *spec* (closed graph)."""
         profile = spec.profile
+        ctx = boot_capabilities()
         hub = create_observability(spec.observability)
-        mem = self._resolve_memory(spec.memory, shared_store)
-        state_store = _resolve_component(
-            self._registries.components,
-            ComponentKind.STATE_STORE,
-            spec.state_store,
-            StateStore,  # type: ignore[type-abstract]
+        mem = self._resolve_memory(spec.memory, shared_store, ctx.require(SeamKey.MEMORY.value))
+        state_store = self._resolve_state_store(
+            spec.state_store, ctx.require(SeamKey.STATE_STORE.value)
         )
 
-        tool_registry = SimpleToolRegistry()
+        llm_rt: LlmService = ctx.require(SeamKey.LLM.value)
+        llm_rt.register("spec", self._instrument_llm(spec.llm), activate=True)
+
+        tool_registry: ToolsService = ctx.require(SeamKey.TOOLS.value)
         for tool in spec.tools:
             tool_registry.register(tool)
         safe_executor = SimpleSafeExecutor(profile.tool_permission_manifest)
-        transport_registry = build_default_transport_registry()
+        transport_registry: TransportService = ctx.require(SeamKey.TRANSPORT.value)
         if team_channel is not None:
             transport_registry.register(team_channel)
         action_registry = build_default_action_registry(
@@ -190,7 +196,7 @@ class AgentComposer:
             scope=action_scope,
         )
 
-        brain = self._resolve_brain(spec, profile)
+        brain = self._resolve_brain(spec, profile, llm_rt)
         if decision_gate is not None:
             brain = self._apply_lead_brain(brain, decision_gate=decision_gate)
 
@@ -200,18 +206,12 @@ class AgentComposer:
             transport_registry=transport_registry,
             action_registry=action_registry,
         )
-        event_bus = _resolve_component(
-            self._registries.components,
-            ComponentKind.EVENT_BUS,
-            EVENT_BUS_SIMPLE,
-            EventBus,  # type: ignore[type-abstract]
-        )
         runtime = CognitiveRuntime(
             brain,
             body,
-            mem,
-            self._build_hooks(event_bus),
-            state_store,
+            consume("memory", mem, CognitiveRuntime),
+            self._build_hooks(),
+            consume("state_store", state_store, CognitiveRuntime),
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         return CognitiveAgent(
@@ -266,19 +266,40 @@ class AgentComposer:
         self,
         choice: str | MemorySystem,
         shared_store: SharedMemoryStore | None,
+        memory_service: MemoryService,
     ) -> MemorySystem:
         if shared_store is not None:
-            mem: MemorySystem = SimpleMemorySystem(shared_store=shared_store)
-        else:
+            mem: MemorySystem = memory_service.create(shared_store=shared_store)
+        elif isinstance(choice, str) and choice in memory_service.providers.names():
+            memory_service.providers.use(choice)
+            mem = memory_service.create()
+        elif isinstance(choice, str):
             mem = _resolve_component(
                 self._registries.components,
                 ComponentKind.MEMORY,
                 choice,
                 MemorySystem,  # type: ignore[type-abstract]
             )
+        else:
+            mem = choice
         return TelemetryMemoryAdapter(mem)
 
-    def _resolve_brain(self, spec: AgentSpec, profile: RoleProfile) -> Brain:
+    def _resolve_state_store(
+        self, choice: str | StateStore, service: StateStoreService
+    ) -> StateStore:
+        if isinstance(choice, str) and choice in service.providers.names():
+            service.providers.use(choice)
+            return service.create()
+        if isinstance(choice, str):
+            return _resolve_component(
+                self._registries.components,
+                ComponentKind.STATE_STORE,
+                choice,
+                StateStore,  # type: ignore[type-abstract]
+            )
+        return choice
+
+    def _resolve_brain(self, spec: AgentSpec, profile: RoleProfile, llm: LLMAdapter) -> Brain:
         if not isinstance(spec.brain, str):
             return spec.brain
         factory_reg = self._registries.brain_factories
@@ -286,7 +307,7 @@ class AgentComposer:
             raise ValueError(f"Unknown brain: {spec.brain!r}. Available: {factory_reg.list()}")
         factory = factory_reg.resolve(spec.brain)
         resolved: Brain = factory(
-            self._instrument_llm(spec.llm),
+            consume("llm", llm, PromptReasoner),
             profile,
             _format_tools_xml(spec.tools),
             tools=list(spec.tools),
@@ -314,15 +335,12 @@ class AgentComposer:
         return "\n".join(f"- {e.skill_id}: {e.name}" for e in installed)
 
     @staticmethod
-    def _build_hooks(event_bus: EventBus) -> SimpleHookRegistry:
+    def _build_hooks() -> SimpleHookRegistry:
         hooks = SimpleHookRegistry()
-        install_telemetry_bridge(event_bus)
-        event_hook = make_event_emitting_hook(event_bus)
+        journal_hook = make_journal_emitting_hook(_journal_record)
         for event_name in HookEvent:
             hooks.register(event_name, default_logging_hook)
-            hooks.register(event_name, event_hook)
-        # run 收尾前排空总线：异步桥接事件（step.completed 等）先于容器关闭落 journal
-        hooks.register(HookEvent.ON_COMPLETE, make_bus_drain_hook(event_bus))
+            hooks.register(event_name, journal_hook)
         return hooks
 
     @staticmethod

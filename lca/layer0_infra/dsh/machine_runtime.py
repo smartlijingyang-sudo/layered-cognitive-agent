@@ -1,11 +1,10 @@
 """DSH runtime that delegates execution to the machine plane.
 
-The SDK runs as sandbox-user on the machine — same trust boundary as the
-CLI.  Gateway generates a runner script, deploys it via ``write_files``,
-executes via ``runCommand``, then reads back events from JSONL.
+Phase 2 (preferred): daemon runs SDK in-process; notifications stream over
+device WebSocket via ``StreamingDshRuntime`` (``gateway/device_gateway``).
 
-This is the same pattern as ``MachineExecMixin.execute_code``: write a
-temp script, run it, collect results.  No new transport protocol needed.
+Legacy batch path (``runCommand`` + ``events.jsonl`` replay) remains as fallback
+when the device hub is unavailable.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ from typing import Any
 import structlog
 
 from lca.contracts.models.core.plane import PlaneRef
+from lca.contracts.protocols import DshRuntime
 from lca.layer0_infra.computer.machine import MachineTransport
 from lca.layer0_infra.dsh.driver import DshTurnSpec
 from lca.layer0_infra.dsh.models import DshNotification, DshTurnResult
@@ -93,7 +93,7 @@ if __name__ == "__main__":
 '''
 
 
-class MachineDshRuntime:
+class MachineDshRuntime(DshRuntime):
     """Execute DSH turns on the machine plane via the sidecar transport.
 
     Lifecycle per turn: write runner + config → runCommand → readFile events.

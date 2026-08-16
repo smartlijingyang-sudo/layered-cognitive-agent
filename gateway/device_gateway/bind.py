@@ -27,7 +27,17 @@ def plane_ref_for_device(device: Device) -> PlaneRef:
     )
 
 
+_hub: DeviceHub | None = None
+
+
+def device_hub() -> DeviceHub | None:
+    """Bound device hub (gateway process). Used by DSH streaming runtime."""
+    return _hub
+
+
 def bind_devices(registry: DeviceRegistry, hub: DeviceHub) -> None:
+    global _hub
+    _hub = hub
     from lca.layer0_infra.plane.machine import (
         set_machine_resolver,
         set_machine_transport_resolver,

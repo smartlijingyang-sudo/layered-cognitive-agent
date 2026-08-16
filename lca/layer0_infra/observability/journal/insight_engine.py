@@ -9,6 +9,9 @@ trace 的事件聚合成摘要，跑 ``insight_rules`` 注册表，把 ``RunInsi
 
 防自激：忽略入站 ``RunInsight``；每 trace 只在收尾触发一次。
 装配顺序须 insight 先于 otel/console，保证洞察在 run span 关闭前注入。
+
+store 由构造函数注入——RunStore 通过延迟 subscriber 工厂打破循环依赖，
+不再需要 ``bind_store()`` 两步初始化。
 """
 
 from __future__ import annotations
@@ -40,17 +43,12 @@ def _new_summary() -> dict[str, Any]:
 class InsightEngine(JournalProjector):
     """Post-commit subscriber：聚合事件，收尾时产出 insight。
 
-    须通过 ``bind_store`` 绑定 store 后才能产出 insight。
-    未绑定时仍正常聚合（向后兼容），但不会产出 RunInsight。
+    store 由构造函数注入；RunStore 通过延迟 subscriber 工厂解决循环依赖。
     """
 
-    def __init__(self) -> None:
-        self._store: RunStore | None = None
-        self._summaries: dict[str, dict[str, Any]] = {}
-
-    def bind_store(self, store: RunStore) -> None:
-        """绑定 store 引用——在 hub 构造后调用，解决循环依赖。"""
+    def __init__(self, store: RunStore) -> None:
         self._store = store
+        self._summaries: dict[str, dict[str, Any]] = {}
 
     # ── JournalProjector ───────────────────────────────
     def on_event(self, stamped: StampedEvent) -> None:
@@ -120,13 +118,10 @@ class InsightEngine(JournalProjector):
         summary = self._summaries.pop(trace_id, None)
         if summary is None:
             return
-        store = self._store
-        if store is None:
-            return
         for kind, message, detail in insight_rules.run_all_rules(summary):
-            store.append(RunInsight(kind=kind, summary=message, detail=detail))
+            self._store.append(RunInsight(kind=kind, summary=message, detail=detail))
 
 
-def create_insight_engine() -> InsightEngine:
+def create_insight_engine(store: RunStore) -> InsightEngine:
     """工厂（注册表装配用）。"""
-    return InsightEngine()
+    return InsightEngine(store)

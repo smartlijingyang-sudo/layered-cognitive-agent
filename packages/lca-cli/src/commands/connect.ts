@@ -8,6 +8,7 @@ import { GatewayClient } from '@lca/gateway-client';
 
 import { checkEnvironment, formatReport } from '../tools/env-check.js';
 import { executeToolCall } from '../tools/index.js';
+import { cancelDshTurn, executeDshTurn } from '../dsh/run-turn.js';
 
 const STATE_DIR = path.join(os.homedir(), '.lca');
 const PID_FILE = path.join(STATE_DIR, 'connect.pid');
@@ -88,6 +89,17 @@ export async function connect(options: ConnectOptions): Promise<void> {
       success: false,
       error: `unknown rpc ${request.method}`,
     });
+  });
+
+  client.on('dsh_run_turn_request', (request) => {
+    void executeDshTurn(client, request.turnId, request.params).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      client.sendDshTurnFinished(request.turnId, { success: false, error: message });
+    });
+  });
+
+  client.on('dsh_cancel_turn', (request) => {
+    cancelDshTurn(request.turnId);
   });
 
   await client.connect();

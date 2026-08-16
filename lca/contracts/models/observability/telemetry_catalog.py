@@ -182,13 +182,13 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
         desc="工具调用被安全策略拒绝",
     ),
     EventName.ACTION_DEGRADED.value: _event(
-        "lca.layer4_app.telemetry_bridge",
-        desc="动作降级（EventBus 桥接）",
+        "lca.layer2_runtime.event_emission",
+        desc="动作降级（journal 直写）",
     ),
     EventName.STEP_COMPLETED.value: _event(
-        "lca.layer4_app.telemetry_bridge",
+        "lca.layer2_runtime.event_emission",
         required=(ATTR_STEP,),
-        desc="步骤完成（EventBus 桥接）",
+        desc="步骤完成（journal 直写）",
     ),
     EventName.RUN_INSIGHT.value: _event(
         "lca.layer0_infra.observability.journal.otel_projector",

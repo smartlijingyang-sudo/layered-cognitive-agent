@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 import structlog
 
+from lca.contracts.mechanisms import consume
 from lca.contracts.protocols import Sandbox
 from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.sandbox.runtime import RunBoundSandboxRuntime
@@ -37,7 +38,7 @@ async def bind_sandbox_runtime(
         return existing
 
     runtime = RunBoundSandboxRuntime(
-        sandbox=sandbox,
+        sandbox=consume("sandbox", sandbox, RunBoundSandboxRuntime),
         store=store,
         run_id=run_id,
         attachment_ids=cleaned,

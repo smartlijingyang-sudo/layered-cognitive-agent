@@ -22,6 +22,10 @@ import type {
   AuthFailedMessage,
   ClientMessage,
   ConnectionStatus,
+  AgentRunAckMessage,
+  DshNotificationMessage,
+  DshRunTurnRequestMessage,
+  DshTurnFinishedMessage,
   RpcRequestMessage,
   ServerMessage,
   ToolCallRequestMessage,
@@ -60,6 +64,8 @@ export interface GatewayClientEvents {
   auth_failed: (reason: string) => void;
   tool_call_request: (request: ToolCallRequestMessage) => void;
   rpc_request: (request: RpcRequestMessage) => void;
+  dsh_run_turn_request: (request: DshRunTurnRequestMessage) => void;
+  dsh_cancel_turn: (request: { type: 'dsh_cancel_turn'; turnId: string }) => void;
   status_changed: (status: ConnectionStatus) => void;
   reconnecting: (delayMs: number) => void;
   error: (error: Error) => void;
@@ -164,6 +170,23 @@ export class GatewayClient extends EventEmitter {
     this.sendMessage({ type: 'rpc_response', requestId, result });
   }
 
+  sendDshNotification(turnId: string, method: string, payload: Record<string, unknown>): void {
+    this.sendMessage({ type: 'dsh_notification', turnId, method, payload });
+  }
+
+  sendDshTurnFinished(
+    turnId: string,
+    result: {
+      success?: boolean;
+      session_id?: string;
+      final_response?: string;
+      finish_reason?: string | null;
+      error?: string;
+    },
+  ): void {
+    this.sendMessage({ type: 'dsh_turn_finished', turnId, result });
+  }
+
   // ─── Connection internals ───
 
   private doConnect(): void {
@@ -237,6 +260,12 @@ export class GatewayClient extends EventEmitter {
           break;
         case 'rpc_request':
           this.emit('rpc_request', msg as RpcRequestMessage);
+          break;
+        case 'dsh_run_turn_request':
+          this.emit('dsh_run_turn_request', msg as DshRunTurnRequestMessage);
+          break;
+        case 'dsh_cancel_turn':
+          this.emit('dsh_cancel_turn', msg as { type: 'dsh_cancel_turn'; turnId: string });
           break;
         default:
           this.logger.warn(`unknown message type: ${(msg as { type: string }).type}`);

@@ -25,7 +25,7 @@ LCA 开发平台编排  ./scripts/lca-ops
 日常只记三句
   ./scripts/lca-ops status     看现在怎样
   ./scripts/lca-ops heal       有问题就修，不用再拆命令
-  ./scripts/lca-ops logs       跟 journal（思考 / 工具 / 步）
+  ./scripts/lca-ops logs       跟 journal 事实流
 
 ────────────────────────────────
 全站
@@ -56,11 +56,15 @@ stop
 ────────────────────────────────
 日志  logs
 ────────────────────────────────
-  ./scripts/lca-ops logs                 journal 实况（思考 / 决策 / 工具 / 步）
-  ./scripts/lca-ops logs lobehub         Next.js 进程日志
-  ./scripts/lca-ops logs daemon          sandbox 连接器
+  ./scripts/lca-ops logs              journal 事实流（模型所见即日志）
+  ./scripts/lca-ops logs -v           + prompt/response/args/result
+  ./scripts/lca-ops logs -d           + 增量事件（text/reasoning delta）
+  ./scripts/lca-ops logs --replay     从 traces/lca_journal.jsonl 回放
+  ./scripts/lca-ops logs lobehub      Next.js 进程日志
+  ./scripts/lca-ops logs daemon       sandbox 连接器
 
-  只有一种模式：跟着刷。journal 不是文件，是 gateway 里正在跑的 Run。
+  事实（decision / step / tool / llm）→ 观察（insight：冗余/循环/成本/关键路径）
+  与 DSH 架构对齐：模型可见的一切都可从 journal 重建。
 
 ────────────────────────────────
 单服务
@@ -387,14 +391,23 @@ def daemon(
 def logs(
     target: str = typer.Argument(
         "",
-        help="空=journal 实况；lobehub | daemon = 进程日志",
+        help="空=journal 事实流；lobehub | daemon = 进程日志",
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="显示完整字段（prompt/response/args/result）"
+    ),
+    deltas: bool = typer.Option(
+        False, "--deltas", "-d", help="显示增量事件（text/reasoning/sandbox delta）"
+    ),
+    replay: bool = typer.Option(
+        False, "--replay", "-r", help="从 traces/lca_journal.jsonl 回放（不连 SSE）"
     ),
     config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
 ) -> None:
-    """跟着刷。默认是 journal（思考/工具/步），不是 gateway.log。"""
+    """事实流。默认是 journal（思考/工具/步/洞察），不是 gateway.log。"""
     ops_config = OpsConfig.load(config)
     if target in {"", "journal", "gateway"}:
-        _follow_journal(ops_config)
+        _follow_journal(ops_config, verbose=verbose, show_deltas=deltas, replay=replay)
         return
     import subprocess
 
@@ -412,23 +425,93 @@ def logs(
     subprocess.run(["/usr/bin/tail", "-f", str(log_file)])
 
 
-def _follow_journal(ops_config: OpsConfig) -> None:
-    """Resilient journal SSE consumer with reconnection and rich rendering.
+def _follow_journal(
+    ops_config: OpsConfig,
+    *,
+    verbose: bool = False,
+    show_deltas: bool = False,
+    replay: bool = False,
+) -> None:
+    """Resilient journal SSE consumer with rich fact-stream rendering.
 
-    Three-layer architecture:
+    Three-layer architecture (DSH-aligned: model-visible = logged):
     - Transport: SSE connection with auto-reconnect + Last-Event-ID
     - Domain: SSE record → StampedEvent adapter
-    - Render: ConsoleJournalProjector (scenario cards, run cards, etc.)
+    - Render: FactStreamProjector (every event as a structured fact)
 
-    Death detection: if no cognitive events arrive for 30s (only heartbeats),
-    proactively reconnect. This catches zombie connections from subscriber eviction.
+    ``--replay`` reads from the durable jsonl file instead of live SSE.
+    Death detection only triggers on actual connection stalls (no SSE
+    frames at all for 60s), not on absence of specific event types.
+    Heartbeats keep the connection alive silently.
+    """
+    if replay:
+        _replay_from_jsonl(verbose=verbose, show_deltas=show_deltas)
+        return
+    _stream_live(ops_config, verbose=verbose, show_deltas=show_deltas)
+
+
+def _replay_from_jsonl(*, verbose: bool, show_deltas: bool) -> None:
+    """Read the durable jsonl journal file and project every event."""
+    from pathlib import Path
+
+    from lca.layer0_infra.observability.journal.fact_stream_projector import (
+        FactStreamProjector,
+    )
+    from lca.layer0_infra.observability.journal.journal_io import (
+        JOURNAL_SCHEMA_VERSION,
+        record_to_stamped,
+    )
+
+    jsonl_path = Path("traces/lca_journal.jsonl")
+    if not jsonl_path.exists():
+        print(f"No journal file at {jsonl_path}")
+        raise typer.Exit(1)
+
+    import json
+
+    projector = FactStreamProjector(verbose=verbose, show_deltas=show_deltas)
+    total = 0
+    rendered = 0
+    skipped = 0
+    for line in jsonl_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        total += 1
+        try:
+            record = json.loads(line)
+            if record.get("schema") != JOURNAL_SCHEMA_VERSION:
+                skipped += 1
+                continue
+            stamped = record_to_stamped(record)
+            if stamped is not None:
+                projector.on_event(stamped)
+                rendered += 1
+        except Exception:
+            skipped += 1
+
+    projector.close()
+    print(f"\n── replay done: {rendered}/{total} events rendered, {skipped} skipped ──")
+
+
+def _stream_live(
+    ops_config: OpsConfig,
+    *,
+    verbose: bool,
+    show_deltas: bool,
+) -> None:
+    """Live SSE consumer with fact-stream rendering.
+
+    Death detection: only triggers when no SSE frames arrive for 60s
+    (connection stall). Heartbeats and all event types reset the timer.
+    This avoids false-positive "30s without cognitive events" messages
+    during slow LLM calls or quiet periods.
     """
     import time as _time
 
     import httpx
 
-    from lca.layer0_infra.observability.journal.console_projector import (
-        ConsoleJournalProjector,
+    from lca.layer0_infra.observability.journal.fact_stream_projector import (
+        FactStreamProjector,
     )
     from lca.layer0_infra.ops.journal_log import (
         extract_seq_from_record,
@@ -437,42 +520,12 @@ def _follow_journal(ops_config: OpsConfig) -> None:
     )
 
     url = f"{ops_config.gateway.base_url}/journal/live"
-    projector = ConsoleJournalProjector()
+    projector = FactStreamProjector(verbose=verbose, show_deltas=show_deltas)
     last_seq = 0
-    last_cognitive_ts = _time.monotonic()
+    last_frame_ts = _time.monotonic()
     backoff = 1.0
-    death_timeout = 30.0
+    stall_timeout = 60.0
     max_backoff = 30.0
-
-    # Cognitive event types that reset the death timer.
-    cognitive_events = frozenset(
-        {
-            "AgentRunStarted",
-            "AgentRunFinished",
-            "TeamRunStarted",
-            "TeamRunFinished",
-            "DecisionMade",
-            "StepCompleted",
-            "LlmCallStarted",
-            "LlmCallCompleted",
-            "ReasoningCompleted",
-            "ToolStarted",
-            "ToolInvoked",
-            "ToolDenied",
-            "DelegationIssued",
-            "DelegationCompleted",
-            "DelegationCacheHit",
-            "ActionDegraded",
-            "RunInsight",
-            "CastingStarted",
-            "CastingCompleted",
-            "CastingFailed",
-            "SynthesisCompleted",
-            "AttachmentStagingStarted",
-            "AttachmentStagingCompleted",
-            "AttachmentStagingFailed",
-        }
-    )
 
     while True:
         try:
@@ -480,7 +533,7 @@ def _follow_journal(ops_config: OpsConfig) -> None:
             if last_seq > 0:
                 headers["Last-Event-ID"] = str(last_seq)
             with (
-                httpx.Client(timeout=httpx.Timeout(None, connect=5.0, read=60.0)) as client,
+                httpx.Client(timeout=httpx.Timeout(None, connect=5.0, read=120.0)) as client,
                 client.stream("GET", url, headers=headers) as resp,
             ):
                 if resp.status_code == 404:
@@ -495,30 +548,27 @@ def _follow_journal(ops_config: OpsConfig) -> None:
                 buf = ""
                 for chunk in resp.iter_text():
                     buf += chunk
+                    # Any frame resets the stall timer.
+                    last_frame_ts = _time.monotonic()
                     while "\n\n" in buf:
                         block, buf = buf.split("\n\n", 1)
                         record = parse_sse_block(block)
                         if record is None:
                             continue
 
-                        # Check for death: only heartbeats for 30s.
-                        event_type = record.get("event_type", "")
-                        if event_type in cognitive_events:
-                            last_cognitive_ts = _time.monotonic()
-
                         # Track seq for reconnection.
                         seq = extract_seq_from_record(record)
                         if seq > last_seq:
                             last_seq = seq
 
-                        # Convert to StampedEvent and feed projector.
+                        # Convert to StampedEvent and feed fact-stream projector.
                         stamped = sse_record_to_stamped(record)
                         if stamped is not None:
                             projector.on_event(stamped)
 
-                    # Death detection: check between chunks.
-                    if _time.monotonic() - last_cognitive_ts > death_timeout:
-                        print(f"\n⚠ journal 流 30 秒无认知事件，主动重连（seq={last_seq}）...")
+                    # Stall detection: no frames at all for 60s.
+                    if _time.monotonic() - last_frame_ts > stall_timeout:
+                        print(f"\n⚠ journal 连接 60 秒无数据帧，主动重连（seq={last_seq}）...")
                         break
 
         except httpx.ConnectError:

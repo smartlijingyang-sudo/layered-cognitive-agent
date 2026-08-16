@@ -11,6 +11,7 @@ against the last snapshot. ``status`` shows exactly which files changed.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -136,8 +137,17 @@ class DaemonService:
 
     @property
     def _cli_src_paths(self) -> list[Path]:
-        src = self._root / "packages" / "lca-cli"
-        return [src / "src", src / "package.json", src / "tsconfig.json"]
+        root = self._root / "packages"
+        cli = root / "lca-cli"
+        gw = root / "gateway-client"
+        return [
+            cli / "src",
+            cli / "package.json",
+            cli / "tsconfig.json",
+            gw / "src",
+            gw / "package.json",
+            gw / "tsconfig.json",
+        ]
 
     def ensure_ready(self) -> bool:
         """Ensure CLI is deployed and up-to-date with source.
@@ -146,7 +156,8 @@ class DaemonService:
         Uses ``StateStore.detect_changes`` for file-level drift detection.
         """
         report = self._state.detect_changes("daemon_cli", self._cli_src_paths, "*.ts")
-        if self._cli_deployed() and not report.has_changes:
+        python_stale = self._python_runtime_stale()
+        if self._cli_deployed() and not report.has_changes and not python_stale:
             return False
         return self._deploy_cli()
 
@@ -229,36 +240,143 @@ class DaemonService:
         return cli_js.exists()
 
     def _deploy_cli(self) -> bool:
-        """Deploy CLI from source to /opt/lca. Writes fingerprint marker."""
-        src = self._root / "packages" / "lca-cli"
-        if not (src / "src").is_dir():
+        """Deploy CLI + gateway-client + Python runtime to /opt/lca."""
+        pkg_root = self._root / "packages"
+        gw_src = pkg_root / "gateway-client"
+        cli_src = pkg_root / "lca-cli"
+        if not (cli_src / "src").is_dir() or not (gw_src / "src").is_dir():
             return False
 
-        # Build TypeScript
+        for src in (gw_src, cli_src):
+            try:
+                subprocess.run(
+                    ["npx", "tsc"],
+                    cwd=src,
+                    capture_output=True,
+                    timeout=60,
+                    check=True,
+                )
+            except (subprocess.CalledProcessError, Exception):
+                return False
+
         try:
             subprocess.run(
-                ["npx", "tsc"],
-                cwd=src,
+                ["npm", "install"],
+                cwd=cli_src,
                 capture_output=True,
-                timeout=60,
+                timeout=120,
+                check=True,
             )
-        except Exception:
+        except (subprocess.CalledProcessError, Exception):
             return False
 
-        if not (src / "dist" / "index.js").exists():
+        if not (cli_src / "dist" / "index.js").exists():
             return False
 
         self._sudo.run(["rm", "-rf", str(self._cli_dir / "dist")])
-        copied = self._sudo.run(["cp", "-r", str(src / "dist"), str(self._cli_dir)])
+        copied = self._sudo.run(["cp", "-r", str(cli_src / "dist"), str(self._cli_dir)])
         if copied.returncode != 0:
             return False
-        if (src / "node_modules").exists():
-            self._sudo.run(["cp", "-r", str(src / "node_modules"), str(self._cli_dir)])
+        if (cli_src / "node_modules").exists():
+            self._sudo.run(["rm", "-rf", str(self._cli_dir / "node_modules")])
+            self._sudo.run(["cp", "-r", str(cli_src / "node_modules"), str(self._cli_dir)])
+        gw_dest = self._cli_dir / "node_modules" / "@lca" / "gateway-client"
+        self._sudo.run(["rm", "-rf", str(gw_dest)])
+        self._sudo.run(["mkdir", "-p", str(gw_dest)])
+        self._sudo.run(["cp", "-r", str(gw_src / "dist"), str(gw_dest / "dist")])
+        self._sudo.run(["cp", str(gw_src / "package.json"), str(gw_dest / "package.json")])
+        if (gw_src / "node_modules").exists():
+            self._sudo.run(["cp", "-r", str(gw_src / "node_modules"), str(gw_dest / "node_modules")])
         self._sudo.run(["chmod", "-R", "a+rX", str(self._cli_dir)])
 
-        # Save snapshot so future detect_changes has a baseline.
+        if not self._deploy_python_runtime():
+            return False
+
         self._state.save_snapshot("daemon_cli", self._cli_src_paths, "*.ts")
+        self._write_python_runtime_marker()
         return True
+
+    def _python_runtime_marker(self) -> Path:
+        return self._cli_dir / ".python-runtime-hash"
+
+    def _python_runtime_stale(self) -> bool:
+        marker = self._python_runtime_marker()
+        if not marker.exists():
+            return True
+        try:
+            saved = marker.read_text(encoding="utf-8").strip()
+        except OSError:
+            return True
+        return saved != self._python_runtime_fingerprint()
+
+    def _python_runtime_fingerprint(self) -> str:
+        import hashlib
+
+        hasher = hashlib.sha256()
+        for rel in ("lca", "pyproject.toml"):
+            path = self._root / rel
+            if path.is_dir():
+                for file in sorted(path.rglob("*.py")):
+                    hasher.update(str(file.relative_to(self._root)).encode())
+                    hasher.update(file.read_bytes())
+            elif path.is_file():
+                hasher.update(path.read_bytes())
+        return hasher.hexdigest()[:16]
+
+    def _write_python_runtime_marker(self) -> None:
+        self._sudo.write_text(
+            self._python_runtime_marker(),
+            f"{self._python_runtime_fingerprint()}\n",
+        )
+
+    def _deploy_python_runtime(self) -> bool:
+        """Stage ``lca`` under /opt/lca/python and install worker deps into venv."""
+        venv_py = Path("/opt/lca/venv/bin/python3")
+        if not venv_py.exists():
+            return False
+        python_root = self._cli_dir / "python"
+        self._sudo.run(["rm", "-rf", str(python_root)])
+        self._sudo.run(["mkdir", "-p", str(python_root)])
+        copied = self._sudo.run(["cp", "-r", str(self._root / "lca"), str(python_root)])
+        if copied.returncode != 0:
+            return False
+        self._sudo.run(["chmod", "-R", "a+rX", str(python_root)])
+        try:
+            deps = subprocess.run(
+                [
+                    "uv",
+                    "pip",
+                    "install",
+                    "--python",
+                    str(venv_py),
+                    "structlog",
+                    "pydantic-settings",
+                    "pydantic",
+                    "httpx",
+                    "openai",
+                    "python-dotenv",
+                ],
+                capture_output=True,
+                timeout=180,
+                check=False,
+            )
+        except Exception:
+            return False
+        if deps.returncode != 0:
+            return False
+        verify = subprocess.run(
+            [
+                str(venv_py),
+                "-c",
+                "import lca.layer0_infra.dsh.daemon_worker as w; print('ok')",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env={"PYTHONPATH": str(python_root), **os.environ},
+            check=False,
+        )
+        return verify.returncode == 0
 
     def _spawn(self) -> int | None:
         """Spawn the daemon process as sandbox-user."""
@@ -273,6 +391,8 @@ class DaemonService:
         start_script = self._user_state / "start.sh"
         script_content = f"""#!/bin/sh
 export PATH="/opt/lca/venv/bin:/usr/local/bin:/usr/bin:/bin"
+export LCA_PYTHON="/opt/lca/venv/bin/python3"
+export PYTHONPATH="/opt/lca/python"
 export HOME=/home/{owner}
 cd {self._config.workspace}
 exec node {cli_js} connect \\

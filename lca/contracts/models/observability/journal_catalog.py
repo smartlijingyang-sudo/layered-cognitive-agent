@@ -224,10 +224,10 @@ JOURNAL_CATALOG: dict[str, VocabDef] = {
         desc="决策事实",
     ),
     "StepCompleted": _journal(
-        VocabDomain.EVENT, "lca.layer4_app.telemetry_bridge", required=("step",), desc="步完成"
+        VocabDomain.EVENT, "lca.layer2_runtime.event_emission", required=("step",), desc="步完成"
     ),
     "ActionDegraded": _journal(
-        VocabDomain.EVENT, "lca.layer4_app.telemetry_bridge", desc="动作降级"
+        VocabDomain.EVENT, "lca.layer2_runtime.event_emission", desc="动作降级"
     ),
     "LlmCallCompleted": _journal(
         VocabDomain.RESOURCE,

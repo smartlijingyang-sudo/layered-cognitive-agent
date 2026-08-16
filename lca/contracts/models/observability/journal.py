@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.ids import RunId, TraceId, new_run_id, new_trace_id
 
 # ── 关联骨架 ─────────────────────────────────────────────
 
@@ -37,11 +37,14 @@ class RunScope:
     - ``parent_run_id``：生成此 run 的 run id（根为 None）；
     - ``delegation_id``：生成此 run 的委派 id（无则 None）；
     - ``agent_role``：当前 run 的角色（委派发射点用作 caller_role）。
+
+    品牌化 ID（DSH-inspired）：trace_id/run_id 在类型层面不可互换，
+    防止关联骨架 ID 混传。运行时零成本。
     """
 
-    trace_id: str = ""
-    run_id: str = ""
-    parent_run_id: str | None = None
+    trace_id: TraceId = ""  # type: ignore[assignment]
+    run_id: RunId = ""  # type: ignore[assignment]
+    parent_run_id: RunId | None = None
     delegation_id: str | None = None
     agent_role: str = ""
 
@@ -63,11 +66,14 @@ def adopt_run_scope(*, role: str) -> tuple[RunScope, bool]:
     Gateway (and tests) may open ``RunScope(run_id=..., agent_role='')`` before
     ``Agent`` / ``Team``.run. The first actor claims that id. Nested actors
     (delegation, another speaker) mint a child. Returns ``(scope, is_root)``.
+
+    使用品牌化 ID 工厂（DSH-inspired）：trace_id 和 run_id 在类型层面区分，
+    防止关联骨架 ID 混传。
     """
     inherited = get_current_run_scope()
     if inherited is None:
-        return RunScope(trace_id=new_id("trace"), run_id=new_id("run"), agent_role=role), True
-    claimed = bool(inherited.agent_role)
+        return RunScope(trace_id=new_trace_id(), run_id=new_run_id(), agent_role=role), True
+    claimed = bool(inherited.run_id)
     if (
         inherited.run_id
         and not inherited.parent_run_id
@@ -81,7 +87,7 @@ def adopt_run_scope(*, role: str) -> tuple[RunScope, bool]:
     return (
         RunScope(
             trace_id=inherited.trace_id,
-            run_id=new_id("run"),
+            run_id=new_run_id(),
             parent_run_id=inherited.run_id or inherited.parent_run_id,
             delegation_id=inherited.delegation_id,
             agent_role=role,

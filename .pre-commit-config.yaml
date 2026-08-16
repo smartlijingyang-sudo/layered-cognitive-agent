@@ -59,6 +59,13 @@ repos:
         pass_filenames: false
         types: [python]
 
+      - id: check-protocol-impl
+        name: Protocol 实现必须显式继承
+        entry: python scripts/check_protocol_impl.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
       - id: vulture
         name: 死代码检测 vulture（≥80% 置信度）
         entry: uv run vulture lca --min-confidence 80

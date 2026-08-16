@@ -10,6 +10,7 @@ from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDAT
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
+from lca.layer0_infra.capability.search import SearchService
 from lca.layer0_infra.search.service import (
     build_search_plugin_state,
     format_search_content,
@@ -57,6 +58,11 @@ MANIFEST = ToolManifest(
 
 
 class WebSearchExecutor:
+    """search seam Consumer — 只通过 SearchService（Definition）发请求。"""
+
+    def __init__(self, search: SearchService | None = None) -> None:
+        self._search = search
+
     async def search(self, params: dict[str, Any]) -> Observation:
         start = time.monotonic()
         query = str(params.get("query") or "").strip()
@@ -76,7 +82,10 @@ class WebSearchExecutor:
         topic_s = str(topic) if isinstance(topic, str) and topic.strip() else None
         range_s = str(time_range) if isinstance(time_range, str) and time_range.strip() else None
 
-        result = await web_search(query, topic=topic_s, time_range=range_s)
+        if self._search is not None:
+            result = await self._search.web_search(query, topic=topic_s, time_range=range_s)
+        else:
+            result = await web_search(query, topic=topic_s, time_range=range_s)
         latency_ms = int((time.monotonic() - start) * 1000)
         content = format_search_content(result)
         state = build_search_plugin_state(result)
@@ -103,5 +112,5 @@ class WebSearchExecutor:
         )
 
 
-def build_tools() -> list[Tool]:
-    return build_tools_from_manifest(MANIFEST, WebSearchExecutor())
+def build_tools(search: SearchService | None = None) -> list[Tool]:
+    return build_tools_from_manifest(MANIFEST, WebSearchExecutor(search))

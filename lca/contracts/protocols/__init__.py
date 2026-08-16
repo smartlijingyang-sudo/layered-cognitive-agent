@@ -96,6 +96,15 @@ from lca.contracts.protocols.orchestration import (
 # ── L2 Runtime 协议 ──────────────────────────────────────
 from lca.contracts.protocols.runtime import Runtime, StopOutcomePolicy, StopRule
 
+# ── 工具执行管线（DSH-inspired 五阶段管线）────────────
+from lca.contracts.protocols.tool_pipeline import (
+    ToolExecutionContext,
+    ToolExecutionPipeline,
+    ToolExecutionResult,
+    ToolPostDecision,
+    ToolPreDecision,
+)
+
 __all__ = [
     "SANDBOX_SKILL_MOUNT_PREFIX",
     "AgentTransport",
@@ -149,6 +158,11 @@ __all__ = [
     "TeamUnit",
     "Telemetry",
     "Tool",
+    "ToolExecutionContext",
+    "ToolExecutionPipeline",
+    "ToolExecutionResult",
+    "ToolPostDecision",
+    "ToolPreDecision",
     "ToolRegistry",
     "TransportRegistryProtocol",
 ]

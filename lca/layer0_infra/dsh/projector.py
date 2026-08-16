@@ -55,6 +55,10 @@ class DshJournalProjector:
         data = event.get("data")
         handler(data if isinstance(data, dict) else {})
 
+    def ensure_open(self) -> None:
+        """Emit AgentRunStarted before the first SDK notification arrives."""
+        self._ensure_open()
+
     def emit_terminal_event(
         self, *, status: str | None = None, output: str = "", error: str = ""
     ) -> None:

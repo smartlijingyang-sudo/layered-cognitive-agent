@@ -22,6 +22,7 @@ from lca.layer0_infra.ops.service import (
     http_ready,
     kill_tree,
     pid_alive,
+    pid_on_port,
 )
 from lca.layer0_infra.ops.state import StateStore
 
@@ -123,16 +124,21 @@ class LobeHubService:
 
     def state(self) -> ServiceState:
         """Observe current state."""
-        pid = self._state.read_pid(self.name)
+        stored_pid = self._state.read_pid(self.name)
         checks: list[HealthCheck] = []
 
-        # Process alive?
-        process_ok = pid is not None and pid_alive(pid)
-        checks.append(HealthCheck("process", process_ok, f"pid={pid}" if pid else "none"))
-
-        # Dev server responding?
+        # Dev server responding? HTTP is the ground truth for "UI is up".
         dev_ok = http_ready(f"{self._config.dev_url}/", timeout=2.0)
         checks.append(HealthCheck("dev", dev_ok, f":{self._config.dev_port}"))
+
+        # Reconcile PID: ``bun run dev`` may exit while next-server keeps serving.
+        port_pid = pid_on_port(self._config.dev_port) if dev_ok else None
+        if dev_ok and port_pid and (stored_pid is None or not pid_alive(stored_pid)):
+            self._state.write_pid(self.name, port_pid)
+
+        pid = stored_pid if stored_pid and pid_alive(stored_pid) else port_pid
+        process_ok = pid is not None and pid_alive(pid)
+        checks.append(HealthCheck("process", process_ok, f"pid={pid}" if pid else "none"))
 
         # Source synced?
         source_ok = self._dir.exists() and (self._dir / "package.json").exists()
@@ -157,7 +163,7 @@ class LobeHubService:
         next_action = ""
         patches_stale = patches_ok and patch_drift.has_changes
         patches_missing = not patches_ok
-        if process_ok and dev_ok:
+        if dev_ok:
             status = ServiceStatus.RUNNING
             detail = "healthy"
             if patches_stale or patches_missing:
@@ -364,17 +370,8 @@ class LobeHubService:
             pids.append(pid)
 
         # Find by port
-        try:
-            result = subprocess.run(
-                ["lsof", "-ti", f":{self._config.dev_port}"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            for line in result.stdout.strip().split("\n"):
-                if line.strip():
-                    pids.append(int(line.strip()))
-        except Exception:
-            pass
+        port_pid = pid_on_port(self._config.dev_port)
+        if port_pid:
+            pids.append(port_pid)
 
         return list(set(pids))

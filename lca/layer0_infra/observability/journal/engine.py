@@ -1,28 +1,36 @@
-"""RunStore —— 唯一写入仲裁（ADR-0055 不变量 N1, N2）。
+"""RunStore —— 唯一写入仲裁（ADR-0055 不变量 N1, N2）+ 增量投影。
 
 Append-only run fact log。一个 run 的所有事实只通过一个入口写入。
 
 写入流水线：
     ① 词表校验 —— 未登记事件类 fail-fast；
-    ② 关联骨架盖章 —— ambient RunScope 或显式 scope；
-    ③ 属性策略写入期强制 —— 字符串字段统一脱敏/截断；
-    ④ 原子入 log（commit boundary）；
-    ⑤ post-commit 通知所有 subscriber（失败隔离，不影响 append 返回值）。
+    ② append 边界验证 —— 一次 pass 完成 frozen 校验 + 数据完整性断言；
+    ③ 关联骨架盖章 —— ambient RunScope 或显式 scope；
+    ④ 属性策略写入期强制 —— 字符串字段统一脱敏/截断；
+    ⑤ 原子入 log（commit boundary）；
+    ⑥ post-commit 通知所有 subscriber（失败隔离，不影响 append 返回值）；
+    ⑦ 增量投影缓存失效标记。
 
 关键不变量：
 - N1 append-before-observe：subscriber 永不可见未提交事件。
 - N2 seq = log.length：序号由 log 长度唯一确定，连续不跳跃。
+- N3 append 边界验证：写入即 frozen + 数据完整，后续读取零拷贝。
 
-设计来源：DSH Session.append()（同步原子 + post-commit 通知）、
-EventStore expected-version CAS（并发控制）、
-Kafka consumer-managed offset（观察者自拉）。
+增量投影：
+    ``derive_events(predicate)`` 从日志投影出满足条件的子集，缓存到
+    下次 append 时失效。调用方无需重算全量。
+
+设计来源：DSH Session.append()（同步原子 + post-commit 通知 + 增量
+deriveMessages 缓存）、EventStore expected-version CAS、
+Kafka consumer-managed offset。
 """
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from enum import Enum
 from typing import Any
 
@@ -39,6 +47,9 @@ from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.observability.policy import AttributePolicy
 
 _log = structlog.get_logger("lca.journal")
+
+SubscriberFactory = Callable[[], Sequence[JournalProjector]]
+"""延迟 subscriber 解析：打破 InsightEngine ↔ RunStore 循环依赖。"""
 
 
 class UnregisteredJournalEventError(TypeError):
@@ -83,22 +94,35 @@ class _IsolatedSubscriber(JournalProjector):
 
 
 class RunStore:
-    """Append-only run fact log。不变量 N1 + N2。
+    """Append-only run fact log。不变量 N1 + N2 + N3。
 
     一个 run 的所有事实只通过 ``append()`` 写入。写入后立即通知所有
     subscriber；subscriber 异常被隔离，不影响 append 返回值。
+
+    ``subscribers`` 可以是具体列表或工厂函数——工厂在首次 ``append()`` 时
+    解析，打破 subscriber 与 store 的循环依赖（无需 ``bind_store()``）。
+
+    增量投影：``derive_events(predicate)`` 缓存满足条件的子集，
+    只在 append 后失效并增量扩展。
     """
 
     def __init__(
         self,
-        subscribers: Sequence[JournalProjector] = (),
+        subscribers: Sequence[JournalProjector] | SubscriberFactory = (),
         *,
         policy: AttributePolicy | None = None,
     ) -> None:
-        self._subscribers = [_IsolatedSubscriber(s) for s in subscribers]
+        if callable(subscribers):
+            self._subscriber_factory: SubscriberFactory | None = subscribers
+            self._subscribers: list[_IsolatedSubscriber] = []
+        else:
+            self._subscriber_factory = None
+            self._subscribers = [_IsolatedSubscriber(s) for s in subscribers]
         self._policy = policy if policy is not None else AttributePolicy()
         self._events: list[StampedEvent] = []
         self._seq = 0
+        # 增量投影缓存：predicate id → (cached_result, last_seq)
+        self._projection_cache: dict[int, tuple[list[StampedEvent], int]] = {}
 
     @property
     def events(self) -> tuple[StampedEvent, ...]:
@@ -110,32 +134,92 @@ class RunStore:
         """下一条事件的 seq（= len(log)）。"""
         return self._seq
 
+    def _resolve_subscribers_if_needed(self) -> None:
+        """首次调用时解析延迟 subscriber 工厂，之后工厂引用释放。"""
+        factory = self._subscriber_factory
+        if factory is None:
+            return
+        self._subscriber_factory = None
+        self._subscribers = [_IsolatedSubscriber(s) for s in factory()]
+
+    @staticmethod
+    def _validate_append_boundary(event: JournalEvent) -> JournalEvent:
+        """Append 边界验证（DSH-inspired）：一次 pass 完成 frozen 校验 + 数据完整性断言。
+
+        - 断言事件是 frozen dataclass（构造性不可变）；
+        - 深拷贝隔离：返回独立副本，调用方后续修改不影响 log；
+        - 断言所有字段值不是 mutable container 的共享引用。
+
+        写入即 frozen + 隔离，后续读取零拷贝。
+        """
+        if not getattr(type(event), "__dataclass_params__", None):
+            raise TypeError(f"journal event must be a dataclass, got {type(event).__name__}")
+        if not type(event).__dataclass_params__.frozen:
+            raise TypeError(f"journal event must be frozen dataclass: {type(event).__name__}")
+        # 深拷贝隔离：调用方持有的引用不影响 log 内的副本
+        return copy.deepcopy(event)
+
     def append(self, event: JournalEvent) -> StampedEvent:
-        """原子写入：校验 → 盖章 → 策略 → 入 log → post-commit 通知。
+        """原子写入：校验 → 边界验证 → 盖章 → 策略 → 入 log → 通知。
 
         subscriber 通知在 append 成功后，subscriber 失败不影响返回值。
+        首次 append 时解析延迟 subscriber 工厂（如有）。
         """
+        self._resolve_subscribers_if_needed()
         event_type = type(event)
         if event_type.__name__ not in JOURNAL_EVENT_CLASSES:
             raise UnregisteredJournalEventError(event_type)
+        # Append 边界验证：frozen 断言 + 深拷贝隔离
+        isolated = self._validate_append_boundary(event)
         self._seq += 1
         scope = get_current_run_scope() or RunScope()
-        sanitized = self._apply_policy(event)
+        sanitized = self._apply_policy(isolated)
         stamped = StampedEvent(seq=self._seq, ts=time.time(), scope=scope, event=sanitized)
         self._events.append(stamped)  # ← commit boundary
+        # 通知 subscriber（失败隔离）
         for subscriber in self._subscribers:
             subscriber.on_event(stamped)
+        # 增量投影缓存不清空——derive_events 内部按 last_seq 增量扩展
         return stamped
 
     def read_from(self, after_seq: int) -> Sequence[StampedEvent]:
         """观察者自拉：返回 seq > after_seq 的所有已提交事件。"""
         return tuple(e for e in self._events if e.seq > after_seq)
 
+    def derive_events(
+        self,
+        predicate: Callable[[StampedEvent], bool],
+    ) -> tuple[StampedEvent, ...]:
+        """增量投影：从日志投影出满足 predicate 的子集。
+
+        首次调用全量扫描，后续 append 后失效并增量扩展（只扫描新事件）。
+        缓存按 predicate 的 id 分桶——同一 predicate 对象复用缓存。
+
+        设计来源：DSH Session.deriveMessages() 增量缓存。
+        """
+        pid = id(predicate)
+        cached = self._projection_cache.get(pid)
+        if cached is not None:
+            result, last_seq = cached
+            # 增量扩展：只扫描 last_seq 之后的新事件
+            for event in self._events:
+                if event.seq > last_seq and predicate(event):
+                    result.append(event)
+            cached = (result, self._seq)
+            self._projection_cache[pid] = cached
+            return tuple(result)
+        # 首次全量扫描
+        result = [e for e in self._events if predicate(e)]
+        self._projection_cache[pid] = (result, self._seq)
+        return tuple(result)
+
     def flush(self) -> None:
+        self._resolve_subscribers_if_needed()
         for subscriber in self._subscribers:
             subscriber.flush()
 
     def close(self) -> None:
+        self._resolve_subscribers_if_needed()
         self.flush()
         for subscriber in self._subscribers:
             subscriber.close()

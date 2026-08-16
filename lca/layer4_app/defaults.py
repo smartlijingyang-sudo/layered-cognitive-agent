@@ -51,6 +51,7 @@ from lca.layer3_agent.orchestration_strategies import (
     SequentialStrategy,
     SwarmStrategy,
 )
+from lca.layer4_app.capability_boot import register_seam_catalog
 from lca.layer4_app.policies import LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy
 
 EVENT_BUS_SIMPLE = "simple"
@@ -140,6 +141,8 @@ def register_defaults(registries: Registries) -> None:
         ComponentKind.DECISION_GATE, DecisionGateName.MUST_CONSULT_ALL, MustConsultAllMembers
     )
     reg.register(ComponentKind.BUDGET_POLICY, LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy)
+
+    register_seam_catalog()
 
 
 def build_default_registries() -> Registries:

@@ -59,6 +59,7 @@ uv run vulture lca --min-confidence 80
 - 方法 ≤200 行，文件 ≤1500 行；超过就拆
 - 公共接口必须类型标注；contracts 用 stdlib dataclass
 - 层间只通过 Protocol 通信，同层通过依赖注入协作
+- 实现 contracts Protocol 的类**必须显式继承**该 Protocol（`check_protocol_impl.py` 强制）
 - 禁止魔数、硬编码密钥、裸 `except Exception`、`print`
 - 多种实现 → `Protocol` + 注册表；外部集成 → 适配器
 - 不生成 TODO/FIXME 占位；structlog 替代 print

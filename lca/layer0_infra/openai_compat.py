@@ -22,6 +22,33 @@ class StructuredLLMError(RuntimeError):
 
 _RESPONSES_OBJECT = "response"
 
+_UPSTREAM_CHAT_ROLES = frozenset({"system", "user", "assistant", "tool", "function"})
+
+
+def normalize_chat_role(role: Any) -> str | None:
+    """Map OpenAI/LobeHub roles to upstream chat-completion roles."""
+    if not isinstance(role, str):
+        return None
+    normalized = role.strip().lower()
+    if normalized == "developer":
+        return "system"
+    if normalized in _UPSTREAM_CHAT_ROLES:
+        return normalized
+    return None
+
+
+def normalize_chat_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop unsupported roles and map ``developer`` → ``system`` for upstream APIs."""
+    normalized: list[dict[str, Any]] = []
+    for item in messages:
+        if not isinstance(item, dict):
+            continue
+        role = normalize_chat_role(item.get("role"))
+        if role is None:
+            continue
+        normalized.append({**item, "role": role})
+    return normalized
+
 
 def normalize_responses_input(raw_input: Any) -> list[dict[str, Any]]:
     """Map OpenAI Responses ``input`` to chat ``messages``."""
@@ -37,8 +64,8 @@ def normalize_responses_input(raw_input: Any) -> list[dict[str, Any]]:
     for item in raw_input:
         if not isinstance(item, dict):
             continue
-        role = item.get("role")
-        if role not in {"system", "user", "assistant", "developer"}:
+        role = normalize_chat_role(item.get("role"))
+        if role is None:
             continue
         content = item.get("content")
         if isinstance(content, str):
@@ -155,7 +182,7 @@ async def create_simple_completion(
         client = get_async_openai_client()
     except LLMUnavailableError as exc:
         raise StructuredLLMError(str(exc)) from exc
-    req_messages: Any = messages
+    req_messages: Any = normalize_chat_messages(messages)
     response = await client.chat.completions.create(
         model=upstream_model,
         messages=req_messages,
@@ -191,7 +218,7 @@ async def create_structured_completion(
         client = get_async_openai_client()
     except LLMUnavailableError as exc:
         raise StructuredLLMError(str(exc)) from exc
-    req_messages: Any = list(messages)
+    req_messages: Any = normalize_chat_messages(messages)
     req_format: Any = response_format
     try:
         response = await client.chat.completions.create(
