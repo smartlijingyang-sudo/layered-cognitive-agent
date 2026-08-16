@@ -19,6 +19,7 @@ SURFACES: tuple[tuple[str, str], ...] = (
     ("journal", r"^/journal"),
     ("runs", r"^/runs"),
     ("files", r"^/files"),
+    ("sessions", r"^/v1/sessions"),
     ("openai", r"^/v1/"),
     ("devices", r"^/api/device"),
 )

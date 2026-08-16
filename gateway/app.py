@@ -58,6 +58,17 @@ from gateway.runs.api import (
 )
 from gateway.runs.execute import set_llm_resolver
 from gateway.runs.session import RunRegistry
+from gateway.session_routes import (
+    command_answer,
+    command_cancel,
+    command_inject,
+    command_steer,
+    create_session,
+    get_snapshot,
+    send_message,
+    stream_events,
+)
+from gateway.spine import bind_session_spine
 from lca.layer0_infra.file_store import (
     LocalFileStore,
     get_default_file_store,
@@ -188,6 +199,30 @@ def create_app(
             Route("/runs/{run_id}/doctor", get_run_doctor, methods=["GET"]),
             Route("/runs/{run_id}/cancel", cancel_run, methods=["POST", "OPTIONS"]),
             Route("/runs/{run_id}/answer", answer_run, methods=["POST", "OPTIONS"]),
+            Route("/v1/sessions", create_session, methods=["POST", "OPTIONS"]),
+            Route("/v1/sessions/{session_id}/messages", send_message, methods=["POST", "OPTIONS"]),
+            Route("/v1/sessions/{session_id}/snapshot", get_snapshot, methods=["GET", "OPTIONS"]),
+            Route("/v1/sessions/{session_id}/events", stream_events, methods=["GET", "OPTIONS"]),
+            Route(
+                "/v1/sessions/{session_id}/commands/answer",
+                command_answer,
+                methods=["POST", "OPTIONS"],
+            ),
+            Route(
+                "/v1/sessions/{session_id}/commands/cancel",
+                command_cancel,
+                methods=["POST", "OPTIONS"],
+            ),
+            Route(
+                "/v1/sessions/{session_id}/commands/steer",
+                command_steer,
+                methods=["POST", "OPTIONS"],
+            ),
+            Route(
+                "/v1/sessions/{session_id}/commands/inject",
+                command_inject,
+                methods=["POST", "OPTIONS"],
+            ),
             Route("/files/{attachment_id}", _download_file, methods=["GET"]),
             Route("/files/{attachment_id}/meta", _get_file_meta, methods=["GET"]),
             Route("/v1/models", list_models, methods=["GET", "OPTIONS"]),
@@ -220,6 +255,15 @@ def create_app(
         resolved_profile = "profiles/web-standard.yaml"
     if resolved_profile is not None:
         _load_harness_profile(application, resolved_profile)
+
+    spine_dir = Path("traces/sessions")
+    plugin_scope = getattr(application.state, "plugin_host", None)
+    agent_registry, command_gw, _projections = bind_session_spine(
+        sessions_dir=spine_dir,
+        plugin_scope=plugin_scope,
+    )
+    application.state.agent_registry = agent_registry
+    application.state.command_gateway = command_gw
 
     return application
 

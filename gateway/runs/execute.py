@@ -103,6 +103,50 @@ def llm_status() -> dict[str, bool]:
     return {"llm_available": get_llm_resolver().is_available()}
 
 
+def _maybe_shadow_session(session: RunSession, question: str, result: Any) -> None:
+    """When LCA_SESSION_SPINE=shadow, run the new path and log divergences."""
+    from lca.harness.diagnostics.normalizer import compare_results
+    from lca.harness.flags import session_spine_mode
+
+    if session_spine_mode() != "shadow":
+        return
+    from gateway.spine import agent_registry, projections
+
+    registry = agent_registry()
+    proj = projections()
+    if registry is None or proj is None:
+        return
+    import asyncio
+
+    async def _run() -> None:
+        handle = await registry.create(
+            profile="web-standard",
+            session_id=session.run_id,
+        )
+        from lca.contracts.harness.agent import UserMessage
+
+        await handle.agent.followup(UserMessage(content=question))
+        store = registry.store_for(session.run_id)
+        snapshot = proj.snapshot(session.run_id)
+        journal = list(store.events()) if store is not None else []
+        report = compare_results(
+            session_id=session.run_id,
+            legacy=result,
+            snapshot=snapshot,
+            journal=journal,
+        )
+        if report.divergences:
+            _log.warning("shadow_divergence", report=report.to_dict())
+        else:
+            _log.info("shadow_match", session_id=session.run_id)
+
+    try:
+        loop = asyncio.get_running_loop()
+        session._shadow_task = loop.create_task(_run())
+    except RuntimeError:
+        asyncio.run(_run())
+
+
 def sanitize_error(error: str) -> str:
     """Three regexes. No sanitizer protocol theatre."""
     if not error:
@@ -292,6 +336,7 @@ async def execute_run(
                             )
                             return
                         success = result.status == TaskStatus.COMPLETED
+                        _maybe_shadow_session(session, question, result)
                         if not success and not session.error and result.error:
                             session.error = format_user_error(
                                 result.error,

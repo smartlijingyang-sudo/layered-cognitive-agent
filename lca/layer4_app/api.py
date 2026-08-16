@@ -81,6 +81,7 @@ class Agent(AgentUnit):
         state_store: str | StateStore = STATE_STORE_CHOICE_MEMORY,
         brain: str | Brain = BRAIN_CHOICE_DEFAULT,
         composer: AgentComposer | None = None,
+        scope: object | None = None,
     ) -> None:
         self._spec = AgentSpec(
             profile=RoleProfile(
@@ -101,7 +102,10 @@ class Agent(AgentUnit):
             brain=brain,
         )
         target = composer if composer is not None else AgentComposer()
-        self._agent = target.compose(self._spec)
+        from lca.harness.kernel.scope import ScopedPluginHost
+
+        compose_scope = scope if isinstance(scope, ScopedPluginHost) else None
+        self._agent = target.compose(self._spec, scope=compose_scope)
         self.role_profile = self._spec.profile
 
     @property
