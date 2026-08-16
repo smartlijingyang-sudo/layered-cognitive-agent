@@ -11,7 +11,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import replace
-from typing import TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from lca.harness.kernel.scope import ScopedPluginHost
 
 from lca.contracts.atoms.enums import (
     ActionScope,
@@ -100,6 +103,44 @@ __all__ = [
 T = TypeVar("T")
 
 
+class _ScopeAsCapabilityContext:
+    """Adapter: makes ``ScopedPluginHost`` usable where ``CapabilityHub`` is expected.
+
+    The CapabilityHub interface is: ``mount(key, service)``, ``require(key)``,
+    ``get(key)``, ``keys()``. This adapter delegates to the scope's service table.
+    """
+
+    def __init__(self, scope: Any) -> None:
+        self._scope = scope
+
+    def require(self, key: str) -> Any:
+        from lca.harness.kernel.scope import ServiceNotFoundError
+
+        try:
+            return self._scope.resolve(key)
+        except ServiceNotFoundError as exc:
+            from lca.contracts.mechanisms.capability import MissingCapabilityError
+
+            raise MissingCapabilityError(key) from exc
+
+    def get(self, key: str) -> Any | None:
+        return self._scope.get(key)
+
+    def mount(self, key: str, service: Any) -> None:
+        # Scope doesn't allow ad-hoc mount from composer — this is a no-op
+        # warning. In the new model, all services come from plugin modules.
+        import structlog
+
+        structlog.get_logger("lca.composer").warning(
+            "scope_mount_ignored",
+            key=key,
+            msg="CapabilityHub.mount() is not supported in scope mode; use plugin modules",
+        )
+
+    def keys(self) -> list[str]:
+        return list(self._scope.host._services.keys())
+
+
 def _resolve_component(
     reg: ComponentRegistryProtocol,
     category: str,
@@ -169,10 +210,16 @@ class AgentComposer:
         team_channel: AgentTransport | None = None,
         decision_gate: DecisionGate | None = None,
         shared_store: SharedMemoryStore | None = None,
+        scope: ScopedPluginHost | None = None,
     ) -> CognitiveAgent:
-        """Assemble a complete CognitiveAgent from *spec* (closed graph)."""
+        """Assemble a complete CognitiveAgent from *spec* (closed graph).
+
+        When *scope* is provided, capabilities are resolved from the harness
+        plugin tree (profile-driven). When *scope* is None, falls back to
+        the legacy ``boot_capabilities()`` path.
+        """
         profile = spec.profile
-        ctx = boot_capabilities()
+        ctx = self._resolve_capability_context(scope)
         hub = create_observability(spec.observability)
         mem = self._resolve_memory(spec.memory, shared_store, ctx.require(SeamKey.MEMORY.value))
         state_store = self._resolve_state_store(
@@ -371,6 +418,13 @@ class AgentComposer:
                 f"decision_gate factory produced {type(result).__name__}, expected DecisionGate"
             )
         return result
+
+    @staticmethod
+    def _resolve_capability_context(scope: ScopedPluginHost | None) -> Any:
+        """Resolve the capability context from a scope or legacy boot."""
+        if scope is not None:
+            return _ScopeAsCapabilityContext(scope)
+        return boot_capabilities()
 
 
 class TeamComposer(AgentComposer):
