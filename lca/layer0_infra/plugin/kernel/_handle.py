@@ -32,6 +32,7 @@ class PluginHandle:
 
     # ── Async lifecycle ───────────────────────────────────
     inertia: asyncio.Task[None] | None = None
+    inertia_tasks: list[asyncio.Future[None]] = field(default_factory=list)
 
     # ── Internal ──────────────────────────────────────────
     _accessors: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -47,6 +48,8 @@ class PluginHandle:
     async def await_settled(self) -> PluginHandle:
         while self.inertia is not None:
             await self.inertia
+        for task in self.inertia_tasks:
+            await task
         if self.error is not None:
             raise self.error
         return self

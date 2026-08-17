@@ -1,7 +1,8 @@
 """Integration tests — CognitiveRuntime middleware phase boundary invocation."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
@@ -347,7 +348,6 @@ class TestRuntimeArchitecture:
 
     def test_runtime_uses_middleware_registry_duck_typing(self):
         """CognitiveRuntime accepts middleware_registry as object | None."""
-        import inspect
         from pathlib import Path
 
         source = Path("lca/layer2_runtime/runtime_loop.py").read_text()

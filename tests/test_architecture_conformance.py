@@ -373,6 +373,222 @@ EXEMPT: dict[str, str] = {
     "lca.layer0_infra.plugin.loader._loader.SeamCompletenessError": (
         "Seam 完整性校验异常：Loader 内部控制流 (Harness Spine)"
     ),
+    "lca.layer0_infra.plugin.scope.index._ScopeTargetCarrier": (
+        "scope 事件载体：内部路由值 (DSH core/scope mirror)"
+    ),
+    "lca.layer0_infra.plugin.scope.index._ScopedCtx": (
+        "scope 子上下文包装：内部辅助 (DSH core/scope mirror)"
+    ),
+    "lca.layer0_infra.plugin.scope.store._EntryValues": (
+        "条目表抽象基类：模块内部组合 (DSH core/scope store)"
+    ),
+    "lca.layer0_infra.plugin.scope.store.ScopeLayer": (
+        "scope 层基类：模块内部契约 (DSH core/scope store)"
+    ),
+    "lca.layer0_infra.plugin.scope.store.NamedEntries": (
+        "具名条目表：通用容器 (DSH core/scope store)"
+    ),
+    "lca.layer0_infra.plugin.scope.store.AnonymousEntries": (
+        "匿名条目表：通用容器 (DSH core/scope store)"
+    ),
+    "lca.layer0_infra.plugin.scope.store.ScopedLayers": (
+        "全局+scope 分层注册表：内核基础设施 (DSH core/scope store)"
+    ),
+    "lca.layer0_infra.plugin.expr.pyexpr.PyExpr": (
+        "!py 表达式值载体：可序列化配置 (Cordis !!js mirror)"
+    ),
+    "lca.layer0_infra.plugin.expr.pyexpr.SafeEvaluator": (
+        "AST 白名单沙箱求值器：内部工具 (Cordis !!js mirror)"
+    ),
+    "lca.layer0_infra.plugin.builtins.timer.TimerService": (
+        "fiber 归属定时器服务：内核插件 (Cordis timer mirror)"
+    ),
+    "lca.layer0_infra.plugin.builtins.timer._Ticks": (
+        "interval 异步迭代器：内部辅助 (Cordis timer mirror)"
+    ),
+    "lca.layer0_infra.capability.dispatch.ProviderDispatch": (
+        "provider 注册表：可逆 effect 挂载 (DSH registry seam)"
+    ),
+    "lca.layer0_infra.capability.tools.ToolFactory": (
+        "工具工厂基类：fork_for_run 绑定 run (DSH core/tools)"
+    ),
+    "lca.layer2_runtime.runtime_loop._PhaseCtx": (
+        "loop 阶段上下文：内部状态值 (Execution Planes)"
+    ),
+    "lca.layer0_infra.attachment.normalizer.TextNormalizationRules": (
+        "附件规范化规则值对象 (Attachment Pipeline)"
+    ),
+    "lca.layer0_infra.attachment.normalizer.TextNormalizationService": (
+        "附件文本规范化服务实现 (Attachment Pipeline)"
+    ),
+    "lca.layer0_infra.capability.files.FileStoreService": (
+        "file_store seam Definition (Capability Seams)"
+    ),
+    "lca.layer0_infra.capability.hub.CapabilityHub": (
+        "capability 组合容器 (Capability Seams)"
+    ),
+    "lca.layer0_infra.capability.memory.MemoryService": (
+        "memory seam Definition (Capability Seams)"
+    ),
+    "lca.layer0_infra.capability.observability.ObservabilityService": (
+        "observability seam Definition (Capability Seams)"
+    ),
+    "lca.layer0_infra.capability.search.SearchService": (
+        "search seam Definition (Capability Seams)"
+    ),
+    "lca.layer0_infra.capability.skills.SkillsService": (
+        "skills seam Definition (Capability Seams)"
+    ),
+    "lca.layer0_infra.capability.state_store.StateStoreService": (
+        "state_store seam Definition (Capability Seams)"
+    ),
+    "lca.layer0_infra.computer.machine_exec.MachineExecMixin": (
+        "machine 执行器混入：模块内部组合 (Computer Use)"
+    ),
+    "lca.layer0_infra.host_runtime.config.CLIConfig": (
+        "CLI 配置模型 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.config.GatewayConfig": (
+        "Gateway 配置模型 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.config.HostRuntimeConfig": (
+        "宿主运行时配置模型 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.config.PathConfig": (
+        "路径配置模型 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.config.SystemPackagesConfig": (
+        "系统包配置模型 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.config.ToolsConfig": (
+        "工具配置模型 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.config.UserConfig": (
+        "用户配置模型 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.config.VenvConfig": (
+        "虚拟环境配置模型 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.environment.HostEnvironment": (
+        "宿主环境探测实现 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.CheckResult": (
+        "检查结果值对象 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.ItemStatus": (
+        "条目状态枚举 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.Provider": (
+        "provider 抽象基类 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.StatusReport": (
+        "状态报告值对象 (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.shared.PackagesProvider": (
+        "系统包检查 provider (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.shared.PathProvider": (
+        "路径检查 provider (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.shared.ToolsProvider": (
+        "工具检查 provider (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.shared.VenvProvider": (
+        "venv 检查 provider (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.user.CLIProvider": (
+        "CLI 检查 provider (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.user.UserProvider": (
+        "用户检查 provider (Host Runtime)"
+    ),
+    "lca.layer0_infra.host_runtime.providers.user.WorkspaceProvider": (
+        "workspace 检查 provider (Host Runtime)"
+    ),
+    "lca.layer0_infra.ops.config.DaemonConfig": (
+        "daemon 配置模型 (Ops)"
+    ),
+    "lca.layer0_infra.ops.config.DshConfig": (
+        "DSH 配置模型 (Ops)"
+    ),
+    "lca.layer0_infra.ops.config.GatewayConfig": (
+        "Gateway 配置模型 (Ops)"
+    ),
+    "lca.layer0_infra.ops.config.InfraConfig": (
+        "基础设施配置模型 (Ops)"
+    ),
+    "lca.layer0_infra.ops.config.LobeHubConfig": (
+        "LobeHub 配置模型 (Ops)"
+    ),
+    "lca.layer0_infra.ops.config.OnlyboxesConfig": (
+        "Onlyboxes 配置模型 (Ops)"
+    ),
+    "lca.layer0_infra.ops.config.OpsConfig": (
+        "Ops 聚合配置模型 (Ops)"
+    ),
+    "lca.layer0_infra.ops.console.Console": (
+        "终端控制台实现 (Ops)"
+    ),
+    "lca.layer0_infra.ops.console.ConsoleConfig": (
+        "控制台配置模型 (Ops)"
+    ),
+    "lca.layer0_infra.ops.pipeline.Pipeline": (
+        "服务管道编排 (Ops)"
+    ),
+    "lca.layer0_infra.ops.pipeline.PipelineContext": (
+        "管道上下文 (Ops)"
+    ),
+    "lca.layer0_infra.ops.registry.ServiceRegistry": (
+        "服务注册表 (Ops)"
+    ),
+    "lca.layer0_infra.ops.service.HealthCheck": (
+        "健康检查值对象 (Ops)"
+    ),
+    "lca.layer0_infra.ops.service.ServiceState": (
+        "服务状态值对象 (Ops)"
+    ),
+    "lca.layer0_infra.ops.service.ServiceStatus": (
+        "服务状态枚举 (Ops)"
+    ),
+    "lca.layer0_infra.ops.services.daemon.DaemonService": (
+        "daemon 服务管理实现 (Ops)"
+    ),
+    "lca.layer0_infra.ops.services.dsh.DshObservation": (
+        "DSH 观测值对象 (Ops)"
+    ),
+    "lca.layer0_infra.ops.services.dsh.DshService": (
+        "DSH 服务管理实现 (Ops)"
+    ),
+    "lca.layer0_infra.ops.services.dsh.SystemDshProbe": (
+        "系统 DSH 探测 (Ops)"
+    ),
+    "lca.layer0_infra.ops.services.gateway.GatewayService": (
+        "Gateway 服务管理实现 (Ops)"
+    ),
+    "lca.layer0_infra.ops.services.infra.InfraService": (
+        "基础设施服务管理实现 (Ops)"
+    ),
+    "lca.layer0_infra.ops.services.lobehub.LobeHubService": (
+        "LobeHub 服务管理实现 (Ops)"
+    ),
+    "lca.layer0_infra.ops.services.onlyboxes.OnlyboxesObservation": (
+        "Onlyboxes 观测值对象 (Ops)"
+    ),
+    "lca.layer0_infra.ops.services.onlyboxes.OnlyboxesService": (
+        "Onlyboxes 服务管理实现 (Ops)"
+    ),
+    "lca.layer0_infra.ops.services.onlyboxes.SystemOnlyboxesProbe": (
+        "系统 Onlyboxes 探测 (Ops)"
+    ),
+    "lca.layer0_infra.ops.state.ChangeReport": (
+        "变更报告值对象 (Ops)"
+    ),
+    "lca.layer0_infra.ops.state.StateStore": (
+        "Ops 状态存储 (Ops)"
+    ),
+    "lca.layer0_infra.ops.sudo.Sudo": (
+        "sudo 包装实现 (Ops)"
+    ),
 }
 
 _SCAN_PACKAGES = [

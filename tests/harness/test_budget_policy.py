@@ -1,6 +1,7 @@
 """Tests for Budget Policy Plugin (C.3)."""
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 class TestBudgetPolicy:
@@ -53,8 +54,8 @@ class TestBudgetPolicy:
 
     def test_manifest_declares_policy_kind(self):
         """Plugin manifest has correct id, kind, and seam_key."""
-        from lca.plugins.budget_policy import manifest
         from lca.contracts.harness.plugin import PluginKind
+        from lca.plugins.budget_policy import manifest
 
         assert manifest.id == "lca.policy.budget"
         assert manifest.kind == PluginKind.POLICY
@@ -63,8 +64,8 @@ class TestBudgetPolicy:
 
     def test_apply_registers_middleware(self):
         """apply() registers middleware on the registry."""
-        from lca.plugins.budget_policy import apply
         from lca.contracts.harness.middleware import MiddlewareRegistration
+        from lca.plugins.budget_policy import apply
 
         registry = MagicMock()
         ctx = MagicMock()

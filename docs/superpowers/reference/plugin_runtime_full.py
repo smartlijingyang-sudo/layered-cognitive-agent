@@ -19,27 +19,26 @@ Dependencies: Python 3.11+, watchdog (optional, for HMR), pyyaml (optional).
 
 from __future__ import annotations
 
-import asyncio
 import ast
+import asyncio
 import importlib
 import importlib.util
 import inspect
 import itertools
 import json
 import operator
-import os
-import sys
 import traceback
 from abc import ABC, ABCMeta
 from collections import defaultdict
+from collections.abc import Callable, Generator, Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from types import ModuleType
 from typing import (
-    Any, Awaitable, Callable, ClassVar, Generator, Iterable, Mapping,
+    Any,
+    ClassVar,
 )
-
 
 # ═══════════════════════════════════════════════════════════════
 # §1 — TYPES & ERRORS
@@ -225,7 +224,7 @@ class PluginHandle:
     def get_effects_meta(self) -> list[EffectMeta]:
         return [meta for _, meta in self.effects if meta is not None]
 
-    async def await_settled(self) -> "PluginHandle":
+    async def await_settled(self) -> PluginHandle:
         while self.inertia:
             await self.inertia
         if self.error:
@@ -350,8 +349,8 @@ class PluginContext:
     + accessor/mixin + inject shorthand + child + trace/bind.
     """
 
-    def __init__(self, host: "PluginHost", handle: PluginHandle, *,
-                 parent: "PluginContext | None" = None) -> None:
+    def __init__(self, host: PluginHost, handle: PluginHandle, *,
+                 parent: PluginContext | None = None) -> None:
         self._host = host
         self._handle = handle
         self._parent = parent
@@ -368,7 +367,7 @@ class PluginContext:
         return self._handle.config
 
     @property
-    def parent(self) -> "PluginContext | None":
+    def parent(self) -> PluginContext | None:
         return self._parent
 
     def get_intercept(self, name: str) -> Any:
@@ -585,12 +584,12 @@ class PluginMeta(ABCMeta):
             if isinstance(base_inject, dict):
                 merged_inject.update(base_inject)
             elif isinstance(base_inject, (list, tuple)):
-                merged_inject.update({k: None for k in base_inject})
+                merged_inject.update(dict.fromkeys(base_inject))
         cls_inject = namespace.get("inject", ())
         if isinstance(cls_inject, dict):
             merged_inject.update(cls_inject)
         elif isinstance(cls_inject, (list, tuple)):
-            merged_inject.update({k: None for k in cls_inject})
+            merged_inject.update(dict.fromkeys(cls_inject))
         cls.inject = merged_inject  # type: ignore
 
         merged_intercept: dict[str, Any] = {}
@@ -706,7 +705,7 @@ class SafeEvaluator:
             case ast.Call(func=func, args=args, keywords=kws):
                 fn = self._eval_node(func)
                 if fn not in _SAFE_BUILTINS.values():
-                    raise ValueError(f"Unsafe function call")
+                    raise ValueError("Unsafe function call")
                 pos_args = [self._eval_node(a) for a in args]
                 kw_args = {kw.arg: self._eval_node(kw.value) for kw in kws}
                 return fn(*pos_args, **kw_args)

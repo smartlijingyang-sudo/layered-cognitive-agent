@@ -21,5 +21,6 @@ def apply(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 
     service = StateStoreService()
-    service.register("memory", InMemoryStateStore)
+    disposer = service.register("memory", InMemoryStateStore)
+    ctx.effect(lambda: disposer, "ctx.register(state_store.provider=memory)")
     ctx.mount("state_store", service)

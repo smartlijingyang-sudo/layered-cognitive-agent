@@ -11,6 +11,11 @@ insert:
     name: lca.plugins.llm_service
     config: {}
 
+  - id: lca.llm.provider
+    name: lca.plugins.llm_provider
+    config:
+      mode: auto
+
   - id: lca.sandbox.service
     name: lca.plugins.sandbox_service
     config: {}
@@ -45,6 +50,24 @@ insert:
 
   - id: lca.observability.service
     name: lca.plugins.observability_service
+    config: {}
+
+  # ── Cordis builtin: fiber-owned timers ──
+  - id: timer
+    name: lca.layer0_infra.plugin.builtins.timer
+    config: {}
+
+  # ── Harness spine seams (session / agent lifecycle / prompt assembly) ──
+  - id: lca.session.service
+    name: lca.plugins.session_service
+    config: {}
+
+  - id: lca.agent.service
+    name: lca.plugins.agent_service
+    config: {}
+
+  - id: lca.system_prompt.service
+    name: lca.plugins.system_prompt
     config: {}
 
   # ── Agent loop provider ──

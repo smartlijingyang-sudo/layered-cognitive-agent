@@ -632,6 +632,47 @@ def inspect_tree(
     print("Seam completeness: PASS")
 
 
+@app.command()
+def dump_profile(
+    profile: Path = typer.Argument(
+        Path("profiles/web-standard.yaml"),
+        help="Profile YAML path to dump the expanded entry list for",
+    ),
+    source: bool = typer.Option(
+        False, "--source", help="Annotate each row with its source bundle/patch"
+    ),
+) -> None:
+    """Dump the expanded plugin-tree entry list for a profile.
+
+    Mirrors DSH ``dsh --dump-config``: prints the exact rows the Loader
+    would activate, so a dump can never drift from what boots.
+    """
+    from lca.layer0_infra.plugin.include._profile import ProfileLoader
+
+    if not profile.exists():
+        print(f"Profile not found: {profile}")
+        raise typer.Exit(1)
+
+    rows = ProfileLoader().dump_profile(profile)
+    for row in rows:
+        parts = [f"  - id: {row['id']}"]
+        if row.get("name"):
+            parts.append(f"    name: {row['name']}")
+        if row.get("parent"):
+            parts.append(f"    parent: {row['parent']}")
+        if row.get("group"):
+            parts.append("    group: true")
+        if row.get("disabled"):
+            parts.append("    disabled: true")
+        if row.get("config"):
+            parts.append(f"    config: {row['config']!r}")
+        if source and row.get("source"):
+            parts.append(f"    source: {row['source']}")
+        print("\n".join(parts))
+    print()
+    print(f"Total rows: {len(rows)}")
+
+
 def main() -> None:
     """Entry point for scripts/lca-ops."""
     app()

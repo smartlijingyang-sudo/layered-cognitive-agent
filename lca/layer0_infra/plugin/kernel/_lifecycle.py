@@ -194,6 +194,17 @@ async def _run_effects(handle: PluginHandle) -> None:
     import structlog
 
     errors: list[BaseException] = []
+
+    # Drain async collection tasks first so their disposers are registered
+    # before any teardown runs.
+    tasks = list(handle.inertia_tasks)
+    handle.inertia_tasks.clear()
+    for task in tasks:
+        try:
+            await task
+        except BaseException as exc:
+            errors.append(exc)
+
     while handle.effects:
         cleanup, _ = handle.effects.pop()
         try:

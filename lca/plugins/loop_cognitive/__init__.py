@@ -51,33 +51,26 @@ def build_cognitive_live_agent(
     by ``AgentRegistry``.
     """
     from lca.harness.agent.handle import OwnerAgentHandle
-    from lca.layer0_infra.llm_resolver import ProductionLLMResolver
-    from lca.layer0_infra.tools.default_set import build_g2a_chat_tools
     from lca.layer4_app.api import Agent
     from lca.layer4_app.harness_live import CognitiveLiveAgent
 
     raw = options or {}
 
-    # Resolve LLM
+    # Resolve LLM: explicit option wins, else the plugin scope's ``llm``
+    # seam (Definition provider), else a bare mock.
     llm = raw.get("llm")
     if llm is None:
-        try:
-            resolver = ProductionLLMResolver()
-            if resolver.is_available():
-                llm = resolver.resolve(mode="solo")
-            else:
-                from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        llm = _resolve_llm_from_scope(plugin_scope, raw)
+    if llm is None:
+        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 
-                llm = MockLLMAdapter()
-        except Exception:
-            from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        llm = MockLLMAdapter()
 
-            llm = MockLLMAdapter()
-
-    # Resolve tools
+    # Resolve tools: explicit option wins, else the plugin scope's ``tools``
+    # seam (factory registry forked for this run), else the legacy builder.
     tools = raw.get("tools")
     if tools is None:
-        tools = build_g2a_chat_tools()
+        tools = _resolve_tools_from_scope(plugin_scope, raw)
 
     agent = Agent(
         role=str(raw.get("role") or "agent"),
@@ -90,6 +83,62 @@ def build_cognitive_live_agent(
     )
     live = CognitiveLiveAgent(agent, store, inbox, identity_id=identity_id)
     return OwnerAgentHandle(live)
+
+
+def _resolve_llm_from_scope(plugin_scope: Any, raw: dict[str, Any]) -> Any:
+    """Resolve the current LLM provider from the plugin scope's ``llm`` seam.
+
+    Prefers an explicit provider name in options (e.g. ``{"provider": "real"}``),
+    then the scope's active provider, then a per-run resolver fallback.
+    """
+    from lca.layer0_infra.llm_resolver import ProductionLLMResolver
+
+    provider_name = raw.get("provider")
+    if plugin_scope is not None:
+        try:
+            llm_svc = plugin_scope.resolve("llm")
+            if provider_name:
+                try:
+                    return llm_svc.providers.get(provider_name)
+                except KeyError:
+                    pass
+            try:
+                return llm_svc.providers.current()
+            except RuntimeError:
+                pass
+        except Exception:
+            _log.debug("llm_scope_resolve_fallback", exc_info=True)
+    try:
+        resolver = ProductionLLMResolver()
+        if resolver.is_available():
+            return resolver.resolve(mode="solo")
+    except Exception:
+        _log.debug("llm_resolver_fallback", exc_info=True)
+        return None
+    return None
+
+
+def _resolve_tools_from_scope(plugin_scope: Any, raw: dict[str, Any]) -> Any:
+    """Resolve the tool set from the plugin scope's ``tools`` seam.
+
+    Prefers an explicit tool list in options, then forks the scope's tool
+    factory registry for this run, then falls back to the legacy builder.
+    """
+    from lca.layer0_infra.tools.default_set import build_g2a_chat_tools
+
+    if plugin_scope is not None:
+        try:
+            tools_svc = plugin_scope.resolve("tools")
+            run = type(
+                "_Run", (), {"plane": raw.get("bindings"), "bindings": raw.get("bindings")}
+            )()
+            forked = tools_svc.fork_for_run(run)
+            tools = forked.list_tools()
+            if tools:
+                return tools
+        except Exception:
+            _log.debug("tools_scope_resolve_fallback", exc_info=True)
+    return build_g2a_chat_tools()
 
 
 def apply(ctx: Any, config: Any) -> None:

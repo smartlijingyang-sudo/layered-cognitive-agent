@@ -1,8 +1,9 @@
 """Tests for LegacyApiAdapter — bridges /runs/* to /v1/sessions/*."""
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from lca.plugins.gateway_starlette.legacy_adapter import LegacyApiAdapter
 

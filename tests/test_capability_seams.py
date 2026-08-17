@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+from pathlib import Path
+
 import pytest
 
 from lca.contracts.mechanisms.capability import REQUIRED_SEAM_KEYS, MissingCapabilityError, SeamKey
-from lca.contracts.mechanisms.seam import SeamRole, get_global_seam_registry
 from lca.layer0_infra.capability.hub import CapabilityHub
 from lca.layer0_infra.capability.llm import LlmService
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer4_app.capability_boot import boot_capabilities, register_seam_catalog
+from lca.layer0_infra.plugin.include._profile import ProfileLoader
+from lca.layer0_infra.plugin.loader import Loader
+from lca.layer4_app.capability_boot import boot_capabilities
 
 
 def test_hub_mount_and_require() -> None:
@@ -23,8 +27,6 @@ def test_hub_mount_and_require() -> None:
 
 
 def test_llm_service_dispatches_to_active_provider() -> None:
-    import asyncio
-
     svc = LlmService()
     svc.register("mock", MockLLMAdapter(), activate=True)
 
@@ -41,12 +43,15 @@ def test_boot_mounts_every_required_key() -> None:
         assert ctx.get(key.value) is not None, key
 
 
-def test_every_required_seam_has_three_roles() -> None:
-    register_seam_catalog()
-    registry = get_global_seam_registry()
-    for key in REQUIRED_SEAM_KEYS:
-        roles = registry.get_roles(key.value)
-        assert SeamRole.DEFINITION in roles, key
-        assert SeamRole.PROVIDER in roles, key
-        assert SeamRole.CONSUMER in roles, key
-        assert registry.is_complete(key.value), key
+def test_every_required_seam_loaded_by_profile() -> None:
+    """base-spine profile mounts every required seam key (plugin-system check)."""
+
+    async def _load() -> None:
+        path = Path("profiles/web-standard.yaml")
+        entries = ProfileLoader().load_profile(path)
+        tree = await Loader(check_seam_completeness=True).load(entries)
+        for key in REQUIRED_SEAM_KEYS:
+            svc = tree.host.get_service(key.value)
+            assert svc is not None, f"Seam {key.value!r} not mounted by base-spine profile"
+
+    asyncio.run(_load())

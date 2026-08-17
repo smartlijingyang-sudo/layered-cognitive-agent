@@ -21,5 +21,6 @@ def apply(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.search.providers.tavily import search_tavily
 
     service = SearchService()
-    service.register("tavily", search_tavily)
+    disposer = service.register("tavily", search_tavily)
+    ctx.effect(lambda: disposer, "ctx.register(search.provider=tavily)")
     ctx.mount("search", service)

@@ -2,6 +2,7 @@
 
 Spec reference: SDD Task-9 / harness-spine-spec S3.8.3.
 """
+
 from __future__ import annotations
 
 from lca.contracts.harness.middleware import MiddlewareRegistration
@@ -10,7 +11,6 @@ from lca.contracts.harness.plugin import (
     PluginKind,
     PluginManifest,
 )
-
 
 manifest = PluginManifest(
     id="lca.policy.loop_intervention",
@@ -58,6 +58,9 @@ def apply(ctx: PluginContext, config: dict) -> None:
             plugin_id="lca.policy.loop_intervention",
         ),
         lambda phase, state, context: loop_intervention_middleware(
-            phase, state, context, config=config,
+            phase,
+            state,
+            context,
+            config=config,
         ),
     )

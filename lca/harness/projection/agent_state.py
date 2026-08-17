@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.harness.session import SessionEvent
 from lca.contracts.models.core.budget import Budget
-from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.state import AgentState
 
 
 @dataclass
@@ -18,10 +18,10 @@ class AgentStateProjection:
     This projection folds journal events into an AgentState, allowing
     the agent state to be recovered from the event log.
     """
-    
+
     key = "agent_state"
     version = 1
-    
+
     def init(self) -> AgentState:
         """Initialize an empty AgentState."""
         return AgentState(
@@ -44,7 +44,7 @@ class AgentStateProjection:
             active_template=None,
             activated_skills=[],
         )
-    
+
     def apply(self, state: AgentState, event: SessionEvent) -> AgentState:
         """Apply a session event to update the agent state.
         
@@ -57,23 +57,23 @@ class AgentStateProjection:
         """
         event_type = event.type
         data = event.data
-        
+
         if event_type == "session.created.v1":
             # Initialize from session creation
             state.trace_id = event.session_id
             if "profile" in data:
                 state.extra["profile"] = data["profile"]
-                
+
         elif event_type == "turn.started.v1":
             # Reset step counter for new turn
             if "turn" in data:
                 state.extra["current_turn"] = data["turn"]
-                
+
         elif event_type == "step.ended.v1":
             # Increment step counter
             if "step" in data:
                 state.step = data["step"] + 1
-                
+
         elif event_type == "tool.called.v1":
             # Track tool call
             call_id = data.get("call_id")
@@ -84,7 +84,7 @@ class AgentStateProjection:
                     "tool_name": tool_name,
                     "arguments": arguments,
                 }
-                
+
         elif event_type == "tool.completed.v1":
             # Complete tool call
             call_id = data.get("call_id")
@@ -99,23 +99,23 @@ class AgentStateProjection:
                     "success": success,
                     "result": result,
                 })
-                
+
         elif event_type == "session.checkpoint.v1":
             # Update status from checkpoint
             status_str = data.get("status", "working")
             state.status = _parse_status(status_str)
-            if "answer" in data and data["answer"]:
+            if data.get("answer"):
                 state.final_output = data["answer"]
-            if "error" in data and data["error"]:
+            if data.get("error"):
                 state.last_error = data["error"]
-                
+
         elif event_type == "model.completed.v1":
             # Track LLM completion
             if "response" in data:
                 state.extra["last_model_response"] = data["response"]
-                
+
         return state
-    
+
     def view(self, state: AgentState) -> dict[str, Any]:
         """Convert AgentState to a serializable view.
         

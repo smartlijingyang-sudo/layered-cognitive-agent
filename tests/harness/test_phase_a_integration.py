@@ -167,8 +167,8 @@ class TestBaseSpine:
             assert svc is not None, f"Service '{key}' not loaded"
 
     def test_entry_count(self, tree):
-        # 12 plugins: seam_definitions + 10 services + loop_cognitive
-        assert len(tree.entries) == 12
+        # 16 plugins: seam_definitions + 10 services + 3 harness seams + llm_provider + loop_cognitive
+        assert len(tree.entries) == 17
 
     def test_all_plugins_active(self, tree):
         for entry in tree.entries:
@@ -189,7 +189,7 @@ class TestBaseSpine:
                     break
         assert mod is not None
         assert mod.kind == PluginKind.BUNDLE
-        assert len(mod.extension_points) == 11
+        assert len(mod.extension_points) == 14
 
 
 # ── A.5: AgentComposer scope integration ─────────────────────────────
@@ -297,14 +297,18 @@ class TestSeamCompleteness:
             entries = pl.load_profile(PROFILE_PATH)
             loader = Loader(check_seam_completeness=True)
             tree = await loader.load(entries)
-            assert len(tree.entries) == 1 + len(EXPECTED_SEAM_KEYS)
+            assert len(tree.entries) == 17
 
         asyncio.run(_test())
 
     def test_missing_llm_provider_fails_completeness(self):
         async def _test():
             pl = ProfileLoader()
-            entries = [e for e in pl.load_profile(PROFILE_PATH) if e.id != "lca.llm.service"]
+            entries = [
+                e
+                for e in pl.load_profile(PROFILE_PATH)
+                if e.id not in {"lca.llm.service", "lca.llm.provider"}
+            ]
             with pytest.raises(SeamCompletenessError, match="llm"):
                 await Loader(check_seam_completeness=True).load(entries)
 

@@ -4,6 +4,7 @@ LegacyApiAdapter translates synchronous /runs/* requests into the async
 command flow: create session → send message → wait for terminal state →
 return projection snapshot in the legacy TaskResult shape.
 """
+
 from __future__ import annotations
 
 import asyncio

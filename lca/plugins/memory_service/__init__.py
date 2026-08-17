@@ -21,5 +21,6 @@ def apply(ctx: Any, config: Any) -> None:
     from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
     service = MemoryService()
-    service.register("simple", SimpleMemorySystem)
+    disposer = service.register("simple", SimpleMemorySystem)
+    ctx.effect(lambda: disposer, "ctx.register(memory.provider=simple)")
     ctx.mount("memory", service)

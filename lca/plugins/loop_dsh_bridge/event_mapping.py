@@ -6,7 +6,6 @@ so the harness spine can treat DSH the same as any other loop provider.
 
 from __future__ import annotations
 
-import logging
 import time
 from dataclasses import dataclass
 from typing import Any

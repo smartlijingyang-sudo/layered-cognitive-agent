@@ -18,28 +18,31 @@ Test categories:
 
 from __future__ import annotations
 
-import asyncio
-import json
-import os
-import sys
-import tempfile
 import ast
+import asyncio
 import importlib
 import importlib.util
+import sys
+import tempfile
 from pathlib import Path
-from typing import Any, Generator
 
-import anyio
-import anyio.abc
 import pytest
 
 # Import the runtime under test
 sys.path.insert(0, str(Path(__file__).parent))
 from plugin_runtime_full import (
-    DisposableList, EffectMeta, EventBus, PluginContext, PluginError,
-    PluginHandle, PluginHost, PluginMeta, PluginSpec, PluginState,
-    PyExpr, SafeEvaluator, Service, ServiceRecord,
-    DependencyUnavailable, compose_error, interpolate_config, is_bailed,
+    DisposableList,
+    EventBus,
+    PluginError,
+    PluginHost,
+    PluginMeta,
+    PluginSpec,
+    PluginState,
+    PyExpr,
+    SafeEvaluator,
+    Service,
+    compose_error,
+    interpolate_config,
     states_as_dict,
 )
 

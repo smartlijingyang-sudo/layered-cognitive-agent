@@ -78,7 +78,10 @@ uv run vulture lca --min-confidence 80
 | 关注点 | 位置 |
 |---|---|
 | 开发栈入口 | `./scripts/lca-ops`（无参=手册）。`status` / `heal` / `logs`（journal 实况） |
-| Prompt 模板 | `lca/layer1_cognitive/brain/prompts/*.md` |
+| 插件树 | `lca/layer0_infra/plugin/`（kernel/loader/include/scope/expr/builtins）；profile `profiles/web-standard.yaml` + bundle `bundles/base-spine.yaml` |
+| 插件视图 | `lca-ops inspect-tree`（状态） / `lca-ops dump-profile`（展开行，对齐 DSH `--dump-config`） |
+| LLM/Tools seam | Definition + `ProviderDispatch`（effect 化 register）；真实 adapter 挂 `lca.plugins.llm_provider`，工具工厂挂 `lca.plugins.tools_service` |
+| Prompt 模板 | `lca/layer1_cognitive/brain/prompts/*.md`；动态组装 `lca.plugins.system_prompt` |
 | 可观测性 | ADR-0037 Journal-as-Truth；`record()` / `span()` / `traced()` |
 | 真实 LLM 测试 | `uv run pytest -m real_llm -v`（需 `LLM_API_KEY`） |
 | 本地探针 | `uv run python scripts/run_team_mode.py` |

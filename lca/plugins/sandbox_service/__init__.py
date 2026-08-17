@@ -23,5 +23,6 @@ def apply(ctx: Any, config: Any) -> None:
     service = SandboxService()
     resolved = resolve_sandbox()
     if resolved is not None:
-        service.register("active", resolved, activate=True)
+        disposer = service.register("active", resolved, activate=True)
+        ctx.effect(lambda: disposer, "ctx.register(sandbox.provider=active)")
     ctx.mount("sandbox", service)

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import structlog
 
 from lca.harness.diagnostics.normalizer import (
     DivergenceReport,
-    NormalizedResult,
     ResultNormalizer,
 )
 
@@ -72,7 +72,7 @@ class ShadowExecutor:
         except asyncio.TimeoutError:
             _log.warning("shadow_new_path_timeout")
             return legacy_result
-        except Exception as exc:  # noqa: BLE001 — shadow must never break legacy
+        except Exception as exc:
             _log.warning("shadow_new_path_error", error=str(exc))
             return legacy_result
 
@@ -85,7 +85,7 @@ class ShadowExecutor:
                         "shadow_divergence",
                         divergences=list(report.divergences),
                     )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 _log.warning("shadow_compare_error", error=str(exc))
 
         return legacy_result

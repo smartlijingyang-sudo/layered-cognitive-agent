@@ -89,7 +89,7 @@ def create_session_router(gateway: Any) -> Router:
                         "value": change.value,
                     }
                 )
-                yield f"event: projection\ndata: {data}\n\n".encode("utf-8")
+                yield f"event: projection\ndata: {data}\n\n".encode()
 
         return StreamingResponse(
             event_stream(),

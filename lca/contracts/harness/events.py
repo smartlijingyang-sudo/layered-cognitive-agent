@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from lca.contracts.harness.session import session_event
 from lca.contracts.harness.skill import SkillCatalogEntry
@@ -161,6 +162,20 @@ class InboxSpliced:
     op: str
     target: str
     message_ids: tuple[str, ...]
+
+
+@session_event("assistant.responded.v1")
+@dataclass(frozen=True)
+class AssistantResponded:
+    """Assistant text response — surface event for derive_messages().
+
+    Aligned with DSH ``assistant/message`` surface event.
+    """
+
+    turn: int
+    step: int
+    content: str
+    tool_calls: list[dict[str, Any]] | None = None
 
 
 @session_event("session.checkpoint.v1", visibility="internal")

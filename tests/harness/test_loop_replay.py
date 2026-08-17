@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
-from lca.contracts.harness.agent import AgentIdentity, AgentOptions, UserMessage
+from lca.contracts.harness.agent import AgentOptions, UserMessage
 from lca.contracts.harness.session import SessionEvent, SessionHeader
 from lca.harness.session.persistence import JsonlSessionPersistence
 from lca.harness.session.store import SessionStore
 from lca.plugins.loop_replay import ReplayLiveAgent, ReplayLoopFactory
-
 
 # ---------------------------------------------------------------------------
 # ReplayLiveAgent — direct unit tests

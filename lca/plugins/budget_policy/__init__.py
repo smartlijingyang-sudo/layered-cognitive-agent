@@ -2,6 +2,7 @@
 
 Spec reference: SDD Task-8 / harness-spine-spec S3.8.4.
 """
+
 from __future__ import annotations
 
 from lca.contracts.harness.middleware import MiddlewareRegistration
@@ -43,9 +44,7 @@ async def budget_check_middleware(
     step_count: int = getattr(state, "step_count", 0)
 
     if step_count >= max_steps:
-        raise BudgetExceededError(
-            f"Step budget exhausted: {step_count}/{max_steps}"
-        )
+        raise BudgetExceededError(f"Step budget exhausted: {step_count}/{max_steps}")
     return state
 
 
@@ -59,6 +58,9 @@ def apply(ctx: PluginContext, config: dict) -> None:
             plugin_id="lca.policy.budget",
         ),
         lambda phase, state, context: budget_check_middleware(
-            phase, state, context, config=config,
+            phase,
+            state,
+            context,
+            config=config,
         ),
     )

@@ -24,6 +24,7 @@ def apply(ctx: Any, config: Any) -> None:
 
     store = resolve_skill_store()
     service = SkillsService()
-    service.register("disk", store)
+    disposer = service.register("disk", store)
+    ctx.effect(lambda: disposer, "ctx.register(skills.provider=disk)")
     ctx.mount("skills", service)
     ctx.mount("skill_catalog", SkillCatalogService(DiskSkillProvider(store)))

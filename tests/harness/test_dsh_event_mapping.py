@@ -6,10 +6,7 @@ the warning path for unknown DSH event types.
 
 from __future__ import annotations
 
-import logging
 from unittest.mock import MagicMock
-
-import pytest
 
 from lca.plugins.loop_dsh_bridge.event_mapping import (
     DSH_EVENT_MAP,

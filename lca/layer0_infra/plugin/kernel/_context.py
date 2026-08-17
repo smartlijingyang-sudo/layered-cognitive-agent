@@ -17,6 +17,7 @@ This ensures plugins cannot bypass the host or manipulate handles directly.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import inspect
 from collections.abc import Callable, Iterable, Mapping
@@ -45,11 +46,13 @@ class PluginContext:
         handle: PluginHandle,
         *,
         parent: PluginContext | None = None,
+        scope: Any = None,
     ) -> None:
         self._host = host
         self._handle = handle
         self._parent = parent
         self._overlay: dict[str, Any] = {}
+        self._lca_scope = scope
 
     # ── Properties ────────────────────────────────────────
 
@@ -64,6 +67,15 @@ class PluginContext:
     @property
     def parent(self) -> PluginContext | None:
         return self._parent
+
+    @property
+    def scope(self) -> Any:
+        """The scope key this context is tagged with, or inherited from parent."""
+        if self._lca_scope is not None:
+            return self._lca_scope
+        if self._parent is not None:
+            return self._parent.scope
+        return None
 
     # ── Services ──────────────────────────────────────────
 
@@ -120,22 +132,67 @@ class PluginContext:
         setup: Callable[[], Any],
         label: str = "anonymous",
     ) -> Cleanup:
-        """Register a reversible side effect. setup() runs immediately."""
+        """Register a reversible side effect. setup() runs immediately.
+
+        Mirrors Cordis ``Fiber.effect``: a generator/async-generator result
+        yields disposers one by one, each registered in order and torn down
+        LIFO with the rest of the handle's effects. The returned disposer is
+        single-shot and idempotent.
+        """
         if self._handle.state not in {PluginState.LOADING, PluginState.ACTIVE}:
             raise PluginError(f"Cannot register effect in {self._handle.state.value} state")
         meta = EffectMeta(label=label)
         result = setup()
 
-        # Generator: yield multiple disposers
-        if inspect.isgenerator(result) or inspect.isasyncgen(result):
+        # Generator: drive it to exhaustion, registering each yielded
+        # disposer in order. Disposal runs them LIFO with other effects.
+        if inspect.isgenerator(result):
+            cleanups: list[Cleanup] = []
             gen = result
+            try:
+                while True:
+                    yielded = next(gen)
+                    if callable(yielded):
+                        cleanups.append(yielded)
+            except StopIteration:
+                pass
+            finally:
+                gen.close()
 
             def gen_cleanup() -> None:
-                with contextlib.suppress(Exception):
-                    gen.close()
+                for c in reversed(cleanups):
+                    if callable(c):
+                        c()
 
             self._handle.effects.append((gen_cleanup, meta))
             return gen_cleanup
+
+        # Async generator: schedule async consumption, register the
+        # disposers as they arrive. Disposal runs them LIFO.
+        if inspect.isasyncgen(result):
+            agen = result
+            async_cleanups: list[Cleanup] = []
+            meta_holder = meta
+
+            async def _collect() -> None:
+                try:
+                    async for yielded in agen:
+                        if callable(yielded):
+                            async_cleanups.append(yielded)
+                except Exception:
+                    with contextlib.suppress(Exception):
+                        await agen.aclose()
+
+            self._handle.inertia_tasks.append(asyncio.ensure_future(_collect()))
+
+            def agen_cleanup() -> None:
+                for c in reversed(async_cleanups):
+                    if callable(c):
+                        c()
+
+            agen_cleanup.__meta__ = meta_holder  # type: ignore[attr-defined]
+            self._handle.effects.append((agen_cleanup, meta_holder))
+            return agen_cleanup
 
         # Iterable of disposers
         if isinstance(result, Iterable) and not callable(result):
@@ -274,11 +331,16 @@ class PluginContext:
         *,
         key: str,
         values: Mapping[str, Any] | None = None,
+        scope: Any = None,
     ) -> PluginContext:
-        """Run-scoped sub-context with overlay shadow."""
+        """Run-scoped sub-context with overlay shadow.
+
+        If *scope* is provided, the child is tagged with that scope key and
+        inherits it for scope-aware registries (DSH ``createScope``).
+        """
         if not key:
             raise ValueError("child key is empty")
-        child = PluginContext(self._host, self._handle, parent=self)
+        child = PluginContext(self._host, self._handle, parent=self, scope=scope)
         if values:
             child._overlay.update(values)
         return child

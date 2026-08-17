@@ -1,16 +1,19 @@
 """Phase C integration tests — middleware and loop factory."""
 
 import pytest
+
 from lca.contracts.atoms.enums import ActionType
-from lca.contracts.models.core.decision import Decision, ToolCall, Turn, Observation
-from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.core.budget import create_budget
-from lca.contracts.harness.middleware import MiddlewareRegistration
 from lca.contracts.atoms.ids import new_id
+from lca.contracts.harness.middleware import MiddlewareRegistration
+from lca.contracts.models.core.budget import create_budget
+from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
+from lca.contracts.models.core.state import AgentState
 from lca.harness.middleware import InMemoryMiddlewareRegistry
-from lca.layer2_runtime.hook_middleware import install_hook_bridge
-from lca.layer2_runtime.loop_intervention_mw import install_loop_intervention, loop_intervention_middleware
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
+from lca.layer2_runtime.hook_middleware import install_hook_bridge
+from lca.layer2_runtime.loop_intervention_mw import (
+    install_loop_intervention,
+)
 
 
 @pytest.fixture

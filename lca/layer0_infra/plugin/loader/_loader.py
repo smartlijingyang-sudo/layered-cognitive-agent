@@ -40,6 +40,7 @@ class Loader:
 
     def __init__(self, *, check_seam_completeness: bool = False) -> None:
         self._check_seam = check_seam_completeness
+        self._entries: list[PluginEntry] | None = None
 
     async def load(self, entries: list[PluginEntry]) -> BootedTree:
         """Load and activate plugins. Return BootedTree on success."""
@@ -47,29 +48,11 @@ class Loader:
         self._validate_unique_ids(active)
 
         host = PluginHost()
+        self._entries = entries
 
-        # Register all handles
+        # Register all handles (groups register their children too)
         for entry in active:
-            # Preserve original module for manifest reading
-            entry._original_module = entry.module
-            spec = self._build_spec(entry)
-            injected = self._resolve_inject(entry, spec)
-            # Pre-validate config so failures are LoaderError, not lifecycle FAILED
-            if spec.validate is not None:
-                spec.validate(entry.config)
-            handle = PluginHandle(
-                entry_id=entry.id,
-                spec=spec,
-                config=entry.config,
-                injected=injected,
-            )
-            # Attach manifest for seam-completeness validation (if present)
-            original_mod = getattr(entry, "_original_module", None) or entry.module
-            manifest = getattr(original_mod, "manifest", None)
-            if manifest is not None:
-                handle.manifest = manifest  # type: ignore[attr-defined]
-            entry.module = spec  # keep resolved spec for diagnostics
-            host.register_handle(handle)
+            await self._register_entry(host, entry)
 
         # Validate provides uniqueness
         self._validate_provides(active, host)
@@ -90,8 +73,101 @@ class Loader:
             handle = host.handles.get(entry.id)
             if handle is not None and handle.state is PluginState.ACTIVE:
                 disposers.append((entry.id, lambda h=handle: None))
+            if entry.group and isinstance(entry.config, list):
+                for child in entry.config:
+                    handle = host.handles.get(child.id)
+                    if handle is not None and handle.state is PluginState.ACTIVE:
+                        disposers.append((child.id, lambda h=handle: None))
 
-        return BootedTree(host=host, entries=active, _disposers=disposers)
+        return BootedTree(host=host, entries=active, _disposers=disposers, _loader=self)
+
+    async def _register_entry(self, host: PluginHost, entry: PluginEntry) -> None:
+        """Register one entry (recursing into group children)."""
+        if entry.group:
+            if not isinstance(entry.config, list):
+                raise LoaderError(f"group entry {entry.id!r} config must be a list")
+            for child in entry.config:
+                if child.disabled:
+                    continue
+                await self._register_entry(host, child)
+            return
+        if entry.module is None and entry.plugin_name:
+            import importlib
+
+            try:
+                entry.module = importlib.import_module(entry.plugin_name)
+            except ImportError as exc:
+                raise LoaderError(
+                    f"plugin {entry.id!r} module {entry.plugin_name!r} import failed: {exc}"
+                ) from exc
+
+        # Preserve original module for manifest reading
+        entry._original_module = entry.module
+        spec = self._build_spec(entry)
+        injected = self._resolve_inject(entry, spec)
+        # Pre-validate config so failures are LoaderError, not lifecycle FAILED
+        if spec.validate is not None:
+            spec.validate(entry.config)
+        handle = PluginHandle(
+            entry_id=entry.id,
+            spec=spec,
+            config=entry.config,
+            injected=injected,
+        )
+        # Attach manifest for seam-completeness validation (if present)
+        original_mod = getattr(entry, "_original_module", None) or entry.module
+        manifest = getattr(original_mod, "manifest", None)
+        if manifest is not None:
+            handle.manifest = manifest  # type: ignore[attr-defined]
+        entry.module = spec  # keep resolved spec for diagnostics
+        host.register_handle(handle)
+
+    async def reload(self, tree: BootedTree, entries: list[PluginEntry] | None = None) -> None:
+        """Reload a booted tree after runtime mutation. Diff-driven."""
+        new_entries = entries if entries is not None else tree.entries
+        await self.load(new_entries)
+
+    async def add_entry(self, tree: BootedTree, entry: PluginEntry) -> None:
+        """Register and activate one entry on an existing booted tree.
+
+        Operates on the same ``PluginHost`` so the tree stays live; the new
+        entry's dependencies must already be satisfied or it stays PENDING.
+        """
+        from lca.layer0_infra.plugin.kernel import reconcile
+
+        self._entries = tree.entries
+        if entry.disabled:
+            return
+        await self._register_entry(tree.host, entry)
+        tree.entries.append(entry)
+        await reconcile(tree.host)
+
+    async def remove_entry(self, tree: BootedTree, entry_id: str) -> None:
+        """Deactivate and unregister one entry from a booted tree."""
+        from lca.layer0_infra.plugin.kernel import deactivate
+
+        entry = tree.resolve(entry_id)
+        if entry is None:
+            raise KeyError(f"entry {entry_id!r} not found")
+        handle = tree.host.handles.get(entry.id)
+        if handle is not None:
+            handle.desired = False
+            await deactivate(tree.host, handle, permanent=True)
+            tree.host.unregister_handle(entry.id)
+        if entry in tree.entries:
+            tree.entries.remove(entry)
+        elif entry.group and isinstance(entry.config, list):
+            for parent in tree.entries:
+                if parent.group and isinstance(parent.config, list) and entry in parent.config:
+                    parent.config.remove(entry)
+
+    async def load_profile(self, profile_path: str) -> list[PluginEntry]:
+        """Convenience: resolve a profile path into entries (delegates to ProfileLoader)."""
+        from pathlib import Path
+
+        from lca.layer0_infra.plugin.include._profile import ProfileLoader
+
+        return ProfileLoader().load_profile(Path(profile_path))
 
     # ── Validation ────────────────────────────────────────
 
@@ -106,7 +182,13 @@ class Loader:
     @staticmethod
     def _validate_provides(entries: list[PluginEntry], host: PluginHost) -> None:
         provides_map: dict[str, str] = {}
-        for entry in entries:
+
+        def _walk(entry: PluginEntry) -> None:
+            if entry.group:
+                if isinstance(entry.config, list):
+                    for child in entry.config:
+                        _walk(child)
+                return
             spec = _get_spec(entry)
             if spec.provides is not None:
                 key = spec.provides
@@ -116,32 +198,40 @@ class Loader:
                     )
                 provides_map[key] = entry.id
 
+        for entry in entries:
+            _walk(entry)
+
     @staticmethod
     def _check_failures(host: PluginHost, entries: list[PluginEntry]) -> None:
         """After reconcile: detect unmet deps and cycles."""
         provides_map: dict[str, str] = {}
-        for entry in entries:
+
+        def _collect(entry: PluginEntry) -> None:
+            if entry.group:
+                if isinstance(entry.config, list):
+                    for child in entry.config:
+                        _collect(child)
+                return
             spec = _get_spec(entry)
             if spec.provides is not None:
                 provides_map[spec.provides] = entry.id
 
+        for entry in entries:
+            _collect(entry)
+
         missing: list[str] = []
         cycle_ids: list[str] = []
-        for entry in entries:
-            handle = host.handles.get(entry.id)
-            if handle is None:
-                continue
+        for entry_id, handle in host.handles.items():
             if handle.state is PluginState.ACTIVE:
                 continue
             if handle.state is PluginState.FAILED:
                 # Already reported during activate(); skip
                 continue
-            spec = _get_spec(entry)
             unmet = [k for k in handle.dependencies if k not in provides_map]
             if unmet:
-                missing.append(f"{entry.id} missing {unmet}")
+                missing.append(f"{entry_id} missing {unmet}")
             else:
-                cycle_ids.append(entry.id)
+                cycle_ids.append(entry_id)
 
         if missing:
             raise LoaderError(f"unmet plugin inject: {'; '.join(missing)}")
@@ -166,9 +256,7 @@ class Loader:
             manifest = getattr(mod, "manifest", None)
             if manifest is None:
                 continue
-            shim_handles.append(
-                SimpleNamespace(manifest=manifest, entry_id=entry.id)
-            )
+            shim_handles.append(SimpleNamespace(manifest=manifest, entry_id=entry.id))
         self._check_seam_completeness(shim_handles)
 
     def _check_seam_completeness(self, handles: list[Any]) -> None:
@@ -228,9 +316,7 @@ class Loader:
                 errors.append(f"Provider for unknown seam '{key}': {ids}")
 
         if errors:
-            raise SeamCompletenessError(
-                f"seam completeness check failed: {'; '.join(errors)}"
-            )
+            raise SeamCompletenessError(f"seam completeness check failed: {'; '.join(errors)}")
 
         # Warn about definitions without consumers (not errors)
         import structlog
@@ -252,17 +338,22 @@ class Loader:
         mod = entry.module
         if isinstance(mod, PluginSpec):
             return mod
-        # Module shape: read attributes
-        for attr in ("name", "apply"):
-            if not hasattr(mod, attr):
-                raise LoaderError(f"plugin {entry.id!r} module missing {attr!r}")
+        is_class = isinstance(mod, type)
+        # Class plugins: a ``Service`` subclass constructs via
+        # ``cls(ctx, config)``; any other class uses its ``apply`` classmethod.
+        from lca.layer0_infra.plugin.kernel import Service
+
+        is_service = is_class and issubclass(mod, Service)
+        if not hasattr(mod, "name"):
+            raise LoaderError(f"plugin {entry.id!r} module missing 'name'")
+        if not is_service and not hasattr(mod, "apply"):
+            raise LoaderError(f"plugin {entry.id!r} module missing 'apply'")
         name = getattr(mod, "name", entry.id)
         inject_raw = getattr(mod, "inject", ())
         inject = tuple(inject_raw.keys()) if isinstance(inject_raw, dict) else tuple(inject_raw)
         provides = getattr(mod, "provides", None)
         config_cls = getattr(mod, "Config", PluginConfig)
-        apply_fn = mod.apply
-        is_class = isinstance(mod, type)
+        apply_fn = mod if is_service else mod.apply
 
         def validate(raw: Any) -> Any:
             if isinstance(raw, config_cls):

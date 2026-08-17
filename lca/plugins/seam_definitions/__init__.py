@@ -31,6 +31,14 @@ manifest = PluginManifest(
         ExtensionPoint(seam_key="file_store", description="File store"),
         ExtensionPoint(seam_key="observability", description="Observability backend"),
         ExtensionPoint(seam_key="agent_loop", description="Agent loop factory"),
+        ExtensionPoint(seam_key="agent_service", description="Agent lifecycle event recording"),
+        ExtensionPoint(
+            seam_key="session_service", description="Session event sourcing and projection"
+        ),
+        ExtensionPoint(
+            seam_key="system_prompt",
+            description="Composable prompt assembly",
+        ),
     ),
 )
 

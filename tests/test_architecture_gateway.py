@@ -10,7 +10,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 _ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_MODULES = {"layer1_cognitive", "layer2_runtime", "layer3_agent"}
 GUARDED_FILES = (
