@@ -25,6 +25,18 @@ from pathlib import Path
 #   2. 内部数据结构——不跨越模块边界、不需要运行时多态
 #   3. 异常类型——错误信号，不是可插拔组件
 EXEMPT: dict[str, str] = {
+    "lca.layer0_infra.ops.upstream_mirror.PackageInventory": (
+        "upstream 镜像校验的纯数据值对象 (Upstream Mirror)"
+    ),
+    "lca.layer0_infra.ops.upstream_mirror.UpstreamTree": (
+        "upstream 镜像校验的纯数据值对象 (Upstream Mirror)"
+    ),
+    "lca.layer0_infra.ops.upstream_mirror.LocalMirror": (
+        "upstream 镜像校验的纯数据值对象 (Upstream Mirror)"
+    ),
+    "lca.layer0_infra.ops.upstream_mirror.MirrorDiff": (
+        "upstream 镜像校验的纯数据值对象 (Upstream Mirror)"
+    ),
     "lca.layer0_infra.computer.background.BackgroundCommandRecord": (
         "后台命令追踪值对象，run-scoped 内部状态 (Computer Use)"
     ),

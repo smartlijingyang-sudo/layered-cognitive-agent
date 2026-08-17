@@ -91,6 +91,19 @@ daemon     sandbox-user 连 gateway
   ./scripts/lca-ops provision
 
 ────────────────────────────────
+上游镜像  upstream
+────────────────────────────────
+check-upstream
+  对比 lca/packages/ 与 ~/deepseek-harness/packages/ 的结构差异。
+  三个层级都查：顶层包、子包、src/ 文件（.ts ↔ .py）。
+  ./scripts/lca-ops check-upstream                  看差异
+  ./scripts/lca-ops check-upstream --sync           生成缺失的骨架（不覆盖）
+  ./scripts/lca-ops check-upstream --sync --force   强制覆盖
+  ./scripts/lca-ops check-upstream --json           结构化输出（CI）
+  ./scripts/lca-ops check-upstream --upstream <p>   自定义上游根目录
+  退出码：0=一致；1=有缺失。CI 可据此判定。
+
+────────────────────────────────
 通用参数
 ────────────────────────────────
   --json           结构化 JSON（agent）
@@ -671,6 +684,52 @@ def dump_profile(
         print("\n".join(parts))
     print()
     print(f"Total rows: {len(rows)}")
+
+
+@app.command(name="check-upstream")
+def check_upstream(
+    upstream: Path = typer.Option(
+        Path.home() / "deepseek-harness" / "packages",
+        "--upstream",
+        help="Upstream packages root (default: ~/deepseek-harness/packages).",
+    ),
+    target: Path = typer.Option(
+        Path("lca/packages"),
+        "--target",
+        help="Local mirror root (default: lca/packages).",
+    ),
+    sync: bool = typer.Option(
+        False,
+        "--sync",
+        help="Generate missing skeleton files (idempotent; never overwrites).",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="With --sync, overwrite existing files (use sparingly).",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="JSON report for CI."),
+) -> None:
+    """Compare local ``lca/packages/`` against upstream ``deepseek-harness/packages/``.
+
+    Reports missing/extra at three levels (top-level package, sub-package, src/ files)
+    and, with ``--sync``, generates Python skeleton files mirroring the upstream layout.
+    Each upstream ``.ts`` file becomes a local ``.py`` stub with a header pointing back
+    to its upstream source. Hyphenated upstream names become underscored Python names
+    (e.g. ``llm-deepseek`` → ``llm_deepseek``).
+
+    Exit code: ``0`` when in sync (or after a successful sync), ``1`` otherwise.
+    """
+    from lca.layer0_infra.ops.upstream_mirror import cli_run
+
+    code = cli_run(
+        upstream=upstream,
+        target=target,
+        sync=sync,
+        force=force,
+        json_output=json_output,
+    )
+    raise typer.Exit(code)
 
 
 def main() -> None:
