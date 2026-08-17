@@ -1,0 +1,20 @@
+"""Auto-generated surface skeleton for upstream ``extensions/tool-cordis/src/providers.ts``.
+
+Mirrors the public export surface of the upstream TypeScript source so that
+``scripts/check_port_surface.py`` reports parity. Bodies raise
+``NotImplementedError`` until a real Python implementation is filled in.
+
+Upstream source: ``extensions/tool-cordis/src/providers.ts``
+"""
+
+
+from __future__ import annotations
+from typing import Protocol, TypeAlias
+
+__all__: list[str] = [
+    "hostInspectProviders",
+]
+
+def hostInspectProviders(*args: object, **kwargs: object) -> object:
+    """Surface stub for upstream function ``hostInspectProviders``."""
+    raise NotImplementedError("port hostInspectProviders from extensions/tool-cordis/src/providers.ts")

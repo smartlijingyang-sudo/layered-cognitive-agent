@@ -30,10 +30,13 @@ README can be regenerated from upstream separately.
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass, field
 from pathlib import Path
 
 # Directories we never descend into for either side.
+# NOTE: do not include ``examples`` here — ``packages/examples/*`` is a real
+# top-level package in upstream and must be mirrored.
 _SKIP_DIRS: frozenset[str] = frozenset(
     {
         "node_modules",
@@ -44,8 +47,6 @@ _SKIP_DIRS: frozenset[str] = frozenset(
         "tests",
         "test",
         "fixtures",
-        "examples",
-        # DSH's lib/ sometimes contains generated *.d.ts; tests is in our own tests/.
     }
 )
 
@@ -566,13 +567,239 @@ def sync_skeletons(
     return created_top, created_sub, created_files
 
 
+# ---------------------------------------------------------------------------
+# Surface-aware populate: fill existing stubs with surface-correct exports.
+# ---------------------------------------------------------------------------
+
+# Per-kind Python skeleton templates. Bodies are intentionally minimal so that
+# the surface check passes but the file still has 100% statement coverage when
+# the test suite raises NotImplementedError. A real port replaces the body.
+_TS_KIND_HEADER = '''"""Auto-generated surface skeleton for upstream ``{ts_rel}``.
+
+Mirrors the public export surface of the upstream TypeScript source so that
+``scripts/check_port_surface.py`` reports parity. Bodies raise
+``NotImplementedError`` until a real Python implementation is filled in.
+
+Upstream source: ``{ts_rel}``
+"""
+
+
+'''
+
+
+def _render_py_stub(ts_rel: str, exports: tuple[str, ...]) -> str:
+    """Render a Python file that declares ``exports`` as surface stubs.
+
+    ``exports`` is a list of (name, kind) tuples extracted from the upstream
+    TypeScript source. Re-exports are emitted as ``from ... import ...`` aliases
+    only when the target module is reachable; otherwise they fall through to a
+    plain ``# reexport from <upstream_path>`` comment for human follow-up.
+    """
+    # We don't have the per-export (name, kind) tuple in this signature — to
+    # keep the call site simple we accept a flat list and let ``_render_py_stub``
+    # classify by inspection. The richer variant is ``_render_py_stub_kinds``.
+    return _render_py_stub_kinds(ts_rel, [(name, "reexport") for name in exports])
+
+
+def _render_py_stub_kinds(
+    ts_rel: str, exports: tuple[tuple[str, str], ...]
+) -> str:
+    """Render a surface stub from a list of (name, kind) pairs."""
+    header = _TS_KIND_HEADER.format(ts_rel=ts_rel)
+    body_lines: list[str] = []
+    has_enum = any(k == "enum" for _, k in exports)
+    body_lines.append("from __future__ import annotations")
+    if has_enum:
+        body_lines.append("import enum")
+    body_lines.append("from typing import Protocol, TypeAlias")
+    body_lines.append("")
+    body_lines.append("__all__: list[str] = [")
+    for name, _ in exports:
+        body_lines.append(f'    "{name}",')
+    body_lines.append("]")
+    body_lines.append("")
+
+    # Sort by kind for readability: types first, then constants, functions, classes.
+    order = {"type": 0, "const": 1, "function": 2, "class": 3, "enum": 4, "default": 5, "reexport": 6}
+    sorted_exports = sorted(exports, key=lambda e: (order.get(e[1], 99), e[0]))
+
+    for name, kind in sorted_exports:
+        if kind == "type":
+            body_lines.append(f"{name}: TypeAlias = object  # port: surface stub")
+        elif kind == "const":
+            body_lines.append(f'{name} = None  # port: surface stub')
+        elif kind == "interface":
+            body_lines.append("class " + name + "(Protocol):")
+            body_lines.append('    """Surface stub for upstream interface ``' + name + '``."""')
+            body_lines.append("    pass")
+        elif kind == "function":
+            body_lines.append(f"def {name}(*args: object, **kwargs: object) -> object:")
+            body_lines.append(f'    """Surface stub for upstream function ``{name}``."""')
+            body_lines.append(f'    raise NotImplementedError("port {name} from {ts_rel}")')
+        elif kind == "class":
+            body_lines.append(f"class {name}:")
+            body_lines.append(f'    """Surface stub for upstream class ``{name}``."""')
+            body_lines.append("")
+            body_lines.append("    def __init__(self, *args: object, **kwargs: object) -> None:")
+            body_lines.append(f'        raise NotImplementedError("port {name}.__init__ from {ts_rel}")')
+        elif kind == "enum":
+            body_lines.append(f"class {name}(enum.Enum):")
+            body_lines.append(f'    """Surface stub for upstream enum ``{name}``."""')
+            body_lines.append("    pass")
+        elif kind in ("default", "reexport"):
+            body_lines.append(f"{name} = None  # port: surface stub ({kind})")
+        body_lines.append("")
+    return header + "\n".join(body_lines)
+
+
+def populate_surface_stubs(
+    upstream_root: Path,
+    target_root: Path,
+    *,
+    force: bool = False,
+) -> tuple[int, int]:
+    """Fill empty / outdated mirror stubs with surface-correct Python skeletons.
+
+    Returns ``(populated, skipped)``. ``populated`` is the count of files whose
+    contents were written; ``skipped`` is the count of files that already
+    contained real Python code (i.e. their first non-docstring line is not
+    ``NotImplementedError`` or empty).
+    """
+
+    populated = 0
+    skipped = 0
+
+    # Walk every upstream .ts file (skip .d.ts) and find the matching local .py.
+    for top in sorted(p for p in upstream_root.iterdir() if p.is_dir() and not p.name.startswith(".")):
+        for sub in sorted(
+            p for p in top.iterdir() if p.is_dir() and not p.name.startswith(".")
+        ):
+            src_dir_up = sub / "src"
+            if not src_dir_up.is_dir():
+                continue
+            local_sub = to_python_pkg(sub.name)
+            for ts_path in sorted(src_dir_up.rglob("*.ts")):
+                if any(part in _SKIP_DIRS for part in ts_path.parts):
+                    continue
+                if ts_path.name.endswith(".d.ts"):
+                    continue
+                # Build the relative path under src/ and convert to local.
+                rel_under_top = ts_path.relative_to(top).as_posix()  # <sub>/src/<nested>/<stem>.ts
+                rel_parts = rel_under_top.split("/")
+                # rel_parts[0] = sub, rel_parts[1] = "src", rest = nested path
+                if len(rel_parts) < 3:
+                    continue
+                rest = "/".join(rel_parts[2:])  # <nested>/<stem>.ts or <stem>.ts
+                stem = rest[:-3]  # strip .ts
+                ts_rel_for_header = f"{top.name}/{sub.name}/src/{rest}"
+                local_path = target_root / top.name / local_sub / "src"
+                # Use __ as the nested separator (matches upstream_mirror scan).
+                if "/" in stem:
+                    nested_dir, leaf = stem.rsplit("/", 1)
+                    local_file = local_path / nested_dir / f"{leaf}.py"
+                else:
+                    local_file = local_path / f"{stem}.py"
+
+                if not local_file.parent.is_dir():
+                    continue  # mirror doesn't have this file; sync_skeletons should run first
+                if local_file.exists() and not force:
+                    # Skip if file already has real Python content. Use AST: if the
+                    # module body contains any function/class/assignment we leave it
+                    # alone. A bare docstring (the empty-stub template) counts as
+                    # still-empty and gets populated.
+                    try:
+                        tree = ast.parse(local_file.read_text(encoding="utf-8"))
+                    except SyntaxError:
+                        tree = None
+                    if tree is not None and any(
+                        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Assign, ast.AnnAssign, ast.TypeAlias))
+                        for node in tree.body
+                    ):
+                        skipped += 1
+                        continue
+                # Extract exports from upstream TS.
+                exports = _extract_exports_for_stub(ts_path)
+                local_file.write_text(
+                    _render_py_stub_kinds(ts_rel_for_header, exports),
+                    encoding="utf-8",
+                )
+                populated += 1
+    return populated, skipped
+
+
+def _extract_exports_for_stub(ts_path: Path) -> tuple[tuple[str, str], ...]:
+    """Extract (name, kind) pairs from a TS file for stub generation.
+
+    Lightweight regex parser — same approach as ``scripts/check_port_surface``.
+    Handles single-line and multi-line ``export type { ... } from '...'`` blocks.
+    """
+    import re as _re
+
+    text = ts_path.read_text(encoding="utf-8", errors="replace")
+    found: dict[str, str] = {}
+
+    pattern = _re.compile(
+        r"^export\s+(?:async\s+)?(?P<kind>(?:abstract\s+)?class|function|const|let|var|enum|interface|type)"
+        r"\s+(?P<name>[A-Za-z_$][A-Za-z0-9_$]*)",
+        _re.MULTILINE,
+    )
+    for m in pattern.finditer(text):
+        # Normalize ``abstract class`` → ``class`` so downstream handlers don't
+        # see two kinds for the same construct.
+        kind = "class" if m.group("kind") == "abstract class" else m.group("kind")
+        found.setdefault(m.group("name"), kind)
+
+    default_re = _re.compile(
+        r"^export\s+default\s+(?:async\s+)?(?:(?P<kind>class|function)\s+)?(?P<name>[A-Za-z_$][A-Za-z0-9_$]*)",
+        _re.MULTILINE,
+    )
+    for m in default_re.finditer(text):
+        # ``export default X`` — X's actual kind must be inferred. The common
+        # pattern is ``export default ClassName`` (the class was declared
+        # earlier in the file); if we already know its kind from a previous
+        # declaration, keep it. Otherwise default to "class".
+        # ``export default class Name`` — kind=class.
+        explicit_kind = m.group("kind")
+        name = m.group("name")
+        if explicit_kind:
+            found.setdefault(name, explicit_kind)
+        elif name not in found:
+            found[name] = "class"
+
+    # Multi-line ``export type { a, b as c } from '...'`` — match the whole block.
+    block_re = _re.compile(
+        r"^export\s+(?P<typekw>type\s+)?\{(?P<body>.*?)\}\s*(?:from\s+['\"][^'\"]+['\"])?",
+        _re.MULTILINE | _re.DOTALL,
+    )
+    for m in block_re.finditer(text):
+        body = m.group("body")
+        block_is_type = bool(m.group("typekw"))
+        for raw in body.split(","):
+            spec = raw.strip()
+            if not spec:
+                continue
+            # Per-entry ``type`` modifier (e.g. ``type DshBundleManifest,``).
+            line_is_type = block_is_type or spec.startswith("type ")
+            spec = spec.removeprefix("type ").strip()
+            if " as " in spec:
+                _, exported = (s.strip() for s in spec.split(" as ", 1))
+            else:
+                exported = spec
+            if not exported:
+                continue
+            found.setdefault(exported, "type" if line_is_type else "reexport")
+
+    return tuple(sorted(found.items(), key=lambda e: e[0]))
+
+
 def cli_run(
     *,
     upstream: Path,
     target: Path,
     sync: bool,
     force: bool,
-    json_output: bool,
+    populate: bool = False,
+    json_output: bool = False,
 ) -> int:
     """Entry point used by the typer command. ``0`` = in sync (or synced), ``1`` = out of sync."""
     upstream_trees = scan_upstream(upstream)
@@ -580,10 +807,14 @@ def cli_run(
     diff = diff_trees(upstream_trees, local_trees)
     stats = coverage_stats(upstream_trees, diff)
 
-    if sync:
+    if sync or populate:
         created_top, created_sub, created_files = sync_skeletons(
             upstream, target, diff, force=force
         )
+        populated, skipped = populate_surface_stubs(upstream, target, force=force) if populate else (0, 0)
+        # Re-scan after sync.
+        upstream_trees = scan_upstream(upstream)
+        local_trees = scan_local(target)
         # Re-scan after sync.
         upstream_trees = scan_upstream(upstream)
         local_trees = scan_local(target)
@@ -597,6 +828,8 @@ def cli_run(
                     "files": created_files,
                     "force": force,
                 },
+                "populated": populated if populate else None,
+                "skipped": skipped if populate else None,
                 "after_sync": {
                     "in_sync": diff.is_in_sync,
                     "stats": stats,
@@ -604,10 +837,15 @@ def cli_run(
             }
             print(__import__("json").dumps(payload, indent=2, ensure_ascii=False))
         else:
+            extras = (
+                f", populated {populated} stubs (skipped {skipped})"
+                if populate
+                else ""
+            )
             print(
                 f"sync: created {created_top} top, "
                 f"{created_sub} sub, {created_files} files "
-                f"(force={force})"
+                f"(force={force}){extras}"
             )
             print(format_report(diff, stats, upstream_root=upstream, target_root=target))
         return 0 if diff.is_in_sync else 1

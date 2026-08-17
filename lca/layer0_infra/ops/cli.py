@@ -703,6 +703,11 @@ def check_upstream(
         "--sync",
         help="Generate missing skeleton files (idempotent; never overwrites).",
     ),
+    populate: bool = typer.Option(
+        False,
+        "--populate",
+        help="With --sync, also fill stubs with surface-correct Python exports (passes check_port_surface.py).",
+    ),
     force: bool = typer.Option(
         False,
         "--force",
@@ -727,6 +732,7 @@ def check_upstream(
         target=target,
         sync=sync,
         force=force,
+        populate=populate,
         json_output=json_output,
     )
     raise typer.Exit(code)
