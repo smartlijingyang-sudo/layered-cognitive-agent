@@ -43,6 +43,7 @@ EXPECTED_SEAM_KEYS = (
     "skills",
     "file_store",
     "observability",
+    "agent_loop",
 )
 
 
@@ -166,8 +167,8 @@ class TestBaseSpine:
             assert svc is not None, f"Service '{key}' not loaded"
 
     def test_entry_count(self, tree):
-        # 11 plugins: seam_definitions + 10 services
-        assert len(tree.entries) == 11
+        # 12 plugins: seam_definitions + 10 services + loop_cognitive
+        assert len(tree.entries) == 12
 
     def test_all_plugins_active(self, tree):
         for entry in tree.entries:
@@ -188,7 +189,7 @@ class TestBaseSpine:
                     break
         assert mod is not None
         assert mod.kind == PluginKind.BUNDLE
-        assert len(mod.extension_points) == 10
+        assert len(mod.extension_points) == 11
 
 
 # ── A.5: AgentComposer scope integration ─────────────────────────────

@@ -46,3 +46,8 @@ insert:
   - id: lca.observability.service
     name: lca.plugins.observability_service
     config: {}
+
+  # ── Agent loop provider ──
+  - id: lca.loop.cognitive
+    name: lca.plugins.loop_cognitive
+    config: {}

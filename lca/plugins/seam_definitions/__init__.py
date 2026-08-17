@@ -30,6 +30,7 @@ manifest = PluginManifest(
         ExtensionPoint(seam_key="skills", description="Skill store"),
         ExtensionPoint(seam_key="file_store", description="File store"),
         ExtensionPoint(seam_key="observability", description="Observability backend"),
+        ExtensionPoint(seam_key="agent_loop", description="Agent loop factory"),
     ),
 )
 
