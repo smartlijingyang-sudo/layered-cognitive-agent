@@ -73,7 +73,7 @@ def adopt_run_scope(*, role: str) -> tuple[RunScope, bool]:
     inherited = get_current_run_scope()
     if inherited is None:
         return RunScope(trace_id=new_trace_id(), run_id=new_run_id(), agent_role=role), True
-    claimed = bool(inherited.run_id)
+    claimed = bool(inherited.agent_role)
     if (
         inherited.run_id
         and not inherited.parent_run_id

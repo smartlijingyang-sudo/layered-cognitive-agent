@@ -148,6 +148,9 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
 
     application.state.plugin_tree = tree
     application.state.ctx = tree  # cordis Context (replaces plugin_host)
+    from lca.layer4_app.api import set_default_ctx
+
+    set_default_ctx(tree)
     application.state.profile_path = profile_path
     structlog.get_logger("lca.gateway").info(
         "harness_profile_loaded",

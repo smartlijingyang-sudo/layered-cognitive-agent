@@ -16,7 +16,7 @@ from gateway.runs.session import RunSession
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.team.run_context import RunContext
 from lca.layer0_infra.observability import ObservabilityHub
-from lca.layer4_app.api import Agent
+from lca.layer4_app.api import Agent, ensure_default_ctx
 
 
 @dataclass(frozen=True)
@@ -65,12 +65,14 @@ class CognitiveRunDriver:
         llm_resolver: Any,
     ) -> DriverOutcome:
         llm = llm_resolver.resolve(mode=mode)
+        scope = await ensure_default_ctx()
         if mode == SOLO_MODE_KEY:
             runnable = build_solo_agent(
                 llm,
                 observability=hub,
                 role=session.agent.name,
                 bindings=bindings,
+                scope=scope,
             )
         else:
             runnable = await build_runnable_team(
@@ -80,6 +82,7 @@ class CognitiveRunDriver:
                 trace_id=session.trace_id,
                 run_id=session.run_id,
                 bindings=bindings,
+                plugin_ctx=scope,
             )
         result = (
             await runnable.run(question, run_context)

@@ -215,26 +215,9 @@ class AgentComposer:
         isolation.
         """
         if scope is None:
-            # Fallback: use the cached default web-standard context. This
-            # path is hit by TeamComposer.compose_member / compose_as_lead
-            # which don't take a scope kwarg. The cached ctx is boot-once
-            # in lca.layer4_app.api.
-            import asyncio as _aio
-
             from lca.layer4_app.api import get_or_create_default_ctx
 
-            # Use loop.run_until_complete if a loop is running, else asyncio.run
-            try:
-                _loop = _aio.get_running_loop()
-            except RuntimeError:
-                _loop = None
-            if _loop is not None:
-                # We're inside a running loop (the script's main task) —
-                # the cached ctx should already be booted by the runner.
-                # If not, fall through to the lazy boot which will fail.
-                scope = get_or_create_default_ctx()
-            else:
-                scope = get_or_create_default_ctx()
+            scope = get_or_create_default_ctx()
         profile = spec.profile
         ctx = self._resolve_capability_context(scope)
         hub = create_observability(spec.observability)
@@ -244,10 +227,12 @@ class AgentComposer:
         )
 
         llm_rt: LlmService = ctx.require(SeamKey.LLM.value)
-        # Register spec's LLM under "spec" if not already present (e.g. when
-        # multiple agents share the same LlmService from the root ctx).
-        if "spec" not in llm_rt.providers._providers:
-            llm_rt.register("spec", self._instrument_llm(spec.llm), activate=True)
+        spec_llm = self._instrument_llm(spec.llm)
+        if "spec" in llm_rt.providers.names():
+            llm_rt.providers.replace("spec", spec_llm)
+            llm_rt.providers.use("spec")
+        else:
+            llm_rt.register("spec", spec_llm, activate=True)
 
         tool_registry: ToolsService = ctx.require(SeamKey.TOOLS.value)
         for tool in spec.tools:
@@ -298,7 +283,7 @@ class AgentComposer:
         transport: AgentTransport,
         mandate: LeadMandate,
         observability: ObservabilityHub | None = None,
-        scope: "Context | None" = None,
+        scope: Context | None = None,
     ) -> CognitiveAgent:
         """Build a closed lead agent from *spec* (awareness-aware reasoner + gate)."""
         lead_spec = (
@@ -326,15 +311,17 @@ class AgentComposer:
         *,
         shared_store: SharedMemoryStore | None = None,
         observability: ObservabilityHub | None = None,
-        scope: "Context | None" = None,
+        scope: Context | None = None,
     ) -> CognitiveAgent:
         """Build a team member from *spec* (shared memory / shared observability)."""
         member_spec = (
             replace(spec, observability=observability) if observability is not None else spec
         )
         return self.compose(
-            member_spec, action_scope=ActionScope.MEMBER,
-            shared_store=shared_store, scope=scope,
+            member_spec,
+            action_scope=ActionScope.MEMBER,
+            shared_store=shared_store,
+            scope=scope,
         )
 
     def _resolve_memory(
@@ -466,7 +453,7 @@ class AgentComposer:
         return _ScopeAsCapabilityContext(ctx)
 
 
-def _isolate_agent_scope(parent: "Context", role: str) -> "_IsolatedAgentScope":
+def _isolate_agent_scope(parent: Context, role: str) -> _IsolatedAgentScope:
     """Return an async CM that creates a child scope with fresh service instances.
 
     Per spec §8.1: child gets fresh LlmService / ToolsService / TransportService
@@ -495,13 +482,13 @@ class _IsolatedAgentScope:
     runs inside a `_ScopeCM`, the active context is the child.
     """
 
-    def __init__(self, parent: "Context", role: str) -> None:
+    def __init__(self, parent: Context, role: str) -> None:
         self._parent = parent
         self._role = role
         self._scope_cm: object | None = None
-        self._child: "Context" | None = None
+        self._child: Context | None = None
 
-    async def __aenter__(self) -> "Context":
+    async def __aenter__(self) -> Context:
         from lca.layer0_infra.capability.llm import LlmService
         from lca.layer0_infra.capability.memory import MemoryService
         from lca.layer0_infra.capability.state_store import StateStoreService
@@ -587,7 +574,7 @@ class TeamComposer(AgentComposer):
         self,
         spec: TeamSpec,
         *,
-        scope: "Context | None" = None,
+        scope: Context | None = None,
     ) -> TeamUnit:
         """Assemble the closed team object graph from *spec* (sole composition path)."""
         shared_obs = self._resolve_team_observability(spec)
@@ -598,8 +585,10 @@ class TeamComposer(AgentComposer):
         )
         closed_members = tuple(
             self.compose_member(
-                member_spec, shared_store=shared_store,
-                observability=shared_obs, scope=scope,
+                member_spec,
+                shared_store=shared_store,
+                observability=shared_obs,
+                scope=scope,
             )
             for member_spec in spec.members
         )
@@ -627,7 +616,7 @@ class TeamComposer(AgentComposer):
         transport: AgentTransport,
         shared_obs: ObservabilityHub,
         *,
-        scope: "Context | None" = None,
+        scope: Context | None = None,
     ) -> TeamAssembly:
         """Close the lead agent when governance is a LeadSpec; build the factory view."""
         governance = spec.governance

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -49,6 +49,9 @@ from lca.layer0_infra.tools.default_set import build_default_tools
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer4_app.api import Agent, Team, TeamLead
 from lca.layer4_app.role_suggest import suggest_for_auto_repair, suggest_from_paths
+
+if TYPE_CHECKING:
+    from cordis import Context
 
 logger = structlog.get_logger(__name__)
 
@@ -283,6 +286,7 @@ def build_from_casting_plan(
     *,
     observability: str | ObservabilityBackend = OBSERVABILITY_CHOICE_CONSOLE,
     bindings: PlaneBindings | None = None,
+    scope: Context | None = None,
 ) -> Team:
     """把 CastingPlan 编译成 Team —— 与手写构造同路径，无专用运行时机制。"""
     cards: dict[str, tuple[RoleCard, str | None]] = {
@@ -299,6 +303,7 @@ def build_from_casting_plan(
             tools=build_default_tools(bindings=bindings),
             llm=llm,
             observability=observability,
+            scope=scope,
         )
 
     if plan.governance_kind in _LEAD_MANDATE_BY_KIND:
@@ -310,10 +315,11 @@ def build_from_casting_plan(
             members=members,
             lead=TeamLead(lead_agent, _LEAD_MANDATE_BY_KIND[plan.governance_kind]),
             observability=observability,
+            scope=scope,
         )
 
     factory = _COORDINATION_FACTORY.get(plan.governance_kind)
     if factory is None:  # 同上：白名单校验已保证
         raise CastingError(f"未知治理方式：{plan.governance_kind!r}")
     members = [_member(chosen.role_id) for chosen in plan.selected]
-    return Team(members=members, coordination=factory(), observability=observability)
+    return Team(members=members, coordination=factory(), observability=observability, scope=scope)

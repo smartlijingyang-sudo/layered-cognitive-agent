@@ -78,6 +78,50 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
         self.assertIn("CastingStarted", event_types)
         self.assertIn("CastingCompleted", event_types)
 
+    async def test_solo_hello_does_not_fail_on_running_event_loop(self) -> None:
+        """Gateway execute 跑在 uvicorn 已运行的 loop 上。
+
+        Agent 无 scope 时曾用 loop.run_until_complete(boot_profile)，
+        触发 RuntimeError: This event loop is already running。
+        """
+        import lca.layer4_app.api as api
+
+        previous_ctx = api._cached_default_ctx
+        api._cached_default_ctx = None
+        llm = ScriptedLLMAdapter({}, default_respond=True)
+        set_llm_resolver(_ScriptedResolver(llm))
+
+        session = create_run_session(
+            self.registry,
+            question="你好",
+            user_text="你好",
+            mode="solo",
+        )
+        try:
+            await execute_run(
+                self.registry,
+                run_id=session.run_id,
+                question=session.question,
+                mode=session.mode,
+            )
+        finally:
+            api._cached_default_ctx = previous_ctx
+        self.assertNotIn(
+            "already running",
+            (session.error or "").lower(),
+            msg=session.error,
+        )
+        self.assertEqual(session.status, RunStatus.COMPLETED)
+        event_types = _journal_event_types(session)
+        self.assertIn("AgentRunStarted", event_types)
+        assert session.hub is not None
+        started = next(
+            stamped
+            for stamped in session.hub.store.events
+            if type(stamped.event).__name__ == "AgentRunStarted"
+        )
+        self.assertEqual(started.scope.run_id, session.run_id)
+
     async def test_team_mode_casting_failure_fails_run(self) -> None:
         # 两次尝试都不是合法 JSON → CastingError → run FAILED（既有错误管道收尾）
         llm = ScriptedLLMAdapter(

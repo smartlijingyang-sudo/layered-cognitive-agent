@@ -17,8 +17,9 @@ Example::
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from lca.contracts.atoms.enums import MemoryLayer
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
@@ -62,45 +63,73 @@ from lca.contracts.protocols.spec import (
 )
 from lca.layer4_app.composer import AgentComposer, TeamComposer
 
+if TYPE_CHECKING:
+    from cordis import Context
+
+_DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
 # Module-level cached default context (boot profile lazily on first Agent creation)
-_cached_default_ctx = None
+_cached_default_ctx: Context | None = None
+_boot_lock: asyncio.Lock | None = None
 
 
-def get_or_create_default_ctx() -> "Context":
+def _default_ctx_lock() -> asyncio.Lock:
+    global _boot_lock
+    if _boot_lock is None:
+        _boot_lock = asyncio.Lock()
+    return _boot_lock
+
+
+def set_default_ctx(ctx: Context) -> None:
+    """Bind an already-booted cordis Context as the process default."""
+    global _cached_default_ctx
+    _cached_default_ctx = ctx
+
+
+async def ensure_default_ctx() -> Context:
+    """Return the cached default ctx, awaiting boot on the current loop if needed.
+
+    This is the only legal way to lazy-boot inside a running event loop.
+    ``loop.run_until_complete`` on that loop raises RuntimeError.
+    """
+    global _cached_default_ctx
+    if _cached_default_ctx is not None:
+        return _cached_default_ctx
+    async with _default_ctx_lock():
+        if _cached_default_ctx is not None:
+            return _cached_default_ctx
+        from lca.harness.profile.boot import boot_profile
+
+        _cached_default_ctx = await boot_profile(_DEFAULT_PROFILE)
+        return _cached_default_ctx
+
+
+def get_or_create_default_ctx() -> Context:
     """Return a cached cordis Context booted from the default web-standard profile.
 
     Used as fallback when an Agent is constructed without an explicit scope.
     Boot is expensive (~100ms + plugin instantiation); cache once.
 
-    Detects whether a running event loop is present:
-    - If no loop: asyncio.run(boot_profile(...))
-    - If loop: loop.run_until_complete(boot_profile(...))
+    - If cache is warm: return it.
+    - If no running loop: ``asyncio.run(boot_profile(...))``.
+    - If a loop is already running: refuse. Callers on that loop must
+      ``await ensure_default_ctx()`` or pass ``scope=``.
     """
     global _cached_default_ctx
     if _cached_default_ctx is not None:
         return _cached_default_ctx
 
-    import asyncio
-
     from lca.harness.profile.boot import boot_profile
 
     try:
-        _loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
     except RuntimeError:
-        _loop = None
-
-    if _loop is not None:
-        # Already in an event loop — use the loop's run_until_complete.
-        _cached_default_ctx = _loop.run_until_complete(
-            boot_profile("profiles/web-standard.yaml")
-        )
-    else:
-        # No running loop — use asyncio.run.
-        _cached_default_ctx = asyncio.run(
-            boot_profile("profiles/web-standard.yaml")
-        )
-    return _cached_default_ctx
+        _cached_default_ctx = asyncio.run(boot_profile(_DEFAULT_PROFILE))
+        return _cached_default_ctx
+    raise RuntimeError(
+        "default plugin context is not booted; await ensure_default_ctx() "
+        "or pass scope= from the already-booted cordis Context"
+    )
 
 
 class Agent(AgentUnit):
@@ -121,7 +150,7 @@ class Agent(AgentUnit):
         state_store: str | StateStore = STATE_STORE_CHOICE_MEMORY,
         brain: str | Brain = BRAIN_CHOICE_DEFAULT,
         composer: AgentComposer | None = None,
-        scope: object | None = None,
+        scope: Context | None = None,
     ) -> None:
         self._spec = AgentSpec(
             profile=RoleProfile(
@@ -142,13 +171,10 @@ class Agent(AgentUnit):
             brain=brain,
         )
         target = composer if composer is not None else AgentComposer()
-        # scope is now a cordis.Context (replaces ScopedPluginHost).
-        # If None (e.g. for tests that don't boot a profile), use the
-        # cached default web-standard profile context.
-        print(f'DEBUG: scope passed in: {scope is not None}, type: {type(scope).__name__}')
+        # scope is a cordis.Context. If None (scripts / tests without a
+        # profile), use the cached default web-standard context.
         if scope is None:
             scope = get_or_create_default_ctx()
-        print(f'DEBUG: after fallback, scope is: {scope is not None}, type: {type(scope).__name__}')
         self._agent = target.compose(self._spec, scope=scope)
         self.role_profile = self._spec.profile
 
@@ -208,7 +234,7 @@ class Team(TeamUnit):
         shared_memory_layers: Sequence[MemoryLayer] | None = None,
         delegate_max_attempts: int | None = None,
         observability: str | ObservabilityBackend | None = None,
-        scope: object | None = None,
+        scope: Context | None = None,
         composer: TeamComposer | None = None,
     ) -> None:
         governance: Governance

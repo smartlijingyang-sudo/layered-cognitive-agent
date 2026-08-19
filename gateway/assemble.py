@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from gateway.modes import SOLO_ROLE
 from lca.contracts.models.core.plane import PlaneBindings
 from lca.contracts.models.observability.journal import (
@@ -21,8 +23,11 @@ from lca.layer0_infra.observability import (
 )
 from lca.layer0_infra.tools.default_set import build_g2a_chat_tools
 from lca.layer3_agent.role_library import FileRoleLibrary
-from lca.layer4_app.api import Agent, Team
+from lca.layer4_app.api import Agent, Team, ensure_default_ctx
 from lca.layer4_app.casting import LLMTeamCaster, build_from_casting_plan
+
+if TYPE_CHECKING:
+    from cordis import Context
 
 
 def build_solo_agent(
@@ -31,6 +36,7 @@ def build_solo_agent(
     observability: ObservabilityBackend,
     role: str = SOLO_ROLE,
     bindings: PlaneBindings | None = None,
+    scope: Context | None = None,
 ) -> Agent:
     """Solo 裸模型（ADR-0052）：身份来自 AgentRef.name，不是写死的「助手」。
 
@@ -44,6 +50,7 @@ def build_solo_agent(
         tools=build_g2a_chat_tools(bindings=bindings),
         llm=llm,
         observability=observability,
+        scope=scope,
     )
 
 
@@ -57,6 +64,7 @@ async def build_runnable_team(
     library: RoleLibrary | None = None,
     caster: TeamCaster | None = None,
     bindings: PlaneBindings | None = None,
+    plugin_ctx: Context | None = None,
 ) -> Team:
     """Team LLM casting（ADR-0042）：选角 + 治理判定 + 编译成 Team。
 
@@ -84,10 +92,12 @@ async def build_runnable_team(
                 rationale=plan.rationale,
             )
         )
+    resolved_ctx = plugin_ctx if plugin_ctx is not None else await ensure_default_ctx()
     return build_from_casting_plan(
         plan,
         resolved_library,
         llm,
         observability=observability,
         bindings=bindings,
+        scope=resolved_ctx,
     )
