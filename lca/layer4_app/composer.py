@@ -441,30 +441,66 @@ class AgentComposer:
         return _ScopeAsCapabilityContext(ctx)
 
 
-def _isolate_agent_scope(parent: Context, role: str) -> _IsolatedAgentScope:
-    """Async CM that creates a child scope with fresh service instances.
+def _isolate_agent_scope(parent: "Context", role: str) -> "_IsolatedAgentScope":
+    """Return an async CM that creates a child scope with fresh service instances.
 
-    Placeholder for Chunk 5 — full implementation uses cordis.Context.scope()
-    + ctx.provide() per spec §8.1.
+    Per spec §8.1: child gets fresh LlmService / ToolsService / TransportService
+    so two compose() calls cannot overwrite each other; memory / state_store
+    are inherited from parent (provider tables are shared).
     """
-    raise NotImplementedError(
-        "cordis migration; _isolate_agent_scope rewritten as _IsolatedAgentScope "
-        "async CM in Chunk 5"
-    )
+    return _IsolatedAgentScope(parent, role)
 
 
 class _IsolatedAgentScope:
-    """Placeholder for Chunk 5 — async context manager."""
+    """Async CM that creates a child scope with fresh service instances.
 
-    def __init__(self, parent: Context, role: str) -> None:
+    Use as:
+        async with _IsolatedAgentScope(parent, "researcher") as child:
+            agent = compose(role, child, ...)
+    """
+
+    def __init__(self, parent: "Context", role: str) -> None:
         self._parent = parent
         self._role = role
+        self._scope_cm: "_IsolatedAgentScopeCM" | None = None
+        self._child: "Context" | None = None
 
-    async def __aenter__(self) -> Context:
-        raise NotImplementedError("cordis migration; Chunk 5")
+    async def __aenter__(self) -> "Context":
+        from lca.layer0_infra.capability.llm import LlmService
+        from lca.layer0_infra.capability.memory import MemoryService
+        from lca.layer0_infra.capability.state_store import StateStoreService
+        from lca.layer0_infra.capability.tools import ToolsService
+        from lca.layer0_infra.capability.transport import TransportService
+
+        # Open child scope via cordis's async CM
+        self._scope_cm = self._parent.scope(f"agent:{self._role}")
+        self._child = await self._scope_cm.__aenter__()
+
+        # Per-agent fresh services (avoid cross-agent contamination)
+        self._child.provide("llm", LlmService())
+        self._child.provide("tools", ToolsService())
+        self._child.provide("transport", TransportService())
+
+        # Copy provider tables from parent for memory / state_store
+        self._child.provide("memory", _copy_providers(self._parent.inject("memory"), MemoryService()))
+        self._child.provide("state_store", _copy_providers(self._parent.inject("state_store"), StateStoreService()))
+
+        return self._child
 
     async def __aexit__(self, *exc_info: Any) -> None:
-        return None
+        if self._scope_cm is not None:
+            await self._scope_cm.__aexit__(*exc_info)
+
+
+def _copy_providers(parent_svc: object, new_svc: object) -> object:
+    """Copy registered providers from parent_svc into new_svc.
+
+    Both services use the same registry pattern (`.providers.names()` + `.providers.get(name)`).
+    """
+    if parent_svc is not None and hasattr(parent_svc, "providers"):
+        for name in parent_svc.providers.names():
+            new_svc.providers.register(name, parent_svc.providers.get(name))
+    return new_svc
 
 
 class TeamComposer(AgentComposer):
