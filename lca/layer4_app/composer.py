@@ -457,12 +457,23 @@ class _IsolatedAgentScope:
     Use as:
         async with _IsolatedAgentScope(parent, "researcher") as child:
             agent = compose(role, child, ...)
+
+    The child has its own LlmService / ToolsService / TransportService so two
+    compose() calls cannot overwrite each other. memory / state_store are
+    shared with parent (provider tables inherited).
+
+    Implementation note: cordis's `Context.scope(label)` returns an async CM
+    that exposes a child context. cordis's `Context.inject(key)` searches the
+    current fiber's context first, then the root. By calling `child.provide()`
+    in the child's own context, we shadow the parent's services. The
+    `_active_ctx` ContextVar is what makes `ctx.inject` work — when a coroutine
+    runs inside a `_ScopeCM`, the active context is the child.
     """
 
     def __init__(self, parent: "Context", role: str) -> None:
         self._parent = parent
         self._role = role
-        self._scope_cm: "_IsolatedAgentScopeCM" | None = None
+        self._scope_cm: object | None = None
         self._child: "Context" | None = None
 
     async def __aenter__(self) -> "Context":
@@ -476,14 +487,24 @@ class _IsolatedAgentScope:
         self._scope_cm = self._parent.scope(f"agent:{self._role}")
         self._child = await self._scope_cm.__aenter__()
 
-        # Per-agent fresh services (avoid cross-agent contamination)
+        # Per-agent fresh services (avoid cross-agent contamination).
+        # The child context is `_active_ctx` during this with-block, so
+        # any `ctx.inject(...)` from caller code resolves to the child's
+        # own bindings FIRST before walking up to the parent.
         self._child.provide("llm", LlmService())
         self._child.provide("tools", ToolsService())
         self._child.provide("transport", TransportService())
 
-        # Copy provider tables from parent for memory / state_store
-        self._child.provide("memory", _copy_providers(self._parent.inject("memory"), MemoryService()))
-        self._child.provide("state_store", _copy_providers(self._parent.inject("state_store"), StateStoreService()))
+        # Copy provider tables from parent for memory / state_store.
+        # Walk to parent for the original MemoryService / StateStoreService.
+        self._child.provide(
+            "memory",
+            _copy_providers(self._parent.inject("memory"), MemoryService()),
+        )
+        self._child.provide(
+            "state_store",
+            _copy_providers(self._parent.inject("state_store"), StateStoreService()),
+        )
 
         return self._child
 
