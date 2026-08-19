@@ -2,7 +2,7 @@
 name = "lca-framework"
 version = "0.1.0"
 description = "Layered Cognitive Agent Framework"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "aiofiles>=24.1.0",
     "httpx>=0.28.1",
@@ -17,7 +17,15 @@ dependencies = [
     "typer>=0.15.0",
     "uvicorn[standard]>=0.30.0",
     "websockets>=14.0",
+    "taiyi-cordis",
+    "taiyi-cosmokit",
+    "taiyi-schemastery",
 ]
+
+[tool.uv.sources]
+taiyi-cordis      = { path = "vendor/cordis" }
+taiyi-cosmokit    = { path = "vendor/cosmokit" }
+taiyi-schemastery = { path = "vendor/schemastery" }
 
 [tool.importlinter]
 root_package = "lca"
