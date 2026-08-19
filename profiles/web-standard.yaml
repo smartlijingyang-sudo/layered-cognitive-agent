@@ -1,8 +1,10 @@
 # web-standard profile — default deployment configuration.
-# Bundles: base-spine (core services)
-# Patch: LLM provider selection, session persistence
+# Bundles: base (Tier-1 services + Tier-2 providers) + web-app (Tier-3 behaviors)
+# Patch: LLM provider selection via env vars
 
 bundles:
-  - bundles/base-spine.yaml
+  - bundles/base.yaml
+  - bundles/web-app.yaml
 
+# Optional: override specific plugin config; merged into matching entries by id
 patch: []

@@ -1,4 +1,10 @@
-"""BoardLead plugin — Tier-3 (LCA team-lead mandate `board`)."""
+"""BoardLead plugin — Tier-3 (LCA team-lead mandate `board`).
+
+Note: BoardLead / ConsultLead are TeamStrategy implementations, not
+standalone plugin types. They live in lca/layer3_agent/orchestration_strategies/.
+This plugin registers the strategy registry at the team_lead_factory key
+so the composition root can resolve them.
+"""
 from __future__ import annotations
 
 from cordis import plugin
@@ -6,12 +12,8 @@ from cordis import plugin
 
 @plugin(name="lca-team-lead-board")
 async def setup(ctx, config) -> None:
-    """Register the BoardLead strategy as 'board' in the team-lead factory."""
-    from lca.layer3_agent.orchestration_strategies.lead import (
-        BoardLead,
-    )
-    from lca.layer3_agent.orchestration_registry import OrchestrationFactory
+    """Register the team strategy registry at team_lead_factory."""
+    from lca.layer3_agent.orchestration_registry import TeamStrategyRegistry
 
-    factory = OrchestrationFactory()
-    factory.register_lead("board", BoardLead)
+    factory = TeamStrategyRegistry()
     ctx.provide("team_lead_factory", factory)

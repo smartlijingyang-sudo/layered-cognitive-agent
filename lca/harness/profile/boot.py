@@ -2,6 +2,14 @@
 
 Returns a cordis.Context with all plugins loaded. Thin wrapper around
 cordis.Loader.
+
+Profile YAML structure (LCA extension on top of cordis):
+  bundles:
+    - bundles/base.yaml
+    - bundles/web-app.yaml
+  patch:
+    - id: <plugin-id>      # override config
+      config: { ... }
 """
 from __future__ import annotations
 
@@ -9,6 +17,8 @@ import importlib
 import warnings
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from cordis import Context
 from cordis.loader import Entry, Loader, load_yaml
@@ -19,16 +29,7 @@ async def boot_profile(
     *,
     check_seam_completeness: bool = True,
 ) -> Context:
-    """Load profile YAML → resolve modules → build root Context.
-
-    Profile YAML structure:
-      bundles:
-        - bundles/base.yaml
-        - bundles/web-app.yaml
-      patch:
-        - id: <plugin-id>
-          config: { ... }
-    """
+    """Load profile YAML → resolve modules → build root Context."""
     if check_seam_completeness:
         warnings.warn(
             "check_seam_completeness is deprecated; cordis doesn't validate seams",
@@ -37,9 +38,33 @@ async def boot_profile(
         )
 
     path = Path(profile_path)
-    tree = load_yaml(path)
+    raw = yaml.safe_load(path.read_text()) or {}
+
+    # Merge bundles (LCA extension: load each bundle YAML, concat entries)
+    all_entries: list[dict] = []
+    for bundle_path in raw.get("bundles", []):
+        bundle_full = Path(bundle_path)
+        if not bundle_full.is_absolute():
+            # Profile paths like "bundles/base.yaml" — try relative to profile dir first,
+            # then to cwd.
+            candidate = path.parent / bundle_path
+            if candidate.exists():
+                bundle_full = candidate
+            else:
+                bundle_full = Path.cwd() / bundle_path
+        bundle_data = yaml.safe_load(bundle_full.read_text()) or {}
+        all_entries.extend(bundle_data.get("entries", []))
+
+    # Apply patches (LCA extension: override config for matching ids)
+    patches = {p["id"]: p for p in raw.get("patch", []) if "id" in p}
+    for entry in all_entries:
+        if entry["id"] in patches:
+            entry.setdefault("config", {}).update(patches[entry["id"]].get("config", {}))
+
+    # Build a merged YAML doc and load via cordis
+    merged = {"entries": all_entries}
+    tree = _load_from_dict(merged)
     ctx = Context()
-    # Walk the EntryTree directly (Loader.load() re-parses, but we already have a tree)
     from lca.plugins._compat import legacy_plugin_setup
     for entry in tree.entries:
         # cordis @plugin decorator wraps the function in a Plugin dataclass
@@ -79,3 +104,11 @@ def _resolve_module_by_name(name: str) -> Any:
 def _resolve_module_by_path(path: str) -> Any:
     """Resolve plugin module by path."""
     return importlib.import_module(path)
+
+
+def _load_from_dict(data: dict) -> Any:
+    """Build an EntryTree from a parsed dict (skips YAML re-parsing)."""
+    import importlib as _il
+    # Lazy import to avoid circular dependency
+    from cordis import loader as _loader
+    return _loader.Loader().load(data)
