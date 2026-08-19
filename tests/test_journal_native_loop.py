@@ -59,11 +59,38 @@ def test_driver_sends_execution_plane() -> None:
 
 def test_driver_projects_one_run() -> None:
     assert "POST" in _DRIVER_TS
-    assert "/lca-api/runs" in _DRIVER_TS
+    assert "${RUN_BASE}/runs" in _DRIVER_TS
     assert "/live" in _DRIVER_TS
     assert "Last-Event-ID" in _DRIVER_TS
     assert "LlmCallStarted" in _JOURNAL_TS
     assert "const openTurn" in _DRIVER_TS
+
+
+def test_run_target_switches_url_base() -> None:
+    # local target → /lca-api (default, works through Next.js rewrite)
+    # deepseek-harness target → absolute DSH URL bypassing the proxy
+    assert "NEXT_PUBLIC_LCA_RUN_TARGET" in _DRIVER_TS
+    assert "NEXT_PUBLIC_LCA_DSH_BASE_URL" in _DRIVER_TS
+    assert "RUN_TARGET === 'deepseek-harness'" in _DRIVER_TS
+    assert "RUN_BASE:" in _DRIVER_TS
+
+    # all 4 run endpoints must resolve through the same base
+    for endpoint in (
+        "`${RUN_BASE}/runs`,",  # POST /runs
+        "`${RUN_BASE}/runs/${runId}/live`,",  # GET  /runs/:id/live
+        "`${RUN_BASE}/runs/${runId}`,",  # GET  /runs/:id
+        "`${RUN_BASE}/runs/${runId}/cancel`,",  # POST /runs/:id/cancel
+    ):
+        assert endpoint in _DRIVER_TS, endpoint
+
+    # defaults: same token, local target, DSH on :3080 (use ??, not ||, so empty string still picks the fallback)
+    default_block = _DRIVER_TS.split("const RUN_TARGET", 1)[1].split("const TERMINAL", 1)[0]
+    assert "?? 'local'" in default_block
+    assert "?? 'http://localhost:3080'" in default_block
+    assert "RUN_TARGET ===" in default_block
+
+    # default branch must keep the existing prefix so the local path is identical
+    assert "RUN_TARGET === 'deepseek-harness' ? DSH_BASE_URL : '/lca-api'" in _DRIVER_TS
 
 
 def test_each_llm_call_opens_an_assistant() -> None:
@@ -282,7 +309,7 @@ def test_failed_run_uses_native_error_lifecycle() -> None:
     assert "noteRowError" in catch
     assert "ensureTurn" in catch
     assert "throw error" not in catch
-    assert "const createRes = await fetch('/lca-api/runs'" in _DRIVER_TS.split("try {", 1)[1]
+    assert "const createRes = await fetch(`${RUN_BASE}/runs`" in _DRIVER_TS.split("try {", 1)[1]
     assert "projected.error" in _FINISH_TS
     assert "runtimeStatus: cancelled ? 'interrupted'" in _FINISH_TS
     assert "'error'" in _FINISH_TS
