@@ -24,15 +24,21 @@ LCA 现有 21 个 capability 插件都还跑在自家 `lca/layer0_infra/plugin/`
 - 替换 `lca/layer0_infra/plugin/` 为 cordis
 - 替换 `lca.harness.kernel`（ScopedPluginHost / compat）为 cordis
 - 替换 `lca.harness.profile/boot.py` 为 cordis.Loader 的薄包装
-- 删 `lca/contracts/harness/plugin.py` + `lca/contracts/mechanisms/plugin.py` + `lca/contracts/mechanisms/seam.py`
+- 删 `lca/contracts/harness/plugin.py`（保留 `MiddlewareRegistration` 等在 `middleware.py`）— 实际是拆 `plugin.py`：删 `Manifest`/`ExtensionPoint`/`CapabilityGrant`/`ScopeKind`/`PluginKind`/`ProviderMode`，保留 `PluginContext` Protocol
+- 删 `lca/contracts/mechanisms/seam.py` 中的 `SeamRole`/`SeamDeclaration`/`SeamRegistry`/`seam`/`validate_all_seams`；**保留 `consume()`**（composition-time gate，3 个 production 文件 + tests 依赖）
+- 删 `lca/contracts/mechanisms/plugin.py` 中的 `Plugin` Protocol；**保留 `PluginConfig`**（Pydantic 基类，多个 plugin 和 test 依赖）
 - 21 个 `lca/plugins/*` 改写为 `@plugin` 形式
-- `bundles/base-spine.yaml` + `profiles/web-standard.yaml` 改为 cordis YAML
-- `lca/layer4_app/composer.py:_isolate_agent_scope` 用 cordis Context 改写
+- `bundles/base-spine.yaml` + `profiles/web-standard.yaml` 改为 cordis YAML（用 `id` 不是 `name`）
+- `lca/layer4_app/composer.py:_isolate_agent_scope` 用 cordis Context 改写（`Context.scope(label)` 不是 `Context.isolate(label)`）
 - vendor 引入 `taiyi-cordis` / `taiyi-cosmokit` / `taiyi-schemastery`
+
+**实际 service 文件状态**：
+- `LlmService` **保持不继承 `cordis.Service`**——它是 `LLMAdapter` 实现，不会随 ctx dispose 消失。Plugin 提供 `LlmService()` 实例并 `ctx.provide("llm", ...)`，由 Service Definition 自身管理生命周期。
+- `cordis.Service` 用在真需要 auto-dispose 的组件上（HTTP 客户端、DB 连接）。LCA 当前的 Service Definition 类都不是这种。
 
 **Out**:
 - 不 port dsh 100+ 包（subagent / sandbox / LSP / MCP / ACP / compaction / skill / goal / workflow / jobs / todo / plan / preset / guard / hooks / session-query / settings / credentials / attachment / fs / lsp / terminal / code-runtime / shell / subprocess / e2b / feedback / context / identity / interaction / web / storage / workspace / boot / sdk / examples / support / util / typert）
-- 不重写 `lca/contracts/protocols/` 的 22 个 Protocol
+- 不重写 `lca/contracts/protocols/` 的 16 个 Protocol
 - 不动 LCA 5 层单向依赖 import 图
 - 不动 `lca/contracts/{atoms,models}/` 纯数据契约
 - 不改 Journal 真相机制（ADR-0037）
@@ -43,9 +49,9 @@ LCA 现有 21 个 capability 插件都还跑在自家 `lca/layer0_infra/plugin/`
 ## 2. 第一性原理
 
 1. **vendor 唯一 = cordis**。DSH 的 cordis 是经过产品考验的运行时；taiyi 的 1:1 Python 移植可用。LCA 自家复刻只是临时脚手架，留下来就是双轨约定。
-2. **协议是架构的硬骨；runtime 是方法的肉**。`lca/contracts/protocols/` 的 22 个 `@runtime_checkable Protocol` 是真抽象，价值高于 runtime——保留。`lca/contracts/harness/plugin.py` 的 `Manifest`/`ExtensionPoint`/`CapabilityGrant` 在 dsh 都没对应物，是 LCA 早期自创的中间层，删。
+2. **协议是架构的硬骨；runtime 是方法的肉**。`lca/contracts/protocols/` 的 16 个 `@runtime_checkable Protocol` 是真抽象，价值高于 runtime——保留。`lca/contracts/harness/plugin.py` 的 `Manifest`/`ExtensionPoint`/`CapabilityGrant` 在 dsh 都没对应物，是 LCA 早期自创的中间层，删。
 3. **plugin = 行为单位**。21 个 capability 插件都是有用的；plugin 集不缩——只在文件夹 + 命名上重新组织。
-4. **scope 在 cordis 上重新表达**。LCA 自创的 5-ScopeKind 是语义名词（DEPLOYMENT/PROFILE/TEAM/AGENT/SESSION），cordis 的 `Context.isolate` / `Context.fork` 不需要语义枚举——`"agent:{role}"` 这种 label 字符串足够。把 ScopedPluginHost 从一个类简化成一个 `async with ctx.isolate(label)`。
+4. **scope 在 cordis 上重新表达**。LCA 自创的 5-ScopeKind 是语义名词（DEPLOYMENT/PROFILE/TEAM/AGENT/SESSION），cordis 的 `Context.scope(label)` / `Context.fork()` 不需要语义枚举——`"agent:{role}"` 这种 label 字符串足够。把 ScopedPluginHost 从一个类简化成一个 `async with ctx.scope(label)`。
 5. **bundles 是装配面，不是行为面**。bundle 文件只是 entry 列表 + 顺序；行为住在 setup callback 里。`seam_definitions` 这种"纯声明"插件是 cordis 不需要的——`@plugin(name="...")` 自己声明。
 6. **L4 仍是组合根**。Composer（`lca/layer4_app/composer.py`）知道整棵树；其他层只挂自己那一层的插件。
 
@@ -120,35 +126,29 @@ LCA 不再 re-export `cordis.*`——所有 `@plugin` 装饰 + Service 都从 `c
 ### 4.3 标准插件形状
 
 ```python
-# lca/plugins/llm_service/__init__.py
+# lca/plugins/llm/__init__.py
 from __future__ import annotations
-from cordis import plugin, Service
+from cordis import plugin
 from pydantic import BaseModel
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
     default_provider: str = "mock"
 
-class LlmService(Service):
-    """Service Definition for the LLM seam. Owns the provider registry."""
-    def __init__(self, ctx, **config):
-        super().__init__(ctx)
-        self._providers: dict[str, object] = {}
-        self._default = config.get("default_provider", "mock")
-
-    def register(self, name: str, adapter, *, activate: bool = False) -> None:
-        self._providers[name] = adapter
-        if activate and not self._default:
-            self._default = name
-
-    async def complete(self, *args, **kwargs):
-        return await self._providers[self._default].complete(*args, **kwargs)
-
-@plugin(name="lca-llm-service", inject=())
+@plugin(name="lca-llm-service", inject=[])
 async def setup(ctx, config: Config):
-    service = LlmService(ctx, **(config.model_dump() if config else {}))
+    """llm capability 的 Service Definition。
+
+    LlmService 保持 plain class(LLMAdapter)——它不跟 ctx 生命周期绑定，
+    所以不继承 cordis.Service。需要 auto-dispose 的资源类才继承。
+    """
+    from lca.layer0_infra.capability.llm import LlmService
+
+    service = LlmService()
     ctx.provide("llm", service)
 ```
+
+**LCA 保留原则**：`LlmService` / `ToolsService` / `SessionService` 等 Service Definition **不继承 `cordis.Service`**——它们是长寿命的注册表，绑定到 fiber 生命周期自动消失。`cordis.Service` 留给网络连接、DB、Cod 客户端这类需要 dispose 的。
 
 ### 4.4 Config 校验
 
@@ -183,12 +183,14 @@ LCA 的 capability 清单（`SeamKey` 枚举）的"字段名"在 cordis 上变�
 | `lca/layer0_infra/plugin/scope/` | 删除 | cordis.Context.scope 替代 |
 | `lca/layer0_infra/plugin/expr/` | 删除 | cordis.Loader.interpolate 替代 |
 | `lca/layer0_infra/plugin/builtins/` | 删除 | cordis.Fiber.effect 替代 |
+| `lca/layer0_infra/plugin/_test_plugins/` | 删除 | 依赖 `PluginConfig`，删后整个目录无意义 |
 | `lca/harness/kernel/` | 删除 | cordis 替代 |
-| `lca/harness/profile/boot.py` | 重写为 cordis 包装 | 公开 API 保留 |
-| `lca/contracts/harness/plugin.py` | 删除 | cordis 替代 |
-| `lca/contracts/mechanisms/plugin.py` | 删除 | cordis 替代 |
-| `lca/contracts/mechanisms/seam.py` | 删除 | dsh 不用 seam 三角色 |
+| `lca/harness/profile/boot.py` | 重写为 cordis 包装 | 保留 `boot_profile(Path, *, check_seam_completeness)` 签名（`check_seam_completeness` 改为 no-op 提示） |
+| `lca/contracts/harness/plugin.py` | 拆 | 删 `Manifest`/`ExtensionPoint`/`CapabilityGrant`/`ScopeKind`/`PluginKind`/`ProviderMode`；**保留 `PluginContext` Protocol**（用于 compat/迁移期） |
+| `lca/contracts/mechanisms/plugin.py` | 拆 | 删 `Plugin` Protocol；**保留 `PluginConfig` Pydantic 基类** |
+| `lca/contracts/mechanisms/seam.py` | 拆 | 删 `SeamRole`/`SeamDeclaration`/`SeamRegistry`/`seam`/`validate_all_seams`；**保留 `consume()`** |
 | `lca/plugins/seam_definitions/` | 删除 | cordis 不需要 |
+| `lca/harness/middleware/registry.py` | 重写 | `COGNITIVE_POINTS` 10 点表迁移到 cordis event 名（`agent.before_step` 等）的 map |
 
 ---
 
@@ -253,17 +255,20 @@ lca/plugins/
 
 ### 6.3 agent_service 合并入 session_service
 
-原 `agent_service` 是 `session.append` 的 typed facade：
+原 `agent_service` 是 `session.append` 的 typed facade，6 个方法：
 
-```python
-# before
-await agent_service.record_assistant_response(store, turn, step, content, ...)
+| 旧方法 | 新方法（session_service） |
+|---|---|
+| `record_assistant_response(store, turn, step, content, tool_calls)` | `record_assistant_message(session_id, turn, step, content, tool_calls)` |
+| `record_tool_call(store, call_id, tool_name, args)` | `record_tool_call(session_id, call_id, tool_name, args)` |
+| `record_tool_result(store, call_id, result)` | `record_tool_result(session_id, call_id, result)` |
+| `record_turn_boundary(store, turn, kind)` | `record_turn_start(session_id, turn)` / `record_turn_end(session_id, turn)` |
+| `record_step_boundary(store, turn, step, kind)` | `record_step_start(session_id, turn, step)` / `record_step_end(session_id, turn, step)` |
+| `record_xxx(...)` (其他) | ... |
 
-# after
-await session_service.record_assistant_message(session_id, turn, step, content, ...)
-```
+`SessionService` 加一组 `record_*` 方法。
 
-`SessionService` 加一组 `record_*` 方法（`record_user_message` / `record_assistant_message` / `record_tool_call` / `record_tool_result` / `record_turn_start` / `record_step_start` / ...）；调用方路径从 `agent_service.record_*` → `session_service.record_*`。
+**调用点扫描（P5 必跑）**：`rg "agent_service"` + `rg "agent\.service"` + `rg "AgentService"` 找全 caller（包括 `bundles/base-spine.yaml:65-67` 的 `lca.agent.service` 引用）。指定 LLM / Runtime / loop_cognitive / loop_dsh_bridge / loop_replay 等。
 
 ---
 
@@ -271,61 +276,82 @@ await session_service.record_assistant_message(session_id, turn, step, content, 
 
 ### 7.1 `bundles/base.yaml`（替代 `base-spine.yaml`）
 
-cordis 的 bundle 是 entry 列表：
+cordis 的 `Entry` dataclass 用 `id` 作主键；`$module` 是 LCA 层加的扩展（cordis 解析器本身从 `name` 反查 module，但 LCA 走自己的 include 协议）。YAML 实际形态：
 
 ```yaml
 # bundles/base.yaml
 plugins:
-  - name: lca-llm-service
+  - id: lca-llm-service
+    name: lca-llm-service
     $module: lca.plugins.llm
-  - name: lca-llm-provider
+  - id: lca-llm-provider
+    name: lca-llm-provider
     $module: lca.plugins.llm.provider
     inject: ["llm"]
     config:
       mode: auto
-  - name: lca-tools-service
+  - id: lca-tools-service
+    name: lca-tools-service
     $module: lca.plugins.tools
-  - name: lca-session-service
+  - id: lca-session-service
+    name: lca-session-service
     $module: lca.plugins.session
-  - name: lca-system-prompt-service
+  - id: lca-system-prompt-service
+    name: lca-system-prompt-service
     $module: lca.plugins.system_prompt
-  - name: lca-transport-service
+  - id: lca-transport-service
+    name: lca-transport-service
     $module: lca.plugins.transport
-  - name: lca-skills-service
+  - id: lca-skills-service
+    name: lca-skills-service
     $module: lca.plugins.skills
-  - name: lca-file-store-service
+  - id: lca-file-store-service
+    name: lca-file-store-service
     $module: lca.plugins.file_store
-  - name: lca-observability-service
+  - id: lca-observability-service
+    name: lca-observability-service
     $module: lca.plugins.observability
-  - name: lca-sandbox-service
+  - id: lca-sandbox-service
+    name: lca-sandbox-service
     $module: lca.plugins.sandbox
-  - name: lca-memory-service
+  - id: lca-memory-service
+    name: lca-memory-service
     $module: lca.plugins.memory
-  - name: lca-search-service
+  - id: lca-search-service
+    name: lca-search-service
     $module: lca.plugins.search
-  - name: lca-state-store-service
+  - id: lca-state-store-service
+    name: lca-state-store-service
     $module: lca.plugins.state_store
 ```
+
+**注意**：cordis 自己解析 YAML 时需要 `id` 是主键（`Loader._is_entry_dict` 启发式）；`$module` 是 LCA 抽象——`lca.harness.profile.boot()` 重新构造的 thin wrapper 读 `$module` 后用 `importlib.import_module()` 解析模块路径，再交给 cordis 的 `Loader.load()` 时，把 `id` + `inject` + `config` 留给 cordis，模块引用自己挂上。
 
 ### 7.2 `bundles/web-app.yaml`
 
 ```yaml
 plugins:
-  - $patch: bundles/base.yaml
-  - name: lca-loop-cognitive
+  - id: lca-loop-cognitive
+    name: lca-loop-cognitive
     $module: lca.plugins.agent_loop.cognitive
-  - name: lca-gateway-starlette
+  - id: lca-gateway-starlette
+    name: lca-gateway-starlette
     $module: lca.plugins.gateways.starlette
-  - name: lca-guard-loop-intervention
+  - id: lca-guard-loop-intervention
+    name: lca-guard-loop-intervention
     $module: lca.plugins.guards.loop_intervention
-  - name: lca-guard-step-budget
+  - id: lca-guard-step-budget
+    name: lca-guard-step-budget
     $module: lca.plugins.guards.step_budget
 ```
+
+bundle **继承**不复用 cordis 自带 `$patch` 机制；LCA 层用 `merge_bundles`（`cordis.loader.merge_bundles`）拼——`base.yaml` → `web-app.yaml` 顺序扩展。
 
 ### 7.3 `profiles/web-standard.yaml` 改写
 
 ```yaml
 bundles:
+  - bundles/base.yaml
   - bundles/web-app.yaml
 patch: []
 ```
@@ -336,17 +362,23 @@ patch: []
 
 ### 8.1 `_isolate_agent_scope` 改动
 
+cordis 的 `Context.isolate(label, callback)` 是**回调式**——它不是 async context manager；async context manager 是 `Context.scope(label)`（见 `cordis/context.py:339`）。当前 `composer.py:_isolate_agent_scope` 的语义是构造一个子 scope 并 shadow 服务实例，所以正确模式是 `Context.scope(label)`：
+
 ```python
 # before
 def _isolate_agent_scope(parent: ScopedPluginHost, role: str) -> ScopedPluginHost:
     child = parent.fork(ScopeKind.AGENT, f"agent:{role}")
     child.provide(handle, "llm", LlmService())  # 三参数
+    child.provide(handle, "tools", ToolsService())
+    child.provide(handle, "transport", TransportService())
+    # memory / state_store 沿用父（深拷贝 providers）
     ...
+    return child
 
 # after
 async def _isolate_agent_scope(parent: Context, role: str) -> Context:
-    async with parent.isolate(f"agent:{role}") as child:
-        child.provide("llm", LlmService())  # 二参数
+    async with parent.scope(f"agent:{role}") as child:
+        child.provide("llm", LlmService())
         child.provide("tools", ToolsService())
         child.provide("transport", TransportService())
         # memory / state_store 沿用父（深拷贝 providers）
@@ -354,31 +386,49 @@ async def _isolate_agent_scope(parent: Context, role: str) -> Context:
         yield child
 ```
 
-### 8.2 `current_scope()` 替代
+**重要语义**：cordis 的 `Context.scope(label)` 只是 scope-tracking + 共享 root；它**不**自动 shadow 服务实例。LCA 的 "每 agent 一份独立 LlmService" 的语义需要：
+- 显式 `child.provide("llm", LlmService())` 覆盖父
+- 由 `async with parent.scope(...)` 的释放钩子卸载
 
-LCA 中所有 `current_scope()` 调用点（约 6 处）：`diag.tree` / `loop_replay` / `composer` / `api`。
+让 child 保留父的 memory / state_store（providers 列表）需要 `parent.require("memory").providers` → 拷贝构造新 `MemoryService()`。
 
-```python
-# before
-scope = current_scope()
+### 8.2 `ScopedPluginHost` 的使用点
 
-# after
-scope = Context.current()  # cordis 自带
-```
+spec 初稿说"约 6 处 `current_scope()`"——**错的**。`rg "current_scope\("` 返回空。实际引用 `ScopedPluginHost` 接口的位置（`scope.resolve` / `scope.fork` / `scope.provide` / `wrap`）：
+
+| 文件 | 模式 | 替代 |
+|---|---|---|
+| `lca/layer4_app/composer.py:466` | `parent.fork(ScopeKind.AGENT, ...)` | `parent.scope("agent:{role}")` |
+| `lca/layer4_app/composer.py:496-499` | `child.provide(handle, ...)` | `child.provide(key, value)` |
+| `lca/layer4_app/api.py:105` | `isinstance(x, ScopedPluginHost)` | `isinstance(x, Context)` |
+| `gateway/app.py:149-153` | `ScopedPluginHost.wrap(host, ScopeKind.DEPLOYMENT, ...)` | `Context.wrap(host)` + `setup_logging()` |
+| `lca/plugins/loop_cognitive/__init__.py:99` | `plugin_scope.resolve("llm")` | `ctx.inject("llm")` |
+| `lca/plugins/loop_cognitive/__init__.py:105` | `plugin_scope.resolve("tools")` | `ctx.inject("tools")` |
+| `lca/plugins/loop_dsh_bridge/__init__.py` | `scope.resolve("session_store")` / `scope.resolve("dsh_settings")` | `ctx.inject(...)` |
+| `lca/plugins/loop_replay/__init__.py` | `scope.resolve("session_store")` | `ctx.inject(...)` |
+| `lca/harness/diagnostics/tree.py` | tree walker over `ScopedPluginHost` | 重写为 cordis `Context` walker |
 
 ### 8.3 mount / provide 翻译
 
 ```python
 # before
-child.provide(handle, "llm", service)            # 三参数 (handle, key, value)
-child.provide(handle, "llm", service, check=fn)  # 四参数
+ctx.mount(handle, "llm", service)              # 三参数 (handle, key, value)
+ctx.mount(handle, "llm", service, check=fn)    # 四参数
 
 # after
-child.provide("llm", service)                    # 二参数 (key, value)
-# check predicate via Service.check classmethod
+ctx.provide("llm", service)                    # 二参数 (key, value)
+# check predicate via Service.check classmethod（只有继承 cordis.Service 的类才需要）
 ```
 
 `handle` 的概念在 cordis 里由 `ctx.fiber.effect` 自动管理——`provide` 不需要显式 handle；插件 setup 里所有写入 `ctx.provide(...)` / `ctx.effect(...)` / `ctx.on(...)` 都是 fiber-owned，卸载时自动撤销。
+
+### 8.4 `consume()` 保留
+
+`lca/contracts/mechanisms/seam.py` 的 `consume(definition, provider, consumer)` 函数（composition-time gate）**保留**。3 个 production 调用点（`composer.py:266,268,365` / `brain/default_factory.py:32` / `sandbox/runtime_scope.py:41`）+ 4 个测试文件不变。`SeamRole`/`SeamDeclaration`/`SeamRegistry`/`seam`/`validate_all_seams` 删掉。
+
+### 8.5 `PluginConfig` 保留
+
+`lca/contracts/mechanisms/plugin.py` 的 `PluginConfig` Pydantic 基类（`extra="forbid"` 默认）保留。`Plugin` Protocol 删（cordis 的 `@plugin` 装饰器替代）。
 
 ---
 
@@ -386,15 +436,16 @@ child.provide("llm", service)                    # 二参数 (key, value)
 
 | Phase | 内容 | 验证 |
 |---|---|---|
-| **P0** | vendor 引入 cordis + cosmokit + schemastery（`uv sync` 跑通） | `uv run python -c "from cordis import Context, plugin, Service"` |
-| **P1** | 删 `lca/layer0_infra/plugin/` + `lca/harness/kernel/` + `lca/harness/profile/boot.py` | `rg -l lca.layer0_infra.plugin` 空 |
-| **P2** | 删 `lca/contracts/{harness/plugin.py, mechanisms/plugin.py, mechanisms/seam.py}` | `rg -l "PluginManifest\|ExtensionPoint\|CapabilityGrant"` 仅命中 docstring |
-| **P3** | `lca/harness/profile/boot.py` 重写为 cordis.Loader 薄包装 | `lca-ops status` 跑通 |
-| **P4** | 21 个 plugin 改写为 `@plugin` 形式（一次提交） | `uv run pytest lca/plugins/ tests/test_plugin_*.py` |
-| **P5** | bundle / profile YAML 改写 | `lca-ops status` + `lca-ops inspect-tree` |
-| **P6** | `composer.py` + 6 个 `current_scope()` 调用点改写 | `uv run pytest lca/layer4_app/` + `examples/pluggability_demo/` |
-| **P7** | 端到端：`scripts/run_team_mode.py` 跑通真 e2e | Agent reply 在 journal |
-| **P8** | `loop_dsh_bridge` 重新挂上（之前在 P4 跑过 stub） | `lca-ops logs` 看 dsh bridge 记录 |
+| **P0** | vendor 引入 cordis + cosmokit + schemastery（`uv sync` 跑通 + `pyproject.toml` 加 `[tool.uv.sources]`） | `uv run python -c "from cordis import Context, plugin"` |
+| **P1** | 删 `lca/layer0_infra/plugin/`（含 `_test_plugins/`）+ `lca/harness/kernel/` | `rg -l lca.layer0_infra.plugin` 空 |
+| **P2** | 拆 `lca/contracts/{harness/plugin.py, mechanisms/plugin.py, mechanisms/seam.py}` 三处：删 LCA seam 抽象，保留 `consume()` / `PluginConfig` | `rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|ScopeKind\|PluginKind\|ProviderMode\|SeamDeclaration\|SeamRegistry\|seam\b"` 仅命中 docstring；`rg "from lca.contracts.mechanisms.seam import consume"` 仍能 import |
+| **P3** | `lca/harness/middleware/registry.py` 10 点 `COGNITIVE_POINTS` 重写为 cordis event 名 map | `tests/test_middleware.py` |
+| **P4** | `lca/harness/profile/boot.py` 重写为 cordis.Loader 薄包装（保留 `boot_profile(path, *, check_seam_completeness: bool = True)` 签名；now no-op 警告） | `gateway/app.py:138` + `tests/harness/test_phase_a_integration.py:225` 跑通 |
+| **P5** | 21 个 plugin 改写为 `@plugin` 形式（一次提交） | `uv run pytest lca/plugins/ tests/test_plugin_*.py` |
+| **P6** | bundle / profile YAML 改写（`bundles/base.yaml` + `bundles/web-app.yaml` + `profiles/web-standard.yaml`） | `lca-ops status` + `lca-ops inspect-tree` |
+| **P7** | `composer.py` + `loop_cognitive` + `loop_dsh_bridge` + `loop_replay` + `gateway/app.py` + `lca/layer4_app/api.py` + `lca/harness/diagnostics/tree.py` 改写（`scope.resolve` → `ctx.inject`；`scope.fork` → `ctx.scope`；`scope.provide` → `ctx.provide`） | `uv run pytest lca/layer4_app/ tests/harness/` + `examples/pluggability_demo/` |
+| **P8** | 端到端：`scripts/run_team_mode.py` 跑通真 e2e | Agent reply 在 journal |
+| **P9** | `loop_dsh_bridge` 重新挂上（之前在 P5 跑过 stub） | `lca-ops logs` 看 dsh bridge 记录 |
 
 每 phase 必跑：
 - `uv run ruff check --fix <改动路径> && uv run ruff format <改动路径>`
@@ -429,20 +480,24 @@ P4 / P6 必跑：
 
 | 风险 | 概率 | 影响 | 缓解 |
 |---|---|---|---|
-| `composer.py` 多处 `ScopedPluginHost` 引用漏改 | 中 | 阻塞 | `rg -l ScopedPluginHost\|current_scope` 找出 6 个点逐个改 |
-| cordis 的 `@plugin` + Standard Schema 校验在 extra="forbid" 上某些 capability 需要 `model_config` 调整 | 低 | 测试挂 | P4 阶段单 plugin 跑 mypy |
-| `bundles/base-spine.yaml` → `bundles/base.yaml` 改名打破外部引用 | 低 | 持续集成 | `rg "base-spine" ` 全仓扫 |
-| `lca/plugins/seam_definitions` 有测试依赖 | 中 | 阻塞 | P2 阶段先 `rg seam_definitions` |
-| `loop_dsh_bridge` 内部还要 `lca.harness.kernel` 某个工具 | 中 | 阻塞 | cordis 替代后 dsh_bridge 也要改写 |
-| `lca_harness.profile.boot()` 公开 API 仍被外部脚本调用 | 低 | 阻塞 | 保留 `boot_profile()` function 名字，内部改实现 |
+| `composer.py` + 5 个 plugin + `gateway/app.py` + `api.py` `ScopedPluginHost` / `scope.resolve` 引用漏改 | 高 | 阻塞 | P7 阶段明确列 9 个调用点（见 §8.2 表） |
+| `consume()` 保留，但 `seam.py` 拆分后忘记 re-export | 中 | 阻塞 | P2 阶段 `from lca.contracts.mechanisms.seam import consume` 跑通 |
+| `PluginConfig` 保留，但 `plugin.py` 拆分后忘记 re-export | 中 | 阻塞 | P2 阶段 `from lca.contracts.mechanisms.plugin import PluginConfig` 跑通 |
+| `lca/harness/middleware/registry.py` 拆 `COGNITIVE_POINTS` 时漏掉中间件 plugin 引用 | 中 | 阻塞 | P3 阶段先 `rg COGNITIVE_POINTS` 找全 |
+| `_isolate_agent_scope` 改写后 `Context.scope(label)` 不创建新 `LlmService` 实例 | 高 | 行为破坏 | 显式 `child.provide("llm", LlmService())` 覆盖父；`tests/test_compose_*.py` 用两个并发 agent 验证（不能互相覆盖） |
+| `bundles/base-spine.yaml` → `bundles/base.yaml` 改名打破外部引用 | 低 | 持续集成 | P6 阶段 `rg "base-spine"` 全仓扫（已知引用：`profiles/web-standard.yaml`、`tests/test_phase_a_integration.py`、`docs/superpowers/specs/2026-08-16-plugin-tree-runtime-design.md`、`lca-ops` 脚本） |
+| `loop_dsh_bridge` 内部 plugin scope resolve 改写时回归到旧 `lca.harness.kernel` 路径 | 中 | 阻塞 | P7 阶段把 dsh_bridge 放进 `tests/test_loop_dsh_bridge.py` 隔离测试 |
+| `lca_harness.profile.boot()` 公开 API 仍被外部脚本调用 | 低 | 阻塞 | P4 阶段保留 `boot_profile(path, *, check_seam_completeness)` 签名（`check_seam_completeness` 变为 no-op 警告）；`gateway/app.py:138` 和 `tests/harness/test_phase_a_integration.py:225` 跑通 |
+| `cordis.Loader.load_yaml` 实际不存在，需要 LCA 层包装 | 中 | 阻塞 | P0 阶段先 `rg "load_yaml" cordis/` 验证；不存在则 LCA 层用 `yaml.safe_load` + `cordis.loader.Loader.load()` |
 | vendor 同步：taiyi 未来更新 cordis 时 LCA 同步 | 低 | 长期 | 写 `scripts/sync_vendor.sh` 借鉴 taiyi 同步协议 |
+| `Hook` 名字冲突（cordis 导出 `Hook` class；LCA `lca/contracts/mechanisms/__init__.py` 也有 `Hook` Protocol） | 低 | 命名冲突 | 所有 LCA 内部继续 `from lca.contracts.mechanisms import Hook`；不 re-export cordis 符号；如要交叉 import 显式 `from cordis import Hook as CordisHook` |
 
 ---
 
 ## 12. 不在范围（明确 YAGNI）
 
 - 100+ dsh 包的 Python port（subagent / sandbox / LSP / MCP / ACP / compaction / skill / goal / workflow / jobs / todo / plan / preset / guard / hooks / session-query / settings / credentials / attachment / fs / lsp / terminal / code-runtime / shell / subprocess / e2b / feedback / context / identity / interaction / web / storage / workspace / boot / sdk / examples / support / util / typert）
-- 不动 `lca/contracts/protocols/` 的 22 个 `@runtime_checkable Protocol`
+- 不动 `lca/contracts/protocols/` 的 16 个 `@runtime_checkable Protocol`
 - 不改 Journal 事实源契约
 - 不改 L4 公共面 `Agent` / `Team` / `TeamLead` / `Pipeline`
 - 不重写 lobehub 集成（patches 源不动）
@@ -457,5 +512,8 @@ P4 / P6 必跑：
 - `uv run pytest --no-cov` 全过（real_llm 跳过）
 - `scripts/run_team_mode.py` 起真 e2e，journal 落一条 agent reply
 - `rg -l lca.layer0_infra.plugin` 空（in-house kernel 完全删除）
-- `rg -l ScopedPluginHost\|PluginManifest\|ExtensionPoint` 仅命中 docstring
+- `rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|ScopeKind\|PluginKind\|ProviderMode\|SeamDeclaration\|SeamRegistry\|SeamRole"` 仅命中 docstring
+- `rg "ScopedPluginHost\|scope\.resolve\|scope\.fork\|ScopeKind\."` 仅命中 docstring
+- `from lca.contracts.mechanisms.seam import consume` 仍能 import
+- `from lca.contracts.mechanisms.plugin import PluginConfig` 仍能 import
 - `uv run vulture lca --min-confidence 80` 干净
