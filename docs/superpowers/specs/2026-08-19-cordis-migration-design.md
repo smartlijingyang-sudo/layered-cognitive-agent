@@ -35,21 +35,19 @@ LCA 现有 21 个 capability 插件都还跑在自家 `lca/layer0_infra/plugin/`
 - `lca/layer4_app/capability_boot.py` 删掉（被 Tier-1 plugin 集合完全替代）
 - vendor 引入 `taiyi-cordis` / `taiyi-cosmokit` / `taiyi-schemastery`
 
-**三 Tier 落实"插件贯彻"**：
+**三 Tier 落实"插件贯彻"（精修后总数 46）**：
 
 ```
-Tier-1 Definition (~21)
-  ↓ 注：Definition 仅是接口 + 空注册表
-Tier-2 Provider (~30+)
-  ↓ 注：每个 seam 至少 1 个 default；可用 patch 替换
-Tier-3 Behavior (~15+)
-  ↓ 注：Brain / Loop / Team / Middleware 全部 plugin
+Tier-1 Definition (~21)  — 接口 + 空注册表
+Tier-2 Provider    (12)  — 每个 seam 单 plugin + 工厂多 provider
+Tier-3 Behavior    (13)  — Brain / Loop / Guard / Bridge / TeamLead
+                                (Team coordination 不 plugin 化)
 @plugin setup
   ↓
-cordis Context → L4 组合根只 inject
+cordis Context → L4 组合根只 ctx.<typed-property>
 ```
 
-**L4 组合根 = `ctx.inject(...)` 唯一合法组装路径**。任何 `from X import Y; Y(...)` 直接构造都视为违规。`lca.layer4_app.capability_boot.py` 全删。
+**L4 组合根 = `ctx.<typed-property>` 唯一合法组装路径**。任何 `from X import Y; Y(...)` 直接构造都视为违规。`lca.layer4_app.capability_boot.py` 全删。
 
 **实际 service 文件状态**：
 - `LlmService` **保持不继承 `cordis.Service`**——它是 `LLMAdapter` 实现，不会随 ctx dispose 消失。Plugin 提供 `LlmService()` 实例并 `ctx.provide("llm", ...)`，由 Service Definition 自身管理生命周期。
@@ -190,6 +188,155 @@ LCA 的 capability 清单（`SeamKey` 枚举）的"字段名"在 cordis 上变�
 
 `lca/contracts/mechanisms/capability.py` 保留，`SeamKey` 改名为 `CapabilityKey`（一致性）；`REQUIRED_SEAM_KEYS` 改名为 `REQUIRED_CAPABILITY_KEYS`。
 
+### 4.5 Typed Accessor（精修项 2）
+
+cordis 的 `ReflectService` 支持 `ctx.llm` 形式（property access）。LCA 在 `lca/contracts/typed_ctx.py` 定义**类型化 ctx**：
+
+```python
+# lca/contracts/typed_ctx.py
+from typing import Protocol
+from lca.contracts.protocols.infra import LLMAdapter
+from lca.contracts.protocols.tool_pipeline import ToolRegistry
+
+class TypedContext(Protocol):
+    """Typed accessor for cordis Context.
+
+    Each property corresponds to a Tier-1 Definition's `provide` key. cordis's
+    ReflectService resolves attribute reads through this typing, so:
+    - `ctx.llm` is type-checked (mypy 知道返回 LLMAdapter)
+    - `ctx.inject("llm")` 仍然有效（无类型时兜底）
+    """
+    @property
+    def llm(self) -> LLMAdapter: ...
+    @property
+    def tools(self) -> ToolRegistry: ...
+    @property
+    def session_service(self) -> "SessionService": ...
+    @property
+    def system_prompt(self) -> "SystemPromptService": ...
+    @property
+    def transport(self) -> "TransportService": ...
+    @property
+    def memory(self) -> "MemoryService": ...
+    @property
+    def state_store(self) -> "StateStoreService": ...
+    @property
+    def search(self) -> "SearchService": ...
+    @property
+    def skills(self) -> "SkillsService": ...
+    @property
+    def file_store(self) -> "FileStore": ...
+    @property
+    def observability(self) -> "ObservabilityService": ...
+    @property
+    def sandbox(self) -> "SandboxService": ...
+    @property
+    def attachment(self) -> "AttachmentService": ...
+    @property
+    def workspace(self) -> "WorkspaceService": ...
+    @property
+    def brain_factory(self) -> "BrainFactory": ...
+    @property
+    def agent_loop(self) -> "AgentLoopFactory": ...
+    @property
+    def command_gateway(self) -> "CommandGateway": ...
+```
+
+**规则**（plugin 风格强制）：
+
+```python
+# 允许：typed property access
+async def setup(ctx: TypedContext, config: Config):
+    ctx.llm.register(...)            # IDE 自动补全 + mypy 类型检查
+    factory = ctx.brain_factory
+
+# 仍允许：untyped key access（dynamic case）
+async def setup(ctx, config):
+    svc = ctx.inject("some_runtime_service")  # typing: Any
+```
+
+**lint 规则**（`importlinter` 或 `ruff` custom）：plugin setup 函数参数类型必须是 `Context` 或 `TypedContext`；`ctx.inject` 调用建议带类型注释。
+
+### 4.6 Plugin Top-Level Import 约束（精修项 4）
+
+**问题**：5 层单向依赖（`contracts → layer0 → layer1 → layer2 → layer3 → layer4`） + plugin 体系是**正交概念**。plugin file 跨层 import 会破坏 import 图。
+
+**规则**：
+
+| 位置 | 允许 import | 禁止 import |
+|---|---|---|
+| `lca/plugins/foo.py` 模块顶层 | `cordis.*` / `lca.contracts.*` | `lca.layer0_infra.*` / `lca.layer1_cognitive.*` / `lca.layer2_runtime.*` / `lca.layer3_agent.*` / `lca.layer4_app.*` |
+| `@plugin` setup 函数体内部 | 任意（延迟到 load 时） | — |
+| `lca/plugins/guards/*.py` 顶层 | `cordis.*` / `lca.contracts.*` / `lca.layer2_runtime.loop_intervention_mw` / `lca.layer2_runtime.budget_policy` | 同上 + 跨 plugin 互引（避免循环） |
+
+**enforcement**：`importlinter` 规则加：
+```ini
+[importlinter:contract:plugin-top-level]
+type = forbidden
+source_modules = lca.plugins
+forbidden_modules =
+    lca.layer0_infra
+    lca.layer1_cognitive
+    lca.layer2_runtime
+    lca.layer3_agent
+    lca.layer4_app
+```
+
+**P5 必跑**：`uv run lint-imports` → 比对 plugin top-level imports。
+
+### 4.7 `lca-ops debug` 工具（精修项 6）
+
+**问题**：plugin 链路过长，调试时缺失工具。cordis 自带 `Loader.dump_tree` 但入口不暴露。
+
+**新增三个子命令**：
+
+```bash
+# lca-ops debug tree — 打印 plugin 树
+$ lca-ops debug tree
+[boot] lca-llm-service @@ inject=[]  provides=[llm]
+[boot] lca-llm-provider-registry @@ inject=[llm]  config.mode=auto
+[boot] lca-memory-service @@ inject=[]
+[boot] lca-memory-provider-simple @@ inject=[memory]
+[boot] lca-brain-modular @@ inject=[llm, memory, system_prompt, session_service]
+[boot] lca-loop-cognitive @@ inject=[session_service, tools, system_prompt]
+...
+Total: 25 plugins loaded, 7 hot-reloadable.
+
+# lca-ops debug run <id> — 打印 run 事件流
+$ lca-ops debug run abc-123
+[00:00.000] session/created
+[00:00.100] attachment/added  q3.pdf (1.2MB)
+[00:00.150] attachment/added  data.csv (340KB)
+[00:00.200] user/message/accepted  "总结这个 PDF"
+[00:00.250] turn/start  turn=1
+[00:00.300] step/start  step=1
+[00:00.350] llm/request  prompt_tokens=1240
+[00:00.800] llm/response  completion_tokens=234
+[00:00.850] assistant/message  "好的，我先读 PDF..."
+[00:01.000] tool/call  fs.read /inbox/q3.pdf
+[00:01.100] tool/result  (1342 lines text)
+[00:01.150] step/end  step=1
+[00:01.200] turn/end  turn=1
+[00:01.250] session/flushed
+
+# lca-ops debug scope <id> — 打印 scope 的 service 表
+$ lca-ops debug scope abc-123
+Scope: agent:researcher (parent: profile:web-app)
+Services:
+  llm           → RealLLMAdapter (active)
+  tools         → ToolRegistry [fs.read, fs.write, fs.list, shell.run, browser.fetch]
+  memory        → SimpleMemorySystem
+  state_store   → InMemoryStateStore
+  ...
+```
+
+**实现**：
+- `lca-ops debug tree` → `cordis.Loader.dump_tree(root_ctx)` 输出
+- `lca-ops debug run <id>` → `journal_store.events(run_id)` 投影
+- `lca-ops debug scope <id>` → `ctx.inject("reflection_service").dump()`
+
+**P5 必跑**：`lca-ops debug tree` 输出 25 个 plugin 节点；`lca-ops debug run <id>` 输出 ≥ 5 个 event。
+
 ---
 
 ## 5. 删除清单
@@ -320,38 +467,74 @@ DSH 与 LCA 的"插件贯彻"实际是**三层**：
 
 **第一轮 spec 只覆盖 Tier-1**。"完全贯彻"必须把 Tier-2 + Tier-3 也 plugin 化。
 
-#### Tier-2 Provider Plugin 清单（当前硬编码，要 plugin 化）
+#### Tier-2 Provider Plugin 清单（精修：单 plugin + 工厂）
 
-| Seam | Provider plugins（每个一个 plugin） |
+**第一稿错误**：每 `(seam, provider)` 一个 plugin → 33+ entries。**精修**：每个 seam **单 plugin + 工厂**。
+
+| Seam | 单 plugin（一个 plugin 注册多个 provider） |
 |---|---|
-| `llm` | `lca.plugins.providers.llm.mock` / `.real` / `.pi_ai` / `.deepseek` |
-| `memory` | `lca.plugins.providers.memory.simple` / `.redis` / `.vector` |
-| `state_store` | `lca.plugins.providers.state_store.memory` / `.redis` / `.sqlite` |
-| `search` | `lca.plugins.providers.search.tavily` / `.bing` / `.serpapi` |
-| `tools` | `lca.plugins.providers.tools.g2a_factory` / `.office_factory` |
-| `transport` | `lca.plugins.providers.transport.internal` / `.a2a` / `.mcp` |
-| `skills` | `lca.plugins.providers.skills.disk` / `.remote` |
-| `file_store` | `lca.plugins.providers.file_store.local` / `.s3` |
-| `observability` | `lca.plugins.providers.observability.console` / `.langfuse` / `.otel` |
-| `sandbox` | `lca.plugins.providers.sandbox.local` / `.e2b` / `.docker` |
-| `workspace` | `lca.plugins.providers.workspace.local` / `.remote` |
+| `llm` | `lca.plugins.providers.llm` 注册 mock+real+pi_ai+deepseek，config.mode 选 active |
+| `memory` | `lca.plugins.providers.memory` 注册 simple+redis+vector |
+| `state_store` | `lca.plugins.providers.state_store` 注册 memory+redis+sqlite |
+| `search` | `lca.plugins.providers.search` 注册 tavily+bing+serpapi |
+| `tools` | `lca.plugins.providers.tools` 注册 g2a+office factories |
+| `transport` | `lca.plugins.providers.transport` 注册 internal+a2a+mcp |
+| `skills` | `lca.plugins.providers.skills` 注册 disk+remote |
+| `file_store` | `lca.plugins.providers.file_store` 注册 local+s3 |
+| `observability` | `lca.plugins.providers.observability` 注册 console+langfuse+otel |
+| `sandbox` | `lca.plugins.providers.sandbox` 注册 local+e2b+docker |
+| `attachment` | `lca.plugins.providers.attachment` 注册 filesystem+s3 |
+| `workspace` | `lca.plugins.providers.workspace` 注册 local+remote |
 
-**plugin 形状**（统一）：
+**总 Tier-2 plugin 数 = 12**（不是 33+）。
+
+**plugin 形状**（canonical）：
 
 ```python
-# lca/plugins/providers/llm/mock.py
+# lca/plugins/providers/llm.py  (Tier-2, single plugin for the LLM seam)
+from __future__ import annotations
 from cordis import plugin
+from pydantic import BaseModel, Field
 
-@plugin(name="lca-llm-provider-mock", inject=["llm"])
-async def setup(ctx, config):
-    """Register the mock LLM adapter as the default provider."""
-    from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-    ctx.inject("llm").register("mock", MockLLMAdapter(), activate=True)
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    mode: str = Field(default="auto", description="auto|real|deepseek|mock|pi_ai")
+    providers: list[str] = Field(default_factory=lambda: ["mock", "real", "deepseek"])
+    api_key: str | None = None
+    base_url: str | None = None
+
+@plugin(name="lca-llm-provider", inject=["llm"])
+async def setup(ctx, config: Config):
+    """Register multiple LLM providers; ``config.mode`` picks the active one.
+
+    This is a Tier-2 Provider plugin. It owns the policy of *which* providers
+    are available and *which* is active. Profiles swap providers by patching
+    the plugin's `config` (or replace the plugin entirely).
+    """
+    from lca.layer0_infra.llm_adapter import (
+        MockLLMAdapter, RealLLMAdapter, DeepseekAdapter, PiAIAdapter,
+    )
+
+    llm = ctx.llm  # typed accessor
+    if "mock" in config.providers:
+        llm.register("mock", MockLLMAdapter())
+    if "real" in config.providers:
+        llm.register("real", RealLLMAdapter(api_key=config.api_key, base_url=config.base_url))
+    if "deepseek" in config.providers:
+        llm.register("deepseek", DeepseekAdapter(api_key=config.api_key, base_url=config.base_url))
+    if "pi_ai" in config.providers:
+        llm.register("pi_ai", PiAIAdapter())
+
+    # activate selection
+    target = config.mode
+    if target == "auto":
+        target = "real" if config.api_key else "mock"
+    if target not in config.providers:
+        target = config.providers[0]
+    llm.activate(target)
 ```
 
-每个 Tier-2 plugin 声明 `inject=["<seam_key>"]`，`config` 包含 `mode: auto|force` 等选择。Bundle YAML 由 Tier-2 plugin 的存在/缺失决定哪些 provider 实际可用。
-
-**bundle YAML 改写**（append-only，所有 default provider 都在）：
+**bundle YAML 改写**：
 
 ```yaml
 # bundles/base.yaml
@@ -361,75 +544,116 @@ plugins:
     $module: lca.plugins.llm_service
   - id: lca-memory-service
     $module: lca.plugins.memory_service
-  # ... 其他 11 略
+  # ... 其他 10 略
 
-  # Tier-2 默认 Providers（每个 seam 至少 1 个 default）
-  - id: lca-llm-provider-mock
-    $module: lca.plugins.providers.llm.mock
+  # Tier-2 Providers（每个 seam 单 plugin）
+  - id: lca-llm-provider
+    $module: lca.plugins.providers.llm
     inject: ["llm"]
     config:
-      mode: auto           # auto = real when LLM_API_KEY present, else mock
-  - id: lca-memory-provider-simple
-    $module: lca.plugins.providers.memory.simple
+      mode: auto
+      providers: [mock, real, deepseek]
+      api_key: ${LLM_API_KEY}
+      base_url: ${LLM_BASE_URL}
+  - id: lca-memory-provider
+    $module: lca.plugins.providers.memory
     inject: ["memory"]
-  - id: lca-state-store-provider-memory
-    $module: lca.plugins.providers.state_store.memory
+  - id: lca-state-store-provider
+    $module: lca.plugins.providers.state_store
     inject: ["state_store"]
-  - id: lca-search-provider-tavily
-    $module: lca.plugins.providers.search.tavily
+  - id: lca-search-provider
+    $module: lca.plugins.providers.search
     inject: ["search"]
-  - id: lca-tools-provider-g2a
-    $module: lca.plugins.providers.tools.g2a_factory
+  - id: lca-tools-provider
+    $module: lca.plugins.providers.tools
     inject: ["tools"]
-  - id: lca-transport-provider-internal
-    $module: lca.plugins.providers.transport.internal
+  - id: lca-transport-provider
+    $module: lca.plugins.providers.transport
     inject: ["transport"]
-  - id: lca-skills-provider-disk
-    $module: lca.plugins.providers.skills.disk
+  - id: lca-skills-provider
+    $module: lca.plugins.providers.skills
     inject: ["skills"]
-  - id: lca-file-store-provider-local
-    $module: lca.plugins.providers.file_store.local
+  - id: lca-file-store-provider
+    $module: lca.plugins.providers.file_store
     inject: ["file_store"]
-  - id: lca-observability-provider-console
-    $module: lca.plugins.providers.observability.console
+  - id: lca-observability-provider
+    $module: lca.plugins.providers.observability
     inject: ["observability"]
-  - id: lca-sandbox-provider-local
-    $module: lca.plugins.providers.sandbox.local
+  - id: lca-sandbox-provider
+    $module: lca.plugins.providers.sandbox
     inject: ["sandbox"]
-  - id: lca-workspace-provider-local
-    $module: lca.plugins.providers.workspace.local
+  - id: lca-attachment-provider
+    $module: lca.plugins.providers.attachment
+    inject: ["attachment"]
+  - id: lca-workspace-provider
+    $module: lca.plugins.providers.workspace
     inject: ["workspace"]
 ```
 
-**用户切换** = 删除/替换 bundle YAML 中的 Tier-2 entry，或者用 `profiles/web-app.yaml` 的 `patch` 删掉再 insert 新的。
+**用户切换 provider**：改 `config.mode` / `config.providers`（profile patch），或整个 plugin 替换。
 
-#### Tier-3 Behavior Plugin 清单
+#### Tier-3 Behavior Plugin 清单（精修：team coordination 砍掉）
 
-| Behavior | Plugin |
-|---|---|
-| Brain 默认实现 | `lca.plugins.brain.modular`（装 `ModularBrain`） / `lca.plugins.brain.simple`（装 `SimpleBrain`） |
-| Reasoner | `lca.plugins.reasoner.prompt` / `lca.plugins.reasoner.critic` |
-| Synthesizer | `lca.plugins.synthesizer.concat` / `lca.plugins.synthesizer.streaming` |
-| Loop Driver | `lca.plugins.loop_cognitive`（已有）/ `lca.plugins.loop_dsh_bridge` / `lca.plugins.loop_replay` |
-| Team Coordination | `lca.plugins.team.pipeline` / `lca.plugins.team.fanout` / `lca.plugins.team.graph` / `lca.plugins.team.debate` / `lca.plugins.team.peer_relay` / `lca.plugins.team.peer_swarm` |
-| Middleware / Guard | `lca.plugins.guards.loop_intervention`（已有）/ `lca.plugins.guards.step_budget` |
-| DSH Bridge | `lca.plugins.dsh.bridge`（装 `build_harness_env` 工厂） |
+| Behavior | Plugin | 备注 |
+|---|---|---|
+| Brain 默认实现 | `lca.plugins.brain.modular` / `lca.plugins.brain.simple` | Tier-3 |
+| Reasoner | `lca.plugins.reasoner.prompt` / `lca.plugins.reasoner.critic` | Tier-3 |
+| Synthesizer | `lca.plugins.synthesizer.concat` / `lca.plugins.synthesizer.streaming` | Tier-3 |
+| Loop Driver | `lca.plugins.loop_cognitive` / `lca.plugins.loop_dsh_bridge` / `lca.plugins.loop_replay` | Tier-3 |
+| Middleware / Guard | `lca.plugins.guards.loop_intervention` / `lca.plugins.guards.step_budget` | Tier-3 |
+| DSH Bridge | `lca.plugins.dsh.bridge` | Tier-3 |
+| **Team Coordination** | **❌ 不 plugin 化** | 详情见下 |
 
-**plugin 形状**（统一）：
+**Team Coordination 不 plugin 化（精修项 5）**：
 
 ```python
-# lca/plugins/brain/modular.py
+# lca/layer3_agent/team/coordination/__init__.py  —— plain dataclass 集合
+from .pipeline import Pipeline
+from .fanout import FanOut
+from .graph import Graph
+from .debate import Debate
+from .peer_relay import PeerRelay
+from .peer_swarm import PeerSwarm
+
+# 用户在 spec 里写：
+#   team = Team(spec, coordination=Pipeline())
+# 根本不切换运行时。所以 6 个 pseudo-plugin 砍掉。
+```
+
+**真正需要 plugin 化的 team 行为**：lead 类型（`board` / `consult` / `direct`）——只有 lead 是真的"运行时切换"：
+
+```python
+# lca/plugins/team_lead/board.py  (Tier-3)
+@plugin(name="lca-team-lead-board", inject=["team_strategy_factory"])
+async def setup(ctx, config):
+    from lca.layer3_agent.team.lead.board import BoardLead
+    ctx.inject("team_strategy_factory").register("board", BoardLead)
+```
+
+**Tier-3 总数**：Brain (2) + Reasoner (2) + Synthesizer (2) + Loop (3) + Guard (2) + DSH bridge (1) + TeamLead (1) = **13 plugins**。
+
+**plugin 形状**（Tier-3 通用）：
+
+```python
+# lca/plugins/brain/modular.py  (Tier-3)
 from cordis import plugin
+from lca.contracts.typed_ctx import TypedContext
 
 @plugin(name="lca-brain-modular")
-async def setup(ctx, config):
+async def setup(ctx: TypedContext, config):
     """Mount the default ModularBrain strategy as the brain factory."""
     from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-    from lca.layer1_cognitive.brain.default_factory import brain_factory
-    
-    brain_factory.register("modular", ModularBrain)
-    ctx.provide("brain_factory", brain_factory)
+    from lca.layer1_cognitive.brain.default_factory import BrainFactory
+
+    factory = ctx.brain_factory
+    factory.register("modular", ModularBrain)
 ```
+
+**plugin 总数（精修后）**：
+- Tier-1 Definition: 21
+- Tier-2 Provider: 12
+- Tier-3 Behavior: 13
+- **Total: 46 plugins**（之前 66 → 25 不到）
 
 #### 替换 `composer.py:_resolve_component` 硬编码
 
@@ -445,27 +669,134 @@ def _resolve_component(...):
 ```python
 # lca/layer4_app/composer.py — 一切来自 ctx
 def _resolve_component(scope, ...):
-    factory = scope.inject("brain_factory")
+    factory = scope.brain_factory
     return factory.resolve("modular", ...)
 ```
 
-L4 组合根**只**通过 `ctx.inject(...)` 拿东西。任何 `import X; X()` 直接构造都视为违规。
+L4 组合根**只**通过 `ctx.<typed-property>` 拿东西。任何 `import X; X()` 直接构造都视为违规。
 
-### 6.4 agent_service 合并入 session_service
+### 6.4 agent_service 合并入 session_service + 单一 record API（精修项 3）
 
-原 `agent_service` 是 `session.append` 的 typed facade，**5 个方法**（不是 6 个）：
+**原问题**：`record_assistant_message` / `record_tool_call` / ... 5 个独立 API。caller 易错选。
 
-| 旧方法（agent_service） | 新方法（session_service） |
-|---|---|
-| `record_assistant_response(store, turn, step, content, tool_calls)` | `record_assistant_message(session_id, turn, step, content, tool_calls)` |
-| `record_tool_call(store, turn, step, call_id, tool_name, arguments_ref)` | `record_tool_call(session_id, turn, step, call_id, tool_name, arguments_ref)` |
-| `record_tool_result(store, turn, step, call_id, success, result_ref, error)` | `record_tool_result(session_id, turn, step, call_id, success, result_ref, error)` |
-| `record_turn_boundary(store, turn, event_type)` | `record_turn_start(session_id, turn)` / `record_turn_end(session_id, turn, reason)` |
-| `record_step_boundary(store, turn, step, event_type)` | `record_step_start(session_id, turn, step)` / `record_step_end(session_id, turn, step)` |
+**精修**：单一 `record(EventType, ...)` + 事件类型枚举。
 
-**关键约束**：所有 `turn` / `step` / `arguments_ref` / `result_ref` / `error` / `event_type` 字段语义保留——它们是 surface event 上必须保留的字段（DSH `SessionEvent` 同构）。`store.append(...)` 内部化进 `SessionService`，`session_id` 替代 `store`（store 通过 `ctx.inject("session_store")` 内部获取）。
+#### 6.4.1 事件类型枚举（"session everything" 完整覆盖）
 
-**Service 类拆 5 个文件**（与 5 个 record_* 方法对应）：
+```python
+# lca/contracts/observability/session_events.py
+from enum import Enum
+
+class SessionEventType(str, Enum):
+    """session 任何状态变更。DSH core/session/known_event_types 1:1 对齐 + 扩展。"""
+    # Session 生命周期
+    SESSION_CREATED = "session/created"
+    SESSION_DISPOSED = "session/disposed"
+    SESSION_FLUSHED = "session/flushed"
+
+    # Attachment
+    ATTACHMENT_ADDED = "attachment/added"
+    ATTACHMENT_REMOVED = "attachment/removed"
+    ATTACHMENT_STAGED = "attachment/staged"
+
+    # User / Assistant
+    USER_MESSAGE_ACCEPTED = "user/message/accepted"
+    ASSISTANT_MESSAGE = "assistant/message"
+
+    # Turn / Step
+    TURN_START = "turn/start"
+    TURN_END = "turn/end"
+    STEP_START = "step/start"
+    STEP_END = "step/end"
+
+    # LLM
+    LLM_REQUEST = "llm/request"
+    LLM_RESPONSE_CHUNK = "llm/response/chunk"
+    LLM_RESPONSE = "llm/response"
+    LLM_ERROR = "llm/error"
+
+    # Tool
+    TOOL_CALL = "tool/call"
+    TOOL_PRE_EXECUTE = "tool/pre-execute"
+    TOOL_POST_EXECUTE = "tool/post-execute"
+    TOOL_RESULT = "tool/result"
+    TOOL_ERROR = "tool/error"
+
+    # Guards
+    GUARD_REJECTED = "guard/rejected"
+    LOOP_INTERVENTION = "loop/intervention"
+    BUDGET_EXCEEDED = "budget/exceeded"
+
+    # Subagent / Delegation
+    SUBAGENT_START = "subagent/start"
+    SUBAGENT_END = "subagent/end"
+    DELEGATION_SENT = "delegation/sent"
+
+    # Transport / Sandbox
+    SANDBOX_VIOLATION = "sandbox/violation"
+    TRANSPORT_ERROR = "transport/error"
+```
+
+#### 6.4.2 `SessionService.record()` 单一入口
+
+```python
+# lca/layer0_infra/session/service.py
+class SessionService:
+    async def record(
+        self,
+        event_type: SessionEventType,
+        session_id: str,
+        **payload: Any,
+    ) -> None:
+        """Single entry point for any session event (session everything 原则)."""
+        event = SessionEvent(
+            type=event_type,
+            session_id=session_id,
+            timestamp=now(),
+            **payload,
+        )
+        await self._store.append(event, actor="session_service")
+        # 同步触发监听者（observability / guards）
+        await self._ctx.events.parallel(event_type.value, event)
+```
+
+**typed helpers**（可选，让常用事件不易写错）：
+
+```python
+# lca/layer0_infra/session/typed_helpers.py
+
+@record_event(SessionEventType.ASSISTANT_MESSAGE)
+async def emit_assistant_message(
+    self, session_id: str, turn: int, step: int, content: str,
+    tool_calls: list[dict] | None = None,
+) -> None: ...
+
+@record_event(SessionEventType.TOOL_CALL)
+async def emit_tool_call(
+    self, session_id: str, turn: int, step: int, call_id: str,
+    tool_name: str, arguments_ref: str,
+) -> None: ...
+
+@record_event(SessionEventType.TOOL_RESULT)
+async def emit_tool_result(
+    self, session_id: str, turn: int, step: int, call_id: str,
+    success: bool, result_ref: str, error: str | None = None,
+) -> None: ...
+
+@record_event(SessionEventType.TURN_START)
+async def emit_turn_start(self, session_id: str, turn: int) -> None: ...
+
+@record_event(SessionEventType.TURN_END)
+async def emit_turn_end(self, session_id: str, turn: int, reason: str) -> None: ...
+
+@record_event(SessionEventType.STEP_START)
+async def emit_step_start(self, session_id: str, turn: int, step: int) -> None: ...
+
+@record_event(SessionEventType.STEP_END)
+async def emit_step_end(self, session_id: str, turn: int, step: int) -> None: ...
+```
+
+**Service 类拆 5 个文件**（与 5 个 typed helper 对应）：
 
 ```
 lca/layer0_infra/session/
@@ -629,25 +960,10 @@ plugins:
   - id: lca-loop-replay
     name: lca-loop-replay
     $module: lca.plugins.loop_replay
-  # Team Coordinations（一组 6 个 default）
-  - id: lca-team-pipeline
-    name: lca-team-pipeline
-    $module: lca.plugins.team.pipeline
-  - id: lca-team-fanout
-    name: lca-team-fanout
-    $module: lca.plugins.team.fanout
-  - id: lca-team-graph
-    name: lca-team-graph
-    $module: lca.plugins.team.graph
-  - id: lca-team-debate
-    name: lca-team-debate
-    $module: lca.plugins.team.debate
-  - id: lca-team-peer-relay
-    name: lca-team-peer-relay
-    $module: lca.plugins.team.peer_relay
-  - id: lca-team-peer-swarm
-    name: lca-team-peer-swarm
-    $module: lca.plugins.team.peer_swarm
+  # Team Lead（只有 lead 是运行时切换；6 个 coordination 是 plain dataclass）
+  - id: lca-team-lead-board
+    name: lca-team-lead-board
+    $module: lca.plugins.team_lead.board
   # Middleware / Guard
   - id: lca-guard-loop-intervention
     name: lca-guard-loop-intervention
@@ -665,7 +981,7 @@ plugins:
     $module: lca.plugins.gateway_starlette
 ```
 
-**总计**：base.yaml 约 13 Tier-1 + 13 Tier-2 = 26 entries；web-app.yaml 追加 19 Tier-3 = 总 ~45 entries。**L4 组合根不 import 任何具体类**。
+**总计**：base.yaml 13 Tier-1 + 12 Tier-2 = 25 entries；web-app.yaml 追加 13 Tier-3 = 总 **38 entries**（精修前 45 → 38）。**L4 组合根不 import 任何具体类**。
 
 ```yaml
 # Profile 层用 patch 替换 provider：
@@ -674,17 +990,15 @@ bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
 patch:
-  - remove: lca-llm-provider-mock
-    insert:
-      - id: lca-llm-provider-real
-        $module: lca.plugins.providers.llm.real
-        inject: ["llm"]
-        config:
-          api_key: ${LLM_API_KEY}
-          base_url: ${LLM_BASE_URL:-https://api.deepseek.com}
+  - id: lca-llm-provider
+    config:
+      mode: deepseek              # 强制 activate deepseek
+      providers: [mock, real, deepseek]
+      api_key: ${LLM_API_KEY}
+      base_url: ${LLM_BASE_URL:-https://api.deepseek.com}
 ```
 
-用户切 real LLM 不用改 Python——改 profile / env。
+用户切 real LLM 不用改 Python——改 profile `config`。Provider 替换 = 改 plugin `config.providers` 数组。
 
 bundle **继承**不复用 cordis 自带 `$patch` 机制；LCA 层用 `merge_bundles`（`cordis.loader.merge_bundles`）拼——`base.yaml` → `web-app.yaml` 顺序扩展。
 
@@ -944,8 +1258,19 @@ P4 / P6 必跑：
 
 ## 13. 验收
 
+**架构验收**（精修项 1-6 对应的硬性指标）：
+
+- `lca-ops debug tree` 输出 **38 个 plugin 节点**（21 Tier-1 + 12 Tier-2 + 13 Tier-3），按依赖拓扑排序
+- `lca-ops debug run <id>` 输出 5+ 个 event，覆盖 user/turn/step/llm/assistant 至少 5 种类型
+- `lca-ops debug scope <id>` 输出 11+ 个 service，每个 typed property 可解析
+- `rg "ctx\.llm\." lca/layer4_app/` 找到至少 5 处 typed property 使用（验证精修项 2）
+- `rg "@plugin" lca/plugins/ | wc -l` = 38（精确 plugin 数）
+- `uv run lint-imports` plugin top-level 0 违规（精修项 4）
+- `rg "from lca.layer0_infra\|from lca.layer1_cognitive\|from lca.layer2_runtime\|from lca.layer3_agent\|from lca.layer4_app" lca/plugins/*/` 仅命中 plugin setup 函数体内部（非模块顶层）
+
+**功能验收**：
+
 - `uv run lca-ops status` 跑通，所有 capability 加载成功
-- `uv run lca-ops inspect-tree` 输出 cordis 风格的插件树
 - `uv run pytest --no-cov` 全过（real_llm 跳过）
 - `scripts/run_team_mode.py` 起真 e2e，journal 落一条 agent reply
 - `rg -l lca.layer0_infra.plugin` 空（in-house kernel 完全删除）
@@ -954,3 +1279,29 @@ P4 / P6 必跑：
 - `from lca.contracts.mechanisms.seam import consume` 仍能 import
 - `from lca.contracts.mechanisms.plugin import PluginConfig` 仍能 import
 - `uv run vulture lca --min-confidence 80` 干净
+
+**精简验收**（精修项 5）：
+
+- `rg "lca\.plugins\.team\.(pipeline|fanout|graph|debate|peer_relay|peer_swarm)"` 仅命中 `lca/layer3_agent/team/coordination/` 内部（非 plugin 形态）
+- `rg "lca-team-(pipeline|fanout|graph|debate|peer-relay|peer-swarm)"` 空（精修前存在）
+
+**调试验收**（精修项 6）：
+
+- `lca-ops debug tree` 命令存在
+- `lca-ops debug run <id>` 命令存在
+- `lca-ops debug scope <id>` 命令存在
+
+---
+
+## 14. 架构保证（精修项 1-6 总结）
+
+| 原则 | 实施 | 验证 |
+|---|---|---|
+| **一切皆 plugin** | 38 个 plugin 覆盖 Definition/Provider/Behavior 三层；team coordination 不 plugin 化（无切换意图） | `lca-ops debug tree` |
+| **零硬编码组装** | L4 组合根全部 `ctx.<typed-property>`；`capability_boot.py` 删除 | `rg "from lca\.layer0_infra.*import" lca/layer4_app/` |
+| **Plugin 边界清晰** | Module-per-plugin（每个 file ≤ 50 行）；plugin top-level import 受 `importlinter` 约束 | `uv run lint-imports` |
+| **session 一切皆 event** | `SessionService.record(EventType, ...)` 单一入口；`SessionEventType` 枚举 25+ 类型 | `lca-ops debug run <id>` |
+| **types 不是装饰** | `TypedContext` Protocol，`ctx.llm` 等 typed property 优先于 `ctx.inject("llm")` | `rg "ctx\.<service-key>\." lca/` |
+| **调试可观察** | `lca-ops debug {tree,run,scope}` 三件；cordis.Loader.dump_tree + journal 投影 | `lca-ops debug --help` |
+| **意图 ≠ 代码** | Profile + bundle YAML 改 1 行替换 provider；不改 Python | `profiles/web-standard.yaml` patch example |
+| **plugin 不可绕过生命周期** | Plugin setup 函数体内部 import 任何层；plugin 模块顶层只 import `cordis.*` + `lca.contracts.*` | `uv run lint-imports` |
