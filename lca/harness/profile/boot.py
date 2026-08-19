@@ -37,30 +37,35 @@ async def boot_profile(
         )
 
     path = Path(profile_path)
-    data = load_yaml(path)
+    tree = load_yaml(path)
     ctx = Context()
-    loader = Loader()
-    entries = loader.load(data)
-    for entry in entries:
-        module = _resolve_module(entry)
-        # Try cordis @plugin style first (entry has its own setup() function)
-        if hasattr(module, "setup"):
-            await module.setup(ctx, entry.config)
+    # Walk the EntryTree directly (Loader.load() re-parses, but we already have a tree)
+    from lca.plugins._compat import legacy_plugin_setup
+    for entry in tree.entries:
+        # cordis @plugin decorator wraps the function in a Plugin dataclass
+        # (with `setup` as a field). To call, we need module.setup.setup(ctx, config).
+        module_path = entry.extra.get("$module")
+        if module_path is None:
+            # Try legacy entry — name maps to plugin module
+            module = _resolve_module_by_name(entry.name)
+        else:
+            module = _resolve_module_by_path(module_path)
+        # Try cordis @plugin style first (Plugin dataclass with .setup field)
+        if hasattr(module, "setup") and hasattr(module.setup, "setup"):
+            await module.setup.setup(ctx, entry.config)
             continue
-        # Fallback: legacy LCA plugin (manifest + apply / mount)
+        # Fallback: legacy LCA plugin (manifest + apply)
         if hasattr(module, "apply"):
-            from lca.plugins._compat import legacy_plugin_setup
-            legacy_plugin_setup(ctx, entry.extra.get("$module", entry.name), entry.config)
+            legacy_plugin_setup(ctx, module_path or entry.name, entry.config)
             continue
-        # Otherwise, the entry name itself is the plugin — use the compat shim
-        from lca.plugins._compat import legacy_plugin_setup
-        legacy_plugin_setup(ctx, entry.name, entry.config)
     return ctx
 
 
-def _resolve_module(entry: Entry) -> Any:
-    """Resolve $module from YAML entry."""
-    module_path = entry.extra.get("$module")
-    if module_path is None:
-        raise ValueError(f"entry {entry.id!r} missing $module")
-    return importlib.import_module(module_path)
+def _resolve_module_by_name(name: str) -> Any:
+    """Resolve plugin module by name (for legacy entries)."""
+    return importlib.import_module(name)
+
+
+def _resolve_module_by_path(path: str) -> Any:
+    """Resolve plugin module by path."""
+    return importlib.import_module(path)
