@@ -2,17 +2,30 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Protocol
-
-from lca.contracts.harness.plugin import ExtensionPoint
+from dataclasses import dataclass, field
+from typing import Any, Awaitable, Callable, Optional, Protocol
 
 
 @dataclass(frozen=True)
 class MiddlewareRegistration:
+    """One middleware binding to a cognitive phase event.
+
+    `callback` is OPTIONAL (default None) to preserve the existing 3-field
+    constructor signature used at 4 production callers (F1 fix):
+    - lca/plugins/budget_policy/__init__.py:55
+    - lca/plugins/loop_intervention_policy/__init__.py:55
+    - lca/layer2_runtime/hook_middleware.py:57
+    - lca/layer2_runtime/loop_intervention_mw.py:47
+
+    These callers pass seam_key/priority/plugin_id only — the actual callback
+    is registered separately via `InMemoryMiddlewareRegistry.register()`.
+    """
+
     seam_key: str
     priority: int = 100
     plugin_id: str = ""
+    callback: Optional[Callable[..., Awaitable[Any]]] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class PhaseContext(Protocol):
@@ -26,21 +39,7 @@ class PhaseMiddleware(Protocol):
     async def __call__(self, phase: str, state: Any, context: PhaseContext) -> Any: ...
 
 
-class MiddlewareRegistry(Protocol):
-    def register_point(self, point: ExtensionPoint) -> None: ...
-
-    def register(
-        self, registration: MiddlewareRegistration, middleware: PhaseMiddleware
-    ) -> None: ...
-
-    async def run(
-        self,
-        seam_key: str,
-        phase: str,
-        state: Any,
-        context: PhaseContext,
-    ) -> Any: ...
-
-    def has_point(self, seam_key: str) -> bool: ...
-
-    def list_registrations(self, seam_key: str) -> list[MiddlewareRegistration]: ...
+# Dropped (cordis migration):
+# - MiddlewareRegistry Protocol (references ExtensionPoint; replaced by
+#   cordis.ctx.events.on() hooks in plugin setup)
+# - callback field required → now optional (default None)
