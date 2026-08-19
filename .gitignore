@@ -34,3 +34,7 @@ node_modules/
 
 # Runtime state (daemon manifests, logs, pids)
 .lca-ops/
+
+# Git worktrees (per superpowers:using-git-worktrees)
+.worktrees/
+worktrees/
