@@ -543,17 +543,20 @@ git commit -m "production callers: composer/gateway/api drop ScopedPluginHost (C
 
 ---
 
-### Task 1.7: Migrate `lca/layer4_app/profile.py` and `lca/harness/diagnostics/inspect.py`
+### Task 1.7: Migrate profile.py / inspect.py / **boot.py** (B1 fix — boot.py must move out of Chunk 2)
 
 **Files:**
 - Modify: `lca/layer4_app/profile.py`
 - Modify: `lca/harness/diagnostics/inspect.py`
+- Modify: `lca/harness/profile/boot.py`  ← **moved here from Chunk 2 Task 2.1**
+
+**Critical (B1 fix)**: `lca/harness/profile/boot.py` imports `ProfileLoader` / `BootedTree` / `Loader` from `lca.layer0_infra.plugin.*`. Task 1.15 (Chunk 1) deletes that module. boot.py's rewrite MUST happen in Chunk 1, not Chunk 2. Chunk 2's Task 2.1 is now redundant (delete or mark as `Replaced by Task 1.7`).
 
 - [ ] **Step 1: Find plugin/kernel imports**
 
-Run: `rg -n "lca\.layer0_infra\.plugin\|lca\.harness\.kernel" lca/layer4_app/profile.py lca/harness/diagnostics/inspect.py`
+Run: `rg -n "lca\.layer0_infra\.plugin\|lca\.harness\.kernel" lca/layer4_app/profile.py lca/harness/diagnostics/inspect.py lca/harness/profile/boot.py`
 
-- [ ] **Step 2: For `lca/layer4_app/profile.py`: drop ProfileLoader import; rewrite as thin wrapper around `cordis.Loader.load_yaml`**
+- [ ] **Step 2: For `lca/layer4_app/profile.py`: drop ProfileLoader; rewrite as thin wrapper around cordis.Loader**
 
 ```python
 # lca/layer4_app/profile.py
@@ -568,9 +571,7 @@ def load_profile(path: Path | str) -> object:
     return load_yaml(path)
 ```
 
-(Implementation of `ProfileLoader` will move to `lca/harness/profile/loader.py` in Chunk 2.)
-
-- [ ] **Step 3: For `lca/harness/diagnostics/inspect.py`: drop `loader._entry` import; replace with cordis.Loader**
+- [ ] **Step 3: For `lca/harness/diagnostics/inspect.py`: drop loader._entry import; replace with cordis.Loader**
 
 ```python
 # lca/harness/diagnostics/inspect.py
@@ -580,23 +581,87 @@ from cordis import Context
 
 
 def inspect(ctx: Context) -> dict:
-    """Return summary of plugin tree: plugin count, services, events."""
+    """Return summary of plugin tree."""
     return {
-        "plugin_count": len(ctx.fiber.entries),
+        "plugin_count": sum(1 for _ in dir(ctx) if not _.startswith("_")),
         "services": [k for k in dir(ctx) if not k.startswith("_")],
     }
 ```
 
-- [ ] **Step 4: Verify both files import cleanly**
+- [ ] **Step 4: For `lca/harness/profile/boot.py`: rewrite as cordis.Loader thin wrapper (moved from Chunk 2 Task 2.1)**
 
-Run: `uv run python -c "from lca.layer4_app.profile import load_profile; from lca.harness.diagnostics.inspect import inspect; print('OK')"`
-Expected: OK
+```python
+# lca/harness/profile/boot.py
+"""Boot a harness plugin tree from a profile YAML.
 
-- [ ] **Step 5: Commit**
+Thin wrapper around cordis.Loader. Bundles from ``bundles/*.yaml`` are first
+merged via ``cordis.loader.merge_bundles``, then loaded into a root Context.
+"""
+from __future__ import annotations
+
+import warnings
+from pathlib import Path
+
+from cordis import Context
+from cordis.loader import Entry, Loader, load_yaml, merge_bundles
+
+
+async def boot_profile(
+    profile_path: Path | str,
+    *,
+    check_seam_completeness: bool = True,  # legacy kwarg, now no-op
+) -> Context:
+    """Load profile YAML → resolve modules → build root Context."""
+    if check_seam_completeness:
+        warnings.warn(
+            "check_seam_completeness is deprecated; cordis doesn't validate seams",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    path = Path(profile_path)
+    data = load_yaml(path)
+    ctx = Context()
+    loader = Loader()
+    entries = loader.load(data)
+    for entry in entries:
+        module = _resolve_module(entry)
+        plugin_obj = getattr(module, entry.name)
+        await plugin_obj.setup(ctx, entry.config)
+    return ctx
+
+
+def _resolve_module(entry: Entry) -> object:
+    """Resolve $module from YAML entry."""
+    import importlib
+    module_path = entry.extra.get("$module")
+    if module_path is None:
+        raise ValueError(f"entry {entry.id!r} missing $module")
+    return importlib.import_module(module_path)
+```
+
+- [ ] **Step 5: Verify all 3 files import cleanly**
 
 ```bash
-git add lca/layer4_app/profile.py lca/harness/diagnostics/inspect.py
-git commit -m "profile + inspect: rewrite as thin wrappers over cordis"
+uv run python -c "from lca.layer4_app.profile import load_profile; from lca.harness.diagnostics.inspect import inspect; print('OK')"
+uv run python -c "from lca.harness.profile.boot import boot_profile; print('boot OK')"
+uv run python -c "from lca.harness.profile import boot_profile; print('re-export OK')"  # lca/harness/profile/__init__.py re-exports
+```
+
+Expected: all three OK
+
+- [ ] **Step 6: Verify `lca/harness/profile/__init__.py` re-export still works**
+
+```bash
+uv run python -c "from lca.harness.profile import boot_profile; print(boot_profile)"
+```
+
+Expected: OK
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add lca/layer4_app/profile.py lca/harness/diagnostics/inspect.py lca/harness/profile/boot.py
+git commit -m "profile + inspect + boot: rewrite as thin wrappers over cordis (boot moved from Chunk 2)"
 ```
 
 ---
@@ -790,12 +855,23 @@ from typing import Any, Awaitable, Callable, Optional
 
 @dataclass(frozen=True)
 class MiddlewareRegistration:
-    """One middleware binding to a cognitive phase event."""
+    """One middleware binding to a cognitive phase event.
+
+    `callback` is OPTIONAL (default None) to preserve the existing 3-field
+    constructor signature used at 4 production callers (F1 fix):
+    - lca/plugins/budget_policy/__init__.py:55
+    - lca/plugins/loop_intervention_policy/__init__.py:55
+    - lca/layer2_runtime/hook_middleware.py:57
+    - lca/layer2_runtime/loop_intervention_mw.py:47
+
+    These callers pass seam_key/priority/plugin_id only — the actual callback
+    is registered separately via `InMemoryMiddlewareRegistry.register()`.
+    """
 
     seam_key: str
     priority: int
     plugin_id: str
-    callback: Callable[..., Awaitable[Any]]
+    callback: Callable[..., Awaitable[Any]] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -897,12 +973,14 @@ git commit -m "plugins: 21 plugins drop PluginManifest/ExtensionPoint/seam_defin
 
 **Files:**
 - Delete: `tests/plugin/` (entire dir)
-- Delete: `tests/test_plugin_*.py` (multiple files)
+- Delete: `tests/test_plugin_*.py` (multiple files, **including** `tests/test_plugin_context.py`)
 - Delete: `tests/test_seam_pattern.py`
-- Delete: `tests/harness/test_seam_completeness.py` (tests the removed SeamRole/SeamRegistry; lives under tests/harness/, NOT at root)
-- Delete: `tests/harness/test_budget_policy.py` (tests the old `manifest = PluginManifest(...)` plugin shape)
-- Delete: `tests/harness/test_loop_intervention_policy.py` (same reason)
-- Delete: `tests/harness/test_gateway_profile_integration.py` (uses ScopeKind, deleted in Task 1.17)
+- Delete: `tests/test_capability_seams.py` (B2 — uses SeamKey/REQUIRED_SEAM_KEYS/ProfileLoader/Loader/boot_capabilities/ctx.mount/ctx.require — all removed)
+- Delete: `tests/test_architecture_self_consistency.py` (B4 — `test_all_first_party_plugins_declare_a_manifest` asserts PluginManifest in every plugin; assertion fails after Task 1.12 rewrites plugins)
+- Delete: `tests/harness/test_seam_completeness.py`
+- Delete: `tests/harness/test_budget_policy.py`
+- Delete: `tests/harness/test_loop_intervention_policy.py`
+- Delete: `tests/harness/test_gateway_profile_integration.py`
 
 - [ ] **Step 1: Find obsolete test files (extended)**
 
@@ -920,8 +998,10 @@ ls tests/harness/test_gateway_profile_integration.py 2>/dev/null
 
 ```bash
 git rm -r tests/plugin/
-git rm tests/test_plugin_kernel.py tests/test_plugin_loader.py tests/test_plugin_protocol.py tests/test_plugin_profile.py 2>/dev/null
+git rm tests/test_plugin_loader.py tests/test_plugin_protocol.py tests/test_plugin_profile.py tests/test_plugin_context.py 2>/dev/null
 git rm tests/test_seam_pattern.py
+git rm tests/test_capability_seams.py
+git rm tests/test_architecture_self_consistency.py
 git rm tests/harness/test_seam_completeness.py
 git rm tests/harness/test_budget_policy.py
 git rm tests/harness/test_loop_intervention_policy.py
@@ -1182,41 +1262,27 @@ def consume(definition: str, provider: T, consumer: Any) -> T:
     return provider
 ```
 
-- [ ] **Step 5: Update `lca/contracts/mechanisms/__init__.py`**
+- [ ] **Step 5: SURGICAL edit `lca/contracts/mechanisms/__init__.py` — KEEP inline Protocols (B5 fix)**
 
-```python
-# lca/contracts/mechanisms/__init__.py
-"""LCA core mechanisms — typed models and protocols."""
-from lca.contracts.mechanisms.capability import (
-    CapabilityContext,
-    CapabilityKey,
-    MissingCapabilityError,
-    REQUIRED_CAPABILITY_KEYS,
-)
-from lca.contracts.mechanisms.registries import Registries
-from lca.contracts.mechanisms.seam import consume
+**Don't rewrite the file.** Only make these surgical edits:
 
-# Removed (cordis migration):
-# - SeamRole, SeamDeclaration, SeamRegistry, seam, validate_all_seams
-# - register_seam, get_global_seam_registry, require_complete
-# - UnauthorizedConsumerError, IncompleteSeamError
+1. Delete the line `from lca.contracts.mechanisms.capability import SeamKey as SeamKey,`
+2. Delete the entire `from lca.contracts.mechanisms.seam import (IncompleteSeamError, SeamDeclaration, SeamRegistry, SeamRole, UnauthorizedConsumerError, consume, get_global_seam_registry, register_seam, require_complete, seam, validate_all_seams) as ...` block
+3. Add: `from lca.contracts.mechanisms.capability import CapabilityKey as CapabilityKey,`
+4. Add: `from lca.contracts.mechanisms.seam import consume as consume,`
+5. Update `__all__` list — drop SeamRole/SeamDeclaration/SeamRegistry/etc., add CapabilityKey + consume.
 
-__all__ = [
-    "CapabilityContext",
-    "CapabilityKey",
-    "MissingCapabilityError",
-    "REQUIRED_CAPABILITY_KEYS",
-    "Registries",
-    "consume",
-]
-```
+**KEEP** all 6 inline Protocols (`EventBus`, `Hook`, `HookRegistry`, `NamedRegistryProtocol`, `OrchestrationRegistryProtocol`, `ComponentRegistryProtocol`). They're imported by `lca.contracts.__init__` and `lca.contracts.protocols.__init__` which load eagerly — removing them breaks `import lca`.
 
-- [ ] **Step 6: Verify imports work**
+- [ ] **Step 6: Verify imports work + eager load test**
 
 ```bash
 uv run python -c "from lca.contracts.mechanisms.seam import consume; print(repr(consume('test', 'p', 'c')))"
 uv run python -c "from lca.contracts.mechanisms.capability import CapabilityKey; print(CapabilityKey.LLM)"
-uv run python -c "from lca.contracts.mechanisms import CapabilityKey, REQUIRED_CAPABILITY_KEYS; print('OK')"
+uv run python -c "from lca.contracts.mechanisms import EventBus, Hook, HookRegistry, NamedRegistryProtocol, OrchestrationRegistryProtocol, ComponentRegistryProtocol; print('inline Protocols OK')"
+uv run python -c "from lca.contracts.mechanisms import CapabilityKey, REQUIRED_CAPABILITY_KEYS, consume; print('rename + consume OK')"
+uv run python -c "import lca; print('lca OK')"  # eager load test
+uv run python -c "from lca.contracts.protocols import ComponentRegistryProtocol, EventBus, Hook, HookRegistry, NamedRegistryProtocol; print('protocols OK')"
 ```
 
 - [ ] **Step 7: Commit**
@@ -1349,10 +1415,9 @@ git commit -m "chore: chunk 1 verification fixes" --allow-empty
 
 ---
 
-### Task 2.1: Rewrite `lca/harness/profile/boot.py` as cordis.Loader thin wrapper
+### Task 2.1: ~~Rewrite `lca/harness/profile/boot.py`~~ [MOVED to Chunk 1 Task 1.7 — see B1 fix]
 
-**Files:**
-- Modify: `lca/harness/profile/boot.py`
+**Status**: REMOVED. boot.py migration was moved to Chunk 1 Task 1.7 to fix B1 (chunk-boundary ordering). This task should be skipped during execution.
 
 - [ ] **Step 1: Write the failing test**
 
