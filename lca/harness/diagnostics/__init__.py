@@ -1,5 +1,4 @@
 """Harness diagnostics — inspect, replay, doctor."""
-
 from lca.harness.diagnostics.inspect import format_plugin_tree, inspect_profile_tree
 from lca.harness.diagnostics.tree import render_tree
 

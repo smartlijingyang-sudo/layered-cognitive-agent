@@ -1,47 +1,38 @@
-"""Plugin tree diagnostic renderer (``lca inspect tree``)."""
-
+"""Plugin tree diagnostic renderer (for `lca-ops debug tree`)."""
 from __future__ import annotations
 
 from typing import Any
 
 
-def render_tree(host: Any, *, show_effects: bool = True) -> str:
-    """Render a plugin host as a human-readable tree string.
+def render_tree(ctx: Any, *, show_listeners: bool = True) -> str:
+    """Render a cordis Context's plugin tree as a human-readable string.
 
-    Args:
-        host: ``PluginHost`` or ``ScopedPluginHost`` instance — anything
-            exposing a ``handles: dict[str, PluginHandle]`` mapping.
-        show_effects: When *True* (default), include per-plugin effect count.
-
-    Returns:
-        Multi-line string representation of the plugin tree.
+    Walks ``ctx.own_bindings`` (user-provided services) and the
+    EventsService listener map (for `show_listeners=True`).
     """
-    lines: list[str] = ["Plugin Tree", "=" * 60]
+    lines: list[str] = ["Plugin Tree (cordis)", "=" * 60]
 
-    handles: dict[str, Any] = getattr(host, "handles", {}) or {}
-    if not handles:
+    bindings = getattr(ctx, "own_bindings", {}) or {}
+    if bindings:
+        lines.append(f"  Services ({len(bindings)}):")
+        for name in sorted(bindings):
+            value = bindings[name]
+            value_repr = type(value).__name__
+            lines.append(f"    - {name}: {value_repr}")
+    else:
         lines.append("  (empty — no plugins loaded)")
-        return "\n".join(lines)
 
-    for entry_id, handle in sorted(handles.items()):
-        state = getattr(handle, "state", "UNKNOWN")
-        # state may be an enum (PluginState.ACTIVE) — pull .value when present
-        state_str = getattr(state, "value", state)
+    if show_listeners and hasattr(ctx, "events"):
+        events = ctx.events
+        listener_counts = {}
+        for name in dir(events):
+            n = len(getattr(events, "_listeners", {}).get(name, []))
+            if n > 0:
+                listener_counts[name] = n
+        if listener_counts:
+            lines.append("")
+            lines.append("  Event listeners:")
+            for name, count in sorted(listener_counts.items()):
+                lines.append(f"    - {name}: {count} listener(s)")
 
-        spec = getattr(handle, "spec", None)
-        provides: tuple[str, ...] | None = getattr(spec, "provides", None) if spec else None
-        injected: tuple[str, ...] = getattr(handle, "injected", ()) or ()
-        effect_count: int = len(getattr(handle, "effects", []))
-
-        lines.append(f"  {entry_id}")
-        lines.append(f"    state:    {state_str}")
-        if provides:
-            lines.append(f"    provides: {', '.join(provides)}")
-        if injected:
-            lines.append(f"    inject:   {', '.join(injected)}")
-        if show_effects:
-            lines.append(f"    effects:  {effect_count}")
-
-    lines.append("=" * 60)
-    lines.append(f"  total plugins: {len(handles)}")
     return "\n".join(lines)
