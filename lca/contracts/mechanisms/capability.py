@@ -1,11 +1,8 @@
 """Capability context — Definition 拥有的活服务键（DSH ctx 的 Python 形态）。
 
-Seam 运行时：
-    ctx.mount("llm", LlmService())     # Definition 占据键
-    ctx.llm.register("mock", adapter)  # Provider 挂到 Definition
-    reasoner = PromptReasoner(ctx.llm) # Consumer 只拿 Definition
-
-Consumer 永不 import Provider。换 Provider 只改挂载，不改 Consumer。
+cordis migration: SeamKey → CapabilityKey rename. CapabilityHub / mount /
+require / get are replaced by cordis.Context.provide / inject; the
+CapabilityContext Protocol is kept for migration-period back-compat.
 """
 
 from __future__ import annotations
@@ -14,7 +11,7 @@ from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
 
-class SeamKey(str, Enum):
+class CapabilityKey(str, Enum):
     """全部能力接缝键。仅可替换后端进此表；编排（Brain/Loop/Team）不是 seam。"""
 
     LLM = "llm"
@@ -29,7 +26,30 @@ class SeamKey(str, Enum):
     OBSERVABILITY = "observability"
 
 
-REQUIRED_SEAM_KEYS: tuple[SeamKey, ...] = tuple(SeamKey)
+REQUIRED_CAPABILITY_KEYS: tuple[CapabilityKey, ...] = tuple(CapabilityKey)
+
+# ── Deprecated alias (back-compat for migration period) ──
+
+
+# Re-export SeamKey as deprecated alias pointing to CapabilityKey
+def __getattr__(name: str):
+    if name == "SeamKey":
+        import warnings
+        warnings.warn(
+            "SeamKey is deprecated; use CapabilityKey instead",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return CapabilityKey
+    if name == "REQUIRED_SEAM_KEYS":
+        import warnings
+        warnings.warn(
+            "REQUIRED_SEAM_KEYS is deprecated; use REQUIRED_CAPABILITY_KEYS instead",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return REQUIRED_CAPABILITY_KEYS
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class MissingCapabilityError(KeyError):
@@ -38,7 +58,10 @@ class MissingCapabilityError(KeyError):
 
 @runtime_checkable
 class CapabilityContext(Protocol):
-    """活接缝上下文：键上只有 Definition 服务。"""
+    """活接缝上下文：键上只有 Definition 服务。
+
+    Back-compat shim — replaced by cordis.Context.provide / inject.
+    """
 
     def mount(self, key: str, service: Any) -> None: ...
 

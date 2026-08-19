@@ -15,51 +15,20 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, TypeVar, runtime_checkable
 
 from lca.contracts.mechanisms.capability import (
-    REQUIRED_SEAM_KEYS as REQUIRED_SEAM_KEYS,
+    REQUIRED_CAPABILITY_KEYS as REQUIRED_CAPABILITY_KEYS,
 )
 from lca.contracts.mechanisms.capability import (
     CapabilityContext as CapabilityContext,
 )
 from lca.contracts.mechanisms.capability import (
-    MissingCapabilityError as MissingCapabilityError,
+    CapabilityKey as CapabilityKey,
 )
 from lca.contracts.mechanisms.capability import (
-    SeamKey as SeamKey,
+    MissingCapabilityError as MissingCapabilityError,
 )
 
-# Re-export seam 三角色约束
-from lca.contracts.mechanisms.seam import (
-    IncompleteSeamError as IncompleteSeamError,
-)
-from lca.contracts.mechanisms.seam import (
-    SeamDeclaration as SeamDeclaration,
-)
-from lca.contracts.mechanisms.seam import (
-    SeamRegistry as SeamRegistry,
-)
-from lca.contracts.mechanisms.seam import (
-    SeamRole as SeamRole,
-)
-from lca.contracts.mechanisms.seam import (
-    UnauthorizedConsumerError as UnauthorizedConsumerError,
-)
 from lca.contracts.mechanisms.seam import (
     consume as consume,
-)
-from lca.contracts.mechanisms.seam import (
-    get_global_seam_registry as get_global_seam_registry,
-)
-from lca.contracts.mechanisms.seam import (
-    register_seam as register_seam,
-)
-from lca.contracts.mechanisms.seam import (
-    require_complete as require_complete,
-)
-from lca.contracts.mechanisms.seam import (
-    seam as seam,
-)
-from lca.contracts.mechanisms.seam import (
-    validate_all_seams as validate_all_seams,
 )
 from lca.contracts.models.core.state import AgentState
 
