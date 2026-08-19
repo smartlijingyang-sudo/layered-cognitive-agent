@@ -43,9 +43,18 @@ async def boot_profile(
     entries = loader.load(data)
     for entry in entries:
         module = _resolve_module(entry)
-        plugin_obj = getattr(module, entry.name)
-        if hasattr(plugin_obj, "setup"):
-            await plugin_obj.setup(ctx, entry.config)
+        # Try cordis @plugin style first (entry has its own setup() function)
+        if hasattr(module, "setup"):
+            await module.setup(ctx, entry.config)
+            continue
+        # Fallback: legacy LCA plugin (manifest + apply / mount)
+        if hasattr(module, "apply"):
+            from lca.plugins._compat import legacy_plugin_setup
+            legacy_plugin_setup(ctx, entry.extra.get("$module", entry.name), entry.config)
+            continue
+        # Otherwise, the entry name itself is the plugin — use the compat shim
+        from lca.plugins._compat import legacy_plugin_setup
+        legacy_plugin_setup(ctx, entry.name, entry.config)
     return ctx
 
 
