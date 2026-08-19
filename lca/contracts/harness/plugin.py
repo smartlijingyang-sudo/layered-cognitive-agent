@@ -1,21 +1,46 @@
-"""PluginManifest — harness-level plugin descriptor.
+"""Harness plugin shape — post-cordis migration.
 
-Extends the legacy ``PluginSpec`` with seam unification fields,
-scoped lifecycle, and typed plugin kinds. This is the single
-source of truth for what a plugin *is* in the harness runtime.
+PluginManifest / ExtensionPoint / CapabilityGrant / ScopeKind / PluginKind /
+ProviderMode are kept as DEPRECATED compatibility aliases for the migration
+period. cordis's @plugin + Standard Schema cover the same ground; once all
+21 plugins are rewritten to @plugin form (Chunk 2), these aliases will be
+deleted.
 
-Spec reference: §2.2.1 of ``docs/specs/harness-spine-spec.md``.
+PluginContext Protocol is the stable type alias for migration-period
+compatibility. Uses ONLY cordis's public surface (provide / inject / on /
+once / scope / dispose).
 """
-
 from __future__ import annotations
 
-from dataclasses import dataclass
+import warnings
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
+
+
+# ── PluginContext Protocol (kept; cordis surface only) ───────────────
+
+
+class PluginContext(Protocol):
+    """Stable name for migration-period type alias.
+
+    Resolves to cordis.Context at runtime. After Chunk 5 migration,
+    callers should use cordis.Context directly.
+    """
+
+    def provide(self, key: str, value: Any) -> None: ...
+    def inject(self, key: str) -> Any: ...
+    def on(self, event: str, callback: Any) -> None: ...
+    def once(self, event: str, callback: Any) -> None: ...
+
+
+# ── Deprecated aliases (kept for migration period; remove in Chunk 2) ──
 
 
 class ScopeKind(Enum):
-    """Scope hierarchy for plugin visibility and lifecycle."""
+    """DEPRECATED: ScopeKind is gone. cordis.Context.scope(label) replaces.
+
+    Kept as deprecated alias for migration period."""
 
     DEPLOYMENT = "deployment"
     PROFILE = "profile"
@@ -24,133 +49,61 @@ class ScopeKind(Enum):
     SESSION = "session"
 
 
+def _scope_kind_deprecation_warning() -> None:
+    warnings.warn(
+        "ScopeKind is deprecated; cordis.Context.scope(label) replaces",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
 class PluginKind(Enum):
-    """What role a plugin plays in the system."""
+    """DEPRECATED: PluginKind is gone. cordis @plugin decorator replaces."""
 
     SERVICE = "service"
-    """Provides a core service (sessions, agents, tools)."""
-
     DEFINITION = "definition"
-    """Declares an extension point (was Seam Definition) — declares a seam key and contract."""
-
     PROVIDER = "provider"
-    """Implements an extension point (was Seam Provider)."""
-
     CONSUMER = "consumer"
-    """Consumes a service or extension point (was Seam Consumer)."""
-
     BUNDLE = "bundle"
-    """Pure composition, no logic of its own."""
-
     POLICY = "policy"
-    """Governance policy (sandbox, approval, budget)."""
 
 
 class ProviderMode(Enum):
-    """Single-active vs multi-provider registry."""
+    """DEPRECATED: ProviderMode is gone. cordis uses active= on register."""
 
     SINGLE = "single"
-    """One active provider per scope (e.g. agent_loop, session persistence)."""
-
     REGISTRY = "registry"
-    """Named registry, multiple providers coexist (e.g. llm, subagent, skills)."""
 
 
 @dataclass(frozen=True)
 class ExtensionPoint:
-    """Declares an extension point exposed by a DEFINITION plugin.
-
-    Corresponds to DSH waterfall/serial event names and LCA Seam Definitions.
-
-    Semantics:
-    - Other plugins can register middleware against this extension point.
-    - Loader reconcile validates: DEFINITION must have at least one PROVIDER
-      (optional seams may have zero) and ideally at least one CONSUMER.
-    - ``dispatch_mode`` controls middleware execution order:
-      - ``waterfall``: each middleware's output feeds the next.
-      - ``serial``: all middleware receive the same input, results collected.
-      - ``around``: onion model — outer wraps inner.
-    """
+    """DEPRECATED: ExtensionPoint is gone. cordis events replace."""
 
     seam_key: str
-    dispatch_mode: Literal["waterfall", "serial", "around"] = "waterfall"
+    dispatch_mode: str = "waterfall"
     description: str = ""
 
 
 @dataclass(frozen=True)
 class CapabilityGrant:
-    """Permission a plugin requires to operate."""
+    """DEPRECATED: CapabilityGrant is gone. cordis pydantic config replaces."""
 
     capability: str
-    """E.g. ``"tool.execute"``, ``"session.append"``, ``"agent.create"``."""
-
-    scope: ScopeKind = ScopeKind.AGENT
-
-
-class PluginContext(Protocol):
-    """Runtime context passed to a plugin's ``apply()`` function.
-
-    Provides access to harness services via ``require()``.
-    """
-
-    def require(self, service_key: str) -> object:
-        """Return the service registered under ``service_key``."""
-        ...
+    scope: str = "agent"
 
 
 @dataclass(frozen=True)
 class PluginManifest:
-    """Harness-level plugin descriptor.
+    """DEPRECATED: PluginManifest is gone. cordis @plugin decorator replaces."""
 
-    Fully declarative: everything the Loader needs to know about a plugin
-    is captured here. Legacy ``PluginSpec`` modules are adapted via
-    ``lca.harness.kernel.compat.manifest_from_spec()``.
-    """
-
-    id: str
-    """Unique plugin identifier, e.g. ``"lca.loop.cognitive"``."""
-
-    version: str
-    """SemVer version string."""
-
-    api_version: str
-    """Harness API version this plugin targets, e.g. ``"lca-harness/1"``."""
-
-    kind: PluginKind
-    """What role this plugin plays."""
-
-    requires: tuple[str, ...] = ()
-    """Required service keys — must be available before this plugin activates."""
-
-    optional_requires: tuple[str, ...] = ()
-    """Optional service keys — used if available, not a hard dependency."""
-
-    provides: tuple[str, ...] = ()
-    """Service keys this plugin provides."""
-
-    provider_mode: ProviderMode = ProviderMode.SINGLE
-    """Whether this plugin is single-active or registry-style."""
-
-    scopes: tuple[ScopeKind, ...] = (ScopeKind.PROFILE,)
-    """Scope levels at which this plugin is active."""
-
-    permissions: tuple[CapabilityGrant, ...] = ()
-    """Permissions this plugin requires."""
-
-    config_model: type | None = None
-    """Pydantic model for config validation. None = no config."""
-
-    reload: Literal["never", "restart_scope", "hot_safe"] = "restart_scope"
-    """Hot-replacement safety level."""
-
-    # ── Seam unification fields (§3.7) ──
-
-    seam_key: str | None = None
-    """Associated seam key. Required for DEFINITION/PROVIDER/CONSUMER kinds."""
-
-    extension_points: tuple[ExtensionPoint, ...] = ()
-    """Extension points declared by this plugin. Only used by DEFINITION kind."""
-
-    middleware: tuple[str, ...] = ()
-    """Extension point seam_keys this plugin registers middleware against.
-    Used by PROVIDER/CONSUMER/POLICY kinds."""
+    id: str = ""
+    version: str = "1.0.0"
+    api_version: str = "lca-harness/1"
+    kind: PluginKind = PluginKind.SERVICE
+    provides: tuple[str, ...] = field(default_factory=tuple)
+    requires: tuple[str, ...] = field(default_factory=tuple)
+    inject: tuple[str, ...] = field(default_factory=tuple)
+    seam_key: str = ""
+    dispatch_mode: str = "waterfall"
+    middleware: tuple[str, ...] = field(default_factory=tuple)
+    optional_requires: tuple[str, ...] = field(default_factory=tuple)
