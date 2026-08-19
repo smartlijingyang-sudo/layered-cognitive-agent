@@ -1,0 +1,76 @@
+# bundles/web-app.yaml — Web app behavior plugins (Tier-3).
+# Extends bundles/base.yaml with behavior plugins: brain, reasoner,
+# synthesizer, loop, team_lead, guards, gateway, dsh-bridge.
+
+entries:
+  # ── Brain strategy (Tier-3) ─────────────────────────────
+  - id: lca-brain-modular
+    name: lca_brain_modular
+    $module: lca.plugins.brain.modular
+    config: {}
+
+  - id: lca-brain-simple
+    name: lca_brain_simple
+    $module: lca.plugins.brain.simple
+    config: {}
+
+  # ── Reasoner + Synthesizer (Tier-3) ────────────────────
+  - id: lca-reasoner-prompt
+    name: lca_reasoner_prompt
+    $module: lca.plugins.reasoner.prompt
+    config: {}
+
+  - id: lca-synthesizer-concat
+    name: lca_synthesizer_concat
+    $module: lca.plugins.synthesizer.concat
+    config: {}
+
+  # ── Loop drivers (Tier-3) ───────────────────────────
+  - id: lca-loop-cognitive
+    name: lca_loop_cognitive
+    $module: lca.plugins.loop_cognitive
+    config: {}
+
+  - id: lca-loop-dsh-bridge
+    name: lca_loop_dsh_bridge
+    $module: lca.plugins.loop_dsh_bridge
+    inject: [session_store]
+    config: {}
+
+  - id: lca-loop-replay
+    name: lca_loop_replay
+    $module: lca.plugins.loop_replay
+    inject: [session_store]
+    config: {}
+
+  # ── Team lead (Tier-3 — only lead is plugin-ized; 6 coordinations are plain dataclasses) ──
+  - id: lca-team-lead-board
+    name: lca_team_lead_board
+    $module: lca.plugins.team_lead.board
+    config: {}
+
+  # ── Middleware / Guards (Tier-3) ────────────────────
+  - id: lca-guard-loop-intervention
+    name: lca_guards_loop_intervention
+    $module: lca.plugins.guards.loop_intervention
+    config:
+      threshold: 3
+
+  - id: lca-guard-step-budget
+    name: lca_guards_step_budget
+    $module: lca.plugins.guards.step_budget
+    config:
+      max_steps: 100
+
+  # ── DSH Bridge (Tier-3) ─────────────────────────────
+  - id: lca-dsh-bridge
+    name: lca_dsh_bridge
+    $module: lca.plugins.dsh.bridge
+    config: {}
+
+  # ── Gateway (Tier-3 — HTTP carrier) ────────────────
+  - id: lca-gateway-starlette
+    name: lca_gateway_starlette
+    $module: lca.plugins.gateway_starlette
+    inject: [sessions, projections]
+    config: {}
