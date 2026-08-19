@@ -78,10 +78,14 @@ uv run vulture lca --min-confidence 80
 | 关注点 | 位置 |
 |---|---|
 | 开发栈入口 | `./scripts/lca-ops`（无参=手册）。`status` / `heal` / `logs`（journal 实况） |
-| 插件树 | `lca/layer0_infra/plugin/`（kernel/loader/include/scope/expr/builtins）；profile `profiles/web-standard.yaml` + bundle `bundles/base-spine.yaml` |
-| 插件视图 | `lca-ops inspect-tree`（状态） / `lca-ops dump-profile`（展开行，对齐 DSH `--dump-config`） |
-| LLM/Tools seam | Definition + `ProviderDispatch`（effect 化 register）；真实 adapter 挂 `lca.plugins.llm_provider`，工具工厂挂 `lca.plugins.tools_service` |
+| 插件树 | `lca/plugins/`（38 个 `@plugin` 文件：15 Tier-1 服务定义 + 12 Tier-2 提供器 + 5 Tier-3 行为 + 6 guard/gateway）；profile `profiles/web-standard.yaml` + bundle `bundles/{base,web-app}.yaml` |
+| 插件实现 | cordis 1:1 Python 移植（DSH 的 cordis framework）；`vendor/{cordis,cosmokit,schemastery}/`；通过 `pyproject.toml` 的 `[tool.uv.sources]` 加载 |
+| 启动入口 | `lca/harness/profile/boot.py` 是 `cordis.Loader` 的薄包装 + bundle 合并 + patch 覆盖；`boot_profile("profiles/web-standard.yaml")` 异步返回 cordis.Context |
+| 插件视图 | `lca-ops debug tree`（21 服务 + 事件监听者）/ `lca-ops dump-profile`（展开行） |
+| 隔离 per-agent | `lca/layer4_app/composer.py:_IsolatedAgentScope`（async CM）— 每次 compose 创建一个 child scope + 新鲜 LlmService/ToolsService；`memory`/`state_store` 共享父 |
+| LLM/Tools seam | Definition + `ProviderDispatch`（`register`/`activate`/`current`）；12 个 Tier-2 单 plugin 多 provider 工厂模式 |
 | Prompt 模板 | `lca/layer1_cognitive/brain/prompts/*.md`；动态组装 `lca.plugins.system_prompt` |
+| Session 一切 | `lca/contracts/observability/session_events.py` 定义 29 类事件枚举；`SessionService.record(EventType, ...)` 单一入口；`lca/plugins/guards/` 用 `ctx.events.on(...)` 监听 |
 | 可观测性 | ADR-0037 Journal-as-Truth；`record()` / `span()` / `traced()` |
 | 真实 LLM 测试 | `uv run pytest -m real_llm -v`（需 `LLM_API_KEY`） |
 | 本地探针 | `uv run python scripts/run_team_mode.py` |
