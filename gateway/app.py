@@ -146,18 +146,13 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
         # No running event loop yet (startup) — create one
         tree = asyncio.run(boot_profile(path))
 
-    from lca.contracts.harness.plugin import ScopeKind
-    from lca.harness.kernel.scope import ScopedPluginHost
-
     application.state.plugin_tree = tree
-    application.state.plugin_host = ScopedPluginHost.wrap(
-        tree.host, ScopeKind.PROFILE, Path(profile_path).stem
-    )
+    application.state.ctx = tree  # cordis Context (replaces plugin_host)
     application.state.profile_path = profile_path
     structlog.get_logger("lca.gateway").info(
         "harness_profile_loaded",
         profile=profile_path,
-        plugins=len(tree.entries),
+        plugins=(len(tree.entries) if hasattr(tree, "entries") else "n/a"),
     )
 
 

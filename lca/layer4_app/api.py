@@ -102,10 +102,9 @@ class Agent(AgentUnit):
             brain=brain,
         )
         target = composer if composer is not None else AgentComposer()
-        from lca.harness.kernel.scope import ScopedPluginHost
-
-        compose_scope = scope if isinstance(scope, ScopedPluginHost) else None
-        self._agent = target.compose(self._spec, scope=compose_scope)
+        # scope is now a cordis.Context (replaces ScopedPluginHost); AgentComposer
+        # expects cordis Context — Chunk 5 fully migrates the call site.
+        self._agent = target.compose(self._spec, scope=scope)
         self.role_profile = self._spec.profile
 
     @property

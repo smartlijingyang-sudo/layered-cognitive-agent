@@ -13,11 +13,14 @@ from collections.abc import Sequence
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from lca.contracts.harness.plugin import ScopeKind
+# Note: ScopedPluginHost / ScopeKind / InMemoryMiddlewareRegistry are deleted
+# in the cordis migration. The functions in this module that depended on them
+# (_resolve_capability_context, _isolate_agent_scope, AgentComposer.compose)
+# are stubbed to raise NotImplementedError until Chunk 5 rewires them to
+# cordis.Context. The class-level type annotations are replaced with Any.
 
 if TYPE_CHECKING:
-    from lca.harness.kernel.scope import ScopedPluginHost
-    from lca.harness.middleware import InMemoryMiddlewareRegistry
+    from cordis import Context
 
 from lca.contracts.atoms.enums import (
     ActionScope,
@@ -88,7 +91,6 @@ from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.member_invoke import TransportMemberInvoker
 from lca.layer3_agent.orchestration_registry import OrchestrationFactory
 from lca.layer3_agent.team_handle import TeamHandle
-from lca.layer4_app.capability_boot import boot_capabilities
 from lca.layer4_app.defaults import build_default_registries
 from lca.layer4_app.policies import LEAD_BUDGET_POLICY_KEY
 from lca.layer4_app.team_wiring import (
@@ -107,41 +109,32 @@ T = TypeVar("T")
 
 
 class _ScopeAsCapabilityContext:
-    """Adapter: makes ``ScopedPluginHost`` usable where ``CapabilityHub`` is expected.
+    """Adapter: makes ``cordis.Context`` usable where ``CapabilityHub`` is expected.
 
     The CapabilityHub interface is: ``mount(key, service)``, ``require(key)``,
-    ``get(key)``, ``keys()``. This adapter delegates to the scope's service table.
+    ``get(key)``, ``keys()``. This adapter delegates to a cordis Context.
     """
 
-    def __init__(self, scope: Any) -> None:
-        self._scope = scope
+    def __init__(self, ctx: Any) -> None:
+        self._ctx = ctx
 
     def require(self, key: str) -> Any:
-        from lca.harness.kernel.scope import ServiceNotFoundError
-
-        try:
-            return self._scope.resolve(key)
-        except ServiceNotFoundError as exc:
+        result = self._ctx.inject(key)
+        if result is None:
             from lca.contracts.mechanisms.capability import MissingCapabilityError
 
-            raise MissingCapabilityError(key) from exc
+            raise MissingCapabilityError(key)
+        return result
 
     def get(self, key: str) -> Any | None:
-        return self._scope.get(key)
+        return self._ctx.inject(key)
 
     def mount(self, key: str, service: Any) -> None:
-        # Scope doesn't allow ad-hoc mount from composer — this is a no-op
-        # warning. In the new model, all services come from plugin modules.
-        import structlog
-
-        structlog.get_logger("lca.composer").warning(
-            "scope_mount_ignored",
-            key=key,
-            msg="CapabilityHub.mount() is not supported in scope mode; use plugin modules",
-        )
+        # cordis supports provide(); composer hands off to Context
+        self._ctx.provide(key, service)
 
     def keys(self) -> list[str]:
-        return list(self._scope.host._services.keys())
+        return [k for k in dir(self._ctx) if not k.startswith("_")]
 
 
 def _resolve_component(
@@ -213,19 +206,21 @@ class AgentComposer:
         team_channel: AgentTransport | None = None,
         decision_gate: DecisionGate | None = None,
         shared_store: SharedMemoryStore | None = None,
-        scope: ScopedPluginHost | None = None,
+        scope: Context | None = None,
     ) -> CognitiveAgent:
         """Assemble a complete CognitiveAgent from *spec* (closed graph).
 
-        When *scope* is provided, capabilities are resolved from the harness
-        plugin tree (profile-driven). When *scope* is None, falls back to
-        the legacy ``boot_capabilities()`` path.
+        Capabilities are resolved from the cordis plugin tree (profile-driven).
+        Full rewrite in Chunk 5 — uses cordis.Context.scope() for per-agent
+        isolation.
         """
+        if scope is None:
+            raise NotImplementedError(
+                "cordis migration; AgentComposer.compose requires a cordis.Context; "
+                "Chunk 5 wires _isolate_agent_scope"
+            )
         profile = spec.profile
-        compose_scope = (
-            _isolate_agent_scope(scope, spec.profile.role) if scope is not None else None
-        )
-        ctx = self._resolve_capability_context(compose_scope)
+        ctx = self._resolve_capability_context(scope)
         hub = create_observability(spec.observability)
         mem = self._resolve_memory(spec.memory, shared_store, ctx.require(SeamKey.MEMORY.value))
         state_store = self._resolve_state_store(
@@ -441,56 +436,35 @@ class AgentComposer:
         return result
 
     @staticmethod
-    def _resolve_capability_context(scope: ScopedPluginHost | None) -> Any:
-        """Resolve the capability context from a scope or legacy boot."""
-        if scope is not None:
-            return _ScopeAsCapabilityContext(scope)
-        return boot_capabilities()
+    def _resolve_capability_context(ctx: Context) -> Any:
+        """Resolve the capability context — cordis.Context IS the context."""
+        return _ScopeAsCapabilityContext(ctx)
 
 
-def _isolate_agent_scope(parent: ScopedPluginHost, role: str) -> ScopedPluginHost:
-    """Fork an agent scope and shadow services that compose() mutates.
+def _isolate_agent_scope(parent: Context, role: str) -> _IsolatedAgentScope:
+    """Async CM that creates a child scope with fresh service instances.
 
-    Profile-scoped LlmService / ToolsService / TransportService / MemoryService /
-    StateStoreService stay shared for lookup of factories; the child gets
-    fresh instances so two compose() calls cannot overwrite each other.
+    Placeholder for Chunk 5 — full implementation uses cordis.Context.scope()
+    + ctx.provide() per spec §8.1.
     """
-    from lca.layer0_infra.capability.llm import LlmService
-    from lca.layer0_infra.capability.memory import MemoryService
-    from lca.layer0_infra.capability.state_store import StateStoreService
-    from lca.layer0_infra.capability.tools import ToolsService
-    from lca.layer0_infra.capability.transport import TransportService
-    from lca.layer0_infra.plugin.kernel._handle import PluginHandle
-    from lca.layer0_infra.plugin.kernel._spec import PluginSpec
-
-    child = parent.fork(ScopeKind.AGENT, f"agent:{role}")
-    spec = PluginSpec(name="compose-shadow", apply=lambda _ctx, _cfg: None)
-    handle = PluginHandle(
-        entry_id=f"compose-shadow:{child.scope_id}",
-        spec=spec,
-        config={},
-        injected=(),
+    raise NotImplementedError(
+        "cordis migration; _isolate_agent_scope rewritten as _IsolatedAgentScope "
+        "async CM in Chunk 5"
     )
-    child.host.register_handle(handle)
 
-    child.provide(handle, "llm", LlmService())
-    child.provide(handle, "tools", ToolsService())
-    child.provide(handle, "transport", TransportService())
 
-    mem = MemoryService()
-    parent_mem = parent.get("memory")
-    if parent_mem is not None:
-        for name in parent_mem.providers.names():
-            mem.register(name, parent_mem.providers.get(name))
-    child.provide(handle, "memory", mem)
+class _IsolatedAgentScope:
+    """Placeholder for Chunk 5 — async context manager."""
 
-    stores = StateStoreService()
-    parent_stores = parent.get("state_store")
-    if parent_stores is not None:
-        for name in parent_stores.providers.names():
-            stores.register(name, parent_stores.providers.get(name))
-    child.provide(handle, "state_store", stores)
-    return child
+    def __init__(self, parent: Context, role: str) -> None:
+        self._parent = parent
+        self._role = role
+
+    async def __aenter__(self) -> Context:
+        raise NotImplementedError("cordis migration; Chunk 5")
+
+    async def __aexit__(self, *exc_info: Any) -> None:
+        return None
 
 
 class TeamComposer(AgentComposer):
