@@ -28,19 +28,22 @@ async def setup(ctx, config: Config) -> None:
     from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
 
     llm = ctx.inject("llm")
-    if "mock" in config.providers:
-        llm.register("mock", MockLLMAdapter())
-    if "real" in config.providers:
-        llm.register("real", OpenAICompatAdapter(api_key=config.api_key, base_url=config.base_url))
-    if "deepseek" in config.providers:
-        # DeepSeek is OpenAI-compatible; reuse the adapter.
-        base = config.base_url or "https://api.deepseek.com"
-        llm.register("deepseek", OpenAICompatAdapter(api_key=config.api_key, base_url=base))
-    # "pi_ai" not yet implemented — registered as a stub provider below.
-
     target = config.mode
     if target == "auto":
         target = "real" if config.api_key else "mock"
     if target not in config.providers:
         target = config.providers[0]
-    llm.activate(target)
+
+    if "mock" in config.providers:
+        llm.register("mock", MockLLMAdapter(), activate=(target == "mock"))
+    if "real" in config.providers:
+        llm.register("real", OpenAICompatAdapter(api_key=config.api_key, base_url=config.base_url), activate=(target == "real"))
+    if "deepseek" in config.providers:
+        # DeepSeek is OpenAI-compatible; reuse the adapter.
+        base = config.base_url or "https://api.deepseek.com"
+        llm.register(
+            "deepseek",
+            OpenAICompatAdapter(api_key=config.api_key, base_url=base),
+            activate=(target == "deepseek"),
+        )
+    # "pi_ai" not yet implemented — registered as a stub provider below.

@@ -52,7 +52,17 @@ async def boot_profile(
             module = _resolve_module_by_path(module_path)
         # Try cordis @plugin style first (Plugin dataclass with .setup field)
         if hasattr(module, "setup") and hasattr(module.setup, "setup"):
-            await module.setup.setup(ctx, entry.config)
+            # cordis Plugin has a Config field. Look up the plugin's Config
+            # class either from the Plugin dataclass (if explicitly set via
+            # `@plugin(Config=...)`) or from the module's globals (by name).
+            config = entry.config
+            config_cls = getattr(module.setup, "Config", None)
+            if config_cls is None:
+                # Convention: each plugin file has a `Config` Pydantic class.
+                config_cls = getattr(module, "Config", None)
+            if config_cls is not None and not isinstance(config, config_cls):
+                config = config_cls.model_validate(config)
+            await module.setup.setup(ctx, config)
             continue
         # Fallback: legacy LCA plugin (manifest + apply)
         if hasattr(module, "apply"):

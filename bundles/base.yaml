@@ -1,0 +1,173 @@
+# bundles/base.yaml — LCA core capability services (cordis YAML format).
+# Replaces the legacy bundles/base-spine.yaml.
+#
+# YAML format: top-level `entries:` list. Each entry has id, name, $module, config.
+#   $module is the importable Python module path; boot.py resolves it via
+#   importlib.import_module() and invokes module.setup.setup(ctx, config)
+#   (the cordis @plugin decorator wraps the function in a Plugin dataclass
+#   whose `setup` field holds the original async function).
+
+entries:
+  # ── Tier-1: Service Definitions (13) ───────────────────────────
+  - id: lca-llm-service
+    name: lca_llm_service
+    $module: lca.plugins.llm_service
+    config: {}
+
+  - id: lca-tools-service
+    name: lca_tools_service
+    $module: lca.plugins.tools_service
+    config: {}
+
+  - id: lca-session-service
+    name: lca_session_service
+    $module: lca.plugins.session_service
+    config: {}
+
+  - id: lca-system-prompt-service
+    name: lca_system_prompt
+    $module: lca.plugins.system_prompt
+    config: {}
+
+  - id: lca-transport-service
+    name: lca_transport_service
+    $module: lca.plugins.transport_service
+    config: {}
+
+  - id: lca-skills-service
+    name: lca_skills_service
+    $module: lca.plugins.skills_service
+    config: {}
+
+  - id: lca-file-store-service
+    name: lca_file_store_service
+    $module: lca.plugins.file_store_service
+    config: {}
+
+  - id: lca-observability-service
+    name: lca_observability_service
+    $module: lca.plugins.observability_service
+    config: {}
+
+  - id: lca-sandbox-service
+    name: lca_sandbox_service
+    $module: lca.plugins.sandbox_service
+    config: {}
+
+  - id: lca-memory-service
+    name: lca_memory_service
+    $module: lca.plugins.memory_service
+    config: {}
+
+  - id: lca-search-service
+    name: lca_search_service
+    $module: lca.plugins.search_service
+    config: {}
+
+  - id: lca-state-store-service
+    name: lca_state_store_service
+    $module: lca.plugins.state_store_service
+    config: {}
+
+  - id: lca-agent-service
+    name: lca_agent_service
+    $module: lca.plugins.agent_service
+    config: {}
+
+  - id: lca-attachment-service
+    name: lca_attachment_service
+    $module: lca.plugins.attachment_service
+    config: {}
+
+  - id: lca-workspace-service
+    name: lca_workspace_service
+    $module: lca.plugins.workspace_service
+    config: {}
+
+  # ── Tier-2: Provider plugins (12 — single plugin per seam + factory) ──
+  - id: lca-llm-provider
+    name: lca_providers_llm
+    $module: lca.plugins.providers.llm
+    inject: [llm]
+    config:
+      mode: auto
+      providers: [mock, real, deepseek]
+      api_key: ${LLM_API_KEY}
+      base_url: ${LLM_BASE_URL}
+
+  - id: lca-memory-provider
+    name: lca_providers_memory
+    $module: lca.plugins.providers.memory
+    inject: [memory]
+    config:
+      providers: [simple]
+
+  - id: lca-state-store-provider
+    name: lca_providers_state_store
+    $module: lca.plugins.providers.state_store
+    inject: [state_store]
+    config:
+      providers: [memory]
+
+  - id: lca-search-provider
+    name: lca_providers_search
+    $module: lca.plugins.providers.search
+    inject: [search]
+    config:
+      providers: [tavily]
+
+  - id: lca-tools-provider
+    name: lca_providers_tools
+    $module: lca.plugins.providers.tools
+    inject: [tools]
+    config:
+      factories: [g2a]
+
+  - id: lca-transport-provider
+    name: lca_providers_transport
+    $module: lca.plugins.providers.transport
+    inject: [transport]
+    config:
+      providers: [internal, a2a, mcp]
+
+  - id: lca-skills-provider
+    name: lca_providers_skills
+    $module: lca.plugins.providers.skills
+    inject: [skills]
+    config:
+      providers: [disk]
+
+  - id: lca-file-store-provider
+    name: lca_providers_file_store
+    $module: lca.plugins.providers.file_store
+    inject: [file_store]
+    config:
+      providers: [local]
+
+  - id: lca-observability-provider
+    name: lca_providers_observability
+    $module: lca.plugins.providers.observability
+    inject: [observability]
+    config:
+      providers: [console]
+
+  - id: lca-sandbox-provider
+    name: lca_providers_sandbox
+    $module: lca.plugins.providers.sandbox
+    inject: [sandbox]
+    config:
+      providers: [local]
+
+  - id: lca-attachment-provider
+    name: lca_providers_attachment
+    $module: lca.plugins.providers.attachment
+    inject: [attachment, file_store]
+    config:
+      providers: [filesystem]
+
+  - id: lca-workspace-provider
+    name: lca_providers_workspace
+    $module: lca.plugins.providers.workspace
+    inject: [workspace]
+    config:
+      providers: [local]
