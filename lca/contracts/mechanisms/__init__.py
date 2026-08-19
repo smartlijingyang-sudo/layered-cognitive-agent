@@ -26,7 +26,6 @@ from lca.contracts.mechanisms.capability import (
 from lca.contracts.mechanisms.capability import (
     MissingCapabilityError as MissingCapabilityError,
 )
-
 from lca.contracts.mechanisms.seam import (
     consume as consume,
 )

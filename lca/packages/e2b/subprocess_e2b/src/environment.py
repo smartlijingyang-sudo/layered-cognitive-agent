@@ -9,7 +9,6 @@ Upstream source: ``e2b/subprocess-e2b/src/environment.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "bootstrapEnvironment",

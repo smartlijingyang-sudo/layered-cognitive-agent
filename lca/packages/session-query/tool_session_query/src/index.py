@@ -9,12 +9,13 @@ Upstream source: ``session-query/tool-session-query/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "Config",
     "DEFAULT_MAX_SEARCH_RESULTS",
     "DEFAULT_SEARCH_TIMEOUT_MS",
+    "Config",
     "apply",
     "inject",
     "name",

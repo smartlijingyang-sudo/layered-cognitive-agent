@@ -9,7 +9,6 @@ Upstream source: ``storage/storage-json/src/atomic.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "writeAtomic",

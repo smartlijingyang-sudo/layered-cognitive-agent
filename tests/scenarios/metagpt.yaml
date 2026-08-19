@@ -1,0 +1,61 @@
+# Scenario 8: metagpt — Team XOR + Graph coordination + roles.
+# Per spec §13.5.3: PM / Architect / Engineer / QA 多角色 PR 风格文档流.
+
+team:
+  members:
+    - role: pm
+      profile: lca-role-pm
+      task_contract:
+        goal: "写 PRD"
+        success_criteria: [{kind: artifact, validator_ref: tool.doc.prd}]
+        risk_level: LOW
+    - role: architect
+      profile: lca-role-architect
+      task_contract:
+        goal: "基于 PRD 写 Design"
+        success_criteria: [{kind: artifact, validator_ref: tool.doc.design}]
+    - role: engineer_1
+      profile: lca-role-engineer
+      task_contract:
+        goal: "基于 Design 写 Code"
+    - role: engineer_2
+      profile: lca-role-engineer
+      task_contract:
+        goal: "基于 Design 写 Code"
+    - role: qa
+      profile: lca-role-qa
+      task_contract:
+        goal: "测代码 + 报告 Bug"
+        risk_level: LOW
+    - role: lead
+      profile: lca-role-lead
+      task_contract:
+        goal: "合并 + 输出"
+        risk_level: MEDIUM
+  governance:
+    coordination: Graph
+    workflow_edges:
+      - from: pm
+        to: architect
+      - from: architect
+        to: engineer_1
+      - from: architect
+        to: engineer_2
+      - from: engineer_1
+        to: qa
+      - from: engineer_2
+        to: qa
+      - from: qa
+        to: engineer_1
+        note: failure-loop
+
+memory_policy:
+  shared_layers: [semantic]
+  private_layers: [working, episodic]
+
+team_message_policy:
+  artifact_visibility: team
+  default_ttl_step: 100
+
+synthesizer:
+  type: merge_by_review

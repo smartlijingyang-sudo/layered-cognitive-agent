@@ -9,15 +9,16 @@ Upstream source: ``shell/shell/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
-    "CollectedOutput",
     "DSH_ENV_PREFIX",
+    "SHELL_SETTINGS_NAMESPACE",
+    "CollectedOutput",
     "DshEnvironment",
     "DshEnvironmentKey",
     "ParsedExitStatus",
-    "SHELL_SETTINGS_NAMESPACE",
     "ShellExecRequest",
     "ShellExecSpec",
     "ShellExecutor",

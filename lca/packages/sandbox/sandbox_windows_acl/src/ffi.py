@@ -9,13 +9,14 @@ Upstream source: ``sandbox/sandbox-windows-acl/src/ffi.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "NativePtr",
     "PROCESS_INFORMATION",
-    "ProcessInfoOutput",
     "STARTUPINFOW",
+    "NativePtr",
+    "ProcessInfoOutput",
     "StartupInfoInput",
     "Win32Bindings",
     "allocBytes",
@@ -27,10 +28,10 @@ __all__: list[str] = [
     "decodeProcessInfo",
     "decodePtr",
     "decodePtrAt",
+    "decodeUint8At",
     "decodeUint16At",
     "decodeUint32",
     "decodeUint32At",
-    "decodeUint8At",
     "encodeStartupInfo",
     "encodeUint32",
     "errorText",

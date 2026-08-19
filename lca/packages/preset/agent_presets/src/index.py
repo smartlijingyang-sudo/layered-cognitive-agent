@@ -9,18 +9,20 @@ Upstream source: ``preset/agent-presets/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "COMPOSITION_FILE",
+    "METADATA_FILE",
+    "SETTINGS_NAMESPACE",
     "AgentPreset",
     "AgentPresetSettings",
     "AgentPresetSettingsSchema",
     "AgentPresets",
-    "COMPOSITION_FILE",
     "Config",
     "InvalidPresetIdError",
     "JoinedPresetMount",
-    "METADATA_FILE",
     "PresetBearingSession",
     "PresetExistsError",
     "PresetMetadata",
@@ -29,7 +31,6 @@ __all__: list[str] = [
     "PresetNotWritableError",
     "PresetRoot",
     "PresetTrust",
-    "SETTINGS_NAMESPACE",
     "UnknownPresetError",
     "copyComposition",
     "deleteComposition",

@@ -9,7 +9,8 @@ Upstream source: ``client/hmr/src/events.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
     "EVENTS_ENDPOINT",

@@ -9,14 +9,15 @@ Upstream source: ``client/ui-settings-plugins/src/client/bash-card-controller.ts
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
+    "SHELL_NS",
     "BashCardController",
     "BashCardFace",
     "BashCardState",
     "BashSettings",
-    "SHELL_NS",
 ]
 
 SHELL_NS = None  # port: surface stub

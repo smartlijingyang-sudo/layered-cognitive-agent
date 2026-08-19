@@ -19,9 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from cordis import Context
-from cordis.loader import Entry, Loader, load_yaml
 
 
 async def boot_profile(
@@ -108,7 +106,6 @@ def _resolve_module_by_path(path: str) -> Any:
 
 def _load_from_dict(data: dict) -> Any:
     """Build an EntryTree from a parsed dict (skips YAML re-parsing)."""
-    import importlib as _il
     # Lazy import to avoid circular dependency
     from cordis import loader as _loader
     return _loader.Loader().load(data)

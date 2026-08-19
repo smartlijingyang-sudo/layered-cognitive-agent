@@ -9,11 +9,12 @@ Upstream source: ``subagent/subagent-claude-code/src/run.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "ClaudeCodeRunSpec",
     "DEFAULT_DISPOSE_GRACE_MS",
+    "ClaudeCodeRunSpec",
     "claudeQueryOptions",
     "consumeClaudeQuery",
     "disposeClaudeCodeChild",

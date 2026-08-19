@@ -9,20 +9,21 @@ Upstream source: ``boot/app-boot/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "ConfigDumpLayer",
     "DEFAULT_PROFILE_BUNDLES",
-    "DshBundleManifest",
-    "DshManifestSection",
-    "DshProfileManifest",
     "FAIL_LOUD_RELEASE_TIMEOUT_MS",
-    "FailLoudProcess",
     "HARNESS_SOURCE_SECTION",
     "PROFILES_DIR",
     "PROFILE_PATCH_FILENAME",
     "PROFILE_TEMPLATES",
+    "ConfigDumpLayer",
+    "DshBundleManifest",
+    "DshManifestSection",
+    "DshProfileManifest",
+    "FailLoudProcess",
     "Profile",
     "ProfileLayer",
     "ProfileManifest",

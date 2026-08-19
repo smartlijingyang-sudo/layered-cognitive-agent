@@ -9,13 +9,16 @@ Upstream source: ``core/session/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
+    "KNOWN_SESSION_EVENT_TYPES",
+    "TOOL_NOT_STARTED",
+    "TOOL_OUTCOME_UNKNOWN",
     "AssistantMessage",
     "ChunkRow",
     "JsonValue",
-    "KNOWN_SESSION_EVENT_TYPES",
     "Session",
     "SessionForkError",
     "SessionForkErrorCode",
@@ -27,8 +30,6 @@ __all__: list[str] = [
     "StorageRecord",
     "SurfaceFoldReplacement",
     "SurfaceFoldResult",
-    "TOOL_NOT_STARTED",
-    "TOOL_OUTCOME_UNKNOWN",
     "ToolResultMessage",
     "UserMessage",
     "adoptSessionEvent",

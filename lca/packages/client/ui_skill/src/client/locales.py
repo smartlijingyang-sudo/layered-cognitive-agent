@@ -9,7 +9,8 @@ Upstream source: ``client/ui-skill/src/client/locales.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
     "NS",

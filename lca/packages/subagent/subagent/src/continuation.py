@@ -9,6 +9,7 @@ Upstream source: ``subagent/subagent/src/continuation.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

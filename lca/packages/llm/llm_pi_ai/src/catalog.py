@@ -9,10 +9,13 @@ Upstream source: ``llm/llm-pi-ai/src/catalog.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "MODALITIES",
+    "SUPPORTED_THINKING_FORMATS",
+    "THINKING_LEVELS",
     "PiAiCompatProfile",
     "PiAiModality",
     "PiAiModelOverride",
@@ -21,8 +24,6 @@ __all__: list[str] = [
     "PiAiThinkingFormat",
     "RouteCatalog",
     "RouteCatalogRequest",
-    "SUPPORTED_THINKING_FORMATS",
-    "THINKING_LEVELS",
     "catalogModels",
     "catalogProvider",
     "catalogProviderIds",

@@ -9,15 +9,16 @@ Upstream source: ``context/agent-instructions/src/render.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
+    "USER_GLOBAL_DIRECTORY",
+    "USER_GLOBAL_FILE",
     "AgentInstructionChange",
     "ChangeRenderItem",
     "RenderedWorkspaceContext",
     "TruncatedInstruction",
-    "USER_GLOBAL_DIRECTORY",
-    "USER_GLOBAL_FILE",
     "candidateScopeKey",
     "decodeScopeKey",
     "instructionScopeKey",

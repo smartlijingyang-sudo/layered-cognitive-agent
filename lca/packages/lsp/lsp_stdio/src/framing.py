@@ -9,7 +9,6 @@ Upstream source: ``lsp/lsp-stdio/src/framing.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "MessageDecoder",

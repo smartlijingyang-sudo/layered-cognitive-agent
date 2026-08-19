@@ -9,11 +9,10 @@ Upstream source: ``client/ui-conversation/src/client/input/submission-policy.ts`
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "ComposerSubmissionPolicy",
     "DEFAULT_BUSY_ENTER_BEHAVIOR",
+    "ComposerSubmissionPolicy",
 ]
 
 class ComposerSubmissionPolicy:

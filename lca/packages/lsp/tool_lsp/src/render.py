@@ -9,7 +9,8 @@ Upstream source: ``lsp/tool-lsp/src/render.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "DEFAULT_MAX_LOCATIONS",

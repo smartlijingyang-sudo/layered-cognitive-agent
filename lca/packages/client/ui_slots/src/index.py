@@ -9,6 +9,7 @@ Upstream source: ``client/ui-slots/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

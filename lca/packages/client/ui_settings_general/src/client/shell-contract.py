@@ -9,6 +9,7 @@ Upstream source: ``client/ui-settings-general/src/client/shell-contract.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

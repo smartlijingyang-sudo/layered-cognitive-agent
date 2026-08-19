@@ -9,6 +9,7 @@ Upstream source: ``client/ui-primitives/src/markdown/plain-text.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

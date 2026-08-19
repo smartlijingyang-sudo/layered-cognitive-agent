@@ -9,7 +9,6 @@ Upstream source: ``core/session/src/request-header.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "canonicalHeader",

@@ -9,12 +9,13 @@ Upstream source: ``terminal/tool-terminal/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "Config",
     "DEFAULT_MAX_RESULT_BYTES",
     "MIN_MAX_RESULT_BYTES",
+    "Config",
     "apply",
     "inject",
     "name",

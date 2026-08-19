@@ -9,9 +9,11 @@ Upstream source: ``core/session/src/types.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "SESSION_FORMAT_VERSION",
     "AgentCancelCause",
     "CreateSessionOptions",
     "EpochHeader",
@@ -20,7 +22,6 @@ __all__: list[str] = [
     "RequestContext",
     "RequestHeaderReason",
     "RestoredSessionOptions",
-    "SESSION_FORMAT_VERSION",
     "SessionEvent",
     "SessionEventMap",
     "SessionEventType",

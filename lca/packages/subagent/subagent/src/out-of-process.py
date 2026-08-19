@@ -9,7 +9,8 @@ Upstream source: ``subagent/subagent/src/out-of-process.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "NO_START_CAPABILITIES",

@@ -9,7 +9,6 @@ Upstream source: ``context/session-reference/src/serialization.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "stringifyTagSafeJson",

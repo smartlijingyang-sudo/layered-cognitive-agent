@@ -9,7 +9,8 @@ Upstream source: ``client/connection/src/http-bridge.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "DEFAULT_MAX_REQUEST_BODY_BYTES",

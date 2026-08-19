@@ -9,16 +9,17 @@ Upstream source: ``boot/app-boot/src/profile.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "DEFAULT_PROFILE_BUNDLES",
-    "DshBundleManifest",
-    "DshManifestSection",
-    "DshProfileManifest",
     "PROFILES_DIR",
     "PROFILE_PATCH_FILENAME",
     "PROFILE_TEMPLATES",
+    "DshBundleManifest",
+    "DshManifestSection",
+    "DshProfileManifest",
     "Profile",
     "ProfileLayer",
     "ProfileManifest",

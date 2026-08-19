@@ -9,11 +9,11 @@ Upstream source: ``client/ui-layout/src/client/columns.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "CENTER_MIN",
-    "Columns",
     "DETAILS_DEFAULT",
     "DETAILS_MAX",
     "DETAILS_MIN",
@@ -22,6 +22,7 @@ __all__: list[str] = [
     "SIDEBAR_DEFAULT",
     "SIDEBAR_MAX",
     "SIDEBAR_MIN",
+    "Columns",
     "clampWidth",
     "computeColumns",
 ]

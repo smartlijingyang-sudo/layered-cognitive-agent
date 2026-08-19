@@ -9,7 +9,8 @@ Upstream source: ``llm/llm-pi-ai/src/adapter.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "PiAiAdapter",

@@ -9,14 +9,15 @@ Upstream source: ``host/directory-picker-auto/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
     "BACKEND_PACKAGES",
+    "SURFACE_PACKAGES",
     "DirectoryPickerBackendKind",
     "DirectoryPickerEnv",
     "DirectoryPickerHostFacts",
-    "SURFACE_PACKAGES",
     "apply",
     "canExecute",
     "hasLinuxChooserBinary",

@@ -9,7 +9,6 @@ Upstream source: ``schedule/schedule/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "MIN_EVERY_INTERVAL_SECONDS",

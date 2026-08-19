@@ -9,14 +9,15 @@ Upstream source: ``client/ui-tool/src/client/tool/models/tool-call-model.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "VARIANT_TITLES",
     "ToolCallBlock",
     "ToolRowModel",
     "ToolRowState",
     "ToolRowVariant",
-    "VARIANT_TITLES",
     "classifyTool",
     "relativizeToCwd",
     "resultText",

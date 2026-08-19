@@ -9,12 +9,13 @@ Upstream source: ``session-query/session-query/src/config.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "Config",
     "SESSION_QUERY_DEFAULT_PERSISTED_INSPECT_CONCURRENCY",
     "SESSION_QUERY_READ_WINDOW_MAX",
+    "Config",
     "SessionQueryError",
     "SessionQueryErrorCode",
 ]

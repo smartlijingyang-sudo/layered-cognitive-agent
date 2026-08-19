@@ -9,6 +9,7 @@ Upstream source: ``e2b/e2b/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

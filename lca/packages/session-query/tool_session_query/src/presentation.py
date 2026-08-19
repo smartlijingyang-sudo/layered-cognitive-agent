@@ -9,7 +9,6 @@ Upstream source: ``session-query/tool-session-query/src/presentation.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "presentation",

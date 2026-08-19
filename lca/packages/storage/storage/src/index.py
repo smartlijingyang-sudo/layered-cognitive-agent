@@ -9,9 +9,11 @@ Upstream source: ``storage/storage/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "UNIT_NAME_RE",
     "BackendRegistry",
     "KvFacet",
     "KvUnit",
@@ -21,7 +23,6 @@ __all__: list[str] = [
     "StorageError",
     "StorageErrorCode",
     "StorageForms",
-    "UNIT_NAME_RE",
     "storageBackendServiceKey",
 ]
 

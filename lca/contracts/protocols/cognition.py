@@ -6,7 +6,7 @@ PR4 adds: PolicyFact, ExecutionEnvelope, DecisionVerdict.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.llm import LLMResponse

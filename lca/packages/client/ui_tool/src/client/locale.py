@@ -9,7 +9,6 @@ Upstream source: ``client/ui-tool/src/client/locale.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "CONVERSATION_NS",

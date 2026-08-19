@@ -9,21 +9,22 @@ Upstream source: ``client/connection/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "API_PATH",
+    "HOST_EVENTS_PATH",
+    "MUX_EVENTS_PATH",
     "Config",
     "ConnectionConfig",
     "ConnectionRpcAuthority",
     "ConnectionRpcEndpointMatcher",
     "ConnectionRpcHandler",
     "ConnectionRpcHandlerOptions",
-    "HOST_EVENTS_PATH",
     "HostConnectionHandle",
     "HostConnectionRpc",
     "HostConnectionService",
-    "MUX_EVENTS_PATH",
     "apply",
     "inject",
     "name",

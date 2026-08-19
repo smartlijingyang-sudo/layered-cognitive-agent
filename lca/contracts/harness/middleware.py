@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Optional, Protocol
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
@@ -24,7 +25,7 @@ class MiddlewareRegistration:
     seam_key: str
     priority: int = 100
     plugin_id: str = ""
-    callback: Optional[Callable[..., Awaitable[Any]]] = None
+    callback: Callable[..., Awaitable[Any]] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

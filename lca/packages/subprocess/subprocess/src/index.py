@@ -9,14 +9,15 @@ Upstream source: ``subprocess/subprocess/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
-    "CollectedOutput",
     "DSH_ENV_PREFIX",
+    "SENSITIVE_ENV_PATTERN",
+    "CollectedOutput",
     "DshEnvironment",
     "DshEnvironmentKey",
-    "SENSITIVE_ENV_PATTERN",
     "SubprocessCollect",
     "SubprocessCollectedOutputs",
     "SubprocessHandle",

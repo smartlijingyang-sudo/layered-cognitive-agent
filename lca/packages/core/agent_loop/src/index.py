@@ -9,17 +9,18 @@ Upstream source: ``core/agent-loop/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "AGENT_LOOP_SETTINGS_NAMESPACE",
     "AGENT_LOOP_SETTINGS_SCHEMA",
+    "CONFIGURED_AGENT_IDENTITIES_KEY",
+    "DEFAULT_MAX_PARALLEL_TOOL_CALLS",
     "AgentLoop",
     "AgentLoopSettings",
-    "CONFIGURED_AGENT_IDENTITIES_KEY",
     "Config",
     "ConfiguredAgentIdentities",
-    "DEFAULT_MAX_PARALLEL_TOOL_CALLS",
     "LauncherAgentIdentity",
 ]
 

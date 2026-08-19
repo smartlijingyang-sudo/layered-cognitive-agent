@@ -9,7 +9,8 @@ Upstream source: ``hooks/hook-protocol/src/runner.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "DEFAULT_HOOK_TIMEOUT_MS",

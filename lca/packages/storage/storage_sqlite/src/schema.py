@@ -9,11 +9,12 @@ Upstream source: ``storage/storage-sqlite/src/schema.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
-    "JournalMode",
     "STORAGE_SQLITE_SCHEMA_VERSION",
+    "JournalMode",
     "openDatabase",
     "recordTableName",
 ]

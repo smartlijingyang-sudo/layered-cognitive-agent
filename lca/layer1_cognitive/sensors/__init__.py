@@ -21,10 +21,10 @@ from lca.layer1_cognitive.sensors.workspace_artifacts import (
 )
 
 __all__ = [
-    "ClockSensor",
     "INBOX_FACTS_KIND",
-    "InboxFactsSensor",
     "TEAM_INBOX_KIND",
+    "ClockSensor",
+    "InboxFactsSensor",
     "TeamInboxSensor",
     "WorkspaceArtifactsSensor",
     "build_clock_sensor",

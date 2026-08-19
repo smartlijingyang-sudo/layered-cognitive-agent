@@ -9,15 +9,16 @@ Upstream source: ``client/ui-conversation/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
     "BUSY_ENTER_BEHAVIORS",
     "BUSY_ENTER_FIELD",
-    "BusyEnterBehavior",
     "CONVERSATION_SETTINGS_NAMESPACE",
-    "ConversationSettings",
     "DEFAULT_BUSY_ENTER_BEHAVIOR",
+    "BusyEnterBehavior",
+    "ConversationSettings",
     "apply",
 ]
 

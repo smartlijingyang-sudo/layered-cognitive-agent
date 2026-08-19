@@ -9,7 +9,6 @@ Upstream source: ``api/remotes/src/remote-events.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "API_REMOTE_FORWARDED_EVENTS",

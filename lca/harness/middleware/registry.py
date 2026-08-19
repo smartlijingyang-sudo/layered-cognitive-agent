@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Awaitable, Callable
-from typing import Any
 from dataclasses import dataclass
+from typing import Any
 
 import structlog
 

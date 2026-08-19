@@ -9,7 +9,8 @@ Upstream source: ``compaction/compaction-tool-result-pruner/src/types.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "PruneResult",

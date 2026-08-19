@@ -9,7 +9,6 @@ Upstream source: ``client/connection/src/client/web-api-client.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "WebApiClient",

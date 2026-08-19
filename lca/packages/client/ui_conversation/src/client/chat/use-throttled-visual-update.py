@@ -9,7 +9,6 @@ Upstream source: ``client/ui-conversation/src/client/chat/use-throttled-visual-u
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "useThrottledVisualUpdate",

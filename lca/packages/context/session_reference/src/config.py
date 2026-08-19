@@ -9,13 +9,14 @@ Upstream source: ``context/session-reference/src/config.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "Config",
     "DEFAULT_CANDIDATE_LIMIT",
     "DEFAULT_MAX_REFERENCE_BYTES",
     "MAX_REFERENCES",
+    "Config",
     "SessionReferenceError",
     "SessionReferenceErrorCode",
 ]

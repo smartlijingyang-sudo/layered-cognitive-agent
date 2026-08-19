@@ -9,16 +9,17 @@ Upstream source: ``typert/generator/src/cordis-catalog.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
+    "REGION_BEGIN",
+    "REGION_END",
     "CordisCatalogModel",
     "CordisCatalogPolicy",
     "CordisCatalogProjector",
     "EventEntry",
     "InheritedEntry",
-    "REGION_BEGIN",
-    "REGION_END",
     "ServiceEntry",
     "ServiceMethodEntry",
     "collectEvents",

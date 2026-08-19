@@ -9,7 +9,8 @@ Upstream source: ``bundle/headless/src/startup.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "HEADLESS_STARTUP_SERVICE",

@@ -9,14 +9,15 @@ Upstream source: ``fs/tool-fs/src/read-render.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
+    "READ_MAX_BYTES",
+    "READ_MAX_LINE_LENGTH",
     "FileReadOutcome",
     "FileTextLine",
     "FsReadMeta",
-    "READ_MAX_BYTES",
-    "READ_MAX_LINE_LENGTH",
     "ReadWindow",
     "WindowResult",
     "buildWindow",

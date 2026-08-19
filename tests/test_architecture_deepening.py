@@ -28,6 +28,7 @@ from lca.layer2_runtime.default_stop_rule import DefaultStopRule
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer4_app.api import Agent, Team
+from lca.layer4_app.runtime_factory import NullPerceiveHub
 
 
 def _state() -> AgentState:
@@ -99,6 +100,7 @@ class TestCheckpointResume:
             memory=_Mem(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
             hooks=SimpleHookRegistry(),
             state_store=store,
+            perceive_hub=NullPerceiveHub(),
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         result = await rt.run("checkpoint me", max_steps=3)

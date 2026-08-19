@@ -9,7 +9,6 @@ Upstream source: ``extensions/cordis-client-runner/src/client/providers.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "CLIENT_BUILTIN_INSPECTION",

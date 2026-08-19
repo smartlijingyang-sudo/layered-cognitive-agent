@@ -9,11 +9,12 @@ Upstream source: ``typert/loader/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "Config",
     "TYPERT_HOST_EXPORT",
+    "Config",
     "apply",
     "inject",
     "name",

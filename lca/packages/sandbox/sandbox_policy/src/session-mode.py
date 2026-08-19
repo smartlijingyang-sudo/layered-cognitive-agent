@@ -9,7 +9,6 @@ Upstream source: ``sandbox/sandbox-policy/src/session-mode.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "SANDBOX_MODES",

@@ -9,20 +9,21 @@ Upstream source: ``core/system-prompt/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
+    "PERSONA_ORDER",
+    "PERSONA_SECTION",
+    "TOOL_ORDER_REST",
     "AssembleContext",
     "AssembledContext",
     "AssembledSection",
     "Config",
-    "PERSONA_ORDER",
-    "PERSONA_SECTION",
     "PromptAssembly",
     "PromptContext",
     "PromptSection",
     "SystemPrompt",
-    "TOOL_ORDER_REST",
     "ToolProviderResult",
     "joinContextSections",
     "renderContextSections",

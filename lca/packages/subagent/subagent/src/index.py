@@ -9,9 +9,11 @@ Upstream source: ``subagent/subagent/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
+    "SUBAGENT_DESCRIPTOR_VERSION",
     "AssistantOutputFold",
     "ChildComposition",
     "ContinuableCreateRequest",
@@ -26,7 +28,6 @@ __all__: list[str] = [
     "OneShotSubagentDescriptorData",
     "OneShotSubagentDescriptorInput",
     "ResolvedSubagentStartRequest",
-    "SUBAGENT_DESCRIPTOR_VERSION",
     "SubagentCapabilities",
     "SubagentDepthError",
     "SubagentDescendantListEntry",

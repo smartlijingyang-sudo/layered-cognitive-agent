@@ -10,12 +10,12 @@ from typing import Any
 
 
 def build_live_agent(
-    store: "SessionStore",
-    inbox: "Inbox",
+    store: SessionStore,
+    inbox: Inbox,
     identity_id: str,
     options: dict[str, Any] | None,
     cordis_ctx: Any | None,
-) -> "OwnerAgentHandle":
+) -> OwnerAgentHandle:
     """Build a LiveAgent by resolving the loop builder from cordis context.
 
     Resolution order:

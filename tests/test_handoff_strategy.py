@@ -12,6 +12,7 @@ from lca.contracts.models.core.state import Budget
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer3_agent.orchestration_strategies import HandoffStrategy
 from lca.layer4_app.defaults import build_default_registries
+from lca.layer4_app.runtime_factory import NullPerceiveHub
 from tests.support.team_stage import stage_with_invoker
 
 _REGISTRIES = build_default_registries()
@@ -223,6 +224,7 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
             hooks,
             state_store,
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+            perceive_hub=NullPerceiveHub(),
         )
         result = await runtime.run("test task", max_steps=10)
 

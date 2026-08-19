@@ -9,7 +9,6 @@ Upstream source: ``shell/tool-bash/src/background.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "processOutcome",

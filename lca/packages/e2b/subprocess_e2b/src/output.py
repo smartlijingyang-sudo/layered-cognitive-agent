@@ -9,12 +9,11 @@ Upstream source: ``e2b/subprocess-e2b/src/output.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "E2B_OUTPUT_COMPLETE_FRAME",
     "E2BBase64Decoder",
     "E2BOutputReader",
-    "E2B_OUTPUT_COMPLETE_FRAME",
 ]
 
 E2B_OUTPUT_COMPLETE_FRAME = None  # port: surface stub

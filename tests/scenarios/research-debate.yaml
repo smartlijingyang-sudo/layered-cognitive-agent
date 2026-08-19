@@ -1,0 +1,75 @@
+# Scenario 12: research-debate — Lead + 3 researchers + evidence synthesizer.
+# Per spec §3.7.4: 配置即文档.
+
+team:
+  members:
+    - role: lead
+      profile: lca-role-lead-debate
+      bundle: bundles/lead-standard.yaml
+      task_contract:
+        goal: "协调 3 个调研者 + 主持 debate + 输出最终答案"
+        allowed_actions: [DELEGATE, RESPOND]
+        success_criteria: [{kind: artifact, validator_ref: tool.synthesizer.verify}]
+        budget: {token_limit: 50000, time_limit_s: 600, call_limit: 200}
+        risk_level: MEDIUM
+        escalation: {on_high_risk_action: true, target: human}
+      tool_restriction:
+        allow: [team_message.publish, team_message.reply]
+        deny: [shell_exec, file_write]
+    - role: researcher_doc
+      profile: lca-role-researcher-doc
+      bundle: bundles/researcher-doc-tools.yaml
+      task_contract:
+        goal: "在文档库中调研问题"
+        success_criteria: [{kind: verifiable_fact, validator_ref: tool.doc.verify}]
+        budget: {token_limit: 20000, call_limit: 50}
+        risk_level: LOW
+      tool_restriction:
+        allow: [tool.file.read, tool.doc.search, tool.fs.search]
+        deny: [tool.shell, tool.web, tool.git, tool.fs.write]
+    - role: researcher_code
+      profile: lca-role-researcher-code
+      bundle: bundles/researcher-code-tools.yaml
+      task_contract:
+        goal: "在代码库中调研问题"
+        success_criteria: [{kind: artifact, validator_ref: tool.git.diff}]
+        budget: {token_limit: 25000, call_limit: 80}
+        risk_level: MEDIUM
+      tool_restriction:
+        allow: [tool.shell, tool.git, tool.lsp, tool.fs.search]
+        deny: [tool.web]
+    - role: researcher_web
+      profile: lca-role-researcher-web
+      bundle: bundles/researcher-web-tools.yaml
+      task_contract:
+        goal: "在网络上调研问题"
+        success_criteria: [{kind: artifact, validator_ref: tool.web.cite}]
+        budget: {token_limit: 15000, call_limit: 30}
+        risk_level: MEDIUM
+        poison_screening: HIGH
+      tool_restriction:
+        allow: [tool.web.search, tool.web.fetch, tool.doc.search]
+        deny: [tool.shell, tool.fs.write]
+  governance:
+    coordination: Debate
+    topic: "current_question"
+
+memory_policy:
+  shared_layers: [semantic]
+  private_layers: [working, episodic]
+
+team_message_policy:
+  default_visibility: team
+  default_ttl_step: 50
+  acl:
+    - sender: researcher
+      audience: [lead, researcher]
+      action: publish
+    - sender: researcher
+      audience: [lead]
+      action: reply
+
+synthesizer:
+  type: evidence_weighted
+  require_consensus: false
+  min_sources: 2

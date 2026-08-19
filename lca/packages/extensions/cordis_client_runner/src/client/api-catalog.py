@@ -9,18 +9,19 @@ Upstream source: ``extensions/cordis-client-runner/src/client/api-catalog.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "ApiParameter",
     "EVENT_API",
-    "EventApiEntry",
     "INHERITED_CTX_API",
-    "InheritedApiEntry",
     "SERVICE_API",
+    "TYPE_API",
+    "ApiParameter",
+    "EventApiEntry",
+    "InheritedApiEntry",
     "ServiceApiEntry",
     "ServiceApiMethod",
-    "TYPE_API",
     "TypeApiEntry",
     "queryEventApi",
     "queryServiceApi",

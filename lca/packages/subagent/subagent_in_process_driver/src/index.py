@@ -9,12 +9,13 @@ Upstream source: ``subagent/subagent-in-process-driver/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "InProcessRunOptions",
     "STRUCTURED_OUTPUT_INSTRUCTION",
     "STRUCTURED_OUTPUT_TOOL",
+    "InProcessRunOptions",
     "startInProcessRun",
 ]
 

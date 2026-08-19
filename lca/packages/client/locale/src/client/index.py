@@ -9,12 +9,14 @@ Upstream source: ``client/locale/src/client/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "COMMON_NS",
-    "CommonKey",
     "FALLBACK_LOCALE",
+    "SETTINGS_NS",
+    "CommonKey",
     "LanguageOptionRow",
     "LanguageRowComponentProps",
     "LanguageRowInjected",
@@ -25,7 +27,6 @@ __all__: list[str] = [
     "LocaleRuntime",
     "LocaleSettings",
     "LocaleSnapshot",
-    "SETTINGS_NS",
     "Translate",
     "TranslateNS",
     "apply",

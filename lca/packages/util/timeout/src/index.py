@@ -9,12 +9,13 @@ Upstream source: ``util/timeout/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
+    "MAX_TIMER_DELAY_MS",
     "Deadline",
     "IdleWatchdog",
-    "MAX_TIMER_DELAY_MS",
     "TimeoutReason",
     "clampTimeout",
     "deadline",

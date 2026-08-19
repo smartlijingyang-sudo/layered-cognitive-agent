@@ -9,7 +9,6 @@ Upstream source: ``client/runtime/src/client/time-zone.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "resolvedClientTimeZone",

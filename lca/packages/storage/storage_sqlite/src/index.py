@@ -9,12 +9,13 @@ Upstream source: ``storage/storage-sqlite/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "STORAGE_SQLITE_SCHEMA_VERSION",
     "Config",
     "JournalMode",
-    "STORAGE_SQLITE_SCHEMA_VERSION",
     "SqliteStorageBackend",
     "apply",
     "inject",

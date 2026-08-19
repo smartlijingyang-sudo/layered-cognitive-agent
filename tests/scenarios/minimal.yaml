@@ -1,0 +1,30 @@
+# Scenario 1: minimal — only bash + str_replace_editor.
+# Two tools, no memory, no skills, no decision gates.  Per spec §13.2.1.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/scenario-minimal.yaml
+
+patch: []
+
+profile:
+  id: minimal
+  description: "bash + str_replace_editor 双工具编码 Agent（极简）"
+  trust: system
+  bundle_overrides:
+    - id: lca-tool-bash
+      config: { allowed: true }
+    - id: lca-tool-str-replace-editor
+      config: { allowed: true }
+  # Disabled (Null by default)
+  disabled_plugins:
+    - lca-brain-modular
+    - lca-memory-four-layer
+    - lca-skills-service
+    - lca-sensor-clock
+    - lca-sensor-workspace-artifacts
+    - lca-sensor-inbox-facts
+    - lca-sensor-skill-catalog
+    - lca-gate-repeat-tool-call
+    - lca-gate-loop-breaker
+    - lca-gate-progress-detector

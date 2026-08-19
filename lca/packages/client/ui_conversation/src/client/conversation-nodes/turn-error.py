@@ -9,7 +9,6 @@ Upstream source: ``client/ui-conversation/src/client/conversation-nodes/turn-err
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "registerTurnErrorConversationNode",

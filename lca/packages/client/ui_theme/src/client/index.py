@@ -9,13 +9,14 @@ Upstream source: ``client/ui-theme/src/client/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "SETTINGS_NS",
     "AppearanceRowComponentProps",
     "AppearanceRowInjected",
     "AppearanceRowState",
-    "SETTINGS_NS",
     "ThemeDefinition",
     "ThemeKey",
     "ThemePreference",

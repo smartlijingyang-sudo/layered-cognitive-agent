@@ -707,8 +707,8 @@ def debug(
     import asyncio
 
     if sub == "tree":
-        from lca.harness.profile.boot import boot_profile
         from lca.harness.diagnostics.tree import render_tree
+        from lca.harness.profile.boot import boot_profile
 
         async def main():
             ctx = await boot_profile(str(profile))

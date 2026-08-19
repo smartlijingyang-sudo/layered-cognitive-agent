@@ -9,11 +9,10 @@ Upstream source: ``client/ui-conversation/src/client/input/machine.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "InputMachine",
     "PLACEHOLDER",
+    "InputMachine",
     "projectClipboard",
 ]
 

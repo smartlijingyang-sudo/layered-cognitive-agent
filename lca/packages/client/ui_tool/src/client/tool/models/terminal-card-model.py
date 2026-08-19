@@ -9,7 +9,8 @@ Upstream source: ``client/ui-tool/src/client/tool/models/terminal-card-model.ts`
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "TerminalCardModel",

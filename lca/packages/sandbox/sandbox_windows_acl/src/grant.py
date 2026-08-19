@@ -9,7 +9,6 @@ Upstream source: ``sandbox/sandbox-windows-acl/src/grant.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "AclWriteGrant",

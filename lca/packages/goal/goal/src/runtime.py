@@ -9,7 +9,6 @@ Upstream source: ``goal/goal/src/runtime.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "GOAL_CHANGE_VERSION",

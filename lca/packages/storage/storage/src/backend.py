@@ -9,14 +9,15 @@ Upstream source: ``storage/storage/src/backend.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
+    "UNIT_NAME_RE",
     "KvFacet",
     "KvUnit",
     "KvUnitDescriptor",
     "StorageBackend",
-    "UNIT_NAME_RE",
 ]
 
 UNIT_NAME_RE = None  # port: surface stub

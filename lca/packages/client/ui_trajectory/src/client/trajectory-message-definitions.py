@@ -9,7 +9,6 @@ Upstream source: ``client/ui-trajectory/src/client/trajectory-message-definition
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "registerTrajectoryMessageDefinitions",

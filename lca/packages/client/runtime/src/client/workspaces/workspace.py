@@ -9,6 +9,7 @@ Upstream source: ``client/runtime/src/client/workspaces/workspace.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

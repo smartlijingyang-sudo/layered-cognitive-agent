@@ -1,0 +1,23 @@
+# Scenario 4: cordis-creator — standard + Composer.mount/unmount + cordis_control tool.
+# The creator uses an ordinary Tool call (Body.act) to mount/unmount plugins.
+# C3/C4/C5/PR12/§23.2 invariants gate the mount.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
+
+patch: []
+
+profile:
+  id: cordis-creator
+  description: "标准 + 运行时检查 + 插件实验 + preset 创作"
+  trust: system
+  role: cordis-creator
+  capability_grant:
+    - cordis_control.inspect
+    - cordis_control.mount
+    - cordis_control.unmount
+    - cordis_control.publish
+    - tool_fs.write
+    - tool_bash

@@ -9,7 +9,6 @@ Upstream source: ``client/ui-conversation/src/client/conversation-nodes/common.t
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "CHAT_SYNTHETIC_SEQ_OFFSETS",

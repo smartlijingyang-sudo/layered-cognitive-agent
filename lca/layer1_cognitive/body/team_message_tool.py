@@ -52,8 +52,8 @@ def build_team_message_publish_tool():
     The tool is a thin wrapper around ``publish_team_message``.  The
     registry wires up the standard tool schema.
     """
-    from lca.contracts.protocols.infra import Tool
     from lca.contracts.models.core.decision import Observation
+    from lca.contracts.protocols.infra import Tool
 
     class _TeamMessagePublishTool(Tool):
         name = TEAM_MESSAGE_TOOL_NAME

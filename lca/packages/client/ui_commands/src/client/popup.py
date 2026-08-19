@@ -9,6 +9,7 @@ Upstream source: ``client/ui-commands/src/client/popup.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

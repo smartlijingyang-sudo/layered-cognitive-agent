@@ -9,7 +9,6 @@ Upstream source: ``sandbox/sandbox-windows-acl/src/win32-abi.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "ACCESS_ALLOWED_ACE_TYPE",
@@ -41,7 +40,6 @@ __all__: list[str] = [
     "JOBOBJECT_EXTENDED_LIMIT_FLAGS_OFFSET",
     "JOBOBJECT_EXTENDED_LIMIT_SIZE",
     "JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE",
-    "JobObjectExtendedLimitInformation",
     "LOCKFILE_EXCLUSIVE_LOCK",
     "LOCKFILE_FAIL_IMMEDIATELY",
     "LUA_TOKEN",
@@ -72,9 +70,10 @@ __all__: list[str] = [
     "TRUSTEE_IS_UNKNOWN",
     "TRUSTEE_W_OFFSET",
     "TRUSTEE_W_PTSTRNAME_OFFSET",
+    "WRITE_RESTRICTED",
+    "JobObjectExtendedLimitInformation",
     "TokenDefaultDacl",
     "TokenGroups",
-    "WRITE_RESTRICTED",
     "WinWorldSid",
 ]
 

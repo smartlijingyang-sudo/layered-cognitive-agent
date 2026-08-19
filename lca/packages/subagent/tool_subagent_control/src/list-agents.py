@@ -9,7 +9,6 @@ Upstream source: ``subagent/tool-subagent-control/src/list-agents.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "apply",

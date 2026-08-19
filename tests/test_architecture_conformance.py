@@ -87,7 +87,7 @@ def _read_source(path: Path) -> str:
 class TestPhaseAllowlist:
     def test_allowlist_keys_match_spec(self) -> None:
         """Allowlist mirrors spec §3.4 \"Eight Phases\" minus legacy pre_step."""
-        assert ALLOWED_SEAM_KEYS == frozenset(
+        assert frozenset(
             {
                 "agent.pre_step",
                 "agent.before_perceive",
@@ -100,7 +100,7 @@ class TestPhaseAllowlist:
                 "agent.after_reflect",
                 "agent.before_turn_end",
             }
-        )
+        ) == ALLOWED_SEAM_KEYS
 
     def test_cognitive_phases_matches_allowlist(self) -> None:
         from lca.harness.middleware.registry import COGNITIVE_PHASES

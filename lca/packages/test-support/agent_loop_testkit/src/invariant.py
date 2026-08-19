@@ -9,7 +9,6 @@ Upstream source: ``test-support/agent-loop-testkit/src/invariant.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "apply",

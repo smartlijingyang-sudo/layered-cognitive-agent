@@ -9,7 +9,8 @@ Upstream source: ``client/ui-settings-general/src/client/settings-document-store
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "SettingsDocumentState",

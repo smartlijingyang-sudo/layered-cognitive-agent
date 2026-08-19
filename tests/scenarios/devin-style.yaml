@@ -1,0 +1,56 @@
+# Scenario 11: devin-style — GoalStack + Ralph + Team + ApprovalToken.
+# Per spec §13.5.6: 接 GitHub Issue → 规划 → 实现 → 测 → PR.
+
+team:
+  members:
+    - role: planner
+      profile: lca-role-planner
+      task_contract:
+        goal: "拆 Issue 为 GoalStack"
+        risk_level: LOW
+      tools_allow: [tool.git, tool.github.read]
+    - role: implementer
+      profile: lca-role-implementer
+      task_contract:
+        goal: "写 patch + 测"
+        risk_level: HIGH
+      tools_allow:
+        - tool.fs.write
+        - tool.shell
+        - tool.git
+        - tool.test_run
+    - role: reviewer
+      profile: lca-role-reviewer
+      task_contract:
+        goal: "审查 diff 质量"
+        risk_level: LOW
+      tools_allow: [tool.git.diff, tool.fs.read]
+    - role: pr-creator
+      profile: lca-role-pr-creator
+      task_contract:
+        goal: "开 PR"
+        risk_level: MEDIUM
+      tools_allow: [tool.github.create_pr, tool.git.push]
+    - role: ci-runner
+      profile: lca-role-ci-runner
+      task_contract:
+        goal: "跑 CI"
+        risk_level: LOW
+      tools_allow: [tool.github.run_ci]
+  governance:
+    coordination: Graph
+    workflow_edges:
+      - from: planner
+        to: implementer
+      - from: implementer
+        to: reviewer
+      - from: reviewer
+        to: pr-creator
+      - from: pr-creator
+        to: ci-runner
+      - from: ci-runner
+        to: reviewer
+        note: failure-loop
+
+memory_policy:
+  shared_layers: [semantic]

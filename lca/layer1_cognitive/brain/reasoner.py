@@ -22,8 +22,8 @@ from lca.contracts.models.core.conversation import (
 )
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.memory import MemoryRecord
-from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.perceive_state import PerceiveState
+from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.delegation import DelegationResult
 from lca.contracts.models.team.role_team import RoleProfile
@@ -199,7 +199,7 @@ def _role_prompt_vars(
     *,
     tools: Sequence[Tool] | None = None,
     available_skills: str = "",
-    manifest: object | None = None,
+    manifest: ContextManifest | None = None,
 ) -> dict[str, str]:
     """Render the prompt's role-keyed variables.
 

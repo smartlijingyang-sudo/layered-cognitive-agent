@@ -9,11 +9,12 @@ Upstream source: ``session/session-title-llm/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "ResolvedSessionTitleLlmConfig",
     "SESSION_TITLE_TIMEOUT_CODE",
+    "ResolvedSessionTitleLlmConfig",
     "SessionTitleLlmConfig",
     "SessionTitleLlmConfigFields",
     "SessionTitleLlmConfigSchema",

@@ -9,6 +9,7 @@ Upstream source: ``extensions/ui-cordis/src/client/card-model.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

@@ -9,7 +9,6 @@ Upstream source: ``session/session-persistence-jsonl/src/zstd-private-decoder.ts
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "NodePrivateZstdFrameDecoder",

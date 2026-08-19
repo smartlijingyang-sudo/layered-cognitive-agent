@@ -9,9 +9,12 @@ Upstream source: ``client/runtime/src/client/sessions/conversation.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "EMPTY_CHAT_SNAPSHOT",
+    "EMPTY_CONVERSATION_VIEWS",
     "AssistantBlock",
     "AssistantMessageNode",
     "AssistantProvenanceView",
@@ -26,8 +29,6 @@ __all__: list[str] = [
     "ContextMessageNode",
     "ConversationNode",
     "ConversationSnapshot",
-    "EMPTY_CHAT_SNAPSHOT",
-    "EMPTY_CONVERSATION_VIEWS",
     "LegacyConversationSlice",
     "ModelRetryNode",
     "OpenState",

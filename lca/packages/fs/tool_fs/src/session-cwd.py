@@ -9,7 +9,6 @@ Upstream source: ``fs/tool-fs/src/session-cwd.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "sessionCwd",

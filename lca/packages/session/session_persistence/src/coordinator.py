@@ -9,7 +9,8 @@ Upstream source: ``session/session-persistence/src/coordinator.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "DEFAULT_PREPARED_SESSION_CACHE_SIZE",

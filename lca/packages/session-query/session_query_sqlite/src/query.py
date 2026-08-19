@@ -9,17 +9,18 @@ Upstream source: ``session-query/session-query-sqlite/src/query.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "FTS_HIGHLIGHT_END",
     "FTS_HIGHLIGHT_START",
-    "NormalizedEventRequest",
-    "NormalizedSessionRequest",
-    "QueryLimits",
     "SQLITE_FTS5_OUTER_PREDICATE_LIMIT",
     "SQLITE_MAX_PAGE_LIMIT",
     "SQLITE_PORTABLE_VARIABLE_LIMIT",
+    "NormalizedEventRequest",
+    "NormalizedSessionRequest",
+    "QueryLimits",
     "SqlWhere",
     "assertFts5OuterPredicateCount",
     "assertPortableBindingCount",

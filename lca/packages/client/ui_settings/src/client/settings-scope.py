@@ -9,7 +9,6 @@ Upstream source: ``client/ui-settings/src/client/settings-scope.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "SettingsScopeBinder",

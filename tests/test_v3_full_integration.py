@@ -15,34 +15,26 @@ spec §Risks / "PR-by-PR canary" mitigation.
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
 from lca.contracts.atoms.ids import new_id
+from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.execution import (
     ExecutionEnvelope,
     envelope_from_decision,
     find_terminal_tool_invoked,
 )
-from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perception import ContextItem
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.observability.journal import (
     InboxFollowupCreated,
     TeamMessagePublished,
 )
-from lca.contracts.protocols import Sensor
-from lca.contracts.protocols.cognition import SensorDisabled
-from lca.contracts.models.core.decision import Decision, ToolCall, Turn, Observation
 from lca.layer0_infra.observability.journal.engine import RunStore
 from lca.layer1_cognitive.brain.context_manifest import digest_manifest
 from lca.layer1_cognitive.brain.decision_gates import (
     ChainedDecisionGate,
     RepeatToolCallGate,
     ToolLoopBreakerGate,
-    record_gate_decided,
 )
 from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
 from lca.layer1_cognitive.perceive_sink import RunStoreSink

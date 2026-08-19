@@ -9,7 +9,8 @@ Upstream source: ``client/ui-primitives/src/pointer-grace.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "POINTER_GRACE_MS",

@@ -9,7 +9,6 @@ Upstream source: ``sandbox/sandbox-local/src/profiles.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "bwrapProfileArgs",

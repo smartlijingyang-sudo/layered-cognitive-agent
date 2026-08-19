@@ -9,6 +9,7 @@ Upstream source: ``jobs/tool-jobs/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

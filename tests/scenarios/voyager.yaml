@@ -1,0 +1,27 @@
+# Scenario 6: voyager — procedural memory + skill acquisition.
+# Per spec §13.5.1: Skill 习得 → procedural memory; Critic 提炼.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-voyager.yaml
+
+patch: []
+
+profile:
+  id: voyager
+  description: "Voyager 风格技能习得 Agent（procedural memory 自动写入）"
+  trust: system
+  memory_policy:
+    shared_layers: []
+    private_layers: [working, episodic, semantic, procedural]
+    max_procedural: 10000
+    default_authority: model_inference
+  skill_acquisition:
+    enabled: true
+    min_confidence: 0.7
+    min_evidence: 3
+  tools_allow:
+    - tool.shell
+    - tool.fs.write
+    - tool.test_run

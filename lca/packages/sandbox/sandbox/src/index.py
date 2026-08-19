@@ -9,25 +9,26 @@ Upstream source: ``sandbox/sandbox/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "ESCALATION_TARGETS",
+    "SANDBOX_UNAVAILABLE",
+    "WIDER_MODES",
     "ConfinedArgv",
     "ConfinedSandboxMode",
-    "ESCALATION_TARGETS",
     "EscalationApproval",
     "EscalationApprover",
     "EscalationOutcome",
     "EscalationRequest",
     "RunnerFailureRule",
-    "SANDBOX_UNAVAILABLE",
     "SandboxEnforcement",
     "SandboxExecutionPolicy",
     "SandboxMode",
     "SandboxPolicy",
     "SandboxProvider",
     "SandboxUnavailableError",
-    "WIDER_MODES",
     "approveEscalation",
     "canonicalPath",
     "escalationHintMarker",

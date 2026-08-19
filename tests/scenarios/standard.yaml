@@ -1,0 +1,14 @@
+# Scenario 2: standard — full standard implementation.
+# All primitives enabled, default Brain, all Sensors, four-layer Memory.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-standard.yaml
+
+patch: []
+
+profile:
+  id: standard
+  description: "功能完整的编码 Agent（标准实现）"
+  trust: system

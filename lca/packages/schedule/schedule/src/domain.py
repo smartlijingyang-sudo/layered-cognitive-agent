@@ -9,13 +9,14 @@ Upstream source: ``schedule/schedule/src/domain.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "EveryOccurrence",
-    "FoldedSchedules",
     "MIN_EVERY_INTERVAL_SECONDS",
     "SCHEDULE_CHANGE_VERSION",
+    "EveryOccurrence",
+    "FoldedSchedules",
     "ScheduleId",
     "ScheduleInputError",
     "ScheduleLogError",

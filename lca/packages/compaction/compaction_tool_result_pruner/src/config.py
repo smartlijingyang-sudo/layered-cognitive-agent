@@ -9,7 +9,6 @@ Upstream source: ``compaction/compaction-tool-result-pruner/src/config.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "DEFAULTS",

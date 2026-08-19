@@ -9,7 +9,6 @@ Upstream source: ``core/agent-loop/src/constants.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "DEFAULT_MAX_PARALLEL_TOOL_CALLS",

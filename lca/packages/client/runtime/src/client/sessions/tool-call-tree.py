@@ -9,7 +9,6 @@ Upstream source: ``client/runtime/src/client/sessions/tool-call-tree.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "MAX_TOOL_CALL_TREE_DEPTH",

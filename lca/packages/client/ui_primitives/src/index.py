@@ -9,19 +9,20 @@ Upstream source: ``client/ui-primitives/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
+    "DEFAULT_DIFF_MAX_LINES",
+    "DEFAULT_READ_MAX_LINES",
+    "DEFAULT_SEARCH_MAX_LINES",
+    "DEFAULT_TERMINAL_MAX_LINES",
     "BrandWordmark",
     "Button",
     "ButtonVariant",
     "CodeBlock",
     "CodeBlockProps",
     "ConnectionBanner",
-    "DEFAULT_DIFF_MAX_LINES",
-    "DEFAULT_READ_MAX_LINES",
-    "DEFAULT_SEARCH_MAX_LINES",
-    "DEFAULT_TERMINAL_MAX_LINES",
     "DiffBlock",
     "DiffBlockProps",
     "DiffHunk",

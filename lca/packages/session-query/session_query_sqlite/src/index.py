@@ -9,18 +9,19 @@ Upstream source: ``session-query/session-query-sqlite/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "Config",
-    "JournalMode",
-    "OpenAt",
     "SESSION_QUERY_SQLITE_APPLICATION_ID",
     "SESSION_QUERY_SQLITE_DEFAULT_LIMIT",
     "SESSION_QUERY_SQLITE_MAX_LIMIT",
     "SESSION_QUERY_SQLITE_PATH_KEY",
     "SESSION_QUERY_SQLITE_SCHEMA_VERSION",
     "SESSION_QUERY_SQLITE_SNIPPET_CHARS",
+    "Config",
+    "JournalMode",
+    "OpenAt",
     "SqliteSessionQueryEngine",
 ]
 

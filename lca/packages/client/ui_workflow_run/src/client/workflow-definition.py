@@ -9,6 +9,7 @@ Upstream source: ``client/ui-workflow-run/src/client/workflow-definition.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

@@ -31,34 +31,29 @@ import pytest
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import (
     ContextManifested,
-    GateDecided as JournalGateDecided,
     InboxFollowupCreated,
     TeamMessagePublished,
 )
-from lca.contracts.protocols import PerceiveHub, Sensor
-from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.layer0_infra.observability.journal.engine import RunStore
 from lca.layer1_cognitive.brain.decision_gates import (
     ChainedDecisionGate,
     RepeatToolCallGate,
     record_gate_decided,
 )
+from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
+from lca.layer1_cognitive.perceive_sink import RunStoreSink
 from lca.layer1_cognitive.sensors import (
     ClockSensor,
+    InboxFactsSensor,
+    TeamInboxSensor,
     WorkspaceArtifactsSensor,
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
-from lca.layer1_cognitive.sensors import (
-    InboxFactsSensor,
-    TeamInboxSensor,
-)
-from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import RunStoreSink
 
 
 def _bucket(state: AgentState) -> list:
@@ -220,7 +215,6 @@ class TestPolicyFactEndToEnd:
     async def test_gate_events_in_global_journal(self) -> None:
         # Verify the GateDecided journal event is published and recoverable.
         from lca.contracts.models.observability.journal import GateDecided
-        from lca.layer0_infra.observability import record as _journal_record
 
         store = RunStore()
         state = _state()

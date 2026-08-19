@@ -9,14 +9,15 @@ Upstream source: ``attachment/attachment-local/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "Config",
     "DEFAULT_MAX_IMAGES_PER_MESSAGE",
     "DEFAULT_MAX_IMAGE_BYTES",
     "DEFAULT_MAX_IMAGE_PIXELS",
     "DEFAULT_MAX_MESSAGE_IMAGE_BYTES",
+    "Config",
     "LocalAttachmentStore",
     "detectImage",
     "readImageFile",

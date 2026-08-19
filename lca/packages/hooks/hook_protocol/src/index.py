@@ -9,12 +9,13 @@ Upstream source: ``hooks/hook-protocol/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
-    "CommandHook",
     "DEFAULT_HOOK_TIMEOUT_MS",
     "DEFAULT_STDERR_SUMMARY_MAX_CHARS",
+    "CommandHook",
     "DetachedRuns",
     "HookDialect",
     "HookInvocation",

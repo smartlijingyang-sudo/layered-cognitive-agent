@@ -9,7 +9,8 @@ Upstream source: ``examples/agent-spine-demo/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "Config",

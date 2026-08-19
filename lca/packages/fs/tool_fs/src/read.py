@@ -9,12 +9,13 @@ Upstream source: ``fs/tool-fs/src/read.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "READ_LIMIT",
-    "ReadToolCaps",
     "STREAM_MIN_SIZE",
+    "ReadToolCaps",
     "applyReadTool",
     "parseReadArgs",
 ]

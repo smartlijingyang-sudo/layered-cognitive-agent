@@ -9,9 +9,14 @@ Upstream source: ``code-runtime/code-runtime/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
+    "DUNDER_MEMBER",
+    "PORTABLE_RESERVED_WORDS",
+    "RESERVED_BINDING_GLOBALS",
+    "RESERVED_ERROR_MEMBERS",
     "CodeBindingErrorClass",
     "CodeBindingFunction",
     "CodeBindingNamespace",
@@ -20,10 +25,6 @@ __all__: list[str] = [
     "CodeRunRequest",
     "CodeRunResult",
     "CodeRuntime",
-    "DUNDER_MEMBER",
-    "PORTABLE_RESERVED_WORDS",
-    "RESERVED_BINDING_GLOBALS",
-    "RESERVED_ERROR_MEMBERS",
 ]
 
 CodeBindingErrorClass: TypeAlias = object  # port: surface stub

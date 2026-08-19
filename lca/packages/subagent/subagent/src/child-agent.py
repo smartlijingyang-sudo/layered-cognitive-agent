@@ -9,13 +9,14 @@ Upstream source: ``subagent/subagent/src/child-agent.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
+    "SUBAGENT_DELEGATION_CONTEXT",
     "ChildComposition",
     "ChildCreateInputs",
     "DelegatedPolicyOverrides",
-    "SUBAGENT_DELEGATION_CONTEXT",
     "SubagentDepthError",
     "appendDelegatedPolicyOverrides",
     "applyChildComposition",

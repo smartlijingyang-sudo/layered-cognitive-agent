@@ -9,7 +9,6 @@ Upstream source: ``llm/llm-pi-ai/src/discovery.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "discoverModels",

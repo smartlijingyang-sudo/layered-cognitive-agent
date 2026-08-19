@@ -9,6 +9,7 @@ Upstream source: ``goal/tool-goal/src/authority.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

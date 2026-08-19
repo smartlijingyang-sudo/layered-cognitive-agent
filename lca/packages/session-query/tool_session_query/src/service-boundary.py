@@ -9,7 +9,6 @@ Upstream source: ``session-query/tool-session-query/src/service-boundary.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "serviceBoundary",

@@ -9,6 +9,7 @@ Upstream source: ``host/directory-picker-native/src/win32-dialog-worker.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

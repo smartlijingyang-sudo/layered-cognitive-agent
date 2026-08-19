@@ -9,6 +9,7 @@ Upstream source: ``workflow/workflow-worker-thread/src/protocol.ts``
 
 
 from __future__ import annotations
+
 import enum
 from typing import Protocol, TypeAlias
 

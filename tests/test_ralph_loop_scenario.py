@@ -33,15 +33,12 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perception import ContextItem
+from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import (
     ContextManifested,
     InboxFollowupCreated,
 )
-from lca.contracts.models.core.perceive_state import PerceiveState
-from lca.contracts.protocols import PerceiveHub, Sensor
 from lca.layer0_infra.observability.journal.engine import RunStore
 from lca.layer1_cognitive.brain.decision_gates import (
     ChainedDecisionGate,
@@ -55,7 +52,6 @@ from lca.layer1_cognitive.sensors import (
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
-
 
 # ─────────────────────────────────────────────────────────────
 # Scenario: Ralph loop

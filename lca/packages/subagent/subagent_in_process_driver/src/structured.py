@@ -9,7 +9,8 @@ Upstream source: ``subagent/subagent-in-process-driver/src/structured.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "STRUCTURED_OUTPUT_INSTRUCTION",

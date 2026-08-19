@@ -9,14 +9,15 @@ Upstream source: ``llm/llm-pi-ai/src/config.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "Config",
     "DEFAULT_CONTEXT_WINDOW",
     "DEFAULT_INPUT",
     "DEFAULT_MAX_TOKENS",
     "DEFAULT_STREAM_IDLE_TIMEOUT_MS",
+    "Config",
     "PiAiCompatProfile",
     "PiAiModality",
     "PiAiModelOverride",

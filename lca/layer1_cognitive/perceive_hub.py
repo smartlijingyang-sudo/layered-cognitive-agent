@@ -19,18 +19,19 @@ The Hub's outputs are written to two typed slots on AgentState:
 
 from __future__ import annotations
 
-import structlog
 from collections.abc import Sequence
 
+import structlog
+
 from lca.contracts.models.core.gate_policy import GateDecided
+from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.cognition import SensorDisabled
 from lca.layer1_cognitive.brain.context_manifest import (
-    digest_manifest,
     build_manifest_from_items,
+    digest_manifest,
 )
 from lca.layer1_cognitive.perceive_sink import ManifestSink, default_sink
 
@@ -85,7 +86,7 @@ class SequentialPerceiveHub(PerceiveHub):
                 items.extend(await sensor.read(state))
             except SensorDisabled:
                 continue
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 _log.warning(
                     "sensor_failed",
                     sensor=type(sensor).__name__,
@@ -98,7 +99,7 @@ class SequentialPerceiveHub(PerceiveHub):
             try:
                 await self._memory.perceive(state)
                 items.extend(_memory_items(state))
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 _log.warning("memory_perceive_failed", error=str(exc))
 
         # 3. GateDecided fold (PR4): PolicyFacts from the previous step's

@@ -9,7 +9,8 @@ Upstream source: ``extensions/cordis-client-runner/src/client/guard.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "DynamicCordisGuardEnv",

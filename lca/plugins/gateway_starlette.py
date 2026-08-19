@@ -21,8 +21,8 @@ def create_session_router(gateway) -> object:
 
     async def create_session(request):
         body = await request.json()
-        from lca.contracts.harness.command import SessionCreateCommand
         from lca.contracts.atoms.ids import new_id
+        from lca.contracts.harness.command import SessionCreateCommand
 
         receipt = await gateway.handle_create_session(
             SessionCreateCommand(

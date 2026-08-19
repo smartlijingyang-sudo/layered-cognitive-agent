@@ -9,15 +9,16 @@ Upstream source: ``sandbox/sandbox/src/escalation.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "ESCALATION_TARGETS",
+    "WIDER_MODES",
     "EscalationApproval",
     "EscalationApprover",
     "EscalationOutcome",
     "EscalationRequest",
-    "WIDER_MODES",
     "approveEscalation",
     "escalationHintMarker",
     "sandboxDenialMarker",

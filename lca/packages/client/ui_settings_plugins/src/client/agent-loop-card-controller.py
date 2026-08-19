@@ -9,7 +9,8 @@ Upstream source: ``client/ui-settings-plugins/src/client/agent-loop-card-control
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "AGENT_LOOP_NS",

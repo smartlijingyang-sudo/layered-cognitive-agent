@@ -9,6 +9,7 @@ Upstream source: ``api/remotes/src/agent-lookup.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [

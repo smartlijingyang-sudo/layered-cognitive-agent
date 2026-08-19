@@ -9,7 +9,6 @@ Upstream source: ``client/ui-tool/src/client/tool/models/web-card-model.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "webCardModel",

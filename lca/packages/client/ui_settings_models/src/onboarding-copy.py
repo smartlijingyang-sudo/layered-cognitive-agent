@@ -9,7 +9,6 @@ Upstream source: ``client/ui-settings-models/src/onboarding-copy.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "WELCOME_NOTICE_ACK_FIELD",

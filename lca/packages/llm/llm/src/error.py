@@ -9,14 +9,13 @@ Upstream source: ``llm/llm/src/error.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "CONTEXT_WINDOW_EXCEEDED_CODE",
     "EMPTY_RESPONSE_CODE",
-    "HarnessError",
     "INVALID_CREDENTIAL_CODE",
     "QUOTA_EXCEEDED_CODE",
+    "HarnessError",
     "errorChain",
     "isContextWindowExceededError",
     "isHarnessError",

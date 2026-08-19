@@ -9,7 +9,8 @@ Upstream source: ``client/ui-permission-presets/src/client/settings-store.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "PERMISSION_SETTINGS_NS",

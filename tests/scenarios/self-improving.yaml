@@ -1,0 +1,38 @@
+# Scenario 10: self-improving — Composer.mount + Profile evolution + A/B testing.
+# Per spec §13.6: 4 层闭环 (Skill 习得 + 失败分析 + A/B + 能力扩展).
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-self-improving.yaml
+
+patch: []
+
+profile:
+  id: self-improving
+  description: "自进化系统（Skill 习得 + 失败分析 + Profile 演化 + 能力扩展）"
+  trust: system
+  memory_policy:
+    shared_layers: []
+    private_layers: [working, episodic, semantic, procedural]
+    max_procedural: 10000
+    default_authority: model_inference
+  self_improving:
+    skill_acquisition:
+      enabled: true
+      min_confidence: 0.7
+      min_evidence: 3
+    failure_analysis:
+      enabled: true
+      trigger: ["max_retries_reached", "budget_exceeded"]
+    profile_evolution:
+      enabled: true
+      ab_test_size: 20
+      commit_threshold: 0.05
+      rollback_on_regression: true
+  tools_allow:
+    - tool.cordis_control
+    - tool.profile.diff
+    - tool.profile.apply
+    - tool.shell
+    - tool.fs.write

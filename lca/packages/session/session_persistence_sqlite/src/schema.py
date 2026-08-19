@@ -9,13 +9,14 @@ Upstream source: ``session/session-persistence-sqlite/src/schema.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "EventRow",
-    "JournalMode",
     "SCHEMA_VERSION",
     "SESSION_PERSISTENCE_SQLITE_APPLICATION_ID",
+    "EventRow",
+    "JournalMode",
     "SessionRow",
     "openDatabase",
     "rowToEvent",

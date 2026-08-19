@@ -9,7 +9,6 @@ Upstream source: ``test-support/client-runtime/src/translate.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "makeTranslate",

@@ -16,7 +16,7 @@ import pytest
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perception import ContextItem, ContextManifest
+from lca.contracts.models.core.perception import ContextItem
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import ContextManifested
 from lca.contracts.protocols import PerceiveHub, Sensor

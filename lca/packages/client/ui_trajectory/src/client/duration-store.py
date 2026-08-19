@@ -9,7 +9,6 @@ Upstream source: ``client/ui-trajectory/src/client/duration-store.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "createTrajectoryDurationStore",

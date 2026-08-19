@@ -9,9 +9,12 @@ Upstream source: ``client/ui-workspace/src/client/tree.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "UNGROUPED_KEY",
+    "UNGROUPED_LABEL",
     "GroupNode",
     "RelativeTime",
     "RelativeTimeUnit",
@@ -20,8 +23,6 @@ __all__: list[str] = [
     "SessionNode",
     "SessionOrderBy",
     "TreeView",
-    "UNGROUPED_KEY",
-    "UNGROUPED_LABEL",
     "deriveFlat",
     "deriveGroups",
     "deriveSearchResults",

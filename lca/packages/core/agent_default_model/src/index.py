@@ -9,7 +9,8 @@ Upstream source: ``core/agent-default-model/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE",

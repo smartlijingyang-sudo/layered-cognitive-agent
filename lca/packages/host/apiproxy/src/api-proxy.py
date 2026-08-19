@@ -9,11 +9,12 @@ Upstream source: ``host/apiproxy/src/api-proxy.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "ApiProxyDefaults",
     "DEFAULT_COLD_BLANK_PROBE_MAX_BYTES",
+    "ApiProxyDefaults",
     "assertJsonArgs",
     "createApiProxy",
 ]

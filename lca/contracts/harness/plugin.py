@@ -15,8 +15,7 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Literal, Protocol
-
+from typing import Any, Protocol
 
 # ── PluginContext Protocol (kept; cordis surface only) ───────────────
 

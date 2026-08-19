@@ -9,7 +9,8 @@ Upstream source: ``sdk/client/src/client.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "HarnessClient",

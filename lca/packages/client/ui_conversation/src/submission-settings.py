@@ -9,16 +9,17 @@ Upstream source: ``client/ui-conversation/src/submission-settings.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "BUSY_ENTER_BEHAVIORS",
     "BUSY_ENTER_FIELD",
-    "BusyEnterBehavior",
     "CONVERSATION_SETTINGS_NAMESPACE",
+    "DEFAULT_BUSY_ENTER_BEHAVIOR",
+    "BusyEnterBehavior",
     "ConversationSettings",
     "ConversationSettingsSchema",
-    "DEFAULT_BUSY_ENTER_BEHAVIOR",
 ]
 
 BusyEnterBehavior: TypeAlias = object  # port: surface stub

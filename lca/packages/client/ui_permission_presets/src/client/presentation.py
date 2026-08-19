@@ -9,7 +9,6 @@ Upstream source: ``client/ui-permission-presets/src/client/presentation.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "FULL_ACCESS_PRESET",

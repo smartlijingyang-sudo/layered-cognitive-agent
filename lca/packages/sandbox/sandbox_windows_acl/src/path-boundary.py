@@ -9,7 +9,6 @@ Upstream source: ``sandbox/sandbox-windows-acl/src/path-boundary.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "assertPrivateTempDisjoint",

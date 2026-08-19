@@ -135,9 +135,9 @@ class TestHubConstruction:
 
     def test_hub_constructor_signature(self) -> None:
         """The Hub constructor takes sensors / memory / sink (PR3a)."""
-        from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-
         import inspect
+
+        from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
 
         sig = inspect.signature(SequentialPerceiveHub.__init__)
         params = list(sig.parameters.keys())
@@ -172,11 +172,11 @@ class TestSensorBaseClass:
 
     def test_journal_sensor_uses_dict_projection(self) -> None:
         """The base class projects events to a dict; subclasses override."""
-        from lca.layer1_cognitive.sensors.journal_backed import InboxFactsSensor
-        from lca.contracts.models.observability.journal import InboxFollowupCreated
-        from lca.contracts.models.core.state import AgentState, Budget
         from lca.contracts.atoms.ids import new_id
+        from lca.contracts.models.core.state import AgentState, Budget
+        from lca.contracts.models.observability.journal import InboxFollowupCreated
         from lca.layer0_infra.observability.journal.engine import RunStore
+        from lca.layer1_cognitive.sensors.journal_backed import InboxFactsSensor
 
         store = RunStore()
         store.append(

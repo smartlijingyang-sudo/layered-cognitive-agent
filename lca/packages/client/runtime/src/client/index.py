@@ -9,9 +9,12 @@ Upstream source: ``client/runtime/src/client/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import TypeAlias
 
 __all__: list[str] = [
+    "EMPTY_CHAT_SNAPSHOT",
+    "EMPTY_CONVERSATION_VIEWS",
     "AgentContext",
     "AgentScopeHandle",
     "AssistantBlock",
@@ -63,8 +66,6 @@ __all__: list[str] = [
     "DirectoryBrowseError",
     "DirectoryEntry",
     "DirectoryListing",
-    "EMPTY_CHAT_SNAPSHOT",
-    "EMPTY_CONVERSATION_VIEWS",
     "EngineStoreHandle",
     "EngineStoreInstance",
     "ISession",

@@ -9,12 +9,13 @@ Upstream source: ``preset/agent-presets/src/preset.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "PRESET_ID",
     "AgentPreset",
     "Config",
-    "PRESET_ID",
     "PresetMountError",
     "PresetRoot",
     "PresetTrust",

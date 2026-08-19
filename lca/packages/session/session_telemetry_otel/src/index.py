@@ -9,13 +9,14 @@ Upstream source: ``session/session-telemetry-otel/src/index.ts``
 
 
 from __future__ import annotations
+
 import enum
-from typing import Protocol, TypeAlias
+from typing import Protocol
 
 __all__: list[str] = [
-    "Config",
     "DEFAULT_SHUTDOWN_TIMEOUT_MILLIS",
     "DEFAULT_TELEMETRY_MODE",
+    "Config",
     "OpenTelemetrySessionBackend",
     "SessionTelemetryMode",
 ]

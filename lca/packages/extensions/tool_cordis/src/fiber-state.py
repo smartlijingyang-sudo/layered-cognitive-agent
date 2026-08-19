@@ -9,11 +9,10 @@ Upstream source: ``extensions/tool-cordis/src/fiber-state.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
-    "FiberState",
     "STATE_LABELS",
+    "FiberState",
 ]
 
 FiberState = None  # port: surface stub

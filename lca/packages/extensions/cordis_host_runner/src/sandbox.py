@@ -9,7 +9,6 @@ Upstream source: ``extensions/cordis-host-runner/src/sandbox.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "HOST_BUILTIN_INSPECTION",

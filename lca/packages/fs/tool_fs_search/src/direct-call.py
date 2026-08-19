@@ -9,7 +9,6 @@ Upstream source: ``fs/tool-fs-search/src/direct-call.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "acceptedDirectCallValue",

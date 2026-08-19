@@ -1,0 +1,26 @@
+# Scenario 7: memgpt — 4-layer memory + CompactionPolicy paging.
+# Per spec §13.5.2: working / episodic / semantic / procedural, paging policy.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-memgpt.yaml
+
+patch: []
+
+profile:
+  id: memgpt
+  description: "MemGPT 风格分页 + 上下文压缩（4 层 memory + CompactionPolicy）"
+  trust: system
+  memory_policy:
+    shared_layers: [semantic]
+    private_layers: [working, episodic, procedural]
+    default_authority: tool_observation
+  compaction_policy:
+    type: memgpt-style
+    summarize_after: 30_messages
+    keep_tool_pairs: true
+    keep_active_approvals: true
+  context_budgeter:
+    type: memgpt
+    pin_anchors: [active_task, current_goal, tool_pair]

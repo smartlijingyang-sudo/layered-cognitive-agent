@@ -31,7 +31,6 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.protocols import Sensor
 from lca.layer0_infra.observability.journal.engine import RunStore
 
-
 # Item kind identifiers (closed set, see perception.py).
 INBOX_FACTS_KIND = "inbox_facts"
 TEAM_INBOX_KIND = "team_inbox"

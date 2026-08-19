@@ -9,14 +9,15 @@ Upstream source: ``subagent/subagent/src/descriptor.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "SUBAGENT_DESCRIPTOR_VERSION",
     "ContinuableSubagentDescriptorData",
     "ContinuableSubagentDescriptorInput",
     "OneShotSubagentDescriptorData",
     "OneShotSubagentDescriptorInput",
-    "SUBAGENT_DESCRIPTOR_VERSION",
     "SubagentDescriptorData",
     "SubagentDescriptorInput",
     "foldSubagentDescriptor",

@@ -9,9 +9,11 @@ Upstream source: ``extensions/cordis-host-runner/src/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "HOST_BUILTIN_INSPECTION",
     "ApprovalRequestId",
     "Config",
     "CordisDynamicPackageId",
@@ -29,7 +31,6 @@ __all__: list[str] = [
     "DynamicCordisRun",
     "DynamicCordisRunnerService",
     "DynamicCordisSnapshotRow",
-    "HOST_BUILTIN_INSPECTION",
     "HostCordisInspectProviderRegistration",
 ]
 

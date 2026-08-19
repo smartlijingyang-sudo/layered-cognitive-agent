@@ -9,9 +9,12 @@ Upstream source: ``host/apiproxy/src/api/index.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "SESSION_SEARCH_RESULT_LIMIT",
+    "SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS",
     "AgentPresetEntry",
     "AgentPresetsApi",
     "ApiProxy",
@@ -57,8 +60,6 @@ __all__: list[str] = [
     "RpcRequest",
     "RpcResponse",
     "RpcResult",
-    "SESSION_SEARCH_RESULT_LIMIT",
-    "SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS",
     "ServerRequest",
     "ServerResponse",
     "SessionListMetadata",

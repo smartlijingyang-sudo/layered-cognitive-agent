@@ -9,7 +9,6 @@ Upstream source: ``client/ui-user-questions/src/invariant.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "apply",

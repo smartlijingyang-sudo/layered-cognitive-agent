@@ -9,7 +9,6 @@ Upstream source: ``client/ui-settings-plugin-inventory/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "apply",

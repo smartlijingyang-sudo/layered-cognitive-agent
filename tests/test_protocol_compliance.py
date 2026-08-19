@@ -54,6 +54,7 @@ from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
 # L3
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
+from lca.layer4_app.runtime_factory import NullPerceiveHub
 from tests.support.unimplemented_transport import UnimplementedTransport
 
 
@@ -194,6 +195,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
             SimpleMemorySystem(),
             SimpleHookRegistry(),
             InMemoryStateStore(),
+            perceive_hub=NullPerceiveHub(),
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         self.assertIsInstance(runtime, Runtime)
@@ -227,6 +229,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             SimpleMemorySystem(),
             SimpleHookRegistry(),
             InMemoryStateStore(),
+            perceive_hub=NullPerceiveHub(),
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
         return CognitiveAgent(runtime, rp, create_observability("console")), rp, runtime

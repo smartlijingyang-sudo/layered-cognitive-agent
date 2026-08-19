@@ -16,18 +16,17 @@ spec section.
 
 from __future__ import annotations
 
-import asyncio
 import pytest
 
 from lca.contracts.atoms.ids import new_id
+from lca.contracts.harness.plugin_meta import LAYER_FIELD, NAME_FIELD, PluginMeta
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
-from lca.contracts.models.core.perception import ContextItem
+from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import (
     InboxFollowupCreated,
     TeamMessagePublished,
 )
-from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.protocols import Sensor
 from lca.contracts.protocols.cognition import SensorDisabled
 from lca.layer0_infra.observability.journal.engine import RunStore
@@ -40,17 +39,14 @@ from lca.layer1_cognitive.brain.decision_gates import (
     ToolLoopBreakerGate,
     record_gate_decided,
 )
-from lca.layer1_cognitive.body.team_message_tool import publish_team_message
 from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import RunStoreSink, NullSink
+from lca.layer1_cognitive.perceive_sink import NullSink, RunStoreSink
 from lca.layer1_cognitive.sensors import (
     InboxFactsSensor,
     TeamInboxSensor,
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
-from lca.contracts.harness.plugin_meta import PluginMeta, NAME_FIELD, LAYER_FIELD
-
 
 # ─────────────────────────────────────────────────────────────
 # Sensors — fine-grained
@@ -407,7 +403,7 @@ def _dec(tool: str):
 
 
 def _failed_turn(tool: str):
-    from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
+    from lca.contracts.models.core.decision import Observation, Turn
 
     return Turn(
         decision=_dec(tool),
@@ -421,7 +417,7 @@ def _failed_turn(tool: str):
 
 
 def _ok_turn(tool: str):
-    from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
+    from lca.contracts.models.core.decision import Observation, Turn
 
     return Turn(
         decision=_dec(tool),
@@ -438,5 +434,5 @@ class WorkspaceArtifactsSensor:
 
     from lca.layer1_cognitive.sensors import WorkspaceArtifactsSensor as _Impl
 
-    def __new__(cls):  # noqa: D401
+    def __new__(cls):
         return cls._Impl()

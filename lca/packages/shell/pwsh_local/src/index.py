@@ -9,12 +9,13 @@ Upstream source: ``shell/pwsh-local/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "Config",
     "ENCODING_PREAMBLE",
     "ENV_OVERRIDES",
+    "Config",
     "PwshLocalExecutor",
     "assertServiceablePwshConfig",
     "candidatePwshPaths",

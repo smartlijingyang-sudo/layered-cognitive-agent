@@ -9,7 +9,6 @@ Upstream source: ``host/apiproxy/src/api/goals.schema.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
     "goalClearRequestSchema",

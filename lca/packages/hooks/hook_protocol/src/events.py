@@ -9,7 +9,8 @@ Upstream source: ``hooks/hook-protocol/src/events.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
     "DEFAULT_STDERR_SUMMARY_MAX_CHARS",

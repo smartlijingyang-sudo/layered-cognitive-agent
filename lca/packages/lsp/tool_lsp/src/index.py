@@ -9,15 +9,16 @@ Upstream source: ``lsp/tool-lsp/src/index.ts``
 
 
 from __future__ import annotations
-from typing import Protocol, TypeAlias
+
+from typing import Protocol
 
 __all__: list[str] = [
-    "Config",
     "DEFAULT_LSP_TOOL_TIMEOUT_MS",
     "DEFAULT_MAX_LOCATIONS",
     "DEFAULT_MAX_RESULT_CHARS",
     "LSP_OPERATIONS",
     "LSP_PROMPT_TEXT",
+    "Config",
     "apply",
     "formatHover",
     "formatLocations",

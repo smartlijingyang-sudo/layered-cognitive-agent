@@ -9,12 +9,13 @@ Upstream source: ``llm/llm/src/message.ts``
 
 
 from __future__ import annotations
+
 from typing import Protocol, TypeAlias
 
 __all__: list[str] = [
+    "CONTEXT_SUMMARY_MAX_CHARS",
     "AssistantMessage",
     "AssistantProvenance",
-    "CONTEXT_SUMMARY_MAX_CHARS",
     "ContextForm",
     "ContextFormed",
     "ContextSnapshotSection",
