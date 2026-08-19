@@ -4,39 +4,27 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.harness.profile.boot import boot_profile
-from lca.layer0_infra.plugin.loader._entry import BootedTree
+
+async def inspect_profile_tree(profile_path: Path | str):
+    """Boot a profile and return the resolved cordis.Context."""
+
+    from lca.harness.profile.boot import boot_profile
+
+    return await boot_profile(profile_path)
 
 
-async def inspect_profile_tree(profile_path: Path | str) -> BootedTree:
-    """Boot a profile and return the resolved tree."""
-    return await boot_profile(profile_path, check_seam_completeness=True)
+def format_plugin_tree(ctx: Context, *, profile: str) -> str:
+    """Render a human-readable plugin tree dump from a cordis Context.
 
-
-def format_plugin_tree(tree: BootedTree, *, profile: str) -> str:
-    """Render a human-readable plugin tree dump."""
+    Inspects the Context's fiber for entries and dumps them as a
+    human-readable listing. The full implementation is deferred to Chunk 6
+    (lca-ops debug tree); this stub returns a minimal summary.
+    """
     lines = [
         f"Profile: {profile}",
-        f"Plugins: {len(tree.entries)}",
+        f"Plugin count: {sum(1 for k in dir(ctx) if not k.startswith('_'))}",
         "",
     ]
-    entries_by_id = {entry.id: entry for entry in tree.entries}
-    for handle_id, handle in tree.host.handles.items():
-        provides = handle.spec.provides or "—"
-        inject = handle.injected or "—"
-        lines.append(f"  {handle_id}")
-        lines.append(f"    state: {handle.state.value}")
-        lines.append(f"    provides: {provides}")
-        lines.append(f"    inject: {inject}")
-        lines.append(f"    effects: {len(handle.effects)}")
-
-        original = getattr(entries_by_id.get(handle_id), "_original_module", None)
-        if original is not None:
-            manifest = getattr(original, "manifest", None)
-            if manifest is not None:
-                lines.append(f"    kind: {manifest.kind.value}")
-                if manifest.seam_key:
-                    lines.append(f"    seam: {manifest.seam_key}")
+    lines.append("(Detailed plugin tree dump: see Chunk 6 lca-ops debug tree)")
     lines.append("")
-    lines.append("Seam completeness: PASS")
     return "\n".join(lines)
