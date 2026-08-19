@@ -612,17 +612,13 @@ def inspect_tree(
     ),
 ) -> None:
     """Show the resolved plugin tree for a profile."""
-    import asyncio
-
-    from lca.layer0_infra.plugin.include._profile import ProfileLoader
-    from lca.layer0_infra.plugin.loader._loader import Loader
+    from cordis.loader import load_yaml
 
     if not profile.exists():
         print(f"Profile not found: {profile}")
         raise typer.Exit(1)
 
-    entries = ProfileLoader().load_profile(profile)
-    tree = asyncio.run(Loader(check_seam_completeness=True).load(entries))
+    data = load_yaml(profile)
 
     print(f"Profile: {profile}")
     print(f"Plugins: {len(tree.entries)}")
@@ -660,13 +656,14 @@ def dump_profile(
     Mirrors DSH ``dsh --dump-config``: prints the exact rows the Loader
     would activate, so a dump can never drift from what boots.
     """
-    from lca.layer0_infra.plugin.include._profile import ProfileLoader
+    from cordis.loader import load_yaml
 
     if not profile.exists():
         print(f"Profile not found: {profile}")
         raise typer.Exit(1)
 
-    rows = ProfileLoader().dump_profile(profile)
+    data = load_yaml(profile)
+    rows = data.get("plugins", []) if isinstance(data, dict) else data
     for row in rows:
         parts = [f"  - id: {row['id']}"]
         if row.get("name"):
