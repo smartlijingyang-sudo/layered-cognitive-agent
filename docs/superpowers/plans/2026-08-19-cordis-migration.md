@@ -1744,14 +1744,31 @@ async def setup(ctx, config):
 
 ```python
 # lca/plugins/session_service.py
-"""Session service plugin — Tier-1. Includes merge of agent_service."""
+"""Session service plugin — Tier-1. Includes merge of agent_service.
+
+SessionService currently lives inline in lca/plugins/session_service/__init__.py.
+The rewrite keeps the class inline in this file (the plugin IS the service
+file). Future tasks may extract to lca/layer0_infra/session/ for separation.
+"""
 from __future__ import annotations
 from cordis import plugin
+from lca.contracts.observability.session_events import SessionEventType
+
+
+class SessionService:
+    """Session store + surface projection (model-visible ⟺ logged)."""
+
+    def __init__(self):
+        # state placeholder; full implementation grows in subsequent tasks
+        self._events = []
+
+    async def record(self, event_type: SessionEventType, session_id: str, **payload):
+        """Single entry point for any session event."""
+        self._events.append((event_type, session_id, payload))
 
 
 @plugin(name="lca-session-service")
 async def setup(ctx, config):
-    from lca.layer0_infra.session.service import SessionService
     ctx.provide("session_service", SessionService())
 ```
 
@@ -1789,7 +1806,7 @@ git commit -m "plugins: rewrite 21 plugins to @plugin form (module-per-plugin)"
 - Modify: `lca/plugins/guards/loop_intervention.py`
 - Modify: `lca/plugins/guards/step_budget.py`
 
-- [ ] **Step 1: Rewrite loop_intervention.py using cordis events**
+- [ ] **Step 1: Rewrite loop_intervention.py using cordis events (fix function name)**
 
 ```python
 # lca/plugins/guards/loop_intervention.py
@@ -1806,14 +1823,16 @@ class Config(BaseModel):
 
 @plugin(name="lca-guard-loop-intervention")
 async def setup(ctx, config: Config):
-    from lca.layer2_runtime.loop_intervention_mw import check_intervention
+    from lca.layer2_runtime.loop_intervention_mw import loop_intervention_middleware
 
     @ctx.events.on("agent.after_act")
     async def _check(call_result, state):
-        return check_intervention(state, threshold=config.threshold)
+        return loop_intervention_middleware("agent.after_act", state, None, config={"threshold": config.threshold})
 ```
 
-- [ ] **Step 2: Rewrite step_budget.py using cordis events**
+**Note (F-fix)**: Plan originally said `check_intervention` but the actual function name in `lca/layer2_runtime/loop_intervention_mw.py` is `loop_intervention_middleware`. Also the middleware signature is `(phase, state, context, *, config=None)`.
+
+- [ ] **Step 2: Rewrite step_budget.py using cordis events (fix import path)**
 
 ```python
 # lca/plugins/guards/step_budget.py
@@ -1830,12 +1849,14 @@ class Config(BaseModel):
 
 @plugin(name="lca-guard-step-budget")
 async def setup(ctx, config: Config):
-    from lca.layer2_runtime.budget_policy import check_budget
+    from lca.plugins.budget_policy import budget_check_middleware
 
     @ctx.events.on("agent.pre_step")
     async def _check(state):
-        return check_budget(state, max_steps=config.max_steps)
+        return budget_check_middleware("agent.pre_step", state, None, config={"max_steps": config.max_steps})
 ```
+
+**Note (F-fix)**: Plan originally said `lca/layer2_runtime/budget_policy` but that file doesn't exist — the function lives at `lca/plugins/budget_policy/__init__.py:budget_check_middleware`. After Chunk 2 Task 2.3 renames the file to `lca/plugins/guards/step_budget.py`, the import becomes `from lca.plugins.guards.step_budget import budget_check_middleware`.
 
 - [ ] **Step 3: Verify line counts**
 
@@ -1851,37 +1872,59 @@ git commit -m "guards: rewrite loop_intervention/step_budget as @plugin with cor
 
 ---
 
-### Task 2.6: Delete `lca/layer4_app/capability_boot.py`
+### Task 2.6: Delete `lca/layer4_app/capability_boot.py` + migrate callers
 
 **Files:**
 - Delete: `lca/layer4_app/capability_boot.py`
+- Modify: `lca/layer4_app/defaults.py` (drop `register_seam_catalog()`)
+- Modify: `lca/layer4_app/composer.py` (drop `_resolve_capability_context` legacy + `_ScopeAsCapabilityContext` adapter)
 
-- [ ] **Step 1: Verify no callers**
+**Critical**: 3 caller sites missed in original plan:
+- `lca/layer4_app/defaults.py:54,145` calls `register_seam_catalog()`
+- `lca/layer4_app/composer.py:444-448` `_resolve_capability_context` still calls `boot_capabilities()`
+- `lca/layer4_app/composer.py:109` `_ScopeAsCapabilityContext` adapter uses `ScopedPluginHost.resolve()`
 
-Run: `rg -l "capability_boot\|boot_capabilities\|new_capability_hub\|mount_default_providers" lca/ tests/`
-Expected: only `lca/layer4_app/capability_boot.py` itself + tests
+- [ ] **Step 1: Verify all callers**
 
-- [ ] **Step 2: Delete the file**
+Run: `rg -l "capability_boot\|boot_capabilities\|register_seam_catalog" lca/ tests/`
+Expected: 4 files
+
+- [ ] **Step 2: Migrate `lca/layer4_app/defaults.py`**
+
+DELETE both occurrences of `register_seam_catalog()` call. The CapabilityHub / SeamRegistry / register_seam_catalog machinery is gone — the Tier-1 plugin tree replaces it.
+
+- [ ] **Step 3: Migrate `composer.py:_resolve_capability_context` + `_ScopeAsCapabilityContext` adapter**
+
+```python
+# before (line 444-448)
+def _resolve_capability_context(scope):
+    if scope is None:
+        return boot_capabilities()
+    return scope
+
+# after
+def _resolve_capability_context(ctx):
+    return ctx  # cordis Context IS the capability context
+
+# DELETE _ScopeAsCapabilityContext adapter entirely (cordis.Context.inject is the equivalent)
+```
+
+- [ ] **Step 4: Delete the file**
 
 ```bash
 git rm lca/layer4_app/capability_boot.py
 ```
 
-- [ ] **Step 3: Update `lca/layer4_app/composer.py` to remove `boot_capabilities()` calls**
+- [ ] **Step 5: Run tests (collection only)**
 
-For each `from lca.layer4_app.capability_boot import boot_capabilities`:
-- Replace `boot_capabilities()` with `ctx.inject("plugin_host")` (or removed entirely if `_isolate_agent_scope` is the only caller)
+Run: `uv run pytest tests/ --collect-only --no-cov -q 2>&1 | tail -30`
+Expected: collection passes; individual failures acceptable
 
-- [ ] **Step 4: Run tests**
-
-Run: `uv run pytest tests/ -x --no-cov -q 2>&1 | tail -30`
-Expected: tests run; some fail (acceptable — Phase 7 fixes)
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add -A
-git commit -m "layer4_app: delete capability_boot.py (replaced by cordis plugin tree)"
+git commit -m "layer4_app: delete capability_boot.py + migrate defaults/composer adapters"
 ```
 
 ---
@@ -2010,19 +2053,18 @@ class Config(BaseModel):
 
 @plugin(name="lca-llm-provider", inject=["llm"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.llm_adapter import (
-        MockLLMAdapter, RealLLMAdapter, DeepseekAdapter, PiAIAdapter,
-    )
+    from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+    from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
 
     llm = ctx.inject("llm")
     if "mock" in config.providers:
         llm.register("mock", MockLLMAdapter())
     if "real" in config.providers:
-        llm.register("real", RealLLMAdapter(api_key=config.api_key, base_url=config.base_url))
+        llm.register("real", OpenAICompatAdapter(api_key=config.api_key, base_url=config.base_url))
     if "deepseek" in config.providers:
-        llm.register("deepseek", DeepseekAdapter(api_key=config.api_key, base_url=config.base_url))
-    if "pi_ai" in config.providers:
-        llm.register("pi_ai", PiAIAdapter())
+        # Deepseek is OpenAI-compatible; uses the same adapter.
+        llm.register("deepseek", OpenAICompatAdapter(api_key=config.api_key, base_url=config.base_url or "https://api.deepseek.com"))
+    # "pi_ai" not yet implemented — skip.
 
     target = config.mode
     if target == "auto":
@@ -2368,7 +2410,7 @@ from lca.contracts.typed_ctx import TypedContext
 @plugin(name="lca-brain-modular")
 async def setup(ctx: TypedContext, config) -> None:
     from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-    from lca.layer3_agent.brain.factory import BrainFactory
+    from lca.layer1_cognitive.brain.default_factory import brain_factory  # noqa: F401
 
     factory = ctx.brain_factory
     factory.register("modular", ModularBrain)
@@ -2664,9 +2706,9 @@ plugins:
   - id: lca-state-store-service
     name: lca-state-store-service
     $module: lca.plugins.state_store_service
-  - id: lca-attachment-service
-    name: lca-attachment-service
-    $module: lca.plugins.attachment_service
+  # attachment: NO Tier-1 plugin yet (no separate attachment Service Definition;
+  #   attachment identity is bound to file_store via Tier-2 plugin below)
+  #   (entry omitted intentionally to avoid referencing non-existent module)
 
   # ── Tier-2: Provider plugins (single plugin per seam) ───
   - id: lca-llm-provider
@@ -2718,10 +2760,10 @@ plugins:
     name: lca-attachment-provider
     $module: lca.plugins.providers.attachment
     inject: ["attachment"]
-  - id: lca-workspace-provider
-    name: lca-workspace-provider
-    $module: lca.plugins.providers.workspace
-    inject: ["workspace"]
+  # workspace: no Tier-1 plugin yet (workspace service does not exist as a class)
+  # - id: lca-workspace-provider
+  #   $module: lca.plugins.providers.workspace
+  #   inject: ["workspace"]
 ```
 
 - [ ] **Step 2: Validate YAML schema**
