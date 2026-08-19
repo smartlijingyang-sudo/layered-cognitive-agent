@@ -34,20 +34,6 @@ import { persistAssistantRow } from './lcaPersist';
 import { WIRE } from './lcaWire';
 
 const LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
-
-/** Run loop target switch.
- *  - "local" (default): use the LCA gateway via Next.js rewrites at /lca-api/*.
- *    No client code change required; same auth as today.
- *  - "deepseek-harness": point directly at a standalone DSH HTTP service
- *    (default http://localhost:3080); bypasses the /lca-api proxy and
- *    hits `${DSH_BASE_URL}/runs/...` with the same Bearer token.
- *  Override the DSH host via NEXT_PUBLIC_LCA_DSH_BASE_URL.
- *  Unrecognized values fall back to "local" so a typo never silently
- *  redirects traffic to the wrong service. */
-const RUN_TARGET = (process.env.NEXT_PUBLIC_LCA_RUN_TARGET ?? 'local').trim().toLowerCase();
-const DSH_BASE_URL = (process.env.NEXT_PUBLIC_LCA_DSH_BASE_URL ?? 'http://localhost:3080').replace(/\/$/, '');
-const RUN_BASE: string = RUN_TARGET === 'deepseek-harness' ? DSH_BASE_URL : '/lca-api';
-
 const TERMINAL = new Set(['canceled', 'completed', 'failed']);
 const PAUSED = new Set(['waiting_input']);
 
@@ -720,7 +706,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
   const authHeaders = { Authorization: `Bearer ${LCA_TOKEN}` };
 
   try {
-    const createRes = await fetch(`${RUN_BASE}/runs`, {
+    const createRes = await fetch('/lca-api/runs', {
       body: JSON.stringify({
         agent: {
           id: ctx.agentId || 'solo',
@@ -748,7 +734,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
     });
 
     while (!signal.aborted) {
-      const streamRes = await fetch(`${RUN_BASE}/runs/${runId}/live`, {
+      const streamRes = await fetch(`/lca-api/runs/${runId}/live`, {
         headers: {
           ...authHeaders,
           'Last-Event-ID': String(afterSeq),
@@ -767,7 +753,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
         await applyProjected(projectJournalFrame(frame));
       }
       if (signal.aborted) break;
-      const snapRes = await fetch(`${RUN_BASE}/runs/${runId}`, {
+      const snapRes = await fetch(`/lca-api/runs/${runId}`, {
         headers: authHeaders,
       });
       const snap = snapRes.ok
@@ -787,7 +773,7 @@ export async function runLcaJournal(get: () => ChatStore, options: LcaRunOptions
   } catch (error) {
     if (signal.aborted) {
       if (runId) {
-        await fetch(`${RUN_BASE}/runs/${runId}/cancel`, {
+        await fetch(`/lca-api/runs/${runId}/cancel`, {
           headers: authHeaders,
           method: 'POST',
         }).catch(() => undefined);
