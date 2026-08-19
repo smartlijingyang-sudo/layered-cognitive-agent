@@ -63,6 +63,46 @@ from lca.contracts.protocols.spec import (
 from lca.layer4_app.composer import AgentComposer, TeamComposer
 
 
+# Module-level cached default context (boot profile lazily on first Agent creation)
+_cached_default_ctx = None
+
+
+def get_or_create_default_ctx() -> "Context":
+    """Return a cached cordis Context booted from the default web-standard profile.
+
+    Used as fallback when an Agent is constructed without an explicit scope.
+    Boot is expensive (~100ms + plugin instantiation); cache once.
+
+    Detects whether a running event loop is present:
+    - If no loop: asyncio.run(boot_profile(...))
+    - If loop: loop.run_until_complete(boot_profile(...))
+    """
+    global _cached_default_ctx
+    if _cached_default_ctx is not None:
+        return _cached_default_ctx
+
+    import asyncio
+
+    from lca.harness.profile.boot import boot_profile
+
+    try:
+        _loop = asyncio.get_running_loop()
+    except RuntimeError:
+        _loop = None
+
+    if _loop is not None:
+        # Already in an event loop — use the loop's run_until_complete.
+        _cached_default_ctx = _loop.run_until_complete(
+            boot_profile("profiles/web-standard.yaml")
+        )
+    else:
+        # No running loop — use asyncio.run.
+        _cached_default_ctx = asyncio.run(
+            boot_profile("profiles/web-standard.yaml")
+        )
+    return _cached_default_ctx
+
+
 class Agent(AgentUnit):
     """A single cognitive agent：声明式构造规格 + 由它组装的封闭对象图。"""
 
@@ -102,8 +142,13 @@ class Agent(AgentUnit):
             brain=brain,
         )
         target = composer if composer is not None else AgentComposer()
-        # scope is now a cordis.Context (replaces ScopedPluginHost); AgentComposer
-        # expects cordis Context — Chunk 5 fully migrates the call site.
+        # scope is now a cordis.Context (replaces ScopedPluginHost).
+        # If None (e.g. for tests that don't boot a profile), use the
+        # cached default web-standard profile context.
+        print(f'DEBUG: scope passed in: {scope is not None}, type: {type(scope).__name__}')
+        if scope is None:
+            scope = get_or_create_default_ctx()
+        print(f'DEBUG: after fallback, scope is: {scope is not None}, type: {type(scope).__name__}')
         self._agent = target.compose(self._spec, scope=scope)
         self.role_profile = self._spec.profile
 
@@ -163,6 +208,7 @@ class Team(TeamUnit):
         shared_memory_layers: Sequence[MemoryLayer] | None = None,
         delegate_max_attempts: int | None = None,
         observability: str | ObservabilityBackend | None = None,
+        scope: object | None = None,
         composer: TeamComposer | None = None,
     ) -> None:
         governance: Governance
@@ -186,7 +232,11 @@ class Team(TeamUnit):
             observability=observability,
         )
         target = composer if composer is not None else TeamComposer()
-        self._handle = target.compose_team_spec(self._spec)
+        # scope is propagated by Agent; if Team is constructed directly
+        # without an Agent, fall back to the cached default context.
+        if scope is None:
+            scope = get_or_create_default_ctx()
+        self._handle = target.compose_team_spec(self._spec, scope=scope)
 
     @property
     def spec(self) -> TeamSpec:

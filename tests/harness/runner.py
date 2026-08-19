@@ -87,6 +87,10 @@ async def run_team_scripted(
     objective: str = "test objective",
 ) -> RunOutcome:
     col = collector or InMemoryObservability()
+    # Boot the cordis context once (per run_mode invocation) so Agent constructors
+    # have a populated cordis.Context to resolve services from.
+    from lca.harness.profile.boot import boot_profile
+    cordis_ctx = await boot_profile("profiles/web-standard.yaml")
     team = Team(
         members=members,
         lead=lead,
@@ -121,6 +125,10 @@ async def run_mode(
 ) -> RunOutcome:
     """Build a minimal 2–3 agent team for *mode* and run with shared collector."""
     col = collector or InMemoryObservability()
+    # Boot the cordis context once (per run_mode invocation) so Agent constructors
+    # have a populated cordis.Context to resolve services from.
+    from lca.harness.profile.boot import boot_profile
+    cordis_ctx = await boot_profile("profiles/web-standard.yaml")
 
     def _agent(role: str, steps: int = 5) -> Agent:
         goal, backstory = _probe_profile(role)
@@ -132,6 +140,7 @@ async def run_mode(
             llm=llm,
             max_steps=steps,
             observability=col,
+            scope=cordis_ctx,
         )
 
     a = _agent("Alice")
@@ -144,6 +153,7 @@ async def run_mode(
             members=[a, b],
             lead=TeamLead(lead_agent, LeadMandate.BOARD),
             observability=col,
+            scope=cordis_ctx,
         )
     else:
         raise ValueError(f"Unknown mode {mode!r} — only 'team' is supported (ADR-0052)")

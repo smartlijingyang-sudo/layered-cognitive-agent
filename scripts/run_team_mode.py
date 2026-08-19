@@ -131,6 +131,10 @@ async def _run_one(
     # LiveCollector = InMemory + console 叙述导出器（同一份叙事，不双写）。
     col = LiveCollector(live=live)
 
+    # The runner already booted cordis_ctx at the start of run_mode. It's
+    # passed to all Agent() constructors below so the composer resolves
+    # services from the booted ctx.
+
     try:
         outcome = await run_mode(
             mode,
@@ -141,7 +145,7 @@ async def _run_one(
         )
     except Exception as exc:
         print(f"\n运行失败: {type(exc).__name__}: {exc}", file=sys.stderr)
-        if digest and col.spans:
+        if digest and (col.bundle().spans if col.bundle() else []):
             print(format_case_digest(col.bundle(), title=f"{mode} (failed)"))
         return 1
 

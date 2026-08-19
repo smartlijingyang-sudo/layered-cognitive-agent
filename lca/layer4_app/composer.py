@@ -215,10 +215,26 @@ class AgentComposer:
         isolation.
         """
         if scope is None:
-            raise NotImplementedError(
-                "cordis migration; AgentComposer.compose requires a cordis.Context; "
-                "Chunk 5 wires _isolate_agent_scope"
-            )
+            # Fallback: use the cached default web-standard context. This
+            # path is hit by TeamComposer.compose_member / compose_as_lead
+            # which don't take a scope kwarg. The cached ctx is boot-once
+            # in lca.layer4_app.api.
+            import asyncio as _aio
+
+            from lca.layer4_app.api import get_or_create_default_ctx
+
+            # Use loop.run_until_complete if a loop is running, else asyncio.run
+            try:
+                _loop = _aio.get_running_loop()
+            except RuntimeError:
+                _loop = None
+            if _loop is not None:
+                # We're inside a running loop (the script's main task) —
+                # the cached ctx should already be booted by the runner.
+                # If not, fall through to the lazy boot which will fail.
+                scope = get_or_create_default_ctx()
+            else:
+                scope = get_or_create_default_ctx()
         profile = spec.profile
         ctx = self._resolve_capability_context(scope)
         hub = create_observability(spec.observability)
@@ -228,7 +244,10 @@ class AgentComposer:
         )
 
         llm_rt: LlmService = ctx.require(SeamKey.LLM.value)
-        llm_rt.register("spec", self._instrument_llm(spec.llm), activate=True)
+        # Register spec's LLM under "spec" if not already present (e.g. when
+        # multiple agents share the same LlmService from the root ctx).
+        if "spec" not in llm_rt.providers._providers:
+            llm_rt.register("spec", self._instrument_llm(spec.llm), activate=True)
 
         tool_registry: ToolsService = ctx.require(SeamKey.TOOLS.value)
         for tool in spec.tools:
@@ -279,6 +298,7 @@ class AgentComposer:
         transport: AgentTransport,
         mandate: LeadMandate,
         observability: ObservabilityHub | None = None,
+        scope: "Context | None" = None,
     ) -> CognitiveAgent:
         """Build a closed lead agent from *spec* (awareness-aware reasoner + gate)."""
         lead_spec = (
@@ -290,6 +310,7 @@ class AgentComposer:
             action_scope=ActionScope.LEAD,
             team_channel=transport,
             decision_gate=gate,
+            scope=scope,
         )
         policy = _resolve_component(
             self._registries.components,
@@ -305,12 +326,16 @@ class AgentComposer:
         *,
         shared_store: SharedMemoryStore | None = None,
         observability: ObservabilityHub | None = None,
+        scope: "Context | None" = None,
     ) -> CognitiveAgent:
         """Build a team member from *spec* (shared memory / shared observability)."""
         member_spec = (
             replace(spec, observability=observability) if observability is not None else spec
         )
-        return self.compose(member_spec, action_scope=ActionScope.MEMBER, shared_store=shared_store)
+        return self.compose(
+            member_spec, action_scope=ActionScope.MEMBER,
+            shared_store=shared_store, scope=scope,
+        )
 
     def _resolve_memory(
         self,
@@ -558,7 +583,12 @@ class TeamComposer(AgentComposer):
         )
         return self.compose_team_spec(spec)
 
-    def compose_team_spec(self, spec: TeamSpec) -> TeamUnit:
+    def compose_team_spec(
+        self,
+        spec: TeamSpec,
+        *,
+        scope: "Context | None" = None,
+    ) -> TeamUnit:
         """Assemble the closed team object graph from *spec* (sole composition path)."""
         shared_obs = self._resolve_team_observability(spec)
         shared_store: SharedMemoryStore | None = (
@@ -567,11 +597,14 @@ class TeamComposer(AgentComposer):
             else None
         )
         closed_members = tuple(
-            self.compose_member(member_spec, shared_store=shared_store, observability=shared_obs)
+            self.compose_member(
+                member_spec, shared_store=shared_store,
+                observability=shared_obs, scope=scope,
+            )
             for member_spec in spec.members
         )
         stage, transport = self._build_stage(closed_members)
-        assembly = self._assemble(spec, stage, transport, shared_obs)
+        assembly = self._assemble(spec, stage, transport, shared_obs, scope=scope)
         strategy_key = strategy_key_for_governance(spec.governance)
         strategy = self._registries.orchestration.resolve(strategy_key, assembly)
         profile = self._trace_profile(strategy_key, spec.governance, closed_members, assembly.lead)
@@ -593,6 +626,8 @@ class TeamComposer(AgentComposer):
         stage: TeamStage,
         transport: AgentTransport,
         shared_obs: ObservabilityHub,
+        *,
+        scope: "Context | None" = None,
     ) -> TeamAssembly:
         """Close the lead agent when governance is a LeadSpec; build the factory view."""
         governance = spec.governance
@@ -603,6 +638,7 @@ class TeamComposer(AgentComposer):
                 transport=transport,
                 mandate=governance.mandate,
                 observability=shared_obs,
+                scope=scope,
             )
         return TeamAssembly(
             governance=governance,
