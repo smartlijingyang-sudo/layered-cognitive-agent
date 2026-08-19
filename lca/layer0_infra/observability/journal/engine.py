@@ -198,8 +198,9 @@ class RunStore:
         return stamped.event if stamped is not None else None
 
     def find_terminal_tool_invoked(
-        self, idempotency_key: str
-    ) -> ToolInvoked | None:
+        self,
+        idempotency_key: str,
+    ) -> ToolInvoked | None:  # noqa: F821
         """Find the last ``ToolInvoked`` event for a given idempotency key (PR6).
 
         Used by the resume path to short-circuit already-executed side
