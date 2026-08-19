@@ -20,8 +20,14 @@ _projections: InMemoryProjectionRegistry | None = None
 def bind_session_spine(
     *,
     sessions_dir: Path,
-    plugin_scope: Any | None = None,
+    cordis_ctx: Any | None = None,
 ) -> tuple[AgentRegistry, CommandGateway, InMemoryProjectionRegistry]:
+    """Bind the session spine to disk persistence.
+
+    `cordis_ctx` is the cordis.Context produced by boot_profile(); AgentRegistry
+    uses it to resolve live agent builders, llm, tools, etc. via ctx.inject().
+    Falls back to None (which AgentRegistry handles gracefully).
+    """
     global _registry, _gateway, _projections
     projections = InMemoryProjectionRegistry()
     projections.register(ConversationProjection())
@@ -31,7 +37,7 @@ def bind_session_spine(
         sessions_dir=sessions_dir,
         projections=projections,
         live_builder=build_live_agent,
-        plugin_scope=plugin_scope,
+        cordis_ctx=cordis_ctx,
     )
     gateway = CommandGateway(registry, projections)
     _registry = registry

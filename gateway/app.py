@@ -252,10 +252,10 @@ def create_app(
         _load_harness_profile(application, resolved_profile)
 
     spine_dir = Path("traces/sessions")
-    plugin_scope = getattr(application.state, "plugin_host", None)
+    cordis_ctx = getattr(application.state, "ctx", None)
     agent_registry, command_gw, _projections = bind_session_spine(
         sessions_dir=spine_dir,
-        plugin_scope=plugin_scope,
+        cordis_ctx=cordis_ctx,
     )
     application.state.agent_registry = agent_registry
     application.state.command_gateway = command_gw

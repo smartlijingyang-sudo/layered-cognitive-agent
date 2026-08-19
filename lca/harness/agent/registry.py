@@ -41,13 +41,15 @@ class AgentRegistry:
         sessions_dir: Path,
         projections: InMemoryProjectionRegistry,
         live_builder: LiveBuilder,
-        plugin_scope: Any | None = None,
+        cordis_ctx: Any | None = None,
+        plugin_scope: Any | None = None,  # DEPRECATED: use cordis_ctx
     ) -> None:
         self._sessions_dir = sessions_dir
         self._sessions_dir.mkdir(parents=True, exist_ok=True)
         self._projections = projections
         self._live_builder = live_builder
-        self._plugin_scope = plugin_scope
+        # Prefer cordis_ctx; fall back to deprecated plugin_scope for back-compat.
+        self._cordis_ctx = cordis_ctx if cordis_ctx is not None else plugin_scope
         self._live: dict[str, _AgentEntry] = {}
         self._idempotency: dict[str, CommandReceipt] = {}
 
@@ -85,7 +87,7 @@ class AgentRegistry:
         store.subscribe(self._projections.on_event)
         self._projections.bind_session(sid)
         inbox = Inbox(store)
-        handle = self._live_builder(store, inbox, sid, options, self._plugin_scope)
+        handle = self._live_builder(store, inbox, sid, options, self._cordis_ctx)
         self._live[sid] = _AgentEntry(handle=handle, store=store, inbox=inbox)
         await store.append(SessionCreated(profile=profile, preset=preset), actor="system")
         return handle
@@ -99,7 +101,7 @@ class AgentRegistry:
         store.subscribe(self._projections.on_event)
         self._projections.replay(session_id, list(store.events()))
         inbox = Inbox(store)
-        handle = self._live_builder(store, inbox, session_id, None, self._plugin_scope)
+        handle = self._live_builder(store, inbox, session_id, None, self._cordis_ctx)
         status = self._status_from_store(store)
         agent = handle.agent
         if hasattr(agent, "_status"):
