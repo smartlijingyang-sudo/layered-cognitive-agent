@@ -44,12 +44,18 @@ class LobeHubConfig(BaseModel):
     release: str = "v2.2.13"
     dir: str = "lobehub-ui"
     dev_port: int = 3010
+    spa_port: int = 9876
     env_template: str = "deploy/lobehub/.env.lca"
 
     @property
     def dev_url(self) -> str:
         """Dev server URL."""
         return f"http://{self.host}:{self.dev_port}"
+
+    @property
+    def spa_url(self) -> str:
+        """Vite SPA sidecar URL. Independent lifetime from :dev_port."""
+        return f"http://{self.host}:{self.spa_port}"
 
 
 class InfraConfig(BaseModel):

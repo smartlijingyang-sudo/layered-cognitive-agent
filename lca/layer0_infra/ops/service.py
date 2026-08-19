@@ -179,28 +179,17 @@ def pid_alive(pid: int) -> bool:
 
 
 def pid_on_port(port: int) -> int | None:
-    """Return a PID listening on ``port``, or None if none found."""
+    """Return a PID listening on ``port``, or None if none found.
+
+    Prefer ``lsof`` / ``ss``. ``fuser`` is not used: it prints stray PIDs
+    that are not bound to the port, which made the Vite sidecar look up.
+    """
     import re
     import subprocess
 
     try:
         result = subprocess.run(
-            ["fuser", f"{port}/tcp"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        combined = f"{result.stdout} {result.stderr}"
-        for match in re.finditer(r"\b(\d+)\b", combined):
-            pid = int(match.group(1))
-            if pid != port:
-                return pid
-    except Exception:
-        pass
-
-    try:
-        result = subprocess.run(
-            ["lsof", "-ti", f":{port}"],
+            ["lsof", "-ti", f"tcp:{port}"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -208,7 +197,24 @@ def pid_on_port(port: int) -> int | None:
         for line in result.stdout.strip().split("\n"):
             if line.strip():
                 return int(line.strip())
-    except Exception:
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+
+    try:
+        result = subprocess.run(
+            ["ss", "-tlnp"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        bound = re.compile(rf":{port}\s")
+        for line in result.stdout.splitlines():
+            if not bound.search(line):
+                continue
+            match = re.search(r"pid=(\d+)", line)
+            if match:
+                return int(match.group(1))
+    except (OSError, ValueError, subprocess.TimeoutExpired):
         pass
     return None
 

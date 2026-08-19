@@ -47,6 +47,8 @@ from lca.contracts.protocols import (
     LLMAdapter,
     MemorySystem,
     ObservabilityBackend,
+    PerceiveHub,
+    Sensor,
     SharedMemoryStore,
     StateStore,
     TeamAssembly,
@@ -63,6 +65,7 @@ from lca.contracts.protocols.spec import (
     TeamSpec,
     strategy_key_for_governance,
 )
+from lca.harness.middleware import InMemoryMiddlewareRegistry
 from lca.layer0_infra.capability.llm import LlmService
 from lca.layer0_infra.capability.memory import MemoryService
 from lca.layer0_infra.capability.state_store import StateStoreService
@@ -83,6 +86,11 @@ from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
+from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
+from lca.layer1_cognitive.sensors import (
+    build_clock_sensor,
+    build_workspace_artifacts_sensor,
+)
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
 from lca.layer2_runtime.event_emission import make_journal_emitting_hook
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
@@ -259,6 +267,7 @@ class AgentComposer:
             action_registry=action_registry,
         )
         hooks = self._build_hooks()
+        perceive_hub = self._build_perceive_hub(mem)
         runtime = CognitiveRuntime(
             brain,
             body,
@@ -266,6 +275,7 @@ class AgentComposer:
             hooks,
             consume("state_store", state_store, CognitiveRuntime),
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+            perceive_hub=perceive_hub,
             middleware_registry=self._build_middleware_registry(hooks),
         )
         return CognitiveAgent(
@@ -406,16 +416,32 @@ class AgentComposer:
         return hooks
 
     @staticmethod
+    def _build_perceive_hub(memory: MemorySystem) -> PerceiveHub:
+        """Build the ``SequentialPerceiveHub`` with the v3 named factories.
+
+        Spec §5.5: composition order is fixed (clock → workspace-artifacts →
+        inbox-facts → team-inbox → skill-catalog).  Missing factories
+        are skipped; the Hub is robust to partial plugin trees.
+
+        This is the only place the Hub is composed.  Plugins provide
+        named factories (via ``ctx.provide``); the Composer is the
+        single assembler.
+        """
+        sensors: list[Sensor] = [
+            build_clock_sensor(),
+            build_workspace_artifacts_sensor(),
+        ]
+        return SequentialPerceiveHub(sensors=sensors, memory=memory)
+
+    @staticmethod
     def _build_middleware_registry(hooks: SimpleHookRegistry) -> InMemoryMiddlewareRegistry:
-        from lca.harness.middleware import InMemoryMiddlewareRegistry
         from lca.layer2_runtime.hook_middleware import install_hook_bridge
-        from lca.layer2_runtime.loop_intervention_mw import install_loop_intervention
 
         registry = InMemoryMiddlewareRegistry()
         # Hook bridge: maps middleware phases to legacy hooks
         install_hook_bridge(registry, hooks)
-        # Loop intervention: replaces inline detection in runtime
-        install_loop_intervention(registry)
+        # Loop intervention is now a DecisionGate (RepeatToolCallGate), not
+        # middleware (PR4 / cognitive-primitive v3 §3.5).
         return registry
 
     @staticmethod

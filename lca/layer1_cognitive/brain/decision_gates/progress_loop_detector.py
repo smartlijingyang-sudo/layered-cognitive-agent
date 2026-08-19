@@ -1,5 +1,10 @@
 """ProgressLoopDetector — detect multi-tool loops with no meaningful progress.
 
+PR4: warning + break phases record GateDecided events.  The warning
+phase no longer writes to ``state.working_memory[\"loop_warning\"]`` —
+the spec forbids that path.  The PolicyFact is folded into the next
+ContextManifest.
+
 Unlike ToolLoopBreakerGate which only blocks a *single* tool after repeated
 failures, this gate detects the broader pattern:
 
@@ -23,19 +28,14 @@ ADR reference: zero-delivery root-cause #2 (multi-tool loop detection).
 from __future__ import annotations
 
 from lca.contracts.atoms.enums import ActionType
+from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, Turn
+from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
+from lca.layer1_cognitive.brain.decision_gates.chained import record_gate_decided
 
-_NO_PROGRESS_WARNING = (
-    "⚠️ 你已连续 {count} 步没有产生有效输出。"
-    "最近尝试的工具: {tools}。请换一种方法，或直接 respond 回复用户。"
-)
-_FORCED_RATIONALE = "无进展循环检测：Agent 连续多步未产出有效内容，强制收口。"
-
-# After N consecutive non-progress steps, inject a warning into working_memory.
 _PROGRESS_WARNING_THRESHOLD = 3
-# After M consecutive non-progress steps, force a respond.
 _PROGRESS_BREAK_THRESHOLD = 6
 
 
@@ -43,8 +43,8 @@ class ProgressLoopDetector(DecisionGate):
     """Detect cross-tool loops with zero progress.
 
     Operates in two phases:
-    1. Warning (at _PROGRESS_WARNING_THRESHOLD steps): inject into working_memory
-       so the next think phase sees the hint and can self-correct.
+    1. Warning (at _PROGRESS_WARNING_THRESHOLD steps): emit a PolicyFact
+       that the next ContextManifest will fold into the LLM prompt.
     2. Break (at _PROGRESS_BREAK_THRESHOLD steps): force RESPOND with
        diagnostic message including recent tool history.
     """
@@ -57,40 +57,64 @@ class ProgressLoopDetector(DecisionGate):
         if count < _PROGRESS_WARNING_THRESHOLD:
             return decision
 
+        tools = self._recent_tool_history(state, n=count)
+        tool_summary = ", ".join(tools)
+
         if count < _PROGRESS_BREAK_THRESHOLD:
-            # Phase 1: inject warning for next think phase.
-            tools = self._recent_tool_history(state, n=count)
-            state.working_memory["loop_warning"] = _NO_PROGRESS_WARNING.format(
-                count=count, tools=", ".join(tools)
+            # Phase 1: emit PolicyFact for next think phase.
+            message = (
+                f"⚠️ 你已连续 {count} 步没有产生有效输出。"
+                f"最近尝试的工具: {tool_summary}。"
+                f"请换一种方法，或直接 respond 回复用户。"
+            )
+            record_gate_decided(
+                state,
+                GateDecided(
+                    event_id=new_id("gate"),
+                    gate="ProgressLoopDetector",
+                    verdict="warn",
+                    is_rewritten=False,
+                    policy_fact=PolicyFact(
+                        kind="progress_loop_warning",
+                        message=message,
+                        source="progress_loop",
+                    ),
+                ),
             )
             return decision
 
         # Phase 2: force respond with diagnostics.
-        tools = self._recent_tool_history(state, n=count)
         text = (
             f"连续 {count} 步未产生有效输出，已停止重试。\n"
-            f"最近尝试的工具: {', '.join(tools)}。\n"
+            f"最近尝试的工具: {tool_summary}。\n"
             f"建议: 检查工具参数是否正确，或换一种方法完成任务。"
         )
-        return Decision(
+        forced = Decision(
             decision_id=decision.decision_id,
             action_type=ActionType.RESPOND,
-            rationale=_FORCED_RATIONALE,
+            rationale="无进展循环检测：Agent 连续多步未产出有效内容，强制收口。",
             confidence=0.9,
             response_text=text,
         )
+        record_gate_decided(
+            state,
+            GateDecided(
+                event_id=new_id("gate"),
+                gate="ProgressLoopDetector",
+                verdict="rewrite",
+                is_rewritten=True,
+                policy_fact=PolicyFact(
+                    kind="progress_loop_break",
+                    message=text,
+                    source="progress_loop",
+                ),
+            ),
+        )
+        return forced
 
     @staticmethod
     def _count_consecutive_no_progress(state: AgentState) -> int:
-        """Count consecutive recent turns that produced no progress.
-
-        A turn counts as 'no progress' when:
-        - action_type is USE_TOOL
-        - observation.success is NOT True (False or None)
-
-        Stops counting at the first turn that is not USE_TOOL or has
-        a successful observation.
-        """
+        """Count consecutive recent turns that produced no progress."""
         count = 0
         for turn in reversed(state.history):
             if not isinstance(turn, Turn):

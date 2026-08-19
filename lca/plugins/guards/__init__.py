@@ -1,7 +1,7 @@
-"""Guard plugins — Tier-3 middleware.
+"""Guards package — empty after cognitive-primitive v3 PR4.
 
-Loop intervention (loop_intervention_policy.py) and step budget
-(budget_policy.py) are the two default guards. They're the only
-place where we keep a `guards/` package because both plugins share
-the same audit/rollback helper patterns in the future.
+The historical Tier-3 middleware guards are deleted.  Loop warning is
+handled by ``DecisionGate`` (see ``repeat_tool_call``); budget is
+enforced by ``StopRule``.  This package is kept empty so historical
+imports of ``lca.plugins.guards`` continue to resolve.
 """

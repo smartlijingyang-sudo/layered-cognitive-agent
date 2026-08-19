@@ -1,13 +1,12 @@
-"""DefaultStopRule —— 组合 StopOutcomePolicy + Budget 的默认终止裁判。
+"""DefaultStopRule —— 组合 StopOutcomePolicy + Budget 的默认终止裁判（PR5 纯函数化）。
 
 L2 层职责：
     将原先散落在 CognitiveRuntime._loop 中的三种终止判定
     （budget 超限 / outcome 策略 / 异常状态）收敛为单一内聚类。
 
-    判定流程：
-    1. 调用 StopOutcomePolicy.resolve() 获取业务判定
-    2. 检查 budget 是否超限（资源约束）
-    3. 综合输出 StopDecision
+    v3 §5.1 + §17：本类为**纯函数**，禁止写入 ``state.final_output``
+    或任何 AgentState 字段。最终输出由 Runtime 经 ``apply_stop`` 写入
+    （PR5）。
 """
 
 from __future__ import annotations
@@ -20,10 +19,11 @@ from lca.contracts.protocols import StopOutcomePolicy, StopRule
 
 
 class DefaultStopRule(StopRule):
-    """默认循环终止裁判。
+    """默认循环终止裁判（纯函数版）。
 
-    组合 StopOutcomePolicy（业务判定）与 Budget 检查（资源约束），
-    输出统一的 StopDecision。
+    不再直接写 ``state.final_output``；最终输出经 ``StopDecision.final_output``
+    返回，由 Runtime 调用 ``reducer.apply_stop`` 写回 State。这是 v3 §5.1
+    "StopRule 不得直接写 state.final_output" 的落地。
     """
 
     def __init__(self, outcome_policy: StopOutcomePolicy) -> None:
@@ -37,17 +37,16 @@ class DefaultStopRule(StopRule):
         reflection: Reflection | None,
     ) -> StopDecision:
         outcome = self._outcome_policy.resolve(state, decision, act_result, reflection)
-        if outcome.final_output is not None:
-            state.final_output = outcome.final_output
 
         if state.budget.exceeded():
             return self._on_budget_exceeded(act_result, state)
 
         if outcome.should_stop:
+            final_output = outcome.final_output if isinstance(outcome.final_output, str) else None
             return StopDecision(
                 should_stop=True,
                 reason=StopReason.TASK_COMPLETED,
-                final_output=state.final_output if isinstance(state.final_output, str) else None,
+                final_output=final_output,
                 status=coerce_status(outcome.status) or TaskStatus.COMPLETED,
             )
 
@@ -59,12 +58,13 @@ class DefaultStopRule(StopRule):
         state: AgentState,
     ) -> StopDecision:
         budget_outcome = self._outcome_policy.resolve_budget_exceeded(observation, state)
-        if budget_outcome.final_output is not None:
-            state.final_output = budget_outcome.final_output
+        final_output = (
+            budget_outcome.final_output if isinstance(budget_outcome.final_output, str) else None
+        )
         return StopDecision(
             should_stop=True,
             reason=StopReason.BUDGET_EXCEEDED,
-            final_output=state.final_output if isinstance(state.final_output, str) else None,
+            final_output=final_output,
             status=coerce_status(budget_outcome.status) or TaskStatus.FAILED,
         )
 

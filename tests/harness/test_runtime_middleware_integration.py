@@ -13,6 +13,7 @@ from lca.contracts.models.core.state import AgentState
 from lca.harness.middleware.registry import InMemoryMiddlewareRegistry, SimplePhaseContext
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+from lca.layer4_app.runtime_factory import NullPerceiveHub
 
 
 @pytest.fixture
@@ -50,10 +51,14 @@ class TestRuntimeMiddlewareIntegration:
         # Register middleware at all cognitive phase boundaries
         for point in [
             "agent.pre_step",
-            "agent.before_perceive", "agent.after_perceive",
-            "agent.before_think", "agent.after_think",
-            "agent.before_act", "agent.after_act",
-            "agent.before_reflect", "agent.after_reflect",
+            "agent.before_perceive",
+            "agent.after_perceive",
+            "agent.before_think",
+            "agent.after_think",
+            "agent.before_act",
+            "agent.after_act",
+            "agent.before_reflect",
+            "agent.after_reflect",
             "agent.before_turn_end",
         ]:
             middleware_registry.register(
@@ -64,8 +69,10 @@ class TestRuntimeMiddlewareIntegration:
         # Verify middleware is registered
         for point in [
             "agent.pre_step",
-            "agent.before_perceive", "agent.before_think",
-            "agent.before_act", "agent.before_reflect",
+            "agent.before_perceive",
+            "agent.before_think",
+            "agent.before_act",
+            "agent.before_reflect",
         ]:
             assert middleware_registry.has_point(point)
             regs = middleware_registry.list_registrations(point)
@@ -74,6 +81,7 @@ class TestRuntimeMiddlewareIntegration:
     @pytest.mark.asyncio
     async def test_middleware_can_modify_state(self, middleware_registry):
         """Waterfall middleware can modify state between phases."""
+
         async def inject_context(phase, state, context):
             state.working_memory["injected"] = True
             return state
@@ -86,7 +94,9 @@ class TestRuntimeMiddlewareIntegration:
         # Run the middleware
         ctx = SimplePhaseContext(session_id="test", record=lambda e: None)
         result = await middleware_registry.run(
-            "agent.before_think", "think", AgentState(
+            "agent.before_think",
+            "think",
+            AgentState(
                 trace_id=new_id("trace"),
                 task="test",
                 budget=create_budget(),
@@ -108,10 +118,14 @@ class TestRuntimeMiddlewareIntegration:
         # Register at all cognitive points
         for point in [
             "agent.pre_step",
-            "agent.before_perceive", "agent.after_perceive",
-            "agent.before_think", "agent.after_think",
-            "agent.before_act", "agent.after_act",
-            "agent.before_reflect", "agent.after_reflect",
+            "agent.before_perceive",
+            "agent.after_perceive",
+            "agent.before_think",
+            "agent.after_think",
+            "agent.before_act",
+            "agent.after_act",
+            "agent.before_reflect",
+            "agent.after_reflect",
             "agent.before_turn_end",
         ]:
             middleware_registry.register(
@@ -121,20 +135,24 @@ class TestRuntimeMiddlewareIntegration:
 
         # Create mock components
         mock_brain = MagicMock()
-        mock_brain.think = AsyncMock(return_value=Decision(
-            decision_id=new_id("dec"),
-            action_type=ActionType.RESPOND,
-            rationale="test",
-            confidence=1.0,
-        ))
+        mock_brain.think = AsyncMock(
+            return_value=Decision(
+                decision_id=new_id("dec"),
+                action_type=ActionType.RESPOND,
+                rationale="test",
+                confidence=1.0,
+            )
+        )
         mock_brain.reflect = AsyncMock(return_value=None)
 
         mock_body = MagicMock()
-        mock_body.act = AsyncMock(return_value=Observation(
-            observation_id=new_id("obs"),
-            success=True,
-            payload="done",
-        ))
+        mock_body.act = AsyncMock(
+            return_value=Observation(
+                observation_id=new_id("obs"),
+                success=True,
+                payload="done",
+            )
+        )
 
         mock_memory = MagicMock()
         mock_memory.perceive = AsyncMock(side_effect=lambda state: state)
@@ -145,11 +163,13 @@ class TestRuntimeMiddlewareIntegration:
         mock_state_store.load = AsyncMock()
 
         mock_stop_rule = MagicMock()
-        mock_stop_rule.decide = MagicMock(return_value=MagicMock(
-            should_stop=True,
-            reason=None,
-            status=None,
-        ))
+        mock_stop_rule.decide = MagicMock(
+            return_value=MagicMock(
+                should_stop=True,
+                reason=None,
+                status=None,
+            )
+        )
 
         # Create runtime with middleware registry
         runtime = CognitiveRuntime(
@@ -159,6 +179,7 @@ class TestRuntimeMiddlewareIntegration:
             hooks=hooks,
             state_store=mock_state_store,
             stop_rule=mock_stop_rule,
+            perceive_hub=NullPerceiveHub(),
             middleware_registry=middleware_registry,
         )
 
@@ -197,20 +218,24 @@ class TestRuntimeMiddlewareIntegration:
         """CognitiveRuntime works normally when middleware_registry is None."""
         # Create mock components
         mock_brain = MagicMock()
-        mock_brain.think = AsyncMock(return_value=Decision(
-            decision_id=new_id("dec"),
-            action_type=ActionType.RESPOND,
-            rationale="test",
-            confidence=1.0,
-        ))
+        mock_brain.think = AsyncMock(
+            return_value=Decision(
+                decision_id=new_id("dec"),
+                action_type=ActionType.RESPOND,
+                rationale="test",
+                confidence=1.0,
+            )
+        )
         mock_brain.reflect = AsyncMock(return_value=None)
 
         mock_body = MagicMock()
-        mock_body.act = AsyncMock(return_value=Observation(
-            observation_id=new_id("obs"),
-            success=True,
-            payload="done",
-        ))
+        mock_body.act = AsyncMock(
+            return_value=Observation(
+                observation_id=new_id("obs"),
+                success=True,
+                payload="done",
+            )
+        )
 
         mock_memory = MagicMock()
         mock_memory.perceive = AsyncMock(side_effect=lambda state: state)
@@ -221,11 +246,13 @@ class TestRuntimeMiddlewareIntegration:
         mock_state_store.load = AsyncMock()
 
         mock_stop_rule = MagicMock()
-        mock_stop_rule.decide = MagicMock(return_value=MagicMock(
-            should_stop=True,
-            reason=None,
-            status=None,
-        ))
+        mock_stop_rule.decide = MagicMock(
+            return_value=MagicMock(
+                should_stop=True,
+                reason=None,
+                status=None,
+            )
+        )
 
         # Create runtime WITHOUT middleware registry
         runtime = CognitiveRuntime(
@@ -235,6 +262,7 @@ class TestRuntimeMiddlewareIntegration:
             hooks=hooks,
             state_store=mock_state_store,
             stop_rule=mock_stop_rule,
+            perceive_hub=NullPerceiveHub(),
             middleware_registry=None,  # Explicitly None
         )
 
@@ -252,6 +280,7 @@ class TestRuntimeMiddlewareIntegration:
     @pytest.mark.asyncio
     async def test_middleware_waterfall_state_propagation(self, middleware_registry, hooks):
         """Middleware state modifications propagate through the waterfall."""
+
         # First middleware injects a value
         async def inject_value(phase, state, context):
             state.working_memory["step1"] = "injected"
@@ -274,20 +303,24 @@ class TestRuntimeMiddlewareIntegration:
 
         # Create mock components
         mock_brain = MagicMock()
-        mock_brain.think = AsyncMock(return_value=Decision(
-            decision_id=new_id("dec"),
-            action_type=ActionType.RESPOND,
-            rationale="test",
-            confidence=1.0,
-        ))
+        mock_brain.think = AsyncMock(
+            return_value=Decision(
+                decision_id=new_id("dec"),
+                action_type=ActionType.RESPOND,
+                rationale="test",
+                confidence=1.0,
+            )
+        )
         mock_brain.reflect = AsyncMock(return_value=None)
 
         mock_body = MagicMock()
-        mock_body.act = AsyncMock(return_value=Observation(
-            observation_id=new_id("obs"),
-            success=True,
-            payload="done",
-        ))
+        mock_body.act = AsyncMock(
+            return_value=Observation(
+                observation_id=new_id("obs"),
+                success=True,
+                payload="done",
+            )
+        )
 
         mock_memory = MagicMock()
         mock_memory.perceive = AsyncMock(side_effect=lambda state: state)
@@ -297,11 +330,13 @@ class TestRuntimeMiddlewareIntegration:
         mock_state_store.save = AsyncMock(return_value=new_id("ref"))
 
         mock_stop_rule = MagicMock()
-        mock_stop_rule.decide = MagicMock(return_value=MagicMock(
-            should_stop=True,
-            reason=None,
-            status=None,
-        ))
+        mock_stop_rule.decide = MagicMock(
+            return_value=MagicMock(
+                should_stop=True,
+                reason=None,
+                status=None,
+            )
+        )
 
         runtime = CognitiveRuntime(
             brain=mock_brain,
@@ -310,6 +345,7 @@ class TestRuntimeMiddlewareIntegration:
             hooks=hooks,
             state_store=mock_state_store,
             stop_rule=mock_stop_rule,
+            perceive_hub=NullPerceiveHub(),
             middleware_registry=middleware_registry,
         )
 
@@ -338,7 +374,7 @@ class TestRuntimeArchitecture:
         source = Path("lca/layer2_runtime/runtime_loop.py").read_text()
         tree = ast.parse(source)
 
-        forbidden_patterns = {"budget_check", "loop_intervention", "journal_emitting"}
+        forbidden_patterns = {"budget_check", "journal_emitting"}
         for node in ast.walk(tree):
             if isinstance(node, ast.Name):
                 for pattern in forbidden_patterns:

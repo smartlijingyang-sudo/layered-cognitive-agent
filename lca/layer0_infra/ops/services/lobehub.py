@@ -30,9 +30,11 @@ from lca.layer0_infra.ops.state import StateStore
 class LobeHubService:
     """LobeHub Next.js frontend.
 
-    Manages the complete frontend lifecycle: source sync, patches, env,
-    dependencies, and dev server.
+    Next on ``dev_port`` is the service. Vite SPA on ``spa_port`` is a
+    sidecar with an independent lifetime — its exit must not kill Next.
     """
+
+    _SPA_NAME = "lobehub-spa"
 
     def __init__(
         self,
@@ -51,52 +53,40 @@ class LobeHubService:
     # ── Lifecycle ─────────────────────────────────────────────────────
 
     def start(self) -> ServiceState:
-        """Start the dev server if not already running."""
+        """Start Next (the service) and the Vite sidecar if missing."""
         current = self.state()
         if current.is_running:
             return current
 
-        # Ensure prerequisites
         self.ensure_ready()
-
-        pid = self._spawn_dev()
+        pid = self._ensure_next()
         if pid is None:
             return ServiceState(status=ServiceStatus.STOPPED, detail="spawn failed")
-
-        # Wait for ready — require consecutive successes so we don't
-        # report ready during a brief compilation window.
-        needed = 3
-        consec = 0
-        for _ in range(120):
-            time.sleep(0.5)
-            if http_ready(f"{self._config.dev_url}/", timeout=1.0):
-                consec += 1
-                if consec >= needed:
-                    self._state.write_pid(self.name, pid)
-                    return ServiceState(
-                        status=ServiceStatus.RUNNING,
-                        pid=pid,
-                        port=self._config.dev_port,
-                        detail="dev server ready",
-                    )
-            else:
-                consec = 0
-
+        if not self._next_ready():
+            return ServiceState(
+                status=ServiceStatus.STOPPED,
+                pid=pid,
+                detail="dev server start timeout",
+            )
+        self._ensure_spa()
         return ServiceState(
-            status=ServiceStatus.STOPPED,
+            status=ServiceStatus.RUNNING,
             pid=pid,
-            detail="dev server start timeout",
+            port=self._config.dev_port,
+            detail="dev server ready",
         )
 
     def stop(self) -> ServiceState:
-        """Stop the dev server and all related processes."""
+        """Stop Next and the Vite sidecar."""
         pids = self._collect_pids()
         for pid in pids:
             kill_tree(pid)
 
         time.sleep(0.5)
         free_port(self._config.dev_port)
+        free_port(self._config.spa_port)
         self._state.remove_pid(self.name)
+        self._state.remove_pid(self._SPA_NAME)
 
         return ServiceState(status=ServiceStatus.STOPPED)
 
@@ -131,7 +121,14 @@ class LobeHubService:
         dev_ok = http_ready(f"{self._config.dev_url}/", timeout=2.0)
         checks.append(HealthCheck("dev", dev_ok, f":{self._config.dev_port}"))
 
-        # Reconcile PID: ``bun run dev`` may exit while next-server keeps serving.
+        spa_pid = pid_on_port(self._config.spa_port)
+        spa_ok = spa_pid is not None
+        stored_spa = self._state.read_pid(self._SPA_NAME)
+        if spa_ok and spa_pid and (stored_spa is None or not pid_alive(stored_spa)):
+            self._state.write_pid(self._SPA_NAME, spa_pid)
+        checks.append(HealthCheck("spa", spa_ok, f":{self._config.spa_port}" if spa_ok else "none"))
+
+        # Reconcile PID: next-server may outlive the recorded bun parent.
         port_pid = pid_on_port(self._config.dev_port) if dev_ok else None
         if dev_ok and port_pid and (stored_pid is None or not pid_alive(stored_pid)):
             self._state.write_pid(self.name, port_pid)
@@ -163,7 +160,15 @@ class LobeHubService:
         next_action = ""
         patches_stale = patches_ok and patch_drift.has_changes
         patches_missing = not patches_ok
-        if dev_ok:
+        if dev_ok and not spa_ok:
+            status = ServiceStatus.DEGRADED
+            detail = "Next up, Vite sidecar down"
+            why = (
+                f"SPA sidecar :{self._config.spa_port} is down; "
+                f"{self._config.dev_url} still answers"
+            )
+            next_action = "./scripts/lca-ops lobehub heal"
+        elif dev_ok:
             status = ServiceStatus.RUNNING
             detail = "healthy"
             if patches_stale or patches_missing:
@@ -197,12 +202,18 @@ class LobeHubService:
         )
 
     def heal(self) -> ServiceState:
-        """Auto-recover: start if stopped, re-apply patches if stale."""
+        """Repair without a death pact: Next stays up if only the sidecar is missing."""
         current = self.state()
         if current.is_running and not current.next_action:
             return current
 
-        # Patches stale or missing → stop, re-ensure, restart
+        spa_down = not any(c.name == "spa" and c.ok for c in current.checks)
+        next_up = any(c.name == "dev" and c.ok for c in current.checks)
+
+        if next_up and spa_down and current.next_action.endswith("heal"):
+            self._ensure_spa()
+            return self.state()
+
         if current.is_running:
             self.stop()
 
@@ -329,49 +340,86 @@ class LobeHubService:
 
     # ── Lifecycle Internals ───────────────────────────────────────────
 
-    def _spawn_dev(self) -> int | None:
-        """Spawn the dev server process."""
+    def _next_ready(self) -> bool:
+        needed = 3
+        consec = 0
+        for _ in range(120):
+            time.sleep(0.5)
+            if http_ready(f"{self._config.dev_url}/", timeout=1.0):
+                consec += 1
+                if consec >= needed:
+                    return True
+            else:
+                consec = 0
+        return False
+
+    def _spa_listening(self) -> bool:
+        return pid_on_port(self._config.spa_port) is not None
+
+    def _ensure_next(self) -> int | None:
+        if http_ready(f"{self._config.dev_url}/", timeout=1.0):
+            port_pid = pid_on_port(self._config.dev_port)
+            if port_pid:
+                self._state.write_pid(self.name, port_pid)
+                return port_pid
+            stored = self._state.read_pid(self.name)
+            if stored and pid_alive(stored):
+                return stored
+        pid = self._spawn_script("dev:next", self.name)
+        if pid is not None:
+            self._state.write_pid(self.name, pid)
+        return pid
+
+    def _ensure_spa(self) -> int | None:
+        if self._spa_listening():
+            port_pid = pid_on_port(self._config.spa_port)
+            if port_pid:
+                self._state.write_pid(self._SPA_NAME, port_pid)
+                return port_pid
+        pid = self._spawn_script("dev:spa", self._SPA_NAME)
+        if pid is not None:
+            self._state.write_pid(self._SPA_NAME, pid)
+        return pid
+
+    def _child_env(self) -> dict[str, str]:
         import os
 
-        try:
-            # Inherit current environment and override specific variables
-            env = {
-                **os.environ,
-                "PORT": str(self._config.dev_port),
-                "OPENAI_PROXY_URL": f"{self._gateway.base_url}/v1",
-                "OPENAI_API_KEY": "lca-local",
-                "ENABLED_OPENAI": "1",
-            }
+        return {
+            **os.environ,
+            "PORT": str(self._config.dev_port),
+            "SPA_PORT": str(self._config.spa_port),
+            "VITE_DEV_PORT": str(self._config.spa_port),
+            "OPENAI_PROXY_URL": f"{self._gateway.base_url}/v1",
+            "OPENAI_API_KEY": "lca-local",
+            "ENABLED_OPENAI": "1",
+        }
 
-            # Write logs to .lca-ops/lobehub.log
-            log_path = self._state.log_file(self.name)
+    def _spawn_script(self, script: str, log_name: str) -> int | None:
+        try:
+            log_path = self._state.log_file(log_name)
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_handle = log_path.open("a")
-
             proc = subprocess.Popen(
-                ["bun", "run", "dev"],
+                ["bun", "run", script],
                 cwd=self._dir,
-                env=env,
+                env=self._child_env(),
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
             return proc.pid
-        except Exception:
+        except OSError:
             return None
 
     def _collect_pids(self) -> list[int]:
-        """Collect all PIDs related to the dev server."""
-        pids = []
-
-        # Main PID
-        pid = self._state.read_pid(self.name)
-        if pid:
-            pids.append(pid)
-
-        # Find by port
-        port_pid = pid_on_port(self._config.dev_port)
-        if port_pid:
-            pids.append(port_pid)
-
+        """Collect Next and Vite pids from files and listening ports."""
+        pids: list[int] = []
+        for name in (self.name, self._SPA_NAME):
+            pid = self._state.read_pid(name)
+            if pid:
+                pids.append(pid)
+        for port in (self._config.dev_port, self._config.spa_port):
+            port_pid = pid_on_port(port)
+            if port_pid:
+                pids.append(port_pid)
         return list(set(pids))

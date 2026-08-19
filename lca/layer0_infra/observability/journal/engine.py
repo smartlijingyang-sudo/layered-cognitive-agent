@@ -186,6 +186,57 @@ class RunStore:
         """观察者自拉：返回 seq > after_seq 的所有已提交事件。"""
         return tuple(e for e in self._events if e.seq > after_seq)
 
+    def get(self, seq: int) -> StampedEvent | None:
+        """O(1) lookup by seq (PR2 / §7.4).  Returns None if seq is out of range."""
+        if seq < 1 or seq > len(self._events):
+            return None
+        return self._events[seq - 1]
+
+    def get_event(self, seq: int) -> JournalEvent | None:
+        """O(1) lookup of the JournalEvent payload by seq (PR2 / §7.4)."""
+        stamped = self.get(seq)
+        return stamped.event if stamped is not None else None
+
+    def find_terminal_tool_invoked(
+        self, idempotency_key: str
+    ) -> ToolInvoked | None:
+        """Find the last ``ToolInvoked`` event for a given idempotency key (PR6).
+
+        Used by the resume path to short-circuit already-executed side
+        effects: when the same envelope arrives again (e.g. crash + retry),
+        we replay the previous terminal observation instead of re-executing.
+
+        Returns ``None`` if the key was never recorded (the executor must
+        re-run in that case).
+        """
+        if not idempotency_key:
+            return None
+        # Linear scan over the (small) tool-invocation history — the key
+        # is unique per envelope so a hashmap would only help if the log
+        # grew beyond a few thousand entries.
+        from lca.contracts.models.observability.journal import ToolInvoked
+
+        for stamped in reversed(self._events):
+            event = stamped.event
+            if isinstance(event, ToolInvoked) and event.idempotency_key == idempotency_key:
+                return event
+        return None
+
+    def get_blob(self, seq: int) -> bytes | None:
+        """O(1) serialized blob for the event payload (PR2 / §7.4).
+
+        Returns the JSON-serialized event payload or None if seq is out of
+        range.  Used by projectors that need the raw form without a dataclass
+        reconstruction.
+        """
+        stamped = self.get(seq)
+        if stamped is None:
+            return None
+        import dataclasses
+        import json
+
+        return json.dumps(dataclasses.asdict(stamped.event), ensure_ascii=False).encode("utf-8")
+
     def derive_events(
         self,
         predicate: Callable[[StampedEvent], bool],

@@ -390,12 +390,15 @@ class ToolStarted(JournalEvent):
 
     ``arguments_preview`` 是截断字符串（OTel/console）；``plugin_state`` 是 UI
     一等字段（完整 code/command 等，dict 不受 AttributePolicy 2k 截断）。
+
+    ``idempotency_key`` (PR6) 由 ExecutionEnvelope 注入；为空表示工具未声明幂等。
     """
 
     tool_name: str = ""
     arguments_preview: str = ""
     invocation_id: str = ""
     plugin_state: dict[str, Any] = field(default_factory=dict)
+    idempotency_key: str = ""
 
 
 @dataclass(frozen=True)
@@ -405,6 +408,9 @@ class ToolInvoked(JournalEvent):
     ``plugin_state`` / ``files`` 是 UI 与产品通道（journal 不截断）。
     ``arguments_preview`` / ``result_preview`` 只给 jsonl 与 OTel（2k 有损）。
     Live SSE 必须抹掉两个 preview，浏览器不得读到。
+
+    ``idempotency_key`` (PR6) 与 ``ToolStarted`` 同步；用于 resume dedupe
+    via ``RunStore.find_terminal_tool_invoked``。
     """
 
     tool_name: str = ""
@@ -417,6 +423,7 @@ class ToolInvoked(JournalEvent):
     invocation_id: str = ""  # optional link to in-flight streaming deltas
     files: tuple[dict[str, Any], ...] = ()
     plugin_state: dict[str, Any] = field(default_factory=dict)
+    idempotency_key: str = ""
 
 
 @dataclass(frozen=True)
@@ -470,3 +477,137 @@ class RunInsight(JournalEvent):
     kind: str = ""
     summary: str = ""
     detail: str = ""
+
+
+# ── 认知控制原语（PR2 / PR3a / PR4）─────────────────────
+
+
+@dataclass(frozen=True)
+class ContextManifested(JournalEvent):
+    """PerceiveHub emitted a curated ContextManifest for this step (PR2).
+
+    The ``item_refs`` are seq numbers into the journal that carry the
+    full payloads (clock, workspace_artifacts, etc.).  ``digest`` is the
+    canonical hash of the manifest for replay-side verification.
+
+    The Reasoner never reads ``prompt_preview``; the manifest is the only
+    source of truth.
+    """
+
+    step: int = 0
+    item_refs: tuple[int, ...] = ()
+    item_kinds: tuple[str, ...] = ()
+    digest: str = ""
+    persist_full_prompt: bool = False
+
+
+@dataclass(frozen=True)
+class PerceptionMerged(JournalEvent):
+    """Hub fold result — final state of the receive phase for this step."""
+
+    step: int = 0
+    delta_ref: int = 0
+    item_kinds: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class GateDecided(JournalEvent):
+    """DecisionGate verdict (PR4 / v3 §3.5).
+
+    The journal record IS the canonical event surface.  ``allow`` is
+    intentionally NOT recorded (allow 默认不记).  Only ``warn`` /
+    ``rewrite`` / ``deny`` are emitted.
+    """
+
+    gate: str = ""
+    verdict: str = ""  # "warn" | "rewrite" | "deny"
+    is_rewritten: bool = False
+    tool_name: str = ""
+    policy_fact_kind: str = ""
+    policy_fact_message: str = field(default="", metadata={"journal_kind": "content"})
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class InboxFollowupCreated(JournalEvent):
+    """A user message was injected via the Inbox (PR8 / D24).
+
+    All user input flows Inbox → journal → inbox-facts sensor → Perceive.
+    """
+
+    inbox_id: str = ""
+    actor: str = ""
+    target: str = ""
+    priority: str = ""
+    step: int = 0
+    payload_preview: str = field(default="", metadata={"journal_kind": "content"})
+
+
+@dataclass(frozen=True)
+class TeamMessagePublished(JournalEvent):
+    """TeamMessage MVP (PR9 / D25).  One topic per team; ``thread_id`` for
+    delegation sub-threads.  No CRDT — see PR9b for the blackboard lease
+    that complements this channel.
+    """
+
+    team_id: str = ""
+    thread_id: str = ""
+    sender_role: str = ""
+    recipient_role: str = ""
+    step: int = 0
+    body_preview: str = field(default="", metadata={"journal_kind": "content"})
+
+
+@dataclass(frozen=True)
+class ApprovalRequested(JournalEvent):
+    """PR6: an ExecutionEnvelope flagged ``approval_requirement`` and the
+    approval was queued.
+    """
+
+    envelope_id: str = ""
+    tool_name: str = ""
+    capability_grant: str = ""
+    risk_level: str = ""
+
+
+@dataclass(frozen=True)
+class ApprovalResolved(JournalEvent):
+    """PR6: a queued approval was resolved (approved / denied)."""
+
+    envelope_id: str = ""
+    resolver: str = ""
+    approved: bool = False
+
+
+@dataclass(frozen=True)
+class MemoryCommitted(JournalEvent):
+    """PR7: a MemorySystem.committed event for observability."""
+
+    layer: str = ""
+    record_kind: str = ""
+    record_id: str = ""
+
+
+@dataclass(frozen=True)
+class ContextCompacted(JournalEvent):
+    """PR7: a CompactionPolicy was applied and the manifest was compacted."""
+
+    step: int = 0
+    original_kinds: tuple[str, ...] = ()
+    kept_kinds: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RunPaused(JournalEvent):
+    """PR2: emitted on the ``_loop`` boundary when the run is paused."""
+
+    step: int = 0
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class RunResumed(JournalEvent):
+    """PR2: emitted on the ``_loop`` boundary when the run is resumed."""
+
+    step: int = 0
+    reason: str = ""

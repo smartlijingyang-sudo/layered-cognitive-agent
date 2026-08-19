@@ -22,6 +22,7 @@ lobehub:
   release: v2.2.13
   dir: lobehub-ui
   dev_port: 3010
+  spa_port: 9876
   env_template: deploy/lobehub/.env.lca
 
 # ── Infrastructure (docker-compose) ───────────────────────────────────

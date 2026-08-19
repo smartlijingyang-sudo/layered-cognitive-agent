@@ -1,12 +1,25 @@
-"""Terminal respond gate — reserve last step for user-facing closure (ADR-0051)."""
+"""Terminal respond gate — reserve last step for user-facing closure (ADR-0051 + PR6).
+
+PR4: rewrite verdicts MUST record a GateDecided event.  When the gate
+forces a respond, a GateDecided event with verdict=rewrite is recorded.
+
+PR6: the gate reads workspace artifacts **exclusively** from the typed
+``PerceiveState.current_manifest`` artifact items.  Live
+``get_run_workspace()`` reads from the Reasoner / Gates are forbidden
+(v3 §5.1) — the workspace is a Sensor-owned surface.
+"""
 
 from __future__ import annotations
 
 from lca.contracts.atoms.enums import ActionType
+from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.budget import TERMINAL_RESERVE_STEPS
 from lca.contracts.models.core.decision import Decision
+from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
+from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
-from lca.layer0_infra.workspace import get_run_workspace
+from lca.contracts.protocols import DecisionGate
+from lca.layer1_cognitive.brain.decision_gates.chained import record_gate_decided
 
 _TERMINAL_RATIONALE = "终态步：必须向用户收口；产物已从工作区账本合成摘要。"
 
@@ -30,7 +43,32 @@ _PRODUCER_TOOLS = frozenset(
 )
 
 
-class TerminalRespondGate:
+def _closure_from_manifest(state: AgentState) -> str:
+    """Read the workspace-artifacts manifest item as the closure source (PR6).
+
+    Pre-PR6 this called ``get_run_workspace().artifacts.closure_text()``
+    directly.  v3 §5.1 forbids live workspace reads in Gates — the
+    Hub's ``WorkspaceArtifactsSensor`` is the only legitimate source.
+    """
+    manifest = PerceiveState.from_agent_state(state).current_manifest
+    if manifest is None:
+        return ""
+    for item in manifest.items:
+        if item.kind != "workspace_artifacts":
+            continue
+        if not isinstance(item.payload, list) or not item.payload:
+            continue
+        lines: list[str] = []
+        for art in item.payload:
+            if isinstance(art, dict):
+                path = art.get("path", "")
+                url = art.get("url", "")
+                lines.append(f"- {path} {url}")
+        return "\n".join(lines)
+    return ""
+
+
+class TerminalRespondGate(DecisionGate):
     """Force respond on last step for non-producing tool actions."""
 
     async def enforce(self, state: AgentState, decision: Decision) -> Decision:
@@ -43,16 +81,30 @@ class TerminalRespondGate:
         if _is_producer(decision):
             return decision
 
-        workspace = get_run_workspace()
-        closure = workspace.artifacts.closure_text() if workspace is not None else ""
+        closure = _closure_from_manifest(state)
         response = closure or decision.response_text or "任务已完成。"
-        return Decision(
+        forced = Decision(
             decision_id=decision.decision_id,
             action_type=ActionType.RESPOND,
             rationale=_TERMINAL_RATIONALE,
             confidence=decision.confidence,
             response_text=response,
         )
+        record_gate_decided(
+            state,
+            GateDecided(
+                event_id=new_id("gate"),
+                gate="TerminalRespondGate",
+                verdict="rewrite",
+                is_rewritten=True,
+                policy_fact=PolicyFact(
+                    kind="terminal_respond",
+                    message=_TERMINAL_RATIONALE,
+                    source="terminal_respond",
+                ),
+            ),
+        )
+        return forced
 
 
 def _is_producer(decision: Decision) -> bool:

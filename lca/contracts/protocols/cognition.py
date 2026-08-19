@@ -1,14 +1,59 @@
-"""L1 认知 / Brain 协议 —— Reasoner / Critic / Brain 等。"""
+"""L1 认知 / Brain 协议 —— Reasoner / Critic / Brain 等。
+
+PR3a adds: PerceiveHub, Sensor, ContextItem, ContextManifest.
+PR4 adds: PolicyFact, ExecutionEnvelope, DecisionVerdict.
+"""
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.llm import LLMResponse
+from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.protocols.infra import LLMAdapter, Tool
+
+
+@runtime_checkable
+class Sensor(Protocol):
+    """A pure read-only data source for the PerceiveHub fold.
+
+    Sensors must operate on already-staged state / journal; they must NOT
+    issue live workspace reads — gates in PR6 read from the Manifest
+    artifact items.  Sensors return a list of ``ContextItem`` (possibly
+    empty) and raise ``SensorDisabled`` to signal the Hub to skip them.
+
+    The Hub handles per-Sensor exception isolation (per spec §5.5).
+    """
+
+    async def read(self, state: AgentState) -> list[ContextItem]: ...
+
+
+class SensorDisabled(RuntimeError):
+    """Raised by a Sensor to signal "skip me this turn" (per spec §5.5)."""
+
+
+@runtime_checkable
+class PerceiveHub(Protocol):
+    """Combine ``Memory.perceive`` with a list of Sensors into a ContextManifest.
+
+    The Hub is the SOLE emitter of ``ContextManifested`` (PR3a).  The
+    fold order is fixed (per spec §5.5):
+
+    1. Sensors (in composition order; failures isolated)
+    2. Budgeter (Drop / Trim)
+    3. Memory adapter (per spec §5.5)
+    4. RecordGateDecided fold (PolicyFacts from the previous step)
+    5. Manifest emission
+
+    The Hub must NOT mutate ``state.history`` and must NOT mutate
+    ``state.working_memory`` directly — the Reasoner never reads
+    working_memory for world facts.
+    """
+
+    async def perceive(self, state: AgentState) -> ContextManifest: ...
 
 
 @runtime_checkable
@@ -47,7 +92,6 @@ class DecisionGate(Protocol):
         state: AgentState,
         decision: Decision,
     ) -> Decision: ...
-
 
 @runtime_checkable
 class SupportsShortcut(Protocol):

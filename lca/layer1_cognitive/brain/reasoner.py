@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from datetime import datetime, timezone
 
 from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.atoms.telemetry import ATTR_PROMPT_TEMPLATE
@@ -23,14 +22,14 @@ from lca.contracts.models.core.conversation import (
 )
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.perception import ContextManifest
+from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.delegation import DelegationResult
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.team_awareness import TeamAwareness
 from lca.contracts.protocols import LLMAdapter, Reasoner, Tool
 from lca.layer0_infra.observability import annotate
-from lca.layer0_infra.search.router import search_routing_hint
-from lca.layer0_infra.search.service import any_search_provider_available
 from lca.layer1_cognitive.brain.conversation_prompt import format_prior_conversation
 from lca.layer1_cognitive.brain.llm_turn import execute_llm_turn
 
@@ -200,11 +199,19 @@ def _role_prompt_vars(
     *,
     tools: Sequence[Tool] | None = None,
     available_skills: str = "",
+    manifest: object | None = None,
 ) -> dict[str, str]:
+    """Render the prompt's role-keyed variables.
+
+    The ``current_date`` field is sourced from the manifest's ``clock``
+    item (PR3b).  When no clock item is present, the line is omitted
+    entirely (per spec §3.5: no clock item → no CURRENT_DATE template
+    line).  The Reasoner NEVER calls ``datetime.now()`` directly.
+    """
     tool_list = tools or ()
     cloud_sandbox = _cloud_sandbox_block(tool_list)
-    now = datetime.now(timezone.utc)
-    return {
+    current_date = _clock_text_from_manifest(manifest)
+    variables: dict[str, str] = {
         "role": role_profile.role,
         "goal": role_profile.goal,
         "backstory": role_profile.backstory,
@@ -214,14 +221,32 @@ def _role_prompt_vars(
         "context": context_lines,
         "available_skills": available_skills or "（无技能库）",
         "activated_skills": _format_activated_skills(state),
-        "search_routing": search_routing_hint(tavily_available=any_search_provider_available()),
+        "search_routing": "",  # PR3c: live search probe is gone.
         "cloud_sandbox": cloud_sandbox,
-        "current_date": now.strftime("%Y-%m-%d %A"),
     }
+    if current_date is not None:
+        variables["current_date"] = current_date
+    return variables
+
+
+def _clock_text_from_manifest(manifest: ContextManifest | None) -> str | None:
+    """Return the clock item's payload string, or None if absent."""
+    if manifest is None:
+        return None
+    for item in manifest.items:
+        if item.kind == "clock" and isinstance(item.payload, str):
+            return item.payload
+    return None
 
 
 def _with_subtasks(variables: dict[str, str], state: AgentState) -> dict[str, str]:
-    subtasks = state.working_memory.get("subtasks")
+    """Apply the manifest's ``subtasks`` item, if present.
+
+    Pre-PR3c the subtasks were read from ``state.working_memory``; the
+    spec forbids live state reads so they now come from the typed
+    manifest slot (PR3c).
+    """
+    subtasks = _subtasks_from_manifest(state)
     if not subtasks:
         return variables
     enriched = dict(variables)
@@ -231,39 +256,47 @@ def _with_subtasks(variables: dict[str, str], state: AgentState) -> dict[str, st
     return enriched
 
 
-def _with_loop_warning(variables: dict[str, str], state: AgentState) -> dict[str, str]:
-    """Inject loop-intervention warning into the prompt context if present.
-
-    The runtime loop injects this into working_memory when it detects
-    consecutive same-tool calls (Phase 3.6).  The model sees it on the
-    next think phase and can change strategy.
-    """
-    warning = state.working_memory.get("loop_warning")
-    if not warning:
-        return variables
-    enriched = dict(variables)
-    enriched["context"] = enriched["context"] + f"\n\n{warning}"
-    return enriched
+def _subtasks_from_manifest(state: AgentState) -> list[str]:
+    """Read subtasks from the typed ``PerceiveState`` view."""
+    manifest = PerceiveState.from_agent_state(state).current_manifest
+    if manifest is None:
+        return []
+    for item in manifest.items:
+        if item.kind == "subtasks" and isinstance(item.payload, list):
+            return [str(x) for x in item.payload]
+    return []
 
 
 def _with_artifact_context(variables: dict[str, str], state: AgentState) -> dict[str, str]:
-    """Inject workspace artifact summary into prompt context.
+    """Inject workspace artifact summary from the manifest (PR3c).
 
-    When the workspace already has file products, the LLM sees them and:
-    - avoids re-executing code that already produced output
-    - knows correct file paths instead of hallucinating URLs
+    The pre-PR3c path called ``get_run_workspace()`` directly.  The v3
+    spec forbids live workspace reads in the Reasoner; the typed
+    manifest is the only source of truth.
     """
-    from lca.layer0_infra.workspace import get_run_workspace
+    manifest = PerceiveState.from_agent_state(state).current_manifest
+    if manifest is None:
+        return variables
+    for item in manifest.items:
+        if item.kind == "workspace_artifacts" and isinstance(item.payload, list) and item.payload:
+            enriched = dict(variables)
+            enriched["context"] = enriched["context"] + "\n\n" + _format_artifacts(item.payload)
+            return enriched
+    return variables
 
-    workspace = get_run_workspace()
-    if workspace is None:
-        return variables
-    handoff = workspace.artifacts.handoff_block()
-    if not handoff:
-        return variables
-    enriched = dict(variables)
-    enriched["context"] = enriched["context"] + f"\n\n{handoff}"
-    return enriched
+
+def _format_artifacts(payload: list[object]) -> str:
+    lines: list[str] = []
+    for art in payload:
+        if isinstance(art, dict):
+            path = art.get("path", "")
+            url = art.get("url", "")
+            mime = art.get("mime", "")
+            size = art.get("size", 0)
+            lines.append(f"- {path} ({mime}, {size}B) {url}")
+    if not lines:
+        return ""
+    return "Workspace artifacts:\n" + "\n".join(lines)
 
 
 class PromptReasoner(Reasoner):
@@ -300,6 +333,7 @@ class PromptReasoner(Reasoner):
         exclusions = (
             context_exclusions_for(awareness) if awareness is not None else _KIND_EXCLUDE_NONE
         )
+        manifest = PerceiveState.from_agent_state(state).current_manifest
         variables = _role_prompt_vars(
             self.role_profile,
             self.tools_desc,
@@ -307,13 +341,13 @@ class PromptReasoner(Reasoner):
             _context_lines(state, exclude_kinds=exclusions),
             tools=self.tools,
             available_skills=self.available_skills,
+            manifest=manifest,
         )
         template_name = state.active_template or _DEFAULT_TEMPLATE
         if awareness is not None:
             variables.update(build_awareness_variables(awareness))
             template_name = state.active_template or default_template_for(awareness)
         variables = _with_subtasks(variables, state)
-        variables = _with_loop_warning(variables, state)
         variables = _with_artifact_context(variables, state)
         prompt = self._templates[template_name].format(**variables)
         prompt = _strip_empty_prompt_fields(prompt)

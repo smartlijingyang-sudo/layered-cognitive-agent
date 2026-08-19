@@ -90,17 +90,25 @@ def test_start_spawns_next_and_spa_not_coupled_dev(lobehub_svc: LobeHubService) 
         spawned.append(list(cmd))  # type: ignore[arg-type]
         return _Proc(100 + len(spawned))
 
+    hits = {"n": 0}
+
+    def _ready(*_a: object, **_k: object) -> bool:
+        hits["n"] += 1
+        return hits["n"] > 1
+
     with (
         patch.object(lobehub_svc, "ensure_ready", return_value=False),
         patch("lca.layer0_infra.ops.services.lobehub.subprocess.Popen", side_effect=_popen),
-        patch("lca.layer0_infra.ops.services.lobehub.http_ready", return_value=True),
+        patch("lca.layer0_infra.ops.services.lobehub.http_ready", side_effect=_ready),
         patch("lca.layer0_infra.ops.services.lobehub.time.sleep"),
-        patch("lca.layer0_infra.ops.services.lobehub.pid_on_port", side_effect=_port_pid(None, None)),
+        patch(
+            "lca.layer0_infra.ops.services.lobehub.pid_on_port", side_effect=_port_pid(None, None)
+        ),
     ):
         state = lobehub_svc.start()
 
     assert state.status == ServiceStatus.RUNNING
-    scripts = [cmd for cmd in spawned]
+    scripts = list(spawned)
     assert ["bun", "run", "dev"] not in scripts
     assert ["bun", "run", "dev:next"] in scripts
     assert ["bun", "run", "dev:spa"] in scripts
@@ -113,8 +121,12 @@ def test_next_up_spa_down_is_degraded_not_stopped(lobehub_svc: LobeHubService) -
 
     with (
         patch("lca.layer0_infra.ops.services.lobehub.http_ready", return_value=True),
-        patch("lca.layer0_infra.ops.services.lobehub.pid_on_port", side_effect=_port_pid(42_001, None)),
-        patch("lca.layer0_infra.ops.services.lobehub.pid_alive", side_effect=lambda pid: pid == 42_001),
+        patch(
+            "lca.layer0_infra.ops.services.lobehub.pid_on_port", side_effect=_port_pid(42_001, None)
+        ),
+        patch(
+            "lca.layer0_infra.ops.services.lobehub.pid_alive", side_effect=lambda pid: pid == 42_001
+        ),
     ):
         state = lobehub_svc.state()
 
@@ -145,7 +157,10 @@ def test_heal_spa_only_does_not_respawn_next(lobehub_svc: LobeHubService) -> Non
             "lca.layer0_infra.ops.services.lobehub.pid_on_port",
             side_effect=_port_pid(42_001, None),
         ),
-        patch("lca.layer0_infra.ops.services.lobehub.pid_alive", side_effect=lambda pid: pid in {42_001, 77}),
+        patch(
+            "lca.layer0_infra.ops.services.lobehub.pid_alive",
+            side_effect=lambda pid: pid in {42_001, 77},
+        ),
     ):
         state = lobehub_svc.heal()
 
