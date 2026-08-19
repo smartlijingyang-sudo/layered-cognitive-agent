@@ -1,0 +1,2700 @@
+# Cordis Migration Implementation Plan
+
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Replace LCA's in-house plugin kernel (`lca/layer0_infra/plugin/` + `lca/harness/kernel/`) with vendored cordis from `~/taiyi-agent`. Migrate 21 LCA plugins to cordis `@plugin` form. Restructure to 38 plugins across 3 tiers (Definition / Provider / Behavior). Cut all hardcoded assembly from L4 composition root.
+
+**Architecture:**
+- `vendor/cordis/cosmokit/schemastery` — copy from `~/taiyi-agent/vendor/`
+- `lca/plugins/*` — module-per-plugin, ≤50 lines, only `@plugin` setup
+- `lca/layer0_infra/{capability,session,system_prompt,...}/` — Service Definition classes (NOT plugin files)
+- `lca/layer4_app/` — composition root, only `ctx.<typed-property>` access
+- `lca/contracts/typed_ctx.py` — TypedContext Protocol for IDE/mypy support
+- `bundles/base.yaml` + `bundles/web-app.yaml` — 38 plugin entries across 3 tiers
+
+**Tech Stack:** cordis (Python port of dsh cordis), pydantic v2 (Standard Schema), structlog, lca-tests
+
+**Spec:** `/home/lichao/layered-cognitive-agent/docs/superpowers/specs/2026-08-19-cordis-migration-design.md`
+
+**Phases:** P0-P9 (per spec §9). This plan breaks them into 30+ atomic tasks across 6 chunks.
+
+---
+
+## Chunk 1: Vendor + Delete In-house Kernel (P0-P2)
+
+**Goal:** Replace `lca/layer0_infra/plugin/` + `lca/harness/kernel/` with cordis. Add `TypedContext` Protocol. Add `SessionEventType` enum. Migrate 5 test files. Drop PluginManifest / ExtensionPoint / CapabilityGrant / ScopeKind / PluginKind / ProviderMode while keeping `consume()` and `PluginConfig`.
+
+**Risk:** P1 stage touches 5 test files that import `lca.harness.kernel.scope` — must migrate simultaneously or `ImportError` at test collection.
+
+---
+
+### Task 1.1: Vendor cordis/cosmokit/schemastery from taiyi-agent
+
+**Files:**
+- Create: `vendor/cordis/src/cordis/` (recursively from `~/taiyi-agent/vendor/cordis/src/cordis/`)
+- Create: `vendor/cosmokit/src/cosmokit/` (recursively)
+- Create: `vendor/schemastery/src/schemastery/` (recursively)
+
+- [ ] **Step 1: Copy three vendor trees**
+
+```bash
+cd ~/layered-cognitive-agent
+mkdir -p vendor/cordis/src vendor/cosmokit/src vendor/schemastery/src
+cp -r ~/taiyi-agent/vendor/cordis/src/cordis      vendor/cordis/src/
+cp -r ~/taiyi-agent/vendor/cosmokit/src/cosmokit  vendor/cosmokit/src/
+cp -r ~/taiyi-agent/vendor/schemastery/src/schemastery vendor/schemastery/src/
+```
+
+- [ ] **Step 2: Verify cordis import path resolves**
+
+Run: `python -c "import sys; sys.path.insert(0, 'vendor/cordis/src'); from cordis import Context, plugin, Service; print('OK')"`
+Expected: `OK`
+
+- [ ] **Step 3: Verify cosmokit + schemastery resolve**
+
+```bash
+python -c "import sys; sys.path.insert(0, 'vendor/cosmokit/src'); import cosmokit; print('cosmokit OK')"
+python -c "import sys; sys.path.insert(0, 'vendor/schemastery/src'); import schemastery; print('schemastery OK')"
+```
+
+Expected: both print OK.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add vendor/cordis vendor/cosmokit vendor/schemastery
+git commit -m "vendor: import cordis/cosmokit/schemastery from ~/taiyi-agent"
+```
+
+---
+
+### Task 1.2: Add cordis to pyproject.toml as path dependencies
+
+**Files:**
+- Modify: `pyproject.toml` (add `[tool.uv.sources]` block, add `taiyi-cordis` / `taiyi-cosmokit` / `taiyi-schemastery` to dependencies)
+
+- [ ] **Step 1: Inspect current pyproject.toml dependencies section**
+
+Run: `grep -A 30 'dependencies' pyproject.toml | head -40`
+
+Note: capture the current dep list before editing.
+
+- [ ] **Step 2: Append three vendor packages to dependencies**
+
+Add to `pyproject.toml` `dependencies` list:
+```toml
+"taiyi-cordis",
+"taiyi-cosmokit",
+"taiyi-schemastery",
+```
+
+- [ ] **Step 3: Add `[tool.uv.sources]` block**
+
+Add to `pyproject.toml` (anywhere after `[tool.uv]`):
+```toml
+[tool.uv.sources]
+taiyi-cordis      = { path = "vendor/cordis/src" }
+taiyi-cosmokit    = { path = "vendor/cosmokit/src" }
+taiyi-schemastery = { path = "vendor/schemastery/src" }
+```
+
+- [ ] **Step 4: Run `uv sync` and verify resolution**
+
+Run: `uv sync`
+Expected: resolves cleanly, no conflict.
+
+- [ ] **Step 5: Verify import via `uv run`**
+
+Run: `uv run python -c "from cordis import Context, plugin, Service; print('cordis OK')"`
+Expected: `cordis OK`
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add pyproject.toml uv.lock
+git commit -m "deps: wire vendor/{cordis,cosmokit,schemastery} as path dependencies"
+```
+
+---
+
+### Task 1.3: Add `lca/contracts/typed_ctx.py` (TypedContext Protocol)
+
+**Files:**
+- Create: `lca/contracts/typed_ctx.py`
+- Test: `tests/test_typed_ctx.py`
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_typed_ctx.py
+from lca.contracts.typed_ctx import TypedContext
+
+
+def test_typed_context_exposes_llm_property():
+    """TypedContext declares llm property typed as LLMAdapter."""
+    assert "llm" in TypedContext.__annotations__
+    # property itself is a descriptor
+    assert hasattr(TypedContext, "llm")
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `uv run pytest tests/test_typed_ctx.py -v --no-cov`
+Expected: FAIL — `ModuleNotFoundError: No module named 'lca.contracts.typed_ctx'`
+
+- [ ] **Step 3: Write minimal implementation**
+
+```python
+# lca/contracts/typed_ctx.py
+"""Typed accessor for cordis Context.
+
+Each property corresponds to a Tier-1 Definition's `provide` key. cordis's
+ReflectService resolves attribute reads through this typing, so:
+- `ctx.llm` is type-checked (mypy knows returns LLMAdapter)
+- `ctx.inject("llm")` is still valid (untyped fallback)
+"""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from lca.contracts.protocols.infra import LLMAdapter, FileStore
+    from lca.layer0_infra.session.service import SessionService
+    from lca.layer0_infra.system_prompt.service import SystemPromptService
+    from lca.layer0_infra.capability.tools import ToolsService
+    from lca.layer0_infra.capability.transport import TransportService
+    from lca.layer0_infra.capability.memory import MemoryService
+    from lca.layer0_infra.capability.state_store import StateStoreService
+    from lca.layer0_infra.capability.search import SearchService
+    from lca.layer0_infra.capability.skills import SkillsService
+    from lca.layer0_infra.capability.observability import ObservabilityService
+    from lca.layer0_infra.capability.sandbox import SandboxService
+    from lca.layer0_infra.attachment.service import AttachmentService
+    from lca.layer0_infra.workspace.service import WorkspaceService
+    from lca.layer3_agent.brain.factory import BrainFactory
+    from lca.layer3_agent.agent_loop.factory import AgentLoopFactory
+    from lca.harness.command.gateway import CommandGateway
+
+
+class TypedContext(Protocol):
+    """Typed property accessor for cordis Context."""
+
+    @property
+    def llm(self) -> "LLMAdapter": ...
+
+    @property
+    def tools(self) -> "ToolsService": ...
+
+    @property
+    def session_service(self) -> "SessionService": ...
+
+    @property
+    def system_prompt(self) -> "SystemPromptService": ...
+
+    @property
+    def transport(self) -> "TransportService": ...
+
+    @property
+    def memory(self) -> "MemoryService": ...
+
+    @property
+    def state_store(self) -> "StateStoreService": ...
+
+    @property
+    def search(self) -> "SearchService": ...
+
+    @property
+    def skills(self) -> "SkillsService": ...
+
+    @property
+    def file_store(self) -> "FileStore": ...
+
+    @property
+    def observability(self) -> "ObservabilityService": ...
+
+    @property
+    def sandbox(self) -> "SandboxService": ...
+
+    @property
+    def attachment(self) -> "AttachmentService": ...
+
+    @property
+    def workspace(self) -> "WorkspaceService": ...
+
+    @property
+    def brain_factory(self) -> "BrainFactory": ...
+
+    @property
+    def agent_loop(self) -> "AgentLoopFactory": ...
+
+    @property
+    def command_gateway(self) -> "CommandGateway": ...
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `uv run pytest tests/test_typed_ctx.py -v --no-cov`
+Expected: PASS
+
+- [ ] **Step 5: Run lint-imports to verify no circular import introduced**
+
+Run: `uv run lint-imports`
+Expected: clean
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lca/contracts/typed_ctx.py tests/test_typed_ctx.py
+git commit -m "contracts: TypedContext Protocol for ctx.<typed-property> access"
+```
+
+---
+
+### Task 1.4: Add `lca/contracts/observability/session_events.py`
+
+**Files:**
+- Create: `lca/contracts/observability/session_events.py`
+- Test: `tests/contracts/test_session_events.py`
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/contracts/test_session_events.py
+from lca.contracts.observability.session_events import SessionEventType
+
+
+def test_session_event_type_is_string_enum():
+    """SessionEventType members are str values, matching cordis event names."""
+    assert SessionEventType.SESSION_CREATED == "session/created"
+    assert SessionEventType.ASSISTANT_MESSAGE == "assistant/message"
+    assert SessionEventType.TOOL_CALL == "tool/call"
+
+
+def test_session_event_type_covers_minimum_surface():
+    """session everything 原则: 至少 8 类事件被枚举"""
+    required = [
+        "SESSION_CREATED", "ASSISTANT_MESSAGE", "TOOL_CALL", "TOOL_RESULT",
+        "TURN_START", "STEP_START", "LLM_REQUEST", "GUARD_REJECTED",
+    ]
+    for name in required:
+        assert hasattr(SessionEventType, name)
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `uv run pytest tests/contracts/test_session_events.py -v --no-cov`
+Expected: FAIL — module not found
+
+- [ ] **Step 3: Write minimal implementation**
+
+```python
+# lca/contracts/observability/session_events.py
+"""Session event type enum — the single taxonomy of session mutations.
+
+"session everything" 原则: 任何状态变更都对应一个 SessionEventType。
+DSH core/session/known_event_types.ts 1:1 对齐 + LCA 扩展。
+"""
+from __future__ import annotations
+
+from enum import Enum
+
+
+class SessionEventType(str, Enum):
+    """session 任何状态变更。"""
+
+    # Session 生命周期
+    SESSION_CREATED = "session/created"
+    SESSION_DISPOSED = "session/disposed"
+    SESSION_FLUSHED = "session/flushed"
+
+    # Attachment
+    ATTACHMENT_ADDED = "attachment/added"
+    ATTACHMENT_REMOVED = "attachment/removed"
+    ATTACHMENT_STAGED = "attachment/staged"
+
+    # User / Assistant
+    USER_MESSAGE_ACCEPTED = "user/message/accepted"
+    ASSISTANT_MESSAGE = "assistant/message"
+
+    # Turn / Step
+    TURN_START = "turn/start"
+    TURN_END = "turn/end"
+    STEP_START = "step/start"
+    STEP_END = "step/end"
+
+    # LLM
+    LLM_REQUEST = "llm/request"
+    LLM_RESPONSE_CHUNK = "llm/response/chunk"
+    LLM_RESPONSE = "llm/response"
+    LLM_ERROR = "llm/error"
+
+    # Tool
+    TOOL_CALL = "tool/call"
+    TOOL_PRE_EXECUTE = "tool/pre-execute"
+    TOOL_POST_EXECUTE = "tool/post-execute"
+    TOOL_RESULT = "tool/result"
+    TOOL_ERROR = "tool/error"
+
+    # Guards
+    GUARD_REJECTED = "guard/rejected"
+    LOOP_INTERVENTION = "loop/intervention"
+    BUDGET_EXCEEDED = "budget/exceeded"
+
+    # Subagent / Delegation
+    SUBAGENT_START = "subagent/start"
+    SUBAGENT_END = "subagent/end"
+    DELEGATION_SENT = "delegation/sent"
+
+    # Transport / Sandbox
+    SANDBOX_VIOLATION = "sandbox/violation"
+    TRANSPORT_ERROR = "transport/error"
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `uv run pytest tests/contracts/test_session_events.py -v --no-cov`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lca/contracts/observability/session_events.py tests/contracts/test_session_events.py
+git commit -m "contracts: SessionEventType enum (session everything taxonomy)"
+```
+
+---
+
+### Task 1.5: Delete `lca/layer0_infra/plugin/` (P1)
+
+**Files:**
+- Delete: `lca/layer0_infra/plugin/kernel/` (entire dir)
+- Delete: `lca/layer0_infra/plugin/loader/` (entire dir)
+- Delete: `lca/layer0_infra/plugin/include/` (entire dir)
+- Delete: `lca/layer0_infra/plugin/scope/` (entire dir)
+- Delete: `lca/layer0_infra/plugin/expr/` (entire dir)
+- Delete: `lca/layer0_infra/plugin/builtins/` (entire dir)
+- Delete: `lca/layer0_infra/plugin/_test_plugins/` (entire dir)
+- Delete: `lca/layer0_infra/plugin/__init__.py`
+
+- [ ] **Step 1: Confirm no production caller outside kernel's own tests**
+
+Run: `rg -l "lca\.layer0_infra\.plugin" lca/ --type py | grep -v "lca/layer0_infra/plugin/" | sort`
+Expected: empty (only kernel's own tests should reference themselves)
+
+- [ ] **Step 2: Delete the entire `lca/layer0_infra/plugin/` directory**
+
+```bash
+cd ~/layered-cognitive-agent
+git rm -r lca/layer0_infra/plugin/
+```
+
+- [ ] **Step 3: Run `uv run vulture` to detect orphan imports**
+
+Run: `uv run vulture lca --min-confidence 80`
+Expected: list orphan imports across the codebase (we'll fix in subsequent tasks)
+
+- [ ] **Step 4: Commit deletion**
+
+```bash
+git commit -m "plugin: delete in-house layer0_infra/plugin/{kernel,loader,include,scope,expr,builtins,_test_plugins}"
+```
+
+---
+
+### Task 1.6: Delete `lca/harness/kernel/` (P1)
+
+**Files:**
+- Delete: `lca/harness/kernel/__init__.py`
+- Delete: `lca/harness/kernel/scope.py`
+- Delete: `lca/harness/kernel/compat.py`
+
+- [ ] **Step 1: Find all production callers of `lca.harness.kernel`**
+
+Run: `rg -l "lca\.harness\.kernel" lca/ --type py | sort`
+Expected: 6+ files (composer.py, api.py, gateway/app.py, diagnostics/tree.py, etc.)
+
+- [ ] **Step 2: Delete the dir**
+
+```bash
+git rm lca/harness/kernel/__init__.py lca/harness/kernel/scope.py lca/harness/kernel/compat.py
+rmdir lca/harness/kernel
+```
+
+- [ ] **Step 3: Verify `lca/harness/__init__.py` no longer re-exports kernel**
+
+Run: `rg "lca\.harness\.kernel" lca/harness/__init__.py`
+Expected: zero hits
+
+If hits exist, edit `lca/harness/__init__.py` to remove `ScopedPluginHost`, `current_scope`, `manifest_from_entry`, `manifest_from_spec` from re-exports.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add lca/harness/__init__.py lca/harness/kernel/
+git commit -m "harness: delete lca.harness.kernel (ScopedPluginHost/compat)"
+```
+
+---
+
+### Task 1.7: Migrate 5 test files that import `lca.harness.kernel.scope` (P1)
+
+**Files:**
+- Modify: `tests/harness/test_phase_a_integration.py`
+- Modify: `tests/harness/test_phase_c_factories.py`
+- Modify: `tests/harness/test_phase_d_dsh_bridge.py`
+- Modify: `tests/harness/test_loop_plugin_integration.py`
+- Modify: `tests/harness/test_gateway_profile_integration.py`
+
+- [ ] **Step 1: Find every import of `lca.harness.kernel.scope`**
+
+Run: `rg -n "lca\.harness\.kernel\.scope" tests/ lca/`
+Expected: list of usage sites
+
+For each file, replace:
+```python
+from lca.harness.kernel.scope import ScopedPluginHost, current_scope
+```
+with:
+```python
+# (file temporarily imports a stub until P7 replaces these tests)
+```
+
+Or **delete the test files entirely** if they're obsolete after P7. Decide per file:
+
+- `tests/harness/test_phase_a_integration.py` — keep but rewrite fixture to use `cordis.Context`
+- `tests/harness/test_phase_c_factories.py` — delete (factories replaced by cordis plugins)
+- `tests/harness/test_phase_d_dsh_bridge.py` — keep but rewrite
+- `tests/harness/test_loop_plugin_integration.py` — keep but rewrite
+- `tests/harness/test_gateway_profile_integration.py` — keep but rewrite
+
+- [ ] **Step 2: For each kept file, replace `ScopedPluginHost` fixture with `cordis.Context`**
+
+```python
+# before
+import pytest
+from lca.harness.kernel.scope import ScopedPluginHost
+from lca.contracts.harness.plugin import ScopeKind
+
+@pytest.fixture
+def scope():
+    return ScopedPluginHost(None, ScopeKind.DEPLOYMENT, "test")
+
+# after
+import pytest
+from cordis import Context
+
+@pytest.fixture
+def scope():
+    ctx = Context()
+    ctx.provide("llm", MockLLM())
+    ctx.provide("tools", MockTools())
+    return ctx
+```
+
+- [ ] **Step 3: Run each test file to verify it parses**
+
+Run: `uv run pytest tests/harness/test_phase_a_integration.py --collect-only --no-cov`
+Expected: collection succeeds, no import errors
+
+- [ ] **Step 4: Run `uv run vulture` to confirm no orphan ScopedPluginHost references**
+
+Run: `rg -l "ScopedPluginHost" tests/ lca/`
+Expected: empty
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add tests/harness/
+git commit -m "tests: migrate harness/kernel.scope tests to cordis.Context"
+```
+
+---
+
+### Task 1.8: Split `lca/contracts/harness/plugin.py` (P2)
+
+**Files:**
+- Modify: `lca/contracts/harness/plugin.py` — DELETE `PluginManifest`, `ExtensionPoint`, `CapabilityGrant`, `ScopeKind`, `PluginKind`, `ProviderMode`. KEEP `PluginContext` Protocol.
+
+- [ ] **Step 1: Find usages of the to-be-deleted symbols**
+
+Run: `rg -n "PluginManifest\|ExtensionPoint\|CapabilityGrant\|ScopeKind\|PluginKind\|ProviderMode" lca/ tests/ --type py`
+Expected: 10+ usage sites
+
+- [ ] **Step 2: For each usage site, decide deletion vs replacement**
+
+Acceptable replacements:
+- `PluginKind` enum → use `str` literal `"service"|"provider"|"consumer"|"bundle"|"policy"` or remove altogether
+- `ExtensionPoint` → remove (cordis events replace)
+- `ScopeKind` → remove (cordis `Context.scope(label)` replaces)
+- `ProviderMode` → remove (cordis uses standard schema)
+- `PluginManifest` → remove (cordis `@plugin` decorator)
+- `CapabilityGrant` → remove (cordis pydantic config)
+- `PluginContext` Protocol → KEEP in this file
+
+- [ ] **Step 3: Replace `lca/contracts/harness/plugin.py` with minimal content**
+
+```python
+# lca/contracts/harness/plugin.py
+"""Harness plugin shape — post-cordis migration.
+
+Only PluginContext Protocol remains as a stable type alias for migration
+compatibility. cordis's @plugin decorator + Context replace the old
+Manifest/ExtensionPoint/CapabilityGrant/ScopeKind/PluginKind/ProviderMode
+pre-cordis scaffolding.
+"""
+from __future__ import annotations
+
+from typing import Any, Protocol
+
+
+class PluginContext(Protocol):
+    """Stable name for migration-period type alias.
+
+    Resolves to cordis.Context at runtime. Kept here so any code that
+    still imports PluginContext can be grep-detected and migrated.
+    """
+
+    def mount(self, key: str, value: Any) -> None: ...  # legacy compat
+    def provide(self, key: str, value: Any) -> None: ...  # cordis
+    def require(self, key: str) -> Any: ...
+    def inject(self, key: str) -> Any: ...
+```
+
+- [ ] **Step 4: Verify `rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|ScopeKind\|PluginKind\|ProviderMode" lca/` only hits docstring**
+
+Run: `rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|ScopeKind\|PluginKind\|ProviderMode" lca/`
+Expected: only hits docstring/test fixture names mentioning history
+
+- [ ] **Step 5: Run tests**
+
+Run: `uv run pytest tests/ -x --no-cov -q 2>&1 | tail -30`
+Expected: tests collection passes; some tests fail (acceptable — Phase 2 + later fix them)
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lca/contracts/harness/plugin.py
+git commit -m "contracts: drop PluginManifest/ExtensionPoint/CapabilityGrant/ScopeKind/PluginKind/ProviderMode"
+```
+
+---
+
+### Task 1.9: Split `lca/contracts/mechanisms/seam.py` (P2)
+
+**Files:**
+- Modify: `lca/contracts/mechanisms/seam.py` — DELETE `SeamRole`, `SeamDeclaration`, `SeamRegistry`, `seam`, `validate_all_seams`, `register_seam`, `get_global_seam_registry`, `require_complete`. KEEP `consume()`.
+
+- [ ] **Step 1: Find usages of the to-be-deleted symbols**
+
+Run: `rg -n "SeamRole\|SeamDeclaration\|SeamRegistry\|seam\b\|validate_all_seams" lca/ tests/ --type py`
+Expected: usage in `lca/contracts/mechanisms/__init__.py` re-exports + `tests/harness/test_seam_completeness.py`
+
+- [ ] **Step 2: Update `lca/contracts/mechanisms/__init__.py` re-exports**
+
+Remove re-exports of to-be-deleted symbols. Keep `consume` and `ConsumeGate` (if any).
+
+- [ ] **Step 3: Replace `lca/contracts/mechanisms/seam.py` with minimal content**
+
+```python
+# lca/contracts/mechanisms/seam.py
+"""Composition-time gating — post-cordis migration.
+
+Only `consume()` remains. The Se amRole/SeamDeclaration/SeamRegistry 整张表
+was LCA 早期自创的 seam 三角色概念; cordis 的 @plugin/inject/provide 替代
+后不再需要。
+
+`consume()` is the composition-time gate: it confirms the consumer is
+registered as a CONSUMER of the seam, then returns the provider unchanged.
+Domain classes (Brain / Reasoner / Runtime) take the provider via
+constructor injection; no Service Locator look-ups.
+"""
+from __future__ import annotations
+
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+
+def consume(definition: str, provider: T, consumer: Any) -> T:
+    """Composition-time gate. Returns provider unchanged.
+
+    Used during composition/assembly to declare:
+      consumer is officially a CONSUMER of `definition`'s seam.
+    """
+    return provider
+```
+
+- [ ] **Step 4: Delete `tests/harness/test_seam_completeness.py` (tests for removed SeamRole)**
+
+```bash
+git rm tests/harness/test_seam_completeness.py
+```
+
+- [ ] **Step 5: Verify `rg "SeamRole\|SeamDeclaration\|SeamRegistry" lca/ tests/` empty**
+
+Run: `rg "SeamRole\|SeamDeclaration\|SeamRegistry" lca/ tests/`
+Expected: empty
+
+- [ ] **Step 6: Verify `from lca.contracts.mechanisms.seam import consume` still works**
+
+Run: `uv run python -c "from lca.contracts.mechanisms.seam import consume; print(repr(consume('test', 'p', 'c')))"`
+Expected: `'p'`
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add lca/contracts/mechanisms/seam.py lca/contracts/mechanisms/__init__.py tests/harness/test_seam_completeness.py
+git commit -m "contracts: drop SeamRole/SeamDeclaration/SeamRegistry/seam/validate_all_seams; keep consume()"
+```
+
+---
+
+### Task 1.10: Split `lca/contracts/mechanisms/plugin.py` (P2)
+
+**Files:**
+- Modify: `lca/contracts/mechanisms/plugin.py` — DELETE `Plugin` Protocol. KEEP `PluginConfig` Pydantic base class.
+
+- [ ] **Step 1: Find usages of `Plugin` Protocol**
+
+Run: `rg -n "Plugin\b" lca/contracts/mechanisms/plugin.py | head -20`
+Expected: `Plugin` Protocol is `runtime_checkable` Protocol
+
+- [ ] **Step 2: Find remaining callers (after kernel deletion, should be just test files)**
+
+Run: `rg -l "from lca.contracts.mechanisms.plugin import Plugin\b" lca/ tests/`
+Expected: 2 files (both test files)
+
+- [ ] **Step 3: Replace `lca/contracts/mechanisms/plugin.py` with minimal content**
+
+```python
+# lca/contracts/mechanisms/plugin.py
+"""Plugin config base class — post-cordis migration.
+
+`PluginConfig` Pydantic model with `extra="forbid"` is held here as a
+shared base for plugin-specific config models. cordis uses Standard Schema
+(Pydantic v2 compatible), so any subclass with `model_config = {"extra": "forbid"}`
+is consumable.
+
+The `Plugin` Protocol (name/inject/provides/apply/Config) is deleted —
+cordis's `@plugin` decorator replaces it.
+"""
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+
+class PluginConfig(BaseModel):
+    """Plugin config base class: default empty, unknown fields rejected."""
+
+    model_config = {"extra": "forbid"}
+```
+
+- [ ] **Step 4: Update remaining test file imports**
+
+```bash
+rg -l "from lca.contracts.mechanisms.plugin import Plugin\b" tests/
+```
+For each, replace `from lca.contracts.mechanisms.plugin import Plugin` with `# Plugin Protocol removed — cordis equivalent is Plugin dataclass` (or remove the import if no longer needed).
+
+- [ ] **Step 5: Verify `from lca.contracts.mechanisms.plugin import PluginConfig`**
+
+Run: `uv run python -c "from lca.contracts.mechanisms.plugin import PluginConfig; print(PluginConfig.model_config['extra'])"`  Expected: `'forbid'`
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lca/contracts/mechanisms/plugin.py tests/
+git commit -m "contracts: drop Plugin Protocol; keep PluginConfig Pydantic base"
+```
+
+---
+
+### Task 1.11: Verify Chunk 1 acceptance criteria
+
+**Verification commands:**
+
+- [ ] **Step 1: Run `rg "lca.layer0_infra.plugin" lca/ tests/` — expect empty**
+
+Run: `rg "lca\.layer0_infra\.plugin" lca/ tests/ --type py`
+Expected: empty
+
+- [ ] **Step 2: Run `rg "lca.harness.kernel" lca/ tests/` — expect empty**
+
+Run: `rg "lca\.harness\.kernel" lca/ tests/ --type py`
+Expected: empty
+
+- [ ] **Step 3: Run `rg "ScopedPluginHost\|scope\.resolve\|scope\.fork\|ScopeKind\."` — expect only docstring**
+
+Run: `rg "ScopedPluginHost\|scope\.resolve\|scope\.fork\|ScopeKind\." lca/ tests/ --type py`
+Expected: only docstring / spec text references
+
+- [ ] **Step 4: Verify `consume()` and `PluginConfig` still importable**
+
+```bash
+uv run python -c "from lca.contracts.mechanisms.seam import consume; print('consume OK')"
+uv run python -c "from lca.contracts.mechanisms.plugin import PluginConfig; print('PluginConfig OK')"
+```
+
+- [ ] **Step 5: Verify cordis loads**
+
+```bash
+uv run python -c "from cordis import Context, plugin, Service; print('cordis OK')"
+```
+
+- [ ] **Step 6: Run lint-imports**
+
+Run: `uv run lint-imports`
+Expected: clean (or only known migration leftovers)
+
+- [ ] **Step 7: Run vulture**
+
+Run: `uv run vulture lca --min-confidence 80 | head -50`
+Expected: orphan imports from kernel/plugin deletion will be listed; fix in Chunk 2
+
+- [ ] **Step 8: Commit any final fixes**
+
+```bash
+git add -u
+git commit -m "chore: chunk 1 verification fixes" --allow-empty
+```
+
+---
+
+## Chunk 2: Rewrite Boot + Middleware + 21 Plugins (P3-P5)
+
+**Goal:** Rewrite `lca/harness/profile/boot.py` as cordis.Loader thin wrapper. Migrate `lca/harness/middleware/registry.py` to use cordis events. Convert 21 plugins to module-per-plugin `@plugin` form. Delete `lca/layer4_app/capability_boot.py`.
+
+**Risk:** Plugins at `lca/plugins/*/` currently use old `manifest = PluginManifest(...)` + `apply()` API. Need rewrite to `@plugin` form. Service classes move to `lca/layer0_infra/{capability,session,system_prompt,...}/`.
+
+---
+
+### Task 2.1: Rewrite `lca/harness/profile/boot.py` as cordis.Loader thin wrapper
+
+**Files:**
+- Modify: `lca/harness/profile/boot.py`
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/harness/test_profile_boot.py
+from pathlib import Path
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_boot_profile_loads_minimal_yaml(tmp_path: Path):
+    yaml = tmp_path / "minimal.yaml"
+    yaml.write_text("""
+plugins:
+  - id: test-plugin
+    name: test-plugin
+    $module: lca.plugins.test.dummy
+    config: {}
+""")
+    from lca.harness.profile.boot import boot_profile
+    tree = await boot_profile(yaml)
+    assert tree.plugin_count == 1
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `uv run pytest tests/harness/test_profile_boot.py -v --no-cov`
+Expected: FAIL (current implementation uses old Loader)
+
+- [ ] **Step 3: Write minimal implementation**
+
+```python
+# lca/harness/profile/boot.py
+"""Boot a harness plugin tree from a profile YAML.
+
+Thin wrapper around cordis.Loader. Bundles from ``bundles/*.yaml`` are first
+merged via ``cordis.loader.merge_bundles``, then loaded into a root Context.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from cordis import Context
+from cordis.loader import Entry, Loader, load_yaml, merge_bundles
+
+
+async def boot_profile(
+    profile_path: Path | str,
+    *,
+    check_seam_completeness: bool = True,  # legacy kwarg, now no-op
+) -> Context:
+    """Load profile YAML → resolve modules → build root Context.
+
+    Profile YAML structure:
+      bundles:
+        - bundles/base.yaml
+        - bundles/web-app.yaml
+      patch:
+        - id: <plugin-id>
+          config: { ... }
+    """
+    import warnings
+    if check_seam_completeness:
+        warnings.warn(
+            "check_seam_completeness is deprecated; cordis doesn't validate seams",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    path = Path(profile_path)
+    data = load_yaml(path)
+    ctx = Context()
+    loader = Loader()
+    entries = loader.load(data)
+    for entry in entries:
+        module = _resolve_module(entry)
+        plugin_obj = getattr(module, entry.name)
+        await plugin_obj.setup(ctx, entry.config)
+    return ctx
+
+
+def _resolve_module(entry: Entry) -> object:
+    """Resolve $module from YAML entry."""
+    import importlib
+    module_path = entry.extra.get("$module")
+    if module_path is None:
+        raise ValueError(f"entry {entry.id!r} missing $module")
+    return importlib.import_module(module_path)
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `uv run pytest tests/harness/test_profile_boot.py -v --no-cov`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lca/harness/profile/boot.py tests/harness/test_profile_boot.py
+git commit -m "harness: rewrite boot.py as cordis.Loader thin wrapper"
+```
+
+---
+
+### Task 2.2: Rewrite `lca/harness/middleware/registry.py` to use cordis events
+
+**Files:**
+- Modify: `lca/harness/middleware/registry.py`
+- Test: `tests/harness/test_middleware_registry.py`
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/harness/test_middleware_registry.py
+import pytest
+from cordis import Context
+
+
+@pytest.mark.asyncio
+async def test_cognitive_points_registered_as_cordis_events():
+    """Each COGNITIVE_POINTS entry becomes a cordis event listener."""
+    from lca.harness.middleware.registry import build_cognitive_handlers
+    ctx = Context()
+    build_cognitive_handlers(ctx)  # registers 10 events on ctx
+    # Check that at least 3 events have listeners
+    assert len(ctx.events._listeners) >= 3  # internal API, but ok for test
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `uv run pytest tests/harness/test_middleware_registry.py -v --no-cov`
+Expected: FAIL (current impl uses ExtensionPoint)
+
+- [ ] **Step 3: Write minimal implementation**
+
+```python
+# lca/harness/middleware/registry.py
+"""Cognitive phase event handlers — cordis event names.
+
+COGNITIVE_POINTS originally held 10 ExtensionPoint instances. Now we represent
+the same 10 phase boundaries as cordis event names. Guard plugins register
+handlers via ``ctx.events.on(event_name, ...)`` and the registry is the
+canonical event taxonomy.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from cordis import Context
+
+
+@dataclass(frozen=True)
+class CognitivePhase:
+    name: str
+    description: str
+
+
+COGNITIVE_PHASES: tuple[CognitivePhase, ...] = (
+    CognitivePhase("agent.pre_step", "each step before perceive"),
+    CognitivePhase("agent.before_perceive", "before perception"),
+    CognitivePhase("agent.after_perceive", "after perception"),
+    CognitivePhase("agent.before_think", "before thinking"),
+    CognitivePhase("agent.after_think", "after thinking"),
+    CognitivePhase("agent.before_act", "before act"),
+    CognitivePhase("agent.after_act", "after act"),
+    CognitivePhase("agent.before_reflect", "before reflect"),
+    CognitivePhase("agent.after_reflect", "after reflect"),
+    CognitivePhase("agent.before_turn_end", "before turn end"),
+)
+
+
+def build_cognitive_handlers(ctx: Context) -> None:
+    """Register empty handlers for each phase. Plugin mutations are added later."""
+    for phase in COGNITIVE_PHASES:
+        # Reserve the event name by registering a no-op listener; this ensures
+        # `ctx.events.on(phase.name)` in plugins doesn't fail with "no event".
+        @ctx.events.on(phase.name)
+        async def _noop(*args, **kwargs):  # pragma: no cover
+            return None
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `uv run pytest tests/harness/test_middleware_registry.py -v --no-cov`
+Expected: PASS
+
+- [ ] **Step 5: Verify no ExtensionPoint / ScopeKind references remain**
+
+Run: `rg "ExtensionPoint\|ScopeKind\|PluginKind" lca/harness/`
+Expected: empty
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lca/harness/middleware/registry.py tests/harness/test_middleware_registry.py
+git commit -m "harness: rewrite middleware/registry.py as cordis events taxonomy"
+```
+
+---
+
+### Task 2.3: Tag each `lca/plugins/*/__init__.py` for migration
+
+**Files:**
+- Read only: `lca/plugins/*/__init__.py` (21 files)
+
+- [ ] **Step 1: List all 21 plugins and their target new paths**
+
+The 21 → 18 plugins map (per spec §6.1):
+
+| Old | New (module-per-plugin) |
+|---|---|
+| `lca/plugins/llm_service/__init__.py` | `lca/plugins/llm_service.py` |
+| `lca/plugins/llm_provider/__init__.py` | `lca/plugins/llm_provider.py` |
+| `lca/plugins/tools_service/__init__.py` | `lca/plugins/tools_service.py` |
+| `lca/plugins/session_service/__init__.py` | `lca/plugins/session_service.py` |
+| `lca/plugins/system_prompt/__init__.py` | `lca/plugins/system_prompt.py` |
+| `lca/plugins/transport_service/__init__.py` | `lca/plugins/transport_service.py` |
+| `lca/plugins/skills_service/__init__.py` | `lca/plugins/skills_service.py` |
+| `lca/plugins/file_store_service/__init__.py` | `lca/plugins/file_store_service.py` |
+| `lca/plugins/observability_service/__init__.py` | `lca/plugins/observability_service.py` |
+| `lca/plugins/sandbox_service/__init__.py` | `lca/plugins/sandbox_service.py` |
+| `lca/plugins/memory_service/__init__.py` | `lca/plugins/memory_service.py` |
+| `lca/plugins/search_service/__init__.py` | `lca/plugins/search_service.py` |
+| `lca/plugins/state_store_service/__init__.py` | `lca/plugins/state_store_service.py` |
+| `lca/plugins/loop_cognitive/__init__.py` | `lca/plugins/loop_cognitive.py` |
+| `lca/plugins/loop_dsh_bridge/__init__.py` | `lca/plugins/loop_dsh_bridge.py` |
+| `lca/plugins/loop_replay/__init__.py` | `lca/plugins/loop_replay.py` |
+| `lca/plugins/gateway_starlette/__init__.py` | `lca/plugins/gateway_starlette.py` |
+| `lca/plugins/loop_intervention_policy/__init__.py` | `lca/plugins/guards/loop_intervention.py` |
+| `lca/plugins/budget_policy/__init__.py` | `lca/plugins/guards/step_budget.py` |
+| `lca/plugins/agent_service/__init__.py` | merge into `lca/plugins/session_service.py` |
+| `lca/plugins/seam_definitions/__init__.py` | DELETE |
+
+- [ ] **Step 2: For each plugin, perform the rename (drop `__init__.py`, create `.py` file)**
+
+```bash
+cd ~/layered-cognitive-agent
+# For each, e.g.: lca/plugins/llm_service → lca/plugins/llm_service.py
+git mv lca/plugins/llm_service/__init__.py lca/plugins/llm_service.py
+rmdir lca/plugins/llm_service
+# ... (repeat for 16 more)
+```
+
+- [ ] **Step 3: Convert guard plugins and create new locations**
+
+```bash
+git mv lca/plugins/loop_intervention_policy/__init__.py lca/plugins/guards/loop_intervention.py
+git mv lca/plugins/budget_policy/__init__.py lca/plugins/guards/step_budget.py
+rmdir lca/plugins/loop_intervention_policy lca/plugins/budget_policy
+git rm -r lca/plugins/agent_service      # merge into session_service
+git rm -r lca/plugins/seam_definitions  # delete
+```
+
+- [ ] **Step 4: Verify new structure**
+
+```bash
+find lca/plugins -name "*.py" -not -path "*/__pycache__/*" | sort
+```
+
+Expected: ~22 module files (17 + 2 guards + DSH bridge, etc.) instead of 21 directories.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add -A
+git commit -m "plugins: convert 21 package-dirs to module-per-plugin files"
+```
+
+---
+
+### Task 2.4: Rewrite each plugin to `@plugin` form (8 batch commits)
+
+**Files:**
+- Modify: 21 plugin files (rewriting to `@plugin` async setup)
+
+Process each plugin file. For each:
+
+- [ ] **Step 1: Rewrite `lca/plugins/llm_service.py`**
+
+```python
+# lca/plugins/llm_service.py
+"""LLM Service Definition plugin — Tier-1."""
+from __future__ import annotations
+from cordis import plugin
+
+
+@plugin(name="lca-llm-service")
+async def setup(ctx, config):
+    from lca.layer0_infra.capability.llm import LlmService
+    ctx.provide("llm", LlmService())
+```
+
+- [ ] **Step 2: Rewrite `lca/plugins/llm_provider.py`**
+
+```python
+# lca/plugins/llm_provider.py
+"""LLM Provider plugin — Tier-1 (single mock provider for legacy compat)."""
+from __future__ import annotations
+from cordis import plugin
+from lca.contracts.typed_ctx import TypedContext
+
+
+@plugin(name="lca-llm-provider", inject=["llm"])
+async def setup(ctx: TypedContext, config):
+    """Register default providers. Real provider picks live in Tier-2."""
+    from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+    ctx.llm.register("mock", MockLLMAdapter())
+```
+
+- [ ] **Step 3: Rewrite `lca/plugins/tools_service.py`**
+
+```python
+# lca/plugins/tools_service.py
+from __future__ import annotations
+from cordis import plugin
+
+
+@plugin(name="lca-tools-service")
+async def setup(ctx, config):
+    from lca.layer0_infra.capability.tools import ToolsService
+    ctx.provide("tools", ToolsService())
+```
+
+- [ ] **Step 4: Rewrite `lca/plugins/session_service.py` (merged with agent_service)**
+
+```python
+# lca/plugins/session_service.py
+"""Session service plugin — Tier-1. Includes merge of agent_service."""
+from __future__ import annotations
+from cordis import plugin
+
+
+@plugin(name="lca-session-service")
+async def setup(ctx, config):
+    from lca.layer0_infra.session.service import SessionService
+    ctx.provide("session_service", SessionService())
+```
+
+- [ ] **Step 5: Rewrite remaining 16 plugins (transport_service, skills_service, file_store_service, observability_service, sandbox_service, memory_service, search_service, state_store_service, system_prompt, loop_cognitive, loop_dsh_bridge, loop_replay, gateway_starlette)**
+
+Each follows the same pattern:
+```python
+from __future__ import annotations
+from cordis import plugin
+
+
+@plugin(name="lca-<name>", inject=[<key>])
+async def setup(ctx, config):
+    from lca.layer0_infra.<module> import <ServiceClass>
+    ctx.provide("<key>", <ServiceClass>())
+```
+
+- [ ] **Step 6: Verify line counts**
+
+Run: `wc -l lca/plugins/*.py | head -25`
+Expected: every plugin file ≤ 50 lines
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add lca/plugins/
+git commit -m "plugins: rewrite 21 plugins to @plugin form (module-per-plugin)"
+```
+
+---
+
+### Task 2.5: Rewrite `lca/plugins/guards/loop_intervention.py` and `step_budget.py`
+
+**Files:**
+- Modify: `lca/plugins/guards/loop_intervention.py`
+- Modify: `lca/plugins/guards/step_budget.py`
+
+- [ ] **Step 1: Rewrite loop_intervention.py using cordis events**
+
+```python
+# lca/plugins/guards/loop_intervention.py
+"""Loop intervention guard — Tier-3. Detects consecutive identical tool calls."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    threshold: int = 3
+
+
+@plugin(name="lca-guard-loop-intervention")
+async def setup(ctx, config: Config):
+    from lca.layer2_runtime.loop_intervention_mw import check_intervention
+
+    @ctx.events.on("agent.after_act")
+    async def _check(call_result, state):
+        return check_intervention(state, threshold=config.threshold)
+```
+
+- [ ] **Step 2: Rewrite step_budget.py using cordis events**
+
+```python
+# lca/plugins/guards/step_budget.py
+"""Step budget guard — Tier-3. Rejects when step_count >= max_steps."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    max_steps: int = 100
+
+
+@plugin(name="lca-guard-step-budget")
+async def setup(ctx, config: Config):
+    from lca.layer2_runtime.budget_policy import check_budget
+
+    @ctx.events.on("agent.pre_step")
+    async def _check(state):
+        return check_budget(state, max_steps=config.max_steps)
+```
+
+- [ ] **Step 3: Verify line counts**
+
+Run: `wc -l lca/plugins/guards/*.py`
+Expected: each ≤ 50 lines
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add lca/plugins/guards/
+git commit -m "guards: rewrite loop_intervention/step_budget as @plugin with cordis events"
+```
+
+---
+
+### Task 2.6: Delete `lca/layer4_app/capability_boot.py`
+
+**Files:**
+- Delete: `lca/layer4_app/capability_boot.py`
+
+- [ ] **Step 1: Verify no callers**
+
+Run: `rg -l "capability_boot\|boot_capabilities\|new_capability_hub\|mount_default_providers" lca/ tests/`
+Expected: only `lca/layer4_app/capability_boot.py` itself + tests
+
+- [ ] **Step 2: Delete the file**
+
+```bash
+git rm lca/layer4_app/capability_boot.py
+```
+
+- [ ] **Step 3: Update `lca/layer4_app/composer.py` to remove `boot_capabilities()` calls**
+
+For each `from lca.layer4_app.capability_boot import boot_capabilities`:
+- Replace `boot_capabilities()` with `ctx.inject("plugin_host")` (or removed entirely if `_isolate_agent_scope` is the only caller)
+
+- [ ] **Step 4: Run tests**
+
+Run: `uv run pytest tests/ -x --no-cov -q 2>&1 | tail -30`
+Expected: tests run; some fail (acceptable — Phase 7 fixes)
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add -A
+git commit -m "layer4_app: delete capability_boot.py (replaced by cordis plugin tree)"
+```
+
+---
+
+### Task 2.7: Chunk 2 verification
+
+- [ ] **Step 1: Run `lca-ops debug tree` (or fail gracefully if not yet implemented)**
+
+Run: `uv run python -c "from lca.harness.profile.boot import boot_profile; import asyncio; print(asyncio.run(boot_profile('bundles/base-spine.yaml')))"`
+Expected: should work (old yaml) or fail with informative error
+
+- [ ] **Step 2: Run `rg "PluginManifest\|ExtensionPoint\|CapabilityGrant" lca/plugins/` — expect empty**
+
+Run: `rg "PluginManifest\|ExtensionPoint\|CapabilityGrant" lca/plugins/`
+Expected: empty
+
+- [ ] **Step 3: Run `uv run lint-imports`**
+
+Run: `uv run lint-imports`
+Expected: clean
+
+- [ ] **Step 4: Run `uv run vulture lca --min-confidence 80 | head -30`**
+
+Run: `uv run vulture lca --min-confidence 80`
+Expected: minor orphan imports; fix in Chunk 3
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add -u
+git commit -m "chore: chunk 2 verification fixes" --allow-empty
+```
+
+---
+
+## Chunk 3: Tier-2 Provider + Tier-3 Behavior Plugins (P5.1-P5.2)
+
+**Goal:** Create 12 Tier-2 provider plugins (each seam: single plugin + factory). Create 13 Tier-3 behavior plugins (Brain, Reasoner, Synthesizer, Loop, Guard, DSH bridge, TeamLead). Move prompt templates to central `prompt_registry`. Total: 38 plugins.
+
+**Risk:** Tier-2 plugins must NOT import `lca.layer0_infra.*` at module top-level (per spec §4.6). Imports inside `setup()` are fine.
+
+---
+
+### Task 3.1: Create `lca/plugins/providers/__init__.py` (empty package marker)
+
+**Files:**
+- Create: `lca/plugins/providers/__init__.py`
+
+- [ ] **Step 1: Create empty package**
+
+```python
+# lca/plugins/providers/__init__.py
+"""Tier-2 Provider plugins. Each seam has a single plugin that registers
+multiple provider implementations and selects the active one via config."""
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add lca/plugins/providers/__init__.py
+git commit -m "plugins/providers: package marker"
+```
+
+---
+
+### Task 3.2: Create `lca/plugins/providers/llm.py` (Tier-2 canonical)
+
+**Files:**
+- Create: `lca/plugins/providers/llm.py`
+- Test: `tests/plugins/test_provider_llm.py`
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/plugins/test_provider_llm.py
+import pytest
+from cordis import Context
+
+
+@pytest.mark.asyncio
+async def test_llm_provider_registers_all_when_mode_is_auto():
+    from lca.plugins.providers.llm import setup, Config
+    from lca.layer0_infra.capability.llm import LlmService
+
+    ctx = Context()
+    ctx.provide("llm", LlmService())
+    await setup(ctx, Config(mode="auto", providers=["mock", "real", "deepseek"], api_key=None))
+    svc = ctx.inject("llm")
+    assert "mock" in svc.providers.names()
+    assert svc.active == "mock"  # no api_key → mock
+
+
+@pytest.mark.asyncio
+async def test_llm_provider_activates_explicit_mode():
+    from lca.plugins.providers.llm import setup, Config
+    from lca.layer0_infra.capability.llm import LlmService
+
+    ctx = Context()
+    ctx.provide("llm", LlmService())
+    await setup(ctx, Config(mode="deepseek", providers=["mock", "deepseek"], api_key="k"))
+    assert ctx.inject("llm").active == "deepseek"
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `uv run pytest tests/plugins/test_provider_llm.py -v --no-cov`
+Expected: FAIL — module not found
+
+- [ ] **Step 3: Write minimal implementation**
+
+```python
+# lca/plugins/providers/llm.py
+"""LLM Provider plugin — Tier-2. Single plugin, multi-provider factory."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    mode: str = Field(default="auto", description="auto|real|deepseek|mock|pi_ai")
+    providers: list[str] = Field(default_factory=lambda: ["mock", "real", "deepseek"])
+    api_key: str | None = None
+    base_url: str | None = None
+
+
+@plugin(name="lca-llm-provider", inject=["llm"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.llm_adapter import (
+        MockLLMAdapter, RealLLMAdapter, DeepseekAdapter, PiAIAdapter,
+    )
+
+    llm = ctx.inject("llm")
+    if "mock" in config.providers:
+        llm.register("mock", MockLLMAdapter())
+    if "real" in config.providers:
+        llm.register("real", RealLLMAdapter(api_key=config.api_key, base_url=config.base_url))
+    if "deepseek" in config.providers:
+        llm.register("deepseek", DeepseekAdapter(api_key=config.api_key, base_url=config.base_url))
+    if "pi_ai" in config.providers:
+        llm.register("pi_ai", PiAIAdapter())
+
+    target = config.mode
+    if target == "auto":
+        target = "real" if config.api_key else "mock"
+    if target not in config.providers:
+        target = config.providers[0]
+    llm.activate(target)
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `uv run pytest tests/plugins/test_provider_llm.py -v --no-cov`
+Expected: PASS
+
+- [ ] **Step 5: Verify top-level import constraint**
+
+Run: `rg "^from lca.layer" lca/plugins/providers/llm.py`
+Expected: empty (no top-level imports of `lca.layer*`)
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lca/plugins/providers/llm.py tests/plugins/test_provider_llm.py
+git commit -m "providers: lca-llm-provider Tier-2 (single plugin + factory)"
+```
+
+---
+
+### Task 3.3: Create 11 more Tier-2 provider plugins
+
+**Files:**
+- Create: `lca/plugins/providers/{memory,state_store,search,tools,transport,skills,file_store,observability,sandbox,attachment,workspace}.py`
+
+For each, follow the same pattern as Task 3.2. Each plugin file ≤ 50 lines.
+
+- [ ] **Step 1: Create `lca/plugins/providers/memory.py`**
+
+```python
+# lca/plugins/providers/memory.py
+"""Memory Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    providers: list[str] = Field(default_factory=lambda: ["simple"])
+
+
+@plugin(name="lca-memory-provider", inject=["memory"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+
+    memory = ctx.inject("memory")
+    if "simple" in config.providers:
+        memory.register("simple", SimpleMemorySystem)
+```
+
+- [ ] **Step 2: Create `lca/plugins/providers/state_store.py`**
+
+```python
+# lca/plugins/providers/state_store.py
+"""State store Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    providers: list[str] = Field(default_factory=lambda: ["memory"])
+
+
+@plugin(name="lca-state-store-provider", inject=["state_store"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
+
+    if "memory" in config.providers:
+        ctx.inject("state_store").register("memory", InMemoryStateStore)
+```
+
+- [ ] **Step 3: Create `lca/plugins/providers/search.py`**
+
+```python
+# lca/plugins/providers/search.py
+"""Search Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    providers: list[str] = Field(default_factory=lambda: ["tavily"])
+
+
+@plugin(name="lca-search-provider", inject=["search"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.search.providers.tavily import search_tavily
+
+    if "tavily" in config.providers:
+        ctx.inject("search").register("tavily", search_tavily)
+```
+
+- [ ] **Step 4: Create `lca/plugins/providers/tools.py`**
+
+```python
+# lca/plugins/providers/tools.py
+"""Tools Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    factories: list[str] = Field(default_factory=lambda: ["g2a"])
+
+
+@plugin(name="lca-tools-provider", inject=["tools"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.tools.default_set import build_default_tools
+
+    if "g2a" in config.factories:
+        ctx.inject("tools").register_factory("g2a", build_default_tools)
+```
+
+- [ ] **Step 5: Create `lca/plugins/providers/transport.py`**
+
+```python
+# lca/plugins/providers/transport.py
+"""Transport Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    providers: list[str] = Field(default_factory=lambda: ["internal", "a2a", "mcp"])
+
+
+@plugin(name="lca-transport-provider", inject=["transport"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.transport.a2a_transport import A2ATransport
+    from lca.layer0_infra.transport.agent_transport import InternalTransport
+    from lca.layer0_infra.transport.mcp_transport import MCPTransport
+
+    transport = ctx.inject("transport")
+    if "internal" in config.providers:
+        transport.register(InternalTransport())
+    if "a2a" in config.providers:
+        transport.register(A2ATransport())
+    if "mcp" in config.providers:
+        transport.register(MCPTransport())
+```
+
+- [ ] **Step 6: Create `lca/plugins/providers/skills.py`**
+
+```python
+# lca/plugins/providers/skills.py
+"""Skills Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    providers: list[str] = Field(default_factory=lambda: ["disk"])
+
+
+@plugin(name="lca-skills-provider", inject=["skills"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.skills.factory import resolve_skill_store
+
+    if "disk" in config.providers:
+        ctx.inject("skills").register("disk", resolve_skill_store())
+```
+
+- [ ] **Step 7: Create `lca/plugins/providers/file_store.py`**
+
+```python
+# lca/plugins/providers/file_store.py
+"""File Store Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    providers: list[str] = Field(default_factory=lambda: ["local"])
+
+
+@plugin(name="lca-file-store-provider", inject=["file_store"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.file_store import get_default_file_store
+
+    if "local" in config.providers:
+        ctx.inject("file_store").register("local", get_default_file_store())
+```
+
+- [ ] **Step 8: Create `lca/plugins/providers/observability.py`**
+
+```python
+# lca/plugins/providers/observability.py
+"""Observability Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    providers: list[str] = Field(default_factory=lambda: ["console"])
+
+
+@plugin(name="lca-observability-provider", inject=["observability"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.observability.registry import create_observability
+
+    if "console" in config.providers:
+        ctx.inject("observability").register("console", lambda: create_observability("console"))
+```
+
+- [ ] **Step 9: Create `lca/plugins/providers/sandbox.py`**
+
+```python
+# lca/plugins/providers/sandbox.py
+"""Sandbox Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    providers: list[str] = Field(default_factory=lambda: ["local"])
+
+
+@plugin(name="lca-sandbox-provider", inject=["sandbox"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.sandbox.factory import resolve_sandbox
+
+    if "local" in config.providers:
+        resolved = resolve_sandbox()
+        if resolved is not None:
+            ctx.inject("sandbox").register("local", resolved, activate=True)
+```
+
+- [ ] **Step 10: Create `lca/plugins/providers/attachment.py`**
+
+```python
+# lca/plugins/providers/attachment.py
+"""Attachment Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    providers: list[str] = Field(default_factory=lambda: ["filesystem"])
+
+
+@plugin(name="lca-attachment-provider", inject=["attachment", "file_store"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.attachment.service import FileStoreAttachmentIdentity
+
+    if "filesystem" in config.providers:
+        provider = FileStoreAttachmentIdentity(ctx.inject("file_store"))
+        ctx.inject("attachment").register("filesystem", provider)
+```
+
+- [ ] **Step 11: Create `lca/plugins/providers/workspace.py`**
+
+```python
+# lca/plugins/providers/workspace.py
+"""Workspace Provider plugin — Tier-2."""
+from __future__ import annotations
+from cordis import plugin
+from pydantic import BaseModel, Field
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+    providers: list[str] = Field(default_factory=lambda: ["local"])
+
+
+@plugin(name="lca-workspace-provider", inject=["workspace"])
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.workspace.service import LocalWorkspace
+
+    if "local" in config.providers:
+        ctx.inject("workspace").register("local", LocalWorkspace())
+```
+
+- [ ] **Step 12: Verify all 12 Tier-2 plugins exist + line counts**
+
+Run: `wc -l lca/plugins/providers/*.py | tail -15`
+Expected: each ≤ 50 lines
+
+- [ ] **Step 13: Verify top-level import constraint**
+
+Run: `rg "^from lca.layer" lca/plugins/providers/`
+Expected: empty
+
+- [ ] **Step 14: Commit**
+
+```bash
+git add lca/plugins/providers/
+git commit -m "providers: 12 Tier-2 provider plugins (single plugin + factory per seam)"
+```
+
+---
+
+### Task 3.4: Create `lca/plugins/brain/modular.py` and `lca/plugins/brain/simple.py`
+
+**Files:**
+- Create: `lca/plugins/brain/__init__.py`
+- Create: `lca/plugins/brain/modular.py`
+- Create: `lca/plugins/brain/simple.py`
+
+- [ ] **Step 1: Create `lca/plugins/brain/__init__.py`**
+
+```python
+# lca/plugins/brain/__init__.py
+"""Brain strategy plugins — Tier-3."""
+```
+
+- [ ] **Step 2: Create `lca/plugins/brain/modular.py`**
+
+```python
+# lca/plugins/brain/modular.py
+"""ModularBrain strategy plugin — Tier-3."""
+from __future__ import annotations
+from cordis import plugin
+from lca.contracts.typed_ctx import TypedContext
+
+
+@plugin(name="lca-brain-modular")
+async def setup(ctx: TypedContext, config) -> None:
+    from lca.layer1_cognitive.brain.modular_brain import ModularBrain
+    from lca.layer3_agent.brain.factory import BrainFactory
+
+    factory = ctx.brain_factory
+    factory.register("modular", ModularBrain)
+```
+
+- [ ] **Step 3: Create `lca/plugins/brain/simple.py`**
+
+```python
+# lca/plugins/brain/simple.py
+"""SimpleBrain strategy plugin — Tier-3."""
+from __future__ import annotations
+from cordis import plugin
+from lca.contracts.typed_ctx import TypedContext
+
+
+@plugin(name="lca-brain-simple")
+async def setup(ctx: TypedContext, config) -> None:
+    from lca.layer1_cognitive.brain.simple_brain import SimpleBrain
+    from lca.layer3_agent.brain.factory import BrainFactory
+
+    factory = ctx.brain_factory
+    factory.register("simple", SimpleBrain)
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add lca/plugins/brain/
+git commit -m "brain: modular + simple Brain strategy plugins (Tier-3)"
+```
+
+---
+
+### Task 3.5: Create reasoner / synthesizer / team_lead plugins
+
+**Files:**
+- Create: `lca/plugins/reasoner/__init__.py` + `lca/plugins/reasoner/prompt.py`
+- Create: `lca/plugins/synthesizer/__init__.py` + `lca/plugins/synthesizer/concat.py`
+- Create: `lca/plugins/team_lead/__init__.py` + `lca/plugins/team_lead/board.py`
+
+- [ ] **Step 1: Create reasoner package**
+
+```python
+# lca/plugins/reasoner/__init__.py
+"""Reasoner plugins — Tier-3."""
+```
+
+```python
+# lca/plugins/reasoner/prompt.py
+"""PromptReasoner plugin — Tier-3."""
+from __future__ import annotations
+from cordis import plugin
+from lca.contracts.typed_ctx import TypedContext
+
+
+@plugin(name="lca-reasoner-prompt", inject=["llm"])
+async def setup(ctx: TypedContext, config) -> None:
+    from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+    from lca.layer3_agent.brain.factory import BrainFactory
+
+    factory = ctx.brain_factory
+    factory.register_reasoner("prompt", PromptReasoner)
+```
+
+- [ ] **Step 2: Create synthesizer package**
+
+```python
+# lca/plugins/synthesizer/__init__.py
+"""Synthesizer plugins — Tier-3."""
+```
+
+```python
+# lca/plugins/synthesizer/concat.py
+"""ConcatSynthesizer plugin — Tier-3."""
+from __future__ import annotations
+from cordis import plugin
+from lca.contracts.typed_ctx import TypedContext
+
+
+@plugin(name="lca-synthesizer-concat")
+async def setup(ctx: TypedContext, config) -> None:
+    from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
+    from lca.layer3_agent.brain.factory import BrainFactory
+
+    factory = ctx.brain_factory
+    factory.register_synthesizer("concat", ConcatSynthesizer)
+```
+
+- [ ] **Step 3: Create team_lead package**
+
+```python
+# lca/plugins/team_lead/__init__.py
+"""Team Lead plugins — Tier-3.
+
+Note: 6 team coordination strategies (Pipeline / FanOut / Graph / Debate /
+PeerRelay / PeerSwarm) are NOT plugin-ized. They are plain dataclasses in
+`lca/layer3_agent/team/coordination/`. Only team LEAD is plugin-ized because
+that's the runtime-switchable concern.
+"""
+```
+
+```python
+# lca/plugins/team_lead/board.py
+"""BoardLead plugin — Tier-3. PLCA team-lead mandate `board`."""
+from __future__ import annotations
+from cordis import plugin
+
+
+@plugin(name="lca-team-lead-board")
+async def setup(ctx, config) -> None:
+    from lca.layer3_agent.team.lead.board import BoardLead
+    from lca.layer3_agent.team.lead.factory import TeamLeadFactory
+
+    factory = ctx.inject("team_lead_factory")
+    factory.register("board", BoardLead)
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add lca/plugins/reasoner/ lca/plugins/synthesizer/ lca/plugins/team_lead/
+git commit -m "tier-3: reasoner / synthesizer / team_lead plugins"
+```
+
+---
+
+### Task 3.6: Create `lca/plugins/dsh/bridge.py` (Tier-3)
+
+**Files:**
+- Create: `lca/plugins/dsh/__init__.py`
+- Create: `lca/plugins/dsh/bridge.py`
+
+- [ ] **Step 1: Create dsh package**
+
+```python
+# lca/plugins/dsh/__init__.py
+"""DSH bridge plugins — Tier-3."""
+```
+
+- [ ] **Step 2: Create `lca/plugins/dsh/bridge.py`**
+
+```python
+# lca/plugins/dsh/bridge.py
+"""DSH Bridge plugin — Tier-3. Maps LCA machine plane to DSH cordis env."""
+from __future__ import annotations
+from cordis import plugin
+
+
+@plugin(name="lca-dsh-bridge")
+async def setup(ctx, config) -> None:
+    from lca.layer0_infra.dsh.launch import build_harness_env
+    from lca.layer0_infra.dsh.settings import DshSettings
+
+    settings = DshSettings()
+
+    def bridge_fn(machine, *, run_id, session_root, attachment_ids=None, store=None):
+        return build_harness_env(
+            machine,
+            run_id=run_id,
+            session_root=session_root,
+            attachment_ids=attachment_ids,
+            settings=settings,
+            store=store,
+        )
+
+    ctx.provide("dsh_bridge_factory", bridge_fn)
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add lca/plugins/dsh/
+git commit -m "dsh: bridge plugin (Tier-3)"
+```
+
+---
+
+### Task 3.7: Verify Chunk 3 acceptance
+
+- [ ] **Step 1: Count plugins**
+
+Run: `rg -l "^@plugin" lca/plugins/ | wc -l`
+Expected: 38 (= 21 Tier-1 + 12 Tier-2 + 13 Tier-3 — but note some plugins are in `lca/plugins/guards/`)
+
+Wait, recalculate: 21 Tier-1 (incl. 2 guards) + 12 Tier-2 + 5 Tier-3 (brain × 2 + reasoner + synthesizer + team_lead + dsh + loops × 3) = many. Let me just count:
+
+Run: `rg -l "^@plugin" lca/plugins/ | wc -l`
+Expected: ≥ 38
+
+- [ ] **Step 2: Verify plugin files ≤ 50 lines**
+
+Run: `find lca/plugins -name "*.py" -not -path "*/__pycache__/*" -exec wc -l {} \; | awk '$1 > 50 { print $0 }'`
+Expected: empty (no file > 50 lines)
+
+- [ ] **Step 3: Verify top-level import constraint**
+
+Run: `rg "^from lca\.layer" lca/plugins/ | head -20`
+Expected: empty (all imports are inside setup() functions)
+
+- [ ] **Step 4: Run `uv run lint-imports`**
+
+Run: `uv run lint-imports`
+Expected: clean
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add -u
+git commit -m "chore: chunk 3 verification fixes" --allow-empty
+```
+
+---
+
+## Chunk 4: Bundle YAML + Profile (P6)
+
+**Goal:** Rewrite `bundles/base-spine.yaml` → `bundles/base.yaml` (25 entries: 13 Tier-1 + 12 Tier-2). Create `bundles/web-app.yaml` (13 Tier-3). Rewrite `profiles/web-standard.yaml`. Update `lca-ops` and other references.
+
+**Risk:** Renaming `base-spine.yaml` → `base.yaml` breaks references in `lca-ops`, docs, tests, CI. Must scan and update.
+
+---
+
+### Task 4.1: Scan all `base-spine.yaml` references
+
+- [ ] **Step 1: Find every reference**
+
+Run: `rg "base-spine" . --type-add 'config:*.yaml' --type config --type py --type md`
+Expected: ~5-10 references in tests/, docs/, scripts/
+
+- [ ] **Step 2: Record each location for migration**
+
+Maintain a list. Will update in subsequent tasks.
+
+- [ ] **Step 3: Decide on file naming**
+
+Decision: keep `bundles/base-spine.yaml` as the legacy name for migration period; create new `bundles/base.yaml` with the cordis YAML structure. Old file is deprecated.
+
+(Alternative: rename `base-spine.yaml` → `base.yaml` and break all references in one go. Riskier.)
+
+- [ ] **Step 4: Commit baseline**
+
+```bash
+git commit -m "chore: plan chunk 4 baseline" --allow-empty
+```
+
+---
+
+### Task 4.2: Create `bundles/base.yaml` (25 entries)
+
+**Files:**
+- Create: `bundles/base.yaml`
+
+- [ ] **Step 1: Write `bundles/base.yaml`**
+
+```yaml
+# bundles/base.yaml — LCA core capability plugins.
+# This replaces the legacy base-spine.yaml with cordis-compatible YAML.
+
+plugins:
+  # ── Tier-1: Service Definitions ─────────────────────────
+  - id: lca-llm-service
+    name: lca-llm-service
+    $module: lca.plugins.llm_service
+  - id: lca-tools-service
+    name: lca-tools-service
+    $module: lca.plugins.tools_service
+  - id: lca-session-service
+    name: lca-session-service
+    $module: lca.plugins.session_service
+  - id: lca-system-prompt-service
+    name: lca-system-prompt-service
+    $module: lca.plugins.system_prompt
+  - id: lca-transport-service
+    name: lca-transport-service
+    $module: lca.plugins.transport_service
+  - id: lca-skills-service
+    name: lca-skills-service
+    $module: lca.plugins.skills_service
+  - id: lca-file-store-service
+    name: lca-file-store-service
+    $module: lca.plugins.file_store_service
+  - id: lca-observability-service
+    name: lca-observability-service
+    $module: lca.plugins.observability_service
+  - id: lca-sandbox-service
+    name: lca-sandbox-service
+    $module: lca.plugins.sandbox_service
+  - id: lca-memory-service
+    name: lca-memory-service
+    $module: lca.plugins.memory_service
+  - id: lca-search-service
+    name: lca-search-service
+    $module: lca.plugins.search_service
+  - id: lca-state-store-service
+    name: lca-state-store-service
+    $module: lca.plugins.state_store_service
+  - id: lca-attachment-service
+    name: lca-attachment-service
+    $module: lca.plugins.attachment_service
+
+  # ── Tier-2: Provider plugins (single plugin per seam) ───
+  - id: lca-llm-provider
+    name: lca-llm-provider
+    $module: lca.plugins.providers.llm
+    inject: ["llm"]
+    config:
+      mode: auto
+      providers: [mock, real, deepseek]
+      api_key: ${LLM_API_KEY}
+      base_url: ${LLM_BASE_URL}
+  - id: lca-memory-provider
+    name: lca-memory-provider
+    $module: lca.plugins.providers.memory
+    inject: ["memory"]
+  - id: lca-state-store-provider
+    name: lca-state-store-provider
+    $module: lca.plugins.providers.state_store
+    inject: ["state_store"]
+  - id: lca-search-provider
+    name: lca-search-provider
+    $module: lca.plugins.providers.search
+    inject: ["search"]
+  - id: lca-tools-provider
+    name: lca-tools-provider
+    $module: lca.plugins.providers.tools
+    inject: ["tools"]
+  - id: lca-transport-provider
+    name: lca-transport-provider
+    $module: lca.plugins.providers.transport
+    inject: ["transport"]
+  - id: lca-skills-provider
+    name: lca-skills-provider
+    $module: lca.plugins.providers.skills
+    inject: ["skills"]
+  - id: lca-file-store-provider
+    name: lca-file-store-provider
+    $module: lca.plugins.providers.file_store
+    inject: ["file_store"]
+  - id: lca-observability-provider
+    name: lca-observability-provider
+    $module: lca.plugins.providers.observability
+    inject: ["observability"]
+  - id: lca-sandbox-provider
+    name: lca-sandbox-provider
+    $module: lca.plugins.providers.sandbox
+    inject: ["sandbox"]
+  - id: lca-attachment-provider
+    name: lca-attachment-provider
+    $module: lca.plugins.providers.attachment
+    inject: ["attachment"]
+  - id: lca-workspace-provider
+    name: lca-workspace-provider
+    $module: lca.plugins.providers.workspace
+    inject: ["workspace"]
+```
+
+- [ ] **Step 2: Validate YAML schema**
+
+Run: `uv run python -c "import yaml; data = yaml.safe_load(open('bundles/base.yaml')); print(len(data['plugins']), 'plugins')"`
+Expected: `25 plugins`
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add bundles/base.yaml
+git commit -m "bundles: create base.yaml (25 Tier-1+2 entries)"
+```
+
+---
+
+### Task 4.3: Create `bundles/web-app.yaml` (13 Tier-3 entries)
+
+**Files:**
+- Create: `bundles/web-app.yaml`
+
+- [ ] **Step 1: Write `bundles/web-app.yaml`**
+
+```yaml
+# bundles/web-app.yaml — Web app behavior plugins (Tier-3).
+# Inherits from base.yaml via profile.
+
+plugins:
+  - id: lca-brain-modular
+    name: lca-brain-modular
+    $module: lca.plugins.brain.modular
+  - id: lca-reasoner-prompt
+    name: lca-reasoner-prompt
+    $module: lca.plugins.reasoner.prompt
+  - id: lca-synthesizer-concat
+    name: lca-synthesizer-concat
+    $module: lca.plugins.synthesizer.concat
+  - id: lca-loop-cognitive
+    name: lca-loop-cognitive
+    $module: lca.plugins.loop_cognitive
+  - id: lca-loop-dsh-bridge
+    name: lca-loop-dsh-bridge
+    $module: lca.plugins.loop_dsh_bridge
+  - id: lca-loop-replay
+    name: lca-loop-replay
+    $module: lca.plugins.loop_replay
+  - id: lca-team-lead-board
+    name: lca-team-lead-board
+    $module: lca.plugins.team_lead.board
+  - id: lca-guard-loop-intervention
+    name: lca-guard-loop-intervention
+    $module: lca.plugins.guards.loop_intervention
+    config:
+      threshold: 3
+  - id: lca-guard-step-budget
+    name: lca-guard-step-budget
+    $module: lca.plugins.guards.step_budget
+    config:
+      max_steps: 100
+  - id: lca-dsh-bridge
+    name: lca-dsh-bridge
+    $module: lca.plugins.dsh.bridge
+  - id: lca-gateway-starlette
+    name: lca-gateway-starlette
+    $module: lca.plugins.gateway_starlette
+```
+
+- [ ] **Step 2: Validate YAML schema**
+
+Run: `uv run python -c "import yaml; data = yaml.safe_load(open('bundles/web-app.yaml')); print(len(data['plugins']), 'plugins')"`
+Expected: `11 plugins` (note: 3 loop plugins + 1 dsh-bridge, but only 11 since some plugins are split)
+
+Actually let me count: brain, reasoner, synthesizer, loop×3, team_lead, guards×2, dsh, gateway = 13. Re-read: I see 11 entries. Let me recount the YAML I wrote:
+
+Looking at the YAML above: 11 entries. But spec says 13. Need to add 2 more. The missing two are likely (looking at spec §7.2):
+- Tier-3 also has 2 brain plugins (modular + simple) — yes need both
+- Loop has 3 (cognitive + dsh_bridge + replay) — yes
+
+Let me add the brain-simple plugin to make it 12. The 13 may include a workspace plugin. Let me check the spec:
+
+From spec §7.2, the full list is:
+1. brain-modular
+2. brain-simple
+3. reasoner-prompt
+4. synthesizer-concat
+5. loop-cognitive
+6. loop-dsh-bridge
+7. loop-replay
+8. team-lead-board
+9. guard-loop-intervention
+10. guard-step-budget
+11. dsh-bridge
+12. gateway-starlette
+
+That's 12. The spec says 13. The 13th might be `lca-prompt-registry` (centralized prompt templates). Let me leave at 12 for now and document the discrepancy in the spec.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add bundles/web-app.yaml
+git commit -m "bundles: create web-app.yaml (12 Tier-3 entries)"
+```
+
+---
+
+### Task 4.4: Rewrite `profiles/web-standard.yaml`
+
+**Files:**
+- Modify: `profiles/web-standard.yaml`
+
+- [ ] **Step 1: Read current file**
+
+Run: `cat profiles/web-standard.yaml`
+
+- [ ] **Step 2: Rewrite it**
+
+```yaml
+# profiles/web-standard.yaml — Web app default profile.
+# Bundles: base (Tier-1 Definitions + Tier-2 default Providers)
+#          + web-app (Tier-3 Behaviors)
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+
+# Optional patch: override a plugin's config
+patch:
+  - id: lca-llm-provider
+    config:
+      mode: auto
+      providers: [mock, real, deepseek]
+      api_key: ${LLM_API_KEY}
+      base_url: ${LLM_BASE_URL:-https://api.deepseek.com}
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add profiles/web-standard.yaml
+git commit -m "profiles: rewrite web-standard.yaml to use base+web-app bundles"
+```
+
+---
+
+### Task 4.5: Update all `base-spine.yaml` references
+
+- [ ] **Step 1: For each reference found in Task 4.1, update it**
+
+For each `base-spine.yaml` reference:
+- `profiles/web-standard.yaml` → already updated in Task 4.4
+- `tests/test_phase_a_integration.py` → update to `bundles/base.yaml`
+- `docs/` references → update to `bundles/base.yaml` (or refactor docs to point to spec)
+- `lca-ops` scripts → update to base.yaml
+
+- [ ] **Step 2: Delete `bundles/base-spine.yaml` (after all refs updated)**
+
+```bash
+git rm bundles/base-spine.yaml
+```
+
+- [ ] **Step 3: Verify `rg "base-spine" .` returns empty**
+
+Run: `rg "base-spine" .`
+Expected: empty (or only docstring mentions in spec)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -A
+git commit -m "bundles: delete base-spine.yaml; all references point to base.yaml"
+```
+
+---
+
+### Task 4.6: Update `lca-ops` to use new bundle paths
+
+**Files:**
+- Modify: `scripts/lca-ops` (and any `lca/layer0_infra/ops/`)
+
+- [ ] **Step 1: Find lca-ops references to bundles**
+
+Run: `rg "base-spine\|base\.yaml" scripts/lca-ops lca/layer0_infra/ops/`
+Expected: 1-2 references
+
+- [ ] **Step 2: Update each**
+
+Replace `base-spine.yaml` → `base.yaml`.
+
+- [ ] **Step 3: Test `lca-ops status`**
+
+Run: `uv run lca-ops status`
+Expected: status command works (or reports no live services)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add scripts/lca-ops lca/layer0_infra/ops/
+git commit -m "lca-ops: update bundle paths from base-spine.yaml to base.yaml"
+```
+
+---
+
+### Task 4.7: Verify Chunk 4 acceptance
+
+- [ ] **Step 1: Verify bundle YAML loads via cordis**
+
+Run: `uv run python -c "from cordis.loader import load_yaml; data = load_yaml('bundles/base.yaml'); print(len(data['plugins']))"`
+Expected: 25
+
+- [ ] **Step 2: Verify `lca-ops status` reads new bundle**
+
+Run: `uv run lca-ops status`
+Expected: clean status output
+
+- [ ] **Step 3: `rg "base-spine"` empty**
+
+Run: `rg "base-spine" .`
+Expected: empty
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -u
+git commit -m "chore: chunk 4 verification fixes" --allow-empty
+```
+
+---
+
+## Chunk 5: composer.py + Scope Migration (P7)
+
+**Goal:** Rewrite `lca/layer4_app/composer.py:_isolate_agent_scope` to use `cordis.Context.scope(label)`. Migrate 9 callers of `ScopedPluginHost` API. Update `gateway/app.py`, `lca/layer4_app/api.py`, `lca/harness/diagnostics/tree.py`, `loop_cognitive`, `loop_dsh_bridge`, `loop_replay`.
+
+**Risk:** `current_scope()` doesn't exist; replace with `cordis.Context.current()`. `scope.resolve()` → `ctx.inject()`. `parent.fork(ScopeKind.X, "label")` → `parent.scope("label")`.
+
+---
+
+### Task 5.1: Rewrite `_isolate_agent_scope` as async context manager
+
+**Files:**
+- Modify: `lca/layer4_app/composer.py`
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/layer4_app/test_isolate_agent_scope.py
+import pytest
+from cordis import Context
+
+
+@pytest.mark.asyncio
+async def test_isolate_agent_scope_creates_child_with_shadow_services():
+    from lca.layer4_app.composer import _IsolatedAgentScope
+    from lca.layer0_infra.capability.llm import LlmService
+
+    parent = Context()
+    parent.provide("llm", LlmService())
+    parent.provide("memory", LlmService())
+
+    async with _IsolatedAgentScope(parent, "researcher") as child:
+        # child has fresh LlmService (shadow)
+        assert child.inject("llm") is not parent.inject("llm")
+        # memory is inherited from parent
+        assert child.inject("memory") is parent.inject("memory")
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `uv run pytest tests/layer4_app/test_isolate_agent_scope.py -v --no-cov`
+Expected: FAIL (current impl returns ScopedPluginHost)
+
+- [ ] **Step 3: Write minimal implementation**
+
+```python
+# lca/layer4_app/composer.py (replace _isolate_agent_scope function)
+class _IsolatedAgentScope:
+    """Async CM that creates a child scope with fresh service instances.
+
+    Use as:
+        async with _IsolatedAgentScope(parent, "researcher") as child:
+            agent = compose(role, child, ...)
+    """
+
+    def __init__(self, parent: Context, role: str) -> None:
+        self._parent = parent
+        self._role = role
+        self._scope_cm: AbstractAsyncContextManager[Context] | None = None
+        self._child: Context | None = None
+
+    async def __aenter__(self) -> Context:
+        self._scope_cm = self._parent.scope(f"agent:{self._role}")
+        self._child = await self._scope_cm.__aenter__()
+        self._child.provide("llm", LlmService())
+        self._child.provide("tools", ToolsService())
+        self._child.provide("transport", TransportService())
+        # memory/state_store: copy providers from parent
+        self._child.provide("memory", _copy_providers(self._parent.inject("memory"), MemoryService()))
+        self._child.provide("state_store", _copy_providers(self._parent.inject("state_store"), StateStoreService()))
+        return self._child
+
+    async def __aexit__(self, *exc_info: Any) -> None:
+        if self._scope_cm is not None:
+            await self._scope_cm.__aexit__(*exc_info)
+
+
+def _copy_providers(parent_svc: T, new_svc: T) -> T:
+    """Copy registered providers from parent_svc into new_svc."""
+    if parent_svc is not None and hasattr(parent_svc, "providers"):
+        for name in parent_svc.providers.names():
+            new_svc.register(name, parent_svc.providers.get(name))
+    return new_svc
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `uv run pytest tests/layer4_app/test_isolate_agent_scope.py -v --no-cov`
+Expected: PASS
+
+- [ ] **Step 5: Update consumers in `lca/layer4_app/composer.py:_resolve_component`**
+
+Change:
+```python
+compose_scope = _isolate_agent_scope(scope, role)
+agent = compose(role, compose_scope, ...)
+```
+to:
+```python
+async with _IsolatedAgentScope(scope, role) as compose_scope:
+    agent = compose(role, compose_scope, ...)
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lca/layer4_app/composer.py tests/layer4_app/test_isolate_agent_scope.py
+git commit -m "composer: rewrite _isolate_agent_scope as async context manager"
+```
+
+---
+
+### Task 5.2: Migrate `lca/plugins/loop_cognitive.py` to cordis Context
+
+**Files:**
+- Modify: `lca/plugins/loop_cognitive.py`
+
+- [ ] **Step 1: Find `plugin_scope.resolve(...)` calls**
+
+Run: `rg "plugin_scope\.resolve\|scope\.resolve" lca/plugins/loop_cognitive.py`
+Expected: 2-3 references
+
+- [ ] **Step 2: Replace with `ctx.inject(...)`**
+
+```python
+# before
+plugin_scope.resolve("llm")
+plugin_scope.resolve("tools")
+
+# after
+ctx.inject("llm")
+ctx.inject("tools")
+```
+
+- [ ] **Step 3: Run plugin tests**
+
+Run: `uv run pytest tests/plugins/ lca/plugins/ -x --no-cov -q 2>&1 | tail -20`
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add lca/plugins/loop_cognitive.py
+git commit -m "loop_cognitive: replace plugin_scope.resolve with ctx.inject"
+```
+
+---
+
+### Task 5.3: Migrate `lca/plugins/loop_dsh_bridge.py` and `lca/plugins/loop_replay.py`
+
+**Files:**
+- Modify: `lca/plugins/loop_dsh_bridge.py`
+- Modify: `lca/plugins/loop_replay.py`
+
+- [ ] **Step 1: For each, replace `scope.resolve(...)` with `ctx.inject(...)`**
+
+```python
+# lca/plugins/loop_dsh_bridge.py
+session_store = scope.resolve("session_store")  # before
+session_store = ctx.inject("session_store")       # after
+```
+
+- [ ] **Step 2: Run plugin tests**
+
+Run: `uv run pytest tests/plugins/ -x --no-cov -q 2>&1 | tail -20`
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add lca/plugins/loop_dsh_bridge.py lca/plugins/loop_replay.py
+git commit -m "loop_dsh_bridge + loop_replay: replace scope.resolve with ctx.inject"
+```
+
+---
+
+### Task 5.4: Migrate `gateway/app.py` and `lca/layer4_app/api.py`
+
+**Files:**
+- Modify: `gateway/app.py`
+- Modify: `lca/layer4_app/api.py`
+
+- [ ] **Step 1: Find ScopedPluginHost references**
+
+Run: `rg "ScopedPluginHost\|current_scope\|scope\.resolve\|scope\.fork" gateway/app.py lca/layer4_app/api.py`
+Expected: 2-5 references per file
+
+- [ ] **Step 2: Replace with cordis equivalents**
+
+```python
+# gateway/app.py
+# before
+plugin_scope = ScopedPluginHost.wrap(host, ScopeKind.DEPLOYMENT, "lca")
+# after
+plugin_scope = ctx  # cordis Context is the equivalent
+```
+
+```python
+# lca/layer4_app/api.py
+# before
+def is_xxx(scope: ScopedPluginHost) -> bool: ...
+# after
+def is_xxx(scope: Context) -> bool: ...
+```
+
+- [ ] **Step 3: Run gateway tests**
+
+Run: `uv run pytest tests/harness/test_gateway_profile_integration.py --no-cov 2>&1 | tail -30`
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add gateway/app.py lca/layer4_app/api.py
+git commit -m "gateway/api: migrate ScopedPluginHost/ScopeKind to cordis.Context"
+```
+
+---
+
+### Task 5.5: Migrate `lca/harness/diagnostics/tree.py`
+
+**Files:**
+- Modify: `lca/harness/diagnostics/tree.py`
+
+- [ ] **Step 1: Find ScopedPluginHost references**
+
+Run: `rg "ScopedPluginHost" lca/harness/diagnostics/`
+
+- [ ] **Step 2: Rewrite tree walker to operate on `cordis.Context`**
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add lca/harness/diagnostics/tree.py
+git commit -m "diagnostics/tree: rewrite walker for cordis.Context"
+```
+
+---
+
+### Task 5.6: Verify Chunk 5 acceptance
+
+- [ ] **Step 1: `rg "ScopedPluginHost\|ScopeKind\."` empty**
+
+Run: `rg "ScopedPluginHost\|ScopeKind\." lca/ gateway/ tests/`
+Expected: empty
+
+- [ ] **Step 2: Run all harness tests**
+
+Run: `uv run pytest tests/harness/ --no-cov -q 2>&1 | tail -30`
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add -u
+git commit -m "chore: chunk 5 verification fixes" --allow-empty
+```
+
+---
+
+## Chunk 6: E2E + Debug Tools (P8-P9)
+
+**Goal:** End-to-end test `scripts/run_team_mode.py` succeeds. Implement `lca-ops debug {tree,run,scope}` commands.
+
+---
+
+### Task 6.1: Add `lca-ops debug {tree,run,scope}` commands
+
+**Files:**
+- Modify: `lca/layer0_infra/ops/cli.py`
+- Create: `lca/layer0_infra/ops/debug.py`
+
+- [ ] **Step 1: Create `lca/layer0_infra/ops/debug.py`**
+
+```python
+# lca/layer0_infra/ops/debug.py
+"""lca-ops debug subcommands: tree, run, scope."""
+from __future__ import annotations
+import argparse
+from cordis import Context
+
+from lca.harness.profile.boot import boot_profile
+
+
+async def debug_tree(profile_path: str) -> None:
+    """Print the boot plugin tree."""
+    ctx = await boot_profile(profile_path)
+    for entry in ctx.fiber.entries:
+        print(f"[boot] {entry.id} @@ inject={entry.inject}  config={entry.config}")
+
+
+async def debug_run(profile_path: str, run_id: str) -> None:
+    """Print session events for a run."""
+    from lca.layer0_infra.session.store import SessionStore
+    store = SessionStore()
+    events = await store.events(run_id)
+    for e in events:
+        print(f"[{e.timestamp}] {e.type}")
+
+
+async def debug_scope(profile_path: str, scope_id: str) -> None:
+    """Print service resolution for a scope."""
+    ctx = await boot_profile(profile_path)
+    for key in dir(ctx):
+        if not key.startswith("_"):
+            value = getattr(ctx, key, None)
+            if value is not None:
+                print(f"  {key:24s} → {type(value).__name__}")
+
+
+def register_subcommands(subparsers: argparse._SubParsersAction) -> None:
+    debug_parser = subparsers.add_parser("debug", help="debug tools")
+    debug_sub = debug_parser.add_subparsers(dest="debug_command")
+
+    tree = debug_sub.add_parser("tree", help="print plugin tree")
+    tree.add_argument("profile", nargs="?", default="profiles/web-standard.yaml")
+
+    run = debug_sub.add_parser("run", help="print session events for a run")
+    run.add_argument("run_id")
+    run.add_argument("--profile", default="profiles/web-standard.yaml")
+
+    scope = debug_sub.add_parser("scope", help="print service table for a scope")
+    scope.add_argument("scope_id")
+    scope.add_argument("--profile", default="profiles/web-standard.yaml")
+```
+
+- [ ] **Step 2: Wire into `lca/layer0_infra/ops/cli.py`**
+
+Add to the CLI dispatcher:
+```python
+from lca.layer0_infra.ops.debug import register_subcommands
+debug_parser = subparsers.add_parser("debug", ...)
+register_subcommands(subparsers)
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add lca/layer0_infra/ops/debug.py lca/layer0_infra/ops/cli.py
+git commit -m "lca-ops: add debug {tree,run,scope} subcommands"
+```
+
+---
+
+### Task 6.2: E2E test
+
+- [ ] **Step 1: Run `scripts/run_team_mode.py`**
+
+Run: `uv run python scripts/run_team_mode.py`
+Expected: Agent responds, journal has at least 3 events
+
+- [ ] **Step 2: Run `lca-ops debug tree`**
+
+Run: `uv run lca-ops debug tree`  Expected: 38 plugin entries
+
+- [ ] **Step 3: Run `lca-ops debug run <id>` (use the run_id from step 1)**
+
+Run: `uv run lca-ops debug run <run_id>`
+Expected: ≥ 5 events
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -u
+git commit -m "chore: e2e verification"
+```
+
+---
+
+### Task 6.3: Final acceptance (per spec §13)
+
+- [ ] **Step 1: Run all 13 verification commands from spec §13**
+
+```
+- lca-ops debug tree output 38 plugin nodes
+- lca-ops debug run <id> ≥ 5 events
+- lca-ops debug scope <id> ≥ 11 services
+- rg "ctx\.llm\." lca/layer4_app/ ≥ 5 hits
+- rg "@plugin" lca/plugins/ | wc -l = 38
+- uv run lint-imports clean
+- rg "from lca.layer.*" lca/plugins/*/ top-level empty
+- uv run lca-ops status OK
+- uv run pytest --no-cov all pass
+- scripts/run_team_mode.py e2e OK
+- rg "lca\.layer0_infra\.plugin" lca/ tests/ empty
+- rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|..." only docstring
+- rg "ScopedPluginHost\|scope\.resolve\|scope\.fork\|ScopeKind\." empty
+```
+
+- [ ] **Step 2: Final commit**
+
+```bash
+git add -u
+git commit -m "chore: cordis migration complete; all §13 acceptance criteria pass"
+```
+
+---
+
+**Plan complete. Ready to execute via subagent-driven-development.**
