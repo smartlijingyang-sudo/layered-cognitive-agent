@@ -138,13 +138,13 @@ git commit -m "deps: wire vendor/{cordis,cosmokit,schemastery} as path dependenc
 
 ---
 
-### Task 1.3: Add `lca/contracts/typed_ctx.py` (TypedContext Protocol — minimal, only existing imports)
+### Task 1.3: Add `lca/contracts/typed_ctx.py` (TypedContext Protocol — Protocol-only, no L0 imports)
 
 **Files:**
 - Create: `lca/contracts/typed_ctx.py`
 - Test: `tests/test_typed_ctx.py`
 
-**Note:** Forward references to `lca.layer0_infra.session.service.SessionService` etc. are NOT made — those modules don't exist yet (they're created in Chunk 2). TypedContext only references modules that exist today (verified 2026-08-19).
+**Critical constraint** (per importlinter contract 3, pyproject.toml lines 53-65): `lca.contracts` is FORBIDDEN from importing `lca.layer0_infra`, `lca.harness`, `lca.plugins`. TypedContext references ONLY Protocol types already in `lca/contracts/protocols/`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -154,7 +154,7 @@ from lca.contracts.typed_ctx import TypedContext
 
 
 def test_typed_context_exposes_llm_property():
-    """TypedContext declares llm property typed as LLMAdapter."""
+    """TypedContext declares llm property typed as LLMAdapter Protocol."""
     assert "llm" in TypedContext.__annotations__
     assert hasattr(TypedContext, "llm")
 
@@ -169,95 +169,103 @@ def test_typed_context_imports_cleanly():
 Run: `uv run pytest tests/test_typed_ctx.py -v --no-cov`
 Expected: FAIL — `ModuleNotFoundError: No module named 'lca.contracts.typed_ctx'`
 
-- [ ] **Step 3: Write minimal implementation (only existing imports)**
+- [ ] **Step 3: Write minimal implementation (Protocol-only — no L0 imports)**
 
 ```python
 # lca/contracts/typed_ctx.py
-"""Typed accessor for cordis Context.
+"""Typed accessor for cordis Context — Protocol-only references.
 
 Each property corresponds to a Tier-1 Definition's `provide` key. cordis's
 ReflectService resolves attribute reads through this typing, so:
 - `ctx.llm` is type-checked (mypy knows returns LLMAdapter)
 - `ctx.inject("llm")` is still valid (untyped fallback)
 
-Only references modules that exist today. SessionService / SystemPromptService /
-WorkspaceService / BrainFactory / AgentLoopFactory imports will be added in
-Chunk 2 when those modules are extracted from `lca/plugins/*`.
+Constraint: this module is in `lca.contracts/`, which is FORBIDDEN by
+importlinter from importing `lca.layer0_infra` / `lca.harness` / `lca.plugins`.
+Therefore TypedContext references ONLY Protocol types already declared in
+`lca/contracts/protocols/`. Concrete service classes (`LlmService`,
+`ToolsService`, `CommandGateway`, etc.) are not imported here.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
-if TYPE_CHECKING:
-    # Existing modules — verified present in the codebase today (2026-08-19).
-    from lca.contracts.protocols.infra import LLMAdapter, FileStore
-    from lca.contracts.protocols.cognition import BrainStrategy
-    from lca.contracts.harness.agent import AgentLoopFactory
-    from lca.harness.command.gateway import CommandGateway
-    from lca.layer0_infra.capability.llm import LlmService
-    from lca.layer0_infra.capability.memory import MemoryService
-    from lca.layer0_infra.capability.observability import ObservabilityService
-    from lca.layer0_infra.capability.sandbox import SandboxService
-    from lca.layer0_infra.capability.search import SearchService
-    from lca.layer0_infra.capability.skills import SkillsService
-    from lca.layer0_infra.capability.state_store import StateStoreService
-    from lca.layer0_infra.capability.tools import ToolsService
-    from lca.layer0_infra.capability.transport import TransportService
-    from lca.layer0_infra.attachment.service import AttachmentService
+from lca.contracts.protocols.cognition import Brain, BrainFactory
+from lca.contracts.protocols.infra import (
+    AgentTransport,
+    AttachmentIdentity,
+    LLMAdapter,
+    Sandbox,
+    StateStore,
+    ToolRegistry,
+    TransportRegistryProtocol,
+)
+from lca.contracts.protocols.memory import MemorySystem
+from lca.contracts.protocols.observability import ObservabilityBackend
+from lca.contracts.protocols.operational_skills import SkillPackageStore
+from lca.contracts.protocols.runtime import Runtime
 
 
 class TypedContext(Protocol):
-    """Typed property accessor for cordis Context."""
+    """Typed property accessor for cordis Context.
+
+    All property types are Protocol declarations from `lca.contracts.protocols`.
+    Concrete classes (LlmService / ToolsService / etc.) satisfy these
+    Protocols structurally — no inheritance required.
+    """
 
     @property
-    def llm(self) -> "LLMAdapter": ...
+    def llm(self) -> LLMAdapter: ...
 
     @property
-    def tools(self) -> "ToolsService": ...
+    def tools(self) -> ToolRegistry: ...
 
     @property
-    def transport(self) -> "TransportService": ...
+    def transport(self) -> TransportRegistryProtocol: ...
 
     @property
-    def memory(self) -> "MemoryService": ...
+    def memory(self) -> MemorySystem: ...
 
     @property
-    def state_store(self) -> "StateStoreService": ...
+    def state_store(self) -> StateStore: ...
 
     @property
-    def search(self) -> "SearchService": ...
+    def skills(self) -> SkillPackageStore: ...
 
     @property
-    def skills(self) -> "SkillsService": ...
+    def observability(self) -> ObservabilityBackend: ...
 
     @property
-    def file_store(self) -> "FileStore": ...
+    def sandbox(self) -> Sandbox: ...
 
     @property
-    def observability(self) -> "ObservabilityService": ...
+    def attachment(self) -> AttachmentIdentity: ...
 
     @property
-    def sandbox(self) -> "SandboxService": ...
+    def brain(self) -> Brain: ...
 
     @property
-    def attachment(self) -> "AttachmentService": ...
+    def brain_factory(self) -> BrainFactory: ...
 
     @property
-    def brain(self) -> "BrainStrategy": ...
+    def runtime(self) -> Runtime: ...
 
     @property
-    def agent_loop(self) -> "AgentLoopFactory": ...
-
-    @property
-    def command_gateway(self) -> "CommandGateway": ...
+    def agent_transport(self) -> AgentTransport: ...
 ```
+
+**Notes on what's NOT in TypedContext** (deliberately):
+- `search_service` — no Protocol exists yet; add `SearchService` Protocol in a follow-up if needed
+- `file_store` — no Protocol exists yet; add `FileStoreProtocol` in a follow-up
+- `command_gateway` — too LCA-specific; consumed via `ctx.inject("command_gateway")` (untyped)
+- Concrete service classes (`LlmService`, `ToolsService`, etc.) — these are accessed via Protocol structural matching, not direct import
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_typed_ctx.py -v --no-cov`
 Expected: PASS
 
-- [ ] **Step 5: Run lint-imports to verify no circular import introduced**
+- [ ] **Step 5: Run lint-imports to verify no circular import / forbidden module introduced**
 
 Run: `uv run lint-imports`
 Expected: clean
@@ -266,7 +274,7 @@ Expected: clean
 
 ```bash
 git add lca/contracts/typed_ctx.py tests/test_typed_ctx.py
-git commit -m "contracts: TypedContext Protocol for ctx.<typed-property> access"
+git commit -m "contracts: TypedContext Protocol (Protocol-only, no L0 imports)"
 ```
 
 ---
@@ -447,20 +455,28 @@ git commit -m "harness: drop in-house plugin/kernel re-exports from __init__.py"
 
 ---
 
-### Task 1.6: Migrate `lca/layer4_app/composer.py` (drop plugin/kernel imports)
+### Task 1.6: Migrate production callers of in-house kernel (composer / gateway / api)
 
 **Files:**
 - Modify: `lca/layer4_app/composer.py`
+- Modify: `gateway/app.py`
+- Modify: `lca/layer4_app/api.py`
 
-- [ ] **Step 1: Find plugin/kernel imports**
+**Critical**: All three files import `lca.harness.kernel.scope.ScopedPluginHost`. They MUST be migrated before Task 1.16 deletes `lca/harness/kernel/`.
 
-Run: `rg -n "lca\.layer0_infra\.plugin\|lca\.harness\.kernel\|ScopedPluginHost\|ScopeKind\." lca/layer4_app/composer.py`
-Expected: 8-12 hits at lines 19, 91, 110, 120, 216, 222, 444, 451, 463-464
+- [ ] **Step 1: Find all in-house kernel references**
 
-- [ ] **Step 2: Remove all imports**
+```bash
+rg -n "lca\.layer0_infra\.plugin\|lca\.harness\.kernel\|ScopedPluginHost\|ScopeKind\." \
+    lca/layer4_app/composer.py lca/layer4_app/api.py gateway/app.py
+```
+
+Expected: ~15-25 hits across 3 files
+
+- [ ] **Step 2: For `lca/layer4_app/composer.py`: remove imports; stub affected functions**
 
 ```python
-# lca/layer4_app/composer.py — remove these lines:
+# remove these lines:
 #   from lca.harness.kernel.scope import ScopedPluginHost
 #   from lca.contracts.harness.plugin import ScopeKind
 #   from lca.layer0_infra.plugin.kernel._handle import PluginHandle
@@ -468,33 +484,62 @@ Expected: 8-12 hits at lines 19, 91, 110, 120, 216, 222, 444, 451, 463-464
 #   from lca.layer4_app.capability_boot import boot_capabilities
 ```
 
-Note: full migration of `_isolate_agent_scope` and `_resolve_capability_context` happens in Chunk 5; for Chunk 1, just remove the imports and replace usages with stubs that will be filled in later.
+Replace `_isolate_agent_scope` body with `raise NotImplementedError("cordis migration; Chunk 5")`. Same for `_resolve_capability_context`.
 
-- [ ] **Step 3: Stub out the affected functions**
+- [ ] **Step 3: For `gateway/app.py`: replace `ScopedPluginHost` with `cordis.Context` stub**
 
-Replace `_isolate_agent_scope` body with `raise NotImplementedError("migrating to cordis in Chunk 5")`. Same for `_resolve_capability_context`.
+```python
+# before
+from lca.harness.kernel.scope import ScopedPluginHost
+plugin_scope = ScopedPluginHost.wrap(host, ScopeKind.DEPLOYMENT, "lca")
 
-- [ ] **Step 4: Verify `lca/layer4_app/composer.py` no longer imports in-house kernel**
+# after
+from cordis import Context
+plugin_scope = Context()  # stub; full migration in Chunk 5
+```
 
-Run: `rg "lca\.layer0_infra\.plugin\|lca\.harness\.kernel\|ScopedPluginHost\|ScopeKind" lca/layer4_app/composer.py`
+If any code path uses `plugin_scope.resolve(...)`, replace with `plugin_scope.inject(...)`.
+
+- [ ] **Step 4: For `lca/layer4_app/api.py`: replace `ScopedPluginHost` isinstance check**
+
+```python
+# before
+def is_scope(x): return isinstance(x, ScopedPluginHost)
+
+# after
+def is_scope(x): return isinstance(x, Context)
+```
+
+Replace any `scope.resolve(...)` with `scope.inject(...)`.
+
+- [ ] **Step 5: Verify all 3 files no longer import in-house kernel**
+
+Run: `rg "lca\.layer0_infra\.plugin\|lca\.harness\.kernel\|ScopedPluginHost\|ScopeKind" lca/layer4_app/composer.py lca/layer4_app/api.py gateway/app.py`
 Expected: empty
 
-- [ ] **Step 5: Verify composer imports without errors**
-
-Run: `uv run python -c "from lca.layer4_app.composer import AgentComposer; print('OK')"`
-Expected: OK
-
-- [ ] **Step 6: Run composer tests**
-
-Run: `uv run pytest tests/test_compose_*.py --no-cov -q 2>&1 | tail -30`
-Expected: tests fail (acceptable — Chunk 5 fixes them) but **collection passes**
-
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Verify all 3 files import cleanly**
 
 ```bash
-git add lca/layer4_app/composer.py
-git commit -m "composer: drop in-house plugin/kernel imports (stub for Chunk 5)"
+uv run python -c "from lca.layer4_app.composer import AgentComposer; print('composer OK')"
+uv run python -c "from lca.layer4_app.api import Agent, Team; print('api OK')"
+uv run python -c "import gateway.app; print('gateway OK')"
 ```
+
+Expected: all three print OK
+
+- [ ] **Step 7: Run affected tests (collection only; full passes deferred)**
+
+Run: `uv run pytest tests/test_compose_*.py tests/test_gateway_*.py tests/harness/ --collect-only --no-cov -q 2>&1 | tail -30`
+Expected: collection succeeds; individual failures acceptable
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add lca/layer4_app/composer.py lca/layer4_app/api.py gateway/app.py
+git commit -m "production callers: composer/gateway/api drop ScopedPluginHost (Chunk 5 stub)"
+```
+
+**Critical constraint check**: After this task, NO production file outside `lca/harness/kernel/` and `lca/layer0_infra/plugin/` should reference `ScopedPluginHost` or any in-house kernel type. If they do, list them and add migration steps before Task 1.16.
 
 ---
 
@@ -633,31 +678,48 @@ git commit -m "ops/cli: drop in-house plugin imports; use cordis"
 
 ---
 
-### Task 1.10: Migrate `lca/harness/middleware/registry.py` (drop ExtensionPoint)
+### Task 1.10: Migrate `lca/harness/middleware/registry.py` (keep ExtensionPoint internally, replace public surface)
 
 **Files:**
 - Modify: `lca/harness/middleware/registry.py`
+
+**Critical**: `InMemoryMiddlewareRegistry.register_point()` and `run()` access `point.seam_key` and `point.dispatch_mode` (lines 49/70). The new public type `CognitivePhase` lacks these fields. **Solution**: Keep `ExtensionPoint` as the internal storage type, but expose `COGNITIVE_PHASES` (public list) as `tuple[CognitivePhase, ...]` — conversion happens at the boundary.
 
 - [ ] **Step 1: Find ExtensionPoint / ScopeKind / PluginKind imports**
 
 Run: `rg -n "ExtensionPoint\|ScopeKind\|PluginKind" lca/harness/middleware/registry.py`
 Expected: 2-4 hits
 
-- [ ] **Step 2: Replace ExtensionPoint with CognitivePhase dataclass**
+- [ ] **Step 2: Split internal type (ExtensionPoint, kept) and public type (CognitivePhase, new)**
 
 ```python
 # lca/harness/middleware/registry.py
-"""Cognitive phase event handlers — cordis event names."""
+"""Cognitive phase event handlers — cordis event names.
+
+Internal: `ExtensionPoint` (with `seam_key`, `dispatch_mode`) is kept as
+the registry's storage type to preserve `register_point` / `run()` behavior.
+
+Public: `COGNITIVE_PHASES` exposes a `CognitivePhase` list (just `name` +
+`description`) for plugin authors to consume via docstring / metadata.
+Conversion from CognitivePhase (public) to ExtensionPoint (internal) happens
+in `build_cognitive_handlers(ctx)`.
+"""
 from __future__ import annotations
+
 from dataclasses import dataclass
+
+from lca.contracts.harness.plugin import ExtensionPoint  # KEEP — internal use
 
 
 @dataclass(frozen=True)
 class CognitivePhase:
+    """Public phase metadata — name + description only."""
+
     name: str
     description: str = ""
 
 
+# Public taxonomy (consumed by docs / plugin manifest authors)
 COGNITIVE_PHASES: tuple[CognitivePhase, ...] = (
     CognitivePhase("agent.pre_step", "each step before perceive"),
     CognitivePhase("agent.before_perceive", "before perception"),
@@ -670,55 +732,102 @@ COGNITIVE_PHASES: tuple[CognitivePhase, ...] = (
     CognitivePhase("agent.after_reflect", "after reflect"),
     CognitivePhase("agent.before_turn_end", "before turn end"),
 )
+
+
+def to_extension_point(phase: CognitivePhase) -> ExtensionPoint:
+    """Convert public CognitivePhase → internal ExtensionPoint (seam_key)."""
+    return ExtensionPoint(seam_key=phase.name, dispatch_mode="waterfall", description=phase.description)
+
+
+# InMemoryMiddlewareRegistry keeps using ExtensionPoint — no change.
+# The `run()` and `register_point()` methods retain their existing semantics
+# since `ExtensionPoint.seam_key` and `ExtensionPoint.dispatch_mode` are intact.
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Verify `lca/harness/middleware/registry.py` still has working `InMemoryMiddlewareRegistry`**
 
-```bash
-git add lca/harness/middleware/registry.py
-git commit -m "middleware/registry: drop ExtensionPoint; use CognitivePhase dataclass + cordis event names"
-```
-
----
-
-### Task 1.11: Migrate `lca/contracts/harness/middleware.py` (drop ExtensionPoint)
-
-**Files:**
-- Modify: `lca/contracts/harness/middleware.py`
-
-- [ ] **Step 1: Find ExtensionPoint import**
-
-Run: `rg -n "ExtensionPoint" lca/contracts/harness/middleware.py`
-Expected: 1 hit (line 8)
-
-- [ ] **Step 2: Drop the import; replace usages with raw strings**
-
-```python
-# lca/contracts/harness/middleware.py
-"""Middleware registration — post-cordis migration."""
-from __future__ import annotations
-from typing import Any, Callable
-
-
-# ExtensionPoint class deleted. Use plain str for event names.
-MiddlewareRegistration = dict[str, Any]
-
-
-async def register_middleware(name: str, callback: Callable[..., Any]) -> None:
-    """Stub: full implementation comes in Chunk 3 with cordis events."""
-    raise NotImplementedError("cordis migration; Chunk 3")
-```
-
-- [ ] **Step 3: Verify `lca/contracts/harness/middleware.py` has no ExtensionPoint refs**
-
-Run: `rg "ExtensionPoint\|ScopeKind\|PluginKind" lca/contracts/harness/middleware.py`
-Expected: empty
+Run: `rg -n "register_point\|dispatch_mode\|seam_key" lca/harness/middleware/registry.py`
+Expected: references intact (no break)
 
 - [ ] **Step 4: Commit**
 
 ```bash
+git add lca/harness/middleware/registry.py
+git commit -m "middleware/registry: keep ExtensionPoint internal; expose CognitivePhase public"
+```
+
+---
+
+### Task 1.11: Migrate `lca/contracts/harness/middleware.py` (keep MiddlewareRegistration dataclass)
+
+**Files:**
+- Modify: `lca/contracts/harness/middleware.py`
+
+**Critical**: `MiddlewareRegistration` (frozen dataclass) is used by `lca/layer2_runtime/hook_middleware.py:56` and the budget/loop_intervention policy plugins. Keep the dataclass; only drop the `MiddlewareRegistry` Protocol (which references `ExtensionPoint`).
+
+- [ ] **Step 1: Find ExtensionPoint / MiddlewareRegistry imports**
+
+Run: `rg -n "ExtensionPoint\|MiddlewareRegistry" lca/contracts/harness/middleware.py`
+Expected: 2-3 hits
+
+- [ ] **Step 2: Keep `MiddlewareRegistration`; drop only the `MiddlewareRegistry` Protocol**
+
+```python
+# lca/contracts/harness/middleware.py
+"""Middleware registration contract — post-cordis migration.
+
+`MiddlewareRegistration` (frozen dataclass) is kept as-is. It carries
+seam_key / priority / plugin_id / callable — used by hook_middleware.py:56
+and the budget_policy / loop_intervention_policy plugins.
+
+`MiddlewareRegistry` Protocol (which referenced ExtensionPoint) is dropped.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Awaitable, Callable, Optional
+
+
+@dataclass(frozen=True)
+class MiddlewareRegistration:
+    """One middleware binding to a cognitive phase event."""
+
+    seam_key: str
+    priority: int
+    plugin_id: str
+    callback: Callable[..., Awaitable[Any]]
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+# Dropped:
+# - MiddlewareRegistry Protocol (references ExtensionPoint)
+# - register_middleware helper function (replaced by cordis ctx.events.on in plugin setup)
+```
+
+- [ ] **Step 3: Verify `MiddlewareRegistration` still importable**
+
+Run: `uv run python -c "from lca.contracts.harness.middleware import MiddlewareRegistration; print('OK')"`
+Expected: OK
+
+- [ ] **Step 4: Verify `lca/contracts/harness/middleware.py` has no `ExtensionPoint` / `MiddlewareRegistry` refs**
+
+Run: `rg "ExtensionPoint\|MiddlewareRegistry" lca/contracts/harness/middleware.py`
+Expected: empty
+
+- [ ] **Step 5: Verify `lca/layer2_runtime/hook_middleware.py` and policy plugins still import**
+
+```bash
+uv run python -c "from lca.layer2_runtime.hook_middleware import hook_middleware; print('OK')"
+uv run python -c "from lca.plugins.budget_policy import apply; print('OK')"
+```
+
+Expected: OK
+
+- [ ] **Step 6: Commit**
+
+```bash
 git add lca/contracts/harness/middleware.py
-git commit -m "contracts/harness/middleware: drop ExtensionPoint import"
+git commit -m "contracts/harness/middleware: keep MiddlewareRegistration; drop MiddlewareRegistry Protocol"
 ```
 
 ---
@@ -784,19 +893,27 @@ git commit -m "plugins: 21 plugins drop PluginManifest/ExtensionPoint/seam_defin
 
 ---
 
-### Task 1.13: Delete obsolete test files
+### Task 1.13: Delete obsolete test files (extended list)
 
 **Files:**
 - Delete: `tests/plugin/` (entire dir)
 - Delete: `tests/test_plugin_*.py` (multiple files)
 - Delete: `tests/test_seam_pattern.py`
+- Delete: `tests/harness/test_seam_completeness.py` (tests the removed SeamRole/SeamRegistry; lives under tests/harness/, NOT at root)
+- Delete: `tests/harness/test_budget_policy.py` (tests the old `manifest = PluginManifest(...)` plugin shape)
+- Delete: `tests/harness/test_loop_intervention_policy.py` (same reason)
+- Delete: `tests/harness/test_gateway_profile_integration.py` (uses ScopeKind, deleted in Task 1.17)
 
-- [ ] **Step 1: Find obsolete test files**
+- [ ] **Step 1: Find obsolete test files (extended)**
 
 ```bash
 ls tests/plugin/ 2>/dev/null
 ls tests/test_plugin_*.py 2>/dev/null
 ls tests/test_seam_pattern.py 2>/dev/null
+ls tests/harness/test_seam_completeness.py 2>/dev/null
+ls tests/harness/test_budget_policy.py 2>/dev/null
+ls tests/harness/test_loop_intervention_policy.py 2>/dev/null
+ls tests/harness/test_gateway_profile_integration.py 2>/dev/null
 ```
 
 - [ ] **Step 2: Delete obsolete tests**
@@ -805,7 +922,10 @@ ls tests/test_seam_pattern.py 2>/dev/null
 git rm -r tests/plugin/
 git rm tests/test_plugin_kernel.py tests/test_plugin_loader.py tests/test_plugin_protocol.py tests/test_plugin_profile.py 2>/dev/null
 git rm tests/test_seam_pattern.py
-git rm tests/test_seam_completeness.py 2>/dev/null
+git rm tests/harness/test_seam_completeness.py
+git rm tests/harness/test_budget_policy.py
+git rm tests/harness/test_loop_intervention_policy.py
+git rm tests/harness/test_gateway_profile_integration.py
 ```
 
 - [ ] **Step 3: Verify `pytest --collect-only` works**
@@ -817,65 +937,45 @@ Expected: collects remaining tests; no import errors
 
 ```bash
 git add -A
-git commit -m "tests: delete obsolete plugin/kernel/seam tests"
+git commit -m "tests: delete obsolete plugin/kernel/seam/policy tests (extended list)"
 ```
 
 ---
 
-### Task 1.14: Migrate `tests/harness/test_phase_*.py` (4 files)
+### Task 1.14: Delete `tests/harness/test_phase_*.py` (4 files — NOT migrate)
 
 **Files:**
-- Modify: `tests/harness/test_phase_a_integration.py`
-- Modify: `tests/harness/test_phase_c_factories.py`
-- Modify: `tests/harness/test_phase_d_dsh_bridge.py`
-- Modify: `tests/harness/test_loop_plugin_integration.py`
+- Delete: `tests/harness/test_phase_a_integration.py`
+- Delete: `tests/harness/test_phase_c_factories.py`
+- Delete: `tests/harness/test_phase_d_dsh_bridge.py`
+- Delete: `tests/harness/test_loop_plugin_integration.py`
 
-- [ ] **Step 1: Find `lca.harness.kernel.scope` imports**
+**Rationale**: All 4 files test the in-house kernel semantics (`TestPluginManifest`, `TestScopedPluginHost.parent_delegation`, etc.) that have no cordis equivalent. They cannot be migrated to `cordis.Context`; they MUST be deleted. Replacements come in Chunk 5/6.
 
-Run: `rg -l "lca\.harness\.kernel\.scope" tests/harness/`
-Expected: 4 files (test_phase_a, test_phase_c, test_phase_d, test_loop_plugin_integration)
+- [ ] **Step 1: Find `lca.harness.kernel.scope` imports AND `ExtensionPoint`/`PluginManifest` imports**
 
-- [ ] **Step 2: For each file, replace `ScopedPluginHost` fixture with `cordis.Context` fixture**
+Run: `rg -l "lca\.harness\.kernel\.scope\|ExtensionPoint\|PluginManifest\|ScopeKind" tests/harness/`
+Expected: 4+ files
 
-```python
-# before
-import pytest
-from lca.harness.kernel.scope import ScopedPluginHost
-
-@pytest.fixture
-def scope():
-    return ScopedPluginHost(None, ...)
-
-# after
-import pytest
-from cordis import Context
-
-@pytest.fixture
-def scope():
-    ctx = Context()
-    ctx.provide("llm", MockLLM())
-    return ctx
-```
-
-- [ ] **Step 3: Replace `plugin_scope.resolve(...)` with `ctx.inject(...)`**
-
-```python
-# before
-llm = plugin_scope.resolve("llm")
-# after
-llm = ctx.inject("llm")
-```
-
-- [ ] **Step 4: Verify collection**
-
-Run: `uv run pytest tests/harness/ --collect-only --no-cov 2>&1 | tail -20`
-Expected: collection succeeds
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 2: Delete the 4 files**
 
 ```bash
-git add tests/harness/
-git commit -m "tests/harness: migrate ScopedPluginHost fixture to cordis.Context"
+git rm tests/harness/test_phase_a_integration.py
+git rm tests/harness/test_phase_c_factories.py
+git rm tests/harness/test_phase_d_dsh_bridge.py
+git rm tests/harness/test_loop_plugin_integration.py
+```
+
+- [ ] **Step 3: Verify collection succeeds**
+
+Run: `uv run pytest tests/harness/ --collect-only --no-cov 2>&1 | tail -20`
+Expected: collection succeeds (or only collects the few non-deleted tests)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -A
+git commit -m "tests/harness: delete test_phase_{a,c,d} + test_loop_plugin_integration (test in-house kernel)"
 ```
 
 ---
@@ -955,10 +1055,12 @@ git commit -m "harness: delete kernel/{scope,compat}"
 
 ---
 
-### Task 1.17: Split `lca/contracts/harness/plugin.py` (drop PluginManifest etc.)
+### Task 1.17: Split `lca/contracts/harness/plugin.py` (drop PluginManifest etc., PluginContext uses cordis surface only)
 
 **Files:**
 - Modify: `lca/contracts/harness/plugin.py`
+
+**Critical**: cordis.Context has only `provide`, `inject`, `scope`, `on`, `once`, `dispose`. **No `mount()` or `require()`** — those are LCA-in-house API. PluginContext Protocol must use the cordis surface only.
 
 - [ ] **Step 1: Verify no callers of to-be-deleted symbols remain**
 
@@ -968,7 +1070,7 @@ rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|ScopeKind\|PluginKind\|Prov
 
 Expected: empty (all callers migrated in Tasks 1.5-1.12)
 
-- [ ] **Step 2: Replace with minimal content (PluginContext Protocol only)**
+- [ ] **Step 2: Replace with minimal content (PluginContext Protocol — cordis surface only)**
 
 ```python
 # lca/contracts/harness/plugin.py
@@ -979,7 +1081,8 @@ ProviderMode are all deleted (cordis's @plugin + Standard Schema cover
 the same ground).
 
 PluginContext Protocol is kept as a stable type alias for migration-period
-compatibility.
+compatibility. Uses ONLY cordis's public surface (provide / inject / on /
+once / scope / dispose).
 """
 from __future__ import annotations
 
@@ -993,10 +1096,10 @@ class PluginContext(Protocol):
     callers should use cordis.Context directly.
     """
 
-    def mount(self, key: str, value: Any) -> None: ...
     def provide(self, key: str, value: Any) -> None: ...
-    def require(self, key: str) -> Any: ...
     def inject(self, key: str) -> Any: ...
+    def on(self, event: str, callback: Any) -> None: ...
+    def once(self, event: str, callback: Any) -> None: ...
 ```
 
 - [ ] **Step 3: Verify imports**
@@ -1004,20 +1107,28 @@ class PluginContext(Protocol):
 Run: `uv run python -c "from lca.contracts.harness.plugin import PluginContext; print('OK')"`
 Expected: OK
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Verify no `mount`/`require` references remain in LCA / tests**
+
+Run: `rg "\.mount\(\|\.require\(" lca/layer4_app/ lca/harness/ tests/`
+Expected: only `request.method == "OPTIONS"` / unrelated `mount`/`require` (no false positives on `request.require`)
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add lca/contracts/harness/plugin.py
-git commit -m "contracts: drop PluginManifest/ExtensionPoint/CapabilityGrant/ScopeKind/PluginKind/ProviderMode"
+git commit -m "contracts: drop PluginManifest/ExtensionPoint/CapabilityGrant/ScopeKind/PluginKind/ProviderMode; PluginContext uses cordis surface"
 ```
 
 ---
 
-### Task 1.18: Split `lca/contracts/mechanisms/seam.py` (drop SeamRole etc., keep consume)
+### Task 1.18: Split `lca/contracts/mechanisms/seam.py` (drop SeamRole etc., keep consume) — REQUIRES SeamKey rename
 
 **Files:**
 - Modify: `lca/contracts/mechanisms/seam.py`
 - Modify: `lca/contracts/mechanisms/__init__.py` (re-exports)
+- Modify: `lca/contracts/mechanisms/capability.py` (SeamKey → CapabilityKey rename)
+
+**Critical**: Step 3 imports `CapabilityKey` and `REQUIRED_CAPABILITY_KEYS`. These don't exist yet — the file currently defines `SeamKey` and `REQUIRED_SEAM_KEYS`. This task includes the rename.
 
 - [ ] **Step 1: Verify no callers of to-be-deleted symbols remain**
 
@@ -1027,7 +1138,26 @@ rg "SeamRole\|SeamDeclaration\|SeamRegistry\|seam\b\|validate_all_seams\|Unautho
 
 Expected: empty
 
-- [ ] **Step 2: Replace `lca/contracts/mechanisms/seam.py`**
+- [ ] **Step 2: Rename `SeamKey` → `CapabilityKey` in `lca/contracts/mechanisms/capability.py`**
+
+```python
+# lca/contracts/mechanisms/capability.py — find and replace:
+#   class SeamKey(str, Enum):     →  class CapabilityKey(str, Enum):
+#   REQUIRED_SEAM_KEYS            →  REQUIRED_CAPABILITY_KEYS
+# Update ALL class member usages (`SeamKey.LLM` → `CapabilityKey.LLM`)
+```
+
+- [ ] **Step 3: Find and migrate all `SeamKey` callers**
+
+```bash
+rg "SeamKey" lca/ tests/ --type py | grep -v "specs/"
+```
+
+Expected: ~5-10 files (composer.py:32, capability_boot.py, plugins/* etc.)
+
+For each caller, replace `SeamKey` → `CapabilityKey`. Existing importers get the rename automatically.
+
+- [ ] **Step 4: Replace `lca/contracts/mechanisms/seam.py`**
 
 ```python
 # lca/contracts/mechanisms/seam.py
@@ -1052,7 +1182,7 @@ def consume(definition: str, provider: T, consumer: Any) -> T:
     return provider
 ```
 
-- [ ] **Step 3: Update `lca/contracts/mechanisms/__init__.py`**
+- [ ] **Step 5: Update `lca/contracts/mechanisms/__init__.py`**
 
 ```python
 # lca/contracts/mechanisms/__init__.py
@@ -1081,16 +1211,19 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 4: Verify `consume()` still importable**
-
-Run: `uv run python -c "from lca.contracts.mechanisms.seam import consume; print(repr(consume('test', 'p', 'c')))"`
-Expected: `'p'`
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Verify imports work**
 
 ```bash
-git add lca/contracts/mechanisms/seam.py lca/contracts/mechanisms/__init__.py
-git commit -m "contracts: drop SeamRole/SeamDeclaration/SeamRegistry/seam/validate_all_seams; keep consume()"
+uv run python -c "from lca.contracts.mechanisms.seam import consume; print(repr(consume('test', 'p', 'c')))"
+uv run python -c "from lca.contracts.mechanisms.capability import CapabilityKey; print(CapabilityKey.LLM)"
+uv run python -c "from lca.contracts.mechanisms import CapabilityKey, REQUIRED_CAPABILITY_KEYS; print('OK')"
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add lca/contracts/mechanisms/seam.py lca/contracts/mechanisms/__init__.py lca/contracts/mechanisms/capability.py
+git commit -m "contracts: drop SeamRole/SeamDeclaration/SeamRegistry/seam/validate_all_seams; rename SeamKey → CapabilityKey; keep consume()"
 ```
 
 ---
