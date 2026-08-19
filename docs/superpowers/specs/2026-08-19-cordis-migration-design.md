@@ -255,20 +255,36 @@ lca/plugins/
 
 ### 6.3 agent_service 合并入 session_service
 
-原 `agent_service` 是 `session.append` 的 typed facade，6 个方法：
+原 `agent_service` 是 `session.append` 的 typed facade，**5 个方法**（不是 6 个）：
 
-| 旧方法 | 新方法（session_service） |
+| 旧方法（agent_service） | 新方法（session_service） |
 |---|---|
 | `record_assistant_response(store, turn, step, content, tool_calls)` | `record_assistant_message(session_id, turn, step, content, tool_calls)` |
-| `record_tool_call(store, call_id, tool_name, args)` | `record_tool_call(session_id, call_id, tool_name, args)` |
-| `record_tool_result(store, call_id, result)` | `record_tool_result(session_id, call_id, result)` |
-| `record_turn_boundary(store, turn, kind)` | `record_turn_start(session_id, turn)` / `record_turn_end(session_id, turn)` |
-| `record_step_boundary(store, turn, step, kind)` | `record_step_start(session_id, turn, step)` / `record_step_end(session_id, turn, step)` |
-| `record_xxx(...)` (其他) | ... |
+| `record_tool_call(store, turn, step, call_id, tool_name, arguments_ref)` | `record_tool_call(session_id, turn, step, call_id, tool_name, arguments_ref)` |
+| `record_tool_result(store, turn, step, call_id, success, result_ref, error)` | `record_tool_result(session_id, turn, step, call_id, success, result_ref, error)` |
+| `record_turn_boundary(store, turn, event_type)` | `record_turn_start(session_id, turn)` / `record_turn_end(session_id, turn, reason)` |
+| `record_step_boundary(store, turn, step, event_type)` | `record_step_start(session_id, turn, step)` / `record_step_end(session_id, turn, step)` |
 
-`SessionService` 加一组 `record_*` 方法。
+**关键约束**：所有 `turn` / `step` / `arguments_ref` / `result_ref` / `error` / `event_type` 字段语义保留——它们是 surface event 上必须保留的字段（DSH `SessionEvent` 同构）。`store.append(...)` 内部化进 `SessionService`：
 
-**调用点扫描（P5 必跑）**：`rg "agent_service"` + `rg "agent\.service"` + `rg "AgentService"` 找全 caller（包括 `bundles/base-spine.yaml:65-67` 的 `lca.agent.service` 引用）。指定 LLM / Runtime / loop_cognitive / loop_dsh_bridge / loop_replay 等。
+```python
+class SessionService:
+    async def record_assistant_message(
+        self, session_id: str, turn: int, step: int, content: str,
+        tool_calls: list[dict] | None = None,
+    ) -> None:
+        event = AssistantResponded(turn=turn, step=step, content=content, tool_calls=tool_calls)
+        await self._store.append(event, actor="session_service")
+    # ... 同模式 record_tool_call / record_tool_result / record_turn_* / record_step_*
+```
+
+`session_id` 替代 `store`（store 通过 `ctx.inject("session_store")` 内部获取）。调用方路径：`agent_service.record_assistant_response(store, ...)` → `session_service.record_assistant_message(session_id, ...)`。
+
+**调用点扫描（P5 必跑）**：
+- `rg "agent_service"` 应只在 `lca/plugins/agent_service/` 被引用
+- `rg "agent\.service"` 应只在 `bundles/base-spine.yaml` 引用
+- `rg "AgentService"` 找全 facade 引用
+- 已知 caller：`lca/layer3_agent/` + `lca/layer2_runtime/` + `lca/plugins/loop_cognitive/` + `lca/plugins/loop_dsh_bridge/` + `lca/plugins/loop_replay/` 都需要扫一遍
 
 ---
 
@@ -362,65 +378,158 @@ patch: []
 
 ### 8.1 `_isolate_agent_scope` 改动
 
-cordis 的 `Context.isolate(label, callback)` 是**回调式**——它不是 async context manager；async context manager 是 `Context.scope(label)`（见 `cordis/context.py:339`）。当前 `composer.py:_isolate_agent_scope` 的语义是构造一个子 scope 并 shadow 服务实例，所以正确模式是 `Context.scope(label)`：
+cordis 的 `Context.isolate(label, callback)` 是**回调式**——它不是 async context manager；async context manager 是 `Context.scope(label)`（见 `cordis/context.py:339`）。当前 `composer.py:_isolate_agent_scope` 的语义是构造一个子 scope 并 shadow 服务实例。
 
 ```python
-# before
+# before (composer.py:451-499)
 def _isolate_agent_scope(parent: ScopedPluginHost, role: str) -> ScopedPluginHost:
     child = parent.fork(ScopeKind.AGENT, f"agent:{role}")
-    child.provide(handle, "llm", LlmService())  # 三参数
-    child.provide(handle, "tools", ToolsService())
-    child.provide(handle, "transport", TransportService())
-    # memory / state_store 沿用父（深拷贝 providers）
-    ...
+    spec = PluginSpec(name="compose-shadow", apply=lambda _ctx, _cfg: None)
+    handle = PluginHandle(
+        entry_id=f"compose-shadow:{child.scope_id}",
+        spec=spec,
+        config={},
+        injected=(),
+    )
+    child.host.register_handle(handle)
+    child.provide(handle, "llm", LlmService())        # line 476
+    child.provide(handle, "tools", ToolsService())     # line 477
+    child.provide(handle, "transport", TransportService())  # line 478
+    mem = MemoryService()
+    parent_mem = parent.get("memory")
+    if parent_mem is not None:
+        for name in parent_mem.providers.names():
+            mem.register(name, parent_mem.providers.get(name))
+    child.provide(handle, "memory", mem)              # line 485
+    stores = StateStoreService()
+    parent_stores = parent.get("state_store")
+    if parent_stores is not None:
+        for name in parent_stores.providers.names():
+            stores.register(name, parent_stores.providers.get(name))
+    child.provide(handle, "state_store", stores)      # line 492
     return child
 
-# after
-async def _isolate_agent_scope(parent: Context, role: str) -> Context:
-    async with parent.scope(f"agent:{role}") as child:
-        child.provide("llm", LlmService())
-        child.provide("tools", ToolsService())
-        child.provide("transport", TransportService())
-        # memory / state_store 沿用父（深拷贝 providers）
-        ...
-        yield child
+# after — async-context-manager (returns child, no yield)
+async def _isolate_agent_scope(parent: Context, role: str) -> AsyncContextManager[Context]:
+    """Return an async CM that materializes a child scope with shadow services.
+
+    Caller does: ``async with _isolate_agent_scope(parent, role) as child: ...``.
+    The returned child gets fresh LlmService / ToolsService / TransportService
+    to isolate per-agent provider state; memory / state_store copy parent
+    providers into fresh service instances.
+    """
+    return _IsolatedAgentScope(parent, role)
+
+class _IsolatedAgentScope:
+    def __init__(self, parent: Context, role: str) -> None:
+        self._parent = parent
+        self._role = role
+        self._scope_cm = None  # type: AsyncContextManager[Context] | None
+        self._child: Context | None = None
+
+    async def __aenter__(self) -> Context:
+        self._scope_cm = self._parent.scope(f"agent:{self._role}")
+        self._child = await self._scope_cm.__aenter__()
+        self._child.provide("llm", LlmService())
+        self._child.provide("tools", ToolsService())
+        self._child.provide("transport", TransportService())
+
+        # memory / state_store: copy parent providers into fresh instances
+        mem = MemoryService()
+        parent_mem = self._parent.inject("memory")
+        if parent_mem is not None:
+            for name in parent_mem.providers.names():
+                mem.register(name, parent_mem.providers.get(name))
+        self._child.provide("memory", mem)
+
+        stores = StateStoreService()
+        parent_stores = self._parent.inject("state_store")
+        if parent_stores is not None:
+            for name in parent_stores.providers.names():
+                stores.register(name, parent_stores.providers.get(name))
+        self._child.provide("state_store", stores)
+        return self._child
+
+    async def __aexit__(self, *exc_info) -> None:
+        if self._scope_cm is not None:
+            await self._scope_cm.__aexit__(*exc_info)
 ```
 
 **重要语义**：cordis 的 `Context.scope(label)` 只是 scope-tracking + 共享 root；它**不**自动 shadow 服务实例。LCA 的 "每 agent 一份独立 LlmService" 的语义需要：
 - 显式 `child.provide("llm", LlmService())` 覆盖父
-- 由 `async with parent.scope(...)` 的释放钩子卸载
+- 由 `async with` 的释放钩子卸载
 
-让 child 保留父的 memory / state_store（providers 列表）需要 `parent.require("memory").providers` → 拷贝构造新 `MemoryService()`。
+让 child 保留父的 memory / state_store（providers 列表）需要 `parent.inject("memory").providers` → 拷贝构造新 `MemoryService()`。
 
-### 8.2 `ScopedPluginHost` 的使用点
+**调用点迁移**（`composer.py:226` 调用方）：
+```python
+# before
+compose_scope = _isolate_agent_scope(scope, role)
+agent = compose(role, compose_scope, ...)
 
-spec 初稿说"约 6 处 `current_scope()`"——**错的**。`rg "current_scope\("` 返回空。实际引用 `ScopedPluginHost` 接口的位置（`scope.resolve` / `scope.fork` / `scope.provide` / `wrap`）：
+# after
+async with _isolate_agent_scope(scope, role) as compose_scope:
+    agent = compose(role, compose_scope, ...)
+```
 
-| 文件 | 模式 | 替代 |
+或不返回 CM，只把 child 提为局部变量：
+```python
+isolator = _IsolatedAgentScope(scope, role)
+async with isolator as compose_scope:
+    agent = compose(role, compose_scope, ...)
+```
+
+### 8.2 `ScopedPluginHost` / `ScopeKind` 的使用点
+
+spec 初稿说"约 6 处 `current_scope()`"——**错的**。`rg "current_scope\("` 返回空。实际引用 `ScopedPluginHost` / `ScopeKind` 接口的位置（`scope.resolve` / `scope.fork` / `scope.provide` / `wrap` / `isinstance`）：
+
+**生产代码**：
+
+| 文件 | 行 | 模式 | 替代 |
+|---|---|---|---|
+| `lca/layer4_app/composer.py` | 466 | `parent.fork(ScopeKind.AGENT, f"agent:{role}")` | `parent.scope(f"agent:{role}")` |
+| `lca/layer4_app/composer.py` | 476–492 | `child.provide(handle, key, value)` | `child.provide(key, value)` |
+| `lca/layer4_app/api.py` | 105 | `isinstance(x, ScopedPluginHost)` | `isinstance(x, Context)` |
+| `lca/layer4_app/api.py` | (other) | `scope.resolve(...)` | `ctx.inject(...)` |
+| `gateway/app.py` | 149–153 | `ScopedPluginHost.wrap(host, ScopeKind.DEPLOYMENT, ...)` | `Context.wrap(host)` + `setup_logging()` |
+| `lca/plugins/loop_cognitive/__init__.py` | 99, 105 | `plugin_scope.resolve("llm")` / `plugin_scope.resolve("tools")` | `ctx.inject("llm")` / `ctx.inject("tools")` |
+| `lca/plugins/loop_dsh_bridge/__init__.py` | — | `scope.resolve("session_store")` / `scope.resolve("dsh_settings")` | `ctx.inject(...)` |
+| `lca/plugins/loop_replay/__init__.py` | — | `scope.resolve("session_store")` | `ctx.inject(...)` |
+| `lca/harness/diagnostics/tree.py` | — | tree walker over `ScopedPluginHost` | 重写为 cordis `Context` walker |
+| `lca/harness/__init__.py` | 11, 31, 33 | re-exports `ScopedPluginHost` | 删除 |
+
+**测试代码**（P1 同步迁移，否则 kernel 删后跑不通）：
+
+| 文件 | 范围 | 动作 |
 |---|---|---|
-| `lca/layer4_app/composer.py:466` | `parent.fork(ScopeKind.AGENT, ...)` | `parent.scope("agent:{role}")` |
-| `lca/layer4_app/composer.py:496-499` | `child.provide(handle, ...)` | `child.provide(key, value)` |
-| `lca/layer4_app/api.py:105` | `isinstance(x, ScopedPluginHost)` | `isinstance(x, Context)` |
-| `gateway/app.py:149-153` | `ScopedPluginHost.wrap(host, ScopeKind.DEPLOYMENT, ...)` | `Context.wrap(host)` + `setup_logging()` |
-| `lca/plugins/loop_cognitive/__init__.py:99` | `plugin_scope.resolve("llm")` | `ctx.inject("llm")` |
-| `lca/plugins/loop_cognitive/__init__.py:105` | `plugin_scope.resolve("tools")` | `ctx.inject("tools")` |
-| `lca/plugins/loop_dsh_bridge/__init__.py` | `scope.resolve("session_store")` / `scope.resolve("dsh_settings")` | `ctx.inject(...)` |
-| `lca/plugins/loop_replay/__init__.py` | `scope.resolve("session_store")` | `ctx.inject(...)` |
-| `lca/harness/diagnostics/tree.py` | tree walker over `ScopedPluginHost` | 重写为 cordis `Context` walker |
+| `tests/harness/test_phase_a_integration.py` | 25, 28, 93–95, 110, 220, 237, 275, 358 (≈11+ uses) | 改为 `Context` fixture |
+| `tests/harness/test_phase_c_factories.py` | fixture + 4 tests | 改为 `Context` fixture |
+| `tests/harness/test_phase_d_dsh_bridge.py` | fixture + 2 tests | 改为 `Context` fixture |
+| `tests/harness/test_loop_plugin_integration.py` | 10, 29 | 改为 `Context` fixture |
+| `tests/harness/test_gateway_profile_integration.py` | 118 | 改为 `Context` fixture |
+
+**注意**：P1 阶段（kernel 删除）必须**同时**改这些测试，否则 `from lca.harness.kernel.scope import ScopedPluginHost` 全部 `ImportError`。
 
 ### 8.3 mount / provide 翻译
 
-```python
-# before
-ctx.mount(handle, "llm", service)              # 三参数 (handle, key, value)
-ctx.mount(handle, "llm", service, check=fn)    # 四参数
+LCA 在生产代码里有两种 `ctx.mount` 形式：
 
-# after
-ctx.provide("llm", service)                    # 二参数 (key, value)
-# check predicate via Service.check classmethod（只有继承 cordis.Service 的类才需要）
+```python
+# before (composer's _isolate_agent_scope, line 476-492)
+ctx.mount(handle, "llm", service)              # 3-arg (handle, key, value)
+ctx.mount(handle, "llm", service, check=fn)    # 4-arg (with check predicate)
+
+# before (16 plugins' apply() functions, capability_boot.py:38-47)
+ctx.mount("llm", service)                      # 2-arg (key, value)
+
+# after — both forms collapse to 2-arg cordis Context.provide
+ctx.provide("llm", service)                    # 2-arg (key, value, *, dispose=None)
+# check predicate via Service.check classmethod（只在继承 cordis.Service 的类上需要）
 ```
 
 `handle` 的概念在 cordis 里由 `ctx.fiber.effect` 自动管理——`provide` 不需要显式 handle；插件 setup 里所有写入 `ctx.provide(...)` / `ctx.effect(...)` / `ctx.on(...)` 都是 fiber-owned，卸载时自动撤销。
+
+**注意**：保留 `check` 语义的 LCA capability service 会落到 `cordis.Service` 子类，否则默认 `service.check()` 返回 True。LCA 当前的 11 个 capability service 都很简单，不需要 `check` 谓词。
 
 ### 8.4 `consume()` 保留
 
@@ -482,15 +591,16 @@ P4 / P6 必跑：
 |---|---|---|---|
 | `composer.py` + 5 个 plugin + `gateway/app.py` + `api.py` `ScopedPluginHost` / `scope.resolve` 引用漏改 | 高 | 阻塞 | P7 阶段明确列 9 个调用点（见 §8.2 表） |
 | `consume()` 保留，但 `seam.py` 拆分后忘记 re-export | 中 | 阻塞 | P2 阶段 `from lca.contracts.mechanisms.seam import consume` 跑通 |
-| `PluginConfig` 保留，但 `plugin.py` 拆分后忘记 re-export | 中 | 阻塞 | P2 阶段 `from lca.contracts.mechanisms.plugin import PluginConfig` 跑通 |
+| `PluginConfig` 保留，但 `plugin.py` 拆分后忘记 re-export | 中 | 阻塞 | P2 阶段 `from lca.contracts.mechanisms.plugin import PluginConfig` 跑通；剩余 2 个 surviving consumer（`tests/test_plugin_loader.py` + `tests/plugin/test_contracts.py`）P1 + P5 同步迁移 |
 | `lca/harness/middleware/registry.py` 拆 `COGNITIVE_POINTS` 时漏掉中间件 plugin 引用 | 中 | 阻塞 | P3 阶段先 `rg COGNITIVE_POINTS` 找全 |
 | `_isolate_agent_scope` 改写后 `Context.scope(label)` 不创建新 `LlmService` 实例 | 高 | 行为破坏 | 显式 `child.provide("llm", LlmService())` 覆盖父；`tests/test_compose_*.py` 用两个并发 agent 验证（不能互相覆盖） |
 | `bundles/base-spine.yaml` → `bundles/base.yaml` 改名打破外部引用 | 低 | 持续集成 | P6 阶段 `rg "base-spine"` 全仓扫（已知引用：`profiles/web-standard.yaml`、`tests/test_phase_a_integration.py`、`docs/superpowers/specs/2026-08-16-plugin-tree-runtime-design.md`、`lca-ops` 脚本） |
 | `loop_dsh_bridge` 内部 plugin scope resolve 改写时回归到旧 `lca.harness.kernel` 路径 | 中 | 阻塞 | P7 阶段把 dsh_bridge 放进 `tests/test_loop_dsh_bridge.py` 隔离测试 |
 | `lca_harness.profile.boot()` 公开 API 仍被外部脚本调用 | 低 | 阻塞 | P4 阶段保留 `boot_profile(path, *, check_seam_completeness)` 签名（`check_seam_completeness` 变为 no-op 警告）；`gateway/app.py:138` 和 `tests/harness/test_phase_a_integration.py:225` 跑通 |
-| `cordis.Loader.load_yaml` 实际不存在，需要 LCA 层包装 | 中 | 阻塞 | P0 阶段先 `rg "load_yaml" cordis/` 验证；不存在则 LCA 层用 `yaml.safe_load` + `cordis.loader.Loader.load()` |
+| `PluginContext` Protocol 在 P5 后变孤儿（2 个使用 plugin `budget_policy`/`loop_intervention_policy` 改写后无 caller） | 低 | 死代码 | P5 完成后删除 `lca/contracts/harness/plugin.py:PluginContext` 定义；保留 `lca/contracts/harness/plugin.py` 文件作为 LCA harness 抽象的归口（仅留 `PluginContext` 一个 type alias） |
 | vendor 同步：taiyi 未来更新 cordis 时 LCA 同步 | 低 | 长期 | 写 `scripts/sync_vendor.sh` 借鉴 taiyi 同步协议 |
 | `Hook` 名字冲突（cordis 导出 `Hook` class；LCA `lca/contracts/mechanisms/__init__.py` 也有 `Hook` Protocol） | 低 | 命名冲突 | 所有 LCA 内部继续 `from lca.contracts.mechanisms import Hook`；不 re-export cordis 符号；如要交叉 import 显式 `from cordis import Hook as CordisHook` |
+| `seam_key` 命名不一致：COGNITIVE_POINTS[0] 是 `agent.pre_step`；`budget_policy` plugin 引用 `agent.before_step`；其他 9 个名称一致 | 低 | 命名漂移 | P3 阶段统一为 `agent.before_step` / `agent.after_step` 风格；全仓 `rg "agent\.(pre|before)_step"` 找全 |
 
 ---
 
