@@ -27,10 +27,29 @@ LCA 现有 21 个 capability 插件都还跑在自家 `lca/layer0_infra/plugin/`
 - 删 `lca/contracts/harness/plugin.py`（保留 `MiddlewareRegistration` 等在 `middleware.py`）— 实际是拆 `plugin.py`：删 `Manifest`/`ExtensionPoint`/`CapabilityGrant`/`ScopeKind`/`PluginKind`/`ProviderMode`，保留 `PluginContext` Protocol
 - 删 `lca/contracts/mechanisms/seam.py` 中的 `SeamRole`/`SeamDeclaration`/`SeamRegistry`/`seam`/`validate_all_seams`；**保留 `consume()`**（composition-time gate，3 个 production 文件 + tests 依赖）
 - 删 `lca/contracts/mechanisms/plugin.py` 中的 `Plugin` Protocol；**保留 `PluginConfig`**（Pydantic 基类，多个 plugin 和 test 依赖）
-- 21 个 `lca/plugins/*` 改写为 `@plugin` 形式
-- `bundles/base-spine.yaml` + `profiles/web-standard.yaml` 改为 cordis YAML（用 `id` 不是 `name`）
-- `lca/layer4_app/composer.py:_isolate_agent_scope` 用 cordis Context 改写（`Context.scope(label)` 不是 `Context.isolate(label)`）
+- 21 个 `lca/plugins/*` 改写为 `@plugin` 形式（Tier-1 Definition）
+- **30+ Tier-2 Provider plugins** 抽出到 `lca/plugins/providers/{seam}/{provider}.py`（替换 `lca/layer4_app/capability_boot.py:mount_default_providers()` 硬编码）
+- **15+ Tier-3 Behavior plugins** 抽出到 `lca/plugins/{brain,reasoner,synthesizer,team,guards,dsh}/...`（替换 `composer.py:_resolve_component` + `lca/contracts/models/team/team_coordination.py` 硬编码）
+- `bundles/base.yaml` 包含 Tier-1 + Tier-2 entries；`bundles/web-app.yaml` 追加 Tier-3 entries
+- `lca/layer4_app/composer.py` 全部 `import X; X()` 形式改为 `ctx.inject(...)`/`ctx.provide(...)`
+- `lca/layer4_app/capability_boot.py` 删掉（被 Tier-1 plugin 集合完全替代）
 - vendor 引入 `taiyi-cordis` / `taiyi-cosmokit` / `taiyi-schemastery`
+
+**三 Tier 落实"插件贯彻"**：
+
+```
+Tier-1 Definition (~21)
+  ↓ 注：Definition 仅是接口 + 空注册表
+Tier-2 Provider (~30+)
+  ↓ 注：每个 seam 至少 1 个 default；可用 patch 替换
+Tier-3 Behavior (~15+)
+  ↓ 注：Brain / Loop / Team / Middleware 全部 plugin
+@plugin setup
+  ↓
+cordis Context → L4 组合根只 inject
+```
+
+**L4 组合根 = `ctx.inject(...)` 唯一合法组装路径**。任何 `from X import Y; Y(...)` 直接构造都视为违规。`lca.layer4_app.capability_boot.py` 全删。
 
 **实际 service 文件状态**：
 - `LlmService` **保持不继承 `cordis.Service`**——它是 `LLMAdapter` 实现，不会随 ctx dispose 消失。Plugin 提供 `LlmService()` 实例并 `ctx.provide("llm", ...)`，由 Service Definition 自身管理生命周期。
@@ -200,7 +219,9 @@ LCA 的 capability 清单（`SeamKey` 枚举）的"字段名"在 cordis 上变�
 
 ## 6. 插件集重组
 
-### 6.1 21 → 18 个 `@plugin`（module-形状）
+### 6.1 21 → 18 个 `@plugin`（module-形状）— Tier-1 Definition
+
+**Tier-1 仅是入口；Tier-2/3 见 §6.3**（必备，否则不算"插件贯彻"）。
 
 | # | Plugin | 决策 | 新位置（plugin module） | Service 类归口 |
 |---|---|---|---|---|
@@ -287,7 +308,150 @@ bundle YAML `$module` 字段相应改为模块路径：
   $module: lca.plugins.llm_service      # 不是 lca.plugins.llm
 ```
 
-### 6.3 agent_service 合并入 session_service
+### 6.3 Plugin 三层分级（实现 "everything is a plugin"）
+
+DSH 与 LCA 的"插件贯彻"实际是**三层**：
+
+| Tier | 角色 | 数量（约） | 例子 |
+|---|---|---|---|
+| **Tier-1: Definition Plugin** | 声明 seam + 挂载 Definition 服务 | 21 | `lca.plugins.llm_service` 挂 `LlmService` |
+| **Tier-2: Provider Plugin** | 实现 Definition 接口，挂载到 Definition | 30+ | `lca.plugins.providers.llm.mock` 注册 `MockLLMAdapter` |
+| **Tier-3: Behavior Plugin** | 业务行为（Brain / Loop / Coordination / Middleware） | 15+ | `lca.plugins.brain.modular` 装 `ModularBrain` |
+
+**第一轮 spec 只覆盖 Tier-1**。"完全贯彻"必须把 Tier-2 + Tier-3 也 plugin 化。
+
+#### Tier-2 Provider Plugin 清单（当前硬编码，要 plugin 化）
+
+| Seam | Provider plugins（每个一个 plugin） |
+|---|---|
+| `llm` | `lca.plugins.providers.llm.mock` / `.real` / `.pi_ai` / `.deepseek` |
+| `memory` | `lca.plugins.providers.memory.simple` / `.redis` / `.vector` |
+| `state_store` | `lca.plugins.providers.state_store.memory` / `.redis` / `.sqlite` |
+| `search` | `lca.plugins.providers.search.tavily` / `.bing` / `.serpapi` |
+| `tools` | `lca.plugins.providers.tools.g2a_factory` / `.office_factory` |
+| `transport` | `lca.plugins.providers.transport.internal` / `.a2a` / `.mcp` |
+| `skills` | `lca.plugins.providers.skills.disk` / `.remote` |
+| `file_store` | `lca.plugins.providers.file_store.local` / `.s3` |
+| `observability` | `lca.plugins.providers.observability.console` / `.langfuse` / `.otel` |
+| `sandbox` | `lca.plugins.providers.sandbox.local` / `.e2b` / `.docker` |
+| `workspace` | `lca.plugins.providers.workspace.local` / `.remote` |
+
+**plugin 形状**（统一）：
+
+```python
+# lca/plugins/providers/llm/mock.py
+from cordis import plugin
+
+@plugin(name="lca-llm-provider-mock", inject=["llm"])
+async def setup(ctx, config):
+    """Register the mock LLM adapter as the default provider."""
+    from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+    ctx.inject("llm").register("mock", MockLLMAdapter(), activate=True)
+```
+
+每个 Tier-2 plugin 声明 `inject=["<seam_key>"]`，`config` 包含 `mode: auto|force` 等选择。Bundle YAML 由 Tier-2 plugin 的存在/缺失决定哪些 provider 实际可用。
+
+**bundle YAML 改写**（append-only，所有 default provider 都在）：
+
+```yaml
+# bundles/base.yaml
+plugins:
+  # Tier-1 Definitions
+  - id: lca-llm-service
+    $module: lca.plugins.llm_service
+  - id: lca-memory-service
+    $module: lca.plugins.memory_service
+  # ... 其他 11 略
+
+  # Tier-2 默认 Providers（每个 seam 至少 1 个 default）
+  - id: lca-llm-provider-mock
+    $module: lca.plugins.providers.llm.mock
+    inject: ["llm"]
+    config:
+      mode: auto           # auto = real when LLM_API_KEY present, else mock
+  - id: lca-memory-provider-simple
+    $module: lca.plugins.providers.memory.simple
+    inject: ["memory"]
+  - id: lca-state-store-provider-memory
+    $module: lca.plugins.providers.state_store.memory
+    inject: ["state_store"]
+  - id: lca-search-provider-tavily
+    $module: lca.plugins.providers.search.tavily
+    inject: ["search"]
+  - id: lca-tools-provider-g2a
+    $module: lca.plugins.providers.tools.g2a_factory
+    inject: ["tools"]
+  - id: lca-transport-provider-internal
+    $module: lca.plugins.providers.transport.internal
+    inject: ["transport"]
+  - id: lca-skills-provider-disk
+    $module: lca.plugins.providers.skills.disk
+    inject: ["skills"]
+  - id: lca-file-store-provider-local
+    $module: lca.plugins.providers.file_store.local
+    inject: ["file_store"]
+  - id: lca-observability-provider-console
+    $module: lca.plugins.providers.observability.console
+    inject: ["observability"]
+  - id: lca-sandbox-provider-local
+    $module: lca.plugins.providers.sandbox.local
+    inject: ["sandbox"]
+  - id: lca-workspace-provider-local
+    $module: lca.plugins.providers.workspace.local
+    inject: ["workspace"]
+```
+
+**用户切换** = 删除/替换 bundle YAML 中的 Tier-2 entry，或者用 `profiles/web-app.yaml` 的 `patch` 删掉再 insert 新的。
+
+#### Tier-3 Behavior Plugin 清单
+
+| Behavior | Plugin |
+|---|---|
+| Brain 默认实现 | `lca.plugins.brain.modular`（装 `ModularBrain`） / `lca.plugins.brain.simple`（装 `SimpleBrain`） |
+| Reasoner | `lca.plugins.reasoner.prompt` / `lca.plugins.reasoner.critic` |
+| Synthesizer | `lca.plugins.synthesizer.concat` / `lca.plugins.synthesizer.streaming` |
+| Loop Driver | `lca.plugins.loop_cognitive`（已有）/ `lca.plugins.loop_dsh_bridge` / `lca.plugins.loop_replay` |
+| Team Coordination | `lca.plugins.team.pipeline` / `lca.plugins.team.fanout` / `lca.plugins.team.graph` / `lca.plugins.team.debate` / `lca.plugins.team.peer_relay` / `lca.plugins.team.peer_swarm` |
+| Middleware / Guard | `lca.plugins.guards.loop_intervention`（已有）/ `lca.plugins.guards.step_budget` |
+| DSH Bridge | `lca.plugins.dsh.bridge`（装 `build_harness_env` 工厂） |
+
+**plugin 形状**（统一）：
+
+```python
+# lca/plugins/brain/modular.py
+from cordis import plugin
+
+@plugin(name="lca-brain-modular")
+async def setup(ctx, config):
+    """Mount the default ModularBrain strategy as the brain factory."""
+    from lca.layer1_cognitive.brain.modular_brain import ModularBrain
+    from lca.layer1_cognitive.brain.default_factory import brain_factory
+    
+    brain_factory.register("modular", ModularBrain)
+    ctx.provide("brain_factory", brain_factory)
+```
+
+#### 替换 `composer.py:_resolve_component` 硬编码
+
+旧的：
+```python
+# lca/layer4_app/composer.py:225 — 硬编码
+def _resolve_component(...):
+    brain = ModularBrain(...)  # 直接 import + 构造
+    return brain
+```
+
+新的（plugin 化后）：
+```python
+# lca/layer4_app/composer.py — 一切来自 ctx
+def _resolve_component(scope, ...):
+    factory = scope.inject("brain_factory")
+    return factory.resolve("modular", ...)
+```
+
+L4 组合根**只**通过 `ctx.inject(...)` 拿东西。任何 `import X; X()` 直接构造都视为违规。
+
+### 6.4 agent_service 合并入 session_service
 
 原 `agent_service` 是 `session.append` 的 typed facade，**5 个方法**（不是 6 个）：
 
@@ -342,20 +506,15 @@ async def setup(ctx, config):
 
 ### 7.1 `bundles/base.yaml`（替代 `base-spine.yaml`）
 
-cordis 的 `Entry` dataclass 用 `id` 作主键；`$module` 是 LCA 层加的扩展（cordis 解析器本身从 `name` 反查 module，但 LCA 走自己的 include 协议）。`$module` 路径对应 §6.2 的 module-per-plugin 形状：
+cordis 的 `Entry` dataclass 用 `id` 作主键；`$module` 是 LCA 层加的扩展（cordis 解析器本身从 `name` 反查 module，但 LCA 走自己的 include 协议）。`$module` 路径对应 §6.2 的 module-per-plugin 形状 + §6.3 的 Tier-2 Provider 形状：
 
 ```yaml
 # bundles/base.yaml
 plugins:
+  # ── Tier-1: Definitions ─────────────────────────────────────
   - id: lca-llm-service
     name: lca-llm-service
     $module: lca.plugins.llm_service
-  - id: lca-llm-provider
-    name: lca-llm-provider
-    $module: lca.plugins.llm_provider
-    inject: ["llm"]
-    config:
-      mode: auto
   - id: lca-tools-service
     name: lca-tools-service
     $module: lca.plugins.tools_service
@@ -389,6 +548,58 @@ plugins:
   - id: lca-state-store-service
     name: lca-state-store-service
     $module: lca.plugins.state_store_service
+
+  # ── Tier-2: Default Providers（每个 seam 至少 1 个）──
+  - id: lca-llm-provider-mock
+    name: lca-llm-provider-mock
+    $module: lca.plugins.providers.llm.mock
+    inject: ["llm"]
+    config:
+      mode: auto
+  - id: lca-memory-provider-simple
+    name: lca-memory-provider-simple
+    $module: lca.plugins.providers.memory.simple
+    inject: ["memory"]
+  - id: lca-state-store-provider-memory
+    name: lca-state-store-provider-memory
+    $module: lca.plugins.providers.state_store.memory
+    inject: ["state_store"]
+  - id: lca-search-provider-tavily
+    name: lca-search-provider-tavily
+    $module: lca.plugins.providers.search.tavily
+    inject: ["search"]
+  - id: lca-tools-provider-g2a
+    name: lca-tools-provider-g2a
+    $module: lca.plugins.providers.tools.g2a_factory
+    inject: ["tools"]
+  - id: lca-transport-provider-internal
+    name: lca-transport-provider-internal
+    $module: lca.plugins.providers.transport.internal
+    inject: ["transport"]
+  - id: lca-transport-provider-a2a
+    name: lca-transport-provider-a2a
+    $module: lca.plugins.providers.transport.a2a
+    inject: ["transport"]
+  - id: lca-transport-provider-mcp
+    name: lca-transport-provider-mcp
+    $module: lca.plugins.providers.transport.mcp
+    inject: ["transport"]
+  - id: lca-skills-provider-disk
+    name: lca-skills-provider-disk
+    $module: lca.plugins.providers.skills.disk
+    inject: ["skills"]
+  - id: lca-file-store-provider-local
+    name: lca-file-store-provider-local
+    $module: lca.plugins.providers.file_store.local
+    inject: ["file_store"]
+  - id: lca-observability-provider-console
+    name: lca-observability-provider-console
+    $module: lca.plugins.providers.observability.console
+    inject: ["observability"]
+  - id: lca-sandbox-provider-local
+    name: lca-sandbox-provider-local
+    $module: lca.plugins.providers.sandbox.local
+    inject: ["sandbox"]
 ```
 
 **注意**：cordis 自己解析 YAML 时需要 `id` 是主键（`Loader._is_entry_dict` 启发式）；`$module` 是 LCA 抽象——`lca.harness.profile.boot()` 重新构造的 thin wrapper 读 `$module` 后用 `importlib.import_module()` 解析模块路径，再交给 cordis 的 `Loader.load()` 时，把 `id` + `inject` + `config` 留给 cordis，模块引用自己挂上。
@@ -397,19 +608,83 @@ plugins:
 
 ```yaml
 plugins:
+  # ── Tier-3: Behavior Plugins ──────────────────────────────
+  # Brain / Reasoner / Synthesizer
+  - id: lca-brain-modular
+    name: lca-brain-modular
+    $module: lca.plugins.brain.modular
+  - id: lca-reasoner-prompt
+    name: lca-reasoner-prompt
+    $module: lca.plugins.reasoner.prompt
+  - id: lca-synthesizer-concat
+    name: lca-synthesizer-concat
+    $module: lca.plugins.synthesizer.concat
+  # Loop Driver
   - id: lca-loop-cognitive
     name: lca-loop-cognitive
     $module: lca.plugins.loop_cognitive
-  - id: lca-gateway-starlette
-    name: lca-gateway-starlette
-    $module: lca.plugins.gateway_starlette
+  - id: lca-loop-dsh-bridge
+    name: lca-loop-dsh-bridge
+    $module: lca.plugins.loop_dsh_bridge
+  - id: lca-loop-replay
+    name: lca-loop-replay
+    $module: lca.plugins.loop_replay
+  # Team Coordinations（一组 6 个 default）
+  - id: lca-team-pipeline
+    name: lca-team-pipeline
+    $module: lca.plugins.team.pipeline
+  - id: lca-team-fanout
+    name: lca-team-fanout
+    $module: lca.plugins.team.fanout
+  - id: lca-team-graph
+    name: lca-team-graph
+    $module: lca.plugins.team.graph
+  - id: lca-team-debate
+    name: lca-team-debate
+    $module: lca.plugins.team.debate
+  - id: lca-team-peer-relay
+    name: lca-team-peer-relay
+    $module: lca.plugins.team.peer_relay
+  - id: lca-team-peer-swarm
+    name: lca-team-peer-swarm
+    $module: lca.plugins.team.peer_swarm
+  # Middleware / Guard
   - id: lca-guard-loop-intervention
     name: lca-guard-loop-intervention
     $module: lca.plugins.guards.loop_intervention
   - id: lca-guard-step-budget
     name: lca-guard-step-budget
     $module: lca.plugins.guards.step_budget
+  # DSH Bridge
+  - id: lca-dsh-bridge
+    name: lca-dsh-bridge
+    $module: lca.plugins.dsh.bridge
+  # Gateway
+  - id: lca-gateway-starlette
+    name: lca-gateway-starlette
+    $module: lca.plugins.gateway_starlette
 ```
+
+**总计**：base.yaml 约 13 Tier-1 + 13 Tier-2 = 26 entries；web-app.yaml 追加 19 Tier-3 = 总 ~45 entries。**L4 组合根不 import 任何具体类**。
+
+```yaml
+# Profile 层用 patch 替换 provider：
+# profiles/web-standard.yaml
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+patch:
+  - remove: lca-llm-provider-mock
+    insert:
+      - id: lca-llm-provider-real
+        $module: lca.plugins.providers.llm.real
+        inject: ["llm"]
+        config:
+          api_key: ${LLM_API_KEY}
+          base_url: ${LLM_BASE_URL:-https://api.deepseek.com}
+```
+
+用户切 real LLM 不用改 Python——改 profile / env。
 
 bundle **继承**不复用 cordis 自带 `$patch` 机制；LCA 层用 `merge_bundles`（`cordis.loader.merge_bundles`）拼——`base.yaml` → `web-app.yaml` 顺序扩展。
 
@@ -600,7 +875,9 @@ ctx.provide("llm", service)                    # 2-arg (key, value, *, dispose=N
 | **P2** | 拆 `lca/contracts/{harness/plugin.py, mechanisms/plugin.py, mechanisms/seam.py}` 三处：删 LCA seam 抽象，保留 `consume()` / `PluginConfig` | `rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|ScopeKind\|PluginKind\|ProviderMode\|SeamDeclaration\|SeamRegistry\|seam\b"` 仅命中 docstring；`rg "from lca.contracts.mechanisms.seam import consume"` 仍能 import |
 | **P3** | `lca/harness/middleware/registry.py` 10 点 `COGNITIVE_POINTS` 重写为 cordis event 名 map | `tests/test_middleware.py` |
 | **P4** | `lca/harness/profile/boot.py` 重写为 cordis.Loader 薄包装（保留 `boot_profile(path, *, check_seam_completeness: bool = True)` 签名；now no-op 警告） | `gateway/app.py:138` + `tests/harness/test_phase_a_integration.py:225` 跑通 |
-| **P5** | 21 个 plugin 改写为 `@plugin` 形式（module-per-plugin：每个 plugin file ≤ 50 行；service 类搬回 `lca/layer0_infra/capability/` 或 layer2/3 归口模块） | `uv run pytest lca/plugins/ tests/test_plugin_*.py` |
+| **P5** | 21 个 Tier-1 plugin 改写为 `@plugin` 形式（module-per-plugin：每个 plugin file ≤ 50 行；service 类搬回 `lca/layer0_infra/capability/` 或 layer2/3 归口模块） | `uv run pytest lca/plugins/ tests/test_plugin_*.py` |
+| **P5.1** | Tier-2 Provider plugins 抽出（30+ entry：每个 capability seam 至少 1 个 default provider；`lca/layer4_app/capability_boot.py` 删除） | `uv run pytest tests/test_provider_*.py` + `lca/lca-ops status` 不再有 `capability_boot` 警告 |
+| **P5.2** | Tier-3 Behavior plugins 抽出（15+ entry：brain / reasoner / synthesizer / team coordination / middleware / dsh bridge） | `uv run pytest tests/test_compose_*.py tests/test_team_*.py` |
 | **P6** | bundle / profile YAML 改写（`bundles/base.yaml` + `bundles/web-app.yaml` + `profiles/web-standard.yaml`） | `lca-ops status` + `lca-ops inspect-tree` |
 | **P7** | `composer.py` + `loop_cognitive` + `loop_dsh_bridge` + `loop_replay` + `gateway/app.py` + `lca/layer4_app/api.py` + `lca/harness/diagnostics/tree.py` 改写（`scope.resolve` → `ctx.inject`；`scope.fork` → `ctx.scope`；`scope.provide` → `ctx.provide`） | `uv run pytest lca/layer4_app/ tests/harness/` + `examples/pluggability_demo/` |
 | **P8** | 端到端：`scripts/run_team_mode.py` 跑通真 e2e | Agent reply 在 journal |
