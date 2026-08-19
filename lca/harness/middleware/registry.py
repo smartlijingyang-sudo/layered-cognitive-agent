@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Awaitable, Callable
 from typing import Any
+from dataclasses import dataclass
 
 import structlog
 
@@ -13,17 +14,47 @@ from lca.contracts.harness.plugin import ExtensionPoint
 
 _log = structlog.get_logger("lca.harness.middleware")
 
-COGNITIVE_POINTS: tuple[ExtensionPoint, ...] = (
-    ExtensionPoint("agent.pre_step", "waterfall", "each step before perceive"),
-    ExtensionPoint("agent.before_perceive", "waterfall"),
-    ExtensionPoint("agent.after_perceive", "waterfall"),
-    ExtensionPoint("agent.before_think", "waterfall"),
-    ExtensionPoint("agent.after_think", "waterfall"),
-    ExtensionPoint("agent.before_act", "waterfall"),
-    ExtensionPoint("agent.after_act", "waterfall"),
-    ExtensionPoint("agent.before_reflect", "waterfall"),
-    ExtensionPoint("agent.after_reflect", "waterfall"),
-    ExtensionPoint("agent.before_turn_end", "serial"),
+
+@dataclass(frozen=True)
+class CognitivePhase:
+    """Public phase metadata — name + description only.
+
+    ExtensionPoint (internal storage) carries seam_key + dispatch_mode.
+    This is the public taxonomy for plugin authors / docs.
+    """
+
+    name: str
+    description: str = ""
+
+
+def to_extension_point(phase: CognitivePhase) -> ExtensionPoint:
+    """Convert CognitivePhase → ExtensionPoint for internal storage."""
+    return ExtensionPoint(seam_key=phase.name, dispatch_mode="waterfall", description=phase.description)
+
+
+# Public taxonomy (consumed by docs / plugin manifest authors)
+COGNITIVE_PHASES: tuple[CognitivePhase, ...] = (
+    CognitivePhase("agent.pre_step", "each step before perceive"),
+    CognitivePhase("agent.before_perceive", "before perception"),
+    CognitivePhase("agent.after_perceive", "after perception"),
+    CognitivePhase("agent.before_think", "before thinking"),
+    CognitivePhase("agent.after_think", "after thinking"),
+    CognitivePhase("agent.before_act", "before act"),
+    CognitivePhase("agent.after_act", "after act"),
+    CognitivePhase("agent.before_reflect", "before reflect"),
+    CognitivePhase("agent.after_reflect", "after reflect"),
+    CognitivePhase("agent.before_turn_end", "before turn end"),
+)
+
+# Internal storage (preserves registry.run() seam_key/dispatch_mode usage)
+COGNITIVE_POINTS: tuple[ExtensionPoint, ...] = tuple(
+    to_extension_point(p) for p in COGNITIVE_PHASES
+)
+# agent.before_turn_end is "serial" — override the default waterfall
+COGNITIVE_POINTS = tuple(
+    ExtensionPoint(p.seam_key, "serial", p.description)
+    if p.seam_key == "agent.before_turn_end" else p
+    for p in COGNITIVE_POINTS
 )
 
 
