@@ -1,0 +1,15 @@
+[project]
+name = "taiyi-schemastery"
+version = "0.1.0"
+description = "taiyi-schemastery — 1:1 Python port of @deepseek-ai/schemastery"
+requires-python = ">=3.10"
+dependencies = [
+    "taiyi-cosmokit",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["schemastery"]
