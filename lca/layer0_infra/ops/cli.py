@@ -683,6 +683,63 @@ def dump_profile(
     print(f"Total rows: {len(rows)}")
 
 
+@app.command()
+def debug(
+    sub: str = typer.Argument(..., help="debug sub-subcommand: tree | run | scope"),
+    profile: Path = typer.Option(
+        Path("profiles/web-standard.yaml"),
+        "--profile",
+        "-p",
+        help="Profile YAML to boot",
+    ),
+    run_id: str = typer.Option(
+        None, "--run-id", help="Run ID for `debug run` (optional)"
+    ),
+) -> None:
+    """Debug subcommand: tree, run, scope.
+
+    - `debug tree`: render the booted plugin tree (services + event listeners)
+    - `debug run <id>`: print session events for a run (stub — full impl in
+      follow-up; reads journal from traces/runs/<id>.journal)
+    - `debug scope <id>`: print service resolution for a scope (stub —
+      full impl queries session_store for the session's scope snapshot)
+    """
+    import asyncio
+
+    if sub == "tree":
+        from lca.harness.profile.boot import boot_profile
+        from lca.harness.diagnostics.tree import render_tree
+
+        async def main():
+            ctx = await boot_profile(str(profile))
+            print(render_tree(ctx))
+
+        asyncio.run(main())
+    elif sub == "run":
+        if run_id is None:
+            print("debug run requires --run-id")
+            raise typer.Exit(1)
+        from pathlib import Path as _Path
+
+        journal_path = _Path("traces/runs") / f"{run_id}.journal"
+        if not journal_path.exists():
+            print(f"No journal for {run_id} (expected {journal_path})")
+            raise typer.Exit(1)
+        # Read the journal (JSONL) and print events
+        for line in journal_path.read_text().splitlines():
+            print(line)
+    elif sub == "scope":
+        if run_id is None:
+            print("debug scope requires --run-id")
+            raise typer.Exit(1)
+        # Stub: print run_id + a hint
+        print(f"Run: {run_id}")
+        print("Service resolution: deferred to follow-up (requires session_store.index)")
+    else:
+        print(f"Unknown debug sub: {sub!r} (expected: tree, run, scope)")
+        raise typer.Exit(1)
+
+
 @app.command(name="check-upstream")
 def check_upstream(
     upstream: Path = typer.Option(
