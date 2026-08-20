@@ -28,12 +28,16 @@ class _ScriptedResolver:
 
 
 def _journal_event_types(session: object) -> set[str]:
+    from typing import cast
+
     from gateway.runs.session import RunSession
+    from lca.layer0_infra.observability.journal.engine import RunStore
     from lca.layer0_infra.observability.journal.journal_io import read_journal
 
     assert isinstance(session, RunSession)
-    if session.hub is not None:
-        return {type(stamped.event).__name__ for stamped in session.hub.store.events}
+    if session.hub is not None and session.hub.journal is not None:
+        store = cast("RunStore", getattr(session.hub.journal, "store", session.hub.journal))
+        return {type(stamped.event).__name__ for stamped in store.events}
     return {type(stamped.event).__name__ for stamped in read_journal(session.jsonl_path)}
 
 
@@ -114,11 +118,14 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(session.status, RunStatus.COMPLETED)
         event_types = _journal_event_types(session)
         self.assertIn("AgentRunStarted", event_types)
-        assert session.hub is not None
+        assert session.hub is not None and session.hub.journal is not None
+        from typing import cast
+
+        from lca.layer0_infra.observability.journal.engine import RunStore
+
+        store = cast("RunStore", getattr(session.hub.journal, "store", session.hub.journal))
         started = next(
-            stamped
-            for stamped in session.hub.store.events
-            if type(stamped.event).__name__ == "AgentRunStarted"
+            stamped for stamped in store.events if type(stamped.event).__name__ == "AgentRunStarted"
         )
         self.assertEqual(started.scope.run_id, session.run_id)
 

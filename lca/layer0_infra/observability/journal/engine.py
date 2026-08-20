@@ -58,7 +58,9 @@ class RunStore:
         if registry is not None and projections:
             raise ValueError("RunStore accepts projections or registry, not both")
         self._policy = policy if policy is not None else AttributePolicy()
-        self._backend: JournalStoreBackend = backend if backend is not None else InMemoryJournalStore()
+        self._backend: JournalStoreBackend = (
+            backend if backend is not None else InMemoryJournalStore()
+        )
         self._registry = registry if registry is not None else ProjectionRegistry(projections)
 
     @property
@@ -84,7 +86,7 @@ class RunStore:
         挂到 ``BoundObservability`` 上，老 readers 仍然在原基线实例里。
         """
         return RunStore(
-            projections=tuple(self._registry.projections) + (projection,),
+            projections=(*self._registry.projections, projection),
             policy=self._policy,
         )
 
@@ -92,6 +94,11 @@ class RunStore:
     def backend(self) -> JournalStoreBackend:
         """暴露当前 backend，便于测试与诊断。"""
         return self._backend
+
+    @property
+    def policy(self) -> AttributePolicy:
+        """暴露当前 policy，便于适配层 immutable 转发。"""
+        return self._policy
 
     def append(self, event: JournalEvent) -> StampedEvent:
         """验证、治理、提交，再向投影发布事件。

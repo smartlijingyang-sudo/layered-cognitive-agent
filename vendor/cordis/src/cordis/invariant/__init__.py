@@ -11,8 +11,9 @@ re-export barrel; we mirror that pattern as a Python subpackage).
 from __future__ import annotations
 
 from cordis.context import Context, Hook
-from cordis.disposer import Disposer, DisposableMixin, Effect, dispose_all, run_disposer
-from cordis.events import EventsService, Hook as EventHook, is_bailed
+from cordis.disposer import DisposableMixin, Disposer, Effect, dispose_all, run_disposer
+from cordis.events import EventsService, is_bailed
+from cordis.events import Hook as EventHook
 from cordis.fiber import CordisError, Fiber, FiberState, ValidationError
 from cordis.loader import (
     Bundle,

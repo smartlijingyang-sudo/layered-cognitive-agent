@@ -35,12 +35,8 @@ from cordis.disposer import Disposer, run_disposer
 from cordis.utils import (
     EFFECT,
     FILTER,
-    INIT_HOOKS,
     INTERCEPT,
     ISOLATE,
-    RECEIVER,
-    SHADOW,
-    Tracker,
 )
 
 _T = TypeVar("_T")
@@ -58,7 +54,7 @@ class Hook(Generic[_T]):
 
     __slots__ = ("ctx", "callback")
 
-    def __init__(self, ctx: "Context", callback: Callable[..., Any]) -> None:
+    def __init__(self, ctx: Context, callback: Callable[..., Any]) -> None:
         self.ctx = ctx
         self.callback = callback
 
@@ -71,16 +67,16 @@ def hook(func: Callable[..., Any]) -> Hook[Any]:  # noqa: ARG001
 
 # Stubs used by `ctx.parallel/emit/serial/bail/waterfall`. Real implementations
 # are mixed in by the Event service in `cordis.events` once that module loads.
-def ready(_ctx: "Context") -> Awaitable[None]:
+def ready(_ctx: Context) -> Awaitable[None]:
     raise NotImplementedError
 
 
-def dispose(_ctx: "Context") -> Awaitable[None]:  # noqa: ARG001
+def dispose(_ctx: Context) -> Awaitable[None]:  # noqa: ARG001
     raise NotImplementedError
 
 
 # Tracks the currently-active `Context` for `scope` resolution.
-_active_ctx: ContextVar["Context | None"] = ContextVar("cordis_active_ctx", default=None)
+_active_ctx: ContextVar[Context | None] = ContextVar("cordis_active_ctx", default=None)
 
 
 class Context:
@@ -126,17 +122,17 @@ class Context:
     def __init__(
         self,
         *,
-        parent: "Context | None" = None,
-        root: "Context | None" = None,
+        parent: Context | None = None,
+        root: Context | None = None,
         isolation_label: str | None = None,
     ) -> None:
         # Identity.
         self.parent = parent
-        self.root: "Context" = root if root is not None else self
+        self.root: Context = root if root is not None else self
         # Bindings + disposers.
         self.own_bindings: dict[str, Any] = {}
         self.disposers: list[Disposer] = []
-        self.isolated: dict[str, "Context"] = {}
+        self.isolated: dict[str, Context] = {}
         self.state_disposed: bool = False
         self._isolation_label = isolation_label
         self._descendants: list[Context] = []
@@ -166,10 +162,10 @@ class Context:
         # Install the root Fiber attached to this context.
         self.fiber: Fiber = Fiber(self, {}, {}, None, _capture_outer(), is_root=True)
 
-        from cordis.reflect import ReflectService
-        from cordis.registry import RegistryService
         from cordis.events import EventsService
         from cordis.logger import LoggerService
+        from cordis.reflect import ReflectService
+        from cordis.registry import RegistryService
 
         self.reflect = ReflectService(self)
         self.registry = RegistryService(self)
@@ -245,7 +241,7 @@ class Context:
             return _MISSING
         return self._walk_local(active, key)
 
-    def _walk_local(self, node: "Context", key: str) -> Any:
+    def _walk_local(self, node: Context, key: str) -> Any:
         if key in node.own_bindings:
             return node.own_bindings[key]
         for descendant in node._descendants:
@@ -255,7 +251,7 @@ class Context:
         return _MISSING
 
     def _inject_chain(self, key: str, default: Any) -> Any:
-        node: "Context | None" = self
+        node: Context | None = self
         while node is not None:
             if key in node.own_bindings:
                 return node.own_bindings[key]
@@ -264,16 +260,16 @@ class Context:
             raise KeyError(key)
         return default
 
-    def _is_ancestor_of(self, other: "Context") -> bool:
-        node: "Context | None" = other.parent
+    def _is_ancestor_of(self, other: Context) -> bool:
+        node: Context | None = other.parent
         while node is not None:
             if node is self:
                 return True
             node = node.parent
         return False
 
-    def _is_scope_descendant(self, root: "Context", target: "Context") -> bool:
-        node: "Context | None" = target
+    def _is_scope_descendant(self, root: Context, target: Context) -> bool:
+        node: Context | None = target
         while node is not None:
             if node is root:
                 return True
@@ -284,11 +280,11 @@ class Context:
     # Derived contexts
     # ------------------------------------------------------------------
 
-    def fork(self) -> "Context":
+    def fork(self) -> Context:
         """Return a new child context."""
         return Context(parent=self, root=self.root)
 
-    def extend(self, meta: dict[str, Any] | None = None) -> "Context":
+    def extend(self, meta: dict[str, Any] | None = None) -> Context:
         """Create a child context with extra metadata.
 
         Mirrors upstream ``Context.extend``: returns a new context whose
@@ -306,7 +302,7 @@ class Context:
                         pass
         return child
 
-    def isolate(self, label: str, callback: Callable[["Context"], Any]) -> Any:
+    def isolate(self, label: str, callback: Callable[[Context], Any]) -> Any:
         """Run ``callback`` in a fresh isolated child."""
         scoped = Context(parent=self, root=self.root, isolation_label=label)
         self.isolated[label] = scoped
@@ -327,7 +323,7 @@ class Context:
         finally:
             _active_ctx.reset(token)
 
-    def scope(self, label: str) -> "_ScopeCM":
+    def scope(self, label: str) -> _ScopeCM:
         """Async context manager introducing a labeled scope."""
         return _ScopeCM(self, label)
 

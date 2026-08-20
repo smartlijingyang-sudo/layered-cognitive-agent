@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any
 
 __all__ = ["Plugin", "plugin", "get_plugin_meta", "is_plugin"]
 

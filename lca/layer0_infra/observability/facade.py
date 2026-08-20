@@ -50,6 +50,7 @@ from lca.contracts.observability.ports import (
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
+
 # ── Scope 上下文：唯一 ambient ─────────────────────────────────
 # 业务代码的"我是谁"——trace / run / actor / session。所有 backend 共享同一份
 # scope，由 runtime 边界（bind/run_scope）统一设置；facade 不感知具体 backend。
@@ -130,9 +131,7 @@ class BoundObservability:
             self.journal.close()
 
 
-_bound: ContextVar[BoundObservability | None] = ContextVar(
-    "lca_observability_bound", default=None
-)
+_bound: ContextVar[BoundObservability | None] = ContextVar("lca_observability_bound", default=None)
 
 
 def current_bound() -> BoundObservability | None:
@@ -150,6 +149,7 @@ def bind_backends(bound: BoundObservability) -> Iterator[BoundObservability]:
 
 
 # ── 4 个 dispatch 入口：record / span / annotate / score ─────────────
+
 
 def record(event: JournalEvent) -> StampedEvent | None:
     """向当前 journal 写入领域/运行时事实。"""
@@ -319,9 +319,7 @@ class OperationRecorder:
         exc: BaseException | None,
         _tb: Any,
     ) -> bool:
-        duration_ms = (
-            int((time.perf_counter() - self._started) * 1000) if self._started else 0
-        )
+        duration_ms = int((time.perf_counter() - self._started) * 1000) if self._started else 0
         output = {**self._output, "duration_ms": duration_ms}
         if exc is None:
             record_runtime(
@@ -373,7 +371,10 @@ def record_operation(
 
 # ── 装饰器 ─────────────────────────────────────────────
 
-def traced(name: object, *, capture: Callable[..., dict[str, Any]] | None = None) -> Callable[[_F], _F]:
+
+def traced(
+    name: object, *, capture: Callable[..., dict[str, Any]] | None = None
+) -> Callable[[_F], _F]:
     """用 span 包裹同步或异步函数。"""
     label = name.value if hasattr(name, "value") else str(name)
 
@@ -402,6 +403,7 @@ def traced(name: object, *, capture: Callable[..., dict[str, Any]] | None = None
 
 
 # ── Span context（get current OTel span info） ──────────────
+
 
 @dataclass(frozen=True)
 class SpanContextInfo:

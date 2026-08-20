@@ -23,7 +23,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from cordis.utils import Tracker
@@ -96,35 +96,35 @@ c256: list[int] = [
 Formatter = Callable[[Any, "Exporter", "Message"], Any]
 
 
-def _fmt_s(value: Any, _exporter: "Exporter", _message: "Message") -> str:
+def _fmt_s(value: Any, _exporter: Exporter, _message: Message) -> str:
     return str(value)
 
 
-def _fmt_d(value: Any, _exporter: "Exporter", _message: "Message") -> int:
+def _fmt_d(value: Any, _exporter: Exporter, _message: Message) -> int:
     return int(Number(value))
 
 
-def _fmt_i(value: Any, _exporter: "Exporter", _message: "Message") -> int:
+def _fmt_i(value: Any, _exporter: Exporter, _message: Message) -> int:
     return int(Number(value))
 
 
-def _fmt_f(value: Any, _exporter: "Exporter", _message: "Message") -> float:
+def _fmt_f(value: Any, _exporter: Exporter, _message: Message) -> float:
     return float(Number(value))
 
 
-def _fmt_o(value: Any, exporter: "Exporter", message: "Message") -> str:
+def _fmt_o(value: Any, exporter: Exporter, message: Message) -> str:
     return json.dumps(value, default=_json_default)
 
 
-def _fmt_O(value: Any, exporter: "Exporter", message: "Message") -> str:
+def _fmt_O(value: Any, exporter: Exporter, message: Message) -> str:
     return json.dumps(value, default=_json_default)
 
 
-def _fmt_c(_value: Any, _exporter: "Exporter", _message: "Message") -> str:
+def _fmt_c(_value: Any, _exporter: Exporter, _message: Message) -> str:
     return ""
 
 
-def _fmt_C(value: Any, exporter: "Exporter", message: "Message") -> str:
+def _fmt_C(value: Any, exporter: Exporter, message: Message) -> str:
     code = Logger.code(message.name, exporter.colors)
     return Logger.color(exporter, code, value)
 
@@ -215,7 +215,7 @@ def _is_aggregate_error(error: Any) -> bool:
 class Logger:
     """Logger facade for one named subsystem."""
 
-    def __init__(self, options: dict[str, Any], service: "LoggerService") -> None:
+    def __init__(self, options: dict[str, Any], service: LoggerService) -> None:
         # Object.assign(this, options) — copy name / level / meta
         self.name: str = options["name"]
         self.level: int | None = options.get("level")
@@ -375,13 +375,13 @@ class LoggerService:
 
     buffer_size: int = 1000
     buffer: list[Message] = []
-    ctx: "Context | None" = None
+    ctx: Context | None = None
 
     _sn_message: int = 0
     _sn_exporter: int = 0
     exporters: dict[int, Exporter] = {}
 
-    def __init__(self, ctx: "Context") -> None:
+    def __init__(self, ctx: Context) -> None:
         # Mirror upstream Tracker pattern.
         self._tracker = Tracker(property="ctx", no_shadow=True)
         try:

@@ -349,11 +349,12 @@ def spawn_agent(
     scope = _ensure_scope(scope)
     profile = spec.profile
     if isinstance(spec.observability, str):
-        # Temporary shim: capability seam still returns BoundObservability factories.
-        # TODO: replace with direct bound resolution once observe seam provides it.
+        # Boot 期 ``assemble_observability`` 已把 ``BoundObservability`` 挂到
+        # ctx.observability；spec.observability 字符串选择仅用于跨团队互操作，
+        # 当前未启用解析路径。Fallback 保留以应对 boot 未装该 seam 的极端场景。
         try:
-            hub = require_capability(scope, "observability").create()
-        except RuntimeError:
+            hub = require_capability(scope, "observability")
+        except MissingCapabilityError:
             hub = make_minimal_bound()
     elif isinstance(spec.observability, BoundObservability):
         hub = spec.observability

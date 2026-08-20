@@ -22,7 +22,6 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.layer0_infra.file_store import LocalFileStore
 from lca.layer0_infra.observability import bind_backends
-from tests.support.observability_helpers import make_test_bound
 from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime, unbind_sandbox_runtime
 from lca.layer0_infra.tools.default_set import build_default_tools
 from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
@@ -35,6 +34,7 @@ from lca.layer0_infra.tools.sandbox_runtime_tools import (
 )
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from tests.support.inline_sandbox import InlineSandbox
+from tests.support.observability_helpers import make_test_bound
 
 
 class _Collector:

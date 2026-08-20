@@ -42,7 +42,6 @@ from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
 from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.observability import (
     BoundObservability,
-    bind,
     bind_backends,
     fold_run_state,
     record,
@@ -181,7 +180,8 @@ def assemble_run_hub(
     """
     from lca.harness.observability import make_minimal_bound
 
-    cfg = settings if settings is not None else ObservabilitySettings()
+    # settings 形参保留以兼容外部调用方；新模型 settings 由 boot 期
+    # assemble_observability 一次性消费，run 边不再二次解析。
     try:
         base: BoundObservability = require_capability(ctx, "observability")
     except MissingCapabilityError:
@@ -289,11 +289,14 @@ def _emit_plugin_inventory(session: RunSession, ctx: Any, hub: BoundObservabilit
         )
         for entry in entries
     ]
-    with bind_backends(hub), run_scope(
-        RunScope(
-            trace_id=cast("TraceId", session.trace_id),
-            run_id=cast("RunId", session.run_id),
-        )
+    with (
+        bind_backends(hub),
+        run_scope(
+            RunScope(
+                trace_id=cast("TraceId", session.trace_id),
+                run_id=cast("RunId", session.run_id),
+            )
+        ),
     ):
         record_runtime(
             DiagnosticCategory.PLUGIN,
@@ -502,7 +505,7 @@ async def finalize(
     finally:
         try:
             if session.hub is not None:
-                session.hub.release()  # type: ignore[attr-defined]
+                session.hub.close()
         finally:
             _derive_terminal_status(session, success)
             registry.clear_inflight(session.run_id)
@@ -513,19 +516,25 @@ async def finalize(
 
 
 async def _dispose_export(hub: BoundObservability) -> None:
-    """Langfuse / OTel teardown off the event loop. Live readers already closed."""
+    """Langfuse / OTel teardown off the event loop. Live readers already closed.
+
+    BoundObservability 用 ``flush()`` 冲刷缓冲；新模型 journal backend 自身
+    实现 ``close()``，OTel tracer 同样关闭当前 span——但 release()/dispose()
+    是老 ObservabilityHub 的语义，已迁移到 close()。
+    """
     try:
-        await asyncio.wait_for(asyncio.to_thread(hub.dispose), timeout=_EXPORT_DISPOSE_TIMEOUT_S)  # type: ignore[attr-defined]
+        await asyncio.wait_for(asyncio.to_thread(hub.flush), timeout=_EXPORT_DISPOSE_TIMEOUT_S)
     except TimeoutError:
-        _log.warning("observability_export_dispose_timeout", hop="H3")
+        _log.warning("observability_export_flush_timeout", hop="H3")
     except Exception:
-        _log.warning("observability_export_dispose_failed", hop="H3", exc_info=True)
-    try:
-        await asyncio.wait_for(asyncio.to_thread(hub.dispose), timeout=_EXPORT_DISPOSE_TIMEOUT_S)  # type: ignore[attr-defined]
-    except TimeoutError:
-        _log.warning("observability_export_dispose_timeout", hop="H3")
-    except Exception:
-        _log.warning("observability_export_dispose_failed", hop="H3", exc_info=True)
+        _log.warning("observability_export_flush_failed", hop="H3", exc_info=True)
+
+
+def _journal_store(hub: BoundObservability | None) -> Any:
+    """从 BoundObservability 提取 RunStore；hub/journal 缺失时返回 None。"""
+    if hub is None or hub.journal is None:
+        return None
+    return getattr(hub.journal, "store", hub.journal)
 
 
 def _derive_terminal_status(session: RunSession, success: bool) -> None:
@@ -539,8 +548,12 @@ def _derive_terminal_status(session: RunSession, success: bool) -> None:
     elif session.error:
         session.status = RunStatus.FAILED
     elif session.hub is not None:
-        derived = fold_run_state(session.hub.store.events)  # type: ignore[attr-defined]
-        session.status = _journal_to_session_status(derived.status)
+        store = _journal_store(session.hub)
+        if store is None:
+            _fallback_terminal_status(session, success)
+        else:
+            derived = fold_run_state(store.events)
+            session.status = _journal_to_session_status(derived.status)
     else:
         _fallback_terminal_status(session, success)
     if session.status in {RunStatus.CANCELED, RunStatus.FAILED, RunStatus.COMPLETED}:
@@ -607,11 +620,14 @@ def _record_run_failure(session: RunSession, exc: BaseException | None, hub: Any
 
     message = session.error or (f"{type(exc).__name__}: {exc}" if exc else "run failed")
     try:
-        with bind(hub), run_scope(
-            RunScope(
-                trace_id=cast("TraceId", session.trace_id),
-                run_id=cast("RunId", session.run_id),
-            )
+        with (
+            bind_backends(hub),
+            run_scope(
+                RunScope(
+                    trace_id=cast("TraceId", session.trace_id),
+                    run_id=cast("RunId", session.run_id),
+                )
+            ),
         ):
             record(
                 AgentRunStarted(
@@ -653,14 +669,16 @@ def _emit_artifact_closure_if_needed(
     from lca.contracts.models.observability.journal import StepTextDelta
 
     try:
-        hub.store.append(  # type: ignore[attr-defined]
-            StepTextDelta(
-                step=-1,
-                text_delta="\n\n" + closure,
-                seq=0,
-                channel=StreamChannel.ANSWER.value,
+        store = _journal_store(hub)
+        if store is not None:
+            store.append(
+                StepTextDelta(
+                    step=-1,
+                    text_delta="\n\n" + closure,
+                    seq=0,
+                    channel=StreamChannel.ANSWER.value,
+                )
             )
-        )
         _log.info(
             "artifact_closure_emitted",
             hop="H2",

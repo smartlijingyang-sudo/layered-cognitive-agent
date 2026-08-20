@@ -33,7 +33,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         AttributePolicy,
         NamedRegistry,
         ObservabilitySettings,
-        RunStore,
     )
 
     registry: NamedRegistry = ctx.require("journal_backends")
@@ -46,9 +45,13 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         **_: Any,
     ) -> JournalBackend:
         cfg = settings or ObservabilitySettings()
-        pol = policy if policy is not None else AttributePolicy(
-            verbosity=cfg.verbosity, redact=cfg.redact_enabled
+        pol = (
+            policy
+            if policy is not None
+            else AttributePolicy(verbosity=cfg.verbosity, redact=cfg.redact_enabled)
         )
-        return RunStore(policy=pol, projections=projections)
+        from lca.layer0_infra.observability.journal_backend import MemoryJournal
+
+        return MemoryJournal(policy=pol, projections=projections)
 
     registry.register("memory", _make_memory)

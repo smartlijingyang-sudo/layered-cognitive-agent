@@ -18,7 +18,7 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
     ToolStarted,
 )
-from lca.layer0_infra.observability import bind, record
+from lca.layer0_infra.observability import bind_backends, record
 from lca.layer0_infra.ops.journal_log import (
     extract_seq_from_record,
     parse_sse_block,
@@ -117,12 +117,12 @@ def test_create_run_session_publishes_to_process_journal(tmp_path: Path) -> None
     registry = RunRegistry(runs_dir=tmp_path)
     session = create_run_session(registry, question="q", user_text="q")
     assert session.hub is not None
-    with bind(session.hub):
+    with bind_backends(session.hub):
         record(AgentRunStarted(agent_role="助手", objective="q"))
         record(DecisionMade(action_type="use_tool", tool_name="ls"))
         record(ReasoningDelta(step=1, text_delta="noise", seq=1))
     assert registry.journal.tail.buffer_size >= 2
-    session.hub.release()
+    session.hub.close()
     assert not registry.journal.tail.is_closed
 
 
@@ -130,7 +130,7 @@ def test_journal_live_keeps_tool_preview(tmp_path: Path) -> None:
     registry = RunRegistry(runs_dir=tmp_path)
     session = create_run_session(registry, question="q", user_text="q")
     assert session.hub is not None
-    with bind(session.hub):
+    with bind_backends(session.hub):
         record(
             ToolStarted(
                 tool_name="local_runCommand",
@@ -148,4 +148,4 @@ def test_journal_live_keeps_tool_preview(tmp_path: Path) -> None:
                 break
     assert "local_runCommand" in buf
     assert "ls" in buf
-    session.hub.release()
+    session.hub.close()

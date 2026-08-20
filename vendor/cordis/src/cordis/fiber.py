@@ -167,15 +167,15 @@ class Fiber:
 
     def __init__(  # noqa: PLR0915
         self,
-        parent: "Context",
+        parent: Context,
         config: Any,
         inject: dict[str, Any],
         runtime: Any | None,
         get_outer_stack: Callable[[], list[str]] | None = None,
         is_root: bool = False,
     ) -> None:
-        self.parent: "Context" = parent
-        self.ctx: "Context" = parent
+        self.parent: Context = parent
+        self.ctx: Context = parent
         self.config: Any = config
         self._config: Any = config
         self.inject: dict[str, Any] = inject
@@ -331,11 +331,11 @@ class Fiber:
             fiber = parent_fiber
 
     @property
-    def context(self) -> "Context":  # type: ignore[name-defined]
+    def context(self) -> Context:  # type: ignore[name-defined]
         return self.ctx
 
     @context.setter
-    def context(self, value: "Context") -> None:  # type: ignore[name-defined]
+    def context(self, value: Context) -> None:  # type: ignore[name-defined]
         self.ctx = value
 
     # ------------------------------------------------------------------
@@ -455,7 +455,7 @@ class Fiber:
 
         try:
             task = self._execute_runner(runner)
-        except Exception as exc:
+        except Exception:
             try:
                 _do_dispose()
             except Exception:  # pragma: no cover
@@ -689,7 +689,7 @@ class Fiber:
     # Public awaitable methods
     # ------------------------------------------------------------------
 
-    async def await_(self) -> "Fiber":
+    async def await_(self) -> Fiber:
         """Wait for inertia; rethrow any startup error."""
         while self.inertia is not None:
             try:

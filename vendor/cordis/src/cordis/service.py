@@ -12,7 +12,7 @@ Services are the primary unit of stateful logic in cordis. A Service:
 from __future__ import annotations
 
 import logging
-from typing import Any, ClassVar, Type
+from typing import Any, ClassVar
 
 from cordis.context import Context
 
@@ -43,7 +43,7 @@ class Service:
         await ctx.dispose()  # calls db.dispose() automatically
     """
 
-    config: ClassVar[Type[Any] | None] = None
+    config: ClassVar[type[Any] | None] = None
     """Optional Pydantic model class for config validation.
 
     If set, the service will validate config kwargs against this model.

@@ -73,7 +73,6 @@ from lca.contracts.protocols.memory import MemorySystem
 
 # ── 可观测性协议（业务层唯一发射门面）──────────────────
 from lca.contracts.protocols.observability import (
-    DiagnosticSink,
     ObservabilityBackend,
     Telemetry,
 )
@@ -128,7 +127,6 @@ __all__ = [
     "ComponentRegistryProtocol",
     "Critic",
     "DecisionGate",
-    "DiagnosticSink",
     "DshRuntime",
     "EventBus",
     "HasHooks",

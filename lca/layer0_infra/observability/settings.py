@@ -67,6 +67,47 @@ class ObservabilitySettings(BaseSettings):
         ),
     )
 
+    # ── 新模型 seam 选择（ADR-0063 PR-7/8/9/10 收尾）────────────────
+    # 每个字段对应 boot 期 ``assemble_observability`` 解析哪个 seam 注册
+    # 工厂来实例化 backend；空 / 默认值 = 该 seam 不挂任何 backend，由
+    # facade 安全 no-op。
+    journal_backend: str = Field(
+        default="memory",
+        description="journal_backends 注册表里的工厂名；空字符串表示不挂 journal。",
+    )
+    tracer_backend: str = Field(
+        default="",
+        description="tracer_backends 注册表里的工厂名；空字符串表示不挂 tracer。",
+    )
+    reader_backends: str = Field(
+        default="",
+        description=("fact_readers 注册表里的工厂名列表（'+' 或 ',' 分隔）；空 = 不挂 readers。"),
+    )
+    scorer_backends: str = Field(
+        default="",
+        description=("fact_scorers 注册表里的工厂名列表（'+' 或 ',' 分隔）；空 = 不挂 scorers。"),
+    )
+
+    def reader_backend_names(self) -> list[str]:
+        """解析 ``reader_backends`` 字段 → 工厂名列表。"""
+        if not self.reader_backends:
+            return []
+        return [
+            part.strip()
+            for part in self.reader_backends.replace(",", "+").split("+")
+            if part.strip()
+        ]
+
+    def scorer_backend_names(self) -> list[str]:
+        """解析 ``scorer_backends`` 字段 → 工厂名列表。"""
+        if not self.scorer_backends:
+            return []
+        return [
+            part.strip()
+            for part in self.scorer_backends.replace(",", "+").split("+")
+            if part.strip()
+        ]
+
     def backend_names(self) -> list[str]:
         """解析 backends，并按 include_langfuse / 凭据决定是否挂 Langfuse。"""
         return resolve_backend_names(

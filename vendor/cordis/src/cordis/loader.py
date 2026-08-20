@@ -117,7 +117,7 @@ class EntryTree:
     Stores a flat list of entries and a parent chain. Lookups walk ancestors.
     """
 
-    def __init__(self, parent: "EntryTree | None" = None) -> None:
+    def __init__(self, parent: EntryTree | None = None) -> None:
         self.parent = parent
         self.entries: list[Entry] = []
         self.disposables = DisposableList()
@@ -263,7 +263,7 @@ def load_config(data: Mapping[str, Any] | Iterable[Mapping[str, Any]] | str) -> 
 
 def load_yaml(path: str) -> EntryTree:
     """Read YAML from ``path`` and parse into an EntryTree."""
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return _build_tree(yaml.safe_load(f) or {})
 
 
@@ -327,7 +327,7 @@ class Loader:
         # env scope for ${ENV.X} substitutions
         self.scope.setdefault("ENV", dict(os.environ))
 
-    def with_scope(self, extra: Mapping[str, Any]) -> "Loader":
+    def with_scope(self, extra: Mapping[str, Any]) -> Loader:
         """Return a new Loader with merged scope."""
         merged = {**self.scope, **dict(extra)}
         return Loader(merged)
@@ -339,7 +339,7 @@ class Loader:
 
     def load_yaml(self, path: str) -> EntryTree:
         """Load + interpolate a YAML file."""
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
         interpolated = interpolate(raw, self.scope)
         return load_config(interpolated)
@@ -350,6 +350,6 @@ class Loader:
         return interpolate(raw, self.scope)
 
     @classmethod
-    def from_internal(cls) -> "Loader":
+    def from_internal(cls) -> Loader:
         """Loader backed by the in-process plugin registry (1:1 with upstream)."""
         return cls()

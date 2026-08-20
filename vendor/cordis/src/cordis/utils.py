@@ -193,7 +193,7 @@ class EffectMeta:
     """Tree node for nested effect labels (used by ``Fiber.getEffects``)."""
 
     label: str
-    children: list["EffectMeta"] = field(default_factory=list)
+    children: list[EffectMeta] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

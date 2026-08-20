@@ -12,7 +12,7 @@ metadata），不修改 backend 实例。Backends 本身通过 plugin ctx 注入
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from lca.contracts.observability.named_registry import NamedRegistry
 from lca.contracts.observability.ports import (
@@ -26,9 +26,6 @@ from lca.layer0_infra.observability import (
     ObservabilitySettings,
 )
 from lca.layer0_infra.observability.facade import BoundObservability
-
-if TYPE_CHECKING:
-    from lca.harness.plugin_api import PluginContext
 
 
 def assemble_observability(
@@ -65,44 +62,50 @@ def assemble_observability(
     policy: AttributePolicyBackend | None = None
     policy_registry = _maybe("attribute_policy_backends")
     if isinstance(policy_registry, NamedRegistry) and "default" in policy_registry:
-        policy = policy_registry.get("default")(cfg)
+        policy_factory = policy_registry.get("default")
+        if policy_factory is not None:
+            policy = policy_factory(cfg)
 
     # 2. readers
     readers: list[Any] = []
     reader_registry = _maybe("fact_readers")
     if isinstance(reader_registry, NamedRegistry):
-        for name in cfg.reader_backends():
-            if name in reader_registry:
-                factory = reader_registry.get(name)
-                readers.append(factory(cfg))
+        for name in cfg.reader_backend_names():
+            factory = reader_registry.get(name)
+            if factory is None:
+                continue
+            readers.append(factory(cfg))
 
     # 3. journal
     journal: JournalBackend | None = None
     journal_registry = _maybe("journal_backends")
     if isinstance(journal_registry, NamedRegistry):
         backend_name = cfg.journal_backend
-        if backend_name in journal_registry:
+        if backend_name:
             factory = journal_registry.get(backend_name)
-            # 工厂签名：(settings, projections=..., policy=...)
-            journal = factory(cfg, projections=tuple(readers), policy=policy)
+            if factory is not None:
+                # 工厂签名：(settings, projections=..., policy=...)
+                journal = factory(cfg, projections=tuple(readers), policy=policy)
 
     # 4. tracer
     tracer: TracerBackend | None = None
     tracer_registry = _maybe("tracer_backends")
     if isinstance(tracer_registry, NamedRegistry):
         backend_name = cfg.tracer_backend
-        if backend_name in tracer_registry:
+        if backend_name:
             factory = tracer_registry.get(backend_name)
-            tracer = factory(cfg, policy=policy)
+            if factory is not None:
+                tracer = factory(cfg, policy=policy)
 
     # 5. scorers
     scorers: list[ScorerFn] = []
     scorer_registry = _maybe("fact_scorers")
     if isinstance(scorer_registry, NamedRegistry):
-        for name in cfg.scorer_backends():
-            if name in scorer_registry:
-                factory = scorer_registry.get(name)
-                scorers.append(factory(cfg))
+        for name in cfg.scorer_backend_names():
+            factory = scorer_registry.get(name)
+            if factory is None:
+                continue
+            scorers.append(factory(cfg))
 
     bound = BoundObservability(
         journal=journal,

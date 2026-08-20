@@ -37,6 +37,13 @@ class MemoryJournal(JournalBackend):
         """暴露 RunStore 给需要直接 append 的低层代码（如 DSH sink）。"""
         return self._store
 
+    def with_projection(self, projection: JournalProjector) -> MemoryJournal:
+        """返回追加 ``projection`` 后的新 MemoryJournal（原实例不变）。"""
+        return MemoryJournal(
+            policy=self._store.policy,
+            projections=(*self._store.projections, projection),
+        )
+
     def write(self, event: JournalEvent) -> StampedEvent | None:
         return self._store.append(event)
 
