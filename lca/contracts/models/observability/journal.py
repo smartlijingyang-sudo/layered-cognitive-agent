@@ -8,7 +8,7 @@ Journal-as-Truth：协作运行时的语义边界发射 ``JournalEvent``，span 
   OTel context（0 秒化石 span 与错挂父子链在构造上不可能）。
 - **事件词表**：容器事件（Team/Agent run 开闭）、协作事件（Delegation
   一等公民 + Synthesis 收口）、资源事实（Llm/Tool/Step/Decision）、
-  洞察事件（RunInsight 由 InsightEngine 回注）。
+  洞察由只读 TraceInspector 从事件账本派生，不回写事实流。
 
 事件是纯 frozen dataclass（ADR-0015）；关联骨架不在事件本体上——由引擎在
 record 时盖章进 ``StampedEvent.scope``，事件字段只承载领域语义。
@@ -25,6 +25,7 @@ from enum import Enum
 from typing import Any
 
 from lca.contracts.atoms.ids import RunId, TraceId, new_run_id, new_trace_id
+from lca.contracts.models.observability.event import OperationOutcome, RuntimeKind
 
 # ── 关联骨架 ─────────────────────────────────────────────
 
@@ -120,6 +121,30 @@ class JournalEvent:
 
 
 @dataclass(frozen=True)
+class RuntimeObserved(JournalEvent):
+    """插件和运行边界的解释记录。
+
+    此事件不改变领域状态，也不参与 reducer；它与事实和生命周期事件共享
+    ``StampedEvent`` 的序列和因果链，因而可由 Agent 在同一轨迹中解释插件、
+    Hook、LLM、工具、传输、权限和代码执行行为。``operation`` 使用稳定的
+    点分命名，例如 ``plugin.interaction``、``context.injected`` 或
+    ``transport.receive``。
+    """
+
+    kind: RuntimeKind = RuntimeKind.PLUGIN
+    operation: str = ""
+    source: str = ""
+    outcome: OperationOutcome = OperationOutcome.OK
+    duration_ms: int | None = None
+    attributes: dict[str, Any] = field(default_factory=dict)
+    output: dict[str, Any] = field(default_factory=dict)
+    error_code: str = ""
+    error_message: str = ""
+    retryable: bool = False
+    causation_refs: tuple[int, ...] = ()
+
+
+@dataclass(frozen=True)
 class StampedEvent:
     """引擎盖章后的日志记录：序号 + 时间戳 + 关联骨架 + 事件本体。
 
@@ -145,6 +170,7 @@ class StampedEvent:
     turn: int = 0
     event_type: str = ""
     data: dict[str, object] = field(default_factory=dict)
+    parent_seq: int | None = None
     correlation_ids: tuple[str, ...] = ()
 
 
@@ -178,7 +204,7 @@ class TeamRunStarted(JournalEvent):
 
 @dataclass(frozen=True)
 class TeamRunFinished(JournalEvent):
-    """团队 run 容器关闭（触发 Run Card / 序列图 / InsightEngine）。"""
+    """团队 run 容器关闭；投影器和轨迹检查器据此完成其只读视图。"""
 
     status: str = ""
     output_text: str = field(default="", metadata={"journal_kind": "content"})
@@ -490,12 +516,12 @@ class AttachmentStagingFailed(JournalEvent):
     run_id: str = ""
 
 
-# ── 洞察事件（InsightEngine 回注）───────────────────────
+# ── 兼容洞察事件（不由账本投影器回写）───────────────────
 
 
 @dataclass(frozen=True)
 class RunInsight(JournalEvent):
-    """计算洞察（冗余调用/关键路径/成本/循环等，引擎回注日志）。"""
+    """兼容的显式洞察事实；常规分析由 TraceInspector 只读派生。"""
 
     kind: str = ""
     summary: str = ""

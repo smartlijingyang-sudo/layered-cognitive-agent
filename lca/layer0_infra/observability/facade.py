@@ -1,15 +1,9 @@
-"""Ambient 遥测引擎 —— 业务层唯一发射面（OTel 骨干的薄封装）。
+"""业务层唯一可观测性发射面。
 
-规则：
-- ``bind(hub)`` 只在 run 边缘调用（TeamHandle.run / CognitiveAgent.run）；
-- 嵌套组件（hooks / adapters / strategies）只调用 ``span`` / ``event``；
-- 未 bind 时全部调用安全 no-op（Null Object）；
-- 业务层永不 import opentelemetry —— 本模块是唯一下行通道。
-
-埋点三形态：
-1. ``@traced(SpanName.X)`` —— 函数级注解，零样板；
-2. ``with span(SpanName.X, ...) as h`` —— 需中途写属性的场景；
-3. 零埋点 —— 认知四相 / LLM / 记忆由边界适配器自动发射。
+一个 ``BoundObservability`` ContextVar 持有 hub、session、actor 和 step；Journal
+关联骨架仍由 ``RunScope`` 在 run 边界盖章。业务代码只有四种行为：写领域事实
+``record``、写运行解释 ``observe``、开启外部追踪 ``span``、补充 span 属性
+``annotate``。未绑定时全部安全 no-op。
 """
 
 from __future__ import annotations
@@ -17,118 +11,117 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import wraps
 from typing import Any, TypeVar
 
 from opentelemetry import trace as otel_trace
 
 from lca.contracts.atoms.telemetry import ATTR_SESSION_ID
-from lca.contracts.models.observability.diagnostic import (
-    DiagnosticCategory,
-    DiagnosticEvent,
-    DiagnosticStatus,
-)
-from lca.contracts.models.observability.journal import JournalEvent
+from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
+from lca.contracts.models.observability.journal import JournalEvent, StampedEvent
 from lca.layer0_infra.observability.diagnostic_operation import DiagnosticOperation
 from lca.layer0_infra.observability.handles import NullSpanHandle, SpanHandle
 from lca.layer0_infra.observability.hub import ObservabilityHub
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
-_hub_var: ContextVar[ObservabilityHub | None] = ContextVar("lca_obs_hub", default=None)
-_session_var: ContextVar[str | None] = ContextVar("lca_obs_session", default=None)
-_actor_role: ContextVar[str] = ContextVar("lca_obs_actor_role", default="")
-_actor_step: ContextVar[int | None] = ContextVar("lca_obs_actor_step", default=None)
+
+@dataclass(frozen=True)
+class BoundObservability:
+    """一次运行中所有环境关联观测信息。"""
+
+    hub: ObservabilityHub
+    session_id: str | None = None
+    actor_role: str = ""
+    actor_step: int | None = None
+
+
+_bound: ContextVar[BoundObservability | None] = ContextVar(
+    "lca_observability_context", default=None
+)
 
 
 @dataclass(frozen=True)
 class SpanContext:
-    """当前 span 关联上下文（trace/span id 十六进制）。"""
+    """当前 OTel span 的关联标识。"""
 
     trace_id: str | None
     parent_span_id: str | None
 
 
-# ── ambient 状态 ─────────────────────────────────────────
-
-
 def current_hub() -> ObservabilityHub | None:
-    return _hub_var.get()
+    current = _bound.get()
+    return current.hub if current is not None else None
 
 
 @contextmanager
 def bind(hub: ObservabilityHub) -> Iterator[ObservabilityHub]:
-    """在 run 边缘安装 hub（可重入：嵌套 run 各自绑定）。"""
-    token = _hub_var.set(hub)
+    """在 run 边缘绑定 hub；嵌套绑定不泄漏到外层。"""
+    token = _bound.set(BoundObservability(hub=hub))
     try:
         yield hub
     finally:
-        _hub_var.reset(token)
+        _bound.reset(token)
+
+
+def _replace_bound(**updates: Any) -> None:
+    current = _bound.get()
+    if current is not None:
+        _bound.set(replace(current, **updates))
 
 
 def set_actor(role: str, step: int | None) -> None:
-    """设置当前上下文的 actor 身份（hook 触发边界调用）。"""
-    _actor_role.set(role or "")
-    _actor_step.set(step)
+    """更新本运行的 actor 身份。"""
+    _replace_bound(actor_role=role or "", actor_step=step)
 
 
 def set_session(session_id: str | None) -> None:
-    """设置会话 id（run 边缘调用；映射后端 session 视图）。"""
-    _session_var.set(session_id or None)
+    """更新本运行映射到外部后端的会话标识。"""
+    _replace_bound(session_id=session_id or None)
 
 
 def get_span_context() -> SpanContext:
-    """当前活跃 span 的关联上下文（无活跃 span 时全 None）。"""
-    ctx = otel_trace.get_current_span().get_span_context()
-    if not ctx.is_valid:
+    context = otel_trace.get_current_span().get_span_context()
+    if not context.is_valid:
         return SpanContext(trace_id=None, parent_span_id=None)
-    return SpanContext(trace_id=format(ctx.trace_id, "032x"), parent_span_id=None)
-
-
-# ── 发射 API ─────────────────────────────────────────────
+    return SpanContext(trace_id=format(context.trace_id, "032x"), parent_span_id=None)
 
 
 def _open(name: object, attributes: dict[str, Any], *, attach: bool) -> SpanHandle | NullSpanHandle:
-    hub = _hub_var.get()
-    if hub is None:
+    current = _bound.get()
+    if current is None:
         return NullSpanHandle()
     label = name.value if hasattr(name, "value") else str(name)
     attrs = dict(attributes)
-    session = _session_var.get()
-    if session is not None and ATTR_SESSION_ID not in attrs:
-        attrs[ATTR_SESSION_ID] = session
-    return hub.open_span(
-        label, attrs, actor_role=_actor_role.get(), actor_step=_actor_step.get(), attach=attach
+    if current.session_id is not None and ATTR_SESSION_ID not in attrs:
+        attrs[ATTR_SESSION_ID] = current.session_id
+    return current.hub.open_span(
+        label,
+        attrs,
+        actor_role=current.actor_role,
+        actor_step=current.actor_step,
+        attach=attach,
     )
 
 
 def span(name: object, **attributes: Any) -> SpanHandle | NullSpanHandle:
-    """打开子 span（context manager）。
-
-    ``name`` 必须取 ``SpanName`` 成员（守卫测试强制）；
-    会话 id 自动注入根级属性。
-    """
+    """开启与当前 OTel 上下文关联的 span。"""
     return _open(name, attributes, attach=True)
 
 
 def detached_span(name: object, **attributes: Any) -> SpanHandle | NullSpanHandle:
-    """打开 detached span（context manager）：只计时/落属性，不占 ambient 上下文。
-
-    块内发射的 span/事件仍挂外层父节点——专用于生命周期脚手架 span
-    （如 hook 边界相位 span），避免业务事件被挂到脚手架节点下、
-    后端过滤脚手架后留下孤儿子节点。
-    """
+    """开启不接管当前 OTel 上下文的计时 span。"""
     return _open(name, attributes, attach=False)
 
 
 def event(name: object, **attributes: Any) -> None:
-    """记录业务事件（EventName 成员）。"""
-    hub = _hub_var.get()
-    if hub is None:
+    """向当前 OTel trace 写入机制事件。"""
+    current = _bound.get()
+    if current is None:
         return
     label = name.value if hasattr(name, "value") else str(name)
-    hub.emit_event(label, attributes)
+    current.hub.emit_event(label, attributes)
 
 
 def observe(
@@ -139,25 +132,22 @@ def observe(
     attributes: dict[str, Any] | None = None,
     output: dict[str, Any] | None = None,
     causation_refs: tuple[str, ...] = (),
-) -> DiagnosticEvent | None:
-    """记录一条 run-scoped 诊断信息。
-
-    诊断行不可用于恢复或状态归约；业务事实仍必须调用 :func:`record`。
-    ``attributes`` 与 ``output`` 均会在写入前经过 Hub 的统一脱敏策略。
-    """
-    hub = _hub_var.get()
-    if hub is None:
+    status: DiagnosticStatus = DiagnosticStatus.INFO,
+) -> StampedEvent | None:
+    """向主事件账本写入一条运行解释记录。"""
+    current = _bound.get()
+    if current is None:
         return None
-    return hub.emit_diagnostic(
+    return current.hub.emit_diagnostic(
         category=DiagnosticCategory(category),
         operation=operation,
         plugin=plugin,
-        status=DiagnosticStatus.INFO,
+        status=status,
         attributes=attributes or {},
         output=output or {},
         causation_refs=causation_refs,
-        actor_role=_actor_role.get(),
-        actor_step=_actor_step.get(),
+        actor_role=current.actor_role,
+        actor_step=current.actor_step,
     )
 
 
@@ -169,38 +159,28 @@ def observe_operation(
     attributes: dict[str, Any] | None = None,
     causation_refs: tuple[str, ...] = (),
 ) -> DiagnosticOperation:
-    """创建一个带开始/完成/失败行与耗时的诊断操作上下文。"""
+    """为开始、成功或失败终态写入一组解释事件。"""
     return DiagnosticOperation(
-        _hub_var.get(),
+        current_hub(),
         category=category,
         operation=operation,
         plugin=plugin,
         attributes=attributes or {},
         causation_refs=causation_refs,
-        actor_role=_actor_role.get,
-        actor_step=_actor_step.get,
+        actor_role=lambda: _bound.get().actor_role if _bound.get() is not None else "",
+        actor_step=lambda: _bound.get().actor_step if _bound.get() is not None else None,
     )
 
 
-def record(event: JournalEvent) -> None:
-    """记录 journal 事件（叙事平面，ADR-0055）。
-
-    与 span/event 并列的第四种发射形态：事件必须是 ``JournalEvent``
-    子类实例（词表守卫强制）；关联骨架（trace/run/parent/delegation id）
-    由 RunStore 从 ambient ``RunScope`` 盖章，发射点不需要提供。未 bind 时 no-op。
-    """
-    hub = _hub_var.get()
-    if hub is None:
-        return
-    hub.store.append(event)
+def record(event_payload: JournalEvent) -> StampedEvent | None:
+    """向主事件账本追加一个已经登记的领域或生命周期事件。"""
+    hub = current_hub()
+    return hub.store.append(event_payload) if hub is not None else None
 
 
 def annotate(**attributes: Any) -> None:
-    """给当前活跃 span 追加属性（如 think 相位挂 prompt 模板名）。
-
-    属性经策略脱敏/截断；无活跃 span 时安全忽略。
-    """
-    hub = _hub_var.get()
+    """为当前可记录 span 写入受策略治理的属性。"""
+    hub = current_hub()
     if hub is None:
         return
     current = otel_trace.get_current_span()
@@ -211,28 +191,17 @@ def annotate(**attributes: Any) -> None:
 
 
 def score(name: str, value: float, **attributes: Any) -> None:
-    """评估打分（后端支持则记 score，否则降级事件）。"""
-    hub = _hub_var.get()
-    if hub is None:
-        return
-    hub.score(name, value, attributes)
-
-
-# ── 装饰器形态 ───────────────────────────────────────────
+    """向已装配的评估后端发出分数，或降级为 OTel 事件。"""
+    hub = current_hub()
+    if hub is not None:
+        hub.score(name, value, attributes)
 
 
 def traced(
     name: object, *, capture: Callable[..., dict[str, Any]] | None = None
 ) -> Callable[[_F], _F]:
-    """函数级埋点装饰器：计时 / 异常 / 落 span 全自动。
-
-    ``capture`` 为纯函数，接收与被装饰函数相同的参数，返回属性字典
-    （写入前经属性策略脱敏/截断）。同步与异步函数均支持。
-    """
+    """用 span 包裹同步或异步函数。"""
     label = name.value if hasattr(name, "value") else str(name)
-
-    def _capture_args(args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
-        return capture(*args, **kwargs) if capture is not None else {}
 
     def decorator(fn: _F) -> _F:
         import inspect
@@ -241,16 +210,38 @@ def traced(
 
             @wraps(fn)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                with span(label, **_capture_args(args, kwargs)):
+                attrs = capture(*args, **kwargs) if capture is not None else {}
+                with span(label, **attrs):
                     return await fn(*args, **kwargs)
 
             return async_wrapper  # type: ignore[return-value]
 
         @wraps(fn)
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            with span(label, **_capture_args(args, kwargs)):
+            attrs = capture(*args, **kwargs) if capture is not None else {}
+            with span(label, **attrs):
                 return fn(*args, **kwargs)
 
         return sync_wrapper  # type: ignore[return-value]
 
     return decorator
+
+
+__all__ = [
+    "BoundObservability",
+    "SpanContext",
+    "annotate",
+    "bind",
+    "current_hub",
+    "detached_span",
+    "event",
+    "get_span_context",
+    "observe",
+    "observe_operation",
+    "record",
+    "score",
+    "set_actor",
+    "set_session",
+    "span",
+    "traced",
+]

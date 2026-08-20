@@ -1,11 +1,7 @@
-"""ManifestSink — the typed emit path for ContextManifested (PR2 / PR3a).
+"""ContextManifest 的专用事实发射适配器。
 
-The Hub is the sole caller of ``ContextManifested.emit``; the sink
-abstraction is the seam between the Hub and the underlying store
-(``RunStore`` in tests, ``journal.facade.record`` in production).
-
-The seam is a Protocol so alternative sinks (e.g. a tracing-only sink
-for read-only runs) can be plugged in without modifying the Hub.
+感知 Hub 只构造 ``ContextManifested``；生产适配器调用统一 ``record`` 入口，
+测试可注入 ``RunStoreSink``。不存在运行时双写开关或第二条生产写入路径。
 """
 
 from __future__ import annotations
@@ -18,13 +14,7 @@ from lca.contracts.models.observability.journal import ContextManifested
 
 @runtime_checkable
 class ManifestSink(Protocol):
-    """A typed sink for the ``ContextManifested`` event.
-
-    Implementations MUST be idempotent (a fold may run twice during
-    replay) and MUST accept the manifest payload as the only required
-    argument.  The ``extra`` keyword is for forward compatibility
-    (e.g. ``persist_full_prompt``, ``step``).
-    """
+    """把已构造的 ContextManifest 事实追加到调用方指定的事件账本。"""
 
     def emit(
         self,
@@ -36,7 +26,7 @@ class ManifestSink(Protocol):
 
 
 class NullSink:
-    """No-op sink (default for offline tests that don't care about the journal)."""
+    """离线或无 Journal 测试的 no-op 适配器。"""
 
     def emit(
         self,
@@ -49,7 +39,7 @@ class NullSink:
 
 
 class RunStoreSink:
-    """RunStore-backed sink (test path)."""
+    """测试和显式组合使用的账本适配器。"""
 
     def __init__(self, store: Any) -> None:
         self._store = store
@@ -61,15 +51,12 @@ class RunStoreSink:
         *,
         extra: dict[str, Any] | None = None,
     ) -> ContextManifested:
-        return cast("ContextManifested", self._store.append(event))
+        stamped = self._store.append(event)
+        return cast("ContextManifested", stamped.event)
 
 
 class JournalSink:
-    """Production sink — emit via the global journal record path.
-
-    The Hub's default sink is always ``JournalSink``.  The sink holds
-    no state; the gate is the dual-write flag in cognitive_loop_settings.
-    """
+    """生产适配器：所有 ContextManifest 统一进入主事件账本。"""
 
     def emit(
         self,
@@ -78,15 +65,13 @@ class JournalSink:
         *,
         extra: dict[str, Any] | None = None,
     ) -> ContextManifested:
-        from lca.layer0_infra.cognitive_loop_settings import get_cognitive_loop_settings
-        from lca.layer0_infra.observability import record as _journal_record
+        from lca.layer0_infra.observability import current_hub
 
-        if get_cognitive_loop_settings().context_manifest_dual_write:
-            _journal_record(event)
-        return event
+        hub = current_hub()
+        stamped = hub.store.append(event) if hub is not None else None
+        return cast("ContextManifested", stamped.event) if stamped is not None else event
 
 
 def default_sink() -> ManifestSink:
-    """Return the production sink — used when the Hub is built without
-    an explicit sink (the common case)."""
+    """返回生产账本适配器。"""
     return JournalSink()

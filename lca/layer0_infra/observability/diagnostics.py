@@ -80,12 +80,14 @@ def diagnose_model_not_seen(
     findings: list[Finding] = []
 
     inbox = [
-        e.seq for e in store.events
+        e.seq
+        for e in store.events
         if isinstance(e.event, InboxFollowupCreated)
         and (trace_id is None or e.scope.trace_id == trace_id)
     ]
     manifests = [
-        e.seq for e in store.events
+        e.seq
+        for e in store.events
         if isinstance(e.event, ContextManifested)
         and (trace_id is None or e.scope.trace_id == trace_id)
     ]
@@ -118,7 +120,8 @@ def diagnose_model_not_seen(
         return DiagnosisReport(DiagnosePattern.MODEL_NOT_SEEN, tuple(findings))
 
     last_manifest_seq = manifests[-1]
-    last_manifest = store.get_event(last_manifest_seq)
+    stamped_manifest = store.get(last_manifest_seq)
+    last_manifest = stamped_manifest.event if stamped_manifest is not None else None
     if not isinstance(last_manifest, ContextManifested):
         findings.append(
             Finding(
@@ -164,14 +167,14 @@ def diagnose_loop_stuck(
     """
     findings: list[Finding] = []
     tool_events: list[StampedEvent] = [
-        e for e in store.events
-        if isinstance(e.event, ToolInvoked)
-        and (trace_id is None or e.scope.trace_id == trace_id)
+        e
+        for e in store.events
+        if isinstance(e.event, ToolInvoked) and (trace_id is None or e.scope.trace_id == trace_id)
     ]
     gate_events: list[StampedEvent] = [
-        e for e in store.events
-        if isinstance(e.event, GateDecided)
-        and (trace_id is None or e.scope.trace_id == trace_id)
+        e
+        for e in store.events
+        if isinstance(e.event, GateDecided) and (trace_id is None or e.scope.trace_id == trace_id)
     ]
 
     if len(tool_events) < window:

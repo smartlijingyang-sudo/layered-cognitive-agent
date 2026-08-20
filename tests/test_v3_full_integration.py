@@ -96,9 +96,7 @@ class TestFullV3Integration:
         assert manifest.has_kind("policy_fact")
         # 6. The ContextManifested events were recorded (only the
         # Hub emits, so the last 2 events are manifests).
-        all_events = [
-            store.get_event(seq) for seq in range(1, store.seq + 1)
-        ]
+        all_events = [stamped.event for stamped in store.read_from(0)]
         context_manifested_events = [
             e for e in all_events if type(e).__name__ == "ContextManifested"
         ]

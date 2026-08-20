@@ -1,13 +1,11 @@
-"""Process-wide journal reader — one LiveTail for every Run in this gateway.
+"""进程级运行事件观察入口。
 
-Per-run LiveTail seq restarts at 1. This remints a process seq so ops
-can subscribe once and see every run's journal without colliding.
-A bind() projector is a no-op on close: run teardown must not shut ops.
+进程日志是多个 run 的实时投影，不是新的事件账本。它保留每条 ``StampedEvent``
+的原始 ``seq``；跨 run 的唯一性由 ``trace_id`` 与 ``run_id`` 共同提供，绝不为
+传输便利改写领域账本的提交顺序。
 """
 
 from __future__ import annotations
-
-from dataclasses import replace
 
 from gateway.runs.live import LiveTail
 from lca.contracts.models.observability.journal import StampedEvent
@@ -15,21 +13,22 @@ from lca.contracts.protocols import JournalProjector
 
 
 class ProcessJournal:
-    """Long-lived journal fan-in for ``lca-ops logs``."""
+    """长生命周期的跨 run 实时投影。"""
 
     def __init__(self) -> None:
         self.tail = LiveTail()
-        self._seq = 0
 
     def bind(self) -> JournalProjector:
         return _BoundProcessJournal(self)
 
     def publish(self, stamped: StampedEvent) -> None:
-        self._seq += 1
-        self.tail.on_event(replace(stamped, seq=self._seq))
+        """转发已提交事件，不得修改其原始身份或序列。"""
+        self.tail.on_event(stamped)
 
 
 class _BoundProcessJournal(JournalProjector):
+    """run 结束时不关闭共享实时投影的轻量适配器。"""
+
     def __init__(self, owner: ProcessJournal) -> None:
         self._owner = owner
 

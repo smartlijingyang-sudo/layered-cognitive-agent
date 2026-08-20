@@ -87,9 +87,10 @@ class TestMinimalHub:
         manifest = await hub.perceive(state)
         assert manifest.items == ()
         assert store.seq == 1
-        event = store.get_event(store.seq)
-        assert isinstance(event, ContextManifested)
-        assert event.digest != ""  # digest is always computed
+        stamped = store.get(store.seq)
+        assert stamped is not None
+        assert isinstance(stamped.event, ContextManifested)
+        assert stamped.event.digest != ""  # digest is always computed
 
     @pytest.mark.asyncio
     async def test_hub_emits_event_with_step(self) -> None:
@@ -98,9 +99,10 @@ class TestMinimalHub:
         state = _state()
         state.step = 7
         await hub.perceive(state)
-        event = store.get_event(store.seq)
-        assert isinstance(event, ContextManifested)
-        assert event.step == 7
+        stamped = store.get(store.seq)
+        assert stamped is not None
+        assert isinstance(stamped.event, ContextManifested)
+        assert stamped.event.step == 7
 
 
 # ─────────────────────────────────────────────────────────────
@@ -217,7 +219,6 @@ class TestPolicyFactEndToEnd:
         from lca.contracts.models.observability.journal import GateDecided
 
         store = RunStore()
-        state = _state()
         # Manually emit a GateDecided through the journal record path.
         evt = GateDecided(
             gate="RepeatToolCallGate",
@@ -231,9 +232,10 @@ class TestPolicyFactEndToEnd:
         # store directly to bypass the global hub and verify the catalog.
         stamped = store.append(evt)
         assert stamped is not None
-        recovered = store.get_event(stamped.seq)
-        assert isinstance(recovered, GateDecided)
-        assert recovered.gate == "RepeatToolCallGate"
+        recovered = store.get(stamped.seq)
+        assert recovered is not None
+        assert isinstance(recovered.event, GateDecided)
+        assert recovered.event.gate == "RepeatToolCallGate"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -323,9 +325,7 @@ class TestLargeComposition:
         store = RunStore()
         # Stage all upstream events.
         store.append(
-            InboxFollowupCreated(
-                inbox_id="i1", actor="user", target="agent", priority="normal"
-            )
+            InboxFollowupCreated(inbox_id="i1", actor="user", target="agent", priority="normal")
         )
         store.append(
             TeamMessagePublished(
@@ -373,10 +373,10 @@ class TestLargeComposition:
         )
         await hub.perceive(_state())
         await hub.perceive(_state())
-        events = [store.get_event(seq) for seq in range(1, store.seq + 1)]
-        assert all(isinstance(e, ContextManifested) for e in events)
+        events = [stamped.event for stamped in store.read_from(0)]
+        assert all(isinstance(event, ContextManifested) for event in events)
         # Each event has a digest.
-        assert all(e.digest != "" for e in events)
+        assert all(event.digest != "" for event in events)
 
 
 # ─────────────────────────────────────────────────────────────

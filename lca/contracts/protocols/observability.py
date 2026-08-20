@@ -37,8 +37,8 @@ class Telemetry(Protocol):
 class DiagnosticSink(Protocol):
     """只读诊断接收器；不参与 Journal 的恢复、重放或状态归约。"""
 
-    def on_event(self, event: DiagnosticEvent) -> None:
-        """消费一条已规范化的 run-scoped 诊断记录。"""
+    def write(self, event: DiagnosticEvent) -> None:
+        """写入一条已规范化的诊断兼容记录。"""
         ...
 
     def flush(self) -> None:

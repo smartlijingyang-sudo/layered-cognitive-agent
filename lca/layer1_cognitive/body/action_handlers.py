@@ -71,7 +71,7 @@ _ERR_TIMEOUT = "delegate 超时"
 
 
 def record_decision_made(decision: Decision, state: AgentState) -> None:
-    """发射决策事实（所有 action_type 统一入口，供 InsightEngine 循环检测）。"""
+    """发射决策事实；TraceInspector 可从账本按需分析动作模式。"""
     delegate_target = ""
     delegate_count = 0
     if decision.delegations:
@@ -229,9 +229,7 @@ def _combine_tool_observations(
     """
     observations = list(observations)
     all_ok = all(obs.success for obs in observations)
-    errors = [
-        e for e in (obs.error for obs in observations if not obs.success) if e
-    ]
+    errors = [e for e in (obs.error for obs in observations if not obs.success) if e]
     extra: dict[str, Any] = {
         OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
         OBS_TOOL_RESULTS: [

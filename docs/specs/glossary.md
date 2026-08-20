@@ -90,15 +90,16 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **Budget** | token / cost / steps / wall_clock 预算 |
 | **Hook** / **HookRegistry** / **EventBus** | 生命周期钩子与事件总线（业务事实经遥测桥进入 trace 管道） |
 | **Telemetry** | 业务层唯一发射门面契约：span / event / score，不耦合任何后端 |
-| **ObservabilityHub** | 可观测性唯一门面对象：OTel 骨干 + 属性策略 + journal + 投影器 fan-out + 生命周期；满足 **ObservabilityBackend** 结构契约 |
+| **ObservabilityHub** | 可观测性组合根：装配一个运行事件账本、只读投影插件与 OTel 外部导出；不维护第二条诊断流 |
 | **SpanName** / **EventName** | 封闭遥测词表（span 名 / 业务事件名），配 **VocabDef** 目录登记唯一发射点 |
 | **SpanView** / **SpanContext** | OTel span 的本地投影视图 / 当前关联上下文（trace/span id） |
 | **AttributePolicy** / **Verbosity** | 属性策略（脱敏/截断，写入期强制）与信息量档位（minimal/standard/verbose） |
-| **JournalEvent** / **RunScope** / **StampedEvent** | journal 事件基类 / 关联骨架（trace·run·parent·delegation id）/ 引擎盖章记录（ADR-0037） |
-| **RunStore** | 执行日志引擎：词表校验 → 关联盖章 → 策略强制 → 投影器扇出（Journal-as-Truth 写入端；ADR-0037 + PR2） |
-| **JournalProjector** | journal 投影契约：OTel / console / jsonl / 序列图 / 洞察皆为投影 |
+| **JournalEvent** / **RuntimeObserved** / **RunScope** / **StampedEvent** | 领域事实事件 / 插件、Hook、工具、LLM、记忆与传输的运行解释事件 / 关联骨架 / 盖章记录 |
+| **EventDescriptor** / **EventPlane** / **EventProjection** | 事件的唯一治理描述（受众、敏感性、保留、发射边界）/ 事实、结构、解释三平面 / 已提交事件的只读投影协议 |
+| **RunStore** | 运行事件账本：词表校验 → 关联盖章 → 策略强制 → 原子追加 → 提交后投影；查询与洞察不进写路径 |
+| **JournalProjector** / **ProjectionRegistry** | 兼容投影契约 / 按装配顺序分发已提交事件并隔离投影故障的注册表 |
+| **TraceInspector** / **TraceReport** | 面向 Coding Agent 的只读账本检查器 / 可序列化的因果链、失败、瓶颈、复现与插件交互图报告 |
 | **OtelProjector** / **ConsoleJournalProjector** / **JsonlJournalProjector** | journal → OTel span（显式定父）/ console 场景卡·叙事·Run Card·序列图 / jsonl 落盘投影器 |
-| **InsightEngine** | 洞察引擎：聚合 journal 触发规则（冗余调用/循环/关键路径/成本），RunInsight 回注 |
 | **LangfuseBridge** / **ExporterUnavailableError** | Langfuse 后端桥接（OTel 原生 SDK 挂接）/ 导出器不可用异常 |
 | **LLMResponse** / **TokenUsage** | LLM 结构化返回（文本 + 模型 + token 用量），成本链路单一事实源 |
 | **StateStore** / **StateSnapshot** | 状态持久化与快照 |
@@ -195,7 +196,6 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **Provider** / **ProviderDispatch** | LLM / Tools / Search provider 协议 + 分发 |
 | **ScorerFn** / **SearchHit** / **SearchService** | 评分函数签名 + 检索命中 + 检索服务 |
 | **Service** / **SkillsService** / **ToolsConfig** / **ToolsProvider** / **ToolsService** / **UserConfig** / **UserProvider** / **VenvConfig** / **VenvProvider** | 平台 service 协议与实现（L4 门面下的服务注册） |
-| **Step** | 单步记录类型（journal 事件基础） |
 | **Sudo** | 提权操作适配（仅安全操作走；v3 spec 显式约束） |
 | **UpstreamTree** | upstream 仓库目录树（patch 应用源） |
 | **Verbosity** | 日志信息量档位（minimal / standard / verbose） |

@@ -22,6 +22,15 @@ from lca.contracts.models.observability.diagnostic import (
     DiagnosticEvent,
     DiagnosticStatus,
 )
+from lca.contracts.models.observability.event import (
+    EventAudience,
+    EventDescriptor,
+    EventDurability,
+    EventPlane,
+    EventSensitivity,
+    OperationOutcome,
+    RuntimeKind,
+)
 from lca.contracts.models.observability.journal import (
     ActionDegraded,
     AgentRunFinished,
@@ -42,6 +51,7 @@ from lca.contracts.models.observability.journal import (
     RunActivity,
     RunInsight,
     RunScope,
+    RuntimeObserved,
     StampedEvent,
     StepCompleted,
     StepTextDelta,
@@ -106,6 +116,7 @@ from lca.layer0_infra.observability.langfuse_conventions import (
 )
 from lca.layer0_infra.observability.narrative import plan_steps_joined
 from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
+from lca.layer0_infra.observability.projection_registry import EventProjection, ProjectionRegistry
 from lca.layer0_infra.observability.registry import (
     UnknownExporterError,
     create_observability,
@@ -117,6 +128,7 @@ from lca.layer0_infra.observability.team_profile import (
     objective_preview,
     team_id_for,
 )
+from lca.layer0_infra.observability.trace_inspector import TraceInspector, TraceReport
 from lca.layer0_infra.observability.view import SpanView
 
 __all__ = [
@@ -150,6 +162,12 @@ __all__ = [
     "DiagnosticCategory",
     "DiagnosticEvent",
     "DiagnosticStatus",
+    "EventAudience",
+    "EventDescriptor",
+    "EventDurability",
+    "EventPlane",
+    "EventProjection",
+    "EventSensitivity",
     "ExporterUnavailableError",
     "JournalEvent",
     "JournalProjector",
@@ -159,7 +177,9 @@ __all__ = [
     "LlmCallStarted",
     "ObservabilityHub",
     "ObservabilitySettings",
+    "OperationOutcome",
     "OtelProjector",
+    "ProjectionRegistry",
     "ReasoningCompleted",
     "ReasoningDelta",
     "RunActivity",
@@ -168,6 +188,8 @@ __all__ = [
     "RunState",
     "RunStatus",
     "RunStore",
+    "RuntimeKind",
+    "RuntimeObserved",
     "SpanContext",
     "SpanView",
     "StampedEvent",
@@ -181,6 +203,8 @@ __all__ = [
     "ToolDenied",
     "ToolInvoked",
     "ToolStarted",
+    "TraceInspector",
+    "TraceReport",
     "UnknownExporterError",
     "UnregisteredJournalEventError",
     "Verbosity",

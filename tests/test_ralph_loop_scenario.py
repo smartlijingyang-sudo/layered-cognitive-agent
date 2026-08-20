@@ -100,9 +100,10 @@ class TestRalphLoop:
         assert "clock" in kinds
         assert "inbox_facts" in kinds
         # The manifest event was recorded.
-        event = store.get_event(store.seq)
-        assert isinstance(event, ContextManifested)
-        assert event.step == 0
+        stamped = store.get(store.seq)
+        assert stamped is not None
+        assert isinstance(stamped.event, ContextManifested)
+        assert stamped.event.step == 0
 
     @pytest.mark.asyncio
     async def test_ralph_chain_emits_repeat_warning(self) -> None:
@@ -111,7 +112,6 @@ class TestRalphLoop:
         The chain includes RepeatToolCallGate + ToolLoopBreakerGate.
         Three consecutive test-run calls produce a PolicyFact warning.
         """
-        store = RunStore()
         chain = ChainedDecisionGate(RepeatToolCallGate(), ToolLoopBreakerGate())
         state = AgentState(
             trace_id=new_id("trace"),
@@ -158,6 +158,7 @@ class TestRalphLoop:
         # The output decision should be RESPOND (ToolLoopBreaker forced it).
         assert out is not None
         from lca.contracts.atoms.enums import ActionType
+
         assert out.action_type == ActionType.RESPOND
 
     @pytest.mark.asyncio
@@ -268,10 +269,10 @@ class TestComplexScenarios:
         for step in range(3):
             state.step = step
             await hub.perceive(state)
-        events = [store.get_event(seq) for seq in range(1, store.seq + 1)]
-        assert all(isinstance(e, ContextManifested) for e in events)
+        events = [stamped.event for stamped in store.read_from(0)]
+        assert all(isinstance(event, ContextManifested) for event in events)
         # Step numbers are preserved.
-        assert [e.step for e in events] == [0, 1, 2]
+        assert [event.step for event in events] == [0, 1, 2]
 
     @pytest.mark.asyncio
     async def test_complex_chain_with_multiple_gates(self) -> None:
@@ -283,7 +284,6 @@ class TestComplexScenarios:
             TerminalRespondGate,
         )
 
-        store = RunStore()
         chain = ChainedDecisionGate(
             RepeatToolCallGate(),
             ToolLoopBreakerGate(),

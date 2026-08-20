@@ -27,8 +27,10 @@ from lca.contracts.models.core.gate_policy import GateDecided
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.cognition import SensorDisabled
+from lca.layer0_infra.observability import observe
 from lca.layer1_cognitive.brain.context_manifest import (
     build_manifest_from_items,
     digest_manifest,
@@ -92,6 +94,14 @@ class SequentialPerceiveHub(PerceiveHub):
                     sensor=type(sensor).__name__,
                     error=str(exc),
                 )
+                observe(
+                    DiagnosticCategory.PLUGIN,
+                    "sensor.read",
+                    plugin=type(sensor).__name__,
+                    attributes={"step": state.step},
+                    output={"error": str(exc)},
+                    status=DiagnosticStatus.FAILED,
+                )
                 continue
 
         # 2. Memory adapter (per spec §5.5): records, not raw state.
@@ -101,6 +111,14 @@ class SequentialPerceiveHub(PerceiveHub):
                 items.extend(_memory_items(state))
             except Exception as exc:
                 _log.warning("memory_perceive_failed", error=str(exc))
+                observe(
+                    DiagnosticCategory.MEMORY,
+                    "memory.perceive",
+                    plugin=type(self._memory).__name__,
+                    attributes={"step": state.step},
+                    output={"error": str(exc)},
+                    status=DiagnosticStatus.FAILED,
+                )
 
         # 3. GateDecided fold (PR4): PolicyFacts from the previous step's
         # gate decisions.  The Reasoner never reads state.working_memory

@@ -46,6 +46,7 @@ from lca.contracts.models.observability.journal import (
     RunInsight,
     RunPaused,
     RunResumed,
+    RuntimeObserved,
     SandboxOutputDelta,
     StepCompleted,
     StepTextDelta,
@@ -94,6 +95,7 @@ JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
         AttachmentStagingCompleted,
         AttachmentStagingFailed,
         RunInsight,
+        RuntimeObserved,
         ContextManifested,
         PerceptionMerged,
         GateDecided,
@@ -165,8 +167,9 @@ JOURNAL_CATALOG_META: dict[str, JournalSchemaMeta] = {
     "AttachmentStagingStarted": JournalSchemaMeta("best_effort", "operator", "internal"),
     "AttachmentStagingCompleted": JournalSchemaMeta("best_effort", "operator", "internal"),
     "AttachmentStagingFailed": JournalSchemaMeta("required", "operator", "internal"),
-    # 洞察
+    # 洞察与运行解释
     "RunInsight": JournalSchemaMeta("best_effort", "operator", "internal"),
+    "RuntimeObserved": JournalSchemaMeta("best_effort", "operator", "internal", "short"),
     # 控制原语 (PR2 / PR3a / PR4 / PR6 / PR7 / PR8 / PR9)
     "ContextManifested": JournalSchemaMeta("required", "operator", "internal"),
     "PerceptionMerged": JournalSchemaMeta("required", "operator", "internal"),
@@ -352,6 +355,12 @@ JOURNAL_CATALOG: dict[str, VocabDef] = {
         "lca.layer0_infra.observability.journal.insight",
         required=("kind",),
         desc="计算洞察",
+    ),
+    "RuntimeObserved": _journal(
+        VocabDomain.RESOURCE,
+        "lca.layer0_infra.observability.facade",
+        required=("operation", "source"),
+        desc="插件、Hook、适配器与传输的运行解释记录",
     ),
     # 控制原语 (PR2 / PR3a / PR4 / PR6 / PR7 / PR8 / PR9)
     "ContextManifested": _journal(

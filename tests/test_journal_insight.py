@@ -1,21 +1,18 @@
-"""Insight 层守卫（ADR-0037 Stage 4）：规则纯函数 + 引擎回注闭环。"""
+"""轨迹分析守卫：规则是纯函数，账本洞察必须只读派生。"""
 
 from __future__ import annotations
 
-import time
-
+from lca.contracts.models.observability.event import OperationOutcome, RuntimeKind
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
     LlmCallCompleted,
-    RunInsight,
     RunScope,
-    TeamRunFinished,
-    TeamRunStarted,
+    RuntimeObserved,
     ToolInvoked,
     run_scope,
 )
-from lca.layer0_infra.observability import ObservabilityHub, bind, record
+from lca.layer0_infra.observability import ObservabilityHub, TraceInspector, bind, record
 from lca.layer0_infra.observability.journal import insight_rules as rules
 
 _BASE = 5_000_000.0
@@ -53,8 +50,7 @@ def test_single_tool_call_not_flagged() -> None:
 
 def test_loop_detected_on_repeated_action() -> None:
     summary = _summary(
-        actions={"r1": ["delegate", "delegate", "delegate"]},
-        runs={"r1": {"role": "Lead"}},
+        actions={"r1": ["delegate", "delegate", "delegate"]}, runs={"r1": {"role": "Lead"}}
     )
     found = rules.detect_loop(summary)
     assert len(found) == 1
@@ -67,7 +63,6 @@ def test_no_loop_for_varied_actions() -> None:
 
 
 def test_no_loop_for_normal_lead_delegation_pattern() -> None:
-    """Lead 交替 delegate/respond 不应误报（修复 DecisionMade 仅 delegate 发射的误报）。"""
     summary = _summary(
         actions={"r1": ["delegate", "respond", "delegate", "respond", "delegate"]},
         runs={"r1": {"role": "Lead"}},
@@ -76,22 +71,14 @@ def test_no_loop_for_normal_lead_delegation_pattern() -> None:
 
 
 def test_no_loop_for_different_tools() -> None:
-    """连续调用不同工具不应误报（use_tool 聚合需带 tool_name）。"""
     summary = _summary(
-        actions={
-            "r1": [
-                "use_tool(calculator)",
-                "use_tool(search)",
-                "use_tool(read_file)",
-            ]
-        },
+        actions={"r1": ["use_tool(calculator)", "use_tool(search)", "use_tool(read_file)"]},
         runs={"r1": {"role": "独立分析师"}},
     )
     assert rules.detect_loop(summary) == []
 
 
 def test_loop_detected_on_same_tool_repeated() -> None:
-    """同一工具连续调用 3 次仍应报循环。"""
     summary = _summary(
         actions={"r1": ["use_tool(calculator)", "use_tool(calculator)", "use_tool(calculator)"]},
         runs={"r1": {"role": "独立分析师"}},
@@ -157,90 +144,83 @@ def test_run_all_rules_combines() -> None:
             }
         ],
     )
-    kinds = {k for k, _, _ in rules.run_all_rules(summary)}
+    kinds = {kind for kind, _, _ in rules.run_all_rules(summary)}
     assert rules.INSIGHT_REDUNDANT_TOOL in kinds
     assert rules.INSIGHT_CRITICAL_PATH in kinds
     assert rules.INSIGHT_COST in kinds
 
 
-# ── 引擎回注闭环（hub 集成）─────────────────────────────
+# ── 账本只读轨迹检查 ─────────────────────────────────────
 
 
-def test_insights_recorded_on_team_finish() -> None:
+def test_trace_inspector_finds_bottleneck_without_writing_insight_events() -> None:
     hub = ObservabilityHub([])
     try:
-        with bind(hub):
-            team_scope = RunScope(trace_id="t", run_id="team-run")
-            lead_scope = RunScope(
-                trace_id="t", run_id="lead-run", parent_run_id="team-run", agent_role="商务经理"
+        with bind(hub), run_scope(RunScope(trace_id="t", run_id="r", agent_role="商务经理")):
+            record(AgentRunStarted(agent_role="商务经理", objective="谈价"))
+            record(
+                ToolInvoked(
+                    tool_name="calculator", arguments_preview="2400000 * 0.2", latency_ms=12
+                )
             )
-            with run_scope(team_scope):
-                record(TeamRunStarted(team_id="team-x", strategy_key="lead"))
-            with run_scope(lead_scope):
-                record(AgentRunStarted(agent_role="商务经理", objective="谈价"))
-                record(
-                    ToolInvoked(
-                        tool_name="calculator", arguments_preview="2400000 * 0.2", latency_ms=1
-                    )
-                )
-                record(
-                    ToolInvoked(
-                        tool_name="calculator", arguments_preview="2400000 * 0.2", latency_ms=1
-                    )
-                )
-                record(
-                    LlmCallCompleted(model="m", latency_ms=10, prompt_tokens=5, completion_tokens=3)
-                )
-                time.sleep(0.01)  # 让 run 有真实时长，critical_path 才成立
-                record(AgentRunFinished(status="completed", steps=2))
-            with run_scope(team_scope):
-                record(TeamRunFinished(status="completed", steps=2))
-        insights = [e.event for e in hub.store.events if isinstance(e.event, RunInsight)]
-        kinds = {i.kind for i in insights}
-        assert rules.INSIGHT_REDUNDANT_TOOL in kinds
-        assert rules.INSIGHT_CRITICAL_PATH in kinds
-        assert rules.INSIGHT_COST in kinds
+            record(LlmCallCompleted(model="m", latency_ms=40, prompt_tokens=5, completion_tokens=3))
+            record(AgentRunFinished(status="completed", steps=2))
+        inspector = TraceInspector(hub.store.events)
+        report = inspector.inspect_trace(trace_id="t", focus="latency")
+        assert report.bottlenecks[0]["name"] == "m"
+        assert all(event.event_type != "RunInsight" for event in hub.store.events)
     finally:
         hub.close()
 
 
-def test_insights_publish_after_finished_in_seq_order() -> None:
+def test_trace_inspector_explains_failure_through_parent_seq() -> None:
     hub = ObservabilityHub([])
     try:
-        with bind(hub):
-            scope = RunScope(trace_id="t", run_id="root")
-            with run_scope(scope):
-                record(AgentRunStarted(agent_role="助手", objective="x"))
-                record(
-                    LlmCallCompleted(model="m", latency_ms=10, prompt_tokens=5, completion_tokens=3)
+        with bind(hub), run_scope(RunScope(trace_id="t", run_id="r", agent_role="coder")):
+            source = hub.store.append(
+                RuntimeObserved(
+                    kind=RuntimeKind.PLUGIN,
+                    operation="plugin.interaction",
+                    source="router",
+                    attributes={"target_plugin": "sandbox"},
                 )
-                record(AgentRunFinished(status="completed", steps=1))
-        names = [type(event.event).__name__ for event in hub.store.events]
-        finished_at = names.index("AgentRunFinished")
-        assert "RunInsight" not in names[:finished_at]
-        assert "RunInsight" in names[finished_at + 1 :]
-        seqs = [event.seq for event in hub.store.events]
-        assert seqs == sorted(seqs)
+            )
+            failure = hub.store.append(
+                RuntimeObserved(
+                    kind=RuntimeKind.CODE,
+                    operation="code.execution",
+                    source="sandbox",
+                    outcome=OperationOutcome.ERROR,
+                    error_code="exit_1",
+                    error_message="command failed",
+                    causation_refs=(source.seq,),
+                )
+            )
+        report = TraceInspector(hub.store.events).explain_failure(trace_id="t")
+        assert report.causal_chain == (source.seq, failure.seq)
+        assert [event["seq"] for event in report.events][:2] == [source.seq, failure.seq]
+        assert '"router" -->|ok| "sandbox"' in report.plugin_graph
     finally:
         hub.close()
 
 
-def test_insights_not_double_emitted_for_member_runs() -> None:
-    """成员 run 收尾不触发洞察（只在根收尾触发一次）。"""
+def test_trace_inspector_exports_minimal_failure_reproduction() -> None:
     hub = ObservabilityHub([])
     try:
-        with bind(hub):
-            member_scope = RunScope(
-                trace_id="t",
-                run_id="m-run",
-                parent_run_id="lead-run",
-                delegation_id="d",
-                agent_role="A",
+        with bind(hub), run_scope(RunScope(trace_id="t", run_id="r")):
+            source = hub.store.append(
+                RuntimeObserved(operation="context.injected", source="memory")
             )
-            with run_scope(member_scope):
-                record(AgentRunStarted(agent_role="A", objective="x"))
-                record(AgentRunFinished(status="completed", steps=1))
-        insights = [e.event for e in hub.store.events if isinstance(e.event, RunInsight)]
-        assert insights == []
+            hub.store.append(
+                RuntimeObserved(
+                    kind=RuntimeKind.TOOL,
+                    operation="tool.execute",
+                    source="shell",
+                    outcome=OperationOutcome.ERROR,
+                    causation_refs=(source.seq,),
+                )
+            )
+        reproduction = TraceInspector(hub.store.events).export_minimal_reproduction(trace_id="t")
+        assert [event["seq"] for event in reproduction] == [1, 2]
     finally:
         hub.close()

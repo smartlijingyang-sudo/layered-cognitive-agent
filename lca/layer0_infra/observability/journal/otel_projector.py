@@ -46,6 +46,7 @@ from lca.contracts.models.observability.journal import (
     ToolInvoked,
 )
 from lca.contracts.protocols import JournalProjector
+from lca.layer0_infra.observability.event_catalog import may_export_externally
 from lca.layer0_infra.observability.journal import otel_genai_mapping as genai
 from lca.layer0_infra.observability.journal import otel_mapping as mapping
 from lca.layer0_infra.observability.journal.otel_mapping import EVENT_PROJECTIONS
@@ -101,6 +102,8 @@ class OtelProjector(JournalProjector):
 
     # ── JournalProjector ───────────────────────────────
     def on_event(self, stamped: StampedEvent) -> None:
+        if not may_export_externally(stamped.event):
+            return
         handler = self._handlers.get(type(stamped.event))
         if handler is not None:
             handler(stamped)

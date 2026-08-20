@@ -1,11 +1,12 @@
 """FactStreamProjector —— journal 事实流投影器（DSH「模型所见即日志」终端视图）。
 
 每个盖章事件作为一条「事实」渲染：事件类型 + 关键字段 + 时间戳。
-InsightEngine 产出的 RunInsight 单独标记为「观察」——事实推导出的洞察。
+轨迹分析由只读 ``TraceInspector`` 按需派生；若兼容调用方显式写入 ``RunInsight``，
+本投影仍将其标记为「观察」。
 
 设计原则（对齐 ADR-0037 + DSH session log philosophy）：
 - 模型可见的即被记录的：每个事件都渲染，不做过滤
-- 事实（fact）与观察（observation）分离：RunInsight 用不同标记
+- 事实（fact）与显式观察（observation）分离：兼容 RunInsight 用不同标记
 - 容器事件（run start/finish）用 Run Card 包裹
 
 与 ConsoleJournalProjector 的区别：

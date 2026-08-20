@@ -71,9 +71,10 @@ async def test_perceive_emits_manifest_with_sensor_items() -> None:
     assert clock_item.payload == "2026-01-01"
     # The ContextManifested event was recorded.
     last_seq = store.seq
-    event = store.get_event(last_seq)
-    assert isinstance(event, ContextManifested)
-    assert "clock" in event.item_kinds
+    stamped = store.get(last_seq)
+    assert stamped is not None
+    assert isinstance(stamped.event, ContextManifested)
+    assert "clock" in stamped.event.item_kinds
 
 
 @pytest.mark.asyncio
@@ -132,6 +133,7 @@ async def test_policy_fact_fold_into_next_manifest() -> None:
     assert any(it.payload == "warning" for it in pf_items)
     # Bucket is drained.
     from lca.contracts.models.core.perceive_state import PerceiveState
+
     view = PerceiveState.from_agent_state(state)
     assert view.gate_decided == []
 
@@ -150,9 +152,6 @@ async def test_apply_delta_equivalent_to_fold_events() -> None:
     items = list(manifest.items)
     # The list is self-consistent: applying the delta locally = same items.
     delta = tuple((it.kind, it.payload) for it in items)
-    rebuilt = [
-        ContextItem(kind=k, payload=p, provenance="replay")
-        for k, p in delta
-    ]
+    rebuilt = [ContextItem(kind=k, payload=p, provenance="replay") for k, p in delta]
     assert [it.kind for it in items] == [it.kind for it in rebuilt]
     assert [it.payload for it in items] == [it.payload for it in rebuilt]

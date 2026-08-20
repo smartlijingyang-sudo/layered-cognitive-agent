@@ -4,7 +4,7 @@
 1. SimpleEventBus waterfall 链式分发 + 短路
 2. SimpleEventBus serial 串行分发
 3. DefaultToolExecutionPipeline 五阶段管线
-4. RunStore append 边界验证 + derive_events 增量投影
+4. RunStore 原子提交 + TraceInspector 按需投影
 5. Branded IDs 工厂
 6. assert_never 穷尽检查
 """
@@ -30,6 +30,7 @@ from lca.contracts.protocols.tool_pipeline import (
     ToolPostDecision,
     ToolPreDecision,
 )
+from lca.layer0_infra.observability import TraceInspector
 from lca.layer0_infra.observability.journal.engine import RunStore
 from lca.layer0_infra.tool_pipeline import DefaultToolExecutionPipeline
 from lca.layer1_cognitive.event_bus import SimpleEventBus
@@ -274,87 +275,40 @@ class TestToolExecutionPipeline:
 
 
 class TestJournalAppendBoundary:
-    """Append 边界验证：frozen 断言 + 深拷贝隔离。"""
+    """账本只验证不可变 payload、原子提交与连续序列。"""
 
-    def test_frozen_dataclass_isolation(self) -> None:
-        """frozen dataclass 通过 append 边界验证。"""
+    def test_frozen_dataclass_commits_without_deep_copy(self) -> None:
         store = RunStore()
         event = DecisionMade(step=1, action_type="use_tool", tool_name="calculator")
         stamped = store.append(event)
-        assert stamped.event.step == 1
-        assert stamped.event.tool_name == "calculator"
-
-    def test_deep_copy_isolation(self) -> None:
-        """append 后调用方修改原始对象不影响 log 内副本。"""
-        store = RunStore()
-        event = DecisionMade(step=1, action_type="use_tool", tool_name="calculator")
-        stamped = store.append(event)
-        # log 内的事件与原始对象是独立的
-        assert stamped.event.tool_name == "calculator"
-        # 原始对象被深拷贝隔离，stamped.event 是独立副本
-        assert stamped.event is not event
+        assert stamped.event is event
+        assert stamped.seq == 1
+        assert store.get(1) == stamped
 
 
-class TestJournalIncrementalProjection:
-    """derive_events 增量投影：首次全量，后续增量扩展。"""
+class TestJournalReadProjections:
+    """查询由消费者按需从账本派生，不在写路径维护 predicate 缓存。"""
 
-    def test_derive_events_first_call(self) -> None:
+    def test_read_from_returns_committed_suffix(self) -> None:
         store = RunStore()
         store.append(TeamRunStarted(team_id="t1", strategy_key="board"))
         store.append(DecisionMade(step=1, action_type="respond"))
         store.append(TeamRunFinished(status="completed"))
+        result = store.read_from(1)
+        assert [event.seq for event in result] == [2, 3]
 
-        # 只投影容器事件
-        def is_container(e: any) -> bool:
-            return isinstance(e.event, (TeamRunStarted, TeamRunFinished))
-
-        result = store.derive_events(is_container)
-        assert len(result) == 2
-        assert isinstance(result[0].event, TeamRunStarted)
-        assert isinstance(result[1].event, TeamRunFinished)
-
-    def test_derive_events_incremental(self) -> None:
-        """append 新事件后，derive_events 只扫描新增部分。"""
-        store = RunStore()
-        store.append(DecisionMade(step=1, action_type="respond"))
-
-        call_count = 0
-
-        def counting_predicate(e: any) -> bool:
-            nonlocal call_count
-            call_count += 1
-            return isinstance(e.event, DecisionMade)
-
-        # 首次调用
-        result1 = store.derive_events(counting_predicate)
-        assert len(result1) == 1
-        first_call_count = call_count
-
-        # 追加新事件
-        store.append(DecisionMade(step=2, action_type="use_tool"))
-
-        # 再次调用：只扫描新增事件
-        result2 = store.derive_events(counting_predicate)
-        assert len(result2) == 2
-        # 增量扫描：调用次数 = 新增事件数（1），不是全量（3）
-        assert call_count == first_call_count + 1
-
-    def test_derive_events_cache_invalidation(self) -> None:
-        """不同 predicate 各自独立缓存。"""
+    def test_trace_inspector_filters_without_store_cache(self) -> None:
         store = RunStore()
         store.append(TeamRunStarted(team_id="t1"))
-        store.append(DecisionMade(step=1))
-
-        def is_team(e: any) -> bool:
-            return isinstance(e.event, TeamRunStarted)
-
-        def is_decision(e: any) -> bool:
-            return isinstance(e.event, DecisionMade)
-
-        team_result = store.derive_events(is_team)
-        decision_result = store.derive_events(is_decision)
-        assert len(team_result) == 1
-        assert len(decision_result) == 1
+        store.append(DecisionMade(step=1, action_type="respond"))
+        store.append(TeamRunFinished(status="completed"))
+        report = TraceInspector(store.events).inspect_trace(focus="all")
+        assert report.event_count == 3
+        assert [event["type"] for event in report.events] == [
+            "TeamRunStarted",
+            "DecisionMade",
+            "TeamRunFinished",
+        ]
 
 
 # ── 5. Branded IDs ────────────────────────────────────────────

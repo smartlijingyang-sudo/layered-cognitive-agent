@@ -71,9 +71,7 @@ class TestSensorsPrimitive:
     async def test_inbox_sensor_folds_journal_events(self) -> None:
         store = RunStore()
         store.append(
-            InboxFollowupCreated(
-                inbox_id="i1", actor="user", target="t", priority="p", step=0
-            )
+            InboxFollowupCreated(inbox_id="i1", actor="user", target="t", priority="p", step=0)
         )
         sensor = InboxFactsSensor(store)
         items = await sensor.read(_state())
@@ -197,8 +195,9 @@ class TestHubPrimitive:
         manifest = await hub.perceive(_state())
         digest = digest_manifest(manifest)
         assert digest != ""
-        event = store.get_event(store.seq)
-        assert event.digest == digest
+        stamped = store.get(store.seq)
+        assert stamped is not None
+        assert stamped.event.digest == digest
 
     @pytest.mark.asyncio
     async def test_hub_drains_gate_decided(self) -> None:
@@ -251,9 +250,7 @@ class TestCompositionLarge:
     async def test_all_sensors_together(self) -> None:
         store = RunStore()
         store.append(
-            InboxFollowupCreated(
-                inbox_id="i1", actor="user", target="t", priority="p", step=0
-            )
+            InboxFollowupCreated(inbox_id="i1", actor="user", target="t", priority="p", step=0)
         )
         store.append(
             TeamMessagePublished(
