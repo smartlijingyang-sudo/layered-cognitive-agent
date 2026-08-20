@@ -6,11 +6,9 @@ transport table; one per agent pipeline). Composer no longer instantiates
 """
 
 from __future__ import annotations
-
 from pydantic import BaseModel
-
 from lca.contracts.protocols.infra import TransportRegistryProtocol
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -24,15 +22,15 @@ def build_transport_service_compose() -> TransportRegistryProtocol:
 
 
 @plugin(
-    name="transport.compose_service",
+    id="transport.compose_service",
     provides=["transport.compose_service"],
     requires=[],
     implements=[TransportRegistryProtocol],
-    layer="behavior",
-    side_effects="none",
-    policy_class="observe",
+    layer="L1",
+    effects="none",
     description="Compose-time TransportService factory (one fresh instance per compose).",
     test_suite="tests/test_plugin_alignment.py::test_compose_root_no_inline_instantiation",
+    kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx, config: Config) -> None:
     """Provide the named factory ``transport.compose_service``."""

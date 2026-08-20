@@ -1,22 +1,20 @@
 """Tools Service Definition plugin — Tier-1."""
 
 from __future__ import annotations
-
 from typing import Any
-
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 @plugin(
-    name="lca-tools-service",
+    id="lca-tools-service",
     provides=["tools"],
     requires=[],
     implements=["ToolRegistry"],
-    layer="service",
-    side_effects="tools",
-    policy_class="control",
+    layer="L0",
+    effects="tools",
     description="Provide the Tool registry Definition service (forked per-run).",
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
+    kind=PluginKind.SEAM,
 )
 async def setup(ctx: Any, config: Any) -> None:
     from lca.layer0_infra.capability.tools import ToolsService

@@ -5,10 +5,8 @@ This Tier-2 stub is a safe default that registers a no-op workspace.
 """
 
 from __future__ import annotations
-
 from pydantic import BaseModel, Field
-
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -17,13 +15,13 @@ class Config(BaseModel):
 
 
 @plugin(
-    name="lca-workspace-provider",
+    id="lca-workspace-provider",
     requires=["workspace"],
-    layer="provider",
-    side_effects="none",
-    policy_class="observe",
+    layer="L0",
+    effects="none",
     description="Placeholder Workspace provider — real implementation deferred.",
     test_suite="tests/test_plugin_alignment.py",
+    kind=PluginKind.PROVIDER,
 )
 async def setup(ctx, config: Config) -> None:
     """WorkspaceService does not exist yet; deferred to follow-up."""

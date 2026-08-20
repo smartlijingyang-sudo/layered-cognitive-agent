@@ -6,11 +6,9 @@ through this plugin (``ctx.inject("tools.compose_service")()``).
 """
 
 from __future__ import annotations
-
 from pydantic import BaseModel
-
 from lca.contracts.protocols.infra import ToolRegistry
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -24,15 +22,15 @@ def build_tools_service_compose() -> ToolRegistry:
 
 
 @plugin(
-    name="tools.compose_service",
+    id="tools.compose_service",
     provides=["tools.compose_service"],
     requires=[],
     implements=[ToolRegistry],
-    layer="behavior",
-    side_effects="tools",
-    policy_class="observe",
+    layer="L1",
+    effects="tools",
     description="Compose-time ToolsService factory (one fresh instance per compose).",
     test_suite="tests/test_plugin_alignment.py::test_compose_root_no_inline_instantiation",
+    kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx, config: Config) -> None:
     """Provide the named factory ``tools.compose_service``."""

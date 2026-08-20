@@ -1,8 +1,7 @@
 """Workspace Service Definition plugin — Tier-1 (minimal stub)."""
 
 from __future__ import annotations
-
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class WorkspaceService:
@@ -27,13 +26,13 @@ class WorkspaceService:
 
 
 @plugin(
-    name="lca-workspace-service",
+    id="lca-workspace-service",
     provides=["workspace"],
-    layer="service",
-    side_effects="none",
-    policy_class="control",
+    layer="L0",
+    effects="none",
     description="Minimal WorkspaceService stub — full implementation deferred.",
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
+    kind=PluginKind.SEAM,
 )
 async def setup(ctx, config) -> None:
     ctx.provide("workspace", WorkspaceService())

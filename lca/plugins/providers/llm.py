@@ -10,11 +10,9 @@ Profiles swap providers by patching:
 """
 
 from __future__ import annotations
-
 from pydantic import BaseModel, Field
-
 from lca.contracts.protocols import LLMAdapter
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -26,14 +24,14 @@ class Config(BaseModel):
 
 
 @plugin(
-    name="lca-llm-provider",
+    id="lca-llm-provider",
     requires=["llm"],
     implements=[LLMAdapter],
-    layer="provider",
-    side_effects="none",
-    policy_class="control",
+    layer="L0",
+    effects="none",
     description="Register LLM adapter providers on the LlmService Definition.",
     test_suite="tests/test_plugin_tree_single_owner.py",
+    kind=PluginKind.PROVIDER,
 )
 async def setup(ctx, config: Config) -> None:
     from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
@@ -47,19 +45,18 @@ async def setup(ctx, config: Config) -> None:
         target = "real" if api_key else "mock"
     if target not in config.providers:
         target = config.providers[0]
-
     if "mock" in config.providers:
-        llm.register("mock", MockLLMAdapter(), activate=(target == "mock"))
+        llm.register("mock", MockLLMAdapter(), activate=target == "mock")
     if "real" in config.providers:
         llm.register(
             "real",
             OpenAICompatAdapter(api_key=api_key, base_url=config.base_url),
-            activate=(target == "real"),
+            activate=target == "real",
         )
     if "deepseek" in config.providers:
         base = config.base_url or "https://api.deepseek.com"
         llm.register(
             "deepseek",
             OpenAICompatAdapter(api_key=api_key, base_url=base),
-            activate=(target == "deepseek"),
+            activate=target == "deepseek",
         )

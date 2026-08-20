@@ -1,11 +1,9 @@
 """ProgressLoopDetector contribution — posts onto GateService."""
 
 from __future__ import annotations
-
 from pydantic import BaseModel
-
 from lca.contracts.protocols import DecisionGate
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -13,14 +11,14 @@ class Config(BaseModel):
 
 
 @plugin(
-    name="gate.progress-loop-detector",
+    id="gate.progress-loop-detector",
     requires=["gates"],
     implements=[DecisionGate],
-    layer="guard",
-    side_effects="none",
-    policy_class="control",
+    layer="L1",
+    effects="none",
     description="Detect lack-of-progress loops and force a course change.",
     test_suite="tests/test_plugin_alignment.py",
+    kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx, config: Config) -> None:
     from lca.layer1_cognitive.brain.decision_gates.progress_loop_detector import (

@@ -1,11 +1,9 @@
 """Attachment Service Definition plugin — Tier-1."""
 
 from __future__ import annotations
-
 from typing import Any
-
 from lca.contracts.protocols.infra import AttachmentIdentity
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class AttachmentService:
@@ -31,14 +29,14 @@ class AttachmentService:
 
 
 @plugin(
-    name="lca-attachment-service",
+    id="lca-attachment-service",
     provides=["attachment"],
     implements=[AttachmentIdentity],
-    layer="service",
-    side_effects="world",
-    policy_class="control",
+    layer="L0",
+    effects="world",
     description="Provide the Attachment Definition service (ProviderDispatch + attachment identity table).",
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
+    kind=PluginKind.SEAM,
 )
 async def setup(ctx, config: Any) -> None:
     ctx.provide("attachment", AttachmentService())

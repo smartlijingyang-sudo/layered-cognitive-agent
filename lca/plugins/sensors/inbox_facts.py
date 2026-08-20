@@ -1,11 +1,9 @@
 """Inbox-facts sensor contribution — posts onto PerceiveService."""
 
 from __future__ import annotations
-
 from pydantic import BaseModel
-
 from lca.contracts.protocols import Sensor
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -13,14 +11,14 @@ class Config(BaseModel):
 
 
 @plugin(
-    name="sensor.inbox-facts",
+    id="sensor.inbox-facts",
     requires=["perceive"],
     implements=[Sensor],
-    layer="sensor",
-    side_effects="none",
-    policy_class="observe",
+    layer="L1",
+    effects="none",
     description="Perceive inbox fact entries from the journal-backed RunStore.",
     test_suite="tests/test_sensors_v3.py",
+    kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx, config: Config) -> None:
     from lca.layer1_cognitive.sensors.journal_backed import build_inbox_facts_sensor

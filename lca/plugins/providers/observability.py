@@ -5,13 +5,10 @@ Owns run-hub construction. Execute injects ``observability`` and calls
 """
 
 from __future__ import annotations
-
 from typing import Any
-
 from pydantic import BaseModel, Field
-
 from lca.contracts.protocols import ObservabilityBackend
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 _SKIP_BACKENDS = frozenset({"console", "jsonl"})
 
@@ -29,22 +26,18 @@ def _make_hub(**kwargs: Any) -> Any:
     extra_projectors = tuple(kwargs.get("extra_projectors") or ())
     cfg = settings if settings is not None else ObservabilitySettings()
     names = [name for name in cfg.backend_names() if name not in _SKIP_BACKENDS]
-    return create_observability(
-        "+".join(names),
-        settings=cfg,
-        extra_projectors=extra_projectors,
-    )
+    return create_observability("+".join(names), settings=cfg, extra_projectors=extra_projectors)
 
 
 @plugin(
-    name="lca-observability-provider",
+    id="lca-observability-provider",
     requires=["observability"],
     implements=[ObservabilityBackend],
-    layer="provider",
-    side_effects="none",
-    policy_class="observe",
+    layer="L0",
+    effects="none",
     description="Register ObservabilityBackend factories on the ObservabilityService Definition.",
     test_suite="tests/test_plugin_alignment.py",
+    kind=PluginKind.PROVIDER,
 )
 async def setup(ctx, config: Config) -> None:
     if "console" in config.providers:

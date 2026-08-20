@@ -1,11 +1,9 @@
 """PromptReasoner plugin — named factory ``reasoner.prompt``."""
 
 from __future__ import annotations
-
 from pydantic import BaseModel
-
 from lca.contracts.protocols import Reasoner
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -13,14 +11,14 @@ class Config(BaseModel):
 
 
 @plugin(
-    name="lca-reasoner-prompt",
+    id="lca-reasoner-prompt",
     provides=["reasoner.prompt"],
     implements=[Reasoner],
-    layer="behavior",
-    side_effects="none",
-    policy_class="control",
+    layer="L1",
+    effects="none",
     description="Provide the PromptReasoner class as ``reasoner.prompt``.",
     test_suite="tests/test_plugin_alignment.py",
+    kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx, config: Config) -> None:
     """Provide the PromptReasoner class as ``reasoner.prompt``.

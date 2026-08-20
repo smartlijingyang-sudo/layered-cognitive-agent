@@ -5,10 +5,8 @@ this minimal stub. Real implementation lives in lca/layer0_infra/system_prompt/s
 """
 
 from __future__ import annotations
-
 from typing import Any
-
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class _MinimalSystemPromptService:
@@ -19,13 +17,13 @@ class _MinimalSystemPromptService:
 
 
 @plugin(
-    name="lca-system-prompt-service",
+    id="lca-system-prompt-service",
     provides=["system_prompt"],
-    layer="service",
-    side_effects="none",
-    policy_class="control",
+    layer="L0",
+    effects="none",
     description="Minimal SystemPromptService stub — section assembler deferred.",
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
+    kind=PluginKind.SEAM,
 )
 async def setup(ctx: Any, config: Any) -> None:
     ctx.provide("system_prompt", _MinimalSystemPromptService())

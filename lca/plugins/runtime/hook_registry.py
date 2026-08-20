@@ -6,12 +6,10 @@ this factory to wire ambient span emission at the hook boundary.
 """
 
 from __future__ import annotations
-
 from pydantic import BaseModel
-
 from lca.contracts.atoms.enums import HookEvent
 from lca.contracts.protocols import HookRegistry
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -24,8 +22,6 @@ def build_simple_hook_registry(ctx) -> HookRegistry:
     hooks = CordisHookRegistry(ctx)
     for event_name in HookEvent:
         hooks.register(event_name, default_logging_hook)
-    # Pre-install the journal-emitting hook for every event (DSL: bridges
-    # events to the journal without forcing plugins to register it).
     try:
         from lca.layer0_infra.observability import record as _journal_record
         from lca.layer2_runtime.event_emission import make_journal_emitting_hook
@@ -34,22 +30,20 @@ def build_simple_hook_registry(ctx) -> HookRegistry:
         for event_name in HookEvent:
             hooks.register(event_name, journal_hook)
     except ImportError:
-        # Journal emission is optional in tests; skip the bridge if the
-        # emission module isn't on the path. Other errors still propagate.
         pass
     return hooks
 
 
 @plugin(
-    name="hook_registry.simple",
+    id="hook_registry.simple",
     provides=["hook_registry.simple"],
     requires=[],
     implements=[HookRegistry],
-    layer="behavior",
-    side_effects="none",
-    policy_class="observe",
+    layer="L1",
+    effects="none",
     description="Default HookRegistry factory — wraps the booted ctx's events namespace.",
     test_suite="tests/test_plugin_alignment.py::test_hook_registry_named_factory",
+    kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx, config: Config) -> None:
     """Provide the named HookRegistry factory ``hook_registry.simple``."""

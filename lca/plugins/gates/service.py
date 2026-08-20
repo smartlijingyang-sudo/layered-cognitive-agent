@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.plugins._cordis_adapter import PluginKind, plugin
+from lca.harness.plugin_api import PluginKind, plugin
 
 
 @plugin(

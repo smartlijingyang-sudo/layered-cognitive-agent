@@ -7,12 +7,9 @@ path that resolves the loop from cordis context (see
 """
 
 from __future__ import annotations
-
 from typing import Any
-
 import structlog
-
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 _log = structlog.get_logger(__name__)
 
@@ -44,7 +41,6 @@ def build_cognitive_live_agent(
     if scope is None:
         scope = opts.get("scope")
     if scope is None:
-        # No cordis ctx supplied — fall back to the cached default.
         from lca.layer4_app.api import get_or_create_default_ctx
 
         scope = get_or_create_default_ctx()
@@ -61,25 +57,20 @@ def build_cognitive_live_agent(
     )
     from lca.layer4_app.harness_live import CognitiveLiveAgent
 
-    live = CognitiveLiveAgent(
-        agent=agent,
-        store=store,  # type: ignore[arg-type]
-        inbox=inbox,  # type: ignore[arg-type]
-        identity_id=identity_id,
-    )
+    live = CognitiveLiveAgent(agent=agent, store=store, inbox=inbox, identity_id=identity_id)
     return OwnerAgentHandle(live)
 
 
 @plugin(
-    name="lca-loop-cognitive",
+    id="lca-loop-cognitive",
     requires=["run_loop_driver_registry"],
     provides=["agent_loop", "run_loop_driver_registry[cognitive]"],
     implements=[],
-    layer="behavior",
-    side_effects="none",
-    policy_class="control",
+    layer="L1",
+    effects="none",
     description="Register the cognitive loop driver at run_loop_driver_registry[cognitive].",
     test_suite="tests/test_plugin_tree_single_owner.py",
+    kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx: Any, config: Any) -> None:
     """Register the cognitive loop at two seams:

@@ -7,11 +7,9 @@ For now, this provides a minimal SessionService that records events.
 """
 
 from __future__ import annotations
-
 from typing import Any
-
 from lca.contracts.observability.session_events import SessionEventType
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class SessionService:
@@ -21,22 +19,19 @@ class SessionService:
         self._events: list[dict] = []
 
     async def record(
-        self,
-        event_type: SessionEventType,
-        session_id: str,
-        **payload: object,
+        self, event_type: SessionEventType, session_id: str, **payload: object
     ) -> None:
         self._events.append({"type": event_type.value, "session_id": session_id, **payload})
 
 
 @plugin(
-    name="lca-session-service",
+    id="lca-session-service",
     provides=["session_service"],
-    layer="service",
-    side_effects="none",
-    policy_class="observe",
+    layer="L0",
+    effects="none",
     description="Minimal SessionService — full implementation deferred.",
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
+    kind=PluginKind.SEAM,
 )
 async def setup(ctx: Any, config: Any) -> None:
     ctx.provide("session_service", SessionService())

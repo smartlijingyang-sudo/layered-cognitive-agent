@@ -7,22 +7,20 @@ so the composition root can resolve them.
 """
 
 from __future__ import annotations
-
 from typing import Any
-
 from lca.contracts.protocols import TeamStrategy
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 @plugin(
-    name="lca-team-lead-board",
+    id="lca-team-lead-board",
     provides=["team_lead_factory"],
     implements=[TeamStrategy],
-    layer="behavior",
-    side_effects="none",
-    policy_class="control",
+    layer="L1",
+    effects="none",
     description="Register the team strategy registry at team_lead_factory.",
     test_suite="tests/test_plugin_alignment.py",
+    kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx: Any, config: Any) -> None:
     """Register the team strategy registry at team_lead_factory."""

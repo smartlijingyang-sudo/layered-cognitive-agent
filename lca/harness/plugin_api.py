@@ -1,8 +1,8 @@
-"""LCA plugin Manifest API — definition, kinds, audited PluginContext (ADR-0061).
+"""LCA plugin Manifest API — definition, kinds, audited PluginContext (ADR-0061 / ADR-0062).
 
-Business plugins import from here (or via the thin ``lca.plugins._cordis_adapter``
-compat shim). Vendored Cordis ``Plugin`` remains the carrier; LCA fields live
-in ``Plugin.meta`` and on ``PluginDefinition``.
+Business plugins import :func:`plugin` from here directly. Vendored Cordis
+``Plugin`` remains the carrier; LCA fields live in ``Plugin.meta`` and on
+:data:`PluginDefinition`.
 """
 
 from __future__ import annotations
@@ -48,21 +48,10 @@ class EffectClass(str, Enum):
 
 _LAYER_VALUES = frozenset({"L0", "L1", "L2", "L3", "L4"})
 
-# Legacy taxonomy → (layer, kind) for migration-period decorators.
-_LEGACY_LAYER_MAP: dict[str, tuple[str, PluginKind]] = {
-    "service": ("L0", PluginKind.SEAM),
-    "provider": ("L0", PluginKind.PROVIDER),
-    "behavior": ("L1", PluginKind.PRIMITIVE),
-    "guard": ("L1", PluginKind.PRIMITIVE),
-    "sensor": ("L1", PluginKind.PRIMITIVE),
-}
-
-_LEGACY_EFFECT_MAP: dict[str, frozenset[EffectClass]] = {
-    "none": frozenset({EffectClass.NONE}),
-    "tools": frozenset({EffectClass.TOOLS}),
-    "memory": frozenset({EffectClass.MEMORY}),
-    "world": frozenset({EffectClass.WORLD}),
-}
+# (ADR-0062 §1) Legacy taxonomy / kwargs were deleted: every plugin must
+# declare canonical ``layer="L0".."L4"`` plus ``kind=PluginKind.X`` and
+# ``effects=...``. No migration shim is kept — "delete the compat layer,
+# don't keep a second track" (B7).
 
 
 class UndeclaredInteractionError(RuntimeError):
@@ -142,14 +131,7 @@ def _normalize_implements(values: Any) -> tuple[str, ...]:
 
 def _normalize_effects(
     effects: EffectClass | str | Sequence[EffectClass | str] | None,
-    *,
-    side_effects: str | None,
 ) -> frozenset[EffectClass]:
-    if effects is None and side_effects is not None:
-        mapped = _LEGACY_EFFECT_MAP.get(side_effects)
-        if mapped is None:
-            raise ValueError(f"unknown side_effects={side_effects!r}")
-        return mapped
     if effects is None:
         return frozenset({EffectClass.NONE})
     if isinstance(effects, (EffectClass, str)):
@@ -170,61 +152,56 @@ def _resolve_layer_kind(
     kind: PluginKind | str | None,
 ) -> tuple[str, PluginKind]:
     if layer is None:
-        raise ValueError("@plugin requires layer= (L0–L4 or legacy taxonomy)")
-    if layer in _LAYER_VALUES:
-        if kind is None:
-            raise ValueError("kind is required when layer is L0–L4")
-        return layer, PluginKind(kind) if not isinstance(kind, PluginKind) else kind
-    if layer in _LEGACY_LAYER_MAP:
-        mapped_layer, mapped_kind = _LEGACY_LAYER_MAP[layer]
-        if kind is None:
-            return mapped_layer, mapped_kind
-        return mapped_layer, PluginKind(kind) if not isinstance(kind, PluginKind) else kind
-    raise ValueError(f"unknown layer={layer!r}; expected L0–L4 or legacy taxonomy")
+        raise ValueError("@plugin requires layer= (one of L0–L4)")
+    if layer not in _LAYER_VALUES:
+        raise ValueError(f"unknown layer={layer!r}; expected L0–L4 (no legacy taxonomy)")
+    if kind is None:
+        raise ValueError("kind= is required when layer is L0–L4")
+    return layer, PluginKind(kind) if not isinstance(kind, PluginKind) else kind
 
 
 def plugin(
     setup: Callable[..., Any] | None = None,
     *,
-    id: str | None = None,
-    name: str | None = None,
+    id: str,
     Config: type[Any] | None = None,  # noqa: N803
     provides: Sequence[Capability[Any] | str] | None = None,
     requires: Sequence[Capability[Any] | str] | None = None,
     implements: Any = None,
-    layer: str | None = None,
-    kind: PluginKind | str | None = None,
+    layer: str,
+    kind: PluginKind,
     effects: EffectClass | str | Sequence[EffectClass | str] | None = None,
-    # Legacy kwargs (migration):
-    inject: list[str] | None = None,
-    side_effects: str | None = None,
-    policy_class: str | None = None,
     test_suite: str | None = None,
     description: str | None = None,
     meta: dict[str, Any] | None = None,
 ) -> Any:
-    """Declare a plugin Manifest. ``id`` (or legacy ``name``) is the primary key."""
+    """Declare a plugin Manifest (ADR-0062 §1).
+
+    Required: ``id``, ``layer`` (``L0``–``L4``), ``kind``.
+    Optional: ``provides``, ``requires``, ``implements``, ``effects``,
+    ``Config``, ``test_suite``, ``description``, ``meta``.
+
+    No legacy kwargs (``name``, ``inject``, ``side_effects``,
+    ``policy_class``, taxonomy ``service``/``provider``/``behavior``/
+    ``guard``/``sensor``) are accepted — every plugin must declare
+    canonical fields directly.
+    """
 
     def _wrap(fn: Callable[..., Any]) -> CordisPlugin:
-        plugin_id = id or name
-        if not plugin_id:
-            raise ValueError("@plugin requires id= (or legacy name=)")
         resolved_layer, resolved_kind = _resolve_layer_kind(layer=layer, kind=kind)
         config_cls = Config or _config_from_annotations(fn)
 
         provide_keys = _normalize_keys(provides)
         require_keys = _normalize_keys(requires)
-        if inject:
-            require_keys = tuple(dict.fromkeys((*require_keys, *inject)))
         impl_names = _normalize_implements(implements)
-        effect_set = _normalize_effects(effects, side_effects=side_effects)
+        effect_set = _normalize_effects(effects)
         suite = test_suite or ""
         desc = description or ""
 
         merged_meta: dict[str, Any] = dict(meta) if meta else {}
         merged_meta.update(
             {
-                "id": plugin_id,
+                "id": id,
                 "provides": list(provide_keys),
                 "requires": list(require_keys),
                 "implements": list(impl_names),
@@ -233,14 +210,12 @@ def plugin(
                 "effects": sorted(e.value for e in effect_set),
                 "test_suite": suite,
                 "description": desc,
-                "side_effects": next(iter(effect_set)).value if effect_set else "none",
-                "policy_class": policy_class or "",
             }
         )
         cordis_plugin = _cordis_plugin(
             fn,
             Config=config_cls,
-            name=plugin_id,
+            name=id,
             inject=list(require_keys) or None,
             meta=merged_meta,
         )
@@ -248,7 +223,7 @@ def plugin(
             cordis_plugin,
             "_lca_definition",
             PluginDefinition(
-                id=plugin_id,
+                id=id,
                 Config=config_cls,
                 provides=provide_keys,
                 requires=require_keys,
@@ -294,15 +269,13 @@ def definition_from_plugin(
     meta: Mapping[str, Any] = getattr(plugin_obj, "meta", {}) or {}
     plugin_id = str(meta.get("id") or getattr(plugin_obj, "name", None) or "")
     if not plugin_id:
-        raise ValueError("plugin has no id/name")
+        raise ValueError("plugin has no id")
     kind_raw = meta.get("kind", "primitive")
-    effects_raw = meta.get("effects") or [meta.get("side_effects") or "none"]
+    effects_raw = meta.get("effects") or ["none"]
     layer_raw = str(meta.get("layer") or "L1")
     if layer_raw not in _LAYER_VALUES:
-        layer_raw, kind_default = _LEGACY_LAYER_MAP.get(layer_raw, ("L1", PluginKind.PRIMITIVE))
-        if "kind" not in meta:
-            kind_raw = kind_default.value
-    effect_set = _normalize_effects(effects_raw, side_effects=None)
+        raise ValueError(f"plugin {plugin_id!r} has invalid layer={layer_raw!r}")
+    effect_set = _normalize_effects(effects_raw)
     setup_fn = getattr(plugin_obj, "setup", plugin_obj)
     return PluginDefinition(
         id=plugin_id,

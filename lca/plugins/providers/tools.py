@@ -1,11 +1,9 @@
 """Tools Provider plugin — Tier-2 (tool factories)."""
 
 from __future__ import annotations
-
 from pydantic import BaseModel, Field
-
 from lca.contracts.protocols.infra import Tool
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -28,14 +26,14 @@ def _g2a_factory(run: object | None = None) -> list:
 
 
 @plugin(
-    name="lca-tools-provider",
+    id="lca-tools-provider",
     requires=["tools"],
     implements=[Tool],
-    layer="provider",
-    side_effects="tools",
-    policy_class="control",
+    layer="L0",
+    effects="tools",
     description="Register Tool factories on the ToolsService Definition (forked per-run).",
     test_suite="tests/test_plugin_tree_single_owner.py",
+    kind=PluginKind.PROVIDER,
 )
 async def setup(ctx, config: Config) -> None:
     if "g2a" in config.factories:

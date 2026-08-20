@@ -10,10 +10,8 @@ module-level singleton.
 """
 
 from __future__ import annotations
-
 from typing import Any
-
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class RunLoopDriverRegistry:
@@ -21,10 +19,6 @@ class RunLoopDriverRegistry:
 
     def __init__(self, default: str | None = None) -> None:
         self._drivers: dict[str, Any] = {}
-        # When ``resolve("")`` is called (request omitted
-        # ``execution_target``), fall back to this name. The
-        # ``lca-loop-cognitive`` plugin passes ``default="cognitive"``
-        # so legacy ``/runs`` requests still route.
         self._default = default
 
     def register(self, target: str, driver: Any) -> None:
@@ -42,9 +36,7 @@ class RunLoopDriverRegistry:
             entry = self._drivers[key]
         except KeyError as exc:
             raise _UnknownExecutionTargetError(target or self._default or "") from exc
-        # Lazy factory: a plugin can store a zero-arg callable that returns
-        # a fresh driver instance.
-        if callable(entry) and not _looks_like_driver(entry):
+        if callable(entry) and (not _looks_like_driver(entry)):
             return entry()
         return entry
 
@@ -55,8 +47,7 @@ class RunLoopDriverRegistry:
 class _UnknownExecutionTargetError(RuntimeError):
     def __init__(self, target: str) -> None:
         super().__init__(
-            f"no run_loop_driver registered for execution_target={target!r}; "
-            f"enable the corresponding loop plugin in your bundle"
+            f"no run_loop_driver registered for execution_target={target!r}; enable the corresponding loop plugin in your bundle"
         )
         self.target = target
 
@@ -67,15 +58,15 @@ def _looks_like_driver(obj: Any) -> bool:
 
 
 @plugin(
-    name="lca-run-loop-driver-registry",
+    id="lca-run-loop-driver-registry",
     provides=["run_loop_driver_registry"],
     requires=[],
     implements=[],
-    layer="behavior",
-    side_effects="none",
-    policy_class="observe",
+    layer="L1",
+    effects="none",
     description="Empty run-loop driver registry; loop plugins fill it in.",
     test_suite="tests/test_plugin_tree_single_owner.py::test_empty_execution_target_uses_profile_default",
+    kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx, config: Any) -> None:
     """Provide an empty driver registry; loop plugins fill it in.
@@ -87,7 +78,4 @@ async def setup(ctx, config: Any) -> None:
     default = None
     if isinstance(config, dict):
         default = config.get("default")
-    ctx.provide(
-        "run_loop_driver_registry",
-        RunLoopDriverRegistry(default=default),
-    )
+    ctx.provide("run_loop_driver_registry", RunLoopDriverRegistry(default=default))

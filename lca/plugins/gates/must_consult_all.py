@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.contracts.protocols import DecisionGate
-from lca.plugins._cordis_adapter import PluginKind, plugin
+from lca.harness.plugin_api import PluginKind, plugin
 
 
 class Config(BaseModel):

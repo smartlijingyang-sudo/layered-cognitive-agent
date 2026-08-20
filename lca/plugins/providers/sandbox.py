@@ -1,11 +1,9 @@
 """Sandbox Provider plugin — Tier-2."""
 
 from __future__ import annotations
-
 from pydantic import BaseModel, Field
-
 from lca.contracts.protocols.infra import Sandbox
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -14,14 +12,14 @@ class Config(BaseModel):
 
 
 @plugin(
-    name="lca-sandbox-provider",
+    id="lca-sandbox-provider",
     requires=["sandbox"],
     implements=[Sandbox],
-    layer="provider",
-    side_effects="world",
-    policy_class="control",
+    layer="L0",
+    effects="world",
     description="Register Sandbox providers on the SandboxService Definition.",
     test_suite="tests/test_plugin_tree_single_owner.py",
+    kind=PluginKind.PROVIDER,
 )
 async def setup(ctx, config: Config) -> None:
     from lca.layer0_infra.sandbox.factory import resolve_sandbox

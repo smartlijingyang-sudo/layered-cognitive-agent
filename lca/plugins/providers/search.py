@@ -1,10 +1,8 @@
 """Search Provider plugin — Tier-2."""
 
 from __future__ import annotations
-
 from pydantic import BaseModel, Field
-
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -13,13 +11,13 @@ class Config(BaseModel):
 
 
 @plugin(
-    name="lca-search-provider",
+    id="lca-search-provider",
     requires=["search"],
-    layer="provider",
-    side_effects="tools",
-    policy_class="control",
+    layer="L0",
+    effects="tools",
     description="Register Search provider functions on the SearchService Definition.",
     test_suite="tests/test_plugin_alignment.py",
+    kind=PluginKind.PROVIDER,
 )
 async def setup(ctx, config: Config) -> None:
     from lca.layer0_infra.search.providers.tavily import search_tavily

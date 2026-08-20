@@ -1,11 +1,9 @@
 """Transport Provider plugin — Tier-2 (Internal / A2A / MCP)."""
 
 from __future__ import annotations
-
 from pydantic import BaseModel, Field
-
 from lca.contracts.protocols.infra import AgentTransport
-from lca.plugins._cordis_adapter import plugin
+from lca.harness.plugin_api import plugin, PluginKind
 
 
 class Config(BaseModel):
@@ -14,14 +12,14 @@ class Config(BaseModel):
 
 
 @plugin(
-    name="lca-transport-provider",
+    id="lca-transport-provider",
     requires=["transport"],
     implements=[AgentTransport],
-    layer="provider",
-    side_effects="none",
-    policy_class="control",
+    layer="L0",
+    effects="none",
     description="Register AgentTransport providers on the TransportService Definition.",
     test_suite="tests/test_plugin_alignment.py",
+    kind=PluginKind.PROVIDER,
 )
 async def setup(ctx, config: Config) -> None:
     from lca.layer0_infra.transport.a2a_transport import A2ATransport

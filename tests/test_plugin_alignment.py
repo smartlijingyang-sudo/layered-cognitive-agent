@@ -36,7 +36,6 @@ from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_en
 
 _ROOT = Path(__file__).resolve().parent.parent
 _PLUGINS_DIR = _ROOT / "lca" / "plugins"
-_ADAPTER_PATH = _PLUGINS_DIR / "_cordis_adapter.py"
 
 # (a) Allowlist — modules that legitimately cannot adopt the canonical
 # @plugin(name=..., inject=..., implements=...) shape. Each entry MUST be
@@ -44,7 +43,6 @@ _ADAPTER_PATH = _PLUGINS_DIR / "_cordis_adapter.py"
 # <= 10.
 ALLOWLIST: tuple[tuple[str, str], ...] = (
     ("__init__.py", "plugin package marker"),
-    ("_cordis_adapter.py", "decorator wrapper, not a plugin"),
     # ToolsComposeService / TransportComposeService declare the
     # shape; keep them in coverage.
 )
@@ -60,7 +58,7 @@ DEFAULT_PROFILE = "profiles/web-standard.yaml"
 def _all_plugin_modules() -> list[Path]:
     out: list[Path] = []
     for py in sorted(_PLUGINS_DIR.rglob("*.py")):
-        if py.name in {"__init__.py", "_cordis_adapter.py"}:
+        if py.name == "__init__.py":
             continue
         out.append(py)
     return out
@@ -70,9 +68,9 @@ def _read_plugin_meta(path: Path) -> dict[str, object] | None:
     """Return the ``PluginMeta`` dict this module would expose at boot.
 
     The vendored cordis decorator stores metadata in ``plugin.meta`` (a
-    plain dict). Our ``_cordis_adapter`` writes the DSH fields
-    (``provides / requires / implements / layer / side_effects /
-    policy_class / test_suite / description``) into that same dict.
+    plain dict). ``lca.harness.plugin_api.plugin`` writes the canonical
+    fields (``id / provides / requires / implements / layer / kind /
+    effects / test_suite / description``) into that same dict.
     """
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
