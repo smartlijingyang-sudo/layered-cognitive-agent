@@ -29,6 +29,7 @@ taiyi-schemastery = { path = "vendor/schemastery" }
 
 [tool.importlinter]
 root_package = "lca"
+include_external_packages = true
 
 # ── 契约 1: L0→L1→L2→L3 + contracts 严格单向分层 ──
 # 每层只能 import 直接下方一层；contracts 是最底层
@@ -83,6 +84,18 @@ forbidden_modules = [
     "lca.layer3_agent",
     "lca.layer4_app",
 ]
+
+# ── 契约 5: LCA plugin 不得反向依赖 Gateway ──
+# Drivers live in gateway because they bind gateway protocol types
+# (RunSession, PlaneBindings, SOLO_MODE_KEY) to LCA runtime. LCA plugins
+# only provide/require capabilities; they never import gateway directly.
+# Gateway boot calls register_default_drivers() after the plugin tree
+# is up (ADR-0062 §6 / PR-5).
+[[tool.importlinter.contracts]]
+name = "plugins: 不得依赖 gateway"
+type = "forbidden"
+source_modules = ["lca.plugins"]
+forbidden_modules = ["gateway"]
 
 [dependency-groups]
 dev = [

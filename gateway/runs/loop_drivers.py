@@ -290,3 +290,17 @@ def _record_inbox_followup(*, session: RunSession, question: str, mode: str) -> 
                 payload_preview=question[:200] if isinstance(question, str) else "",
             )
         )
+
+
+# ── Default driver registration (ADR-0062 §6 / PR-5) ────────────────────
+
+
+def register_default_drivers(registry: Any) -> None:
+    """Register the gateway-side default drivers into a runtime registry.
+
+    Caller passes the ``RunLoopDriverRegistry`` instance obtained from
+    the booted plugin tree (``ctx.inject("run_loop_driver_registry")``).
+    Drivers are registered under their canonical target strings; the
+    registry de-duplicates by target.
+    """
+    registry.register("cognitive", CognitiveRunDriver())

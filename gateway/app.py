@@ -153,9 +153,8 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
     # create_app() calls in the same process share the same plugin tree
     # so module-level overrides (e.g. ``set_llm_resolver``) propagate.
     from lca.layer4_app.api import _default_ctx_holder
-    if _default_ctx_holder.ctx is not None and getattr(
-        _default_ctx_holder.ctx, "entries", None
-    ):
+
+    if _default_ctx_holder.ctx is not None and getattr(_default_ctx_holder.ctx, "entries", None):
         application.state.plugin_tree = _default_ctx_holder.ctx
         application.state.ctx = _default_ctx_holder.ctx
         application.state.profile_path = str(path)
@@ -190,6 +189,15 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
     from lca.layer4_app.api import set_default_ctx
 
     set_default_ctx(ctx)
+    # Register the gateway-side default loop drivers into the runtime
+    # registry exposed by the plugin tree (ADR-0062 §6 / PR-5). The
+    # LCA-side plugin tree owns the registry shape; the gateway owns
+    # the driver implementations (which depend on gateway protocol
+    # types like RunSession / SOLO_MODE_KEY).
+    from gateway.runs.loop_drivers import register_default_drivers
+
+    driver_registry = ctx.inject("run_loop_driver_registry")
+    register_default_drivers(driver_registry)
     application.state.profile_path = profile_path
 
     report = build_report(
