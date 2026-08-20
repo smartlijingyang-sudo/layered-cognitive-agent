@@ -19,11 +19,34 @@ from gateway.runs.identity import parse_agent_ref
 from gateway.runs.ingress import prepare_run_from_messages
 from gateway.runs.live import LiveGap, LiveTail
 from gateway.runs.session import RunRegistry, RunStatus
+from lca.contracts.models.observability.journal import (
+    StampedEvent,
+    StepTextDelta,
+)
 from lca.layer0_infra.file_store import LocalFileStore
 from lca.layer0_infra.observability.journal.sse_frames import (
     parse_last_event_id,
     stamped_to_sse_frame,
 )
+
+# ADR-0051 Phase 2 § 九: StepTextDelta 双通道。UI 仅取 answer；ops/replay 取 all。
+_TEXT_CHANNEL_ALL: str = "all"
+_TEXT_CHANNEL_ANSWER: str = "answer"
+
+
+def _is_visible_text_channel(stamped: StampedEvent, channel: str | None) -> bool:
+    """StepTextDelta 按 channel 过滤；其它事件类型总是可见。
+
+    ``channel=None`` 不过滤；``channel="all"`` 全推；``channel="answer"``
+    仅推 answer 通道（ADR-0051 Phase 2 § 九 —— chat-projector / turn-timeline-projector
+    只用 answer 通道更新 finalAnswer）。
+    """
+    if channel is None or channel == _TEXT_CHANNEL_ALL:
+        return True
+    event = stamped.event
+    if not isinstance(event, StepTextDelta):
+        return True
+    return getattr(event, "channel", "decision") == channel
 
 
 def _registry_of(request: Request) -> RunRegistry:
@@ -70,8 +93,18 @@ async def iter_live_sse(
     after_seq: int = 0,
     heartbeat_s: float = _HEARTBEAT_INTERVAL_S,
     redact: bool = True,
+    text_channel: str | None = _TEXT_CHANNEL_ANSWER,
 ) -> AsyncIterator[bytes]:
-    """Journal frames + comment heartbeats. No projection, no adapter."""
+    """Journal frames + comment heartbeats. No projection, no adapter.
+
+    ``text_channel`` 过滤 StepTextDelta：
+
+    - ``"answer"`` (默认) — LobeHub live 只推 answer 通道（ADR-0051 Phase 2 § 九）
+    - ``"all"``          — ops 调试全推（``/journal/live``）
+    - ``None``           — 不过滤（向后兼容 / 排查用）
+
+    Journal 仍写双份：decision 给 replay/audit，answer 给 UI。
+    """
     sub = tail.subscribe(after_seq=after_seq)
     while True:
         try:
@@ -83,6 +116,8 @@ async def iter_live_sse(
             break
         if isinstance(item, LiveGap):
             yield encode_live_gap(item)
+            continue
+        if not _is_visible_text_channel(item, text_channel):
             continue
         yield stamped_to_sse_frame(item, redact=redact).encode()
 
@@ -204,7 +239,9 @@ async def stream_journal_live(request: Request) -> StreamingResponse | JSONRespo
     tail = _registry_of(request).journal.tail
 
     async def _gen() -> AsyncIterator[bytes]:
-        async for frame in iter_live_sse(tail, after_seq=after, redact=False):
+        async for frame in iter_live_sse(
+            tail, after_seq=after, redact=False, text_channel=_TEXT_CHANNEL_ALL
+        ):
             yield frame
 
     return StreamingResponse(
