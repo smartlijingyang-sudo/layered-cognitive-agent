@@ -137,13 +137,13 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     ),
     SpanName.MEMORY_READ.value: _span(
         VocabDomain.RESOURCE,
-        "lca.layer0_infra.observability.adapters",
+        "lca.layer0_infra.observability.memory_adapter",
         required=(ATTR_MEMORY_LAYER,),
         desc="记忆读取（知识检索）",
     ),
     SpanName.MEMORY_WRITE.value: _span(
         VocabDomain.RESOURCE,
-        "lca.layer0_infra.observability.adapters",
+        "lca.layer0_infra.observability.memory_adapter",
         required=(ATTR_MEMORY_LAYER,),
         desc="记忆写入",
     ),

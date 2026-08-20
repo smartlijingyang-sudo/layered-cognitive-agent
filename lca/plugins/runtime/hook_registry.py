@@ -15,11 +15,9 @@ class Config(BaseModel):
 
 
 def build_simple_hook_registry(ctx) -> HookRegistry:
-    from lca.layer1_cognitive.hook_registry import CordisHookRegistry, default_logging_hook
+    from lca.layer1_cognitive.hook_registry import CordisHookRegistry
 
     hooks = CordisHookRegistry(ctx)
-    for event_name in HookEvent:
-        hooks.register(event_name, default_logging_hook)
     try:
         from lca.layer0_infra.observability import record as _journal_record
         from lca.layer2_runtime.event_emission import make_journal_emitting_hook

@@ -22,6 +22,7 @@ class ObservabilitySettings(BaseSettings):
     - ``backends``：``+`` 或 ``,`` 分隔的导出器名（console/jsonl/langfuse/memory）；
     - ``verbosity``：信息量档位 minimal|standard|verbose；
     - ``sampling_rate``：头采样率 0.0~1.0（verbose 大流量调试可降采样）；
+    - ``diagnostics_enabled``：是否为每个 run 记录独立的诊断 JSONL；
     - ``redact_enabled``：脱敏兜底开关（生产环境不应关闭）。
     """
 
@@ -36,6 +37,7 @@ class ObservabilitySettings(BaseSettings):
     verbosity: Verbosity = Verbosity.STANDARD
     sampling_rate: float = Field(default=1.0, ge=0.0, le=1.0)
     jsonl_path: str = _DEFAULT_JSONL_PATH
+    diagnostics_enabled: bool = True
     redact_enabled: bool = True
 
     environment: str = Field(

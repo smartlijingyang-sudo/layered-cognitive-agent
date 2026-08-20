@@ -10,6 +10,7 @@ RunStore（ADR-0055 唯一写入仲裁）；业务层通过包根 ambient API
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 from typing import Any, Protocol, runtime_checkable
 
@@ -24,7 +25,13 @@ from lca.contracts.atoms.telemetry import (
     ATTR_AGENT_ROLE,
     ATTR_STEP,
 )
-from lca.contracts.protocols import JournalProjector, ObservabilityBackend
+from lca.contracts.models.observability.diagnostic import (
+    DiagnosticCategory,
+    DiagnosticEvent,
+    DiagnosticStatus,
+)
+from lca.contracts.models.observability.journal import RunScope, get_current_run_scope
+from lca.contracts.protocols import DiagnosticSink, JournalProjector, ObservabilityBackend
 from lca.layer0_infra.observability.handles import (
     SpanHandle,
     _IsolatedExporter,
@@ -36,6 +43,7 @@ from lca.layer0_infra.observability.langfuse_conventions import (
     LANGFUSE_ENVIRONMENT,
 )
 from lca.layer0_infra.observability.policy import AttributePolicy
+from lca.layer0_infra.observability.run_diagnostics import DiagnosticStream
 
 _log = structlog.get_logger("lca.observability")
 
@@ -71,6 +79,7 @@ class ObservabilityHub(ObservabilityBackend):
         service_name: str = _DEFAULT_SERVICE_NAME,
         environment: str | None = None,
         journal_projectors: Sequence[JournalProjector] = (),
+        diagnostic_sinks: Sequence[DiagnosticSink] = (),
     ) -> None:
         sampler = (
             ParentBased(ALWAYS_ON)
@@ -107,6 +116,7 @@ class ObservabilityHub(ObservabilityBackend):
             ],
             policy=self._policy,
         )
+        self._diagnostics = DiagnosticStream(tuple(diagnostic_sinks))
         self._scorer: ScorerFn | None = None
         self._bridges: list[BackendBridge] = []
         self._released = False
@@ -129,6 +139,11 @@ class ObservabilityHub(ObservabilityBackend):
     @property
     def exporters(self) -> list[SpanExporter]:
         return [p.span_exporter.inner for p in self._processors]  # type: ignore[attr-defined]
+
+    @property
+    def diagnostic_sinks(self) -> tuple[DiagnosticSink, ...]:
+        """已装配的 run-scoped 诊断接收器（只读投影，不是事实流）。"""
+        return self._diagnostics.sinks
 
     # ── 发射（facade 调用）─────────────────────────────
     def open_span(
@@ -163,6 +178,48 @@ class ObservabilityHub(ObservabilityBackend):
         span = self._tracer.start_span(name, attributes=prepared)
         span.end()
 
+    def emit_diagnostic(
+        self,
+        *,
+        category: DiagnosticCategory,
+        operation: str,
+        plugin: str,
+        status: DiagnosticStatus,
+        attributes: dict[str, Any],
+        output: dict[str, Any],
+        causation_refs: tuple[str, ...] = (),
+        duration_ms: int | None = None,
+        error_type: str = "",
+        error_message: str = "",
+        actor_role: str = "",
+        actor_step: int | None = None,
+    ) -> DiagnosticEvent:
+        """向诊断流发射一条已关联、已策略处理的非事实记录。"""
+        scope = get_current_run_scope() or RunScope()
+        return self._diagnostics.emit(
+            DiagnosticEvent(
+                ts=time.time(),
+                run_id=str(scope.run_id),
+                trace_id=str(scope.trace_id),
+                parent_run_id=str(scope.parent_run_id) if scope.parent_run_id else None,
+                delegation_id=scope.delegation_id,
+                actor=actor_role or scope.agent_role,
+                step=actor_step,
+                category=category,
+                operation=operation,
+                plugin=plugin,
+                status=status,
+                duration_ms=duration_ms,
+                attributes=self._policy.prepare(attributes),
+                output=self._policy.prepare(output),
+                error_type=error_type,
+                error_message=self._policy.prepare({"error_message": error_message}).get(
+                    "error_message", ""
+                ),
+                causation_refs=causation_refs,
+            )
+        )
+
     def register_scorer(self, scorer: ScorerFn) -> None:
         """后端评估钩子（Langfuse 导出器装配时注入）。"""
         self._scorer = scorer
@@ -189,8 +246,9 @@ class ObservabilityHub(ObservabilityBackend):
 
     # ── 生命周期 ────────────────────────────────────────
     def flush(self) -> None:
-        """Journal only. Exporters flush in dispose(), never on the chat path."""
+        """冲刷 Journal 与 run-scoped diagnostics；导出器仍只在 dispose 时处理。"""
         self._store.flush()
+        self._diagnostics.flush()
 
     def release(self) -> None:
         """Close store subscribers (jsonl, LiveTail). Chat SSE can end here.
@@ -202,6 +260,7 @@ class ObservabilityHub(ObservabilityBackend):
             return
         self._released = True
         self._store.close()
+        self._diagnostics.close()
 
     def dispose(self) -> None:
         """Best-effort exporter shutdown. Caller must not hold the event loop."""

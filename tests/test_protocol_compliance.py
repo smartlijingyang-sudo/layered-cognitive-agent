@@ -16,7 +16,6 @@ from lca.contracts.protocols import (
     Brain,
     Critic,
     EventBus,
-    Hook,
     HookRegistry,
     LLMAdapter,
     MemorySystem,
@@ -44,7 +43,7 @@ from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 from lca.layer1_cognitive.event_bus import SimpleEventBus
-from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
+from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
 # L2
@@ -162,9 +161,6 @@ class TestL1ProtocolCompliance(unittest.TestCase):
 
     def test_simple_hook_registry(self):
         self.assertIsInstance(SimpleHookRegistry(), HookRegistry)
-
-    def test_default_logging_hook_is_hook(self):
-        self.assertIsInstance(default_logging_hook, Hook)
 
 
 class TestL2ProtocolCompliance(unittest.TestCase):

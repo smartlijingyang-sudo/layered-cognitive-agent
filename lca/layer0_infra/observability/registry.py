@@ -15,7 +15,7 @@ import structlog
 from opentelemetry.sdk.trace.export import SpanExporter
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lca.contracts.protocols import JournalProjector, ObservabilityBackend
+from lca.contracts.protocols import DiagnosticSink, JournalProjector, ObservabilityBackend
 from lca.layer0_infra.observability.exporters.langfuse import (
     ExporterUnavailableError,
     LangfuseBridge,
@@ -59,6 +59,7 @@ def create_observability(
     *,
     settings: ObservabilitySettings | None = None,
     extra_projectors: Sequence[JournalProjector] = (),
+    diagnostic_sinks: Sequence[DiagnosticSink] = (),
 ) -> ObservabilityHub:
     """唯一构造入口：字符串选择 → 装配完成的 hub。
 
@@ -67,7 +68,9 @@ def create_observability(
     - ``"a+b"``：按 ``+``/``,`` 分隔解析后端名（console 走 journal 投影器，
       jsonl/memory/langfuse 走 OTel 导出器/桥）。
     - ``extra_projectors``：本次装配额外的 journal 读者（如 Run 的 LiveTail）。
-      与 backends 投影器同序扇出，不是平行总线。
+      与 backends 投影器同序扇出，不是平行总线；
+    - ``diagnostic_sinks``：run-scoped 非事实诊断读者（如 JSONL 文件），
+      与 Journal 恢复/重放语义严格分离。
     非 hub 的自定义 backend 实例不可作为选择传入（必须是完整 hub）。
     Langfuse 不可用（未装 SDK / 无凭据）时跳过并记日志，不阻断其它读者。
     """
@@ -110,6 +113,7 @@ def create_observability(
         sampling_rate=cfg.sampling_rate,
         environment=cfg.environment,
         journal_projectors=[*projectors, *extra_projectors],
+        diagnostic_sinks=diagnostic_sinks,
     )
     for bridge in bridges:
         try:

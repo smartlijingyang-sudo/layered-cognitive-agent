@@ -7,7 +7,9 @@ All service access goes through ServiceRegistry.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -760,14 +762,17 @@ def graph(
 
 @app.command()
 def debug(
-    sub: str = typer.Argument(..., help="debug sub-subcommand: tree | run | scope"),
+    sub: str = typer.Argument(..., help="debug sub-subcommand: tree | run | scope | trace"),
     profile: Path = typer.Option(
         Path("profiles/web-standard.yaml"),
         "--profile",
         "-p",
         help="Profile YAML to boot",
     ),
-    run_id: str = typer.Option(None, "--run-id", help="Run ID for `debug run` (optional)"),
+    run_id: str = typer.Option(None, "--run-id", help="Run ID for `debug run` / `debug trace`"),
+    diagnostic: Path = typer.Option(None, "--diagnostic", help="Explicit diagnostic JSONL path"),
+    category: str = typer.Option("", "--category", help="Filter `debug trace` by category"),
+    plugin: str = typer.Option("", "--plugin", help="Filter `debug trace` by plugin"),
 ) -> None:
     """Debug subcommand: tree, run, scope.
 
@@ -776,6 +781,7 @@ def debug(
       follow-up; reads journal from traces/runs/<id>.journal)
     - `debug scope <id>`: print service resolution for a scope (stub —
       full impl queries session_store for the session's scope snapshot)
+    - `debug trace --run-id <id>`: render the run-scoped diagnostic JSONL
     """
     import asyncio
 
@@ -801,6 +807,25 @@ def debug(
         # Read the journal (JSONL) and print events
         for line in journal_path.read_text().splitlines():
             print(line)
+    elif sub == "trace":
+        if diagnostic is None:
+            if run_id is None:
+                print("debug trace requires --run-id or --diagnostic")
+                raise typer.Exit(1)
+            diagnostic = Path("traces/runs") / f"{run_id}.diagnostic.jsonl"
+        if not diagnostic.exists():
+            print(f"No diagnostic trace found (expected {diagnostic})")
+            raise typer.Exit(1)
+        for line in diagnostic.read_text(encoding="utf-8").splitlines():
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if category and item.get("category") != category:
+                continue
+            if plugin and item.get("plugin") != plugin:
+                continue
+            _render_diagnostic_trace_line(item)
     elif sub == "scope":
         if run_id is None:
             print("debug scope requires --run-id")
@@ -811,6 +836,26 @@ def debug(
     else:
         print(f"Unknown debug sub: {sub!r} (expected: tree, run, scope)")
         raise typer.Exit(1)
+
+
+def _render_diagnostic_trace_line(item: dict[str, Any]) -> None:
+    """Render one diagnostic JSONL record as a compact human-readable timeline row."""
+    timestamp = str(item.get("ts", ""))
+    category = str(item.get("category", "infra"))
+    status = str(item.get("status", "info")).upper()
+    plugin = str(item.get("plugin", "-"))
+    operation = str(item.get("operation", "-"))
+    duration = item.get("duration_ms")
+    suffix = f" {duration}ms" if duration is not None else ""
+    print(f"{timestamp} [{status:<9}] {category:<10} {plugin:<28} {operation}{suffix}")
+    attributes = item.get("attributes") or {}
+    output = item.get("output") or {}
+    if attributes:
+        print(f"  input: {json.dumps(attributes, ensure_ascii=False, sort_keys=True)}")
+    if output:
+        print(f"  output: {json.dumps(output, ensure_ascii=False, sort_keys=True)}")
+    if item.get("error_type"):
+        print(f"  error: {item['error_type']}: {item.get('error_message', '')}")
 
 
 @app.command(name="check-upstream")

@@ -5,10 +5,14 @@ Owns run-hub construction. Execute injects ``observability`` and calls
 """
 
 from __future__ import annotations
+
 from typing import Any
+
 from pydantic import BaseModel, Field
+
 from lca.contracts.protocols import ObservabilityBackend
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginKind, plugin
+from lca.layer0_infra.observability import ObservabilitySettings, create_observability
 
 _SKIP_BACKENDS = frozenset({"console", "jsonl"})
 
@@ -19,14 +23,17 @@ class Config(BaseModel):
 
 
 def _make_hub(**kwargs: Any) -> Any:
-    from lca.layer0_infra.observability import create_observability
-    from lca.layer0_infra.observability.settings import ObservabilitySettings
-
     settings = kwargs.get("settings")
     extra_projectors = tuple(kwargs.get("extra_projectors") or ())
+    diagnostic_sinks = tuple(kwargs.get("diagnostic_sinks") or ())
     cfg = settings if settings is not None else ObservabilitySettings()
     names = [name for name in cfg.backend_names() if name not in _SKIP_BACKENDS]
-    return create_observability("+".join(names), settings=cfg, extra_projectors=extra_projectors)
+    return create_observability(
+        "+".join(names),
+        settings=cfg,
+        extra_projectors=extra_projectors,
+        diagnostic_sinks=diagnostic_sinks,
+    )
 
 
 @plugin(

@@ -72,7 +72,11 @@ from lca.contracts.protocols.journal import JournalProjector
 from lca.contracts.protocols.memory import MemorySystem
 
 # ── 可观测性协议（业务层唯一发射门面）──────────────────
-from lca.contracts.protocols.observability import ObservabilityBackend, Telemetry
+from lca.contracts.protocols.observability import (
+    DiagnosticSink,
+    ObservabilityBackend,
+    Telemetry,
+)
 
 # ── 操作技能库（与角色库平行，ADR-0048）────────────
 from lca.contracts.protocols.operational_skills import (
@@ -124,6 +128,7 @@ __all__ = [
     "ComponentRegistryProtocol",
     "Critic",
     "DecisionGate",
+    "DiagnosticSink",
     "DshRuntime",
     "EventBus",
     "HasHooks",
