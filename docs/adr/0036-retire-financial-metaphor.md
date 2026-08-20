@@ -53,7 +53,7 @@ Accepted
 
 - `scripts/check_no_any.py` 删除失效白名单 `ledger_factory.*Any` 与
   `_team_progress:\s*Any`（对应符号均已不存在）。
-- `docs/glossary.md` 化石表新增一行记录本措辞废除；`DelegationLedger /
+- `docs/specs/glossary.md` 化石表新增一行记录本措辞废除；`DelegationLedger /
   team_progress` 墓碑行保留（死名 → 活名映射正是化石表的职责）。
 - ADR-0015 / ADR-0034 / ADR-0035 是历史快照，正文**不重写**（本目录维护规则）；
   其中的旧名由本 ADR 映射表与 glossary 化石表承担翻译。

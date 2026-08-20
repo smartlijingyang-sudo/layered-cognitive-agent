@@ -5,6 +5,7 @@ implementation (with agent_service merge) lives in Task 2.4.5 follow-up work.
 
 For now, this provides a minimal SessionService that records events.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -26,9 +27,7 @@ class SessionService:
         session_id: str,
         **payload: object,
     ) -> None:
-        self._events.append(
-            {"type": event_type.value, "session_id": session_id, **payload}
-        )
+        self._events.append({"type": event_type.value, "session_id": session_id, **payload})
 
 
 @plugin(name="lca-session-service")

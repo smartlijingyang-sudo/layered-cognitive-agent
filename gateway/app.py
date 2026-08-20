@@ -56,7 +56,6 @@ from gateway.runs.api import (
     stream_journal_live,
     stream_run_live,
 )
-from gateway.runs.execute import set_llm_resolver
 from gateway.runs.session import RunRegistry
 from gateway.session_routes import (
     command_answer,
@@ -74,7 +73,7 @@ from lca.layer0_infra.file_store import (
     get_default_file_store,
     set_default_file_store,
 )
-from lca.layer0_infra.llm_resolver import LLMResolver, ProductionLLMResolver
+from lca.layer0_infra.llm_resolver import ProductionLLMResolver as LLMResolver
 
 _registry = RunRegistry()
 _file_store = get_default_file_store()
@@ -96,7 +95,7 @@ async def _options(_request: Request) -> JSONResponse:
 
 
 async def health(request: Request) -> JSONResponse:
-    payload = health_payload(_registry)
+    payload = health_payload(_registry, ctx=getattr(request.app.state, "ctx", None))
     payload["devices"] = request.app.state.devices.summary()
     return JSONResponse(payload, headers=CORS_HEADERS)
 
@@ -128,34 +127,87 @@ _configure_structlog()
 def _load_harness_profile(application: Starlette, profile_path: str) -> None:
     """Load harness plugin tree from profile YAML and attach to app.state.
 
-    Phase A: The plugin tree is available but not yet used for routing.
-    It enables ``AgentComposer.compose(scope=...)`` and ``lca inspect tree``.
+    Builds the DSH-style boot report (plugin inventory + capability graph)
+    and emits it via structlog and stdout.
     """
     import asyncio
     from pathlib import Path
+    from typing import Any
 
+    import yaml
+
+    from lca.harness.diagnostics.boot_report import build_report
     from lca.harness.profile.boot import boot_profile
 
     path = Path(profile_path)
     if not path.exists():
         raise FileNotFoundError(f"harness profile not found: {profile_path}")
 
-    try:
-        tree = asyncio.get_event_loop().run_until_complete(boot_profile(path))
-    except RuntimeError:
-        # No running event loop yet (startup) — create one
-        tree = asyncio.run(boot_profile(path))
+    # Idempotency: gateway.__init__ eagerly creates the app at import time,
+    # so a second create_app() inside a test fixture sees the cached tree.
+    cached = getattr(application.state, "ctx", None)
+    if cached is not None and getattr(cached, "entries", None):
+        return
 
-    application.state.plugin_tree = tree
-    application.state.ctx = tree  # cordis Context (replaces plugin_host)
+    # Reuse the test-session cached ctx if one exists. Multiple
+    # create_app() calls in the same process share the same plugin tree
+    # so module-level overrides (e.g. ``set_llm_resolver``) propagate.
+    from lca.layer4_app.api import _default_ctx_holder
+    if _default_ctx_holder.ctx is not None and getattr(
+        _default_ctx_holder.ctx, "entries", None
+    ):
+        application.state.plugin_tree = _default_ctx_holder.ctx
+        application.state.ctx = _default_ctx_holder.ctx
+        application.state.profile_path = str(path)
+        # Reset the resolver so the per-app override below is the only
+        # owner; otherwise a prior test's resolver would leak through.
+        _default_ctx_holder.ctx.own_bindings.pop("llm_resolver", None)
+        structlog.get_logger("lca.gateway").info(
+            "harness_profile_reused",
+            profile=str(path),
+            plugin_count=len(_default_ctx_holder.ctx.entries),
+        )
+        return
+
+    profile_raw = yaml.safe_load(path.read_text()) or {}
+    bundle_paths = list(profile_raw.get("bundles", []))
+
+    async def _boot() -> Any:
+        return await boot_profile(path)
+
+    # Spawn a dedicated loop for the boot: ``asyncio.run`` can't be nested
+    # with already-running loops, and ``asyncio.get_event_loop()`` raises
+    # when no current loop is set (Python 3.12+ semantics).
+    loop = asyncio.new_event_loop()
+    try:
+        ctx = loop.run_until_complete(_boot())
+    finally:
+        loop.close()
+    elapsed_ms = 0.0
+
+    application.state.plugin_tree = ctx
+    application.state.ctx = ctx  # cordis Context (replaces plugin_host)
     from lca.layer4_app.api import set_default_ctx
 
-    set_default_ctx(tree)
+    set_default_ctx(ctx)
     application.state.profile_path = profile_path
+
+    report = build_report(
+        ctx,
+        profile=profile_path,
+        bundles=bundle_paths,
+        entries=getattr(ctx, "entries", None),
+        elapsed_ms=elapsed_ms,
+    )
+    text = report.format()
+    print(text, flush=True)
     structlog.get_logger("lca.gateway").info(
         "harness_profile_loaded",
         profile=profile_path,
-        plugins=(len(tree.entries) if hasattr(tree, "entries") else "n/a"),
+        bundles=bundle_paths,
+        plugin_count=len(report.plugins),
+        edge_count=len(report.edges),
+        elapsed_ms=elapsed_ms,
     )
 
 
@@ -182,10 +234,9 @@ def create_app(
         _devices = devices
         _device_hub = DeviceHub(devices)
     bind_devices(_devices, _device_hub)
-    if llm_resolver is not None:
-        set_llm_resolver(llm_resolver)
-    else:
-        set_llm_resolver(ProductionLLMResolver())
+    # Defer the (optional) llm_resolver override until after the plugin tree
+    # boots — the override is layered on top of ``lca-llm-resolver``.
+    _llm_resolver_override = llm_resolver
     application = Starlette(
         routes=[
             Route("/health", health, methods=["GET"]),
@@ -253,6 +304,10 @@ def create_app(
         resolved_profile = "profiles/web-standard.yaml"
     if resolved_profile is not None:
         _load_harness_profile(application, resolved_profile)
+    if _llm_resolver_override is not None and application.state.ctx is not None:
+        # Caller (usually tests) supplies its own resolver; replace the one
+        # the plugin tree mounted.
+        application.state.ctx.provide("llm_resolver", _llm_resolver_override)
 
     spine_dir = Path("traces/sessions")
     cordis_ctx = getattr(application.state, "ctx", None)

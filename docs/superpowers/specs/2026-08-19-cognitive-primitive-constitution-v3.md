@@ -7,7 +7,7 @@
 | 日期 | 2026-08-19 |
 | 作者 | LCA Architecture（Draft for ADR Review） |
 | 状态 | Draft for ADR Review |
-| 取代 | [`docs/superpowers/specs/2026-08-19-cognitive-primitive-plugin-design.md`](./2026-08-19-cognitive-primitive-plugin-design.md)（✅ Approved 原宪法；其 Phase 1 变为本文 PR Plan 的早期 PR） |
+| 取代 | 原 `2026-08-19-cognitive-primitive-plugin-design.md`（✅ Approved 原宪法；其 Phase 1 变为本文 PR Plan 的早期 PR，文件已归档） |
 | 废止（作为评价，不在树内） | internal Manus v2 eval, 2026-08-19, not in tree |
 | 必须修订的 ADR | ADR-0002（废止「新特性只能 Hook」；PR1 写入 supersession 前向引用，全文补丁在 PR11） |
 | 必须遵守的 ADR | ADR-0001 五层单向、ADR-0004 Protocol-First、ADR-0005 L4 组合根、ADR-0015 contracts 无行为类、ADR-0030/0034/0035 Team、ADR-0037 Journal-as-Truth |
@@ -5478,7 +5478,7 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 
 ## 32. References
 
-- 原宪法：`docs/superpowers/specs/2026-08-19-cognitive-primitive-plugin-design.md`
+- 原宪法：`2026-08-19-cognitive-primitive-plugin-design.md`（已归档）
 - Manus v2 评价：internal Manus v2 eval, 2026-08-19, not in tree
 - ADR-0001 五层；ADR-0002 认知闭环（控制面由本文废止）；ADR-0004 Protocol-First；ADR-0005 L4 组合根；ADR-0015 contracts 无行为类；ADR-0030/0034/0035 Team；ADR-0037 Journal-as-Truth；ADR-0045 Decision 形状；ADR-0047 tool wire；ADR-0049 咨询平面；ADR-0051 workspace/terminal gates；ADR-0055 run fact store
 - 装配：`docs/superpowers/specs/2026-08-16-plugin-tree-runtime-design.md`、`2026-08-19-cordis-migration-design.md`

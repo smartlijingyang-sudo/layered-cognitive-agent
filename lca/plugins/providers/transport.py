@@ -1,4 +1,5 @@
 """Transport Provider plugin — Tier-2 (Internal / A2A / MCP)."""
+
 from __future__ import annotations
 
 from cordis import Context, plugin

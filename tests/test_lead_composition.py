@@ -12,6 +12,7 @@ from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+from lca.layer4_app.api import ensure_default_ctx
 from lca.layer4_app.composer import TeamComposer
 from lca.layer4_app.team_wiring import build_team_transport
 from tests.support.agent_specs import make_spec
@@ -30,6 +31,9 @@ class TestLeadMandateMapping(unittest.TestCase):
 
 
 class TestComposeAsLead(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        await ensure_default_ctx()
+
     async def test_new_instance_with_gate(self) -> None:
         """ADR-0035：lead 不做 reasoner 升级——gate 是唯一按 mandate 展开的组合差异。"""
         asm = TeamComposer()
@@ -76,6 +80,9 @@ class TestComposeAsLead(unittest.IsolatedAsyncioTestCase):
 
 
 class TestComposeTeamClosedGraph(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        await ensure_default_ctx()
+
     async def test_lead_board_team_has_closed_lead(self) -> None:
         asm = TeamComposer()
         llm = MockLLMAdapter()

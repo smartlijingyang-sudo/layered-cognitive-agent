@@ -1,13 +1,15 @@
-"""LLM 解析门面 —— 保持既有 import 路径。
+"""LLM resolver — ``ProductionLLMResolver`` plus re-exports for backward compat.
 
-实现拆在 ``lca.layer0_infra.llm``：config（身份）、catalog（路由）、
-openai_client（管家客户端）。
+The plugin (``lca.plugins.llm_resolver``) is the only thing that reads
+credentials and wires an adapter. Two boots → two resolver instances;
+no module-level singleton. The other names re-exported below live in
+:mod:`lca.layer0_infra.llm`; the facade is kept so callers don't have
+to know the real location.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING
 
 from lca.contracts.protocols import LLMAdapter
 from lca.layer0_infra.llm.catalog import (
@@ -30,33 +32,54 @@ from lca.layer0_infra.llm.openai_client import (
 )
 from lca.layer0_infra.llm_adapter import resolve_llm_adapter
 
-
-class LLMResolver(Protocol):
-    """解析一次 run 使用的 LLM adapter。"""
-
-    def is_available(self) -> bool:
-        """当前 resolver 是否可接受新的 run 请求。"""
-        ...
-
-    def resolve(self, *, mode: str) -> LLMAdapter:
-        """为指定协作模式解析 LLM adapter。"""
-        ...
+if TYPE_CHECKING:
+    from lca.layer0_infra.capability.llm import LlmService
 
 
-@dataclass(frozen=True)
 class ProductionLLMResolver:
-    """生产 resolver：仅使用真实 LLM adapter，无静默降级。"""
+    """Resolve an LLMAdapter for one run. Owns nothing but the policy.
+
+    Production code constructs this with explicit kwargs (the
+    ``lca-llm-resolver`` plugin does the env lookup and hands them in).
+    Tests that just want ``is_available()`` may call without arguments.
+    """
+
+    def __init__(
+        self,
+        *,
+        mode: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        default_model: str | None = None,
+        llm_service: LlmService | None = None,
+    ) -> None:
+        self._mode = (mode or "auto").strip().lower()
+        self._api_key = api_key
+        self._base_url = base_url
+        self._default_model = default_model or "deepseek-chat"
+        # Held only for diagnostics / `is_available`; never read on resolve.
+        self._llm_service = llm_service
 
     def is_available(self) -> bool:
-        key, _, _ = llm_credentials()
-        return bool(key)
+        """True when the configured mode can produce a real adapter."""
+        if self._mode == "mock":
+            return True
+        return bool(self._api_key)
 
-    def resolve(self, *, mode: str) -> LLMAdapter:
-        del mode
-        key, base, model = llm_credentials()
-        if not key:
-            raise LLMUnavailableError("LLM_API_KEY 未配置。请设置环境变量或在 .env 中提供凭证。")
-        return resolve_llm_adapter(api_key=key, base_url=base, model=model)
+    def resolve(self, *, mode: str | None = None) -> LLMAdapter:
+        """Construct the adapter for the requested mode (overrides config)."""
+        target = (mode or self._mode).strip().lower()
+        if target == "mock" or not self._api_key:
+            from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+
+            return MockLLMAdapter()
+        from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
+
+        return OpenAICompatAdapter(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            model=self._default_model,
+        )
 
 
 __all__ = [
@@ -67,7 +90,6 @@ __all__ = [
     "STRUCTURED_OUTPUT",
     "TOOL_CALLING",
     "VISION",
-    "LLMResolver",
     "LLMUnavailableError",
     "ModelDefinition",
     "ModelRegistry",
@@ -77,4 +99,5 @@ __all__ = [
     "llm_credentials",
     "llm_openai_credentials",
     "reset_async_openai_client",
+    "resolve_llm_adapter",
 ]

@@ -184,7 +184,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **FilesInfoDocument** | 文件元数据文档（路径 + mime + 大小 + 校验和） |
 | **Finding** | 检索 / 诊断发现的原子单元（source + claim + confidence） |
 | **HealthCheck** / **HostEnvironment** / **InfraConfig** / **InfraService** | 基础设施探活 + 主机环境 + 配置（lca-ops heal 子命令） |
-| **LLMFace** / **LLMResolver** / **ProductionLLMResolver** | LLM 适配门面 + 解析器（多 backend / 多 mode 路由） |
+| **LLMFace** / **ProductionLLMResolver** | LLM 适配门面 + 解析器（多 backend / 多 mode 路由） |
 | **LocalMirror** / **MirrorDiff** | upstream fork 本地镜像 + 与 upstream 的差异报告 |
 | **MachineComputer** | ComputerRuntime 协议的具体机器实例（local subprocess / docker / e2b） |
 | **ModelDefinition** | LLM 模式定义（model id + adapter + 价格 + 限额） |

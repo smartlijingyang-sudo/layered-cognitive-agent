@@ -10,7 +10,7 @@ Journal already records a step track: one `LlmCallStarted` per model call, one `
 
 The current Driver maps **speaker → one assistant row**. Solo always has one speaker, so seven LLM turns collapse into one `reasoning` field and `ProcessFold` shows「共运行了 1 步」. `ARG_OMIT` then strips `code` from `execute_code`, so `hasRenderableArgs` drops the cards. Downloads go through a second file universe (`uploadWithProgress`) instead of the builtin `ExecuteCode` / `ExportFile` renders.
 
-This is not a missing if. The identity unit is wrong. Specs disagree (`docs/run-live.md` says new assistant per `LlmCallStarted`; `CUSTOMIZATIONS.md` and `test_same_speaker_stays_on_one_assistant` lock one assistant per speaker). Tests weld the wrong unit.
+This is not a missing if. The identity unit is wrong. Specs disagree (`docs/specs/run-live.md` says new assistant per `LlmCallStarted`; `CUSTOMIZATIONS.md` and `test_same_speaker_stays_on_one_assistant` lock one assistant per speaker). Tests weld the wrong unit.
 
 ## Goal
 
@@ -142,7 +142,7 @@ Remove from `deploy/lobehub/patches/runtime/` and from `tests/test_journal_nativ
 - `test_user_file_list_is_latest_deliverable`
 - any test that requires `hasRenderableArgs`, `ARG_OMIT`, `addFilesToMessage`, or `uploadWithProgress` to exist (`test_artifacts_rewrite_relative_markdown` keeps only `rewriteArtifactMarkdown`)
 
-Update `docs/run-live.md` and `deploy/lobehub/CUSTOMIZATIONS.md` so both say: **one `LlmCallStarted` = one assistant row**. Same speaker continues the chain (parent = last tool). Different speaker starts a new chain (parent = user).
+Update `docs/specs/run-live.md` and `deploy/lobehub/CUSTOMIZATIONS.md` so both say: **one `LlmCallStarted` = one assistant row**. Same speaker continues the chain (parent = last tool). Different speaker starts a new chain (parent = user).
 
 ## Error and edge cases
 
@@ -182,7 +182,7 @@ Graph shape (7 assistants, tool-anchored parents) is verified by replaying the s
 deploy/lobehub/patches/runtime/LcaRunDriver.ts      rewrite
 deploy/lobehub/patches/runtime/lcaArtifacts.ts      drop upload helpers if unused
 deploy/lobehub/patches/runtime/lcaChatRow.ts        only if persistMissed still needed
-docs/run-live.md                                    mapping table + identity unit
+docs/specs/run-live.md                                    mapping table + identity unit
 deploy/lobehub/CUSTOMIZATIONS.md                    one LLM = one assistant
 tests/test_journal_native_loop.py                   new invariants
 ```

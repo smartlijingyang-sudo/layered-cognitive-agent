@@ -1,4 +1,4 @@
-"""Dependency graph for gateway/runs — docs/run-live.md."""
+"""Dependency graph for gateway/runs — docs/specs/run-live.md."""
 
 from __future__ import annotations
 

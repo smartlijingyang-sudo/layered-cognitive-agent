@@ -2,7 +2,7 @@
 
 **日期**: 2026-08-15（整合完善）
 **状态**: 分析草案（Canonical 候选）
-**关联**: [2026-08-15-dsh-compare-driver-design.md](./2026-08-15-dsh-compare-driver-design.md)、[lobehub-integration.md](../../lobehub-integration.md)
+**关联**: [lobehub-integration.md](../../specs/lobehub-integration.md)
 
 ---
 
@@ -208,7 +208,7 @@ Workflow 补 Team **固定 SOP** 场景；非替代 Pipeline/FanOut。
 
 ### 路径 A：DSH 作为 execution driver（**当前 Canonical，最低风险**）
 
-见 [2026-08-15-dsh-compare-driver-design.md](./2026-08-15-dsh-compare-driver-design.md)。
+见对比跑道设计（已归档）。
 
 ```text
 chip「用 DSH」→ POST /runs {execution_target: dsh}
@@ -339,5 +339,5 @@ LCA 已实现：
 | 模块 | 路径 |
 |---|---|
 | DSH driver | `lca/layer0_infra/dsh/driver.py` |
-| 对比跑道 spec | `docs/superpowers/specs/2026-08-15-dsh-compare-driver-design.md` |
-| LobeHub 集成 | `docs/lobehub-integration.md` |
+| 对比跑道 spec | 已归档 |
+| LobeHub 集成 | `docs/specs/lobehub-integration.md` |

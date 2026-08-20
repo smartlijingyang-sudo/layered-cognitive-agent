@@ -17,7 +17,6 @@ from gateway.modes import DEFAULT_MODE
 from gateway.runs.doctor import diagnose
 from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.live import LiveTail
-from gateway.runs.loop_drivers import DEFAULT_RUN_DRIVERS
 from gateway.runs.session import RunRegistry, RunSession, RunStatus
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
@@ -33,7 +32,6 @@ from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
 from lca.layer0_infra.file_store import get_default_file_store
-from lca.layer0_infra.llm_resolver import LLMResolver, ProductionLLMResolver
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     bind,
@@ -64,8 +62,6 @@ _log = structlog.get_logger(__name__)
 
 _EXPORT_DISPOSE_TIMEOUT_S = 3.0
 
-_default_llm_resolver: LLMResolver = ProductionLLMResolver()
-
 _GATEWAY_SKIP_BACKENDS = frozenset({"console", "jsonl"})
 
 _SANITIZE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
@@ -87,62 +83,40 @@ _SANITIZE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 
-def get_llm_resolver() -> LLMResolver:
+def llm_status(ctx: Any) -> dict[str, bool]:
+    """Whether the boot tree's resolver can hand out a real adapter."""
+    try:
+        resolver = ctx.inject("llm_resolver")
+    except KeyError:
+        return {"llm_available": False}
+    return {"llm_available": resolver.is_available()}
+
+
+# ── Legacy shim — kept only for tests that haven't migrated to ``ctx``. ──────
+# Production code reads ``ctx.inject("llm_resolver")`` exclusively.
+
+_default_llm_resolver: Any | None = None
+
+
+def get_llm_resolver() -> Any:
     return _default_llm_resolver
 
 
-def set_llm_resolver(resolver: LLMResolver) -> None:
+def set_llm_resolver(resolver: Any) -> None:
     global _default_llm_resolver
     _default_llm_resolver = resolver
-
-
-def llm_status() -> dict[str, bool]:
-    return {"llm_available": get_llm_resolver().is_available()}
-
-
-def _maybe_shadow_session(session: RunSession, question: str, result: Any) -> None:
-    """When LCA_SESSION_SPINE=shadow, run the new path and log divergences."""
-    from lca.harness.diagnostics.normalizer import compare_results
-    from lca.harness.flags import session_spine_mode
-
-    if session_spine_mode() != "shadow":
-        return
-    from gateway.spine import agent_registry, projections
-
-    registry = agent_registry()
-    proj = projections()
-    if registry is None or proj is None:
-        return
-
-    import asyncio
-
-    async def _run() -> None:
-        handle = await registry.create(
-            profile="web-standard",
-            session_id=session.run_id,
-        )
-        from lca.contracts.harness.agent import UserMessage
-
-        await handle.agent.followup(UserMessage(content=question))
-        store = registry.store_for(session.run_id)
-        snapshot = proj.snapshot(session.run_id)
-        journal = list(store.events()) if store is not None else []
-        report = compare_results(
-            session_id=session.run_id,
-            legacy=result,
-            snapshot=snapshot,
-            journal=journal,
-        )
-        if report.divergences:
-            _log.warning("shadow_divergence", report=report.to_dict())
-        else:
-            _log.info("shadow_match", session_id=session.run_id)
-
+    # Push the override onto the cached default ctx so ``ctx.inject``
+    # returns the new adapter. Tests rely on this shim.
     try:
-        loop = asyncio.get_running_loop()
-        session._shadow_task = loop.create_task(_run())
-    except RuntimeError:
-        asyncio.run(_run())
+        from lca.layer4_app.api import _default_ctx_holder
+        cached = _default_ctx_holder.ctx
+    except Exception:
+        cached = None
+    if cached is not None:
+        if resolver is not None:
+            cached.provide("llm_resolver", resolver)
+        else:
+            cached.own_bindings.pop("llm_resolver", None)
 
 
 def sanitize_error(error: str) -> str:
@@ -245,10 +219,24 @@ async def execute_run(
     run_id: str,
     question: str,
     mode: str = DEFAULT_MODE,
+    ctx: Any | None = None,
 ) -> None:
+    """Drive one Run. ``ctx`` is the boot-time plugin tree; legacy callers
+    (tests that pre-date the cordis migration) may pass ``None`` and rely
+    on ``set_llm_resolver`` + ``get_or_create_default_ctx``."""
     session = registry.get(run_id)
     if session is None:
         return
+    if ctx is None:
+        from lca.layer4_app.api import get_or_create_default_ctx
+
+        ctx = get_or_create_default_ctx()
+    # Legacy back-compat: tests that pre-date the cordis migration set a
+    # module-level resolver via ``set_llm_resolver``. Only push if the
+    # ctx doesn't already carry a per-request override — otherwise we'd
+    # clobber what ``create_app(llm_resolver=…)`` just installed.
+    if _default_llm_resolver is not None and "llm_resolver" not in ctx.own_bindings:
+        ctx.provide("llm_resolver", _default_llm_resolver)
     session.status = RunStatus.RUNNING
     hub = session.hub if session.hub is not None else create_hub_for_session(session)
     workspace_ref: list[Any] = [None]
@@ -267,12 +255,12 @@ async def execute_run(
             )
             workspace_ref[0] = workspace
             try:
-                bindings = _freeze_bindings(session)
+                bindings = _freeze_bindings(session, ctx)
             except PlaneBindingError as exc:
                 session.error = str(exc)
                 return
             session.bindings = bindings
-            driver = DEFAULT_RUN_DRIVERS.resolve(session.execution_target)
+            driver = ctx.inject("run_loop_driver_registry").resolve(session.execution_target)
             sandbox = (
                 resolve_sandbox()
                 if ref_of(bindings, PlaneKind.SANDBOX) and driver.uses_sandbox
@@ -303,7 +291,7 @@ async def execute_run(
                         hub=hub,
                         bindings=bindings,
                         run_context=_run_context_for_session(session),
-                        llm_resolver=get_llm_resolver(),
+                        ctx=ctx,
                     )
                     if outcome.waiting_input:
                         session.status = RunStatus.WAITING_INPUT
@@ -320,8 +308,6 @@ async def execute_run(
                         )
                         return
                     success = outcome.success
-                    if outcome.result is not None:
-                        _maybe_shadow_session(session, question, outcome.result)
                     if not success and not session.error and outcome.error:
                         session.error = format_user_error(
                             outcome.error,
@@ -530,11 +516,11 @@ def _emit_artifact_closure_if_needed(
         )
 
 
-def _freeze_bindings(session: RunSession):
+def _freeze_bindings(session: RunSession, ctx: Any):
     sandbox = resolve_sandbox()
     sandbox_ref = sandbox_ref_from(sandbox) if sandbox is not None else None
     machine = resolve_machine(session.device_id or None)
-    target = DEFAULT_RUN_DRIVERS.resolve(session.execution_target).plane_target
+    target = ctx.inject("run_loop_driver_registry").resolve(session.execution_target).plane_target
     if target is None:
         target = session.execution_target
     bindings = resolve_plane_bindings(
@@ -646,6 +632,8 @@ def _run_context_for_session(session: RunSession) -> RunContext:
 def schedule_run(
     registry: RunRegistry,
     session: RunSession,
+    *,
+    ctx: Any | None = None,
 ) -> asyncio.Task[Any]:
     task = asyncio.create_task(
         execute_run(
@@ -653,6 +641,7 @@ def schedule_run(
             run_id=session.run_id,
             question=session.question,
             mode=session.mode,
+            ctx=ctx,
         )
     )
     session.task = task

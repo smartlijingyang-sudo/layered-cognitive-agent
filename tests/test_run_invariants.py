@@ -1,4 +1,4 @@
-"""Regression locks for docs/run-live.md — no third vocabulary, one teardown."""
+"""Regression locks for docs/specs/run-live.md — no third vocabulary, one teardown."""
 
 from __future__ import annotations
 

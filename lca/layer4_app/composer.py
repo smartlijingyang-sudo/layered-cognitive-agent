@@ -30,7 +30,7 @@ from lca.contracts.atoms.enums import (
     MemoryLayer,
 )
 from lca.contracts.mechanisms import ComponentRegistryProtocol, consume
-from lca.contracts.mechanisms.capability import SeamKey
+from lca.contracts.mechanisms.capability import MissingCapabilityError, SeamKey
 from lca.contracts.mechanisms.registries import Registries
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.team_coordination import (
@@ -91,6 +91,14 @@ from lca.layer1_cognitive.sensors import (
     build_clock_sensor,
     build_workspace_artifacts_sensor,
 )
+from lca.layer1_cognitive.sensors.journal_backed import (
+    build_inbox_facts_sensor,
+    build_team_inbox_sensor,
+)
+from lca.layer1_cognitive.sensors.skill_catalog import build_skill_catalog_sensor
+from lca.layer1_cognitive.sensors.workspace_instructions import (
+    build_workspace_instructions_sensor,
+)
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
 from lca.layer2_runtime.event_emission import make_journal_emitting_hook
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
@@ -101,6 +109,7 @@ from lca.layer3_agent.orchestration_registry import OrchestrationFactory
 from lca.layer3_agent.team_handle import TeamHandle
 from lca.layer4_app.defaults import build_default_registries
 from lca.layer4_app.policies import LEAD_BUDGET_POLICY_KEY
+from lca.layer4_app.runtime_factory import RuntimeDeps, build_cognitive_runtime
 from lca.layer4_app.team_wiring import (
     build_default_transport_registry,
     build_team_transport,
@@ -163,11 +172,52 @@ def _scope_is_team(scope: object | None) -> bool:
     return str(marker).lower() in {"lead", "member", "team"}
 
 
-def _run_store_from_scope(scope: object | None):
+def _run_store_from_scope(scope: object | None) -> Any | None:
     """Best-effort: pull a RunStore out of a cordis scope, or return None."""
     if scope is None:
         return None
     return getattr(scope, "run_store", None) or getattr(scope, "_run_store", None)
+
+
+def _is_plugin_tree(scope: object | None) -> bool:
+    """True when *scope* is a cordis Context (has ``inject``), not ActionScope."""
+    return callable(getattr(scope, "inject", None))
+
+
+def _ctx_factory(scope: object | None, key: str) -> Any | None:
+    """Resolve a named factory from the plugin tree. Missing key → None."""
+    inject = getattr(scope, "inject", None)
+    if not callable(inject):
+        return None
+    try:
+        return inject(key)
+    except Exception:
+        return None
+
+
+def _resolve_named_factory(scope: object | None, key: str, standard: Any | None) -> Any | None:
+    """Plugin tree wins; unit tests without a booted tree use *standard*.
+
+    When the plugin tree is active a missing key means the plugin was
+    disabled — do NOT fall back to Standard (disable would become a no-op).
+    """
+    if _is_plugin_tree(scope):
+        return _ctx_factory(scope, key)
+    return standard
+
+
+# Spec §5.5 — fixed PerceiveHub composition order. Plugins provide named
+# factories; the Composer is the only assembler.
+_SENSOR_ORDER: tuple[str, ...] = (
+    "sensor.clock",
+    "sensor.workspace-artifacts",
+    "sensor.inbox-facts",
+    "sensor.team-inbox",
+    "sensor.workspace-instructions",
+    "sensor.skill-catalog",
+)
+_TEAM_ONLY_SENSORS: frozenset[str] = frozenset({"sensor.team-inbox"})
+_STORE_SENSORS: frozenset[str] = frozenset({"sensor.inbox-facts", "sensor.team-inbox"})
 
 
 def _resolve_component(
@@ -270,7 +320,12 @@ class AgentComposer:
         tool_registry: ToolsService = ctx.require(SeamKey.TOOLS.value)
         for tool in spec.tools:
             tool_registry.register(tool)
-        safe_executor = SimpleSafeExecutor(profile.tool_permission_manifest)
+        safe_executor_cls = _resolve_named_factory(
+            scope, "safe_executor.simple", SimpleSafeExecutor
+        )
+        if safe_executor_cls is None:
+            raise MissingCapabilityError("safe_executor.simple")
+        safe_executor = safe_executor_cls(profile.tool_permission_manifest)
         transport_registry: TransportService = ctx.require(SeamKey.TRANSPORT.value)
         if team_channel is not None:
             transport_registry.register(team_channel)
@@ -281,27 +336,41 @@ class AgentComposer:
             scope=action_scope,
         )
 
-        brain = self._resolve_brain(spec, profile, llm_rt)
+        brain = self._resolve_brain(spec, profile, llm_rt, scope=scope)
         if decision_gate is not None:
             brain = self._apply_lead_brain(brain, decision_gate=decision_gate)
 
-        body = SimpleBody(
+        body_cls = _resolve_named_factory(scope, "body.simple", SimpleBody)
+        if body_cls is None:
+            raise MissingCapabilityError("body.simple")
+        body = body_cls(
             tool_registry=tool_registry,
             safe_executor=safe_executor,
             transport_registry=transport_registry,
             action_registry=action_registry,
         )
-        hooks = self._build_hooks()
-        perceive_hub = self._build_perceive_hub(mem)
-        runtime = CognitiveRuntime(
-            brain,
-            body,
-            consume("memory", mem, CognitiveRuntime),
-            hooks,
-            consume("state_store", state_store, CognitiveRuntime),
-            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
-            perceive_hub=perceive_hub,
-            middleware_registry=self._build_middleware_registry(hooks),
+        hooks = self._build_hooks(scope)
+        perceive_hub = self._build_perceive_hub(
+            mem, hub=hub, scope=scope, action_scope=action_scope
+        )
+        stop_factory = _resolve_named_factory(
+            scope,
+            "stop_rule.default",
+            lambda: DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+        )
+        if stop_factory is None:
+            raise MissingCapabilityError("stop_rule.default")
+        runtime = build_cognitive_runtime(
+            RuntimeDeps(
+                brain=brain,
+                body=body,
+                memory=consume("memory", mem, CognitiveRuntime),
+                hooks=hooks,
+                state_store=consume("state_store", state_store, CognitiveRuntime),
+                perceive_hub=perceive_hub,
+                stop_rule=stop_factory(),
+                middleware_registry=self._build_middleware_registry(hooks, scope),
+            )
         )
         return CognitiveAgent(
             runtime,
@@ -396,13 +465,22 @@ class AgentComposer:
             )
         return choice
 
-    def _resolve_brain(self, spec: AgentSpec, profile: RoleProfile, llm: LLMAdapter) -> Brain:
+    def _resolve_brain(
+        self,
+        spec: AgentSpec,
+        profile: RoleProfile,
+        llm: LLMAdapter,
+        *,
+        scope: Context | None = None,
+    ) -> Brain:
         if not isinstance(spec.brain, str):
             return spec.brain
-        factory_reg = self._registries.brain_factories
-        if spec.brain not in factory_reg:
-            raise ValueError(f"Unknown brain: {spec.brain!r}. Available: {factory_reg.list()}")
-        factory = factory_reg.resolve(spec.brain)
+        factory = _resolve_named_factory(scope, "brain_factory", None)
+        if factory is None:
+            factory_reg = self._registries.brain_factories
+            if spec.brain not in factory_reg:
+                raise ValueError(f"Unknown brain: {spec.brain!r}. Available: {factory_reg.list()}")
+            factory = factory_reg.resolve(spec.brain)
         resolved: Brain = factory(
             consume("llm", llm, PromptReasoner),
             profile,
@@ -432,7 +510,7 @@ class AgentComposer:
         return "\n".join(f"- {e.skill_id}: {e.name}" for e in installed)
 
     @staticmethod
-    def _build_hooks() -> SimpleHookRegistry:
+    def _standard_hooks() -> SimpleHookRegistry:
         hooks = SimpleHookRegistry()
         journal_hook = make_journal_emitting_hook(_journal_record)
         for event_name in HookEvent:
@@ -441,82 +519,88 @@ class AgentComposer:
         return hooks
 
     @staticmethod
+    def _build_hooks(scope: object | None = None) -> SimpleHookRegistry:
+        factory = _resolve_named_factory(scope, "hook_registry.simple", None)
+        if factory is not None:
+            hooks = factory()
+            if isinstance(hooks, SimpleHookRegistry):
+                return hooks
+        return AgentComposer._standard_hooks()
+
+    @staticmethod
     def _build_perceive_hub(
         memory: MemorySystem,
         *,
         hub: object | None = None,
         scope: object | None = None,
+        action_scope: ActionScope | None = None,
     ) -> PerceiveHub:
         """Build the ``SequentialPerceiveHub`` with the v3 named factories.
 
         Spec §5.5: composition order is fixed (clock → workspace-artifacts →
-        inbox-facts → team-inbox → skill-catalog).  Missing factories
-        are skipped; the Hub is robust to partial plugin trees.
-
-        PR8/PR9/PR14: ``InboxFactsSensor`` is wired in solo/team mode;
-        ``TeamInboxSensor`` is wired only when ``scope`` indicates
-        LEAD/MEMBER (team mode).  ``SkillCatalogSensor`` /
-        ``WorkspaceInstructionsSensor`` are wired when present.
+        inbox-facts → team-inbox → workspace-instructions → skill-catalog).
+        Missing factories are skipped; the Hub is robust to partial plugin
+        trees.
 
         This is the only place the Hub is composed.  Plugins provide
         named factories (via ``ctx.provide``); the Composer is the
-        single assembler.
+        single assembler.  Unit tests that call this without a booted
+        plugin tree receive the Standard layer1 factories.
         """
-        sensors: list[Sensor] = [
-            build_clock_sensor(),
-            build_workspace_artifacts_sensor(),
-        ]
-        # PR8 / PR9: wire InboxFactsSensor + (team-mode) TeamInboxSensor.
-        # Always provide a default in-memory RunStore when no scope-supplied
-        # store is found (tests / scripts).
-        try:
-            from lca.layer1_cognitive.sensors.journal_backed import (
-                build_inbox_facts_sensor,
-                build_team_inbox_sensor,
-            )
-            from lca.layer0_infra.observability import RunStore
+        from lca.layer0_infra.observability import RunStore
 
-            store = (
-                getattr(hub, "_run_store", None)
-                or _run_store_from_scope(scope)
-                or RunStore()
-            )
-            sensors.append(build_inbox_facts_sensor(store))
-            if _scope_is_team(scope):
-                sensors.append(build_team_inbox_sensor(store))
-        except Exception:  # noqa: BLE001
-            pass
+        store_cls = _resolve_named_factory(scope, "journal_store", RunStore)
+        store = (
+            getattr(hub, "_run_store", None)
+            or _run_store_from_scope(scope)
+            or (store_cls() if store_cls is not None else RunStore())
+        )
 
-        # PR13 / PR14: wire workspace_instructions + skill-catalog sensors
-        # when their named factories exist.
-        try:
-            from lca.layer1_cognitive.sensors.workspace_instructions import (
-                build_workspace_instructions_sensor,
-            )
+        standard: dict[str, Any] = {
+            "sensor.clock": build_clock_sensor,
+            "sensor.workspace-artifacts": build_workspace_artifacts_sensor,
+            "sensor.inbox-facts": build_inbox_facts_sensor,
+            "sensor.team-inbox": build_team_inbox_sensor,
+            "sensor.workspace-instructions": build_workspace_instructions_sensor,
+            "sensor.skill-catalog": build_skill_catalog_sensor,
+        }
 
-            sensors.append(build_workspace_instructions_sensor())
-        except Exception:  # noqa: BLE001
-            pass
-        try:
-            from lca.layer1_cognitive.sensors.skill_catalog import (
-                build_skill_catalog_sensor,
-            )
+        sensors: list[Sensor] = []
+        team_mode = _scope_is_team(action_scope) or _scope_is_team(scope)
+        for key in _SENSOR_ORDER:
+            if key in _TEAM_ONLY_SENSORS and not team_mode:
+                continue
+            factory = _resolve_named_factory(scope, key, standard.get(key))
+            if factory is None:
+                continue
+            try:
+                if key in _STORE_SENSORS:
+                    sensors.append(factory(store))
+                elif key == "sensor.skill-catalog":
+                    from lca.layer0_infra.skills.factory import resolve_skill_store
 
-            sensors.append(build_skill_catalog_sensor())
-        except Exception:  # noqa: BLE001
-            pass
+                    sensors.append(factory(resolve_skill_store()))
+                else:
+                    sensors.append(factory())
+            except Exception:  # noqa: S112 — broken factory must not abort Hub
+                continue
 
         return SequentialPerceiveHub(sensors=sensors, memory=memory)
 
     @staticmethod
-    def _build_middleware_registry(hooks: SimpleHookRegistry) -> InMemoryMiddlewareRegistry:
+    def _build_middleware_registry(
+        hooks: SimpleHookRegistry,
+        scope: object | None = None,
+    ) -> InMemoryMiddlewareRegistry:
         from lca.layer2_runtime.hook_middleware import install_hook_bridge
 
+        factory = _resolve_named_factory(scope, "middleware_registry.memory", None)
+        if factory is not None:
+            registry = factory(hooks)
+            if isinstance(registry, InMemoryMiddlewareRegistry):
+                return registry
         registry = InMemoryMiddlewareRegistry()
-        # Hook bridge: maps middleware phases to legacy hooks
         install_hook_bridge(registry, hooks)
-        # Loop intervention is now a DecisionGate (RepeatToolCallGate), not
-        # middleware (PR4 / cognitive-primitive v3 §3.5).
         return registry
 
     @staticmethod

@@ -1,4 +1,5 @@
 """Tools Provider plugin — Tier-2 (tool factories)."""
+
 from __future__ import annotations
 
 from cordis import Context, plugin

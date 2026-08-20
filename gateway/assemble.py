@@ -1,103 +1,12 @@
-"""Gateway 生产组队 —— solo 裸模型 + team LLM casting（ADR-0052）。"""
+"""Back-compat shim — moved to ``gateway.runs.loop_drivers``.
 
+The factory helpers used to live here; they are now private (``_build_*``)
+with public aliases in ``gateway.runs.loop_drivers`` so tests that still
+``from gateway.assemble import …`` continue to work. This file will be
+removed once the test suite migrates.
+"""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from gateway.runs.loop_drivers import build_runnable_team, build_solo_agent
 
-from gateway.modes import SOLO_ROLE
-from lca.contracts.models.core.plane import PlaneBindings
-from lca.contracts.models.observability.journal import (
-    CastingCompleted,
-    CastingFailed,
-    CastingStarted,
-    RunScope,
-)
-from lca.contracts.protocols import LLMAdapter, ObservabilityBackend
-from lca.contracts.protocols.casting import CastingError, RoleLibrary, TeamCaster
-from lca.layer0_infra.observability import (
-    ObservabilityHub,
-    bind,
-    objective_preview,
-    record,
-    run_scope,
-)
-from lca.layer0_infra.tools.default_set import build_g2a_chat_tools
-from lca.layer3_agent.role_library import FileRoleLibrary
-from lca.layer4_app.api import Agent, Team, ensure_default_ctx
-from lca.layer4_app.casting import LLMTeamCaster, build_from_casting_plan
-
-if TYPE_CHECKING:
-    from cordis import Context
-
-
-def build_solo_agent(
-    llm: LLMAdapter,
-    *,
-    observability: ObservabilityBackend,
-    role: str = SOLO_ROLE,
-    bindings: PlaneBindings | None = None,
-    scope: Context | None = None,
-) -> Agent:
-    """Solo 裸模型（ADR-0052）：身份来自 AgentRef.name，不是写死的「助手」。
-
-    不同 LobeHub agentId 是不同 principal。goal/backstory 留空 —— prompt
-    渲染侧空字段不渲染对应 section。
-    """
-    return Agent(
-        role=role,
-        goal="",
-        backstory="",
-        tools=build_g2a_chat_tools(bindings=bindings),
-        llm=llm,
-        observability=observability,
-        scope=scope,
-    )
-
-
-async def build_runnable_team(
-    objective: str,
-    llm: LLMAdapter,
-    *,
-    observability: ObservabilityHub,
-    trace_id: str,
-    run_id: str,
-    library: RoleLibrary | None = None,
-    caster: TeamCaster | None = None,
-    bindings: PlaneBindings | None = None,
-    plugin_ctx: Context | None = None,
-) -> Team:
-    """Team LLM casting（ADR-0042）：选角 + 治理判定 + 编译成 Team。
-
-    library/caster 可注入供测试替换；生产路径用 FileRoleLibrary（扫描
-    AGENCY_ROLES_DIR 或内置 roles/）与 LLMTeamCaster。
-    """
-    resolved_library = library if library is not None else FileRoleLibrary()
-    resolved_caster = caster if caster is not None else LLMTeamCaster()
-    scope = RunScope(trace_id=trace_id, run_id=run_id)
-    with bind(observability), run_scope(scope):
-        record(CastingStarted(objective_preview=objective_preview(objective)))
-        try:
-            plan = await resolved_caster.cast(objective, resolved_library, llm)
-        except CastingError as exc:
-            record(CastingFailed(error=str(exc)))
-            raise
-        selected_roles = tuple(
-            resolved_library.get(chosen.role_id).title for chosen in plan.selected
-        )
-        record(
-            CastingCompleted(
-                governance_kind=plan.governance_kind,
-                lead_role=plan.lead_role_id or "",
-                selected_roles=selected_roles,
-                rationale=plan.rationale,
-            )
-        )
-    resolved_ctx = plugin_ctx if plugin_ctx is not None else await ensure_default_ctx()
-    return build_from_casting_plan(
-        plan,
-        resolved_library,
-        llm,
-        observability=observability,
-        bindings=bindings,
-        scope=resolved_ctx,
-    )
+__all__ = ["build_runnable_team", "build_solo_agent"]

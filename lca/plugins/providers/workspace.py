@@ -3,6 +3,7 @@
 Full WorkspaceService does not yet exist in lca/layer0_infra/workspace/.
 This Tier-2 stub is a safe default that registers a no-op workspace.
 """
+
 from __future__ import annotations
 
 from cordis import Context, plugin

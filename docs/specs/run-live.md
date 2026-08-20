@@ -4,7 +4,7 @@
 
 浏览器订同一本 `/live`。SSE `event:` = Python 类名 = jsonl `event_type`。前端 `runLcaJournal` 把 Journal 译成 LobeHub 原生 Thinking 和工具卡。**LCA 拥有 agent loop**；浏览器不跑 `GeneralChatAgent`，也不 invoke 工具。
 
-这是聊天投影的现行说明。原则来自 ADR-0037 Journal-as-Truth。集成与启动见 [lobehub-integration.md](lobehub-integration.md)；补丁清单见 [CUSTOMIZATIONS.md](../deploy/lobehub/CUSTOMIZATIONS.md)。
+这是聊天投影的现行说明。原则来自 ADR-0037 Journal-as-Truth。集成与启动见 [lobehub-integration.md](lobehub-integration.md)；补丁清单见 [CUSTOMIZATIONS.md](../../deploy/lobehub/CUSTOMIZATIONS.md)。
 
 ## 链路
 

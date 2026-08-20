@@ -8,6 +8,7 @@ Per the cognitive-primitive constitution v3 the plugin does not drive
 ``CognitiveRuntime._loop``; calling it should surface a clear error
 instead of silently returning a placeholder.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -73,8 +74,20 @@ def build_cognitive_live_agent(
     return OwnerAgentHandle(live)
 
 
-@plugin(name="lca-loop-cognitive")
+@plugin(name="lca-loop-cognitive", inject=["run_loop_driver_registry"])
 async def setup(ctx: Context, config: Any) -> None:
-    """Register the cognitive loop builder at the agent_loop seam."""
+    """Register the cognitive loop at two seams:
+
+    - ``agent_loop`` → consumed by the legacy session-spine path
+      (``harness_bridge.build_live_agent`` → ``AgentRegistry``).
+    - ``run_loop_driver_registry["cognitive"]`` → consumed by
+      ``gateway/runs/execute.py:execute_run`` for the ``/runs`` HTTP path.
+    """
     ctx.provide("agent_loop", build_cognitive_live_agent)
-    _log.debug("cognitive_loop_registered", seam_key="agent_loop")
+    from gateway.runs.loop_drivers import CognitiveRunDriver
+
+    target = "cognitive"
+    if isinstance(config, dict) and isinstance(config.get("target"), str):
+        target = config["target"]
+    ctx.inject("run_loop_driver_registry").register(target, CognitiveRunDriver())
+    _log.debug("cognitive_loop_registered", seam_key="agent_loop", driver_target=target)

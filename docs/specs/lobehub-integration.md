@@ -2,7 +2,7 @@
 
 用 LobeHub 官方 UI（v2.2.13）替换自研 `web/`。聊天走 Run Live；标题等小请求走 OpenAI 兼容面。
 
-协议与渲染链路： [run-live.md](run-live.md)。补丁清单： [CUSTOMIZATIONS.md](../deploy/lobehub/CUSTOMIZATIONS.md)。
+协议与渲染链路： [run-live.md](run-live.md)。补丁清单： [CUSTOMIZATIONS.md](../../deploy/lobehub/CUSTOMIZATIONS.md)。
 
 ## 架构
 

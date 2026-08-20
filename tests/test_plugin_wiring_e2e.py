@@ -30,17 +30,46 @@ PLUGINS = LCA / "plugins"
 # ─────────────────────────────────────────────────────────────
 
 
+_SENSOR_PLUGINS: tuple[tuple[str, str], ...] = (
+    ("lca.plugins.sensors.clock", "sensor.clock"),
+    ("lca.plugins.sensors.workspace_artifacts", "sensor.workspace-artifacts"),
+    ("lca.plugins.sensors.inbox_facts", "sensor.inbox-facts"),
+    ("lca.plugins.sensors.team_inbox", "sensor.team-inbox"),
+    ("lca.plugins.sensors.workspace_instructions", "sensor.workspace-instructions"),
+    ("lca.plugins.sensors.skill_catalog", "sensor.skill-catalog"),
+)
+_GATE_PLUGINS: tuple[tuple[str, str], ...] = (
+    ("lca.plugins.gates.repeat_tool_call", "gate.repeat-tool-call"),
+    ("lca.plugins.gates.tool_loop_breaker", "gate.tool-loop-breaker"),
+    ("lca.plugins.gates.progress_loop_detector", "gate.progress-loop-detector"),
+    ("lca.plugins.gates.terminal_respond", "gate.terminal-respond"),
+    ("lca.plugins.gates.artifact_respond_injector", "gate.artifact-respond-injector"),
+    ("lca.plugins.gates.must_consult_all", "gate.must-consult-all"),
+    ("lca.plugins.gates.workspace_chain", "gate.workspace-agent"),
+)
+_ACT_RUNTIME_PLUGINS: tuple[tuple[str, str], ...] = (
+    ("lca.plugins.body.simple", "body.simple"),
+    ("lca.plugins.body.safe_executor", "safe_executor.simple"),
+    ("lca.plugins.runtime.stop_rule", "stop_rule.default"),
+    ("lca.plugins.runtime.hook_registry", "hook_registry.simple"),
+    ("lca.plugins.runtime.middleware", "middleware_registry.memory"),
+)
+_EXPECTED_SENSOR_ORDER: tuple[str, ...] = (
+    "sensor.clock",
+    "sensor.workspace-artifacts",
+    "sensor.inbox-facts",
+    "sensor.team-inbox",
+    "sensor.workspace-instructions",
+    "sensor.skill-catalog",
+)
+
+
 class TestNamedFactoryPlugins:
     """The named factory contract — plugins provide ``sensor.X`` keys."""
 
-    SENSOR_PLUGINS = [
-        ("lca.plugins.sensors.clock", "sensor.clock"),
-        ("lca.plugins.sensors.workspace_artifacts", "sensor.workspace-artifacts"),
-    ]
-
     @pytest.mark.parametrize(
         "module_path,expected_key",
-        SENSOR_PLUGINS,
+        _SENSOR_PLUGINS,
     )
     def test_module_imports(self, module_path: str, expected_key: str) -> None:
         """Each sensor plugin must be importable."""
@@ -50,10 +79,28 @@ class TestNamedFactoryPlugins:
     def test_all_sensor_modules_present(self) -> None:
         """The sensor plugins directory must contain the named factories."""
         sensors_dir = PLUGINS / "sensors"
-        clock = sensors_dir / "clock.py"
-        ws = sensors_dir / "workspace_artifacts.py"
-        assert clock.exists(), f"missing plugin: {clock}"
-        assert ws.exists(), f"missing plugin: {ws}"
+        for name in (
+            "clock.py",
+            "workspace_artifacts.py",
+            "inbox_facts.py",
+            "team_inbox.py",
+            "workspace_instructions.py",
+            "skill_catalog.py",
+        ):
+            path = sensors_dir / name
+            assert path.exists(), f"missing plugin: {path}"
+
+    @pytest.mark.parametrize("module_path,expected_key", _GATE_PLUGINS)
+    def test_gate_module_imports(self, module_path: str, expected_key: str) -> None:
+        mod = importlib.import_module(module_path)
+        assert mod is not None
+        assert hasattr(mod, "setup"), f"{module_path} must expose cordis setup"
+
+    @pytest.mark.parametrize("module_path,expected_key", _ACT_RUNTIME_PLUGINS)
+    def test_act_runtime_module_imports(self, module_path: str, expected_key: str) -> None:
+        mod = importlib.import_module(module_path)
+        assert mod is not None
+        assert hasattr(mod, "setup"), f"{module_path} must expose cordis setup"
 
     def test_guards_dir_no_legacy_dead_plugins(self) -> None:
         """PR4: the dead loop-intervention + step-budget plugins deleted."""
@@ -70,27 +117,17 @@ class TestNamedFactoryPlugins:
 class TestCompositionOrder:
     """The fixed composition order is part of the v3 invariant."""
 
-    EXPECTED_ORDER = [
-        "sensor.clock",
-        "sensor.workspace-artifacts",
-        "sensor.inbox-facts",
-        "sensor.team-inbox",
-        # PR13 / PR14 add sensor.workspace-instructions + sensor.skill-catalog.
-        "sensor.workspace-instructions",
-        "sensor.skill-catalog",
-    ]
-
     def test_expected_order_matches_spec(self) -> None:
         # The order is documented in the spec §5.5 — re-assert it here
         # so a refactor cannot silently reorder sensors.
-        assert self.EXPECTED_ORDER == [
+        assert _EXPECTED_SENSOR_ORDER == (
             "sensor.clock",
             "sensor.workspace-artifacts",
             "sensor.inbox-facts",
             "sensor.team-inbox",
             "sensor.workspace-instructions",
             "sensor.skill-catalog",
-        ]
+        )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -125,6 +162,7 @@ class TestHubConstruction:
 
     def test_hub_accepts_sink_protocol(self) -> None:
         from lca.layer1_cognitive.perceive_sink import ManifestSink, NullSink
+
         # NullSink is a valid ManifestSink.
         assert isinstance(NullSink(), ManifestSink)
 
@@ -180,9 +218,7 @@ class TestSensorBaseClass:
 
         store = RunStore()
         store.append(
-            InboxFollowupCreated(
-                inbox_id="i1", actor="user", target="t", priority="p", step=0
-            )
+            InboxFollowupCreated(inbox_id="i1", actor="user", target="t", priority="p", step=0)
         )
         sensor = InboxFactsSensor(store)
         state = AgentState(trace_id=new_id("trace"), task="t", budget=Budget())

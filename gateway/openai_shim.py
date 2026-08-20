@@ -224,7 +224,15 @@ async def chat_completions(request: Request) -> JSONResponse | StreamingResponse
         return _error_response("invalid JSON body", status_code=400)
     if not isinstance(body, dict):
         return _error_response("request body must be a JSON object", status_code=400)
-    if not llm_status()["llm_available"]:
+    ctx = getattr(request.app.state, "ctx", None)
+    if ctx is None:
+        return _error_response(
+            "gateway boot 未加载 profile，无法执行 LCA run。",
+            status_code=503,
+            error_type="service_unavailable",
+            code="lca_plugin_ctx_missing",
+        )
+    if not llm_status(ctx)["llm_available"]:
         return _error_response(
             "LLM_API_KEY 未配置，无法执行 LCA run。",
             status_code=503,
@@ -246,7 +254,7 @@ async def embeddings_create(request: Request) -> JSONResponse:
     if not isinstance(body, dict):
         return _error_response("request body must be a JSON object", status_code=400)
 
-    if not llm_status()["llm_available"]:
+    if not llm_status(getattr(request.app.state, "ctx", None))["llm_available"]:
         return _error_response(
             "LLM_API_KEY 未配置，无法执行 embeddings。",
             status_code=503,
@@ -288,7 +296,7 @@ async def responses_create(request: Request) -> JSONResponse | StreamingResponse
     if not isinstance(body, dict):
         return _error_response("request body must be a JSON object", status_code=400)
 
-    if not llm_status()["llm_available"]:
+    if not llm_status(getattr(request.app.state, "ctx", None))["llm_available"]:
         return _error_response(
             "LLM_API_KEY 未配置，无法执行 structured output。",
             status_code=503,

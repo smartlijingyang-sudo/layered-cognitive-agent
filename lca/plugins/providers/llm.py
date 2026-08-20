@@ -8,6 +8,7 @@ Profiles swap providers by patching:
   - `config.providers` (list of allowed provider names)
   - `config.api_key` / `config.base_url` (real/deepseek creds)
 """
+
 from __future__ import annotations
 
 from cordis import Context, plugin
@@ -37,7 +38,11 @@ async def setup(ctx: Context, config: Config) -> None:
     if "mock" in config.providers:
         llm.register("mock", MockLLMAdapter(), activate=(target == "mock"))
     if "real" in config.providers:
-        llm.register("real", OpenAICompatAdapter(api_key=config.api_key, base_url=config.base_url), activate=(target == "real"))
+        llm.register(
+            "real",
+            OpenAICompatAdapter(api_key=config.api_key, base_url=config.base_url),
+            activate=(target == "real"),
+        )
     if "deepseek" in config.providers:
         # DeepSeek is OpenAI-compatible; reuse the adapter.
         base = config.base_url or "https://api.deepseek.com"

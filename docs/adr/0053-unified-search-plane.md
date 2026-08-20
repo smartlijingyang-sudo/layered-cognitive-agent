@@ -8,7 +8,7 @@ Accepted — 2026-08-10
 
 LCA gateway runs closed-loop: LobeHub UI starts **one** Run per user turn
 (``POST /runs``); LCA executes the full agent loop internally; tool UI is
-projected from Journal SSE (``GET /runs/{id}/live``). See ``docs/run-live.md``.
+projected from Journal SSE (``GET /runs/{id}/live``). See ``docs/specs/run-live.md``.
 
 Gaps observed in production runs (e.g. 「今天有什么新闻」):
 

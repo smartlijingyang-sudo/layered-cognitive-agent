@@ -5,6 +5,7 @@ standalone plugin types. They live in lca/layer3_agent/orchestration_strategies/
 This plugin registers the strategy registry at the team_lead_factory key
 so the composition root can resolve them.
 """
+
 from __future__ import annotations
 
 from typing import Any

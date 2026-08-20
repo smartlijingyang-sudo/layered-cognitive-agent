@@ -79,6 +79,10 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "lca-gate-progress-detector",
         "lca-dsh-bridge",
         "lca-gateway-starlette",
+        "lca-run-loop-driver-registry",
+        "lca-critic-simple",
+        "lca-blackboard-memory",
+        "lca-journal-store",
         # Sensors (named factories)
         "lca-sensor-clock",
         "lca-sensor-workspace-artifacts",
@@ -90,6 +94,24 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "lca-sensor-prev-patches",
         "sensor.clock",
         "sensor.workspace-artifacts",
+        "sensor.inbox-facts",
+        "sensor.team-inbox",
+        "sensor.workspace-instructions",
+        "sensor.skill-catalog",
+        # Gates (named factories)
+        "gate.repeat-tool-call",
+        "gate.tool-loop-breaker",
+        "gate.progress-loop-detector",
+        "gate.terminal-respond",
+        "gate.artifact-respond-injector",
+        "gate.must-consult-all",
+        "gate.workspace-agent",
+        # Act / runtime
+        "body.simple",
+        "safe_executor.simple",
+        "stop_rule.default",
+        "hook_registry.simple",
+        "middleware_registry.memory",
         # Memory layers
         "lca-memory-four-layer",
         "lca-memory-tree-cache",
@@ -192,9 +214,7 @@ def assert_plugins_are_closed(ids: list[str], *, context: str = "") -> None:
     """Assert every plugin id lives in the closed v3 primitive set."""
     bad = [pid for pid in ids if pid not in _CLOSED_SET]
     if bad:
-        raise AssertionError(
-            f"{context}: plugin ids {bad} are not in the v3 closed set"
-        )
+        raise AssertionError(f"{context}: plugin ids {bad} are not in the v3 closed set")
 
 
 def assert_scenario_references_bundles(scenario: dict[str, Any], *expected: str) -> None:
@@ -209,9 +229,7 @@ def assert_scenario_references_bundles(scenario: dict[str, Any], *expected: str)
 
 def assert_min_plugin_count(ids: list[str], minimum: int, *, context: str = "") -> None:
     """Assert the bundle has at least ``minimum`` plugin entries."""
-    assert len(ids) >= minimum, (
-        f"{context}: expected ≥ {minimum} plugins, got {len(ids)}"
-    )
+    assert len(ids) >= minimum, f"{context}: expected ≥ {minimum} plugins, got {len(ids)}"
 
 
 # ─────────────────────────────────────────────────────────────────────

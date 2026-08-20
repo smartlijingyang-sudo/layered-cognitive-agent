@@ -6,7 +6,7 @@
 | ADR | 标题 | 核心决定 |
 |---|---|---|
 | [0001](0001-five-layer-separation.md) | 五层单向依赖分层 | Accepted |
-| [0002](0002-cognitive-loop.md) | 认知闭环 perceive→think→act→observe→reflect→update | Accepted |
+| [0002](0002-cognitive-loop.md) | 认知闭环 perceive→think→act→observe→reflect→update | Superseded（v3 宪法取代） |
 | [0004](0004-protocol-first-pluggability.md) | Protocol-First 可插拔设计 | Accepted |
 | [0005](0005-composition-root-l4.md) | L4 组合根模式（注册/组装/门面三职责） | Accepted |
 | [0007](0007-interop-mcp-a2a.md) | 原生互操作协议层（MCP / A2A） | Accepted |
@@ -23,7 +23,7 @@
 | [0041](0041-prompt-reasoner-stream-text-delta.md) | PromptReasoner 流式增量文本；answer-delta 归属前端投影 | Proposed |
 | [0042](0042-role-library-and-auto-casting.md) | 角色库与自动组队 — 一句话 → 自动选角 → 既有 Team 执行 | Accepted |
 | [0043](0043-markdown-files-charts-without-lobehub-ui.md) | Markdown/文件产物/图表能力扩展；不引入 @lobehub/ui | Accepted |
-| [0044](0044-code-sandbox-adapters.md) | 代码沙箱适配器 — E2B / local microVM / Mock 多后端 | Accepted |
+| [0044](0044-code-sandbox-adapters.md) | 代码沙箱适配器 — Onlyboxes（退役 E2B / microsandbox） | Accepted |
 | [0045](0045-decision-canonical-intent-shape.md) | Decision 意图形状归一 — Canonical Model + Journal 规范正文 | Accepted |
 | [0046](0046-sandbox-file-roundtrip-contract.md) | 沙箱文件往返契约 — `/mnt/data` 输入 + `/mnt/data/outputs` 产出 | Accepted |
 | [0047](0047-tool-call-wire-anticorruption.md) | 工具调用 Wire 防腐 — finish_reason + 三态 Outcome + 执行闸门 | Accepted |

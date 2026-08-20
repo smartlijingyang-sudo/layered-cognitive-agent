@@ -27,7 +27,7 @@ from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
-from lca.layer4_app.api import Agent, Team
+from lca.layer4_app.api import Agent, Team, ensure_default_ctx
 from lca.layer4_app.runtime_factory import NullPerceiveHub
 
 
@@ -194,6 +194,7 @@ class TestDebateMultiRound:
                 yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
 
         llm = DebateLLM()
+        await ensure_default_ctx()
         a = Agent(role="保守派定价", goal="", backstory="", tools=[], llm=llm, max_steps=2)
         b = Agent(role="激进派定价", goal="", backstory="", tools=[], llm=llm, max_steps=2)
         team = Team(members=[a, b], coordination=Debate(max_rounds=3))

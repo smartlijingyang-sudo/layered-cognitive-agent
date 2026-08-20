@@ -90,6 +90,18 @@ entries:
       api_key: ${LLM_API_KEY}
       base_url: ${LLM_BASE_URL}
 
+  # Sole Tier-2 plugin that reads credentials; provides the resolver that
+  # gateway/runs/execute.py uses to hand an LLMAdapter to each agent.
+  - id: lca-llm-resolver
+    name: lca_llm_resolver
+    $module: lca.plugins.llm_resolver
+    inject: [llm]
+    config:
+      mode: auto
+      api_key_env: LLM_API_KEY
+      base_url_env: LLM_BASE_URL
+      default_model: deepseek-chat
+
   - id: lca-memory-provider
     name: lca_providers_memory
     $module: lca.plugins.providers.memory

@@ -1,15 +1,18 @@
-"""ConcatSynthesizer plugin — Tier-3.
+"""ConcatSynthesizer plugin — named factory ``synthesizer.concat``."""
 
-Stub: synthesizer is a component of ModularBrain, not a separate plugin.
-"""
 from __future__ import annotations
 
-from typing import Any
-
 from cordis import Context, plugin
+from pydantic import BaseModel
+
+from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 @plugin(name="lca-synthesizer-concat")
-async def setup(ctx: Context, config: Any) -> None:
-    """Stub — ModularBrain uses ConcatSynthesizer internally; no separate ctx key."""
-    pass
+async def setup(ctx: Context, config: Config) -> None:
+    """Provide ConcatSynthesizer as ``synthesizer.concat``."""
+    ctx.provide("synthesizer.concat", ConcatSynthesizer)

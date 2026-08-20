@@ -4,7 +4,7 @@
 **状态**: Draft（评审一轮：Issues Found，本版已回填）
 **关联**:
 - [2026-08-14-deepseek-harness-integration-analysis.md](./2026-08-14-deepseek-harness-integration-analysis.md)（借鉴全景；本文**修订**其中「Cordis 插件树替换五层 — 不做」：五层 import 图仍不做，**组合/启动层**改为插件树）
-- [2026-08-15-dsh-compare-driver-design.md](./2026-08-15-dsh-compare-driver-design.md)（DSH 子进程对照跑道保留，是树上的一个可替换 loop 插件）
+- DSH 子进程对照跑道保留，是树上的一个可替换 loop 插件
 - ADR-0004 Protocol-First、ADR-0005 L4 组合根、ADR-0002 认知循环、ADR-0037 Journal-as-Truth
 
 ---
@@ -1858,7 +1858,7 @@ class RunnableHandle(Protocol):
 
 ### 21.2 内核完整代码（全面对齐 Cordis）
 
-> 完整代码见项目 `docs/superpowers/reference/plugin_runtime_full.py`。
+> 完整代码见 `vendor/cordis/`。
 > 下方为精简概览，展示全部新增 API 的使用方式。完整实现约 700 行，覆盖：
 > - 3 种插件形态（Function / Constructor / Object）
 > - 6 状态 Fiber + epoch 依赖追踪 + generator effect

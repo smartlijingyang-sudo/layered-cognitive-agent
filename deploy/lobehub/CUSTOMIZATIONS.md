@@ -2,7 +2,7 @@
 
 > **基准版本**：LobeHub v2.2.13。应用：`python3 deploy/lobehub/patch_lobehub.py apply --reset`
 
-协议 SSOT：`docs/run-live.md`。
+协议 SSOT：`docs/specs/run-live.md`。
 
 ## 架构
 

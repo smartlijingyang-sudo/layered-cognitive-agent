@@ -34,6 +34,11 @@ def _file_store_of(request: Request) -> LocalFileStore:
     return cast("LocalFileStore", request.app.state.file_store)
 
 
+def _ctx_of(request: Request) -> Any:
+    """Cordis Context booted by create_app(); None when running without profile."""
+    return getattr(request.app.state, "ctx", None)
+
+
 _HEARTBEAT_INTERVAL_S = 15.0
 _HEARTBEAT = b": keepalive\n\n"
 
@@ -86,7 +91,15 @@ async def create_run(request: Request) -> JSONResponse:
     """POST /runs — start an LCA run; client then GETs /runs/{id}/live."""
     if request.method == "OPTIONS":
         return JSONResponse({}, headers=cors_headers())
-    if not llm_status()["llm_available"]:
+    ctx = _ctx_of(request)
+    if ctx is None:
+        return _err(
+            "gateway boot 未加载 profile，无法执行 LCA run。",
+            status_code=503,
+            error_type="service_unavailable",
+            code="lca_plugin_ctx_missing",
+        )
+    if not llm_status(ctx)["llm_available"]:
         return _err(
             "LLM_API_KEY 未配置，无法执行 LCA run。",
             status_code=503,
@@ -133,7 +146,7 @@ async def create_run(request: Request) -> JSONResponse:
             extra_plane=str(body.get("extra_plane") or ""),
             execution_target=str(body.get("execution_target") or body.get("executionTarget") or ""),
         )
-        schedule_run(registry, session)
+        schedule_run(registry, session, ctx=ctx)
 
     return JSONResponse(
         {
@@ -301,10 +314,10 @@ async def answer_run(request: Request) -> JSONResponse:
     return JSONResponse({"run_id": run_id, "status": "resumed"}, headers=cors_headers())
 
 
-def health_payload(registry: RunRegistry) -> dict[str, Any]:
+def health_payload(registry: RunRegistry, *, ctx: Any) -> dict[str, Any]:
     return {
         "status": "ok",
-        **llm_status(),
+        **llm_status(ctx),
         "runs": registry.status_counts(),
         "live": registry.live_totals(),
     }

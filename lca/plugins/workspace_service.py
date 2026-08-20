@@ -1,4 +1,5 @@
 """Workspace Service Definition plugin — Tier-1 (minimal stub)."""
+
 from __future__ import annotations
 
 from typing import Any

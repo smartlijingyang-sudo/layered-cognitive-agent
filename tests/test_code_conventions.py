@@ -17,7 +17,7 @@ from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _LCA_ROOT = _PROJECT_ROOT / "lca"
-_GLOSSARY_PATH = _PROJECT_ROOT / "docs" / "glossary.md"
+_GLOSSARY_PATH = _PROJECT_ROOT / "docs" / "specs" / "glossary.md"
 
 # ── 命名禁用词 ──────────────────────────────────────────────────────────
 _BANNED_CLASS_PATTERN = re.compile(
@@ -25,7 +25,7 @@ _BANNED_CLASS_PATTERN = re.compile(
     r"|(Data|Info)$",
 )
 
-# 显式豁免清单（参照 docs/glossary.md "命名约定" 章节）
+# 显式豁免清单（参照 docs/specs/glossary.md "命名约定" 章节）
 _NAME_EXEMPT: dict[str, str] = {
     # Action 策略类：Operation 后缀表达策略模式插槽，非禁用词 Manager/Helper
     "RespondOperation": "Action 策略实现（contracts.protocols.action.Action）",
@@ -161,7 +161,7 @@ def _collect_all_concrete_classes(
 
 
 def _read_glossary_terms() -> set[str]:
-    """从 docs/glossary.md 提取所有术语词条（表格第一列的 **bold** 部分）。"""
+    """从 docs/specs/glossary.md 提取所有术语词条（表格第一列的 **bold** 部分）。"""
     if not _GLOSSARY_PATH.exists():
         return set()
     terms: set[str] = set()
@@ -239,7 +239,7 @@ class TestNoBannedClassNames(unittest.TestCase):
                 continue
             if _BANNED_CLASS_PATTERN.search(cls_name):
                 offenders.append(
-                    f"  - {cls_name}（如需豁免，请在 docs/glossary.md 登记并在 "
+                    f"  - {cls_name}（如需豁免，请在 docs/specs/glossary.md 登记并在 "
                     f"_NAME_EXEMPT 中注明理由）"
                 )
         self.assertFalse(
@@ -312,7 +312,7 @@ class TestGlossaryTermCoverage(unittest.TestCase):
     def test_glossary_term_coverage(self) -> None:
         glossary_terms = _read_glossary_terms()
         if not glossary_terms:
-            self.skipTest("docs/glossary.md 不存在或为空")
+            self.skipTest("docs/specs/glossary.md 不存在或为空")
 
         glossary_text = " ".join(glossary_terms).lower()
 
@@ -339,7 +339,7 @@ class TestGlossaryTermCoverage(unittest.TestCase):
                 f"以下 {len(uncovered_list)} 个类的词根在 glossary.md 中无匹配"
                 f"（仅展示前 10 个）:\n"
                 + "\n".join(uncovered_list[:10])
-                + "\n请在 docs/glossary.md 中补充对应词条。"
+                + "\n请在 docs/specs/glossary.md 中补充对应词条。"
             )
 
 
@@ -355,7 +355,7 @@ class TestGlossaryReverseCoverage(unittest.TestCase):
     def test_active_glossary_terms_exist_in_code(self) -> None:
         terms = _read_active_glossary_terms()
         if not terms:
-            self.skipTest("docs/glossary.md 不存在或为空")
+            self.skipTest("docs/specs/glossary.md 不存在或为空")
 
         # Terms from deleted modules that haven't been moved to the deprecated section yet.
         # Once the glossary is updated, remove these from the skip list.

@@ -1,20 +1,106 @@
 # bundles/web-app.yaml — Web app behavior plugins (Tier-3).
-# Extends bundles/base.yaml with behavior plugins: brain, reasoner,
-# synthesizer, loop, team_lead, guards, gateway, dsh-bridge.
+# Extends bundles/base.yaml with named factories for cognitive primitives:
+# sensors, gates, body, runtime, think internals, loop, team_lead, dsh-bridge.
+#
+# Load order matters: named factories that brain / composer inject must be
+# provided before the consumers (gates before workspace-chain before brain).
 
 entries:
-  # ── Brain strategy (Tier-3) ─────────────────────────────
-  - id: lca-brain-modular
-    name: lca_brain_modular
-    $module: lca.plugins.brain.modular
+  # ── Perceive: named sensor factories (spec §5.5 order) ──
+  - id: sensor.clock
+    name: sensor_clock
+    $module: lca.plugins.sensors.clock
     config: {}
 
-  - id: lca-brain-simple
-    name: lca_brain_simple
-    $module: lca.plugins.brain.simple
+  - id: sensor.workspace-artifacts
+    name: sensor_workspace_artifacts
+    $module: lca.plugins.sensors.workspace_artifacts
     config: {}
 
-  # ── Reasoner + Synthesizer (Tier-3) ────────────────────
+  - id: sensor.inbox-facts
+    name: sensor_inbox_facts
+    $module: lca.plugins.sensors.inbox_facts
+    config: {}
+
+  - id: sensor.team-inbox
+    name: sensor_team_inbox
+    $module: lca.plugins.sensors.team_inbox
+    config: {}
+
+  - id: sensor.workspace-instructions
+    name: sensor_workspace_instructions
+    $module: lca.plugins.sensors.workspace_instructions
+    config: {}
+
+  - id: sensor.skill-catalog
+    name: sensor_skill_catalog
+    $module: lca.plugins.sensors.skill_catalog
+    config: {}
+
+  # ── Gate: individual DecisionGate factories, then the workspace chain ──
+  - id: gate.repeat-tool-call
+    name: gate_repeat_tool_call
+    $module: lca.plugins.gates.repeat_tool_call
+    config: {}
+
+  - id: gate.tool-loop-breaker
+    name: gate_tool_loop_breaker
+    $module: lca.plugins.gates.tool_loop_breaker
+    config: {}
+
+  - id: gate.progress-loop-detector
+    name: gate_progress_loop_detector
+    $module: lca.plugins.gates.progress_loop_detector
+    config: {}
+
+  - id: gate.terminal-respond
+    name: gate_terminal_respond
+    $module: lca.plugins.gates.terminal_respond
+    config: {}
+
+  - id: gate.artifact-respond-injector
+    name: gate_artifact_respond_injector
+    $module: lca.plugins.gates.artifact_respond_injector
+    config: {}
+
+  - id: gate.must-consult-all
+    name: gate_must_consult_all
+    $module: lca.plugins.gates.must_consult_all
+    config: {}
+
+  - id: gate.workspace-agent
+    name: gate_workspace_agent
+    $module: lca.plugins.gates.workspace_chain
+    config: {}
+
+  # ── Act / world plane ──
+  - id: body.simple
+    name: body_simple
+    $module: lca.plugins.body.simple
+    config: {}
+
+  - id: safe_executor.simple
+    name: safe_executor_simple
+    $module: lca.plugins.body.safe_executor
+    config: {}
+
+  # ── Runtime primitives ──
+  - id: stop_rule.default
+    name: stop_rule_default
+    $module: lca.plugins.runtime.stop_rule
+    config: {}
+
+  - id: hook_registry.simple
+    name: hook_registry_simple
+    $module: lca.plugins.runtime.hook_registry
+    config: {}
+
+  - id: middleware_registry.memory
+    name: middleware_registry_memory
+    $module: lca.plugins.runtime.middleware
+    config: {}
+
+  # ── Think internals (named factories consumed by brain factory) ──
   - id: lca-reasoner-prompt
     name: lca_reasoner_prompt
     $module: lca.plugins.reasoner.prompt
@@ -25,25 +111,51 @@ entries:
     $module: lca.plugins.synthesizer.concat
     config: {}
 
+  - id: lca-critic-simple
+    name: lca_critic_simple
+    $module: lca.plugins.critic.simple
+    config: {}
+
+  # ── Brain strategy (after think internals + gate.workspace-agent) ──
+  - id: lca-brain-modular
+    name: lca_brain_modular
+    $module: lca.plugins.brain.modular
+    config: {}
+
+  - id: lca-brain-simple
+    name: lca_brain_simple
+    $module: lca.plugins.brain.simple
+    config: {}
+
+  # ── Collaboration ──
+  - id: lca-blackboard-memory
+    name: lca_blackboard_memory
+    $module: lca.plugins.collaboration.blackboard
+    config: {}
+
+  # ── Journal store (named factory; Composer instantiates per-run) ──
+  - id: lca-journal-store
+    name: lca_journal_store
+    $module: lca.plugins.journal_store
+    config: {}
+
+  # ── Run-loop driver registry (Tier-3) ─────────────
+  # Empty registry; loop plugins below register their drivers into it.
+  # ``default`` is the fallback target when ``/runs`` omits
+  # ``execution_target``.
+  - id: lca-run-loop-driver-registry
+    name: lca_run_loop_driver_registry
+    $module: lca.plugins.run_loop_driver_registry
+    config:
+      default: cognitive
+
   # ── Loop drivers (Tier-3) ───────────────────────────
   - id: lca-loop-cognitive
     name: lca_loop_cognitive
     $module: lca.plugins.loop_cognitive
-    config: {}
-
-  - id: lca-loop-dsh-bridge
-    name: lca_loop_dsh_bridge
-    $module: lca.plugins.loop_dsh_bridge
-    inject: [session_store]
+    inject: [run_loop_driver_registry]
     config:
-      disabled: true
-
-  - id: lca-loop-replay
-    name: lca_loop_replay
-    $module: lca.plugins.loop_replay
-    inject: [session_store]
-    config:
-      disabled: true
+      target: cognitive
 
   # ── Team lead (Tier-3 — only lead is plugin-ized; 6 coordinations are plain dataclasses) ──
   - id: lca-team-lead-board
@@ -51,27 +163,8 @@ entries:
     $module: lca.plugins.team_lead.board
     config: {}
 
-  # ── Guards removed in PR4 (cognitive-primitive v3): ──────────────
-  # lca-guard-loop-intervention  — deleted; use RepeatToolCallGate + PolicyFact
-  # lca-guard-step-budget        — deleted; budget is StopRule's job
-  #
-  # The plugin-meta entry below is kept as the canonical replacement
-  # (named factory registered at PR4/12) so bundle loaders can wire it.
-  - id: lca-gate-repeat-tool-call
-    name: lca_gate_repeat_tool_call
-    $module: lca.layer1_cognitive.brain.decision_gates.repeat_tool_call
-    config:
-      threshold: 3
-
   # ── DSH Bridge (Tier-3) ─────────────────────────────
   - id: lca-dsh-bridge
     name: lca_dsh_bridge
     $module: lca.plugins.dsh.bridge
-    config: {}
-
-  # ── Gateway (Tier-3 — HTTP carrier) ────────────────
-  - id: lca-gateway-starlette
-    name: lca_gateway_starlette
-    $module: lca.plugins.gateway_starlette
-    inject: [sessions, projections]
     config: {}

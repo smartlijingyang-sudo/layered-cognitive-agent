@@ -1,16 +1,23 @@
-"""PromptReasoner plugin — Tier-3.
+"""PromptReasoner plugin — named factory ``reasoner.prompt``."""
 
-Stub: the reasoner is a component of ModularBrain, not a separate
-plugin. This plugin exists to register the brain factory.
-"""
 from __future__ import annotations
 
-from typing import Any
-
 from cordis import Context, plugin
+from pydantic import BaseModel
+
+from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 @plugin(name="lca-reasoner-prompt")
-async def setup(ctx: Context, config: Any) -> None:
-    """Stub — ModularBrain uses PromptReasoner internally; no separate ctx key."""
-    pass
+async def setup(ctx: Context, config: Config) -> None:
+    """Provide the PromptReasoner class as ``reasoner.prompt``.
+
+    ModularBrain still constructs Reasoner internally; this key lets a
+    Composer or an alternate Brain factory resolve the Standard reasoner
+    without importing layer1.
+    """
+    ctx.provide("reasoner.prompt", PromptReasoner)
