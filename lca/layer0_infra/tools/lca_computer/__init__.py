@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from lca.contracts.protocols import Sandbox, Tool
@@ -31,7 +32,7 @@ __all__ = [
 ]
 
 
-def _computer_obs_builder(store: FileStore):
+def _computer_obs_builder(store: FileStore) -> Callable[..., Any]:
     """Return an observation builder bound to a FileStore."""
 
     def _build(raw: Any, tool_name: str, start: float) -> Any:

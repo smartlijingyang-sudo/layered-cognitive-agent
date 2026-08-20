@@ -69,11 +69,6 @@ entries:
     $module: lca.plugins.state_store_service
     config: {}
 
-  - id: lca-agent-service
-    name: lca_agent_service
-    $module: lca.plugins.agent_service
-    config: {}
-
   - id: lca-attachment-service
     name: lca_attachment_service
     $module: lca.plugins.attachment_service

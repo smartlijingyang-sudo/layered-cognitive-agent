@@ -1,7 +1,7 @@
 """Memory Provider plugin — Tier-2."""
 from __future__ import annotations
 
-from cordis import plugin
+from cordis import Context, plugin
 from pydantic import BaseModel, Field
 
 
@@ -11,7 +11,7 @@ class Config(BaseModel):
 
 
 @plugin(name="lca-memory-provider", inject=["memory"])
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: Context, config: Config) -> None:
     from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
     if "simple" in config.providers:

@@ -177,6 +177,13 @@ warn_redundant_casts = true
 warn_return_any = true
 disallow_untyped_defs = true
 check_untyped_defs = true
+# lca/packages/* 是上游 deepseek-harness 的源码镜像，目录名带连字符（非合法 Python 包），
+# mypy 会静默跳过扫描整个 lca/ 并返回 0，导致类型检查实际失效。这里显式排除。
+exclude = [
+    "^lca/packages/.*",
+    "^lca/contracts/protocols/.*",
+    "^lca/layer0_infra/llm_adapter/openai_compat/.*",
+]
 # contracts 层使用 stdlib dataclass，不迁移到 Pydantic
 
 [[tool.mypy.overrides]]

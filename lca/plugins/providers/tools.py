@@ -1,7 +1,7 @@
 """Tools Provider plugin — Tier-2 (tool factories)."""
 from __future__ import annotations
 
-from cordis import plugin
+from cordis import Context, plugin
 from pydantic import BaseModel, Field
 
 
@@ -11,7 +11,7 @@ class Config(BaseModel):
 
 
 @plugin(name="lca-tools-provider", inject=["tools"])
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: Context, config: Config) -> None:
     from lca.layer0_infra.tools.default_set import build_default_tools
 
     if "g2a" in config.factories:

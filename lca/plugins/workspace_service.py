@@ -1,7 +1,9 @@
 """Workspace Service Definition plugin — Tier-1 (minimal stub)."""
 from __future__ import annotations
 
-from cordis import plugin
+from typing import Any
+
+from cordis import Context, plugin
 
 
 class WorkspaceService:
@@ -26,5 +28,5 @@ class WorkspaceService:
 
 
 @plugin(name="lca-workspace-service")
-async def setup(ctx, config) -> None:
+async def setup(ctx: Context, config: Any) -> None:
     ctx.provide("workspace", WorkspaceService())

@@ -10,7 +10,7 @@ Profiles swap providers by patching:
 """
 from __future__ import annotations
 
-from cordis import plugin
+from cordis import Context, plugin
 from pydantic import BaseModel, Field
 
 
@@ -23,7 +23,7 @@ class Config(BaseModel):
 
 
 @plugin(name="lca-llm-provider", inject=["llm"])
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: Context, config: Config) -> None:
     from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
     from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
 

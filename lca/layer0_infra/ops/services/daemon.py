@@ -165,7 +165,7 @@ class DaemonService:
         """True when CLI source differs from last deployed snapshot."""
         return self._state.detect_changes("daemon_cli", self._cli_src_paths, "*.ts").has_changes
 
-    def _cli_change_report(self):
+    def _cli_change_report(self) -> object:
         """Rich change report for status display."""
         return self._state.detect_changes("daemon_cli", self._cli_src_paths, "*.ts")
 

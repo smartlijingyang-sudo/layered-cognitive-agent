@@ -1,7 +1,7 @@
 """File Store Provider plugin — Tier-2."""
 from __future__ import annotations
 
-from cordis import plugin
+from cordis import Context, plugin
 from pydantic import BaseModel, Field
 
 
@@ -11,7 +11,7 @@ class Config(BaseModel):
 
 
 @plugin(name="lca-file-store-provider", inject=["file_store"])
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: Context, config: Config) -> None:
     from lca.layer0_infra.file_store import get_default_file_store
 
     if "local" in config.providers:

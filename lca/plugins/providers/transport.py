@@ -1,7 +1,7 @@
 """Transport Provider plugin — Tier-2 (Internal / A2A / MCP)."""
 from __future__ import annotations
 
-from cordis import plugin
+from cordis import Context, plugin
 from pydantic import BaseModel, Field
 
 
@@ -11,7 +11,7 @@ class Config(BaseModel):
 
 
 @plugin(name="lca-transport-provider", inject=["transport"])
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: Context, config: Config) -> None:
     from lca.layer0_infra.transport.a2a_transport import A2ATransport
     from lca.layer0_infra.transport.agent_transport import InternalTransport
     from lca.layer0_infra.transport.mcp_transport import MCPTransport

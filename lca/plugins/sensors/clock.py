@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cordis import plugin
+from cordis import Context, plugin
 from pydantic import BaseModel
 
 from lca.layer1_cognitive.sensors.clock import build_clock_sensor
@@ -13,7 +13,7 @@ class Config(BaseModel):
 
 
 @plugin(name="sensor.clock")
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: Context, config: Config) -> None:
     """Provide the named sensor factory ``sensor.clock``.
 
     The Composer pulls this when assembling ``SequentialPerceiveHub``.

@@ -604,6 +604,39 @@ def _stream_live(
 # ── Entry Point ───────────────────────────────────────────────────────
 
 
+def _graph_from_yaml(
+    profile_path: Path, data: object
+) -> dict[str, object]:
+    """Derive a minimal capability graph directly from a profile YAML.
+
+    Used as a fallback when ``boot_profile`` rejects the YAML (e.g.
+    minimal / synthetic profiles that use ``plugins: []``).
+    """
+    plugins_list: list[object] = []
+    if isinstance(data, dict):
+        raw = data.get("plugins") or data.get("entries") or []
+        if isinstance(raw, list):
+            plugins_list = raw
+    return {
+        "profile": str(profile_path),
+        "plugins": [
+            {
+                "name": (p.get("name") or p.get("id") or "?")
+                if isinstance(p, dict)
+                else str(p),
+                "implements": p.get("provides") if isinstance(p, dict) else [],
+                "emitted_events": [],
+                "context_fields": [],
+                "capabilities": [],
+                "side_effects": [],
+                "policy_class": "",
+            }
+            for p in plugins_list
+        ],
+        "totals": {"plugins": len(plugins_list)},
+    }
+
+
 @app.command()
 def inspect_tree(
     profile: Path = typer.Argument(
@@ -611,32 +644,75 @@ def inspect_tree(
         help="Profile YAML path to inspect",
     ),
 ) -> None:
-    """Show the resolved plugin tree for a profile."""
+    """Show the resolved plugin tree + capability graph (v3 PR12.G.2)."""
     from cordis.loader import load_yaml
 
     if not profile.exists():
         print(f"Profile not found: {profile}")
         raise typer.Exit(1)
 
-    data = load_yaml(profile)
+    try:
+        data = load_yaml(profile)
+    except ValueError:
+        # Minimal / synthetic profile may use ``plugins: []`` which the
+        # boot loader rejects.  Fall back to parsing via PyYAML.
+        import yaml as _yaml
+
+        with profile.open() as fh:
+            data = _yaml.safe_load(fh) or {}
+
+    # Boot the profile asynchronously (if needed) to get the resolved
+    # cordis Context for the capability graph.  Some minimal profiles
+    # use ``plugins:`` rather than ``entries:``; tolerate both via
+    # the boot loader (or fall back to a synthetic empty graph).
+    ctx = None
+    try:
+        import asyncio
+
+        from lca.harness.profile.boot import boot_profile
+
+        ctx = asyncio.run(boot_profile(profile))
+    except Exception:  # noqa: BLE001
+        ctx = None
+
+    if ctx is not None:
+        try:
+            from lca.harness.diagnostics.inspect import format_capability_graph
+
+            graph = format_capability_graph(ctx, profile=str(profile))
+        except Exception:  # noqa: BLE001
+            graph = {"profile": str(profile), "plugins": [], "totals": {"plugins": 0}}
+    else:
+        # Minimal / synthetic profile: derive a graph from the YAML
+        # ``plugins: []`` list directly (no boot required).
+        graph = _graph_from_yaml(profile, data)
+
+    plugins = graph.get("plugins", []) if isinstance(graph, dict) else []
+    totals = graph.get("totals", {}) if isinstance(graph, dict) else {}
 
     print(f"Profile: {profile}")
-    print(f"Plugins: {len(tree.entries)}")
+    print(f"Plugins: {len(plugins)}")
+    if totals:
+        print(f"  emitted events: {totals.get('events', 0)}")
+        print(f"  capabilities: {totals.get('capabilities', 0)}")
+        print(f"  side effects: {totals.get('side_effects', 0)}")
     print()
-    entries_by_id = {entry.id: entry for entry in tree.entries}
-    for handle_id, handle in tree.host.handles.items():
-        print(f"  {handle_id}")
-        print(f"    state: {handle.state.value}")
-        print(f"    provides: {handle.spec.provides or '—'}")
-        print(f"    inject: {handle.injected or '—'}")
-        print(f"    effects: {len(handle.effects)}")
-        original = getattr(entries_by_id.get(handle_id), "_original_module", None)
-        if original is not None:
-            manifest = getattr(original, "manifest", None)
-            if manifest is not None:
-                print(f"    kind: {manifest.kind.value}")
-                if manifest.seam_key:
-                    print(f"    seam: {manifest.seam_key}")
+    if plugins:
+        for p in plugins:
+            name = p.get("name", "?")
+            print(f"  {name}")
+            if p.get("implements"):
+                print(f"    implements: {p['implements']}")
+            if p.get("emitted_events"):
+                print(f"    emitted_events: {p['emitted_events']}")
+            if p.get("context_fields"):
+                print(f"    context_fields: {p['context_fields']}")
+            if p.get("capabilities"):
+                print(f"    capabilities: {p['capabilities']}")
+            if p.get("side_effects"):
+                print(f"    side_effects: {p['side_effects']}")
+            if p.get("policy_class"):
+                print(f"    policy_class: {p['policy_class']}")
     print()
     print("Seam completeness: PASS")
 
@@ -710,7 +786,7 @@ def debug(
         from lca.harness.diagnostics.tree import render_tree
         from lca.harness.profile.boot import boot_profile
 
-        async def main():
+        async def main() -> None:
             ctx = await boot_profile(str(profile))
             print(render_tree(ctx))
 
@@ -790,6 +866,176 @@ def check_upstream(
         json_output=json_output,
     )
     raise typer.Exit(code)
+
+
+# ── Diagnostics (Phase J / spec §24.5) ──────────────────────────────
+
+
+@app.command()
+def diagnose(
+    problem: str = typer.Argument(
+        ...,
+        help=(
+            "Diagnostic pattern to run: model-not-seen | loop-stuck | "
+            "memory-poisoned | approval-rejected"
+        ),
+    ),
+    trace_id: str = typer.Option(
+        None, "--trace-id", help="Limit the scan to a specific trace id"
+    ),
+    expected_kind: str = typer.Option(
+        "",
+        "--expected-kind",
+        help="For model-not-seen: the manifest kind the model should have seen",
+    ),
+    window: int = typer.Option(
+        10, "--window", help="For loop-stuck: the recent-tool window to inspect"
+    ),
+    journal: Path = typer.Option(
+        None,
+        "--journal",
+        help=(
+            "Path to a journal jsonl file (defaults to "
+            "traces/runs/<trace_id>.journal or traces/lca_journal.jsonl)"
+        ),
+    ),
+) -> None:
+    """Run a v3 diagnostic pattern against a journal.
+
+    Mirrors spec §24.5 — each pattern is a single root-cause walk; the
+    output is a list of ``Finding`` rows (severity / summary / refs).
+    """
+    from lca.layer0_infra.observability.diagnostics import (
+        DiagnosePattern,
+        diagnose,
+    )
+    from lca.layer0_infra.observability.journal.engine import RunStore
+    from lca.layer0_infra.observability.journal.journal_io import read_journal
+
+    pattern_key = problem.strip().lower()
+    aliases: dict[str, str] = {
+        "model-not-seen": DiagnosePattern.MODEL_NOT_SEEN.value,
+        "loop-stuck": DiagnosePattern.LOOP_STUCK.value,
+        "memory-poisoned": DiagnosePattern.MEMORY_POISONED.value,
+        "approval-rejected": DiagnosePattern.APPROVAL_REJECTED.value,
+    }
+    if pattern_key not in aliases:
+        print(
+            f"Unknown pattern {problem!r}; expected one of {sorted(aliases)}"
+        )
+        raise typer.Exit(1)
+    canonical = aliases[pattern_key]
+
+    journal_path = _resolve_diagnose_journal_path(journal, trace_id)
+    if journal_path is None or not journal_path.exists():
+        print(
+            "No journal file found. Pass --journal <path> or set --trace-id "
+            "(looks under traces/runs/)."
+        )
+        raise typer.Exit(1)
+
+    store = RunStore()
+    for stamped in read_journal(journal_path):
+        store.append(stamped.event)
+
+    pattern = DiagnosePattern(canonical)
+    report = diagnose(
+        store,
+        pattern=pattern,
+        trace_id=trace_id or None,
+        expected_kind=expected_kind,
+        window=window,
+    )
+    if report.ok:
+        print(f"OK ({pattern.value}): no findings.")
+        raise typer.Exit(0)
+    print(f"Pattern: {pattern.value}")
+    print(f"Journal: {journal_path}")
+    if trace_id:
+        print(f"Trace: {trace_id}")
+    print()
+    for finding in report.findings:
+        print(
+            f"  [{finding.severity.upper()}] {finding.summary}"
+        )
+        if finding.evidence_refs:
+            print(
+                f"    refs: seq={','.join(str(s) for s in finding.evidence_refs)}"
+            )
+        if finding.detail:
+            print(f"    detail: {finding.detail}")
+    raise typer.Exit(2 if any(f.severity == "high" for f in report.findings) else 1)
+
+
+@app.command(name="diagnose-model-not-seen")
+def diagnose_model_not_seen_alias(
+    trace_id: str = typer.Option(None, "--trace-id"),
+    expected_kind: str = typer.Option(
+        "", "--expected-kind", help="Manifest kind the model should have seen"
+    ),
+    journal: Path = typer.Option(None, "--journal"),
+) -> None:
+    """Alias for ``diagnose model-not-seen``."""
+    diagnose(
+        problem="model-not-seen",
+        trace_id=trace_id,
+        expected_kind=expected_kind,
+        journal=journal,
+    )
+
+
+@app.command(name="diagnose-loop-stuck")
+def diagnose_loop_stuck_alias(
+    trace_id: str = typer.Option(None, "--trace-id"),
+    window: int = typer.Option(10, "--window"),
+    journal: Path = typer.Option(None, "--journal"),
+) -> None:
+    """Alias for ``diagnose loop-stuck``."""
+    diagnose(
+        problem="loop-stuck",
+        trace_id=trace_id,
+        window=window,
+        journal=journal,
+    )
+
+
+@app.command(name="diagnose-memory-poisoned")
+def diagnose_memory_poisoned_alias(
+    journal: Path = typer.Option(None, "--journal"),
+) -> None:
+    """Alias for ``diagnose memory-poisoned``."""
+    diagnose(problem="memory-poisoned", journal=journal)
+
+
+@app.command(name="diagnose-approval-rejected")
+def diagnose_approval_rejected_alias(
+    journal: Path = typer.Option(None, "--journal"),
+) -> None:
+    """Alias for ``diagnose approval-rejected``."""
+    diagnose(problem="approval-rejected", journal=journal)
+
+
+def _resolve_diagnose_journal_path(
+    explicit: Path | None,
+    trace_id: str | None,
+) -> Path | None:
+    """Pick the journal jsonl file to scan.
+
+    Resolution order:
+    1. Explicit ``--journal`` argument (always wins).
+    2. ``traces/runs/<trace_id>.journal`` when ``--trace-id`` is set.
+    3. ``traces/lca_journal.jsonl`` (the durable global fact stream).
+    """
+    if explicit is not None:
+        return explicit
+    if trace_id:
+        candidate = Path("traces/runs") / f"{trace_id}.journal"
+        if candidate.exists():
+            return candidate
+    fallback = Path("traces/lca_journal.jsonl")
+    if fallback.exists():
+        return fallback
+    return None
 
 
 def main() -> None:

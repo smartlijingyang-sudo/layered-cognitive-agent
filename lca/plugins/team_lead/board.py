@@ -7,11 +7,13 @@ so the composition root can resolve them.
 """
 from __future__ import annotations
 
-from cordis import plugin
+from typing import Any
+
+from cordis import Context, plugin
 
 
 @plugin(name="lca-team-lead-board")
-async def setup(ctx, config) -> None:
+async def setup(ctx: Context, config: Any) -> None:
     """Register the team strategy registry at team_lead_factory."""
     from lca.layer3_agent.orchestration_registry import TeamStrategyRegistry
 

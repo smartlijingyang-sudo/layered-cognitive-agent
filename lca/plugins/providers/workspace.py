@@ -5,7 +5,7 @@ This Tier-2 stub is a safe default that registers a no-op workspace.
 """
 from __future__ import annotations
 
-from cordis import plugin
+from cordis import Context, plugin
 from pydantic import BaseModel, Field
 
 
@@ -15,6 +15,6 @@ class Config(BaseModel):
 
 
 @plugin(name="lca-workspace-provider", inject=["workspace"])
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: Context, config: Config) -> None:
     """WorkspaceService does not exist yet; deferred to follow-up."""
     pass

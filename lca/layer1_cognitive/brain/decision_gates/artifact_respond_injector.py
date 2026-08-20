@@ -1,4 +1,4 @@
-"""Artifact respond injector — append authoritative file list to respond text (ADR-0051).
+"""Artifact respond injector — append authoritative file list to respond text (ADR-0051 / PR6.D.4).
 
 Design principle: *system facts do not transit through the LLM.*  File URLs,
 MIME types, and sizes are system facts produced by the file store.  The LLM
@@ -9,6 +9,12 @@ this gate:
 1. Rewrites relative markdown hrefs (``](01_foo.png)``) to ledger URLs
 2. Strips ``/files/file_<hex>`` references that are *not* on the ledger
 3. Appends the authoritative ``closure_text()`` if it is not already present
+
+v3 §5.1 / PR6.D.4: the artifact snapshot is read from the typed manifest
+slot (``PerceiveState.current_manifest`` → ``workspace_artifacts`` item),
+NOT from a live ``get_run_workspace()`` call.  Live workspace reads are
+forbidden in cognitive gates (per spec §3.5 — Gate is think-plane, not
+hand-plane).
 """
 
 from __future__ import annotations
@@ -17,37 +23,69 @@ import re
 
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.models.core.decision import Decision
+from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
-from lca.layer0_infra.workspace import get_run_workspace
-from lca.layer0_infra.workspace.artifact_ledger import (
-    artifact_closure_text,
-    rewrite_artifact_markdown,
-)
+from lca.contracts.protocols import DecisionGate
+from lca.layer0_infra.workspace.artifact_ledger import rewrite_artifact_markdown
 
 _FILE_MD_RE = re.compile(r"\[([^\]]*)\]\((/files/file_[a-f0-9]+)\)")
 _BARE_FILE_URL_RE = re.compile(r"(?<!\w)(/files/file_[a-f0-9]+)\b")
 
 
-class ArtifactRespondInjector:
-    """Post-process respond decisions: rewrite paths and append the ledger."""
+def _artifacts_from_manifest(state: AgentState) -> list[dict[str, object]]:
+    """Read the ``workspace_artifacts`` item from the typed manifest.
+
+    Returns ``[]`` if the manifest is absent or has no artifact item.
+    The item payload is the list of dicts produced by
+    ``WorkspaceArtifactsSensor`` (path / url / mime / size keys).
+    """
+    manifest = PerceiveState.from_agent_state(state).current_manifest
+    if manifest is None:
+        return []
+    for item in manifest.items:
+        if item.kind == "workspace_artifacts" and isinstance(item.payload, list):
+            return [a for a in item.payload if isinstance(a, dict)]
+    return []
+
+
+def _format_closure(artifacts: list[dict[str, object]]) -> str:
+    """Build the authoritative artifact closure text from manifest payload."""
+    if not artifacts:
+        return ""
+    lines = ["Workspace artifacts:"]
+    for art in artifacts:
+        path = art.get("path", "")
+        url = art.get("url", "")
+        mime = art.get("mime", "")
+        size = art.get("size", 0)
+        lines.append(f"- {path} ({mime}, {size}B) {url}")
+    return "\n".join(lines)
+
+
+class ArtifactRespondInjector(DecisionGate):
+    """Post-process respond decisions: rewrite paths and append the ledger.
+
+    v3 PR6.D.4 + PR4.C.3: explicitly inherits ``DecisionGate`` and
+    reads the artifact snapshot from the typed manifest slot
+    (``workspace_artifacts`` kind item); never calls ``get_run_workspace()``.
+    """
 
     async def enforce(self, state: AgentState, decision: Decision) -> Decision:
         if decision.action_type != ActionType.RESPOND:
             return decision
 
-        workspace = get_run_workspace()
-        if workspace is None:
+        artifacts = _artifacts_from_manifest(state)
+        if not artifacts:
             return decision
 
-        snapshot = workspace.artifacts.snapshot()
-        if not snapshot.artifacts:
-            return decision
+        # Build a minimal ledger-shaped snapshot for the rewrite helpers.
+        snapshot = _ledger_snapshot_from_manifest(artifacts)
 
         original_text = decision.response_text or ""
         rewritten = rewrite_artifact_markdown(original_text, snapshot)
-        known = {art.url for art in snapshot.artifacts if art.url}
+        known = {str(art.get("url")) for art in artifacts if art.get("url")}
         cleaned = _strip_unknown_file_urls(rewritten, known)
-        closure = artifact_closure_text(snapshot)
+        closure = _format_closure(artifacts)
         if closure and closure not in cleaned:
             merged = f"{cleaned.rstrip()}\n\n{closure}" if cleaned.strip() else closure
         else:
@@ -60,10 +98,35 @@ class ArtifactRespondInjector:
             confidence=decision.confidence,
             response_text=merged,
             tool_calls=decision.tool_calls,
-            delegations=decision.delegations,
+ delegations=decision.delegations,
             degraded_from=decision.degraded_from,
             extra=decision.extra,
         )
+
+
+def _ledger_snapshot_from_manifest(
+    artifacts: list[dict[str, object]],
+) -> object:
+    """Build the minimal ``ArtifactLedgerSnapshot`` shape for the rewrite helpers.
+
+    The legacy helpers (``rewrite_artifact_markdown`` etc.) expect a
+    snapshot object with ``artifacts`` (list of objects with ``url`` /
+    path / mime attrs).  We materialize duck-typed objects from the
+    manifest payload.
+    """
+    from types import SimpleNamespace
+
+    artifact_ns = [
+        SimpleNamespace(
+            url=str(a.get("url", "")),
+            name=str(a.get("name") or a.get("path") or ""),
+            path=str(a.get("path", "")),
+            mime=str(a.get("mime", "")),
+            size=a.get("size", 0),
+        )
+        for a in artifacts
+    ]
+    return SimpleNamespace(artifacts=artifact_ns)
 
 
 def _strip_unknown_file_urls(text: str, known_urls: set[str]) -> str:

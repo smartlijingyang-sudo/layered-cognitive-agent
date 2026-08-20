@@ -38,7 +38,6 @@ _LEGACY_PLUGINS = [
     "lca.plugins.loop_dsh_bridge",
     "lca.plugins.loop_replay",
     "lca.plugins.gateway_starlette",
-    "lca.plugins.agent_service",
     "lca.plugins.seam_definitions",
 ]
 

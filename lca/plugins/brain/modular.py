@@ -1,11 +1,13 @@
 """ModularBrain strategy plugin — Tier-3."""
 from __future__ import annotations
 
-from cordis import plugin
+from typing import Any
+
+from cordis import Context, plugin
 
 
 @plugin(name="lca-brain-modular")
-async def setup(ctx, config) -> None:
+async def setup(ctx: Context, config: Any) -> None:
     """Register the ModularBrain as 'modular' in the brain factory.
 
     The factory itself is a callable (SimpleBrainFactory) that returns a brain

@@ -317,7 +317,7 @@ def _apply_activation(state: AgentState, activated: tuple[ActivatedSkill, ...]) 
     return state
 
 
-def _apply_manifest(state: AgentState, manifest) -> AgentState:
+def _apply_manifest(state: AgentState, manifest: object) -> AgentState:
     """Reduce a ``ContextManifest`` into state via the typed slot (PR3a).
 
     The Hub already wrote ``current_manifest`` into PerceiveState; this
@@ -329,7 +329,7 @@ def _apply_manifest(state: AgentState, manifest) -> AgentState:
     return state
 
 
-def _apply_stop(state: AgentState, stop) -> AgentState:
+def _apply_stop(state: AgentState, stop: object) -> AgentState:
     """Reduce a ``StopDecision`` into state (PR5).
 
     The StopRule is pure (no AgentState mutation).  This function is the

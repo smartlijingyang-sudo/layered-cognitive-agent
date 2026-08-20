@@ -36,7 +36,7 @@ __all__ = [
 _LAZY_LAYER4 = frozenset({"Agent", "Team", "TeamLead"})
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> object:
     """Defer layer4 imports so ``lca.layer0_infra.*`` works in slim runtimes (DSH daemon)."""
     if name not in _LAZY_LAYER4:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

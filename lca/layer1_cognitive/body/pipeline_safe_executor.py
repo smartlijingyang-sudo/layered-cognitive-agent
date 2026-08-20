@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import structlog
@@ -131,7 +132,7 @@ class PipelineSafeExecutor(SafeExecutor):
         pipeline.add_pre_execute(self._pre_execute_check(tool))
         return pipeline
 
-    def _pre_execute_check(self, tool: Tool):
+    def _pre_execute_check(self, tool: Tool) -> Callable[[ToolExecutionContext], Awaitable[ToolPreDecision]]:
         async def check(ctx: ToolExecutionContext) -> ToolPreDecision:
             return self._check_permission_and_args(tool, ctx.args)
 

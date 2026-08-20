@@ -1,7 +1,7 @@
 """Skills Provider plugin — Tier-2."""
 from __future__ import annotations
 
-from cordis import plugin
+from cordis import Context, plugin
 from pydantic import BaseModel, Field
 
 
@@ -11,7 +11,7 @@ class Config(BaseModel):
 
 
 @plugin(name="lca-skills-provider", inject=["skills"])
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: Context, config: Config) -> None:
     from lca.layer0_infra.skills.factory import resolve_skill_store
 
     if "disk" in config.providers:

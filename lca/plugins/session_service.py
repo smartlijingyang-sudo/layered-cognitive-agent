@@ -7,7 +7,9 @@ For now, this provides a minimal SessionService that records events.
 """
 from __future__ import annotations
 
-from cordis import plugin
+from typing import Any
+
+from cordis import Context, plugin
 
 from lca.contracts.observability.session_events import SessionEventType
 
@@ -30,5 +32,5 @@ class SessionService:
 
 
 @plugin(name="lca-session-service")
-async def setup(ctx, config) -> None:
+async def setup(ctx: Context, config: Any) -> None:
     ctx.provide("session_service", SessionService())

@@ -1,5 +1,7 @@
 """Service implementations."""
 
+from lca.layer0_infra.ops.config import OpsConfig
+from lca.layer0_infra.ops.registry import ServiceRegistry
 from lca.layer0_infra.ops.services.daemon import DaemonService
 from lca.layer0_infra.ops.services.dsh import DshService
 from lca.layer0_infra.ops.services.gateway import GatewayService
@@ -18,10 +20,8 @@ __all__ = [
 ]
 
 
-def build_registry(config):
+def build_registry(config: OpsConfig) -> ServiceRegistry:
     """Create a ServiceRegistry with all services from config."""
-    from lca.layer0_infra.ops.registry import ServiceRegistry
-
     registry = ServiceRegistry()
     registry.register(InfraService(config.infra, config.state_dir))
     registry.register(GatewayService(config.gateway, config.state_dir, config.root))

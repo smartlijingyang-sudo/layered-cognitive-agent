@@ -5,10 +5,12 @@ plugin. This plugin exists to register the brain factory.
 """
 from __future__ import annotations
 
-from cordis import plugin
+from typing import Any
+
+from cordis import Context, plugin
 
 
 @plugin(name="lca-reasoner-prompt")
-async def setup(ctx, config) -> None:
+async def setup(ctx: Context, config: Any) -> None:
     """Stub — ModularBrain uses PromptReasoner internally; no separate ctx key."""
     pass

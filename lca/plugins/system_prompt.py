@@ -5,7 +5,9 @@ this minimal stub. Real implementation lives in lca/layer0_infra/system_prompt/s
 """
 from __future__ import annotations
 
-from cordis import plugin
+from typing import Any
+
+from cordis import Context, plugin
 
 
 class _MinimalSystemPromptService:
@@ -16,5 +18,5 @@ class _MinimalSystemPromptService:
 
 
 @plugin(name="lca-system-prompt-service")
-async def setup(ctx, config) -> None:
+async def setup(ctx: Context, config: Any) -> None:
     ctx.provide("system_prompt", _MinimalSystemPromptService())

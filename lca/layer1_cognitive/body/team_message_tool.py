@@ -46,7 +46,7 @@ def publish_team_message(
 TEAM_MESSAGE_TOOL_NAME = "team.message-publish"
 
 
-def build_team_message_publish_tool():
+def build_team_message_publish_tool() -> object:
     """Return the ``Tool`` instance for the ActionRegistry.
 
     The tool is a thin wrapper around ``publish_team_message``.  The
