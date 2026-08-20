@@ -4,7 +4,7 @@
 ConsoleJournalProjector / FactStreamProjector / JsonlJournalProjector 都是它的实现。
 
 新增展示后端（markdown / csv / parquet）= 一个 ``@plugin`` 注册到 ``journal_formatter``
-seam；不需修改 ``ObservabilityHub`` 装配路径。
+seam；不需修改 ``BoundObservability`` 装配路径。
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ class JournalFormatter(Protocol):
     def name(self) -> str:
         """formatter 注册名（如 'console' / 'fact_stream' / 'jsonl'）。"""
 
-    def render_event(self, stamped: "StampedEvent") -> str:
+    def render_event(self, stamped: StampedEvent) -> str:
         """渲染单条事件为字符串（含末尾换行）。"""
 
     def flush(self) -> str:

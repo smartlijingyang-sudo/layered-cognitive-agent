@@ -21,7 +21,7 @@ from opentelemetry.trace import StatusCode
 if TYPE_CHECKING:
     from opentelemetry.context import Context, Token
 
-    from lca.layer0_infra.observability.hub import ObservabilityHub
+    from lca.contracts.observability.ports import AttributePolicyBackend
 
 _log = structlog.get_logger("lca.observability")
 
@@ -72,13 +72,13 @@ class SpanHandle:
 
     def __init__(
         self,
-        hub: ObservabilityHub,
+        policy: AttributePolicyBackend | None,
         otel_span: Any,
         attributes: dict[str, Any],
         *,
         attach: bool = True,
     ) -> None:
-        self._hub = hub
+        self._policy = policy
         self._otel = otel_span
         self.attributes: dict[str, Any] = attributes
         self._attach = attach
@@ -107,7 +107,7 @@ class SpanHandle:
             self.attributes.setdefault("error_message", str(exc)[:_ERROR_MESSAGE_MAX])
             self._otel.record_exception(exc)
             self._otel.set_status(StatusCode.ERROR)
-        prepared = self._hub.policy.prepare(self.attributes)
+        prepared = self._policy.prepare(self.attributes) if self._policy is not None else dict(self.attributes)
         # 单次 set_attributes 比循环 set_attribute 省 N-1 次 OTel SDK 调用（评估文档 §89）
         self._otel.set_attributes(prepared)
         self._otel.end()

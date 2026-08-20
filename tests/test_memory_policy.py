@@ -282,17 +282,17 @@ class TestSimpleMemorySystemCommit:
     async def test_memory_committed_event_emitted_for_accepted_writes(self) -> None:
         """Direct test: MemoryCommitted is appended to the journal."""
         from lca.contracts.models.observability.journal import RunScope
-        from lca.layer0_infra.observability import bind, run_scope
-        from lca.layer0_infra.observability.hub import ObservabilityHub
+        from lca.layer0_infra.observability import bind_backends, run_scope
+        from tests.support.observability_helpers import make_test_bound
 
-        hub = ObservabilityHub([])
+        hub = make_test_bound()
         system = SimpleMemorySystem()
-        with bind(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
+        with bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
             result = system.commit((_write(),))
         # ``commit`` records MemoryCommitted events onto the ambient RunStore.
         committed_events = [
             stamped.event
-            for stamped in hub.store.events
+            for stamped in hub.journal.store.events
             if isinstance(stamped.event, MemoryCommitted)
         ]
         assert committed_events
@@ -307,10 +307,10 @@ class TestSimpleMemorySystemCommit:
         """Direct test: ContextCompacted is appended on perceive."""
         from lca.contracts.models.core.memory import MemoryRecord
         from lca.contracts.models.observability.journal import RunScope
-        from lca.layer0_infra.observability import bind, run_scope
-        from lca.layer0_infra.observability.hub import ObservabilityHub
+        from lca.layer0_infra.observability import bind_backends, run_scope
+        from tests.support.observability_helpers import make_test_bound
 
-        hub = ObservabilityHub([])
+        hub = make_test_bound()
         system = SimpleMemorySystem()
         for i in range(6):
             system._append_record(
@@ -323,12 +323,12 @@ class TestSimpleMemorySystemCommit:
                     recency_score=float(i),
                 ),
             )
-        with bind(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
+        with bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
             state = _agent_state()
             await system.perceive(state)
         compacted = [
             stamped.event
-            for stamped in hub.store.events
+            for stamped in hub.journal.store.events
             if isinstance(stamped.event, ContextCompacted)
         ]
         assert compacted, "perceive must emit ContextCompacted"

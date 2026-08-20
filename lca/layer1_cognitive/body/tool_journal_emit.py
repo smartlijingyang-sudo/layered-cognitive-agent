@@ -19,7 +19,7 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.contracts.protocols.infra import Tool
-from lca.layer0_infra.observability import observe, record
+from lca.layer0_infra.observability import record, record_runtime
 from lca.layer1_cognitive.body.tool_result_preview import (
     tool_files,
     tool_plugin_state,
@@ -44,7 +44,7 @@ def emit_tool_started(
     started_state: dict[str, Any],
 ) -> None:
     """Emit ``ToolStarted`` from the canonical safe_executor module."""
-    observe(
+    record_runtime(
         DiagnosticCategory.TOOL,
         "tool.start",
         plugin=type(tool).__name__,
@@ -66,7 +66,7 @@ def emit_tool_started(
 
 def emit_tool_denied(tool: Tool, reason: str) -> None:
     """Emit ``ToolDenied`` from the canonical safe_executor module."""
-    observe(
+    record_runtime(
         DiagnosticCategory.TOOL,
         "tool.denied",
         plugin=type(tool).__name__,
@@ -88,7 +88,7 @@ def emit_tool_invoked(
     """Emit ``ToolInvoked`` from the canonical safe_executor module."""
     resolved_id = str((obs.extra or {}).get("invocation_id", "") or "") or invocation_id
     result_preview = _tool_output_preview(obs)
-    observe(
+    record_runtime(
         DiagnosticCategory.TOOL,
         "tool.complete",
         plugin=type(tool).__name__,

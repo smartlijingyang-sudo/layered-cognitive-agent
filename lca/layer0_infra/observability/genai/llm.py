@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from lca.contracts.observability.genai_semantic import GenAISemanticMapper
 from lca.layer0_infra.observability.langfuse_conventions import (
     GEN_AI_INPUT,
     GEN_AI_OPERATION,
@@ -26,7 +25,7 @@ class LlmGenAIMapper:
     event_type = "LlmCallCompleted"
     runtime_kind = "llm"
 
-    def map(self, stamped: "StampedEvent") -> dict[str, str]:
+    def map(self, stamped: StampedEvent) -> dict[str, str]:
         from lca.contracts.models.observability.journal import LlmCallCompleted
 
         event = stamped.event

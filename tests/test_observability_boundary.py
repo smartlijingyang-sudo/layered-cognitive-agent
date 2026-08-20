@@ -19,7 +19,7 @@ from lca.layer0_infra.observability.event_catalog import EVENT_DESCRIPTOR_REGIST
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _LCA_DIR = _REPO_ROOT / "lca"
 _OBS_PKG = "lca.layer0_infra.observability"
-_EMIT_CALLS = frozenset({"span", "detached_span", "event", "traced"})
+_EMIT_CALLS = frozenset({"span", "detached_span", "traced"})
 
 
 def _iter_lca_modules() -> list[tuple[str, Path]]:
@@ -49,6 +49,13 @@ class TestBoundaryGuard(unittest.TestCase):
                     if name.startswith(_OBS_PKG + ".") and not (
                         name.startswith(_OBS_PKG + ".adapters")
                         or mod.startswith("lca.layer0_infra.ops")
+                        # Plugins are the legitimate adapter boundary — they MUST import
+                        # observability internals (ConsoleJournalProjector, OtelTracer, ...)
+                        # to register them as plugin factories. The guard's intent is to
+                        # prevent business logic from depending on internals, not plugins.
+                        or mod.startswith("lca.plugins.")
+                        # harness/observability is the boot-time assembly path.
+                        or mod.startswith("lca.harness.observability")
                     ):
                         violations.append(f"{mod}: {name}")
         self.assertEqual(
@@ -71,6 +78,10 @@ class TestBoundaryGuard(unittest.TestCase):
                 elif isinstance(node, ast.Import):
                     names = [a.name for a in node.names]
                 if any(n.startswith("opentelemetry") for n in names):
+                    # Plugins are the legitimate OTel adapter boundary; same exception
+                    # rationale as the submodule import guard above.
+                    if mod.startswith("lca.plugins.") or mod.startswith("lca.harness.observability"):
+                        continue
                     violations.append(mod)
                     break
         self.assertEqual(
@@ -85,7 +96,7 @@ class TestVocabularyGuard(unittest.TestCase):
     """发射首参必须是词表枚举；一词条一发射点。"""
 
     def _collect_emissions(self) -> dict[str, set[str]]:
-        """词表值 → 发射模块集合（仅统计 span/event/traced 调用）。"""
+        """词表值 → 发射模块集合（仅统计 span/traced 调用）。"""
         emissions: dict[str, set[str]] = {}
         for mod, path in _iter_lca_modules():
             if mod.startswith("lca.contracts"):
@@ -132,17 +143,26 @@ class TestRedactionBackstop(unittest.TestCase):
     """脱敏在写入期强制兜底——发射点不自觉也会被拦。"""
 
     def test_secret_in_preview_is_redacted(self) -> None:
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
             InMemorySpanExporter,
         )
 
-        from lca.layer0_infra.observability import ObservabilityHub, bind, span
+        from lca.layer0_infra.observability import bind_backends, span
+        from lca.layer0_infra.observability.policy import AttributePolicy
+        from lca.layer0_infra.observability.tracer_backend import OtelTracer
         from lca.layer0_infra.observability.view import view_of
+        from tests.support.observability_helpers import make_test_bound
 
         exporter = InMemorySpanExporter()
-        hub = ObservabilityHub([exporter])
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        policy = AttributePolicy()
+        tracer = OtelTracer(provider.get_tracer("lca"), policy=policy)
+        bound = make_test_bound(tracer=tracer)
         with (
-            bind(hub),
+            bind_backends(bound),
             span(
                 SpanName.LLM_CHAT,
                 **{"prompt_preview": "key=sk-1234567890abcdef 正常内容"},
@@ -159,12 +179,16 @@ class TestExporterFaultIsolation(unittest.TestCase):
     """单个导出器故障不中断 run，不影响其余导出器。"""
 
     def test_failing_exporter_does_not_break_run(self) -> None:
-        from opentelemetry.sdk.trace.export import SpanExporter
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
             InMemorySpanExporter,
         )
 
-        from lca.layer0_infra.observability import ObservabilityHub, bind, span
+        from lca.layer0_infra.observability import bind_backends, span
+        from lca.layer0_infra.observability.handles import _IsolatedExporter
+        from lca.layer0_infra.observability.tracer_backend import OtelTracer
+        from tests.support.observability_helpers import make_test_bound
 
         class ExplodingExporter(SpanExporter):
             def export(self, spans):
@@ -174,8 +198,13 @@ class TestExporterFaultIsolation(unittest.TestCase):
                 return None
 
         good = InMemorySpanExporter()
-        hub = ObservabilityHub([ExplodingExporter(), good])
-        with bind(hub), span(SpanName.TOOL_EXECUTE, **{"tool_name": "calculator"}):
+        exploding = _IsolatedExporter(ExplodingExporter())
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exploding))
+        provider.add_span_processor(SimpleSpanProcessor(good))
+        tracer = OtelTracer(provider.get_tracer("lca"))
+        bound = make_test_bound(tracer=tracer)
+        with bind_backends(bound), span(SpanName.TOOL_EXECUTE, **{"tool_name": "calculator"}):
             pass  # run 不被打断
         self.assertEqual(len(good.get_finished_spans()), 1)
 
@@ -184,18 +213,27 @@ class TestVerbosityLevels(unittest.TestCase):
     """verbosity 档位控制预览长度。"""
 
     def _preview_len(self, verbosity: str) -> int:
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
             InMemorySpanExporter,
         )
 
-        from lca.layer0_infra.observability import ObservabilityHub, bind, span
+        from lca.layer0_infra.observability import bind_backends, span
         from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
+        from lca.layer0_infra.observability.tracer_backend import OtelTracer
         from lca.layer0_infra.observability.view import view_of
+        from tests.support.observability_helpers import make_test_bound
 
         exporter = InMemorySpanExporter()
-        hub = ObservabilityHub([exporter], policy=AttributePolicy(Verbosity(verbosity)))
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        tracer = OtelTracer(
+            provider.get_tracer("lca"), policy=AttributePolicy(Verbosity(verbosity))
+        )
+        bound = make_test_bound(tracer=tracer, verbosity=Verbosity(verbosity))
         long_text = "字" * 5000
-        with bind(hub), span(SpanName.LLM_CHAT, **{"prompt_preview": long_text}):
+        with bind_backends(bound), span(SpanName.LLM_CHAT, **{"prompt_preview": long_text}):
             pass
         view = view_of(exporter.get_finished_spans()[0])
         preview = view.attributes.get("prompt_preview")

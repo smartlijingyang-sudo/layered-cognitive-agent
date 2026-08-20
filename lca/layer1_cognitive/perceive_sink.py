@@ -54,12 +54,12 @@ class JournalSink:
     ) -> ContextManifested:
         store = self._store
         if store is None:
-            from lca.layer0_infra.observability import current_hub
+            from lca.layer0_infra.observability import current_bound
 
-            hub = current_hub()
-            if hub is None:
+            bound = current_bound()
+            if bound is None or bound.journal is None:
                 return event
-            store = hub.store
+            store = bound.journal.store
         stamped = store.append(event)
         if stamped is None:
             return event

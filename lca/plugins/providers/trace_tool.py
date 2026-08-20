@@ -8,7 +8,7 @@
 - ``export-minimal-reproduction`` → TraceInspector.export_minimal_reproduction
 - ``plugin-interaction-graph`` → TraceInspector.plugin_interaction_graph
 
-新增工具 = 一个工厂 + 注册一行；不改 ``ObservabilityHub`` 装配。
+新增工具 = 一个工厂 + 注册一行；不改 ``BoundObservability`` 装配。
 """
 
 from __future__ import annotations

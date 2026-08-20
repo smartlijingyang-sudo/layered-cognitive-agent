@@ -21,7 +21,8 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.observability import ObservabilityHub, bind
+from lca.layer0_infra.observability import bind_backends
+from tests.support.observability_helpers import make_test_bound
 from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime, unbind_sandbox_runtime
 from lca.layer0_infra.tools.default_set import build_default_tools
 from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
@@ -155,11 +156,11 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         rid = await self._bind()
         tool = SandboxExecuteTool(sandbox=self.sandbox, store=self.store)
         collector = _Collector()
-        hub = ObservabilityHub([], journal_projectors=[collector])
+        hub = make_test_bound(projections=[collector])
         executor = SimpleSafeExecutor(
             ToolPermissionManifest(allowed_tools=[SANDBOX_EXECUTE_TOOL_NAME])
         )
-        with bind(hub), run_scope(RunScope(trace_id="t", run_id=rid)), run_id_scope(rid):
+        with bind_backends(hub), run_scope(RunScope(trace_id="t", run_id=rid)), run_id_scope(rid):
             obs = await executor.execute(
                 tool,
                 {"code": 'print("x")'},

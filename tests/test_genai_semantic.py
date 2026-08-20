@@ -10,7 +10,6 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.layer0_infra.observability.genai.llm import LlmGenAIMapper
 from lca.layer0_infra.observability.genai.registry import (
-    GenAISemanticMapperRegistry,
     build_default_registry,
 )
 from lca.layer0_infra.observability.genai.tool import ToolGenAIMapper
@@ -85,7 +84,7 @@ def test_registry_returns_none_for_unknown() -> None:
 
 
 def test_seam_provides_registry() -> None:
-    from lca.plugins import seam_genai as mod  # noqa: F401
+    from lca.plugins import seam_genai as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})
@@ -94,7 +93,7 @@ def test_seam_provides_registry() -> None:
 
 def test_llm_mapper_registered() -> None:
     from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers import genai_llm as mod  # noqa: F401
+    from lca.plugins.providers import genai_llm as mod
 
     meta = getattr(mod.setup, "meta", {})
     assert meta.get("id") == "lca-genai-llm-mapper"
@@ -102,7 +101,7 @@ def test_llm_mapper_registered() -> None:
 
 def test_tool_mapper_registered() -> None:
     from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers import genai_tool as mod  # noqa: F401
+    from lca.plugins.providers import genai_tool as mod
 
     meta = getattr(mod.setup, "meta", {})
     assert meta.get("id") == "lca-genai-tool-mapper"

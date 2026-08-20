@@ -16,7 +16,6 @@ from typing import Any
 
 import pytest
 
-
 _DEFAULT_CTX: Any = None
 _BOOT_LOCK = threading.Lock()
 
@@ -36,8 +35,8 @@ def _boot_default_ctx_blocking() -> Any:
         if _DEFAULT_CTX is not None:
             return _DEFAULT_CTX
 
-        from lca.layer4_app.api import set_default_ctx
         from lca.harness.profile.boot import boot_profile
+        from lca.layer4_app.api import set_default_ctx
 
         ctx: Any = asyncio.run(boot_profile("profiles/web-standard.yaml"))
         set_default_ctx(ctx)

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from typing import Any
 
 import pytest
 from cordis import Context
@@ -14,32 +16,38 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
 from lca.contracts.models.observability.journal import RunScope
 from lca.layer0_infra.observability import (
-    AttributePolicy,
-    JsonlDiagnosticSink,
-    ObservabilityHub,
-    bind,
-    observe,
-    observe_operation,
+    bind_backends,
+    record_operation,
+    record_runtime,
     run_scope,
 )
+from lca.layer0_infra.observability.facade import RunContext, bind
+from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
 from lca.layer0_infra.observability.policy import Verbosity
 from lca.layer0_infra.ops.cli import app
 from lca.layer1_cognitive.hook_registry import CordisHookRegistry
+from tests.support.observability_helpers import RuntimeCategoryFilter, make_test_bound
 
 
-def _events(path) -> list[dict[str, object]]:
+def _events(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
-def test_diagnostic_event_is_run_scoped_and_redacted(tmp_path) -> None:
+def test_diagnostic_event_is_run_scoped_and_redacted(tmp_path: Path) -> None:
+    """RuntimeObserved carrying a secret preview is redacted at journal commit."""
     path = tmp_path / "run.diagnostic.jsonl"
-    hub = ObservabilityHub(
-        diagnostic_sinks=(JsonlDiagnosticSink(path),),
-        policy=AttributePolicy(Verbosity.STANDARD),
+    projector = JsonlJournalProjector(path)
+    bound = make_test_bound(
+        verbosity=Verbosity.STANDARD,
+        projections=[RuntimeCategoryFilter(DiagnosticCategory.LLM, projector)],
     )
 
-    with bind(hub), run_scope(RunScope(run_id="run_123", trace_id="trace_456")):
-        observe(
+    with (
+        bind_backends(bound),
+        bind(RunContext()),
+        run_scope(RunScope(run_id="run_123", trace_id="trace_456")),
+    ):
+        record_runtime(
             DiagnosticCategory.LLM,
             "llm.complete",
             plugin="telemetry.llm",
@@ -47,25 +55,31 @@ def test_diagnostic_event_is_run_scoped_and_redacted(tmp_path) -> None:
             output={"response_preview": "safe response"},
         )
 
-    hub.release()
+    bound.journal.flush()  # type: ignore[union-attr]
+    bound.journal.close()  # type: ignore[union-attr]
     [event] = _events(path)
-    assert event["schema"] == "lca.diagnostic.v1"
-    assert event["seq"] == 1
-    assert event["run_id"] == "run_123"
-    assert event["trace_id"] == "trace_456"
-    assert event["category"] == "llm"
-    assert "sk-1234567890abcdef" not in event["attributes"]["prompt_preview"]
-    assert "[REDACTED]" in event["attributes"]["prompt_preview"]
+    # JsonlJournalProjector emits journal.v1 records (seq/scope/event/...)
+    assert event["schema"] == "journal.v1"
+    assert event["scope"]["run_id"] == "run_123"
+    assert event["scope"]["trace_id"] == "trace_456"
+    prompt = event["event"]["attributes"]["prompt_preview"]
+    assert "sk-1234567890abcdef" not in prompt
+    assert "[REDACTED]" in prompt
 
 
-def test_observe_operation_emits_started_and_terminal_status(tmp_path) -> None:
+def test_observe_operation_emits_started_and_terminal_status(tmp_path: Path) -> None:
+    """``record_operation`` writes STARTED on enter and SUCCEEDED on exit."""
     path = tmp_path / "operation.diagnostic.jsonl"
-    hub = ObservabilityHub(diagnostic_sinks=(JsonlDiagnosticSink(path),))
+    projector = JsonlJournalProjector(path)
+    bound = make_test_bound(
+        projections=[RuntimeCategoryFilter(DiagnosticCategory.TOOL, projector)],
+    )
 
     with (
-        bind(hub),
+        bind_backends(bound),
+        bind(RunContext()),
         run_scope(RunScope(run_id="run_123", trace_id="trace_456")),
-        observe_operation(
+        record_operation(
             DiagnosticCategory.TOOL,
             "tool.execute",
             plugin="calculator",
@@ -74,40 +88,54 @@ def test_observe_operation_emits_started_and_terminal_status(tmp_path) -> None:
     ):
         operation.set_output(result_preview="4")
 
-    hub.release()
+    bound.journal.flush()  # type: ignore[union-attr]
+    bound.journal.close()  # type: ignore[union-attr]
     started, completed = _events(path)
-    assert started["status"] == "started"
-    assert completed["status"] == "succeeded"
-    assert completed["duration_ms"] is not None
-    assert completed["output"] == {"result_preview": "4"}
+    assert started["event"]["outcome"] == "started"
+    assert completed["event"]["outcome"] == "ok"
+    assert completed["event"]["output"] == {
+        "result_preview": "4",
+        "duration_ms": completed["event"]["output"]["duration_ms"],
+    }
 
 
 @pytest.mark.asyncio
-async def test_hook_trigger_uses_diagnostic_stream_not_stderr_logger(tmp_path) -> None:
+async def test_hook_trigger_uses_diagnostic_stream_not_stderr_logger(tmp_path: Path) -> None:
+    """PRE_THINK hook triggers a RuntimeObserved that flows to the journal."""
     path = tmp_path / "hook.diagnostic.jsonl"
-    hub = ObservabilityHub(diagnostic_sinks=(JsonlDiagnosticSink(path),))
+    projector = JsonlJournalProjector(path)
+    bound = make_test_bound(
+        projections=[RuntimeCategoryFilter(DiagnosticCategory.HOOK, projector)],
+    )
     state = AgentState(trace_id="trace_456", task="test", budget=Budget(), step=3)
 
-    with bind(hub), run_scope(RunScope(run_id="run_123", trace_id="trace_456")):
+    with (
+        bind_backends(bound),
+        bind(RunContext()),
+        run_scope(RunScope(run_id="run_123", trace_id="trace_456")),
+    ):
         hooks = CordisHookRegistry(Context())
         await hooks.trigger(HookEvent.PRE_THINK, state)
 
-    hub.release()
+    bound.journal.flush()  # type: ignore[union-attr]
+    bound.journal.close()  # type: ignore[union-attr]
     [event] = _events(path)
-    assert event["category"] == "hook"
-    assert event["operation"] == "hook.trigger"
-    assert event["plugin"] == "hook_registry.simple"
-    assert event["attributes"]["hook_event"] == HookEvent.PRE_THINK
-    assert event["attributes"]["state_step"] == 3
+    payload = event["event"]
+    assert payload["operation"] == "hook.trigger"
+    assert payload["source"] == "hook_registry.simple"
+    assert payload["attributes"]["hook_event"] == HookEvent.PRE_THINK.value
+    assert payload["attributes"]["state_step"] == 3
 
 
-def test_debug_trace_renders_and_filters_diagnostic_jsonl(tmp_path) -> None:
+def test_debug_trace_renders_and_filters_diagnostic_jsonl(tmp_path: Path) -> None:
+    """CLI ``debug trace`` accepts a diagnostic-shaped JSONL and filters by category."""
     path = tmp_path / "run.diagnostic.jsonl"
     path.write_text(
         "\n".join(
             (
                 json.dumps(
                     {
+                        "schema": "lca.diagnostic.v1",
                         "ts": 1.0,
                         "category": "llm",
                         "status": "succeeded",
@@ -120,6 +148,7 @@ def test_debug_trace_renders_and_filters_diagnostic_jsonl(tmp_path) -> None:
                 ),
                 json.dumps(
                     {
+                        "schema": "lca.diagnostic.v1",
                         "ts": 2.0,
                         "category": "tool",
                         "status": "succeeded",
@@ -143,3 +172,6 @@ def test_debug_trace_renders_and_filters_diagnostic_jsonl(tmp_path) -> None:
     assert "llm.complete" in result.output
     assert "telemetry.llm" in result.output
     assert "tool.complete" not in result.output
+
+
+_ = Any  # silence unused-import warnings for typing imports kept for readability

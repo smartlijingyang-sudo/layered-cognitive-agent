@@ -25,16 +25,16 @@ class JournalStoreBackend(Protocol):
     - ``flush`` / ``close`` 是可选能力；纯内存实现可空操作。
     """
 
-    def append(self, stamped: "StampedEvent") -> "StampedEvent":
+    def append(self, stamped: StampedEvent) -> StampedEvent:
         """追加已盖章事件；返回同一对象以允许 caller 链式使用。"""
 
-    def events(self) -> Sequence["StampedEvent"]:
+    def events(self) -> Sequence[StampedEvent]:
         """全部已提交事件的稳定快照。"""
 
-    def get(self, seq: int) -> "StampedEvent | None":
+    def get(self, seq: int) -> StampedEvent | None:
         """按连续序列 O(1) 读取；越界返回 None。"""
 
-    def read_from(self, after_seq: int) -> Sequence["StampedEvent"]:
+    def read_from(self, after_seq: int) -> Sequence[StampedEvent]:
         """返回严格晚于 ``after_seq`` 的事件，供可恢复消费者拉取。"""
 
     def flush(self) -> None:

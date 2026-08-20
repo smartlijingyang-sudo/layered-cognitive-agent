@@ -402,6 +402,7 @@ async def test_dsh_loop_is_a_real_plugin(no_llm_key: None) -> None:
     from pathlib import Path
 
     import yaml as _yaml
+
     from lca.harness.profile.boot import boot_entries, load_profile_entries
 
     webapp_ids = {e["id"] for e in load_profile_entries(DEFAULT_PROFILE)}

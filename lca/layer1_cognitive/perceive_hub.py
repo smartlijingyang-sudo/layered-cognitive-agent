@@ -30,7 +30,7 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.cognition import SensorDisabled
-from lca.layer0_infra.observability import observe
+from lca.layer0_infra.observability import record_runtime
 from lca.layer1_cognitive.brain.context_manifest import (
     build_manifest_from_items,
     digest_manifest,
@@ -94,7 +94,7 @@ class SequentialPerceiveHub(PerceiveHub):
                     sensor=type(sensor).__name__,
                     error=str(exc),
                 )
-                observe(
+                record_runtime(
                     DiagnosticCategory.PLUGIN,
                     "sensor.read",
                     plugin=type(sensor).__name__,
@@ -111,7 +111,7 @@ class SequentialPerceiveHub(PerceiveHub):
                 items.extend(_memory_items(state))
             except Exception as exc:
                 _log.warning("memory_perceive_failed", error=str(exc))
-                observe(
+                record_runtime(
                     DiagnosticCategory.MEMORY,
                     "memory.perceive",
                     plugin=type(self._memory).__name__,

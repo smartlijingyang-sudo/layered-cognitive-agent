@@ -35,7 +35,7 @@ class _StubStore:
 
 @dataclass
 class _StubObsHub:
-    """Stub ObservabilityHub exposing a RunStore."""
+    """Stub BoundObservability exposing a RunStore."""
 
     store: _StubStore = field(default_factory=_StubStore)
 

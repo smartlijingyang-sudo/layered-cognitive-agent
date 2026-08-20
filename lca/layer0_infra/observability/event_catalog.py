@@ -6,18 +6,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from lca.contracts.models.observability.event import EventAudience, EventDescriptor, EventSensitivity
+from lca.contracts.models.observability.event import (
+    EventAudience,
+    EventDescriptor,
+    EventSensitivity,
+)
 from lca.contracts.models.observability.journal import JournalEvent
 from lca.layer0_infra.observability.event_descriptor_registry import (
     UnknownEventDescriptorError,
 )
 from lca.layer0_infra.observability.event_descriptors_data import build_default_registry
-
-if TYPE_CHECKING:
-    pass
-
 
 # 启动期 bootstrap：49 个内置事件描述符入册。cordis 启动后插件可继续 register。
 EVENT_DESCRIPTOR_REGISTRY = build_default_registry()

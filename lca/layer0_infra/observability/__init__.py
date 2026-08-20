@@ -1,18 +1,22 @@
 """LCA 可观测性子系统 —— 唯一公共面（白名单守卫）。
 
-架构三层：
-    ① 认知语义层（contracts 词表 + 本包 facade）—— 我们拥有
-    ② 遥测骨干（OpenTelemetry）—— 业界标准，被 facade 封装，业务层不可见
-    ③ 后端（console/jsonl/memory/langfuse）—— 注册表装配，配置化
+架构三层（Hexagonal / Ports & Adapters）：
+    ① 契约层（contracts）—— Protocol + 数据类（JournalEvent / RunContext / 端口）
+    ② 装配层（harness/observability）—— assemble_observability() 把 plugin 装成 BoundObservability
+    ③ 实现层（journal_backend / tracer_backend / readers）—— adapter，plugin 化
 
 外部使用（唯一入口）::
 
-    from lca.layer0_infra.observability import create_observability, bind, span, event
+    from lca.layer0_infra.observability import (
+        record, span, annotate, score,         # dispatch API
+        bind, set_actor, set_session,          # RunContext 控制
+        record_runtime, record_operation,      # 语义化运行时事件
+        BoundObservability, RunContext,        # 值对象
+    )
 
-    hub = create_observability("console+langfuse")   # 或 Agent(observability=...)
-    with bind(hub):
-        with span(SpanName.RUN_AGENT):
-            ...
+    record(AgentRunStarted(...))
+    with span(SpanName.LLM_CHAT) as h:
+        h.attributes["model"] = "qwen"
 
 包外禁止 import 任何子模块（守卫测试强制）；本 ``__init__`` 是唯一表面。
 """
@@ -68,6 +72,7 @@ from lca.contracts.models.observability.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
     JournalSchemaMeta,
 )
+from lca.contracts.observability.named_registry import NamedRegistry
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.observability.event_catalog import (
     EVENT_DESCRIPTOR_REGISTRY,
@@ -80,42 +85,34 @@ from lca.layer0_infra.observability.event_descriptor_registry import (
     UnknownEventDescriptorError,
 )
 from lca.layer0_infra.observability.event_descriptors_data import build_default_registry
-from lca.layer0_infra.observability.exporters.langfuse import ExporterUnavailableError
-from lca.layer0_infra.observability.genai import (
-    GenAISemanticMapperRegistry,
-    LlmGenAIMapper,
-    ToolGenAIMapper,
-    build_default_registry as build_default_genai_registry,
-)
-from lca.layer0_infra.observability.journal.backends import InMemoryJournalStore
-from lca.layer0_infra.observability.journal.journal_io import read_journal, stamped_to_record
-from lca.layer0_infra.observability.trace_tool_runner import (
-    make_explain_failure_tool,
-    make_export_minimal_reproduction_tool,
-    make_find_optimization_tool,
-    make_inspect_trace_tool,
-    make_plugin_interaction_graph_tool,
-)
 from lca.layer0_infra.observability.facade import (
-    SpanContext,
+    BoundObservability,
+    OperationRecorder,
+    RunContext,
+    SpanContextInfo,
     annotate,
     bind,
-    current_hub,
+    bind_backends,
+    current_bound,
+    current_context,
     detached_span,
-    event,
     get_span_context,
-    observe,
-    observe_operation,
     record,
+    record_operation,
+    record_runtime,
     score,
     set_actor,
     set_session,
     span,
     traced,
 )
-from lca.contracts.observability.journal_store import JournalStoreBackend
-from lca.contracts.observability.named_registry import NamedRegistry
-from lca.layer0_infra.observability.hub import ObservabilityHub
+from lca.layer0_infra.observability.genai import (
+    LlmGenAIMapper,
+    ToolGenAIMapper,
+)
+from lca.layer0_infra.observability.genai import (
+    build_default_registry as build_default_genai_registry,
+)
 from lca.layer0_infra.observability.journal import (
     OtelProjector,
     RunState,
@@ -124,6 +121,8 @@ from lca.layer0_infra.observability.journal import (
     UnregisteredJournalEventError,
     fold_run_state,
 )
+from lca.layer0_infra.observability.journal.backends import InMemoryJournalStore
+from lca.layer0_infra.observability.journal.journal_io import read_journal, stamped_to_record
 from lca.layer0_infra.observability.langfuse_conventions import (
     FRAMEWORK_TAG,
     LANGFUSE_ENVIRONMENT,
@@ -142,11 +141,6 @@ from lca.layer0_infra.observability.langfuse_conventions import (
 from lca.layer0_infra.observability.narrative import plan_steps_joined
 from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
 from lca.layer0_infra.observability.projection_registry import EventProjection, ProjectionRegistry
-from lca.layer0_infra.observability.registry import (
-    UnknownExporterError,
-    create_observability,
-)
-from lca.layer0_infra.observability.run_diagnostics import JsonlDiagnosticSink
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.observability.team_profile import (
     TeamTraceProfile,
@@ -154,18 +148,20 @@ from lca.layer0_infra.observability.team_profile import (
     team_id_for,
 )
 from lca.layer0_infra.observability.trace_inspector import TraceInspector, TraceReport
+from lca.layer0_infra.observability.trace_tool_runner import (
+    make_explain_failure_tool,
+    make_export_minimal_reproduction_tool,
+    make_find_optimization_tool,
+    make_inspect_trace_tool,
+    make_plugin_interaction_graph_tool,
+)
+from lca.layer0_infra.observability.tracer_backend import OtelTracer
 from lca.layer0_infra.observability.view import SpanView
 
 __all__ = [
-    "DuplicateEventDescriptorError",
     "EVENT_DESCRIPTOR_REGISTRY",
     "FRAMEWORK_TAG",
-    "InMemoryEventDescriptorRegistry",
-    "InMemoryJournalStore",
     "JOURNAL_EVENT_CLASSES",
-    "JournalStoreBackend",
-    "LlmGenAIMapper",
-    "NamedRegistry",
     "LANGFUSE_ENVIRONMENT",
     "LANGFUSE_OBSERVATION_INPUT",
     "LANGFUSE_OBSERVATION_METADATA_AGENT_ROLE",
@@ -181,6 +177,7 @@ __all__ = [
     "AgentRunFinished",
     "AgentRunStarted",
     "AttributePolicy",
+    "BoundObservability",
     "CastingCompleted",
     "CastingFailed",
     "CastingStarted",
@@ -192,34 +189,40 @@ __all__ = [
     "DiagnosticCategory",
     "DiagnosticEvent",
     "DiagnosticStatus",
+    "DuplicateEventDescriptorError",
     "EventAudience",
     "EventDescriptor",
     "EventDurability",
     "EventPlane",
     "EventProjection",
     "EventSensitivity",
-    "ExporterUnavailableError",
+    "InMemoryEventDescriptorRegistry",
+    "InMemoryJournalStore",
     "JournalEvent",
     "JournalProjector",
     "JournalSchemaMeta",
-    "JsonlDiagnosticSink",
+    "JournalStoreBackend",
     "LlmCallCompleted",
     "LlmCallStarted",
-    "ObservabilityHub",
+    "LlmGenAIMapper",
+    "NamedRegistry",
     "ObservabilitySettings",
     "OperationOutcome",
+    "OperationRecorder",
     "OtelProjector",
+    "OtelTracer",
     "ProjectionRegistry",
     "ReasoningCompleted",
     "ReasoningDelta",
     "RunActivity",
+    "RunContext",
     "RunScope",
     "RunState",
     "RunStatus",
     "RunStore",
     "RuntimeKind",
     "RuntimeObserved",
-    "SpanContext",
+    "SpanContextInfo",
     "SpanView",
     "StampedEvent",
     "StepCompleted",
@@ -227,48 +230,49 @@ __all__ = [
     "SynthesisCompleted",
     "TeamRunFinished",
     "TeamRunStarted",
-    "ToolGenAIMapper",
     "TeamTraceProfile",
     "ToolCallStreaming",
     "ToolDenied",
+    "ToolGenAIMapper",
     "ToolInvoked",
     "ToolStarted",
     "TraceInspector",
+    "TraceReport",
     "TraceTool",
+    "UnknownEventDescriptorError",
+    "UnregisteredJournalEventError",
+    "Verbosity",
+    "annotate",
+    "bind",
+    "bind_backends",
+    "build_default_genai_registry",
+    "build_default_registry",
+    "current_bound",
+    "current_context",
+    "descriptor_for",
+    "detached_span",
+    "fold_run_state",
+    "get_current_run_scope",
+    "get_span_context",
+    "langfuse_span_visible",
     "make_explain_failure_tool",
     "make_export_minimal_reproduction_tool",
     "make_find_optimization_tool",
     "make_inspect_trace_tool",
     "make_plugin_interaction_graph_tool",
-    "read_journal",
-    "stamped_to_record",
-    "TraceReport",
-    "UnknownEventDescriptorError",
-    "UnknownExporterError",
-    "UnregisteredJournalEventError",
-    "Verbosity",
-    "annotate",
-    "bind",
-    "build_default_genai_registry",
-    "build_default_registry",
-    "create_observability",
-    "current_hub",
-    "detached_span",
-    "event",
-    "fold_run_state",
-    "get_current_run_scope",
-    "get_span_context",
-    "langfuse_span_visible",
+    "may_export_externally",
     "objective_preview",
-    "observe",
-    "observe_operation",
     "plan_steps_joined",
+    "read_journal",
     "record",
+    "record_operation",
+    "record_runtime",
     "run_scope",
     "score",
     "set_actor",
     "set_session",
     "span",
+    "stamped_to_record",
     "team_id_for",
     "traced",
 ]

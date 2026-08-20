@@ -76,6 +76,18 @@ class RunStore:
         """已装配的只读投影。"""
         return self._registry.projections
 
+    def with_projection(self, projection: EventProjection) -> RunStore:
+        """返回追加 ``projection`` 后的新 RunStore（原实例不变）。
+
+        Boot 期构造的基线 journal 持有共享 readers（langfuse 等）；run 边
+        追加 jsonl/tail/process_journal 等 run-scoped writer，生成新 RunStore
+        挂到 ``BoundObservability`` 上，老 readers 仍然在原基线实例里。
+        """
+        return RunStore(
+            projections=tuple(self._registry.projections) + (projection,),
+            policy=self._policy,
+        )
+
     @property
     def backend(self) -> JournalStoreBackend:
         """暴露当前 backend，便于测试与诊断。"""
@@ -110,6 +122,10 @@ class RunStore:
         self._backend.append(stamped)
         self._registry.publish(stamped)
         return stamped
+
+    def write(self, event: JournalEvent) -> StampedEvent | None:
+        """JournalBackend 协议入口：append 的别名。"""
+        return self.append(event)
 
     def get(self, seq: int) -> StampedEvent | None:
         """按连续序列 O(1) 读取一条已提交事件。"""

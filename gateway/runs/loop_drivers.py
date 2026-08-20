@@ -36,8 +36,8 @@ from lca.contracts.protocols.casting import (
 )
 from lca.contracts.protocols.infra import Tool
 from lca.layer0_infra.observability import (
-    ObservabilityHub,
-    bind,
+    BoundObservability,
+    bind_backends,
     objective_preview,
     record,
     run_scope,
@@ -76,7 +76,7 @@ class RunLoopDriver(Protocol):
         *,
         question: str,
         mode: str,
-        hub: ObservabilityHub,
+        hub: BoundObservability,
         bindings: Any,
         run_context: RunContext,
         ctx: Context,
@@ -96,7 +96,7 @@ class CognitiveRunDriver:
         *,
         question: str,
         mode: str,
-        hub: ObservabilityHub,
+        hub: BoundObservability,
         bindings: Any,
         run_context: RunContext,
         ctx: Context | None = None,
@@ -166,7 +166,7 @@ class DshRunDriver:
         *,
         question: str,
         mode: str,
-        hub: ObservabilityHub,
+        hub: BoundObservability,
         bindings: Any,
         run_context: RunContext,
         ctx: Context,
@@ -219,7 +219,7 @@ async def _build_team(
     objective: str,
     llm: Any,
     *,
-    observability: ObservabilityHub,
+    observability: BoundObservability,
     trace_id: str,
     run_id: str,
     bindings: PlaneBindings | None = None,
@@ -232,7 +232,7 @@ async def _build_team(
     resolved_library = library if library is not None else FileRoleLibrary()
     resolved_caster = caster if caster is not None else LLMTeamCaster()
     record_scope = RunScope(trace_id=cast("TraceId", trace_id), run_id=cast("RunId", run_id))
-    with bind(observability), run_scope(record_scope):
+    with bind_backends(observability), run_scope(record_scope):
         record(CastingStarted(objective_preview=objective_preview(objective)))
         try:
             plan = await resolved_caster.cast(objective, resolved_library, llm)
@@ -254,7 +254,7 @@ async def _build_team(
         plan,
         resolved_library,
         llm,
-        observability=observability,
+        observability=observability,  # type: ignore[arg-type]
         bindings=bindings,
         scope=scope,
         tools=tools,

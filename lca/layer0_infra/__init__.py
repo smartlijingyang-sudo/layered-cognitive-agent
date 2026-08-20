@@ -8,6 +8,6 @@
 | Tool | tools/<name>/ | manifest + executor + build_tools() |
 | StateStore | state_store/ | InMemoryStateStore |
 | AgentTransport | transport/ | InternalTransport, A2ATransport, MCPTransport |
-| Telemetry (facade) | observability/ | ObservabilityHub + console/jsonl/memory/langfuse 导出器 |
+| Telemetry (facade) | observability/ | BoundObservability + console/jsonl/memory/langfuse 导出器 |
 | NamedRegistryProtocol | component_registry.py | NamedRegistry, ComponentRegistry |
 """

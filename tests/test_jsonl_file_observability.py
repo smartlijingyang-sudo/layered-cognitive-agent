@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
@@ -15,23 +16,35 @@ from lca.contracts.models.observability.journal import (
     TeamRunStarted,
     run_scope,
 )
-from lca.layer0_infra.observability import ObservabilityHub, bind, create_observability, record
+from lca.harness.observability import make_minimal_bound
+from lca.layer0_infra.observability import (
+    AttributePolicy,
+    BoundObservability,
+    RunStore,
+    bind_backends,
+    record,
+)
 from lca.layer0_infra.observability.journal.journal_io import (
     JOURNAL_SCHEMA_VERSION,
     read_journal,
 )
+from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 
 
-def _journal_hub(tmpdir: str, filename: str = "journal.jsonl") -> tuple[ObservabilityHub, Path]:
+def _journal_hub(tmpdir: str, filename: str = "journal.jsonl") -> tuple[BoundObservability, Path]:
     output = Path(tmpdir) / filename
     cfg = ObservabilitySettings(backends="jsonl", jsonl_path=str(output))
-    return create_observability("jsonl", settings=cfg), output
+    # Construct BoundObservability directly with a JsonlJournalProjector.
+    policy = AttributePolicy(verbosity=cfg.verbosity, redact=cfg.redact_enabled)
+    projections: tuple[Any, ...] = (JsonlJournalProjector(output),)
+    store = RunStore(policy=policy, projections=projections)
+    return make_minimal_bound(journal=store, policy=policy), output
 
 
-def _run_solo(hub: ObservabilityHub) -> None:
+def _run_solo(bound: BoundObservability) -> None:
     scope = RunScope(trace_id="t", run_id="r", agent_role="Solo")
-    with bind(hub), run_scope(scope):
+    with bind_backends(bound), run_scope(scope):
         record(AgentRunStarted(agent_role="Solo", objective="hi"))
         record(AgentRunFinished(status="completed", steps=1, output_text="done"))
 
@@ -43,16 +56,19 @@ class TestJsonlJournalProjector(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             target = Path(tmpdir) / "subdir" / "journal.jsonl"
             cfg = ObservabilitySettings(backends="jsonl", jsonl_path=str(target))
-            hub = create_observability("jsonl", settings=cfg)
-            _run_solo(hub)
-            hub.close()
+            policy = AttributePolicy(verbosity=cfg.verbosity, redact=cfg.redact_enabled)
+            store = RunStore(policy=policy, projections=(JsonlJournalProjector(target),))
+            bound = make_minimal_bound(journal=store, policy=policy)
+            _run_solo(bound)
+            store.close()
             self.assertTrue(target.is_file())
 
     def test_writes_schema_versioned_records(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             hub, output = _journal_hub(tmpdir)
             _run_solo(hub)
-            hub.close()
+            if hub.journal is not None:
+                hub.journal.close()
             lines = [json.loads(x) for x in output.read_text(encoding="utf-8").splitlines() if x]
             self.assertGreaterEqual(len(lines), 2)
             for line in lines:
@@ -68,7 +84,7 @@ class TestJsonlJournalProjector(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             hub, output = _journal_hub(tmpdir)
             _run_solo(hub)
-            hub.close()
+            hub.journal.close() if hub.journal else None
             first = json.loads(output.read_text(encoding="utf-8").splitlines()[0])
             scope = first["scope"]
             self.assertEqual(scope["trace_id"], "t")
@@ -79,10 +95,10 @@ class TestJsonlJournalProjector(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             hub, output = _journal_hub(tmpdir)
             scope = RunScope(trace_id="t", run_id="team-run")
-            with bind(hub), run_scope(scope):
+            with bind_backends(hub), run_scope(scope):
                 record(TeamRunStarted(team_id="team-x", strategy_key="lead"))
                 record(TeamRunFinished(status="completed", steps=1))
-            hub.close()
+            hub.journal.close() if hub.journal else None
             events = read_journal(output)
             self.assertEqual(len(events), 2)
             self.assertIsInstance(events[0].event, TeamRunStarted)

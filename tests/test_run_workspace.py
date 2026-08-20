@@ -223,7 +223,6 @@ class TestArtifactClosure:
 class TestArtifactRespondInjector:
     async def test_rewrites_relative_images_and_appends_links(self) -> None:
         from lca.contracts.models.core.perceive_state import PerceiveState
-        from lca.contracts.models.core.perception import ContextManifest
         from lca.layer1_cognitive.brain.context_manifest import build_manifest_from_items
 
         gate = ArtifactRespondInjector()

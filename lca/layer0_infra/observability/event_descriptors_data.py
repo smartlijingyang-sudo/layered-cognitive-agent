@@ -12,7 +12,6 @@ retention_class（来自旧 ``JOURNAL_CATALOG_META``）合在同一个 dataclass
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING
 
 from lca.contracts.models.observability.event import (
     EventAudience,
@@ -67,9 +66,6 @@ from lca.contracts.models.observability.telemetry_catalog import VocabDomain
 from lca.layer0_infra.observability.event_descriptor_registry import (
     InMemoryEventDescriptorRegistry,
 )
-
-if TYPE_CHECKING:
-    pass
 
 
 def _descriptor(

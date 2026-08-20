@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from lca.contracts.observability.genai_semantic import GenAISemanticMapper
-
 if TYPE_CHECKING:
     from lca.contracts.models.observability.journal import StampedEvent
 
@@ -15,7 +13,7 @@ class ToolGenAIMapper:
     event_type = "ToolInvoked"
     runtime_kind = "tool"
 
-    def map(self, stamped: "StampedEvent") -> dict[str, str]:
+    def map(self, stamped: StampedEvent) -> dict[str, str]:
         from lca.contracts.models.observability.journal import ToolInvoked
 
         event = stamped.event

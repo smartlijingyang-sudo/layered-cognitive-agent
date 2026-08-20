@@ -108,12 +108,6 @@ entries:
     config:
       providers: [local]
 
-  - id: lca-observability-provider
-    name: lca_providers_observability
-    $module: lca.plugins.providers.observability
-    config:
-      providers: [console]
-
   - id: lca-sandbox-provider
     name: lca_providers_sandbox
     $module: lca.plugins.providers.sandbox
@@ -137,11 +131,76 @@ entries:
     $module: lca.plugins.journal_store_service
     config: {}
 
-  - id: lca-journal-store-memory-factory
-    name: lca_providers_journal_store
-    $module: lca.plugins.providers.journal_store
-    config:
-      default: memory
+  - id: lca-fact-store-memory-factory
+    name: lca_providers_fact_store_memory
+    $module: lca.plugins.providers.fact_store_memory
+    config: {}
+
+  # ── Facade plugin-ification: 4 backend seams + providers ──
+  - id: lca-journal-seam
+    name: lca_seam_journal
+    $module: lca.plugins.seam_journal
+    config: {}
+
+  - id: lca-tracer-seam
+    name: lca_seam_tracer
+    $module: lca.plugins.seam_tracer
+    config: {}
+
+  - id: lca-attribute-policy-seam
+    name: lca_seam_attribute_policy
+    $module: lca.plugins.seam_attribute_policy
+    config: {}
+
+  - id: lca-fact-reader-seam
+    name: lca_seam_fact_reader
+    $module: lca.plugins.seam_fact_reader
+    config: {}
+
+  - id: lca-fact-scorer-seam
+    name: lca_seam_fact_scorer
+    $module: lca.plugins.seam_fact_scorer
+    config: {}
+
+  - id: lca-journal-memory-factory
+    name: lca_providers_journal_memory
+    $module: lca.plugins.providers.journal_memory
+    config: {}
+
+  - id: lca-tracer-otel-factory
+    name: lca_providers_tracer_otel
+    $module: lca.plugins.providers.tracer_otel
+    config: {}
+
+  - id: lca-attribute-policy-default-factory
+    name: lca_providers_attribute_policy
+    $module: lca.plugins.providers.attribute_policy
+    config: {}
+
+  - id: lca-fact-reader-console-factory
+    name: lca_providers_fact_reader_console
+    $module: lca.plugins.providers.fact_reader_console
+    config: {}
+
+  - id: lca-fact-reader-jsonl-factory
+    name: lca_providers_fact_reader_jsonl
+    $module: lca.plugins.providers.fact_reader_jsonl
+    config: {}
+
+  - id: lca-fact-reader-otel-factory
+    name: lca_providers_fact_reader_otel
+    $module: lca.plugins.providers.fact_reader_otel
+    config: {}
+
+  - id: lca-fact-reader-langfuse-factory
+    name: lca_providers_fact_reader_langfuse
+    $module: lca.plugins.providers.fact_reader_langfuse
+    config: {}
+
+  - id: lca-langfuse-eval-scorer
+    name: lca_providers_fact_scorer_langfuse
+    $module: lca.plugins.providers.fact_scorer_langfuse
+    config: {}
 
   # ── ADR-0063 PR-9: TraceInspector tools + CLI debug commands ──
   - id: lca-trace-tool-seam
@@ -178,17 +237,6 @@ entries:
   - id: lca-genai-tool-mapper
     name: lca_providers_genai_tool
     $module: lca.plugins.providers.genai_tool
-    config: {}
-
-  # ── ADR-0063 PR-10: ObservabilityScorer (Langfuse eval) ──
-  - id: lca-observability-scorer-seam
-    name: lca_seam_observability_scorer
-    $module: lca.plugins.seam_observability_scorer
-    config: {}
-
-  - id: lca-langfuse-eval-scorer
-    name: lca_providers_langfuse_eval
-    $module: lca.plugins.providers.langfuse_eval
     config: {}
 
 

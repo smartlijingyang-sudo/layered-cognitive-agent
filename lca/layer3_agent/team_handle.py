@@ -19,9 +19,9 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.protocols import AgentUnit, TeamStrategy, TeamUnit
 from lca.layer0_infra.observability import (
-    ObservabilityHub,
+    BoundObservability,
     TeamTraceProfile,
-    bind,
+    bind_backends,
     objective_preview,
     plan_steps_joined,
     record,
@@ -37,7 +37,7 @@ class TeamHandle(TeamUnit):
         self,
         strategy: TeamStrategy,
         profile: TeamTraceProfile,
-        observability: ObservabilityHub,
+        observability: BoundObservability,
         members: tuple[AgentUnit, ...],
         lead: AgentUnit | None = None,
     ) -> None:
@@ -55,7 +55,7 @@ class TeamHandle(TeamUnit):
         )
         set_session(self._profile.team_id)
         scope, _ = adopt_run_scope(role=TEAM_CONTAINER_ROLE)
-        with bind(self._observability), run_scope(scope):
+        with bind_backends(self._observability), run_scope(scope):
             record(
                 TeamRunStarted(
                     team_id=self._profile.team_id,

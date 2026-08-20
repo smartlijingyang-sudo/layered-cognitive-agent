@@ -93,7 +93,7 @@ class OtelProjector(JournalProjector):
         self,
         tracer: Tracer,
         *,
-        genai_mapper_registry: "GenAISemanticMapperRegistry | None" = None,
+        genai_mapper_registry: GenAISemanticMapperRegistry | None = None,
     ) -> None:
         self._index = SpanContainerIndex(tracer)
         self._tracer = tracer

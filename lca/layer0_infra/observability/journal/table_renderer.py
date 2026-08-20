@@ -12,8 +12,8 @@ ConsoleJournalProjector / FactStreamProjector / JsonlJournalProjector 各有自�
 from __future__ import annotations
 
 from lca.contracts.models.observability.event import EventPlane
-from lca.layer0_infra.observability.event_catalog import descriptor_for
 from lca.contracts.models.observability.journal import JournalEvent
+from lca.layer0_infra.observability.event_catalog import descriptor_for
 
 
 def truncate(text: str, max_len: int) -> str:

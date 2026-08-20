@@ -419,10 +419,6 @@ class TestIgnoreEmitReturn:
 
 class TestJournalCatalogMeta:
     def test_all_event_classes_have_descriptor(self) -> None:
-        from lca.contracts.models.observability.event import (
-            EventAudience,
-            EventDurability,
-        )
         from lca.contracts.models.observability.journal_catalog import (
             JOURNAL_EVENT_CLASSES,
         )

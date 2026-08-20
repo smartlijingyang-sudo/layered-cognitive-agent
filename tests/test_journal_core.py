@@ -24,13 +24,13 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
 from lca.layer0_infra.observability import (
-    ObservabilityHub,
     RunStore,
     UnregisteredJournalEventError,
-    bind,
+    bind_backends,
     record,
 )
 from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
+from tests.support.observability_helpers import make_test_bound
 
 
 class _Collector:
@@ -175,10 +175,11 @@ def test_failing_subscriber_does_not_break_store() -> None:
 
 def test_hub_lifecycle_flushes_and_closes_store() -> None:
     collector = _Collector()
-    hub = ObservabilityHub([], journal_projectors=[collector])
-    with bind(hub):
+    bound = make_test_bound(projections=[collector])
+    with bind_backends(bound):
         record(TeamRunStarted(team_id="lifecycle"))
-    hub.close()
+    bound.journal.flush()  # type: ignore[union-attr]
+    bound.journal.close()  # type: ignore[union-attr]
     assert len(collector.received) == 1
     assert collector.flushed >= 1
     assert collector.closed
@@ -188,14 +189,15 @@ def test_hub_lifecycle_flushes_and_closes_store() -> None:
 
 
 def test_facade_record_routes_through_hub() -> None:
-    hub = ObservabilityHub([])
+    bound = make_test_bound()
     try:
-        with bind(hub), run_scope(RunScope(run_id="r-1")):
+        with bind_backends(bound), run_scope(RunScope(run_id="r-1")):
             record(TeamRunStarted(team_id="via-facade"))
-        assert len(hub.store.events) == 1
-        assert hub.store.events[0].scope.run_id == "r-1"
+        events = bound.journal.store.events  # type: ignore[union-attr]
+        assert len(events) == 1
+        assert events[0].scope.run_id == "r-1"
     finally:
-        hub.close()
+        bound.journal.close()  # type: ignore[union-attr]
 
 
 def test_facade_record_noop_without_hub() -> None:

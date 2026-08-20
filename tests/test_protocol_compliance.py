@@ -27,9 +27,9 @@ from lca.contracts.protocols import (
     Tool,
     ToolRegistry,
 )
+from lca.harness.observability import make_minimal_bound
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
-from lca.layer0_infra.observability import create_observability
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
 from lca.layer0_infra.tools.weather import build_tools as build_weather_tools
@@ -72,11 +72,12 @@ class TestL0ProtocolCompliance(unittest.TestCase):
     def test_weather_is_tool(self):
         self.assertIsInstance(build_weather_tools()[0], Tool)
 
-    def test_create_observability_is_backend(self):
+    def test_bound_observability_satisfies_backend(self):
+        """BoundObservability satisfies ObservabilityBackend protocol structurally."""
         from lca.contracts.protocols import ObservabilityBackend
-        from lca.layer0_infra.observability import create_observability
+        from lca.layer0_infra.observability import BoundObservability
 
-        self.assertIsInstance(create_observability("console"), ObservabilityBackend)
+        self.assertIsInstance(BoundObservability(), ObservabilityBackend)
 
     def test_in_memory_state_store(self):
         self.assertIsInstance(InMemoryStateStore(), StateStore)
@@ -228,7 +229,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             perceive_hub=NullPerceiveHub(),
             stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
         )
-        return CognitiveAgent(runtime, rp, create_observability("console")), rp, runtime
+        return CognitiveAgent(runtime, rp, make_minimal_bound()), rp, runtime
 
     def test_agent_is_agent_runtime(self):
         agent, _, _ = self._build_agent()
@@ -237,7 +238,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
     def test_supervisor_is_agent_runtime(self):
         _, rp, runtime = self._build_agent()
         sup = CognitiveAgent(
-            runtime, rp, create_observability("console"), max_steps=20, max_wall_clock_seconds=300
+            runtime, rp, make_minimal_bound(), max_steps=20, max_wall_clock_seconds=300
         )
         self.assertIsInstance(sup, AgentUnit)
 

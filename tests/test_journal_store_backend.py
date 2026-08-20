@@ -9,9 +9,9 @@ from lca.contracts.models.observability.journal import (
     RunScope,
     StampedEvent,
 )
+from lca.contracts.observability.journal_store import JournalStoreBackend
 from lca.layer0_infra.observability import (
     InMemoryJournalStore,
-    JournalStoreBackend,
     RunStore,
 )
 
@@ -98,7 +98,7 @@ def test_run_store_accepts_explicit_backend() -> None:
 
 def test_seam_provides_journal_store() -> None:
     """seam plugin 模块可导入。"""
-    from lca.plugins import journal_store_service as mod  # noqa: F401
+    from lca.plugins import journal_store_service as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})
@@ -108,8 +108,8 @@ def test_seam_provides_journal_store() -> None:
 def test_provider_registers_memory_factory() -> None:
     """provider plugin 模块可导入并暴露 memory factory。"""
     from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers import journal_store as mod  # noqa: F401
+    from lca.plugins.providers import fact_store_memory as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})
-    assert meta.get("id") == "lca-journal-store-memory-factory"
+    assert meta.get("id") == "lca-fact-store-memory-factory"

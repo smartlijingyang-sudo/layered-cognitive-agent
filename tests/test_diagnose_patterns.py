@@ -8,16 +8,16 @@ the spec requirement is satisfied without duplicating test bodies.
 
 from __future__ import annotations
 
-from tests.test_v3_diagnose_patterns import (  # noqa: F401
-    TestDiagnoseModelNotSeen,
+from tests.test_v3_diagnose_patterns import (
+    TestDiagnoseApprovalRejected,
     TestDiagnoseLoopStuck,
     TestDiagnoseMemoryPoisoned,
-    TestDiagnoseApprovalRejected,
+    TestDiagnoseModelNotSeen,
 )
 
 __all__ = [
-    "TestDiagnoseModelNotSeen",
+    "TestDiagnoseApprovalRejected",
     "TestDiagnoseLoopStuck",
     "TestDiagnoseMemoryPoisoned",
-    "TestDiagnoseApprovalRejected",
+    "TestDiagnoseModelNotSeen",
 ]

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from lca.contracts.models.observability.journal import (
     ApprovalResolved,
     ContextManifested,

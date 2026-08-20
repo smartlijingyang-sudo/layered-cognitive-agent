@@ -128,6 +128,7 @@ async def boot_resolved_profile(resolved: ResolvedProfile) -> Context:
 
     ctx.__dict__["entries"] = loaded
     ctx.__dict__["resolved_profile"] = resolved
+    _install_observability(ctx)
     return ctx
 
 
@@ -167,7 +168,23 @@ async def boot_entries(entries: list[dict[str, Any]]) -> Context:
         raise
 
     ctx.__dict__["entries"] = loaded
+    _install_observability(ctx)
     return ctx
+
+
+def _install_observability(ctx: Context) -> None:
+    """Boot 末尾唯一挂点：把各 seam registry 装配成 BoundObservability。
+
+    Assemble 必须 boot 期发生一次；run 期业务代码通过
+    ``ctx.inject("observability")`` 拿到 Bound，再按需为 run 边追加
+    jsonl/tail 等 writer projection。Facade（record/span/annotate/score）
+    经 ContextVar ``lca_observability_bound`` 取当前激活的 Bound，与
+    boot ctx 解耦。
+    """
+    from lca.harness.observability import assemble_observability
+    from lca.layer0_infra.observability import ObservabilitySettings
+
+    assemble_observability(ctx, ObservabilitySettings())
 
 
 async def boot_profile(profile_path: Path | str) -> Context:

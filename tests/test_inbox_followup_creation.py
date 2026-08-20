@@ -47,10 +47,10 @@ class TestInboxFollowupCreation:
         from gateway.runs.loop_drivers import CognitiveRunDriver
         from gateway.runs.session import RunSession
         from lca.contracts.models.observability.journal import InboxFollowupCreated, RunScope
-        from lca.layer0_infra.observability import bind, run_scope
-        from lca.layer0_infra.observability.hub import ObservabilityHub
+        from lca.layer0_infra.observability import bind_backends, run_scope
+        from tests.support.observability_helpers import make_test_bound
 
-        hub = ObservabilityHub([])
+        hub = make_test_bound()
         session = RunSession(
             run_id="run-test",
             trace_id="trace-test",
@@ -63,7 +63,7 @@ class TestInboxFollowupCreation:
         )
         driver = CognitiveRunDriver()
         with (
-            bind(hub),
+            bind_backends(hub),
             run_scope(RunScope(trace_id=session.trace_id, run_id=session.run_id)),
         ):
             _run_driver(
@@ -76,7 +76,7 @@ class TestInboxFollowupCreation:
 
         inbox_events = [
             stamped.event
-            for stamped in hub.store.events
+            for stamped in hub.journal.store.events
             if isinstance(stamped.event, InboxFollowupCreated)
         ]
         assert inbox_events, "CognitiveRunDriver must record InboxFollowupCreated on entry"
@@ -87,11 +87,11 @@ class TestInboxFollowupCreation:
         from gateway.runs.loop_drivers import CognitiveRunDriver
         from gateway.runs.session import RunSession
         from lca.contracts.models.observability.journal import InboxFollowupCreated, RunScope
-        from lca.layer0_infra.observability import bind, run_scope
-        from lca.layer0_infra.observability.hub import ObservabilityHub
+        from lca.layer0_infra.observability import bind_backends, run_scope
+        from tests.support.observability_helpers import make_test_bound
 
         question = "帮我总结这份文档的关键点"
-        hub = ObservabilityHub([])
+        hub = make_test_bound()
         session = RunSession(
             run_id="run-test2",
             trace_id="trace-test2",
@@ -104,7 +104,7 @@ class TestInboxFollowupCreation:
         )
         driver = CognitiveRunDriver()
         with (
-            bind(hub),
+            bind_backends(hub),
             run_scope(RunScope(trace_id=session.trace_id, run_id=session.run_id)),
         ):
             _run_driver(
@@ -117,7 +117,7 @@ class TestInboxFollowupCreation:
 
         inbox_events = [
             stamped.event
-            for stamped in hub.store.events
+            for stamped in hub.journal.store.events
             if isinstance(stamped.event, InboxFollowupCreated)
         ]
         assert inbox_events

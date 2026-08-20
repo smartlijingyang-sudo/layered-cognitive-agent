@@ -99,7 +99,7 @@ class EventDescriptor:
     required: tuple[str, ...] = ()
     description: str = ""
     otel_kind: Literal["agent", "generation", "tool", "span", "event"] = "event"
-    payload_class: type["JournalEvent"] | None = None
+    payload_class: type[JournalEvent] | None = None
     """领域 payload 类；反序列化和 ``EventDescriptor`` 校验依赖此绑定。"""
     extra: Mapping[str, Any] = field(default_factory=dict)
     """插件可扩展字段（不破坏核心元数据）。"""

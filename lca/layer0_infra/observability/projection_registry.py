@@ -37,6 +37,14 @@ class ProjectionRegistry:
     def projections(self) -> tuple[EventProjection, ...]:
         return self._projections
 
+    def with_projection(self, projection: EventProjection) -> ProjectionRegistry:
+        """返回追加 ``projection`` 后的新注册表（原表不变）。
+
+        Boot 期构造的基线注册表可被 run 边无副作用地扩展；调用方拿到新实例
+        后挂到 run-scoped ``RunStore`` 上，老 reader 仍指向同一份基线。
+        """
+        return ProjectionRegistry((*self._projections, projection))
+
     def publish(self, event: StampedEvent) -> None:
         if self._closed:
             return

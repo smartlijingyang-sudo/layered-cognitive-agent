@@ -43,7 +43,6 @@ from lca.contracts.atoms.telemetry import (
     ATTR_STEPS,
     ATTR_STRATEGY_KEY,
     ATTR_SUBTASK_PREVIEW,
-    ATTR_SUMMARY,
     ATTR_SYNTHESIS_METHOD,
     ATTR_TASK_ID,
     ATTR_TEAM_ID,

@@ -48,10 +48,10 @@ async def execute_dsh_session(session: RunSession) -> None:
     终态通过 store.append(AgentRunFinished) 写入，不通过独立状态路径——
     消灭双 owner（ADR-0055 不变量 N3）。
     """
-    from lca.layer0_infra.observability.facade import current_hub
+    from lca.layer0_infra.observability.facade import current_bound
 
-    hub = current_hub()
-    sink = HandleJournalSink(hub=hub)
+    hub = current_bound()  # type: ignore[assignment]
+    sink = HandleJournalSink(hub=hub)  # type: ignore[call-arg]
     projector = DshJournalProjector(sink)
     projector.ensure_open()
     archive = JsonlEventArchive(session.jsonl_path.parent / f"{session.run_id}.dsh.jsonl")
@@ -117,7 +117,7 @@ def _emit_dsh_terminal_event(
     status = "failed" if session.error else "completed"
     output = result.final_response if result and not session.error else ""
     # 通过 sink 发射（走 store.append 路径）
-    sink = HandleJournalSink(hub=hub)
+    sink = HandleJournalSink(hub=hub)  # type: ignore[call-arg]
     sink.emit(
         AgentRunFinished(
             status=status,

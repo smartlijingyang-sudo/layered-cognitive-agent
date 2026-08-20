@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
-from lca.layer0_infra.observability.facade import observe
+from lca.layer0_infra.observability.facade import record_runtime
 
 
 def record_llm_completion(
@@ -20,7 +20,7 @@ def record_llm_completion(
     latency_ms: int,
 ) -> None:
     """写入 LLM 完成诊断；Journal 事实仍由调用方独立发射。"""
-    observe(
+    record_runtime(
         DiagnosticCategory.LLM,
         "llm.complete",
         plugin="telemetry.llm",
@@ -47,7 +47,7 @@ def record_memory_operation(
     output: dict[str, Any] | None = None,
 ) -> None:
     """写入记忆边界的轻量诊断。"""
-    observe(
+    record_runtime(
         DiagnosticCategory.MEMORY,
         operation,
         plugin=type(inner).__name__,

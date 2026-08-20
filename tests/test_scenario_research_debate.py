@@ -12,7 +12,6 @@ from tests.support.scenario_harness import (
     assert_bundle_parses,
     assert_min_plugin_count,
     assert_plugins_are_closed,
-    assert_scenario_references_bundles,
     load_scenario_yaml,
     run_stub_agent_async,
 )

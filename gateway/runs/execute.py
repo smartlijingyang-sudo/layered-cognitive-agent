@@ -41,12 +41,12 @@ from lca.contracts.protocols.infra import Sandbox
 from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
 from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.observability import (
-    JsonlDiagnosticSink,
-    ObservabilityHub,
+    BoundObservability,
     bind,
+    bind_backends,
     fold_run_state,
-    observe,
     record,
+    record_runtime,
     run_scope,
 )
 from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
@@ -168,23 +168,40 @@ def assemble_run_hub(
     ctx: Any,
     settings: ObservabilitySettings | None = None,
     extra_projectors: Sequence[JournalProjector] = (),
-) -> ObservabilityHub:
-    """Hub from the booted observability seam; jsonl + tail as extra readers."""
+) -> BoundObservability:
+    """Run-scoped BoundObservability：基线 (boot readers) + run writers。
+
+    boot 期 ``assemble_observability`` 已构造 ``BoundObservability`` 并通过
+    ``ctx.provide("observability", bound)`` 挂上；本函数从基线 Bound 出发，
+    把 jsonl 落盘、LiveTail SSE、跨 run ProcessJournal 等 run-scoped writer
+    追加到 journal 上，返回新 BoundObservability（immutable，原基线不动）。
+
+    Diagnostics go through the journal (see ``diagnostics_enabled``); no
+    separate diagnostic sink needed.
+    """
+    from lca.harness.observability import make_minimal_bound
+
     cfg = settings if settings is not None else ObservabilitySettings()
-    extra = [JsonlJournalProjector(jsonl_path), tail, *extra_projectors]
-    diagnostic_sinks = (
-        (JsonlDiagnosticSink(jsonl_path.with_suffix(".diagnostic.jsonl")),)
-        if cfg.diagnostics_enabled
-        else ()
-    )
-    return cast(
-        "ObservabilityHub",
-        require_capability(ctx, "observability").create(
-            settings=cfg,
-            extra_projectors=tuple(extra),
-            diagnostic_sinks=diagnostic_sinks,
-        ),
-    )
+    try:
+        base: BoundObservability = require_capability(ctx, "observability")
+    except MissingCapabilityError:
+        # boot 未挂 observability（极端测试场景）：退回最小可用 bound，
+        # 业务事件仍可写到 local store。
+        from lca.layer0_infra.observability.facade import BoundObservability
+        from lca.layer0_infra.observability.policy import AttributePolicy
+
+        minimal = make_minimal_bound()
+        return BoundObservability(
+            journal=minimal.journal,
+            tracer=minimal.tracer,
+            policy=AttributePolicy(),
+            scorers=minimal.scorers,
+        )
+    run_bound = base.with_journal_projection(JsonlJournalProjector(jsonl_path))
+    run_bound = run_bound.with_journal_projection(tail)
+    for projection in extra_projectors:
+        run_bound = run_bound.with_journal_projection(projection)
+    return run_bound
 
 
 def create_hub_for_session(
@@ -192,7 +209,7 @@ def create_hub_for_session(
     *,
     ctx: Any | None = None,
     settings: ObservabilitySettings | None = None,
-) -> ObservabilityHub:
+) -> BoundObservability:
     """Used by tests that assemble a session first. Production uses create_run_session."""
     if session.hub is not None:
         return session.hub
@@ -259,7 +276,7 @@ def create_run_session(
     return session
 
 
-def _emit_plugin_inventory(session: RunSession, ctx: Any, hub: ObservabilityHub) -> None:
+def _emit_plugin_inventory(session: RunSession, ctx: Any, hub: BoundObservability) -> None:
     """记录本 run 使用的插件声明摘要，不暴露配置值或密钥。"""
     entries = tuple(getattr(ctx, "entries", ()) or ())
     plugins = [
@@ -272,13 +289,13 @@ def _emit_plugin_inventory(session: RunSession, ctx: Any, hub: ObservabilityHub)
         )
         for entry in entries
     ]
-    with bind(hub), run_scope(
+    with bind_backends(hub), run_scope(
         RunScope(
             trace_id=cast("TraceId", session.trace_id),
             run_id=cast("RunId", session.run_id),
         )
     ):
-        observe(
+        record_runtime(
             DiagnosticCategory.PLUGIN,
             "plugin.inventory",
             plugin="profile.boot",
@@ -371,7 +388,7 @@ async def execute_run(
                             error=str(exc),
                         )
                 await _stage_machine_attachments(session, file_store)
-                with bind(hub):
+                with bind_backends(hub):
                     outcome = await driver.execute(
                         session,
                         question=question,
@@ -485,7 +502,7 @@ async def finalize(
     finally:
         try:
             if session.hub is not None:
-                session.hub.release()
+                session.hub.release()  # type: ignore[attr-defined]
         finally:
             _derive_terminal_status(session, success)
             registry.clear_inflight(session.run_id)
@@ -495,10 +512,16 @@ async def finalize(
                 await _dispose_export(session.hub)
 
 
-async def _dispose_export(hub: ObservabilityHub) -> None:
+async def _dispose_export(hub: BoundObservability) -> None:
     """Langfuse / OTel teardown off the event loop. Live readers already closed."""
     try:
-        await asyncio.wait_for(asyncio.to_thread(hub.dispose), timeout=_EXPORT_DISPOSE_TIMEOUT_S)
+        await asyncio.wait_for(asyncio.to_thread(hub.dispose), timeout=_EXPORT_DISPOSE_TIMEOUT_S)  # type: ignore[attr-defined]
+    except TimeoutError:
+        _log.warning("observability_export_dispose_timeout", hop="H3")
+    except Exception:
+        _log.warning("observability_export_dispose_failed", hop="H3", exc_info=True)
+    try:
+        await asyncio.wait_for(asyncio.to_thread(hub.dispose), timeout=_EXPORT_DISPOSE_TIMEOUT_S)  # type: ignore[attr-defined]
     except TimeoutError:
         _log.warning("observability_export_dispose_timeout", hop="H3")
     except Exception:
@@ -516,7 +539,7 @@ def _derive_terminal_status(session: RunSession, success: bool) -> None:
     elif session.error:
         session.status = RunStatus.FAILED
     elif session.hub is not None:
-        derived = fold_run_state(session.hub.store.events)
+        derived = fold_run_state(session.hub.store.events)  # type: ignore[attr-defined]
         session.status = _journal_to_session_status(derived.status)
     else:
         _fallback_terminal_status(session, success)
@@ -616,7 +639,7 @@ def _record_run_failure(session: RunSession, exc: BaseException | None, hub: Any
 
 
 def _emit_artifact_closure_if_needed(
-    workspace: Any, session: RunSession, hub: ObservabilityHub
+    workspace: Any, session: RunSession, hub: BoundObservability
 ) -> None:
     if workspace is None:
         return
@@ -630,7 +653,7 @@ def _emit_artifact_closure_if_needed(
     from lca.contracts.models.observability.journal import StepTextDelta
 
     try:
-        hub.store.append(
+        hub.store.append(  # type: ignore[attr-defined]
             StepTextDelta(
                 step=-1,
                 text_delta="\n\n" + closure,

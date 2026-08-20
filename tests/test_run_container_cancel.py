@@ -16,7 +16,7 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.observability.journal import AgentRunFinished, TeamRunFinished
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.layer0_infra.observability import ObservabilityHub
+from tests.support.observability_helpers import make_test_bound
 from lca.layer0_infra.observability.team_profile import TeamTraceProfile
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.team_handle import TeamHandle
@@ -47,7 +47,7 @@ def _role() -> RoleProfile:
 
 @pytest.mark.asyncio
 async def test_agent_run_finished_on_cancelled_error() -> None:
-    hub = ObservabilityHub([])
+    hub = make_test_bound()
     agent = CognitiveAgent(_HangRuntime(), _role(), hub)  # type: ignore[arg-type]
     task = asyncio.create_task(agent.run("任务"))
     await asyncio.sleep(0)  # 让 AgentRunStarted 先落地
@@ -56,14 +56,14 @@ async def test_agent_run_finished_on_cancelled_error() -> None:
         await task
     hub.close()
 
-    finished = [e for e in hub.store.events if isinstance(e.event, AgentRunFinished)]
+    finished = [e for e in hub.journal.store.events if isinstance(e.event, AgentRunFinished)]
     assert len(finished) == 1
     assert finished[0].event.status == TaskStatus.CANCELED.value
 
 
 @pytest.mark.asyncio
 async def test_team_run_finished_on_cancelled_error() -> None:
-    hub = ObservabilityHub([])
+    hub = make_test_bound()
     profile = TeamTraceProfile(
         team_id="team-x",
         strategy_key="lead",
@@ -85,6 +85,6 @@ async def test_team_run_finished_on_cancelled_error() -> None:
         await task
     hub.close()
 
-    finished = [e for e in hub.store.events if isinstance(e.event, TeamRunFinished)]
+    finished = [e for e in hub.journal.store.events if isinstance(e.event, TeamRunFinished)]
     assert len(finished) == 1
     assert finished[0].event.status == TaskStatus.CANCELED.value

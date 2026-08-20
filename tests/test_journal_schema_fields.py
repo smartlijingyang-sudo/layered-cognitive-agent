@@ -15,11 +15,9 @@ from __future__ import annotations
 from dataclasses import fields, is_dataclass
 
 from lca.contracts.models.observability.journal import (
+    InboxFollowupCreated,
     RunScope,
     StampedEvent,
-)
-from lca.contracts.models.observability.journal import (
-    InboxFollowupCreated,
 )
 from lca.layer0_infra.observability.journal.engine import RunStore
 

@@ -29,8 +29,8 @@ from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import AgentUnit, Runtime
 from lca.contracts.protocols.capabilities import HasHooks
 from lca.layer0_infra.observability import (
-    ObservabilityHub,
-    bind,
+    BoundObservability,
+    bind_backends,
     objective_preview,
     record,
     run_scope,
@@ -54,7 +54,7 @@ class CognitiveAgent(AgentUnit):
         self,
         runtime: Runtime,
         role_profile: RoleProfile,
-        observability: ObservabilityHub,
+        observability: BoundObservability,
         max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = None,
     ) -> None:
@@ -65,8 +65,8 @@ class CognitiveAgent(AgentUnit):
         self.max_wall_clock_seconds = max_wall_clock_seconds
 
     @property
-    def observability(self) -> ObservabilityHub:
-        """组合注入的观测 hub（只读暴露，供组合根提升/复用）。"""
+    def observability(self) -> BoundObservability:
+        """组合注入的观测 backend（只读暴露，供组合根提升/复用）。"""
         return self._observability
 
     async def run(
@@ -79,7 +79,7 @@ class CognitiveAgent(AgentUnit):
         scope, top_level = adopt_run_scope(role=role)
         if ctx and ctx.session_id:
             set_session(ctx.session_id)
-        with bind(self._observability), run_scope(scope):
+        with bind_backends(self._observability), run_scope(scope):
             partial_token = begin_partial_buffer()
             record(
                 AgentRunStarted(

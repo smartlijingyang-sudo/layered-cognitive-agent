@@ -3,22 +3,27 @@
 from __future__ import annotations
 
 from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lca.layer0_infra.observability import ObservabilityHub, policy
+from lca.layer0_infra.observability import AttributePolicy, Verbosity
 from lca.layer0_infra.observability.handles import NullSpanHandle, SpanHandle
+from lca.layer0_infra.observability.tracer_backend import OtelTracer
+from tests.support.observability_helpers import make_test_bound
 
 
-def _make_hub() -> ObservabilityHub:
-    return ObservabilityHub(exporters=[InMemorySpanExporter()])
+def _make_tracer() -> tuple[OtelTracer, TracerProvider, InMemorySpanExporter]:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = OtelTracer(provider.get_tracer("test"), policy=AttributePolicy())
+    return tracer, provider, exporter
 
 
 def test_span_handle_uses_set_attributes_batch() -> None:
     """__exit__ 必须单次 set_attributes，而非循环 set_attribute（评估文档 §89）。"""
-    hub = _make_hub()
-    provider = hub.provider
-    tracer = provider.get_tracer("test")
-    otel_span = tracer.start_span("test.span")
+    tracer, _provider, _exporter = _make_tracer()
+    otel_span = tracer._tracer.start_span("test.span")  # type: ignore[attr-defined]
 
     batch_calls: list[dict] = []
 
@@ -36,21 +41,22 @@ def test_span_handle_uses_set_attributes_batch() -> None:
     otel_span.set_attribute = tracking_set_attribute  # type: ignore[method-assign]
     otel_span.set_attributes = tracking_set_attributes  # type: ignore[method-assign]
 
-    handle = SpanHandle(hub, otel_span, {"a": 1, "b": "two", "c": True})
+    handle = SpanHandle(tracer._policy, otel_span, {"a": 1, "b": "two", "c": True})  # type: ignore[attr-defined]
     handle.__exit__(None, None, None)
 
     set_attr_ops = [c for c in batch_calls if c["op"] == "set_attribute"]
     set_attrs_ops = [c for c in batch_calls if c["op"] == "set_attributes"]
     assert not set_attr_ops, f"__exit__ 必须批量写入，但发现 {len(set_attr_ops)} 次 set_attribute"
-    assert len(set_attrs_ops) == 1, f"__exit__ 应只调用一次 set_attributes，实际 {len(set_attrs_ops)}"
+    assert len(set_attrs_ops) == 1, (
+        f"__exit__ 应只调用一次 set_attributes，实际 {len(set_attrs_ops)}"
+    )
     assert set_attrs_ops[0]["size"] >= 3
 
 
 def test_span_handle_records_exception_on_exit() -> None:
-    hub = _make_hub()
-    tracer = hub.provider.get_tracer("test")
-    otel_span = tracer.start_span("test.err")
-    handle = SpanHandle(hub, otel_span, {"step": 1})
+    tracer, _provider, _exporter = _make_tracer()
+    otel_span = tracer._tracer.start_span("test.err")  # type: ignore[attr-defined]
+    handle = SpanHandle(tracer._policy, otel_span, {"step": 1})  # type: ignore[attr-defined]
     try:
         raise ValueError("boom")
     except ValueError as exc:
@@ -67,10 +73,9 @@ def test_span_handle_records_exception_on_exit() -> None:
 
 
 def test_span_handle_mark_error_sets_status_and_attribute() -> None:
-    hub = _make_hub()
-    tracer = hub.provider.get_tracer("test")
-    otel_span = tracer.start_span("test.manual")
-    handle = SpanHandle(hub, otel_span, {})
+    tracer, _provider, _exporter = _make_tracer()
+    otel_span = tracer._tracer.start_span("test.manual")  # type: ignore[attr-defined]
+    handle = SpanHandle(tracer._policy, otel_span, {})  # type: ignore[attr-defined]
     handle.mark_error("manual fail")
     from opentelemetry.trace import StatusCode
 
@@ -89,18 +94,17 @@ def test_null_span_handle_safe_no_op() -> None:
 
 def test_attribute_policy_is_applied_at_exit() -> None:
     """策略只在 __exit__ 时跑一次；中间写入不重复过 policy。"""
-    hub = _make_hub()
-    policy_sentinel = policy.AttributePolicy(verbosity=policy.Verbosity.MINIMAL, redact=True)
-    hub_orig_policy = hub.policy
-    try:
-        hub._policy = policy_sentinel  # type: ignore[attr-defined]
-        tracer = hub.provider.get_tracer("test")
-        otel_span = tracer.start_span("test.policy")
-        handle = SpanHandle(hub, otel_span, {"prompt_preview": "hello world", "plain": "x"})
-        handle.__exit__(None, None, None)
-        # minimal verbosity 把 prompt_preview 删掉
-        attrs = dict(otel_span.attributes) if otel_span.attributes else {}
-        assert "prompt_preview" not in attrs
-        assert attrs.get("plain") == "x"
-    finally:
-        hub._policy = hub_orig_policy  # type: ignore[attr-defined]
+    policy_sentinel = AttributePolicy(verbosity=Verbosity.MINIMAL, redact=True)
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = OtelTracer(provider.get_tracer("test"), policy=policy_sentinel)
+    otel_span = tracer._tracer.start_span("test.policy")  # type: ignore[attr-defined]
+    handle = SpanHandle(policy_sentinel, otel_span, {"prompt_preview": "hello world", "plain": "x"})
+    handle.__exit__(None, None, None)
+    attrs = dict(otel_span.attributes) if otel_span.attributes else {}
+    assert "prompt_preview" not in attrs
+    assert attrs.get("plain") == "x"
+
+
+_ = make_test_bound  # keep helper import live for downstream tests

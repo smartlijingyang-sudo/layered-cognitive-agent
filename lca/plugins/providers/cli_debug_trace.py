@@ -72,7 +72,7 @@ class _DebugTraceCommand:
                     "causal_chain": list(report.causal_chain),
                     "bottlenecks": list(report.bottlenecks),
                     "plugin_graph": report.plugin_graph,
-                    "events": [event for event in report.events],
+                    "events": list(report.events),
                 },
                 ensure_ascii=False,
             )

@@ -18,21 +18,21 @@ class InMemoryJournalStore:
     """append-only 内存账本；list 持有 + tuple snapshot 暴露。"""
 
     def __init__(self) -> None:
-        self._events: list["StampedEvent"] = []
+        self._events: list[StampedEvent] = []
 
-    def append(self, stamped: "StampedEvent") -> "StampedEvent":
+    def append(self, stamped: StampedEvent) -> StampedEvent:
         self._events.append(stamped)
         return stamped
 
-    def events(self) -> Sequence["StampedEvent"]:
+    def events(self) -> Sequence[StampedEvent]:
         return tuple(self._events)
 
-    def get(self, seq: int) -> "StampedEvent | None":
+    def get(self, seq: int) -> StampedEvent | None:
         if seq < 1 or seq > len(self._events):
             return None
         return self._events[seq - 1]
 
-    def read_from(self, after_seq: int) -> Sequence["StampedEvent"]:
+    def read_from(self, after_seq: int) -> Sequence[StampedEvent]:
         start = max(after_seq, 0)
         return tuple(self._events[start:])
 

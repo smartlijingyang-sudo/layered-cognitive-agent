@@ -16,13 +16,14 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.observability import ObservabilityHub, bind
+from lca.layer0_infra.observability import bind_backends, run_scope
 from lca.layer0_infra.tools.write_file import build_tools as build_write_file_tools
 from lca.layer1_cognitive.body.safe_executor import (
     SimpleSafeExecutor,
     _tool_output_preview,
 )
 from lca.layer1_cognitive.body.tool_result_preview import tool_files, tool_plugin_state
+from tests.support.observability_helpers import make_test_bound
 
 
 class _Collector:
@@ -109,12 +110,12 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_write_file_emits_structured_files_on_tool_invoked(self) -> None:
         collector = _Collector()
-        hub = ObservabilityHub([], journal_projectors=[collector])
+        hub = make_test_bound(projections=[collector])
         tool = build_write_file_tools(store=self.store)[0]
         executor = SimpleSafeExecutor(
             permission_manifest=ToolPermissionManifest(allowed_tools=["writeFile"])
         )
-        with bind(hub), run_scope(RunScope(trace_id="t", run_id="r")):
+        with bind_backends(hub), run_scope(RunScope(trace_id="t", run_id="r")):
             obs = await executor.execute(
                 tool,
                 {
@@ -140,7 +141,7 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
     async def test_journal_does_not_truncate_files_field(self) -> None:
         """files is non-string → AttributePolicy leaves it intact through record()."""
         collector = _Collector()
-        hub = ObservabilityHub([], journal_projectors=[collector])
+        hub = make_test_bound(projections=[collector])
         many = tuple(
             {
                 "name": f"chart_{i}.png",
@@ -151,7 +152,7 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
             }
             for i in range(8)
         )
-        with bind(hub), run_scope(RunScope(trace_id="t", run_id="r")):
+        with bind_backends(hub), run_scope(RunScope(trace_id="t", run_id="r")):
             from lca.layer0_infra.observability import record
 
             record(
@@ -196,7 +197,7 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_journal_preserves_plugin_state_through_policy(self) -> None:
         collector = _Collector()
-        hub = ObservabilityHub([], journal_projectors=[collector])
+        hub = make_test_bound(projections=[collector])
         plugin_state = {
             "query": "news",
             "resultNumbers": 3,
@@ -206,7 +207,7 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
             ],
             "success": True,
         }
-        with bind(hub), run_scope(RunScope(trace_id="t", run_id="r")):
+        with bind_backends(hub), run_scope(RunScope(trace_id="t", run_id="r")):
             from lca.layer0_infra.observability import record
 
             record(

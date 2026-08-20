@@ -54,7 +54,7 @@ class DiagnosticSink(Protocol):
 class ObservabilityBackend(Protocol):
     """装配完成的可观测后端的结构契约（门面身份 + 生命周期）。
 
-    L0 的 ``ObservabilityHub`` 结构化满足本协议；声明式 spec 用它表达
+    L0 的 ``BoundObservability`` 结构化满足本协议；声明式 spec 用它表达
     「字符串选择 | 已装配实例」双模，contracts 不依赖任何实现层。
     """
 

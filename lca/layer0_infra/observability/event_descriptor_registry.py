@@ -28,8 +28,8 @@ class UnknownEventDescriptorError(KeyError):
 class InMemoryEventDescriptorRegistry(EventDescriptorRegistry):
     """线程不安全的进程内注册中心；boot 期一次性 bootstrap，运行时仅追加。"""
 
-    def __init__(self, initial: Iterable["EventDescriptor"] = ()) -> None:
-        self._by_name: dict[str, "EventDescriptor"] = {}
+    def __init__(self, initial: Iterable[EventDescriptor] = ()) -> None:
+        self._by_name: dict[str, EventDescriptor] = {}
         for descriptor in initial:
             self.register(descriptor)
 
@@ -39,22 +39,22 @@ class InMemoryEventDescriptorRegistry(EventDescriptorRegistry):
     def __len__(self) -> int:
         return len(self._by_name)
 
-    def get(self, type_name: str) -> "EventDescriptor | None":
+    def get(self, type_name: str) -> EventDescriptor | None:
         return self._by_name.get(type_name)
 
-    def require(self, type_name: str) -> "EventDescriptor":
+    def require(self, type_name: str) -> EventDescriptor:
         descriptor = self._by_name.get(type_name)
         if descriptor is None:
             raise UnknownEventDescriptorError(f"未登记事件描述符：{type_name!r}")
         return descriptor
 
-    def all(self) -> Iterable["EventDescriptor"]:
+    def all(self) -> Iterable[EventDescriptor]:
         return tuple(self._by_name.values())
 
     def all_type_names(self) -> Iterable[str]:
         return tuple(self._by_name.keys())
 
-    def register(self, descriptor: "EventDescriptor", *, replace: bool = False) -> None:
+    def register(self, descriptor: EventDescriptor, *, replace: bool = False) -> None:
         existing = self._by_name.get(descriptor.type_name)
         if existing is not None and not replace:
             raise DuplicateEventDescriptorError(
@@ -62,7 +62,7 @@ class InMemoryEventDescriptorRegistry(EventDescriptorRegistry):
             )
         self._by_name[descriptor.type_name] = descriptor
 
-    def payload_class_for(self, event: "JournalEvent | str") -> type["JournalEvent"] | None:
+    def payload_class_for(self, event: JournalEvent | str) -> type[JournalEvent] | None:
         type_name = event if isinstance(event, str) else type(event).__name__
         descriptor = self._by_name.get(type_name)
         return descriptor.payload_class if descriptor is not None else None

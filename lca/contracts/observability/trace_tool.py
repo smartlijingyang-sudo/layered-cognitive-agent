@@ -6,11 +6,7 @@ Coding Agent 可通过标准 tool 接口调用，不需要碰 Python API。
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
-
-if TYPE_CHECKING:
-    from lca.contracts.models.observability.journal import StampedEvent
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable

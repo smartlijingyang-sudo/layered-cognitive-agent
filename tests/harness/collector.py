@@ -1,6 +1,6 @@
 """In-memory observability collectors for tests (not part of lca package).
 
-新基建：collector 本身就是 ``ObservabilityHub``（内置 OTel InMemoryExporter），
+新基建：collector 直接持有 ``BoundObservability``（内置 OTel InMemoryExporter），
 直接作为 observability 注入；``TraceBundle`` 查询 API 不变（SpanView 投影）。
 """
 
@@ -8,11 +8,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lca.layer0_infra.observability import ObservabilityHub, SpanView
-from lca.layer0_infra.observability.journal.console_projector import ConsoleJournalProjector
+from lca.layer0_infra.observability import AttributePolicy, BoundObservability, SpanView
+from lca.layer0_infra.observability.tracer_backend import OtelTracer
 from lca.layer0_infra.observability.view import view_of
+from tests.support.observability_helpers import make_test_bound
 
 
 @dataclass
@@ -50,14 +53,30 @@ class TraceBundle:
         return {s.trace_id for s in self.spans if s.trace_id}
 
 
-class InMemoryObservability(ObservabilityHub):
-    """Collect every span in memory for topology assertions (injectable hub)."""
+class InMemoryObservability(BoundObservability):
+    """In-memory BoundObservability: collect every span for topology assertions.
+
+    Inherits BoundObservability so ``isinstance(..., BoundObservability)`` succeeds
+    and downstream code (spawn_agent, driver) can use it directly. Stores the
+    underlying ``InMemorySpanExporter`` so tests can inspect collected spans.
+    """
 
     name = "in_memory"
 
     def __init__(self) -> None:
         self._memory_exporter = InMemorySpanExporter()
-        super().__init__([self._memory_exporter])
+        self._provider = TracerProvider()
+        self._provider.add_span_processor(SimpleSpanProcessor(self._memory_exporter))
+        raw_tracer = self._provider.get_tracer("test")
+        bound = make_test_bound(
+            tracer=OtelTracer(raw_tracer, policy=AttributePolicy()),
+            otel_tracer=raw_tracer,
+        )
+        # Frozen dataclass → use object.__setattr__ to initialise fields
+        object.__setattr__(self, "journal", bound.journal)
+        object.__setattr__(self, "tracer", bound.tracer)
+        object.__setattr__(self, "policy", bound.policy)
+        object.__setattr__(self, "scorers", bound.scorers)
 
     def bundle(self) -> TraceBundle:
         self.flush()
@@ -76,6 +95,21 @@ class LiveCollector(InMemoryObservability):
     def __init__(self, *, live: bool = True, detail: object = None) -> None:
         # detail kept for CLI API compat; console = journal-driven human view
         del detail
+        from lca.layer0_infra.observability.journal.console_projector import (
+            ConsoleJournalProjector,
+        )
+
         self._memory_exporter = InMemorySpanExporter()
-        projectors = [ConsoleJournalProjector()] if live else []
-        ObservabilityHub.__init__(self, [self._memory_exporter], journal_projectors=projectors)
+        self._provider = TracerProvider()
+        self._provider.add_span_processor(SimpleSpanProcessor(self._memory_exporter))
+        raw_tracer = self._provider.get_tracer("test")
+        projections = [ConsoleJournalProjector()] if live else []
+        bound = make_test_bound(
+            tracer=OtelTracer(raw_tracer, policy=AttributePolicy()),
+            projections=tuple(projections),
+            otel_tracer=raw_tracer,
+        )
+        object.__setattr__(self, "journal", bound.journal)
+        object.__setattr__(self, "tracer", bound.tracer)
+        object.__setattr__(self, "policy", bound.policy)
+        object.__setattr__(self, "scorers", bound.scorers)

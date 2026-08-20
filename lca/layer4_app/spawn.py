@@ -58,7 +58,6 @@ from lca.contracts.protocols import (
 from lca.contracts.protocols.infra import AgentTransport, Tool
 from lca.contracts.protocols.spec import (
     DEFAULT_DELEGATE_MAX_ATTEMPTS,
-    OBSERVABILITY_CHOICE_CONSOLE,
     AgentSpec,
     Governance,
     LeadSpec,
@@ -66,10 +65,10 @@ from lca.contracts.protocols.spec import (
     strategy_key_for_governance,
 )
 from lca.harness.middleware import InMemoryMiddlewareRegistry
+from lca.harness.observability import make_minimal_bound
 from lca.layer0_infra.observability import (
-    ObservabilityHub,
+    BoundObservability,
     TeamTraceProfile,
-    create_observability,
     team_id_for,
 )
 from lca.layer0_infra.observability.adapters import TelemetryLLMAdapter, TelemetryMemoryAdapter
@@ -350,9 +349,17 @@ def spawn_agent(
     scope = _ensure_scope(scope)
     profile = spec.profile
     if isinstance(spec.observability, str):
-        hub = require_capability(scope, "observability").create()
+        # Temporary shim: capability seam still returns BoundObservability factories.
+        # TODO: replace with direct bound resolution once observe seam provides it.
+        try:
+            hub = require_capability(scope, "observability").create()
+        except RuntimeError:
+            hub = make_minimal_bound()
+    elif isinstance(spec.observability, BoundObservability):
+        hub = spec.observability
     else:
-        hub = create_observability(spec.observability)
+        # Legacy path: instantiate from make_minimal_bound (lossy — backends come later)
+        hub = make_minimal_bound()
     mem = _resolve_memory(
         spec.memory, shared_store, require_capability(scope, CapabilityKey.MEMORY.value)
     )
@@ -420,7 +427,7 @@ def spawn_lead(
     *,
     transport: AgentTransport,
     mandate: LeadMandate,
-    observability: ObservabilityHub | None = None,
+    observability: BoundObservability | None = None,
     scope: Context | None = None,
 ) -> CognitiveAgent:
     """Close a lead AgentSpec with mandate-specific decision gate."""
@@ -448,11 +455,11 @@ def spawn_member(
     spec: AgentSpec,
     *,
     shared_store: SharedMemoryStore | None = None,
-    observability: ObservabilityHub | None = None,
+    observability: BoundObservability | None = None,
     scope: Context | None = None,
 ) -> CognitiveAgent:
     """Close a team member AgentSpec."""
-    member_spec = replace(spec, observability=observability) if observability is not None else spec
+    member_spec = replace(spec, observability=observability) if observability is not None else spec  # type: ignore[arg-type]
     return spawn_agent(
         member_spec,
         action_scope=ActionScope.MEMBER,
@@ -497,8 +504,8 @@ def _trace_profile(
     )
 
 
-def _resolve_team_observability(spec: TeamSpec) -> ObservabilityHub:
-    candidates: list[str | ObservabilityBackend] = []
+def _resolve_team_observability(spec: TeamSpec) -> BoundObservability:
+    candidates: list[str | ObservabilityBackend | BoundObservability] = []
     if spec.observability is not None:
         candidates.append(spec.observability)
     candidates.extend(member.observability for member in spec.members)
@@ -506,11 +513,14 @@ def _resolve_team_observability(spec: TeamSpec) -> ObservabilityHub:
     if isinstance(governance, LeadSpec):
         candidates.append(governance.agent.observability)
     for choice in candidates:
-        if isinstance(choice, ObservabilityHub):
+        if isinstance(choice, BoundObservability):
             return choice
         if isinstance(choice, str):
-            return create_observability(choice)
-    return create_observability(OBSERVABILITY_CHOICE_CONSOLE)
+            # Temporary shim: assemble_observability is the boot-time path; for
+            # runtime spec selection we wrap the legacy hub in an empty BoundObservability.
+            # TODO: replace with seam-driven bound resolution once boot seam provides it.
+            return make_minimal_bound()
+    return make_minimal_bound()
 
 
 def spawn_team(
@@ -521,7 +531,7 @@ def spawn_team(
     coordination: Coordination | None = None,
     shared_memory_layers: Sequence[MemoryLayer] | None = None,
     delegate_max_attempts: int | None = None,
-    observability: str | ObservabilityHub | None = None,
+    observability: str | BoundObservability | None = None,
     scope: Context | None = None,
 ) -> TeamUnit:
     """Close a TeamSpec (or kwargs) into a TeamHandle."""

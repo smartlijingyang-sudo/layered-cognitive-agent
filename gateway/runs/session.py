@@ -16,7 +16,7 @@ from gateway.runs.live import LiveTail
 from gateway.runs.process_journal import ProcessJournal
 from lca.contracts.models.core.conversation import ConversationTurn
 from lca.contracts.models.core.plane import PlaneBindings
-from lca.layer0_infra.observability import ObservabilityHub
+from lca.layer0_infra.observability import BoundObservability
 
 _RUNS_DIR = Path("traces/runs")
 _DEFAULT_MAX_TERMINAL = 128
@@ -76,7 +76,7 @@ class RunSession:
     question: str
     user_text: str
     mode: str
-    hub: ObservabilityHub | None = None
+    hub: BoundObservability | None = None
     prior_turns: tuple[ConversationTurn, ...] = field(default_factory=tuple)
     attachment_ids: tuple[str, ...] = field(default_factory=tuple)
     agent: AgentRef = field(default_factory=default_agent_ref)

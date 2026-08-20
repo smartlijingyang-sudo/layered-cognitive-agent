@@ -43,7 +43,7 @@ from lca.contracts.models.team.delegation_context import (
     in_member_invoke,
 )
 from lca.contracts.protocols import AgentTransport
-from lca.layer0_infra.observability import observe, record, span
+from lca.layer0_infra.observability import record, record_runtime, span
 
 
 def _describe_target(agent_card: AgentCard | str) -> str:
@@ -90,7 +90,7 @@ async def send_task_traced(
     ) as handle:
         task_id = await transport.send_task(agent_card, subtask, context_refs)
         handle.attributes[ATTR_OK] = True
-    observe(
+    record_runtime(
         DiagnosticCategory.TRANSPORT,
         "transport.send",
         plugin=type(transport).__name__,
@@ -206,7 +206,7 @@ async def send_and_wait(
         else:
             extra[OBS_COMPLETION_QUALITY] = COMPLETION_EMPTY
     observation.extra = extra
-    observe(
+    record_runtime(
         DiagnosticCategory.TRANSPORT,
         "transport.receive",
         plugin=type(transport).__name__,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from lca.contracts.models.observability.journal import (
     AgentRunStarted,
@@ -22,7 +23,7 @@ def _scope() -> RunScope:
     return RunScope(trace_id="t", run_id="r")
 
 
-def _make_journal(tmp_path) -> "Path":
+def _make_journal(tmp_path) -> Path:
     store = RunStore()
     store.append(TeamRunStarted(team_id="t1"))
     store.append(AgentRunStarted(agent_role="tester"))
@@ -78,7 +79,7 @@ def test_trace_command_missing_file_returns_1(tmp_path) -> None:
 
 
 def test_seam_provides_debug_registry() -> None:
-    from lca.plugins import seam_cli_debug as mod  # noqa: F401
+    from lca.plugins import seam_cli_debug as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})
@@ -87,7 +88,7 @@ def test_seam_provides_debug_registry() -> None:
 
 def test_trace_command_registered() -> None:
     from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers import cli_debug_trace as mod  # noqa: F401
+    from lca.plugins.providers import cli_debug_trace as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})
