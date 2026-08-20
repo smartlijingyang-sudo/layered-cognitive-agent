@@ -60,18 +60,24 @@ STATE_STORE = Capability[object]("state_store", cardinality="registry")
 PERCEIVE = Capability[object]("perceive", cardinality="one")
 GATES = Capability[object]("gates", cardinality="one")
 
+# ── Multi-impl registry seams (ADR-0062 §3 / PR-3) ───────────────────
+
+BODIES = Capability[object]("bodies", cardinality="registry")
+BRAINS = Capability[object]("brains", cardinality="registry")
+STOP_RULES = Capability[object]("stop_rules", cardinality="registry")
+HOOKS = Capability[object]("hooks", cardinality="registry")
+STRATEGIES = Capability[object]("team_strategies", cardinality="registry")
+DRIVERS = Capability[object]("run_loop_driver_registry", cardinality="registry")
+COMPONENT_REGISTRY = Capability[object]("component_registry", cardinality="one")
+
 # ── Named factories / drivers ───────────────────────────────────────
 
 LLM_RESOLVER = Capability[object]("llm_resolver", cardinality="one")
-BRAIN_FACTORY = Capability[object]("brain_factory", cardinality="factory")
-BODY_SIMPLE = Capability[object]("body.simple", cardinality="factory")
 SAFE_EXECUTOR_SIMPLE = Capability[object]("safe_executor.simple", cardinality="factory")
-STOP_RULE_DEFAULT = Capability[object]("stop_rule.default", cardinality="factory")
-HOOK_REGISTRY_SIMPLE = Capability[object]("hook_registry.simple", cardinality="factory")
 MIDDLEWARE_REGISTRY_MEMORY = Capability[object]("middleware_registry.memory", cardinality="factory")
 REASONER_PROMPT = Capability[object]("reasoner.prompt", cardinality="factory")
 CRITIC_SIMPLE = Capability[object]("critic.simple", cardinality="factory")
 JOURNAL_STORE = Capability[object]("journal_store", cardinality="factory")
-RUN_LOOP_DRIVER_REGISTRY = Capability[object]("run_loop_driver_registry", cardinality="one")
+RUN_LOOP_DRIVER_REGISTRY = DRIVERS
 TOOLS_COMPOSE_SERVICE = Capability[object]("tools.compose_service", cardinality="factory")
 TRANSPORT_COMPOSE_SERVICE = Capability[object]("transport.compose_service", cardinality="factory")

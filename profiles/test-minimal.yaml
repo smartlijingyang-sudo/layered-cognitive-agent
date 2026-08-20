@@ -1,0 +1,6 @@
+# test-minimal — L4 spawn / strategy tests without LLM env patch.
+# Same plugin surface as web-standard (base + web-app); secrets optional.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml

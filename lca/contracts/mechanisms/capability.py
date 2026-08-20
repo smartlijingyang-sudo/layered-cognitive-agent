@@ -1,9 +1,4 @@
-"""Capability context — Definition 拥有的活服务键（DSH ctx 的 Python 形态）。
-
-cordis migration: SeamKey → CapabilityKey rename. CapabilityHub / mount /
-require / get are replaced by cordis.Context.provide / inject; the
-CapabilityContext Protocol is kept for migration-period back-compat.
-"""
+"""Capability context — Definition 拥有的活服务键（DSH ctx 的 Python 形态）。"""
 
 from __future__ import annotations
 
@@ -28,10 +23,7 @@ class CapabilityKey(str, Enum):
 
 REQUIRED_CAPABILITY_KEYS: tuple[CapabilityKey, ...] = tuple(CapabilityKey)
 
-# ── Deprecated alias (back-compat for migration period) ──
 
-
-# Re-export SeamKey as deprecated alias pointing to CapabilityKey
 def __getattr__(name: str) -> object:
     if name == "SeamKey":
         import warnings
@@ -61,63 +53,27 @@ class MissingCapabilityError(KeyError):
 def require_capability(ctx: object, key: str) -> Any:
     """Read ``key`` from a booted cordis Context. Missing → MissingCapabilityError.
 
-    Resolution order (DSH-style):
-
-    1. ``ctx.inject("<key>")`` — primary path through the plain-key
-       Tier-1 binding (the Definition service instance). This matches
-       the DSH ``ctx.<service>`` access shape and is the canonical
-       resolution for plugins (providers, sensors, runtime, etc.).
-    2. ``ctx.inject("seam:<key>").current()`` — fallback through the
-       :class:`SeamRegistry` written by ``lca.seam.definitions``.
-       Useful when no Tier-1 service plugin runs but the seam registry
-       has been populated by other plugins (e.g. test fixtures).
-
-    Execute / compose call this instead of module-level factories. A None
-    ctx, a ctx without ``inject``, a KeyError, or an explicit None binding
-    are all the same miss — there is no silent fallback.
+    Single path (ADR-0062 §3): ``ctx.inject("<key>")``. No ``seam:<key>`` fallback.
     """
     if ctx is None:
         raise MissingCapabilityError(key)
     inject = getattr(ctx, "inject", None)
     if not callable(inject):
         raise MissingCapabilityError(key)
-    # Path 1: plain-key binding — preferred (DSH ``ctx.<service>`` parity).
     try:
         value = inject(key)
-    except KeyError:
-        value = None
-    if value is not None:
-        return value
-    # Path 2: seam-namespaced registry (after seam_definitions runs).
-    try:
-        registry = inject(f"seam:{key}")
     except KeyError as exc:
         raise MissingCapabilityError(key) from exc
-    if registry is not None:
-        current = getattr(registry, "current", None)
-        if callable(current):
-            value = current()
-            if value is not None:
-                return value
-    raise MissingCapabilityError(key)
+    if value is None:
+        raise MissingCapabilityError(key)
+    return value
 
 
 def provider_current(svc: object) -> object | None:
-    """Active provider on a Definition service, or None when the table is empty.
-
-    Two shapes are accepted:
-
-    * Tier-1 Definition service with ``providers`` attribute (LCA legacy):
-      returns ``providers.current()`` (the registered adapter).
-    * :class:`SeamRegistry` (new seam shape): returns ``current()`` directly
-      (the registered Definition service).
-    """
+    """Active provider on a Definition service, or None when the table is empty."""
     if svc is None:
         return None
-    # SeamRegistry shape — has its own .current() returning the registered
-    # provider (which is typically a Definition service).
     if hasattr(svc, "providers"):
-        # Tier-1 Definition service — pull the active adapter.
         providers = svc.providers
         if not getattr(providers, "active", None):
             return None
@@ -125,23 +81,18 @@ def provider_current(svc: object) -> object | None:
             return providers.current()
         except Exception:
             return None
-    # Direct .current() (a plain SeamRegistry or a service with no nested providers).
     current_attr = getattr(svc, "current", None)
     if callable(current_attr):
         try:
             return current_attr()
         except Exception:
             return None
-    # Bare service — return as-is.
     return svc
 
 
 @runtime_checkable
 class CapabilityContext(Protocol):
-    """活接缝上下文：键上只有 Definition 服务。
-
-    Back-compat shim — replaced by cordis.Context.provide / inject.
-    """
+    """活接缝上下文：键上只有 Definition 服务。"""
 
     def mount(self, key: str, service: Any) -> None: ...
 

@@ -10,8 +10,10 @@ module-level singleton.
 """
 
 from __future__ import annotations
+
 from typing import Any
-from lca.harness.plugin_api import plugin, PluginKind
+
+from lca.harness.plugin_api import PluginKind, plugin
 
 
 class RunLoopDriverRegistry:
@@ -24,9 +26,12 @@ class RunLoopDriverRegistry:
     def register(self, target: str, driver: Any) -> None:
         """Register a driver (or a zero-arg factory returning one) for ``target``.
 
-        Idempotent: later registration wins (for profile-driven overrides).
+        Duplicate registration fails (ADR-0062 §3).
         """
-        self._drivers[target.strip().lower()] = driver
+        key = target.strip().lower()
+        if key in self._drivers:
+            raise KeyError(f"run_loop_driver_registry: {key!r} already registered")
+        self._drivers[key] = driver
 
     def resolve(self, target: str) -> Any:
         key = target.strip().lower() if target else ""

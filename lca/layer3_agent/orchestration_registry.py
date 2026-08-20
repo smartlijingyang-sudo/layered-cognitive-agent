@@ -23,6 +23,11 @@ class TeamStrategyRegistry(NamedRegistry[OrchestrationFactory]):
 
     _REGISTRY_KIND = "编排策略"
 
+    def register(self, name: str, impl: OrchestrationFactory) -> None:
+        if name in self:
+            raise KeyError(f"编排策略: {name!r} already registered")
+        super().register(name, impl)
+
     def resolve(self, name: str, assembly: TeamAssembly) -> TeamStrategy:  # type: ignore[override]
         factory = super().resolve(name)
         return factory(assembly)

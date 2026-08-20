@@ -8,6 +8,7 @@ is consumable.
 The `Plugin` Protocol (name/inject/provides/apply/Config) is deleted —
 cordis's `@plugin` decorator replaces it.
 """
+
 from __future__ import annotations
 
 from pydantic import BaseModel

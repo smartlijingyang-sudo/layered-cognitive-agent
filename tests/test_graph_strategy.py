@@ -329,30 +329,30 @@ class TestGraphStrategyRegistration(unittest.TestCase):
 
     def test_graph_registered_by_default(self) -> None:
         from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH
-        from lca.layer4_app.defaults import build_default_registries
+        from tests.support.strategy_registry import build_strategy_registry
 
-        registry = build_default_registries().orchestration
-        self.assertTrue(registry.has(STRATEGY_KEY_GRAPH))
+        registry = build_strategy_registry()
+        self.assertIn(STRATEGY_KEY_GRAPH, registry)
 
     def test_graph_resolves_correctly(self) -> None:
         from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH, Graph
-        from lca.layer4_app.defaults import build_default_registries
+        from tests.support.strategy_registry import build_strategy_registry
 
-        registry = build_default_registries().orchestration
+        registry = build_strategy_registry()
         assembly = TeamAssembly(
             governance=Graph(execution_graph=ExecutionGraph()), stage=stage_with_invoker([])
         )
-        strategy = registry.resolve(STRATEGY_KEY_GRAPH, assembly)
+        strategy = registry.create(STRATEGY_KEY_GRAPH, assembly)
         self.assertIsInstance(strategy, GraphStrategy)
 
     def test_graph_requires_graph_coordination(self) -> None:
         from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH, Pipeline
-        from lca.layer4_app.defaults import build_default_registries
+        from tests.support.strategy_registry import build_strategy_registry
 
-        registry = build_default_registries().orchestration
+        registry = build_strategy_registry()
         assembly = TeamAssembly(governance=Pipeline(), stage=stage_with_invoker([]))
         with self.assertRaises(TypeError):
-            registry.resolve(STRATEGY_KEY_GRAPH, assembly)
+            registry.create(STRATEGY_KEY_GRAPH, assembly)
 
 
 if __name__ == "__main__":

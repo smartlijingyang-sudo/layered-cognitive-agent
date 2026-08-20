@@ -74,7 +74,8 @@ def test_boot_default_profile() -> None:
     assert [e.id for e in perceive.members()][:2] == ["clock", "workspace-artifacts"]
     gates = ctx.inject("gates")
     assert "repeat-tool-call" in gates._entries
-    assert ctx.inject("brain_factory") is not None
+    brains = ctx.inject("brains")
+    assert "default" in brains
 
 
 def test_boot_resolved_matches_facade() -> None:

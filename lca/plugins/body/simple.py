@@ -1,9 +1,12 @@
-"""SimpleBody plugin — named factory ``body.simple``."""
+"""SimpleBody plugin — registers into the BODIES registry seam."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel
+
+from lca.contracts.capabilities import BODIES
 from lca.contracts.protocols import Body
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -12,16 +15,16 @@ class Config(BaseModel):
 
 @plugin(
     id="body.simple",
-    provides=["body.simple"],
+    requires=[BODIES.key],
     implements=[Body],
     layer="L1",
     effects="tools",
-    description="Provide the Body factory used by the Composer.",
+    description="Register SimpleBody as bodies['simple'].",
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named Body factory ``body.simple``."""
+    del config
     from lca.layer1_cognitive.body.simple_body import SimpleBody
 
-    ctx.provide("body.simple", SimpleBody)
+    ctx.register(BODIES.key, "simple", SimpleBody)

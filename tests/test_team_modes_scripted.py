@@ -23,8 +23,7 @@ from lca.contracts.models.team.team_coordination import (
     PeerSwarm,
     Pipeline,
 )
-from lca.layer4_app.api import Agent, Team, TeamLead
-from lca.layer4_app.defaults import build_default_registries
+from lca.layer4_app.api import Agent, Team, TeamLead, ensure_default_ctx
 from tests.harness.collector import InMemoryObservability
 from tests.harness.modes import ALL_MODES, scripted_llm_for_mode
 from tests.harness.report import format_case_digest
@@ -36,6 +35,13 @@ from tests.harness.trace_assert import (
     assert_shared_trace_id,
     assert_trace_expect,
 )
+from tests.support.strategy_registry import build_strategy_registry
+
+
+@pytest.fixture(autouse=True)
+async def _boot_default_ctx_for_module() -> None:
+    """Team/Agent construction needs a warm default plugin ctx (ADR-0062 PR-4)."""
+    await ensure_default_ctx()
 
 # team 模式（board 治理探针）的期望
 MODE_EXPECT: dict[str, dict] = {
@@ -215,7 +221,7 @@ async def test_edge_illegal_team_construction() -> None:
 @pytest.mark.asyncio
 async def test_orchestration_registry_completeness() -> None:
     """L3 编排策略注册表完整 —— 九词治理表（ADR-0030）不受 gateway 模式简化影响。"""
-    registered = set(build_default_registries().orchestration.list_strategies())
+    registered = set(build_strategy_registry().names())
     expected = {
         STRATEGY_KEY_LEAD,
         STRATEGY_KEY_PIPELINE,

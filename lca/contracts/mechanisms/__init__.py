@@ -3,7 +3,7 @@
 边界判定（三者 vs 业务协议）：
 - EventBus / Hook / HookRegistry：观察与横切副作用，不改变决策语义
 - NamedRegistryProtocol / ComponentRegistryProtocol / TransportRegistryProtocol：按名解析实现，无业务规则
-- SeamRole / SeamRegistry / seam：Capability Seam 三角色约束（DSH-inspired）
+- FactoryRegistry：多实现 registry seam（BODIES / BRAINS / …，ADR-0062）
 - 业务协议（Brain / Body / Memory / Runtime / Team…）→ 放 protocols/
 
 protocols/ 包内不应再定义 Registry / EventBus / Hook 类。

@@ -1,25 +1,27 @@
-"""SimpleBrain strategy plugin — Tier-3 (default)."""
+"""SimpleBrain strategy plugin — registers into BRAINS as 'default'."""
 
 from __future__ import annotations
 
 from typing import Any
 
+from lca.contracts.capabilities import BRAINS
 from lca.contracts.protocols import BrainFactory
 from lca.harness.plugin_api import PluginKind, plugin
 
 
 @plugin(
     id="lca-brain-simple",
-    provides=["brain_factory"],
-    requires=["gates", "critic.simple", "reasoner.prompt"],
+    provides=[],
+    requires=[BRAINS.key, "gates", "critic.simple", "reasoner.prompt"],
     implements=[BrainFactory],
     layer="L1",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    description="Register SimpleBrainFactory as the default brain_factory.",
+    description="Register SimpleBrainFactory as brains['default'].",
     test_suite="tests/test_plugin_alignment.py",
 )
 async def setup(ctx: Any, config: Any) -> None:
+    del config
     from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
 
     gates = ctx.require("gates") if hasattr(ctx, "require") else ctx.inject("gates")
@@ -28,4 +30,4 @@ async def setup(ctx: Any, config: Any) -> None:
         critic_factory=ctx.inject("critic.simple"),
         reasoner_cls=ctx.inject("reasoner.prompt"),
     )
-    ctx.provide("brain_factory", factory)
+    ctx.register(BRAINS.key, "default", factory)

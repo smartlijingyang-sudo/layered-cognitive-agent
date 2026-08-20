@@ -264,10 +264,12 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
     """验证 Brain 工厂注册表动态选择 Brain 实现。"""
 
     def test_default_brain_registered(self):
-        from lca.layer4_app.defaults import build_default_registries
+        import asyncio
 
-        registries = build_default_registries()
-        self.assertIn("default", registries.brain_factories)
+        from lca.harness.profile.boot import boot_profile
+
+        ctx = asyncio.run(boot_profile("profiles/test-minimal.yaml"))
+        self.assertIn("default", ctx.inject("brains"))
 
     def test_agent_with_string_brain(self):
         from lca.layer4_app.api import Agent

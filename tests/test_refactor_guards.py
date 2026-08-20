@@ -9,30 +9,45 @@ from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _ADR_DIR = _PROJECT_ROOT / "docs" / "adr"
-_DEFAULTS_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "defaults.py"
 _API_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "api.py"
 _SPAWN_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "spawn.py"
+_DEFAULTS_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "defaults.py"
 _ADR_README = _ADR_DIR / "README.md"
 
 
-class TestDefaultsNoObjectConstruction(unittest.TestCase):
-    def test_defaults_no_object_construction(self) -> None:
-        source = _DEFAULTS_PATH.read_text(encoding="utf-8")
-        tree = ast.parse(source, filename=str(_DEFAULTS_PATH))
-        offenders: list[str] = []
+class TestSpawnNoConcreteServices(unittest.TestCase):
+    """ADR-0062 PR-4: spawn.py AST must not import concrete service fallbacks."""
 
+    def test_defaults_py_deleted(self) -> None:
+        self.assertFalse(_DEFAULTS_PATH.exists(), "defaults.py must be deleted (ADR-0062 PR-4)")
+
+    def test_spawn_no_concrete_service_imports(self) -> None:
+        source = _SPAWN_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(_SPAWN_PATH))
+        forbidden = {
+            "SimpleBody",
+            "PerceiveService",
+            "build_default_registries",
+            "register_builtin_sensors",
+            "ToolsService",
+            "TransportService",
+            "SimpleSafeExecutor",
+            "DefaultStopRule",
+            "MustConsultAllMembers",
+        }
+        imported: set[str] = set()
         for node in ast.walk(tree):
-            if not isinstance(node, ast.FunctionDef):
-                continue
-            if node.name not in {"register_defaults"}:
-                for sub in ast.walk(node):
-                    if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name):
-                        name = sub.func.id
-                        if name.endswith("Transport") or name.startswith("build_"):
-                            offenders.append(
-                                f"{node.name}() 内调用 {name}() — 对象构造应留在 spawn.py"
-                            )
-        self.assertFalse(offenders, "\n".join(offenders))
+            if isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    imported.add(alias.name)
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    imported.add(alias.name.split(".")[-1])
+        offenders = sorted(forbidden & imported)
+        self.assertFalse(
+            offenders,
+            f"spawn.py still imports concrete fallbacks: {offenders}",
+        )
 
 
 class TestL4ApiIsThinFacade(unittest.TestCase):

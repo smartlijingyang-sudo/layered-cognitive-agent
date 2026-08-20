@@ -13,10 +13,10 @@ These four assertions cover the criteria from the alignment plan:
   SimpleHookRegistry names must exist only as typed façades (the cordis
   wrapper); private dict-based dispatch implementations are forbidden.
 
-* (c) Seam runtime — :class:`SeamRegistry` is written to the booted
-  Context by ``lca.seam.definitions`` for every one of the 13 capability
-  keys.  A bundle that omits the memory Tier-1 service fails to boot
-  with a message that names the missing seam key.
+* (c) Registry seams — BODIES / BRAINS / STOP_RULES / HOOKS / STRATEGIES
+  are ``FactoryRegistry`` instances on the booted Context (ADR-0062 §3).
+  A bundle that omits the memory Tier-1 service fails to boot with a
+  message that names the missing capability key. No ``seam:`` Path-2.
 
 * (d) Composition root — ``spawn.py`` must not instantiate concrete
   capability services (``ToolsService()``, ``TransportService()``, …)
@@ -170,24 +170,58 @@ def test_eventbus_and_hookregistry_single_backend() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────
-# (c) Seam runtime — 13 SeamRegistry instances written into ctx
+# (c) Registry seams — FactoryRegistry owners (ADR-0062 §3)
 # ─────────────────────────────────────────────────────────────────────
 
+_REGISTRY_SEAMS: tuple[str, ...] = (
+    "bodies",
+    "brains",
+    "stop_rules",
+    "hooks",
+    "team_strategies",
+)
 
-def test_seam_definitions_runtime_registry() -> None:
-    """``lca.seam.definitions`` writes one :class:`SeamRegistry` per seam."""
+
+def test_factory_registry_seams() -> None:
+    """Factory seams are FactoryRegistry; contributors fill named entries."""
     import asyncio
 
-    from lca.contracts.mechanisms.seam_registry import SeamRegistry
-    from lca.plugins.seam_definitions import SEAM_KEYS
+    from lca.contracts.mechanisms.factory_registry import FactoryRegistry
 
     ctx = asyncio.run(boot_profile(DEFAULT_PROFILE))
-    for seam_key in SEAM_KEYS:
-        # The ``seam:<key>`` namespace is the canonical alias.
-        registry = ctx.inject(f"seam:{seam_key}")
-        assert isinstance(registry, SeamRegistry), (
-            f"seam:{seam_key} is not a SeamRegistry: got {type(registry).__name__}"
+    for key in _REGISTRY_SEAMS:
+        registry = ctx.inject(key)
+        assert isinstance(registry, FactoryRegistry), (
+            f"{key} is not a FactoryRegistry: got {type(registry).__name__}"
         )
+    assert "simple" in ctx.inject("bodies")
+    assert "default" in ctx.inject("brains")
+    assert "default" in ctx.inject("stop_rules")
+    assert "simple" in ctx.inject("hooks")
+    assert "lead" in ctx.inject("team_strategies")
+    assert "pipeline" in ctx.inject("team_strategies")
+
+
+def test_factory_registry_duplicate_register_fails() -> None:
+    from lca.contracts.mechanisms.factory_registry import FactoryRegistry
+
+    reg = FactoryRegistry("bodies")
+    reg.register("simple", object)
+    with pytest.raises(KeyError, match="already registered"):
+        reg.register("simple", object)
+
+
+def test_require_capability_has_no_seam_path() -> None:
+    """``seam:`` Path-2 is gone — missing plain key fails immediately."""
+    import asyncio
+
+    from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
+
+    ctx = asyncio.run(boot_profile(DEFAULT_PROFILE))
+    with pytest.raises(MissingCapabilityError, match="no_such_capability"):
+        require_capability(ctx, "no_such_capability")
+    with pytest.raises((KeyError, MissingCapabilityError)):
+        ctx.inject("seam:llm")
 
 
 def test_boot_fails_when_seam_provider_missing() -> None:
@@ -217,7 +251,7 @@ def test_boot_fails_when_seam_provider_missing() -> None:
     # Programmatic entries path: drop provider + consumers of memory, boot,
     # then require_capability must still fail.
     entries = load_profile_entries(DEFAULT_PROFILE)
-    dropped = {"lca-memory-service", "lca-memory-provider", "lca.seam.definitions"}
+    dropped = {"lca-memory-service", "lca-memory-provider"}
     pruned = [entry for entry in entries if entry["id"] not in dropped]
     # Also drop anything that still lists memory in $module providers chain
     # by attempting boot and asserting require fails.

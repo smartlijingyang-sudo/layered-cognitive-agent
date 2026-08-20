@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import pytest
+
 
 @dataclass
 class _StubMemory:
@@ -61,8 +63,17 @@ def _install_perceive_hub_recorder(recorded):
     return original, service_module
 
 
+@pytest.fixture
+async def booted_scope():
+    """Boot the plugin tree so perceive group contributions are available."""
+    from lca.layer4_app.api import ensure_default_ctx
+
+    return await ensure_default_ctx()
+
+
 class TestPerceiveServiceWiring:
-    def test_builtin_wires_inbox_facts_sensor(self) -> None:
+    @pytest.mark.asyncio
+    async def test_builtin_wires_inbox_facts_sensor(self, booted_scope) -> None:
         """InboxFactsSensor MUST be present in solo assemble."""
         from lca.contracts.atoms.enums import ActionScope
         from lca.layer4_app.spawn import build_perceive_hub
@@ -73,6 +84,7 @@ class TestPerceiveServiceWiring:
             build_perceive_hub(
                 _StubMemory(),  # type: ignore[arg-type]
                 hub=_StubObsHub(),
+                scope=booted_scope,
                 action_scope=ActionScope.SOLO,
             )
         finally:
@@ -87,7 +99,8 @@ class TestPerceiveServiceWiring:
             "ClockSensor must precede InboxFactsSensor (PR8 §5.5)"
         )
 
-    def test_team_inbox_in_team_mode(self) -> None:
+    @pytest.mark.asyncio
+    async def test_team_inbox_in_team_mode(self, booted_scope) -> None:
         """TeamInboxSensor MUST be present in team assemble."""
         from lca.contracts.atoms.enums import ActionScope
         from lca.layer4_app.spawn import build_perceive_hub
@@ -98,6 +111,7 @@ class TestPerceiveServiceWiring:
             build_perceive_hub(
                 _StubMemory(),  # type: ignore[arg-type]
                 hub=_StubObsHub(),
+                scope=booted_scope,
                 action_scope=ActionScope.MEMBER,
             )
         finally:
@@ -109,7 +123,8 @@ class TestPerceiveServiceWiring:
             f"TeamInboxSensor MUST be wired in MEMBER scope. Got: {sensor_names}"
         )
 
-    def test_no_team_inbox_in_solo_mode(self) -> None:
+    @pytest.mark.asyncio
+    async def test_no_team_inbox_in_solo_mode(self, booted_scope) -> None:
         """TeamInboxSensor MUST NOT be present in solo assemble."""
         from lca.contracts.atoms.enums import ActionScope
         from lca.layer4_app.spawn import build_perceive_hub
@@ -120,6 +135,7 @@ class TestPerceiveServiceWiring:
             build_perceive_hub(
                 _StubMemory(),  # type: ignore[arg-type]
                 hub=_StubObsHub(),
+                scope=booted_scope,
                 action_scope=ActionScope.SOLO,
             )
         finally:

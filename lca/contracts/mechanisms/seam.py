@@ -9,6 +9,7 @@ officially a CONSUMER of a definition's seam and returns the provider
 unchanged. Domain classes (Brain / Reasoner / Runtime) take the provider
 via constructor injection; no Service Locator look-ups.
 """
+
 from __future__ import annotations
 
 from typing import Any, TypeVar

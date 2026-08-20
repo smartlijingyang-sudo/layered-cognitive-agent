@@ -1,25 +1,27 @@
-"""ModularBrain strategy plugin — Tier-3."""
+"""ModularBrain strategy plugin — registers into BRAINS as 'modular'."""
 
 from __future__ import annotations
 
 from typing import Any
 
+from lca.contracts.capabilities import BRAINS
 from lca.contracts.protocols import BrainFactory
 from lca.harness.plugin_api import PluginKind, plugin
 
 
 @plugin(
     id="lca-brain-modular",
-    provides=["brain_factory.modular"],
-    requires=["gates", "critic.simple", "reasoner.prompt"],
+    provides=[],
+    requires=[BRAINS.key, "gates", "critic.simple", "reasoner.prompt"],
     implements=[BrainFactory],
     layer="L1",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    description="Register the ModularBrain factory for lead-aware composition.",
+    description="Register ModularBrain factory as brains['modular'].",
     test_suite="tests/test_plugin_alignment.py",
 )
 async def setup(ctx: Any, config: Any) -> None:
+    del config
     from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
 
     gates = ctx.require("gates") if hasattr(ctx, "require") else ctx.inject("gates")
@@ -28,4 +30,4 @@ async def setup(ctx: Any, config: Any) -> None:
         critic_factory=ctx.inject("critic.simple"),
         reasoner_cls=ctx.inject("reasoner.prompt"),
     )
-    ctx.provide("brain_factory.modular", factory)
+    ctx.register(BRAINS.key, "modular", factory)

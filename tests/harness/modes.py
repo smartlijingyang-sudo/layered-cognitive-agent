@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-from tests.harness.scripted_llm import ScriptedLLMAdapter, multi_delegate, respond
+from tests.harness.scripted_llm import ScriptedLLMAdapter, respond
 
 
 @dataclass(frozen=True)
@@ -113,12 +113,11 @@ def scripted_llm_for_mode(mode: str) -> ScriptedLLMAdapter:
     if mode == "solo":
         return ScriptedLLMAdapter({"助手": [respond("solo done")]}, default_respond=True)
     if mode == "team":
+        # Board mandate short-circuits the first lead turn into parallel consult
+        # without an LLM call; the only Lead LLM turn is the final respond.
         return ScriptedLLMAdapter(
             {
-                "Lead": [
-                    multi_delegate([("Alice", "analyze"), ("Bob", "review")]),
-                    respond("lead final"),
-                ],
+                "Lead": [respond("lead final")],
                 "Alice": [respond("alice view")],
                 "Bob": [respond("bob view")],
             },

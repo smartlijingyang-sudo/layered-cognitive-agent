@@ -1,8 +1,7 @@
 """L4 spawn — close AgentSpec / TeamSpec into live object graphs.
 
-ADR-0056: group services assemble contributions; this module binds the
-per-agent spec and builds CognitiveRuntime / TeamHandle. No Composer
-class. No contribution-id lists.
+ADR-0056 / ADR-0062 §5: bind per-agent spec from a booted capability scope
+only. No concrete service fallbacks. No ``Registries`` / ``defaults.py``.
 """
 
 from __future__ import annotations
@@ -18,17 +17,23 @@ from lca.contracts.atoms.enums import (
     ActionScope,
     ComponentKind,
     DecisionGateName,
-    HookEvent,
     MemoryLayer,
 )
-from lca.contracts.mechanisms import ComponentRegistryProtocol, consume
+from lca.contracts.capabilities import (
+    BODIES,
+    BRAINS,
+    COMPONENT_REGISTRY,
+    HOOKS,
+    STOP_RULES,
+    STRATEGIES,
+)
+from lca.contracts.mechanisms import consume
 from lca.contracts.mechanisms.capability import (
     CapabilityKey,
     MissingCapabilityError,
     provider_current,
     require_capability,
 )
-from lca.contracts.mechanisms.registries import Registries
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.team_coordination import (
     Coordination,
@@ -52,7 +57,6 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.protocols.infra import AgentTransport, Tool
 from lca.contracts.protocols.spec import (
-    BRAIN_CHOICE_DEFAULT,
     DEFAULT_DELEGATE_MAX_ATTEMPTS,
     OBSERVABILITY_CHOICE_CONSOLE,
     AgentSpec,
@@ -62,40 +66,21 @@ from lca.contracts.protocols.spec import (
     strategy_key_for_governance,
 )
 from lca.harness.middleware import InMemoryMiddlewareRegistry
-from lca.layer0_infra.capability.memory import MemoryService
-from lca.layer0_infra.capability.state_store import StateStoreService
-from lca.layer0_infra.capability.tools import ToolsService
-from lca.layer0_infra.capability.transport import TransportService
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     TeamTraceProfile,
     create_observability,
     team_id_for,
 )
-from lca.layer0_infra.observability import record as _journal_record
 from lca.layer0_infra.observability.adapters import TelemetryLLMAdapter, TelemetryMemoryAdapter
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
-from lca.layer1_cognitive.gate_service import GateService
-from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
-from lca.layer1_cognitive.perceive_service import (
-    Needs,
-    PerceiveService,
-    register_builtin_sensors,
-)
-from lca.layer2_runtime.default_stop_rule import DefaultStopRule
-from lca.layer2_runtime.event_emission import make_journal_emitting_hook
-from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.layer3_agent.member_invoke import TransportMemberInvoker
 from lca.layer3_agent.team_handle import TeamHandle
-from lca.layer4_app.defaults import build_default_registries
 from lca.layer4_app.policies import LEAD_BUDGET_POLICY_KEY
 from lca.layer4_app.runtime_factory import RuntimeDeps, build_cognitive_runtime
 from lca.layer4_app.team_wiring import (
@@ -115,29 +100,17 @@ __all__ = [
 ]
 
 T = TypeVar("T")
-_NEEDS_SKILLS: Needs = "skills"
+_NEEDS_SKILLS = "skills"
 
 
-class _ScopeAsCapabilityContext:
-    """Adapter: cordis.Context where CapabilityHub.require/get/mount is expected."""
+def _ensure_scope(scope: Context | None) -> Any:
+    if scope is not None:
+        if not callable(getattr(scope, "inject", None)):
+            raise TypeError("spawn scope must be a booted cordis Context with inject()")
+        return scope
+    from lca.layer4_app.api import get_or_create_default_ctx
 
-    def __init__(self, ctx: Any) -> None:
-        self._ctx = ctx
-
-    def require(self, key: str) -> Any:
-        result = self._ctx.inject(key)
-        if result is None:
-            raise MissingCapabilityError(key)
-        return result
-
-    def get(self, key: str) -> Any | None:
-        return self._ctx.inject(key)
-
-    def mount(self, key: str, service: Any) -> None:
-        self._ctx.provide(key, service)
-
-    def keys(self) -> list[str]:
-        return [k for k in dir(self._ctx) if not k.startswith("_")]
+    return get_or_create_default_ctx()
 
 
 def _scope_is_team(scope: object | None) -> bool:
@@ -158,39 +131,19 @@ def _run_store_from_scope(scope: object | None) -> Any | None:
     return getattr(scope, "run_store", None) or getattr(scope, "_run_store", None)
 
 
-def _is_plugin_tree(scope: object | None) -> bool:
-    return callable(getattr(scope, "inject", None))
+def _require_factory(scope: object, key: str) -> Any:
+    return require_capability(scope, key)
 
 
-def _ctx_factory(scope: object | None, key: str) -> Any | None:
-    inject = getattr(scope, "inject", None)
-    if not callable(inject):
-        return None
-    try:
-        return inject(key)
-    except Exception:
-        return None
-
-
-def _resolve_named_factory(scope: object | None, key: str, standard: Any | None) -> Any | None:
-    if _is_plugin_tree(scope):
-        return _ctx_factory(scope, key)
-    return standard
-
-
-def _skill_store_from_scope(scope: object | None) -> Any:
-    if _is_plugin_tree(scope):
-        store = provider_current(require_capability(scope, "skills"))
-        if store is None:
-            raise MissingCapabilityError("skills")
-        return store
-    from lca.layer0_infra.skills.factory import resolve_skill_store
-
-    return resolve_skill_store()
+def _skill_store_from_scope(scope: object) -> Any:
+    store = provider_current(require_capability(scope, "skills"))
+    if store is None:
+        raise MissingCapabilityError("skills")
+    return store
 
 
 def _resolve_component(
-    reg: ComponentRegistryProtocol,
+    reg: Any,
     category: str,
     value: object,
     expected_type: type[T],
@@ -234,9 +187,7 @@ def _instrument_llm(llm: LLMAdapter) -> LLMAdapter:
     return TelemetryLLMAdapter(_unwrap_llm(llm))
 
 
-def _render_available_skills(scope: object | None = None) -> str:
-    if not _is_plugin_tree(scope):
-        return "（技能库不可用）"
+def _render_available_skills(scope: object) -> str:
     store = _skill_store_from_scope(scope)
     try:
         installed = store.list_installed()
@@ -247,22 +198,8 @@ def _render_available_skills(scope: object | None = None) -> str:
     return "\n".join(f"- {entry.skill_id}: {entry.name}" for entry in installed)
 
 
-def _standard_hooks() -> SimpleHookRegistry:
-    hooks = SimpleHookRegistry()
-    journal_hook = make_journal_emitting_hook(_journal_record)
-    for event_name in HookEvent:
-        hooks.register(event_name, default_logging_hook)
-        hooks.register(event_name, journal_hook)
-    return hooks
-
-
-def _build_hooks(scope: object | None = None) -> SimpleHookRegistry:
-    factory = _resolve_named_factory(scope, "hook_registry.simple", None)
-    if factory is not None:
-        hooks = factory()
-        if isinstance(hooks, SimpleHookRegistry):
-            return hooks
-    return _standard_hooks()
+def _build_hooks(scope: object) -> Any:
+    return require_capability(scope, HOOKS.key).create("simple")
 
 
 def build_perceive_hub(
@@ -272,26 +209,16 @@ def build_perceive_hub(
     scope: object | None = None,
     action_scope: ActionScope | None = None,
 ) -> PerceiveHub:
-    """Assemble PerceiveHub from the perceive group (or builtin sensors)."""
-    from lca.layer0_infra.observability import RunStore
-
-    store_cls = _resolve_named_factory(scope, "journal_store", RunStore)
-    store = (
-        getattr(hub, "_run_store", None)
-        or _run_store_from_scope(scope)
-        or (store_cls() if store_cls is not None else RunStore())
-    )
+    """Assemble PerceiveHub from the perceive group service on *scope*."""
+    if scope is None or not callable(getattr(scope, "inject", None)):
+        raise MissingCapabilityError("perceive")
+    store_cls = _require_factory(scope, "journal_store")
+    store = getattr(hub, "_run_store", None) or _run_store_from_scope(scope) or store_cls()
     team = _scope_is_team(action_scope) or _scope_is_team(scope)
-    service = _resolve_named_factory(scope, "perceive", None)
-    if service is None:
-        if _is_plugin_tree(scope):
-            raise MissingCapabilityError("perceive")
-        service = PerceiveService()
-        register_builtin_sensors(service)
-    if not isinstance(service, PerceiveService):
-        raise TypeError(f"perceive expected PerceiveService, got {type(service).__name__}")
+    service = require_capability(scope, "perceive")
     skill_store = None
-    if any(entry.needs == _NEEDS_SKILLS for entry in service.members(team=team)):
+    members = service.members(team=team)
+    if any(getattr(entry, "needs", None) == _NEEDS_SKILLS for entry in members):
         skill_store = _skill_store_from_scope(scope)
     return service.assemble(
         memory,
@@ -301,19 +228,14 @@ def build_perceive_hub(
     )
 
 
-def _build_middleware_registry(
-    hooks: SimpleHookRegistry,
-    scope: object | None = None,
-) -> InMemoryMiddlewareRegistry:
-    from lca.layer2_runtime.hook_middleware import install_hook_bridge
-
-    factory = _resolve_named_factory(scope, "middleware_registry.memory", None)
-    if factory is not None:
-        registry = factory(hooks)
-        if isinstance(registry, InMemoryMiddlewareRegistry):
-            return registry
-    registry = InMemoryMiddlewareRegistry()
-    install_hook_bridge(registry, hooks)
+def _build_middleware_registry(hooks: Any, scope: object) -> InMemoryMiddlewareRegistry:
+    factory = _require_factory(scope, "middleware_registry.memory")
+    registry = factory(hooks)
+    if not isinstance(registry, InMemoryMiddlewareRegistry):
+        raise TypeError(
+            f"middleware_registry.memory expected InMemoryMiddlewareRegistry, "
+            f"got {type(registry).__name__}"
+        )
     return registry
 
 
@@ -332,7 +254,7 @@ def _apply_lead_brain(brain: Brain, *, decision_gate: DecisionGate) -> Brain:
 def _resolve_memory(
     choice: str | MemorySystem,
     shared_store: SharedMemoryStore | None,
-    memory_service: MemoryService,
+    memory_service: Any,
 ) -> MemorySystem:
     if shared_store is not None:
         mem: MemorySystem = memory_service.create(shared_store=shared_store)
@@ -345,7 +267,7 @@ def _resolve_memory(
     return TelemetryMemoryAdapter(mem)
 
 
-def _resolve_state_store(choice: str | StateStore, service: StateStoreService) -> StateStore:
+def _resolve_state_store(choice: str | StateStore, service: Any) -> StateStore:
     if not isinstance(choice, str):
         return choice
     if choice in service.providers.names():
@@ -358,26 +280,15 @@ def _resolve_brain(
     profile: RoleProfile,
     llm: LLMAdapter,
     *,
-    scope: Context | None = None,
-    registries: Registries,
+    scope: object,
 ) -> Brain:
     if not isinstance(spec.brain, str):
         return spec.brain
-    if _is_plugin_tree(scope):
-        brain_key = spec.brain
-        factory = _resolve_named_factory(scope, f"brain_factory.{brain_key}", None)
-        if factory is None:
-            factory = _resolve_named_factory(scope, "brain_factory", None)
-            if factory is None or brain_key != BRAIN_CHOICE_DEFAULT:
-                raise ValueError(
-                    f"Unknown brain: {spec.brain!r}. Available: "
-                    "brain_factory.default, brain_factory.modular"
-                )
-    else:
-        factory_reg = registries.brain_factories
-        if spec.brain not in factory_reg:
-            raise ValueError(f"Unknown brain: {spec.brain!r}. Available: {factory_reg.list()}")
-        factory = factory_reg.resolve(spec.brain)
+    brains = require_capability(scope, BRAINS.key)
+    try:
+        factory = brains.resolve(spec.brain)
+    except KeyError as exc:
+        raise ValueError(f"Unknown brain: {spec.brain!r}. Available: {brains.names()}") from exc
     resolved: Brain = factory(
         consume("llm", llm, PromptReasoner),
         profile,
@@ -391,21 +302,16 @@ def _resolve_brain(
 def _resolve_decision_gate(
     name: DecisionGateName,
     *,
-    scope: object | None = None,
-    registries: Registries,
+    scope: object,
 ) -> DecisionGate | None:
     if name == DecisionGateName.NONE:
         return None
     if name == DecisionGateName.MUST_CONSULT_ALL:
-        gates = _resolve_named_factory(scope, "gates", None)
-        if isinstance(gates, GateService):
-            return gates.create("must-consult-all")
-        factory = _resolve_named_factory(scope, "gate.must-consult-all", MustConsultAllMembers)
-        if factory is None:
-            raise MissingCapabilityError("gates")
-        result = factory() if callable(factory) else factory
+        gates = require_capability(scope, "gates")
+        result = gates.create("must-consult-all")
     else:
-        factory = registries.components.require(ComponentKind.DECISION_GATE, name)
+        components = require_capability(scope, COMPONENT_REGISTRY.key)
+        factory = components.require(ComponentKind.DECISION_GATE, name)
         result = factory()
     if not isinstance(result, DecisionGate):
         raise TypeError(
@@ -415,13 +321,11 @@ def _resolve_decision_gate(
 
 
 def _fork_transport(
-    parent: TransportService,
+    parent: Any,
     extra: AgentTransport | None,
-    scope: object | None,
-) -> TransportService:
-    factory = _resolve_named_factory(scope, "transport.compose_service", None)
-    if factory is None:
-        factory = TransportService
+    scope: object,
+) -> Any:
+    factory = _require_factory(scope, "transport.compose_service")
     child = factory()
     for protocol in parent.list_protocols():
         child.register(parent.resolve(protocol))
@@ -438,41 +342,33 @@ def spawn_agent(
     decision_gate: DecisionGate | None = None,
     shared_store: SharedMemoryStore | None = None,
     scope: Context | None = None,
-    registries: Registries | None = None,
 ) -> CognitiveAgent:
-    """Close one AgentSpec into a CognitiveAgent."""
-    if scope is None:
-        from lca.layer4_app.api import get_or_create_default_ctx
-
-        scope = get_or_create_default_ctx()
-    regs = registries if registries is not None else build_default_registries()
+    """Close one AgentSpec into a CognitiveAgent from a booted capability scope."""
+    scope = _ensure_scope(scope)
     profile = spec.profile
-    ctx = _ScopeAsCapabilityContext(scope)
-    if _is_plugin_tree(scope) and isinstance(spec.observability, str):
+    if isinstance(spec.observability, str):
         hub = require_capability(scope, "observability").create()
     else:
         hub = create_observability(spec.observability)
-    mem = _resolve_memory(spec.memory, shared_store, ctx.require(CapabilityKey.MEMORY.value))
+    mem = _resolve_memory(
+        spec.memory, shared_store, require_capability(scope, CapabilityKey.MEMORY.value)
+    )
     state_store = _resolve_state_store(
-        spec.state_store, ctx.require(CapabilityKey.STATE_STORE.value)
+        spec.state_store, require_capability(scope, CapabilityKey.STATE_STORE.value)
     )
 
-    ctx.require(CapabilityKey.LLM.value)
+    require_capability(scope, CapabilityKey.LLM.value)
     spec_llm = _instrument_llm(spec.llm)
 
-    ctx.require(CapabilityKey.TOOLS.value)
-    tools_factory = _resolve_named_factory(scope, "tools.compose_service", None)
-    if tools_factory is None:
-        tools_factory = ToolsService
+    require_capability(scope, CapabilityKey.TOOLS.value)
+    tools_factory = _require_factory(scope, "tools.compose_service")
     tool_registry = tools_factory()
     for tool in spec.tools:
         tool_registry.register(tool)
-    safe_executor_cls = _resolve_named_factory(scope, "safe_executor.simple", SimpleSafeExecutor)
-    if safe_executor_cls is None:
-        raise MissingCapabilityError("safe_executor.simple")
+    safe_executor_cls = _require_factory(scope, "safe_executor.simple")
     safe_executor = safe_executor_cls(profile.tool_permission_manifest)
     transport_registry = _fork_transport(
-        ctx.require(CapabilityKey.TRANSPORT.value), team_channel, scope
+        require_capability(scope, CapabilityKey.TRANSPORT.value), team_channel, scope
     )
     action_registry = build_default_action_registry(
         tool_registry,
@@ -481,14 +377,12 @@ def spawn_agent(
         scope=action_scope,
     )
 
-    brain = _resolve_brain(spec, profile, spec_llm, scope=scope, registries=regs)
+    brain = _resolve_brain(spec, profile, spec_llm, scope=scope)
     if decision_gate is not None:
         brain = _apply_lead_brain(brain, decision_gate=decision_gate)
 
-    body_cls = _resolve_named_factory(scope, "body.simple", SimpleBody)
-    if body_cls is None:
-        raise MissingCapabilityError("body.simple")
-    body = body_cls(
+    body = require_capability(scope, BODIES.key).create(
+        "simple",
         tool_registry=tool_registry,
         safe_executor=safe_executor,
         transport_registry=transport_registry,
@@ -496,13 +390,7 @@ def spawn_agent(
     )
     hooks = _build_hooks(scope)
     perceive_hub = build_perceive_hub(mem, hub=hub, scope=scope, action_scope=action_scope)
-    stop_factory = _resolve_named_factory(
-        scope,
-        "stop_rule.default",
-        lambda: DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
-    )
-    if stop_factory is None:
-        raise MissingCapabilityError("stop_rule.default")
+    stop_rule = require_capability(scope, STOP_RULES.key).create("default")
     runtime = build_cognitive_runtime(
         RuntimeDeps(
             brain=brain,
@@ -511,7 +399,7 @@ def spawn_agent(
             hooks=hooks,
             state_store=consume("state_store", state_store, CognitiveRuntime),
             perceive_hub=perceive_hub,
-            stop_rule=stop_factory(),
+            stop_rule=stop_rule,
             middleware_registry=_build_middleware_registry(hooks, scope),
         )
     )
@@ -531,22 +419,21 @@ def spawn_lead(
     mandate: LeadMandate,
     observability: ObservabilityHub | None = None,
     scope: Context | None = None,
-    registries: Registries | None = None,
 ) -> CognitiveAgent:
     """Close a lead AgentSpec with mandate-specific decision gate."""
-    regs = registries if registries is not None else build_default_registries()
+    scope = _ensure_scope(scope)
     lead_spec = replace(spec, observability=observability) if observability is not None else spec
-    gate = _resolve_decision_gate(gate_name_for_mandate(mandate), scope=scope, registries=regs)
+    gate = _resolve_decision_gate(gate_name_for_mandate(mandate), scope=scope)
     composed = spawn_agent(
         lead_spec,
         action_scope=ActionScope.LEAD,
         team_channel=transport,
         decision_gate=gate,
         scope=scope,
-        registries=regs,
     )
+    components = require_capability(scope, COMPONENT_REGISTRY.key)
     policy = _resolve_component(
-        regs.components,
+        components,
         ComponentKind.BUDGET_POLICY,
         LEAD_BUDGET_POLICY_KEY,
         BudgetPolicy,  # type: ignore[type-abstract]
@@ -560,7 +447,6 @@ def spawn_member(
     shared_store: SharedMemoryStore | None = None,
     observability: ObservabilityHub | None = None,
     scope: Context | None = None,
-    registries: Registries | None = None,
 ) -> CognitiveAgent:
     """Close a team member AgentSpec."""
     member_spec = replace(spec, observability=observability) if observability is not None else spec
@@ -569,7 +455,6 @@ def spawn_member(
         action_scope=ActionScope.MEMBER,
         shared_store=shared_store,
         scope=scope,
-        registries=registries,
     )
 
 
@@ -635,9 +520,9 @@ def spawn_team(
     delegate_max_attempts: int | None = None,
     observability: str | ObservabilityHub | None = None,
     scope: Context | None = None,
-    registries: Registries | None = None,
 ) -> TeamUnit:
     """Close a TeamSpec (or kwargs) into a TeamHandle."""
+    scope = _ensure_scope(scope)
     if spec is None:
         if members is None:
             raise ValueError("spawn_team requires spec= or members=")
@@ -653,7 +538,6 @@ def spawn_team(
             ),
             observability=observability,
         )
-    regs = registries if registries is not None else build_default_registries()
     shared_obs = _resolve_team_observability(spec)
     shared_store: SharedMemoryStore | None = (
         TeamSharedMemoryStore(list(spec.shared_memory_layers))
@@ -666,7 +550,6 @@ def spawn_team(
             shared_store=shared_store,
             observability=shared_obs,
             scope=scope,
-            registries=regs,
         )
         for member_spec in spec.members
     )
@@ -680,7 +563,6 @@ def spawn_team(
             mandate=governance.mandate,
             observability=shared_obs,
             scope=scope,
-            registries=regs,
         )
     assembly = TeamAssembly(
         governance=governance,
@@ -689,6 +571,6 @@ def spawn_team(
         delegate_max_attempts=spec.delegate_max_attempts,
     )
     strategy_key = strategy_key_for_governance(spec.governance)
-    strategy = regs.orchestration.resolve(strategy_key, assembly)
+    strategy = require_capability(scope, STRATEGIES.key).create(strategy_key, assembly)
     profile = _trace_profile(strategy_key, spec.governance, closed_members, assembly.lead)
     return TeamHandle(strategy, profile, shared_obs, closed_members, assembly.lead)

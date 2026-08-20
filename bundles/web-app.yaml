@@ -76,6 +76,12 @@ entries:
     $module: lca.plugins.gates.must_consult_all
     config: {}
 
+  # ── Registry seams (empty owners; contributors register into them) ──
+  - id: lca.registries.factory_seams
+    name: lca_registries_factory_seams
+    $module: lca.plugins.registries.factory_seams
+    config: {}
+
   # ── Act / world plane ──
   - id: body.simple
     name: body_simple
@@ -154,4 +160,46 @@ entries:
   - id: transport.compose_service
     name: transport_compose_service
     $module: lca.plugins.transport_compose_service
+    config: {}
+
+  # ── Component discovery registry (ADR-0062 §7) ──
+  - id: lca.registries.component_registry
+    name: lca_registries_component_registry
+    $module: lca.plugins.registries.component_registry
+    config: {}
+
+  # ── Team strategy factories (ADR-0062 §7 / PR-4) ──
+  - id: strategy.lead
+    name: strategy_lead
+    $module: lca.plugins.strategies.lead
+    config: {}
+
+  - id: strategy.pipeline
+    name: strategy_pipeline
+    $module: lca.plugins.strategies.pipeline
+    config: {}
+
+  - id: strategy.fan_out
+    name: strategy_fan_out
+    $module: lca.plugins.strategies.fan_out
+    config: {}
+
+  - id: strategy.peer_relay
+    name: strategy_peer_relay
+    $module: lca.plugins.strategies.peer_relay
+    config: {}
+
+  - id: strategy.peer_swarm
+    name: strategy_peer_swarm
+    $module: lca.plugins.strategies.peer_swarm
+    config: {}
+
+  - id: strategy.debate
+    name: strategy_debate
+    $module: lca.plugins.strategies.debate
+    config: {}
+
+  - id: strategy.graph
+    name: strategy_graph
+    $module: lca.plugins.strategies.graph
     config: {}

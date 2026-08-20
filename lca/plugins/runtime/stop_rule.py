@@ -1,16 +1,18 @@
-"""DefaultStopRule plugin — named factory ``stop_rule.default``."""
+"""DefaultStopRule plugin — registers into STOP_RULES as 'default'."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel
-from lca.contracts.protocols import StopRule
-from lca.harness.plugin_api import plugin, PluginKind
+
+from lca.contracts.capabilities import STOP_RULES
+from lca.harness.plugin_api import PluginKind, plugin
 
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-def build_default_stop_rule() -> StopRule:
+def build_default_stop_rule():
     from lca.layer2_runtime.default_stop_rule import DefaultStopRule
     from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 
@@ -19,15 +21,15 @@ def build_default_stop_rule() -> StopRule:
 
 @plugin(
     id="stop_rule.default",
-    provides=["stop_rule.default"],
-    requires=[],
+    provides=[],
+    requires=[STOP_RULES.key],
     implements=[],
     layer="L1",
     effects="none",
-    description="Default StopRule factory used by the Composer when none is injected.",
-    test_suite="tests/test_plugin_alignment.py::test_stop_rule_named_factory",
+    description="Register DefaultStopRule factory as stop_rules['default'].",
+    test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named StopRule factory ``stop_rule.default``."""
-    ctx.provide("stop_rule.default", build_default_stop_rule)
+    del config
+    ctx.register(STOP_RULES.key, "default", build_default_stop_rule)

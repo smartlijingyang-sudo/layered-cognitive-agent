@@ -17,10 +17,10 @@ from lca.contracts.models.team.team_coordination import (
     Pipeline,
 )
 from lca.contracts.protocols import TeamAssembly
-from lca.layer4_app.defaults import build_default_registries
+from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
-_REGISTRIES = build_default_registries()
+_STRATEGIES = build_strategy_registry()
 
 _EXPECTED_KEYS = {
     STRATEGY_KEY_LEAD,
@@ -42,13 +42,13 @@ def _assembly(governance=None) -> TeamAssembly:
 
 class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
     def test_strategy_keys_match_registry(self) -> None:
-        registered = set(_REGISTRIES.orchestration.list_strategies())
+        registered = set(_STRATEGIES.names())
         self.assertEqual(_EXPECTED_KEYS, registered)
 
     def test_resolve_unknown_strategy_raises_value_error(self) -> None:
-        registry = _REGISTRIES.orchestration
-        with self.assertRaises(ValueError) as ctx:
-            registry.resolve("nonexistent_strategy", _assembly())
+        registry = _STRATEGIES
+        with self.assertRaises(KeyError) as ctx:
+            registry.create("nonexistent_strategy", _assembly())
         self.assertIn("nonexistent_strategy", str(ctx.exception))
 
     async def test_graph_strategy_requires_execution_graph(self) -> None:

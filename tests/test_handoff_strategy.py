@@ -11,11 +11,11 @@ from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer3_agent.orchestration_strategies import HandoffStrategy
-from lca.layer4_app.defaults import build_default_registries
 from lca.layer4_app.runtime_factory import NullPerceiveHub
+from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
-_REGISTRIES = build_default_registries()
+_STRATEGIES = build_strategy_registry()
 
 
 def _make_result(trace_id: str, output: str, status: TaskStatus = TaskStatus.COMPLETED) -> Result:
@@ -236,16 +236,16 @@ class TestHandoffRegistration(unittest.TestCase):
     """HandoffStrategy 注册与解析。"""
 
     def test_handoff_registered(self) -> None:
-        registry = _REGISTRIES.orchestration
-        self.assertTrue(registry.has("peer_relay"))
+        registry = _STRATEGIES
+        self.assertIn("peer_relay", registry)
 
     def test_handoff_resolves(self) -> None:
         from lca.contracts.models.team.team_coordination import PeerRelay
         from lca.contracts.protocols import TeamAssembly
 
-        registry = _REGISTRIES.orchestration
+        registry = _STRATEGIES
         assembly = TeamAssembly(governance=PeerRelay(), stage=stage_with_invoker([]))
-        strategy = registry.resolve("peer_relay", assembly)
+        strategy = registry.create("peer_relay", assembly)
         self.assertIsInstance(strategy, HandoffStrategy)
 
 

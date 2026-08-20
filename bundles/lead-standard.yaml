@@ -2,11 +2,6 @@
 # Per spec §3.7.4: lead coordinates + publishes + replies; no shell, no file write.
 
 entries:
-  # Board team-lead (Tier-3) — the lead's coordination style.
-  - id: lca-team-lead-board
-    name: lca_team_lead_board
-    $module: lca.plugins.team_lead.board
-    config: {}
 
   # Team message tools — required by lead (publish + reply).
   - id: lca-tool-team-message-publish

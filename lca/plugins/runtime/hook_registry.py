@@ -1,15 +1,13 @@
-"""CordisHookRegistry plugin — named factory ``hook_registry.simple``.
-
-Builds a :class:`CordisHookRegistry` over the booted ctx and pre-registers
-``default_logging_hook`` for every :class:`HookEvent`. Composer consumes
-this factory to wire ambient span emission at the hook boundary.
-"""
+"""CordisHookRegistry plugin — registers into HOOKS as 'simple'."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel
+
 from lca.contracts.atoms.enums import HookEvent
+from lca.contracts.capabilities import HOOKS
 from lca.contracts.protocols import HookRegistry
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -36,15 +34,15 @@ def build_simple_hook_registry(ctx) -> HookRegistry:
 
 @plugin(
     id="hook_registry.simple",
-    provides=["hook_registry.simple"],
-    requires=[],
+    provides=[],
+    requires=[HOOKS.key],
     implements=[HookRegistry],
     layer="L1",
     effects="none",
-    description="Default HookRegistry factory — wraps the booted ctx's events namespace.",
-    test_suite="tests/test_plugin_alignment.py::test_hook_registry_named_factory",
+    description="Register CordisHookRegistry factory as hooks['simple'].",
+    test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named HookRegistry factory ``hook_registry.simple``."""
-    ctx.provide("hook_registry.simple", lambda: build_simple_hook_registry(ctx))
+    del config
+    ctx.register(HOOKS.key, "simple", lambda: build_simple_hook_registry(ctx))
