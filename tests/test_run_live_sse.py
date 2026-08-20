@@ -8,10 +8,12 @@ import pytest
 
 from gateway.runs.api import encode_live_gap, iter_live_sse
 from gateway.runs.live import LiveGap, LiveTail
+from lca.contracts.atoms.enums import StreamChannel
 from lca.contracts.models.observability.journal import (
     ReasoningDelta,
     RunScope,
     StampedEvent,
+    StepTextDelta,
     ToolInvoked,
     ToolStarted,
 )
@@ -150,3 +152,117 @@ def test_live_gap_frame_has_no_id() -> None:
 def test_live_uses_stamped_to_sse_frame() -> None:
     stamped = _stamped(9, ReasoningDelta(step=0, text_delta="z", seq=0))
     assert stamped_to_sse_frame(stamped).startswith("id: 9\nevent: ReasoningDelta\n")
+
+
+@pytest.mark.asyncio
+async def test_default_text_channel_filters_decision_deltas() -> None:
+    """LobeHub live 默认仅推 answer 通道的 StepTextDelta（ADR-0051 § 九）。"""
+    tail = LiveTail()
+    tail.on_event(
+        _stamped(
+            1,
+            StepTextDelta(
+                step=2,
+                text_delta="raw token",
+                seq=0,
+                channel=StreamChannel.DECISION.value,
+            ),
+        )
+    )
+    tail.on_event(
+        _stamped(
+            2,
+            StepTextDelta(
+                step=2,
+                text_delta="visible",
+                seq=1,
+                channel=StreamChannel.ANSWER.value,
+            ),
+        )
+    )
+    tail.close()
+    frames = [frame async for frame in iter_live_sse(tail, after_seq=0, heartbeat_s=30)]
+    names = [_parse_frame(frame)[1] for frame in frames]
+    assert names == ["StepTextDelta"]
+    _, _, payload = _parse_frame(frames[0])
+    assert payload["event"]["channel"] == StreamChannel.ANSWER.value
+
+
+@pytest.mark.asyncio
+async def test_text_channel_all_keeps_both_deltas() -> None:
+    """ops /journal/live 显式传 ``all`` 时全推（决策通道用于 replay/audit）。"""
+    tail = LiveTail()
+    tail.on_event(
+        _stamped(
+            1,
+            StepTextDelta(
+                step=2,
+                text_delta="raw",
+                seq=0,
+                channel=StreamChannel.DECISION.value,
+            ),
+        )
+    )
+    tail.on_event(
+        _stamped(
+            2,
+            StepTextDelta(
+                step=2,
+                text_delta="vis",
+                seq=1,
+                channel=StreamChannel.ANSWER.value,
+            ),
+        )
+    )
+    tail.close()
+    frames = [
+        frame
+        async for frame in iter_live_sse(
+            tail,
+            after_seq=0,
+            heartbeat_s=30,
+            text_channel="all",
+        )
+    ]
+    names = [_parse_frame(frame)[1] for frame in frames]
+    assert names == ["StepTextDelta", "StepTextDelta"]
+
+
+@pytest.mark.asyncio
+async def test_text_channel_none_disables_filter() -> None:
+    """``text_channel=None`` 不过滤（向后兼容 / 排查用）。"""
+    tail = LiveTail()
+    tail.on_event(
+        _stamped(
+            1,
+            StepTextDelta(
+                step=2,
+                text_delta="raw",
+                seq=0,
+                channel=StreamChannel.DECISION.value,
+            ),
+        )
+    )
+    tail.on_event(
+        _stamped(
+            2,
+            StepTextDelta(
+                step=2,
+                text_delta="vis",
+                seq=1,
+                channel=StreamChannel.ANSWER.value,
+            ),
+        )
+    )
+    tail.close()
+    frames = [
+        frame
+        async for frame in iter_live_sse(
+            tail,
+            after_seq=0,
+            heartbeat_s=30,
+            text_channel=None,
+        )
+    ]
+    names = [_parse_frame(frame)[1] for frame in frames]
+    assert names == ["StepTextDelta", "StepTextDelta"]
