@@ -178,13 +178,13 @@ def diagnose_loop_stuck(
         return DiagnosisReport(DiagnosePattern.LOOP_STUCK, ())
 
     recent = tool_events[-window:]
-    tool_names = [cast(ToolInvoked, e.event).tool_name for e in recent]
+    tool_names = [cast("ToolInvoked", e.event).tool_name for e in recent]
     repeats = sum(
         1 for i in range(1, len(tool_names))
         if tool_names[i] == tool_names[i - 1]
     )
     if repeats >= window - 1:
-        warnings = [e for e in gate_events if cast(GateDecided, e.event).verdict == "warn"]
+        warnings = [e for e in gate_events if cast("GateDecided", e.event).verdict == "warn"]
         if not warnings:
             findings.append(
                 Finding(
@@ -283,7 +283,7 @@ def diagnose(
     if pattern == DiagnosePattern.LOOP_STUCK:
         return diagnose_loop_stuck(
             store,
-            window=int(cast(str, kwargs.get("window", 10))),
+            window=int(cast("str", kwargs.get("window", 10))),
             trace_id=cast("str | None", kwargs.get("trace_id")),
         )
     if pattern == DiagnosePattern.MEMORY_POISONED:

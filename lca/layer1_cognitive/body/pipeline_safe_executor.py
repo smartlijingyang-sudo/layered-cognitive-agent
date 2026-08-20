@@ -35,7 +35,6 @@ from lca.contracts.atoms.semantic_keys import (
 )
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ApprovalPendingError, ToolExecutionError
-from lca.contracts.models.observability.journal import ToolDenied, ToolInvoked, ToolStarted
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.contracts.protocols.tool_pipeline import (
@@ -45,15 +44,12 @@ from lca.contracts.protocols.tool_pipeline import (
     ToolPreDecision,
     ToolProvider,
 )
-from lca.layer0_infra.observability import record
 from lca.layer0_infra.tool_pipeline import DefaultToolExecutionPipeline
 from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
 from lca.layer1_cognitive.body.tool_result_preview import (
     build_started_plugin_state,
     compact_args_preview,
     compact_payload_for_preview,
-    tool_files,
-    tool_plugin_state,
 )
 
 _log = structlog.get_logger("lca.safe_executor")
@@ -285,7 +281,7 @@ class PipelineSafeExecutor(SafeExecutor):
 
         # 返回 Observation
         if result.ok and result.output:
-            return cast(Observation, result.output)
+            return cast("Observation", result.output)
         else:
             # 构造失败的 Observation
             return Observation(

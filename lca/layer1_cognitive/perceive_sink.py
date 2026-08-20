@@ -61,7 +61,7 @@ class RunStoreSink:
         *,
         extra: dict[str, Any] | None = None,
     ) -> ContextManifested:
-        return cast(ContextManifested, self._store.append(event))
+        return cast("ContextManifested", self._store.append(event))
 
 
 class JournalSink:

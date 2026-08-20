@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
@@ -26,7 +26,7 @@ def _gateway(request: Request) -> CommandGateway:
     gw = getattr(request.app.state, "command_gateway", None)
     if gw is None:
         raise RuntimeError("session spine is not bound")
-    return gw
+    return cast("CommandGateway", gw)
 
 
 async def create_session(request: Request) -> JSONResponse:

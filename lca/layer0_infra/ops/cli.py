@@ -662,7 +662,7 @@ def inspect_tree(
         graph = _graph_from_yaml(profile, data)
         print(f"Profile: {profile} (unbooted: {exc})")
         totals = cast("dict[str, object]", graph.get("totals", {}))
-        print(f"Plugins: {cast(int, totals.get('plugins', 0))}")
+        print(f"Plugins: {cast('int', totals.get('plugins', 0))}")
         return
 
     print(format_plugin_tree(ctx, profile=str(profile)))

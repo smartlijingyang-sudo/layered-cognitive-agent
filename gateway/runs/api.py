@@ -164,10 +164,12 @@ async def create_run(request: Request) -> JSONResponse:
 def _plane_payload(ref: object | None) -> dict[str, str] | None:
     if ref is None:
         return None
+    kind_attr = getattr(ref, "kind", None)
+    kind_value = getattr(kind_attr, "value", "") if kind_attr is not None else ""
     return {
         "id": getattr(ref, "id", ""),
         "label": getattr(ref, "label", ""),
-        "kind": ref.kind.value if getattr(ref, "kind", None) else "",
+        "kind": kind_value,
         "root": getattr(ref, "root", ""),
         "outputs_dir": getattr(ref, "outputs_dir", ""),
         "platform": getattr(ref, "platform", ""),

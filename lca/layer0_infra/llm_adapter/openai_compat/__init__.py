@@ -65,7 +65,7 @@ class OpenAICompatAdapter(LLMAdapter):
         resolved_base = (
             base_url
             if base_url is not None
-            else os.getenv("LLM_BASE_URL") or None
+            else (os.getenv("LLM_BASE_URL") or "")
         )
         if resolved_key is None:
             resolved_key = ""

@@ -7,7 +7,6 @@ plus the facade Protocol. It does not import LiveAgent or cognitive layers.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
-from typing import Any
 
 from lca.contracts.harness.command import (
     AgentRegistryFacade,

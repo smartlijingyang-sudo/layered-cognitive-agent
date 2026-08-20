@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any, Awaitable, Callable, cast
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 from lca.contracts.protocols import Sandbox, Tool
 from lca.layer0_infra.computer.machine import MachineComputer, MachineTransport

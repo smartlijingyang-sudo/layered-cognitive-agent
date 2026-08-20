@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.atoms.enums import ContentType
 from lca.contracts.atoms.ids import new_id
@@ -89,7 +89,7 @@ def _build_single_tool(
 
     def validate(self: Tool, args: dict[str, Any]) -> str | None:
         if validator is not None:
-            return validator(api.name, args)
+            return cast("str | None", validator(api.name, args))
         return None
 
     tool_cls = type(

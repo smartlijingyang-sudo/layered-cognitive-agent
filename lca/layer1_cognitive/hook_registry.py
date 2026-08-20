@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any
+
+import structlog
 
 from lca.contracts.atoms.enums import HookEvent
 from lca.contracts.atoms.telemetry import ATTR_STEP, HOOK_TO_PHASE_SPAN, SpanName
@@ -22,6 +24,8 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
 from lca.contracts.protocols import HookRegistry
 from lca.layer0_infra.observability import detached_span, observe, set_actor
+
+_log = structlog.get_logger(__name__)
 
 
 def _span_name_for_hook(event_name: str) -> str:

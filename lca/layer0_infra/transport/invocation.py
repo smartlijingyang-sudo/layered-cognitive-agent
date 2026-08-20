@@ -147,8 +147,8 @@ async def send_and_wait(
     # create_task 拷贝 contextvars，成员任务由此继承关联骨架；
     # 等待阶段恢复发起方自己的 scope（成员 scope 只在调度瞬间生效）。
     member_scope = RunScope(
-        trace_id=cast(TraceId, caller_scope.trace_id if caller_scope else ""),
-        run_id=cast(RunId, ""),
+        trace_id=cast("TraceId", caller_scope.trace_id if caller_scope else ""),
+        run_id=cast("RunId", ""),
         parent_run_id=caller_scope.run_id if caller_scope else None,
         delegation_id=delegation_id,
         agent_role=callee,

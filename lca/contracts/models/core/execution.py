@@ -13,10 +13,11 @@ tool call may bypass the envelope.
 
 from __future__ import annotations
 
-from lca.contracts.atoms.enums import ActionType
-
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
+
+from lca.contracts.atoms.enums import ActionType
 
 
 @dataclass
@@ -55,7 +56,7 @@ def envelope_from_decision(
     )
 
 
-def find_terminal_tool_invoked(history: object) -> bool:
+def find_terminal_tool_invoked(history: Iterable[object]) -> bool:
     """Return True if a terminal tool has been invoked in the history.
 
     The check is used by the resume path to make resume idempotent

@@ -17,6 +17,7 @@ from lca.contracts.atoms.semantic_keys import (
 from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.observability.journal import ContextCompacted, MemoryCommitted
 from lca.contracts.protocols import MemorySystem, SharedMemoryStore
 from lca.layer0_infra.observability import record
 
@@ -29,7 +30,6 @@ from lca.layer1_cognitive.memory.policy import (
     SimpleCompactionPolicy,
     SimpleMemoryPolicy,
 )
-from lca.contracts.models.observability.journal import ContextCompacted, MemoryCommitted
 
 _DEFAULT_MAX_WORKING = 20
 _DEFAULT_MAX_EPISODIC = 50

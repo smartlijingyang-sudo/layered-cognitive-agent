@@ -13,12 +13,12 @@ import os
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 from pydantic import BaseModel, SecretStr
 
-from lca.harness.plugin_api import PluginDefinition, definition_from_plugin
+from lca.harness.plugin_api import PluginDefinition, PluginSetupFn, definition_from_plugin
 
 _LAYER_RANK = {"L0": 0, "L1": 1, "L2": 2, "L3": 3, "L4": 4}
 _REDACTED = "***"
@@ -255,7 +255,7 @@ def _disabled_stub(plugin_id: str, module: str) -> PluginDefinition:
         effects=frozenset({EffectClass.NONE}),
         test_suite="",
         description="disabled",
-        setup=lambda *_a, **_k: None,
+        setup=cast("PluginSetupFn", lambda *_a, **_k: None),
         module=module,
     )
 

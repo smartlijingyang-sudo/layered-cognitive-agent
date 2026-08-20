@@ -130,7 +130,7 @@ def set_llm_resolver(resolver: Any) -> None:
             # own_bindings is on the runtime cordis.Context; the audited
             # PluginContext Protocol intentionally omits it. Cast for the
             # narrow binding-teardown path.
-            cast(Any, cached).own_bindings.pop("llm_resolver", None)
+            cast("Any", cached).own_bindings.pop("llm_resolver", None)
 
 
 def sanitize_error(error: str) -> str:
@@ -178,7 +178,7 @@ def assemble_run_hub(
         else ()
     )
     return cast(
-        ObservabilityHub,
+        "ObservabilityHub",
         require_capability(ctx, "observability").create(
             settings=cfg,
             extra_projectors=tuple(extra),
@@ -272,7 +272,12 @@ def _emit_plugin_inventory(session: RunSession, ctx: Any, hub: ObservabilityHub)
         )
         for entry in entries
     ]
-    with bind(hub), run_scope(RunScope(trace_id=session.trace_id, run_id=session.run_id)):
+    with bind(hub), run_scope(
+        RunScope(
+            trace_id=cast("TraceId", session.trace_id),
+            run_id=cast("RunId", session.run_id),
+        )
+    ):
         observe(
             DiagnosticCategory.PLUGIN,
             "plugin.inventory",
@@ -314,8 +319,8 @@ async def execute_run(
             search_run_scope(),
             run_scope(
                 RunScope(
-                    trace_id=cast(TraceId, session.trace_id),
-                    run_id=cast(RunId, session.run_id),
+                    trace_id=cast("TraceId", session.trace_id),
+                    run_id=cast("RunId", session.run_id),
                 )
             ),
         ):
@@ -354,8 +359,8 @@ async def execute_run(
                     try:
                         await bind_sandbox_runtime(
                             session.run_id,
-                            cast(Sandbox, sandbox),
-                            cast(FileStore, file_store),
+                            cast("Sandbox", sandbox),
+                            cast("FileStore", file_store),
                             session.attachment_ids,
                         )
                     except Exception as exc:
@@ -581,8 +586,8 @@ def _record_run_failure(session: RunSession, exc: BaseException | None, hub: Any
     try:
         with bind(hub), run_scope(
             RunScope(
-                trace_id=cast(TraceId, session.trace_id),
-                run_id=cast(RunId, session.run_id),
+                trace_id=cast("TraceId", session.trace_id),
+                run_id=cast("RunId", session.run_id),
             )
         ):
             record(
@@ -650,7 +655,7 @@ def _emit_artifact_closure_if_needed(
 
 
 def _freeze_bindings(session: RunSession, ctx: Any) -> PlaneBindings:
-    sandbox = cast(Sandbox | None, provider_current(require_capability(ctx, "sandbox")))
+    sandbox = cast("Sandbox | None", provider_current(require_capability(ctx, "sandbox")))
     sandbox_ref = sandbox_ref_from(sandbox) if sandbox is not None else None
     machine = resolve_machine(session.device_id or None)
     bindings = resolve_plane_bindings(

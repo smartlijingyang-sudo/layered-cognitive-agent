@@ -11,7 +11,6 @@ from lca.contracts.models.core.decision import Decision, Observation
 from lca.contracts.models.core.execution import ExecutionEnvelope
 from lca.contracts.models.core.result import UnregisteredActionError
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.models.observability.journal import ActionDegraded
 from lca.contracts.protocols import (
     AgentTransport,
     Body,
@@ -20,7 +19,6 @@ from lca.contracts.protocols import (
     TransportRegistryProtocol,
 )
 from lca.contracts.protocols.action import ActionRegistryProtocol
-from lca.layer0_infra.observability import record
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.action_handlers import record_decision_made

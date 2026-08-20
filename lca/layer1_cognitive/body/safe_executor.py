@@ -23,17 +23,13 @@ from lca.contracts.atoms.semantic_keys import (
 )
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ApprovalPendingError, ToolExecutionError
-from lca.contracts.models.observability.journal import ToolDenied, ToolInvoked, ToolStarted
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols import SafeExecutor, Tool
-from lca.layer0_infra.observability import record
 from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
 from lca.layer1_cognitive.body.tool_result_preview import (
     build_started_plugin_state,
     compact_args_preview,
     compact_payload_for_preview,
-    tool_files,
-    tool_plugin_state,
 )
 
 _log = structlog.get_logger("lca.safe_executor")
@@ -70,7 +66,7 @@ def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
 
 
-from lca.layer1_cognitive.body.tool_journal_emit import (  # noqa: E402,F401
+from lca.layer1_cognitive.body.tool_journal_emit import (  # noqa: E402
     emit_tool_denied,
     emit_tool_invoked,
     emit_tool_started,

@@ -566,7 +566,6 @@ class InboxFollowupCreated(JournalEvent):
     target: str = ""
     priority: str = ""
     step: int = 0
-    payload_preview: str = ""
     payload_preview: str = field(default="", metadata={"journal_kind": "content"})
 
 

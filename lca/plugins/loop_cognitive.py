@@ -17,7 +17,6 @@ import structlog
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 if TYPE_CHECKING:
-    from lca.harness.agent.handle import OwnerAgentHandle
     from lca.harness.session.inbox import Inbox
     from lca.harness.session.store import SessionStore
 

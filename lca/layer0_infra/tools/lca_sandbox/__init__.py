@@ -6,7 +6,8 @@ Aligns with LobeHub ``builtin-tool-cloud-sandbox``.
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, cast
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
 from lca.layer0_infra.tools.lca_computer.apis import execute_code as _execute_code

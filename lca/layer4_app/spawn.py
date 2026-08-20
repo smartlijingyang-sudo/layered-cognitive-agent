@@ -217,12 +217,12 @@ def build_perceive_hub(
     team = _scope_is_team(action_scope) or _scope_is_team(scope)
     service = require_capability(scope, "perceive")
     skill_store = None
-    members = cast(Any, service).members(team=team)
+    members = cast("Any", service).members(team=team)
     if any(getattr(entry, "needs", None) == _NEEDS_SKILLS for entry in members):
         skill_store = _skill_store_from_scope(scope)
     return cast(
-        PerceiveHub,
-        cast(Any, service).assemble(
+        "PerceiveHub",
+        cast("Any", service).assemble(
             memory,
             store=store,
             skill_store=skill_store,
@@ -273,8 +273,8 @@ def _resolve_memory(
 def _resolve_state_store(choice: str | StateStore, service: Any) -> StateStore:
     if not isinstance(choice, str):
         return choice
-    if choice in cast(Any, service).providers.names():
-        return cast(StateStore, cast(Any, service).providers.get(choice)())
+    if choice in cast("Any", service).providers.names():
+        return cast("StateStore", cast("Any", service).providers.get(choice)())
     raise MissingCapabilityError("state_store")
 
 

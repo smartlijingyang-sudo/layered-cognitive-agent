@@ -35,7 +35,7 @@ def build_live_agent(
     """
     ctx = cordis_ctx if cordis_ctx is not None else plugin_scope
     builder = _resolve_loop_builder(ctx)
-    return cast(OwnerAgentHandle, builder(store, inbox, identity_id, options, ctx))
+    return cast("OwnerAgentHandle", builder(store, inbox, identity_id, options, ctx))
 
 
 def _resolve_loop_builder(cordis_ctx: Any | None) -> Any:

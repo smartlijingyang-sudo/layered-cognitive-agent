@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.harness.session import SessionEvent
 from lca.contracts.models.core.budget import Budget
+from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState
 
@@ -93,13 +94,16 @@ class AgentStateProjection:
             if call_id and call_id in state.extra.get("pending_tool_calls", {}):
                 tool_info = state.extra["pending_tool_calls"].pop(call_id)
                 state.history.append(
-                    {
-                        "action_type": "tool_call",
-                        "tool_name": tool_info["tool_name"],
-                        "arguments": tool_info["arguments"],
-                        "success": success,
-                        "result": result,
-                    }
+                    cast(
+                        "Turn",
+                        {
+                            "action_type": "tool_call",
+                            "tool_name": tool_info["tool_name"],
+                            "arguments": tool_info["arguments"],
+                            "success": success,
+                            "result": result,
+                        },
+                    )
                 )
 
         elif event_type == "session.checkpoint.v1":

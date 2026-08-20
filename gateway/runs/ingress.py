@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 from urllib.parse import unquote, urlparse
 
 from gateway.runs.ingest import FileFetcher, FileRef, ingest_file_refs
@@ -329,7 +329,7 @@ def _file_ref_from_mapping(part: Any, *, source: str) -> FileRef | None:
     if size_raw is None:
         size_raw = part.get("size_bytes")
     size_ok = isinstance(size_raw, int) or (isinstance(size_raw, str) and size_raw.isdigit())
-    size = int(size_raw) if size_ok else None
+    size = int(cast("str", size_raw)) if size_ok else None
     return FileRef(
         name=name or "file",
         url=url,

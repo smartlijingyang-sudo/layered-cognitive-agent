@@ -157,7 +157,7 @@ class RunStore:
             raise TypeError(f"journal event must be a dataclass, got {type(event).__name__}")
         # ``type(event)`` is ``type[JournalEvent]`` (the marker base); the
         # dataclass-ness is checked at runtime on the concrete subclass.
-        params = getattr(cast(Any, type(event)), "__dataclass_params__", None)
+        params = getattr(cast("Any", type(event)), "__dataclass_params__", None)
         if not getattr(params, "frozen", False):
             raise TypeError(f"journal event must be frozen dataclass: {type(event).__name__}")
         # 深拷贝隔离：调用方持有的引用不影响 log 内的副本
@@ -217,7 +217,7 @@ class RunStore:
     def find_terminal_tool_invoked(
         self,
         idempotency_key: str,
-    ) -> ToolInvoked | None:  # noqa: F821
+    ) -> ToolInvoked | None:
         """Find the last ``ToolInvoked`` event for a given idempotency key (PR6).
 
         Used by the resume path to short-circuit already-executed side

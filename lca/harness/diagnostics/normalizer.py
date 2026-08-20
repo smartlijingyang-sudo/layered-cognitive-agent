@@ -53,7 +53,7 @@ class ResultNormalizer:
     def from_task_result(result: Any) -> NormalizedResult:
         status = getattr(result, "status", None)
         status_value = (
-            cast(Any, status).value
+            cast("Any", status).value
             if hasattr(status, "value")
             else str(status or "unknown")
         )

@@ -70,7 +70,7 @@ def _ledger_snapshot_from_manifest(
             name=str(a.get("name") or a.get("path") or ""),
             mime_type=str(a.get("mime", "")),
             url=str(a.get("url", "")),
-            size_bytes=int(cast(Any, a).get("size", 0) or 0),
+            size_bytes=int(cast("Any", a).get("size", 0) or 0),
         )
         for a in artifacts
     )

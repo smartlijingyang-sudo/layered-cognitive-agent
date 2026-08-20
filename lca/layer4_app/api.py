@@ -65,6 +65,7 @@ from lca.layer4_app.spawn import spawn_agent, spawn_team
 
 if TYPE_CHECKING:
     from cordis import Context
+
     from lca.harness.plugin_api import PluginContext
 
 _DEFAULT_PROFILE = "profiles/web-standard.yaml"

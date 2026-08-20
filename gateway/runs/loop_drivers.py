@@ -231,7 +231,7 @@ async def _build_team(
     """Team LLM casting — select roles + governance, then build Team."""
     resolved_library = library if library is not None else FileRoleLibrary()
     resolved_caster = caster if caster is not None else LLMTeamCaster()
-    record_scope = RunScope(trace_id=cast(TraceId, trace_id), run_id=cast(RunId, run_id))
+    record_scope = RunScope(trace_id=cast("TraceId", trace_id), run_id=cast("RunId", run_id))
     with bind(observability), run_scope(record_scope):
         record(CastingStarted(objective_preview=objective_preview(objective)))
         try:

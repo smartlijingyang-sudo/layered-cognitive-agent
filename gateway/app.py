@@ -132,7 +132,6 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
     """
     import asyncio
     from pathlib import Path
-    from typing import Any
 
     import yaml
 
@@ -159,7 +158,7 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
         structlog.get_logger("lca.gateway").info(
             "harness_profile_reused",
             profile=str(path),
-            plugin_count=len(cast(Any, _default_ctx_holder.ctx).entries),
+            plugin_count=len(cast("Any", _default_ctx_holder.ctx).entries),
         )
         return
 
