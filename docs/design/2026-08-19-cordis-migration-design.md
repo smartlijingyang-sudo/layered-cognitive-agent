@@ -1,7 +1,7 @@
 # Cordis 迁移 — 把 LCA 插件系统换成 Taiyi Cordis
 
 **日期**: 2026-08-19
-**状态**: ✅ **Implemented**（[MIGRATION_COMPLETE.md](../../MIGRATION_COMPLETE.md)；plan 6 chunks / 50 tasks 全部闭环）
+**状态**: ✅ **Implemented**（plan 6 chunks / 50 tasks 全部闭环）
 **关联**:
 - [2026-08-16-plugin-tree-runtime-design.md](./2026-08-16-plugin-tree-runtime-design.md)（已经把 21 个 capability 插件拆出来；本设计是它的运行时承接）
 - [2026-08-14-deepseek-harness-integration-analysis.md](./2026-08-14-deepseek-harness-integration-analysis.md)（"借鉴不搬"已经在做）

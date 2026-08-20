@@ -14,7 +14,7 @@
 
 **Tech Stack:** cordis (Python port of dsh cordis), pydantic v2 (Standard Schema), structlog, lca-tests
 
-**Spec:** `/home/lichao/layered-cognitive-agent/docs/superpowers/specs/2026-08-19-cordis-migration-design.md`
+**Spec:** `docs/design/2026-08-19-cordis-migration-design.md`
 
 **Phases:** P0-P9 (per spec §9). This plan breaks them into 30+ atomic tasks across 6 chunks.
 

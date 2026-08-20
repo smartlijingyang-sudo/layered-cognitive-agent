@@ -8,7 +8,7 @@
 
 **Tech Stack:** existing LCA contracts / L0 / gateway / host sidecar.
 
-**Spec:** `docs/superpowers/specs/2026-08-14-execution-planes-design.md`
+**Spec:** `docs/design/2026-08-14-execution-planes-design.md`
 
 ---
 

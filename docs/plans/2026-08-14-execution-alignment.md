@@ -886,4 +886,4 @@ uv run vulture lca --min-confidence 80
 
 ---
 
-Plan saved to `docs/superpowers/plans/2026-08-14-execution-alignment.md`. Ready to execute?
+Plan saved to `docs/plans/2026-08-14-execution-alignment.md`. Ready to execute?

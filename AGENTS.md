@@ -2,7 +2,7 @@
 
 LCA（Layered Cognitive Agent）是一个基于 vendored Cordis 的 Python 插件化认知 Agent 框架。**一切皆插件**：插件挂载通过 `cordis` `@plugin` 装饰器，扩展通过 seam 注册表，认知内核是封闭六步循环 + 双平面（认知 / 世界）。
 
-变更前必读 [`docs/superpowers/specs/2026-08-19-cognitive-primitive-constitution-v3.md`](docs/superpowers/specs/2026-08-19-cognitive-primitive-constitution-v3.md)（**认知原语宪法 v3**，简称「宪法」）与 [`docs/specs/harness-spine-spec.md`](docs/specs/harness-spine-spec.md)（**Harness Spine Spec**，执行规约）。所有架构决策、跨层接口、新原语引入都要追溯到这两个文档之一。
+变更前必读 [`docs/design/2026-08-19-cognitive-primitive-constitution-v3.md`](docs/design/2026-08-19-cognitive-primitive-constitution-v3.md)（**认知原语宪法 v3**，简称「宪法」）与 [`docs/specs/harness-spine-spec.md`](docs/specs/harness-spine-spec.md)（**Harness Spine Spec**，执行规约）。所有架构决策、跨层接口、新原语引入都要追溯到这两个文档之一。
 
 ## 0. 工程哲学：追问前提
 
@@ -23,7 +23,7 @@ LCA（Layered Cognitive Agent）是一个基于 vendored Cordis 的 Python 插�
 docs/
   adr/                          已采纳的架构决策（0001-0055）
   specs/harness-spine-spec.md   Harness 执行规约
-  superpowers/specs/2026-08-19-cognitive-primitive-constitution-v3.md
+  design/2026-08-19-cognitive-primitive-constitution-v3.md
                                认知原语宪法 v3
 lca/
   contracts/
@@ -168,6 +168,8 @@ uv run vulture lca --min-confidence 80
 | `scripts/check_protocol_impl.py` | 实现 `contracts.Protocol` 的类**必须显式继承** |
 | `scripts/check_assembly_purity.py` | `composer.py` 不得有 `==` 字符串比较分支（契约 2：装配期只读不算） |
 | `scripts/check_port_surface.py` | `lca/packages/` 与 `~/deepseek-harness/packages/` 的 public surface parity |
+| `scripts/verify_md_links.py` | Markdown 相对链接必须解析（目标文件存在 + `#fragment` 指向真实标题） |
+| `scripts/verify_doc_budgets.py` | 文档字数预算超限拒绝（预算清单在 `scripts/doc_budgets.json`） |
 
 ## 4. 编码规范
 
@@ -203,7 +205,8 @@ uv run vulture lca --min-confidence 80
 
 | 关注点 | 位置 |
 |---|---|
-| 宪法原文 | `docs/superpowers/specs/2026-08-19-cognitive-primitive-constitution-v3.md` |
+| 文档管理体系 | `docs/AGENTS.md`（层级分类 + 写作规范 + 字数预算） |
+| 宪法原文 | `docs/design/2026-08-19-cognitive-primitive-constitution-v3.md` |
 | Harness 执行规约 | `docs/specs/harness-spine-spec.md` |
 | 已采纳 ADR | `docs/adr/`（0001-0055） |
 | 平台编排入口 | `./scripts/lca-ops`（无参 = 手册） |

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement the 14-PR cognitive-primitive-v3 constitution in `docs/superpowers/specs/2026-08-19-cognitive-primitive-constitution-v3.md`, with plugin-based configuration profiles covering Ralph Loop, Voyager, MemGPT, MetaGPT, LATS, Self-Improving, and Devin-style scenarios.
+**Goal:** Implement the 14-PR cognitive-primitive-v3 constitution in `docs/design/2026-08-19-cognitive-primitive-constitution-v3.md`, with plugin-based configuration profiles covering Ralph Loop, Voyager, MemGPT, MetaGPT, LATS, Self-Improving, and Devin-style scenarios.
 
 **Architecture:** Plugin-based (cordis runtime) over the existing 5-layer LCA. Each PR adds a closed-set primitive, removes one legacy leakage path, and lands with tests + CI gating. The six-step loop (`perceive → think → act → reflect → remember → stop`) is the closed cognitive set; four cross-cutting systems (Journal-as-Truth / Context Lifecycle / Execution Control / Collaboration Control) are 横切 services, not loop stages.
 

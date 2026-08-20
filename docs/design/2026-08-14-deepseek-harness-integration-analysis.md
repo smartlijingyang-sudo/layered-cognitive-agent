@@ -2,7 +2,7 @@
 
 **日期**: 2026-08-15（整合完善）
 **状态**: 分析草案（Canonical 候选）
-**关联**: [lobehub-integration.md](../../specs/lobehub-integration.md)
+**关联**: [lobehub-integration.md](../specs/lobehub-integration.md)
 
 ---
 
