@@ -1,25 +1,23 @@
-"""Gate group Definition — owns ctx.gates."""
+"""Gate group Definition — owns ctx.gates (ADR-0056 / ADR-0061)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from lca.plugins._cordis_adapter import plugin
+from lca.plugins._cordis_adapter import PluginKind, plugin
 
 
 @plugin(
-    name="gates",
+    id="gates",
     provides=["gates"],
-    layer="guard",
-    side_effects="none",
-    policy_class="control",
+    requires=[],
+    layer="L1",
+    kind=PluginKind.SEAM,
+    effects="none",
     description="Gate group registry; gate plugins add() onto it.",
     test_suite="tests/test_plugin_alignment.py",
 )
 async def setup(ctx: Any, config: Any) -> None:
     from lca.layer1_cognitive.gate_service import GateService
 
-    try:
-        ctx.inject("gates")
-    except KeyError:
-        ctx.provide("gates", GateService())
+    ctx.provide("gates", GateService())

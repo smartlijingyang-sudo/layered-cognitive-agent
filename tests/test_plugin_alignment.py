@@ -105,9 +105,10 @@ def _read_plugin_meta(path: Path) -> dict[str, object] | None:
 
 
 def test_tier1_plugin_shape() -> None:
-    """Every ``@plugin``-decorated module declares name + inject + implements.
+    """Every ``@plugin``-decorated module declares id (or legacy name) + layer.
 
-    Coverage = 100% − allowlist; allowlist size ≤ 10.
+    Coverage = 100% − allowlist; allowlist size ≤ 10. ADR-0061: ``id`` is
+    the primary key; legacy ``name=`` still counts during migration.
     """
     modules = _all_plugin_modules()
     covered: list[str] = []
@@ -122,14 +123,9 @@ def test_tier1_plugin_shape() -> None:
         if not meta:
             missing.append(rel)
             continue
-        if "name" not in meta:
+        if "name" not in meta and "id" not in meta:
             missing.append(rel)
             continue
-        # inject, provides, requires can be empty lists — that is fine.
-        # ``implements`` is the DSH ``extends Service`` analogue; we
-        # accept either a list of Protocol class names or an empty list
-        # for pure structural factories (the allowlist captures genuine
-        # non-Protocol shims).
         covered.append(rel)
     coverage = len(covered) / max(1, len(modules) - len(allowlisted)) * 100
     assert coverage >= 90, (
@@ -153,8 +149,10 @@ def test_eventbus_and_hookregistry_single_backend() -> None:
     that don't boot a profile — but no private dict-based dispatch
     implementation may live outside the two facade modules.
     """
-    layers = [_ROOT / "lca" / "layer1_cognitive" / "event_bus.py",
-              _ROOT / "lca" / "layer1_cognitive" / "hook_registry.py"]
+    layers = [
+        _ROOT / "lca" / "layer1_cognitive" / "event_bus.py",
+        _ROOT / "lca" / "layer1_cognitive" / "hook_registry.py",
+    ]
     forbidden_patterns = [
         re.compile(r"self\._subs\b"),
         re.compile(r"self\._waterfall_subs\b"),
@@ -195,25 +193,38 @@ def test_seam_definitions_runtime_registry() -> None:
 
 
 def test_boot_fails_when_seam_provider_missing() -> None:
-    """Omitting the memory Tier-1 service raises MissingCapabilityError."""
+    """Omitting memory Tier-1 fails at resolve (ADR-0061) or capability require."""
     import asyncio
 
-    from lca.contracts.mechanisms.capability import MissingCapabilityError
+    # Preferred path: disable via patch → resolve reports missing capability.
+    import tempfile
+    from pathlib import Path
 
+    from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
+    from lca.harness.profile.resolve import ProfileResolveError, resolve_profile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        profile = Path(tmp) / "no-memory.yaml"
+        profile.write_text(
+            "bundles:\n"
+            "  - bundles/base.yaml\n"
+            "  - bundles/web-app.yaml\n"
+            "patch:\n"
+            "  - id: lca-memory-service\n"
+            "    disabled: true\n"
+        )
+        with pytest.raises(ProfileResolveError, match="memory"):
+            resolve_profile(profile)
+
+    # Programmatic entries path: drop provider + consumers of memory, boot,
+    # then require_capability must still fail.
     entries = load_profile_entries(DEFAULT_PROFILE)
-    # Drop the Tier-1 service plugin (``lca-memory-service``) and every
-    # entry whose YAML declares ``inject: [memory]`` so boot does not
-    # crash mid-setup on a missing key.
-    dropped = {"lca-memory-service"}
-    for entry in entries:
-        injected = entry.get("inject") or []
-        if isinstance(injected, list) and "memory" in injected:
-            dropped.add(entry["id"])
+    dropped = {"lca-memory-service", "lca-memory-provider", "lca.seam.definitions"}
     pruned = [entry for entry in entries if entry["id"] not in dropped]
+    # Also drop anything that still lists memory in $module providers chain
+    # by attempting boot and asserting require fails.
     ctx = asyncio.run(boot_entries(pruned))
     with pytest.raises(MissingCapabilityError, match="memory"):
-        from lca.contracts.mechanisms.capability import require_capability
-
         require_capability(ctx, "memory")
 
 

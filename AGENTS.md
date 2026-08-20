@@ -96,9 +96,11 @@ contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_ag
 
 - 全部基于 vendored **cordis** Python 移植（`taiyi-cordis` via `[tool.uv.sources]`）；不再使用 `PluginManifest / ExtensionPoint / PluginKind / ScopeKind`（已 deprecated，留在 `lca/contracts/harness/plugin.py` 仅做迁移期兼容）
 - 公共契约：`cordis.Context.provide/inject/on/once/scope/dispose`（`PluginContext` Protocol 是迁移期别名）
-- Bundle 通过 `lca.harness.profile.boot.boot_profile()` 加载：`bundles/*.yaml → patch.* 覆盖 → importlib.setup(ctx, config)`
-- Seams：13 个 extension_point（`llm / sandbox / memory / state_store / search / tools / transport / skills / file_store / observability / agent_loop / session_service / system_prompt`），由 `lca.plugins.seam_definitions` 单一纯声明 Bundle 注入
+- Bundle 通过 `resolve_profile()` → `boot_resolved_profile()` 加载（`boot_profile()` 为兼容门面）：深合并 patch、校验 Manifest、按 `provides→requires` DAG 启动（[ADR-0061](docs/adr/0061-plugin-manifest-resolve-boot.md)）
+- 插件 Manifest：`@plugin(id=..., provides=..., requires=..., layer=L0–L4, kind=..., effects=..., test_suite=...)`（`lca.harness.plugin_api`）；感知/判决向群服务 `add()`（[ADR-0056](docs/adr/0056-plugin-group-contribution.md)）
+- Seams：13 个 extension_point（`llm / sandbox / memory / state_store / search / tools / transport / skills / file_store / observability / agent_loop / session_service / system_prompt`），由 `lca.plugins.seam_definitions` 注入
 - Loop 驱动注册：`lca-run-loop-driver-registry` 提供空 registry，`lca-loop-cognitive` / `lca-dsh-bridge` 注册自身 driver；`gateway/runs/execute.py:execute_run()` 按 run 配置解析。**无模块级单例**。
+- 密钥只经 profile `{from_env:}` 进入；插件不得自行 `os.environ` 读凭证
 
 ## 3. 命令速查
 
@@ -216,6 +218,8 @@ uv run vulture lca --min-confidence 80
 | 插件视图 | `lca-ops inspect-tree` / `lca-ops dump-profile` / `lca-ops debug tree` |
 | 启动诊断 | `lca/harness/diagnostics/boot_report.py`（BootReport：plugins + capability graph） |
 | Agent / Team 闭合 | `lca/layer4_app/spawn.py`（`spawn_agent` / `spawn_team`；ADR-0056） |
+| Profile Resolve/Boot | `lca/harness/profile/{resolve,boot}.py`（ADR-0061） |
+| 插件 Manifest API | `lca/harness/plugin_api.py`；Capability 键 `lca/contracts/capabilities.py` |
 | LLM seam | `lca.plugins.llm_resolver`（env 唯一读取者）+ `lca.plugins.providers.llm`（adapter 工厂） |
 | Loop 驱动 | `gateway/runs/loop_drivers.py:{CognitiveRunDriver, DshRunDriver}`，由 `lca-run-loop-driver-registry` 收集 |
 | Prompt 模板 | `lca/layer1_cognitive/brain/prompts/*.md`；加载 `load_builtin_prompt` |

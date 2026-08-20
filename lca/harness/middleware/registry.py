@@ -29,7 +29,9 @@ class CognitivePhase:
 
 def to_extension_point(phase: CognitivePhase) -> ExtensionPoint:
     """Convert CognitivePhase → ExtensionPoint for internal storage."""
-    return ExtensionPoint(seam_key=phase.name, dispatch_mode="waterfall", description=phase.description)
+    return ExtensionPoint(
+        seam_key=phase.name, dispatch_mode="waterfall", description=phase.description
+    )
 
 
 # Public taxonomy (consumed by docs / plugin manifest authors)
@@ -53,7 +55,8 @@ COGNITIVE_POINTS: tuple[ExtensionPoint, ...] = tuple(
 # agent.before_turn_end is "serial" — override the default waterfall
 COGNITIVE_POINTS = tuple(
     ExtensionPoint(p.seam_key, "serial", p.description)
-    if p.seam_key == "agent.before_turn_end" else p
+    if p.seam_key == "agent.before_turn_end"
+    else p
     for p in COGNITIVE_POINTS
 )
 

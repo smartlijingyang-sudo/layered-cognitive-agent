@@ -1,27 +1,31 @@
 """LLM Resolver plugin — sole owner of credentials, mode, and adapters.
 
-Reads LLM_API_KEY / LLM_BASE_URL, registers adapters on ``ctx.llm``,
-activates mock when no live key is present, and provides the resolver
-``/runs`` injects. Unresolved ``${ENV}`` placeholders are not keys.
+Receives already-resolved ``api_key`` / ``base_url`` from the profile
+resolver (``{from_env: ...}``). Does not read ``os.environ`` (ADR-0061 P3).
 """
 
 from __future__ import annotations
 
-import os
+from pydantic import BaseModel, Field, SecretStr
 
-from pydantic import BaseModel, Field
-
-from lca.plugins._cordis_adapter import plugin
+from lca.plugins._cordis_adapter import PluginKind, plugin
 
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
     mode: str = Field(default="auto", description="auto | real | mock | deepseek")
-    api_key_env: str = Field(default="LLM_API_KEY")
-    base_url_env: str = Field(default="LLM_BASE_URL")
     default_model: str = Field(default="deepseek-chat")
-    api_key: str | None = None
+    api_key: SecretStr | str | None = None
     base_url: str | None = None
+
+
+def _secret_value(value: SecretStr | str | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, SecretStr):
+        raw = value.get_secret_value()
+        return raw or None
+    return value or None
 
 
 def _register_adapters(
@@ -52,28 +56,25 @@ def _register_adapters(
             activate=(target == "deepseek"),
         )
     elif target in {"real", "deepseek"}:
-        # Mode asked for a live adapter but no live key — stay on mock.
         llm.providers.use("mock")
 
 
 @plugin(
-    name="lca-llm-resolver",
+    id="lca-llm-resolver",
     requires=["llm"],
     provides=["llm_resolver"],
-    layer="provider",
-    side_effects="none",
-    policy_class="control",
+    layer="L0",
+    kind=PluginKind.PROVIDER,
+    effects="none",
     description="Register LLM adapters and provide the resolver for /runs.",
     test_suite="tests/test_plugin_tree_single_owner.py::test_llm_single_owner_without_key",
 )
 async def setup(ctx, config: Config) -> None:
     from lca.layer0_infra.llm_resolver import ProductionLLMResolver, live_credential
 
-    api_key = live_credential(config.api_key) or live_credential(os.environ.get(config.api_key_env))
-    base_url = live_credential(config.base_url) or live_credential(
-        os.environ.get(config.base_url_env)
-    )
-    llm_svc = ctx.inject("llm")
+    api_key = live_credential(_secret_value(config.api_key))
+    base_url = live_credential(config.base_url)
+    llm_svc = ctx.require("llm") if hasattr(ctx, "require") else ctx.inject("llm")
     _register_adapters(
         llm_svc,
         mode=config.mode,

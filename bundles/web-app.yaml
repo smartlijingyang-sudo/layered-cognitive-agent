@@ -1,9 +1,7 @@
 # bundles/web-app.yaml — Web app behavior plugins (Tier-3).
-# Extends bundles/base.yaml with named factories for cognitive primitives:
-# sensors, gates, body, runtime, think internals, loop, team_lead, dsh-bridge.
-#
-# Load order matters: named factories that brain / composer inject must be
-# provided before the consumers (gates before workspace-chain before brain).
+# Extends bundles/base.yaml with cognitive primitives: group services,
+# sensor/gate contributions, body, runtime, think internals, loop drivers.
+# Boot order is derived from Manifest requires→provides (ADR-0061), not YAML line order.
 
 entries:
   # ── Perceive group + sensor contributions (ADR-0056) ──
@@ -116,13 +114,13 @@ entries:
     $module: lca.plugins.critic.simple
     config: {}
 
-  # ── Brain strategy (after think internals + gate.workspace-agent) ──
+  # ── Brain strategy (requires gates + critic + reasoner) ──
   - id: lca-brain-simple
     name: lca_brain_simple
     $module: lca.plugins.brain.simple
     config: {}
 
-  # ── Journal store (named factory; Composer instantiates per-run) ──
+  # ── Journal store (named factory; spawn instantiates per-run) ──
   - id: lca-journal-store
     name: lca_journal_store
     $module: lca.plugins.journal_store
@@ -142,7 +140,6 @@ entries:
   - id: lca-loop-cognitive
     name: lca_loop_cognitive
     $module: lca.plugins.loop_cognitive
-    inject: [run_loop_driver_registry]
     config:
       target: cognitive
 

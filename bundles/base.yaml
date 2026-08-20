@@ -66,76 +66,65 @@ entries:
     config: {}
 
   # Sole owner of LLM credentials, mode, and adapters.
+  # Secrets arrive via profile patch {from_env:} (ADR-0061); not read here.
   - id: lca-llm-resolver
     name: lca_llm_resolver
     $module: lca.plugins.llm_resolver
-    inject: [llm]
     config:
       mode: auto
-      api_key_env: LLM_API_KEY
-      base_url_env: LLM_BASE_URL
       default_model: deepseek-chat
 
   - id: lca-memory-provider
     name: lca_providers_memory
     $module: lca.plugins.providers.memory
-    inject: [memory]
     config:
       providers: [simple]
 
   - id: lca-state-store-provider
     name: lca_providers_state_store
     $module: lca.plugins.providers.state_store
-    inject: [state_store]
     config:
       providers: [memory]
 
   - id: lca-search-provider
     name: lca_providers_search
     $module: lca.plugins.providers.search
-    inject: [search]
     config:
       providers: [tavily]
 
   - id: lca-tools-provider
     name: lca_providers_tools
     $module: lca.plugins.providers.tools
-    inject: [tools]
     config:
       factories: [g2a]
 
   - id: lca-transport-provider
     name: lca_providers_transport
     $module: lca.plugins.providers.transport
-    inject: [transport]
     config:
       providers: [internal, a2a, mcp]
 
   - id: lca-skills-provider
     name: lca_providers_skills
     $module: lca.plugins.providers.skills
-    inject: [skills]
     config:
       providers: [disk]
 
   - id: lca-file-store-provider
     name: lca_providers_file_store
     $module: lca.plugins.providers.file_store
-    inject: [file_store]
     config:
       providers: [local]
 
   - id: lca-observability-provider
     name: lca_providers_observability
     $module: lca.plugins.providers.observability
-    inject: [observability]
     config:
       providers: [console]
 
   - id: lca-sandbox-provider
     name: lca_providers_sandbox
     $module: lca.plugins.providers.sandbox
-    inject: [sandbox]
     config:
       providers: [local]
 

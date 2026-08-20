@@ -5,37 +5,27 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.protocols import BrainFactory
-from lca.plugins._cordis_adapter import plugin
-
-
-def _optional_factory(ctx: Any, key: str) -> Any | None:
-    inject = getattr(ctx, "inject", None)
-    if not callable(inject):
-        return None
-    try:
-        return inject(key)
-    except Exception:
-        return None
+from lca.plugins._cordis_adapter import PluginKind, plugin
 
 
 @plugin(
-    name="lca-brain-simple",
+    id="lca-brain-simple",
     provides=["brain_factory"],
+    requires=["gates", "critic.simple", "reasoner.prompt"],
     implements=[BrainFactory],
-    layer="behavior",
-    side_effects="none",
-    policy_class="control",
-    description="Register SimpleBrainFactory as the default 'brain_factory'.",
+    layer="L1",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    description="Register SimpleBrainFactory as the default brain_factory.",
     test_suite="tests/test_plugin_alignment.py",
 )
 async def setup(ctx: Any, config: Any) -> None:
-    """Register SimpleBrainFactory as the default 'brain_factory'."""
     from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
 
-    gates = _optional_factory(ctx, "gates")
+    gates = ctx.require("gates") if hasattr(ctx, "require") else ctx.inject("gates")
     factory = SimpleBrainFactory(
-        agent_gate_factory=gates.assemble if gates is not None else None,
-        critic_factory=_optional_factory(ctx, "critic.simple"),
-        reasoner_cls=_optional_factory(ctx, "reasoner.prompt"),
+        agent_gate_factory=gates.assemble,
+        critic_factory=ctx.inject("critic.simple"),
+        reasoner_cls=ctx.inject("reasoner.prompt"),
     )
     ctx.provide("brain_factory", factory)

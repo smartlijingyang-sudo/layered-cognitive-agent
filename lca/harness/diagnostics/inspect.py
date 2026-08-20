@@ -1,4 +1,4 @@
-"""Inspect a resolved plugin tree (``lca-ops inspect-tree``)."""
+"""Inspect a resolved plugin tree (``lca-ops inspect-tree``) — ADR-0061."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from cordis import Context
+
+from lca.harness.profile.resolve import dump_resolved
 
 
 async def inspect_profile_tree(profile_path: Path | str) -> Context:
@@ -17,20 +19,36 @@ async def inspect_profile_tree(profile_path: Path | str) -> Context:
 
 
 def format_plugin_tree(ctx: Context, *, profile: str) -> str:
-    """Render a human-readable plugin tree dump from a cordis Context.
+    """Render resolved Manifest rows: id, module, kind, layer, config sources."""
+    resolved = getattr(ctx, "resolved_profile", None) or ctx.__dict__.get("resolved_profile")
+    lines = [f"Profile: {profile}"]
+    if resolved is not None:
+        dumped = dump_resolved(resolved, redact=True)
+        lines.append(f"manifest_hash: {dumped['manifest_hash']}")
+        lines.append(f"plugins: {len(dumped['plugins'])}  dag_edges: {len(dumped['dag_edges'])}")
+        lines.append("")
+        for row in dumped["plugins"]:
+            status = "disabled" if row["disabled"] else "active"
+            lines.append(
+                f"  {row['id']}  [{status}]  kind={row['kind']} layer={row['layer']}  "
+                f"module={row['module']}"
+            )
+            if row["provides"]:
+                lines.append(f"    provides: {', '.join(row['provides'])}")
+            if row["requires"]:
+                lines.append(f"    requires: {', '.join(row['requires'])}")
+            if row["config_sources"]:
+                src = ", ".join(f"{k}←{v}" for k, v in sorted(row["config_sources"].items())[:4])
+                lines.append(f"    config_from: {src}")
+        return "\n".join(lines) + "\n"
 
-    Inspects the Context's fiber for entries and dumps them as a
-    human-readable listing. The full implementation is deferred to Chunk 6
-    (lca-ops debug tree); this stub returns a minimal summary.
-    """
-    lines = [
-        f"Profile: {profile}",
-        f"Plugin count: {sum(1 for k in dir(ctx) if not k.startswith('_'))}",
-        "",
-    ]
-    lines.append("(Detailed plugin tree dump: see Chunk 6 lca-ops debug tree)")
-    lines.append("")
-    return "\n".join(lines)
+    entries = ctx.__dict__.get("entries") or []
+    lines.append(f"Plugin count: {len(entries)}")
+    for entry in entries:
+        eid = getattr(entry, "id", "?")
+        module = (getattr(entry, "extra", None) or {}).get("$module", "")
+        lines.append(f"  {eid}  module={module}")
+    return "\n".join(lines) + "\n"
 
 
 def format_capability_graph(
@@ -39,32 +57,32 @@ def format_capability_graph(
     profile: str = "",
     meta: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Return the derived capability graph (PR12.G.2).
-
-    Accepts either a single ``PluginMeta`` dict (test path) or a
-    cordis ``Context`` (production ``inspect-tree`` path).  Aggregates
-    implements / emitted_events / context_fields / capabilities /
-    side_effects / policy_class fields.
-
-    Output structure::
-
-        {
-            "name": str,
-            "layer": str,
-            "implements": list,
-            "emitted_events": list,
-            "context_fields": list,
-            "capabilities": list,
-            "side_effects": list,
-            "policy_class": str,
-        }
-    """
+    """Return the derived capability graph (PR12.G.2 / ADR-0061 dump)."""
     payload: dict[str, Any] = {}
     if isinstance(ctx_or_meta, dict):
         payload = dict(ctx_or_meta)
     elif meta is not None:
         payload = dict(meta)
     elif isinstance(ctx_or_meta, Context):
+        resolved = ctx_or_meta.__dict__.get("resolved_profile")
+        if resolved is not None:
+            dumped = dump_resolved(resolved, redact=True)
+            return {
+                "profile": profile or dumped["profile"],
+                "manifest_hash": dumped["manifest_hash"],
+                "nodes": [
+                    {
+                        "id": row["id"],
+                        "kind": row["kind"],
+                        "layer": row["layer"],
+                        "provides": row["provides"],
+                        "requires": row["requires"],
+                        "disabled": row["disabled"],
+                    }
+                    for row in dumped["plugins"]
+                ],
+                "edges": [list(e) for e in dumped["dag_edges"]],
+            }
         plugins_meta = _collect_plugin_meta(ctx_or_meta)
         if not plugins_meta:
             plugins_meta = _legacy_plugin_entries(ctx_or_meta)
@@ -74,107 +92,134 @@ def format_capability_graph(
     return _normalize_capability_dict(payload)
 
 
-def format_capability_graph_from_legacy(
-    legacy_obj: Any, *, profile: str = ""
-) -> dict[str, Any]:
-    """Adapt a legacy ``manifest`` (or any object with ``kind`` / ``seam_key``).
+def format_capability_graph_from_legacy(legacy_obj: Any, *, profile: str = "") -> dict[str, Any]:
+    """Adapt a legacy ``manifest`` (or any object with ``kind`` / ``seam_key``)."""
+    kind = getattr(legacy_obj, "kind", None) or ""
+    seam_key = getattr(legacy_obj, "seam_key", None) or ""
+    layer = getattr(legacy_obj, "layer", None) or kind
+    graph = _normalize_capability_dict(
+        {
+            "name": str(getattr(legacy_obj, "name", "") or seam_key or kind),
+            "layer": str(layer or ""),
+            "implements": list(getattr(legacy_obj, "implements", []) or []),
+            "capabilities": [seam_key] if seam_key else [],
+            "side_effects": [],
+            "policy_class": "",
+            "profile": profile,
+        }
+    )
+    graph["seam_key"] = seam_key
+    graph["kind"] = kind
+    return graph
 
-    Returns a graph-shape dict containing ``layer`` (from ``kind``) and
-    ``seam_key`` (preserved verbatim) plus the standard capability fields.
-    """
-    payload = {
-        "name": getattr(legacy_obj, "name", type(legacy_obj).__name__),
-        "layer": getattr(legacy_obj, "kind", ""),
-        "seam_key": getattr(legacy_obj, "seam_key", ""),
-        "implements": [],
-        "emitted_events": [],
-        "context_fields": [],
-        "capabilities": [],
-        "side_effects": [],
-        "policy_class": "",
+
+def why_capability(ctx: Context, capability: str) -> str:
+    """Explain who owns a capability and who requires it."""
+    resolved = ctx.__dict__.get("resolved_profile")
+    if resolved is None:
+        return f"capability {capability!r}: no ResolvedProfile on context"
+    owners = [p for p in resolved.plugins if capability in p.definition.provides and not p.disabled]
+    consumers = [
+        p for p in resolved.plugins if capability in p.definition.requires and not p.disabled
+    ]
+    lines = [f"capability: {capability}"]
+    if not owners:
+        lines.append("owner: MISSING")
+    else:
+        for owner in owners:
+            lines.append(
+                f"owner: {owner.id} ({owner.module}) kind={owner.definition.kind.value} "
+                f"layer={owner.definition.layer}"
+            )
+    if consumers:
+        lines.append("required by:")
+        for consumer in consumers:
+            lines.append(f"  - {consumer.id} @ {consumer.source}")
+    else:
+        lines.append("required by: (none in this profile)")
+    return "\n".join(lines)
+
+
+def why_plugin(ctx: Context, plugin_id: str) -> str:
+    """Explain why a plugin was started (reverse dependency + source)."""
+    resolved = ctx.__dict__.get("resolved_profile")
+    if resolved is None:
+        return f"plugin {plugin_id!r}: no ResolvedProfile on context"
+    target = next((p for p in resolved.plugins if p.id == plugin_id), None)
+    if target is None:
+        return f"plugin {plugin_id!r}: not in resolved profile"
+    dependents = [a for a, b in resolved.dag_edges if a == plugin_id]
+    lines = [
+        f"plugin: {plugin_id}",
+        f"module: {target.module}",
+        f"source: {target.source}",
+        f"kind/layer: {target.definition.kind.value}/{target.definition.layer}",
+        f"provides: {list(target.definition.provides)}",
+        f"requires: {list(target.definition.requires)}",
+        f"test_suite: {target.definition.test_suite}",
+        f"disabled: {target.disabled}",
+        f"enables: {dependents or '(no dependents in DAG)'}",
+    ]
+    return "\n".join(lines)
+
+
+# ── Internal helpers (legacy graph assembly) ─────────────────────────
+
+
+def _collect_plugin_meta(ctx: Context) -> list[dict[str, Any]]:
+    entries = ctx.__dict__.get("entries") or []
+    out: list[dict[str, Any]] = []
+    for entry in entries:
+        meta = {
+            "name": getattr(entry, "id", ""),
+            "layer": "",
+            "implements": [],
+            "provides": list(getattr(entry, "provides", []) or []),
+            "requires": list(getattr(entry, "inject", []) or []),
+            "side_effects": [],
+            "policy_class": "",
+        }
+        if meta["name"]:
+            out.append(meta)
+    return out
+
+
+def _legacy_plugin_entries(ctx: Context) -> list[dict[str, Any]]:
+    return _collect_plugin_meta(ctx)
+
+
+def _assemble_graph(*, profile: str, plugins: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "profile": profile,
+        "plugins": plugins,
+        "implements": sorted({i for p in plugins for i in (p.get("implements") or []) if i}),
+        "side_effects": sorted({s for p in plugins for s in (p.get("side_effects") or []) if s}),
     }
-    return _normalize_capability_dict(payload)
 
 
 def _normalize_capability_dict(payload: dict[str, Any]) -> dict[str, Any]:
-    """Ensure the graph dict carries the v3 PR12.G.2 standard keys."""
     return {
-        "name": payload.get("name", ""),
-        "layer": payload.get("layer", ""),
+        "name": str(payload.get("name") or ""),
+        "layer": str(payload.get("layer") or ""),
         "implements": list(payload.get("implements") or []),
         "emitted_events": list(payload.get("emitted_events") or []),
         "context_fields": list(payload.get("context_fields") or []),
         "capabilities": list(payload.get("capabilities") or []),
         "side_effects": list(payload.get("side_effects") or []),
-        "policy_class": payload.get("policy_class", ""),
-        # Legacy bridge: preserve seam_key when present so tests can
-        # round-trip manifest objects (PR12.G.2 forward compatibility).
-        **({"seam_key": payload["seam_key"]} if payload.get("seam_key") else {}),
-    }
-
-
-# ── Internal helpers ─────────────────────────────────────
-
-
-def _collect_plugin_meta(ctx: Context) -> list[dict[str, Any]]:
-    """Collect ``PluginMeta``-shaped payloads from registered plugins.
-
-    Returns ``[]`` when no PluginMeta is found (legacy profile).
-    """
-    out: list[dict[str, Any]] = []
-    try:
-        for entry in _iter_plugin_entries(ctx):
-            meta = getattr(entry, "meta", None)
-            if isinstance(meta, dict) and meta:
-                out.append(dict(meta))
-    except Exception:
-        return []
-    return out
-
-
-def _iter_plugin_entries(ctx: Context):
-    """Yield plugin entries from the cordis Context, tolerating shape changes."""
-    for attr in ("plugins", "_plugins", "entries"):
-        items = getattr(ctx, attr, None)
-        if items:
-            yield from items
-            return
-    # Fallback: scan public attrs.
-    for name in dir(ctx):
-        if name.startswith("_"):
-            continue
-        value = getattr(ctx, name, None)
-        if value is not None and not callable(value):
-            yield value
-
-
-def _legacy_plugin_entries(ctx: Context) -> list[dict[str, Any]]:
-    """Legacy profile: derive a stub PluginMeta from cordis handle shapes."""
-    plugins: list[dict[str, Any]] = []
-    for entry in _iter_plugin_entries(ctx):
-        name = getattr(entry, "name", None) or type(entry).__name__
-        plugins.append(
-            {
-                "name": name,
-                "implements": list(getattr(entry, "provides", []) or []),
-                "emitted_events": list(getattr(entry, "emits", []) or []),
-                "context_fields": [],
-                "capabilities": [],
-                "side_effects": list(getattr(entry, "effects", []) or []),
-                "policy_class": "",
+        "policy_class": str(payload.get("policy_class") or ""),
+        **{
+            k: v
+            for k, v in payload.items()
+            if k
+            not in {
+                "name",
+                "layer",
+                "implements",
+                "emitted_events",
+                "context_fields",
+                "capabilities",
+                "side_effects",
+                "policy_class",
             }
-        )
-    return plugins
-
-
-def _assemble_graph(
-    *, profile: str, plugins: list[dict[str, Any]]
-) -> dict[str, Any]:
-    """Aggregate plugin payloads into a single capability graph."""
-    totals = {
-        "plugins": len(plugins),
-        "events": sum(len(p.get("emitted_events", []) or []) for p in plugins),
-        "side_effects": sum(len(p.get("side_effects", []) or []) for p in plugins),
-        "capabilities": sum(len(p.get("capabilities", []) or []) for p in plugins),
+        },
     }
-    return {"profile": profile, "plugins": plugins, "totals": totals}

@@ -1,4 +1,5 @@
 """Plugin tree diagnostic renderer (for `lca-ops debug tree`)."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -14,9 +15,7 @@ def _state_value(state: Any) -> str:
     return str(state)
 
 
-def render_tree(
-    ctx: Any, *, show_listeners: bool = True, show_effects: bool = True
-) -> str:
+def render_tree(ctx: Any, *, show_listeners: bool = True, show_effects: bool = True) -> str:
     """Render a cordis Context (or host) as a human-readable plugin tree.
 
     Walks either ``ctx.own_bindings`` (cordis Context shape) or

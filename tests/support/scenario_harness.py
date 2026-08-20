@@ -105,7 +105,6 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "gate.terminal-respond",
         "gate.artifact-respond-injector",
         "gate.must-consult-all",
-        "gate.workspace-agent",
         # Act / runtime
         "body.simple",
         "safe_executor.simple",

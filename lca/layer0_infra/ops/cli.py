@@ -640,123 +640,122 @@ def inspect_tree(
         help="Profile YAML path to inspect",
     ),
 ) -> None:
-    """Show the resolved plugin tree + capability graph (v3 PR12.G.2)."""
-    from cordis.loader import load_yaml
+    """Show the resolved plugin Manifest tree (ADR-0061)."""
+    import asyncio
+
+    from lca.harness.diagnostics.inspect import format_plugin_tree, inspect_profile_tree
 
     if not profile.exists():
         print(f"Profile not found: {profile}")
         raise typer.Exit(1)
 
     try:
-        data = load_yaml(profile)
-    except ValueError:
-        # Minimal / synthetic profile may use ``plugins: []`` which the
-        # boot loader rejects.  Fall back to parsing via PyYAML.
+        ctx = asyncio.run(inspect_profile_tree(profile))
+    except Exception as exc:
+        # Minimal / synthetic profiles may not boot — fall back to YAML sketch.
         import yaml as _yaml
 
         with profile.open() as fh:
             data = _yaml.safe_load(fh) or {}
-
-    # Boot the profile asynchronously (if needed) to get the resolved
-    # cordis Context for the capability graph.  Some minimal profiles
-    # use ``plugins:`` rather than ``entries:``; tolerate both via
-    # the boot loader (or fall back to a synthetic empty graph).
-    ctx = None
-    try:
-        import asyncio
-
-        from lca.harness.profile.boot import boot_profile
-
-        ctx = asyncio.run(boot_profile(profile))
-    except Exception:
-        ctx = None
-
-    if ctx is not None:
-        try:
-            from lca.harness.diagnostics.inspect import format_capability_graph
-
-            graph = format_capability_graph(ctx, profile=str(profile))
-        except Exception:
-            graph = {"profile": str(profile), "plugins": [], "totals": {"plugins": 0}}
-    else:
-        # Minimal / synthetic profile: derive a graph from the YAML
-        # ``plugins: []`` list directly (no boot required).
         graph = _graph_from_yaml(profile, data)
+        print(f"Profile: {profile} (unbooted: {exc})")
+        print(f"Plugins: {graph.get('totals', {}).get('plugins', 0)}")
+        return
 
-    plugins = graph.get("plugins", []) if isinstance(graph, dict) else []
-    totals = graph.get("totals", {}) if isinstance(graph, dict) else {}
-    if ctx is not None and hasattr(ctx, "entries") and ctx.entries:
-        plugins = [{"name": getattr(e, "id", None) or getattr(e, "name", "?")} for e in ctx.entries]
-        totals = {**totals, "plugins": len(plugins)}
-
-    print(f"Profile: {profile}")
-    print(f"Plugins: {len(plugins)}")
-    if totals:
-        print(f"  emitted events: {totals.get('events', 0)}")
-        print(f"  capabilities: {totals.get('capabilities', 0)}")
-        print(f"  side effects: {totals.get('side_effects', 0)}")
-    print()
-    if plugins:
-        for p in plugins:
-            name = p.get("name", "?")
-            print(f"  {name}")
-            if p.get("implements"):
-                print(f"    implements: {p['implements']}")
-            if p.get("emitted_events"):
-                print(f"    emitted_events: {p['emitted_events']}")
-            if p.get("context_fields"):
-                print(f"    context_fields: {p['context_fields']}")
-            if p.get("capabilities"):
-                print(f"    capabilities: {p['capabilities']}")
-            if p.get("side_effects"):
-                print(f"    side_effects: {p['side_effects']}")
-            if p.get("policy_class"):
-                print(f"    policy_class: {p['policy_class']}")
-    print()
-    print("Seam completeness: PASS")
+    print(format_plugin_tree(ctx, profile=str(profile)))
 
 
 @app.command()
 def dump_profile(
     profile: Path = typer.Argument(
         Path("profiles/web-standard.yaml"),
-        help="Profile YAML path to dump the expanded entry list for",
+        help="Profile YAML path to dump the resolved Manifest for",
     ),
     source: bool = typer.Option(
         False, "--source", help="Annotate each row with its source bundle/patch"
     ),
+    as_json: bool = typer.Option(False, "--json", help="Emit canonical redacted JSON"),
 ) -> None:
-    """Dump the expanded plugin-tree entry list for a profile.
+    """Dump the resolved, redacted Manifest (ADR-0061). Never prints secrets."""
+    import json
 
-    Mirrors DSH ``dsh --dump-config``: prints the exact rows the Loader
-    would activate, so a dump can never drift from what boots.
-    """
-    from lca.harness.profile.boot import load_profile_entries
+    from lca.harness.profile.resolve import dump_resolved, resolve_profile
 
     if not profile.exists():
         print(f"Profile not found: {profile}")
         raise typer.Exit(1)
 
-    rows = load_profile_entries(profile)
-    for row in rows:
-        if row.get("disabled") or (
-            isinstance(row.get("config"), dict) and row["config"].get("disabled")
-        ):
+    resolved = resolve_profile(profile)
+    dumped = dump_resolved(resolved, redact=True)
+    if as_json:
+        print(json.dumps(dumped, indent=2, sort_keys=True, default=str))
+        return
+    print(f"profile: {dumped['profile']}")
+    print(f"manifest_hash: {dumped['manifest_hash']}")
+    print(f"bundles: {dumped['bundles']}")
+    print()
+    for row in dumped["plugins"]:
+        if row["disabled"]:
             continue
-        parts = [f"  - id: {row['id']}"]
-        if row.get("name"):
-            parts.append(f"    name: {row['name']}")
-        if row.get("parent"):
-            parts.append(f"    parent: {row['parent']}")
-        if row.get("group"):
-            parts.append("    group: true")
-        if row.get("config"):
+        parts = [f"  - id: {row['id']}", f"    module: {row['module']}"]
+        parts.append(f"    kind/layer: {row['kind']}/{row['layer']}")
+        if row["config"]:
             parts.append(f"    config: {row['config']!r}")
         if source and row.get("source"):
             parts.append(f"    source: {row['source']}")
         print("\n".join(parts))
     print()
-    print(f"Total rows: {len(rows)}")
+    print(f"Total rows: {sum(1 for r in dumped['plugins'] if not r['disabled'])}")
+
+
+@app.command("why")
+def why_cmd(
+    capability: str = typer.Argument(..., help="Capability key to explain"),
+    profile: Path = typer.Option(
+        Path("profiles/web-standard.yaml"), "--profile", "-p", help="Profile YAML"
+    ),
+) -> None:
+    """Explain who owns / requires a capability (ADR-0061)."""
+    import asyncio
+
+    from lca.harness.diagnostics.inspect import inspect_profile_tree, why_capability
+
+    ctx = asyncio.run(inspect_profile_tree(profile))
+    print(why_capability(ctx, capability))
+
+
+@app.command("why-plugin")
+def why_plugin_cmd(
+    plugin_id: str = typer.Argument(..., help="Plugin id to explain"),
+    profile: Path = typer.Option(
+        Path("profiles/web-standard.yaml"), "--profile", "-p", help="Profile YAML"
+    ),
+) -> None:
+    """Explain why a plugin was started (ADR-0061)."""
+    import asyncio
+
+    from lca.harness.diagnostics.inspect import inspect_profile_tree, why_plugin
+
+    ctx = asyncio.run(inspect_profile_tree(profile))
+    print(why_plugin(ctx, plugin_id))
+
+
+@app.command()
+def graph(
+    profile: Path = typer.Argument(
+        Path("profiles/web-standard.yaml"),
+        help="Profile YAML path",
+    ),
+) -> None:
+    """Print the plugin DAG edges (provider → consumer)."""
+    from lca.harness.profile.resolve import resolve_profile
+
+    resolved = resolve_profile(profile)
+    print(f"manifest_hash: {resolved.manifest_hash}")
+    print(f"nodes: {sum(1 for p in resolved.plugins if not p.disabled)}")
+    print(f"edges: {len(resolved.dag_edges)}")
+    for src, dst in resolved.dag_edges:
+        print(f"  {src} → {dst}")
 
 
 @app.command()

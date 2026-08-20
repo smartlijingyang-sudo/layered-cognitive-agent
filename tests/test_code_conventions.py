@@ -59,6 +59,12 @@ _MAX_FILE_LINES = 250
 
 # 已登记豁免（引用 ADR 或说明原因）
 _LINE_COUNT_EXEMPT: dict[str, str] = {
+    "lca/harness/plugin_api.py": (
+        "ADR-0061 Manifest API：PluginDefinition / @plugin / AuditedPluginContext 同文件"
+    ),
+    "lca/harness/profile/resolve.py": (
+        "ADR-0061 resolve 阶段：深合并、from_env、DAG、校验集中于单一入口"
+    ),
     "lca/layer4_app/spawn.py": (
         "L4 spawn 闭合 AgentSpec/TeamSpec（ADR-0056）；"
         "promote_lead 由 test_refactor_guards 直接 import"

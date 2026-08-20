@@ -61,13 +61,15 @@ class ShadowExecutor:
 
         # Wait for legacy (authoritative)
         legacy_result = await asyncio.wait_for(
-            legacy_task, timeout=self._config.timeout_seconds,
+            legacy_task,
+            timeout=self._config.timeout_seconds,
         )
 
         # Wait for new (best-effort) — timeout/failure doesn't block legacy
         try:
             new_result = await asyncio.wait_for(
-                new_task, timeout=self._config.timeout_seconds,
+                new_task,
+                timeout=self._config.timeout_seconds,
             )
         except asyncio.TimeoutError:
             _log.warning("shadow_new_path_timeout")
@@ -100,18 +102,15 @@ class ShadowExecutor:
         """Compare normalized results from both paths."""
         norm_legacy = self._normalizer.from_task_result(legacy_result)
         norm_new = self._normalizer.from_projection(
-            new_result, journal=journal or [],
+            new_result,
+            journal=journal or [],
         )
 
         divergences: list[str] = []
         if norm_legacy.status != norm_new.status:
-            divergences.append(
-                f"status: {norm_legacy.status} != {norm_new.status}"
-            )
+            divergences.append(f"status: {norm_legacy.status} != {norm_new.status}")
         if norm_legacy.llm_calls != norm_new.llm_calls:
-            divergences.append(
-                f"llm_calls: {norm_legacy.llm_calls} vs {norm_new.llm_calls}"
-            )
+            divergences.append(f"llm_calls: {norm_legacy.llm_calls} vs {norm_new.llm_calls}")
 
         return DivergenceReport(
             session_id=self._config.session_id,

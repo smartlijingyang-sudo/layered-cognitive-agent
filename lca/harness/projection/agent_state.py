@@ -14,7 +14,7 @@ from lca.contracts.models.core.state import AgentState
 @dataclass
 class AgentStateProjection:
     """Projection that reconstructs AgentState from session events.
-    
+
     This projection folds journal events into an AgentState, allowing
     the agent state to be recovered from the event log.
     """
@@ -47,11 +47,11 @@ class AgentStateProjection:
 
     def apply(self, state: AgentState, event: SessionEvent) -> AgentState:
         """Apply a session event to update the agent state.
-        
+
         Args:
             state: Current agent state
             event: Session event to apply
-            
+
         Returns:
             Updated agent state
         """
@@ -92,13 +92,15 @@ class AgentStateProjection:
             result = data.get("result")
             if call_id and call_id in state.extra.get("pending_tool_calls", {}):
                 tool_info = state.extra["pending_tool_calls"].pop(call_id)
-                state.history.append({
-                    "action_type": "tool_call",
-                    "tool_name": tool_info["tool_name"],
-                    "arguments": tool_info["arguments"],
-                    "success": success,
-                    "result": result,
-                })
+                state.history.append(
+                    {
+                        "action_type": "tool_call",
+                        "tool_name": tool_info["tool_name"],
+                        "arguments": tool_info["arguments"],
+                        "success": success,
+                        "result": result,
+                    }
+                )
 
         elif event_type == "session.checkpoint.v1":
             # Update status from checkpoint
@@ -118,10 +120,10 @@ class AgentStateProjection:
 
     def view(self, state: AgentState) -> dict[str, Any]:
         """Convert AgentState to a serializable view.
-        
+
         Args:
             state: Agent state
-            
+
         Returns:
             Dictionary representation of the state
         """

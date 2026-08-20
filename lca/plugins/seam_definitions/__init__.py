@@ -1,33 +1,22 @@
-"""Seam definitions plugin — declares 13 capability seams AND writes their
-runtime ``SeamRegistry`` slots into the booted ``cordis.Context``.
+"""Seam definitions — write SeamRegistry slots for each capability key (ADR-0061).
 
-This is no longer a no-op. During ``boot_profile()`` the plugin runs after
-all Tier-1 service plugins have registered their Definitions on the plain
-keys (e.g. ``ctx.provide("llm", LlmService())``), but before any Tier-2
-provider plugins run. Its job:
-
-* allocate one :class:`SeamRegistry` per seam key under both
-  ``ctx.provide("seam:<key>", registry)`` and ``ctx.provide("<key>", registry)``;
-* expose the canonical seam key list via :data:`SEAM_KEYS`.
-
-If a Tier-1 service plugin already provided a Definition on the plain key
-(``ctx.provide("llm", LlmService_instance)``), this plugin re-registers the
-Definition into the ``SeamRegistry`` so :func:`require_capability` can route
-through ``ctx.inject("seam:<key>").current()``.
+Runs after Tier-1 Definition services. Wraps each plain-key Definition into
+``seam:<key>`` so :func:`require_capability` can resolve either path.
+Optional seams without a Tier-1 service get an empty registry.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from lca.plugins._cordis_adapter import plugin
+from lca.plugins._cordis_adapter import PluginKind, plugin
 
 if TYPE_CHECKING:
     from cordis import Context
 
 from lca.contracts.mechanisms.seam_registry import SeamRegistry
 
-__all__ = ["SEAM_KEYS", "apply", "name"]
+__all__ = ["SEAM_KEYS", "name"]
 
 SEAM_KEYS: tuple[str, ...] = (
     "llm",
@@ -43,6 +32,20 @@ SEAM_KEYS: tuple[str, ...] = (
     "agent_loop",
     "session_service",
     "system_prompt",
+)
+
+# Tier-1 services present in bundles/base.yaml — wrapped into seam registries.
+_TIER1_WRAP: tuple[str, ...] = (
+    "llm",
+    "sandbox",
+    "memory",
+    "state_store",
+    "search",
+    "tools",
+    "transport",
+    "skills",
+    "file_store",
+    "observability",
 )
 
 _SEAM_DESCRIPTIONS: dict[str, str] = {
@@ -65,32 +68,19 @@ name = "lca.seam.definitions"
 
 
 @plugin(
-    name="lca.seam.definitions",
+    id="lca.seam.definitions",
     provides=[f"seam:{k}" for k in SEAM_KEYS],
-    requires=[],  # bundle order guarantees Tier-1 services precede us
-    layer="service",
+    requires=list(_TIER1_WRAP),
+    layer="L0",
+    kind=PluginKind.SEAM,
+    effects="none",
     description="Declare 13 capability seams and write their runtime registries.",
     test_suite="tests/test_plugin_alignment.py::test_seam_definitions_runtime_registry",
 )
 async def setup(ctx: Context, config: Any) -> None:
-    """Write one :class:`SeamRegistry` per seam key into ``ctx``.
-
-    Bundle order guarantees this plugin runs after every Tier-1 service
-    plugin (``lca-llm-service`` … ``lca-state-store-service``) so each
-    plain-key binding is available. We wrap that Definition as the seam
-    registry's ``"default"`` provider so :func:`require_capability` can
-    route through ``ctx.inject("seam:llm").current()``.
-
-    When a Tier-1 service for a seam key is missing (only ``agent_loop`` /
-    ``session_service`` / ``system_prompt`` are optional in
-    ``web-standard``), we still write a ``SeamRegistry`` — the active
-    provider slot stays empty until that service plugin is enabled.
-    """
     for seam_key in SEAM_KEYS:
         registry: SeamRegistry[Any] = SeamRegistry(seam_key)
-        try:
+        if seam_key in _TIER1_WRAP:
             existing = ctx.inject(seam_key)
             registry.register("default", existing, activate=True)
-        except KeyError:
-            pass
         ctx.provide(f"seam:{seam_key}", registry)

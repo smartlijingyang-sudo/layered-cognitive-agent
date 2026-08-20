@@ -1,10 +1,19 @@
 # web-standard profile — default deployment configuration.
 # Bundles: base (Tier-1 services + Tier-2 providers) + web-app (Tier-3 behaviors)
-# Patch: LLM provider selection via env vars
+# Secrets enter only via explicit {from_env:} refs (ADR-0061 P3).
 
 bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
 
-# Optional: override specific plugin config; merged into matching entries by id
-patch: []
+patch:
+  - id: lca-llm-resolver
+    config:
+      mode: auto
+      default_model: deepseek-chat
+      api_key:
+        from_env: LLM_API_KEY
+        required: false
+      base_url:
+        from_env: LLM_BASE_URL
+        required: false
