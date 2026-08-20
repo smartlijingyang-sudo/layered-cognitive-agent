@@ -11,10 +11,10 @@ from pathlib import Path
 
 from lca.contracts.atoms.telemetry import EventName, SpanName
 from lca.contracts.models.observability.journal_catalog import (
-    JOURNAL_CATALOG,
     JOURNAL_EVENT_CLASSES,
 )
 from lca.contracts.models.observability.telemetry_catalog import TELEMETRY_CATALOG
+from lca.layer0_infra.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _LCA_DIR = _REPO_ROOT / "lca"
@@ -248,20 +248,21 @@ class TestJournalVocabularyGuard(unittest.TestCase):
 
     def test_single_emission_site_per_journal_event(self) -> None:
         for cls_name, mods in self._collect_record_emissions().items():
-            entry = JOURNAL_CATALOG.get(cls_name)
-            self.assertIsNotNone(entry, f"journal 事件 {cls_name} 未在 JOURNAL_CATALOG 登记")
-            offenders = [m for m in mods if not m.startswith(entry.emitter)]
+            descriptor = EVENT_DESCRIPTOR_REGISTRY.get(cls_name)
+            self.assertIsNotNone(descriptor, f"journal 事件 {cls_name} 未在描述符注册中心登记")
+            offenders = [m for m in mods if not m.startswith(descriptor.emitter)]
             self.assertEqual(
                 offenders,
                 [],
-                f"{cls_name} 的唯一发射模块应为 {entry.emitter}，越界发射：{sorted(offenders)}",
+                f"{cls_name} 的唯一发射模块应为 {descriptor.emitter}，越界发射：{sorted(offenders)}",
             )
 
-    def test_catalog_covers_every_event_class(self) -> None:
+    def test_registry_covers_every_event_class(self) -> None:
+        registered = set(EVENT_DESCRIPTOR_REGISTRY.all_type_names())
         self.assertEqual(
-            set(JOURNAL_CATALOG),
+            registered,
             set(JOURNAL_EVENT_CLASSES),
-            "JOURNAL_CATALOG 与 JOURNAL_EVENT_CLASSES 必须一一对应",
+            "EventDescriptorRegistry 与 JOURNAL_EVENT_CLASSES 必须一一对应",
         )
 
 

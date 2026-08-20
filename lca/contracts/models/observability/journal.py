@@ -154,12 +154,12 @@ class StampedEvent:
     - ``ts``   — monotonic timestamp
     - ``scope`` — correlation skeleton (trace_id / parent_trace_id / run_id /
       delegation_id / agent_role / step)
-    - ``turn`` — agent loop turn number (default 0)
     - ``event_type`` — class name of the payload (auto-stamped by ``RunStore.append``)
     - ``data``  — optional dict carrying the raw payload for downstream
       consumers (mirrors ``event.__dict__``; auto-populated when the engine
       stamps it).
-    - ``correlation_ids`` — additional cross-trace ids (multi-trace joining).
+    - ``parent_seq`` — immediate causal parent seq (None for root events).
+    - ``correlation_ids`` — reserved for future multi-trace joining; never written.
     - ``event`` — the typed payload (frozen dataclass).
     """
 
@@ -167,7 +167,6 @@ class StampedEvent:
     ts: float
     scope: RunScope
     event: JournalEvent
-    turn: int = 0
     event_type: str = ""
     data: dict[str, object] = field(default_factory=dict)
     parent_seq: int | None = None
@@ -514,18 +513,6 @@ class AttachmentStagingFailed(JournalEvent):
     error: str = ""
     failed_paths: tuple[str, ...] = ()
     run_id: str = ""
-
-
-# ── 兼容洞察事件（不由账本投影器回写）───────────────────
-
-
-@dataclass(frozen=True)
-class RunInsight(JournalEvent):
-    """兼容的显式洞察事实；常规分析由 TraceInspector 只读派生。"""
-
-    kind: str = ""
-    summary: str = ""
-    detail: str = ""
 
 
 # ── 认知控制原语（PR2 / PR3a / PR4）─────────────────────

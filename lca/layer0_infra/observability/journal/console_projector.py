@@ -28,7 +28,6 @@ from lca.contracts.models.observability.journal import (
     DelegationIssued,
     JournalEvent,
     LlmCallCompleted,
-    RunInsight,
     StampedEvent,
     SynthesisCompleted,
     TeamRunFinished,
@@ -55,7 +54,6 @@ class _TraceState:
         self.is_team = False
         self.trace: dict[str, Any] = {}
         self.runs: dict[str, dict[str, Any]] = {}
-        self.insights: list[str] = []
         self.events: list[StampedEvent] = []
         self.last_section: str | None = None
         # DSH-inspired 增量投影索引：委派事件的快速查找表（O(1) 替代 O(n) 线性扫描）
@@ -182,7 +180,7 @@ class ConsoleJournalProjector(JournalProjector):
         trace["tokens_in"] = sum(r.get("tokens_in", 0) for r in runs)
         trace["tokens_out"] = sum(r.get("tokens_out", 0) for r in runs)
         trace["tool_calls"] = sum(r.get("tool_calls", 0) for r in runs)
-        self._emit(render.render_run_card(trace, state.insights))
+        self._emit(render.render_run_card(trace))
         if self._verbosity is Verbosity.VERBOSE:
             diagram = render_sequence_diagram(state.events)
             if diagram:
@@ -191,8 +189,6 @@ class ConsoleJournalProjector(JournalProjector):
 
     # ── 叙事行（standard+）─────────────────────────────
     def _on_narrative_event(self, stamped: StampedEvent, event: JournalEvent) -> None:
-        if isinstance(event, RunInsight):
-            self._state_of(stamped).insights.append(f"[{event.kind}] {event.summary}")
         if self._verbosity is Verbosity.MINIMAL:
             return
         line = self._narrative_line(stamped, event)

@@ -22,10 +22,8 @@ from lca.contracts.atoms.telemetry import (
     ATTR_DEGRADED_TO,
     ATTR_DELEGATE_COUNT,
     ATTR_DELEGATE_TARGET,
-    ATTR_DETAIL,
     ATTR_ERROR,
     ATTR_FROM_ROLE,
-    ATTR_KIND,
     ATTR_LATENCY_MS,
     ATTR_LEAD_ROLE,
     ATTR_MANDATE,
@@ -62,7 +60,6 @@ from lca.contracts.models.observability.journal import (
     DelegationCompleted,
     DelegationIssued,
     JournalEvent,
-    RunInsight,
     StepCompleted,
     SynthesisCompleted,
     TeamRunFinished,
@@ -248,12 +245,6 @@ def synthesis_completed_attrs(event: SynthesisCompleted) -> dict[str, Any]:
     )
 
 
-def run_insight_attrs(event: RunInsight) -> dict[str, Any]:
-    return drop_empty(
-        {ATTR_KIND: event.kind, ATTR_SUMMARY: event.summary, ATTR_DETAIL: event.detail}
-    )
-
-
 AttrMapper = Callable[[Any], dict[str, Any]]
 
 #: 瞬时事实投影表：事件类型 → (OTel event 名, 属性映射)。
@@ -265,5 +256,4 @@ EVENT_PROJECTIONS: dict[type[JournalEvent], tuple[str, AttrMapper]] = {
     ToolDenied: (EventName.TOOL_DENIED.value, tool_denied_attrs),
     DelegationCacheHit: (SpanName.DELEGATE_CACHE_HIT.value, delegation_cache_hit_attrs),
     SynthesisCompleted: (SpanName.TEAM_SYNTHESIS.value, synthesis_completed_attrs),
-    RunInsight: (EventName.RUN_INSIGHT.value, run_insight_attrs),
 }

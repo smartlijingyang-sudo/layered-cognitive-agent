@@ -40,7 +40,7 @@ from lca.layer1_cognitive.brain.decision_gates import (
     record_gate_decided,
 )
 from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import NullSink, RunStoreSink
+from lca.layer1_cognitive.perceive_sink import JournalSink, NullSink
 from lca.layer1_cognitive.sensors import (
     InboxFactsSensor,
     TeamInboxSensor,
@@ -190,7 +190,7 @@ class TestHubPrimitive:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         manifest = await hub.perceive(_state())
         digest = digest_manifest(manifest)
@@ -205,7 +205,7 @@ class TestHubPrimitive:
         hub = SequentialPerceiveHub(
             sensors=[],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         state = _state()
         # Pre-seed the bucket.
@@ -265,7 +265,7 @@ class TestCompositionLarge:
                 TeamInboxSensor(store),
             ],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         state = _state()
         # Pre-seed a gate so the policy_fact fold is exercised.
@@ -288,7 +288,7 @@ class TestCompositionLarge:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         state = _state()
         m1 = await hub.perceive(state)
@@ -349,7 +349,7 @@ class TestTeamMessageE2E:
         hub = SequentialPerceiveHub(
             sensors=[TeamInboxSensor(store)],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         manifest = await hub.perceive(_state())
         assert manifest.has_kind("team_inbox")

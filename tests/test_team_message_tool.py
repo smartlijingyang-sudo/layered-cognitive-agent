@@ -22,7 +22,7 @@ from lca.layer1_cognitive.body.team_message_tool import (
     publish_team_message,
 )
 from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import RunStoreSink
+from lca.layer1_cognitive.perceive_sink import JournalSink
 from lca.layer1_cognitive.sensors import TeamInboxSensor
 
 
@@ -87,7 +87,7 @@ class TestTeamMessageTool:
         hub = SequentialPerceiveHub(
             sensors=[TeamInboxSensor(store)],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         state = AgentState(trace_id=new_id("trace"), task="t", budget=Budget())
         manifest = await hub.perceive(state)

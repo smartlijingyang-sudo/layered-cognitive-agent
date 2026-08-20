@@ -1,7 +1,8 @@
 """ContextManifest 的专用事实发射适配器。
 
-感知 Hub 只构造 ``ContextManifested``；生产适配器调用统一 ``record`` 入口，
-测试可注入 ``RunStoreSink``。不存在运行时双写开关或第二条生产写入路径。
+感知 Hub 只构造 ``ContextManifested``；生产与测试共用 ``JournalSink``，
+生产走 ``current_hub()``、测试可显式注入 store。不存在运行时双写开关或
+第二条生产写入路径。
 """
 
 from __future__ import annotations
@@ -38,10 +39,10 @@ class NullSink:
         return event
 
 
-class RunStoreSink:
-    """测试和显式组合使用的账本适配器。"""
+class JournalSink:
+    """ContextManifest 统一进入事件账本：生产用 current_hub，测试可显式注入 store。"""
 
-    def __init__(self, store: Any) -> None:
+    def __init__(self, store: Any | None = None) -> None:
         self._store = store
 
     def emit(
@@ -51,27 +52,23 @@ class RunStoreSink:
         *,
         extra: dict[str, Any] | None = None,
     ) -> ContextManifested:
-        stamped = self._store.append(event)
+        store = self._store
+        if store is None:
+            from lca.layer0_infra.observability import current_hub
+
+            hub = current_hub()
+            if hub is None:
+                return event
+            store = hub.store
+        stamped = store.append(event)
+        if stamped is None:
+            return event
         return cast("ContextManifested", stamped.event)
-
-
-class JournalSink:
-    """生产适配器：所有 ContextManifest 统一进入主事件账本。"""
-
-    def emit(
-        self,
-        event: ContextManifested,
-        manifest: ContextManifest,
-        *,
-        extra: dict[str, Any] | None = None,
-    ) -> ContextManifested:
-        from lca.layer0_infra.observability import current_hub
-
-        hub = current_hub()
-        stamped = hub.store.append(event) if hub is not None else None
-        return cast("ContextManifested", stamped.event) if stamped is not None else event
 
 
 def default_sink() -> ManifestSink:
     """返回生产账本适配器。"""
     return JournalSink()
+
+
+__all__ = ["JournalSink", "ManifestSink", "NullSink", "default_sink"]

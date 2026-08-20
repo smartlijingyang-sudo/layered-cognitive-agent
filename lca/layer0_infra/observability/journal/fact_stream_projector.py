@@ -1,12 +1,10 @@
 """FactStreamProjector —— journal 事实流投影器（DSH「模型所见即日志」终端视图）。
 
 每个盖章事件作为一条「事实」渲染：事件类型 + 关键字段 + 时间戳。
-轨迹分析由只读 ``TraceInspector`` 按需派生；若兼容调用方显式写入 ``RunInsight``，
-本投影仍将其标记为「观察」。
+轨迹分析由只读 ``TraceInspector`` 按需派生；洞察事件已并入 RuntimeObserved。
 
 设计原则（对齐 ADR-0037 + DSH session log philosophy）：
 - 模型可见的即被记录的：每个事件都渲染，不做过滤
-- 事实（fact）与显式观察（observation）分离：兼容 RunInsight 用不同标记
 - 容器事件（run start/finish）用 Run Card 包裹
 
 与 ConsoleJournalProjector 的区别：
@@ -48,7 +46,6 @@ from lca.contracts.models.observability.journal import (
     ReasoningCompleted,
     ReasoningDelta,
     RunActivity,
-    RunInsight,
     SandboxOutputDelta,
     StampedEvent,
     StepCompleted,
@@ -62,6 +59,7 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.contracts.protocols import JournalProjector
+from lca.layer0_infra.observability.journal.table_renderer import truncate as _truncate
 
 if TYPE_CHECKING:
     from typing import TextIO
@@ -99,7 +97,7 @@ _DELTA_ICONS = {
     "reasoning_done": "≋",
     "sandbox_delta": "≋",
 }
-_INSIGHT_ICON = "💡"
+
 _ATTACHMENT_ICONS = {
     "start": "📎",
     "done": "📎",
@@ -108,7 +106,7 @@ _ATTACHMENT_ICONS = {
 
 
 class FactStreamProjector(JournalProjector):
-    """journal → terminal 事实流。每个事件一条事实，insight 标记为观察。
+    """journal → terminal 事实流。每个事件一条事实。
 
     结构化层次（对齐 DSH Trajectory）：
     - Run Card：Team/Agent 容器事件渲染为卡片
@@ -163,7 +161,6 @@ class FactStreamProjector(JournalProjector):
             ToolDenied: self._render_tool_denied,
             ToolCallStreaming: self._render_tool_streaming,
             RunActivity: self._render_activity,
-            RunInsight: self._render_insight,
             StepTextDelta: self._render_text_delta,
             ReasoningDelta: self._render_reasoning_delta,
             ReasoningCompleted: self._render_reasoning_completed,
@@ -576,16 +573,7 @@ class FactStreamProjector(JournalProjector):
             f"plane={event.plane_id} · {event.error}" + (f" · {paths}" if paths else "")
         )
 
-    # ── 观察（Insight）─────────────────────────────────
-    def _render_insight(self, stamped: StampedEvent, event: RunInsight) -> None:
-        self._section(stamped)
-        lines = [
-            f"  {_INSIGHT_ICON} observation [{self._delta_ms(stamped)}] kind={event.kind}",
-            f"    {_truncate(event.summary, 120)}",
-        ]
-        if event.detail:
-            lines.append(f"    detail: {_truncate(event.detail, 120)}")
-        self._emit("\n".join(lines))
+    # ── 资源事件（Attachment staging）───────────────────
 
     # ── 工具方法 ───────────────────────────────────────
     def _section(self, stamped: StampedEvent) -> None:
@@ -603,11 +591,9 @@ class FactStreamProjector(JournalProjector):
 # ── 工具函数 ──────────────────────────────────────────
 
 
-def _truncate(text: str, max_len: int) -> str:
-    """截断长文本。"""
-    if len(text) <= max_len:
-        return text
-    return text[: max_len - 3] + "..."
+def _truncate_str(text: str, max_len: int) -> str:
+    """保留旧签名供 test_console/format 兼容性；统一委托给 table_renderer。"""
+    return _truncate(text, max_len)
 
 
 def _format_duration(ms: float) -> str:

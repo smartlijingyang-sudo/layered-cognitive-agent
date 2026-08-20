@@ -60,8 +60,6 @@ class EventName(str, Enum):
     TOOL_DENIED = "tool.denied"
     ACTION_DEGRADED = "action.degraded"
     STEP_COMPLETED = "step.completed"
-    # ── 运行域 ──
-    RUN_INSIGHT = "run.insight"
 
 
 # ── 属性键（封闭词表，禁止裸字符串）────────────────────
@@ -100,10 +98,7 @@ ATTR_REASON = "reason"
 ATTR_RATIONALE_PREVIEW = "rationale_preview"
 ATTR_ORIGINAL_ACTION_TYPE = "original_action_type"
 ATTR_DEGRADED_TO = "degraded_to"
-# 洞察事件（RunInsight）
-ATTR_KIND = "kind"
 ATTR_SUMMARY = "summary"
-ATTR_DETAIL = "detail"
 ATTR_OBJECTIVE_PREVIEW = "objective_preview"
 ATTR_OBJECTIVE = "objective"
 ATTR_RESULT_OUTPUT = "result_output"

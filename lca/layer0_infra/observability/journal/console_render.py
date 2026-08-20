@@ -48,8 +48,11 @@ def render_scenario_card(info: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def render_run_card(trace: dict[str, Any], insights: list[str]) -> str:
-    """Run Card：终态汇总（状态/时长/成员贡献/token/洞察）。"""
+def render_run_card(trace: dict[str, Any]) -> str:
+    """Run Card：终态汇总（状态/时长/成员贡献/token）。
+
+    洞察由 TraceInspector 按需派生，不再内联渲染到 Run Card。
+    """
     identity = trace.get("team_id") or trace.get("title") or "run"
     strategy = trace.get("strategy_key", "")
     status = trace.get("status", "")
@@ -74,8 +77,6 @@ def render_run_card(trace: dict[str, Any], insights: list[str]) -> str:
         lines.append(_card_line(f"tool {tools} calls"))
     if trace.get("error"):
         lines.append(_card_line(f"error: {trace['error']}"))
-    for insight in insights:
-        lines.append(_card_line(f"⚠ {insight}"))
     lines.append(card_bottom())
     return "\n".join(lines)
 

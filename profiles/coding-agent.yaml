@@ -1,0 +1,11 @@
+# Coding Agent 最小 profile（ADR-0063 PR-9）。
+#
+# 仅含 base + observability-default + coding-agent-tools，
+# 默认 web-standard.yaml 不引入，保持默认 profile 不变。
+name: coding-agent
+description: |
+  Minimal profile for Coding Agent consumption: trace tools + debug CLI plugins only.
+bundles:
+  - base
+  - observability-default
+  - coding-agent-tools

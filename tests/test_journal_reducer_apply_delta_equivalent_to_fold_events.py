@@ -24,7 +24,7 @@ from lca.contracts.protocols.cognition import SensorDisabled
 from lca.layer0_infra.observability.journal.engine import RunStore
 from lca.layer1_cognitive.brain.decision_gates import record_gate_decided
 from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import RunStoreSink
+from lca.layer1_cognitive.perceive_sink import JournalSink
 
 
 def _state() -> AgentState:
@@ -63,7 +63,7 @@ async def test_perceive_emits_manifest_with_sensor_items() -> None:
     hub: PerceiveHub = SequentialPerceiveHub(
         sensors=[_ClockSensor()],
         memory=None,
-        sink=RunStoreSink(store),
+        sink=JournalSink(store),
     )
     manifest = await hub.perceive(state)
     assert manifest.has_kind("clock")

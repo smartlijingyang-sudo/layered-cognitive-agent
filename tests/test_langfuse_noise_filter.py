@@ -61,7 +61,6 @@ def test_noise_spans_hidden(name: str) -> None:
         SpanName.DELEGATE_CACHE_HIT.value,
         SpanName.ERROR.value,
         EventName.DECISION_MADE.value,  # 瞬时事实 EVENT 观测
-        EventName.RUN_INSIGHT.value,
     ],
 )
 def test_value_spans_visible(name: str) -> None:

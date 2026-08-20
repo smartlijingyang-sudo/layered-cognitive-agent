@@ -1,0 +1,13 @@
+# GenAI 遥测 bundle（ADR-0063 PR-10）。
+#
+# 把 OTel GenAI 语义映射器注入观测链。OtelProjector 启动后从
+# ``genai_semantic_mapper`` seam 取 mapper 链，按 event_type 派发。
+name: genai-telemetry
+description: |
+  GenAI semantic mappers for OTel/Langfuse (PR-10).
+requires:
+  - observability-default
+plugins:
+  - lca-genai-semantic-mapper-seam
+  - lca-genai-llm-mapper
+  - lca-genai-tool-mapper

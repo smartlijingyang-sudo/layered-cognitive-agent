@@ -46,7 +46,7 @@ from lca.layer1_cognitive.brain.decision_gates import (
     ToolLoopBreakerGate,
 )
 from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import RunStoreSink
+from lca.layer1_cognitive.perceive_sink import JournalSink
 from lca.layer1_cognitive.sensors import (
     InboxFactsSensor,
     build_clock_sensor,
@@ -88,7 +88,7 @@ class TestRalphLoop:
                 InboxFactsSensor(store),
             ],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         state = AgentState(
             trace_id=new_id("trace"),
@@ -172,7 +172,7 @@ class TestRalphLoop:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         state = AgentState(
             trace_id=new_id("trace"),
@@ -258,7 +258,7 @@ class TestComplexScenarios:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         state = AgentState(
             trace_id=new_id("trace"),

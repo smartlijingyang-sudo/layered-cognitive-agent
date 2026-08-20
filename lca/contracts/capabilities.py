@@ -54,6 +54,20 @@ SANDBOX = Capability[object]("sandbox", cardinality="registry")
 MEMORY = Capability[object]("memory", cardinality="registry")
 SEARCH = Capability[object]("search", cardinality="registry")
 STATE_STORE = Capability[object]("state_store", cardinality="registry")
+EVENT_DESCRIPTOR_REGISTRY = Capability[object]("event_descriptor_registry", cardinality="one")
+"""单一事件描述符注册中心（ADR-0063 PR-7 source inversion）。"""
+
+TRACE_INSPECTOR_TOOLS = Capability[object]("trace_inspector_tools", cardinality="registry")
+"""TraceInspector 5 个方法各自作为工具注册（ADR-0063 PR-9）。"""
+
+CLI_DEBUG_COMMAND = Capability[object]("cli_debug_command", cardinality="registry")
+"""lca-ops debug <name> 的子命令注册（ADR-0063 PR-9）。"""
+
+GENAI_SEMANTIC_MAPPER = Capability[object]("genai_semantic_mapper", cardinality="registry")
+"""OTel GenAI 语义映射器（ADR-0063 PR-10）。"""
+
+OBSERVABILITY_SCORER = Capability[object]("observability_scorer", cardinality="registry")
+"""Langfuse / OTel 评估 scorer 注册（ADR-0063 PR-10）。"""
 
 # ── Group services (ADR-0056) ────────────────────────────────────────
 

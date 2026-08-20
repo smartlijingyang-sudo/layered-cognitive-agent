@@ -37,7 +37,7 @@ from lca.layer1_cognitive.brain.decision_gates import (
     ToolLoopBreakerGate,
 )
 from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import RunStoreSink
+from lca.layer1_cognitive.perceive_sink import JournalSink
 from lca.layer1_cognitive.sensors import (
     InboxFactsSensor,
     TeamInboxSensor,
@@ -77,7 +77,7 @@ class TestFullV3Integration:
                 TeamInboxSensor(store),
             ],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         # 3. Run step 1 — no gates have fired yet.
         state = _state()
@@ -159,7 +159,7 @@ class TestFullV3Integration:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=RunStoreSink(store),
+            sink=JournalSink(store),
         )
         # Two runs of the same state produce the same digest.
         state = _state()

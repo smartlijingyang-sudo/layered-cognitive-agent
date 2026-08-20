@@ -36,9 +36,13 @@ _GENERIC_STR_MAX = 2_000
 _CONTENT_STR_MAX = 50_000
 """journal 内容字段（``journal_kind=content``）的安全上限，不受 verbosity 档位影响。"""
 
+_RESTRICTED_PREVIEW_MAX = 80
+"""restricted/confidential 字段统一截断上限（评估文档 §49）。"""
+
 _JOURNAL_KIND_CONTENT = "content"
 
 _SUFFIX = "..."
+_REDACTED = "[REDACTED]"
 
 
 class Verbosity(str, Enum):
@@ -51,12 +55,23 @@ class Verbosity(str, Enum):
 
 def sanitize(text: str) -> str:
     """过滤疑似密钥字符串。"""
-    return _SECRET_PATTERN.sub("[REDACTED]", text)
+    return _SECRET_PATTERN.sub(_REDACTED, text)
 
 
 def truncate(text: str, max_len: int) -> str:
     """超长截断。"""
     return text if len(text) <= max_len else text[:max_len] + _SUFFIX
+
+
+def redact_restricted(text: str) -> str:
+    """restricted/confidential 字段的强制脱敏：截断到片段 + 标 [REDACTED]。
+
+    写入期使用；与 verbosity 解耦，无论档位都生效（评估文档 §49、§67）。
+    """
+    stripped = text.replace("\r\n", "\n")
+    if len(stripped) <= _RESTRICTED_PREVIEW_MAX:
+        return sanitize(stripped)
+    return sanitize(stripped[:_RESTRICTED_PREVIEW_MAX]) + _SUFFIX + " " + _REDACTED
 
 
 def safe_repr(value: Any) -> Any:

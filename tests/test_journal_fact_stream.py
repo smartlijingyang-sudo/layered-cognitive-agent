@@ -25,7 +25,6 @@ from lca.contracts.models.observability.journal import (
     ReasoningCompleted,
     ReasoningDelta,
     RunActivity,
-    RunInsight,
     RunScope,
     SandboxOutputDelta,
     StampedEvent,
@@ -319,18 +318,6 @@ def test_sandbox_delta_shown_with_deltas() -> None:
     output = _render(event, show_deltas=True)
     assert "sandbox.delta" in output
     assert "stderr" in output
-
-
-# ── 洞察（观察）────────────────────────────────────────
-
-
-def test_insight_renders_as_observation() -> None:
-    event = RunInsight(kind="redundant_tool_call", summary="重复调用 bash ×3", detail="args=ls")
-    output = _render(event)
-    assert "observation" in output
-    assert "redundant_tool_call" in output
-    assert "重复调用 bash ×3" in output
-    assert "args=ls" in output
 
 
 # ── 选角 ───────────────────────────────────────────────

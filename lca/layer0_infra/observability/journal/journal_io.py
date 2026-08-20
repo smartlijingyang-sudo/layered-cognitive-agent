@@ -36,9 +36,10 @@ class JournalFormatError(ValueError):
 def stamped_to_record(stamped: StampedEvent) -> dict[str, Any]:
     """StampedEvent → JSON-serializable record.
 
-    Spec §24.5 / Phase J: ``event_type``, ``data``, ``turn`` and
-    ``correlation_ids`` are emitted so the durable journal carries
-    the full Phase J schema.
+    Spec §24.5 / Phase J: ``event_type``, ``data`` and ``correlation_ids``
+    are emitted so the durable journal carries the full Phase J schema.
+    ``turn`` 字段已删除（v3 永远为 0，未消费）；旧 journal.v1 文件中的 ``turn``
+    在 ``record_to_stamped`` 中忽略，向后兼容。
     """
     return {
         "schema": JOURNAL_SCHEMA_VERSION,
@@ -46,7 +47,6 @@ def stamped_to_record(stamped: StampedEvent) -> dict[str, Any]:
         "ts": stamped.ts,
         "scope": dataclasses.asdict(stamped.scope),
         "event_type": stamped.event_type or type(stamped.event).__name__,
-        "turn": stamped.turn,
         "data": dict(stamped.data),
         "correlation_ids": list(stamped.correlation_ids),
         "event": dataclasses.asdict(stamped.event),
@@ -68,7 +68,6 @@ def record_to_stamped(record: dict[str, Any]) -> StampedEvent | None:
         ts=record.get("ts", 0.0),
         scope=scope,
         event=event,
-        turn=int(record.get("turn", 0) or 0),
         event_type=str(record.get("event_type", "") or type(event).__name__),
         data=dict(record.get("data", {}) or {}),
         correlation_ids=tuple(record.get("correlation_ids", ()) or ()),

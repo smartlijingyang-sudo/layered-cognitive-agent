@@ -1,8 +1,8 @@
-"""journal → SSE 帧序列化 —— 零翻译传输契约（ADR-0055 §十三）。
+"""journal → SSE 帧序列化 —— 零翻译传输契约（ADR-0055 §十三 + ADR-0063 PR-7）。
 
 ``StampedEvent`` 经 ``stamped_to_record`` 落盘同构序列化，再包装为
 标准 SSE 帧（``id`` = seq，``event`` = 事件类名，``data`` = JSON）。
-``domain`` 字段从 ``JOURNAL_CATALOG`` 查表附加，供前端着色分组。
+``domain`` 字段从 ``EventDescriptorRegistry`` 查表附加，供前端着色分组。
 
 audience 分类驱动 SSE 过滤：``audience=restricted`` 的事件（如 ReasoningDelta）
 默认不进 SSE live 帧；``audience=end_user`` 的事件才推送。
@@ -12,26 +12,22 @@ from __future__ import annotations
 
 import json
 
+from lca.contracts.models.observability.event import EventAudience
 from lca.contracts.models.observability.journal import StampedEvent
-from lca.contracts.models.observability.journal_catalog import (
-    JOURNAL_CATALOG,
-    JOURNAL_CATALOG_META,
-)
+from lca.layer0_infra.observability.event_catalog import descriptor_for
 from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
 
 # Lossy journal strings — jsonl/OTel only. Live UI uses plugin_state / files.
 _LIVE_REDACT_KEYS = frozenset({"result_preview", "arguments_preview"})
 
 SSE_SENTINEL: None = None
-"""队列/订阅关闭哨兵（与 ``SSEJournalProjector.close`` 对齐）。"""
+"""队列/订阅关闭哨兵（与 ``LiveTail.close`` 对齐）。"""
 
 
 def is_sse_visible(event_type: str) -> bool:
     """audience=restricted 的事件不进 SSE live 帧。"""
-    meta = JOURNAL_CATALOG_META.get(event_type)
-    if meta is None:
-        return True  # 未分类事件默认可见（向前兼容）
-    return meta.audience != "restricted"
+    descriptor = descriptor_for(event_type)
+    return descriptor.audience is not EventAudience.RESTRICTED
 
 
 def stamped_to_sse_frame(stamped: StampedEvent, *, redact: bool = True) -> str:
@@ -42,9 +38,7 @@ def stamped_to_sse_frame(stamped: StampedEvent, *, redact: bool = True) -> str:
     """
     event_type = type(stamped.event).__name__
     record = stamped_to_record(stamped)
-    catalog = JOURNAL_CATALOG.get(event_type)
-    if catalog is not None:
-        record["domain"] = catalog.domain.value
+    record["domain"] = descriptor_for(event_type).domain
     event = record.get("event")
     if redact and isinstance(event, dict):
         for key in _LIVE_REDACT_KEYS:

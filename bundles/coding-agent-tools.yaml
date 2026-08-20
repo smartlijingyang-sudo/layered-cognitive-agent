@@ -1,0 +1,17 @@
+# Coding Agent 工具 bundle（ADR-0063 PR-9）。
+#
+# 包含：
+# - TraceInspector 5 个工具（inspect-trace / explain-failure / ...）
+# - lca-ops debug trace 插件（基于 TraceInspector 的 CLI 入口）
+#
+# profile 需通过 requires 链显式启用，默认 web-standard profile 不引入。
+name: coding-agent-tools
+description: |
+  TraceInspector tools + CLI debug command plugin (PR-9).
+requires:
+  - observability-default
+plugins:
+  - lca-trace-tool-seam
+  - lca-trace-tool-provider
+  - lca-cli-debug-command-seam
+  - lca-cli-debug-trace

@@ -8,9 +8,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import structlog
+
+if TYPE_CHECKING:
+    from lca.layer0_infra.observability.genai.registry import GenAISemanticMapperRegistry
 from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -88,6 +91,7 @@ class ObservabilityHub(ObservabilityBackend):
         environment: str | None = None,
         journal_projectors: Sequence[JournalProjector] = (),
         diagnostic_sinks: Sequence[DiagnosticSink] = (),
+        genai_mapper_registry: "GenAISemanticMapperRegistry | None" = None,
     ) -> None:
         sampler = (
             ParentBased(ALWAYS_ON)
@@ -106,7 +110,10 @@ class ObservabilityHub(ObservabilityBackend):
         self._tracer = self._provider.get_tracer(_TRACER_NAME)
         self._policy = policy if policy is not None else AttributePolicy()
         self._diagnostic_sinks = tuple(diagnostic_sinks)
-        projections: list[JournalProjector] = [OtelProjector(self._tracer), *journal_projectors]
+        projections: list[JournalProjector] = [
+            OtelProjector(self._tracer, genai_mapper_registry=genai_mapper_registry),
+            *journal_projectors,
+        ]
         if self._diagnostic_sinks:
             projections.append(DiagnosticJsonlProjection(self._diagnostic_sinks))
         self._registry = ProjectionRegistry(projections)

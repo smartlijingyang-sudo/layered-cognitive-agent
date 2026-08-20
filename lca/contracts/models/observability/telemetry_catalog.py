@@ -190,8 +190,4 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
         required=(ATTR_STEP,),
         desc="步骤完成（journal 直写）",
     ),
-    EventName.RUN_INSIGHT.value: _event(
-        "lca.layer0_infra.observability.journal.otel_projector",
-        desc="计算洞察的 OTel 事件投影（journal RunInsight，ADR-0037）",
-    ),
 }

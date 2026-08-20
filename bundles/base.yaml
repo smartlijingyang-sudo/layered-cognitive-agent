@@ -120,4 +120,75 @@ entries:
     config:
       providers: [local]
 
+  # ── ADR-0063 PR-7: EventDescriptor 单一源 + Registry ──
+  - id: lca-event-descriptor-registry
+    name: lca_seam_event_descriptor
+    $module: lca.plugins.seam_event_descriptor
+    config: {}
+
+  - id: lca-event-descriptor-bootstrap
+    name: lca_providers_event_descriptor
+    $module: lca.plugins.providers.event_descriptor
+    config: {}
+
+  # ── ADR-0063 PR-8: JournalStoreBackend factory registry ──
+  - id: lca-journal-store-factory-registry
+    name: lca_seam_journal_store
+    $module: lca.plugins.journal_store_service
+    config: {}
+
+  - id: lca-journal-store-memory-factory
+    name: lca_providers_journal_store
+    $module: lca.plugins.providers.journal_store
+    config:
+      default: memory
+
+  # ── ADR-0063 PR-9: TraceInspector tools + CLI debug commands ──
+  - id: lca-trace-tool-seam
+    name: lca_seam_trace_tool
+    $module: lca.plugins.seam_trace_tool
+    config: {}
+
+  - id: lca-trace-tool-provider
+    name: lca_providers_trace_tool
+    $module: lca.plugins.providers.trace_tool
+    config: {}
+
+  - id: lca-cli-debug-command-seam
+    name: lca_seam_cli_debug
+    $module: lca.plugins.seam_cli_debug
+    config: {}
+
+  - id: lca-cli-debug-trace
+    name: lca_providers_cli_debug_trace
+    $module: lca.plugins.providers.cli_debug_trace
+    config: {}
+
+  # ── ADR-0063 PR-10: GenAI semantic mappers ──
+  - id: lca-genai-semantic-mapper-seam
+    name: lca_seam_genai
+    $module: lca.plugins.seam_genai
+    config: {}
+
+  - id: lca-genai-llm-mapper
+    name: lca_providers_genai_llm
+    $module: lca.plugins.providers.genai_llm
+    config: {}
+
+  - id: lca-genai-tool-mapper
+    name: lca_providers_genai_tool
+    $module: lca.plugins.providers.genai_tool
+    config: {}
+
+  # ── ADR-0063 PR-10: ObservabilityScorer (Langfuse eval) ──
+  - id: lca-observability-scorer-seam
+    name: lca_seam_observability_scorer
+    $module: lca.plugins.seam_observability_scorer
+    config: {}
+
+  - id: lca-langfuse-eval-scorer
+    name: lca_providers_langfuse_eval
+    $module: lca.plugins.providers.langfuse_eval
+    config: {}
+
 

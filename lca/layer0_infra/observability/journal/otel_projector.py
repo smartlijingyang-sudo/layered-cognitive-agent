@@ -24,6 +24,9 @@ from typing import TYPE_CHECKING, Any, cast
 import structlog
 from opentelemetry import trace as otel_trace
 
+if TYPE_CHECKING:
+    from lca.layer0_infra.observability.genai.registry import GenAISemanticMapperRegistry
+
 from lca.contracts.atoms.telemetry import (
     ATTR_AGENT_ROLE,
     ATTR_RATIONALE_PREVIEW,
@@ -86,7 +89,12 @@ def _event_input(attributes: dict[str, Any]) -> str:
 class OtelProjector(JournalProjector):
     """journal 事件 → OTel span/观测：显式定父、run 容器 attach、显式起止。"""
 
-    def __init__(self, tracer: Tracer) -> None:
+    def __init__(
+        self,
+        tracer: Tracer,
+        *,
+        genai_mapper_registry: "GenAISemanticMapperRegistry | None" = None,
+    ) -> None:
         self._index = SpanContainerIndex(tracer)
         self._tracer = tracer
         self._handlers: dict[type[JournalEvent], Callable[[StampedEvent], None]] = {
@@ -99,6 +107,7 @@ class OtelProjector(JournalProjector):
             LlmCallCompleted: self._on_llm_call_completed,
             ToolInvoked: self._on_tool_invoked,
         }
+        self._genai_registry = genai_mapper_registry
 
     # ── JournalProjector ───────────────────────────────
     def on_event(self, stamped: StampedEvent) -> None:
@@ -224,18 +233,35 @@ class OtelProjector(JournalProjector):
 
     def _on_llm_call_completed(self, stamped: StampedEvent) -> None:
         event = cast("LlmCallCompleted", stamped.event)
+        base = genai.llm_call_attrs(event)
+        merged = self._merge_genai(stamped, base)
         self._emit_timed_span(
-            stamped, SpanName.LLM_CHAT.value, genai.llm_call_attrs(event), event.latency_ms
+            stamped, SpanName.LLM_CHAT.value, merged, event.latency_ms
         )
 
     def _on_tool_invoked(self, stamped: StampedEvent) -> None:
         event = cast("ToolInvoked", stamped.event)
+        base = mapping.tool_invoked_attrs(event)
+        merged = self._merge_genai(stamped, base)
         self._emit_timed_span(
             stamped,
             SpanName.TOOL_EXECUTE.value,
-            mapping.tool_invoked_attrs(event),
+            merged,
             event.latency_ms,
         )
+
+    def _merge_genai(
+        self, stamped: StampedEvent, base: dict[str, Any]
+    ) -> dict[str, Any]:
+        """若配了 genai_mapper_registry，把 mapper 产生的属性并入基础属性。"""
+        if self._genai_registry is None:
+            return base
+        mapper = self._genai_registry.for_event(stamped)
+        if mapper is None:
+            return base
+        merged = dict(base)
+        merged.update(mapper.map(stamped))
+        return merged
 
     # ── 瞬时事实（投影为 EVENT 观测）────────────────────
     def _project_run_event(

@@ -31,11 +31,14 @@ def _has_field(cls: type, name: str) -> bool:
 
 
 class TestStampedEventFields:
-    """Spec §24.5: every stamped event carries turn + event_type + data + correlation_ids."""
+    """Spec §24.5: every stamped event carries event_type + data + correlation_ids.
 
-    def test_stamped_event_has_turn_field(self) -> None:
-        assert _has_field(StampedEvent, "turn"), (
-            "StampedEvent must declare a 'turn' field (spec §24.5)"
+    ``turn`` 字段已删除（v3 永远 0，从未消费；测试覆盖缺失保护）。
+    """
+
+    def test_stamped_event_does_not_have_turn_field(self) -> None:
+        assert not _has_field(StampedEvent, "turn"), (
+            "StampedEvent.turn 字段已删除；不要再加回来"
         )
 
     def test_stamped_event_has_event_type_field(self) -> None:
@@ -112,14 +115,15 @@ class TestRunStoreAppendStampsEventType:
         )
         assert stamped.correlation_ids == ()
 
-    def test_run_store_default_turn_zero(self) -> None:
+    def test_run_store_no_turn_field(self) -> None:
+        """turn 字段已删除（永远 0，从未消费）。"""
         store = RunStore()
         stamped = store.append(
             InboxFollowupCreated(
                 inbox_id="abc", actor="user", target="t", priority="p"
             )
         )
-        assert stamped.turn == 0
+        assert not hasattr(stamped, "turn") or "turn" not in stamped.__dataclass_fields__
 
 
 class TestStampedEventBackwardsCompatible:
@@ -134,7 +138,6 @@ class TestStampedEventBackwardsCompatible:
                 inbox_id="x", actor="user", target="t", priority="p"
             ),
         )
-        assert stamped.turn == 0
         assert stamped.event_type == ""
         assert stamped.data == {}
         assert stamped.correlation_ids == ()

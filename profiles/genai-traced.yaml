@@ -1,0 +1,12 @@
+# GenAI 遥测 profile（ADR-0063 PR-10）。
+#
+# 在 base + observability-default + coding-agent-tools 之上叠加 GenAI 遥测。
+# 用途：把 OTel 投影接入 Langfuse 时启用。
+name: genai-traced
+description: |
+  Profile with full observability + GenAI semantic mappers for Langfuse export.
+bundles:
+  - base
+  - observability-default
+  - coding-agent-tools
+  - genai-telemetry

@@ -418,23 +418,30 @@ class TestIgnoreEmitReturn:
 
 
 class TestJournalCatalogMeta:
-    def test_all_event_classes_have_meta(self) -> None:
+    def test_all_event_classes_have_descriptor(self) -> None:
+        from lca.contracts.models.observability.event import (
+            EventAudience,
+            EventDurability,
+        )
         from lca.contracts.models.observability.journal_catalog import (
-            JOURNAL_CATALOG_META,
             JOURNAL_EVENT_CLASSES,
         )
+        from lca.layer0_infra.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
-        missing = sorted(set(JOURNAL_EVENT_CLASSES) - set(JOURNAL_CATALOG_META))
-        assert not missing, f"events without JOURNAL_CATALOG_META: {missing}"
+        missing = sorted(set(JOURNAL_EVENT_CLASSES) - set(EVENT_DESCRIPTOR_REGISTRY.all_type_names()))
+        assert not missing, f"events without EventDescriptor: {missing}"
 
-    def test_schema_version_recorded(self) -> None:
-        from lca.contracts.models.observability.journal_catalog import (
-            JOURNAL_CATALOG_META,
-            JournalSchemaMeta,
-        )
+    def test_schema_fields_valid(self) -> None:
+        from lca.contracts.models.observability.event import EventAudience, EventDurability
+        from lca.layer0_infra.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
-        # All entries must declare durability/audience/sensitivity.
-        for name, meta in JOURNAL_CATALOG_META.items():
-            assert isinstance(meta, JournalSchemaMeta), name
-            assert meta.durability in {"required", "best_effort"}, name
-            assert meta.audience in {"end_user", "operator", "auditor", "restricted"}, name
+        # All descriptors must declare durability/audience/sensitivity.
+        for descriptor in EVENT_DESCRIPTOR_REGISTRY:
+            assert descriptor.durability in {EventDurability.REQUIRED, EventDurability.BEST_EFFORT}
+            assert descriptor.audience in {
+                EventAudience.END_USER,
+                EventAudience.OPERATOR,
+                EventAudience.AUDITOR,
+                EventAudience.RESTRICTED,
+            }
+            assert descriptor.retention

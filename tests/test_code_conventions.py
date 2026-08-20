@@ -131,7 +131,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "PipelineSafeExecutor 单模块承载五阶段管线 + finalize（v3 §9.1/9.2）"
     ),
     "lca/contracts/models/observability/journal_catalog.py": (
-        "JOURNAL_CATALOG 元数据单文件（ADR-0037 + PR2/6/9/13 集中登记）"
+        "JOURNAL_EVENT_CLASSES + JournalSchemaMeta 单文件（PR-7 后 EventDescriptor 单一源移到 event_descriptors_data.py）"
     ),
     "lca/layer4_app/api.py": (
         "L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"

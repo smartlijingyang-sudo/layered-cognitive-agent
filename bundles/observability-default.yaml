@@ -1,0 +1,12 @@
+# 观测性默认 bundle（ADR-0063 PR-7 source inversion 后引入）。
+#
+# 启动 EventDescriptorRegistry seam + bootstrap 49 个内置 EventDescriptor。
+# 其它 bundle（web-app / scenario-*）通过 requires 间接依赖本 bundle。
+name: observability-default
+description: |
+  EventDescriptor registry（49 个内置事件描述符的单一源）。
+requires:
+  - base
+plugins:
+  - lca-event-descriptor-registry
+  - lca-event-descriptor-bootstrap

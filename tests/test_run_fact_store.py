@@ -1,14 +1,19 @@
-"""ADR-0055 Run Fact Store 新增特性守卫。
+"""ADR-0055 Run Fact Store 新增特性守卫（ADR-0063 PR-7 后从 ``JOURNAL_CATALOG_META``
+迁移至 ``EventDescriptorRegistry``）。
 
 覆盖：
 - fold_run_state 纯函数推导终态（N3）
-- JOURNAL_CATALOG_META 分类声明完整性（N6）
+- EventDescriptorRegistry 分类声明完整性（N6 + PR-7）
 - RunStore.read_from 自拉（N2）
 - audience 过滤（§十三 SSE 演进）
 """
 
 from __future__ import annotations
 
+from lca.contracts.models.observability.event import (
+    EventAudience,
+    EventDurability,
+)
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
@@ -18,10 +23,9 @@ from lca.contracts.models.observability.journal import (
     TeamRunStarted,
 )
 from lca.contracts.models.observability.journal_catalog import (
-    JOURNAL_CATALOG_META,
     JOURNAL_EVENT_CLASSES,
-    JournalSchemaMeta,
 )
+from lca.layer0_infra.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 from lca.layer0_infra.observability.journal.reducer import (
     RunStatus,
     fold_run_state,
@@ -94,26 +98,33 @@ def test_fold_canceled() -> None:
     assert state.status == RunStatus.CANCELED
 
 
-# ── JOURNAL_CATALOG_META 完整性 ──────────────────────────
+# ── EventDescriptorRegistry 完整性 ──────────────────────────
 
 
-def test_all_registered_events_have_schema_meta() -> None:
-    """每个已登记事件必须有 JournalSchemaMeta 声明（N6）。"""
+def test_all_registered_events_have_descriptor() -> None:
+    """每个已登记事件必须有 EventDescriptor（N6 + ADR-0063 PR-7）。"""
     for event_name in JOURNAL_EVENT_CLASSES:
-        assert event_name in JOURNAL_CATALOG_META, f"事件 {event_name} 缺少 JournalSchemaMeta 声明"
+        descriptor = EVENT_DESCRIPTOR_REGISTRY.get(event_name)
+        assert descriptor is not None, f"事件 {event_name} 缺少 EventDescriptor 登记"
 
 
-def test_schema_meta_fields_valid() -> None:
-    """所有 JournalSchemaMeta 的字段值必须在合法范围内。"""
-    valid_durability = {"required", "best_effort"}
-    valid_audience = {"end_user", "operator", "auditor", "restricted"}
-    valid_sensitivity = {"public", "internal", "confidential"}
-    for name, meta in JOURNAL_CATALOG_META.items():
-        assert isinstance(meta, JournalSchemaMeta), f"{name} 的 meta 不是 JournalSchemaMeta"
-        assert meta.durability in valid_durability, f"{name}.durability={meta.durability!r}"
-        assert meta.audience in valid_audience, f"{name}.audience={meta.audience!r}"
-        assert meta.sensitivity in valid_sensitivity, f"{name}.sensitivity={meta.sensitivity!r}"
-        assert meta.retention_class, f"{name}.retention_class 不能为空"
+def test_descriptor_fields_valid() -> None:
+    """所有 EventDescriptor 的字段值必须在合法范围内。"""
+    valid_durability = {EventDurability.REQUIRED, EventDurability.BEST_EFFORT}
+    valid_audience = {
+        EventAudience.END_USER,
+        EventAudience.OPERATOR,
+        EventAudience.AUDITOR,
+        EventAudience.RESTRICTED,
+    }
+    for descriptor in EVENT_DESCRIPTOR_REGISTRY:
+        assert descriptor.durability in valid_durability, (
+            f"{descriptor.type_name}.durability={descriptor.durability!r}"
+        )
+        assert descriptor.audience in valid_audience, (
+            f"{descriptor.type_name}.audience={descriptor.audience!r}"
+        )
+        assert descriptor.retention, f"{descriptor.type_name}.retention 不能为空"
 
 
 def test_high_value_events_are_required() -> None:
@@ -131,10 +142,10 @@ def test_high_value_events_are_required() -> None:
         "DecisionMade",
     }
     for name in required_events:
-        meta = JOURNAL_CATALOG_META.get(name)
-        assert meta is not None, f"{name} 缺少 catalog meta"
-        assert meta.durability == "required", (
-            f"{name}.durability 应为 required，实际 {meta.durability}"
+        descriptor = EVENT_DESCRIPTOR_REGISTRY.get(name)
+        assert descriptor is not None, f"{name} 缺少 descriptor"
+        assert descriptor.durability is EventDurability.REQUIRED, (
+            f"{name}.durability 应为 required，实际 {descriptor.durability}"
         )
 
 
@@ -148,16 +159,21 @@ def test_delta_events_are_best_effort() -> None:
         "SandboxOutputDelta",
     }
     for name in best_effort_events:
-        meta = JOURNAL_CATALOG_META.get(name)
-        assert meta is not None
-        assert meta.durability == "best_effort", f"{name}.durability 应为 best_effort"
+        descriptor = EVENT_DESCRIPTOR_REGISTRY.get(name)
+        assert descriptor is not None
+        assert descriptor.durability is EventDurability.BEST_EFFORT, (
+            f"{name}.durability 应为 best_effort"
+        )
 
 
 def test_reasoning_events_are_restricted_audience() -> None:
     """Reasoning 事件 audience=restricted，不进 SSE live 帧。"""
     for name in ("ReasoningDelta", "ReasoningCompleted"):
-        meta = JOURNAL_CATALOG_META[name]
-        assert meta.audience == "restricted", f"{name}.audience 应为 restricted"
+        descriptor = EVENT_DESCRIPTOR_REGISTRY.get(name)
+        assert descriptor is not None
+        assert descriptor.audience is EventAudience.RESTRICTED, (
+            f"{name}.audience 应为 restricted"
+        )
 
 
 # ── SSE audience 过滤 ────────────────────────────────────
@@ -170,4 +186,5 @@ def test_is_sse_visible_filters_restricted() -> None:
     assert is_sse_visible("AgentRunFinished") is True
     assert is_sse_visible("ReasoningDelta") is False
     assert is_sse_visible("ReasoningCompleted") is False
-    assert is_sse_visible("UnknownEvent") is True  # 未分类默认可见
+    with __import__("pytest").raises(KeyError):
+        is_sse_visible("UnknownEvent")  # 未登记事件 → KeyError（PR-7 后收紧）

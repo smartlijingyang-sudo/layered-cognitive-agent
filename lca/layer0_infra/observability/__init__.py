@@ -49,7 +49,6 @@ from lca.contracts.models.observability.journal import (
     ReasoningCompleted,
     ReasoningDelta,
     RunActivity,
-    RunInsight,
     RunScope,
     RuntimeObserved,
     StampedEvent,
@@ -66,13 +65,37 @@ from lca.contracts.models.observability.journal import (
     run_scope,
 )
 from lca.contracts.models.observability.journal_catalog import (
-    JOURNAL_CATALOG,
-    JOURNAL_CATALOG_META,
     JOURNAL_EVENT_CLASSES,
     JournalSchemaMeta,
 )
 from lca.contracts.protocols import JournalProjector
+from lca.layer0_infra.observability.event_catalog import (
+    EVENT_DESCRIPTOR_REGISTRY,
+    descriptor_for,
+    may_export_externally,
+)
+from lca.layer0_infra.observability.event_descriptor_registry import (
+    DuplicateEventDescriptorError,
+    InMemoryEventDescriptorRegistry,
+    UnknownEventDescriptorError,
+)
+from lca.layer0_infra.observability.event_descriptors_data import build_default_registry
 from lca.layer0_infra.observability.exporters.langfuse import ExporterUnavailableError
+from lca.layer0_infra.observability.genai import (
+    GenAISemanticMapperRegistry,
+    LlmGenAIMapper,
+    ToolGenAIMapper,
+    build_default_registry as build_default_genai_registry,
+)
+from lca.layer0_infra.observability.journal.backends import InMemoryJournalStore
+from lca.layer0_infra.observability.journal.journal_io import read_journal, stamped_to_record
+from lca.layer0_infra.observability.trace_tool_runner import (
+    make_explain_failure_tool,
+    make_export_minimal_reproduction_tool,
+    make_find_optimization_tool,
+    make_inspect_trace_tool,
+    make_plugin_interaction_graph_tool,
+)
 from lca.layer0_infra.observability.facade import (
     SpanContext,
     annotate,
@@ -90,6 +113,8 @@ from lca.layer0_infra.observability.facade import (
     span,
     traced,
 )
+from lca.contracts.observability.journal_store import JournalStoreBackend
+from lca.contracts.observability.named_registry import NamedRegistry
 from lca.layer0_infra.observability.hub import ObservabilityHub
 from lca.layer0_infra.observability.journal import (
     OtelProjector,
@@ -132,10 +157,15 @@ from lca.layer0_infra.observability.trace_inspector import TraceInspector, Trace
 from lca.layer0_infra.observability.view import SpanView
 
 __all__ = [
+    "DuplicateEventDescriptorError",
+    "EVENT_DESCRIPTOR_REGISTRY",
     "FRAMEWORK_TAG",
-    "JOURNAL_CATALOG",
-    "JOURNAL_CATALOG_META",
+    "InMemoryEventDescriptorRegistry",
+    "InMemoryJournalStore",
     "JOURNAL_EVENT_CLASSES",
+    "JournalStoreBackend",
+    "LlmGenAIMapper",
+    "NamedRegistry",
     "LANGFUSE_ENVIRONMENT",
     "LANGFUSE_OBSERVATION_INPUT",
     "LANGFUSE_OBSERVATION_METADATA_AGENT_ROLE",
@@ -183,7 +213,6 @@ __all__ = [
     "ReasoningCompleted",
     "ReasoningDelta",
     "RunActivity",
-    "RunInsight",
     "RunScope",
     "RunState",
     "RunStatus",
@@ -198,18 +227,30 @@ __all__ = [
     "SynthesisCompleted",
     "TeamRunFinished",
     "TeamRunStarted",
+    "ToolGenAIMapper",
     "TeamTraceProfile",
     "ToolCallStreaming",
     "ToolDenied",
     "ToolInvoked",
     "ToolStarted",
     "TraceInspector",
+    "TraceTool",
+    "make_explain_failure_tool",
+    "make_export_minimal_reproduction_tool",
+    "make_find_optimization_tool",
+    "make_inspect_trace_tool",
+    "make_plugin_interaction_graph_tool",
+    "read_journal",
+    "stamped_to_record",
     "TraceReport",
+    "UnknownEventDescriptorError",
     "UnknownExporterError",
     "UnregisteredJournalEventError",
     "Verbosity",
     "annotate",
     "bind",
+    "build_default_genai_registry",
+    "build_default_registry",
     "create_observability",
     "current_hub",
     "detached_span",

@@ -108,8 +108,8 @@ class SpanHandle:
             self._otel.record_exception(exc)
             self._otel.set_status(StatusCode.ERROR)
         prepared = self._hub.policy.prepare(self.attributes)
-        for key, value in prepared.items():
-            self._otel.set_attribute(key, value)
+        # 单次 set_attributes 比循环 set_attribute 省 N-1 次 OTel SDK 调用（评估文档 §89）
+        self._otel.set_attributes(prepared)
         self._otel.end()
         if self._ctx_token is not None:
             # Token 仅在创建它的 Context 有效；跨 task 退出时静默跳过

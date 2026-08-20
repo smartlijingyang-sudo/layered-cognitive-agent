@@ -7,9 +7,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from lca.contracts.models.observability.journal import JournalEvent
 
 
 class EventPlane(str, Enum):
@@ -78,7 +82,7 @@ class OperationOutcome(str, Enum):
 
 @dataclass(frozen=True)
 class EventDescriptor:
-    """事件类型的唯一注册描述。
+    """事件类型的唯一注册描述（ADR-0063 PR-7 source inversion 后的单一源）。
 
     描述符把分类、持久化、可见性、安全治理、领域归属与唯一发射边界放在
     同一注册表中；投影器只能读取描述符，不能自行解释相同的策略。
@@ -95,6 +99,10 @@ class EventDescriptor:
     required: tuple[str, ...] = ()
     description: str = ""
     otel_kind: Literal["agent", "generation", "tool", "span", "event"] = "event"
+    payload_class: type["JournalEvent"] | None = None
+    """领域 payload 类；反序列化和 ``EventDescriptor`` 校验依赖此绑定。"""
+    extra: Mapping[str, Any] = field(default_factory=dict)
+    """插件可扩展字段（不破坏核心元数据）。"""
 
 
 __all__ = [
