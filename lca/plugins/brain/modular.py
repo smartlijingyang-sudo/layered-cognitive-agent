@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from cordis import Context, plugin
+from lca.contracts.protocols import BrainFactory
+from lca.plugins._cordis_adapter import plugin
 
 
-def _optional_factory(ctx: Context, key: str) -> Any | None:
+def _optional_factory(ctx: Any, key: str) -> Any | None:
     inject = getattr(ctx, "inject", None)
     if not callable(inject):
         return None
@@ -17,16 +18,18 @@ def _optional_factory(ctx: Context, key: str) -> Any | None:
         return None
 
 
-@plugin(name="lca-brain-modular")
-async def setup(ctx: Context, config: Any) -> None:
-    """Register the ModularBrain as 'modular' in the brain factory.
-
-    The factory itself is a callable (SimpleBrainFactory) that returns a brain
-    on demand. The plugin provides the default factory under 'brain_factory'.
-    Named factories ``gate.workspace-agent`` / ``critic.simple`` /
-    ``reasoner.prompt`` override Standard internals when the plugin tree
-    has loaded them (bundle order: those plugins before this one).
-    """
+@plugin(
+    name="lca-brain-modular",
+    provides=["brain_factory.modular"],
+    implements=[BrainFactory],
+    layer="behavior",
+    side_effects="none",
+    policy_class="control",
+    description="Register the ModularBrain factory for lead-aware composition.",
+    test_suite="tests/test_plugin_alignment.py",
+)
+async def setup(ctx: Any, config: Any) -> None:
+    """Register the ModularBrain factory for lead-aware composition."""
     from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
 
     factory = SimpleBrainFactory(
@@ -34,4 +37,4 @@ async def setup(ctx: Context, config: Any) -> None:
         critic_factory=_optional_factory(ctx, "critic.simple"),
         reasoner_cls=_optional_factory(ctx, "reasoner.prompt"),
     )
-    ctx.provide("brain_factory", factory)
+    ctx.provide("brain_factory.modular", factory)

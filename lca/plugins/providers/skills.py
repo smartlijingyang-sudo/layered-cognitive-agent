@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from cordis import Context, plugin
 from pydantic import BaseModel, Field
+
+from lca.contracts.protocols.operational_skills import SkillPackageStore
+from lca.plugins._cordis_adapter import plugin
 
 
 class Config(BaseModel):
@@ -11,8 +13,17 @@ class Config(BaseModel):
     providers: list[str] = Field(default_factory=lambda: ["disk"])
 
 
-@plugin(name="lca-skills-provider", inject=["skills"])
-async def setup(ctx: Context, config: Config) -> None:
+@plugin(
+    name="lca-skills-provider",
+    requires=["skills"],
+    implements=[SkillPackageStore],
+    layer="provider",
+    side_effects="none",
+    policy_class="control",
+    description="Register SkillPackageStore providers on the SkillsService Definition.",
+    test_suite="tests/test_plugin_tree_single_owner.py",
+)
+async def setup(ctx, config: Config) -> None:
     from lca.layer0_infra.skills.factory import resolve_skill_store
 
     if "disk" in config.providers:

@@ -10,9 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from cordis import Context, plugin
-
 from lca.contracts.observability.session_events import SessionEventType
+from lca.plugins._cordis_adapter import plugin
 
 
 class SessionService:
@@ -30,6 +29,14 @@ class SessionService:
         self._events.append({"type": event_type.value, "session_id": session_id, **payload})
 
 
-@plugin(name="lca-session-service")
-async def setup(ctx: Context, config: Any) -> None:
+@plugin(
+    name="lca-session-service",
+    provides=["session_service"],
+    layer="service",
+    side_effects="none",
+    policy_class="observe",
+    description="Minimal SessionService — full implementation deferred.",
+    test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
+)
+async def setup(ctx: Any, config: Any) -> None:
     ctx.provide("session_service", SessionService())

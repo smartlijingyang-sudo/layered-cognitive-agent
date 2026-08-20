@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from cordis import Context, plugin
 from pydantic import BaseModel, Field
+
+from lca.contracts.protocols.infra import AttachmentIdentity
+from lca.plugins._cordis_adapter import plugin
 
 
 class Config(BaseModel):
@@ -11,8 +13,17 @@ class Config(BaseModel):
     providers: list[str] = Field(default_factory=lambda: ["filesystem"])
 
 
-@plugin(name="lca-attachment-provider", inject=["attachment", "file_store"])
-async def setup(ctx: Context, config: Config) -> None:
+@plugin(
+    name="lca-attachment-provider",
+    requires=["attachment", "file_store"],
+    implements=[AttachmentIdentity],
+    layer="provider",
+    side_effects="world",
+    policy_class="control",
+    description="Register AttachmentIdentity providers on the AttachmentService Definition.",
+    test_suite="tests/test_plugin_alignment.py",
+)
+async def setup(ctx, config: Config) -> None:
     from lca.layer0_infra.attachment.service import FileStoreAttachmentIdentity
 
     if "filesystem" in config.providers:

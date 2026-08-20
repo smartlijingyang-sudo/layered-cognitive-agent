@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from cordis import Context, plugin
 from pydantic import BaseModel, Field
+
+from lca.contracts.protocols.infra import Tool
+from lca.plugins._cordis_adapter import plugin
 
 
 class Config(BaseModel):
@@ -25,7 +27,16 @@ def _g2a_factory(run: object | None = None) -> list:
     )
 
 
-@plugin(name="lca-tools-provider", inject=["tools"])
-async def setup(ctx: Context, config: Config) -> None:
+@plugin(
+    name="lca-tools-provider",
+    requires=["tools"],
+    implements=[Tool],
+    layer="provider",
+    side_effects="tools",
+    policy_class="control",
+    description="Register Tool factories on the ToolsService Definition (forked per-run).",
+    test_suite="tests/test_plugin_tree_single_owner.py",
+)
+async def setup(ctx, config: Config) -> None:
     if "g2a" in config.factories:
         ctx.inject("tools").register_factory("g2a", _g2a_factory)

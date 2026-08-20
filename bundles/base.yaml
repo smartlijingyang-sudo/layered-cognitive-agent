@@ -59,6 +59,12 @@ entries:
     $module: lca.plugins.state_store_service
     config: {}
 
+  # ── Seam definitions (after every Tier-1 service, before every Tier-2 provider) ──
+  - id: lca.seam.definitions
+    name: lca_seam_definitions
+    $module: lca.plugins.seam_definitions
+    config: {}
+
   # Sole owner of LLM credentials, mode, and adapters.
   - id: lca-llm-resolver
     name: lca_llm_resolver
