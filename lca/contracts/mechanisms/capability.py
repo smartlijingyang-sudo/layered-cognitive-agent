@@ -56,6 +56,43 @@ class MissingCapabilityError(KeyError):
     """ctx 上尚未 mount 该 Definition。"""
 
 
+def require_capability(ctx: object, key: str) -> Any:
+    """Read ``key`` from a booted cordis Context. Missing → MissingCapabilityError.
+
+    Execute / compose call this instead of module-level factories. A None
+    ctx, a ctx without ``inject``, a KeyError, or an explicit None binding
+    are all the same miss — there is no silent fallback.
+    """
+    if ctx is None:
+        raise MissingCapabilityError(key)
+    inject = getattr(ctx, "inject", None)
+    if not callable(inject):
+        raise MissingCapabilityError(key)
+    try:
+        value = inject(key)
+    except KeyError as exc:
+        raise MissingCapabilityError(key) from exc
+    if value is None:
+        raise MissingCapabilityError(key)
+    return value
+
+
+def provider_current(svc: object) -> object | None:
+    """Active provider on a Definition service, or None when the table is empty."""
+    providers = getattr(svc, "providers", None)
+    if providers is None:
+        current = getattr(svc, "current", None)
+        if callable(current):
+            try:
+                return current()
+            except Exception:
+                return None
+        return svc
+    if not getattr(providers, "active", None):
+        return None
+    return providers.current()
+
+
 @runtime_checkable
 class CapabilityContext(Protocol):
     """活接缝上下文：键上只有 Definition 服务。

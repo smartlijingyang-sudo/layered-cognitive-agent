@@ -23,17 +23,15 @@ import yaml
 from cordis import Context
 
 
-async def boot_profile(profile_path: Path | str) -> Context:
-    """Load profile YAML → resolve modules → build root Context.
+def load_profile_entries(profile_path: Path | str) -> list[dict[str, Any]]:
+    """Expand ``bundles`` + ``patch`` into the entry dicts boot will apply.
 
-    Every entry is expected to use ``$module``; bare ``name`` resolution
-    was a legacy escape hatch that no current bundle relies on.
+    This is the only expansion path: ``boot_profile``, ``dump-profile``,
+    and tests that omit an entry all start here.
     """
     path = Path(profile_path)
-    raw = yaml.safe_load(path.read_text()) or {}  # noqa: ASYNC240 (boot is one-shot)
-
-    # 1. Merge bundles
-    all_entries: list[dict] = []
+    raw = yaml.safe_load(path.read_text()) or {}
+    all_entries: list[dict[str, Any]] = []
     for bundle_path in raw.get("bundles", []):
         bundle_full = Path(bundle_path)
         if not bundle_full.is_absolute():
@@ -42,15 +40,22 @@ async def boot_profile(profile_path: Path | str) -> Context:
         bundle_data = yaml.safe_load(bundle_full.read_text()) or {}
         all_entries.extend(bundle_data.get("entries", []))
 
-    # 2. Apply patches (merge into matching entry's config)
     patches = {p["id"]: p for p in raw.get("patch", []) if "id" in p}
     for entry in all_entries:
-        if entry["id"] in patches:
-            entry.setdefault("config", {}).update(patches[entry["id"]].get("config", {}))
+        patch = patches.get(entry["id"])
+        if patch is None:
+            continue
+        if "disabled" in patch:
+            entry["disabled"] = patch["disabled"]
+        entry.setdefault("config", {}).update(patch.get("config", {}))
+    return all_entries
 
-    # 3. cordis.Loader parses; async-apply each entry
-    tree = _load_from_dict({"entries": all_entries})
+
+async def boot_entries(entries: list[dict[str, Any]]) -> Context:
+    """Apply already-expanded entries onto a fresh ``cordis.Context``."""
+    tree = _load_from_dict({"entries": entries})
     ctx = Context()
+    loaded: list[Any] = []
     for entry in tree.entries:
         if entry.disabled or (isinstance(entry.config, dict) and entry.config.get("disabled")):
             continue
@@ -60,9 +65,6 @@ async def boot_profile(profile_path: Path | str) -> Context:
                 f"bundle entry {entry.id!r} has no $module; bare-name resolution was removed"
             )
         module = importlib.import_module(module_path)
-        # Skip entries whose module never declared a cordis ``setup``
-        # (some gates live as plain dataclasses; they'll be wired by a
-        # future plugin wrapper, not by boot itself).
         if not hasattr(module, "setup"):
             continue
         config = entry.config
@@ -70,10 +72,18 @@ async def boot_profile(profile_path: Path | str) -> Context:
         if config_cls is not None and not isinstance(config, config_cls):
             config = config_cls.model_validate(config)
         await module.setup.setup(ctx, config)
-    # Stash the resolved entry list on ctx so the boot report can walk it
-    # without re-parsing YAML.
-    ctx.__dict__["entries"] = list(tree.entries)
+        loaded.append(entry)
+    ctx.__dict__["entries"] = loaded
     return ctx
+
+
+async def boot_profile(profile_path: Path | str) -> Context:
+    """Load profile YAML → resolve modules → build root Context.
+
+    Every entry is expected to use ``$module``; bare ``name`` resolution
+    was a legacy escape hatch that no current bundle relies on.
+    """
+    return await boot_entries(load_profile_entries(profile_path))
 
 
 def _load_from_dict(data: dict) -> Any:

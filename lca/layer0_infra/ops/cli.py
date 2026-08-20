@@ -604,9 +604,7 @@ def _stream_live(
 # ── Entry Point ───────────────────────────────────────────────────────
 
 
-def _graph_from_yaml(
-    profile_path: Path, data: object
-) -> dict[str, object]:
+def _graph_from_yaml(profile_path: Path, data: object) -> dict[str, object]:
     """Derive a minimal capability graph directly from a profile YAML.
 
     Used as a fallback when ``boot_profile`` rejects the YAML (e.g.
@@ -621,9 +619,7 @@ def _graph_from_yaml(
         "profile": str(profile_path),
         "plugins": [
             {
-                "name": (p.get("name") or p.get("id") or "?")
-                if isinstance(p, dict)
-                else str(p),
+                "name": (p.get("name") or p.get("id") or "?") if isinstance(p, dict) else str(p),
                 "implements": p.get("provides") if isinstance(p, dict) else [],
                 "emitted_events": [],
                 "context_fields": [],
@@ -672,7 +668,7 @@ def inspect_tree(
         from lca.harness.profile.boot import boot_profile
 
         ctx = asyncio.run(boot_profile(profile))
-    except Exception:  # noqa: BLE001
+    except Exception:
         ctx = None
 
     if ctx is not None:
@@ -680,7 +676,7 @@ def inspect_tree(
             from lca.harness.diagnostics.inspect import format_capability_graph
 
             graph = format_capability_graph(ctx, profile=str(profile))
-        except Exception:  # noqa: BLE001
+        except Exception:
             graph = {"profile": str(profile), "plugins": [], "totals": {"plugins": 0}}
     else:
         # Minimal / synthetic profile: derive a graph from the YAML
@@ -689,6 +685,9 @@ def inspect_tree(
 
     plugins = graph.get("plugins", []) if isinstance(graph, dict) else []
     totals = graph.get("totals", {}) if isinstance(graph, dict) else {}
+    if ctx is not None and hasattr(ctx, "entries") and ctx.entries:
+        plugins = [{"name": getattr(e, "id", None) or getattr(e, "name", "?")} for e in ctx.entries]
+        totals = {**totals, "plugins": len(plugins)}
 
     print(f"Profile: {profile}")
     print(f"Plugins: {len(plugins)}")
@@ -732,15 +731,18 @@ def dump_profile(
     Mirrors DSH ``dsh --dump-config``: prints the exact rows the Loader
     would activate, so a dump can never drift from what boots.
     """
-    from cordis.loader import load_yaml
+    from lca.harness.profile.boot import load_profile_entries
 
     if not profile.exists():
         print(f"Profile not found: {profile}")
         raise typer.Exit(1)
 
-    data = load_yaml(profile)
-    rows = data.get("plugins", []) if isinstance(data, dict) else data
+    rows = load_profile_entries(profile)
     for row in rows:
+        if row.get("disabled") or (
+            isinstance(row.get("config"), dict) and row["config"].get("disabled")
+        ):
+            continue
         parts = [f"  - id: {row['id']}"]
         if row.get("name"):
             parts.append(f"    name: {row['name']}")
@@ -748,8 +750,6 @@ def dump_profile(
             parts.append(f"    parent: {row['parent']}")
         if row.get("group"):
             parts.append("    group: true")
-        if row.get("disabled"):
-            parts.append("    disabled: true")
         if row.get("config"):
             parts.append(f"    config: {row['config']!r}")
         if source and row.get("source"):
@@ -768,9 +768,7 @@ def debug(
         "-p",
         help="Profile YAML to boot",
     ),
-    run_id: str = typer.Option(
-        None, "--run-id", help="Run ID for `debug run` (optional)"
-    ),
+    run_id: str = typer.Option(None, "--run-id", help="Run ID for `debug run` (optional)"),
 ) -> None:
     """Debug subcommand: tree, run, scope.
 
@@ -880,9 +878,7 @@ def diagnose(
             "memory-poisoned | approval-rejected"
         ),
     ),
-    trace_id: str = typer.Option(
-        None, "--trace-id", help="Limit the scan to a specific trace id"
-    ),
+    trace_id: str = typer.Option(None, "--trace-id", help="Limit the scan to a specific trace id"),
     expected_kind: str = typer.Option(
         "",
         "--expected-kind",
@@ -920,9 +916,7 @@ def diagnose(
         "approval-rejected": DiagnosePattern.APPROVAL_REJECTED.value,
     }
     if pattern_key not in aliases:
-        print(
-            f"Unknown pattern {problem!r}; expected one of {sorted(aliases)}"
-        )
+        print(f"Unknown pattern {problem!r}; expected one of {sorted(aliases)}")
         raise typer.Exit(1)
     canonical = aliases[pattern_key]
 
@@ -955,13 +949,9 @@ def diagnose(
         print(f"Trace: {trace_id}")
     print()
     for finding in report.findings:
-        print(
-            f"  [{finding.severity.upper()}] {finding.summary}"
-        )
+        print(f"  [{finding.severity.upper()}] {finding.summary}")
         if finding.evidence_refs:
-            print(
-                f"    refs: seq={','.join(str(s) for s in finding.evidence_refs)}"
-            )
+            print(f"    refs: seq={','.join(str(s) for s in finding.evidence_refs)}")
         if finding.detail:
             print(f"    detail: {finding.detail}")
     raise typer.Exit(2 if any(f.severity == "high" for f in report.findings) else 1)

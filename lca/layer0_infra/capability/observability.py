@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from lca.contracts.protocols import ObservabilityBackend
 from lca.layer0_infra.capability.dispatch import ProviderDispatch
 
-ObservabilityFactory = Callable[[], ObservabilityBackend]
+ObservabilityFactory = Callable[..., ObservabilityBackend]
 
 
 class ObservabilityService:
@@ -19,5 +20,5 @@ class ObservabilityService:
     def register(self, name: str, factory: ObservabilityFactory, *, activate: bool = False) -> None:
         self.providers.register(name, factory, activate=activate)
 
-    def create(self) -> ObservabilityBackend:
-        return self.providers.current()()
+    def create(self, **kwargs: Any) -> ObservabilityBackend:
+        return self.providers.current()(**kwargs)

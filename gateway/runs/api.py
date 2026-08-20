@@ -145,6 +145,7 @@ async def create_run(request: Request) -> JSONResponse:
             plane=str(body.get("plane") or ""),
             extra_plane=str(body.get("extra_plane") or ""),
             execution_target=str(body.get("execution_target") or body.get("executionTarget") or ""),
+            ctx=ctx,
         )
         schedule_run(registry, session, ctx=ctx)
 

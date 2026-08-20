@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -42,7 +42,7 @@ from lca.contracts.protocols.casting import (
     SelectedRole,
     TeamCaster,
 )
-from lca.contracts.protocols.infra import LLMAdapter
+from lca.contracts.protocols.infra import LLMAdapter, Tool
 from lca.contracts.protocols.observability import ObservabilityBackend
 from lca.contracts.protocols.spec import OBSERVABILITY_CHOICE_CONSOLE
 from lca.layer0_infra.tools.default_set import build_default_tools
@@ -287,11 +287,13 @@ def build_from_casting_plan(
     observability: str | ObservabilityBackend = OBSERVABILITY_CHOICE_CONSOLE,
     bindings: PlaneBindings | None = None,
     scope: Context | None = None,
+    tools: Sequence[Tool] | None = None,
 ) -> Team:
     """把 CastingPlan 编译成 Team —— 与手写构造同路径，无专用运行时机制。"""
     cards: dict[str, tuple[RoleCard, str | None]] = {
         chosen.role_id: (library.get(chosen.role_id), chosen.task_hint) for chosen in plan.selected
     }
+    member_tools = tools if tools is not None else build_default_tools(bindings=bindings)
 
     def _member(role_id: str) -> Agent:
         card, task_hint = cards[role_id]
@@ -300,7 +302,7 @@ def build_from_casting_plan(
             role=card.title,
             goal=goal,
             backstory=card.backstory,
-            tools=build_default_tools(bindings=bindings),
+            tools=member_tools,
             llm=llm,
             observability=observability,
             scope=scope,

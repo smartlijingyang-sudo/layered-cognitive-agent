@@ -94,3 +94,21 @@ class ToolsService(ToolRegistry):
 
     def list_tools(self) -> list[Tool]:
         return list(self._tools.values())
+
+    def materialize(self, run: object | None = None) -> list[Tool]:
+        """Bind every factory against *run* and return concrete tools.
+
+        Tool ``name`` is kept as the factory produced it — no factory-id
+        prefix. A per-compose registry can then ``register`` these onto a
+        fresh ``ToolsService`` without mutating the boot-time table.
+        """
+        out: list[Tool] = list(self._tools.values())
+        for factory in self._factories.values():
+            bound = factory(run)
+            if bound is None:
+                continue
+            if isinstance(bound, list):
+                out.extend(bound)
+            else:
+                out.append(bound)
+        return out

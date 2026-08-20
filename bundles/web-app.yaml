@@ -106,31 +106,15 @@ entries:
     $module: lca.plugins.reasoner.prompt
     config: {}
 
-  - id: lca-synthesizer-concat
-    name: lca_synthesizer_concat
-    $module: lca.plugins.synthesizer.concat
-    config: {}
-
   - id: lca-critic-simple
     name: lca_critic_simple
     $module: lca.plugins.critic.simple
     config: {}
 
   # ── Brain strategy (after think internals + gate.workspace-agent) ──
-  - id: lca-brain-modular
-    name: lca_brain_modular
-    $module: lca.plugins.brain.modular
-    config: {}
-
   - id: lca-brain-simple
     name: lca_brain_simple
     $module: lca.plugins.brain.simple
-    config: {}
-
-  # ── Collaboration ──
-  - id: lca-blackboard-memory
-    name: lca_blackboard_memory
-    $module: lca.plugins.collaboration.blackboard
     config: {}
 
   # ── Journal store (named factory; Composer instantiates per-run) ──
@@ -156,15 +140,3 @@ entries:
     inject: [run_loop_driver_registry]
     config:
       target: cognitive
-
-  # ── Team lead (Tier-3 — only lead is plugin-ized; 6 coordinations are plain dataclasses) ──
-  - id: lca-team-lead-board
-    name: lca_team_lead_board
-    $module: lca.plugins.team_lead.board
-    config: {}
-
-  # ── DSH Bridge (Tier-3) ─────────────────────────────
-  - id: lca-dsh-bridge
-    name: lca_dsh_bridge
-    $module: lca.plugins.dsh.bridge
-    config: {}

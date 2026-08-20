@@ -26,6 +26,12 @@ from lca.contracts.mechanisms.capability import (
 from lca.contracts.mechanisms.capability import (
     MissingCapabilityError as MissingCapabilityError,
 )
+from lca.contracts.mechanisms.capability import (
+    provider_current as provider_current,
+)
+from lca.contracts.mechanisms.capability import (
+    require_capability as require_capability,
+)
 from lca.contracts.mechanisms.seam import (
     consume as consume,
 )

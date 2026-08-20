@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import unittest
 
-from lca.contracts.atoms.enums import ComponentKind
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, Reflection
 from lca.contracts.models.core.state import AgentState
@@ -14,7 +13,6 @@ from lca.contracts.protocols.spec import AgentSpec, LeadSpec
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer4_app.api import Agent, Team, TeamLead
-from lca.layer4_app.composer import TeamComposer
 
 
 class _StubBrain(Brain):
@@ -89,17 +87,21 @@ class TestExplicitComposerInjection(unittest.IsolatedAsyncioTestCase):
     """自定义注册必须经显式 composer 贯通 Agent 与 Team（无隐式全局）。"""
 
     async def test_custom_memory_flows_through_team(self) -> None:
-        composer = TeamComposer()
-        composer.register_component(ComponentKind.MEMORY, "custom", SimpleMemorySystem)
-        agent = _agent(memory="custom", composer=composer)
+        from lca.layer4_app.api import get_or_create_default_ctx
+
+        ctx = get_or_create_default_ctx()
+        ctx.inject("memory").register("custom", SimpleMemorySystem)
+        agent = _agent(memory="custom", scope=ctx)
         team = Team(
             members=[agent],
             coordination=Pipeline(),
-            composer=composer,
+            scope=ctx,
         )
         member = team._handle.members[0]  # type: ignore[attr-defined]
         self.assertIsInstance(member.runtime.memory.inner, SimpleMemorySystem)  # type: ignore[attr-defined]
 
     async def test_unknown_component_without_composer_raises(self) -> None:
-        with self.assertRaises(ValueError):
+        from lca.contracts.mechanisms.capability import MissingCapabilityError
+
+        with self.assertRaises(MissingCapabilityError):
             _agent(memory="custom_not_registered")

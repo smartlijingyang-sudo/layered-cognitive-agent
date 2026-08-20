@@ -24,29 +24,47 @@ SEARCH_SKILL_TOOL = "search_skill"
 def build_g2a_chat_tools(
     store: FileStore | None = None,
     bindings: PlaneBindings | None = None,
+    **kwargs: object,
 ) -> list[Tool]:
     """Tools for LobeHub G2A chat — GeneralChatAgent parity."""
-    return [t for t in build_default_tools(store, bindings) if t.name != SEARCH_SKILL_TOOL]
+    return [t for t in build_default_tools(store, bindings, **kwargs) if t.name != SEARCH_SKILL_TOOL]
 
 
 def build_default_tools(
     store: FileStore | None = None,
     bindings: PlaneBindings | None = None,
+    *,
+    sandbox: object | None = None,
+    search: object | None = None,
+    skill_store: object | None = None,
+    fallback: bool = True,
 ) -> list[Tool]:
-    """Tools available to gateway / auto-casting agents."""
-    file_store = store if store is not None else get_default_file_store()
-    bound = bindings if bindings is not None else _ambient_bindings()
+    """Tools available to gateway / auto-casting agents.
 
-    search_tools: list[Tool] = web_search_module.build_tools()
+    *fallback=False* (plugin-tree path): never call module-level
+    ``get_default_file_store`` / ``resolve_sandbox``. Missing seams
+    skip the corresponding tools instead of growing a second owner.
+    """
+    file_store = store if store is not None else (get_default_file_store() if fallback else None)
+    if bindings is not None:
+        bound = bindings
+    elif fallback:
+        bound = _ambient_bindings()
+    else:
+        bound = PlaneBindings(primary=None)
+
+    search_tools: list[Tool] = web_search_module.build_tools(search=search)
     hil_tools: list[Tool] = ask_user_module.build_tools()
     computer: list[Tool] = []
 
-    sandbox = resolve_sandbox() if ref_of(bound, PlaneKind.SANDBOX) is not None else None
+    if sandbox is None and fallback:
+        sandbox = resolve_sandbox() if ref_of(bound, PlaneKind.SANDBOX) is not None else None
 
-    if bound.primary is not None:
-        computer.extend(_tools_for_ref(bound.primary, file_store, sandbox))
-    if bound.secondary is not None:
-        computer.extend(_tools_for_ref(bound.secondary, file_store, sandbox))
+    if file_store is not None:
+        if bound.primary is not None:
+            computer.extend(_tools_for_ref(bound.primary, file_store, sandbox))
+        if bound.secondary is not None:
+            computer.extend(_tools_for_ref(bound.secondary, file_store, sandbox))
 
     if computer:
         skill_sandbox = (
@@ -58,14 +76,19 @@ def build_default_tools(
             *search_tools,
             *hil_tools,
             *computer,
-            *build_operational_skill_tools(sandbox=skill_sandbox, file_store=file_store),
+            *build_operational_skill_tools(
+                sandbox=skill_sandbox, file_store=file_store, store=skill_store
+            ),
         ]
 
+    write_tools: list[Tool] = (
+        write_file_module.build_tools(store=file_store) if file_store is not None else []
+    )
     return [
         *search_tools,
         *hil_tools,
-        *write_file_module.build_tools(store=file_store),
-        *build_operational_skill_tools(sandbox=None, file_store=file_store),
+        *write_tools,
+        *build_operational_skill_tools(sandbox=None, file_store=file_store, store=skill_store),
     ]
 
 

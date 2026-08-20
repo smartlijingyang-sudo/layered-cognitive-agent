@@ -66,11 +66,11 @@ def format_capability_graph(
         payload = dict(meta)
     elif isinstance(ctx_or_meta, Context):
         plugins_meta = _collect_plugin_meta(ctx_or_meta)
+        if not plugins_meta:
+            plugins_meta = _legacy_plugin_entries(ctx_or_meta)
         if plugins_meta:
-            payload = dict(plugins_meta[0])
-        else:
-            legacy = _legacy_plugin_entries(ctx_or_meta)
-            payload = legacy[0] if legacy else {}
+            return _assemble_graph(profile=profile, plugins=plugins_meta)
+        payload = {}
     return _normalize_capability_dict(payload)
 
 
@@ -127,7 +127,7 @@ def _collect_plugin_meta(ctx: Context) -> list[dict[str, Any]]:
             meta = getattr(entry, "meta", None)
             if isinstance(meta, dict) and meta:
                 out.append(dict(meta))
-    except Exception:  # noqa: BLE001
+    except Exception:
         return []
     return out
 

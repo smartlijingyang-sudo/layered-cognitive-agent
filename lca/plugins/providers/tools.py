@@ -11,9 +11,21 @@ class Config(BaseModel):
     factories: list[str] = Field(default_factory=lambda: ["g2a"])
 
 
-@plugin(name="lca-tools-provider", inject=["tools"])
-async def setup(ctx: Context, config: Config) -> None:
+def _g2a_factory(run: object | None = None) -> list:
     from lca.layer0_infra.tools.default_set import build_default_tools
 
+    bind = run if isinstance(run, dict) else {}
+    return build_default_tools(
+        store=bind.get("file_store"),
+        bindings=bind.get("bindings"),
+        sandbox=bind.get("sandbox"),
+        search=bind.get("search"),
+        skill_store=bind.get("skill_store"),
+        fallback=False,
+    )
+
+
+@plugin(name="lca-tools-provider", inject=["tools"])
+async def setup(ctx: Context, config: Config) -> None:
     if "g2a" in config.factories:
-        ctx.inject("tools").register_factory("g2a", build_default_tools)
+        ctx.inject("tools").register_factory("g2a", _g2a_factory)

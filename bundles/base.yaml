@@ -19,16 +19,6 @@ entries:
     $module: lca.plugins.tools_service
     config: {}
 
-  - id: lca-session-service
-    name: lca_session_service
-    $module: lca.plugins.session_service
-    config: {}
-
-  - id: lca-system-prompt-service
-    name: lca_system_prompt
-    $module: lca.plugins.system_prompt
-    config: {}
-
   - id: lca-transport-service
     name: lca_transport_service
     $module: lca.plugins.transport_service
@@ -69,29 +59,7 @@ entries:
     $module: lca.plugins.state_store_service
     config: {}
 
-  - id: lca-attachment-service
-    name: lca_attachment_service
-    $module: lca.plugins.attachment_service
-    config: {}
-
-  - id: lca-workspace-service
-    name: lca_workspace_service
-    $module: lca.plugins.workspace_service
-    config: {}
-
-  # ── Tier-2: Provider plugins (12 — single plugin per seam + factory) ──
-  - id: lca-llm-provider
-    name: lca_providers_llm
-    $module: lca.plugins.providers.llm
-    inject: [llm]
-    config:
-      mode: auto
-      providers: [mock, real, deepseek]
-      api_key: ${LLM_API_KEY}
-      base_url: ${LLM_BASE_URL}
-
-  # Sole Tier-2 plugin that reads credentials; provides the resolver that
-  # gateway/runs/execute.py uses to hand an LLMAdapter to each agent.
+  # Sole owner of LLM credentials, mode, and adapters.
   - id: lca-llm-resolver
     name: lca_llm_resolver
     $module: lca.plugins.llm_resolver
@@ -165,16 +133,4 @@ entries:
     config:
       providers: [local]
 
-  - id: lca-attachment-provider
-    name: lca_providers_attachment
-    $module: lca.plugins.providers.attachment
-    inject: [attachment, file_store]
-    config:
-      providers: [filesystem]
 
-  - id: lca-workspace-provider
-    name: lca_providers_workspace
-    $module: lca.plugins.providers.workspace
-    inject: [workspace]
-    config:
-      providers: [local]

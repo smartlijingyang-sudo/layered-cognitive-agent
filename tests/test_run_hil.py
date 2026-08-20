@@ -36,7 +36,7 @@ class _Resolver:
     def is_available(self) -> bool:
         return True
 
-    def resolve(self, *, mode: str) -> LLMAdapter:
+    def resolve(self, *, mode: str | None = None) -> LLMAdapter:
         del mode
         return self.llm
 

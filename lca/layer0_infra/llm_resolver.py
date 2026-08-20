@@ -36,12 +36,28 @@ if TYPE_CHECKING:
     from lca.layer0_infra.capability.llm import LlmService
 
 
-class ProductionLLMResolver:
-    """Resolve an LLMAdapter for one run. Owns nothing but the policy.
+_LLM_MODES = frozenset({"auto", "mock", "real", "deepseek"})
 
-    Production code constructs this with explicit kwargs (the
-    ``lca-llm-resolver`` plugin does the env lookup and hands them in).
-    Tests that just want ``is_available()`` may call without arguments.
+
+def live_credential(value: str | None) -> str | None:
+    """Treat empty strings and unresolved ``${ENV}`` placeholders as no secret."""
+    if value is None:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.startswith("${") and text.endswith("}"):
+        return None
+    return text
+
+
+class ProductionLLMResolver:
+    """Resolve an LLMAdapter for one run. Owns credentials and mode.
+
+    The ``lca-llm-resolver`` plugin reads env, registers adapters on the
+    llm service, and hands this resolver the same table. ``resolve()``
+    returns the service's current adapter — it does not construct a
+    second family of adapters.
     """
 
     def __init__(
@@ -54,10 +70,9 @@ class ProductionLLMResolver:
         llm_service: LlmService | None = None,
     ) -> None:
         self._mode = (mode or "auto").strip().lower()
-        self._api_key = api_key
-        self._base_url = base_url
+        self._api_key = live_credential(api_key)
+        self._base_url = live_credential(base_url)
         self._default_model = default_model or "deepseek-chat"
-        # Held only for diagnostics / `is_available`; never read on resolve.
         self._llm_service = llm_service
 
     def is_available(self) -> bool:
@@ -67,8 +82,20 @@ class ProductionLLMResolver:
         return bool(self._api_key)
 
     def resolve(self, *, mode: str | None = None) -> LLMAdapter:
-        """Construct the adapter for the requested mode (overrides config)."""
-        target = (mode or self._mode).strip().lower()
+        """Return the llm-service adapter for the configured LLM mode.
+
+        *mode* is an LLM mode (``auto|mock|real|deepseek``). Gateway run
+        modes such as ``solo`` are ignored so they cannot select a provider.
+        """
+        requested = (mode or "").strip().lower()
+        target = requested if requested in _LLM_MODES else self._mode
+        if target == "auto":
+            target = "real" if self._api_key else "mock"
+        if self._llm_service is not None:
+            names = set(self._llm_service.providers.names())
+            if target in names:
+                return self._llm_service.providers.get(target)
+            return self._llm_service.providers.current()
         if target == "mock" or not self._api_key:
             from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 
@@ -96,6 +123,7 @@ __all__ = [
     "ProductionLLMResolver",
     "get_async_openai_client",
     "get_model_registry",
+    "live_credential",
     "llm_credentials",
     "llm_openai_credentials",
     "reset_async_openai_client",

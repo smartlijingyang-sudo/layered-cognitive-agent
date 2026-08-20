@@ -137,5 +137,5 @@ class _StubLLMResolver:
     InboxFollowupCreated event is recorded BEFORE the LLM is invoked.
     """
 
-    def resolve(self, *, mode: str):
+    def resolve(self, *, mode: str | None = None):
         raise RuntimeError("stub: no LLM")

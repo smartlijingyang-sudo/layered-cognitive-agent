@@ -23,6 +23,9 @@ class SandboxService(Sandbox):
     def register(self, name: str, provider: Sandbox, *, activate: bool = False) -> None:
         self.providers.register(name, provider, activate=activate)
 
+    def current(self) -> Sandbox:
+        return self.providers.current()
+
     async def write_files(
         self,
         files: dict[str, bytes | str],

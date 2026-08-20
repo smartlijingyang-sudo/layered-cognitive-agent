@@ -8,6 +8,8 @@ module-level singleton.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from itertools import count
 from typing import TYPE_CHECKING, Any, Protocol
@@ -15,14 +17,14 @@ from typing import TYPE_CHECKING, Any, Protocol
 from gateway.modes import SOLO_MODE_KEY, SOLO_ROLE
 from gateway.runs.dsh_execute import execute_dsh_session
 from gateway.runs.session import RunSession
+from lca.contracts.mechanisms.capability import provider_current, require_capability
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.plane import PlaneBindings
-from lca.contracts.models.observability.journal import InboxFollowupCreated
-from lca.layer0_infra.observability import record
 from lca.contracts.models.observability.journal import (
     CastingCompleted,
     CastingFailed,
     CastingStarted,
+    InboxFollowupCreated,
     RunScope,
 )
 from lca.contracts.models.team.run_context import RunContext
@@ -31,6 +33,7 @@ from lca.contracts.protocols.casting import (
     RoleLibrary,
     TeamCaster,
 )
+from lca.contracts.protocols.infra import Tool
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     bind,
@@ -38,10 +41,15 @@ from lca.layer0_infra.observability import (
     record,
     run_scope,
 )
-from lca.layer0_infra.tools.default_set import build_g2a_chat_tools
 from lca.layer3_agent.role_library import FileRoleLibrary
 from lca.layer4_app.api import Agent, Team
 from lca.layer4_app.casting import LLMTeamCaster, build_from_casting_plan
+from lca.plugins.run_loop_driver_registry import (
+    RunLoopDriverRegistry as RunLoopDriverRegistry,
+)
+from lca.plugins.run_loop_driver_registry import (
+    _UnknownExecutionTargetError as _UnknownExecutionTargetError,
+)
 
 if TYPE_CHECKING:
     from cordis import Context
@@ -77,37 +85,6 @@ class RunLoopDriver(Protocol):
     ) -> DriverOutcome: ...
 
 
-class _UnknownExecutionTargetError(RuntimeError):
-    """Raised when no plugin registered a driver for the requested target."""
-
-    def __init__(self, target: str) -> None:
-        super().__init__(
-            f"no run_loop_driver registered for execution_target={target!r}; "
-            f"enable the corresponding loop plugin in your bundle"
-        )
-        self.target = target
-
-
-class RunLoopDriverRegistry:
-    """Target → driver registry. Populated by loop plugins at boot."""
-
-    def __init__(self) -> None:
-        self._drivers: dict[str, RunLoopDriver] = {}
-
-    def register(self, target: str, driver: RunLoopDriver) -> None:
-        """Idempotent: later registration wins (for profile-driven overrides)."""
-        self._drivers[target.strip().lower()] = driver
-
-    def resolve(self, target: str) -> RunLoopDriver:
-        try:
-            return self._drivers[target.strip().lower()]
-        except KeyError as exc:
-            raise _UnknownExecutionTargetError(target or "") from exc
-
-    def targets(self) -> tuple[str, ...]:
-        return tuple(sorted(self._drivers))
-
-
 class CognitiveRunDriver:
     """Default driver — uses plugin-tree Resolver + Agent / Team composition."""
 
@@ -129,16 +106,13 @@ class CognitiveRunDriver:
         _record_inbox_followup(session=session, question=question, mode=mode)
         if llm_resolver is None:
             if ctx is None:
-                raise TypeError(
-                    "CognitiveRunDriver.execute requires ctx or llm_resolver"
-                )
-            llm = ctx.inject("llm_resolver").resolve(mode=mode)
+                raise TypeError("CognitiveRunDriver.execute requires ctx or llm_resolver")
+            llm = require_capability(ctx, "llm_resolver").resolve()
             scope: Context | None = ctx
         else:
-            llm = llm_resolver.resolve(mode=mode)
-            # Legacy caller (tests that pre-date the cordis migration).
-            # The Agent factory will lazy-boot a default one if absent.
+            llm = llm_resolver.resolve()
             scope = None
+        tools = _tools_from_ctx(scope, bindings)
         if mode == SOLO_MODE_KEY:
             runnable: Agent | Team = _build_solo_agent(
                 llm,
@@ -146,6 +120,7 @@ class CognitiveRunDriver:
                 role=session.agent.name,
                 bindings=bindings,
                 scope=scope,
+                tools=tools,
             )
         else:
             runnable = await _build_team(
@@ -156,24 +131,7 @@ class CognitiveRunDriver:
                 run_id=session.run_id,
                 bindings=bindings,
                 scope=scope,
-            )
-        if mode == SOLO_MODE_KEY:
-            runnable: Agent | Team = _build_solo_agent(
-                llm,
-                observability=hub,
-                role=session.agent.name,
-                bindings=bindings,
-                scope=ctx,
-            )
-        else:
-            runnable = await _build_team(
-                question,
-                llm,
-                observability=hub,
-                trace_id=session.trace_id,
-                run_id=session.run_id,
-                bindings=bindings,
-                scope=ctx,
+                tools=tools,
             )
         result = (
             await runnable.run(question, run_context)
@@ -221,6 +179,20 @@ class DshRunDriver:
 # ── Helpers (private; nothing else in the gateway constructs an Agent/Team) ──
 
 
+def _tools_from_ctx(scope: Context | None, bindings: PlaneBindings | None) -> tuple[Tool, ...]:
+    """Materialize tools from the booted tools seam. Missing seam → fail."""
+    if scope is None:
+        return ()
+    bind = {
+        "file_store": provider_current(require_capability(scope, "file_store")),
+        "bindings": bindings,
+        "sandbox": provider_current(require_capability(scope, "sandbox")),
+        "search": require_capability(scope, "search"),
+        "skill_store": provider_current(require_capability(scope, "skills")),
+    }
+    return tuple(require_capability(scope, "tools").materialize(bind))
+
+
 def _build_solo_agent(
     llm: Any,
     *,
@@ -228,13 +200,15 @@ def _build_solo_agent(
     role: str = SOLO_ROLE,
     bindings: PlaneBindings | None = None,
     scope: Context | None = None,
+    tools: Sequence[Tool] | None = None,
 ) -> Agent:
     """Solo agent — identity from AgentRef.name; prompt sections left empty."""
+    del bindings
     return Agent(
         role=role,
         goal="",
         backstory="",
-        tools=build_g2a_chat_tools(bindings=bindings),
+        tools=tools if tools is not None else (),
         llm=llm,
         observability=observability,
         scope=scope,
@@ -252,6 +226,7 @@ async def _build_team(
     scope: Context | None = None,
     library: RoleLibrary | None = None,
     caster: TeamCaster | None = None,
+    tools: Sequence[Tool] | None = None,
 ) -> Team:
     """Team LLM casting — select roles + governance, then build Team."""
     resolved_library = library if library is not None else FileRoleLibrary()
@@ -282,6 +257,7 @@ async def _build_team(
         observability=observability,
         bindings=bindings,
         scope=scope,
+        tools=tools,
     )
 
 
@@ -297,15 +273,13 @@ build_runnable_team = _build_team
 _FOLLOWUP_COUNTER = count(1)
 
 
-def _record_inbox_followup(
-    *, session: RunSession, question: str, mode: str
-) -> None:
+def _record_inbox_followup(*, session: RunSession, question: str, mode: str) -> None:
     """Publish an ``InboxFollowupCreated`` journal event for the run entry.
 
     The inbox-facts sensor folds these into the next perceive cycle.
     Best-effort: a failure here must not block run start.
     """
-    try:
+    with suppress(Exception):
         record(
             InboxFollowupCreated(
                 inbox_id=f"inbox-{session.run_id}-{next(_FOLLOWUP_COUNTER)}",
@@ -316,5 +290,3 @@ def _record_inbox_followup(
                 payload_preview=question[:200] if isinstance(question, str) else "",
             )
         )
-    except Exception:  # noqa: BLE001
-        pass

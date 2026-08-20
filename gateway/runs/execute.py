@@ -19,6 +19,11 @@ from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.live import LiveTail
 from gateway.runs.session import RunRegistry, RunSession, RunStatus
 from lca.contracts.atoms.ids import new_id
+from lca.contracts.mechanisms.capability import (
+    MissingCapabilityError,
+    provider_current,
+    require_capability,
+)
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.plane import PlaneKind
@@ -31,11 +36,9 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
-from lca.layer0_infra.file_store import get_default_file_store
 from lca.layer0_infra.observability import (
     ObservabilityHub,
     bind,
-    create_observability,
     fold_run_state,
     record,
     run_scope,
@@ -51,7 +54,6 @@ from lca.layer0_infra.plane.resolve import (
     sandbox_ref_from,
 )
 from lca.layer0_infra.plane.scope import plane_bindings_scope
-from lca.layer0_infra.sandbox.factory import resolve_sandbox
 from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime
 from lca.layer0_infra.search.scope import search_run_scope
 from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
@@ -61,8 +63,6 @@ from lca.layer0_infra.workspace import run_workspace_scope
 _log = structlog.get_logger(__name__)
 
 _EXPORT_DISPOSE_TIMEOUT_S = 3.0
-
-_GATEWAY_SKIP_BACKENDS = frozenset({"console", "jsonl"})
 
 _SANITIZE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (
@@ -141,16 +141,14 @@ def assemble_run_hub(
     *,
     jsonl_path: Path,
     tail: LiveTail,
+    ctx: Any,
     settings: ObservabilitySettings | None = None,
     extra_projectors: Sequence[JournalProjector] = (),
 ) -> ObservabilityHub:
-    """Langfuse via create_observability; jsonl + tail + ops journal as readers."""
-    cfg = settings if settings is not None else ObservabilitySettings()
-    names = [name for name in cfg.backend_names() if name not in _GATEWAY_SKIP_BACKENDS]
+    """Hub from the booted observability seam; jsonl + tail as extra readers."""
     extra = [JsonlJournalProjector(jsonl_path), tail, *extra_projectors]
-    return create_observability(
-        "+".join(names),
-        settings=cfg,
+    return require_capability(ctx, "observability").create(
+        settings=settings,
         extra_projectors=tuple(extra),
     )
 
@@ -158,12 +156,19 @@ def assemble_run_hub(
 def create_hub_for_session(
     session: RunSession,
     *,
+    ctx: Any | None = None,
     settings: ObservabilitySettings | None = None,
 ) -> ObservabilityHub:
     """Used by tests that assemble a session first. Production uses create_run_session."""
     if session.hub is not None:
         return session.hub
-    hub = assemble_run_hub(jsonl_path=session.jsonl_path, tail=session.tail, settings=settings)
+    if ctx is None:
+        from lca.layer4_app.api import get_or_create_default_ctx
+
+        ctx = get_or_create_default_ctx()
+    hub = assemble_run_hub(
+        jsonl_path=session.jsonl_path, tail=session.tail, ctx=ctx, settings=settings
+    )
     session.hub = hub
     return hub
 
@@ -181,15 +186,21 @@ def create_run_session(
     plane: str = "",
     extra_plane: str = "",
     execution_target: str = "",
+    ctx: Any | None = None,
 ) -> RunSession:
     run_id = new_id("run")
     trace_id = new_id("trace")
     jsonl_path = registry.jsonl_path_for(run_id)
     cleaned_ids = tuple(str(i).strip() for i in attachment_ids if str(i).strip())
     tail = LiveTail()
+    if ctx is None:
+        from lca.layer4_app.api import get_or_create_default_ctx
+
+        ctx = get_or_create_default_ctx()
     hub = assemble_run_hub(
         jsonl_path=jsonl_path,
         tail=tail,
+        ctx=ctx,
         extra_projectors=(registry.journal.bind(),),
     )
     session = RunSession(
@@ -238,7 +249,11 @@ async def execute_run(
     if _default_llm_resolver is not None and "llm_resolver" not in ctx.own_bindings:
         ctx.provide("llm_resolver", _default_llm_resolver)
     session.status = RunStatus.RUNNING
-    hub = session.hub if session.hub is not None else create_hub_for_session(session)
+    hub = (
+        session.hub
+        if session.hub is not None
+        else create_hub_for_session(session, ctx=ctx)
+    )
     workspace_ref: list[Any] = [None]
     success = False
     try:
@@ -260,19 +275,23 @@ async def execute_run(
                 session.error = str(exc)
                 return
             session.bindings = bindings
-            driver = ctx.inject("run_loop_driver_registry").resolve(session.execution_target)
-            sandbox = (
-                resolve_sandbox()
-                if ref_of(bindings, PlaneKind.SANDBOX) and driver.uses_sandbox
-                else None
+            driver = require_capability(ctx, "run_loop_driver_registry").resolve(
+                session.execution_target
             )
+            sandbox_svc = require_capability(ctx, "sandbox")
+            sandbox = provider_current(sandbox_svc)
+            if sandbox is None or not (
+                ref_of(bindings, PlaneKind.SANDBOX) and driver.uses_sandbox
+            ):
+                sandbox = None
+            file_store = provider_current(require_capability(ctx, "file_store"))
             with plane_bindings_scope(bindings):
-                if sandbox is not None:
+                if sandbox is not None and file_store is not None:
                     try:
                         await bind_sandbox_runtime(
                             session.run_id,
                             sandbox,
-                            get_default_file_store(),
+                            file_store,
                             session.attachment_ids,
                         )
                     except Exception as exc:
@@ -282,7 +301,7 @@ async def execute_run(
                             run_id=session.run_id,
                             error=str(exc),
                         )
-                await _stage_machine_attachments(session)
+                await _stage_machine_attachments(session, file_store)
                 with bind(hub):
                     outcome = await driver.execute(
                         session,
@@ -517,10 +536,12 @@ def _emit_artifact_closure_if_needed(
 
 
 def _freeze_bindings(session: RunSession, ctx: Any):
-    sandbox = resolve_sandbox()
+    sandbox = provider_current(require_capability(ctx, "sandbox"))
     sandbox_ref = sandbox_ref_from(sandbox) if sandbox is not None else None
     machine = resolve_machine(session.device_id or None)
-    target = ctx.inject("run_loop_driver_registry").resolve(session.execution_target).plane_target
+    target = require_capability(ctx, "run_loop_driver_registry").resolve(
+        session.execution_target
+    ).plane_target
     if target is None:
         target = session.execution_target
     bindings = resolve_plane_bindings(
@@ -552,17 +573,18 @@ def _freeze_bindings(session: RunSession, ctx: Any):
     return bindings
 
 
-async def _stage_machine_attachments(session: RunSession) -> None:
+async def _stage_machine_attachments(session: RunSession, store: Any | None) -> None:
     """附件暂存——系统 bootstrap 通道，等价于 Sandbox.write_files()。"""
     if session.bindings is None:
         return
     machine = ref_of(session.bindings, PlaneKind.MACHINE)
     if machine is None or not session.attachment_ids:
         return
+    if store is None:
+        raise MissingCapabilityError("file_store")
     transport = resolve_machine_transport(machine.id)
     if transport is None:
         raise RuntimeError(f"machine {machine.label} offline; cannot stage attachments")
-    store = get_default_file_store()
     files = FileStoreAttachmentIdentity(store).stage_payload(session.run_id, session.attachment_ids)
     if not files:
         raise RuntimeError(

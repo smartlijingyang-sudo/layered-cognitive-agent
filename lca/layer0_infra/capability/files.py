@@ -15,6 +15,9 @@ class FileStoreService:
     def register(self, name: str, provider: FileStore, *, activate: bool = False) -> None:
         self.providers.register(name, provider, activate=activate)
 
+    def current(self) -> FileStore:
+        return self.providers.current()
+
     def put(
         self,
         *,

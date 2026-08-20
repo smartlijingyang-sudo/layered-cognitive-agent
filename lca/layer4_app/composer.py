@@ -13,11 +13,8 @@ from collections.abc import Sequence
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any, TypeVar
 
-# Note: ScopedPluginHost / ScopeKind / InMemoryMiddlewareRegistry are deleted
-# in the cordis migration. The functions in this module that depended on them
-# (_resolve_capability_context, _isolate_agent_scope, AgentComposer.compose)
-# are stubbed to raise NotImplementedError until Chunk 5 rewires them to
-# cordis.Context. The class-level type annotations are replaced with Any.
+# Capabilities come from the booted cordis.Context. Per-compose llm/tools
+# tables are local so overlapping compose cannot clobber the parent.
 
 if TYPE_CHECKING:
     from cordis import Context
@@ -30,7 +27,12 @@ from lca.contracts.atoms.enums import (
     MemoryLayer,
 )
 from lca.contracts.mechanisms import ComponentRegistryProtocol, consume
-from lca.contracts.mechanisms.capability import MissingCapabilityError, SeamKey
+from lca.contracts.mechanisms.capability import (
+    CapabilityKey,
+    MissingCapabilityError,
+    provider_current,
+    require_capability,
+)
 from lca.contracts.mechanisms.registries import Registries
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.team_coordination import (
@@ -66,7 +68,6 @@ from lca.contracts.protocols.spec import (
     strategy_key_for_governance,
 )
 from lca.harness.middleware import InMemoryMiddlewareRegistry
-from lca.layer0_infra.capability.llm import LlmService
 from lca.layer0_infra.capability.memory import MemoryService
 from lca.layer0_infra.capability.state_store import StateStoreService
 from lca.layer0_infra.capability.tools import ToolsService
@@ -82,6 +83,7 @@ from lca.layer0_infra.observability.adapters import TelemetryLLMAdapter, Telemet
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
+from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 from lca.layer1_cognitive.hook_registry import SimpleHookRegistry, default_logging_hook
@@ -206,6 +208,22 @@ def _resolve_named_factory(scope: object | None, key: str, standard: Any | None)
     return standard
 
 
+def _skill_store_from_scope(scope: object | None) -> Any:
+    """Installed-skill store: plugin-tree skills seam, nowhere else.
+
+    A booted context with an empty provider table is a miss, not a cue
+    to call ``resolve_skill_store()``.
+    """
+    if _is_plugin_tree(scope):
+        store = provider_current(require_capability(scope, "skills"))
+        if store is None:
+            raise MissingCapabilityError("skills")
+        return store
+    from lca.layer0_infra.skills.factory import resolve_skill_store
+
+    return resolve_skill_store()
+
+
 # Spec §5.5 — fixed PerceiveHub composition order. Plugins provide named
 # factories; the Composer is the only assembler.
 _SENSOR_ORDER: tuple[str, ...] = (
@@ -303,21 +321,22 @@ class AgentComposer:
             scope = get_or_create_default_ctx()
         profile = spec.profile
         ctx = self._resolve_capability_context(scope)
-        hub = create_observability(spec.observability)
-        mem = self._resolve_memory(spec.memory, shared_store, ctx.require(SeamKey.MEMORY.value))
+        if _is_plugin_tree(scope) and isinstance(spec.observability, str):
+            hub = require_capability(scope, "observability").create()
+        else:
+            hub = create_observability(spec.observability)
+        mem = self._resolve_memory(
+            spec.memory, shared_store, ctx.require(CapabilityKey.MEMORY.value)
+        )
         state_store = self._resolve_state_store(
-            spec.state_store, ctx.require(SeamKey.STATE_STORE.value)
+            spec.state_store, ctx.require(CapabilityKey.STATE_STORE.value)
         )
 
-        llm_rt: LlmService = ctx.require(SeamKey.LLM.value)
+        ctx.require(CapabilityKey.LLM.value)
         spec_llm = self._instrument_llm(spec.llm)
-        if "spec" in llm_rt.providers.names():
-            llm_rt.providers.replace("spec", spec_llm)
-            llm_rt.providers.use("spec")
-        else:
-            llm_rt.register("spec", spec_llm, activate=True)
 
-        tool_registry: ToolsService = ctx.require(SeamKey.TOOLS.value)
+        ctx.require(CapabilityKey.TOOLS.value)
+        tool_registry = ToolsService()
         for tool in spec.tools:
             tool_registry.register(tool)
         safe_executor_cls = _resolve_named_factory(
@@ -326,9 +345,9 @@ class AgentComposer:
         if safe_executor_cls is None:
             raise MissingCapabilityError("safe_executor.simple")
         safe_executor = safe_executor_cls(profile.tool_permission_manifest)
-        transport_registry: TransportService = ctx.require(SeamKey.TRANSPORT.value)
-        if team_channel is not None:
-            transport_registry.register(team_channel)
+        transport_registry = _fork_transport(
+            ctx.require(CapabilityKey.TRANSPORT.value), team_channel
+        )
         action_registry = build_default_action_registry(
             tool_registry,
             safe_executor,
@@ -336,7 +355,7 @@ class AgentComposer:
             scope=action_scope,
         )
 
-        brain = self._resolve_brain(spec, profile, llm_rt, scope=scope)
+        brain = self._resolve_brain(spec, profile, spec_llm, scope=scope)
         if decision_gate is not None:
             brain = self._apply_lead_brain(brain, decision_gate=decision_gate)
 
@@ -393,7 +412,7 @@ class AgentComposer:
         lead_spec = (
             replace(spec, observability=observability) if observability is not None else spec
         )
-        gate = self._resolve_decision_gate(gate_name_for_mandate(mandate))
+        gate = self._resolve_decision_gate(gate_name_for_mandate(mandate), scope=scope)
         composed = self.compose(
             lead_spec,
             action_scope=ActionScope.LEAD,
@@ -436,34 +455,22 @@ class AgentComposer:
     ) -> MemorySystem:
         if shared_store is not None:
             mem: MemorySystem = memory_service.create(shared_store=shared_store)
-        elif isinstance(choice, str) and choice in memory_service.providers.names():
-            memory_service.providers.use(choice)
-            mem = memory_service.create()
-        elif isinstance(choice, str):
-            mem = _resolve_component(
-                self._registries.components,
-                ComponentKind.MEMORY,
-                choice,
-                MemorySystem,  # type: ignore[type-abstract]
-            )
-        else:
+        elif not isinstance(choice, str):
             mem = choice
+        elif choice in memory_service.providers.names():
+            mem = memory_service.providers.get(choice)()
+        else:
+            raise MissingCapabilityError("memory")
         return TelemetryMemoryAdapter(mem)
 
     def _resolve_state_store(
         self, choice: str | StateStore, service: StateStoreService
     ) -> StateStore:
-        if isinstance(choice, str) and choice in service.providers.names():
-            service.providers.use(choice)
-            return service.create()
-        if isinstance(choice, str):
-            return _resolve_component(
-                self._registries.components,
-                ComponentKind.STATE_STORE,
-                choice,
-                StateStore,  # type: ignore[type-abstract]
-            )
-        return choice
+        if not isinstance(choice, str):
+            return choice
+        if choice in service.providers.names():
+            return service.providers.get(choice)()
+        raise MissingCapabilityError("state_store")
 
     def _resolve_brain(
         self,
@@ -486,7 +493,7 @@ class AgentComposer:
             profile,
             _format_tools_xml(spec.tools),
             tools=list(spec.tools),
-            available_skills=self._render_available_skills(),
+            available_skills=self._render_available_skills(scope),
         )
         return resolved
 
@@ -496,12 +503,12 @@ class AgentComposer:
         return TelemetryLLMAdapter(_unwrap_llm(llm))
 
     @staticmethod
-    def _render_available_skills() -> str:
-        """Render installed skill catalog for prompt injection."""
-        from lca.layer0_infra.skills.factory import resolve_skill_store
-
+    def _render_available_skills(scope: object | None = None) -> str:
+        """Render installed skill catalog from the skills seam."""
+        if not _is_plugin_tree(scope):
+            return "（技能库不可用）"
+        store = _skill_store_from_scope(scope)
         try:
-            store = resolve_skill_store()
             installed = store.list_installed()
         except Exception:
             return "（技能库不可用）"
@@ -577,11 +584,11 @@ class AgentComposer:
                 if key in _STORE_SENSORS:
                     sensors.append(factory(store))
                 elif key == "sensor.skill-catalog":
-                    from lca.layer0_infra.skills.factory import resolve_skill_store
-
-                    sensors.append(factory(resolve_skill_store()))
+                    sensors.append(factory(_skill_store_from_scope(scope)))
                 else:
                     sensors.append(factory())
+            except MissingCapabilityError:
+                raise
             except Exception:  # noqa: S112 — broken factory must not abort Hub
                 continue
 
@@ -621,11 +628,19 @@ class AgentComposer:
             agent_gates=brain.agent_gates,
         )
 
-    def _resolve_decision_gate(self, name: DecisionGateName) -> DecisionGate | None:
+    def _resolve_decision_gate(
+        self, name: DecisionGateName, *, scope: object | None = None
+    ) -> DecisionGate | None:
         if name == DecisionGateName.NONE:
             return None
-        factory = self._registries.components.require(ComponentKind.DECISION_GATE, name)
-        result = factory()
+        if name == DecisionGateName.MUST_CONSULT_ALL:
+            factory = _resolve_named_factory(scope, "gate.must-consult-all", MustConsultAllMembers)
+            if factory is None:
+                raise MissingCapabilityError("gate.must-consult-all")
+            result = factory() if callable(factory) else factory
+        else:
+            factory = self._registries.components.require(ComponentKind.DECISION_GATE, name)
+            result = factory()
         if not isinstance(result, DecisionGate):
             raise TypeError(
                 f"decision_gate factory produced {type(result).__name__}, expected DecisionGate"
@@ -638,87 +653,14 @@ class AgentComposer:
         return _ScopeAsCapabilityContext(ctx)
 
 
-def _isolate_agent_scope(parent: Context, role: str) -> _IsolatedAgentScope:
-    """Return an async CM that creates a child scope with fresh service instances.
-
-    Per spec §8.1: child gets fresh LlmService / ToolsService / TransportService
-    so two compose() calls cannot overwrite each other; memory / state_store
-    are inherited from parent (provider tables are shared).
-    """
-    return _IsolatedAgentScope(parent, role)
-
-
-class _IsolatedAgentScope:
-    """Async CM that creates a child scope with fresh service instances.
-
-    Use as:
-        async with _IsolatedAgentScope(parent, "researcher") as child:
-            agent = compose(role, child, ...)
-
-    The child has its own LlmService / ToolsService / TransportService so two
-    compose() calls cannot overwrite each other. memory / state_store are
-    shared with parent (provider tables inherited).
-
-    Implementation note: cordis's `Context.scope(label)` returns an async CM
-    that exposes a child context. cordis's `Context.inject(key)` searches the
-    current fiber's context first, then the root. By calling `child.provide()`
-    in the child's own context, we shadow the parent's services. The
-    `_active_ctx` ContextVar is what makes `ctx.inject` work — when a coroutine
-    runs inside a `_ScopeCM`, the active context is the child.
-    """
-
-    def __init__(self, parent: Context, role: str) -> None:
-        self._parent = parent
-        self._role = role
-        self._scope_cm: object | None = None
-        self._child: Context | None = None
-
-    async def __aenter__(self) -> Context:
-        from lca.layer0_infra.capability.llm import LlmService
-        from lca.layer0_infra.capability.memory import MemoryService
-        from lca.layer0_infra.capability.state_store import StateStoreService
-        from lca.layer0_infra.capability.tools import ToolsService
-        from lca.layer0_infra.capability.transport import TransportService
-
-        # Open child scope via cordis's async CM
-        self._scope_cm = self._parent.scope(f"agent:{self._role}")
-        self._child = await self._scope_cm.__aenter__()
-
-        # Per-agent fresh services (avoid cross-agent contamination).
-        # The child context is `_active_ctx` during this with-block, so
-        # any `ctx.inject(...)` from caller code resolves to the child's
-        # own bindings FIRST before walking up to the parent.
-        self._child.provide("llm", LlmService())
-        self._child.provide("tools", ToolsService())
-        self._child.provide("transport", TransportService())
-
-        # Copy provider tables from parent for memory / state_store.
-        # Walk to parent for the original MemoryService / StateStoreService.
-        self._child.provide(
-            "memory",
-            _copy_providers(self._parent.inject("memory"), MemoryService()),
-        )
-        self._child.provide(
-            "state_store",
-            _copy_providers(self._parent.inject("state_store"), StateStoreService()),
-        )
-
-        return self._child
-
-    async def __aexit__(self, *exc_info: Any) -> None:
-        if self._scope_cm is not None:
-            await self._scope_cm.__aexit__(*exc_info)
-
-
-def _copy_providers(parent_svc: object, new_svc: object) -> object:
-    """Copy registered providers from parent_svc into new_svc.
-
-    Both services use the same registry pattern (`.providers.names()` + `.providers.get(name)`).
-    """
-    if parent_svc is not None and hasattr(parent_svc, "providers"):
-        for name in parent_svc.providers.names():
-            new_svc.providers.register(name, parent_svc.providers.get(name))
-    return new_svc
+def _fork_transport(parent: TransportService, extra: AgentTransport | None) -> TransportService:
+    """Per-compose transport table: copy parent protocols, don't mutate them."""
+    child = TransportService()
+    for protocol in parent.list_protocols():
+        child.register(parent.resolve(protocol))
+    if extra is not None:
+        child.register(extra)
+    return child
 
 
 class TeamComposer(AgentComposer):

@@ -15,5 +15,5 @@ class ScriptedLLMResolver:
     def is_available(self) -> bool:
         return True
 
-    def resolve(self, *, mode: str) -> LLMAdapter:
-        return scripted_llm_for_mode(mode)
+    def resolve(self, *, mode: str | None = None) -> LLMAdapter:
+        return scripted_llm_for_mode(mode or "solo")
