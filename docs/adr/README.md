@@ -37,6 +37,7 @@
 | [0055](0055-run-fact-store.md) | Run Fact Store — 以不可变事件为事实源的 Agent 运行时遥测与证据平台 | Accepted |
 | [0056](0056-plugin-group-contribution.md) | 群服务投稿 — 签名即依赖，配置即装箱单 | Accepted |
 | [0061](0061-plugin-manifest-resolve-boot.md) | 声明式插件 Manifest — Resolve/Boot 与可验证依赖图 | Accepted |
+| [0062](0062-plugin-runtime-cleanup.md) | 插件运行时收口 — 单一事实源 + Cordis Fiber Boot + L4 严格闭合 | Proposed |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件
