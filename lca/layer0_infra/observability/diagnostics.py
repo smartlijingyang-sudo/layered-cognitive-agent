@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
+from lca.contracts.atoms.enums import MemoryLayer
 from lca.contracts.models.observability.journal import (
     ApprovalResolved,
     ContextManifested,
@@ -227,7 +228,7 @@ def diagnose_memory_poisoned(store: RunStore) -> DiagnosisReport:
         # committed event itself; the heuristic is: layer=procedural
         # + record_kind=auto_acquired are higher-risk.  Future ADR
         # will add the explicit poison flag.
-        if event.layer == "procedural":
+        if event.layer == MemoryLayer.PROCEDURAL:
             findings.append(
                 Finding(
                     pattern=DiagnosePattern.MEMORY_POISONED,

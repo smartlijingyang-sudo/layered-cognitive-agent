@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 import structlog
 
+from lca.contracts.atoms.enums import SpanStatus
 from lca.contracts.models.core.sandbox import DEFAULT_SANDBOX_TIMEOUT_S, SandboxFile
 from lca.contracts.models.core.sandbox_policy import SandboxPolicy
 from lca.layer0_infra.computer.background import get_background_registry
@@ -59,12 +60,12 @@ def _check_writable(path: str, policy: SandboxPolicy) -> None:
                     denied_resolved = os.path.realpath(denied)
                     if resolved == denied_resolved or resolved.startswith(denied_resolved + os.sep):
                         _log.warning("sandbox_policy_denied_write", path=path, denied=denied)
-                        if policy.on_unavailable == "error":
+                        if policy.on_unavailable == SpanStatus.ERROR:
                             raise PermissionError(
                                 f"write denied: {path} is in denied root {denied}"
                             )
             return
-    if policy.on_unavailable == "error":
+    if policy.on_unavailable == SpanStatus.ERROR:
         raise PermissionError(
             f"write denied: {path} is outside writable roots {list(policy.writable_roots)}"
         )

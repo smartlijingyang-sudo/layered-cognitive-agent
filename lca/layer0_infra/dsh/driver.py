@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
+from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.protocols import DshRuntime
 from lca.layer0_infra.dsh.models import DshNotification, DshTurnResult
 from lca.layer0_infra.dsh.ports import DshEventArchive
@@ -38,11 +39,15 @@ class DshTurnDriver:
         self._projector.feed(notification)
 
     def _finish(self, result: DshTurnResult) -> DshTurnResult:
-        status = "completed" if result.finish_reason in {None, "completed"} else "failed"
+        status = (
+            TaskStatus.COMPLETED
+            if result.finish_reason in {None, TaskStatus.COMPLETED}
+            else TaskStatus.FAILED
+        )
         self._projector.emit_terminal_event(
             status=status,
             output=result.final_response,
-            error="" if status == "completed" else (result.finish_reason or "error"),
+            error="" if status == TaskStatus.COMPLETED else (result.finish_reason or "error"),
         )
         return result
 

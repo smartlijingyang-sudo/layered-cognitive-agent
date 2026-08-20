@@ -7,6 +7,7 @@ from typing import Any
 
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
+from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.protocols import Tool
 from lca.layer0_infra.llm_adapter.openai_compat._history import openai_messages_with_history
 from lca.layer0_infra.llm_adapter.openai_compat._shared import (
@@ -126,7 +127,7 @@ class _ResponsesStrategy:
             return "length"
         if status_s in ("failed", "cancelled"):
             return "error"
-        if status_s == "completed":
+        if status_s == TaskStatus.COMPLETED:
             # 有 function_call 时对齐 Chat 的 tool_calls 语义
             for item in getattr(response, "output", []) or []:
                 if getattr(item, "type", None) == "function_call":

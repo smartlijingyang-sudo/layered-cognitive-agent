@@ -10,6 +10,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 
+from lca.contracts.atoms.enums import SpanStatus
+from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     StampedEvent,
@@ -80,10 +82,10 @@ def fold_run_state(events: Sequence[StampedEvent]) -> RunState:
 
 def _map_finish_status(raw: str) -> RunStatus:
     """映射事件 status 字符串到 RunStatus 枚举。"""
-    if raw == "error" or raw == "failed":
+    if raw == SpanStatus.ERROR or raw == TaskStatus.FAILED:
         return RunStatus.FAILED
     if raw == "canceled":
         return RunStatus.CANCELED
-    if raw == "completed":
+    if raw == TaskStatus.COMPLETED:
         return RunStatus.COMPLETED
     return RunStatus.COMPLETED

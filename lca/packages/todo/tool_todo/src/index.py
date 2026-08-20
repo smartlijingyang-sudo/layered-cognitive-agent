@@ -58,6 +58,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from lca.contracts.models.core.lifecycle import TaskStatus
+
 from .types import TODO_STATUSES, TodoItem
 
 
@@ -268,7 +270,7 @@ def _execute(
     counts = {
         "pending": sum(1 for t in todos if t.status == "pending"),
         "inProgress": sum(1 for t in todos if t.status == "in_progress"),
-        "completed": sum(1 for t in todos if t.status == "completed"),
+        "completed": sum(1 for t in todos if t.status == TaskStatus.COMPLETED),
     }
 
     return {

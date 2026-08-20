@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.atoms.enums import ActionType
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
@@ -101,7 +102,7 @@ class InsightEngine(JournalProjector):
         elif isinstance(event, DecisionMade):
             action = (
                 f"{event.action_type}({event.tool_name})"
-                if event.action_type == "use_tool" and event.tool_name
+                if event.action_type == ActionType.USE_TOOL and event.tool_name
                 else event.action_type
             )
             summary["actions"].setdefault(run_id, []).append(action)

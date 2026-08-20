@@ -157,7 +157,7 @@ class CognitiveLiveAgent:
         reason = (
             "waiting_input"
             if live_status == "waiting_input"
-            else ("error" if getattr(status, "value", "") == "failed" else "completed")
+            else ("error" if getattr(status, "value", "") == TaskStatus.FAILED else "completed")
         )
         if status == TaskStatus.FAILED:
             reason = "error"
@@ -171,7 +171,7 @@ class CognitiveLiveAgent:
             )
         )
         self._status = live_status
-        if self._status != "working":
+        if self._status != TaskStatus.WORKING:
             self._idle.set()
         return MessageReceipt(
             message_id=message_id, session_id=self.session_id, seq=self._store.current_seq

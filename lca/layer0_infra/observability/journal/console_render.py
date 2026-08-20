@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from lca.contracts.models.core.lifecycle import TaskStatus
+
 _CARD_WIDTH = 62
 
 
@@ -79,7 +81,7 @@ def render_run_card(trace: dict[str, Any], insights: list[str]) -> str:
 
 
 def _render_run_line(run: dict[str, Any]) -> str:
-    mark = "✓" if run.get("status") == "completed" else "✗"
+    mark = "✓" if run.get("status") == TaskStatus.COMPLETED else "✗"
     bits = [f"{run.get('role', '?')} {mark}"]
     if run.get("llm_calls"):
         bits.append(f"{run['llm_calls']} llm")

@@ -26,6 +26,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.observability.journal import (
     ActionDegraded,
     AgentRunFinished,
@@ -246,7 +247,7 @@ class FactStreamProjector(JournalProjector):
 
     def _render_team_finished(self, stamped: StampedEvent, event: TeamRunFinished) -> None:
         self._section(stamped)
-        mark = "✓" if event.status == "completed" else "✗"
+        mark = "✓" if event.status == TaskStatus.COMPLETED else "✗"
         elapsed = self._offset_ms(stamped)
         lines = [
             f"{'─' * _LINE_WIDTH}",
@@ -276,7 +277,7 @@ class FactStreamProjector(JournalProjector):
 
     def _render_agent_finished(self, stamped: StampedEvent, event: AgentRunFinished) -> None:
         self._section(stamped)
-        mark = "✓" if event.status == "completed" else "✗"
+        mark = "✓" if event.status == TaskStatus.COMPLETED else "✗"
         elapsed = self._delta_ms(stamped)
         line = (
             f"  {_CONTAINER_ICONS['finish']} AgentRun {mark}"

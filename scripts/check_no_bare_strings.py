@@ -51,6 +51,7 @@ _DOMAIN_STRINGS = {
 _FILE_ALLOWLIST = frozenset(
     {
         "lca/contracts/enums.py",
+        "lca/contracts/atoms/enums.py",
         "lca/contracts/semantic_keys.py",
     }
 )

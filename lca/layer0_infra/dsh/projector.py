@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.contracts.atoms.enums import StreamChannel
+from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
@@ -188,7 +189,7 @@ class DshJournalProjector:
             failure = reason.get("error") or reason.get("failure")
             if isinstance(failure, dict):
                 error = str(failure.get("message") or "")
-        self._turn_status = "completed" if kind == "completed" else "failed"
+        self._turn_status = TaskStatus.COMPLETED if kind == TaskStatus.COMPLETED else TaskStatus.FAILED
         self._turn_error = error
 
 

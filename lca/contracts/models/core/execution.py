@@ -13,6 +13,8 @@ tool call may bypass the envelope.
 
 from __future__ import annotations
 
+from lca.contracts.atoms.enums import ActionType
+
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -66,7 +68,7 @@ def find_terminal_tool_invoked(history: object) -> bool:
     for turn in history:
         if not isinstance(turn, Turn):
             continue
-        if turn.decision.action_type != "use_tool":
+        if turn.decision.action_type != ActionType.USE_TOOL:
             continue
         for tc in turn.decision.tool_calls:
             if tc.tool_name.endswith("respond") or tc.tool_name == "terminal_respond":
