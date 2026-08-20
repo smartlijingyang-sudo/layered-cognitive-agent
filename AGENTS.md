@@ -21,7 +21,7 @@ LCA（Layered Cognitive Agent）是一个基于 vendored Cordis 的 Python 插�
 
 ```
 docs/
-  adr/                          已采纳的架构决策（0001-0055）
+  adr/                          已采纳的架构决策（0001-0056）
   specs/harness-spine-spec.md   Harness 执行规约
   design/2026-08-19-cognitive-primitive-constitution-v3.md
                                认知原语宪法 v3
@@ -166,7 +166,7 @@ uv run vulture lca --min-confidence 80
 | `scripts/check_no_any.py` | 禁裸 `Any` 类型标注（白名单：`dict[str, Any]` / `**kwargs: Any` / `payload: Any` 等） |
 | `scripts/check_no_bare_strings.py` | 领域语义必用枚举（`ActionType` / `TaskStatus` / `HookEvent` / ...） |
 | `scripts/check_protocol_impl.py` | 实现 `contracts.Protocol` 的类**必须显式继承** |
-| `scripts/check_assembly_purity.py` | `composer.py` 不得有 `==` 字符串比较分支（契约 2：装配期只读不算） |
+| `scripts/check_assembly_purity.py` | `spawn.py` 不得有 `==` 字符串比较分支（契约 2：装配期只读不算） |
 | `scripts/check_port_surface.py` | `lca/packages/` 与 `~/deepseek-harness/packages/` 的 public surface parity |
 | `scripts/verify_md_links.py` | Markdown 相对链接必须解析（目标文件存在 + `#fragment` 指向真实标题） |
 | `scripts/verify_doc_budgets.py` | 文档字数预算超限拒绝（预算清单在 `scripts/doc_budgets.json`） |
@@ -208,14 +208,14 @@ uv run vulture lca --min-confidence 80
 | 文档管理体系 | `docs/AGENTS.md`（层级分类 + 写作规范 + 字数预算） |
 | 宪法原文 | `docs/design/2026-08-19-cognitive-primitive-constitution-v3.md` |
 | Harness 执行规约 | `docs/specs/harness-spine-spec.md` |
-| 已采纳 ADR | `docs/adr/`（0001-0055） |
+| 已采纳 ADR | `docs/adr/`（0001-0056） |
 | 平台编排入口 | `./scripts/lca-ops`（无参 = 手册） |
 | Profile 默认 | `profiles/web-standard.yaml`（bundles + patch） |
 | Bundle 集 | `bundles/{base,web-app,scenario-*,lead-standard,researcher-*-tools}.yaml` |
 | 启动入口 | `lca/harness/profile/boot.py:boot_profile()` 异步返回 `cordis.Context` |
 | 插件视图 | `lca-ops inspect-tree` / `lca-ops dump-profile` / `lca-ops debug tree` |
 | 启动诊断 | `lca/harness/diagnostics/boot_report.py`（BootReport：plugins + capability graph） |
-| 隔离 per-agent | `lca/layer4_app/composer.py:_IsolatedAgentScope`（async CM）—— child scope + 新鲜 LlmService/ToolsService；`memory` / `state_store` 共享父 |
+| Agent / Team 闭合 | `lca/layer4_app/spawn.py`（`spawn_agent` / `spawn_team`；ADR-0056） |
 | LLM seam | `lca.plugins.llm_resolver`（env 唯一读取者）+ `lca.plugins.providers.llm`（adapter 工厂） |
 | Loop 驱动 | `gateway/runs/loop_drivers.py:{CognitiveRunDriver, DshRunDriver}`，由 `lca-run-loop-driver-registry` 收集 |
 | Prompt 模板 | `lca/layer1_cognitive/brain/prompts/*.md`；加载 `load_builtin_prompt` |

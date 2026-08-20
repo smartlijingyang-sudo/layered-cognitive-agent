@@ -1,4 +1,4 @@
-"""RepeatToolCallGate plugin — named factory ``gate.repeat-tool-call``."""
+"""RepeatToolCallGate contribution — posts onto GateService."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class Config(BaseModel):
 
 @plugin(
     name="gate.repeat-tool-call",
-    provides=["gate.repeat-tool-call"],
+    requires=["gates"],
     implements=[DecisionGate],
     layer="guard",
     side_effects="none",
@@ -23,7 +23,6 @@ class Config(BaseModel):
     test_suite="tests/test_plugin_alignment.py",
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named gate factory ``gate.repeat-tool-call``."""
     from lca.layer1_cognitive.brain.decision_gates.repeat_tool_call import RepeatToolCallGate
 
-    ctx.provide("gate.repeat-tool-call", RepeatToolCallGate)
+    ctx.inject("gates").add(RepeatToolCallGate, id="repeat-tool-call", slot="loop", order=10)

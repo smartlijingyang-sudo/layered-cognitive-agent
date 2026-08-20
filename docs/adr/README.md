@@ -35,6 +35,7 @@
 | [0053](0053-unified-search-plane.md) | Unified Search Plane — Tavily REST + web_search + LLM 搜索兜底 | Accepted |
 | [0054](0054-officecli-office-plane.md) | OfficeCLI Office 平面 — 沙箱二进制 + Bundled Skill + 路由 | Accepted |
 | [0055](0055-run-fact-store.md) | Run Fact Store — 以不可变事件为事实源的 Agent 运行时遥测与证据平台 | Accepted |
+| [0056](0056-plugin-group-contribution.md) | 群服务投稿 — 签名即依赖，配置即装箱单 | Accepted |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

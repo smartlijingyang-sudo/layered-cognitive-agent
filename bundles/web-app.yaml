@@ -6,7 +6,12 @@
 # provided before the consumers (gates before workspace-chain before brain).
 
 entries:
-  # ── Perceive: named sensor factories (spec §5.5 order) ──
+  # ── Perceive group + sensor contributions (ADR-0056) ──
+  - id: perceive
+    name: perceive
+    $module: lca.plugins.perceive.service
+    config: {}
+
   - id: sensor.clock
     name: sensor_clock
     $module: lca.plugins.sensors.clock
@@ -37,7 +42,12 @@ entries:
     $module: lca.plugins.sensors.skill_catalog
     config: {}
 
-  # ── Gate: individual DecisionGate factories, then the workspace chain ──
+  # ── Gate group + DecisionGate contributions (ADR-0056) ──
+  - id: gates
+    name: gates
+    $module: lca.plugins.gates.service
+    config: {}
+
   - id: gate.repeat-tool-call
     name: gate_repeat_tool_call
     $module: lca.plugins.gates.repeat_tool_call
@@ -66,11 +76,6 @@ entries:
   - id: gate.must-consult-all
     name: gate_must_consult_all
     $module: lca.plugins.gates.must_consult_all
-    config: {}
-
-  - id: gate.workspace-agent
-    name: gate_workspace_agent
-    $module: lca.plugins.gates.workspace_chain
     config: {}
 
   # ── Act / world plane ──

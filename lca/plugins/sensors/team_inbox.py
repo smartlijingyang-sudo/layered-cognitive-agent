@@ -1,4 +1,4 @@
-"""Team-inbox sensor plugin — Tier-2 named factory ``sensor.team-inbox`` (PR9)."""
+"""Team-inbox sensor contribution — posts onto PerceiveService."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class Config(BaseModel):
 
 @plugin(
     name="sensor.team-inbox",
-    provides=["sensor.team-inbox"],
+    requires=["perceive"],
     implements=[Sensor],
     layer="sensor",
     side_effects="none",
@@ -23,7 +23,12 @@ class Config(BaseModel):
     test_suite="tests/test_sensors_v3.py",
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named sensor factory ``sensor.team-inbox``."""
     from lca.layer1_cognitive.sensors.journal_backed import build_team_inbox_sensor
 
-    ctx.provide("sensor.team-inbox", build_team_inbox_sensor)
+    ctx.inject("perceive").add(
+        build_team_inbox_sensor,
+        id="team-inbox",
+        order=40,
+        team_only=True,
+        needs="store",
+    )

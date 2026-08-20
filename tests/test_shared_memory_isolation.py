@@ -220,12 +220,11 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
             Pipeline,
         )
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-        from lca.layer4_app.composer import TeamComposer
+        from lca.layer4_app.spawn import spawn_team
         from tests.support.agent_specs import make_spec
 
-        asm = TeamComposer()
         llm = MockLLMAdapter()
-        team = asm.compose_team(
+        team = spawn_team(
             members=[make_spec("agent_a", llm), make_spec("agent_b", llm)],
             coordination=Pipeline(),
             shared_memory_layers=[MemoryLayer.SEMANTIC],
@@ -245,12 +244,11 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
             Pipeline,
         )
         from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-        from lca.layer4_app.composer import TeamComposer
+        from lca.layer4_app.spawn import spawn_team
         from tests.support.agent_specs import make_spec
 
-        asm = TeamComposer()
         llm = MockLLMAdapter()
-        team = asm.compose_team(
+        team = spawn_team(
             members=[make_spec("agent_a", llm), make_spec("agent_b", llm)],
             coordination=Pipeline(),
             shared_memory_layers=[],

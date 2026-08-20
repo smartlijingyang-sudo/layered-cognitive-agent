@@ -20,7 +20,7 @@ class SimpleBrainFactory:
     组装 Reasoner → Critic，不再需要 DecisionParser（原生 function calling）。
     签名与 ``BrainFactory`` Protocol 严格对齐，不吞额外参数。
 
-    ``agent_gate_factory`` 由 plugin tree 注入（``gate.workspace-agent``）；
+    ``agent_gate_factory`` 由 plugin tree 注入（``GateService.assemble``）；
     未注入时回落到 Standard 链 ``build_workspace_agent_gate``。
     """
 

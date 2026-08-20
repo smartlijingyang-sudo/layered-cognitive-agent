@@ -1,1 +1,1 @@
-"""Named sensor factory plugins. Composer assembles SequentialPerceiveHub."""
+"""Sensor contribution plugins — each add()s onto PerceiveService."""

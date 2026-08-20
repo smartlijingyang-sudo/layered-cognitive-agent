@@ -1,4 +1,4 @@
-"""MustConsultAllMembers plugin — named factory ``gate.must-consult-all``."""
+"""MustConsultAllMembers contribution — posts onto GateService."""
 
 from __future__ import annotations
 
@@ -15,8 +15,7 @@ class Config(BaseModel):
 
 @plugin(
     name="gate.must-consult-all",
-    provides=["gate.must-consult-all"],
-    requires=[],
+    requires=["gates"],
     implements=[DecisionGate],
     layer="guard",
     side_effects="none",
@@ -25,12 +24,9 @@ class Config(BaseModel):
     test_suite="tests/test_refactor_guards.py::TestProgressiveDisclosureVocabulary::test_must_consult_all_rewrites_early_respond",
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named gate factory ``gate.must-consult-all``."""
     from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsultAllMembers
 
-    ctx.provide("gate.must-consult-all", MustConsultAllMembers)
-    # Register into the decision_gate component registry so require(...)
-    # resolves through the named factory path too.
+    ctx.inject("gates").add(MustConsultAllMembers, id="must-consult-all", slot="consult", order=10)
     try:
         registries = ctx.inject("registries")
     except Exception:

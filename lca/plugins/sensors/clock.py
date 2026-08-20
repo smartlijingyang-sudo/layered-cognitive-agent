@@ -1,4 +1,4 @@
-"""Clock sensor plugin — Tier-2 named factory ``sensor.clock`` (PR3b)."""
+"""Clock sensor contribution — posts onto PerceiveService."""
 
 from __future__ import annotations
 
@@ -14,8 +14,7 @@ class Config(BaseModel):
 
 @plugin(
     name="sensor.clock",
-    provides=["sensor.clock"],
-    requires=[],
+    requires=["perceive"],
     implements=[Sensor],
     layer="sensor",
     side_effects="none",
@@ -24,7 +23,6 @@ class Config(BaseModel):
     test_suite="tests/test_sensors_v3.py",
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named sensor factory ``sensor.clock``."""
     from lca.layer1_cognitive.sensors.clock import build_clock_sensor
 
-    ctx.provide("sensor.clock", build_clock_sensor)
+    ctx.inject("perceive").add(build_clock_sensor, id="clock", order=10)

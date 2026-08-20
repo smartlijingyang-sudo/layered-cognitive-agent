@@ -1,11 +1,7 @@
-"""Composer wires InboxFactsSensor + TeamInboxSensor (PR8.E.2 / PR9).
+"""PerceiveService wires InboxFactsSensor + TeamInboxSensor (ADR-0056).
 
 The PerceiveHub must include ``InboxFactsSensor`` in solo / team mode and
-``TeamInboxSensor`` only in team mode (spec §5.5: order is fixed and team
-sensors must not leak into solo compose).
-
-This test inspects the closed sensor list produced by
-``AgentComposer._build_perceive_hub`` and ``TeamComposer.compose_team``.
+``TeamInboxSensor`` only in team mode (spec §5.5).
 """
 
 from __future__ import annotations
@@ -51,63 +47,61 @@ class _RecordingHub:
 
 
 def _install_perceive_hub_recorder(recorded):
-    """Install a SequentialPerceiveHub shim in the composer's namespace."""
+    """Install a SequentialPerceiveHub shim where PerceiveService looks it up."""
 
-    import lca.layer4_app.composer as composer_module
+    import lca.layer1_cognitive.perceive_service as service_module
 
     class _RecordingPerceiveHub:
         def __init__(self, sensors, memory):
             recorded.sensors = list(sensors)
             recorded.memory = memory
 
-    original = composer_module.SequentialPerceiveHub
-    composer_module.SequentialPerceiveHub = _RecordingPerceiveHub  # type: ignore[assignment]
-    return original, composer_module
+    original = service_module.SequentialPerceiveHub
+    service_module.SequentialPerceiveHub = _RecordingPerceiveHub  # type: ignore[assignment]
+    return original, service_module
 
 
-class TestComposerWiring:
-    def test_composer_wires_inbox_facts_sensor(self) -> None:
-        """InboxFactsSensor MUST be present in solo compose."""
-        from lca.layer4_app.composer import AgentComposer
+class TestPerceiveServiceWiring:
+    def test_builtin_wires_inbox_facts_sensor(self) -> None:
+        """InboxFactsSensor MUST be present in solo assemble."""
+        from lca.contracts.atoms.enums import ActionScope
+        from lca.layer4_app.spawn import build_perceive_hub
 
         recorded = _RecordingHub()
-        original, composer_module = _install_perceive_hub_recorder(recorded)
+        original, hub_module = _install_perceive_hub_recorder(recorded)
         try:
-            composer = AgentComposer()
-            composer._build_perceive_hub(
+            build_perceive_hub(
                 _StubMemory(),  # type: ignore[arg-type]
                 hub=_StubObsHub(),
+                action_scope=ActionScope.SOLO,
             )
         finally:
-            composer_module.SequentialPerceiveHub = original  # type: ignore[assignment]
+            hub_module.SequentialPerceiveHub = original  # type: ignore[assignment]
 
         sensor_names = {type(s).__name__ for s in recorded.sensors}
         assert "InboxFactsSensor" in sensor_names, (
-            f"InboxFactsSensor MUST be wired by the composer. "
-            f"Got: {sensor_names}"
+            f"InboxFactsSensor MUST be wired. Got: {sensor_names}"
         )
-        # Fixed composition order: clock comes before inbox-facts.
         order = [type(s).__name__ for s in recorded.sensors]
         assert order.index("ClockSensor") < order.index("InboxFactsSensor"), (
             "ClockSensor must precede InboxFactsSensor (PR8 §5.5)"
         )
 
-    def test_composer_wires_team_inbox_in_team_mode(self) -> None:
-        """TeamInboxSensor MUST be present in team compose."""
+    def test_team_inbox_in_team_mode(self) -> None:
+        """TeamInboxSensor MUST be present in team assemble."""
         from lca.contracts.atoms.enums import ActionScope
-        from lca.layer4_app.composer import TeamComposer
+        from lca.layer4_app.spawn import build_perceive_hub
 
-        composer = TeamComposer()
         recorded = _RecordingHub()
-        original, composer_module = _install_perceive_hub_recorder(recorded)
+        original, hub_module = _install_perceive_hub_recorder(recorded)
         try:
-            composer._build_perceive_hub(
+            build_perceive_hub(
                 _StubMemory(),  # type: ignore[arg-type]
                 hub=_StubObsHub(),
-                scope=ActionScope.MEMBER,
+                action_scope=ActionScope.MEMBER,
             )
         finally:
-            composer_module.SequentialPerceiveHub = original  # type: ignore[assignment]
+            hub_module.SequentialPerceiveHub = original  # type: ignore[assignment]
 
         sensor_names = {type(s).__name__ for s in recorded.sensors}
         assert "InboxFactsSensor" in sensor_names
@@ -115,22 +109,23 @@ class TestComposerWiring:
             f"TeamInboxSensor MUST be wired in MEMBER scope. Got: {sensor_names}"
         )
 
-    def test_composer_does_not_wire_team_inbox_in_solo_mode(self) -> None:
-        """TeamInboxSensor MUST NOT be present in solo compose."""
-        from lca.layer4_app.composer import AgentComposer
+    def test_no_team_inbox_in_solo_mode(self) -> None:
+        """TeamInboxSensor MUST NOT be present in solo assemble."""
+        from lca.contracts.atoms.enums import ActionScope
+        from lca.layer4_app.spawn import build_perceive_hub
 
         recorded = _RecordingHub()
-        original, composer_module = _install_perceive_hub_recorder(recorded)
+        original, hub_module = _install_perceive_hub_recorder(recorded)
         try:
-            composer = AgentComposer()
-            composer._build_perceive_hub(
+            build_perceive_hub(
                 _StubMemory(),  # type: ignore[arg-type]
                 hub=_StubObsHub(),
+                action_scope=ActionScope.SOLO,
             )
         finally:
-            composer_module.SequentialPerceiveHub = original  # type: ignore[assignment]
+            hub_module.SequentialPerceiveHub = original  # type: ignore[assignment]
 
         sensor_names = {type(s).__name__ for s in recorded.sensors}
         assert "TeamInboxSensor" not in sensor_names, (
-            f"TeamInboxSensor must NOT be in solo compose. Got: {sensor_names}"
+            f"TeamInboxSensor must NOT be in solo assemble. Got: {sensor_names}"
         )

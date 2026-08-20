@@ -32,8 +32,9 @@ async def setup(ctx: Any, config: Any) -> None:
     """Register the ModularBrain factory for lead-aware composition."""
     from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
 
+    gates = _optional_factory(ctx, "gates")
     factory = SimpleBrainFactory(
-        agent_gate_factory=_optional_factory(ctx, "gate.workspace-agent"),
+        agent_gate_factory=gates.assemble if gates is not None else None,
         critic_factory=_optional_factory(ctx, "critic.simple"),
         reasoner_cls=_optional_factory(ctx, "reasoner.prompt"),
     )

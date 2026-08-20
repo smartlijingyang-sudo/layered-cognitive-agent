@@ -15,7 +15,7 @@ from lca.contracts.protocols import LLMAdapter, TeamStage
 from lca.layer3_agent.member_invoke import TransportMemberInvoker
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
 from lca.layer4_app.api import Agent
-from lca.layer4_app.composer import build_team_transport
+from lca.layer4_app.team_wiring import build_team_transport
 
 
 class _LLM(LLMAdapter):
@@ -46,6 +46,11 @@ class _LLM(LLMAdapter):
 
 
 class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        from lca.layer4_app.api import ensure_default_ctx
+
+        await ensure_default_ctx()
+
     async def test_parallel_outputs_visible(self):
         llm = _LLM()
         members = [

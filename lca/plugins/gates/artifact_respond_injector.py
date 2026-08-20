@@ -1,4 +1,4 @@
-"""ArtifactRespondInjector plugin — named factory ``gate.artifact-respond-injector``."""
+"""ArtifactRespondInjector contribution — posts onto GateService."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class Config(BaseModel):
 
 @plugin(
     name="gate.artifact-respond-injector",
-    provides=["gate.artifact-respond-injector"],
+    requires=["gates"],
     implements=[DecisionGate],
     layer="guard",
     side_effects="none",
@@ -23,9 +23,10 @@ class Config(BaseModel):
     test_suite="tests/test_plugin_alignment.py",
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named gate factory ``gate.artifact-respond-injector``."""
     from lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector import (
         ArtifactRespondInjector,
     )
 
-    ctx.provide("gate.artifact-respond-injector", ArtifactRespondInjector)
+    ctx.inject("gates").add(
+        ArtifactRespondInjector, id="artifact-respond-injector", slot="loop", order=50
+    )

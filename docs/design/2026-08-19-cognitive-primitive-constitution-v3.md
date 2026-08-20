@@ -344,7 +344,7 @@ flowchart TB
 
 **DSH loop 落点：** `gateway/runs/loop_drivers.py` 的 `execution_target="dsh"` 换的是 **整段运行时**（`DshRunDriver`），等价于替换整个 `loop:` 插件。它不在六步旁边加阶段。比较驱动（compare-driver）同样是 execution_target，不是认知原语。
 
-**Composer 落点：** 生产对象图由 `AgentComposer` / `TeamComposer` 闭合。`build_cognitive_runtime` 放在 `lca/layer4_app/runtime_factory.py`（组合根），**不**放进 `lca-loop-cognitive`。插件经 `ctx.provide` 提供 **具名** 实现（如 `sensor.clock` 工厂）；Composer 是 **唯一** 把 `Sequence[Sensor]` 交给 `SequentialPerceiveHub` 的组装者。插件 **不得** `ctx.events.on("agent.*")` 做控制。今日 `lca-loop-cognitive` 只 `provide("agent_loop", NotImplementedError)`，必须当缺口而不是装配真相。
+**Spawn 落点：** 生产对象图由 `spawn_agent` / `spawn_team` 闭合（`lca/layer4_app/spawn.py`）。群服务组装投稿（`PerceiveService.assemble` 等）；L4 禁止点名 `sensor.*` / `gate.*` 钥匙，禁止 Composer 类。装配纪律见 [ADR-0056](../adr/0056-plugin-group-contribution.md)。插件 **不得** `ctx.events.on("agent.*")` 做控制。
 
 ---
 
@@ -402,7 +402,7 @@ F8  系统由可替换部件组装         → 群 Composition（横切）
 | **Memory** | 跨时间保存有用信息 | `Memory`, `MemoryPolicy`, `MemoryCommitResult` | `CompactionPolicy`, `IndexingStrategy`（Memory 内） |
 | **Collaboration** | 多 Agent 通信与协调 | `Team`, `TeamMessagePolicy`, `Delegation` | `Synthesizer`（Coordination 内） |
 | **Journal**（横切） | 唯一事实源 | `StampedEvent`, `JournalEvent`, `Catalog`, `Projector` | — |
-| **Composition**（横切） | 唯一组装者 | `Composer`, `Profile`, `Bundle`, `Patch` | — |
+| **Composition**（横切） | 装箱 + 闭合对象图 | `Profile`, `Bundle`, `Patch`, 群服务 `assemble`, L4 `Composer` | L4 点名 `sensor.*` / `gate.*` 钥匙（[ADR-0056](../adr/0056-plugin-group-contribution.md)） |
 
 **群与六步流程的对应**：
 
@@ -418,7 +418,7 @@ stop      = 群 State（Reducer.apply_stop）
 - 任何群都可能 record()          → 群 Journal
 - 任何群都可能 Reducer.apply_*() → 群 State
 - 任何群都可能 TeamMessage / Delegation → 群 Collaboration
-- 任何群都由 Composer 组装       → 群 Composition
+- 任何群的投稿由群服务 assemble、L4 闭合 → 群 Composition（[ADR-0056](../adr/0056-plugin-group-contribution.md)）
 ```
 
 ### 3.3 未来加功能的判定树
@@ -685,7 +685,7 @@ CognitiveRuntime._loop（编排者）
 └───────────────────────────────────────────────────┘
 ```
 
-**依赖倒置**：`_loop` 只调 Protocol，不知道具体实现。Composer 装配时注入具名实现。
+**依赖倒置**：`_loop` 只调 Protocol，不知道具体实现。群服务 `assemble()` 产出 Protocol 对象；L4 闭合进 Runtime（[ADR-0056](../adr/0056-plugin-group-contribution.md)）。
 
 #### 3.5.4 Profile + Bundle + Plugin 三层组合
 
@@ -1326,7 +1326,7 @@ PR2：`ContextManifested` 由 **唯一** 模块 `lca.layer1_cognitive.brain.cont
 
 ### 5.5 PerceiveHub 合并规则与失败策略
 
-**组装（消灭 `ctx.inject("sensors")` 列表）：** 只有 `AgentComposer` 构造 `SequentialPerceiveHub(sensors: Sequence[Sensor], memory, budgeter, journal)`。插件 `setup` 只 `ctx.provide("sensor.<id>", factory)`（例如 `sensor.clock`），**禁止** `provide("sensors", list)`（后写覆盖）。Composer 按固定顺序解析具名键：`clock` → `workspace-artifacts` → `workspace-instructions` → `skill-catalog` → `inbox-facts` → `team-inbox`（缺键跳过）。`ctx.inject` 出现在 **L4 plugin setup** 不等于 `Sensor.sense` 里用 Service Locator。`Sensor.sense` **禁止** `ctx.inject` / `ctx.provide`。
+**组装（消灭 `ctx.inject("sensors")` 列表与 `sensor.<id>` 钥匙）：** `PerceiveService` 是 Perceive 群的唯一投稿面。插件 `@plugin` 函数 inject 该服务并 `add(sensor, id=..., order=...)`，**禁止** `ctx.provide("sensor.<id>", factory)`，也 **禁止** `provide("sensors", list)`（后写覆盖）。`assemble()` 按 `order`（Hub `config.order` 可覆盖）产出 `SequentialPerceiveHub`。L4 只调用 `assemble()`，不点名贡献 id（[ADR-0056](../adr/0056-plugin-group-contribution.md)）。默认顺序：`clock` → `workspace-artifacts` → `inbox-facts` → `team-inbox` → `workspace-instructions` → `skill-catalog`（未投稿则缺席）。`Sensor.sense` **禁止** `ctx.inject` / `ctx.provide`。
 
 **失败分层：**
 
@@ -2532,7 +2532,7 @@ PR12 在 `lca/contracts/harness/plugin_meta.py` 增加版本化 `PluginMeta` `Ty
 | `policy_class` | `observe \| control \| execute` |
 | `test_suite` | pytest 节点 id 前缀 |
 
-能力图 = bundle entries + `get_plugin_meta` + `inject` 的派生 inspect。YAML 顶层不新增 `sensors:` / `gates:` schema。装配：plugin 提供 **具名工厂**（`sensor.clock`），Composer 组 `SequentialPerceiveHub`。这仍是第三套「形状」，所以必须进 contracts 并版本化——否则不得自称「没有第三 schema」。
+能力图 = bundle 装箱单 + 插件函数签名派生的 inject 图 + 群服务登记。YAML 顶层不新增 `sensors:` / `gates:` schema。装配：投稿到群服务，L4 闭合 Runtime（[ADR-0056](../adr/0056-plugin-group-contribution.md)）。不发明第三套 PluginManifest。
 
 ---
 
@@ -2875,7 +2875,7 @@ Step 9: Body.act → JsonFieldReader.execute()
 | 维度 | DSH `tool-cordis` | 我们 `cordis_control` |
 |---|---|---|
 | 路径 | `tool.execute → ctx.inject` | `tool.execute → Composer.mount` |
-| 唯一组装者 | ❌ 不严格 | ✅ Composer（群 Composition） |
+| 装配 | 投稿自挂 | 群服务 `add` + L4 闭合（[ADR-0056](../adr/0056-plugin-group-contribution.md)） |
 | Capability 检查 | ❌ 默认无 | ✅ 必须（C5） |
 | PluginMeta 强制 | ⚠️ 可选 | ✅ 强制（PR12） |
 | 写 Journal | ⚠️ session/event | ✅ `record(PluginMounted)` 强制 |
@@ -2897,7 +2897,7 @@ Step 9: Body.act → JsonFieldReader.execute()
 - ❌ 监听 `agent.*` 改 Decision（C4）
 - ❌ 写 AgentState（C4）
 - ❌ 扩大 capability grant（C5）
-- ❌ 跳过 Composer（C3 唯一组装者）
+- ❌ 绕过群服务 `add` / L4 闭合（[ADR-0056](../adr/0056-plugin-group-contribution.md)）
 - ❌ 跳过 PluginMeta 登记（PR12）
 - ❌ 跳过 invariant check（§23.2）
 

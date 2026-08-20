@@ -2,8 +2,8 @@
 
 Import ``Agent``, ``Team``, ``TeamLead`` from here (or package root ``lca``).
 门面是声明式 spec 的持有者 + 符合 contracts 协议的入口：``Agent`` 满足
-``AgentUnit``、``Team`` 满足 ``TeamUnit``；组装委托给各自持有的 composer
-（显式可注入，无进程级全局单例）。
+``AgentUnit``、``Team`` 满足 ``TeamUnit``；组装委托 ``spawn_agent`` /
+``spawn_team``（ADR-0056）。
 
 Example::
 
@@ -61,7 +61,7 @@ from lca.contracts.protocols.spec import (
     LeadSpec,
     TeamSpec,
 )
-from lca.layer4_app.composer import AgentComposer, TeamComposer
+from lca.layer4_app.spawn import spawn_agent, spawn_team
 
 if TYPE_CHECKING:
     from cordis import Context
@@ -184,7 +184,6 @@ class Agent(AgentUnit):
         observability: str | ObservabilityBackend = OBSERVABILITY_CHOICE_CONSOLE,
         state_store: str | StateStore = STATE_STORE_CHOICE_MEMORY,
         brain: str | Brain = BRAIN_CHOICE_DEFAULT,
-        composer: AgentComposer | None = None,
         scope: Context | None = None,
     ) -> None:
         self._spec = AgentSpec(
@@ -205,12 +204,11 @@ class Agent(AgentUnit):
             state_store=state_store,
             brain=brain,
         )
-        target = composer if composer is not None else AgentComposer()
         # scope is a cordis.Context. If None (scripts / tests without a
         # profile), use the cached default web-standard context.
         if scope is None:
             scope = get_or_create_default_ctx()
-        self._agent = target.compose(self._spec, scope=scope)
+        self._agent = spawn_agent(self._spec, scope=scope)
         self.role_profile = self._spec.profile
 
     @property
@@ -270,7 +268,6 @@ class Team(TeamUnit):
         delegate_max_attempts: int | None = None,
         observability: str | ObservabilityBackend | None = None,
         scope: Context | None = None,
-        composer: TeamComposer | None = None,
     ) -> None:
         governance: Governance
         if lead is not None:
@@ -292,12 +289,11 @@ class Team(TeamUnit):
             ),
             observability=observability,
         )
-        target = composer if composer is not None else TeamComposer()
         # scope is propagated by Agent; if Team is constructed directly
         # without an Agent, fall back to the cached default context.
         if scope is None:
             scope = get_or_create_default_ctx()
-        self._handle = target.compose_team_spec(self._spec, scope=scope)
+        self._handle = spawn_team(self._spec, scope=scope)
 
     @property
     def spec(self) -> TeamSpec:

@@ -1,4 +1,4 @@
-"""TerminalRespondGate plugin — named factory ``gate.terminal-respond``."""
+"""TerminalRespondGate contribution — posts onto GateService."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class Config(BaseModel):
 
 @plugin(
     name="gate.terminal-respond",
-    provides=["gate.terminal-respond"],
+    requires=["gates"],
     implements=[DecisionGate],
     layer="guard",
     side_effects="none",
@@ -23,7 +23,6 @@ class Config(BaseModel):
     test_suite="tests/test_plugin_alignment.py",
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named gate factory ``gate.terminal-respond``."""
     from lca.layer1_cognitive.brain.decision_gates.terminal_respond import TerminalRespondGate
 
-    ctx.provide("gate.terminal-respond", TerminalRespondGate)
+    ctx.inject("gates").add(TerminalRespondGate, id="terminal-respond", slot="loop", order=40)

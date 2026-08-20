@@ -1,4 +1,4 @@
-"""ProgressLoopDetector plugin — named factory ``gate.progress-loop-detector``."""
+"""ProgressLoopDetector contribution — posts onto GateService."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class Config(BaseModel):
 
 @plugin(
     name="gate.progress-loop-detector",
-    provides=["gate.progress-loop-detector"],
+    requires=["gates"],
     implements=[DecisionGate],
     layer="guard",
     side_effects="none",
@@ -23,9 +23,10 @@ class Config(BaseModel):
     test_suite="tests/test_plugin_alignment.py",
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named gate factory ``gate.progress-loop-detector``."""
     from lca.layer1_cognitive.brain.decision_gates.progress_loop_detector import (
         ProgressLoopDetector,
     )
 
-    ctx.provide("gate.progress-loop-detector", ProgressLoopDetector)
+    ctx.inject("gates").add(
+        ProgressLoopDetector, id="progress-loop-detector", slot="loop", order=30
+    )

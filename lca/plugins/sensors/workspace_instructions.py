@@ -1,4 +1,4 @@
-"""Workspace-instructions sensor plugin — Tier-2 named factory ``sensor.workspace-instructions`` (PR13)."""
+"""Workspace-instructions sensor contribution — posts onto PerceiveService."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class Config(BaseModel):
 
 @plugin(
     name="sensor.workspace-instructions",
-    provides=["sensor.workspace-instructions"],
+    requires=["perceive"],
     implements=[Sensor],
     layer="sensor",
     side_effects="none",
@@ -23,9 +23,10 @@ class Config(BaseModel):
     test_suite="tests/test_sensors_v3.py",
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named sensor factory ``sensor.workspace-instructions``."""
     from lca.layer1_cognitive.sensors.workspace_instructions import (
         build_workspace_instructions_sensor,
     )
 
-    ctx.provide("sensor.workspace-instructions", build_workspace_instructions_sensor)
+    ctx.inject("perceive").add(
+        build_workspace_instructions_sensor, id="workspace-instructions", order=50
+    )

@@ -11,7 +11,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _ADR_DIR = _PROJECT_ROOT / "docs" / "adr"
 _DEFAULTS_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "defaults.py"
 _API_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "api.py"
-_COMPOSER_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "composer.py"
+_SPAWN_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "spawn.py"
 _ADR_README = _ADR_DIR / "README.md"
 
 
@@ -30,7 +30,7 @@ class TestDefaultsNoObjectConstruction(unittest.TestCase):
                         name = sub.func.id
                         if name.endswith("Transport") or name.startswith("build_"):
                             offenders.append(
-                                f"{node.name}() 内调用 {name}() — 对象构造应留在 composer.py"
+                                f"{node.name}() 内调用 {name}() — 对象构造应留在 spawn.py"
                             )
         self.assertFalse(offenders, "\n".join(offenders))
 
@@ -51,9 +51,9 @@ class TestL4ApiIsThinFacade(unittest.TestCase):
 class TestNoProcessLevelComposerSingleton(unittest.TestCase):
     """ADR-0033：门面不得持有进程级 composer 单例（全局可变状态）。"""
 
-    def test_no_global_composer_in_facade_or_composer(self) -> None:
+    def test_no_global_composer_in_facade_or_spawn(self) -> None:
         offenders: list[str] = []
-        for path in (_API_PATH, _COMPOSER_PATH):
+        for path in (_API_PATH, _SPAWN_PATH):
             source = path.read_text(encoding="utf-8")
             if re.search(r"^\s*global\s+", source, re.MULTILINE):
                 offenders.append(f"{path.name} 含 global 语句")
@@ -62,11 +62,11 @@ class TestNoProcessLevelComposerSingleton(unittest.TestCase):
         self.assertFalse(offenders, "\n".join(offenders))
 
 
-class TestComposerNoClosedGraphExcavation(unittest.TestCase):
-    """ADR-0033：composer 只从声明式 spec 组装，禁止从成品图反向挖零件。"""
+class TestSpawnNoClosedGraphExcavation(unittest.TestCase):
+    """ADR-0033：spawn 只从声明式 spec 组装，禁止从成品图反向挖零件。"""
 
     def test_no_excavation_patterns(self) -> None:
-        source = _COMPOSER_PATH.read_text(encoding="utf-8")
+        source = _SPAWN_PATH.read_text(encoding="utf-8")
         forbidden_patterns = [
             r"_tools_from_agent",
             r"_llm_from_agent",
@@ -76,7 +76,7 @@ class TestComposerNoClosedGraphExcavation(unittest.TestCase):
             r"getattr\(\s*runtime",
         ]
         offenders = [pattern for pattern in forbidden_patterns if re.search(pattern, source)]
-        self.assertFalse(offenders, f"composer.py 含封闭图挖掘反模式: {offenders}")
+        self.assertFalse(offenders, f"spawn.py 含封闭图挖掘反模式: {offenders}")
 
 
 class TestLeadWallClockPropagation(unittest.TestCase):
@@ -85,8 +85,8 @@ class TestLeadWallClockPropagation(unittest.TestCase):
 
         from lca.layer0_infra.observability import create_observability
         from lca.layer3_agent.cognitive_agent import CognitiveAgent
-        from lca.layer4_app.composer import _promote_lead
         from lca.layer4_app.policies import LeadBudgetPolicy
+        from lca.layer4_app.spawn import promote_lead
 
         runtime = MagicMock()
         role_profile = MagicMock()
@@ -98,7 +98,7 @@ class TestLeadWallClockPropagation(unittest.TestCase):
             max_steps=10,
             max_wall_clock_seconds=900,
         )
-        promoted = _promote_lead(lead, LeadBudgetPolicy())
+        promoted = promote_lead(lead, LeadBudgetPolicy())
         self.assertEqual(promoted.max_wall_clock_seconds, 900)
         self.assertEqual(promoted.max_steps, 20)
 
@@ -163,16 +163,17 @@ class TestProgressiveDisclosureVocabulary(unittest.TestCase):
         self.assertFalse(hasattr(state, "team_progress"))
         self.assertIn("a", board.as_prompt_text())
 
-    def test_public_api_uses_run_and_compose(self) -> None:
+    def test_public_api_uses_run_and_spawn(self) -> None:
         api = _API_PATH.read_text(encoding="utf-8")
-        composer = _COMPOSER_PATH.read_text(encoding="utf-8")
+        spawn = _SPAWN_PATH.read_text(encoding="utf-8")
         self.assertIn("class Team", api)
         self.assertIn("class TeamLead", api)
         self.assertIn("async def run", api)
-        self.assertIn("def compose(", composer)
-        self.assertIn("def compose_team(", composer)
+        self.assertIn("def spawn_agent(", spawn)
+        self.assertIn("def spawn_team(", spawn)
         self.assertIn("await self._agent.run", api)
         self.assertNotIn("MultiAgentTeam", api)
+        self.assertNotIn("AgentComposer", api)
         self.assertNotIn("assemble_agent", api)
 
     def test_must_consult_all_rewrites_early_respond(self) -> None:

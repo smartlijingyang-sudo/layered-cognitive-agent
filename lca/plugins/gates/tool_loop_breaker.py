@@ -1,4 +1,4 @@
-"""ToolLoopBreakerGate plugin — named factory ``gate.tool-loop-breaker``."""
+"""ToolLoopBreakerGate contribution — posts onto GateService."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class Config(BaseModel):
 
 @plugin(
     name="gate.tool-loop-breaker",
-    provides=["gate.tool-loop-breaker"],
+    requires=["gates"],
     implements=[DecisionGate],
     layer="guard",
     side_effects="none",
@@ -23,7 +23,6 @@ class Config(BaseModel):
     test_suite="tests/test_plugin_alignment.py",
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named gate factory ``gate.tool-loop-breaker``."""
     from lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
 
-    ctx.provide("gate.tool-loop-breaker", ToolLoopBreakerGate)
+    ctx.inject("gates").add(ToolLoopBreakerGate, id="tool-loop-breaker", slot="loop", order=20)

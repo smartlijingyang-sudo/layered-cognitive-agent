@@ -1,6 +1,6 @@
 """Layer 4 — Application / composition root."""
 
 from lca.layer4_app.api import Agent, Team, TeamLead
-from lca.layer4_app.composer import AgentComposer, TeamComposer
+from lca.layer4_app.spawn import spawn_agent, spawn_team
 
-__all__ = ["Agent", "AgentComposer", "Team", "TeamComposer", "TeamLead"]
+__all__ = ["Agent", "Team", "TeamLead", "spawn_agent", "spawn_team"]

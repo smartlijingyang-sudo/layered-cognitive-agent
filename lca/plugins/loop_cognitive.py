@@ -1,12 +1,9 @@
 """CognitiveLoopFactory plugin — Tier-3 (loop driver).
 
-The production cognitive loop is constructed directly by
-`AgentComposer.compose` and never goes through this factory; this
-fallback exists for the legacy path that resolves the loop from
-cordis context (see ``lca.layer4_app.harness_bridge.build_live_agent``).
-Per the cognitive-primitive constitution v3 the plugin does not drive
-``CognitiveRuntime._loop``; calling it should surface a clear error
-instead of silently returning a placeholder.
+The production cognitive loop is constructed by ``spawn_agent`` and
+never goes through this factory; this fallback exists for the legacy
+path that resolves the loop from cordis context (see
+``lca.layer4_app.harness_bridge.build_live_agent``).
 """
 
 from __future__ import annotations
@@ -34,7 +31,7 @@ def build_cognitive_live_agent(
     absent (the resume path) we fall back to a ``MockLLMAdapter`` so
     the harness can reconstruct a working LiveAgent purely from
     persisted journal state — production wiring should still go
-    through ``AgentComposer.compose()``.
+    through ``spawn_agent()``.
     """
     opts = options or {}
     llm = opts.get("llm")

@@ -1,4 +1,4 @@
-"""Skill-catalog sensor plugin — Tier-2 named factory ``sensor.skill-catalog`` (PR14)."""
+"""Skill-catalog sensor contribution — posts onto PerceiveService."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class Config(BaseModel):
 
 @plugin(
     name="sensor.skill-catalog",
-    provides=["sensor.skill-catalog"],
+    requires=["perceive"],
     implements=[Sensor],
     layer="sensor",
     side_effects="none",
@@ -23,7 +23,8 @@ class Config(BaseModel):
     test_suite="tests/test_sensors_v3.py",
 )
 async def setup(ctx, config: Config) -> None:
-    """Provide the named sensor factory ``sensor.skill-catalog``."""
     from lca.layer1_cognitive.sensors.skill_catalog import build_skill_catalog_sensor
 
-    ctx.provide("sensor.skill-catalog", build_skill_catalog_sensor)
+    ctx.inject("perceive").add(
+        build_skill_catalog_sensor, id="skill-catalog", order=60, needs="skills"
+    )

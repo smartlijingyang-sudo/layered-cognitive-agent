@@ -18,11 +18,10 @@ These four assertions cover the criteria from the alignment plan:
   keys.  A bundle that omits the memory Tier-1 service fails to boot
   with a message that names the missing seam key.
 
-* (d) Composition root — :class:`AgentComposer` and friends must not
-  instantiate concrete capability services (``ToolsService()``,
-  ``SimpleHookRegistry()``, ``InMemoryMiddlewareRegistry()``,
-  ``TransportService()``) inline.  Every concrete service is reached
-  through a plugin-tree named factory.
+* (d) Composition root — ``spawn.py`` must not instantiate concrete
+  capability services (``ToolsService()``, ``TransportService()``, …)
+  inline.  Every concrete service is reached through a plugin-tree
+  named factory.
 """
 
 from __future__ import annotations
@@ -229,7 +228,7 @@ def test_compose_root_no_inline_instantiation() -> None:
     Allowlist (≤ 10): each entry is a one-line comment explaining why
     the inline instantiation is unavoidable.
     """
-    composition_root = _ROOT / "lca" / "layer4_app" / "composer.py"
+    composition_root = _ROOT / "lca" / "layer4_app" / "spawn.py"
     text = composition_root.read_text(encoding="utf-8")
 
     # Class names that MUST NOT appear as ``Cls()`` instantiations in the

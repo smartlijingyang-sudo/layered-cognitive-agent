@@ -1,1 +1,1 @@
-"""Named DecisionGate factory plugins. Composer / brain factory assemble the chain."""
+"""Gate contribution plugins — each add()s onto GateService."""

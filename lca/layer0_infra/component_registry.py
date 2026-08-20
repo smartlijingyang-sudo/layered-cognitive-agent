@@ -9,8 +9,8 @@ ComponentRegistry 是「category → NamedRegistry」的组合器：每个 categ
 全部委派给 NamedRegistry，不保留平行的查找实现。
 
 本模块不再持有进程级全局单例。ComponentRegistry / NamedRegistry
-的实例生命周期由调用方决定 —— 框架默认路径中，实例归 TeamComposer 私有持有
-（见 lca.contracts.mechanisms.registries.Registries、lca.layer4_app.composer.TeamComposer）。
+的实例生命周期由调用方决定 —— 框架默认路径中，实例归 spawn_team 持有的
+Registries（见 lca.contracts.mechanisms.registries.Registries）。
 """
 
 from __future__ import annotations
@@ -84,7 +84,7 @@ class ComponentRegistry:
     name 是用户可见的实现名称，例如 "console"、"simple" 等。
     值可以是类（无参构造）或工厂函数（接受上下文参数）。
 
-    运行时绑定型注册表（Action / Tool / Transport）应由 TeamComposer 注入实例，
+    运行时绑定型注册表（Action / Tool / Transport）应由 spawn 路径注入实例，
     不要用 ComponentRegistry 承载。
     """
 

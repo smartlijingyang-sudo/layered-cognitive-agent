@@ -59,10 +59,9 @@ _MAX_FILE_LINES = 250
 
 # 已登记豁免（引用 ADR 或说明原因）
 _LINE_COUNT_EXEMPT: dict[str, str] = {
-    "lca/layer4_app/composer.py": (
-        "组合根单文件承载 AgentComposer/TeamComposer 全量组装（ADR-0005/0033）；"
-        "_promote_lead 由 test_refactor_guards 直接 import，"
-        "progressive-disclosure 检查 def compose / def compose_team 子串"
+    "lca/layer4_app/spawn.py": (
+        "L4 spawn 闭合 AgentSpec/TeamSpec（ADR-0056）；"
+        "promote_lead 由 test_refactor_guards 直接 import"
     ),
     "lca/layer1_cognitive/body/action_handlers.py": (
         "Body 动作分发单模块（委派/工具/记忆/收口）；ADR-0049 证据平面与 harvest 同文件"

@@ -26,7 +26,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **PeerSwarm** | 协调机制（进阶）：轮询累积直至轮数上限（策略键 `peer_swarm` → SwarmStrategy） |
 | **Debate** | 协调机制（进阶）：多轮辩论收敛（策略键 `debate` → DebateStrategy） |
 | **Graph** | 协调机制（进阶）：按 ExecutionGraph 拓扑执行（策略键 `graph` → GraphStrategy） |
-| **AgentComposer** / **TeamComposer** | 组合根：从 AgentSpec / TeamSpec 封闭组装 Agent / Team 对象图，无构造后 bind/install（ADR-0030 / ADR-0033 / ADR-0034）；无进程级单例，门面未注入时各自构造默认实例 |
+| **spawn_agent** / **spawn_team** | L4 组合根函数：从 AgentSpec / TeamSpec 封闭组装 Agent / Team 对象图（ADR-0056）；无 Composer 类 |
 | **multi-delegate** | 一步并行委派多个角色（`Decision.delegations` 多条 + DelegateOperation gather） |
 | **Result** | 运行最终结果：status / output / budget / error |
 | **run** | 全链路唯一生命周期动词（Agent / Team / CognitiveRuntime） |
@@ -35,7 +35,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 
 | 术语 | 定义 |
 |---|---|
-| **Registries** | 三个发现型注册表的值对象包（components / brain_factories / orchestration），由 TeamComposer 私有持有，替代进程级全局单例 |
+| **Registries** | 三个发现型注册表的值对象包（components / brain_factories / orchestration），由 `spawn_team` 持有，替代进程级全局单例 |
 | **CognitiveAgent** | L3 可调度单元：CognitiveRuntime + RoleProfile |
 | **TeamHandle** | 封闭团队的运行句柄：持有闭合 TeamStrategy + TeamTraceProfile，run 只做 trace 边缘 + 委派，不做编排（ADR-0034） |
 | **TeamSpec** | 团队声明式构造规格：成员 + Governance，团队组合根的唯一事实来源（ADR-0034） |

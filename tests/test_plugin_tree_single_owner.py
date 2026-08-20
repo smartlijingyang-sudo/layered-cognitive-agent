@@ -13,7 +13,7 @@ from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_en
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.llm_resolver import live_credential
 from lca.layer4_app.api import Agent
-from lca.layer4_app.composer import AgentComposer
+from lca.layer4_app.spawn import build_perceive_hub, spawn_agent
 
 DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
@@ -118,11 +118,7 @@ async def test_every_default_entry_is_consumed(no_llm_key: None) -> None:
         "hook_registry.simple",
         "middleware_registry.memory",
         "journal_store",
-        "sensor.clock",
-        "sensor.workspace-artifacts",
-        "sensor.inbox-facts",
-        "sensor.workspace-instructions",
-        "sensor.skill-catalog",
+        "perceive",
     }
     missing = consumed_keys - injected
     assert not missing, f"execute/compose never injected {sorted(missing)}"
@@ -200,7 +196,7 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
 
     monkeypatch.setattr("lca.layer0_infra.skills.factory.resolve_skill_store", _boom)
     monkeypatch.setattr(
-        "lca.layer4_app.composer.resolve_skill_store",
+        "lca.layer4_app.spawn.resolve_skill_store",
         _boom,
         raising=False,
     )
@@ -208,7 +204,7 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
     from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
     with pytest.raises(MissingCapabilityError, match="skills"):
-        AgentComposer._build_perceive_hub(SimpleMemorySystem(), scope=ctx)
+        build_perceive_hub(SimpleMemorySystem(), scope=ctx)
 
     registry = RunRegistry()
     session = create_run_session(registry, question="ping", user_text="ping", mode="solo", ctx=ctx)
@@ -261,13 +257,14 @@ async def test_cognitive_driver_composes_once(
 ) -> None:
     ctx = await boot_profile(DEFAULT_PROFILE)
     calls = {"n": 0}
-    original = AgentComposer.compose
+    original = spawn_agent
 
-    def counted(self: AgentComposer, spec: Any, **kwargs: Any) -> Any:
+    def counted(spec: Any, **kwargs: Any) -> Any:
         calls["n"] += 1
-        return original(self, spec, **kwargs)
+        return original(spec, **kwargs)
 
-    monkeypatch.setattr(AgentComposer, "compose", counted)
+    monkeypatch.setattr("lca.layer4_app.api.spawn_agent", counted)
+    monkeypatch.setattr("lca.layer4_app.spawn.spawn_agent", counted)
     registry = RunRegistry()
     session = create_run_session(
         registry, question="hello", user_text="hello", mode="solo", ctx=ctx

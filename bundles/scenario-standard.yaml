@@ -21,6 +21,17 @@ entries:
     $module: lca.plugins.skills_service
     config: {}
 
+  # Perceive / Gate groups (ADR-0056) — idempotent if web-app already loaded them
+  - id: perceive
+    name: perceive
+    $module: lca.plugins.perceive.service
+    config: {}
+
+  - id: gates
+    name: gates
+    $module: lca.plugins.gates.service
+    config: {}
+
   # Sensors (Tier-3)
   - id: lca-sensor-clock
     name: sensor_clock

@@ -1,7 +1,7 @@
 """Built-in default registrations for the LCA framework.
 
 register_defaults() registers factories on the given Registries.
-Object-graph construction lives in composer.py (ADR-0030).
+Object-graph construction lives in spawn.py (ADR-0056).
 
 编排策略工厂统一签名为 ``(TeamAssembly) -> TeamStrategy``（ADR-0034）：
 工厂在 resolve 期从组合期闭合的装配视图中取所需（stage / lead /
