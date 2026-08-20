@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from cordis import Context, plugin
 from pydantic import BaseModel, Field
+
+from lca.contracts.protocols import ObservabilityBackend
+from lca.plugins._cordis_adapter import plugin
 
 _SKIP_BACKENDS = frozenset({"console", "jsonl"})
 
@@ -34,7 +36,16 @@ def _make_hub(**kwargs: Any) -> Any:
     )
 
 
-@plugin(name="lca-observability-provider", inject=["observability"])
-async def setup(ctx: Context, config: Config) -> None:
+@plugin(
+    name="lca-observability-provider",
+    requires=["observability"],
+    implements=[ObservabilityBackend],
+    layer="provider",
+    side_effects="none",
+    policy_class="observe",
+    description="Register ObservabilityBackend factories on the ObservabilityService Definition.",
+    test_suite="tests/test_plugin_alignment.py",
+)
+async def setup(ctx, config: Config) -> None:
     if "console" in config.providers:
         ctx.inject("observability").register("console", _make_hub)

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from cordis import Context, plugin
 from pydantic import BaseModel
 
-from lca.layer1_cognitive.brain.decision_gates.chained import ChainedDecisionGate
+from lca.contracts.protocols import DecisionGate
+from lca.plugins._cordis_adapter import plugin
 
 _CHAIN_KEYS: tuple[str, ...] = (
     "gate.repeat-tool-call",
@@ -20,7 +20,9 @@ class Config(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-def _build_workspace_agent_gate(ctx: Context) -> ChainedDecisionGate:
+def _build_workspace_agent_gate(ctx) -> object:
+    from lca.layer1_cognitive.brain.decision_gates.chained import ChainedDecisionGate
+
     gates = []
     for key in _CHAIN_KEYS:
         factory = ctx.inject(key)
@@ -30,11 +32,21 @@ def _build_workspace_agent_gate(ctx: Context) -> ChainedDecisionGate:
     return ChainedDecisionGate(*gates)
 
 
-@plugin(name="gate.workspace-agent")
-async def setup(ctx: Context, config: Config) -> None:
+@plugin(
+    name="gate.workspace-agent",
+    provides=["gate.workspace-agent"],
+    requires=list(_CHAIN_KEYS),
+    implements=[DecisionGate],
+    layer="guard",
+    side_effects="none",
+    policy_class="control",
+    description="Compose the workspace agent gate chain from individual gate plugins.",
+    test_suite="tests/test_plugin_alignment.py",
+)
+async def setup(ctx, config: Config) -> None:
     """Provide ``gate.workspace-agent`` assembled from individual gate plugins."""
 
-    def factory() -> ChainedDecisionGate:
+    def factory() -> object:
         return _build_workspace_agent_gate(ctx)
 
     ctx.provide("gate.workspace-agent", factory)

@@ -11,8 +11,10 @@ Profiles swap providers by patching:
 
 from __future__ import annotations
 
-from cordis import Context, plugin
 from pydantic import BaseModel, Field
+
+from lca.contracts.protocols import LLMAdapter
+from lca.plugins._cordis_adapter import plugin
 
 
 class Config(BaseModel):
@@ -23,8 +25,17 @@ class Config(BaseModel):
     base_url: str | None = None
 
 
-@plugin(name="lca-llm-provider", inject=["llm"])
-async def setup(ctx: Context, config: Config) -> None:
+@plugin(
+    name="lca-llm-provider",
+    requires=["llm"],
+    implements=[LLMAdapter],
+    layer="provider",
+    side_effects="none",
+    policy_class="control",
+    description="Register LLM adapter providers on the LlmService Definition.",
+    test_suite="tests/test_plugin_tree_single_owner.py",
+)
+async def setup(ctx, config: Config) -> None:
     from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
     from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
     from lca.layer0_infra.llm_resolver import live_credential
@@ -46,7 +57,6 @@ async def setup(ctx: Context, config: Config) -> None:
             activate=(target == "real"),
         )
     if "deepseek" in config.providers:
-        # DeepSeek is OpenAI-compatible; reuse the adapter.
         base = config.base_url or "https://api.deepseek.com"
         llm.register(
             "deepseek",

@@ -2,16 +2,25 @@
 
 from __future__ import annotations
 
-from cordis import Context, plugin
 from pydantic import BaseModel
+
+from lca.plugins._cordis_adapter import plugin
 
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-@plugin(name="lca-dsh-bridge")
-async def setup(ctx: Context, config: Config) -> None:
+@plugin(
+    name="lca-dsh-bridge",
+    provides=["dsh_bridge_factory"],
+    layer="behavior",
+    side_effects="tools",
+    policy_class="execute",
+    description="Register the DSH bridge factory as a fallback loop provider.",
+    test_suite="tests/test_dsh_driver.py",
+)
+async def setup(ctx, config: Config) -> None:
     """Register the DSH bridge factory as a fallback loop provider."""
     from lca.layer0_infra.dsh.launch import build_harness_env
     from lca.layer0_infra.dsh.settings import DshSettings

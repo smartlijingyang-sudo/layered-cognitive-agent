@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cordis import Context, plugin
+from lca.plugins._cordis_adapter import plugin
 
 
 class RunLoopDriverRegistry:
@@ -66,8 +66,18 @@ def _looks_like_driver(obj: Any) -> bool:
     return callable(getattr(obj, "execute", None))
 
 
-@plugin(name="lca-run-loop-driver-registry")
-async def setup(ctx: Context, config: Any) -> None:
+@plugin(
+    name="lca-run-loop-driver-registry",
+    provides=["run_loop_driver_registry"],
+    requires=[],
+    implements=[],
+    layer="behavior",
+    side_effects="none",
+    policy_class="observe",
+    description="Empty run-loop driver registry; loop plugins fill it in.",
+    test_suite="tests/test_plugin_tree_single_owner.py::test_empty_execution_target_uses_profile_default",
+)
+async def setup(ctx, config: Any) -> None:
     """Provide an empty driver registry; loop plugins fill it in.
 
     Config shape::

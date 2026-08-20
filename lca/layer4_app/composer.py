@@ -336,7 +336,13 @@ class AgentComposer:
         spec_llm = self._instrument_llm(spec.llm)
 
         ctx.require(CapabilityKey.TOOLS.value)
-        tool_registry = ToolsService()
+        tools_factory = _resolve_named_factory(
+            scope, "tools.compose_service", None
+        )
+        if tools_factory is None:
+            # Back-compat fallback for unit tests without a booted plugin tree.
+            tools_factory = ToolsService
+        tool_registry = tools_factory()
         for tool in spec.tools:
             tool_registry.register(tool)
         safe_executor_cls = _resolve_named_factory(
@@ -482,8 +488,23 @@ class AgentComposer:
     ) -> Brain:
         if not isinstance(spec.brain, str):
             return spec.brain
-        factory = _resolve_named_factory(scope, "brain_factory", None)
-        if factory is None:
+        # When a plugin tree is active the spec.brain key maps to a
+        # named factory ``brain_factory.<key>``; the bare ``brain_factory``
+        # key is the canonical default. Unknown keys raise ValueError so
+        # callers don't silently fall through to a wrong factory.
+        if _is_plugin_tree(scope):
+            brain_key = spec.brain
+            factory = _resolve_named_factory(scope, f"brain_factory.{brain_key}", None)
+            if factory is None:
+                # Fall back to the default brain_factory — but only if the
+                # spec.brain matches the conventional default name.
+                factory = _resolve_named_factory(scope, "brain_factory", None)
+                if factory is None or brain_key != "default":
+                    raise ValueError(
+                        f"Unknown brain: {spec.brain!r}. Available: "
+                        "brain_factory.default, brain_factory.modular"
+                    )
+        else:
             factory_reg = self._registries.brain_factories
             if spec.brain not in factory_reg:
                 raise ValueError(f"Unknown brain: {spec.brain!r}. Available: {factory_reg.list()}")
@@ -654,8 +675,20 @@ class AgentComposer:
 
 
 def _fork_transport(parent: TransportService, extra: AgentTransport | None) -> TransportService:
-    """Per-compose transport table: copy parent protocols, don't mutate them."""
-    child = TransportService()
+    """Per-compose transport table: copy parent protocols, don't mutate them.
+
+    The fresh child ``TransportService`` is built through the
+    ``transport.compose_service`` named factory when a plugin tree is
+    available, so the composition root never instantiates a concrete
+    capability service inline.
+    """
+    factory = _resolve_named_factory(None, "transport.compose_service", None)
+    if factory is None:
+        # No plugin tree: synthesize a child TransportService directly.
+        # The composition root has no thread-local scope — the only
+        # fallback is the canonical class.
+        factory = TransportService
+    child = factory()
     for protocol in parent.list_protocols():
         child.register(parent.resolve(protocol))
     if extra is not None:

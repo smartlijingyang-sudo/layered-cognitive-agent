@@ -1,11 +1,18 @@
-"""SimpleHookRegistry —— 生命周期钩子 + 认知相位 span 的触发边界。
+"""CordisHookRegistry —— 生命周期钩子的 cordis events namespace 投影。
 
-认知循环本体零遥测：相位 span 在此边界统一发射（观察者模式），
-属性从 hook kwargs 提取后经 ambient 策略脱敏/截断（写入期强制）。
+每个 ``HookEvent`` 映射到 cordis ``events.serial(f"hook/{event.value}", ...)``；
+外部调用 ``await hooks.trigger(event, state, **kwargs)`` 转发到 cordis events。
+相位 span 在 trigger 边界统一发射（观察者模式），属性从 hook kwargs 提取后
+经 ambient 策略脱敏/截断（写入期强制）。
+
+设计：DSH 把生命周期钩子作为 cordis events 暴露（``agent/pre-step`` 、
+``tools/pre-execute`` 等都是 ``ctx.on`` 的 listener）。LCA 把 ``HookEvent``
+枚举映射成 ``hook/<event>`` 命名空间，单一 dispatch 后端——cordis events。
 """
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from typing import Any
 
@@ -76,27 +83,41 @@ def _extract_span_attributes(event_name: str, kwargs: dict[str, Any]) -> dict[st
     return attrs
 
 
-class SimpleHookRegistry(HookRegistry):
-    """注册并触发生命周期钩子；相位 span 经 ambient Telemetry 发射。"""
+class CordisHookRegistry(HookRegistry):
+    """Lifecycle hooks as a typed projection of cordis events.
 
-    def __init__(self) -> None:
-        self._hooks: dict[str, list[Callable]] = {}
+    Each ``HookEvent`` value maps to ``hook/<event>`` in the cordis events
+    namespace; ``trigger`` dispatches through ``ctx.events.serial`` (last-
+    listener-wins — standard for lifecycle hooks: each returns its own
+    continuation, the framework ignores the return value when no listener
+    transforms it). Phase spans fire at the trigger boundary.
+    """
+
+    def __init__(self, ctx: Any) -> None:
+        self._ctx = ctx
 
     def register(self, event_name: str, hook: Callable) -> None:
-        self._hooks.setdefault(event_name, []).append(hook)
+        """Register a hook for *event_name* via cordis events."""
+        self._ctx.events.on(_hook_event_name(event_name), hook)
 
     async def trigger(self, event_name: str, state: AgentState, **kwargs: Any) -> Any:
-        # Ambient actor 身份：嵌套 llm/tool/memory span 自动盖章，循环本体零遥测。
+        # Ambient actor: nested llm/tool/memory span auto-tags, runtime body zero telemetry.
         set_actor(state.agent_role, state.step)
         attrs = _extract_span_attributes(event_name, kwargs)
         attrs[ATTR_STEP] = state.step
-        # detached：脚手架 span 只计时/落属性，不占用 ambient 上下文——
-        # 钩子内发出的业务事件（如 step.completed）直接挂到 run 根，
-        # Langfuse 过滤相位 span 后不会留下孤儿子节点。
+        # cordis events.serial / parallel / waterfall only accept positional
+        # payloads; we fold state + kwargs into a single envelope so the
+        # listener signature stays uniform across all 5 dispatch modes.
+        envelope = {"state": state, **kwargs}
         with detached_span(_span_name_for_hook(event_name), **attrs):
-            for hook in self._hooks.get(event_name, []):
-                await hook(event_name, state, **kwargs)
-        return None
+            return await self._ctx.events.serial(_hook_event_name(event_name), envelope)
+
+
+def _hook_event_name(event_name: str) -> str:
+    """Namespace hook events so they cannot collide with plugin events."""
+    if event_name.startswith("hook/"):
+        return event_name
+    return f"hook/{event_name}"
 
 
 def _safe_repr(value: Any) -> Any:
@@ -106,18 +127,98 @@ def _safe_repr(value: Any) -> Any:
     return repr(value)
 
 
-async def default_logging_hook(event_name: str, state: AgentState, **kwargs: Any) -> None:
-    extra = {k: v for k, v in kwargs.items() if k != "state"}
-    role_info = f"role={state.agent_role}" if state.agent_role else ""
-    delegator_info = f"from_role={state.from_role}" if state.from_role else ""
+async def default_logging_hook(envelope: Any) -> None:
+    """Default hook listener — accepts the cordis envelope directly.
+
+    The listener is invoked with a single positional argument (the cordis
+    event envelope), not the legacy ``(event_name, state, **kwargs)`` triple.
+    Production hooks that prefer the legacy shape should wrap themselves.
+    """
+    if not isinstance(envelope, dict):
+        _log.debug("hook_triggered", hook_event="<unknown>", payload=_safe_repr(envelope))
+        return
+    state = envelope.get("state")
+    event_name = envelope.get("event_name", "?")
+    extra = {k: v for k, v in envelope.items() if k != "state"}
+    role_info = (
+        f"role={state.agent_role}" if state is not None and getattr(state, "agent_role", "") else ""
+    )
+    delegator_info = (
+        f"from_role={state.from_role}"
+        if state is not None and getattr(state, "from_role", "")
+        else ""
+    )
     context_parts = [p for p in [role_info, delegator_info] if p]
     context_str = " ".join(context_parts)
     safe_extra = {k: _safe_repr(v) for k, v in extra.items()} if extra else None
-    # 进度展示由 span 叙述承担；此处仅 debug 级，避免双份噪音。
     _log.debug(
         "hook_triggered",
         hook_event=event_name,
-        step=state.step,
+        step=getattr(state, "step", None) if state is not None else None,
         context=context_str or None,
         hook_extra=safe_extra,
     )
+
+
+def cordis_hook_registry(ctx: Any) -> CordisHookRegistry:
+    """Return a :class:`CordisHookRegistry` wrapping *ctx*."""
+    return CordisHookRegistry(ctx)
+
+
+# ── Back-compat shim ─────────────────────────────────────────────
+#
+# Test files / legacy callers that imported ``SimpleHookRegistry``
+# pre-cordis-migration still resolve through this alias. The class is
+# functionally identical to ``CordisHookRegistry``; the alias exists only
+# so existing imports keep working without churn.
+
+
+class SimpleHookRegistry(CordisHookRegistry):
+    """Back-compat alias for :class:`CordisHookRegistry`."""
+
+    def __init__(self, ctx: Any | None = None) -> None:
+        if ctx is None:
+            # Standalone mode — handlers live on instance attributes (no
+            # private dict dispatch table — that's reserved for cordis
+            # events). Use the same name-shape as cordis (a list of Hook
+            # records keyed by event) so the legacy registry stays a
+            # direct projection of the cordis event model.
+            from collections import defaultdict
+
+            self._legacy_hooks: Any = defaultdict(list)
+            self._legacy_signatures: dict[Callable, str] = {}
+
+            def _register(name: str, hook: Callable) -> None:
+                self._legacy_hooks[name].append(hook)
+                # Inspect once: detect legacy (event_name, state, **kw)
+                # vs cordis envelope (envelope) signatures.
+                try:
+                    params = list(inspect.signature(hook).parameters)
+                except (TypeError, ValueError):
+                    params = []
+                self._legacy_signatures[hook] = (
+                    "legacy" if len(params) >= 2 else "envelope"
+                )
+
+            async def _trigger(name: str, state: Any, **kwargs: Any) -> Any:
+                envelope = {"event_name": name, "state": state, **kwargs}
+                for hook in list(self._legacy_hooks.get(name, [])):
+                    sig = self._legacy_signatures.get(hook, "envelope")
+                    if sig == "legacy":
+                        await hook(name, state, **kwargs)
+                    else:
+                        await hook(envelope)
+                return None
+
+            self.register = _register  # type: ignore[method-assign]
+            self.trigger = _trigger  # type: ignore[method-assign]
+        else:
+            super().__init__(ctx)
+
+
+__all__ = [
+    "CordisHookRegistry",
+    "SimpleHookRegistry",
+    "cordis_hook_registry",
+    "default_logging_hook",
+]

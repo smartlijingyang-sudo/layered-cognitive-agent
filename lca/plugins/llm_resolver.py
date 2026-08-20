@@ -9,12 +9,9 @@ from __future__ import annotations
 
 import os
 
-from cordis import Context, plugin
 from pydantic import BaseModel, Field
 
-from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
-from lca.layer0_infra.llm_resolver import ProductionLLMResolver, live_credential
+from lca.plugins._cordis_adapter import plugin
 
 
 class Config(BaseModel):
@@ -35,6 +32,9 @@ def _register_adapters(
     base_url: str | None,
     default_model: str,
 ) -> None:
+    from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+    from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
+
     target = mode.strip().lower()
     if target == "auto":
         target = "real" if api_key else "mock"
@@ -56,8 +56,19 @@ def _register_adapters(
         llm.providers.use("mock")
 
 
-@plugin(name="lca-llm-resolver", inject=["llm"])
-async def setup(ctx: Context, config: Config) -> None:
+@plugin(
+    name="lca-llm-resolver",
+    requires=["llm"],
+    provides=["llm_resolver"],
+    layer="provider",
+    side_effects="none",
+    policy_class="control",
+    description="Register LLM adapters and provide the resolver for /runs.",
+    test_suite="tests/test_plugin_tree_single_owner.py::test_llm_single_owner_without_key",
+)
+async def setup(ctx, config: Config) -> None:
+    from lca.layer0_infra.llm_resolver import ProductionLLMResolver, live_credential
+
     api_key = live_credential(config.api_key) or live_credential(os.environ.get(config.api_key_env))
     base_url = live_credential(config.base_url) or live_credential(
         os.environ.get(config.base_url_env)

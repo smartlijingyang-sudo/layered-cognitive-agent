@@ -10,11 +10,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from cordis import Context, plugin
+from lca.contracts.protocols import TeamStrategy
+from lca.plugins._cordis_adapter import plugin
 
 
-@plugin(name="lca-team-lead-board")
-async def setup(ctx: Context, config: Any) -> None:
+@plugin(
+    name="lca-team-lead-board",
+    provides=["team_lead_factory"],
+    implements=[TeamStrategy],
+    layer="behavior",
+    side_effects="none",
+    policy_class="control",
+    description="Register the team strategy registry at team_lead_factory.",
+    test_suite="tests/test_plugin_alignment.py",
+)
+async def setup(ctx: Any, config: Any) -> None:
     """Register the team strategy registry at team_lead_factory."""
     from lca.layer3_agent.orchestration_registry import TeamStrategyRegistry
 

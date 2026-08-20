@@ -14,23 +14,19 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
-from cordis import Context, plugin
 
-from lca.harness.agent.handle import OwnerAgentHandle
-from lca.harness.session.inbox import Inbox
-from lca.harness.session.store import SessionStore
-from lca.layer4_app.api import Agent
+from lca.plugins._cordis_adapter import plugin
 
 _log = structlog.get_logger(__name__)
 
 
 def build_cognitive_live_agent(
-    store: SessionStore,
-    inbox: Inbox,
+    store: object,
+    inbox: object,
     identity_id: str,
     options: dict[str, Any] | None,
     cordis_ctx: Any | None,
-) -> OwnerAgentHandle:
+) -> object:
     """Build a LiveAgent backed by the LCA cognitive loop.
 
     Wires ``CognitiveLiveAgent`` around an ``Agent`` constructed from
@@ -55,6 +51,9 @@ def build_cognitive_live_agent(
         from lca.layer4_app.api import get_or_create_default_ctx
 
         scope = get_or_create_default_ctx()
+    from lca.harness.agent.handle import OwnerAgentHandle
+    from lca.layer4_app.api import Agent
+
     agent = Agent(
         role=opts.get("role", identity_id),
         goal=opts.get("goal", ""),
@@ -67,15 +66,25 @@ def build_cognitive_live_agent(
 
     live = CognitiveLiveAgent(
         agent=agent,
-        store=store,
-        inbox=inbox,
+        store=store,  # type: ignore[arg-type]
+        inbox=inbox,  # type: ignore[arg-type]
         identity_id=identity_id,
     )
     return OwnerAgentHandle(live)
 
 
-@plugin(name="lca-loop-cognitive", inject=["run_loop_driver_registry"])
-async def setup(ctx: Context, config: Any) -> None:
+@plugin(
+    name="lca-loop-cognitive",
+    requires=["run_loop_driver_registry"],
+    provides=["agent_loop", "run_loop_driver_registry[cognitive]"],
+    implements=[],
+    layer="behavior",
+    side_effects="none",
+    policy_class="control",
+    description="Register the cognitive loop driver at run_loop_driver_registry[cognitive].",
+    test_suite="tests/test_plugin_tree_single_owner.py",
+)
+async def setup(ctx: Any, config: Any) -> None:
     """Register the cognitive loop at two seams:
 
     - ``agent_loop`` → consumed by the legacy session-spine path

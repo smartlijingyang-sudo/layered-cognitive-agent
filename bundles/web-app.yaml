@@ -140,3 +140,16 @@ entries:
     inject: [run_loop_driver_registry]
     config:
       target: cognitive
+
+  # ── Compose-time named factories (DSH-style) ──────────
+  # Provide fresh capability service instances at compose time
+  # so the composition root never instantiates concrete classes inline.
+  - id: tools.compose_service
+    name: tools_compose_service
+    $module: lca.plugins.tools_compose_service
+    config: {}
+
+  - id: transport.compose_service
+    name: transport_compose_service
+    $module: lca.plugins.transport_compose_service
+    config: {}
