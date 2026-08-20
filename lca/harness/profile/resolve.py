@@ -182,9 +182,7 @@ def resolve_profile(
     _validate_layer_edges(enabled)
     order, edges = _topo_sort(enabled)
     # Append disabled at end (stable by index) so dump still lists them.
-    disabled_plugins = sorted(
-        (p for p in resolved_plugins if p.disabled), key=lambda p: p.index
-    )
+    disabled_plugins = sorted((p for p in resolved_plugins if p.disabled), key=lambda p: p.index)
     ordered = tuple(order) + tuple(disabled_plugins)
     payload = _canonical_payload(ordered)
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[
@@ -336,9 +334,7 @@ def _apply_patches(
 
 
 def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
-    out: dict[str, Any] = {
-        k: _deep_copy_mapping(v) for k, v in base.items()
-    }
+    out: dict[str, Any] = {k: _deep_copy_mapping(v) for k, v in base.items()}
     for key, value in overlay.items():
         if key in out and isinstance(out[key], dict) and isinstance(value, dict):
             out[key] = _deep_merge(out[key], value)

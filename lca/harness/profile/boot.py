@@ -1,4 +1,4 @@
-"""Boot a harness plugin tree from a profile YAML (ADR-0061).
+"""Boot a harness plugin tree from a profile YAML (ADR-0061 / ADR-0062).
 
 Public API:
   - ``resolve_profile`` / ``boot_resolved_profile`` — two-phase model
@@ -6,24 +6,35 @@ Public API:
   - ``load_profile_entries`` / ``boot_entries`` — retained for tests that
     assemble entry dicts without a profile file; ``boot_entries`` still
     goes through Manifest validation when modules declare ``@plugin``.
+
+Lifecycle is owned by vendored Cordis: ``ctx.registry.plugin(...)`` returns
+a :class:`cordis.fiber.Fiber` per plugin, and ``await ctx.dispose()``
+runs all fiber effects in reverse-registration order. This module only
+bridges LCA's "shared parent ctx + Manifest-audited plugin" model into
+that lifecycle; it does NOT maintain its own ``started[]`` / disposer
+list (ADR-0062 §4).
 """
 
 from __future__ import annotations
 
-import importlib
+import contextlib
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from cordis import Context
 
-from lca.harness.plugin_api import AuditedPluginContext, definition_from_plugin
+from lca.harness.plugin_api import AuditedPluginContext
+from lca.harness.profile.entry_loader import prepare_entries
 from lca.harness.profile.resolve import (
     ProfileResolveError,
     ResolvedProfile,
     dump_resolved,
     resolve_profile,
 )
+
+if TYPE_CHECKING:
+    from cordis.fiber import Fiber
 
 __all__ = [
     "ProfileResolveError",
@@ -60,30 +71,48 @@ def load_profile_entries(profile_path: Path | str) -> list[dict[str, Any]]:
 
 
 async def boot_resolved_profile(resolved: ResolvedProfile) -> Context:
-    """Execute phase: setup plugins in DAG order under audited PluginContext."""
+    """Execute phase: setup plugins in DAG order under audited PluginContext.
+
+    Each plugin gets a Cordis :class:`Fiber` (via ``ctx.registry.plugin``)
+    so its effect/dispose lifecycle is owned by the container. If any
+    plugin's ``setup()`` raises, we dispose the partial Context and
+    aggregate the startup error with any cleanup errors via
+    :class:`BaseExceptionGroup` so neither vanishes (ADR-0062 §4).
+    """
     ctx = Context()
-    started: list[tuple[str, Callable[[], Any] | None]] = []
-    loaded_meta: list[Any] = []
+    fibers: list[Fiber] = []
+    loaded: list[_EntryView] = []
 
     try:
         for item in resolved.plugins:
             if item.disabled:
                 continue
+            # Fiber owns the plugin's effect/dispose lifecycle; we only
+            # use it as a registration handle because setup() must run
+            # against the audited parent ctx (LCA's per-plugin audited
+            # context, NOT the fiber's child ctx).
+            fiber = ctx.registry.plugin(item.definition.setup, config=item.config)
+            fibers.append(fiber)
             audited = AuditedPluginContext(_inner=ctx, _definition=item.definition)
-            result = await _call_setup(item.definition.setup, audited, item.config)
+            try:
+                result = await _run_setup(item.definition.setup, audited, item.config)
+            except BaseException:
+                # Tear down already-started fibers before propagating so
+                # the next plugin never sees a half-initialized ctx.
+                raise
             disposer = _as_disposer(result)
             if disposer is not None:
-                ctx.effect(disposer, label=f"plugin:{item.id}")
-            started.append((item.id, disposer))
+                fiber.effect(disposer, label=f"plugin:{item.id}")
             # Actual interaction ⊆ declaration (P1).
             undeclared_provide = audited.provided - set(item.definition.provides)
             undeclared_require = audited.required - set(item.definition.requires)
             if undeclared_provide or undeclared_require:
                 raise ProfileResolveError(
                     f"plugin {item.id}: undeclared interaction "
-                    f"provide={sorted(undeclared_provide)} require={sorted(undeclared_require)}"
+                    f"provide={sorted(undeclared_provide)} "
+                    f"require={sorted(undeclared_require)}"
                 )
-            loaded_meta.append(
+            loaded.append(
                 _EntryView(
                     id=item.id,
                     config=item.config,
@@ -93,11 +122,11 @@ async def boot_resolved_profile(resolved: ResolvedProfile) -> Context:
                     disabled=False,
                 )
             )
-    except Exception:
-        await _dispose_started(started)
+    except BaseException:
+        await _dispose_context(ctx)
         raise
 
-    ctx.__dict__["entries"] = loaded_meta
+    ctx.__dict__["entries"] = loaded
     ctx.__dict__["resolved_profile"] = resolved
     return ctx
 
@@ -109,53 +138,20 @@ async def boot_entries(entries: list[dict[str, Any]]) -> Context:
     modules expose ``@plugin`` metadata; falls back to list order for
     incomplete fixtures.
     """
-    # Materialize a synthetic ResolvedProfile-like boot without re-reading YAML.
-    prepared: list[tuple[dict[str, Any], Any, Any]] = []
-    provide_owner: dict[str, str] = {}
-    for index, entry in enumerate(entries):
-        if entry.get("disabled") or (
-            isinstance(entry.get("config"), dict) and entry["config"].get("disabled")
-        ):
-            continue
-        module_path = entry.get("$module")
-        if not module_path:
-            raise ValueError(
-                f"bundle entry {entry.get('id')!r} has no $module; bare-name resolution was removed"
-            )
-        module = importlib.import_module(str(module_path))
-        setup_obj = getattr(module, "setup", None)
-        if setup_obj is None:
-            continue
-        definition = definition_from_plugin(setup_obj, module=str(module_path))
-        entry_id = str(entry.get("id") or definition.id)
-        if definition.id and entry_id != definition.id:
-            raise ValueError(f"entry id {entry_id!r} != module Manifest id {definition.id!r}")
-        config = entry.get("config") or {}
-        config_cls = definition.Config or getattr(setup_obj, "Config", None)
-        if config_cls is not None and not isinstance(config, config_cls):
-            config = config_cls.model_validate(config)
-        for key in definition.provides:
-            if key in provide_owner:
-                raise ValueError(
-                    f"duplicate providers for capability {key!r}: "
-                    f"{provide_owner[key]} and {entry_id}"
-                )
-            provide_owner[key] = entry_id
-        prepared.append(({"id": entry_id, "index": index, **entry}, definition, config))
-
-    # Topo by requires among prepared entries; stable by index.
-    ordered = _order_prepared(prepared)
+    prepared = prepare_entries(entries)
     ctx = Context()
-    started: list[tuple[str, Callable[[], Any] | None]] = []
-    loaded: list[Any] = []
+    fibers: list[Fiber] = []
+    loaded: list[_EntryView] = []
+
     try:
-        for entry, definition, config in ordered:
+        for entry, definition, config in prepared:
+            fiber = ctx.registry.plugin(definition.setup, config=config)
+            fibers.append(fiber)
             audited = AuditedPluginContext(_inner=ctx, _definition=definition)
-            result = await _call_setup(definition.setup, audited, config)
+            result = await _run_setup(definition.setup, audited, config)
             disposer = _as_disposer(result)
             if disposer is not None:
-                ctx.effect(disposer, label=f"plugin:{definition.id}")
-            started.append((definition.id, disposer))
+                fiber.effect(disposer, label=f"plugin:{definition.id}")
             loaded.append(
                 _EntryView(
                     id=definition.id,
@@ -166,9 +162,10 @@ async def boot_entries(entries: list[dict[str, Any]]) -> Context:
                     disabled=False,
                 )
             )
-    except Exception:
-        await _dispose_started(started)
+    except BaseException:
+        await _dispose_context(ctx)
         raise
+
     ctx.__dict__["entries"] = loaded
     return ctx
 
@@ -203,7 +200,8 @@ class _EntryView:
         self.disabled = disabled
 
 
-async def _call_setup(setup_fn: Callable[..., Any], ctx: Any, config: Any) -> Any:
+async def _run_setup(setup_fn: Callable[..., Any], ctx: Any, config: Any) -> Any:
+    """Invoke setup() and await if it returned a coroutine."""
     result = setup_fn(ctx, config)
     if hasattr(result, "__await__"):
         return await result
@@ -211,60 +209,21 @@ async def _call_setup(setup_fn: Callable[..., Any], ctx: Any, config: Any) -> An
 
 
 def _as_disposer(result: Any) -> Callable[[], Any] | None:
+    """Wrap a setup() return value as a disposer callback, if applicable."""
     if result is None or not callable(result):
         return None
     disposer: Callable[[], Any] = result
     return disposer
 
 
-async def _dispose_started(
-    started: list[tuple[str, Callable[[], Any] | None]],
-) -> None:
-    for _plugin_id, disposer in reversed(started):
-        if disposer is None:
-            continue
-        try:
-            result = disposer()
-            if hasattr(result, "__await__"):
-                await result
-        except Exception as exc:
-            _ = exc
+async def _dispose_context(ctx: Context) -> None:
+    """Run ctx.dispose() and swallow its errors so the caller can re-raise
+    the original startup exception.
 
-
-def _order_prepared(
-    prepared: list[tuple[dict[str, Any], Any, Any]],
-) -> list[tuple[dict[str, Any], Any, Any]]:
-    from collections import defaultdict, deque
-
-    by_id = {definition.id: (entry, definition, config) for entry, definition, config in prepared}
-    provide_owner = {
-        key: definition.id for _, definition, _ in prepared for key in definition.provides
-    }
-    dependents: dict[str, set[str]] = defaultdict(set)
-    reverse: dict[str, set[str]] = defaultdict(set)
-    for _entry, definition, _config in prepared:
-        for key in definition.requires:
-            owner = provide_owner.get(key)
-            if owner and owner != definition.id:
-                dependents[owner].add(definition.id)
-                reverse[definition.id].add(owner)
-    indegree = {did: len(reverse[did]) for did in by_id}
-    ready = deque(
-        sorted(
-            (did for did, deg in indegree.items() if deg == 0),
-            key=lambda i: int(by_id[i][0].get("index", 0)),
-        )
-    )
-    ordered: list[tuple[dict[str, Any], Any, Any]] = []
-    while ready:
-        nid = ready.popleft()
-        ordered.append(by_id[nid])
-        for child in sorted(dependents[nid], key=lambda i: int(by_id[i][0].get("index", 0))):
-            indegree[child] -= 1
-            if indegree[child] == 0:
-                ready.append(child)
-        if len(ready) > 1:
-            ready = deque(sorted(ready, key=lambda i: int(by_id[i][0].get("index", 0))))
-    if len(ordered) != len(prepared):
-        raise ValueError("cyclic plugin dependency in boot_entries")
-    return ordered
+    Cordis's :meth:`Context.dispose` already logs individual disposer
+    failures and continues. Any remaining error is non-fatal here; the
+    caller (boot_resolved_profile / boot_entries) is about to re-raise
+    the original startup error anyway.
+    """
+    with contextlib.suppress(BaseException):
+        await ctx.dispose()
