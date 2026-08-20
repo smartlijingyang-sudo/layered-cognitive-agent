@@ -23,7 +23,7 @@ import asyncio
 import json
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -285,7 +285,7 @@ class PipelineSafeExecutor(SafeExecutor):
 
         # 返回 Observation
         if result.ok and result.output:
-            return result.output
+            return cast(Observation, result.output)
         else:
             # 构造失败的 Observation
             return Observation(

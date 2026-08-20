@@ -58,17 +58,17 @@ class OpenAICompatAdapter(LLMAdapter):
         base_url: str | None = None,
         api: LLMApiStyle | None = None,
     ) -> None:
-        self._model: str = model if model is not None else os.getenv("LLM_MODEL", "gpt-4.1")
+        from lca.layer0_infra.llm.config import DEFAULT_CHAT_MODEL
+
+        self._model: str = model if model is not None else os.getenv("LLM_MODEL", DEFAULT_CHAT_MODEL)
         resolved_key = api_key if api_key is not None else os.getenv("LLM_API_KEY", "")
         resolved_base = (
             base_url
             if base_url is not None
-            else os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+            else os.getenv("LLM_BASE_URL") or None
         )
         if resolved_key is None:
             resolved_key = ""
-        if resolved_base is None:
-            resolved_base = "https://api.openai.com/v1"
         style = _resolve_api_style(api, base_url=resolved_base)
         if style is LLMApiStyle.ANTHROPIC:
             self._strategy: _ApiStrategy = _AnthropicMessagesStrategy(

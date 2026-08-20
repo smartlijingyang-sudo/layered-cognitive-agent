@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.atoms.enums import HookEvent
 from lca.contracts.atoms.telemetry import ATTR_STEP, HOOK_TO_PHASE_SPAN, SpanName
@@ -127,6 +127,41 @@ def _hook_event_name(event_name: str) -> str:
     return f"hook/{event_name}"
 
 
+def _safe_repr(value: Any) -> Any:
+    """结构化日志安全表示：原语透传，复杂对象 fallback ``repr()``。"""
+    if isinstance(value, (str, int, float, bool, type(None))):
+        return value
+    return repr(value)
+
+
+async def default_logging_hook(envelope: Any) -> None:
+    """Default hook listener — accepts the cordis envelope directly.
+
+    The listener is invoked with a single positional argument (the cordis
+    event envelope), not the legacy ``(event_name, state, **kwargs)`` triple.
+    Production hooks that prefer the legacy shape should wrap themselves.
+    """
+    if not isinstance(envelope, dict):
+        _log.debug("hook_triggered", hook_event="<unknown>", payload=_safe_repr(envelope))
+        return
+    state_raw = envelope.get("state")
+    state: Any = state_raw  # narrow to Any to silence state-shape mismatches
+    event_name = envelope.get("event_name", "?")
+    extra = {k: v for k, v in envelope.items() if k != "state"}
+    agent_role_val = state.agent_role if state is not None and hasattr(state, "agent_role") else ""
+    from_role_val = state.from_role if state is not None and hasattr(state, "from_role") else ""
+    role_info = f"role={agent_role_val}" if agent_role_val else ""
+    delegator_info = f"from_role={from_role_val}" if from_role_val else ""
+    context_parts = [p for p in [role_info, delegator_info] if p]
+    context_str = " ".join(context_parts)
+    safe_extra = {k: _safe_repr(v) for k, v in extra.items()} if extra else None
+    _log.debug(
+        "hook_triggered",
+        hook_event=event_name,
+        step=getattr(state, "step", None) if state is not None else None,
+        context=context_str or None,
+        hook_extra=safe_extra,
+    )
 
 def cordis_hook_registry(ctx: Any) -> CordisHookRegistry:
     """Return a :class:`CordisHookRegistry` wrapping *ctx*."""
@@ -178,8 +213,8 @@ class SimpleHookRegistry(CordisHookRegistry):
                         await hook(envelope)
                 return None
 
-            self.register = _register  # type: ignore[method-assign]
-            self.trigger = _trigger  # type: ignore[method-assign]
+            self.register = _register  # type: ignore[method-assign,assignment]
+            self.trigger = _trigger  # type: ignore[method-assign,assignment]
         else:
             super().__init__(ctx)
 

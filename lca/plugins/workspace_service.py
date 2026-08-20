@@ -1,7 +1,14 @@
 """Workspace Service Definition plugin — Tier-1 (minimal stub)."""
 
 from __future__ import annotations
-from lca.harness.plugin_api import plugin, PluginKind
+
+from pydantic import BaseModel
+
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 class WorkspaceService:
@@ -34,5 +41,5 @@ class WorkspaceService:
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
     kind=PluginKind.SEAM,
 )
-async def setup(ctx, config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     ctx.provide("workspace", WorkspaceService())

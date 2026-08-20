@@ -20,11 +20,13 @@ v3 path is canonical.
 from __future__ import annotations
 
 import re
+from typing import Any, cast
 
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.core.workspace import ArtifactLedgerSnapshot
 from lca.contracts.protocols import DecisionGate
 from lca.layer0_infra.workspace.artifact_ledger import rewrite_artifact_markdown
 
@@ -50,7 +52,7 @@ def _artifacts_from_manifest(state: AgentState) -> list[dict[str, object]]:
 
 def _ledger_snapshot_from_manifest(
     artifacts: list[dict[str, object]],
-):
+) -> ArtifactLedgerSnapshot:
     """Build the minimal ``ArtifactLedgerSnapshot`` shape for the rewrite helpers.
 
     The legacy helpers (``rewrite_artifact_markdown`` etc.) expect a
@@ -68,7 +70,7 @@ def _ledger_snapshot_from_manifest(
             name=str(a.get("name") or a.get("path") or ""),
             mime_type=str(a.get("mime", "")),
             url=str(a.get("url", "")),
-            size_bytes=int(a.get("size", 0) or 0),
+            size_bytes=int(cast(Any, a).get("size", 0) or 0),
         )
         for a in artifacts
     )

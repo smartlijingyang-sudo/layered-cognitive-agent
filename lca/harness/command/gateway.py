@@ -19,7 +19,11 @@ from lca.contracts.harness.command import (
     SessionCreateCommand,
     SteerCommand,
 )
-from lca.contracts.harness.projection import ProjectionChange, ProjectionSnapshot
+from lca.contracts.harness.projection import (
+    ProjectionChange,
+    ProjectionRegistry,
+    ProjectionSnapshot,
+)
 
 
 class CommandGateway:
@@ -28,7 +32,7 @@ class CommandGateway:
     def __init__(
         self,
         agent_registry: AgentRegistryFacade,
-        projection_registry: Any,
+        projection_registry: ProjectionRegistry,
     ) -> None:
         self._agent_registry = agent_registry
         self._projection_registry = projection_registry

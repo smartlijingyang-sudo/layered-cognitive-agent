@@ -5,8 +5,10 @@ this minimal stub. Real implementation lives in lca/layer0_infra/system_prompt/s
 """
 
 from __future__ import annotations
-from typing import Any
-from lca.harness.plugin_api import plugin, PluginKind
+
+from pydantic import BaseModel
+
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class _MinimalSystemPromptService:
@@ -14,6 +16,10 @@ class _MinimalSystemPromptService:
 
     def assemble(self, role: str, **kwargs: object) -> str:
         return f"base_prompt_for({role})"
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 @plugin(
@@ -25,5 +31,5 @@ class _MinimalSystemPromptService:
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
     kind=PluginKind.SEAM,
 )
-async def setup(ctx: Any, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     ctx.provide("system_prompt", _MinimalSystemPromptService())

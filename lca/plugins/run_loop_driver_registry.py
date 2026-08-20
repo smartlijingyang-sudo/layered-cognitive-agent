@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class RunLoopDriverRegistry:
@@ -21,6 +21,7 @@ class RunLoopDriverRegistry:
 
     def __init__(self, default: str | None = None) -> None:
         self._drivers: dict[str, Any] = {}
+        self._materialized: dict[str, Any] = {}
         self._default = default
 
     def register(self, target: str, driver: Any) -> None:
@@ -33,28 +34,46 @@ class RunLoopDriverRegistry:
             raise KeyError(f"run_loop_driver_registry: {key!r} already registered")
         self._drivers[key] = driver
 
+    def contains(self, target: str) -> bool:
+        """True iff ``target`` names a registered loop driver."""
+        return (target or "").strip().lower() in self._drivers
+
     def resolve(self, target: str) -> Any:
         key = target.strip().lower() if target else ""
         if not key:
             key = (self._default or "").strip().lower()
+        cached = self._materialized.get(key)
+        if cached is not None:
+            return cached
         try:
             entry = self._drivers[key]
         except KeyError as exc:
             raise _UnknownExecutionTargetError(target or self._default or "") from exc
         if callable(entry) and (not _looks_like_driver(entry)):
-            return entry()
+            entry = entry()
+        self._materialized[key] = entry
         return entry
 
     def targets(self) -> tuple[str, ...]:
         return tuple(sorted(self._drivers))
 
 
-class _UnknownExecutionTargetError(RuntimeError):
+class _UnknownExecutionTargetError(KeyError):
+    """Loop plugin missing for the requested execution_target.
+
+    Subclasses ``KeyError`` so plugin-tree omission handlers treat it as a
+    missing seam (no driver registered for that key).
+    """
+
     def __init__(self, target: str) -> None:
-        super().__init__(
-            f"no run_loop_driver registered for execution_target={target!r}; enable the corresponding loop plugin in your bundle"
-        )
+        super().__init__(target or "")
         self.target = target
+
+    def __str__(self) -> str:
+        return (
+            f"no run_loop_driver registered for execution_target={self.target!r}; "
+            f"enable the corresponding loop plugin in your bundle"
+        )
 
 
 def _looks_like_driver(obj: Any) -> bool:
@@ -73,7 +92,7 @@ def _looks_like_driver(obj: Any) -> bool:
     test_suite="tests/test_plugin_tree_single_owner.py::test_empty_execution_target_uses_profile_default",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx, config: Any) -> None:
+async def setup(ctx: PluginContext, config: dict[str, Any]) -> None:
     """Provide an empty driver registry; loop plugins fill it in.
 
     Config shape::

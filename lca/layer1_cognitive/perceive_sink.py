@@ -10,7 +10,7 @@ for read-only runs) can be plugged in without modifying the Hub.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.observability.journal import ContextManifested
@@ -61,7 +61,7 @@ class RunStoreSink:
         *,
         extra: dict[str, Any] | None = None,
     ) -> ContextManifested:
-        return self._store.append(event)
+        return cast(ContextManifested, self._store.append(event))
 
 
 class JournalSink:
@@ -81,9 +81,9 @@ class JournalSink:
         from lca.layer0_infra.cognitive_loop_settings import get_cognitive_loop_settings
         from lca.layer0_infra.observability import record as _journal_record
 
-        if not get_cognitive_loop_settings().context_manifest_dual_write:
-            return event
-        return _journal_record(event)
+        if get_cognitive_loop_settings().context_manifest_dual_write:
+            _journal_record(event)
+        return event
 
 
 def default_sink() -> ManifestSink:

@@ -59,14 +59,12 @@ entries:
     $module: lca.plugins.state_store_service
     config: {}
 
-  # Sole owner of LLM credentials, mode, and adapters.
-  # Secrets arrive via profile patch {from_env:} (ADR-0061); not read here.
+  # Sole owner of LLM credentials (.env + aliases) and the chat adapter.
   - id: lca-llm-resolver
     name: lca_llm_resolver
     $module: lca.plugins.llm_resolver
     config:
-      mode: auto
-      default_model: deepseek-chat
+      default_model: qwen3.7-plus
 
   - id: lca-memory-provider
     name: lca_providers_memory

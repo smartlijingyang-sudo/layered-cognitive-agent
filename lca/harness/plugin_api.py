@@ -7,13 +7,14 @@ Business plugins import :func:`plugin` from here directly. Vendored Cordis
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
 from cordis.plugin import Plugin as CordisPlugin
 from cordis.plugin import plugin as _cordis_plugin
+from pydantic import BaseModel
 
 from lca.contracts.capabilities import Capability, cap_key
 
@@ -22,10 +23,18 @@ __all__ = [
     "PluginContext",
     "PluginDefinition",
     "PluginKind",
+    "PluginSetupFn",
     "UndeclaredInteractionError",
     "definition_from_plugin",
     "plugin",
 ]
+
+# A plugin's ``setup`` callable MUST match this signature. The constraint
+# lives at the decorator entry point on purpose: mypy enforces it for every
+# ``@plugin``-decorated function, so untyped ``async def setup(ctx, config)``
+# is rejected at decoration time, not at use time. ``BaseModel`` is the
+# abstract bound for the pydantic Config; concrete subclasses satisfy it.
+PluginSetupFn = Callable[["PluginContext", BaseModel], Awaitable[None]]
 
 
 class PluginKind(str, Enum):
@@ -89,7 +98,7 @@ class PluginDefinition:
     effects: frozenset[EffectClass]
     test_suite: str
     description: str
-    setup: Callable[..., Any]
+    setup: PluginSetupFn
     module: str | None = None
 
 
@@ -161,7 +170,7 @@ def _resolve_layer_kind(
 
 
 def plugin(
-    setup: Callable[..., Any] | None = None,
+    setup: PluginSetupFn | None = None,
     *,
     id: str,
     Config: type[Any] | None = None,  # noqa: N803
@@ -185,9 +194,15 @@ def plugin(
     ``policy_class``, taxonomy ``service``/``provider``/``behavior``/
     ``guard``/``sensor``) are accepted — every plugin must declare
     canonical fields directly.
+
+    The ``setup`` callable (or the function the decorator is applied to)
+    MUST match :data:`PluginSetupFn`: ``async def setup(ctx: PluginContext,
+    config: <BaseModel>) -> None``. Type-checking is enforced by mypy via
+    :data:`PluginSetupFn`; :func:`scripts.check_plugin_typing` enforces it
+    as a pre-commit fallback.
     """
 
-    def _wrap(fn: Callable[..., Any]) -> CordisPlugin:
+    def _wrap(fn: PluginSetupFn) -> CordisPlugin:
         resolved_layer, resolved_kind = _resolve_layer_kind(layer=layer, kind=kind)
         config_cls = Config or _config_from_annotations(fn)
 

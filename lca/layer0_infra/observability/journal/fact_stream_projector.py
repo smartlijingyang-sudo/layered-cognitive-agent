@@ -140,7 +140,7 @@ class FactStreamProjector(JournalProjector):
         self._total_tool_calls: int = 0
         self._total_tool_errors: int = 0
         # 事件渲染注册表
-        self._renderers: dict[type[JournalEvent], Callable[[StampedEvent, JournalEvent], None]] = {
+        self._renderers: dict[type[JournalEvent], Callable[..., None]] = {
             TeamRunStarted: self._render_team_started,
             TeamRunFinished: self._render_team_finished,
             AgentRunStarted: self._render_agent_started,

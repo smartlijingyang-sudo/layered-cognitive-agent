@@ -7,15 +7,15 @@ from pydantic import BaseModel
 from lca.contracts.atoms.enums import HookEvent
 from lca.contracts.capabilities import HOOKS
 from lca.contracts.protocols import HookRegistry
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-def build_simple_hook_registry(ctx) -> HookRegistry:
-    from lca.layer1_cognitive.hook_registry import CordisHookRegistry
+def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
+    from lca.layer1_cognitive.hook_registry import CordisHookRegistry, default_logging_hook
 
     hooks = CordisHookRegistry(ctx)
     try:
@@ -41,6 +41,6 @@ def build_simple_hook_registry(ctx) -> HookRegistry:
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     ctx.register(HOOKS.key, "simple", lambda: build_simple_hook_registry(ctx))

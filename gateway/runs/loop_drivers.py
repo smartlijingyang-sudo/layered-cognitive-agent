@@ -12,11 +12,12 @@ from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from itertools import count
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from gateway.modes import SOLO_MODE_KEY, SOLO_ROLE
 from gateway.runs.dsh_execute import execute_dsh_session
 from gateway.runs.session import RunSession
+from lca.contracts.atoms.ids import RunId, TraceId
 from lca.contracts.mechanisms.capability import provider_current, require_capability
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.plane import PlaneBindings
@@ -69,9 +70,6 @@ class DriverOutcome:
 class RunLoopDriver(Protocol):
     """A loop provider available to the legacy HTTP carrier."""
 
-    uses_sandbox: bool
-    plane_target: str | None
-
     async def execute(
         self,
         session: RunSession,
@@ -86,10 +84,11 @@ class RunLoopDriver(Protocol):
 
 
 class CognitiveRunDriver:
-    """Default driver — uses plugin-tree Resolver + Agent / Team composition."""
+    """Default driver — uses plugin-tree Resolver + Agent / Team composition.
 
-    uses_sandbox = True
-    plane_target: str | None = None
+    Plane ownership is decided by ``session.plane`` / ``resolve_run_intent``,
+    never by the driver itself.
+    """
 
     async def execute(
         self,
@@ -155,10 +154,11 @@ class CognitiveRunDriver:
 
 
 class DshRunDriver:
-    """DSH sub-process driver (production path)."""
+    """DSH sub-process driver (production path).
 
-    uses_sandbox = False
-    plane_target = "device"
+    Plane hint must arrive as ``plane: 'machine'`` from the wire; the driver
+    never overrides the request.
+    """
 
     async def execute(
         self,
@@ -231,7 +231,7 @@ async def _build_team(
     """Team LLM casting — select roles + governance, then build Team."""
     resolved_library = library if library is not None else FileRoleLibrary()
     resolved_caster = caster if caster is not None else LLMTeamCaster()
-    record_scope = RunScope(trace_id=trace_id, run_id=run_id)
+    record_scope = RunScope(trace_id=cast(TraceId, trace_id), run_id=cast(RunId, run_id))
     with bind(observability), run_scope(record_scope):
         record(CastingStarted(objective_preview=objective_preview(objective)))
         try:
@@ -290,17 +290,3 @@ def _record_inbox_followup(*, session: RunSession, question: str, mode: str) -> 
                 payload_preview=question[:200] if isinstance(question, str) else "",
             )
         )
-
-
-# ── Default driver registration (ADR-0062 §6 / PR-5) ────────────────────
-
-
-def register_default_drivers(registry: Any) -> None:
-    """Register the gateway-side default drivers into a runtime registry.
-
-    Caller passes the ``RunLoopDriverRegistry`` instance obtained from
-    the booted plugin tree (``ctx.inject("run_loop_driver_registry")``).
-    Drivers are registered under their canonical target strings; the
-    registry de-duplicates by target.
-    """
-    registry.register("cognitive", CognitiveRunDriver())

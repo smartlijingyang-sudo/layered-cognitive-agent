@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from lca.contracts.capabilities import BODIES
 from lca.contracts.protocols import Body
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -23,7 +23,7 @@ class Config(BaseModel):
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     from lca.layer1_cognitive.body.simple_body import SimpleBody
 

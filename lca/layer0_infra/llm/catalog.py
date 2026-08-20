@@ -37,6 +37,7 @@ _QWEN_CHAT_CAPS: frozenset[str] = frozenset(
 )
 
 _KNOWN_MODELS: tuple[ModelDefinition, ...] = (
+    ModelDefinition("qwen3.7-plus", "Qwen 3.7 Plus", "dashscope", _QWEN_CHAT_CAPS),
     ModelDefinition("qwen-plus", "Qwen Plus", "dashscope", _QWEN_CHAT_CAPS),
     ModelDefinition("qwen-turbo", "Qwen Turbo", "dashscope", _QWEN_CHAT_CAPS),
     ModelDefinition("qwen-max", "Qwen Max", "dashscope", _QWEN_CHAT_CAPS),

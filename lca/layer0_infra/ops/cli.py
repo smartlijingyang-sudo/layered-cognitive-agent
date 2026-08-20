@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import typer
 
@@ -661,7 +661,8 @@ def inspect_tree(
             data = _yaml.safe_load(fh) or {}
         graph = _graph_from_yaml(profile, data)
         print(f"Profile: {profile} (unbooted: {exc})")
-        print(f"Plugins: {graph.get('totals', {}).get('plugins', 0)}")
+        totals = cast("dict[str, object]", graph.get("totals", {}))
+        print(f"Plugins: {cast(int, totals.get('plugins', 0))}")
         return
 
     print(format_plugin_tree(ctx, profile=str(profile)))

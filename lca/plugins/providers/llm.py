@@ -1,62 +1,12 @@
-"""LLM Provider plugin — Tier-2 canonical.
+"""Retired: LLM adapters are owned solely by ``lca.plugins.llm_resolver``.
 
-Single plugin per seam with a factory pattern: registers multiple provider
-implementations and selects the active one via `config.mode`.
-
-Profiles swap providers by patching:
-  - `config.mode` (auto | real | deepseek | mock | pi_ai)
-  - `config.providers` (list of allowed provider names)
-  - `config.api_key` / `config.base_url` (real/deepseek creds)
+This module remains importable so old bundle/test references fail loudly
+instead of silently registering mock/deepseek providers.
 """
 
 from __future__ import annotations
-from pydantic import BaseModel, Field
-from lca.contracts.protocols import LLMAdapter
-from lca.harness.plugin_api import plugin, PluginKind
 
-
-class Config(BaseModel):
-    model_config = {"extra": "forbid"}
-    mode: str = Field(default="auto", description="auto|real|deepseek|mock|pi_ai")
-    providers: list[str] = Field(default_factory=lambda: ["mock", "real", "deepseek"])
-    api_key: str | None = None
-    base_url: str | None = None
-
-
-@plugin(
-    id="lca-llm-provider",
-    requires=["llm"],
-    implements=[LLMAdapter],
-    layer="L0",
-    effects="none",
-    description="Register LLM adapter providers on the LlmService Definition.",
-    test_suite="tests/test_plugin_tree_single_owner.py",
-    kind=PluginKind.PROVIDER,
+raise ImportError(
+    "lca.plugins.providers.llm is retired; use lca.plugins.llm_resolver "
+    "(id=lca-llm-resolver) as the sole LLM credential and adapter owner."
 )
-async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-    from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
-    from lca.layer0_infra.llm_resolver import live_credential
-
-    llm = ctx.inject("llm")
-    api_key = live_credential(config.api_key)
-    target = config.mode
-    if target == "auto":
-        target = "real" if api_key else "mock"
-    if target not in config.providers:
-        target = config.providers[0]
-    if "mock" in config.providers:
-        llm.register("mock", MockLLMAdapter(), activate=target == "mock")
-    if "real" in config.providers:
-        llm.register(
-            "real",
-            OpenAICompatAdapter(api_key=api_key, base_url=config.base_url),
-            activate=target == "real",
-        )
-    if "deepseek" in config.providers:
-        base = config.base_url or "https://api.deepseek.com"
-        llm.register(
-            "deepseek",
-            OpenAICompatAdapter(api_key=api_key, base_url=base),
-            activate=target == "deepseek",
-        )

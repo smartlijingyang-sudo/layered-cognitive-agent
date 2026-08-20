@@ -32,7 +32,7 @@ import dataclasses
 import time
 from collections.abc import Callable, Sequence
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -40,6 +40,7 @@ from lca.contracts.models.observability.journal import (
     JournalEvent,
     RunScope,
     StampedEvent,
+    ToolInvoked,
     get_current_run_scope,
 )
 from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
@@ -154,7 +155,10 @@ class RunStore:
         """
         if not getattr(type(event), "__dataclass_params__", None):
             raise TypeError(f"journal event must be a dataclass, got {type(event).__name__}")
-        if not type(event).__dataclass_params__.frozen:
+        # ``type(event)`` is ``type[JournalEvent]`` (the marker base); the
+        # dataclass-ness is checked at runtime on the concrete subclass.
+        params = getattr(cast(Any, type(event)), "__dataclass_params__", None)
+        if not getattr(params, "frozen", False):
             raise TypeError(f"journal event must be frozen dataclass: {type(event).__name__}")
         # 深拷贝隔离：调用方持有的引用不影响 log 内的副本
         return copy.deepcopy(event)

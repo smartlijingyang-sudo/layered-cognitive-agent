@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 
 class CapabilityKey(str, Enum):
@@ -78,13 +78,13 @@ def provider_current(svc: object) -> object | None:
         if not getattr(providers, "active", None):
             return None
         try:
-            return providers.current()
+            return cast("object", providers.current())
         except Exception:
             return None
     current_attr = getattr(svc, "current", None)
     if callable(current_attr):
         try:
-            return current_attr()
+            return cast("object", current_attr())
         except Exception:
             return None
     return svc

@@ -71,8 +71,26 @@ def _unwrap_llm(llm: Any) -> Any:
 
 @pytest.fixture
 def no_llm_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("LLM_API_KEY", raising=False)
-    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    """Block dotenv reload and clear credential env so boot has no real key."""
+    monkeypatch.setattr(
+        "lca.layer0_infra.llm.config.prepare_llm_environ",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        "lca.layer0_infra.llm_adapter.factory.load_dotenv_if_present",
+        lambda path=None: None,
+    )
+    for key in (
+        "LLM_API_KEY",
+        "LLM_BASE_URL",
+        "LLM_OPENAI_BASE_URL",
+        "LLM_MODEL",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_MODEL",
+    ):
+        monkeypatch.delenv(key, raising=False)
 
 
 @pytest.mark.asyncio
@@ -95,6 +113,9 @@ async def test_every_default_entry_is_consumed(no_llm_key: None) -> None:
         return orig(key, **kwargs)
 
     ctx.inject = spy  # type: ignore[method-assign]
+    from tests.support.gateway_scripted import ScriptedLLMResolver
+
+    ctx.provide("llm_resolver", ScriptedLLMResolver())
     registry = RunRegistry()
     session = create_run_session(registry, question="ping", user_text="ping", mode="solo", ctx=ctx)
     await execute_run(registry, run_id=session.run_id, question="ping", mode="solo", ctx=ctx)
@@ -189,7 +210,10 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
     no_llm_key: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Skills factory gone → compose/execute miss the seam; no module-level store."""
+    from tests.support.gateway_scripted import ScriptedLLMResolver
+
     ctx = await _boot_omitting("lca-skills-provider")
+    ctx.provide("llm_resolver", ScriptedLLMResolver())
 
     def _boom(*_a: object, **_k: object) -> object:
         raise AssertionError("resolve_skill_store must not run when skills-provider is omitted")
@@ -218,15 +242,15 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
 async def test_llm_single_owner_without_key(no_llm_key: None) -> None:
     ctx = await boot_profile(DEFAULT_PROFILE)
     resolver = ctx.inject("llm_resolver")
-    adapter = resolver.resolve()
-    current = ctx.inject("llm").providers.current()
-    assert type(adapter).__name__ == "MockLLMAdapter"
-    assert type(current).__name__ == "MockLLMAdapter"
+    assert resolver.is_available() is False
+    with pytest.raises(Exception, match="LLM_API_KEY"):
+        resolver.resolve()
     assert live_credential("${LLM_API_KEY}") is None
     assert live_credential("") is None
     assert live_credential("sk-live") == "sk-live"
-    # Placeholder must not flip the service onto a real adapter.
-    assert ctx.inject("llm").providers.active == "mock"
+    # No mock/deepseek provider registered on the llm seam.
+    assert "mock" not in set(ctx.inject("llm").providers.names())
+    assert "deepseek" not in set(ctx.inject("llm").providers.names())
 
 
 @pytest.mark.asyncio
@@ -237,7 +261,7 @@ async def test_empty_execution_target_uses_profile_default(no_llm_key: None) -> 
     named = registry.resolve("cognitive")
     assert empty is named
     with pytest.raises(Exception, match="execution_target"):
-        registry.resolve("dsh")
+        registry.resolve("never-registered-loop")
 
 
 @pytest.mark.asyncio
@@ -255,7 +279,10 @@ async def test_overlapping_compose_keeps_distinct_adapters(no_llm_key: None) -> 
 async def test_cognitive_driver_composes_once(
     no_llm_key: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from tests.support.gateway_scripted import ScriptedLLMResolver
+
     ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx.provide("llm_resolver", ScriptedLLMResolver())
     calls = {"n": 0}
     original = spawn_agent
 
@@ -275,8 +302,11 @@ async def test_cognitive_driver_composes_once(
 
 
 @pytest.mark.asyncio
-async def test_two_execute_runs_complete_with_mock_text(no_llm_key: None) -> None:
+async def test_two_execute_runs_complete_with_scripted_text(no_llm_key: None) -> None:
+    from tests.support.gateway_scripted import ScriptedLLMResolver
+
     ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx.provide("llm_resolver", ScriptedLLMResolver())
     outputs: list[str] = []
     for question in ("say hello in one word", "say goodbye in one word"):
         registry = RunRegistry()
@@ -287,7 +317,7 @@ async def test_two_execute_runs_complete_with_mock_text(no_llm_key: None) -> Non
         assert session.status == RunStatus.COMPLETED, session.error
         journal = session.jsonl_path.read_text(encoding="utf-8")
         assert journal.strip(), "run journal is empty"
-        assert "通用问题" in journal or "mock" in journal.lower() or "respond" in journal
+        assert "通用问题" in journal or "respond" in journal or "solo" in journal.lower()
         outputs.append(journal)
     assert len(outputs) == 2
 
@@ -304,3 +334,85 @@ async def test_dump_profile_matches_boot_ids() -> None:
         and not (isinstance(e.get("config"), dict) and e["config"].get("disabled"))
     }
     assert dumped == _entry_ids(ctx)
+
+
+@pytest.mark.asyncio
+async def test_unknown_execution_target_writes_journal_and_session_error(
+    no_llm_key: None,
+) -> None:
+    """sandbox/device/etc. → plane hint; missing-loop token → error visible
+    in both the snapshot endpoint (``session.error``) and the journal
+    jsonl that ``lca-ops logs`` replays.
+    """
+    from tests.support.gateway_scripted import ScriptedLLMResolver
+
+    ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx.provide("llm_resolver", ScriptedLLMResolver())
+    registry = RunRegistry()
+    session = create_run_session(
+        registry,
+        question="你好吗",
+        user_text="你好吗",
+        mode="solo",
+        execution_target="sandbox",  # plane hint, profile default driver
+        ctx=ctx,
+    )
+    await execute_run(
+        registry,
+        run_id=session.run_id,
+        question="你好吗",
+        mode="solo",
+        ctx=ctx,
+    )
+    assert session.error == "", session.error
+    assert session.status in {RunStatus.FAILED, RunStatus.COMPLETED}
+
+    session2 = create_run_session(
+        registry,
+        question="x",
+        user_text="x",
+        mode="solo",
+        execution_target="no-such-loop",
+        ctx=ctx,
+    )
+    await execute_run(
+        registry,
+        run_id=session2.run_id,
+        question="x",
+        mode="solo",
+        ctx=ctx,
+    )
+    assert session2.status == RunStatus.FAILED
+    assert "no-such-loop" in (session2.error or "")
+    assert "loop plugin" in (session2.error or "").lower()
+    # Internal exception class name must not leak to end users.
+    assert "_UnknownExecutionTargetError" not in (session2.error or "")
+    journal = session2.jsonl_path.read_text(encoding="utf-8")
+    assert "AgentRunFinished" in journal
+    assert "no-such-loop" in journal
+
+
+@pytest.mark.asyncio
+async def test_dsh_loop_is_a_real_plugin(no_llm_key: None) -> None:
+    """lca-loop-dsh registers DshRunDriver into the runtime registry.
+
+    Opt-in via ``bundles/loop-dsh.yaml``; web-app.yaml does not ship it
+    by default because DSH is a separate deployment artifact.
+    """
+    from pathlib import Path
+
+    import yaml as _yaml
+    from lca.harness.profile.boot import boot_entries, load_profile_entries
+
+    webapp_ids = {e["id"] for e in load_profile_entries(DEFAULT_PROFILE)}
+    assert "lca-loop-cognitive" in webapp_ids
+    assert "lca-loop-dsh" not in webapp_ids
+
+    loop_dsh_entries = _yaml.safe_load(Path("bundles/loop-dsh.yaml").read_text())["entries"]
+    entries = load_profile_entries(DEFAULT_PROFILE) + loop_dsh_entries
+    ctx = await boot_entries(entries)
+    registry = ctx.inject("run_loop_driver_registry")
+    assert registry.contains("cognitive")
+    assert registry.contains("dsh")
+    assert registry.resolve("cognitive") is registry.resolve("cognitive")
+    assert registry.resolve("dsh") is not registry.resolve("cognitive")

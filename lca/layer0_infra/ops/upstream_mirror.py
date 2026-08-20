@@ -310,7 +310,7 @@ def diff_trees(
 def coverage_stats(
     upstream: dict[str, UpstreamTree],
     diff: MirrorDiff,
-) -> dict[str, int]:
+) -> dict[str, int | float]:
     """Compute coverage numbers used by the human-readable report."""
     up_top = len(upstream)
     up_sub = sum(len(t.sub_names) for t in upstream.values())
@@ -339,7 +339,7 @@ def coverage_stats(
 
 def format_report(
     diff: MirrorDiff,
-    stats: dict[str, int],
+    stats: dict[str, int | float],
     *,
     upstream_root: Path,
     target_root: Path,
@@ -418,7 +418,7 @@ def format_report(
 
 def format_json(
     diff: MirrorDiff,
-    stats: dict[str, int],
+    stats: dict[str, int | float],
     *,
     upstream_root: Path,
     target_root: Path,
@@ -598,7 +598,7 @@ def _render_py_stub(ts_rel: str, exports: tuple[str, ...]) -> str:
     # We don't have the per-export (name, kind) tuple in this signature — to
     # keep the call site simple we accept a flat list and let ``_render_py_stub``
     # classify by inspection. The richer variant is ``_render_py_stub_kinds``.
-    return _render_py_stub_kinds(ts_rel, [(name, "reexport") for name in exports])
+    return _render_py_stub_kinds(ts_rel, tuple((name, "reexport") for name in exports))
 
 
 def _render_py_stub_kinds(
@@ -711,8 +711,12 @@ def populate_surface_stubs(
                         tree = ast.parse(local_file.read_text(encoding="utf-8"))
                     except SyntaxError:
                         tree = None
+                    # ``ast.TypeAlias`` is Python 3.12+; fall back to AnnAssign
+                    # with a Name target on 3.11 (where ``from __future__ import
+                    # annotations`` leaves the right-hand side unparsed at AST time).
+                    type_alias_nodes = (ast.TypeAlias,) if hasattr(ast, "TypeAlias") else ()
                     if tree is not None and any(
-                        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Assign, ast.AnnAssign, ast.TypeAlias))
+                        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Assign, ast.AnnAssign, *type_alias_nodes))
                         for node in tree.body
                     ):
                         skipped += 1

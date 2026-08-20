@@ -64,7 +64,8 @@ _LINE_ALLOW_PATTERNS = [
     re.compile(r"_OPS.*dict\[type,\s*Any\]"),  # 操作映射表
     re.compile(r"_get_mcp_session.*->\s*Any"),  # 第三方 SDK session
     re.compile(r"_subs.*dict\[str.*Any"),  # 事件总线内部
-    re.compile(r"async def setup\(ctx:?\s*Any[,\s]*config:?\s*Any"),  # cordis @plugin 标准签名
+    # NOTE: ``async def setup(ctx: Any, config: Any)`` 是历史上错误的写法，
+    # 已经统一迁移到 ``ctx: PluginContext, config: Config``；不在白名单。
 ]
 
 _ROOT = Path(__file__).resolve().parent.parent

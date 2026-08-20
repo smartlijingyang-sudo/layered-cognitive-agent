@@ -14,7 +14,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from lca.layer0_infra.llm_adapter.factory import load_dotenv_if_present
 
-DEFAULT_CHAT_MODEL = "qwen-plus"
+DEFAULT_CHAT_MODEL = "qwen3.7-plus"
 
 
 class LLMFace(str, Enum):
@@ -106,8 +106,41 @@ class LLMProviderSettings(BaseSettings):
         )
 
 
-def load_provider_settings() -> LLMProviderSettings:
+# ANTHROPIC_* → LLM_* fill-ins only when the LLM_* key is missing/empty.
+_ALIAS_FILLINS: tuple[tuple[str, str], ...] = (
+    ("LLM_API_KEY", "ANTHROPIC_AUTH_TOKEN"),
+    ("LLM_API_KEY", "ANTHROPIC_API_KEY"),
+    ("LLM_MODEL", "ANTHROPIC_MODEL"),
+    ("LLM_BASE_URL", "ANTHROPIC_BASE_URL"),
+)
+
+
+def normalize_llm_environ() -> None:
+    """Fill empty ``LLM_*`` from Anthropic aliases. Never overwrite a set LLM_*."""
+    import os
+
+    for llm_key, alias in _ALIAS_FILLINS:
+        current = os.environ.get(llm_key, "").strip()
+        if current:
+            continue
+        alias_val = os.environ.get(alias, "").strip()
+        if alias_val:
+            os.environ[llm_key] = alias_val
+
+
+def prepare_llm_environ() -> None:
+    """Sole process-env prep for LLM credentials: dotenv then alias normalize.
+
+    Owned by the ``lca-llm-resolver`` plugin call path (and by
+    ``load_provider_settings`` for non-boot library callers). Gateway/ops
+    must not load ``.env`` themselves.
+    """
     load_dotenv_if_present()
+    normalize_llm_environ()
+
+
+def load_provider_settings() -> LLMProviderSettings:
+    prepare_llm_environ()
     return LLMProviderSettings()
 
 

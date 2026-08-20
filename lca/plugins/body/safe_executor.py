@@ -1,9 +1,11 @@
 """SimpleSafeExecutor plugin — named factory ``safe_executor.simple``."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel
+
 from lca.contracts.protocols.infra import SafeExecutor
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -20,7 +22,7 @@ class Config(BaseModel):
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide the named SafeExecutor factory ``safe_executor.simple``."""
     from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 

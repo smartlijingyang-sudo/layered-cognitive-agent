@@ -1,9 +1,11 @@
 """Memory Provider plugin — Tier-2."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel, Field
+
 from lca.contracts.protocols import MemorySystem
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -21,7 +23,7 @@ class Config(BaseModel):
     test_suite="tests/test_plugin_tree_single_owner.py",
     kind=PluginKind.PROVIDER,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
     if "simple" in config.providers:

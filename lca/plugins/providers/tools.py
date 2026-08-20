@@ -1,9 +1,11 @@
 """Tools Provider plugin — Tier-2 (tool factories)."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel, Field
+
 from lca.contracts.protocols.infra import Tool
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -35,6 +37,6 @@ def _g2a_factory(run: object | None = None) -> list:
     test_suite="tests/test_plugin_tree_single_owner.py",
     kind=PluginKind.PROVIDER,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     if "g2a" in config.factories:
         ctx.inject("tools").register_factory("g2a", _g2a_factory)

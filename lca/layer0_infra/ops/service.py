@@ -112,6 +112,26 @@ class Service(Protocol):
         ...
 
 
+@runtime_checkable
+class CliShippingService(Protocol):
+    """Services that ship a managed CLI binary on disk.
+
+    Currently only ``DaemonService`` satisfies this; the CLI is the
+    sandbox-user daemon. Other services (``GatewayService``,
+    ``InfraService`` etc.) do not own a CLI and must not be type-checked
+    against this Protocol.
+    """
+
+    def _cli_deployed(self) -> bool:
+        """True iff the managed CLI binary is on disk and matches the
+        expected fingerprint."""
+        ...
+
+    def _cli_source_changed(self) -> bool:
+        """True iff the CLI source has changed since the last deploy."""
+        ...
+
+
 # ── Process management primitives ─────────────────────────────────────
 
 

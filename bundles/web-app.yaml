@@ -143,11 +143,17 @@ entries:
       default: cognitive
 
   # ── Loop drivers (Tier-3) ───────────────────────────
+  # Each loop plugin declares its requires/provides and registers its
+  # driver into ``run_loop_driver_registry``. Bundle controls which loops
+  # are loaded; nothing in gateway hard-codes drivers.
   - id: lca-loop-cognitive
     name: lca_loop_cognitive
     $module: lca.plugins.loop_cognitive
     config:
       target: cognitive
+  # lca-loop-dsh is NOT loaded here: deployments that ship DSH opt in via
+  # bundles/loop-dsh.yaml in their profile. Avoids registering a driver
+  # whose runtime (DSH daemon) may not be deployed.
 
   # ── Compose-time named factories (DSH-style) ──────────
   # Provide fresh capability service instances at compose time

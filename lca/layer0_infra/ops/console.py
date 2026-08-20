@@ -36,7 +36,10 @@ class Console:
 
     def __init__(self, config: ConsoleConfig | None = None) -> None:
         self._config = config or ConsoleConfig()
-        self._rich = RichConsole() if not self._config.json_mode else None
+        # _rich is always constructed; in json_mode every method returns
+        # early before reaching `_rich.print(...)`, so the field never
+        # carries a runtime None even though its constructor is unconditional.
+        self._rich: RichConsole = RichConsole()
         self._json_output: list[dict[str, Any]] = []
 
     # ── Service Status ────────────────────────────────────────────────

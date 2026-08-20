@@ -1,11 +1,9 @@
 """LLM Adapter 工厂 —— 环境变量驱动的 LLM 选择 + .env 加载。
 
-设计目标：
-  1. 任何 demo / 测试 / 用户代码只需一行 ``resolve_llm_adapter()`` 即可获得可用 LLM。
-  2. 有 ``LLM_API_KEY`` 环境变量 → 返回 ``OpenAICompatAdapter``（真实网络调用）。
-  3. 无 Key → 返回 ``MockLLMAdapter``（离线确定性，零成本）。
-  4. ``load_dotenv_if_present()`` 从 CWD 向上寻找最近的 ``.env`` 文件，
-     不再硬编码任何开发者本机路径。
+生产路径请用插件 ``lca-llm-resolver``。本模块供脚本 / 库调用：
+  1. ``prepare_llm_environ``（dotenv + 别名）后读 ``LLM_*``
+  2. 有 Key → ``OpenAICompatAdapter``
+  3. 无 Key → ``LLMUnavailableError``（不再静默 Mock）
 """
 
 from __future__ import annotations
@@ -59,34 +57,29 @@ def resolve_llm_adapter(
 ) -> LLMAdapter:
     """根据环境变量解析 LLM Adapter 实例。
 
-    优先级：显式参数 > 环境变量 > 降级到 Mock。
+    优先级：显式参数 > ``prepare_llm_environ`` 后的环境变量。
+    无 Key 时抛 ``LLMUnavailableError``（不再静默降级 Mock）。
 
-    Args:
-        api_key: 显式 API Key（覆盖 ``LLM_API_KEY`` 环境变量）。
-        base_url: 显式 Base URL（覆盖 ``LLM_BASE_URL`` 环境变量）。
-        model: 显式模型名（覆盖 ``LLM_MODEL`` 环境变量）。
-
-    Returns:
-        ``OpenAICompatAdapter``（有 Key 时）或 ``MockLLMAdapter``（无 Key 时）。
+    Prefer the booted ``llm_resolver`` capability in process; this helper is
+    for scripts / tests that are outside the plugin tree.
     """
-    from lca.layer0_infra.llm.config import LLMProviderSettings
+    from lca.layer0_infra.llm.config import DEFAULT_CHAT_MODEL, load_provider_settings
+    from lca.layer0_infra.llm.openai_client import LLMUnavailableError
 
-    endpoint = LLMProviderSettings().agent_endpoint()
+    settings = load_provider_settings()
+    endpoint = settings.agent_endpoint()
     resolved_key = api_key if api_key is not None else (endpoint.api_key or None)
     resolved_base = base_url if base_url is not None else endpoint.base_url
-    resolved_model = model if model is not None else (endpoint.model or None)
+    resolved_model = model if model is not None else (endpoint.model or DEFAULT_CHAT_MODEL)
 
-    if resolved_key:
-        from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
+    if not resolved_key:
+        raise LLMUnavailableError("LLM_API_KEY 未配置，无法解析 LLM adapter")
 
-        return OpenAICompatAdapter(
-            model=resolved_model,
-            api_key=resolved_key,
-            base_url=resolved_base,
-            api=api,
-        )
+    from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
 
-    from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-
-    logger.info("No LLM_API_KEY found; falling back to MockLLMAdapter")
-    return MockLLMAdapter()
+    return OpenAICompatAdapter(
+        model=resolved_model,
+        api_key=resolved_key,
+        base_url=resolved_base,
+        api=api,
+    )

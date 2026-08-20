@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from pydantic import BaseModel
 
 from lca.contracts.capabilities import BRAINS
 from lca.contracts.protocols import BrainFactory
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 @plugin(
@@ -20,7 +24,7 @@ from lca.harness.plugin_api import PluginKind, plugin
     description="Register ModularBrain factory as brains['modular'].",
     test_suite="tests/test_plugin_alignment.py",
 )
-async def setup(ctx: Any, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
 

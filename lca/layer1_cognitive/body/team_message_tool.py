@@ -31,16 +31,16 @@ def publish_team_message(
     the ActionRegistry so the tool is invokable via the regular
     ``use_tool`` pipeline.
     """
-    return _journal_record(
-        TeamMessagePublished(
-            team_id=team_id,
-            thread_id=thread_id,
-            sender_role=sender_role,
-            recipient_role=recipient_role,
-            step=step,
-            body_preview=body,
-        )
+    event = TeamMessagePublished(
+        team_id=team_id,
+        thread_id=thread_id,
+        sender_role=sender_role,
+        recipient_role=recipient_role,
+        step=step,
+        body_preview=body,
     )
+    _journal_record(event)
+    return event
 
 
 TEAM_MESSAGE_TOOL_NAME = "team.message-publish"

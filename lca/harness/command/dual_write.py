@@ -56,8 +56,8 @@ class ShadowExecutor:
         Returns:
             The legacy result (authoritative during shadow).
         """
-        legacy_task = asyncio.create_task(legacy_fn())
-        new_task = asyncio.create_task(new_fn())
+        legacy_task: asyncio.Task[Any] = asyncio.create_task(legacy_fn())  # type: ignore[arg-type]
+        new_task: asyncio.Task[Any] = asyncio.create_task(new_fn())  # type: ignore[arg-type]
 
         # Wait for legacy (authoritative)
         legacy_result = await asyncio.wait_for(

@@ -11,22 +11,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import TypeAlias
 
 from lca.layer0_infra.ops.config import OpsConfig
 from lca.layer0_infra.ops.console import Console
 from lca.layer0_infra.ops.registry import ServiceRegistry
 from lca.layer0_infra.ops.state import StateStore
-
-
-class Step(Protocol):
-    """A single pipeline step.
-
-    Steps are pure functions: receive context, perform action, return nothing.
-    Side effects are tracked via context.console and context.state.
-    """
-
-    def __call__(self, context: PipelineContext) -> None: ...
 
 
 @dataclass
@@ -54,6 +44,11 @@ class PipelineContext:
         """Record a step execution."""
         self.log.append(message)
         self.console.step(message)
+
+
+# Step is just a function: receive context, perform action, return nothing.
+# Side effects are tracked via context.console and context.state.
+Step: TypeAlias = Callable[[PipelineContext], None]
 
 
 class Pipeline:

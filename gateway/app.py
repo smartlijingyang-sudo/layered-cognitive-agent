@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any, cast
 
 import structlog
 from starlette.applications import Starlette
@@ -73,7 +74,6 @@ from lca.layer0_infra.file_store import (
     get_default_file_store,
     set_default_file_store,
 )
-from lca.layer0_infra.llm_resolver import ProductionLLMResolver as LLMResolver
 
 _registry = RunRegistry()
 _file_store = get_default_file_store()
@@ -149,22 +149,17 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
     if cached is not None and getattr(cached, "entries", None):
         return
 
-    # Reuse the test-session cached ctx if one exists. Multiple
-    # create_app() calls in the same process share the same plugin tree
-    # so module-level overrides (e.g. ``set_llm_resolver``) propagate.
+    # Reuse the test-session cached ctx if one exists.
     from lca.layer4_app.api import _default_ctx_holder
 
     if _default_ctx_holder.ctx is not None and getattr(_default_ctx_holder.ctx, "entries", None):
         application.state.plugin_tree = _default_ctx_holder.ctx
         application.state.ctx = _default_ctx_holder.ctx
         application.state.profile_path = str(path)
-        # Reset the resolver so the per-app override below is the only
-        # owner; otherwise a prior test's resolver would leak through.
-        _default_ctx_holder.ctx.own_bindings.pop("llm_resolver", None)
         structlog.get_logger("lca.gateway").info(
             "harness_profile_reused",
             profile=str(path),
-            plugin_count=len(_default_ctx_holder.ctx.entries),
+            plugin_count=len(cast(Any, _default_ctx_holder.ctx).entries),
         )
         return
 
@@ -189,15 +184,9 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
     from lca.layer4_app.api import set_default_ctx
 
     set_default_ctx(ctx)
-    # Register the gateway-side default loop drivers into the runtime
-    # registry exposed by the plugin tree (ADR-0062 §6 / PR-5). The
-    # LCA-side plugin tree owns the registry shape; the gateway owns
-    # the driver implementations (which depend on gateway protocol
-    # types like RunSession / SOLO_MODE_KEY).
-    from gateway.runs.loop_drivers import register_default_drivers
-
-    driver_registry = ctx.inject("run_loop_driver_registry")
-    register_default_drivers(driver_registry)
+    # Loop drivers register themselves as plugins (lca-loop-cognitive /
+    # lca-loop-dsh). The bundle decides which are loaded; the runtime
+    # registry is populated by cordis, not by this boot step.
     application.state.profile_path = profile_path
 
     report = build_report(
@@ -221,16 +210,19 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
 
 def create_app(
     registry: RunRegistry | None = None,
-    llm_resolver: LLMResolver | None = None,
     file_store: LocalFileStore | None = None,
     devices: DeviceRegistry | None = None,
     profile_path: str | None = None,
 ) -> Starlette:
-    """Factory: tests inject RunRegistry / LLMResolver / FileStore / DeviceRegistry.
+    """Factory: tests inject RunRegistry / FileStore / DeviceRegistry.
 
     When *profile_path* is provided (or ``LCA_PROFILE`` env var is set),
     the gateway loads the harness plugin tree and stores it in
     ``app.state.plugin_tree`` for use by scope-driven composition.
+
+    LLM credentials are owned by ``lca-llm-resolver`` (loads ``.env``).
+    Tests that need a fake LLM call ``ctx.provide("llm_resolver", …)``
+    after boot — see ``tests.support.gateway_app``.
     """
     global _registry, _file_store, _devices, _device_hub
     if registry is not None:
@@ -242,9 +234,6 @@ def create_app(
         _devices = devices
         _device_hub = DeviceHub(devices)
     bind_devices(_devices, _device_hub)
-    # Defer the (optional) llm_resolver override until after the plugin tree
-    # boots — the override is layered on top of ``lca-llm-resolver``.
-    _llm_resolver_override = llm_resolver
     application = Starlette(
         routes=[
             Route("/health", health, methods=["GET"]),
@@ -312,10 +301,6 @@ def create_app(
         resolved_profile = "profiles/web-standard.yaml"
     if resolved_profile is not None:
         _load_harness_profile(application, resolved_profile)
-    if _llm_resolver_override is not None and application.state.ctx is not None:
-        # Caller (usually tests) supplies its own resolver; replace the one
-        # the plugin tree mounted.
-        application.state.ctx.provide("llm_resolver", _llm_resolver_override)
 
     spine_dir = Path("traces/sessions")
     cordis_ctx = getattr(application.state, "ctx", None)

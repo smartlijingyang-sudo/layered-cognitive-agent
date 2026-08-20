@@ -1,9 +1,11 @@
 """InMemoryMiddlewareRegistry plugin — named factory ``middleware_registry.memory``."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel
+
 from lca.contracts.mechanisms import HookRegistry
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -28,6 +30,6 @@ def build_memory_middleware_registry(hooks: HookRegistry) -> object:
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide the named middleware factory ``middleware_registry.memory``."""
     ctx.provide("middleware_registry.memory", build_memory_middleware_registry)

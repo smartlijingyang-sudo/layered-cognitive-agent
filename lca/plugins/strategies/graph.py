@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import BaseModel
+
 from lca.contracts.capabilities import STRATEGIES
 from lca.contracts.models.team.team_coordination import STRATEGY_KEY_GRAPH, Graph
 from lca.contracts.protocols import TeamAssembly
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 def build_graph_strategy(assembly: TeamAssembly) -> Any:
@@ -19,6 +21,10 @@ def build_graph_strategy(assembly: TeamAssembly) -> Any:
     return GraphStrategy(assembly.stage, execution_graph=governance.execution_graph)
 
 
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
 @plugin(
     id="strategy.graph",
     requires=[STRATEGIES.key],
@@ -28,6 +34,6 @@ def build_graph_strategy(assembly: TeamAssembly) -> Any:
     description="Register graph TeamStrategy factory.",
     test_suite="tests/test_graph_strategy.py",
 )
-async def setup(ctx: Any, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     ctx.register(STRATEGIES.key, STRATEGY_KEY_GRAPH, build_graph_strategy)

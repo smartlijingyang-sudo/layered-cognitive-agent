@@ -65,6 +65,7 @@ from lca.layer4_app.spawn import spawn_agent, spawn_team
 
 if TYPE_CHECKING:
     from cordis import Context
+    from lca.harness.plugin_api import PluginContext
 
 _DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
@@ -84,7 +85,7 @@ class _DefaultCtxHolder:
     legal boot path.
     """
 
-    ctx: object | None = None
+    ctx: PluginContext | None = None
     lock: asyncio.Lock | None = None
 
 
@@ -101,15 +102,6 @@ def __getattr__(name: str) -> object:
     if name == "_cached_default_ctx":
         return _default_ctx_holder.ctx
     raise AttributeError(name)
-
-
-def __setattr__(name: str, value: object) -> None:
-    """Module-level ``__setattr__`` so writes to ``_cached_default_ctx``
-    propagate to the underlying holder (tests rely on this)."""
-    if name == "_cached_default_ctx":
-        _default_ctx_holder.ctx = value
-        return
-    super().__setattr__(name, value)
 
 
 def _default_ctx_lock() -> asyncio.Lock:
@@ -130,14 +122,14 @@ async def ensure_default_ctx() -> Context:
     ``loop.run_until_complete`` on that loop raises RuntimeError.
     """
     if _default_ctx_holder.ctx is not None:
-        return _default_ctx_holder.ctx  # type: ignore[return-value]
+        return _default_ctx_holder.ctx
     async with _default_ctx_lock():
         if _default_ctx_holder.ctx is not None:
-            return _default_ctx_holder.ctx  # type: ignore[return-value]
+            return _default_ctx_holder.ctx
         from lca.harness.profile.boot import boot_profile
 
         _default_ctx_holder.ctx = await boot_profile(_DEFAULT_PROFILE)
-        return _default_ctx_holder.ctx  # type: ignore[return-value]
+        return _default_ctx_holder.ctx
 
 
 def get_or_create_default_ctx() -> Context:
@@ -152,7 +144,7 @@ def get_or_create_default_ctx() -> Context:
       ``await ensure_default_ctx()`` or pass ``scope=``.
     """
     if _default_ctx_holder.ctx is not None:
-        return _default_ctx_holder.ctx  # type: ignore[return-value]
+        return _default_ctx_holder.ctx
 
     from lca.harness.profile.boot import boot_profile
 
@@ -160,7 +152,7 @@ def get_or_create_default_ctx() -> Context:
         asyncio.get_running_loop()
     except RuntimeError:
         _default_ctx_holder.ctx = asyncio.run(boot_profile(_DEFAULT_PROFILE))
-        return _default_ctx_holder.ctx  # type: ignore[return-value]
+        return _default_ctx_holder.ctx
     raise RuntimeError(
         "default plugin context is not booted; await ensure_default_ctx() "
         "or pass scope= from the already-booted cordis Context"

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from pydantic import BaseModel
 
 from lca.contracts.capabilities import BODIES, BRAINS, HOOKS, STOP_RULES, STRATEGIES
 from lca.contracts.mechanisms.factory_registry import FactoryRegistry
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 @plugin(
@@ -25,7 +29,7 @@ from lca.harness.plugin_api import PluginKind, plugin
     description="Empty BODIES/BRAINS/STOP_RULES/HOOKS/STRATEGIES registry seams.",
     test_suite="tests/test_plugin_alignment.py::test_factory_registry_seams",
 )
-async def setup(ctx: Any, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     ctx.provide(BODIES.key, FactoryRegistry("bodies"))
     ctx.provide(BRAINS.key, FactoryRegistry("brains"))

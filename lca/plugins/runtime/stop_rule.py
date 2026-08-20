@@ -5,15 +5,15 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.contracts.capabilities import STOP_RULES
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.layer2_runtime.default_stop_rule import DefaultStopRule
 
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-def build_default_stop_rule():
-    from lca.layer2_runtime.default_stop_rule import DefaultStopRule
+def build_default_stop_rule() -> DefaultStopRule:
     from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 
     return DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy())
@@ -30,6 +30,6 @@ def build_default_stop_rule():
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     ctx.register(STOP_RULES.key, "default", build_default_stop_rule)

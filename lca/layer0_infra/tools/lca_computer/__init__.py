@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Awaitable, Callable, cast
 
 from lca.contracts.protocols import Sandbox, Tool
 from lca.layer0_infra.computer.machine import MachineComputer, MachineTransport
@@ -75,14 +75,14 @@ def build_computer_tools(
         raise TypeError("build_computer_tools requires sandbox or ops")
 
     if hasattr(runtime, "execute_code") and hasattr(runtime, "export_file"):
-        executor = LcaSandboxExecutor(runtime)  # type: ignore[arg-type]
+        executor: LcaSandboxExecutor | LcaComputerExecutor = LcaSandboxExecutor(runtime)
     else:
         executor = LcaComputerExecutor(runtime)
 
     return build_tools_from_manifest(
         CLOUD_SANDBOX_MANIFEST,
         executor,
-        invoke_fn=_invoke_via_executor,
+        invoke_fn=cast("Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor),
         observation_builder=_computer_obs_builder(store),
     )
 
@@ -101,7 +101,7 @@ def build_machine_computer_tools(
     return build_tools_from_manifest(
         MACHINE_MANIFEST,
         executor,
-        invoke_fn=_invoke_via_executor,
+        invoke_fn=cast("Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor),
         observation_builder=_computer_obs_builder(store),
         name_prefix="local_",
     )

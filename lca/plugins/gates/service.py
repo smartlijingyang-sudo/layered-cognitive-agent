@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from pydantic import BaseModel
 
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 @plugin(
@@ -17,7 +21,7 @@ from lca.harness.plugin_api import PluginKind, plugin
     description="Gate group registry; gate plugins add() onto it.",
     test_suite="tests/test_plugin_alignment.py",
 )
-async def setup(ctx: Any, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer1_cognitive.gate_service import GateService
 
     ctx.provide("gates", GateService())

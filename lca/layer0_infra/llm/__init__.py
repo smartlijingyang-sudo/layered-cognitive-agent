@@ -25,6 +25,8 @@ from lca.layer0_infra.llm.config import (
     llm_credentials,
     llm_openai_credentials,
     load_provider_settings,
+    normalize_llm_environ,
+    prepare_llm_environ,
     resolve_endpoint,
 )
 from lca.layer0_infra.llm.openai_client import (
@@ -54,6 +56,8 @@ __all__ = [
     "llm_credentials",
     "llm_openai_credentials",
     "load_provider_settings",
+    "normalize_llm_environ",
+    "prepare_llm_environ",
     "reset_async_openai_client",
     "resolve_endpoint",
 ]

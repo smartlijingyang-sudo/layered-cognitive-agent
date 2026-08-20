@@ -7,9 +7,11 @@ For now, this provides a minimal SessionService that records events.
 """
 
 from __future__ import annotations
-from typing import Any
+
+from pydantic import BaseModel
+
 from lca.contracts.observability.session_events import SessionEventType
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class SessionService:
@@ -24,6 +26,10 @@ class SessionService:
         self._events.append({"type": event_type.value, "session_id": session_id, **payload})
 
 
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
 @plugin(
     id="lca-session-service",
     provides=["session_service"],
@@ -33,5 +39,5 @@ class SessionService:
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
     kind=PluginKind.SEAM,
 )
-async def setup(ctx: Any, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     ctx.provide("session_service", SessionService())

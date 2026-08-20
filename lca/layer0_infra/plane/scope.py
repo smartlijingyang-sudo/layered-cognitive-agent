@@ -90,8 +90,8 @@ def _inside(path: str, root: str, platform: str) -> bool:
     path = _normalize(path, platform)
     root = _normalize(root, platform)
     if _windows(platform):
-        target = PureWindowsPath(path)
-        base = PureWindowsPath(root)
+        target: PureWindowsPath | PurePosixPath = PureWindowsPath(path)
+        base: PureWindowsPath | PurePosixPath = PureWindowsPath(root)
         return target == base or base in target.parents
     target = PurePosixPath(path)
     base = PurePosixPath(root.rstrip("/") or "/")

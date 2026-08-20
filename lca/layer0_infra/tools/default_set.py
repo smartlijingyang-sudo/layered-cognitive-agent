@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from lca.contracts.models.core.plane import PlaneBindings, PlaneKind, PlaneRef
 from lca.contracts.protocols import Tool
+from lca.contracts.protocols.infra import Sandbox
+from lca.contracts.protocols.operational_skills import SkillPackageStore
+from lca.layer0_infra.capability.search import SearchService
 from lca.layer0_infra.file_store import FileStore, get_default_file_store
 from lca.layer0_infra.plane.machine import resolve_machine, resolve_machine_transport
 from lca.layer0_infra.plane.resolve import ref_of, resolve_plane_bindings, sandbox_ref_from
@@ -24,19 +27,34 @@ SEARCH_SKILL_TOOL = "search_skill"
 def build_g2a_chat_tools(
     store: FileStore | None = None,
     bindings: PlaneBindings | None = None,
-    **kwargs: object,
+    *,
+    sandbox: Sandbox | None = None,
+    search: SearchService | None = None,
+    skill_store: SkillPackageStore | None = None,
+    fallback: bool = True,
 ) -> list[Tool]:
     """Tools for LobeHub G2A chat — GeneralChatAgent parity."""
-    return [t for t in build_default_tools(store, bindings, **kwargs) if t.name != SEARCH_SKILL_TOOL]
+    return [
+        t
+        for t in build_default_tools(
+            store,
+            bindings,
+            sandbox=sandbox,
+            search=search,
+            skill_store=skill_store,
+            fallback=fallback,
+        )
+        if t.name != SEARCH_SKILL_TOOL
+    ]
 
 
 def build_default_tools(
     store: FileStore | None = None,
     bindings: PlaneBindings | None = None,
     *,
-    sandbox: object | None = None,
-    search: object | None = None,
-    skill_store: object | None = None,
+    sandbox: Sandbox | None = None,
+    search: SearchService | None = None,
+    skill_store: SkillPackageStore | None = None,
     fallback: bool = True,
 ) -> list[Tool]:
     """Tools available to gateway / auto-casting agents.
@@ -101,14 +119,14 @@ def _ambient_bindings() -> PlaneBindings:
 def _tools_for_ref(
     plane: PlaneRef,
     file_store: FileStore,
-    sandbox: object | None,
+    sandbox: Sandbox | None,
 ) -> list[Tool]:
     if plane.kind is PlaneKind.SANDBOX:
         if sandbox is None:
             return []
         return lca_computer.build_computer_tools(
             sandbox=sandbox, plane=plane, file_store=file_store
-        )  # type: ignore[arg-type]
+        )
     transport = resolve_machine_transport(plane.id)
     if transport is None:
         return []

@@ -9,16 +9,17 @@ import time
 from collections.abc import Sequence
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
 from gateway.modes import DEFAULT_MODE
 from gateway.runs.doctor import diagnose
 from gateway.runs.identity import AgentRef, default_agent_ref
+from gateway.runs.intent import resolve_run_intent
 from gateway.runs.live import LiveTail
 from gateway.runs.session import RunRegistry, RunSession, RunStatus
-from lca.contracts.atoms.ids import new_id
+from lca.contracts.atoms.ids import RunId, TraceId, new_id
 from lca.contracts.mechanisms.capability import (
     MissingCapabilityError,
     provider_current,
@@ -26,7 +27,7 @@ from lca.contracts.mechanisms.capability import (
 )
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
 from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.plane import PlaneKind
+from lca.contracts.models.core.plane import PlaneBindings, PlaneKind
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
 from lca.contracts.models.observability.journal import (
     AttachmentStagingCompleted,
@@ -36,7 +37,9 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import JournalProjector
+from lca.contracts.protocols.infra import Sandbox
 from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
+from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.observability import (
     JsonlDiagnosticSink,
     ObservabilityHub,
@@ -47,6 +50,7 @@ from lca.layer0_infra.observability import (
     run_scope,
 )
 from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
+from lca.layer0_infra.observability.journal.reducer import RunStatus as JRunStatus
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.plane.machine import resolve_machine, resolve_machine_transport
 from lca.layer0_infra.plane.resolve import (
@@ -62,6 +66,9 @@ from lca.layer0_infra.search.scope import search_run_scope
 from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
 from lca.layer0_infra.tools.run_finalizer import finalize_run, run_id_scope
 from lca.layer0_infra.workspace import run_workspace_scope
+from lca.plugins.run_loop_driver_registry import (
+    _UnknownExecutionTargetError as _UnknownExecutionTargetError,
+)
 
 _log = structlog.get_logger(__name__)
 
@@ -112,6 +119,7 @@ def set_llm_resolver(resolver: Any) -> None:
     # returns the new adapter. Tests rely on this shim.
     try:
         from lca.layer4_app.api import _default_ctx_holder
+
         cached = _default_ctx_holder.ctx
     except Exception:
         cached = None
@@ -119,7 +127,10 @@ def set_llm_resolver(resolver: Any) -> None:
         if resolver is not None:
             cached.provide("llm_resolver", resolver)
         else:
-            cached.own_bindings.pop("llm_resolver", None)
+            # own_bindings is on the runtime cordis.Context; the audited
+            # PluginContext Protocol intentionally omits it. Cast for the
+            # narrow binding-teardown path.
+            cast(Any, cached).own_bindings.pop("llm_resolver", None)
 
 
 def sanitize_error(error: str) -> str:
@@ -133,11 +144,21 @@ def sanitize_error(error: str) -> str:
 
 
 def format_user_error(error: str, *, run_id: str, trace_id: str) -> str:
-    """结构化错误消息：用户可读原因 + debug 上下文。"""
-    sanitized = sanitize_error(error)
-    if sanitized == error:
-        return f"{sanitized}（run: {run_id}, trace: {trace_id}）"
-    return f"{sanitized}\nrun: {run_id} | trace: {trace_id}"
+    """结构化错误消息：用户可读原因 + debug 上下文。
+
+    内部异常类名前缀（``_UnknownExecutionTargetError:`` / ``KeyError:`` 等）
+    在拼装之前剥掉——终端用户不应看到 Python 内部符号。
+    """
+    user_facing = _strip_internal_exception_prefix(sanitize_error(error))
+    return f"{user_facing}\nrun: {run_id} | trace: {trace_id}"
+
+
+_INTERNAL_EXCEPTION_PREFIX = re.compile(r"^_*[A-Z][A-Za-z0-9._]*Error:\s*")
+
+
+def _strip_internal_exception_prefix(error: str) -> str:
+    """去掉形如 ``KeyError: foo`` / ``_UnknownExecutionTargetError: bar`` 的前缀。"""
+    return _INTERNAL_EXCEPTION_PREFIX.sub("", error or "", count=1)
 
 
 def assemble_run_hub(
@@ -156,10 +177,13 @@ def assemble_run_hub(
         if cfg.diagnostics_enabled
         else ()
     )
-    return require_capability(ctx, "observability").create(
-        settings=cfg,
-        extra_projectors=tuple(extra),
-        diagnostic_sinks=diagnostic_sinks,
+    return cast(
+        ObservabilityHub,
+        require_capability(ctx, "observability").create(
+            settings=cfg,
+            extra_projectors=tuple(extra),
+            diagnostic_sinks=diagnostic_sinks,
+        ),
     )
 
 
@@ -267,8 +291,7 @@ async def execute_run(
     ctx: Any | None = None,
 ) -> None:
     """Drive one Run. ``ctx`` is the boot-time plugin tree; legacy callers
-    (tests that pre-date the cordis migration) may pass ``None`` and rely
-    on ``set_llm_resolver`` + ``get_or_create_default_ctx``."""
+    (tests) may pass ``None`` and rely on ``set_llm_resolver`` + default ctx."""
     session = registry.get(run_id)
     if session is None:
         return
@@ -276,18 +299,11 @@ async def execute_run(
         from lca.layer4_app.api import get_or_create_default_ctx
 
         ctx = get_or_create_default_ctx()
-    # Legacy back-compat: tests that pre-date the cordis migration set a
-    # module-level resolver via ``set_llm_resolver``. Only push if the
-    # ctx doesn't already carry a per-request override — otherwise we'd
-    # clobber what ``create_app(llm_resolver=…)`` just installed.
+    # Test shim: ``set_llm_resolver`` pushes onto ctx when no resolver yet.
     if _default_llm_resolver is not None and "llm_resolver" not in ctx.own_bindings:
         ctx.provide("llm_resolver", _default_llm_resolver)
     session.status = RunStatus.RUNNING
-    hub = (
-        session.hub
-        if session.hub is not None
-        else create_hub_for_session(session, ctx=ctx)
-    )
+    hub = session.hub if session.hub is not None else create_hub_for_session(session, ctx=ctx)
     workspace_ref: list[Any] = [None]
     success = False
     try:
@@ -296,7 +312,12 @@ async def execute_run(
             run_attachment_scope(session.attachment_ids),
             run_workspace_scope(session.run_id) as workspace,
             search_run_scope(),
-            run_scope(RunScope(trace_id=session.trace_id, run_id=session.run_id)),
+            run_scope(
+                RunScope(
+                    trace_id=cast(TraceId, session.trace_id),
+                    run_id=cast(RunId, session.run_id),
+                )
+            ),
         ):
             structlog.contextvars.bind_contextvars(
                 run_id=session.run_id,
@@ -307,16 +328,25 @@ async def execute_run(
                 bindings = _freeze_bindings(session, ctx)
             except PlaneBindingError as exc:
                 session.error = str(exc)
+                _record_run_failure(session, exc, hub)
+                return
+            except _UnknownExecutionTargetError as exc:
+                session.error = str(exc)
+                _record_run_failure(session, exc, hub)
                 return
             session.bindings = bindings
-            driver = require_capability(ctx, "run_loop_driver_registry").resolve(
-                session.execution_target
+            driver_registry = require_capability(ctx, "run_loop_driver_registry")
+            intent = resolve_run_intent(
+                driver_registry,
+                execution_target=session.execution_target,
+                plane=session.plane,
+                extra_plane=session.extra_plane,
+                device_id=session.device_id,
             )
+            driver = intent.driver
             sandbox_svc = require_capability(ctx, "sandbox")
             sandbox = provider_current(sandbox_svc)
-            if sandbox is None or not (
-                ref_of(bindings, PlaneKind.SANDBOX) and driver.uses_sandbox
-            ):
+            if sandbox is None or ref_of(bindings, PlaneKind.SANDBOX) is None:
                 sandbox = None
             file_store = provider_current(require_capability(ctx, "file_store"))
             with plane_bindings_scope(bindings):
@@ -324,8 +354,8 @@ async def execute_run(
                     try:
                         await bind_sandbox_runtime(
                             session.run_id,
-                            sandbox,
-                            file_store,
+                            cast(Sandbox, sandbox),
+                            cast(FileStore, file_store),
                             session.attachment_ids,
                         )
                     except Exception as exc:
@@ -382,6 +412,7 @@ async def execute_run(
             run_id=session.run_id,
             trace_id=session.trace_id,
         )
+        _record_run_failure(session, exc, hub)
     finally:
         structlog.contextvars.clear_contextvars()
         if session.status == RunStatus.WAITING_INPUT:
@@ -488,18 +519,18 @@ def _derive_terminal_status(session: RunSession, success: bool) -> None:
         session.closed_at = time.time()
 
 
-def _journal_to_session_status(journal_status: object) -> RunStatus:
+def _journal_to_session_status(journal_status: JRunStatus | None) -> RunStatus:
     """映射 journal reducer 的 RunStatus 到 session 的 RunStatus。"""
-    from lca.layer0_infra.observability.journal.reducer import RunStatus as JRunStatus
-
-    mapping = {
+    mapping: dict[JRunStatus, RunStatus] = {
         JRunStatus.COMPLETED: RunStatus.COMPLETED,
         JRunStatus.FAILED: RunStatus.FAILED,
         JRunStatus.CANCELED: RunStatus.CANCELED,
         JRunStatus.RUNNING: RunStatus.COMPLETED,  # 无 finish 事件但 teardown 到达 → 视为完成
         JRunStatus.WAITING_INPUT: RunStatus.WAITING_INPUT,
     }
-    return mapping.get(journal_status, RunStatus.COMPLETED)  # type: ignore[arg-type]
+    if journal_status is None:
+        return RunStatus.COMPLETED
+    return mapping.get(journal_status, RunStatus.COMPLETED)
 
 
 def _fallback_terminal_status(session: RunSession, success: bool) -> None:
@@ -528,6 +559,55 @@ def _record_doctor(session: RunSession) -> None:
         )
     except Exception:
         _log.warning("run_doctor_failed", hop="H2", run_id=session.run_id, exc_info=True)
+
+
+def _record_run_failure(session: RunSession, exc: BaseException | None, hub: Any) -> None:
+    """Emit ``AgentRunStarted`` + ``AgentRunFinished(error=...)`` so the
+    failure is visible to the journal (jsonl + SSE + ``lca-ops logs``).
+
+    The reducer (``lca/layer0_infra/observability/journal/reducer.py``,
+    rule-2) derives ``RunStatus.FAILED`` from any root-level finished
+    event, keeping ``session.error`` and the snapshot endpoint consistent.
+    """
+    if hub is None:
+        return
+    from lca.contracts.models.core.lifecycle import TaskStatus
+    from lca.contracts.models.observability.journal import (
+        AgentRunFinished,
+        AgentRunStarted,
+    )
+
+    message = session.error or (f"{type(exc).__name__}: {exc}" if exc else "run failed")
+    try:
+        with bind(hub), run_scope(
+            RunScope(
+                trace_id=cast(TraceId, session.trace_id),
+                run_id=cast(RunId, session.run_id),
+            )
+        ):
+            record(
+                AgentRunStarted(
+                    agent_role=session.agent.name if session.agent else "",
+                    strategy_key=session.mode,
+                    objective=session.user_text,
+                    objective_preview=session.user_text[:200],
+                    from_role="",
+                )
+            )
+            record(
+                AgentRunFinished(
+                    status=TaskStatus.FAILED.value,
+                    output_text="",
+                    steps=0,
+                    error=message,
+                )
+            )
+    except Exception:
+        _log.warning(
+            "run_failure_journal_failed",
+            run_id=session.run_id,
+            exc_info=True,
+        )
 
 
 def _emit_artifact_closure_if_needed(
@@ -569,15 +649,10 @@ def _emit_artifact_closure_if_needed(
         )
 
 
-def _freeze_bindings(session: RunSession, ctx: Any):
-    sandbox = provider_current(require_capability(ctx, "sandbox"))
+def _freeze_bindings(session: RunSession, ctx: Any) -> PlaneBindings:
+    sandbox = cast(Sandbox | None, provider_current(require_capability(ctx, "sandbox")))
     sandbox_ref = sandbox_ref_from(sandbox) if sandbox is not None else None
     machine = resolve_machine(session.device_id or None)
-    target = require_capability(ctx, "run_loop_driver_registry").resolve(
-        session.execution_target
-    ).plane_target
-    if target is None:
-        target = session.execution_target
     bindings = resolve_plane_bindings(
         machine,
         sandbox_ref,
@@ -585,7 +660,7 @@ def _freeze_bindings(session: RunSession, ctx: Any):
             device_id=session.device_id,
             plane=session.plane,
             extra_plane=session.extra_plane,
-            execution_target=target,
+            execution_target=session.execution_target,
         ),
     )
     machine_bound = ref_of(bindings, PlaneKind.MACHINE)
@@ -635,7 +710,13 @@ async def _stage_machine_attachments(session: RunSession, store: Any | None) -> 
     )
     started = time.monotonic()
     try:
-        result = await transport.write_files(files, base_dir=machine.root)
+        # write_files signature expects ``dict[str, bytes | str]``; we have
+        # ``dict[str, bytes]``. Mapping is covariant in the value, so cast
+        # through a read-only view to satisfy invariance.
+        result = await transport.write_files(
+            cast("dict[str, bytes | str]", files),
+            base_dir=machine.root,
+        )
     except Exception as exc:
         _log.exception(
             "attachment_staging_transport_error",

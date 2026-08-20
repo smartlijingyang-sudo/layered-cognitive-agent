@@ -1,6 +1,6 @@
 # web-standard profile — default deployment configuration.
 # Bundles: base (Tier-1 services + Tier-2 providers) + web-app (Tier-3 behaviors)
-# Secrets enter only via explicit {from_env:} refs (ADR-0061 P3).
+# LLM secrets are owned by lca-llm-resolver (loads project .env at setup).
 
 bundles:
   - bundles/base.yaml
@@ -9,11 +9,5 @@ bundles:
 patch:
   - id: lca-llm-resolver
     config:
-      mode: auto
-      default_model: deepseek-chat
-      api_key:
-        from_env: LLM_API_KEY
-        required: false
-      base_url:
-        from_env: LLM_BASE_URL
-        required: false
+      default_model: qwen3.7-plus
+      load_dotenv: true

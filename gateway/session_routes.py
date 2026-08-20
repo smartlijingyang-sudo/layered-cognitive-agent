@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from typing import Any
 
 from starlette.requests import Request
@@ -92,7 +93,7 @@ async def stream_events(request: Request) -> StreamingResponse:
     if raw and raw.isdigit():
         last_seq = int(raw)
 
-    async def event_stream():
+    async def event_stream() -> AsyncIterator[str]:
         async for change in _gateway(request).subscribe_changes(session_id, last_seq):
             payload = {
                 "session_id": change.session_id,

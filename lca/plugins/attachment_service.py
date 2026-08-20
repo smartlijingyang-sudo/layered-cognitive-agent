@@ -1,9 +1,11 @@
 """Attachment Service Definition plugin — Tier-1."""
 
 from __future__ import annotations
-from typing import Any
+
+from pydantic import BaseModel
+
 from lca.contracts.protocols.infra import AttachmentIdentity
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class AttachmentService:
@@ -28,6 +30,10 @@ class AttachmentService:
         return self._providers.get(self._active)
 
 
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
 @plugin(
     id="lca-attachment-service",
     provides=["attachment"],
@@ -38,5 +44,5 @@ class AttachmentService:
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
     kind=PluginKind.SEAM,
 )
-async def setup(ctx, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     ctx.provide("attachment", AttachmentService())

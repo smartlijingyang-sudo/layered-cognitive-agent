@@ -18,7 +18,7 @@ from abc import abstractmethod
 from collections.abc import Iterator
 from typing import Any
 
-from lca.contracts.models.core.perception import ContextItem
+from lca.contracts.models.core.perception import ContextItem, ItemKind
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import (
     InboxFollowupCreated,
@@ -32,8 +32,8 @@ from lca.contracts.protocols import Sensor
 from lca.layer0_infra.observability import RunStore
 
 # Item kind identifiers (closed set, see perception.py).
-INBOX_FACTS_KIND = "inbox_facts"
-TEAM_INBOX_KIND = "team_inbox"
+INBOX_FACTS_KIND: ItemKind = "inbox_facts"
+TEAM_INBOX_KIND: ItemKind = "team_inbox"
 
 
 class _JournalSensor(Sensor):
@@ -47,7 +47,7 @@ class _JournalSensor(Sensor):
     """
 
     event_cls: type[_JournalEvent]
-    item_kind: str
+    item_kind: ItemKind
     provenance: str
 
     def __init__(self, store: RunStore, *, since_step: int = 0) -> None:
@@ -69,7 +69,8 @@ class _JournalSensor(Sensor):
     def _iter_events(self) -> Iterator[StampedEvent]:
         for stamped in self._store.events:
             event = stamped.event
-            if isinstance(event, self.event_cls) and event.step >= self._since_step:
+            # ``step`` lives on the stamped scope, not on the bare event
+            if isinstance(event, self.event_cls) and stamped.scope.step >= self._since_step:
                 yield stamped
 
     @abstractmethod

@@ -1,9 +1,11 @@
 """Skills Provider plugin — Tier-2."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel, Field
+
 from lca.contracts.protocols.operational_skills import SkillPackageStore
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -21,7 +23,7 @@ class Config(BaseModel):
     test_suite="tests/test_plugin_tree_single_owner.py",
     kind=PluginKind.PROVIDER,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer0_infra.skills.factory import resolve_skill_store
 
     if "disk" in config.providers:

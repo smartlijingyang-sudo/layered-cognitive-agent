@@ -1,9 +1,11 @@
 """Skill-catalog sensor contribution — posts onto PerceiveService."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel
+
 from lca.contracts.protocols import Sensor
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -20,7 +22,7 @@ class Config(BaseModel):
     test_suite="tests/test_sensors_v3.py",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer1_cognitive.sensors.skill_catalog import build_skill_catalog_sensor
 
     ctx.inject("perceive").add(

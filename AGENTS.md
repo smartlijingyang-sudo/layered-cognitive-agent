@@ -168,6 +168,7 @@ uv run vulture lca --min-confidence 80
 | `scripts/check_no_any.py` | 禁裸 `Any` 类型标注（白名单：`dict[str, Any]` / `**kwargs: Any` / `payload: Any` 等） |
 | `scripts/check_no_bare_strings.py` | 领域语义必用枚举（`ActionType` / `TaskStatus` / `HookEvent` / ...） |
 | `scripts/check_protocol_impl.py` | 实现 `contracts.Protocol` 的类**必须显式继承** |
+| `scripts/check_plugin_typing.py` | 插件 `setup(ctx, config)` 与模块级 `build_*` 工厂必须有完整类型标注（兜底 mypy；与 `plugin()` 装饰器签名 `PluginSetupFn` 互为校验） |
 | `scripts/check_assembly_purity.py` | `spawn.py` 不得有 `==` 字符串比较分支（契约 2：装配期只读不算） |
 | `scripts/check_port_surface.py` | `lca/packages/` 与 `~/deepseek-harness/packages/` 的 public surface parity |
 | `scripts/verify_md_links.py` | Markdown 相对链接必须解析（目标文件存在 + `#fragment` 指向真实标题） |
@@ -177,6 +178,8 @@ uv run vulture lca --min-confidence 80
 
 - 方法 ≤ 200 行，文件 ≤ 1500 行；超过就拆
 - 公共接口必须类型标注；`contracts/` 用 stdlib `dataclass`
+- **插件 `setup` 签名必须满足 `PluginSetupFn`**（`Callable[[PluginContext, BaseModel], Awaitable[None]]`，见 `lca/harness/plugin_api.py`）。`@plugin` 装饰器在签名层强制；`scripts/check_plugin_typing.py` 是绕过 mypy 时的确定性兜底。**未标注 `ctx: PluginContext` 的 setup 函数无法通过编译**——不要再加 `# type: ignore[no-untyped-def]`。
+- **模块级 `build_*` 工厂函数必须完整标注**（参数 + 返回），否则 `check_plugin_typing.py` 阻断
 - 层间只通过 Protocol 通信，同层通过依赖注入协作
 - 多种实现 → `Protocol` + 注册表；外部集成 → 适配器
 - 配置走 pydantic-settings / 环境变量；`LLM_API_KEY` 由 `lca.plugins.llm_resolver` 唯一读取

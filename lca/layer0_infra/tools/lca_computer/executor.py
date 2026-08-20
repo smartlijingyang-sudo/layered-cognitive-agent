@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from lca.layer0_infra.computer.op_result import ComputerOpResult
-from lca.layer0_infra.computer.ops import ComputerOps
+from lca.layer0_infra.computer.ops import ComputerOps, SandboxExecOps
 from lca.layer0_infra.tools.lca_computer.types import ApiName
 
 
@@ -50,7 +50,7 @@ class LcaComputerExecutor:
                 state={},
                 error=f"unknown apiName: {api_name}",
             )
-        return await dispatch(self, params)
+        return cast(ComputerOpResult, await dispatch(self, params))
 
     async def list_files(self, params: dict[str, Any]) -> ComputerOpResult:
         return await self._ops.list_files(
@@ -161,7 +161,7 @@ class LcaSandboxExecutor(LcaComputerExecutor):
         return await super().invoke(api_name, params)
 
     async def export_file(self, params: dict[str, Any]) -> ComputerOpResult:
-        return await self._ops.export_file(
+        return await cast(SandboxExecOps, self._ops).export_file(
             path=_str_arg(params, "path"),
         )
 

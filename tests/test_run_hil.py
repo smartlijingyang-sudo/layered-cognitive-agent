@@ -8,12 +8,12 @@ from dataclasses import dataclass
 import pytest
 from starlette.testclient import TestClient
 
-from gateway.app import create_app
 from gateway.runs.execute import create_run_session, execute_run, resume_run, set_llm_resolver
 from gateway.runs.session import RunRegistry, RunStatus
 from lca.contracts.protocols import LLMAdapter
 from lca.layer0_infra.llm_resolver import ProductionLLMResolver
 from tests.harness.scripted_llm import ScriptedLLMAdapter, respond, use_tool
+from tests.support.gateway_app import create_scripted_app
 
 _ASK = {
     "questions": [
@@ -110,7 +110,7 @@ async def test_answer_resumes_same_run_and_finalizes(_restore_resolver: None) ->
 
 def test_http_waiting_input_snapshot_and_answer(_restore_resolver: None) -> None:
     registry = RunRegistry()
-    app = create_app(registry, llm_resolver=_Resolver(_ask_then_reply()))
+    app = create_scripted_app(registry, llm_resolver=_Resolver(_ask_then_reply()))
     with TestClient(app) as client:
         created = client.post(
             "/runs",

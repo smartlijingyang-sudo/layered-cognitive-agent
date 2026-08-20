@@ -1,8 +1,15 @@
 """DSH Bridge plugin — Tier-3 (alien loop driver)."""
 
 from __future__ import annotations
+
+from collections.abc import Sequence
+from pathlib import Path
+
 from pydantic import BaseModel
-from lca.harness.plugin_api import plugin, PluginKind
+
+from lca.contracts.models.core.plane import PlaneRef
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.layer0_infra.file_store import FileStore
 
 
 class Config(BaseModel):
@@ -18,7 +25,7 @@ class Config(BaseModel):
     test_suite="tests/test_dsh_driver.py",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     """Register the DSH bridge factory as a fallback loop provider."""
     from lca.layer0_infra.dsh.launch import build_harness_env
     from lca.layer0_infra.dsh.settings import DshSettings
@@ -26,13 +33,13 @@ async def setup(ctx, config: Config) -> None:
     settings = DshSettings()
 
     def dsh_bridge_factory(
-        machine: object,
+        machine: PlaneRef,
         *,
         run_id: str,
-        session_root: object,
-        attachment_ids: list[str] | None = None,
-        store: object | None = None,
-    ) -> object:
+        session_root: Path | str,
+        attachment_ids: Sequence[str] | None = None,
+        store: FileStore | None = None,
+    ) -> dict[str, str]:
         return build_harness_env(
             machine,
             run_id=run_id,

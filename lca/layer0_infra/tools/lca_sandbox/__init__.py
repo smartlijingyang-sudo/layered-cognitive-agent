@@ -6,7 +6,7 @@ Aligns with LobeHub ``builtin-tool-cloud-sandbox``.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Awaitable, Callable, cast
 
 from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
 from lca.layer0_infra.tools.lca_computer.apis import execute_code as _execute_code
@@ -91,7 +91,7 @@ def build_sandbox_tools(**kwargs: Any) -> list:
     return build_tools_from_manifest(
         MANIFEST,
         executor,
-        invoke_fn=_invoke_via_executor,
+        invoke_fn=cast("Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor),
         observation_builder=_sandbox_obs_builder(store),
     )
 

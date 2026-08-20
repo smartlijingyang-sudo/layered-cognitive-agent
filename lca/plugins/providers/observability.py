@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from lca.contracts.protocols import ObservabilityBackend
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.layer0_infra.observability import ObservabilitySettings, create_observability
 
 _SKIP_BACKENDS = frozenset({"console", "jsonl"})
@@ -46,6 +46,6 @@ def _make_hub(**kwargs: Any) -> Any:
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PROVIDER,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     if "console" in config.providers:
         ctx.inject("observability").register("console", _make_hub)

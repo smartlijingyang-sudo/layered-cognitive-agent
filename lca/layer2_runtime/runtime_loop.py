@@ -18,6 +18,8 @@ PR5 落地：
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 
 from lca.contracts.atoms.enums import ActionType, SnapshotReason
@@ -30,7 +32,7 @@ from lca.contracts.models.core.decision import Decision, Observation, ToolCall, 
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import ApprovalPendingError, BudgetExceededError, Result
 from lca.contracts.models.core.state import AgentState, StateSnapshot
-from lca.contracts.models.core.stop import StopReason
+from lca.contracts.models.core.stop import StopDecision, StopReason
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import (
     Body,
@@ -73,7 +75,7 @@ class CognitiveRuntime(Runtime):
         state_store: StateStore,
         stop_rule: StopRule,
         perceive_hub: PerceiveHub,
-        middleware_registry: object | None = None,
+        middleware_registry: Any | None = None,
     ) -> None:
         self.brain = brain
         self.body = body
@@ -329,7 +331,7 @@ def _apply_manifest(state: AgentState, manifest: object) -> AgentState:
     return state
 
 
-def _apply_stop(state: AgentState, stop: object) -> AgentState:
+def _apply_stop(state: AgentState, stop: StopDecision) -> AgentState:
     """Reduce a ``StopDecision`` into state (PR5).
 
     The StopRule is pure (no AgentState mutation).  This function is the

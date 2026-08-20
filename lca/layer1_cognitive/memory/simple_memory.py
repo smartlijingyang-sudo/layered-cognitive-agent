@@ -140,7 +140,7 @@ class SimpleMemorySystem(MemorySystem):
         for rej in result.rejected:
             record(
                 MemoryCommitted(
-                    layer=rej.write.memory_type.value,
+                    layer=rej.write.layer.value,
                     record_id=rej.write.record_id,
                     record_kind="rejected",
                 )

@@ -48,6 +48,9 @@ class RunScope:
     parent_trace_id: TraceId | None = None
     delegation_id: str | None = None
     agent_role: str = ""
+    # Per-step counter inside the agent loop turn; sensors use it to
+    # bound re-reads (e.g. only events at step >= N).
+    step: int = 0
 
 
 _run_scope: ContextVar[RunScope | None] = ContextVar("lca_run_scope", default=None)

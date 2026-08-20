@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from lca.contracts.protocols import DecisionGate
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -22,7 +22,7 @@ class Config(BaseModel):
     description="DecisionGate that forces lead to consult every team member before responding.",
     test_suite="tests/test_refactor_guards.py::TestProgressiveDisclosureVocabulary::test_must_consult_all_rewrites_early_respond",
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsultAllMembers
 
     ctx.inject("gates").add(MustConsultAllMembers, id="must-consult-all", slot="consult", order=10)

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import BaseModel
+
 from lca.contracts.capabilities import STRATEGIES
 from lca.contracts.models.team.team_coordination import STRATEGY_KEY_LEAD, LeadMandate
 from lca.contracts.protocols import TeamAssembly
 from lca.contracts.protocols.spec import LeadSpec
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _DUTY_MANDATES: frozenset[LeadMandate] = frozenset({LeadMandate.CONSULT, LeadMandate.BOARD})
 
@@ -36,6 +38,10 @@ def build_lead_strategy(assembly: TeamAssembly) -> Any:
     )
 
 
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
 @plugin(
     id="strategy.lead",
     requires=[STRATEGIES.key],
@@ -45,6 +51,6 @@ def build_lead_strategy(assembly: TeamAssembly) -> Any:
     description="Register lead TeamStrategy factory.",
     test_suite="tests/test_orchestration_coverage.py",
 )
-async def setup(ctx: Any, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     ctx.register(STRATEGIES.key, STRATEGY_KEY_LEAD, build_lead_strategy)

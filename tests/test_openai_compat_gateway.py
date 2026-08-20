@@ -16,12 +16,13 @@ from lca.layer0_infra.openai_compat import (
     normalize_responses_input,
     resolve_upstream_model,
 )
+from tests.support.gateway_app import create_scripted_app
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
 
 class TestOpenAiCompatGateway(unittest.TestCase):
     def test_list_models_is_lca_ui_catalog(self) -> None:
-        client = TestClient(create_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
+        client = TestClient(create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
         response = client.get("/v1/models")
         self.assertEqual(response.status_code, 200)
         ids = [item["id"] for item in response.json()["data"]]
@@ -29,7 +30,7 @@ class TestOpenAiCompatGateway(unittest.TestCase):
 
     def test_chat_completions_housekeeper_passthrough(self) -> None:
         registry = RunRegistry()
-        client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
+        client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
         with patch(
             "gateway.openai_shim.create_simple_completion",
             return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2}),
@@ -51,17 +52,25 @@ class TestOpenAiCompatGateway(unittest.TestCase):
 
     def test_chat_completions_without_llm_returns_503(self) -> None:
         registry = RunRegistry()
-        with patch(
-            "lca.layer0_infra.llm_resolver.llm_credentials", return_value=(None, None, None)
-        ):
-            client = TestClient(create_app(registry))
-            response = client.post(
-                "/v1/chat/completions",
-                json={
-                    "model": "solo",
-                    "messages": [{"role": "user", "content": "hi"}],
-                },
-            )
+
+        class _Unavailable:
+            def is_available(self) -> bool:
+                return False
+
+            def resolve(self, *, mode: str | None = None):
+                raise RuntimeError("unavailable")
+
+        app = create_app(registry)
+        if getattr(app.state, "ctx", None) is not None:
+            app.state.ctx.provide("llm_resolver", _Unavailable())
+        client = TestClient(app)
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "solo",
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
         self.assertEqual(response.status_code, 503)
 
 
@@ -211,7 +220,7 @@ class TestOpenAiStructuredHelpers(unittest.TestCase):
 
 class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
     def test_embeddings_create_returns_vectors(self) -> None:
-        client = TestClient(create_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
+        client = TestClient(create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
         with patch(
             "gateway.openai_shim.create_embeddings",
             return_value={
@@ -234,7 +243,7 @@ class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
 class TestOpenAiResponsesEndpoint(unittest.TestCase):
     def test_responses_without_schema_is_housekeeper(self) -> None:
         registry = RunRegistry()
-        client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
+        client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
         with patch(
             "gateway.openai_shim.create_simple_completion",
             return_value=("ok", {}),
@@ -252,7 +261,7 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
 
     def test_responses_create_returns_output_text(self) -> None:
         registry = RunRegistry()
-        client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
+        client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
         with patch(
             "gateway.openai_shim.create_structured_completion",
             return_value=(
@@ -280,7 +289,7 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
         self.assertIn("satisfied", payload["output_text"])
 
     def test_responses_missing_schema_without_user_message_returns_400(self) -> None:
-        client = TestClient(create_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
+        client = TestClient(create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
         response = client.post(
             "/v1/responses",
             json={

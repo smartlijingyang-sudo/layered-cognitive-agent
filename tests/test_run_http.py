@@ -8,8 +8,8 @@ import time
 import pytest
 from starlette.testclient import TestClient
 
-from gateway.app import create_app
 from gateway.runs.session import RunRegistry
+from tests.support.gateway_app import create_scripted_app
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
 
@@ -38,13 +38,13 @@ def _frames(body: str) -> list[tuple[str, dict]]:
 
 def test_create_app_binds_registry_on_state() -> None:
     registry = RunRegistry()
-    app = create_app(registry, llm_resolver=ScriptedLLMResolver())
+    app = create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())
     assert app.state.registry is registry
 
 
 def test_post_runs_202_then_live_is_journal() -> None:
     registry = RunRegistry()
-    with TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver())) as client:
+    with TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client:
         created = client.post(
             "/runs",
             json={"model": "solo", "messages": [{"role": "user", "content": "只回一个字：好"}]},
@@ -103,14 +103,14 @@ def test_post_runs_202_then_live_is_journal() -> None:
 
 
 def test_post_runs_requires_user_message() -> None:
-    client = TestClient(create_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
+    client = TestClient(create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
     resp = client.post("/runs", json={"model": "solo", "messages": []})
     assert resp.status_code == 400
 
 
 def test_inflight_dedup_returns_same_run() -> None:
     registry = RunRegistry()
-    client = TestClient(create_app(registry, llm_resolver=ScriptedLLMResolver()))
+    client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
     payload = {"model": "solo", "messages": [{"role": "user", "content": "同一句话"}]}
     first = client.post("/runs", json=payload)
     second = client.post("/runs", json=payload)

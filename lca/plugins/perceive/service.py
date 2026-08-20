@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from pydantic import BaseModel
 
-from lca.harness.plugin_api import PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
 @plugin(
@@ -17,7 +21,7 @@ from lca.harness.plugin_api import PluginKind, plugin
     description="Perceive group registry; sensor plugins add() onto it.",
     test_suite="tests/test_composer_sensor_wiring.py",
 )
-async def setup(ctx: Any, config: Any) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer1_cognitive.perceive_service import PerceiveService
 
     ctx.provide("perceive", PerceiveService())

@@ -66,6 +66,13 @@ repos:
         pass_filenames: false
         types: [python]
 
+      - id: check-plugin-typing
+        name: 插件 setup / build_ 工厂类型标注完整性
+        entry: python scripts/check_plugin_typing.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
       - id: vulture
         name: 死代码检测 vulture（≥80% 置信度）
         entry: uv run vulture lca --min-confidence 80

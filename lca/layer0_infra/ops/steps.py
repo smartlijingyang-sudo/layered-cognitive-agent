@@ -9,6 +9,7 @@ Commands are sequences of steps defined in the CLI.
 from __future__ import annotations
 
 from lca.layer0_infra.ops.pipeline import PipelineContext, register_step
+from lca.layer0_infra.ops.service import CliShippingService
 
 # ── Infrastructure Steps ──────────────────────────────────────────────
 
@@ -132,7 +133,9 @@ def lobehub_stop(ctx: PipelineContext) -> None:
 def daemon_ensure(ctx: PipelineContext) -> None:
     """Ensure daemon CLI is deployed and up-to-date with source."""
     svc = ctx.registry.get("daemon")
-    if svc._cli_deployed() and not svc._cli_source_changed():
+    # only DaemonService ships a CLI; narrow for the introspection calls
+    daemon = svc if isinstance(svc, CliShippingService) else None
+    if daemon is not None and daemon._cli_deployed() and not daemon._cli_source_changed():
         ctx.console.success("daemon CLI up-to-date (source fingerprint match)")
         return
     ctx.console.info("daemon source changed — rebuilding & redeploying CLI...")

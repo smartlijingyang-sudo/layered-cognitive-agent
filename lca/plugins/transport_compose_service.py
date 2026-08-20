@@ -6,9 +6,11 @@ transport table; one per agent pipeline). Composer no longer instantiates
 """
 
 from __future__ import annotations
+
 from pydantic import BaseModel
+
 from lca.contracts.protocols.infra import TransportRegistryProtocol
-from lca.harness.plugin_api import plugin, PluginKind
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -32,6 +34,6 @@ def build_transport_service_compose() -> TransportRegistryProtocol:
     test_suite="tests/test_plugin_alignment.py::test_compose_root_no_inline_instantiation",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide the named factory ``transport.compose_service``."""
     ctx.provide("transport.compose_service", build_transport_service_compose)

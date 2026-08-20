@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import cast
 
 from lca.contracts.atoms.enums import MemoryLayer
 from lca.contracts.models.observability.journal import (
@@ -26,6 +27,7 @@ from lca.contracts.models.observability.journal import (
     GateDecided,
     InboxFollowupCreated,
     MemoryCommitted,
+    StampedEvent,
     ToolInvoked,
 )
 from lca.layer0_infra.observability.journal.engine import RunStore
@@ -109,7 +111,7 @@ def diagnose_model_not_seen(
                 pattern=DiagnosePattern.MODEL_NOT_SEEN,
                 severity="high",
                 summary="No ContextManifested events; Hub did not run.",
-                evidence_refs=inbox,
+                evidence_refs=tuple(inbox),
                 detail="Check: PerceiveHub is wired into CognitiveRuntime.",
             )
         )
@@ -161,12 +163,12 @@ def diagnose_loop_stuck(
     is not reading the PolicyFact fold.
     """
     findings: list[Finding] = []
-    tool_events = [
+    tool_events: list[StampedEvent] = [
         e for e in store.events
         if isinstance(e.event, ToolInvoked)
         and (trace_id is None or e.scope.trace_id == trace_id)
     ]
-    gate_events = [
+    gate_events: list[StampedEvent] = [
         e for e in store.events
         if isinstance(e.event, GateDecided)
         and (trace_id is None or e.scope.trace_id == trace_id)
@@ -176,13 +178,13 @@ def diagnose_loop_stuck(
         return DiagnosisReport(DiagnosePattern.LOOP_STUCK, ())
 
     recent = tool_events[-window:]
-    tool_names = [e.event.tool_name for e in recent]
+    tool_names = [cast(ToolInvoked, e.event).tool_name for e in recent]
     repeats = sum(
         1 for i in range(1, len(tool_names))
         if tool_names[i] == tool_names[i - 1]
     )
     if repeats >= window - 1:
-        warnings = [e for e in gate_events if e.event.verdict == "warn"]
+        warnings = [e for e in gate_events if cast(GateDecided, e.event).verdict == "warn"]
         if not warnings:
             findings.append(
                 Finding(
@@ -276,13 +278,13 @@ def diagnose(
         return diagnose_model_not_seen(
             store,
             expected_kind=str(kwargs.get("expected_kind", "")),
-            trace_id=kwargs.get("trace_id"),
+            trace_id=cast("str | None", kwargs.get("trace_id")),
         )
     if pattern == DiagnosePattern.LOOP_STUCK:
         return diagnose_loop_stuck(
             store,
-            window=int(kwargs.get("window", 10)),
-            trace_id=kwargs.get("trace_id"),
+            window=int(cast(str, kwargs.get("window", 10))),
+            trace_id=cast("str | None", kwargs.get("trace_id")),
         )
     if pattern == DiagnosePattern.MEMORY_POISONED:
         return diagnose_memory_poisoned(store)

@@ -79,6 +79,7 @@ def _check_writable(path: str, policy: SandboxPolicy) -> None:
 class _GuestOpHost(Protocol):
     _sandbox: Any
     _store: Any
+    plane: Any  # PlaneRef; relaxed to Any to keep the Protocol import-light
 
     async def _guest_op(
         self,
@@ -258,7 +259,9 @@ class ComputerRuntimeExecMixin:
             )
         return guest
 
-    async def get_command_output(self: _GuestOpHost, *, command_id: str) -> ComputerOpResult:
+    async def get_command_output(
+        self: _GuestOpHost, *, command_id: str, timeout_s: int = 60
+    ) -> ComputerOpResult:
         return await self._guest_op(build_background_poll_script(command_id=command_id))
 
     async def kill_command(self: _GuestOpHost, *, command_id: str) -> ComputerOpResult:

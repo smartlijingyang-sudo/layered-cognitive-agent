@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.harness.projection import ProjectionSnapshot
 from lca.contracts.harness.session import SessionEvent
@@ -52,7 +52,11 @@ class ResultNormalizer:
     @staticmethod
     def from_task_result(result: Any) -> NormalizedResult:
         status = getattr(result, "status", None)
-        status_value = status.value if hasattr(status, "value") else str(status or "unknown")
+        status_value = (
+            cast(Any, status).value
+            if hasattr(status, "value")
+            else str(status or "unknown")
+        )
         if status_value == "input-required":
             status_value = "waiting_input"
         tool_calls = tuple(

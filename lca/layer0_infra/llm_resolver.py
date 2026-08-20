@@ -1,10 +1,8 @@
 """LLM resolver — ``ProductionLLMResolver`` plus re-exports for backward compat.
 
-The plugin (``lca.plugins.llm_resolver``) is the only thing that reads
-credentials and wires an adapter. Two boots → two resolver instances;
-no module-level singleton. The other names re-exported below live in
-:mod:`lca.layer0_infra.llm`; the facade is kept so callers don't have
-to know the real location.
+The plugin (``lca.plugins.llm_resolver``) is the only thing that loads
+``.env``, normalizes aliases, and wires the chat adapter. No product
+``mode`` vocabulary (mock / deepseek / auto).
 """
 
 from __future__ import annotations
@@ -24,7 +22,11 @@ from lca.layer0_infra.llm.catalog import (
     ModelRegistry,
     get_model_registry,
 )
-from lca.layer0_infra.llm.config import llm_credentials, llm_openai_credentials
+from lca.layer0_infra.llm.config import (
+    DEFAULT_CHAT_MODEL,
+    llm_credentials,
+    llm_openai_credentials,
+)
 from lca.layer0_infra.llm.openai_client import (
     LLMUnavailableError,
     get_async_openai_client,
@@ -34,9 +36,6 @@ from lca.layer0_infra.llm_adapter import resolve_llm_adapter
 
 if TYPE_CHECKING:
     from lca.layer0_infra.capability.llm import LlmService
-
-
-_LLM_MODES = frozenset({"auto", "mock", "real", "deepseek"})
 
 
 def live_credential(value: str | None) -> str | None:
@@ -52,60 +51,61 @@ def live_credential(value: str | None) -> str | None:
 
 
 class ProductionLLMResolver:
-    """Resolve an LLMAdapter for one run. Owns credentials and mode.
+    """Resolve the chat LLMAdapter for one run. Owns credentials after boot.
 
-    The ``lca-llm-resolver`` plugin reads env, registers adapters on the
-    llm service, and hands this resolver the same table. ``resolve()``
-    returns the service's current adapter — it does not construct a
-    second family of adapters.
+    ``resolve()`` returns the llm-service's active adapter when the plugin
+    registered one; otherwise constructs an OpenAI-compat adapter from the
+    stored credentials. Never silently falls back to Mock.
     """
 
     def __init__(
         self,
         *,
-        mode: str | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
+        openai_base_url: str | None = None,
         default_model: str | None = None,
+        api_style: str | None = None,
         llm_service: LlmService | None = None,
+        mode: str | None = None,  # ignored; kept for call-site compat during migration
     ) -> None:
-        self._mode = (mode or "auto").strip().lower()
         self._api_key = live_credential(api_key)
         self._base_url = live_credential(base_url)
-        self._default_model = default_model or "deepseek-chat"
+        self._openai_base_url = live_credential(openai_base_url)
+        self._default_model = (default_model or "").strip() or DEFAULT_CHAT_MODEL
+        self._api_style = (api_style or "").strip() or None
         self._llm_service = llm_service
 
     def is_available(self) -> bool:
-        """True when the configured mode can produce a real adapter."""
-        if self._mode == "mock":
-            return True
         return bool(self._api_key)
 
     def resolve(self, *, mode: str | None = None) -> LLMAdapter:
-        """Return the llm-service adapter for the configured LLM mode.
+        """Return the registered chat adapter, or build one from credentials.
 
-        *mode* is an LLM mode (``auto|mock|real|deepseek``). Gateway run
-        modes such as ``solo`` are ignored so they cannot select a provider.
+        *mode* is ignored (gateway run modes like ``solo`` must not select a
+        provider). Kept as a keyword for call-site compatibility.
         """
-        requested = (mode or "").strip().lower()
-        target = requested if requested in _LLM_MODES else self._mode
-        if target == "auto":
-            target = "real" if self._api_key else "mock"
+        del mode  # run modes are not LLM provider selectors
         if self._llm_service is not None:
             names = set(self._llm_service.providers.names())
-            if target in names:
-                return self._llm_service.providers.get(target)
-            return self._llm_service.providers.current()
-        if target == "mock" or not self._api_key:
-            from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-
-            return MockLLMAdapter()
+            if names:
+                return self._llm_service.providers.current()
+        if not self._api_key:
+            raise LLMUnavailableError("LLM_API_KEY 未配置，无法解析 chat adapter")
+        from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
         from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
 
+        style = None
+        if self._api_style:
+            for candidate in LLMApiStyle:
+                if candidate.value == self._api_style or candidate.name.lower() == self._api_style:
+                    style = candidate
+                    break
         return OpenAICompatAdapter(
             api_key=self._api_key,
             base_url=self._base_url,
             model=self._default_model,
+            api=style,
         )
 
 

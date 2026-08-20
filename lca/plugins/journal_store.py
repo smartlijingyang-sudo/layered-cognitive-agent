@@ -1,8 +1,10 @@
 """Journal store plugin — named factory ``journal_store``."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel
-from lca.harness.plugin_api import plugin, PluginKind
+
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
@@ -18,7 +20,7 @@ class Config(BaseModel):
     test_suite="tests/test_plugin_alignment.py::test_compose_root_no_inline_instantiation",
     kind=PluginKind.PRIMITIVE,
 )
-async def setup(ctx, config: Config) -> None:
+async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide the RunStore class as ``journal_store``.
 
     Composer instantiates a RunStore per-run; this plugin only registers

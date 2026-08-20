@@ -6,7 +6,12 @@ the default cognitive loop builder if not provided.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from lca.harness.agent.handle import OwnerAgentHandle
+    from lca.harness.session.inbox import Inbox
+    from lca.harness.session.store import SessionStore
 
 
 def build_live_agent(
@@ -30,7 +35,7 @@ def build_live_agent(
     """
     ctx = cordis_ctx if cordis_ctx is not None else plugin_scope
     builder = _resolve_loop_builder(ctx)
-    return builder(store, inbox, identity_id, options, ctx)
+    return cast(OwnerAgentHandle, builder(store, inbox, identity_id, options, ctx))
 
 
 def _resolve_loop_builder(cordis_ctx: Any | None) -> Any:
