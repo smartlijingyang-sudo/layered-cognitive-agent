@@ -14,16 +14,8 @@ from typing import Any
 
 import structlog
 
-from lca.contracts.atoms.enums import LLMStreamEventType, MemoryLayer, StreamChannel
-from lca.contracts.atoms.telemetry import (
-    ATTR_HIT,
-    ATTR_MEMORY_LAYER,
-    SpanName,
-)
-from lca.contracts.models.core.decision import Observation, Reflection
+from lca.contracts.atoms.enums import LLMStreamEventType, StreamChannel
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
-from lca.contracts.models.core.memory import MemoryRecord
-from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import (
     LlmCallCompleted,
     LlmCallStarted,
@@ -31,9 +23,13 @@ from lca.contracts.models.observability.journal import (
     ReasoningDelta,
     StepTextDelta,
 )
-from lca.contracts.protocols import LLMAdapter, MemorySystem
-from lca.layer0_infra.observability.facade import record, span
+from lca.contracts.protocols import LLMAdapter
+from lca.layer0_infra.observability.diagnostic_emitters import record_llm_completion
+from lca.layer0_infra.observability.facade import record
 from lca.layer0_infra.observability.llm_stream_activity import LlmStreamActivityTracker
+from lca.layer0_infra.observability.memory_adapter import (
+    TelemetryMemoryAdapter as TelemetryMemoryAdapter,
+)
 from lca.layer0_infra.observability.response_text_stream import ResponseTextStreamExtractor
 
 _PERF_COUNTER_SCALE = 1000
@@ -225,11 +221,22 @@ class TelemetryLLMAdapter(LLMAdapter):
         *,
         stream: bool,
     ) -> None:
+        latency_ms = int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
+        record_llm_completion(
+            model=model,
+            stream=stream,
+            ok=ok,
+            prompt=prompt,
+            prompt_tokens=prompt_tokens,
+            response_text=response_text,
+            completion_tokens=completion_tokens,
+            latency_ms=latency_ms,
+        )
         record(
             LlmCallCompleted(
                 model=model,
                 ok=ok,
-                latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
+                latency_ms=latency_ms,
                 prompt_preview=prompt,
                 response_preview=response_text,
                 prompt_tokens=prompt_tokens,
@@ -237,37 +244,3 @@ class TelemetryLLMAdapter(LLMAdapter):
                 stream=stream,
             )
         )
-
-
-_MEMORY_LAYER_PERCEIVE = "perceive"
-_MEMORY_LAYER_UPDATE = "update"
-
-
-class TelemetryMemoryAdapter(MemorySystem):
-    """装饰器：记忆边界打 memory.read / memory.write span（机制平面）。"""
-
-    def __init__(self, inner: MemorySystem) -> None:
-        self._inner = inner
-
-    @property
-    def inner(self) -> MemorySystem:
-        """被装饰的记忆系统（组合无损性内省用）。"""
-        return self._inner
-
-    async def perceive(self, state: AgentState) -> AgentState:
-        with span(SpanName.MEMORY_READ, **{ATTR_MEMORY_LAYER: _MEMORY_LAYER_PERCEIVE}) as handle:
-            result = await self._inner.perceive(state)
-            handle.attributes[ATTR_HIT] = bool(getattr(result, "retrieved_context", None))
-            return result
-
-    async def update(
-        self, state: AgentState, observation: Observation, reflection: Reflection
-    ) -> None:
-        with span(SpanName.MEMORY_WRITE, **{ATTR_MEMORY_LAYER: _MEMORY_LAYER_UPDATE}):
-            await self._inner.update(state, observation, reflection)
-
-    def query(self, layer: MemoryLayer) -> list[MemoryRecord]:
-        with span(SpanName.MEMORY_READ, **{ATTR_MEMORY_LAYER: layer.value}) as handle:
-            records = self._inner.query(layer)
-            handle.attributes[ATTR_HIT] = bool(records)
-            return records

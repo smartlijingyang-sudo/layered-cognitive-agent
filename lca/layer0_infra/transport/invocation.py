@@ -10,6 +10,8 @@ asyncio.create_task 边界，成员 run 由此派生 parent_run_id / delegation_
 
 from __future__ import annotations
 
+import time
+
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.atoms.semantic_keys import (
     COMPLETION_EMPTY,
@@ -25,6 +27,7 @@ from lca.contracts.atoms.telemetry import ATTR_CALLEE_ROLE, ATTR_OK, ATTR_PROTOC
 from lca.contracts.models.core.budget import DEFAULT_DELEGATION_TIMEOUT_S
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.lifecycle import AgentCard, TaskStatus
+from lca.contracts.models.observability.diagnostic import DiagnosticCategory
 from lca.contracts.models.observability.journal import (
     DelegationCompleted,
     DelegationIssued,
@@ -39,7 +42,7 @@ from lca.contracts.models.team.delegation_context import (
     in_member_invoke,
 )
 from lca.contracts.protocols import AgentTransport
-from lca.layer0_infra.observability import record, span
+from lca.layer0_infra.observability import observe, record, span
 
 
 def _describe_target(agent_card: AgentCard | str) -> str:
@@ -86,6 +89,18 @@ async def send_task_traced(
     ) as handle:
         task_id = await transport.send_task(agent_card, subtask, context_refs)
         handle.attributes[ATTR_OK] = True
+    observe(
+        DiagnosticCategory.TRANSPORT,
+        "transport.send",
+        plugin=type(transport).__name__,
+        attributes={
+            "callee_role": callee,
+            "protocol": protocol,
+            "subtask_preview": subtask,
+            "context_ref_count": len(context_refs),
+        },
+        output={"task_id": task_id},
+    )
     return task_id
 
 
@@ -116,6 +131,7 @@ async def send_and_wait(
     protocol = getattr(transport, "protocol_name", "unknown")
 
     delegation_id = new_id("dlg")
+    started = time.perf_counter()
     caller_scope = get_current_run_scope()
     record(
         DelegationIssued(
@@ -189,6 +205,24 @@ async def send_and_wait(
         else:
             extra[OBS_COMPLETION_QUALITY] = COMPLETION_EMPTY
     observation.extra = extra
+    observe(
+        DiagnosticCategory.TRANSPORT,
+        "transport.receive",
+        plugin=type(transport).__name__,
+        attributes={
+            "callee_role": callee,
+            "protocol": protocol,
+            "task_id": task_id,
+            "delegation_id": delegation_id,
+            "context_ref_count": len(refs),
+        },
+        output={
+            "ok": observation.success,
+            "status": status,
+            "payload_preview": _payload_preview(observation.payload),
+            "latency_ms": int((time.perf_counter() - started) * 1000),
+        },
+    )
     return observation
 
 

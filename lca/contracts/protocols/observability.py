@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
+from lca.contracts.models.observability.diagnostic import DiagnosticEvent
+
 
 @runtime_checkable
 class Telemetry(Protocol):
@@ -28,6 +30,23 @@ class Telemetry(Protocol):
 
     def score(self, name: str, value: float, **attributes: Any) -> None:
         """附加评估分数；无后端支持时降级为 span 事件。"""
+        ...
+
+
+@runtime_checkable
+class DiagnosticSink(Protocol):
+    """只读诊断接收器；不参与 Journal 的恢复、重放或状态归约。"""
+
+    def on_event(self, event: DiagnosticEvent) -> None:
+        """消费一条已规范化的 run-scoped 诊断记录。"""
+        ...
+
+    def flush(self) -> None:
+        """冲刷当前缓冲。"""
+        ...
+
+    def close(self) -> None:
+        """关闭本接收器拥有的资源。"""
         ...
 
 

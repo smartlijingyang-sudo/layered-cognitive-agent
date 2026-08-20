@@ -27,6 +27,7 @@ from lca.contracts.mechanisms.capability import (
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY, ConversationTurn
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.plane import PlaneKind
+from lca.contracts.models.observability.diagnostic import DiagnosticCategory
 from lca.contracts.models.observability.journal import (
     AttachmentStagingCompleted,
     AttachmentStagingFailed,
@@ -37,9 +38,11 @@ from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
 from lca.layer0_infra.observability import (
+    JsonlDiagnosticSink,
     ObservabilityHub,
     bind,
     fold_run_state,
+    observe,
     record,
     run_scope,
 )
@@ -146,10 +149,17 @@ def assemble_run_hub(
     extra_projectors: Sequence[JournalProjector] = (),
 ) -> ObservabilityHub:
     """Hub from the booted observability seam; jsonl + tail as extra readers."""
+    cfg = settings if settings is not None else ObservabilitySettings()
     extra = [JsonlJournalProjector(jsonl_path), tail, *extra_projectors]
+    diagnostic_sinks = (
+        (JsonlDiagnosticSink(jsonl_path.with_suffix(".diagnostic.jsonl")),)
+        if cfg.diagnostics_enabled
+        else ()
+    )
     return require_capability(ctx, "observability").create(
-        settings=settings,
+        settings=cfg,
         extra_projectors=tuple(extra),
+        diagnostic_sinks=diagnostic_sinks,
     )
 
 
@@ -221,7 +231,31 @@ def create_run_session(
         execution_target=execution_target.strip(),
     )
     registry.put(session)
+    _emit_plugin_inventory(session, ctx, hub)
     return session
+
+
+def _emit_plugin_inventory(session: RunSession, ctx: Any, hub: ObservabilityHub) -> None:
+    """记录本 run 使用的插件声明摘要，不暴露配置值或密钥。"""
+    entries = tuple(getattr(ctx, "entries", ()) or ())
+    plugins = [
+        "|".join(
+            (
+                str(getattr(entry, "id", "")),
+                f"requires={','.join(getattr(entry, 'inject', ()) or ())}",
+                f"provides={','.join(getattr(entry, 'provides', ()) or ())}",
+            )
+        )
+        for entry in entries
+    ]
+    with bind(hub), run_scope(RunScope(trace_id=session.trace_id, run_id=session.run_id)):
+        observe(
+            DiagnosticCategory.PLUGIN,
+            "plugin.inventory",
+            plugin="profile.boot",
+            attributes={"plugin_count": len(plugins)},
+            output={"plugins": plugins},
+        )
 
 
 async def execute_run(

@@ -9,24 +9,20 @@ this module so the journal sees exactly one emission site per event.
 from __future__ import annotations
 
 import json
-import time
 from typing import Any
 
 from lca.contracts.models.core.decision import Observation, ToolCall  # noqa: F401
+from lca.contracts.models.observability.diagnostic import DiagnosticCategory
 from lca.contracts.models.observability.journal import (
     ToolDenied,
     ToolInvoked,
     ToolStarted,
 )
 from lca.contracts.protocols.infra import Tool
-from lca.layer0_infra.observability import record
+from lca.layer0_infra.observability import observe, record
 from lca.layer1_cognitive.body.tool_result_preview import (
     tool_files,
     tool_plugin_state,
-)
-from lca.layer1_cognitive.body.tool_ui_state import (
-    build_started_plugin_state,
-    compact_args_preview,
 )
 
 
@@ -48,6 +44,16 @@ def emit_tool_started(
     started_state: dict[str, Any],
 ) -> None:
     """Emit ``ToolStarted`` from the canonical safe_executor module."""
+    observe(
+        DiagnosticCategory.TOOL,
+        "tool.start",
+        plugin=type(tool).__name__,
+        attributes={
+            "tool_name": tool.name,
+            "invocation_id": invocation_id,
+            "arguments_preview": args_preview,
+        },
+    )
     record(
         ToolStarted(
             tool_name=tool.name,
@@ -60,6 +66,12 @@ def emit_tool_started(
 
 def emit_tool_denied(tool: Tool, reason: str) -> None:
     """Emit ``ToolDenied`` from the canonical safe_executor module."""
+    observe(
+        DiagnosticCategory.TOOL,
+        "tool.denied",
+        plugin=type(tool).__name__,
+        attributes={"tool_name": tool.name, "reason": reason},
+    )
     record(ToolDenied(tool_name=tool.name, reason=reason))
 
 
@@ -75,11 +87,29 @@ def emit_tool_invoked(
 ) -> None:
     """Emit ``ToolInvoked`` from the canonical safe_executor module."""
     resolved_id = str((obs.extra or {}).get("invocation_id", "") or "") or invocation_id
+    result_preview = _tool_output_preview(obs)
+    observe(
+        DiagnosticCategory.TOOL,
+        "tool.complete",
+        plugin=type(tool).__name__,
+        attributes={
+            "tool_name": tool.name,
+            "invocation_id": resolved_id,
+            "arguments_preview": args_preview,
+            "attempt": attempt,
+        },
+        output={
+            "ok": obs.success,
+            "latency_ms": latency_ms,
+            "result_preview": result_preview,
+            "error": "" if obs.success else (obs.error or ""),
+        },
+    )
     record(
         ToolInvoked(
             tool_name=tool.name,
             arguments_preview=args_preview,
-            result_preview=_tool_output_preview(obs),
+            result_preview=result_preview,
             ok=obs.success,
             latency_ms=latency_ms,
             attempt=attempt,

@@ -24,7 +24,13 @@ from typing import Any, TypeVar
 from opentelemetry import trace as otel_trace
 
 from lca.contracts.atoms.telemetry import ATTR_SESSION_ID
+from lca.contracts.models.observability.diagnostic import (
+    DiagnosticCategory,
+    DiagnosticEvent,
+    DiagnosticStatus,
+)
 from lca.contracts.models.observability.journal import JournalEvent
+from lca.layer0_infra.observability.diagnostic_operation import DiagnosticOperation
 from lca.layer0_infra.observability.handles import NullSpanHandle, SpanHandle
 from lca.layer0_infra.observability.hub import ObservabilityHub
 
@@ -123,6 +129,57 @@ def event(name: object, **attributes: Any) -> None:
         return
     label = name.value if hasattr(name, "value") else str(name)
     hub.emit_event(label, attributes)
+
+
+def observe(
+    category: DiagnosticCategory | str,
+    operation: str,
+    *,
+    plugin: str = "",
+    attributes: dict[str, Any] | None = None,
+    output: dict[str, Any] | None = None,
+    causation_refs: tuple[str, ...] = (),
+) -> DiagnosticEvent | None:
+    """记录一条 run-scoped 诊断信息。
+
+    诊断行不可用于恢复或状态归约；业务事实仍必须调用 :func:`record`。
+    ``attributes`` 与 ``output`` 均会在写入前经过 Hub 的统一脱敏策略。
+    """
+    hub = _hub_var.get()
+    if hub is None:
+        return None
+    return hub.emit_diagnostic(
+        category=DiagnosticCategory(category),
+        operation=operation,
+        plugin=plugin,
+        status=DiagnosticStatus.INFO,
+        attributes=attributes or {},
+        output=output or {},
+        causation_refs=causation_refs,
+        actor_role=_actor_role.get(),
+        actor_step=_actor_step.get(),
+    )
+
+
+def observe_operation(
+    category: DiagnosticCategory | str,
+    operation: str,
+    *,
+    plugin: str = "",
+    attributes: dict[str, Any] | None = None,
+    causation_refs: tuple[str, ...] = (),
+) -> DiagnosticOperation:
+    """创建一个带开始/完成/失败行与耗时的诊断操作上下文。"""
+    return DiagnosticOperation(
+        _hub_var.get(),
+        category=category,
+        operation=operation,
+        plugin=plugin,
+        attributes=attributes or {},
+        causation_refs=causation_refs,
+        actor_role=_actor_role.get,
+        actor_step=_actor_step.get,
+    )
 
 
 def record(event: JournalEvent) -> None:

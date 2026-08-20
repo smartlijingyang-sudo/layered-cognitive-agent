@@ -17,6 +17,11 @@
 包外禁止 import 任何子模块（守卫测试强制）；本 ``__init__`` 是唯一表面。
 """
 
+from lca.contracts.models.observability.diagnostic import (
+    DiagnosticCategory,
+    DiagnosticEvent,
+    DiagnosticStatus,
+)
 from lca.contracts.models.observability.journal import (
     ActionDegraded,
     AgentRunFinished,
@@ -66,6 +71,8 @@ from lca.layer0_infra.observability.facade import (
     detached_span,
     event,
     get_span_context,
+    observe,
+    observe_operation,
     record,
     score,
     set_actor,
@@ -103,6 +110,7 @@ from lca.layer0_infra.observability.registry import (
     UnknownExporterError,
     create_observability,
 )
+from lca.layer0_infra.observability.run_diagnostics import JsonlDiagnosticSink
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.observability.team_profile import (
     TeamTraceProfile,
@@ -139,10 +147,14 @@ __all__ = [
     "DelegationCompleted",
     "DelegationIssued",
     "DelegationMechanism",
+    "DiagnosticCategory",
+    "DiagnosticEvent",
+    "DiagnosticStatus",
     "ExporterUnavailableError",
     "JournalEvent",
     "JournalProjector",
     "JournalSchemaMeta",
+    "JsonlDiagnosticSink",
     "LlmCallCompleted",
     "LlmCallStarted",
     "ObservabilityHub",
@@ -183,6 +195,8 @@ __all__ = [
     "get_span_context",
     "langfuse_span_visible",
     "objective_preview",
+    "observe",
+    "observe_operation",
     "plan_steps_joined",
     "record",
     "run_scope",
