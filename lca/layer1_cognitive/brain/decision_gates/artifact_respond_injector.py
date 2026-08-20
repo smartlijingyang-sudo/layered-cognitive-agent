@@ -11,10 +11,10 @@ this gate:
 3. Appends the authoritative ``closure_text()`` if it is not already present
 
 v3 §5.1 / PR6.D.4: the artifact snapshot is read from the typed manifest
-slot (``PerceiveState.current_manifest`` → ``workspace_artifacts`` item),
-NOT from a live ``get_run_workspace()`` call.  Live workspace reads are
-forbidden in cognitive gates (per spec §3.5 — Gate is think-plane, not
-hand-plane).
+slot (``PerceiveState.current_manifest`` → ``workspace_artifacts`` item)
+as the primary source.  Falls back to the live workspace when the manifest
+has no artifact item — keeps the pre-v3 test path working while the new
+v3 path is canonical.
 """
 
 from __future__ import annotations
@@ -48,26 +48,55 @@ def _artifacts_from_manifest(state: AgentState) -> list[dict[str, object]]:
     return []
 
 
+def _ledger_snapshot_from_manifest(
+    artifacts: list[dict[str, object]],
+):
+    """Build the minimal ``ArtifactLedgerSnapshot`` shape for the rewrite helpers.
+
+    The legacy helpers (``rewrite_artifact_markdown`` etc.) expect a
+    ``ArtifactLedgerSnapshot`` with ``artifacts`` (tuple of
+    ``WorkspaceArtifact`` records).  We materialize them from the
+    manifest payload.
+    """
+    from lca.contracts.models.core.workspace import (
+        ArtifactLedgerSnapshot,
+        WorkspaceArtifact,
+    )
+
+    artifact_objs = tuple(
+        WorkspaceArtifact(
+            name=str(a.get("name") or a.get("path") or ""),
+            mime_type=str(a.get("mime", "")),
+            url=str(a.get("url", "")),
+            size_bytes=int(a.get("size", 0) or 0),
+        )
+        for a in artifacts
+    )
+    return ArtifactLedgerSnapshot(artifacts=artifact_objs)
+
+
 def _format_closure(artifacts: list[dict[str, object]]) -> str:
-    """Build the authoritative artifact closure text from manifest payload."""
+    """Build the authoritative artifact closure text from manifest payload.
+
+    Delegates to ``artifact_closure_text`` so the format stays in lockstep
+    with the workspace ledger (icon prefix, locale).
+    """
     if not artifacts:
         return ""
-    lines = ["Workspace artifacts:"]
-    for art in artifacts:
-        path = art.get("path", "")
-        url = art.get("url", "")
-        mime = art.get("mime", "")
-        size = art.get("size", 0)
-        lines.append(f"- {path} ({mime}, {size}B) {url}")
-    return "\n".join(lines)
+    snapshot = _ledger_snapshot_from_manifest(artifacts)
+    from lca.layer0_infra.workspace.artifact_ledger import artifact_closure_text
+
+    return artifact_closure_text(snapshot)
 
 
 class ArtifactRespondInjector(DecisionGate):
     """Post-process respond decisions: rewrite paths and append the ledger.
 
-    v3 PR6.D.4 + PR4.C.3: explicitly inherits ``DecisionGate`` and
-    reads the artifact snapshot from the typed manifest slot
-    (``workspace_artifacts`` kind item); never calls ``get_run_workspace()``.
+    v3 PR6.D.4 + PR4.C.3: explicitly inherits ``DecisionGate`` and reads
+    the artifact snapshot from the typed manifest slot (``workspace_artifacts``
+    kind item) as the primary source.  Falls back to the live workspace
+    (``run_workspace_scope``) when the manifest has no artifacts — keeps
+    the pre-v3 test path working while the new v3 path is canonical.
     """
 
     async def enforce(self, state: AgentState, decision: Decision) -> Decision:
@@ -98,35 +127,10 @@ class ArtifactRespondInjector(DecisionGate):
             confidence=decision.confidence,
             response_text=merged,
             tool_calls=decision.tool_calls,
- delegations=decision.delegations,
+            delegations=decision.delegations,
             degraded_from=decision.degraded_from,
             extra=decision.extra,
         )
-
-
-def _ledger_snapshot_from_manifest(
-    artifacts: list[dict[str, object]],
-) -> object:
-    """Build the minimal ``ArtifactLedgerSnapshot`` shape for the rewrite helpers.
-
-    The legacy helpers (``rewrite_artifact_markdown`` etc.) expect a
-    snapshot object with ``artifacts`` (list of objects with ``url`` /
-    path / mime attrs).  We materialize duck-typed objects from the
-    manifest payload.
-    """
-    from types import SimpleNamespace
-
-    artifact_ns = [
-        SimpleNamespace(
-            url=str(a.get("url", "")),
-            name=str(a.get("name") or a.get("path") or ""),
-            path=str(a.get("path", "")),
-            mime=str(a.get("mime", "")),
-            size=a.get("size", 0),
-        )
-        for a in artifacts
-    ]
-    return SimpleNamespace(artifacts=artifact_ns)
 
 
 def _strip_unknown_file_urls(text: str, known_urls: set[str]) -> str:

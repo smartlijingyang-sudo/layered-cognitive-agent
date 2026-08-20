@@ -1,0 +1,31 @@
+# bundles/scenario-code.yaml — code scenario bundle.
+# Per spec §13.2.1 (scenario 3): standard + CodeMode executor strategy.
+# CodeMode is a SafeExecutor internal strategy (NOT a new primitive).
+
+entries:
+  # Reuse the standard v3 surface; the profile overrides
+  # lca-safe-executor.mode = "code" at the patch level.
+  - id: lca-safe-executor
+    name: lca_safe_executor
+    $module: lca.plugins.body.safe_executor
+    config:
+      mode: code
+      single_call_multi_tool: true
+
+  - id: lca-tool-bash
+    name: lca_tool_bash
+    $module: lca.plugins.tools.bash
+    config:
+      allowed: true
+
+  - id: lca-tool-str-replace-editor
+    name: lca_tool_str_replace_editor
+    $module: lca.plugins.tools.str_replace_editor
+    config:
+      allowed: true
+
+  - id: lca-tool-test-run
+    name: lca_tool_test_run
+    $module: lca.plugins.tools.test_run
+    config:
+      allowed: true

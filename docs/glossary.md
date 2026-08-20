@@ -95,7 +95,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **SpanView** / **SpanContext** | OTel span 的本地投影视图 / 当前关联上下文（trace/span id） |
 | **AttributePolicy** / **Verbosity** | 属性策略（脱敏/截断，写入期强制）与信息量档位（minimal/standard/verbose） |
 | **JournalEvent** / **RunScope** / **StampedEvent** | journal 事件基类 / 关联骨架（trace·run·parent·delegation id）/ 引擎盖章记录（ADR-0037） |
-| **ExecutionJournal** | 执行日志引擎：词表校验 → 关联盖章 → 策略强制 → 投影器扇出（Journal-as-Truth 写入端） |
+| **RunStore** | 执行日志引擎：词表校验 → 关联盖章 → 策略强制 → 投影器扇出（Journal-as-Truth 写入端；ADR-0037 + PR2） |
 | **JournalProjector** | journal 投影契约：OTel / console / jsonl / 序列图 / 洞察皆为投影 |
 | **OtelProjector** / **ConsoleJournalProjector** / **JsonlJournalProjector** | journal → OTel span（显式定父）/ console 场景卡·叙事·Run Card·序列图 / jsonl 落盘投影器 |
 | **InsightEngine** | 洞察引擎：聚合 journal 触发规则（冗余调用/循环/关键路径/成本），RunInsight 回注 |
@@ -160,6 +160,45 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **SimpleToolRegistry** | ToolRegistry 默认实现 |
 | **InMemoryStateStore** | StateStore 内存实现 |
 | **calculator** / **weather** | 内置示例 Tool 模块（manifest + executor） |
+| **ArtifactLedger** | 工作区产物账本：路径 → url 映射 + MIME / 大小元数据；Body finalize 写、LobeHub 渲染读 |
+| **CLIConfig** / **CLIProvider** | lca-ops CLI 配置 + provider 解析（基于 pydantic-settings） |
+| **ChangeReport** | 升级 / patch 应用的结果报告（lobehub stack 部署侧） |
+| **ClockSensor** | PerceiveHub 命名工厂 `sensor.clock`：从 journal 上下文读时间戳，避免第三条时钟 |
+| **ComputerOps** | ComputerRuntime 协议（命令 + 输出 + 异步等待） |
+| **Console** / **ConsoleConfig** | 控制台输出 + 配置（ANSI / 日志级别） |
+| **DaemonConfig** / **DaemonService** | lca-ops daemon 进程管理（uptime / health / start-stop） |
+| **WorkspaceArtifactsSensor** | PerceiveHub 命名工厂 `sensor.workspace-artifacts`：从 ArtifactLedger 读当前 run 产物 |
+| **InboxFactsSensor** | PerceiveHub 命名工厂 `sensor.inbox-facts`：从 journal `InboxFollowupCreated` 读用户输入 |
+| **TeamInboxSensor** | PerceiveHub 命名工厂 `sensor.team-inbox`：从 journal `TeamMessagePublished` 读跨 agent 消息 |
+| **WorkspaceInstructionsSensor** | PerceiveHub 命名工厂 `sensor.workspace-instructions`：读 AGENTS.md 作为指令通道事实 |
+| **SkillCatalogSensor** | PerceiveHub 命名工厂 `sensor.skill-catalog`：从 OperationalSkillRegistry 读当前可见 skill 列表 |
+| **Blackboard** / **InMemoryBlackboard** / **BlackboardEntry** / **Lease** | 团队共享工件 + 租约协议与内存实现（v3 §11 / PR9b） |
+| **MemoryPolicy** / **CompactionPolicy** / **MemoryWrite** / **MemoryCommitResult** | 记忆策略协议（v3 §8 / PR7）；禁止裸 read/write |
+| **RepeatToolCallGate** / **ToolLoopBreakerGate** / **TerminalRespondGate** / **OfficeWorksSealer** / **ArtifactRespondInjector** | 决策出门 Gate（v3 §3.5 / PR4） |
+| **GateDecided** / **PolicyFact** | Gate 出门判定事件 + 提示词用政策事实（v3 §3.5 / PR4） |
+| **ExecutionEnvelope** / **envelope_from_decision** | Body.act 必须收到的执行包（v3 §9.1 / PR6） |
+| **SimpleMemoryPolicy** / **SimpleCompactionPolicy** | MemoryPolicy / CompactionPolicy 默认实现 |
+| **DiagnosePattern** / **diagnose_loop_stuck** / **diagnose_model_not_seen** / **diagnose_memory_poisoned** / **diagnose_approval_rejected** | v3 §24.5 诊断模式（CLI `lca-ops diagnose`） |
+| **DiagnosisReport** | 诊断模式输出报告（根因 + 修复建议 + 证据链） |
+| **DshConfig** / **DshNotification** / **DshProbe** / **DshService** | DeepSeek Harness 适配（DSH 桥接层；v2 遗产，逐步退役） |
+| **FilesInfoDocument** | 文件元数据文档（路径 + mime + 大小 + 校验和） |
+| **Finding** | 检索 / 诊断发现的原子单元（source + claim + confidence） |
+| **HealthCheck** / **HostEnvironment** / **InfraConfig** / **InfraService** | 基础设施探活 + 主机环境 + 配置（lca-ops heal 子命令） |
+| **LLMFace** / **LLMResolver** / **ProductionLLMResolver** | LLM 适配门面 + 解析器（多 backend / 多 mode 路由） |
+| **LocalMirror** / **MirrorDiff** | upstream fork 本地镜像 + 与 upstream 的差异报告 |
+| **MachineComputer** | ComputerRuntime 协议的具体机器实例（local subprocess / docker / e2b） |
+| **ModelDefinition** | LLM 模式定义（model id + adapter + 价格 + 限额） |
+| **NullSink** | ManifestSink no-op 实现（测试用） |
+| **OpsConfig** | lca-ops 全局配置（基于 pydantic-settings） |
+| **PathConfig** / **PathProvider** / **PlaneRequest** / **ResolvedEndpoint** / **WorkspaceProvider** | 路径配置 + provider + 平面请求 + endpoint 解析 + workspace provider |
+| **ProgressLoopDetector** | 同名工具调用循环检测（DecisionGate 组件） |
+| **Provider** / **ProviderDispatch** | LLM / Tools / Search provider 协议 + 分发 |
+| **ScorerFn** / **SearchHit** / **SearchService** | 评分函数签名 + 检索命中 + 检索服务 |
+| **Service** / **SkillsService** / **ToolsConfig** / **ToolsProvider** / **ToolsService** / **UserConfig** / **UserProvider** / **VenvConfig** / **VenvProvider** | 平台 service 协议与实现（L4 门面下的服务注册） |
+| **Step** | 单步记录类型（journal 事件基础） |
+| **Sudo** | 提权操作适配（仅安全操作走；v3 spec 显式约束） |
+| **UpstreamTree** | upstream 仓库目录树（patch 应用源） |
+| **Verbosity** | 日志信息量档位（minimal / standard / verbose） |
 
 ## L-Casting（自动组队，ADR-0042）
 

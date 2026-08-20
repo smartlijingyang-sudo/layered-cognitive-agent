@@ -14,7 +14,9 @@ def build_live_agent(
     inbox: Inbox,
     identity_id: str,
     options: dict[str, Any] | None,
-    cordis_ctx: Any | None,
+    cordis_ctx: Any | None = None,
+    *,
+    plugin_scope: Any | None = None,  # DEPRECATED: use cordis_ctx
 ) -> OwnerAgentHandle:
     """Build a LiveAgent by resolving the loop builder from cordis context.
 
@@ -26,8 +28,9 @@ def build_live_agent(
     The agent loop is fully swappable through YAML configuration:
     replace the loop plugin in the profile to change the execution engine.
     """
-    builder = _resolve_loop_builder(cordis_ctx)
-    return builder(store, inbox, identity_id, options, cordis_ctx)
+    ctx = cordis_ctx if cordis_ctx is not None else plugin_scope
+    builder = _resolve_loop_builder(ctx)
+    return builder(store, inbox, identity_id, options, ctx)
 
 
 def _resolve_loop_builder(cordis_ctx: Any | None) -> Any:

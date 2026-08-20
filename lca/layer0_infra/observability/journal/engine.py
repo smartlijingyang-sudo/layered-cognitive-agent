@@ -164,6 +164,11 @@ class RunStore:
 
         subscriber 通知在 append 成功后，subscriber 失败不影响返回值。
         首次 append 时解析延迟 subscriber 工厂（如有）。
+
+        Spec §24.5 / Phase J: ``event_type`` is auto-filled with
+        ``type(event).__name__``; ``data`` carries the payload as a
+        dict so downstream consumers can filter without unpacking the
+        frozen dataclass.
         """
         self._resolve_subscribers_if_needed()
         event_type = type(event)
@@ -174,7 +179,15 @@ class RunStore:
         self._seq += 1
         scope = get_current_run_scope() or RunScope()
         sanitized = self._apply_policy(isolated)
-        stamped = StampedEvent(seq=self._seq, ts=time.time(), scope=scope, event=sanitized)
+        stamped = StampedEvent(
+            seq=self._seq,
+            ts=time.time(),
+            scope=scope,
+            event=sanitized,
+            turn=getattr(sanitized, "turn", 0) or 0,
+            event_type=event_type.__name__,
+            data=dataclasses.asdict(sanitized),
+        )
         self._events.append(stamped)  # ← commit boundary
         # 通知 subscriber（失败隔离）
         for subscriber in self._subscribers:

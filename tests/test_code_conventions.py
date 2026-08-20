@@ -82,6 +82,58 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/layer0_infra/computer/runtime_exec.py": (
         "ComputerRuntime 执行平面单模块：code/shell/background/export + SandboxPolicy 检查"
     ),
+    "lca/layer2_runtime/runtime_loop.py": (
+        "CognitiveRuntime 单模块承载 v3 6 阶段闭环编排 + 协议边界 record()"
+        "（perceive→think→act→reflect→remember→stop，ADR-0002 + PR10 落地）"
+    ),
+    "lca/layer0_infra/observability/journal/engine.py": (
+        "RunStore 单模块承载事件索引 + get/get_event/get_blob/find_terminal"
+        "（PR2 / PR6 / PR10 集中落地）"
+    ),
+    "lca/layer0_infra/observability/journal/fact_stream_projector.py": (
+        "FactStreamProjector 单模块承载流式事件到 Journal 转换（ADR-0037）"
+    ),
+    "lca/layer0_infra/observability/journal/console_projector.py": (
+        "ConsoleProjector 单模块承载 console 输出（ADR-0037）"
+    ),
+    "lca/layer0_infra/observability/diagnostics.py": (
+        "DiagnosePattern 单模块承载 4 个 v3 §24.5 诊断模式"
+        "（model_not_seen / loop_stuck / memory_poisoned / approval_rejected）"
+    ),
+    "lca/layer0_infra/ops/cli.py": (
+        "lca-ops CLI 单模块承载 dev/restart/stop/status/heal/provision"
+        "/diagnose/dump-profile/inspect-tree 全子命令"
+    ),
+    "lca/layer0_infra/ops/services/lobehub.py": (
+        "LobeHub deploy service 单模块承载 dev/prod/restart/logs/upgrade"
+    ),
+    "lca/layer0_infra/ops/services/daemon.py": (
+        "Daemon 单模块承载 process 管理 + uptime + health"
+    ),
+    "lca/layer0_infra/ops/upstream_mirror.py": (
+        "Upstream mirror 单模块承载 fork / mirror / patch 应用"
+    ),
+    "lca/layer0_infra/openai_compat.py": (
+        "OpenAI compat 单模块承载 chat / completion / embedding 适配"
+    ),
+    "lca/layer0_infra/host_runtime/providers/user.py": (
+        "User provider 单模块承载 user runtime 配置 + workspace"
+    ),
+    "lca/layer1_cognitive/memory/simple_memory.py": (
+        "SimpleMemorySystem 单模块承载四层记忆 + propose/commit/compaction 影子（PR7）"
+    ),
+    "lca/layer1_cognitive/body/pipeline_safe_executor.py": (
+        "PipelineSafeExecutor 单模块承载五阶段管线 + finalize（v3 §9.1/9.2）"
+    ),
+    "lca/contracts/models/observability/journal_catalog.py": (
+        "JOURNAL_CATALOG 元数据单文件（ADR-0037 + PR2/6/9/13 集中登记）"
+    ),
+    "lca/layer4_app/api.py": (
+        "L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"
+    ),
+    "lca/packages/client/runtime/src/client/index.py": (
+        "Upstream TypeScript port stub（lobehub-ui 同名；不计入 LCA 行数硬限）"
+    ),
 }
 
 

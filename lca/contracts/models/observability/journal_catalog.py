@@ -313,19 +313,19 @@ JOURNAL_CATALOG: dict[str, VocabDef] = {
     ),
     "ToolStarted": _journal(
         VocabDomain.RESOURCE,
-        "lca.layer1_cognitive.body.safe_executor",
+        "lca.layer1_cognitive.body.tool_journal_emit",
         required=("tool_name", "invocation_id"),
         desc="工具调用开始；plugin_state 为 UI 完整初始态（code/command）",
     ),
     "ToolInvoked": _journal(
         VocabDomain.RESOURCE,
-        "lca.layer1_cognitive.body.safe_executor",
+        "lca.layer1_cognitive.body.tool_journal_emit",
         required=("tool_name",),
         desc="工具调用完成；plugin_state/files 为 UI 一等字段（不截断）",
     ),
     "ToolDenied": _journal(
         VocabDomain.RESOURCE,
-        "lca.layer1_cognitive.body.safe_executor",
+        "lca.layer1_cognitive.body.tool_journal_emit",
         required=("tool_name",),
         desc="工具调用被拒",
     ),

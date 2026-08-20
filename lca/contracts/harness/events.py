@@ -80,7 +80,7 @@ class ContextInjected:
 class SkillCatalogPublished:
     entries: tuple[SkillCatalogEntry, ...]
     digest: str
-    source: str = "pre_step"
+    source: str = "perceive"
 
 
 @session_event("skill.loaded.v1", visibility="audit")

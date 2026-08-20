@@ -1,0 +1,29 @@
+# bundles/scenario-lats.yaml — lats scenario bundle.
+# Per spec §13.5.4: Brain 内部跑 MCTS — 树搜索 / rollout / 价值评估 / backprop.
+
+entries:
+  # LATS Brain — replaces the default React brain with MCTS.
+  - id: lca-brain-lats
+    name: lca_brain_lats
+    $module: lca.plugins.brain.lats
+    config:
+      n_simulations: 50
+      rollout_depth: 5
+      exploration_constant: 1.4
+
+  # Critic — value network evaluator.
+  - id: lca-critic-value-network
+    name: lca_critic_value_network
+    $module: lca.plugins.critic.value_network
+    config:
+      evaluation_dimensions:
+        - correctness
+        - completeness
+        - efficiency
+
+  # Tree evaluation cache in memory.
+  - id: lca-memory-tree-cache
+    name: lca_memory_tree_cache
+    $module: lca.plugins.memory.tree_cache
+    config:
+      tree_evaluation_cache: true

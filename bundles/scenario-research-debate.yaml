@@ -1,0 +1,27 @@
+# bundles/scenario-research-debate.yaml — research-debate scenario bundle.
+# Per spec §3.7.4: 配置即文档 — Lead + 3 researchers + evidence synthesizer.
+# The role-specific tool bundles (lead-standard, researcher-*-tools)
+# live alongside this file; this bundle is the team-level glue.
+
+entries:
+  # Evidence-weighted synthesizer — collects findings from 3 researchers.
+  - id: lca-synthesizer-evidence-weighted
+    name: lca_synthesizer_evidence_weighted
+    $module: lca.plugins.synthesizer.evidence_weighted
+    config:
+      require_consensus: false
+      min_sources: 2
+
+  # Debate coordination primitive.
+  - id: lca-coordination-debate
+    name: lca_coordination_debate
+    $module: lca.plugins.coordination.debate
+    config: {}
+
+  # Team message bus.
+  - id: lca-team-message-policy
+    name: lca_team_message_policy
+    $module: lca.plugins.policy.team_message
+    config:
+      default_visibility: team
+      default_ttl_step: 50

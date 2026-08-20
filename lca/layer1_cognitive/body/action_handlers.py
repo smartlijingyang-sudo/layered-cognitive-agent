@@ -229,7 +229,9 @@ def _combine_tool_observations(
     """
     observations = list(observations)
     all_ok = all(obs.success for obs in observations)
-    errors = [obs.error for obs in observations if not obs.success]
+    errors = [
+        e for e in (obs.error for obs in observations if not obs.success) if e
+    ]
     extra: dict[str, Any] = {
         OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
         OBS_TOOL_RESULTS: [

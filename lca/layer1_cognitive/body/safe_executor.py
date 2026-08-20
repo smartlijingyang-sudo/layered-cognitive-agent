@@ -70,6 +70,13 @@ def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
 
 
+from lca.layer1_cognitive.body.tool_journal_emit import (  # noqa: E402,F401
+    emit_tool_denied,
+    emit_tool_invoked,
+    emit_tool_started,
+)
+
+
 class SimpleSafeExecutor(SafeExecutor):
     """Permission → validate → ToolStarted → cache → retry → sandbox execute → ToolInvoked."""
 
@@ -86,14 +93,14 @@ class SimpleSafeExecutor(SafeExecutor):
         invocation_id: str = "",
     ) -> Observation:
         if tool.name not in self.permission_manifest.allowed_tools:
-            record(ToolDenied(tool_name=tool.name, reason="permission"))
+            emit_tool_denied(tool, "permission")
             raise ToolExecutionError(
                 f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权"
             )
 
         validation_error = self._validate_args(tool, args)
         if validation_error is not None:
-            record(ToolDenied(tool_name=tool.name, reason="validation"))
+            emit_tool_denied(tool, "validation")
             return Observation(
                 observation_id=new_id("obs"),
                 success=False,
@@ -105,14 +112,7 @@ class SimpleSafeExecutor(SafeExecutor):
         invocation_id = invocation_id.strip() or new_id("inv")
         args_preview = compact_args_preview(args)
         started_state = build_started_plugin_state(tool.name, args)
-        record(
-            ToolStarted(
-                tool_name=tool.name,
-                arguments_preview=args_preview,
-                invocation_id=invocation_id,
-                plugin_state=started_state,
-            )
-        )
+        emit_tool_started(tool, args_preview, invocation_id, started_state)
 
         with tool_invocation_scope(invocation_id):
             return await self._execute_with_retry(
@@ -219,20 +219,16 @@ class SimpleSafeExecutor(SafeExecutor):
         invocation_id: str,
     ) -> None:
         # Prefer sandbox/tool-provided id; fall back to SafeExecutor-assigned id.
-        resolved_id = str((obs.extra or {}).get("invocation_id", "") or "") or invocation_id
-        record(
-            ToolInvoked(
-                tool_name=tool.name,
-                arguments_preview=args_preview,
-                result_preview=_tool_output_preview(obs),
-                ok=obs.success,
-                latency_ms=latency_ms,
-                attempt=attempt,
-                error="" if obs.success else (obs.error or ""),
-                invocation_id=resolved_id,
-                files=tool_files(obs),
-                plugin_state=tool_plugin_state(obs, tool_name=tool.name, args=args),
-            )
+        # ToolInvoked emission is delegated to tool_journal_emit so the
+        # boundary guard sees a single canonical site (this module).
+        emit_tool_invoked(
+            tool,
+            args,
+            args_preview,
+            obs,
+            latency_ms=latency_ms,
+            attempt=attempt,
+            invocation_id=invocation_id,
         )
 
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:

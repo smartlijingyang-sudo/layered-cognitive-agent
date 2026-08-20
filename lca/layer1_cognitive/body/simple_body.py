@@ -9,6 +9,7 @@ from lca.contracts.atoms.enums import ActionScope, ActionType
 from lca.contracts.atoms.semantic_keys import OBS_DEGRADED_FROM
 from lca.contracts.models.core.decision import Decision, Observation
 from lca.contracts.models.core.execution import ExecutionEnvelope
+from lca.contracts.models.core.result import UnregisteredActionError
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import ActionDegraded
 from lca.contracts.protocols import (
@@ -138,24 +139,14 @@ class SimpleBody(Body):
     ) -> None:
         """协议边界派生事件（v3 §4.4 + §10）。
 
-        Decision.degraded_from 不为空 + Observation.success=True → 派生
-        ``ActionDegraded`` 并直接 ``record()``。原 hook 派生路径已拆。
+        Decision.degraded_from 不为空 + Observation.success=True → 由
+        ``lca.layer2_runtime.event_emission`` 派生 ``ActionDegraded``；
+        我们只保留溯源传播（``_propagate_degradation``），不再在 body
+        里直接 emit（边界守卫：单一发射点是 event_emission）。
         """
-        if not getattr(observation, "success", False):
-            return
-        if not getattr(observation, "degraded_from", None):
-            return
-        degraded_to = (
-            getattr(decision, "action_type", None)
-            and getattr(decision.action_type, "value", decision.action_type)
-        ) or ActionType.RESPOND.value
-        record(
-            ActionDegraded(
-                original_action_type=observation.degraded_from,
-                degraded_to=degraded_to,
-                step=state.step,
-            )
-        )
+        # Emit path lives in event_emission; body is responsible for
+        # surfacing the degradation marker on Observation only.
+        return
 
     @staticmethod
     def _propagate_degradation(decision: Decision, observation: Observation) -> Observation:

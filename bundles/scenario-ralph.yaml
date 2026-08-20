@@ -1,0 +1,57 @@
+# bundles/scenario-ralph.yaml — ralph-loop scenario bundle.
+# Per spec §13.4: 完全由 v3 现有原语组合实现，零新增原语.
+# Uses GoalStack + LoopBreaker + TaskContract.
+
+entries:
+  # Goal stack policy (Tier-3) — patch-then-test cycle driver.
+  - id: lca-goal-stack-policy
+    name: lca_goal_stack_policy
+    $module: lca.plugins.policy.goal_stack
+    config:
+      max_retries: 3
+      retry_on:
+        - test_failed
+        - build_failed
+
+  # Loop breakers — Ralph relies on repeat detection + break.
+  - id: lca-gate-repeat-tool-call
+    name: lca_gate_repeat_tool_call
+    $module: lca.layer1_cognitive.brain.decision_gates.repeat_tool_call
+    config:
+      threshold: 3
+
+  - id: lca-gate-loop-breaker
+    name: lca_gate_loop_breaker
+    $module: lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker
+    config: {}
+
+  # Tools — git + test-run + file-write
+  - id: lca-tool-git
+    name: lca_tool_git
+    $module: lca.plugins.tools.git
+    config:
+      allowed: true
+
+  - id: lca-tool-test-run
+    name: lca_tool_test_run
+    $module: lca.plugins.tools.test_run
+    config:
+      allowed: true
+
+  - id: lca-tool-bash
+    name: lca_tool_bash
+    $module: lca.plugins.tools.bash
+    config:
+      allowed: true
+
+  - id: lca-tool-file-read
+    name: lca_tool_file_read
+    $module: lca.plugins.tools.file_read
+    config:
+      allowed: true
+
+  - id: lca-tool-file-write
+    name: lca_tool_file_write
+    $module: lca.plugins.tools.file_write
+    config:
+      allowed: true

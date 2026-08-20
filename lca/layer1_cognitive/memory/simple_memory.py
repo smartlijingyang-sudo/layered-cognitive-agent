@@ -18,6 +18,18 @@ from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import MemorySystem, SharedMemoryStore
+from lca.layer0_infra.observability import record
+
+# v3 §8 / PR7.D.6/7: the system is wired
+from lca.layer1_cognitive.memory.policy import (
+    CompactionPolicy,
+    MemoryCommitResult,
+    MemoryPolicy,
+    MemoryWrite,
+    SimpleCompactionPolicy,
+    SimpleMemoryPolicy,
+)
+from lca.contracts.models.observability.journal import ContextCompacted, MemoryCommitted
 
 _DEFAULT_MAX_WORKING = 20
 _DEFAULT_MAX_EPISODIC = 50
@@ -28,10 +40,25 @@ class SimpleMemorySystem(MemorySystem):
 
     可选绑定 SharedMemoryStore：对声明共享的层（semantic/procedural），
     读写直接走共享 store，实现跨 Agent 记忆共享；未声明共享的层保持私有。
+
+    v3 §8 / PR7.D.6/7：
+    - 写入必经 ``MemoryPolicy.commit(writes)``；返回 ``MemoryCommitResult``；
+      接受部分 emit ``MemoryCommitted``，拒绝部分 emit ``MemoryWriteRejected``。
+    - ``perceive`` 末尾影子调用 ``CompactionPolicy.compact``；emit ``ContextCompacted``。
     """
 
-    def __init__(self, shared_store: SharedMemoryStore | None = None) -> None:
+    def __init__(
+        self,
+        shared_store: SharedMemoryStore | None = None,
+        *,
+        policy: MemoryPolicy | None = None,
+        compaction: CompactionPolicy | None = None,
+    ) -> None:
         self._shared_store: SharedMemoryStore | None = shared_store
+        # Public attrs so tests / hot-reload can swap in custom policies
+        # via ``system.policy = ...`` (PR7.D.6/7).
+        self.policy: MemoryPolicy = policy or SimpleMemoryPolicy()
+        self.compaction: CompactionPolicy = compaction or SimpleCompactionPolicy()
         self._private_layers: dict[MemoryLayer, list[MemoryRecord]] = {
             MemoryLayer.WORKING: [],
             MemoryLayer.SEMANTIC: [],
@@ -54,8 +81,71 @@ class SimpleMemorySystem(MemorySystem):
         records: list[MemoryRecord] = []
         for layer_name in self._private_layers:
             records.extend(self._get_layer_records(layer_name))
-        state.retrieved_context = records
+        # PR7.D.7: shadow-compact inside perceive; emit ContextCompacted
+        # with the original vs kept kinds.  Empty compaction is still
+        # journaled (every Perceive gets an audit trail).
+        compacted = self._shadow_compact(records)
+        kinds = tuple(
+            r.kind.value if hasattr(r.kind, "value") else str(r.kind)
+            for r in records
+        )
+        kept_kinds = tuple(
+            r.kind.value if hasattr(r.kind, "value") else str(r.kind)
+            for r in compacted
+        )
+        record(
+            ContextCompacted(
+                step=state.step,
+                original_kinds=kinds,
+                kept_kinds=kept_kinds,
+            )
+        )
+        state.retrieved_context = compacted
         return state
+
+    def _shadow_compact(
+        self, records: list[MemoryRecord]
+    ) -> list[MemoryRecord]:
+        """Shadow-compact the in-memory snapshot (PR7.D.7).
+
+        Delegates to ``CompactionPolicy.compact`` with a working-layer
+        budget (default 20); the result becomes ``state.retrieved_context``.
+        Original records stay intact in the layer storage — compaction
+        is presentation-side only.
+        """
+        # Working-memory is the snapshot we render into prompts; cap it
+        # at ``_DEFAULT_MAX_WORKING`` so the prompt doesn't grow unbounded.
+        budget = _DEFAULT_MAX_WORKING
+        return list(self.compaction.compact(tuple(records), budget=budget))
+
+    def commit(self, writes: tuple[MemoryWrite, ...]) -> MemoryCommitResult:
+        """Apply writes via ``MemoryPolicy``; emit ``MemoryCommitted`` (PR7.D.6).
+
+        Returns ``MemoryCommitResult(accepted, rejected)``.  ``accepted``
+        records are appended to their target layers; ``rejected`` writes
+        are not stored.  Both sides journal via ``record()``.
+        """
+        result = self.policy.commit(writes)
+        for rec in result.accepted:
+            self._append_record(rec.memory_type, rec)
+        # Emit journal events.  Best-effort: outside a bind() context the
+        # record() facade is a no-op (per ADR-0055 / facade.py:140).
+        for rec in result.accepted:
+            record(
+                MemoryCommitted(
+                    layer=rec.memory_type.value,
+                    record_id=rec.record_id,
+                )
+            )
+        for rej in result.rejected:
+            record(
+                MemoryCommitted(
+                    layer=rej.write.memory_type.value,
+                    record_id=rej.write.record_id,
+                    record_kind="rejected",
+                )
+            )
+        return result
 
     async def update(
         self, state: AgentState, observation: Observation, reflection: Reflection

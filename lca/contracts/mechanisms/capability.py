@@ -32,7 +32,7 @@ REQUIRED_CAPABILITY_KEYS: tuple[CapabilityKey, ...] = tuple(CapabilityKey)
 
 
 # Re-export SeamKey as deprecated alias pointing to CapabilityKey
-def __getattr__(name: str):
+def __getattr__(name: str) -> object:
     if name == "SeamKey":
         import warnings
         warnings.warn(

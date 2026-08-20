@@ -34,6 +34,7 @@
 | [0052](0052-unified-dynamic-casting.md) | 统一动态选角 — 退役静态模式目录，solo/team 收成同一套 casting | Proposed |
 | [0053](0053-unified-search-plane.md) | Unified Search Plane — Tavily REST + web_search + LLM 搜索兜底 | Accepted |
 | [0054](0054-officecli-office-plane.md) | OfficeCLI Office 平面 — 沙箱二进制 + Bundled Skill + 路由 | Accepted |
+| [0055](0055-run-fact-store.md) | Run Fact Store — 以不可变事件为事实源的 Agent 运行时遥测与证据平台 | Accepted |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件

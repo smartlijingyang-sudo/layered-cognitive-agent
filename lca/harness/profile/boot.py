@@ -65,6 +65,11 @@ async def boot_profile(
     ctx = Context()
     from lca.plugins._compat import legacy_plugin_setup
     for entry in tree.entries:
+        # ``disabled: true`` in config skips the plugin's setup.
+        if entry.disabled or (
+            isinstance(entry.config, dict) and entry.config.get("disabled")
+        ):
+            continue
         # cordis @plugin decorator wraps the function in a Plugin dataclass
         # (with `setup` as a field). To call, we need module.setup.setup(ctx, config).
         module_path = entry.extra.get("$module")

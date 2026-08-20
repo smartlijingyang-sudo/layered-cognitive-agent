@@ -49,6 +49,60 @@ class RunLoopDriver(Protocol):
     ) -> DriverOutcome: ...
 
 
+def _record_inbox_followup(
+    *,
+    session: RunSession,
+    question: str,
+    mode: str,
+    run_context: RunContext,
+) -> None:
+    """Emit ``InboxFollowupCreated`` on the ambient RunStore (PR8.E.1 / D24).
+
+    ``InboxFactsSensor`` reads these events to feed user messages into
+    the next Perceive step.  No more bare ``run(question)`` — every
+    user input enters via the Inbox followup.  The question text lives
+    on the event's ``step`` metadata via RunScope; for simplicity we
+    truncate to 200 chars and store on the agent session.
+    """
+    try:
+        from lca.contracts.models.observability.journal import InboxFollowupCreated
+        from lca.layer0_infra.observability import record
+
+        priority = "task" if mode == "solo" else "background"
+        target = "next_turn"
+        record(
+            InboxFollowupCreated(
+                inbox_id=f"inbox-{session.run_id}-{_COUNTER.next()}",
+                actor="user",
+                target=target,
+                priority=priority,
+                step=0,
+                payload_preview=question[:200] if isinstance(question, str) else "",
+            )
+        )
+        # Also stash the question on the session so downstream readers
+        # can pull it back without parsing the journal payload.
+        if isinstance(question, str) and question:
+            session.user_text = question[:200]
+    except Exception:  # noqa: BLE001
+        # Best-effort: if hub not bound (e.g. dry scripts), skip.
+        pass
+
+
+class _Counter:
+    """Monotonic inbox-id counter for followup events."""
+
+    def __init__(self) -> None:
+        self._n = 0
+
+    def next(self) -> int:
+        self._n += 1
+        return self._n
+
+
+_COUNTER = _Counter()
+
+
 class CognitiveRunDriver:
     uses_sandbox = True
     plane_target: str | None = None
@@ -64,6 +118,15 @@ class CognitiveRunDriver:
         run_context: RunContext,
         llm_resolver: Any,
     ) -> DriverOutcome:
+        # PR8.E.1 / D24: every user input enters the loop via Inbox followup
+        # (v3 §10.1).  Record ``InboxFollowupCreated`` so ``InboxFactsSensor``
+        # can fold it into the next Perceive (no more bare ``run(question````).
+        _record_inbox_followup(
+            session=session,
+            question=question,
+            mode=mode,
+            run_context=run_context,
+        )
         llm = llm_resolver.resolve(mode=mode)
         scope = await ensure_default_ctx()
         if mode == SOLO_MODE_KEY:

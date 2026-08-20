@@ -12,7 +12,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-observability-provider", inject=["observability"])
 async def setup(ctx: Context, config: Config) -> None:
-    from lca.layer0_infra.observability.registry import create_observability
+    from lca.layer0_infra.observability import create_observability
 
     if "console" in config.providers:
         ctx.inject("observability").register(

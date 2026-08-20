@@ -145,6 +145,31 @@ class _ScopeAsCapabilityContext:
         return [k for k in dir(self._ctx) if not k.startswith("_")]
 
 
+def _scope_is_team(scope: object | None) -> bool:
+    """Heuristic: detect LEAD/MEMBER scope (ActionScope or cordis ctx).
+
+    Used by ``_build_perceive_hub`` to decide whether to wire
+    ``TeamInboxSensor`` (only for team runs).
+    """
+    if scope is None:
+        return False
+    # ActionScope is an Enum whose values include SOLO, MEMBER, LEAD.
+    value = getattr(scope, "value", None)
+    if value is not None:
+        return str(value).lower() in {"member", "lead", "team"}
+    marker = getattr(scope, "team_scope", None) or getattr(scope, "_team_scope", None)
+    if marker is None:
+        return False
+    return str(marker).lower() in {"lead", "member", "team"}
+
+
+def _run_store_from_scope(scope: object | None):
+    """Best-effort: pull a RunStore out of a cordis scope, or return None."""
+    if scope is None:
+        return None
+    return getattr(scope, "run_store", None) or getattr(scope, "_run_store", None)
+
+
 def _resolve_component(
     reg: ComponentRegistryProtocol,
     category: str,
@@ -416,12 +441,22 @@ class AgentComposer:
         return hooks
 
     @staticmethod
-    def _build_perceive_hub(memory: MemorySystem) -> PerceiveHub:
+    def _build_perceive_hub(
+        memory: MemorySystem,
+        *,
+        hub: object | None = None,
+        scope: object | None = None,
+    ) -> PerceiveHub:
         """Build the ``SequentialPerceiveHub`` with the v3 named factories.
 
         Spec §5.5: composition order is fixed (clock → workspace-artifacts →
         inbox-facts → team-inbox → skill-catalog).  Missing factories
         are skipped; the Hub is robust to partial plugin trees.
+
+        PR8/PR9/PR14: ``InboxFactsSensor`` is wired in solo/team mode;
+        ``TeamInboxSensor`` is wired only when ``scope`` indicates
+        LEAD/MEMBER (team mode).  ``SkillCatalogSensor`` /
+        ``WorkspaceInstructionsSensor`` are wired when present.
 
         This is the only place the Hub is composed.  Plugins provide
         named factories (via ``ctx.provide``); the Composer is the
@@ -431,6 +466,46 @@ class AgentComposer:
             build_clock_sensor(),
             build_workspace_artifacts_sensor(),
         ]
+        # PR8 / PR9: wire InboxFactsSensor + (team-mode) TeamInboxSensor.
+        # Always provide a default in-memory RunStore when no scope-supplied
+        # store is found (tests / scripts).
+        try:
+            from lca.layer1_cognitive.sensors.journal_backed import (
+                build_inbox_facts_sensor,
+                build_team_inbox_sensor,
+            )
+            from lca.layer0_infra.observability import RunStore
+
+            store = (
+                getattr(hub, "_run_store", None)
+                or _run_store_from_scope(scope)
+                or RunStore()
+            )
+            sensors.append(build_inbox_facts_sensor(store))
+            if _scope_is_team(scope):
+                sensors.append(build_team_inbox_sensor(store))
+        except Exception:  # noqa: BLE001
+            pass
+
+        # PR13 / PR14: wire workspace_instructions + skill-catalog sensors
+        # when their named factories exist.
+        try:
+            from lca.layer1_cognitive.sensors.workspace_instructions import (
+                build_workspace_instructions_sensor,
+            )
+
+            sensors.append(build_workspace_instructions_sensor())
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            from lca.layer1_cognitive.sensors.skill_catalog import (
+                build_skill_catalog_sensor,
+            )
+
+            sensors.append(build_skill_catalog_sensor())
+        except Exception:  # noqa: BLE001
+            pass
+
         return SequentialPerceiveHub(sensors=sensors, memory=memory)
 
     @staticmethod

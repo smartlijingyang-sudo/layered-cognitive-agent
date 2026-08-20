@@ -28,10 +28,11 @@ class WorkspaceArtifactsSensor(Sensor):
         # Render minimal JSON-able form for the manifest.
         payload = [
             {
-                "path": art.path,
+                "path": art.guest_path,
+                "name": art.name,
                 "url": art.url,
-                "mime": art.mime,
-                "size": art.size,
+                "mime": art.mime_type,
+                "size": art.size_bytes,
             }
             for art in snapshot.artifacts
         ]

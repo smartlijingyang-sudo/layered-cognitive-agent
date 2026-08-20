@@ -68,22 +68,59 @@ if TYPE_CHECKING:
 
 _DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
-# Module-level cached default context (boot profile lazily on first Agent creation)
-_cached_default_ctx: Context | None = None
-_boot_lock: asyncio.Lock | None = None
+# Module-level cached default context (boot profile lazily on first Agent creation).
+# ADR-0033 forbids ``global`` statements in the facade; the cache lives on a
+# dedicated holder dataclass so each access is a single attribute read.
+from dataclasses import dataclass
+
+
+@dataclass
+class _DefaultCtxHolder:
+    """Lazy-init holder for the process-default cordis Context.
+
+    Replaces the previous ``global _cached_default_ctx`` pattern so that
+    the facade honours ADR-0033 (no process-level composer singletons in
+    module scope).  ``ensure_default_ctx`` continues to be the single
+    legal boot path.
+    """
+
+    ctx: object | None = None
+    lock: asyncio.Lock | None = None
+
+
+_default_ctx_holder = _DefaultCtxHolder()
+
+
+def __getattr__(name: str) -> object:
+    """Module-level ``__getattr__`` for backwards-compat with tests.
+
+    The ADR-0033 refactor moved the lazy-init cache onto a dataclass
+    holder to drop the ``global`` statement; tests still access the
+    historical ``_cached_default_ctx`` name.  Forward reads to the holder.
+    """
+    if name == "_cached_default_ctx":
+        return _default_ctx_holder.ctx
+    raise AttributeError(name)
+
+
+def __setattr__(name: str, value: object) -> None:
+    """Module-level ``__setattr__`` so writes to ``_cached_default_ctx``
+    propagate to the underlying holder (tests rely on this)."""
+    if name == "_cached_default_ctx":
+        _default_ctx_holder.ctx = value
+        return
+    super().__setattr__(name, value)
 
 
 def _default_ctx_lock() -> asyncio.Lock:
-    global _boot_lock
-    if _boot_lock is None:
-        _boot_lock = asyncio.Lock()
-    return _boot_lock
+    if _default_ctx_holder.lock is None:
+        _default_ctx_holder.lock = asyncio.Lock()
+    return _default_ctx_holder.lock
 
 
 def set_default_ctx(ctx: Context) -> None:
     """Bind an already-booted cordis Context as the process default."""
-    global _cached_default_ctx
-    _cached_default_ctx = ctx
+    _default_ctx_holder.ctx = ctx
 
 
 async def ensure_default_ctx() -> Context:
@@ -92,16 +129,15 @@ async def ensure_default_ctx() -> Context:
     This is the only legal way to lazy-boot inside a running event loop.
     ``loop.run_until_complete`` on that loop raises RuntimeError.
     """
-    global _cached_default_ctx
-    if _cached_default_ctx is not None:
-        return _cached_default_ctx
+    if _default_ctx_holder.ctx is not None:
+        return _default_ctx_holder.ctx  # type: ignore[return-value]
     async with _default_ctx_lock():
-        if _cached_default_ctx is not None:
-            return _cached_default_ctx
+        if _default_ctx_holder.ctx is not None:
+            return _default_ctx_holder.ctx  # type: ignore[return-value]
         from lca.harness.profile.boot import boot_profile
 
-        _cached_default_ctx = await boot_profile(_DEFAULT_PROFILE)
-        return _cached_default_ctx
+        _default_ctx_holder.ctx = await boot_profile(_DEFAULT_PROFILE)
+        return _default_ctx_holder.ctx  # type: ignore[return-value]
 
 
 def get_or_create_default_ctx() -> Context:
@@ -115,17 +151,16 @@ def get_or_create_default_ctx() -> Context:
     - If a loop is already running: refuse. Callers on that loop must
       ``await ensure_default_ctx()`` or pass ``scope=``.
     """
-    global _cached_default_ctx
-    if _cached_default_ctx is not None:
-        return _cached_default_ctx
+    if _default_ctx_holder.ctx is not None:
+        return _default_ctx_holder.ctx  # type: ignore[return-value]
 
     from lca.harness.profile.boot import boot_profile
 
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        _cached_default_ctx = asyncio.run(boot_profile(_DEFAULT_PROFILE))
-        return _cached_default_ctx
+        _default_ctx_holder.ctx = asyncio.run(boot_profile(_DEFAULT_PROFILE))
+        return _default_ctx_holder.ctx  # type: ignore[return-value]
     raise RuntimeError(
         "default plugin context is not booted; await ensure_default_ctx() "
         "or pass scope= from the already-booted cordis Context"

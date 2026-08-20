@@ -226,6 +226,11 @@ def _role_prompt_vars(
     }
     if current_date is not None:
         variables["current_date"] = current_date
+    else:
+        # PR3c.B.11: no clock item → template's CURRENT_DATE line is
+        # empty; ``_strip_empty_prompt_fields`` strips it via the
+        # ``^[A-Z_]+: \s*$`` regex (no KeyError on format).
+        variables["current_date"] = ""
     return variables
 
 

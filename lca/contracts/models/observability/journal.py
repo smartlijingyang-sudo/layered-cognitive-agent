@@ -45,6 +45,7 @@ class RunScope:
     trace_id: TraceId = ""  # type: ignore[assignment]
     run_id: RunId = ""  # type: ignore[assignment]
     parent_run_id: RunId | None = None
+    parent_trace_id: TraceId | None = None
     delegation_id: str | None = None
     agent_role: str = ""
 
@@ -117,12 +118,31 @@ class JournalEvent:
 
 @dataclass(frozen=True)
 class StampedEvent:
-    """引擎盖章后的日志记录：序号 + 时间戳 + 关联骨架 + 事件本体。"""
+    """引擎盖章后的日志记录：序号 + 时间戳 + 关联骨架 + 事件本体。
+
+    Spec §24.5 / Phase J: every stamped event carries:
+
+    - ``seq``  — sequential log index (ADR-0055 N2)
+    - ``ts``   — monotonic timestamp
+    - ``scope`` — correlation skeleton (trace_id / parent_trace_id / run_id /
+      delegation_id / agent_role / step)
+    - ``turn`` — agent loop turn number (default 0)
+    - ``event_type`` — class name of the payload (auto-stamped by ``RunStore.append``)
+    - ``data``  — optional dict carrying the raw payload for downstream
+      consumers (mirrors ``event.__dict__``; auto-populated when the engine
+      stamps it).
+    - ``correlation_ids`` — additional cross-trace ids (multi-trace joining).
+    - ``event`` — the typed payload (frozen dataclass).
+    """
 
     seq: int
     ts: float
     scope: RunScope
     event: JournalEvent
+    turn: int = 0
+    event_type: str = ""
+    data: dict[str, object] = field(default_factory=dict)
+    correlation_ids: tuple[str, ...] = ()
 
 
 class DelegationMechanism(str, Enum):
@@ -533,6 +553,9 @@ class InboxFollowupCreated(JournalEvent):
     """A user message was injected via the Inbox (PR8 / D24).
 
     All user input flows Inbox → journal → inbox-facts sensor → Perceive.
+    ``payload_preview`` carries a (lossy) preview of the user message
+    so the journal itself is the single source of truth (per ADR-0037);
+    the full text stays on the originating ``Session.user_text``.
     """
 
     inbox_id: str = ""
@@ -540,6 +563,7 @@ class InboxFollowupCreated(JournalEvent):
     target: str = ""
     priority: str = ""
     step: int = 0
+    payload_preview: str = ""
     payload_preview: str = field(default="", metadata={"journal_kind": "content"})
 
 

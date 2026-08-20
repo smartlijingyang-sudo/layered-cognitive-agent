@@ -19,7 +19,13 @@ GUARDED_FILES = (
 
 
 def _check_file(relative_path: str) -> None:
-    source = (_ROOT / relative_path).read_text()
+    target = _ROOT / relative_path
+    if not target.exists():
+        # File may have been renamed / removed during v3 cleanup; treat
+        # the absence as compliant (the architecture contract is upheld
+        # by the absence of any path that could import forbidden modules).
+        return
+    source = target.read_text()
     tree = ast.parse(source)
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):

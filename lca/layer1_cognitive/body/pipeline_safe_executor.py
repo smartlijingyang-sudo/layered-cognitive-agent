@@ -140,8 +140,10 @@ class PipelineSafeExecutor(SafeExecutor):
 
     def _check_permission_and_args(self, tool: Tool, args: dict[str, Any]) -> ToolPreDecision:
         """Stage 1: 权限检查和参数校验。"""
+        from lca.layer1_cognitive.body.safe_executor import emit_tool_denied
+
         if tool.name not in self.permission_manifest.allowed_tools:
-            record(ToolDenied(tool_name=tool.name, reason="permission"))
+            emit_tool_denied(tool, "permission")
             return ToolPreDecision(
                 kind="deny",
                 reason=f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权",
@@ -150,7 +152,7 @@ class PipelineSafeExecutor(SafeExecutor):
         # 参数校验
         validation_error = self._validate_args(tool, args)
         if validation_error is not None:
-            record(ToolDenied(tool_name=tool.name, reason="validation"))
+            emit_tool_denied(tool, "validation")
             return ToolPreDecision(kind="deny", reason=validation_error)
 
         return ToolPreDecision(kind="allow")
@@ -163,19 +165,16 @@ class PipelineSafeExecutor(SafeExecutor):
         cache_config: CacheConfig,
         invocation_id: str,
     ) -> ToolExecutionResult:
-        """Stage 3: 实际执行（含重试、缓存）。"""
+        """Stage 3: 实际执行（含重试、缓存）。
+
+        Note: ``ToolStarted`` is emitted by ``SimpleSafeExecutor`` (the
+        canonical emitter per spec §9.1).  The pipeline executor reuses
+        that emitter by routing through ``_LegacyToolProvider`` —
+        duplicating the emit here would violate the single-emission
+        boundary guard.
+        """
         args_preview = compact_args_preview(args)
         started_state = build_started_plugin_state(tool.name, args)
-
-        # Journal: ToolStarted
-        record(
-            ToolStarted(
-                tool_name=tool.name,
-                arguments_preview=args_preview,
-                invocation_id=invocation_id,
-                plugin_state=started_state,
-            )
-        )
 
         with tool_invocation_scope(invocation_id):
             # 缓存检查
@@ -353,21 +352,22 @@ class PipelineSafeExecutor(SafeExecutor):
         attempt: int,
         invocation_id: str,
     ) -> None:
-        """Journal: ToolInvoked。"""
-        resolved_id = str((obs.extra or {}).get("invocation_id", "") or "") or invocation_id
-        record(
-            ToolInvoked(
-                tool_name=tool.name,
-                arguments_preview=args_preview,
-                result_preview=_tool_output_preview(obs),
-                ok=obs.success,
-                latency_ms=latency_ms,
-                attempt=attempt,
-                error="" if obs.success else (obs.error or ""),
-                invocation_id=resolved_id,
-                files=tool_files(obs),
-                plugin_state=tool_plugin_state(obs, tool_name=tool.name, args=args),
-            )
+        """Journal: ToolInvoked。
+
+        Per spec §9.1 the canonical emitter is ``safe_executor``; this
+        delegate routes through it so the boundary guard sees one
+        emission site per event.
+        """
+        from lca.layer1_cognitive.body.safe_executor import emit_tool_invoked
+
+        emit_tool_invoked(
+            tool,
+            args,
+            args_preview,
+            obs,
+            latency_ms=latency_ms,
+            attempt=attempt,
+            invocation_id=invocation_id,
         )
 
 

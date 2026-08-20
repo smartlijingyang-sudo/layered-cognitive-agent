@@ -1,0 +1,27 @@
+# bundles/scenario-cordis-creator.yaml — cordis-creator scenario bundle.
+# Per spec §13.3: standard + Composer.mount/unmount + cordis_control tool.
+
+entries:
+  # Cordis control tool (Tier-3) — mount/unmount/inspect/publish
+  - id: lca-tool-cordis-control
+    name: lca_tool_cordis_control
+    $module: lca.plugins.tools.cordis_control
+    config:
+      allowed_actions:
+        - inspect
+        - mount
+        - unmount
+        - publish
+
+  # File + bash — creator needs to author bundles on disk.
+  - id: lca-tool-bash
+    name: lca_tool_bash
+    $module: lca.plugins.tools.bash
+    config:
+      allowed: true
+
+  - id: lca-tool-file-write
+    name: lca_tool_file_write
+    $module: lca.plugins.tools.file_write
+    config:
+      allowed: true

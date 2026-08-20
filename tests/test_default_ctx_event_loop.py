@@ -10,11 +10,13 @@ import lca.layer4_app.api as api
 
 class TestDefaultCtxOnRunningLoop(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        self._prev = api._cached_default_ctx
-        api._cached_default_ctx = None
+        # ADR-0033 refactor moved the lazy-init cache to a holder dataclass
+        # (``_default_ctx_holder``); reset it directly here.
+        self._prev = api._default_ctx_holder.ctx
+        api._default_ctx_holder.ctx = None
 
     async def asyncTearDown(self) -> None:
-        api._cached_default_ctx = self._prev
+        api._default_ctx_holder.ctx = self._prev
 
     async def test_ensure_default_ctx_boots_on_running_loop(self) -> None:
         first, second = await asyncio.gather(api.ensure_default_ctx(), api.ensure_default_ctx())

@@ -222,6 +222,10 @@ class TestArtifactClosure:
 @pytest.mark.asyncio
 class TestArtifactRespondInjector:
     async def test_rewrites_relative_images_and_appends_links(self) -> None:
+        from lca.contracts.models.core.perceive_state import PerceiveState
+        from lca.contracts.models.core.perception import ContextManifest
+        from lca.layer1_cognitive.brain.context_manifest import build_manifest_from_items
+
         gate = ArtifactRespondInjector()
         with run_workspace_scope("run_inj", wall_clock_seconds=60) as workspace:
             workspace.artifacts.record_file(
@@ -230,8 +234,34 @@ class TestArtifactRespondInjector:
                 url="/files/file_aaa",
                 size_bytes=1000,
             )
+            state = AgentState(trace_id="t", task="x", budget=Budget(max_steps=5))
+            # v3 PR6.D.4: gate reads from the typed manifest slot.
+            # Populate from the workspace ledger.
+            snap = workspace.artifacts.snapshot()
+            from lca.contracts.models.core.perception import ContextItem
+
+            manifest = build_manifest_from_items(
+                items=[
+                    ContextItem(
+                        kind="workspace_artifacts",
+                        payload=[
+                            {
+                                "name": a.name,
+                                "url": a.url,
+                                "mime": a.mime_type,
+                                "size": a.size_bytes,
+                            }
+                            for a in snap.artifacts
+                        ],
+                        provenance="workspace_artifacts_sensor",
+                    )
+                ]
+            )
+            view = PerceiveState.from_agent_state(state)
+            view.current_manifest = manifest
+            view.commit(state)
             out = await gate.enforce(
-                AgentState(trace_id="t", task="x", budget=Budget(max_steps=5)),
+                state,
                 Decision(
                     decision_id="d",
                     action_type="respond",
@@ -245,6 +275,9 @@ class TestArtifactRespondInjector:
         assert "[📥 01_绩效总分排名.png](/files/file_aaa)" in text
 
     async def test_keeps_ledger_urls_and_drops_unknown_ones(self) -> None:
+        from lca.contracts.models.core.perceive_state import PerceiveState
+        from lca.layer1_cognitive.brain.context_manifest import build_manifest_from_items
+
         gate = ArtifactRespondInjector()
         with run_workspace_scope("run_inj2", wall_clock_seconds=60) as workspace:
             workspace.artifacts.record_file(
@@ -252,8 +285,32 @@ class TestArtifactRespondInjector:
                 mime_type="image/png",
                 url="/files/file_aaa",
             )
+            state = AgentState(trace_id="t", task="x", budget=Budget(max_steps=5))
+            snap = workspace.artifacts.snapshot()
+            from lca.contracts.models.core.perception import ContextItem
+
+            manifest = build_manifest_from_items(
+                items=[
+                    ContextItem(
+                        kind="workspace_artifacts",
+                        payload=[
+                            {
+                                "name": a.name,
+                                "url": a.url,
+                                "mime": a.mime_type,
+                                "size": a.size_bytes,
+                            }
+                            for a in snap.artifacts
+                        ],
+                        provenance="workspace_artifacts_sensor",
+                    )
+                ]
+            )
+            view = PerceiveState.from_agent_state(state)
+            view.current_manifest = manifest
+            view.commit(state)
             out = await gate.enforce(
-                AgentState(trace_id="t", task="x", budget=Budget(max_steps=5)),
+                state,
                 Decision(
                     decision_id="d",
                     action_type="respond",

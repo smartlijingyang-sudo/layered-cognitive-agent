@@ -1,0 +1,53 @@
+# bundles/scenario-self-improving.yaml — self-improving scenario bundle.
+# Per spec §13.6: 4 层闭环 (Skill 习得 + 失败分析 + A/B + 能力扩展).
+
+entries:
+  # Skill acquisition (same as Voyager).
+  - id: lca-skill-auto-acquire
+    name: lca_skill_auto_acquire
+    $module: lca.plugins.skill.auto_acquire
+    config:
+      enabled: true
+      min_confidence: 0.7
+      min_evidence: 3
+
+  # Failure analysis — records failed traces + emits retrospective insights.
+  - id: lca-failure-analyzer
+    name: lca_failure_analyzer
+    $module: lca.plugins.insight.failure_analyzer
+    config:
+      enabled: true
+      trigger:
+        - max_retries_reached
+        - budget_exceeded
+
+  # Profile evolution — A/B testing + commit/rollback.
+  - id: lca-profile-evolver
+    name: lca_profile_evolver
+    $module: lca.plugins.profile.evolver
+    config:
+      enabled: true
+      ab_test_size: 20
+      commit_threshold: 0.05
+      rollback_on_regression: true
+
+  # Capability grant — composer.mount + composer.unmount tools.
+  - id: lca-tool-cordis-control
+    name: lca_tool_cordis_control
+    $module: lca.plugins.tools.cordis_control
+    config:
+      allowed_actions:
+        - mount
+        - unmount
+
+  - id: lca-tool-profile-diff
+    name: lca_tool_profile_diff
+    $module: lca.plugins.tools.profile_diff
+    config:
+      allowed: true
+
+  - id: lca-tool-profile-apply
+    name: lca_tool_profile_apply
+    $module: lca.plugins.tools.profile_apply
+    config:
+      allowed: true

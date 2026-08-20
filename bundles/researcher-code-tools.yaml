@@ -1,0 +1,27 @@
+# bundles/researcher-code-tools.yaml — researcher (code) role bundle.
+# Per spec §3.7.4: code researcher — shell + git + LSP + fs search; no web.
+
+entries:
+  - id: lca-tool-bash
+    name: lca_tool_bash
+    $module: lca.plugins.tools.bash
+    config:
+      allowed: true
+
+  - id: lca-tool-git
+    name: lca_tool_git
+    $module: lca.plugins.tools.git
+    config:
+      allowed: true
+
+  - id: lca-tool-lsp
+    name: lca_tool_lsp
+    $module: lca.plugins.tools.lsp
+    config:
+      allowed: true
+
+  - id: lca-tool-fs-search
+    name: lca_tool_fs_search
+    $module: lca.plugins.tools.fs_search
+    config:
+      allowed: true

@@ -35,13 +35,15 @@ entries:
     name: lca_loop_dsh_bridge
     $module: lca.plugins.loop_dsh_bridge
     inject: [session_store]
-    config: {}
+    config:
+      disabled: true
 
   - id: lca-loop-replay
     name: lca_loop_replay
     $module: lca.plugins.loop_replay
     inject: [session_store]
-    config: {}
+    config:
+      disabled: true
 
   # ── Team lead (Tier-3 — only lead is plugin-ized; 6 coordinations are plain dataclasses) ──
   - id: lca-team-lead-board

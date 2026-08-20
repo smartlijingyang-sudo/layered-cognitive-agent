@@ -25,7 +25,6 @@ from lca.contracts.models.observability.journal import (
     GateDecided,
     InboxFollowupCreated,
     MemoryCommitted,
-    StampedEvent,
     ToolInvoked,
 )
 from lca.layer0_infra.observability.journal.engine import RunStore

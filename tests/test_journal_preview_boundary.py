@@ -25,6 +25,7 @@ _PREVIEW_ALLOWLIST = {
     "lca/layer1_cognitive/body/pipeline_safe_executor.py",
     "lca/layer1_cognitive/body/tool_result_preview.py",
     "lca/layer1_cognitive/body/tool_ui_state.py",
+    "lca/layer1_cognitive/body/tool_journal_emit.py",
     "lca/layer0_infra/observability/journal/otel_mapping.py",
     "lca/layer0_infra/observability/journal/sse_frames.py",
     "lca/layer0_infra/observability/journal/fact_stream_projector.py",

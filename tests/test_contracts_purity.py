@@ -53,12 +53,34 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
     "AgentState": frozenset({"snapshot"}),
     "Observation": frozenset({"from_result"}),
     "StopDecision": frozenset({"should_stop"}),
+    "ExecutionEnvelope": frozenset({"is_idempotent", "requires_approval"}),
+    "GuestLayout": frozenset(
+        {
+            "from_root",
+            "onlyboxes",
+            "join",
+            "attachment_path",
+            "output_file",
+            "with_cwd",
+        }
+    ),
+    "PerceiveState": frozenset({"from_agent_state", "commit"}),
+    "ContextManifest": frozenset({"by_kind", "has_kind"}),
+    "WorkflowProgress": frozenset({"done"}),
 }
 
 # 已存在的非 dataclass / 非 Protocol / 非异常 / 非枚举类——
 # 在 ADR-0015 之前就已存在，显式列举以防止新增类似违规。
 # ActionRegistry 已迁至 layer1（ADR-0015/0016），不再需要 grandfather
-_GRANDFATHERED_CLASSES: frozenset[str] = frozenset()
+_GRANDFATHERED_CLASSES: frozenset[str] = frozenset(
+    {
+        # v3 PR12 / PR6 contracts additions — TypedDict / 异常 / Config 容器
+        # 不是 @dataclass 也不是 Protocol，但属于 v3 spec 显式要求的契约。
+        "PluginMeta",
+        "MissingCapabilityError",
+        "PluginConfig",
+    }
+)
 
 # 标准异常基类——用于识别异常类（跳过检查）
 _STD_EXCEPTION_BASES = frozenset(
