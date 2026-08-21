@@ -40,7 +40,6 @@ _ACT_RUNTIME_PLUGINS: tuple[str, ...] = (
     "lca.plugins.body.safe_executor",
     "lca.plugins.runtime.stop_rule",
     "lca.plugins.runtime.hook_registry",
-    "lca.plugins.runtime.middleware",
 )
 _EXPECTED_SENSOR_ORDER: tuple[str, ...] = (
     "clock",

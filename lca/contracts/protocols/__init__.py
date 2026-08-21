@@ -99,6 +99,12 @@ from lca.contracts.protocols.orchestration import (
 )
 
 # ── L2 Runtime 协议 ──────────────────────────────────────
+from lca.contracts.protocols.reducer import (
+    LoopPhase,
+    LoopPhaseKind,
+    LoopTopology,
+    Reducer,
+)
 from lca.contracts.protocols.runtime import Runtime, StopOutcomePolicy, StopRule
 
 # ── 工具执行管线（五阶段可拦截管线）────────────
@@ -132,6 +138,9 @@ __all__ = [
     "HookRegistry",
     "JournalProjector",
     "LLMAdapter",
+    "LoopPhase",
+    "LoopPhaseKind",
+    "LoopTopology",
     "MemberInvoker",
     "MemorySystem",
     "NamedRegistryProtocol",
@@ -139,6 +148,7 @@ __all__ = [
     "OrchestrationRegistryProtocol",
     "PerceiveHub",
     "Reasoner",
+    "Reducer",
     "RoleLibrary",
     "Runtime",
     "SafeExecutor",

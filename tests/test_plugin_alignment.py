@@ -294,7 +294,6 @@ def test_compose_root_no_inline_instantiation() -> None:
     # façade over CordisHookRegistry — it's the cordis events shim, not
     # a capability service, so it doesn't go on the forbidden list.
     inline_allowlist = (
-        ("InMemoryMiddlewareRegistry", "no-op fallback when plugin tree is absent"),
         ("SimpleHookRegistry", "cordis events shim — typed façade over CordisHookRegistry"),
     )
     offenders: list[str] = []

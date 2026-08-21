@@ -74,9 +74,7 @@ RUN_LEDGER_FACTORY = Capability[object]("run_ledger_factory", cardinality="facto
 W3C_TRACE_CONTEXT_VALIDATOR = Capability[object]("w3c_trace_context_validator", cardinality="one")
 """W3C traceparent / tracestate 入站不可信校验(ADR-0065 §八 / PR-7)。"""
 
-CODING_AGENT_TRACE_INSPECTOR = Capability[object](
-    "coding_agent_trace_inspector", cardinality="one"
-)
+CODING_AGENT_TRACE_INSPECTOR = Capability[object]("coding_agent_trace_inspector", cardinality="one")
 """Coding Agent TraceInspectorTool(0065 §六 / PR-8)。"""
 
 CODING_AGENT_FAILURE_EXPLAINER = Capability[object](
@@ -91,12 +89,8 @@ CODING_AGENT_PLUGIN_GRAPH_RENDERER = Capability[object](
 CODING_AGENT_MINIMAL_REPRODUCTION = Capability[object](
     "coding_agent_minimal_reproduction", cardinality="one"
 )
-CODING_AGENT_DIFF_CONTEXT = Capability[object](
-    "coding_agent_diff_context", cardinality="one"
-)
-CODING_AGENT_RUN_DIFF = Capability[object](
-    "coding_agent_run_diff", cardinality="one"
-)
+CODING_AGENT_DIFF_CONTEXT = Capability[object]("coding_agent_diff_context", cardinality="one")
+CODING_AGENT_RUN_DIFF = Capability[object]("coding_agent_run_diff", cardinality="one")
 
 TRACE_INSPECTOR_TOOLS = Capability[object]("trace_inspector_tools", cardinality="registry")
 """TraceInspector 5 个方法各自作为工具注册（ADR-0063 PR-9）。"""
@@ -129,7 +123,6 @@ COMPONENT_REGISTRY = Capability[object]("component_registry", cardinality="one")
 
 LLM_RESOLVER = Capability[object]("llm_resolver", cardinality="one")
 SAFE_EXECUTOR_SIMPLE = Capability[object]("safe_executor.simple", cardinality="factory")
-MIDDLEWARE_REGISTRY_MEMORY = Capability[object]("middleware_registry.memory", cardinality="factory")
 REASONER_PROMPT = Capability[object]("reasoner.prompt", cardinality="factory")
 CRITIC_SIMPLE = Capability[object]("critic.simple", cardinality="factory")
 JOURNAL_STORE = Capability[object]("journal_store", cardinality="factory")

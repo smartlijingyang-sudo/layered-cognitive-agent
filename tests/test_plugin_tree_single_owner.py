@@ -136,7 +136,6 @@ async def test_every_default_entry_is_consumed(no_llm_key: None) -> None:
         "safe_executor.simple",
         "stop_rules",
         "hooks",
-        "middleware_registry.memory",
         "journal_store",
         "perceive",
     }

@@ -20,7 +20,8 @@ class MemorySystem(Protocol):
 
     两阶段语义：
     - perceive：think 之前，刷新 retrieved_context
-    - update：reflect 之后，写入 observation + reflection
+    - update：reflect 之后，写入 observation + reflection（ADR-0066 计划拆
+      为 propose + commit；本 PR 仅集中 reducer 调用入口，拆 deferred）
     - query：显式检索指定层的记录（共享记忆统一入口）
     """
 

@@ -31,7 +31,7 @@ from lca.contracts.observability.evidence import (
 )
 from lca.contracts.protocols.infra import Tool
 from lca.layer0_infra.observability import record, record_runtime
-from lca.layer1_cognitive.body.tool_ui_state import (
+from lca.layer1_cognitive.body.tool_result_preview import (
     tool_files,
     tool_plugin_state,
 )

@@ -29,14 +29,18 @@ from lca.contracts.protocols import (
     Brain,
     MemorySystem,
     PerceiveHub,
+    Reducer,
     StateStore,
     StopRule,
 )
+from lca.contracts.protocols.reducer import LoopTopology
 from lca.contracts.protocols.runtime import StopOutcomePolicy
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
+from lca.layer2_runtime.loop_topology import ClosedSetTopology
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
     DefaultStopOutcomePolicy,
 )
+from lca.layer2_runtime.reducer import DefaultReducer
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 
 if TYPE_CHECKING:
@@ -59,7 +63,8 @@ class RuntimeDeps:
     perceive_hub: PerceiveHub
     stop_rule: StopRule = field(default=None)  # type: ignore[assignment]
     outcome_policy: StopOutcomePolicy = field(default_factory=DefaultStopOutcomePolicy)
-    middleware_registry: object | None = None
+    reducer: Reducer = field(default_factory=DefaultReducer)
+    topology: LoopTopology = field(default_factory=ClosedSetTopology)
 
 
 def build_cognitive_runtime(deps: RuntimeDeps) -> CognitiveRuntime:
@@ -77,7 +82,8 @@ def build_cognitive_runtime(deps: RuntimeDeps) -> CognitiveRuntime:
         state_store=deps.state_store,
         stop_rule=stop_rule,
         perceive_hub=deps.perceive_hub,
-        middleware_registry=deps.middleware_registry,
+        reducer=deps.reducer,
+        topology=deps.topology,
     )
 
 

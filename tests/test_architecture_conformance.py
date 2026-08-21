@@ -87,25 +87,28 @@ def _read_source(path: Path) -> str:
 class TestPhaseAllowlist:
     def test_allowlist_keys_match_spec(self) -> None:
         """Allowlist mirrors spec §3.4 \"Eight Phases\" minus legacy pre_step."""
-        assert frozenset(
-            {
-                "agent.pre_step",
-                "agent.before_perceive",
-                "agent.after_perceive",
-                "agent.before_think",
-                "agent.after_think",
-                "agent.before_act",
-                "agent.after_act",
-                "agent.before_reflect",
-                "agent.after_reflect",
-                "agent.before_turn_end",
-            }
-        ) == ALLOWED_SEAM_KEYS
+        assert (
+            frozenset(
+                {
+                    "agent.pre_step",
+                    "agent.before_perceive",
+                    "agent.after_perceive",
+                    "agent.before_think",
+                    "agent.after_think",
+                    "agent.before_act",
+                    "agent.after_act",
+                    "agent.before_reflect",
+                    "agent.after_reflect",
+                    "agent.before_turn_end",
+                }
+            )
+            == ALLOWED_SEAM_KEYS
+        )
 
     def test_cognitive_phases_matches_allowlist(self) -> None:
-        from lca.harness.middleware.registry import COGNITIVE_PHASES
+        from lca.layer2_runtime.loop_topology import ClosedSetTopology
 
-        declared = frozenset(phase.name for phase in COGNITIVE_PHASES)
+        declared = frozenset(ClosedSetTopology().seam_keys())
         assert declared == ALLOWED_SEAM_KEYS, (
             f"COGNITIVE_PHASES drift: declared={sorted(declared)} "
             f"allowlist={sorted(ALLOWED_SEAM_KEYS)}"
@@ -170,7 +173,7 @@ class TestControlSurfacePurity:
                     continue
                 # Look at the next 600 chars after the listener bind to see if
                 # it mutates history. Catches "state.history.append" patterns.
-                window = src[seam_match.end():seam_match.end() + 600]
+                window = src[seam_match.end() : seam_match.end() + 600]
                 if "state.history.append" in window or "state.history.extend" in window:
                     pytest.fail(
                         f"{path.relative_to(ROOT)}: listener on {seam!r} "
@@ -289,11 +292,7 @@ class TestWorkingMemoryKeys:
         # We tolerate a small set of legacy keys during the rollout.
         # The forward-looking assertion: the gate_decided / current_manifest
         # strings are read & written in the typed module only.
-        offenders = [
-            o
-            for o in offenders
-            if "gate_decided" in o or "current_manifest" in o
-        ]
+        offenders = [o for o in offenders if "gate_decided" in o or "current_manifest" in o]
         assert not offenders, (
             "Ad-hoc state.extra magic strings are forbidden outside the typed "
             "PerceiveState module. offenders: "
@@ -330,8 +329,7 @@ class TestProtocolImplInheritance:
             check=False,
         )
         assert result.returncode == 0, (
-            f"check_protocol_impl.py failed:\nstdout={result.stdout}\n"
-            f"stderr={result.stderr}"
+            f"check_protocol_impl.py failed:\nstdout={result.stdout}\nstderr={result.stderr}"
         )
 
 
@@ -356,8 +354,7 @@ class TestLoopOrder:
             check=False,
         )
         assert result.returncode == 0, (
-            f"check_cognitive_loop_order.py failed:\nstdout={result.stdout}\n"
-            f"stderr={result.stderr}"
+            f"check_cognitive_loop_order.py failed:\nstdout={result.stdout}\nstderr={result.stderr}"
         )
 
 
@@ -424,7 +421,9 @@ class TestJournalCatalogMeta:
         )
         from lca.layer0_infra.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
-        missing = sorted(set(JOURNAL_EVENT_CLASSES) - set(EVENT_DESCRIPTOR_REGISTRY.all_type_names()))
+        missing = sorted(
+            set(JOURNAL_EVENT_CLASSES) - set(EVENT_DESCRIPTOR_REGISTRY.all_type_names())
+        )
         assert not missing, f"events without EventDescriptor: {missing}"
 
     def test_schema_fields_valid(self) -> None:

@@ -64,7 +64,6 @@ from lca.contracts.protocols.spec import (
     TeamSpec,
     strategy_key_for_governance,
 )
-from lca.harness.middleware import InMemoryMiddlewareRegistry
 from lca.harness.observability import make_minimal_bound
 from lca.layer0_infra.observability import (
     BoundObservability,
@@ -233,17 +232,6 @@ def build_perceive_hub(
             team=team,
         ),
     )
-
-
-def _build_middleware_registry(hooks: Any, scope: object) -> InMemoryMiddlewareRegistry:
-    factory = _require_factory(scope, "middleware_registry.memory")
-    registry = factory(hooks)
-    if not isinstance(registry, InMemoryMiddlewareRegistry):
-        raise TypeError(
-            f"middleware_registry.memory expected InMemoryMiddlewareRegistry, "
-            f"got {type(registry).__name__}"
-        )
-    return registry
 
 
 def _apply_lead_brain(brain: Brain, *, decision_gate: DecisionGate) -> Brain:
@@ -416,7 +404,6 @@ def spawn_agent(
             state_store=consume("state_store", state_store, CognitiveRuntime),
             perceive_hub=perceive_hub,
             stop_rule=stop_rule,
-            middleware_registry=_build_middleware_registry(hooks, scope),
         )
     )
     return CognitiveAgent(

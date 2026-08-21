@@ -104,11 +104,6 @@ entries:
     $module: lca.plugins.runtime.hook_registry
     config: {}
 
-  - id: middleware_registry.memory
-    name: middleware_registry_memory
-    $module: lca.plugins.runtime.middleware
-    config: {}
-
   # ── Think internals (named factories consumed by brain factory) ──
   - id: lca-reasoner-prompt
     name: lca_reasoner_prompt

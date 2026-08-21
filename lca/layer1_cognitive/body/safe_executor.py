@@ -26,10 +26,10 @@ from lca.contracts.models.core.result import ApprovalPendingError, ToolExecution
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
+from lca.layer1_cognitive.body.tool_result_preview import compact_payload_for_preview
 from lca.layer1_cognitive.body.tool_ui_state import (
     build_started_plugin_state,
     compact_args_preview,
-    compact_payload_for_preview,
 )
 
 _log = structlog.get_logger("lca.safe_executor")
