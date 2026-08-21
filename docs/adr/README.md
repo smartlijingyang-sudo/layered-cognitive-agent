@@ -44,6 +44,10 @@
 | [0067](0067-spacetime-runtime-and-governed-creation.md) | 时空运行时与受治理的动态创造 | Proposed |
 | [0068](0068-compiled-plugin-kernel-and-unified-run-plan.md) | 编译式插件内核与唯一运行计划 | Proposed |
 | [0069](0069-agent-primitive-system-and-declarative-grammar.md) | Agent 原语体系与声明组合语法 | Proposed |
+| [0070](0070-reducer-as-plugin.md) | CognitiveRuntime Reducer-as-Plugin —— `_loop` 只调 Protocol，middleware 与 `_emit` 收口 | Proposed |
+| [0071](0071-composer-per-cluster.md) | Composer-per-Cluster —— 4 个 sub-composer plugin 接管 spawn 的装配策略 | Proposed |
+| [0072](0072-null-default-discipline.md) | Null-Default Discipline —— Think 群与 Memory retrieval 真 Null 默认 | Proposed |
+| [0073](0073-runsession-sole-session-path.md) | Session Path Convergence —— `SessionService` Protocol 统一两条路径的契约 | Proposed |
 
 ## 维护规则
 - 推翻已有决定时，新建一篇标记 `Supersedes: ADR-XXXX`，不改旧文件
