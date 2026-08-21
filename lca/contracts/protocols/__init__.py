@@ -47,6 +47,20 @@ from lca.contracts.protocols.cognition import (
     SupportsShortcut,
 )
 
+# ── 控制面单一入口（ADR-0066 + tracker §19）─────────────────────
+from lca.contracts.protocols.control_plan import (
+    ALLOWED_OPERATORS,
+    SLOT_DEFAULT_AGGREGATION,
+    SLOT_DEFAULT_FAILURE,
+    Activation,
+    AggregationMode,
+    ControlEntry,
+    ControlPlan,
+    FailureMode,
+    always,
+    compute_control_plan_hash,
+)
+
 # ── L1 Body / 行动执行协议 ───────────────────────────────
 from lca.contracts.protocols.embodiment import Body
 
@@ -120,9 +134,14 @@ from lca.contracts.protocols.tool_pipeline import (
 )
 
 __all__ = [
+    "ALLOWED_OPERATORS",
     "SANDBOX_SKILL_MOUNT_PREFIX",
+    "SLOT_DEFAULT_AGGREGATION",
+    "SLOT_DEFAULT_FAILURE",
+    "Activation",
     "AgentTransport",
     "AgentUnit",
+    "AggregationMode",
     "AttachmentIdentity",
     "Body",
     "Brain",
@@ -130,9 +149,12 @@ __all__ = [
     "BudgetAware",
     "BudgetPolicy",
     "ComponentRegistryProtocol",
+    "ControlEntry",
+    "ControlPlan",
     "Critic",
     "DecisionGate",
     "EventBus",
+    "FailureMode",
     "HasHooks",
     "Hook",
     "HookRegistry",
@@ -189,4 +211,6 @@ __all__ = [
     "ToolRegistry",
     "ToolRenderer",
     "TransportRegistryProtocol",
+    "always",
+    "compute_control_plan_hash",
 ]

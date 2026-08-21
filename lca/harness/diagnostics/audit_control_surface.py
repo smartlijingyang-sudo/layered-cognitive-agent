@@ -16,22 +16,11 @@ from pathlib import Path
 
 import yaml
 
-# Control Slots from ADR-0066 §二 + tracker §19 variants
-KNOWN_CONTROL_SLOTS: frozenset[str] = frozenset(
-    [
-        "perceive.context",
-        "think.guard",
-        "act.authorize",
-        "act.budget",
-        "act.constrain",
-        "act.execute",
-        "remember.admit",
-        "stop.decide",
-        "observe.*",
-        "observe.checkpoint",
-        "act.safe-boundary",
-    ]
-)
+from lca.contracts.atoms.control_slot import all_slot_values
+
+# Single source of truth: derive from ControlSlot enum so any ADR that
+# adds a new slot is automatically covered by audit (no silent drift).
+KNOWN_CONTROL_SLOTS: frozenset[str] = frozenset(all_slot_values())
 
 
 @dataclass
