@@ -90,9 +90,8 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **Budget** | token / cost / steps / wall_clock 预算 |
 | **Hook** / **HookRegistry** / **EventBus** | 生命周期钩子与事件总线（业务事实经遥测桥进入 trace 管道） |
 | **Telemetry** | 业务层唯一发射门面契约：span / event / score，不耦合任何后端 |
-| **ObservabilityHub** | 可观测性组合根：装配一个运行事件账本、只读投影插件与 OTel 外部导出；不维护第二条诊断流 |
 | **SpanName** / **EventName** | 封闭遥测词表（span 名 / 业务事件名），配 **VocabDef** 目录登记唯一发射点 |
-| **SpanView** / **SpanContext** | OTel span 的本地投影视图 / 当前关联上下文（trace/span id） |
+| **SpanView** | OTel span 的本地投影视图 |
 | **AttributePolicy** / **Verbosity** | 属性策略（脱敏/截断，写入期强制）与信息量档位（minimal/standard/verbose） |
 | **JournalEvent** / **RuntimeObserved** / **RunScope** / **StampedEvent** | 领域事实事件 / 插件、Hook、工具、LLM、记忆与传输的运行解释事件 / 关联骨架 / 盖章记录 |
 | **EventDescriptor** / **EventPlane** / **EventProjection** | 事件的唯一治理描述（受众、敏感性、保留、发射边界）/ 事实、结构、解释三平面 / 已提交事件的只读投影协议 |
@@ -100,7 +99,6 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **JournalProjector** / **ProjectionRegistry** | 兼容投影契约 / 按装配顺序分发已提交事件并隔离投影故障的注册表 |
 | **TraceInspector** / **TraceReport** | 面向 Coding Agent 的只读账本检查器 / 可序列化的因果链、失败、瓶颈、复现与插件交互图报告 |
 | **OtelProjector** / **ConsoleJournalProjector** / **JsonlJournalProjector** | journal → OTel span（显式定父）/ console 场景卡·叙事·Run Card·序列图 / jsonl 落盘投影器 |
-| **LangfuseBridge** / **ExporterUnavailableError** | Langfuse 后端桥接（OTel 原生 SDK 挂接）/ 导出器不可用异常 |
 | **LLMResponse** / **TokenUsage** | LLM 结构化返回（文本 + 模型 + token 用量），成本链路单一事实源 |
 | **StateStore** / **StateSnapshot** | 状态持久化与快照 |
 
@@ -181,12 +179,10 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **SimpleMemoryPolicy** / **SimpleCompactionPolicy** | MemoryPolicy / CompactionPolicy 默认实现 |
 | **DiagnosePattern** / **diagnose_loop_stuck** / **diagnose_model_not_seen** / **diagnose_memory_poisoned** / **diagnose_approval_rejected** | v3 §24.5 诊断模式（CLI `lca-ops diagnose`） |
 | **DiagnosisReport** | 诊断模式输出报告（根因 + 修复建议 + 证据链） |
-| **DshConfig** / **DshNotification** / **DshProbe** / **DshService** | DeepSeek Harness 适配（DSH 桥接层；v2 遗产，逐步退役） |
 | **FilesInfoDocument** | 文件元数据文档（路径 + mime + 大小 + 校验和） |
 | **Finding** | 检索 / 诊断发现的原子单元（source + claim + confidence） |
 | **HealthCheck** / **HostEnvironment** / **InfraConfig** / **InfraService** | 基础设施探活 + 主机环境 + 配置（lca-ops heal 子命令） |
 | **LLMFace** / **ProductionLLMResolver** | LLM 适配门面 + 解析器（多 backend / 多 mode 路由） |
-| **LocalMirror** / **MirrorDiff** | upstream fork 本地镜像 + 与 upstream 的差异报告 |
 | **MachineComputer** | ComputerRuntime 协议的具体机器实例（local subprocess / docker / e2b） |
 | **ModelDefinition** | LLM 模式定义（model id + adapter + 价格 + 限额） |
 | **NullSink** | ManifestSink no-op 实现（测试用） |
@@ -194,10 +190,9 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **PathConfig** / **PathProvider** / **PlaneRequest** / **ResolvedEndpoint** / **WorkspaceProvider** | 路径配置 + provider + 平面请求 + endpoint 解析 + workspace provider |
 | **ProgressLoopDetector** | 同名工具调用循环检测（DecisionGate 组件） |
 | **Provider** / **ProviderDispatch** | LLM / Tools / Search provider 协议 + 分发 |
-| **ScorerFn** / **SearchHit** / **SearchService** | 评分函数签名 + 检索命中 + 检索服务 |
+| **SearchHit** / **SearchService** | 检索命中 + 检索服务 |
 | **Service** / **SkillsService** / **ToolsConfig** / **ToolsProvider** / **ToolsService** / **UserConfig** / **UserProvider** / **VenvConfig** / **VenvProvider** | 平台 service 协议与实现（L4 门面下的服务注册） |
 | **Sudo** | 提权操作适配（仅安全操作走；v3 spec 显式约束） |
-| **UpstreamTree** | upstream 仓库目录树（patch 应用源） |
 | **Verbosity** | 日志信息量档位（minimal / standard / verbose） |
 
 ## L-Casting（自动组队，ADR-0042）
@@ -213,5 +208,37 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **LLMTeamCaster** | 默认 TeamCaster：一次结构化 LLM 调用 + 白名单校验 + 一次纠正重试，失败抛 CastingError |
 | **CastingError** | 自动组队判定失败：解析 / 白名单校验 / 纠正重试全部失败 |
 | **RoleNotFoundError** | role_id 不存在于角色库 |
+
+| **BindOptions** (PR-5) | spawn.bind_plan 配置：use_legacy_spawn / include_disabled / enforce_capability_plan 等 |
+| **FailureExplainer** (PR-3 + PR-4) | 失败诊断与解释器（lca-ops diagnose 子命令） |
+| **HostEnvironment** (PR-12) | 主机环境封装（lca-ops heal 子命令）：uptime + health + start-stop |
+| **Lease** (v3 §11 / PR-9b) | Blackboard 共享工件的租约协议（团队协作隔离） |
+| **MinimalReproduction** | 最小可复现 bug case 模板（tests/ 辅助） |
+| **OptimizationFinder** | Profile 优化发现器（lca-ops optimize 子命令；找重复 plugin / 冲突 capability） |
+| **PlaneRequest** | lca.ops 平面请求（路径配置 + endpoint 解析） |
+| **PresetAuthoring** | Creator preset 写入层（PR-12 V7 publish） |
+| **PresetLayout** | Creator preset 目录布局（PR-12 V7 publish） |
+| **ProductionLLMResolver** | 生产环境 LLM 解析器（多 backend 路由 + 限额 + 价格） |
+
+## 已废弃主名（PR-12 整理）
+
+> 这些术语曾在 codebase 中存在，现已删除 / 改名 / 退役。禁止复活
+> 为现役主名；新代码请使用替代术语（见上方现役区）。如果旧代码仍
+> 引用这些名字，请先迁移再删除本表条目。
+
+| 已废弃术语 | 替代 / 状态 |
+|---|---|
+| **DshConfig** | DeepSeek Harness 适配器；v2 遗产，已退役 — 替代：lca-ops daemon / native config |
+| **DshNotification** | DSH 桥接；v2 遗产，已退役 — 替代：lca layer0_infra observability |
+| **DshProbe** | DSH 桥接；v2 遗产，已退役 — 替代：lca-ops doctor |
+| **DshService** | DSH 桥接；v2 遗产，已退役 — 替代：lca-ops daemon |
+| **ExporterUnavailableError** | observability exporter fallback；已退役 — 替代：None fallback in facade |
+| **LangfuseBridge** | Langfuse 旧版桥接；已退役 — 替代：Layer0 observability 直接 |
+| **LocalMirror** | upstream fork 旧版镜像；已退役 — 替代：Layer0 upstream scan |
+| **MirrorDiff** | upstream 旧版差异报告；已退役 — 替代：Layer0 upstream scan |
+| **ObservabilityHub** | 旧 observability facade 类；改名 — 替代：lca.layer0_infra.observability.facade |
+| **ScorerFn** | 旧版评分函数；已退役 — 替代：observability eval pipeline |
+| **SpanContext** | 旧 span context 类；改名 — 替代：lca.contracts.atoms.semantic_keys.SpanContext |
+| **UpstreamTree** | upstream 仓库目录树；已退役 — 替代：Layer0 upstream patch scan |
 
 

@@ -89,6 +89,39 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/layer0_infra/computer/runtime_exec.py": (
         "ComputerRuntime 执行平面单模块：code/shell/background/export + SandboxPolicy 检查"
     ),
+    "lca/contracts/atoms/plan_template.py": (
+        "PR-12 12 PlanTemplate 标准集数据面 + module-level accessors"
+    ),
+    "lca/contracts/harness/artifact.py": (
+        "PR-8 4 状态机 + CapabilityArtifact + ArtifactController + 8→4 legacy migration"
+    ),
+    "lca/contracts/protocols/__init__.py": (
+        "contracts/protocols re-export hub（所有 contracts 子模块类型统一导出）"
+    ),
+    "lca/contracts/protocols/command_envelope.py": (
+        "PR-7 CommandEnvelope + RunFact + Verdict 5 闸单调聚合数据面"
+    ),
+    "lca/contracts/protocols/control_plan.py": (
+        "PR-1 11 ControlSlot + Activation DSL + ControlPlan + plan_hash"
+    ),
+    "lca/layer0_infra/observability/__init__.py": (
+        "observability 模块统一 re-export（journal / evidence / otel）"
+    ),
+    "lca/layer0_infra/observability/event_descriptors_data.py": (
+        "Journal event descriptor 注册表（ADR-0065 PR-7 source inversion 单一源）"
+    ),
+    "lca/layer0_infra/observability/facade.py": (
+        "observability 主 facade（record / record_runtime / observe_operation）"
+    ),
+    "lca/layer0_infra/observability/journal/journal_io.py": (
+        "Journal v2 envelope IO（read / write / disk format；PR-3 + PR-6）"
+    ),
+    "lca/layer1_cognitive/body/safe_executor.py": (
+        "SafeExecutor + 5 阶段管线 + ToolStarted / ToolInvoked audit"
+    ),
+    "lca/layer4_app/spawn_bind_plan.py": (
+        "PR-5 bind_plan + BindOptions + PlanBindingResult + legacy fallback"
+    ),
     "lca/layer2_runtime/runtime_loop.py": (
         "CognitiveRuntime 单模块承载 v3 6 阶段闭环编排 + 协议边界 record()"
         "（perceive→think→act→reflect→remember→stop，ADR-0002 + PR10 落地）"
