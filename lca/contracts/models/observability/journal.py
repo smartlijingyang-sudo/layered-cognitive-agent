@@ -154,12 +154,16 @@ class RuntimeObserved(JournalEvent):
 class StampedEvent:
     """引擎盖章后的日志记录：序号 + 时间戳 + 关联骨架 + 事件本体。
 
-    Spec §24.5 / Phase J: every stamped event carries:
+    Spec §24.5 / Phase J + ADR-0074 PR-6: every stamped event carries:
 
     - ``seq``  — sequential log index (ADR-0055 N2)
     - ``ts``   — monotonic timestamp
     - ``scope`` — correlation skeleton (trace_id / parent_trace_id / run_id /
       delegation_id / agent_role / step)
+    - ``plan_ref`` — CompiledRunPlan canonical hash (PR-6 V5); auto-stamped
+      from ``lca_run_plan_ref`` ContextVar at append time. Empty string
+      ``""`` for legacy code paths without plan binding (tests, projector
+      previews). V5 acceptance: replay test 守护每条 fact 携带 plan_ref。
     - ``event_type`` — class name of the payload (auto-stamped by ``RunStore.append``)
     - ``data``  — optional dict carrying the raw payload for downstream
       consumers (mirrors ``event.__dict__``; auto-populated when the engine
@@ -186,6 +190,8 @@ class StampedEvent:
     correlation_ids: tuple[str, ...] = ()
     event_id: str = ""
     parent_event_id: str = ""
+    plan_ref: str = ""
+    """CompiledRunPlan canonical hash (PR-6 V5)；auto-stamped by RunStore."""
 
 
 class DelegationMechanism(str, Enum):
@@ -912,6 +918,9 @@ class JournalRecord:
     - descriptor: DescriptorRef —— L4 fail-fast 校验目标。
     - data: 类型化 payload 规范化序列化;不再是自由 dict 逃逸口。
     - evidence: 受治理证据引用(L5 / §四);完整载荷走 EvidenceStore。
+    - plan_ref: ADR-0074 PR-6 —— CompiledRunPlan canonical hash (V5 硬约束);
+      auto-stamped from ``lca_run_plan_ref`` ContextVar. 空字符串 ``""`` for
+      legacy code paths without plan binding (tests, projector previews)。
     """
 
     schema: Literal["lca.journal/2"] = "lca.journal/2"
@@ -925,6 +934,8 @@ class JournalRecord:
     descriptor: DescriptorRef = field(default_factory=DescriptorRef)
     data: Mapping[str, object] = field(default_factory=dict)
     evidence: tuple[_EvidenceRef, ...] = ()
+    plan_ref: str = ""
+    """CompiledRunPlan canonical hash (PR-6 V5); empty = no plan binding."""
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -939,6 +950,7 @@ class JournalRecord:
             "descriptor": self.descriptor.to_dict(),
             "data": dict(self.data),
             "evidence": [ref.to_dict() for ref in self.evidence],
+            "plan_ref": self.plan_ref,
         }
 
     @classmethod
@@ -965,6 +977,7 @@ class JournalRecord:
             descriptor=descriptor,
             data=dict(payload.get("data", {}) or {}),
             evidence=evidence,
+            plan_ref=str(payload.get("plan_ref", "")),
         )
 
 
@@ -1034,6 +1047,7 @@ def stamped_to_journal_record(
         ),
         data=stamped.data,
         evidence=(),
+        plan_ref=stamped.plan_ref,
     )
 
 

@@ -183,6 +183,13 @@ class RunStore:
         sanitized = self._apply_policy(event)
         causation = sanitized.causation_refs if isinstance(sanitized, RuntimeObserved) else ()
 
+        # ── PR-6: 读取 plan_ref from ContextVar ─────────────
+        from lca.contracts.models.observability.plan_ref import (
+            get_current_plan_ref,
+        )
+
+        current_plan_ref = get_current_plan_ref()
+
         # ── 临界区(L1): 期望 seq 比对 + sealed 检查 + durable commit ──
         with self._lock:
             if self._sealed:
@@ -201,6 +208,7 @@ class RunStore:
                 event_type=event_type.__name__,
                 data=dataclasses.asdict(sanitized),
                 parent_seq=causation[-1] if causation else None,
+                plan_ref=current_plan_ref,
             )
             try:
                 self._backend.append(stamped)
@@ -227,6 +235,10 @@ class RunStore:
         可选地附带一个终态事件(若提供则先 append 再 seal;若账本已 sealed
         则抛 ``LedgerSealedError``)。不带终态事件时纯封存。
         """
+        from lca.contracts.models.observability.plan_ref import (
+            get_current_plan_ref,
+        )
+
         with self._lock:
             if self._sealed:
                 raise LedgerSealedError(f"run_id={self._run_id!r} is already sealed (L7)")
@@ -245,6 +257,7 @@ class RunStore:
                     event=sanitized,
                     event_type=event_type.__name__,
                     data=dataclasses.asdict(sanitized),
+                    plan_ref=get_current_plan_ref(),
                 )
                 self._backend.append(stamped)
             self._sealed = True
