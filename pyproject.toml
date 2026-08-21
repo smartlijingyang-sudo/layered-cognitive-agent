@@ -140,6 +140,9 @@ web = [
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+# SKILL.md files embed Python code blocks; ruff 0.16+ misinterprets the file as
+# Python when the embedded block parses cleanly. Treat all .md as out of scope.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = [
@@ -178,7 +181,6 @@ ignore = [
 "lca/layer0_infra/ops/sudo.py" = ["S603"]  # privileged subprocess wrapper
 "lca/layer0_infra/ops/service.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for process management
 "lca/layer0_infra/ops/services/*.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for service management
-"lca/layer0_infra/dsh_core/session/*.py" = ["N815", "N802", "N803", "N806", "UP007"]  # 1:1 TS port
 
 [tool.ruff.format]
 quote-style = "double"

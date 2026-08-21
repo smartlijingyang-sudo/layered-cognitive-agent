@@ -194,7 +194,12 @@ def _render_available_skills(scope: object) -> str:
         return "（技能库不可用）"
     if not installed:
         return "（本地无已安装 skill，用 search_skill 从 Market 搜索）"
-    return "\n".join(f"- {entry.skill_id}: {entry.name}" for entry in installed)
+    lines: list[str] = []
+    for entry in installed:
+        suffix = f" (v{entry.version})" if entry.version else ""
+        summary = f" — {entry.summary}" if entry.summary else ""
+        lines.append(f"- {entry.skill_id}: {entry.name}{summary}{suffix}")
+    return "\n".join(lines)
 
 
 def _build_hooks(scope: object) -> Any:

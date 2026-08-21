@@ -235,6 +235,41 @@ def _build_solo_agent(
     )
 
 
+def _filter_creator_tools(tools: Sequence[Tool] | None) -> dict[str, Tool]:
+    """Filter the upstream ``tools`` pool to the cordis-creator subset.
+
+    Keeps ``file_write`` / ``bash`` / ``activate_skill`` / ``read_skill_reference``
+    (the four tools the creator persona expects). ``cordis_control`` is
+    constructed separately via the composer factory inside
+    :func:`_build_cordis_creator_agent` and is not pulled from the pool here.
+
+    Fail-loud: ``activate_skill`` is referenced by :data:`PERSONA_GOAL`; if
+    the upstream pool is missing it (e.g. the active profile dropped the
+    operational-skills bundle), raise a clear error before any Agent is
+    constructed — easier to debug than "model tried activate_skill at step 0
+    and got ValidationError".
+    """
+    filtered: dict[str, Tool] = {}
+    for tool in tools or ():
+        if tool.name in {
+            "file_write",
+            "bash",
+            "activate_skill",
+            "read_skill_reference",
+        }:
+            filtered[tool.name] = tool
+    if "activate_skill" not in filtered:
+        raise RuntimeError(
+            "cordis-creator profile booted without `activate_skill` tool; "
+            "PERSONA_GOAL instructs the model to load bundled skills via "
+            "activate_skill. Check that bundles/web-app.yaml (or the active "
+            "profile) registers operational skill tools. Bundled skills "
+            "missing from the skill store: run `lca-ops debug tree` and "
+            "inspect `ctx.skills.current().list_installed()`."
+        )
+    return filtered
+
+
 def _build_cordis_creator_agent(
     llm: Any,
     *,

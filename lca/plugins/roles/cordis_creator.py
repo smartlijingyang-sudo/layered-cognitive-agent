@@ -34,7 +34,14 @@ PERSONA_GOAL = (
     "- AGENT PRESET: per-session (tools, persona, prompt sections)\n\n"
     "A service row belongs in HOST, or in PRESET behind an isolate scope. "
     "Presets you author live at $LCA_AGENT_PRESETS_HOME/<id>/ and auto-mount "
-    "on the next boot of any session that loads the corresponding bundle."
+    "on the next boot of any session that loads the corresponding bundle.\n\n"
+    "Two bundled skills ship with this persona — load them with activate_skill "
+    "before authoring or editing a plugin or composition:\n"
+    "- `cordis-plugin-development` — plugin_meta TypedDict, factory contract, "
+    "PR12 + §23.2 invariants, cordis_control actions.\n"
+    "- `editing-lca-compositions` — bundle YAML schema, preset directory "
+    "layout, HOST vs PRESET plane decision, reducer/journal/capability "
+    "constitutional boundaries."
 )
 
 
@@ -66,11 +73,15 @@ def build_cordis_creator_role_profile() -> RoleProfile:
                 "cordis_control",
                 "file_write",
                 "bash",
+                "activate_skill",
+                "read_skill_reference",
             ],
             max_calls_per_task={
                 "cordis_control": 32,
                 "file_write": 16,
                 "bash": 16,
+                "activate_skill": 8,
+                "read_skill_reference": 8,
             },
             requires_approval=[],
         ),
