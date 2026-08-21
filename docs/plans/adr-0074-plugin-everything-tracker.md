@@ -55,7 +55,7 @@
 | **0067 §四** | 8 状态机 | ⛔ → ✅ | **PR-8** | 0074 §三 裁剪到 4 状态；映射见 §18 |
 | **0067 §五** | 6 道闸 | ⛔ | PR-4 | 0074 §三 裁剪到 3 道闸 |
 | **0067 §七** | 7 Creator 面 | ⛔ | PR-9 | 0074 §三 裁剪到 4 面；映射见 §18 |
-| **0068 §一** | CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan | ⛔ | PR-3 | |
+| **0068 §一** | CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan | ⛔ → ✅ (PR-3) | PR-3 | |
 | **0068 §二** | PluginContract 概念 | ⏳ → ✅ (PR-2) | PR-2 可选段 | 详见 §12；0074 §四 不替换 PluginDefinition |
 | **0068 §五** | CommandEnvelope = effect 唯一入口 | ⛔ | PR-7 | architecture test 路径见 §14 |
 | **0068 §六** | Boot 双轨消除 | ✅ Done | ADR-0062 PR-3/PR-4 (`e0eb2484`) | 已落地，详见 §3.3 |
@@ -89,7 +89,7 @@
 | **1** | 1 | ControlSlot + ControlPlan 数据面 | ✅ Done | `e2043986` | 2026-08-21 | PR-0 |
 | **1** | 2 | PluginDefinition.control 可选段 | ✅ Done | `396c89ba` | 2026-08-21 | PR-1 |
 | **1** | 2.5 | 11 关系代数扩展 CapabilityPlan | ✅ Done | `23161de1` | 2026-08-21 | PR-2 |
-| **2** | 3 | CompiledRunPlan + PlanCompiler | ⛔ Blocked | — | — | PR-2.5 |
+| **2** | 3 | CompiledRunPlan + PlanCompiler | ✅ Done | `cb53a7a8` | 2026-08-21 | PR-2.5 |
 | **2** | 4 | think.guard / stop.decide 原子化 | ⛔ Blocked | — | — | PR-3 |
 | **2** | 5 | spawn.bind_plan | ⛔ Blocked | — | — | PR-3 + ADR-0071 |
 | **3** | 6 | plan_ref × Journal 绑定 | ⛔ Blocked | — | — | PR-5 |
@@ -99,9 +99,9 @@
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-3（CompiledRunPlan + PlanCompiler）。
+**Next Action**：PR-4（think.guard / stop.decide 原子化首次迁移）。
 
-**累计完成**：7 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：8 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -192,94 +192,96 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-2.5（11 关系代数扩展 CapabilityPlan）
+## 4. 已完成 PR 详情：PR-3（CompiledRunPlan + PlanCompiler + ScopePlan）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
-> PR-0 / PR-1 / PR-2 完成细节见 §5 Phase 1。
+> PR-0 / PR-1 / PR-2 / PR-2.5 完成细节见 §5 Phase 1。
 
 ### 4.1 目标
 
-落地 11 关系代数（ADR-0069 §三）：5 老关系（provides / requires / contributes_to / reads_fact / emits_fact，由 ResolvedProfile 提供者关系自动派生）+ 6 新关系（governs / executes / delegates / projects / revises / evaluates，由 plugin ``meta.relations:`` 段显式声明）。CapabilityPlan 数据面新增 ``relations`` 字段；Resolve 期验证引用合法性。**图谱可视化保留到 PR-12**，本 PR 只交付数据面 + 解析。
+实现 ``CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan``，profile 编译为不可变对象；含 plan_ref hash 跨进程 / 跨运行稳定。ScopePlan 是 PR-3 最小版（lifecycle + visibility + ACL + budget ceiling，无 SpacetimeContext 5 子空间）。PlanCompiler 是纯函数（输入 ResolvedProfile → 输出 CompiledRunPlan），不依赖 ADR-0071 Composer-per-Cluster。
 
 ### 4.2 新增文件
 
 | 文件 | 作用 |
 |---|---|
-| `lca/contracts/atoms/relation.py` | `Relation` 枚举（11 项 = 5 老 + 6 新）+ `NEW_RELATIONS` 集合 + `RELATION_GROUP_HINT`（PR-12 图谱颜色用）+ `parse_relation` / `validate_relations` |
-| `lca/contracts/protocols/relation.py` | `TypedRelation` dataclass（source / target / kind / evidence / scope / weight）+ `typed_relation_to_dict` + `typed_relations_from_iter` factory |
-| `lca/contracts/protocols/capability_plan.py` | `CapabilityPlan` dataclass（profile_path + provider_bindings + relations + revision）+ `ProviderBinding`（capability / owner_plugin / effect_class / revision）+ module-level accessors（`capability_plan_hash` / `capability_plan_to_dict` / `relations_of_kind` / `relations_from_plugin` / `relations_to_plugin`） |
-| `lca/harness/profile/capability_plan_resolver.py` | `project_capability_plan()` 从 `ResolvedProfile` 投影 CapabilityPlan；`validate_targets` 校验 source / target 引用 |
-| `tests/plan/test_11_relations.py` | 11 关系枚举 / TypedRelation / ProviderBinding / CapabilityPlan / hash 稳定 / order invariance / resolver 全覆盖（58 测试） |
+| `lca/contracts/protocols/scope_plan.py` | `BudgetCeiling` (5 字段 token / wall_clock / tool_calls / steps / cost_cents) + `ScopePlan` (lifecycle / visibility / acl_grants / budget_ceiling / revision) + `scope_plan_hash` / `scope_plan_to_dict` / `scope_plan_from_iter` |
+| `lca/contracts/protocols/plan.py` | `CompiledRunPlan` frozen dataclass = CapabilityPlan + ControlPlan + ScopePlan；`COMPILED_RUN_PLAN_VERSION` schema 版本；`compiled_run_plan_ref` 16 字符 SHA-256；`build_input_provenance` 工厂；`compiled_run_plan_to_dict`；module-level `capability_sub_plan_hash` / `control_sub_plan_hash` / `scope_sub_plan_hash` / `plan_ref_of` |
+| `lca/harness/profile/plan_compiler.py` | `compile_plan()` 从 ResolvedProfile 投影 CompiledRunPlan；`CompileOptions` dataclass（lifecycle / visibility / acl_grants / budget_ceiling / task_id / env_fingerprint / include_disabled）；`explain_compile_plan()`（`lca-ops plan inspect` 最小版）；`is_plan_compat_enabled()`（LCA_PLAN_COMPAT 兼容开关） |
+| `tests/plan/test_scope_plan.py` | BudgetCeiling 校验 / ScopePlan construction / hash 稳定 / order invariance / scope_plan_to_dict round trip（16 测试） |
+| `tests/plan/test_plan_compiler.py` | build_input_provenance / CompiledRunPlan / plan_ref 稳定 / to_dict / 编译选项 / plan_compat env var / explain_compile_plan（32 测试） |
+| `tests/plan/test_plan_hash_determinism.py` | 100 iterations same input same plan_ref property test（V2 验收 §3.2 核心守护）；plan_ref 16-char SHA-256 hex；sub-plan hashes 稳定；不同 options / profile → 不同 plan_ref（8 测试） |
 
 修改文件：
 
-- `lca/contracts/atoms/__init__.py` — re-export `Relation` 系列
-- `lca/contracts/protocols/__init__.py` — re-export `CapabilityPlan` / `ProviderBinding` / `TypedRelation` 系列
+- `lca/contracts/protocols/__init__.py` — re-export `ScopePlan` / `BudgetCeiling` / `CompiledRunPlan` / `compiled_run_plan_ref` 等
+- `lca/harness/profile/resolve.py` — `ResolvedProfile.compile_plan()` convenience shortcut（避免 import cycle）
 
 ### 4.3 实现要点
 
-- **11 关系代数闭集**：5 老 + 6 新；新增第 12 关系需 ADR（C6 改闭集必 ADR）
-- **`Relation` enum** 是 `str Enum`，字符串值稳定（序列化 / plan_ref 引用）；与 `lca.contracts.atoms.functional_group.FunctionalGroup` 等其它 atoms 同源
-- **`TypedRelation` dataclass** 命名刻意区别于 `Relation` enum（避免 `lca.contracts.relation.Relation` 双重定义歧义）
-- **`ProviderBinding`** 把 ADR-0061 capabilities DAG（``provides`` → owner）与 ADR-0062 effect class 合流到 typed 表达
-- **`CapabilityPlan` 不放方法**（ADR-0015 contracts 纯类型契约）；访问器全部 module-level 函数
-- **`capability_plan_hash`** 先按稳定 key 排序 bindings / relations 再 SHA-256 → 跨运行稳定
-- **PR-2.5 阶段运行时不解** `CapabilityPlan`（PR-3 PlanCompiler 才消费）；本 resolver 是纯数据面
-- **target 校验**：source 必填（默认 = plugin.id）；target 可指 plugin / capability / `descriptor:` / `fact:` / `journal.` 前缀引用；reads_fact / emits_fact 的 target 必须是 fact descriptor 风格
+- **plan_ref 跨进程 / 跨运行稳定**：SHA-256 16 字符（PR-3 plan_hash determinism property test 守护；同输入 100 次 = 1 unique ref）
+- **plan_ref 输入**：3 子 plan hash（capability / control / scope）+ profile_path + plan_version + sorted(input_provenance)
+- **input_provenance 5 类**：profile / bundle / patch / task / env；不接受 PID / timestamp（PR-3 §3.2 停留概念红旗）
+- **ScopePlan 最小版**：lifecycle + visibility（默认 = 8 scope）+ acl_grants（capability ceiling）+ budget_ceiling（5 字段软上限）+ revision；不实现 SpacetimeContext 5 子空间（tracker §三裁剪）
+- **`CompiledRunPlan` 不放方法**（ADR-0015）：plan_ref / sub-plan hashes 都是 module-level 函数；通过 `compiled_run_plan_ref(plan)` / `plan_ref_of(plan)` 等调用
+- **LCA_PLAN_COMPAT=1 兼容开关**：保留 3 个 PR 后删除（PR-3 → PR-6 后）；PR-3 默认 off（新路径启用）
+- **PR-3 阶段 runtime 不消费** `CompiledRunPlan`：`plan_compiler` 是数据面，runtime 接线在 PR-5 `spawn.bind_plan`（依赖 ADR-0071）
 
 ### 4.4 不变量
 
 - **不改 ADR 文件**（0066/0067/0068/0069/0071/0073/0070/0072/0062 任何文件一字不改）
 - **不动 layer 分层**：contracts/ 不能 import 实现层
-- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-2.5 新增 58 测试全过，**无新增失败**）
-- **不扩张到 PR-3 范围**（不在 PR-2.5 内顺手做 CompiledRunPlan / PlanCompiler）
-- **不放方法在 contracts/@dataclass**（ADR-0015；访问器为 module-level 函数）
-- **不引入第 12 关系**（新增关系需 ADR）
-- **不删除 5 老关系**（ADR-0061 capabilities DAG 已支持；PR-2.5 是扩展而非替换）
-- **不改 `Relation` enum 字符串值**（序列化 / plan_ref 引用稳定；break wire 触发 PR-6 ExecutionEnvelope）
+- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-3 新增 56 测试全过，**无新增失败**）
+- **不放方法在 contracts/@dataclass**（ADR-0015；plan_ref / sub_plan_hash 都是 module-level 函数）
+- **不扩张到 PR-4 范围**（不在 PR-3 内顺手做 think.guard / stop.decide 原子化迁移）
+- **不实现 SpacetimeContext 5 子空间**（tracker §三裁剪推迟到 ADR Draft）
+- **不引入 plan_hash 之外的不可重复字段**（PID / timestamp / 随机盐 等；plan_ref = SHA-256）
+- **不修改 plan_version schema**（breaking change = PR-X 重新设计）
 
 ### 4.5 验证流程
 
 ```sh
 # 1. ruff check + format
-uv run ruff check --fix lca/contracts/atoms/relation.py lca/contracts/protocols/relation.py lca/contracts/protocols/capability_plan.py lca/harness/profile/capability_plan_resolver.py tests/plan/test_11_relations.py
+uv run ruff check --fix lca/contracts/protocols/scope_plan.py lca/contracts/protocols/plan.py lca/harness/profile/plan_compiler.py lca/harness/profile/resolve.py tests/plan/
 uv run ruff format ...
 
-# 2. PR-2.5 L1 sign-off 命令（acceptance-criteria §4.5 V11）
-uv run python -c "from lca.contracts.atoms.relation import Relation, all_relation_values; print(len(all_relation_values()))"
-# 预期: 11
+# 2. PR-3 L1 sign-off 命令（acceptance-criteria §3.1 + §3.2 V2）
+uv run python -c "from lca.harness.profile.plan_compiler import compile_plan; from lca.harness.profile.resolve import resolve_profile; p = compile_plan(resolve_profile('profiles/web-standard.yaml')); print(p.plan_ref)"
+# 预期: 16 字符 hex (e.g. '4f1d3d78fee8f96e')
 
-# 3. CapabilityPlan hash 稳定 + order invariance
-uv run pytest --no-cov tests/plan/test_11_relations.py -v -k "Hash"
+# 3. plan_hash determinism (V2 acceptance §3.2 核心守护)
+uv run pytest --no-cov tests/plan/test_plan_hash_determinism.py -v
 
-# 4. 不破坏既有测试（除 §11 已登记的 pre-existing 19 失败）
-uv run pytest --no-cov tests/harness/ tests/test_contracts.py tests/plan/ -q
+# 4. 全套 PR-3 测试
+uv run pytest --no-cov tests/plan/ -v
+
+# 5. 不破坏既有测试
+uv run pytest --no-cov tests/harness/ tests/test_contracts.py -q
 ```
 
 ### 4.6 完成判据
 
-- 1 个新测试文件全过（58 测试，0 失败）
+- 3 个新测试文件全过（56 测试，0 失败）
 - harness/ + contracts/ + plan/ 测试无新增失败
 - ruff 无新增警告
-- mypy 无新增错误
-- 11 关系枚举闭合（5 老 + 6 新）
-- `web-standard.yaml` profile 投影出 ≥ 30 ProviderBinding（42 plugins）+ 0 explicit relations
-- CapabilityPlan hash 稳定（cross-run determinism）
+- 100-iteration property test 通过（plan_ref 跨运行稳定）
+- `web-standard.yaml` profile 编译出非空 CompiledRunPlan（42 provider_bindings + 3 control entries + run scope）
+- plan_ref 是 16 字符 SHA-256 hex
 
 ### 4.7 提交规范
 
 ```text
-feat(contracts+harness): PR-2.5 11 relations algebra + CapabilityPlan data layer
+feat(contracts+harness): PR-3 CompiledRunPlan + PlanCompiler + ScopePlan
 
-- 新增 lca/contracts/atoms/relation.py (11 关系枚举 + NEW_RELATIONS + group hint)
-- 新增 lca/contracts/protocols/relation.py (TypedRelation dataclass + accessors)
-- 新增 lca/contracts/protocols/capability_plan.py (CapabilityPlan + ProviderBinding + accessors)
-- 新增 lca/harness/profile/capability_plan_resolver.py (project_capability_plan + validate_targets)
-- 新增 tests/plan/test_11_relations.py (58 测试)
-- ADR-0074 PR-2.5 落地
+- 新增 lca/contracts/protocols/scope_plan.py (BudgetCeiling + ScopePlan)
+- 新增 lca/contracts/protocols/plan.py (CompiledRunPlan + plan_ref)
+- 新增 lca/harness/profile/plan_compiler.py (compile_plan + LCA_PLAN_COMPAT)
+- 3 个新测试文件 (test_scope_plan / test_plan_compiler /
+  test_plan_hash_determinism)
+- ADR-0074 PR-3 落地
 
-Refs: ADR-0074 phase 1 / PR-2.5 / ADR-0069 §三 + ADR-0068 §一 +
-tracker §15.3 + acceptance-criteria §4.5 V11
+Refs: ADR-0074 phase 2 / PR-3 / ADR-0068 §一 + tracker §15.3 +
+acceptance-criteria §3.1 §3.2 V2
 ```
 
 ### 4.8 完成后如何更新本追踪
@@ -295,31 +297,30 @@ tracker §15.3 + acceptance-criteria §4.5 V11
 9. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
 10. 把追踪文件 commit 与代码 commit 分开（避免一个 commit 含两类变更）
 
-### 4.9 已知陷阱（PR-2.5 新增）
+### 4.9 已知陷阱（PR-3 新增）
 
-- **`Relation` enum 与 `TypedRelation` dataclass 同名冲突**：enum 在 `lca.contracts.atoms.relation`，dataclass 在 `lca.contracts.protocols.relation`（命名刻意区分 `TypedRelation` 而非 `Relation`，避免 `lca.contracts.relation.Relation` 双重定义）。PR-3 PlanCompiler 引用时按需 `from lca.contracts.atoms.relation import Relation` 或 `from lca.contracts.protocols.relation import TypedRelation`。
-- **`CapabilityPlan.relations` 在 PR-2.5 阶段为 opt-in**：plugin 作者未在 ``meta.relations:`` 段声明 → plan 只有 provider_bindings（来自 `provides`），无 typed relations；这是 PR-2 / PR-2.5 迁移期的合法状态。PR-3 PlanCompiler 落地后，PlanCompiler 会基于 ControlPlan + provider_bindings 推断部分关系（governs / executes / delegates），补足到 CapabilityPlan.relations。
-- **`TypedRelation.source` 默认 = plugin.id**：用户在 ``meta.relations:`` 不指定 source 时，resolver 默认填 plugin.id。**这意味着 self-relation（source == plugin.id）合法**（用于描述 plugin 自己的 governance / evaluation 行为）。如果用户显式指定 source 为不存在的 plugin id → `CapabilityPlanResolveError`（PR-2.5 阶段 fail-fast）。
-- **`TypedRelation.target` 校验可关闭**：`CapabilityPlanOptions(validate_targets=False)` 时，target 不校验（用于 PR-3 PlanCompiler 推断阶段）；默认 `validate_targets=True`。
-- **`capability_plan_hash` 不包含 resolver options**：options 改变（如 `include_disabled=True`）→ hash 变化（因 bindings 数量变化）。跨运行同 options → 同 hash。
-
----
-
----|
-| `audit-control-surface` | 0 | V1 基线：尚未硬编码 slot 字符串 |
-| `audit-state-writers` | 40 | V3 / C4 基线：40 处直接 state 写入待 PR-7 收口 |
-| `audit-direct-commands` | 2 | V4 基线：2 处 Body 直接 import transport |
-| `audit-hook-attach` | 0 | V5 / PR-7 基线：起点已干净 |
-
-**详见**：§4 PR-0 完成判据；§10 V/CV 验收闭环。
+- **`CompiledRunPlan.plan_ref` 不放 property**（ADR-0015 contracts 纯类型契约）：调用 `compiled_run_plan_ref(plan)` 而不是 `plan.plan_ref`。所有 sub-plan hash 同理（`capability_sub_plan_hash(plan)` / `control_sub_plan_hash(plan)` / `scope_sub_plan_hash(plan)`）。
+- **`plan_ref` 包含 input_provenance**：task_id / env_fingerprint 影响 hash；相同 profile + 不同 task → 不同 plan_ref（PR-6 plan_ref × Journal 绑定的基础）。
+- **LCA_PLAN_COMPAT 默认 off**：PR-3 阶段新路径启用；保留 3 个 PR 后删除（PR-6 后）。任何调用 `spawn_agent` / `boot_resolved_profile` 的代码 PR-5 落地后应优先消费 CompiledRunPlan。
+- **ScopePlan 最小版不实现 SpacetimeContext 5 子空间**：tracker §三裁剪推迟；本 PR-3 仅 lifecycle / visibility / acl / budget ceiling 4 字段。TemporalContext / IdentitySpace / VisibilitySpace 留待 ADR Draft 协调规则明文化。
+- **plan_ref 是 SHA-256 截断 16 字符**：理论碰撞概率 1/2^64（64 bit）；LCA 内部 plan 数量 < 2^32 → 实际碰撞概率忽略不计。PR-12 PlanTemplate list 时若有 2^32+ plans，应考虑 SHA-512。
 
 ---
+
+---|---|---|
+| `f980ace0` | v3.1 宪法补丁（§1 双层分类 + §2 C1 闭集细化 + CV1-CV6 验收） | `docs/design/2026-08-21-cognitive-primitive-constitution-v3-1.md`（+156） |
+| `c8c1b007` | ADR-0074 重排（PR 顺序 + V9 评分 + Boot 失实修正 + 兼容性表） | `docs/adr/0074-plugin-everything-trimmed-implementation.md`（+371） |
+| `5e32e704` | README 收尾（0062/0070/0072 Accepted + 元 ADR 例外） | `docs/adr/README.md`（±32） |
+
+**Phase 0 总评审**：8/10 架构优雅度。
+
+**Phase 0 留下的关键约束**（详见 §2 决策表）。
 
 ## 5. 已完成 Phase 详情
 
 ### Phase 0：宪法对齐与顺序重排（2026-08-21）
 
-**Goal**：在不破坏 v3 宪法的前提下，让 ADR-0074 的 PR 序列在宪法层面对齐、可被下游 agent 无歧义执行。
+**Goal**：在不破坏 v3 宪法前提下，让 ADR-0074 的 PR 序列在宪法层面对齐、可被下游 agent 无歧义执行。
 
 **Commits**：
 
