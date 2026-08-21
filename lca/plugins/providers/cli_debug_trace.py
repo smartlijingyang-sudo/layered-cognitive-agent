@@ -56,7 +56,9 @@ class _DebugTraceCommand:
             print(json.dumps(list(payload), ensure_ascii=False))
             return 0
         elif bottlenecks:
-            print(json.dumps(inspector.find_optimization_candidates(limit=limit), ensure_ascii=False))
+            print(
+                json.dumps(inspector.find_optimization_candidates(limit=limit), ensure_ascii=False)
+            )
             return 0
         elif plugin_graph:
             print(inspector.plugin_interaction_graph())

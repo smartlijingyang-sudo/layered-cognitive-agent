@@ -10,6 +10,6 @@
 entries:
   - id: lca-loop-dsh
     name: lca_loop_dsh
-    $module: lca.plugins.loop_dsh
+    $module: lca.plugins.loop_drivers.dsh
     config:
       target: dsh

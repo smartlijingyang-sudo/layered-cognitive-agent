@@ -55,10 +55,10 @@ from lca.layer0_infra.observability import (
 from lca.layer3_agent.role_library import FileRoleLibrary
 from lca.layer4_app.api import Agent, Team
 from lca.layer4_app.casting import LLMTeamCaster, build_from_casting_plan
-from lca.plugins.run_loop_driver_registry import (
+from lca.plugins.loop_drivers.registry import (
     RunLoopDriverRegistry as RunLoopDriverRegistry,
 )
-from lca.plugins.run_loop_driver_registry import (
+from lca.plugins.loop_drivers.registry import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
 

@@ -4,6 +4,7 @@ The agent loop is provided by Tier-3 plugins registered at the `agent_loop`
 key. Resolution path: `cordis_ctx.inject("agent_loop")` — falls back to
 the default cognitive loop builder if not provided.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
@@ -49,6 +50,6 @@ def _resolve_loop_builder(cordis_ctx: Any | None) -> Any:
             pass
 
     # Fallback: import the default cognitive loop builder directly
-    from lca.plugins.loop_cognitive import build_cognitive_live_agent
+    from lca.plugins.loop_drivers.cognitive import build_cognitive_live_agent
 
     return build_cognitive_live_agent

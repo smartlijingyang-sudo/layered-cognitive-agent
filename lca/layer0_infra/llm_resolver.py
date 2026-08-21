@@ -1,6 +1,6 @@
 """LLM resolver — ``ProductionLLMResolver`` plus re-exports for backward compat.
 
-The plugin (``lca.plugins.llm_resolver``) is the only thing that loads
+The plugin (``lca.plugins.seam_definitions.llm_resolver``) is the only thing that loads
 ``.env``, normalizes aliases, and wires the chat adapter. No product
 ``mode`` vocabulary (mock / deepseek / auto).
 """

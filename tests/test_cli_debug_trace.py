@@ -79,7 +79,7 @@ def test_trace_command_missing_file_returns_1(tmp_path) -> None:
 
 
 def test_seam_provides_debug_registry() -> None:
-    from lca.plugins import seam_cli_debug as mod
+    from lca.plugins.seam_definitions.observability import cli_debug as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

@@ -8,61 +8,61 @@
 #   whose `setup` field holds the original async function).
 
 entries:
-  # ── Tier-1: Service Definitions (13) ───────────────────────────
+  # ── Tier-1: Service Definitions (13 base capabilities) ───────────
   - id: lca-llm-service
     name: lca_llm_service
-    $module: lca.plugins.llm_service
+    $module: lca.plugins.seam_definitions.llm
     config: {}
 
   - id: lca-tools-service
     name: lca_tools_service
-    $module: lca.plugins.tools_service
+    $module: lca.plugins.seam_definitions.tools
     config: {}
 
   - id: lca-transport-service
     name: lca_transport_service
-    $module: lca.plugins.transport_service
+    $module: lca.plugins.seam_definitions.transport
     config: {}
 
   - id: lca-skills-service
     name: lca_skills_service
-    $module: lca.plugins.skills_service
+    $module: lca.plugins.seam_definitions.skills
     config: {}
 
   - id: lca-file-store-service
     name: lca_file_store_service
-    $module: lca.plugins.file_store_service
+    $module: lca.plugins.seam_definitions.file_store
     config: {}
 
   - id: lca-observability-service
     name: lca_observability_service
-    $module: lca.plugins.observability_service
+    $module: lca.plugins.seam_definitions.observability_service
     config: {}
 
   - id: lca-sandbox-service
     name: lca_sandbox_service
-    $module: lca.plugins.sandbox_service
+    $module: lca.plugins.seam_definitions.sandbox
     config: {}
 
   - id: lca-memory-service
     name: lca_memory_service
-    $module: lca.plugins.memory_service
+    $module: lca.plugins.seam_definitions.memory
     config: {}
 
   - id: lca-search-service
     name: lca_search_service
-    $module: lca.plugins.search_service
+    $module: lca.plugins.seam_definitions.search
     config: {}
 
   - id: lca-state-store-service
     name: lca_state_store_service
-    $module: lca.plugins.state_store_service
+    $module: lca.plugins.seam_definitions.state_store
     config: {}
 
   # Sole owner of LLM credentials (.env + aliases) and the chat adapter.
   - id: lca-llm-resolver
     name: lca_llm_resolver
-    $module: lca.plugins.llm_resolver
+    $module: lca.plugins.seam_definitions.llm_resolver
     config:
       default_model: qwen3.7-plus
 
@@ -117,7 +117,7 @@ entries:
   # ── ADR-0063 PR-7: EventDescriptor 单一源 + Registry ──
   - id: lca-event-descriptor-registry
     name: lca_seam_event_descriptor
-    $module: lca.plugins.seam_event_descriptor
+    $module: lca.plugins.seam_definitions.observability.event_descriptor
     config: {}
 
   - id: lca-event-descriptor-bootstrap
@@ -128,7 +128,7 @@ entries:
   # ── ADR-0063 PR-8: JournalStoreBackend factory registry ──
   - id: lca-journal-store-factory-registry
     name: lca_seam_journal_store
-    $module: lca.plugins.journal_store_service
+    $module: lca.plugins.seam_definitions.journal_store_factories
     config: {}
 
   - id: lca-fact-store-memory-factory
@@ -139,27 +139,27 @@ entries:
   # ── Facade plugin-ification: 4 backend seams + providers ──
   - id: lca-journal-seam
     name: lca_seam_journal
-    $module: lca.plugins.seam_journal
+    $module: lca.plugins.seam_definitions.observability.journal
     config: {}
 
   - id: lca-tracer-seam
     name: lca_seam_tracer
-    $module: lca.plugins.seam_tracer
+    $module: lca.plugins.seam_definitions.observability.tracer
     config: {}
 
   - id: lca-attribute-policy-seam
     name: lca_seam_attribute_policy
-    $module: lca.plugins.seam_attribute_policy
+    $module: lca.plugins.seam_definitions.observability.attribute_policy
     config: {}
 
   - id: lca-fact-reader-seam
     name: lca_seam_fact_reader
-    $module: lca.plugins.seam_fact_reader
+    $module: lca.plugins.seam_definitions.observability.fact_reader
     config: {}
 
   - id: lca-fact-scorer-seam
     name: lca_seam_fact_scorer
-    $module: lca.plugins.seam_fact_scorer
+    $module: lca.plugins.seam_definitions.observability.fact_scorer
     config: {}
 
   - id: lca-journal-memory-factory
@@ -205,7 +205,7 @@ entries:
   # ── ADR-0063 PR-9: TraceInspector tools + CLI debug commands ──
   - id: lca-trace-tool-seam
     name: lca_seam_trace_tool
-    $module: lca.plugins.seam_trace_tool
+    $module: lca.plugins.seam_definitions.observability.trace_tool
     config: {}
 
   - id: lca-trace-tool-provider
@@ -215,7 +215,7 @@ entries:
 
   - id: lca-cli-debug-command-seam
     name: lca_seam_cli_debug
-    $module: lca.plugins.seam_cli_debug
+    $module: lca.plugins.seam_definitions.observability.cli_debug
     config: {}
 
   - id: lca-cli-debug-trace
@@ -226,7 +226,7 @@ entries:
   # ── ADR-0063 PR-10: GenAI semantic mappers ──
   - id: lca-genai-semantic-mapper-seam
     name: lca_seam_genai
-    $module: lca.plugins.seam_genai
+    $module: lca.plugins.seam_definitions.observability.genai
     config: {}
 
   - id: lca-genai-llm-mapper
@@ -238,5 +238,3 @@ entries:
     name: lca_providers_genai_tool
     $module: lca.plugins.providers.genai_tool
     config: {}
-
-

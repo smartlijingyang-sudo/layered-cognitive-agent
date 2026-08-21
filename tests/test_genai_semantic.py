@@ -84,7 +84,7 @@ def test_registry_returns_none_for_unknown() -> None:
 
 
 def test_seam_provides_registry() -> None:
-    from lca.plugins import seam_genai as mod
+    from lca.plugins.seam_definitions.observability import genai as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

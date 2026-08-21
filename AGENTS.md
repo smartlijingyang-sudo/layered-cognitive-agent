@@ -47,17 +47,34 @@ lca/
   layer3_agent/                 CognitiveAgent + TeamHandle + OrchestrationStrategies
   layer4_app/                   组合根：composer / runtime_factory / team_wiring / harness_bridge
   harness/                      Harness 自身实现：profile / boot / session / agent / middleware / skills / workflow
-  plugins/                      cordis 插件（37 个 .py + 子目录）
-    seam_definitions/           纯声明 Bundle 插件（13 个 extension_point，零逻辑）
-    llm_service.py tools_service.py session_service.py ...
-                                Tier-1：服务定义
-    providers/                  Tier-2：每 seam 一工厂（llm / tools / sandbox / memory / ...）
-    brain/ reasoner/ synthesizer/ loop_cognitive.py team_lead/
-                                Tier-3：行为实现
+  plugins/                      cordis 插件
+    seam_definitions/           Tier-1 纯声明 seam（17 模块 + observability/ 子命名空间）
+                                llm/tools/transport/memory/sandbox/file_store/observability/
+                                skills/state_store/search/attachment/workspace/system_prompt/
+                                session_service/journal_store/journal_store_factories/llm_resolver
+      observability/            Tier-1 观测 seam 命名空间（attribute_policy / cli_debug /
+                                event_descriptor / evidence_store / fact_reader / fact_scorer /
+                                genai / journal / run_locator / tracer / trace_tool /
+                                w3c_validator）
+    providers/                  Tier-2：每 seam 一工厂（memory / sandbox / tools / transport / ...）
+    compose/                    Tier-3：compose-time 命名工厂（tools / transport）
+    loop_drivers/                Tier-3：run-loop 驱动注册中心（registry + cognitive + dsh）
+    brain/ reasoner/ synthesizer/ critic/
+                                Tier-3：认知原语（think 子系统）
+    body/                       Tier-3：执行平面（safe_executor + simple）
+    perceive/ sensors/          Tier-3：感知群组 + sensor 贡献
+    gates/                      Tier-3：决策门群组（repeat_tool_call / tool_loop_breaker / ...）
+    runtime/                    Tier-3：runtime 原语（stop_rule / hook_registry / middleware）
+    registries/                 Tier-3：注册中心（component_registry / factory_seams）
+    strategies/                 Tier-3：team 编排策略（lead / pipeline / fan_out / peer_relay /
+                                peer_swarm / debate / graph）
+    tools/                      Tier-3：tool plugins（bash / file_write / cordis_control/ ...）
+    roles/                      Tier-3：角色 profile 工厂（cordis_creator）
     dsh/bridge.py               DSH alien loop driver
-    guards/                     Phase 中间件（已精简：仅 RepeatToolCall / ToolLoopBreaker 等少数）
-    llm_resolver.py             LLM_API_KEY 唯一读取者；profile 切换 mode
-    run_loop_driver_registry.py Loop 驱动注册中心（cognitive + dsh-bridge 注册到这里）
+    collaboration/blackboard.py 认知协作面板
+    bundles/                    复合 bundle 插件（coding_agent_tools）
+    synthesizer/                Synthesizer 实现（concat）
+    guards/                     Phase 中间件（精简后空包，仅留历史 import 兼容）
 gateway/                        FastAPI 入口：app.py / openai_shim.py / runs/{api,execute,loop_drivers}
 profiles/                       Profile YAML（默认 profiles/web-standard.yaml）
 bundles/                        Bundle YAML（base.yaml + web-app.yaml + scenario-* + lead/researcher-*）
@@ -182,7 +199,7 @@ uv run vulture lca --min-confidence 80
 - **模块级 `build_*` 工厂函数必须完整标注**（参数 + 返回），否则 `check_plugin_typing.py` 阻断
 - 层间只通过 Protocol 通信，同层通过依赖注入协作
 - 多种实现 → `Protocol` + 注册表；外部集成 → 适配器
-- 配置走 pydantic-settings / 环境变量；`LLM_API_KEY` 由 `lca.plugins.llm_resolver` 唯一读取
+- 配置走 pydantic-settings / 环境变量；`LLM_API_KEY` 由 `lca.plugins.seam_definitions.llm_resolver` 唯一读取
 - 禁止魔数、硬编码密钥、裸 `except Exception`、`print`；用 `structlog`
 - 不生成 TODO / FIXME 占位
 - 文件以恰好一个换行结尾（`git diff --cached --check` 门禁）
@@ -223,7 +240,7 @@ uv run vulture lca --min-confidence 80
 | Agent / Team 闭合 | `lca/layer4_app/spawn.py`（`spawn_agent` / `spawn_team`；ADR-0056） |
 | Profile Resolve/Boot | `lca/harness/profile/{resolve,boot}.py`（ADR-0061） |
 | 插件 Manifest API | `lca/harness/plugin_api.py`；Capability 键 `lca/contracts/capabilities.py` |
-| LLM seam | `lca.plugins.llm_resolver`（env 唯一读取者）+ `lca.plugins.providers.llm`（adapter 工厂） |
+| LLM seam | `lca.plugins.seam_definitions.llm_resolver`（env 唯一读取者）+ `lca.plugins.providers.llm`（adapter 工厂） |
 | Loop 驱动 | `gateway/runs/loop_drivers.py:{CognitiveRunDriver, DshRunDriver}`，由 `lca-run-loop-driver-registry` 收集 |
 | Prompt 模板 | `lca/layer1_cognitive/brain/prompts/*.md`；加载 `load_builtin_prompt` |
 | Journal 词表 | `lca/contracts/models/observability/{journal,journal_catalog}.py`（v3 增 PR2/PR3a/PR4/PR6/PR7/PR8/PR9 控制原语） |
@@ -238,7 +255,7 @@ uv run vulture lca --min-confidence 80
 - 不直接改 `lobehub-ui/`——改 `deploy/lobehub/patches/` 后 `patch_lobehub.py apply --reset`
 - 不在 6 步循环上开洞、不引入新 step / 新事件词表 / 新插件 schema（**C6：改闭集必 ADR**）
 - 不让 Sensor / Gate / Body 原地改 `AgentState`（**C4：Reducer 唯一写**）
-- 不绕过 `LLM_API_KEY` 路径——所有 key 经 `lca.plugins.llm_resolver` 解析
+- 不绕过 `LLM_API_KEY` 路径——所有 key 经 `lca.plugins.seam_definitions.llm_resolver` 解析
 
 ## 8. 编辑本文件
 

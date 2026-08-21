@@ -64,7 +64,9 @@ def test_read_from_filters_correctly() -> None:
 def test_events_returns_independent_tuple() -> None:
     """events() 每次返回新 tuple，互不影响。"""
     backend = InMemoryJournalStore()
-    backend.append(StampedEvent(seq=1, ts=1.0, scope=_scope(), event=AgentRunStarted(agent_role="x")))
+    backend.append(
+        StampedEvent(seq=1, ts=1.0, scope=_scope(), event=AgentRunStarted(agent_role="x"))
+    )
     snapshot_a = backend.events()
     backend.append(
         StampedEvent(
@@ -98,7 +100,7 @@ def test_run_store_accepts_explicit_backend() -> None:
 
 def test_seam_provides_journal_store() -> None:
     """seam plugin 模块可导入。"""
-    from lca.plugins import journal_store_service as mod
+    from lca.plugins.seam_definitions import journal_store_factories as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

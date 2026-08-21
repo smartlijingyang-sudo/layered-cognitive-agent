@@ -91,7 +91,7 @@ def test_plugin_interaction_graph_default_empty() -> None:
 
 
 def test_seam_provides_tools() -> None:
-    from lca.plugins import seam_trace_tool as mod
+    from lca.plugins.seam_definitions.observability import trace_tool as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

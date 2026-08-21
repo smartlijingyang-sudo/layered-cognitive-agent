@@ -129,7 +129,7 @@ entries:
   # ── Journal store (named factory; spawn instantiates per-run) ──
   - id: lca-journal-store
     name: lca_journal_store
-    $module: lca.plugins.journal_store
+    $module: lca.plugins.seam_definitions.journal_store
     config: {}
 
   # ── Run-loop driver registry (Tier-3) ─────────────
@@ -138,7 +138,7 @@ entries:
   # ``execution_target``.
   - id: lca-run-loop-driver-registry
     name: lca_run_loop_driver_registry
-    $module: lca.plugins.run_loop_driver_registry
+    $module: lca.plugins.loop_drivers.registry
     config:
       default: cognitive
 
@@ -148,7 +148,7 @@ entries:
   # are loaded; nothing in gateway hard-codes drivers.
   - id: lca-loop-cognitive
     name: lca_loop_cognitive
-    $module: lca.plugins.loop_cognitive
+    $module: lca.plugins.loop_drivers.cognitive
     config:
       target: cognitive
   # lca-loop-dsh is NOT loaded here: deployments that ship DSH opt in via
@@ -160,12 +160,12 @@ entries:
   # so the composition root never instantiates concrete classes inline.
   - id: tools.compose_service
     name: tools_compose_service
-    $module: lca.plugins.tools_compose_service
+    $module: lca.plugins.compose.tools
     config: {}
 
   - id: transport.compose_service
     name: transport_compose_service
-    $module: lca.plugins.transport_compose_service
+    $module: lca.plugins.compose.transport
     config: {}
 
   # ── Component discovery registry (ADR-0062 §7) ──
