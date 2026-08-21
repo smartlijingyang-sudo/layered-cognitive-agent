@@ -30,6 +30,18 @@ from lca.contracts.protocols.agent import (
 # ── 可选能力（无 bind/install 组装面）────────────
 from lca.contracts.protocols.capabilities import HasHooks
 
+# ── CapabilityPlan + 11 关系代数（ADR-0068 §一 + ADR-0069 §三）──────
+from lca.contracts.protocols.capability_plan import (
+    CapabilityPlan,
+    ProviderBinding,
+    capability_plan_hash,
+    capability_plan_to_dict,
+    provider_bindings_from_iter,
+    relations_from_plugin,
+    relations_of_kind,
+    relations_to_plugin,
+)
+
 # ── 自动组队（角色库与选角契约，ADR-0042）────────
 from lca.contracts.protocols.casting import RoleLibrary, TeamCaster
 
@@ -129,6 +141,11 @@ from lca.contracts.protocols.reducer import (
     LoopTopology,
     Reducer,
 )
+from lca.contracts.protocols.relation import (
+    TypedRelation,
+    typed_relation_to_dict,
+    typed_relations_from_iter,
+)
 from lca.contracts.protocols.runtime import Runtime, StopOutcomePolicy, StopRule
 
 # ── 工具执行管线（五阶段可拦截管线）────────────
@@ -158,6 +175,7 @@ __all__ = [
     "BrainFactory",
     "BudgetAware",
     "BudgetPolicy",
+    "CapabilityPlan",
     "ComponentRegistryProtocol",
     "ControlEntry",
     "ControlPlan",
@@ -181,6 +199,7 @@ __all__ = [
     "ObservabilityBackend",
     "OrchestrationRegistryProtocol",
     "PerceiveHub",
+    "ProviderBinding",
     "Reasoner",
     "Reducer",
     "RetrievalPolicy",
@@ -223,15 +242,24 @@ __all__ = [
     "ToolRegistry",
     "ToolRenderer",
     "TransportRegistryProtocol",
+    "TypedRelation",
     "always",
     "canonical_scope_of",
+    "capability_plan_hash",
+    "capability_plan_to_dict",
     "compute_control_plan_hash",
     "control_plan_to_dict",
     "declared_dim_count",
     "is_complete_address",
     "is_slot_empty",
+    "provider_bindings_from_iter",
+    "relations_from_plugin",
+    "relations_of_kind",
+    "relations_to_plugin",
     "score_logic_address",
     "slot_entries",
     "slots_covered",
     "slots_missing",
+    "typed_relation_to_dict",
+    "typed_relations_from_iter",
 ]
