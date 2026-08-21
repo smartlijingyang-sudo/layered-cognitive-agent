@@ -38,3 +38,7 @@ node_modules/
 # Git worktrees (per superpowers:using-git-worktrees)
 .worktrees/
 worktrees/
+
+# Creator scenario scratch dirs (test output, regenerated on run)
+tests/.scratch_cordis_creator/
+tests/.scratch_cordis_creator_real/

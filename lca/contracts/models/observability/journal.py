@@ -650,3 +650,118 @@ class RunResumed(JournalEvent):
 
     step: int = 0
     reason: str = ""
+
+
+# ── 创造模式（§13.3 Creator）─────────────────────────────────
+#
+# PluginAuthored / PluginMounted / PluginUnmounted / PresetPublished 是
+# 宪法 §13.3.1 五条硬约束（C3/C4/C5/PR12/§23.2）的可审计事实：每一笔 plugin
+# 的「创作→挂载→卸载→发布」必有一条对应事件，trace_id/run_id/step 自动盖章。
+#
+# Payload 设计原则：
+# - capability_grant 字段一律序列化为 tuple[str, ...] —— 与 CapabilityGrant 原子值
+#   体系保持一致，方便按子集校验。
+# - plugin_meta 字段保存 PluginMeta TypedDict 关键字段的 snapshot 而非引用：
+#   后续即使插件代码改了 meta，历史 journal 仍能如实回放挂载时声明的能力。
+# - rejection 字段统一为具名错误码（CapabilityGrantExceeded / PluginMetaMissing /
+#   InvariantViolation / NameConflict / NotMounted），禁止裸字符串。
+
+
+@dataclass(frozen=True)
+class PluginAuthored(JournalEvent):
+    """创造模式：agent 把一份 plugin 源码写到磁盘。
+
+    Step 5 / §13.3.4 流程的「写文件」动作；ToolInvoked 之外另发一条 Creator
+    专用事件，用于按 actor_role 把"我写了一个插件"与通用工具事件区分开。
+    """
+
+    plugin_name: str = ""
+    path: str = ""
+    language: str = ""
+    size_bytes: int = 0
+    actor_role: str = ""
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class PluginMounted(JournalEvent):
+    """创造模式：plugin 已通过 Composer.mount 挂入 Context（C3 单一事实源）。
+
+    §13.3.1 C5：挂载时调用方 capability_grant 与插件声明 capabilities 子集校验，
+    超集 → CapabilityGrantExceeded 拒绝并落拒绝事件。拒绝路径不发本事件，
+    改发 PluginMountRejected。
+    """
+
+    plugin_name: str = ""
+    plugin_id: str = ""
+    capabilities: tuple[str, ...] = ()
+    capability_grant: tuple[str, ...] = ()
+    meta: dict[str, object] = field(default_factory=dict)
+    actor_role: str = ""
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class PluginMountRejected(JournalEvent):
+    """挂载被拒（C5 / PR12 / §23.2 三道闸任一失败）。
+
+    ``reason_code`` 取值见 ``composition.py::ComposerErrorCode``；
+    本事件是失败事实的唯一来源，PluginMounted 与之互斥。
+    """
+
+    plugin_name: str = ""
+    reason_code: str = ""
+    reason_message: str = ""
+    plugin_meta_present: bool = False
+    capability_grant: tuple[str, ...] = ()
+    requested_capabilities: tuple[str, ...] = ()
+    actor_role: str = ""
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class PluginUnmounted(JournalEvent):
+    """创造模式：plugin 已通过 Composer.unmount 退出 Context。"""
+
+    plugin_name: str = ""
+    plugin_id: str = ""
+    actor_role: str = ""
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class PluginInspected(JournalEvent):
+    """创造模式：CordisControlTool(inspect) 已返回当前能力图 snapshot。
+
+    每条记录带 ``mounted_count`` 与 ``plugins_summary``（name + implements +
+    policy_class + side_effects 派生键），便于 lca-ops trace 子命令按 seq
+    回放「运行时的能力图长什么样」。
+    """
+
+    actor_role: str = ""
+    mounted_count: int = 0
+    plugin_names: tuple[str, ...] = ()
+    plugins_summary: tuple[dict[str, object], ...] = ()
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class PresetPublished(JournalEvent):
+    """创造模式：mount 成功后 PluginAuthoring 把 plugin 落盘到 preset 目录。
+
+    §13.3.4 流程的 Step 6：plugin 源码 + bundle YAML 写入
+    ``$LCA_AGENT_PRESETS_HOME/<preset_id>/``。下一次 boot 加载该 bundle
+    时 plugin 自动挂入 Context，无需任何 cordis_control 调用。
+
+    ``bundle_path`` / ``plugin_path`` 是相对 preset root 的 POSIX 路径，
+    不带环境变量前缀（避免 journal 含敏感信息）。
+    """
+
+    preset_id: str = ""
+    plugin_name: str = ""
+    plugin_id: str = ""
+    preset_root: str = ""
+    bundle_path: str = ""
+    plugin_path: str = ""
+    actor_role: str = ""
+    step: int = 0

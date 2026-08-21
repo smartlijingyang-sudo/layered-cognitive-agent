@@ -45,6 +45,12 @@ from lca.contracts.models.observability.journal import (
     LlmCallStarted,
     MemoryCommitted,
     PerceptionMerged,
+    PluginAuthored,
+    PluginInspected,
+    PluginMounted,
+    PluginMountRejected,
+    PluginUnmounted,
+    PresetPublished,
     ReasoningCompleted,
     ReasoningDelta,
     RunActivity,
@@ -109,6 +115,12 @@ JOURNAL_EVENT_CLASSES: dict[str, type[JournalEvent]] = {
         ContextCompacted,
         RunPaused,
         RunResumed,
+        PluginAuthored,
+        PluginMounted,
+        PluginMountRejected,
+        PluginUnmounted,
+        PluginInspected,
+        PresetPublished,
     )
 }
 

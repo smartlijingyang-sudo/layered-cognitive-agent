@@ -95,3 +95,12 @@ JOURNAL_STORE = Capability[object]("journal_store", cardinality="factory")
 RUN_LOOP_DRIVER_REGISTRY = DRIVERS
 TOOLS_COMPOSE_SERVICE = Capability[object]("tools.compose_service", cardinality="factory")
 TRANSPORT_COMPOSE_SERVICE = Capability[object]("transport.compose_service", cardinality="factory")
+
+# ── Creator (§13.3) capability keys ────────────────────────────────
+#
+# 单进程内「群 Composition」组装者的命名工厂；Tier-2 provider 把 ``CordisComposer``
+# 工厂挂到 ``composer.compose_factory``，Tier-3 tool ``cordis_control`` 通过
+# ``ctx.inject("composer.compose_factory")`` 取工厂。
+COMPOSER_COMPOSE_FACTORY = Capability[object](
+    "composer.compose_factory", cardinality="factory"
+)

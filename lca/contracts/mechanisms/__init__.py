@@ -35,6 +35,48 @@ from lca.contracts.mechanisms.capability import (
 from lca.contracts.mechanisms.seam import (
     consume as consume,
 )
+from lca.contracts.mechanisms.composition import (
+    CapabilityGrantExceeded as CapabilityGrantExceeded,
+)
+from lca.contracts.mechanisms.composition import (
+    Composer as Composer,
+)
+from lca.contracts.mechanisms.composition import (
+    ComposerError as ComposerError,
+)
+from lca.contracts.mechanisms.composition import (
+    ComposerErrorCode as ComposerErrorCode,
+)
+from lca.contracts.mechanisms.composition import (
+    InspectEntry as InspectEntry,
+)
+from lca.contracts.mechanisms.composition import (
+    InspectResult as InspectResult,
+)
+from lca.contracts.mechanisms.composition import (
+    InvariantChecker as InvariantChecker,
+)
+from lca.contracts.mechanisms.composition import (
+    InvariantViolation as InvariantViolation,
+)
+from lca.contracts.mechanisms.composition import (
+    MountResult as MountResult,
+)
+from lca.contracts.mechanisms.composition import (
+    NameConflict as NameConflict,
+)
+from lca.contracts.mechanisms.composition import (
+    NotMounted as NotMounted,
+)
+from lca.contracts.mechanisms.composition import (
+    PluginFactory as PluginFactory,
+)
+from lca.contracts.mechanisms.composition import (
+    PluginMetaMissing as PluginMetaMissing,
+)
+from lca.contracts.mechanisms.composition import (
+    UnmountResult as UnmountResult,
+)
 from lca.contracts.models.core.state import AgentState
 
 T = TypeVar("T")
