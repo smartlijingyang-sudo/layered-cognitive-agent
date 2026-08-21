@@ -32,6 +32,8 @@ _NAME_EXEMPT: dict[str, str] = {
     "UseToolOperation": "Action 策略实现（contracts.protocols.action.Action）",
     "DelegateOperation": "Action 策略实现（contracts.protocols.action.Action）",
     "HandoffOperation": "Action 策略实现（contracts.protocols.action.Action）",
+    # Observability 命名：SpanContextInfo 是 OTel SDK 兼容的 dataclass（非 Info/Helper 类）
+    "SpanContextInfo": "OTel span context 信息封装（兼容 OTel SDK 命名约定）",
 }
 
 _SCAN_PACKAGES = [

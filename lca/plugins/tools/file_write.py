@@ -67,7 +67,7 @@ MANIFEST = ToolManifest(
 )
 
 
-class FileWriteTool:
+class FileWriteTool(Tool):
     """file_write Tool 实现。"""
 
     name: ClassVar[str] = "file_write"

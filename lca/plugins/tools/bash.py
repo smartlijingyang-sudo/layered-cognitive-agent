@@ -70,7 +70,7 @@ MANIFEST = ToolManifest(
 )
 
 
-class BashTool:
+class BashTool(Tool):
     """bash Tool 实现。"""
 
     name: ClassVar[str] = "bash"

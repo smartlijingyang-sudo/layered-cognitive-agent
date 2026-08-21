@@ -82,7 +82,7 @@ MANIFEST = ToolManifest(
 )
 
 
-class CordisControlTool:
+class CordisControlTool(Tool):
     """cordis_control Tool 实现（构造期绑定 Composer 与 caller_grant）。
 
     实例方法 :meth:`execute` 是 Body.act 唯一调用入口；具体 action 行为
