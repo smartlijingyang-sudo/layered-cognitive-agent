@@ -158,14 +158,19 @@ async def test_denied_policy_prevents_provider_execution() -> None:
 
 @pytest.mark.asyncio
 async def test_legacy_safe_executor_uses_provider_pipeline_contract() -> None:
+    # PR-7: mint_envelope requires plan_ref (V5 acceptance). Tests must wrap
+    # the call in plan_ref_scope to inject a non-empty plan_ref.
+    from lca.contracts.models.observability.plan_ref import plan_ref_scope
+
     executor = PipelineSafeExecutor(ToolPermissionManifest(allowed_tools=["legacy_echo"]))
 
-    result = await executor.execute(
-        _LegacyEchoTool(),
-        {"message": "hello"},
-        RetryPolicy(max_retries=0),
-        CacheConfig(enabled=False),
-    )
+    with plan_ref_scope("test_plan_ref_for_pipeline_test"):
+        result = await executor.execute(
+            _LegacyEchoTool(),
+            {"message": "hello"},
+            RetryPolicy(max_retries=0),
+            CacheConfig(enabled=False),
+        )
 
     assert result.success is True
     assert result.payload == "hello"

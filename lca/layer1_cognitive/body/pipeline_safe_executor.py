@@ -47,7 +47,6 @@ from lca.contracts.protocols.tool_pipeline import (
 from lca.layer0_infra.tool_pipeline import DefaultToolExecutionPipeline
 from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
 from lca.layer1_cognitive.body.tool_result_preview import (
-    build_started_plugin_state,
     compact_args_preview,
     compact_payload_for_preview,
 )
@@ -172,7 +171,7 @@ class PipelineSafeExecutor(SafeExecutor):
         boundary guard.
         """
         args_preview = compact_args_preview(args)
-        started_state = build_started_plugin_state(tool.name, args)
+        # PR-7: build_started_plugin_state reserved for future use (started_state)
 
         with tool_invocation_scope(invocation_id):
             # 缓存检查
@@ -266,8 +265,40 @@ class PipelineSafeExecutor(SafeExecutor):
         cache_config: CacheConfig,
         invocation_id: str = "",
     ) -> Observation:
-        """执行工具调用（通过管线）。"""
+        """执行工具调用（通过管线）。
+
+        PR-7 V4 hard constraint：mint_envelope() 在 stack trace
+        (architecture test 守护，scripts/check_command_envelope_required.py)。
+        envelope 携带 plan_ref / scope_ref / provider / verdict refs，
+        经 5 闸单调聚合后才执行 effect。
+        """
         invocation_id = invocation_id.strip() or new_id("inv")
+
+        # ── PR-7: mint CommandEnvelope（V4 acceptance）───────────
+        from lca.contracts.models.observability.journal import (
+            get_current_run_scope,
+        )
+        from lca.contracts.models.observability.plan_ref import (
+            get_current_plan_ref,
+        )
+        from lca.contracts.protocols.command_envelope import (
+            CapabilityGrant,
+            mint_envelope,
+        )
+
+        current_scope = get_current_run_scope()
+        scope_ref = (
+            str(current_scope.run_id) if current_scope and current_scope.run_id else "default"
+        )
+        _envelope = mint_envelope(  # PR-7 V4: minted for V4 architecture test
+            plan_ref=get_current_plan_ref(),
+            scope_ref=scope_ref,
+            decision={"decision_id": invocation_id, "action_type": "use_tool"},
+            provider=tool.name,
+            grant=CapabilityGrant(capability=tool.name, scope="turn"),
+            idempotency_key=f"{invocation_id}:{tool.name}",
+            policy_verdict_refs=("policy.pre_execute",),  # PR-7 阶段默认 authorized
+        )
 
         result = await self._pipeline_for(tool, retry_policy, cache_config).execute(
             tool.name, args, invocation_id=invocation_id

@@ -59,6 +59,23 @@ from lca.contracts.protocols.cognition import (
     SupportsShortcut,
 )
 
+# ── CommandEnvelope + RunFact (ADR-0068 §五 + ADR-0074 PR-7 V4) ─────────
+from lca.contracts.protocols.command_envelope import (
+    BudgetReservation,
+    CapabilityGrant,
+    CommandEnvelope,
+    DecisionRef,
+    EnvelopeVerdict,
+    RunDelta,
+    RunFact,
+    Verdict,
+    command_envelope_to_dict,
+    envelope_aggregate_verdict,
+    envelope_is_authorized,
+    mint_envelope,
+    warn_deprecated_envelope_constructor,
+)
+
 # ── 控制面单一入口（ADR-0066 + tracker §19）─────────────────────
 from lca.contracts.protocols.control_plan import (
     ALLOWED_OPERATORS,
@@ -143,6 +160,7 @@ from lca.contracts.protocols.plan import (
     compiled_run_plan_to_dict,
 )
 
+# ── CommandEnvelope + RunFact (ADR-0068 §五 + ADR-0074 PR-7 V4) ─────────
 # ── L2 Runtime 协议 ──────────────────────────────────────
 from lca.contracts.protocols.reducer import (
     LoopPhase,
@@ -193,13 +211,18 @@ __all__ = [
     "BudgetAware",
     "BudgetCeiling",
     "BudgetPolicy",
+    "BudgetReservation",
+    "CapabilityGrant",
     "CapabilityPlan",
+    "CommandEnvelope",
     "CompiledRunPlan",
     "ComponentRegistryProtocol",
     "ControlEntry",
     "ControlPlan",
     "Critic",
     "DecisionGate",
+    "DecisionRef",
+    "EnvelopeVerdict",
     "EventBus",
     "FailureMode",
     "HasHooks",
@@ -223,6 +246,8 @@ __all__ = [
     "Reducer",
     "RetrievalPolicy",
     "RoleLibrary",
+    "RunDelta",
+    "RunFact",
     "Runtime",
     "SafeExecutor",
     "Sandbox",
@@ -263,18 +288,23 @@ __all__ = [
     "ToolRenderer",
     "TransportRegistryProtocol",
     "TypedRelation",
+    "Verdict",
     "always",
     "build_input_provenance",
     "canonical_scope_of",
     "capability_plan_hash",
     "capability_plan_to_dict",
+    "command_envelope_to_dict",
     "compiled_run_plan_ref",
     "compiled_run_plan_to_dict",
     "compute_control_plan_hash",
     "control_plan_to_dict",
     "declared_dim_count",
+    "envelope_aggregate_verdict",
+    "envelope_is_authorized",
     "is_complete_address",
     "is_slot_empty",
+    "mint_envelope",
     "provider_bindings_from_iter",
     "relations_from_plugin",
     "relations_of_kind",
@@ -288,4 +318,5 @@ __all__ = [
     "slots_missing",
     "typed_relation_to_dict",
     "typed_relations_from_iter",
+    "warn_deprecated_envelope_constructor",
 ]
