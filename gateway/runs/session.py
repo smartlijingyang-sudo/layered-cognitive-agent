@@ -13,7 +13,6 @@ from typing import Any
 
 from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.live import LiveTail
-from gateway.runs.process_journal import ProcessJournal
 from lca.contracts.models.core.conversation import ConversationTurn
 from lca.contracts.models.core.plane import PlaneBindings
 from lca.layer0_infra.observability import BoundObservability
@@ -111,7 +110,10 @@ class RunRegistry:
         self._runs_dir.mkdir(parents=True, exist_ok=True)
         self._max_terminal = max_terminal
         self._terminal_ttl_s = terminal_ttl_s
-        self.journal = ProcessJournal()
+        # ADR-0065 PR-5: ProcessJournal 实例化走 _journal_factory。
+        from gateway.runs._journal_factory import get_or_create_process_journal
+
+        self.journal = get_or_create_process_journal(registry_journal=None)
 
     def latest_bindings(self) -> PlaneBindings | None:
         for session in reversed(list(self._runs.values())):

@@ -17,15 +17,18 @@ record 时盖章进 ``StampedEvent.scope``，事件字段只承载领域语义�
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from lca.contracts.atoms.ids import RunId, TraceId, new_run_id, new_trace_id
 from lca.contracts.models.observability.event import OperationOutcome, RuntimeKind
+from lca.contracts.observability.evidence import (
+    EvidenceRef as _EvidenceRef,  # used in JournalRecord.evidence
+)
 
 # ── 关联骨架 ─────────────────────────────────────────────
 
@@ -765,3 +768,222 @@ class PresetPublished(JournalEvent):
     plugin_path: str = ""
     actor_role: str = ""
     step: int = 0
+
+
+# ── ADR-0065 §三 / PR-3: JournalRecord v2 envelope ──────────────────
+#
+# 引入 JournalRecord 作为 StampedEvent 的下替代身;不立即删除 StampedEvent。
+# 字段语义变化:
+# - schema 必填 "lca.journal/2"
+# - event_id 全局唯一(ULID),与 seq 不同
+# - occurred_at vs committed_at 显式区分(0065 §三)
+# - causation.parent_event_id / causation.links 替代 parent_seq(0065 §三)
+# - evidence: tuple[EvidenceRef, ...] 引用受治理证据(0065 §四)
+# - 不再有 *_preview 字段;plugin_state 字段;output_truncated 字段
+#   (迁移完成后由后续 PR 强制删除)
+#
+# PR-3 不删除 StampedEvent / *_preview / plugin_state;消费方迁移完成后再
+# 单独 PR 走删除路径。本文件只新增类型 + 工厂方法。
+
+
+@dataclass(frozen=True, slots=True)
+class Causation:
+    """事件因果关系(ADR-0065 §三)。
+
+    - ``parent_event_id``: 直接因果(替代 StampedEvent.parent_seq)。
+    - ``links``: 非树形关联 —— 重试 / 并行委派 / 外部 trace / 跨 run 证据。
+    """
+
+    parent_event_id: str = ""
+    links: tuple[dict[str, str], ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "parent_event_id": self.parent_event_id,
+            "links": [dict(link) for link in self.links],
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> Causation:
+        links_raw = payload.get("links", ()) or ()
+        links: tuple[dict[str, str], ...] = tuple(
+            dict(item) for item in links_raw if isinstance(item, Mapping)
+        )
+        return cls(
+            parent_event_id=str(payload.get("parent_event_id", "")),
+            links=links,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DescriptorRef:
+    """事件描述符引用(ADR-0065 §三 / L4)。
+
+    - type: 与 EventDescriptor.type_name 对应;
+    - version: 描述符自身版本号;
+    - payload_schema_version: payload dataclass schema 版本。
+    """
+
+    type: str = ""
+    version: int = 1
+    payload_schema_version: int = 1
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "type": self.type,
+            "version": self.version,
+            "payload_schema_version": self.payload_schema_version,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> DescriptorRef:
+        return cls(
+            type=str(payload.get("type", "")),
+            version=int(payload.get("version", 1)),
+            payload_schema_version=int(payload.get("payload_schema_version", 1)),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class JournalRecord:
+    """Journal v2 envelope(ADR-0065 §三)。
+
+    字段:
+    - schema: 必填 "lca.journal/2";L4 fail-fast 校验入口。
+    - event_id: 全局唯一(ULID);L3 身份不可重铸的稳定句柄。
+    - run_id / run_seq: 连续唯一;L1/L3 强约束。
+    - occurred_at: 源认定的发生时间(可能落后于 committed_at)。
+    - committed_at: 账本接受该记录的时间(L2 "提交先于观察")。
+    - scope: RunScope —— 与 StampedEvent.scope 等价。
+    - causation: Causation —— 替代 parent_seq;支持跨 run 关联。
+    - descriptor: DescriptorRef —— L4 fail-fast 校验目标。
+    - data: 类型化 payload 规范化序列化;不再是自由 dict 逃逸口。
+    - evidence: 受治理证据引用(L5 / §四);完整载荷走 EvidenceStore。
+    """
+
+    schema: Literal["lca.journal/2"] = "lca.journal/2"
+    event_id: str = ""
+    run_id: str = ""
+    run_seq: int = 0
+    occurred_at: float = 0.0
+    committed_at: float = 0.0
+    scope: RunScope = field(default_factory=RunScope)
+    causation: Causation = field(default_factory=Causation)
+    descriptor: DescriptorRef = field(default_factory=DescriptorRef)
+    data: Mapping[str, object] = field(default_factory=dict)
+    evidence: tuple[_EvidenceRef, ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema": self.schema,
+            "event_id": self.event_id,
+            "run_id": self.run_id,
+            "run_seq": self.run_seq,
+            "occurred_at": self.occurred_at,
+            "committed_at": self.committed_at,
+            "scope": _scope_to_dict(self.scope),
+            "causation": self.causation.to_dict(),
+            "descriptor": self.descriptor.to_dict(),
+            "data": dict(self.data),
+            "evidence": [ref.to_dict() for ref in self.evidence],
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> JournalRecord:
+        from lca.contracts.observability.evidence import EvidenceRef as _EvidenceRef
+
+        scope_raw = payload.get("scope", {}) or {}
+        scope = _scope_from_dict(scope_raw)
+        causation = Causation.from_dict(payload.get("causation", {}) or {})
+        descriptor = DescriptorRef.from_dict(payload.get("descriptor", {}) or {})
+        evidence_raw = payload.get("evidence", ()) or ()
+        evidence = tuple(_EvidenceRef.from_dict(item) for item in evidence_raw if isinstance(item, Mapping))
+        return cls(
+            schema="lca.journal/2",
+            event_id=str(payload.get("event_id", "")),
+            run_id=str(payload.get("run_id", "")),
+            run_seq=int(payload.get("run_seq", 0)),
+            occurred_at=float(payload.get("occurred_at", 0.0)),
+            committed_at=float(payload.get("committed_at", 0.0)),
+            scope=scope,
+            causation=causation,
+            descriptor=descriptor,
+            data=dict(payload.get("data", {}) or {}),
+            evidence=evidence,
+        )
+
+
+def _scope_to_dict(scope: RunScope) -> dict[str, object]:
+    """RunScope 不依赖 dataclasses.asdict(因为字段是 brand-typed)。"""
+    return {
+        "trace_id": str(scope.trace_id),
+        "run_id": str(scope.run_id),
+        "parent_run_id": str(scope.parent_run_id) if scope.parent_run_id else None,
+        "parent_trace_id": str(scope.parent_trace_id) if scope.parent_trace_id else None,
+        "delegation_id": scope.delegation_id,
+        "agent_role": scope.agent_role,
+        "step": scope.step,
+    }
+
+
+def _scope_from_dict(payload: Mapping[str, object]) -> RunScope:
+    """从 dict 重建 RunScope;brand-typed 字段转回 str,None 原样保留。"""
+    def _opt_str(key: str) -> str | None:
+        value = payload.get(key)
+        if value is None:
+            return None
+        return str(value)
+
+    return RunScope(
+        trace_id=str(payload.get("trace_id", "")),
+        run_id=str(payload.get("run_id", "")),
+        parent_run_id=_opt_str("parent_run_id"),
+        parent_trace_id=_opt_str("parent_trace_id"),
+        delegation_id=_opt_str("delegation_id"),
+        agent_role=str(payload.get("agent_role", "")),
+        step=int(payload.get("step", 0)),
+    )
+
+
+def stamped_to_journal_record(
+    stamped: StampedEvent,
+    *,
+    event_id: str,
+    run_id: str,
+    run_seq: int,
+    occurred_at: float,
+    committed_at: float,
+    descriptor_version: int = 1,
+    payload_schema_version: int = 1,
+) -> JournalRecord:
+    """StampedEvent → JournalRecord 升级工厂(PR-3 迁移期桥)。
+
+    不丢失字段;预览字段原样保留(后续 PR 删除)。causation 由
+    stamped.parent_seq 在同 run seq 映射表里查 event_id;查不到留空。
+    """
+    parent_event_id = ""
+    return JournalRecord(
+        schema="lca.journal/2",
+        event_id=event_id,
+        run_id=run_id,
+        run_seq=run_seq,
+        occurred_at=occurred_at,
+        committed_at=committed_at,
+        scope=stamped.scope,
+        causation=Causation(parent_event_id=parent_event_id, links=()),
+        descriptor=DescriptorRef(
+            type=stamped.event_type,
+            version=descriptor_version,
+            payload_schema_version=payload_schema_version,
+        ),
+        data=stamped.data,
+        evidence=(),
+    )
+
+
+__all__ = [
+    "Causation",
+    "DescriptorRef",
+    "JournalRecord",
+    "stamped_to_journal_record",
+]

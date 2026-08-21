@@ -32,9 +32,6 @@ from lca.contracts.mechanisms.capability import (
 from lca.contracts.mechanisms.capability import (
     require_capability as require_capability,
 )
-from lca.contracts.mechanisms.seam import (
-    consume as consume,
-)
 from lca.contracts.mechanisms.composition import (
     CapabilityGrantExceeded as CapabilityGrantExceeded,
 )
@@ -76,6 +73,9 @@ from lca.contracts.mechanisms.composition import (
 )
 from lca.contracts.mechanisms.composition import (
     UnmountResult as UnmountResult,
+)
+from lca.contracts.mechanisms.seam import (
+    consume as consume,
 )
 from lca.contracts.models.core.state import AgentState
 

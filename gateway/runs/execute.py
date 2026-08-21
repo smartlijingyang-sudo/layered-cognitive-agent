@@ -8,12 +8,14 @@ import re
 import time
 from collections.abc import Sequence
 from contextlib import nullcontext
-from pathlib import Path
 from typing import Any, cast
 
 import structlog
 
 from gateway.modes import DEFAULT_MODE
+from gateway.runs._journal_factory import (
+    create_run_journal_components as _create_run_journal_components,
+)
 from gateway.runs.doctor import diagnose
 from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.intent import resolve_run_intent
@@ -36,6 +38,7 @@ from lca.contracts.models.observability.journal import (
     RunScope,
 )
 from lca.contracts.models.team.run_context import RunContext
+from lca.contracts.observability.run_locator import RunLocator
 from lca.contracts.protocols import JournalProjector
 from lca.contracts.protocols.infra import Sandbox
 from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
@@ -48,7 +51,6 @@ from lca.layer0_infra.observability import (
     record_runtime,
     run_scope,
 )
-from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
 from lca.layer0_infra.observability.journal.reducer import RunStatus as JRunStatus
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.plane.machine import resolve_machine, resolve_machine_transport
@@ -131,7 +133,7 @@ def _strip_internal_exception_prefix(error: str) -> str:
 
 def assemble_run_hub(
     *,
-    jsonl_path: Path,
+    jsonl_writer: JournalProjector,
     tail: LiveTail,
     ctx: Any,
     settings: ObservabilitySettings | None = None,
@@ -143,6 +145,10 @@ def assemble_run_hub(
     ``ctx.provide("observability", bound)`` 挂上；本函数从基线 Bound 出发，
     把 jsonl 落盘、LiveTail SSE、跨 run ProcessJournal 等 run-scoped writer
     追加到 journal 上，返回新 BoundObservability（immutable，原基线不动）。
+
+    ADR-0065 L9 / PR-5: ``JsonlJournalProjector`` / ``LiveTail`` 实例化集中
+    在 ``gateway/runs/_journal_factory.py``。调用方经 ``create_run_journal_components``
+    拿到 ``(jsonl_writer, tail)`` 后传入本函数。
 
     Diagnostics go through the journal (see ``diagnostics_enabled``); no
     separate diagnostic sink needed.
@@ -166,7 +172,7 @@ def assemble_run_hub(
             policy=AttributePolicy(),
             scorers=minimal.scorers,
         )
-    run_bound = base.with_journal_projection(JsonlJournalProjector(jsonl_path))
+    run_bound = base.with_journal_projection(jsonl_writer)
     run_bound = run_bound.with_journal_projection(tail)
     for projection in extra_projectors:
         run_bound = run_bound.with_journal_projection(projection)
@@ -182,11 +188,28 @@ def create_hub_for_session(
     """Used by tests that assemble a session first. Production uses create_run_session."""
     if session.hub is not None:
         return session.hub
+    # ADR-0065 PR-5: writer 由 factory 装配,不再直接 new。
+    jsonl_writer, _tail = _create_run_journal_components(
+        jsonl_path=session.jsonl_path,
+    )
     hub = assemble_run_hub(
-        jsonl_path=session.jsonl_path, tail=session.tail, ctx=ctx, settings=settings
+        jsonl_writer=jsonl_writer,
+        tail=session.tail,
+        ctx=ctx,
+        settings=settings,
     )
     session.hub = hub
     return hub
+
+
+def _locator_or_default(ctx: Any) -> RunLocator:
+    """从 ctx 拉 run_locator;缺失时退回 traces/ 默认 fs locator(测试场景)。"""
+    try:
+        return ctx.require("run_locator")  # type: ignore[no-any-return]
+    except Exception:
+        from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+
+        return FilesystemRunLocator(root="traces")
 
 
 def create_run_session(
@@ -208,9 +231,12 @@ def create_run_session(
     trace_id = new_id("trace")
     jsonl_path = registry.jsonl_path_for(run_id)
     cleaned_ids = tuple(str(i).strip() for i in attachment_ids if str(i).strip())
-    tail = LiveTail()
-    hub = assemble_run_hub(
+    # ADR-0065 PR-5: writer 由 factory 装配,tail 由 factory 装配。
+    jsonl_writer, tail = _create_run_journal_components(
         jsonl_path=jsonl_path,
+    )
+    hub = assemble_run_hub(
+        jsonl_writer=jsonl_writer,
         tail=tail,
         ctx=ctx,
         extra_projectors=(registry.journal.bind(),),

@@ -73,6 +73,55 @@ repos:
         pass_filenames: false
         types: [python]
 
+      - id: check-evidence-atomic
+        name: Evidence 摘要不匹配必须显式 raise（ADR-0065 L5）
+        entry: python scripts/check_evidence_atomic.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-no-preview-fields
+        name: Journal event 不允许 *_preview 字段（ADR-0065 §四 / PR-3）
+        entry: python scripts/check_no_preview_fields.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-no-double-encoding
+        name: Journal payload 不允许 JSON 字符串化（ADR-0065 §四 / PR-3）
+        entry: python scripts/check_no_double_encoding.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-plugin-capability
+        name: 新 capability key 必须有 seam + provider（ADR-0065 PR-3）
+        entry: python scripts/check_plugin_capability.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-gateway-no-direct-journal-new
+        name: gateway/runs/ 不允许直接 new Journal/LiveTail/ProcessJournal（ADR-0065 L9 / PR-5）
+        entry: python scripts/check_gateway_no_direct_journal_new.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-no-journal-write-in-coding-agent
+        name: Coding Agent Tools 不允许写账本（ADR-0065 L6 / PR-8）
+        entry: python scripts/check_no_journal_write_in_coding_agent.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-run-naming
+        name: Run 目录命名必须是不可猜测 run_<hex>（ADR-0065 §七 / PR-10）
+        entry: python scripts/check_run_naming.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
       - id: vulture
         name: 死代码检测 vulture（≥80% 置信度）
         entry: uv run vulture lca --min-confidence 80

@@ -1,9 +1,10 @@
-"""journal backends —— ADR-0063 PR-8 引入的存储抽象。
+"""journal backends —— ADR-0063 PR-8 / ADR-0065 PR-4 引入的存储抽象。
 
-``InMemoryJournalStore`` 是当前唯一实现；文件 backed 是后续 PR（PR-8-ext）
-配合 durability ADR 单独落地。
+- ``InMemoryJournalStore`` 默认(测试 + boot 期)
+- ``FilesystemJournalStore`` ADR-0065 PR-4 落地(L2 durable + atomic append)
 """
 
+from lca.layer0_infra.observability.journal.backends.filesystem import FilesystemJournalStore
 from lca.layer0_infra.observability.journal.backends.memory import InMemoryJournalStore
 
-__all__ = ["InMemoryJournalStore"]
+__all__ = ["FilesystemJournalStore", "InMemoryJournalStore"]

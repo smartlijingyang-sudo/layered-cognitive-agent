@@ -200,6 +200,79 @@ A2A、MCP、HTTP 或队列边界可以携带 W3C `traceparent` / `tracestate`。
 | 为每类对象新增独立 factory seam | 会以构造细节替代领域 capability，扩张依赖图；一个 run-scoped ledger handle 已足以表达对象生命周期。 |
 | 依赖 `inspect.stack()` 默认记录完整代码 trace | 增加热路径开销并泄露部署路径，且不能提供稳定的构建级可重现定位。 |
 
+## 实施序列(2026-08-21 plan-mode 产出)
+
+10 个 PR,每 PR 独立可合。前 3 PR 是契约地基,后 7 PR 是行为实现。
+
+| PR | 标题 | 跨层 | blast radius | 验证锚点 |
+|---|---|---|---|---|
+| **PR-1** | ADR-0065 文档(本章节)| docs | 无 | git grep |
+| **PR-2** | EvidenceStore 契约 + 默认 fs 实现 | contracts + layer0 + plugins | contracts 全局 | L5 / L8 |
+| **PR-3** | `JournalRecord` v2 envelope + 删 `*_preview` + `plugin_state` + descriptor schema versioning + v1→v2 migration | contracts + layer0 + layer1 | layer1 全部 emit 点 | L1 / L3 / L4 / L8 |
+| **PR-4** | `RunLedger` 重写:单一临界区 + expected-version + L7 终态封存 + filesystem backend | layer0 + plugins | layer0 journal | L1 / L2 / L7 |
+| **PR-5** | 6 个新 seam + `run_ledger_factory` + gateway `new` 清零 + RunLocator fs | contracts + layer0 + gateway + plugins | gateway/runs/ + seam_definitions | L9 |
+| **PR-6** | RunManifest + `materializations/<id>/<v>/` + `latest.json` 原子 rename + CostProjector with `pricing_ref` | contracts + layer0 + plugins + gateway | gateway/finalize + cli/cost | L6 / 决策第六节 |
+| **PR-7** | OTel GenAI 语义映射完成 + W3C trace context 不可信入站校验 + `causation.links` 映射 | contracts + layer0 + plugins + gateway | exporters + SSE 入站 | L8 / 决策第八节 |
+| **PR-8** | Coding Agent Tools bundle(7 工具,只读,无 `journal.write` 旁路)| contracts + layer0 + plugins + bundles | bundle / profile | L6 / L9 / 决策第六节 |
+| **PR-9** | Viewer + CLI 子命令(`lca-ops logs --replay` / `cost` / `diff-runs` / `graph` / `explain` / `minimal-repro` / `diagnose`) + ErrorCode 字典(10 大类 ~30 稳定码)| contracts + layer0 + gateway + cli | lca-ops + lobehub UI | 决策第六节 |
+| **PR-10** | 全量验证 + 8 篇 doc(`docs/observability/`)+ 7 个 check 脚本 + v1→v2 migration 测试 + lobehub patch 适配 + 收尾 | docs + scripts + tests + deploy | 全部 | 0065 验证约束表全部 7 条 |
+
+### 故意丢弃(本 ADR 显式否决)
+
+| 否决项 | 否决依据 |
+|---|---|
+| `RunOpened` / `RunClosed` 新词表 | §三:"v2 不再另造含义重复的 RunOpened/RunClosed 词表",保留 `AgentRunStarted/Finished` |
+| `TurnOpened` / `TurnClosed` / `StepOpened` 新结构事件 | §三:"任何新增 turn、step 或控制事件必须先完成 descriptor 登记与闭集评审" |
+| `EventMeta` 自动 `inspect.stack()` 热路径副作用 | §五:"`SourceLocation` 不是账本写入热路径的隐式副作用";按需受控 instrumentation |
+| `RunFinalizer` 同步写 summary/index/cost | §六:"不得被 run 关闭同步地视为完成前提" |
+| `result_preview` / `*_preview` / `plugin_state` 字典逃逸口 | §四:"不再作为账本事实字段" |
+| Lobehub `lcaJournal.ts` 的 `JSON.parse(result_preview)` | §四:配套 lobehub patch 改走 typed 字段 |
+| `traces/latest` symlink(双 OS 行为差异外露) | §七:"通过临时文件加原子替换更新" |
+
+### 不在本 ADR 实施序列范围(明确承诺,后续 ADR / PR)
+
+| 章节 | 触发条件 |
+|---|---|
+| `journal.write` capability(收紧任意 plugin 可 emit) | 单独 ADR v3 引入 |
+| 远程 EvidenceStore / S3 backend | 单独 PR;fs 默认已足够 |
+| OTel GenAI 评估 scorer / Langfuse scorer hooks | 单独 PR;评估指标通道成熟时 |
+| 生产监控 / 健康检查 / 告警 / 触发器 | 单独 PR;metrics 通道设计完成后 |
+| 高吞吐采样 / token 流超阈值批处理 | 单独 PR;`best_effort` + 流式批处理 |
+| Multi-run 关联视图(跨 `trace_id` UI) | 单独 PR;`causation.links` 已就位但 UI 未动 |
+| 第三方 trace 集成(Jaeger / Tempo) | 单独 PR;OTel 已支持,policy 待配 |
+
+### 跨 PR 依赖图
+
+```
+PR-1 (ADR doc,本章节)
+   │
+PR-2 (EvidenceStore 契约)
+   │
+PR-3 (JournalRecord v2 + 删 preview + descriptor version)
+   │
+PR-4 (RunLedger + L7 seal)
+   │
+PR-5 (6 seam + run_ledger_factory + gateway new 清零)
+   │
+   ├──> PR-6 (manifest + materializations + cost)
+   │
+   ├──> PR-7 (OTel strict + W3C 入站校验)
+   │
+   └──> PR-8 (Coding Agent Tools bundle)
+            │
+            └──> PR-9 (CLI + diagnose + ErrorCode 字典)
+                     │
+                     └──> PR-10 (全量验证 + 8 篇 doc + 7 个 check + lobehub patch)
+```
+
+PR-6 / PR-7 / PR-8 可并行;PR-9 等 PR-8;PR-10 收尾。
+
+### 详细 plan
+
+完整 plan 文件(含每 PR 改动文件清单、关键 API 签名、测试套件、check 脚本、验证锚点、风险与缓解):
+
+`/home/lichao/.grok/sessions/%2Fhome%2Flichao%2Flayered-cognitive-agent/01a02296-ced1-7f90-acbe-45d421255c9f/plan.md`(665 行,2026-08-21 产出)
+
 ## 参考
 
 [1]: https://opentelemetry.io/docs/concepts/signals/traces/ "OpenTelemetry: Traces"

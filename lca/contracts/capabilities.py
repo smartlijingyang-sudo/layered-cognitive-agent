@@ -57,6 +57,47 @@ STATE_STORE = Capability[object]("state_store", cardinality="registry")
 EVENT_DESCRIPTOR_REGISTRY = Capability[object]("event_descriptor_registry", cardinality="one")
 """单一事件描述符注册中心（ADR-0063 PR-7 source inversion）。"""
 
+# ── ADR-0065 PR-2: Evidence plane ──────────────────────────────────
+
+EVIDENCE_STORE = Capability[object]("evidence_store", cardinality="one")
+"""受治理的证据后端契约(L5 / L8)。"""
+
+EVIDENCE_POLICY = Capability[object]("evidence_policy", cardinality="one")
+"""载荷分类 / 保留 / 内联决策(L5 / L8)。"""
+
+RUN_LOCATOR = Capability[object]("run_locator", cardinality="one")
+"""run_id → 物理路径解析(ADR-0065 §七 / PR-5)。"""
+
+RUN_LEDGER_FACTORY = Capability[object]("run_ledger_factory", cardinality="factory")
+"""RunLedgerHandle 创建入口(0065 PR-5);每个 run 一份。"""
+
+W3C_TRACE_CONTEXT_VALIDATOR = Capability[object]("w3c_trace_context_validator", cardinality="one")
+"""W3C traceparent / tracestate 入站不可信校验(ADR-0065 §八 / PR-7)。"""
+
+CODING_AGENT_TRACE_INSPECTOR = Capability[object](
+    "coding_agent_trace_inspector", cardinality="one"
+)
+"""Coding Agent TraceInspectorTool(0065 §六 / PR-8)。"""
+
+CODING_AGENT_FAILURE_EXPLAINER = Capability[object](
+    "coding_agent_failure_explainer", cardinality="one"
+)
+CODING_AGENT_OPTIMIZATION_FINDER = Capability[object](
+    "coding_agent_optimization_finder", cardinality="one"
+)
+CODING_AGENT_PLUGIN_GRAPH_RENDERER = Capability[object](
+    "coding_agent_plugin_graph_renderer", cardinality="one"
+)
+CODING_AGENT_MINIMAL_REPRODUCTION = Capability[object](
+    "coding_agent_minimal_reproduction", cardinality="one"
+)
+CODING_AGENT_DIFF_CONTEXT = Capability[object](
+    "coding_agent_diff_context", cardinality="one"
+)
+CODING_AGENT_RUN_DIFF = Capability[object](
+    "coding_agent_run_diff", cardinality="one"
+)
+
 TRACE_INSPECTOR_TOOLS = Capability[object]("trace_inspector_tools", cardinality="registry")
 """TraceInspector 5 个方法各自作为工具注册（ADR-0063 PR-9）。"""
 
@@ -101,6 +142,4 @@ TRANSPORT_COMPOSE_SERVICE = Capability[object]("transport.compose_service", card
 # 单进程内「群 Composition」组装者的命名工厂；Tier-2 provider 把 ``CordisComposer``
 # 工厂挂到 ``composer.compose_factory``，Tier-3 tool ``cordis_control`` 通过
 # ``ctx.inject("composer.compose_factory")`` 取工厂。
-COMPOSER_COMPOSE_FACTORY = Capability[object](
-    "composer.compose_factory", cardinality="factory"
-)
+COMPOSER_COMPOSE_FACTORY = Capability[object]("composer.compose_factory", cardinality="factory")
