@@ -29,11 +29,18 @@ class TestGatewaySoloFactory(unittest.TestCase):
         self.assertEqual(agent.role_profile.backstory, "")
 
     def test_solo_excludes_search_skill_from_g2a_tools(self) -> None:
+        # Per PR-5/PR-7 plugin-ification, solo agent has no default tools;
+        # caller must explicitly pass tools= argument. This test verifies that
+        # search_skill (the operational skill discovery tool) is NOT auto-loaded
+        # into solo agent spec — it would leak g2a internals.
         llm = ScriptedLLMAdapter({}, default_respond=True)
         agent = build_solo_agent(llm, observability=InMemoryObservability())
         names = {t.name for t in agent.spec.tools}
         self.assertNotIn("search_skill", names)
-        self.assertIn("search", names)
+        # solo agent spec.tools is empty (no defaults); no "search" tool.
+        # Original test assumed defaults; behavior changed in plugin-ification
+        # (callers must explicitly pass tools=[...] to build_solo_agent).
+        self.assertEqual(names, set())
 
 
 class TestGatewayTeamFactory(unittest.TestCase):

@@ -64,6 +64,12 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "lca-sandbox-provider",
         "lca-attachment-provider",
         "lca-workspace-provider",
+        # Tier-3 group services (ADR-0056 short names — perceived via perceive/gates group)
+        "perceive",
+        "gates",
+        "remember",
+        "act",
+        "tools",
         # Tier-3 behaviors (from bundles/web-app.yaml + scenarios)
         "lca-brain-modular",
         "lca-brain-simple",
