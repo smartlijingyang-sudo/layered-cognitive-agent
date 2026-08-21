@@ -575,6 +575,12 @@ v4 的“Environment & Interop”“Composition & Lifecycle”“Perceive & Cont
 
 这不是第十三个插件群，也不是第七个认知阶段。TemporalContext 属于 G2 Perceive 的事实贡献，ExecutionSpace 是 G5 / G11 的受限环境契约，artifact lifecycle 归属 G10 Composition。动态创造的完整实施方案、开发体验、Promotion、HMR、回滚、发布和安全边界见《[时空与受治理创造运行时设计](2026-08-21-spacetime-governed-creator-runtime.md)》。
 
+## 14. 代码对齐与唯一运行计划
+
+v4 的最终可读性不以目录结构或 Python 插件数量为准，而以一次 run 是否可被一个不可变计划解释为准。[ADR-0068](../adr/0068-compiled-plugin-kernel-and-unified-run-plan.md) 将此落实为 `CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan`：Profile Resolve / Boot、AgentSpec、TaskContract 与环境必须先被编译为唯一计划，Runtime Kernel 只解释计划，普通插件只贡献被类型化的 PlanEntry。具体代码断裂、内核边界、Boot 生命周期收敛、RunFact / Reducer、CommandEnvelope 与动态 PlanRevision 的迁移顺序见《[代码对齐的第一性原理架构审计](2026-08-21-code-aligned-architecture-audit.md)》。
+
+这条增补同样明确一个反直觉边界：**不是一切东西都可替换，而是一切独立变化都可声明；不可替换的是使声明保持可信的最小内核。** 因此 Runtime 时序、状态提交、effect 窄门、scope 衰减、artifact transition 与 Evidence Ledger 属于内核；sensor、gate、action、policy、tool、memory、strategy 与 renderer 属于插件贡献。
+
 ## 参考
 
 [1]: 2026-08-19-cognitive-primitive-constitution-v3.md "认知原语插件宪法 v3.0"
