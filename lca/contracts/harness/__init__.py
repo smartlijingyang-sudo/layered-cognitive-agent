@@ -7,6 +7,12 @@ Phase A scope: ``plugin.py``. Legacy ``PluginSpec`` adaptation lives in
 ``lca.harness.kernel.compat`` (contracts must not import implementations).
 """
 
+from lca.contracts.harness.composer import (
+    AgentGraph,
+    Composer,
+    TeamGraph,
+    merge_agent_graphs,
+)
 from lca.contracts.harness.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -23,16 +29,20 @@ from lca.contracts.harness.plugin_contract import (
 )
 
 __all__ = [
+    "AgentGraph",
     "ArchitectureContract",
     "AuthorityContract",
     "CapabilityContract",
+    "Composer",
     "EvidenceContract",
     "LifecycleContract",
     "OwnershipContract",
     "PluginContract",
     "PluginIdentity",
+    "TeamGraph",
     "VerificationContract",
     "is_plugin_contract_empty",
+    "merge_agent_graphs",
     "plugin_contract_control_slots",
     "plugin_contract_functional_group",
 ]

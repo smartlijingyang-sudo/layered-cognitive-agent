@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 if TYPE_CHECKING:
     from cordis import Context
 
+    from lca.contracts.protocols.plan import CompiledRunPlan
+
 from lca.contracts.atoms.enums import (
     ActionScope,
     ComponentKind,
@@ -337,8 +339,42 @@ def spawn_agent(
     decision_gate: DecisionGate | None = None,
     shared_store: SharedMemoryStore | None = None,
     scope: Context | None = None,
+    compiled_plan: CompiledRunPlan | None = None,
+    use_bind_plan: bool = False,
 ) -> CognitiveAgent:
-    """Close one AgentSpec into a CognitiveAgent from a booted capability scope."""
+    """Close one AgentSpec into a CognitiveAgent from a booted capability scope.
+
+    PR-5: 当 ``use_bind_plan=True`` 且 ``compiled_plan`` 提供时，路由到
+    ``bind_plan`` (PR-5 路径) — spawn 不再自己造对象图，4 个 sub-composer
+    plugin 通过 cordis Context 提供拼装策略。否则走 legacy 路径（保留 6
+    个月，PR-6 后删除）。
+    """
+    # PR-5: bind_plan 路径（当显式启用 + compiled_plan 提供时）
+    if use_bind_plan and compiled_plan is not None:
+        from lca.layer4_app.spawn_bind_plan import (
+            bind_plan,
+            is_bind_plan_available,
+        )
+
+        scope = _ensure_scope(scope)
+        if not is_bind_plan_available(scope):
+            import warnings
+
+            warnings.warn(
+                "spawn_agent: use_bind_plan=True but sub-composers missing; "
+                "falling back to legacy path",
+                UserWarning,
+                stacklevel=2,
+            )
+        else:
+            bind_plan(spec, compiled_plan, scope=scope)  # PR-5b: graph 注入 CognitiveAgent
+            # TODO (PR-5b): when TEAM composer lands, hook into CognitiveAgent
+            # For now, the graph is informational; legacy path still constructs
+            # CognitiveAgent below.
+            # PR-5 阶段：仅 plan_ref 写入 metadata（PR-6 plan_ref × Journal 绑定落地）
+            import lca.layer4_app.spawn_bind_plan as _bind_module
+
+            _ = _bind_module  # avoid unused import
     scope = _ensure_scope(scope)
     profile = spec.profile
     if isinstance(spec.observability, str):
