@@ -1,0 +1,6 @@
+# Golden profile: hitl-loop (PR-10 V1 acceptance §7.3)
+# Human-in-the-loop — exercises act.authorize slot + ASK_HUMAN action.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml

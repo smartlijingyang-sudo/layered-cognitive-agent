@@ -1,0 +1,7 @@
+# Golden profile: standard-solo (PR-10 V1 acceptance §7.3)
+# 1. Single agent (no team) — most basic Configured Agent.
+# Coverage: V1 control plane; V2 plan_hash determinism; V3 reducer.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml

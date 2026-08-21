@@ -37,7 +37,7 @@
 | ADR | 关系 | 整体状态 | 落地入口（PR 序列） |
 |---|---|:-:|---|
 | **ADR-0066** Control Slot（9 槽 + 单调聚合）| Refined by ADR-0074 §一 | ⛔ 待 PR-1 | PR-1 dataclass → PR-2 Manifest 字段 → PR-3 compile → PR-4 migrate-first |
-| **ADR-0067** Spacetime Runtime（5 子空间 / 8 状态 / 7 Creator 面 / 6 闸）| Superseded(部分) by ADR-0074 §三 | ⏳ 部分已裁剪 | 4 状态→PR-8 / 4 Creator 面→PR-9 / 6→3 闸→PR-4 / 子空间→ADR Draft 待 owner |
+| **ADR-0067** Spacetime Runtime（5 子空间 / 8 状态 / 7 Creator 面 / 6 闸）| Superseded(部分) by ADR-0074 §三 | ✅ Accepted (PR-10) | 4 状态→PR-8 / 4 Creator 面→PR-9 / 6→3 闸→PR-4 / 2 子空间→PR-12 |
 | **ADR-0068** Compiled Plugin Kernel（3 子 plan + CommandEnvelope + ArtifactController）| Refined by ADR-0074 §二 | ⛔ 待 PR-3 | PR-3 plan+compiler / PR-7 envelope / PR-8 artifact 4 状态 |
 | **ADR-0069** Agent Primitive System（13 群 + LogicAddress + 11 关系 + 6 verbs + PlanTemplate + PluginContract）| Refined by ADR-0074 §四 | ⏳ taxonomy (PR-2 ✅ 字段) | PR-2 functional_group + logic_address + contract 字段 / PR-2.5 11 关系 data / PR-12 template / 6 verbs 含 0074 §四 |
 | **ADR-0074** Plugin-Everything 本体 | 自身实施计划 | ⏳ 4 / 17 | §1 状态总览追踪 PR-0..PR-12 |
@@ -97,12 +97,13 @@
 | **3** | 7 | RunFact / CommandEnvelope 收口 | ✅ Done | `afbac7a7` | 2026-08-21 | PR-6 + ADR-0073 |
 | **3** | 8 | ArtifactController（4 状态机） | ✅ Done | `17906ee0` | 2026-08-21 | PR-7 |
 | **4** | 9 | Creator 4 面化 | ✅ Done | `d17d8447` | 2026-08-21 | PR-8 |
+| **4** | 10 | Golden profile + 文档更新 | ✅ Done | _pending commit_ | 2026-08-21 | PR-9 |
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-10（Golden profile + 文档更新）。
+**Next Action**：PR-12（PlanTemplate + 关系图谱可视化）。
 
-**累计完成**：14 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 / PR-8 / PR-9 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：15 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 / PR-8 / PR-9 / PR-10 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 

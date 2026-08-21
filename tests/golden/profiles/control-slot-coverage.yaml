@@ -1,0 +1,6 @@
+# Golden profile: control-slot-coverage (PR-10 V1 acceptance §7.3)
+# All 11 ControlSlot entries — full control plane coverage.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml

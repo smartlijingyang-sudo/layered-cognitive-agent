@@ -2,7 +2,9 @@
 
 ## 状态
 
-Proposed — 2026-08-21
+**Accepted — 2026-08-21（PR-10 整合落地后接受）**
+
+PR-2 / PR-10 整合落地：NullCritic / NullSynthesizer / NullRetrievalPolicy（C7 原语默认 no-op）。
 
 Keeps: [ADR-0002](0002-cognitive-loop.md)、[ADR-0004](0004-protocol-first-pluggability.md)
 

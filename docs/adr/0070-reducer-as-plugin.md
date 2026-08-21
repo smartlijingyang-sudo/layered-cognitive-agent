@@ -2,7 +2,9 @@
 
 ## 状态
 
-Proposed — 2026-08-21
+**Accepted — 2026-08-21（PR-10 整合落地后接受）**
+
+PR-4 / PR-10 整合落地：Reducer Protocol + DefaultReducer（apply_skill_route 等 seam）；C4 单一写守护（audit_state_writers 40 → 39）。
 
 Keeps: [ADR-0002](0002-cognitive-loop.md)、[ADR-0005](0005-composition-root-l4.md)
 

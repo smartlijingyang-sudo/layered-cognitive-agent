@@ -2,7 +2,11 @@
 
 ## 状态
 
-Proposed — 2026-08-21
+**Partially Accepted — 2026-08-21（PR-5 / PR-10）**
+
+**PR-5 落地**：Composer Protocol + AgentGraph / TeamGraph frozen dataclasses；4 sub-composer implementations (BrainComposer / BodyComposer / PerceiveComposer / TeamComposer) — 包装 spawn.py 现有工厂调用（PR-5a 临时路径）。
+
+**PR-5b / PR-12 待落地**：sub-composer 完全 self-contained（不再 import spawn.py 内部函数）；runtime 集成（mount/unmount 调用 ArtifactController + Composer）；TEAM composer 完整实现（TeamGraph 编排）。
 
 Keeps: [ADR-0005](0005-composition-root-l4.md)、[ADR-0056](0056-plugin-group-contribution.md)、[ADR-0061](0061-plugin-manifest-resolve-boot.md)
 

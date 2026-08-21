@@ -2,7 +2,9 @@
 
 ## 状态
 
-Proposed
+**Accepted — 2026-08-21（PR-10 整合落地后接受）**
+
+PR-0 / PR-1 / PR-2 / PR-3 等多轮整合落地：Cordis Fiber Boot + L4 严格闭合 + 单一事实源。
 
 Amends: [ADR-0056](0056-plugin-group-contribution.md)、[ADR-0061](0061-plugin-manifest-resolve-boot.md)、[ADR-0004](0004-protocol-first-pluggability.md)、[ADR-0005](0005-composition-root-l4.md)
 

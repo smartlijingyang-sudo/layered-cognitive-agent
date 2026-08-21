@@ -2,7 +2,9 @@
 
 ## 状态
 
-**Proposed — 2026-08-21**
+**Accepted — 2026-08-21（PR-10 落地后接受）**
+
+**裁剪（ADR-0074 §三）**：8 状态 → 4 状态（DRAFT/VERIFIED/ACTIVE/RETIRED；PR-8 落地 ArtifactController）；7 Creator 面 → 4 Creator 面（INSPECT/AUTHOR/VALIDATE/PROMOTE；PR-9 落地）；6 闸 → 3 闸（identity/invariant/experiment；PR-4 落地 think.guard + stop.decide 原子化）；5 子空间 → 2 子空间（ExecutionSpace + LifecycleSpace；PR-3 stage 2 / PR-10 落地）。**保留 4 状态 + 4 Creator 面 + 3 闸 + 2 子空间 落地部分**。
 
 Amends: [ADR-0066](0066-declarative-atomic-control-plugins.md)
 
