@@ -1,0 +1,25 @@
+# PlanTemplate: tool_using_loop (Tool-Using Loop)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: tool_using_loop
+name: Tool-Using Loop
+description: Decide tool use → execute tool → observe → repeat
+version: 1
+
+relations:
+  - governs
+  - executes
+  - reads_fact
+  - emits_fact
+
+control_slots:
+  - act.authorize
+  - act.budget
+  - act.constrain
+  - act.execute
+
+required_groups:
+  - G6
+  - G7
+
+scope: turn

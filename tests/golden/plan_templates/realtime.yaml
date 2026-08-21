@@ -1,0 +1,23 @@
+# PlanTemplate: realtime (Realtime Streaming Agent)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: realtime
+name: Realtime Streaming Agent
+description: Stream events with low latency; partial results projected to user
+version: 1
+
+relations:
+  - executes
+  - projects
+  - emits_fact
+
+control_slots:
+  - act.execute
+  - act.safe-boundary
+
+required_groups:
+  - G7
+  - G9
+  - G12
+
+scope: turn

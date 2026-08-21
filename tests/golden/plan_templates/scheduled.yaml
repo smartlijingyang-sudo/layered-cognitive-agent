@@ -1,0 +1,22 @@
+# PlanTemplate: scheduled (Scheduled Agent)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: scheduled
+name: Scheduled Agent
+description: Run agent on cron / schedule; batch process
+version: 1
+
+relations:
+  - governs
+  - executes
+  - emits_fact
+
+control_slots:
+  - perceive.context
+  - stop.decide
+
+required_groups:
+  - G3
+  - G7
+
+scope: experiment

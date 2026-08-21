@@ -1,0 +1,22 @@
+# PlanTemplate: evaluator_optimizer (Evaluator + Optimizer Loop)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: evaluator_optimizer
+name: Evaluator + Optimizer Loop
+description: Generate → evaluate → refine; iterate until quality threshold
+version: 1
+
+relations:
+  - evaluates
+  - revises
+  - governs
+
+control_slots:
+  - think.guard
+  - stop.decide
+
+required_groups:
+  - G5
+  - G11
+
+scope: run

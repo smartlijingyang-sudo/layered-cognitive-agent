@@ -1,0 +1,22 @@
+# PlanTemplate: routing (Intent-based Routing)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: routing
+name: Intent-based Routing
+description: Classify intent → delegate to specialized agent
+version: 1
+
+relations:
+  - contributes_to
+  - delegates
+  - reads_fact
+
+control_slots:
+  - perceive.context
+  - act.authorize
+
+required_groups:
+  - G4
+  - G6
+
+scope: turn
