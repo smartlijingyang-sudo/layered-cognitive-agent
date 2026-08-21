@@ -5,6 +5,7 @@ with public aliases in ``gateway.runs.loop_drivers`` so tests that still
 ``from gateway.assemble import …`` continue to work. This file will be
 removed once the test suite migrates.
 """
+
 from __future__ import annotations
 
 from gateway.runs.loop_drivers import build_runnable_team, build_solo_agent
