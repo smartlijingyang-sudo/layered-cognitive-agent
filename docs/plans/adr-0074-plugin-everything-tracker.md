@@ -49,7 +49,7 @@
 | **0066 §二** | 9 个 Control Slot 有限枚举 | ⛔ | PR-1 | 11 槽全表见 §19（含 PR-0 新增 2 个） |
 | **0066 §三** | PluginDefinition.control 三件套（identity / authority / effects） | ⛔ | PR-2 | |
 | **0066 §四** | 单调聚合（deny-on-any-deny / stop-on-any-stop / scope 收紧） | ⛔ | PR-3 编译期 + PR-7 运行时 | |
-| **0066 §五-§六** | Composer + ControlPlan 描述 | ⏳ | ADR-0071 | 外移 |
+| **0066 §五-§六** | Composer + ControlPlan 描述 | ⏳ → ✅ (PR-5 数据面) | PR-5 (commit 309dddcc) | 数据面落地；PR-5b 后 sub-composers self-contained |
 | **0066 §七** | 决策点三分（策略 / 事实 / 强制） | ⛔ → ✅ (PR-4) | PR-4 首次迁移 | |
 | **0067 §一-§三** | SpacetimeContext 5 子空间 | 暂缓 | ADR Draft | 0074 §三 裁剪到 ExecutionSpace + LifecycleSpace |
 | **0067 §四** | 8 状态机 | ⛔ → ✅ | **PR-8** | 0074 §三 裁剪到 4 状态；映射见 §18 |
@@ -91,7 +91,7 @@
 | **1** | 2.5 | 11 关系代数扩展 CapabilityPlan | ✅ Done | `23161de1` | 2026-08-21 | PR-2 |
 | **2** | 3 | CompiledRunPlan + PlanCompiler | ✅ Done | `cb53a7a8` | 2026-08-21 | PR-2.5 |
 | **2** | 4 | think.guard / stop.decide 原子化 | ✅ Done | `007bae8c` | 2026-08-21 | PR-3 |
-| **2** | 5 | spawn.bind_plan | ⛔ Blocked | — | — | PR-3 + ADR-0071 |
+| **2** | 5 | spawn.bind_plan | ✅ Done | `309dddcc` | 2026-08-21 | PR-3 + ADR-0071 |
 | **3** | 6 | plan_ref × Journal 绑定 | ⛔ Blocked | — | — | PR-5 |
 | **3** | 7 | RunFact / CommandEnvelope 收口 | ⛔ Blocked | — | — | PR-6 + ADR-0073 |
 | **3** | 8 | ArtifactController（4 状态机） | ⛔ Blocked | — | — | PR-7 |
@@ -99,9 +99,9 @@
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-5（spawn.bind_plan）。
+**Next Action**：PR-6（plan_ref × Journal 绑定）。
 
-**累计完成**：9 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：10 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -192,86 +192,78 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-4（think.guard / stop.decide 原子化首次迁移）
+## 4. 已完成 PR 详情：PR-5（spawn.bind_plan + Composer Protocol）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
-> PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 完成细节见 §5 Phase 1。
+> PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 完成细节见 §5 Phase 1。
 
 ### 4.1 目标
 
-已有 gate 链改为向 ControlPlan 的 Control Slot 投稿（PR-3 后 ControlPlan 已编译，可静态表达）。ModularBrain 不再直接写 state（CV4 兑现 + C4 单一写）：通过新增 ``Reducer.apply_skill_route`` seam 把 ``SkillRouter.route(state)`` 结果 fold 到 ``state.active_template``。L2 acceptance §2.4 守护（think.guard / stop.decide 已在 RuntimeLoop / ModularBrain 中实际调用）。
+落地 ``spawn.bind_plan`` 数据面：``spawn_agent`` 接受 ``compiled_plan`` + ``use_bind_plan`` kwargs；``bind_plan()`` 通过 4 个 sub-composer plugin（Brain / Body / Perceive / Team，ADR-0071）拼装 ``AgentGraph``。**L4 不再 import 具体插件 ID**（5 老工厂 key 已迁入 sub-composer 内）。ADR-0071 仍为 Proposed (per P0 决策) — PR-5 仅落地数据面，accept 决策留 PR-5b / PR-10。
 
 ### 4.2 新增 / 修改文件
 
 | 文件 | 作用 |
 |---|---|
-| `lca/contracts/protocols/reducer.py` | Reducer Protocol 新增 ``apply_skill_route(state, active_template)`` 方法（C4 fold; PR-4 seam） |
-| `lca/layer2_runtime/reducer.py` | DefaultReducer 实现 ``apply_skill_route``（写 ``state.active_template``） |
-| `lca/layer1_cognitive/brain/modular_brain.py` | ModularBrain.think() 不再直接写 ``state.active_template``；通过 ``reducer.apply_skill_route`` 收口；新增 ``_LocalReducer`` 兼容 reducer for testing / isolated boot |
-| `lca/harness/diagnostics/audit_state_writers.py` | ``_REDUCER_FILE_ALLOWLIST`` 增 ``lca/layer1_cognitive/brain/modular_brain.py``（因 _LocalReducer 含合法 state mutation） |
-| `tests/harness/test_c1_phase_substeps_guard.py` | CV4 守护：ModularBrain 不含 ``_gate_chain`` / ``_gates`` / ``_chain`` 字段；think() 不直接 mutate state；Reducer 含 apply_skill_route；CognitiveRuntime 不含子阶段 state field；runtime 通过 stop_rule.decide 走 stop.decide 控制面（7 测试） |
-| `tests/harness/test_think_guard_consumer.py` | ModularBrain think 走 reducer 路径；ControlPlan.by_slot['think.guard'] 按 (order, plugin_id) 排序；stop.decide entry 存在；Reducer Protocol + DefaultReducer 含 apply_skill_route；runtime 调用 stop_rule.decide + reducer.apply_stop（9 测试） |
+| `lca/contracts/harness/composer.py` | ``Composer`` Protocol (ADR-0071)；``AgentGraph`` + ``TeamGraph`` frozen dataclasses；``merge_agent_graphs`` helper；module-level accessors ``agent_graph_has_brain`` / ``agent_graph_has_body`` / ``team_graph_member_count`` (ADR-0015) |
+| `lca/contracts/harness/__init__.py` | re-export ``AgentGraph`` / ``TeamGraph`` / ``Composer`` + accessors |
+| `lca/layer4_app/spawn_bind_plan.py` | ``bind_plan()`` / ``bind_team()`` / ``is_bind_plan_available()`` / ``BindOptions`` / ``PlanBindingResult`` / ``TeamBindingResult``；PR-5 路径：4 sub-composer 拼装图；缺 composer → fallback to legacy (PR-5 之前兼容)；保留 6 个月 (PR-5b 后删除) |
+| `lca/layer4_app/spawn.py` | ``spawn_agent`` 新增 ``compiled_plan: CompiledRunPlan | None`` + ``use_bind_plan: bool`` kwargs；当 use_bind_plan=True 且 plan 提供 → 路由到 bind_plan；否则 legacy |
+| `lca/plugins/composer/legacy_sub_composers.py` | PR-5a 4 sub-composers (BrainComposer + BodyComposer + PerceiveComposer + TeamComposer) — 包装 spawn.py 现有工厂调用；PR-5b 阶段完全 self-contained |
+| `tests/layer4_app/test_spawn_bind_plan.py` | 18 测试覆盖 AgentGraph / TeamGraph / merge_agent_graphs / bind_plan legacy + happy path / bind_team fallback / is_bind_plan_available / spawn_agent signature accepts compiled_plan kwarg |
 
 ### 4.3 实现要点
 
-- **Reducer Protocol 新 seam**：``apply_skill_route(state, active_template)`` 把 SkillRouter.route() 结果 fold 到 state（C4 兑现；ModularBrain 不再直接 mutate）
-- **ModularBrain 不存 gate chain 字段**：``agent_gates`` 是单个 DecisionGate（来自 ControlPlan.by_slot['think.guard'] 投影的 gates registry）；gate 顺序由 ControlEntry.order 决定
-- **CV4 守护**：AST 扫描确保 ModularBrain 无 ``_gate_chain`` / ``_gates`` / ``_chain`` 字段；确保 think() 内无 ``state.X = ...`` 直接 mutation；确保 CognitiveRuntime 无 ``_loop_step`` / ``_last_phase`` / ``_sub_state`` 等子阶段 state 字段
-- **stop.decide 消费**：CognitiveRuntime._loop 通过 ``self.stop_rule.decide(...)`` + ``self.reducer.apply_stop(...)`` 走 stop.decide 控制面；不允许 if/else 直接写 stop 状态
-- **audit_state_writers 基线下降**：40 → 39（ModularBrain.think() 的 1 个直接 mutation 收口到 reducer）
+- **Composer Protocol (ADR-0071)**：``key: ClassVar[str]`` + ``compose_agent(spec, scope)`` + ``compose_team(spec, scope)`` 两个方法
+- **AgentGraph** 是 frozen dataclass（Brain / Body / Memory / StateStore / PerceiveHub / Hooks / Observability / LLM / StopRule / metadata）；不在 contracts/ 放方法（ADR-0015）；访问器 module-level
+- **bind_plan 路径**：scope 通过 ``inject("composer.brain")`` 解析 sub-composer；缺失则 BindPlanError 或 fallback；plan_ref 通过 ``compiled_run_plan_ref(plan)`` 传播
+- **PR-5a vs PR-5b**：PR-5a 阶段 sub-composers 包装现有工厂（最少侵入）；PR-5b 阶段 sub-composers 完全 self-contained（不依赖 spawn.py 内部函数）
+- **TEAM composer stub**：PR-5a 阶段 ``compose_team`` 退化为 legacy；PR-5b 阶段实现完整 team orchestration
 
 ### 4.4 不变量
 
 - **不改 ADR 文件**（0066/0067/0068/0069/0071/0073/0070/0072/0062 任何文件一字不改）
-- **不动 layer 分层**：contracts/ 不能 import 实现层
-- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-4 新增 16 测试全过，**无新增失败**）
+- **不动 layer 分层**：contracts/ 不能 import 实现层（composers 在 plugins/）
+- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-5 新增 18 测试全过，**无新增失败**）
+- **不改 spawn.py 默认行为**（`spawn_agent(spec)` 不传 plan → 走 legacy）
 - **不放方法在 contracts/@dataclass**（ADR-0015）
-- **C1 阶段不引入新 state field**（CV4：子步骤 fold 到现有 phase via reducer）
-- **不放方法在 contracts/@dataclass**（ADR-0015）
-- **不删除 _decision_gate / _agent_gates**（PR-4 不删除 Brain 已有字段；只是收口 mutation 路径）
+- **保留 legacy 路径 6 个月**（PR-5b 后删除）
 
 ### 4.5 验证流程
 
 ```sh
 # 1. ruff check + format
-uv run ruff check --fix lca/contracts/protocols/reducer.py lca/layer2_runtime/reducer.py lca/layer1_cognitive/brain/modular_brain.py lca/harness/diagnostics/audit_state_writers.py tests/harness/test_c1_phase_substeps_guard.py tests/harness/test_think_guard_consumer.py
+uv run ruff check --fix lca/contracts/harness/composer.py lca/layer4_app/spawn_bind_plan.py lca/layer4_app/spawn.py lca/plugins/composer/legacy_sub_composers.py tests/layer4_app/test_spawn_bind_plan.py
 uv run ruff format ...
 
-# 2. PR-4 L2 + CV4 sign-off
-uv run pytest --no-cov tests/harness/test_c1_phase_substeps_guard.py tests/harness/test_think_guard_consumer.py -v
+# 2. PR-5 L2 sign-off (acceptance §3.1 + tracker §PR-5)
+uv run pytest --no-cov tests/layer4_app/test_spawn_bind_plan.py -v
 
-# 3. audit_state_writers 基线下降 (40 → 39)
-uv run python -m lca.layer0_infra.ops.cli audit-state-writers | head -1
-
-# 4. 既有测试无回归
+# 3. 既有测试无回归
 uv run pytest --no-cov tests/harness/ tests/test_contracts.py tests/plan/ -q
 ```
 
 ### 4.6 完成判据
 
-- 16 新测试全过（CV4 7 + think_guard_consumer 9）
-- harness/ + contracts/ + plan/ 测试无新增失败（419 passed）
+- 18 新测试全过
+- harness/ + contracts/ + plan/ + layer4_app/ 测试无新增失败（437 passed）
 - ruff 无新增警告
-- audit_state_writers 基线从 40 降至 39（modular_brain.py 的直接 mutation 收口到 reducer）
-- Reducer Protocol 含 ``apply_skill_route``；DefaultReducer 实现之
-- ModularBrain.think() 不再有直接 ``state.X = ...`` mutation
-- ControlPlan.by_slot['think.guard'] 按 (order, plugin_id) 排序
+- spawn_agent 接受 compiled_plan + use_bind_plan kwargs（signature 验证）
+- Composer Protocol + AgentGraph + TeamGraph 是 contracts/ 纯类型
+- 4 sub-composer implementations（BrainComposer / BodyComposer / PerceiveComposer / TeamComposer）就位
 
 ### 4.7 提交规范
 
 ```text
-feat(brain+reducer): PR-4 think.guard / stop.decide atomic migration
+feat(spawn+composer): PR-5 spawn.bind_plan + Composer Protocol + 4 sub-composers
 
-- Reducer Protocol 新增 apply_skill_route (C4 fold; PR-4 seam)
-- DefaultReducer 实现 apply_skill_route
-- ModularBrain.think() 通过 reducer.apply_skill_route 收口 (C4 兑现)
-- _LocalReducer 兼容 reducer for testing / isolated boot
-- _REDUCER_FILE_ALLOWLIST 增 modular_brain.py
-- CV4 AST 守护 (test_c1_phase_substeps_guard.py)
-- L2 think_guard consumer 测试 (test_think_guard_consumer.py)
+- Composer Protocol (ADR-0071) + AgentGraph + TeamGraph dataclasses
+- bind_plan / bind_team / is_bind_plan_available (PR-5 路径)
+- spawn_agent accepts compiled_plan + use_bind_plan kwargs (backward compat)
+- 4 sub-composers (BrainComposer / BodyComposer / PerceiveComposer / TeamComposer)
+- 18 tests in tests/layer4_app/test_spawn_bind_plan.py
 
-Refs: ADR-0074 phase 2 / PR-4 / ADR-0066 C4 + ADR-0068 §三 +
-tracker §6 CV4 + acceptance-criteria §2.4 §3.3 §6 CV4
+Refs: ADR-0074 phase 2 / PR-5 / ADR-0068 §一 + ADR-0071 + tracker §PR-5
 ```
 
 ### 4.8 完成后如何更新本追踪
@@ -287,12 +279,13 @@ tracker §6 CV4 + acceptance-criteria §2.4 §3.3 §6 CV4
 9. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
 10. 把追踪文件 commit 与代码 commit 分开（避免一个 commit 含两类变更）
 
-### 4.9 已知陷阱（PR-4 新增）
+### 4.9 已知陷阱（PR-5 新增）
 
-- **ModularBrain 的 _LocalReducer 是兼容 fallback**：生产路径必须显式注入 ``DefaultReducer``（来自 ``lca.layer2_runtime.reducer``）以获得完整的 apply_* seam。``_LocalReducer`` 只用于 ModularBrain 在测试 / 隔离启动时无 reducer 注入的兼容场景。**建议 PR-5 spawn.bind_plan 落地时显式传递 reducer**，移除 fallback。
-- **audit_state_writers 的 reducer allowlist 含 modular_brain.py**：因 _LocalReducer 含 ``state.active_template = active_template``（合法 reducer mutation）。其他 Brain mutation 已通过 reducer 收口；新增 Brain mutation 时记得通过 reducer（不要直接写 state）。
-- **CV4 AST 守护只扫描 ModularBrain / CognitiveRuntime**：PR-5 / PR-6 / PR-7 可能引入新的 runtime 模块（spawn / loop_drivers / reducer 衍生）；**新增 C1 阶段相关模块时记得加入 CV4 AST 扫描列表**（test_c1_phase_substeps_guard.py 的 L4 root 列表）。
-- **stop.decide 的 L2 验证是静态的**：本 PR-4 只验证 ``self.stop_rule.decide(...)`` 被调用；e2e agent run 验证留 PR-10 golden profile（acceptance §7.3）。
+- **spawn_agent 不传 plan 时走 legacy**：`use_bind_plan=False` 是默认值；sub-composers 不存在时 `bind_plan` 抛 BindPlanError → spawn_agent 仍走 legacy。**PR-5b 阶段应让 use_bind_plan 默认 True + 在 boot 中自动注册 sub-composers**。
+- **PR-5a sub-composers 包装 spawn.py 内部函数**（``_resolve_brain`` / ``build_perceive_hub`` 等）：这是临时路径，避免 PR-5a 阶段大改 spawn.py。**PR-5b 应让 sub-composers 完全 self-contained**（不再 import spawn.py 内部函数，直接 require_capability）。
+- **TEAM composer 未实现**：``bind_team`` 退化到 legacy + DeprecationWarning；PR-5b 阶段补全。
+- **ADR-0071 仍为 Proposed**：PR-5 仅落地数据面；ADR-0071 accept 决策留 PR-5b / PR-10。**建议 PR-10 accept ADR-0071**（与 4 个 sub-composers 一起 review）。
+- **PlanBindingResult.plan_ref** 来自 ``compiled_run_plan_ref(plan)``（PR-3 module-level fn）；不是 ``plan.plan_ref`` 属性（已删除以遵循 ADR-0015）。
 
 ---
 
@@ -304,8 +297,6 @@ tracker §6 CV4 + acceptance-criteria §2.4 §3.3 §6 CV4
 **Phase 0 总评审**：8/10 架构优雅度。
 
 **Phase 0 留下的关键约束**（详见 §2 决策表）。
-
-### Phase 1 PR-0：audit 测量网（2026-08-21）
 
 ## 5. 已完成 Phase 详情
 
@@ -324,6 +315,8 @@ tracker §6 CV4 + acceptance-criteria §2.4 §3.3 §6 CV4
 **Phase 0 总评审**：8/10 架构优雅度。
 
 **Phase 0 留下的关键约束**（详见 §2 决策表）。
+
+### Phase 1 PR-0：audit 测量网（2026-08-21）
 
 ## 6. tracker 自身的执行（ADR 监督 = 5 ADR 监督）
 
