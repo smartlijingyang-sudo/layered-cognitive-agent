@@ -1,6 +1,6 @@
 # ADR-0074 Plugin-Everything 实施追踪
 
-> **这是 ADR-0074「Plugin-Everything 裁剪版」的中央实施账本。所有 superpowers session 进来到工作前先读这一份。不需要读对话历史——本文件自包含。**
+> **这是 ADR-0074「Plugin-Everything 裁剪版」的中央实施账本。开始动手前先读这一份——本文件自包含。**
 
 ## 0. 读取顺序
 
@@ -8,20 +8,20 @@
 >
 > ADR-0066 §"实施序列"自带的 PR-1~PR-9 表（PR-2=扩展 Manifest / PR-3=ControlPlan Resolver / PR-4=Gate/Stop 原子化 / PR-5=Execution Control 原子化 / PR-6=L4 组合根瘦身……）与本 tracker 的 PR-1~PR-12 表指**完全不同的实施步骤**。**Phase 0 PR-B 已对 PR-3↔PR-4 做过一次互换，PR-0.5 / PR-2.5 是新增项**。
 >
-> 新 session 必须**只按本 tracker 的 PR 表执行**，不要去读 ADR-0066 的 PR 表。如果读 ADR-0066 的实施序列章节来对照执行步骤，会指向错误的模块与错误的 commit 路径。
+> **只按本 tracker 的 PR 表执行**，不要去读 ADR-0066 的 PR 表。如果读 ADR-0066 的实施序列章节来对照执行步骤，会指向错误的模块与错误的 commit 路径。
 >
 > 决策记录：ADR-0066 §"实施序列"是 2026-08-21 初稿时的排期；ADR-0074 PR-B 在同日对该排期做了重排。**不要修改 ADR-0066**（"不改旧文件" 规则），本声明即作为该重排的事实记录。
 
-新 session 的 agent 必须按下列顺序读完前 6 节，再开始动手：
+开始动手前，按下列顺序读完前 6 节：
 
-1. §1 状态总览（知道当前 Phase 与 Next Action）
-2. §2 5 个 Phase 0 决策（不可变更）
-3. §3 依赖图（理解 PR ↔ PR ↔ ADR 阻塞）
-4. §4 当前 PR 详情
-5. §6 Session 日志（看上一 session 干了什么、留了什么）
-6. §7 已知陷阱（避免重复踩坑）
+1. **ADR 监督范围**（了解 0066 / 0067 / 0068 / 0069 / 0074 五 ADR 整体监督状态）
+2. §1 状态总览（知道当前 Phase 与 Next Action）
+3. §6 tracker 自身的执行（5 ADR 监督 = 看 §6 流程链 + check_adr_supervision.py / route_legacy_patterns.py / lca-ops status-adr-supervision）
+4. §2 5 个 Phase 0 决策（不可变更）
+5. §3 依赖图（理解 PR ↔ PR ↔ ADR 阻塞）
+6. §4 当前 PR 详情 / 已完成 PR 详情 + §7 已知陷阱 + §7.5 历史迁移路线图
 
-读完上述 6 节后，再去读：
+读完上述 5 节后，再去读：
 
 - `/home/lichao/layered-cognitive-agent/AGENTS.md`
 - `/home/lichao/layered-cognitive-agent/docs/adr/0074-plugin-everything-trimmed-implementation.md`（**只读 §一~§五的设计意图，不读 §"实施序列"**——该章节与本 tracker 一致但 PR 编号不同，是参考而非执行依据）
@@ -29,29 +29,76 @@
 
 ---
 
+## ADR 监督范围：5 个 ADR × 所有条款
+
+本 tracker 是下列 5 个 ADR 落地的**单一中央账本**。任何 PR 完成时同步更新对应条目；任何 ADR 收到用户接受动作时同步更新状态。
+
+| ADR | 关系 | 整体状态 | 落地入口（PR 序列） |
+|---|---|:-:|---|
+| **ADR-0066** Control Slot（9 槽 + 单调聚合）| Refined by ADR-0074 §一 | ⛔ 待 PR-1 | PR-1 dataclass → PR-2 Manifest 字段 → PR-3 compile → PR-4 migrate-first |
+| **ADR-0067** Spacetime Runtime（5 子空间 / 8 状态 / 7 Creator 面 / 6 闸）| Superseded(部分) by ADR-0074 §三 | ⏳ 部分已裁剪 | 4 状态→PR-8 / 4 Creator 面→PR-9 / 6→3 闸→PR-4 / 子空间→ADR Draft 待 owner |
+| **ADR-0068** Compiled Plugin Kernel（3 子 plan + CommandEnvelope + ArtifactController）| Refined by ADR-0074 §二 | ⛔ 待 PR-3 | PR-3 plan+compiler / PR-7 envelope / PR-8 artifact 4 状态 |
+| **ADR-0069** Agent Primitive System（13 群 + LogicAddress + 11 关系 + 6 verbs + PlanTemplate + PluginContract）| Refined by ADR-0074 §四 | ⏳ taxonomy | PR-2 字段 / PR-2.5 data / PR-12 template / 6 verbs 含 0074 §四 |
+| **ADR-0074** Plugin-Everything 本体 | 自身实施计划 | ⏳ 4 / 17 | §1 状态总览追踪 PR-0..PR-12 |
+
+### 实施矩阵（ADR § × clause → 交付 PR）
+
+| ADR § | clause 描述 | 状态 | 交付 PR | 备注 |
+|:-:|---|:-:|:-:|---|
+| **0066 §二** | 9 个 Control Slot 有限枚举 | ⛔ | PR-1 | 11 槽全表见 §19（含 PR-0 新增 2 个） |
+| **0066 §三** | PluginDefinition.control 三件套（identity / authority / effects） | ⛔ | PR-2 | |
+| **0066 §四** | 单调聚合（deny-on-any-deny / stop-on-any-stop / scope 收紧） | ⛔ | PR-3 编译期 + PR-7 运行时 | |
+| **0066 §五-§六** | Composer + ControlPlan 描述 | ⏳ | ADR-0071 | 外移 |
+| **0066 §七** | 决策点三分（策略 / 事实 / 强制） | ⛔ | PR-4 首次迁移 | |
+| **0067 §一-§三** | SpacetimeContext 5 子空间 | 暂缓 | ADR Draft | 0074 §三 裁剪到 ExecutionSpace + LifecycleSpace |
+| **0067 §四** | 8 状态机 | ⛔ → ✅ | **PR-8** | 0074 §三 裁剪到 4 状态；映射见 §18 |
+| **0067 §五** | 6 道闸 | ⛔ | PR-4 | 0074 §三 裁剪到 3 道闸 |
+| **0067 §七** | 7 Creator 面 | ⛔ | PR-9 | 0074 §三 裁剪到 4 面；映射见 §18 |
+| **0068 §一** | CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan | ⛔ | PR-3 | |
+| **0068 §二** | PluginContract 概念 | ⏳ | PR-2 可选段 | 详见 §12；0074 §四 不替换 PluginDefinition |
+| **0068 §五** | CommandEnvelope = effect 唯一入口 | ⛔ | PR-7 | architecture test 路径见 §14 |
+| **0068 §六** | Boot 双轨消除 | ✅ Done | ADR-0062 PR-3/PR-4 (`e0eb2484`) | 已落地，详见 §3.3 |
+| **0068 §七** | ArtifactController | ⛔ | PR-8 | 4 状态机 |
+| **0069 §一** | 13 原语群分类学 | ⏳ taxonomy 部分 | PR-2 functional_group 字段 | 群名见 §15.2 |
+| **0069 §二** | LogicAddress 6 维 | ⛔ | PR-2 logic_address 字段 | 评分细则见 §15.3 |
+| **0069 §三** | 11 关系代数 | ⛔ | PR-2.5 数据面 + PR-12 可视化 | |
+| **0069 §四** | 6 contribution verbs | ⛔ | PR-3 PlanCompiler | verb 集见 §1 实施序列 §四 |
+| **0069 §五** | PlanTemplate 实例（RAG / prompt chain / routing …） | ⛔ | PR-12 | 12 个 template 见 §16.2 |
+| **0069 §六** | PluginContract 9 段 | ⏳ | PR-2 可选段 + PR-12 | 详见 §12 |
+| **0074 §一** | 接受 0066 / 0068 / 0069 核心 | ✅ Done | Phase 0 | |
+| **0074 §二** | 接受 0068 CompiledRunPlan + §五 CommandEnvelope | ✅ Done | Phase 0 | |
+| **0074 §三** | 裁剪 0067（4 状态 / 4 Creator 面 / 3 闸 / 2 子空间） | ✅ Done | Phase 0 | |
+| **0074 §四** | 接受 0069 13 群 / LogicAddress / 11 关系 / PlanTemplate / PluginContract | ✅ Done | Phase 0 | |
+| **0074 §五** | 整合本地 0070–0073 | ✅ Done | Phase 0 | |
+| **0074 实施序列** | PR-0..PR-12 13 项 | ⏳ 4 / 17 | 详见 §1 | |
+
+> **更新规则**：任何 PR 完成 → §1 同步更新；同时核查本表中对应 "交付 PR" 行是否可标 ✅，并清理"备注"列中"详见 §N"指向的章节；任何 ADR 收到 supersedes / Refines 关系变动 → 修改本表头行。
+
+---
+
 ## 1. 状态总览
 
-| Phase | PR | 标题 | 状态 | 分支 | Commit | 完成日 | 阻塞 |
-|:-:|:-:|---|:-:|---|---|:-:|---|
-| **0** | A | v3.1 宪法补丁 | ✅ Done | `feat/adr-0074-phase-0-constitutional-alignment` | `f980ace0` | 2026-08-21 | — |
-| **0** | B | ADR-0074 重排 | ✅ Done | `feat/adr-0074-phase-0-constitutional-alignment` | `c8c1b007` | 2026-08-21 | — |
-| **0** | D | README 收尾 | ✅ Done | `feat/adr-0074-phase-0-constitutional-alignment` | `5e32e704` | 2026-08-21 | — |
-| **1** | 0 | audit 测量网 | ✅ Done | `feat/adr-0074-phase-1-pr-0-audit-scripts` | `8f8469eb` | 2026-08-21 | — |
-| **1** | 0.5 | 清 19 个 pre-existing 失败 | ⏳ Ready（与 PR-0 并行） | TBD | — | — | — |
-| **1** | 1 | ControlSlot + ControlPlan 数据面 | ⛔ Blocked | — | — | — | PR-0 |
-| **1** | 2 | PluginDefinition.control 可选段 | ⛔ Blocked | — | — | — | PR-1 |
-| **1** | 2.5 | 11 关系代数扩展 CapabilityPlan | ⛔ Blocked | — | — | — | PR-2 |
-| **2** | 3 | CompiledRunPlan + PlanCompiler | ⛔ Blocked | — | — | — | PR-2.5 |
-| **2** | 4 | think.guard / stop.decide 原子化 | ⛔ Blocked | — | — | — | PR-3 |
-| **2** | 5 | spawn.bind_plan | ⛔ Blocked | — | — | — | PR-3 + ADR-0071 |
-| **3** | 6 | plan_ref × Journal 绑定 | ⛔ Blocked | — | — | — | PR-5 |
-| **3** | 7 | RunFact / CommandEnvelope 收口 | ⛔ Blocked | — | — | — | PR-6 + ADR-0073 |
-| **3** | 8 | ArtifactController（4 状态机） | ⛔ Blocked | — | — | — | PR-7 |
-| **4** | 9 | Creator 4 面化 | ⛔ Blocked | — | — | — | PR-8 |
-| **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | — | PR-9 |
-| **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | — | PR-10 |
+| Phase | PR | 标题 | 状态 | Commit | 完成日 | 阻塞 |
+|:-:|:-:|---|:-:|---|:-:|---|
+| **0** | A | v3.1 宪法补丁 | ✅ Done | `f980ace0` | 2026-08-21 | — |
+| **0** | B | ADR-0074 重排 | ✅ Done | `c8c1b007` | 2026-08-21 | — |
+| **0** | D | README 收尾 | ✅ Done | `5e32e704` | 2026-08-21 | — |
+| **1** | 0 | audit 测量网 | ✅ Done | `8f8469eb` | 2026-08-21 | — |
+| **1** | 0.5 | 清 19 个 pre-existing 失败 | ⏳ Ready（与 PR-0 并行） | — | — | — |
+| **1** | 1 | ControlSlot + ControlPlan 数据面 | ⛔ Blocked | — | — | PR-0 |
+| **1** | 2 | PluginDefinition.control 可选段 | ⛔ Blocked | — | — | PR-1 |
+| **1** | 2.5 | 11 关系代数扩展 CapabilityPlan | ⛔ Blocked | — | — | PR-2 |
+| **2** | 3 | CompiledRunPlan + PlanCompiler | ⛔ Blocked | — | — | PR-2.5 |
+| **2** | 4 | think.guard / stop.decide 原子化 | ⛔ Blocked | — | — | PR-3 |
+| **2** | 5 | spawn.bind_plan | ⛔ Blocked | — | — | PR-3 + ADR-0071 |
+| **3** | 6 | plan_ref × Journal 绑定 | ⛔ Blocked | — | — | PR-5 |
+| **3** | 7 | RunFact / CommandEnvelope 收口 | ⛔ Blocked | — | — | PR-6 + ADR-0073 |
+| **3** | 8 | ArtifactController（4 状态机） | ⛔ Blocked | — | — | PR-7 |
+| **4** | 9 | Creator 4 面化 | ⛔ Blocked | — | — | PR-8 |
+| **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
+| **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-1（ControlSlot + ControlPlan 数据面）。新 session 接进来就干这个。
+**Next Action**：PR-1（ControlSlot + ControlPlan 数据面）。
 
 **累计完成**：4 / 17（PR-0 完成；PR-0.5 推迟到大重构结束后）。
 
@@ -59,7 +106,7 @@
 
 ## 2. 5 个 Phase 0 决策（不可变更）
 
-> 这些决策在 Phase 0 review 中由用户拍板，后续 session **不得重新决定**。如果发现需要修改，必须先与用户确认。
+> 这些决策在 Phase 0 review 中由用户拍板，后续工作**不得重新决定**。如果发现需要修改，必须先与用户确认。
 
 | # | 决策 | 来源 | 不可变更理由 |
 |--:|---|---|---|
@@ -140,11 +187,13 @@ PR-12 (PlanTemplate + 关系图谱)
 - W14–W16 之间预留 **1 周 buffer** 用于 golden profile 的兼容性回归
 - 总 buffer：**4 周**，timeline 由"乐观 16 周"调整为"现实 **20 周**"（与 §13 一致）
 
-> **决策记录（2026-08-21 user 决策）**：当前是大重构周期，外部 ADR 落地与本计划主路径**并行推进**，不阻塞 PR-0 / PR-1 / PR-2 / PR-2.5 的早期工作；但 PR-5 启动前必须确认 0071 状态、PR-7 启动前必须确认 0073 状态。Session 2 启动 PR-0 时，必须**显式校验** §3.4 的两个 deadline 仍然可达；若不可达，**立刻升级到 user**，不擅自重排。
+> **决策记录（2026-08-21）**：当前是大重构周期，外部 ADR 落地与本计划主路径**并行推进**，不阻塞 PR-0 / PR-1 / PR-2 / PR-2.5 的早期工作；但 PR-5 启动前必须确认 0071 状态、PR-7 启动前必须确认 0073 状态。**任何 PR 启动前必须显式校验 §3.4 的两个 deadline 仍然可达**；若不可达，**立刻升级到 user**，不擅自重排。
 
 ---
 
-## 4. 当前 PR 详情：PR-0（audit 测量网）
+## 4. 已完成 PR 详情：PR-0（audit 测量网，commit `8f8469eb`）
+
+> 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
 
 ### 4.1 目标
 
@@ -225,11 +274,15 @@ Refs: ADR-0074 phase 1 / PR-0
 ### 4.8 完成后如何更新本追踪
 
 1. 在 `git commit` 后 commit hash
-2. 更新 §1 状态总览：PR-0 行 → ✅ Done
-3. 在 §6 Session 日志 追加本次 session 记录
-4. 如果发现新陷阱，追加到 §7
-5. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
-6. commit 追踪文件更新（与代码 commit 分开，避免一个 commit 含两类变更）
+2. 更新 §1 状态总览：对应 PR 行 → ✅ Done
+3. 更新「ADR 监督范围」实施矩阵：把对应 ADR § 行状态从 ⛔ 改为 ⏳/✅
+4. 把 §4 标题从 "当前 PR 详情" 重命名为 "已完成 PR 详情：<N>"
+5. **跑 `python scripts/check_adr_supervision.py` 验证 tracker 与 git 一致**
+6. **跑 `python scripts/route_legacy_patterns.py` 看 owner_pr == PR-N 桶是否下降**
+7. **同步更新 §7.5 历史迁移路线图**: `python scripts/route_legacy_patterns.py --md` 取最新值替换
+8. 如果发现新陷阱，追加到 §7
+9. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
+10. 把追踪文件 commit 与代码 commit 分开（避免一个 commit 含两类变更）
 
 ---
 
@@ -239,7 +292,7 @@ Refs: ADR-0074 phase 1 / PR-0
 
 **Goal**：在不破坏 v3 宪法的前提下，让 ADR-0074 的 PR 序列在宪法层面对齐、可被下游 agent 无歧义执行。
 
-**Commits**（全部在 `feat/adr-0074-phase-0-constitutional-alignment` 分支）：
+**Commits**：
 
 | Commit | 内容 | 文件 |
 |---|---|---|
@@ -247,43 +300,98 @@ Refs: ADR-0074 phase 1 / PR-0
 | `c8c1b007` | ADR-0074 重排（PR 顺序 + V9 评分 + Boot 失实修正 + 兼容性表） | `docs/adr/0074-plugin-everything-trimmed-implementation.md`（+371） |
 | `5e32e704` | README 收尾（0062/0070/0072 Accepted + 元 ADR 例外） | `docs/adr/README.md`（±32） |
 
-**Phase 0 总评审**：8/10（评估报告见对话历史；落地后无后续修订）。
+**Phase 0 总评审**：8/10 架构优雅度。
 
 **Phase 0 留下的关键约束**（详见 §2 决策表）。
 
+### Phase 1 PR-0：audit 测量网（2026-08-21）
+
+**Goal**：让 reviewer 一行命令看清当前 hardcode 在哪（Control Slot 投稿 / State 写入 / 直接 effect 调用 / 残留 hook 挂载点）。
+
+**Commit**：`8f8469eb`
+
+**交付**：
+
+- 4 个 pure-function AST 扫描器 + 4 个测试文件（47 测试全过）
+- `lca-ops audit-control-surface` / `audit-state-writers` / `audit-direct-commands` / `audit-hook-attach` 注册到 `lca/layer0_infra/ops/cli.py`
+- 基线数据（PR-0 终点快照，是后续 PR 的对照点）：
+
+| 子命令 | 命中数 | 含义 |
+|:-:|:-:|---|
+| `audit-control-surface` | 0 | V1 基线：尚未硬编码 slot 字符串 |
+| `audit-state-writers` | 40 | V3 / C4 基线：40 处直接 state 写入待 PR-7 收口 |
+| `audit-direct-commands` | 2 | V4 基线：2 处 Body 直接 import transport |
+| `audit-hook-attach` | 0 | V5 / PR-7 基线：起点已干净 |
+
+**详见**：§4 PR-0 完成判据；§10 V/CV 验收闭环。
+
 ---
 
-## 6. Session 日志
+## 6. tracker 自身的执行（ADR 监督 = 5 ADR 监督）
 
-> 每个 superpowers session 完成后追加一条。格式：session 号 + 日期 + 完成项 + 留下的状态。
+**核心命题**：实施了本 tracker 即实施了 ADR-0066 / 0067 / 0068 / 0069 / 0074 五份 ADR。
 
-### Session 1（2026-08-21）：Phase 0 落地 + 评估
+**工程化执行链**（CI / pre-commit / operator 都可以撞这条链验证 ADR 落地）：
 
-- **完成**：Phase 0 三个 PR（v3.1 补丁 + 0074 重排 + README 收尾）
-- **评估报告**：8/10 架构优雅度
-- **决策**：5 个 Phase 0 决策拍板
-- **遗留**：分支未合并到 main；等待用户 review
-- **下一步**：用户决定是否合并；合并后启动 Session 2 做 PR-0
+```
+tracker.md (declarative source of truth)
+    ↓ parsed by
+scripts/check_adr_supervision.py        — 验证 §1 / 实施矩阵 / Next Action 一致性
+scripts/route_legacy_patterns.py        — 把 PR-0 baseline 路由到 owner PR
+    ↓ invoked by
+pre-commit hooks                        — 防止 tracker 漂移
+pytest tests/test_check_adr_supervision — 单元测试
+lca-ops status-adr-supervision          — 人类 / agent 现场查问
+```
 
-### Session 2（2026-08-21）：Phase 1 PR-0
+### 6.1 scripts/check_adr_supervision.py
 
-- **完成**：PR-0 全部 4 个 audit 测量网
-  - 4 个 pure-function AST 扫描器 + 4 个测试文件（47 测试全过）
-  - `lca-ops audit-control-surface` / `audit-state-writers` / `audit-direct-commands` / `audit-hook-attach` 注册到 `lca/layer0_infra/ops/cli.py`
-  - 基线数据：audit-state-writers 命中 40 个直接 state 写入点（V3 起点）；audit-direct-commands 命中 2 个 body 直接 import；audit-control-surface / audit-hook-attach 0 命中（V1 / V5 起点为零）
-- **Commit**：`8f8469eb`（独立 commit，便于 reviewer 拆 PR 范围）
-- **决策**：PR-0.5 推迟决策仍生效（19 个 pre-existing failure 由 PR-99 在所有 PR 落地后处理）
-- **遗留**：分支 `feat/adr-0074-phase-1-pr-0-audit-scripts` 未合并到 main，等待 user review
-- **下一步**：user 决定是否合并；合并后启动 PR-1（ControlSlot + ControlPlan 数据面）
-- **新增陷阱**（追加到 §7）：
-  - **`/home/lichao/.cache/uv` 只读**：本会话遇到；绕过用 `UV_CACHE_DIR=/tmp/uv-cache-test uv run …`。背景：uv 在 docker 容器内某些 overlay 文件系统 tmpdir 创建失败，错误 `Could not create temporary file at /.cache/uv/.tmpXXXXX (Read-only file system)`
-  - **layer 编码字符**：cli.py 的 GUIDE 段含 box-drawing char `─`（U+2500）。`edit` 工具的 old_string 必须字节匹配才能替换；python `str.replace` 更稳妥
+验证 tracker.md 内部一致性 + 与 git/代码外部一致性：
+
+| 校验 | 规则 |
+|---|---|
+| §1 status Done | ✅ Done 行必须引用真实 git commit hash（`git cat-file -e` 验证） |
+| 实施矩阵 | ✅ 行必须含具体交付者（PR-N 或已知 commit） |
+| Next Action | 必须指向首个未完成的 PR，不能指向 Done 行 |
+| 全 tracker | 任意 `\`<hex>\`` 形式的 commit 引用必须存在于 git |
+
+退出码：0 一致 / 1 一致性破坏 / 2 tracker 缺失。
+
+### 6.2 scripts/route_legacy_patterns.py
+
+跑 4 个 audit_*.py 脚本，输出 PR-N owner 路由表。**这是"历史迁移路线图"段的机械化产出**：
+
+```
+uv run python scripts/route_legacy_patterns.py       # human
+uv run python scripts/route_legacy_patterns.py --md  # 直接粘贴到本文件的迁移路线图段
+uv run python scripts/route_legacy_patterns.py --json
+```
+
+### 6.3 lca-ops status-adr-supervision
+
+聚合 view：
+
+```sh
+./scripts/lca-ops status-adr-supervision
+# ADR supervision tracker: consistent ✅
+#
+# Historical migration baseline (PR-0 → ownership):
+# ... (route_legacy_patterns 输出)
+```
+
+### 6.4 pre-commit + pytest
+
+- `scripts/check_adr_supervision.py` 作为 local pre-commit hook 接入（详见 §8 .pre-commit-config.yaml 引用）
+- `tests/test_check_adr_supervision.py` 4 个测试守护脚本自身正确性
+- CI 跑 `pytest tests/test_check_adr_supervision.py` + `python scripts/check_adr_supervision.py`
+
+**任何 ADR 落地证据 = tracker + 一致性脚本同时通过 + 历史迁移基线下降 + lca-ops status-adr-supervision 全绿**。
 
 ---
 
 ## 7. 已知陷阱（living document）
 
-> 任何 session 遇到的新陷阱、ADR 漂移、测试 flaky、依赖变更，都追加到这里。后续 session 进来到必读。
+> 任何后续工作遇到的新陷阱、ADR 漂移、测试 flaky、依赖变更，都追加到这里。下一个动手者必读。
 
 ### 7.1 已记录
 
@@ -301,7 +409,32 @@ Refs: ADR-0074 phase 1 / PR-0
 
 ### 7.2 待识别
 
-[新 session 发现时追加]
+[新发现时追加]
+
+---
+
+## 7.5 历史迁移路线图（PR-0 baseline → owner PR）
+
+> 本节由 `scripts/route_legacy_patterns.py --md` 自动产出；每次 audit baseline 下降时同步更新。**（手动维护 = 漂移源头，优先 re-run 脚本）**
+
+### 7.5.1 当前 snapshot（2026-08-21，PR-0 落地时）
+
+PR-0 audit 测量网对全仓库扫一次得到 42 条违规基线，路由如下：
+
+| Owner PR | 数量 | 违规类型分布 | 路由理由 |
+|---|:-:|---|---|
+| **PR-3** CompiledRunPlan + PlanCompiler | 1 | state_writers=1 | MemoryPolicy / CapabilityPlan 中读写 |
+| **PR-4** think.guard / stop.decide 原子化 | 12 | state_writers=12 | ModularBrain / Reasoner 写入 |
+| **PR-7** RunFact / CommandEnvelope 收口 | 29 | direct_commands=2, state_writers=27 | CommandEnvelope 收口 + Body.execute 5 闸 |
+| **PR-99** 测试修复专期 | 19 | （外加 19 个 pre-existing test failures，详见 §11） | 大重构后统一清零 |
+
+合计 42 + 19 = 61 条历史迁移基线，由 PR-3 / PR-4 / PR-7 / PR-99 承担。
+
+### 7.5.2 更新规则
+
+- PR-N 完成 + merge 后，跑 `python scripts/check_adr_supervision.py` 确认 tracker 同步；再跑 `python scripts/route_legacy_patterns.py` 看到 owner_pr == PR-N 的桶从 N1 下降到 N2
+- 当某个 owner 桶从 0 触发：把 §1 状态总览对应 PR 行标 ✅ Done，并修改本节"当前 snapshot"日期
+- 任何手动编辑本节：先 `python scripts/route_legacy_patterns.py --md` 取最新值（防止手写漂移）
 
 ---
 
@@ -322,12 +455,24 @@ Refs: ADR-0074 phase 1 / PR-0
 
 ---
 
-## 9. 变更记录（本追踪文件本身的修订）
+## 9. V1-V12 ↔ PR 完成判据映射（节流引用）
 
-| 日期 | 修订 | 修订人 |
-|---|---|---|
-| 2026-08-21 | 初版：状态总览 + 5 决策 + PR-0 详情 + Phase 0 完成 + Session 1 日志 | Session 1 agent |
-| 2026-08-21 | PR-0 完成：§1 PR-0 ✅ Done（`8f8469eb`）+ §6 Session 2 日志 + §7 两条新陷阱（uv cache RO / U+2500 编码字节匹配） + Next Action → PR-1 + 累计进度 3/17 → 4/17 | Session 2 agent |
+完整的 V / CV 验收表见 [§10 V/CV 验收闭环](#10-v1-v12--pr-完成判据映射--v31-cv1-cv6-验收闭环)。本节只放该表 TL;DR，§10 是权威版本。
+
+| V 约束 | 在哪一 PR 首次生效 | 该 PR 完成时新增的强制证据 |
+|:-:|:-:|---|
+| V1 控制面单一入口 | PR-3 | `lca-ops explain control <slot>` 列表 |
+| V2 plan_hash 确定性 | PR-3 | property test 100 次随机 |
+| V3 Reducer 唯一写 | PR-0 → PR-7 | `lca-ops audit state-writers` 缩窄到 reducer |
+| V4 CommandEnvelope | PR-7 | architecture test |
+| V5 plan_ref 全覆盖 | PR-6 | replay test |
+| V6 4 状态封闭 | PR-8 | state migration property test |
+| V7 Creator 4 面 | PR-9 | `lca-ops creator --help` 4 sub |
+| V8 capability 单调 | PR-3 + PR-8 | property test 子代理 ⊆ 父代理 |
+| V9 LogicAddress 6 维 | PR-2 | `lca plugin check` 评分 |
+| V10 13 群分类 | PR-2 | functional_group 字段 |
+| V11 11 关系 | PR-2.5 + PR-12 | relations 字段 + 图谱 |
+| V12 PlanTemplate 可发现 | PR-12 | `lca-ops plan list-templates` |
 
 ---
 
@@ -370,7 +515,7 @@ Refs: ADR-0074 phase 1 / PR-0
 > 2. PR 引入的测试覆盖该 V/CV 约束的自动化证据
 > 3. `uv run pytest --no-cov -q` 不引入新失败（pre-existing 19 个按 user 决策推迟）
 > 4. `uv run ruff check --fix <改动路径>` 与 `uv run ruff format <改动路径>` 通过
-> 5. tracker §1 状态总览对应行更新为 ✅ Done，§6 Session 日志追加一条
+> 5. tracker §1 状态总览对应行更新为 ✅ Done
 
 ---
 
@@ -771,10 +916,11 @@ ADR-0066 §二 9 槽位 + ADR-0074 §三新增 = **11 槽位**：
 
 ---
 
-## 21. 变更记录（更新本追踪文件本身的修订）
+## 21. 修订记录
 
-| 日期 | 修订 | 修订人 |
-|---|---|---|
-| 2026-08-21 | 初版：状态总览 + 5 决策 + PR-0 详情 + Phase 0 完成 + Session 1 日志 | Session 1 agent |
-| 2026-08-21 | **§0 P0 声明（ADR-0066 PR 表冲突）+ §3.4 外部 ADR deadline + §10 V/CV 映射 + §11 19 个 failure 分类 + §12 PluginContract 决策 + §13 20 周 timeline + §14 PR-7 arch test + §15 V9 集合明文 + §16 golden 覆盖 + §17 PR-5 回滚 + §18 0067 迁移 + §19 0068 横切项 + 22→19 数字修正** | Review follow-up agent |
-| 2026-08-21 | PR-0 完成：§1 PR-0 ✅ Done（commit `8f8469eb`，4 个 audit + 4 个测试 + lca-ops 4 子命令集成，47 测试全过，harness 测试无回归）+ §6 Session 2 日志 + §7 新增 2 条陷阱（`/home/lichao/.cache/uv` overlay RO / U+2500 box-drawing 编码字节匹配）+ Next Action → PR-1 + 累计进度 3/17 → 4/17 | Session 2 agent |
+| 日期 | 关键内容修订 |
+|---|---|
+| 2026-08-21 | 初版：状态总览 + 5 决策 + PR-0 详情 + Phase 0 完成 |
+| 2026-08-21 | §0 P0 声明（ADR-0066 PR 表冲突）+ §3.4 外部 ADR deadline + §10 V/CV 映射 + §11 19 个 failure 分类 + §12 PluginContract 决策 + §13 20 周 timeline + §14 PR-7 arch test + §15 V9 集合明文 + §16 golden 覆盖 + §17 PR-5 回滚 + §18 0067 迁移 + §19 0068 横切项 + 22→19 数字修正 |
+| 2026-08-21 | PR-0 完成（`8f8469eb`，4 个 audit + 4 个测试 + lca-ops 4 子命令；47 测试全过；harness 无回归）|
+| 2026-08-21 | 切到只在 main 工作：移除 §6 Session 日志 + §9 副本 + 分支列 + agent attribution；新增「ADR 监督范围」段（5 ADR × 30+ 条款实施矩阵）|

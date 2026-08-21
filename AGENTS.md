@@ -227,6 +227,7 @@ uv run vulture lca --min-confidence 80
 | 宪法原文 | `docs/design/2026-08-19-cognitive-primitive-constitution-v3.md` |
 | Harness 执行规约 | `docs/specs/harness-spine-spec.md` |
 | 已采纳 ADR | `docs/adr/`（0001-0065） |
+| **ADR-0066 / 0067 / 0068 / 0069 / 0074 监督** | [`docs/plans/adr-0074-plugin-everything-tracker.md`](docs/plans/adr-0074-plugin-everything-tracker.md)（中央实施账本；§6 写明工程化执行链） |
 | 平台编排入口 | `./scripts/lca-ops`（无参 = 手册） |
 | Profile 默认 | `profiles/web-standard.yaml`（bundles + patch） |
 | Bundle 集 | `bundles/{base,web-app,scenario-*,lead-standard,researcher-*-tools}.yaml` |
