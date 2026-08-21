@@ -8,6 +8,7 @@ import re
 import time
 from collections.abc import Sequence
 from contextlib import nullcontext
+from pathlib import Path
 from typing import Any, cast
 
 import structlog
@@ -39,6 +40,7 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.observability.run_locator import RunLocator
+from lca.contracts.observability.run_manifest import IntegrityState, ManifestEvidence, RunManifest
 from lca.contracts.protocols import JournalProjector
 from lca.contracts.protocols.infra import Sandbox
 from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
@@ -68,7 +70,7 @@ from lca.layer0_infra.search.scope import search_run_scope
 from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
 from lca.layer0_infra.tools.run_finalizer import finalize_run, run_id_scope
 from lca.layer0_infra.workspace import run_workspace_scope
-from lca.plugins.run_loop_driver_registry import (
+from lca.plugins.loop_drivers.registry import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
 
@@ -258,6 +260,8 @@ def create_run_session(
         plane=plane.strip(),
         extra_plane=extra_plane.strip(),
         execution_target=execution_target.strip(),
+        started_at=time.time(),
+        locator=registry.locator(),
     )
     registry.put(session)
     _emit_plugin_inventory(session, ctx, hub)
@@ -381,9 +385,7 @@ async def execute_run(
                 # ambient ContextVar,供 SSE 帧选择器 / 控制台渲染器 / Inspector
                 # 走 cordis 路径(RunStore 走 self._descriptor_registry 直传,无需
                 # ContextVar)。无 boot registry 时(specialty 测试)退回 module fallback。
-                _descriptor_registry = ctx.inject(
-                    "event_descriptor_registry", default=None
-                )
+                _descriptor_registry = ctx.inject("event_descriptor_registry", default=None)
                 if _descriptor_registry is None:
                     from lca.layer0_infra.observability.event_catalog import (
                         EVENT_DESCRIPTOR_REGISTRY,
@@ -510,7 +512,7 @@ async def finalize(
             _derive_terminal_status(session, success)
             registry.clear_inflight(session.run_id)
             registry.prune()
-            _record_doctor(session)
+            _record_terminal_materialization(session)
             if session.hub is not None:
                 await _dispose_export(session.hub)
 
@@ -582,7 +584,18 @@ def _fallback_terminal_status(session: RunSession, success: bool) -> None:
         session.status = RunStatus.COMPLETED
 
 
-def _record_doctor(session: RunSession) -> None:
+def _record_terminal_materialization(session: RunSession) -> None:
+    """ADR-0065 §一 / §六 / PR-11:终态写 manifest.json + 更新 latest.json。
+
+    manifest.json 是 terminal materialization + 完整性状态,**不是事实 owner**;
+    任意 run 都可由 ledger.jsonl 重建。latest.json 是原子指针(临时文件 +
+    ``os.replace``),**仅供人机导航**,不可作为重放输入。
+
+    doctor 报告(payload + 各 hop verdict)合并进 ``extra["doctor_report"]``;
+    ``hops`` / ``consistency`` / ``factory`` 都纳入,与原 ``<id>.doctor.json``
+    形状兼容(`doctor.v2 schema` + `as_dict()` 字段)。
+    """
+    locator: RunLocator = _session_locator(session)
     try:
         report = diagnose(session, session.jsonl_path)
         if report.broken_hop or not report.factory["ok"]:
@@ -593,13 +606,175 @@ def _record_doctor(session: RunSession) -> None:
                 broken_hop=report.broken_hop,
                 summary=report.summary,
             )
-        doctor_path = session.jsonl_path.with_suffix(".doctor.json")
-        doctor_path.write_text(
-            json.dumps(report.as_dict(), ensure_ascii=False, indent=2),
+        manifest_path = locator.manifest_path(session.run_id)
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        ledger_summary = _ledger_summary_for(session)
+        ledger_high_watermark = _ledger_high_watermark_for(session)
+        terminal_event_id = _terminal_event_id_for(session)
+        manifest = RunManifest(
+            run_id=session.run_id,
+            terminal_event_id=terminal_event_id,
+            ledger_high_watermark=ledger_high_watermark,
+            ledger_summary=ledger_summary,
+            materializer_version=RunManifest.materializer_default_version(),
+            evidence_integrity=_evidence_integrity_for(locator, session.run_id),
+            started_at=session.started_at,
+            closed_at=session.closed_at if session.closed_at is not None else time.time(),
+            extra={"doctor_report": report.as_dict()},
+        )
+        manifest_path.write_text(
+            json.dumps(manifest.to_dict(), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        # 终态封存完成后,原子指针指向当前 run(便于 `lca-ops logs --replay` / 导航)
+        locator.update_latest_pointer(session.run_id)
     except Exception:
-        _log.warning("run_doctor_failed", hop="H2", run_id=session.run_id, exc_info=True)
+        _log.warning(
+            "run_terminal_materialization_failed", hop="H2", run_id=session.run_id, exc_info=True
+        )
+
+
+def _session_locator(session: RunSession) -> RunLocator:
+    """从 session.locator 拿 locator;测试 / 直构造的 session 退回 fs(由 jsonl_path 推断)。"""
+    if session.locator is not None:
+        return session.locator
+    # journal_path = <root>/runs/<run_id>/journal.jsonl → root = parent.parent.parent
+    from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+
+    root = session.jsonl_path.parent.parent.parent
+    return FilesystemRunLocator(root=root)
+
+
+def _ledger_high_watermark_for(session: RunSession) -> int:
+    """从 BoundObservability 的 RunStore 取最后 seq;hub 缺失时回退读 journal.jsonl。"""
+    store = _journal_store(getattr(session, "hub", None))
+    if store is not None:
+        try:
+            events = store.events  # type: ignore[attr-defined]
+            return max((int(getattr(e, "seq", 0) or 0) for e in events), default=0)
+        except Exception as exc:
+            _log.debug(
+                "ledger_high_watermark_from_hub_failed",
+                run_id=session.run_id,
+                error=str(exc),
+            )
+    return _watermark_from_file(session.jsonl_path)
+
+
+def _terminal_event_id_for(session: RunSession) -> str:
+    """从 journal 最后一条 AgentRunFinished / RunFinished / 等终态事件拿 event_id。
+
+    hub 缺失时回退扫描 journal.jsonl。
+    """
+    store = _journal_store(getattr(session, "hub", None))
+    if store is not None:
+        events: list[object] = []
+        try:
+            events = list(store.events)  # type: ignore[attr-defined]
+        except Exception as exc:
+            _log.debug(
+                "terminal_event_id_from_hub_failed",
+                run_id=session.run_id,
+                error=str(exc),
+            )
+            events = []
+        for stamped in reversed(events):
+            evt = getattr(stamped, "event", None)
+            if evt is None:
+                continue
+            name = type(evt).__name__
+            if name in {"AgentRunFinished", "RunFinished", "RunSealed"}:
+                return str(getattr(stamped, "event_id", "") or "")
+    return _terminal_event_id_from_file(session.jsonl_path)
+
+
+def _watermark_from_file(path: Path) -> int:
+    """扫描 journal.jsonl 最后一行取 seq;空 / 缺失回退 0。"""
+    if not path.exists():
+        return 0
+    last = 0
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                seq = int(row.get("seq", 0) or 0)
+                if seq > last:
+                    last = seq
+    except OSError:
+        return 0
+    return last
+
+
+def _terminal_event_id_from_file(path: Path) -> str:
+    """扫描 journal.jsonl 最后一条 ``event_type=AgentRunFinished`` 的 event_id。"""
+    if not path.exists():
+        return ""
+    last = ""
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if row.get("event_type") == "AgentRunFinished":
+                    last = str(row.get("event_id") or row.get("scope", {}).get("event_id") or "")
+    except OSError:
+        return ""
+    return last
+
+
+def _evidence_integrity_for(locator: RunLocator, run_id: str) -> tuple[ManifestEvidence, ...]:
+    """校验 evidence/<sha256-*.*> 文件存在;缺失记 MISSING。"""
+    ev_dir = locator.evidence_dir(run_id)
+    if not ev_dir.exists():
+        return ()
+    out: list[ManifestEvidence] = []
+    for path in sorted(ev_dir.iterdir()):
+        if not path.is_file():
+            continue
+        name = path.name
+        if not name.startswith("sha256-"):
+            continue
+        digest = name.removeprefix("sha256-").split(".", 1)[0]
+        if path.exists() and path.stat().st_size > 0:
+            state, detail = IntegrityState.OK, ""
+        else:
+            state, detail = IntegrityState.MISSING, f"empty evidence blob: {name}"
+        out.append(
+            ManifestEvidence(ref_digest=digest, ref_algorithm="sha256", state=state, detail=detail)
+        )
+    return tuple(out)
+
+
+def _ledger_summary_for(session: RunSession) -> str:
+    """对 journal.jsonl 最后 1MB 算 sha256(完整性指纹;不替代内容寻址)。"""
+    path = session.jsonl_path
+    if not path.exists():
+        return ""
+    try:
+        import hashlib
+
+        h = hashlib.sha256()
+        with path.open("rb") as fh:
+            # 末 1MB,够覆盖尾段摘要
+            fh.seek(0, 2)
+            size = fh.tell()
+            fh.seek(max(0, size - 1_048_576))
+            for chunk in iter(lambda: fh.read(65_536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return ""
 
 
 def _record_run_failure(session: RunSession, exc: BaseException | None, hub: Any) -> None:

@@ -54,7 +54,8 @@ async def execute_dsh_session(session: RunSession) -> None:
     sink = HandleJournalSink(hub=hub)  # type: ignore[call-arg]
     projector = DshJournalProjector(sink)
     projector.ensure_open()
-    archive = JsonlEventArchive(session.jsonl_path.parent / f"{session.run_id}.dsh.jsonl")
+    # ADR-0065 §七: DSH archive 与 live journal 同目录(都是 run 平面内的 driver 制品)。
+    archive = JsonlEventArchive(session.jsonl_path.parent / "dsh.jsonl")
     result: DshTurnResult | None = None
 
     try:
@@ -79,7 +80,7 @@ async def execute_dsh_session(session: RunSession) -> None:
                 prior_turns=session.prior_turns,
                 machine=machine,
                 transport=transport,
-                runs_dir=session.jsonl_path.parent,
+                runs_dir=session.jsonl_path.parent,  # ADR-0065 §七: = <run_id>/
                 attachment_ids=session.attachment_ids,
                 runtime=default_runtime(settings, transport=transport, machine=machine),
                 settings=settings,

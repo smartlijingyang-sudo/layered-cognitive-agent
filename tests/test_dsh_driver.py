@@ -199,6 +199,7 @@ async def test_execute_run_uses_dsh_driver(tmp_path: Path, monkeypatch: pytest.M
     from gateway.runs.execute import create_run_session, execute_run
     from gateway.runs.session import RunRegistry, RunStatus
     from lca.contracts.models.core.plane import PlaneBindings, PlaneKind, PlaneRef
+    from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
 
     monkeypatch.setenv("LCA_OBS_INCLUDE_LANGFUSE", "false")
     monkeypatch.setenv("LCA_OBS_BACKENDS", "console")
@@ -275,7 +276,7 @@ async def test_execute_run_uses_dsh_driver(tmp_path: Path, monkeypatch: pytest.M
 
     from lca.harness.profile.lifespan import profile_lifespan
 
-    registry = RunRegistry(runs_dir=tmp_path)
+    registry = RunRegistry(locator=FilesystemRunLocator(root=tmp_path))
     async with profile_lifespan("profiles/web-standard.yaml") as state:
         ctx = state["ctx"]
         session = create_run_session(

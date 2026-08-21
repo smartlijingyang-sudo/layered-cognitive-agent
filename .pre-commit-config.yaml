@@ -122,6 +122,13 @@ repos:
         pass_filenames: false
         types: [python]
 
+      - id: check-no-flat-runs
+        name: traces/runs/ 顶层禁 flat <id>.jsonl / .doctor.json 残留（ADR-0065 §七 / PR-11）
+        entry: python scripts/check_no_flat_runs.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
       - id: vulture
         name: 死代码检测 vulture（≥80% 置信度）
         entry: uv run vulture lca --min-confidence 80

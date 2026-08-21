@@ -11,6 +11,7 @@ from gateway.app import create_app
 from gateway.runs.execute import create_run_session
 from gateway.runs.process_journal import ProcessJournal
 from gateway.runs.session import RunRegistry
+from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
 from lca.contracts.models.observability.journal import (
     AgentRunStarted,
     DecisionMade,
@@ -118,7 +119,7 @@ def test_process_journal_survives_bind_close() -> None:
 async def test_create_run_session_publishes_to_process_journal(tmp_path: Path) -> None:
     from lca.harness.profile.lifespan import profile_lifespan
 
-    registry = RunRegistry(runs_dir=tmp_path)
+    registry = RunRegistry(locator=FilesystemRunLocator(root=tmp_path))
     async with profile_lifespan("profiles/web-standard.yaml") as state:
         ctx = state["ctx"]
         session = create_run_session(registry, question="q", user_text="q", ctx=ctx)
@@ -136,7 +137,7 @@ async def test_create_run_session_publishes_to_process_journal(tmp_path: Path) -
 async def test_journal_live_keeps_tool_preview(tmp_path: Path) -> None:
     from lca.harness.profile.lifespan import profile_lifespan
 
-    registry = RunRegistry(runs_dir=tmp_path)
+    registry = RunRegistry(locator=FilesystemRunLocator(root=tmp_path))
     async with profile_lifespan("profiles/web-standard.yaml") as state:
         ctx = state["ctx"]
         session = create_run_session(registry, question="q", user_text="q", ctx=ctx)

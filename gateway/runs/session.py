@@ -15,9 +15,10 @@ from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.live import LiveTail
 from lca.contracts.models.core.conversation import ConversationTurn
 from lca.contracts.models.core.plane import PlaneBindings
+from lca.contracts.observability.run_locator import RunLocator
 from lca.layer0_infra.observability import BoundObservability
 
-_RUNS_DIR = Path("traces/runs")
+_RUNS_ROOT = Path("traces")  # ADR-0065 §七:locator root,runs/ 是其子目录
 _DEFAULT_MAX_TERMINAL = 128
 _DEFAULT_TERMINAL_TTL_S = 3600.0
 
@@ -92,22 +93,36 @@ class RunSession:
     plane: str = ""
     extra_plane: str = ""
     execution_target: str = ""
+    started_at: float = 0.0
+    locator: RunLocator | None = None  # ADR-0065 PR-11:run 级 locator 引用
 
 
 class RunRegistry:
-    """The only Run index. No parallel module-level session tables."""
+    """The only Run index. No parallel module-level session tables.
+
+    ADR-0065 PR-11: ``RunLocator`` 是 run_id → 物理路径的唯一契约;Registry
+    持有 locator 实例,所有路径解析(jsonl / manifest / evidence /
+    materialization)都走它。默认 locator 是 ``FilesystemRunLocator(root=traces)``;
+    测试隔离可通过 ``locator=`` 注入临时 root。
+    """
 
     def __init__(
         self,
-        runs_dir: Path | None = None,
         *,
+        locator: RunLocator | None = None,
         max_terminal: int = _DEFAULT_MAX_TERMINAL,
         terminal_ttl_s: float = _DEFAULT_TERMINAL_TTL_S,
     ) -> None:
         self._runs: dict[str, RunSession] = {}
         self._inflight_by_key: dict[str, str] = {}
-        self._runs_dir = runs_dir if runs_dir is not None else _RUNS_DIR
-        self._runs_dir.mkdir(parents=True, exist_ok=True)
+        if locator is None:
+            from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+
+            locator = FilesystemRunLocator(root=_RUNS_ROOT)
+        self._locator: RunLocator = locator
+        # ensure runs/ exists under locator root
+        self._locator.storage_root.mkdir(parents=True, exist_ok=True)
+        (self._locator.storage_root / "runs").mkdir(parents=True, exist_ok=True)
         self._max_terminal = max_terminal
         self._terminal_ttl_s = terminal_ttl_s
         # ADR-0065 PR-5: ProcessJournal 实例化走 _journal_factory。
@@ -201,11 +216,27 @@ class RunRegistry:
     def sessions(self) -> tuple[RunSession, ...]:
         return tuple(self._runs.values())
 
-    def runs_dir(self) -> Path:
-        return self._runs_dir
+    def locator(self) -> RunLocator:
+        return self._locator
 
     def jsonl_path_for(self, run_id: str) -> Path:
-        return self._runs_dir / f"{run_id}.jsonl"
+        return self._locator.journal_path(run_id)
+
+    def manifest_path_for(self, run_id: str) -> Path:
+        return self._locator.manifest_path(run_id)
+
+    def evidence_dir_for(self, run_id: str) -> Path:
+        return self._locator.evidence_dir(run_id)
+
+    def materialization_dir_for(
+        self, run_id: str, *, generator_id: str, generator_version: str
+    ) -> Path:
+        return self._locator.materialization_dir(
+            run_id, generator_id=generator_id, generator_version=generator_version
+        )
+
+    def update_latest_pointer(self, run_id: str) -> None:
+        self._locator.update_latest_pointer(run_id)
 
     def summary(self, run_id: str) -> dict[str, Any] | None:
         session = self.get(run_id)
