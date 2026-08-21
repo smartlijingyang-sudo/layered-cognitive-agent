@@ -11,7 +11,7 @@
 | 废止（作为评价，不在树内） | internal Manus v2 eval, 2026-08-19, not in tree |
 | 必须修订的 ADR | ADR-0002（废止「新特性只能 Hook」；PR1 写入 supersession 前向引用，全文补丁在 PR11） |
 | 必须遵守的 ADR | ADR-0001 五层单向、ADR-0004 Protocol-First、ADR-0005 L4 组合根、ADR-0015 contracts 无行为类、ADR-0030/0034/0035 Team、ADR-0037 Journal-as-Truth |
-| 装配仍有效 | [`2026-08-16-plugin-tree-runtime-design.md`](./2026-08-16-plugin-tree-runtime-design.md)、[`2026-08-19-cordis-migration-design.md`](./2026-08-19-cordis-migration-design.md)（运行时是 cordis；本文约束 *挂什么*，不换内核） |
+| 装配仍有效 | plugin-tree-runtime-design（已归档）、cordis-migration-design（已归档）——运行时是 cordis；本文约束 *挂什么*，不换内核 |
 
 **一句话：** Agent 的认知永远是封闭六步循环；世界副作用永远经 Body 内的执行窄门；模型可见事实永远可由 Journal 重建；跨 Agent 协作永远经有权限的消息与共享资源进入 Perceive。插件只换实现，不在循环上开洞。
 
@@ -5481,7 +5481,6 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 - 原宪法：`2026-08-19-cognitive-primitive-plugin-design.md`（已归档）
 - Manus v2 评价：internal Manus v2 eval, 2026-08-19, not in tree
 - ADR-0001 五层；ADR-0002 认知闭环（控制面由本文废止）；ADR-0004 Protocol-First；ADR-0005 L4 组合根；ADR-0015 contracts 无行为类；ADR-0030/0034/0035 Team；ADR-0037 Journal-as-Truth；ADR-0045 Decision 形状；ADR-0047 tool wire；ADR-0049 咨询平面；ADR-0051 workspace/terminal gates；ADR-0055 run fact store
-- 装配：`docs/design/2026-08-16-plugin-tree-runtime-design.md`、`2026-08-19-cordis-migration-design.md`
 - 现网锚点：`lca/layer2_runtime/runtime_loop.py`、`lca/layer4_app/composer.py`、`lca/contracts/protocols/cognition.py`、`lca/contracts/models/observability/journal_catalog.py`、`lca/harness/middleware/registry.py`、`lca/layer1_cognitive/brain/reasoner.py`、`lca/layer1_cognitive/brain/decision_gates/__init__.py`、`gateway/runs/loop_drivers.py`
 - Anthropic, *Effective context engineering for AI agents*
 - Anthropic, *Patterns and problems in emerging multiagent systems*

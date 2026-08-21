@@ -39,7 +39,6 @@
 | [0061](0061-plugin-manifest-resolve-boot.md) | 声明式插件 Manifest —— Resolve/Boot 与依赖图 | Accepted |
 | [0062](0062-plugin-runtime-cleanup.md) | 插件运行时收口 — 单一事实源 + Cordis Fiber Boot + L4 严格闭合 | Proposed |
 | [0063](0063-run-trace-ssot.md) | 运行事件账本 SSOT —— Journal 事实流 + 插件化投影 | Accepted |
-| [0064](0064-journal-v2-evidence-sidecar.md) | Journal v2 —— evidence sidecar + per-run 目录 | Superseded by ADR-0065 |
 | [0065](0065-recoverable-evidence-ledger.md) | 可恢复的证据保真运行账本 | Accepted |
 | [0066](0066-declarative-atomic-control-plugins.md) | 声明式原子控制插件——认知闭集内的可组合治理 | Proposed |
 | [0067](0067-spacetime-runtime-and-governed-creation.md) | 时空运行时与受治理的动态创造 | Proposed |

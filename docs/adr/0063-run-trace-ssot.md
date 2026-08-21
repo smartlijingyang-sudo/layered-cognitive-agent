@@ -4,7 +4,7 @@
 
 **Accepted — 2026-08-20；本次记录完整覆盖原 ADR-0063。**
 
-本 ADR 细化并继承 [ADR-0037](0037-journal-as-truth.md) 的 **Journal-as-Truth** 决策，替代此前“Journal 事实流 + 平行 `DiagnosticStream` 诊断流”的双流设计。它同时吸收仓库的 [日志系统评估](../design/2026-08-20-logging-system-evaluation.md) 与用户提供的“业界范式 + 面向 Coding Agent 的日志插件设计”材料：DeepSeek Harness 的 Session 追加事件流与插件投影边界、OpenTelemetry GenAI 的互操作追踪模型，以及 Langfuse 的 trace / observation 关联模型。[1] [2] [3]
+本 ADR 细化并继承 [ADR-0037](0037-journal-as-truth.md) 的 **Journal-as-Truth** 决策，替代此前“Journal 事实流 + 平行 `DiagnosticStream` 诊断流”的双流设计。它同时吸收仓库的 日志系统评估（已归档） 与用户提供的“业界范式 + 面向 Coding Agent 的日志插件设计”材料：DeepSeek Harness 的 Session 追加事件流与插件投影边界、OpenTelemetry GenAI 的互操作追踪模型，以及 Langfuse 的 trace / observation 关联模型。[1] [2] [3]
 
 > **核心决策：每次运行只有一个可追加事件账本；事实、结构生命周期与运行解释共享同一封套和因果链。任何 JSONL、SSE、控制台、OTel、Langfuse、诊断摘要或 Coding Agent 工具结果都是已提交事件的只读投影。**
 

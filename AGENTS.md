@@ -32,7 +32,7 @@ lca/
     models/                     纯数据 dataclass（core / observability / team）
     protocols/                  业务协议：infra / cognition / embodiment / runtime / orchestration
     harness/                    Harness 自身的契约：plugin / middleware / projection / session / agent
-  layer0_infra/                 基础设施：llm / tools / transport / sandbox / observability / dsh / plane
+  layer0_infra/                 基础设施：llm / tools / transport / sandbox / observability / plane
   layer1_cognitive/             认知原语
     brain/                      ModularBrain + Reasoner + Critic + Synthesizer + decision_gates/
     body/                       ActionRegistry + SafeExecutor + ToolRegistry + SimpleBody
@@ -58,7 +58,7 @@ lca/
                                 w3c_validator）
     providers/                  Tier-2：每 seam 一工厂（memory / sandbox / tools / transport / ...）
     compose/                    Tier-3：compose-time 命名工厂（tools / transport）
-    loop_drivers/                Tier-3：run-loop 驱动注册中心（registry + cognitive + dsh）
+    loop_drivers/                Tier-3：run-loop 驱动注册中心（registry + cognitive）
     brain/ reasoner/ synthesizer/ critic/
                                 Tier-3：认知原语（think 子系统）
     body/                       Tier-3：执行平面（safe_executor + simple）
@@ -70,7 +70,6 @@ lca/
                                 peer_swarm / debate / graph）
     tools/                      Tier-3：tool plugins（bash / file_write / cordis_control/ ...）
     roles/                      Tier-3：角色 profile 工厂（cordis_creator）
-    dsh/bridge.py               DSH alien loop driver
     collaboration/blackboard.py 认知协作面板
     bundles/                    复合 bundle 插件（coding_agent_tools）
     synthesizer/                Synthesizer 实现（concat）
@@ -80,7 +79,6 @@ profiles/                       Profile YAML（默认 profiles/web-standard.yaml
 bundles/                        Bundle YAML（base.yaml + web-app.yaml + scenario-* + lead/researcher-*）
 scripts/                        平台编排（lca-ops）与质量门禁（check_*.py）
 vendor/{cordis,cosmokit,schemastery}/  cordis 1:1 Python 移植；pyproject 通过 [tool.uv.sources] 加载
-lca/packages/                   deepseek-harness/packages 1:1 Python 镜像（Surface parity 由 check_port_surface.py 校验）
 ```
 
 ## 2. 架构约束
@@ -116,7 +114,7 @@ contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_ag
 - Bundle 通过 `resolve_profile()` → `boot_resolved_profile()` 加载（`boot_profile()` 为兼容门面）：深合并 patch、校验 Manifest、按 `provides→requires` DAG 启动（[ADR-0061](docs/adr/0061-plugin-manifest-resolve-boot.md)）
 - 插件 Manifest：`@plugin(id=..., provides=..., requires=..., layer=L0–L4, kind=..., effects=..., test_suite=...)`（`lca.harness.plugin_api`）；感知/判决向群服务 `add()`（[ADR-0056](docs/adr/0056-plugin-group-contribution.md)）
 - Seams：13 个 extension_point（`llm / sandbox / memory / state_store / search / tools / transport / skills / file_store / observability / agent_loop / session_service / system_prompt`），由 `lca.plugins.seam_definitions` 注入
-- Loop 驱动注册：`lca-run-loop-driver-registry` 提供空 registry，`lca-loop-cognitive` / `lca-dsh-bridge` 注册自身 driver；`gateway/runs/execute.py:execute_run()` 按 run 配置解析。**无模块级单例**。
+- Loop 驱动注册：`lca-run-loop-driver-registry` 提供空 registry，`lca-loop-cognitive` 注册自身 driver；`gateway/runs/execute.py:execute_run()` 按 run 配置解析。**无模块级单例**。
 - 密钥只经 profile `{from_env:}` 进入；插件不得自行 `os.environ` 读凭证
 
 ## 3. 命令速查
@@ -134,7 +132,6 @@ contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_ag
 | `dump-profile <profile.yaml>` | 展开 bundle + patch 的 entries |
 | `debug tree\|run\|scope` | cordis.Context 视图：tree / run 事件 / scope 服务解析 |
 | `diagnose <alias>` | 内置诊断（model_not_seen / loop_stuck / memory_poisoned / approval_rejected） |
-| `check-upstream [--sync]` | 对比 `lca/packages/` 与 `~/deepseek-harness/packages/` 的结构差异 |
 | `provision` | sandbox-user daemon 部署（包 / venv / 用户 / 工作区 / CLI） |
 
 输出人类可读 / `--json` 给 agent 用。
@@ -187,7 +184,6 @@ uv run vulture lca --min-confidence 80
 | `scripts/check_protocol_impl.py` | 实现 `contracts.Protocol` 的类**必须显式继承** |
 | `scripts/check_plugin_typing.py` | 插件 `setup(ctx, config)` 与模块级 `build_*` 工厂必须有完整类型标注（兜底 mypy；与 `plugin()` 装饰器签名 `PluginSetupFn` 互为校验） |
 | `scripts/check_assembly_purity.py` | `spawn.py` 不得有 `==` 字符串比较分支（契约 2：装配期只读不算） |
-| `scripts/check_port_surface.py` | `lca/packages/` 与 `~/deepseek-harness/packages/` 的 public surface parity |
 | `scripts/verify_md_links.py` | Markdown 相对链接必须解析（目标文件存在 + `#fragment` 指向真实标题） |
 | `scripts/verify_doc_budgets.py` | 文档字数预算超限拒绝（预算清单在 `scripts/doc_budgets.json`） |
 
@@ -227,10 +223,10 @@ uv run vulture lca --min-confidence 80
 
 | 关注点 | 位置 |
 |---|---|
-| 文档管理体系 | `docs/AGENTS.md`（层级分类 + 写作规范 + 字数预算） |
+| 文档管理体系 | `docs/AGENTS.md`（层级分类 + 写作规范 + 防膨胀规则） |
 | 宪法原文 | `docs/design/2026-08-19-cognitive-primitive-constitution-v3.md` |
 | Harness 执行规约 | `docs/specs/harness-spine-spec.md` |
-| 已采纳 ADR | `docs/adr/`（0001-0056） |
+| 已采纳 ADR | `docs/adr/`（0001-0065） |
 | 平台编排入口 | `./scripts/lca-ops`（无参 = 手册） |
 | Profile 默认 | `profiles/web-standard.yaml`（bundles + patch） |
 | Bundle 集 | `bundles/{base,web-app,scenario-*,lead-standard,researcher-*-tools}.yaml` |
@@ -241,12 +237,11 @@ uv run vulture lca --min-confidence 80
 | Profile Resolve/Boot | `lca/harness/profile/{resolve,boot}.py`（ADR-0061） |
 | 插件 Manifest API | `lca/harness/plugin_api.py`；Capability 键 `lca/contracts/capabilities.py` |
 | LLM seam | `lca.plugins.seam_definitions.llm_resolver`（env 唯一读取者）+ `lca.plugins.providers.llm`（adapter 工厂） |
-| Loop 驱动 | `gateway/runs/loop_drivers.py:{CognitiveRunDriver, DshRunDriver}`，由 `lca-run-loop-driver-registry` 收集 |
+| Loop 驱动 | `gateway/runs/loop_drivers.py:CognitiveRunDriver`，由 `lca-run-loop-driver-registry` 收集 |
 | Prompt 模板 | `lca/layer1_cognitive/brain/prompts/*.md`；加载 `load_builtin_prompt` |
 | Journal 词表 | `lca/contracts/models/observability/{journal,journal_catalog}.py`（v3 增 PR2/PR3a/PR4/PR6/PR7/PR8/PR9 控制原语） |
 | 真实 LLM 测试 | `uv run pytest -m real_llm -v`（需 `LLM_API_KEY`） |
 | 本地探针 | `uv run python scripts/run_team_mode.py` |
-| 上游对齐 | `scripts/check_port_surface.py`（lca/packages ↔ ~/deepseek-harness/packages） |
 
 ## 7. 禁止事项
 

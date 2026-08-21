@@ -4,7 +4,7 @@
 
 **Accepted — 2026-08-21**
 
-Supersedes: [ADR-0064](0064-journal-v2-evidence-sidecar.md)
+Supersedes: ADR-0064（Journal v2 evidence sidecar，已删除）
 
 Keeps: [ADR-0037](0037-journal-as-truth.md)、[ADR-0055](0055-run-fact-store.md)、[ADR-0061](0061-plugin-manifest-resolve-boot.md)、[ADR-0063](0063-run-trace-ssot.md)
 
