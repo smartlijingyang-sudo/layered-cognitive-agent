@@ -62,7 +62,7 @@
 | **0068 §七** | ArtifactController | ⛔ | PR-8 | 4 状态机 |
 | **0069 §一** | 13 原语群分类学 | ⏳ taxonomy 部分 → ✅ (PR-2) | PR-2 functional_group 字段 | 群名见 §15.2 |
 | **0069 §二** | LogicAddress 6 维 | ⛔ → ✅ (PR-2) | PR-2 logic_address 字段 | 评分细则见 §15.3 |
-| **0069 §三** | 11 关系代数 | ⛔ | PR-2.5 数据面 + PR-12 可视化 | |
+| **0069 §三** | 11 关系代数 | ⛔ → ✅ (PR-2.5) | PR-2.5 数据面 + PR-12 可视化 | |
 | **0069 §四** | 6 contribution verbs | ⛔ | PR-3 PlanCompiler | verb 集见 §1 实施序列 §四 |
 | **0069 §五** | PlanTemplate 实例（RAG / prompt chain / routing …） | ⛔ | PR-12 | 12 个 template 见 §16.2 |
 | **0069 §六** | PluginContract 9 段 | ⏳ → ✅ (PR-2) | PR-2 可选段 + PR-12 | 详见 §12 |
@@ -88,7 +88,7 @@
 | **1** | 0.5 | 清 19 个 pre-existing 失败 | ⏳ Ready（与 PR-0 并行） | — | — | — |
 | **1** | 1 | ControlSlot + ControlPlan 数据面 | ✅ Done | `e2043986` | 2026-08-21 | PR-0 |
 | **1** | 2 | PluginDefinition.control 可选段 | ✅ Done | `396c89ba` | 2026-08-21 | PR-1 |
-| **1** | 2.5 | 11 关系代数扩展 CapabilityPlan | ⛔ Blocked | — | — | PR-2 |
+| **1** | 2.5 | 11 关系代数扩展 CapabilityPlan | ✅ Done | `23161de1` | 2026-08-21 | PR-2 |
 | **2** | 3 | CompiledRunPlan + PlanCompiler | ⛔ Blocked | — | — | PR-2.5 |
 | **2** | 4 | think.guard / stop.decide 原子化 | ⛔ Blocked | — | — | PR-3 |
 | **2** | 5 | spawn.bind_plan | ⛔ Blocked | — | — | PR-3 + ADR-0071 |
@@ -99,9 +99,9 @@
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-2.5（11 关系代数扩展 CapabilityPlan）。
+**Next Action**：PR-3（CompiledRunPlan + PlanCompiler）。
 
-**累计完成**：6 / 17（PR-0 / PR-1 / PR-2 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：7 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -192,110 +192,94 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-2（PluginDefinition.control + LogicAddress + FunctionalGroup + PluginContract）
+## 4. 已完成 PR 详情：PR-2.5（11 关系代数扩展 CapabilityPlan）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
-> PR-0 / PR-1 完成细节见 §5 Phase 1。
+> PR-0 / PR-1 / PR-2 完成细节见 §5 Phase 1。
 
 ### 4.1 目标
 
-plugin 作者能声明自己投到哪个 slot（完全可选，不填则行为不变）；同时按 ADR-0069 §一-§六 把 13 群 / LogicAddress / PluginContract 作为可选段附加到 `PluginDefinition`，L1 sign-off 全部达成（acceptance-criteria §4.1-§4.4）。
+落地 11 关系代数（ADR-0069 §三）：5 老关系（provides / requires / contributes_to / reads_fact / emits_fact，由 ResolvedProfile 提供者关系自动派生）+ 6 新关系（governs / executes / delegates / projects / revises / evaluates，由 plugin ``meta.relations:`` 段显式声明）。CapabilityPlan 数据面新增 ``relations`` 字段；Resolve 期验证引用合法性。**图谱可视化保留到 PR-12**，本 PR 只交付数据面 + 解析。
 
 ### 4.2 新增文件
 
 | 文件 | 作用 |
 |---|---|
-| `lca/contracts/atoms/functional_group.py` | `FunctionalGroup` 枚举（13 项 G0..G12，ADR-0069 §一）+ `V3_TO_0069_MAPPING`（v3 9 群 → 13 群映射）+ `parse_functional_group` |
-| `lca/contracts/atoms/scope.py` | `Scope` 枚举（7+1 项：release / profile / agent / run / turn / invocation / experiment / device，ADR-0074 §三裁剪；invocation → turn 折叠）+ `canonical_scope` |
-| `lca/contracts/protocols/logic_address.py` | `LogicAddress` dataclass（6 维：FunctionalGroup × ControlSlot × Scope × Authority × Evidence × Revision）+ `LogicAddressScore`（V9 评分 4 维各 25 分）+ `score_logic_address` |
-| `lca/contracts/harness/plugin_contract.py` | `PluginContract` 9 段 typed dataclass：identity / architecture / capabilities / ownership / authority / lifecycle / observability / verification / contribution（ADR-0069 §六 + tracker §12 不替换 PluginDefinition） |
-| `tests/harness/test_functional_group.py` | 13 群枚举 / v3 映射 / parse_functional_group 校验 |
-| `tests/harness/test_logic_address.py` | LogicAddress 6 维构造 / 派生值 / V9 评分 4 档边界 |
-| `tests/harness/test_plugin_contract.py` | PluginContract 9 段构造 / is_empty / 派生 helper |
-| `tests/harness/test_plugin_optional_fields.py` | @plugin 装饰器 4 个新 kwargs / 迁移插件验证 / resolver 集成 |
+| `lca/contracts/atoms/relation.py` | `Relation` 枚举（11 项 = 5 老 + 6 新）+ `NEW_RELATIONS` 集合 + `RELATION_GROUP_HINT`（PR-12 图谱颜色用）+ `parse_relation` / `validate_relations` |
+| `lca/contracts/protocols/relation.py` | `TypedRelation` dataclass（source / target / kind / evidence / scope / weight）+ `typed_relation_to_dict` + `typed_relations_from_iter` factory |
+| `lca/contracts/protocols/capability_plan.py` | `CapabilityPlan` dataclass（profile_path + provider_bindings + relations + revision）+ `ProviderBinding`（capability / owner_plugin / effect_class / revision）+ module-level accessors（`capability_plan_hash` / `capability_plan_to_dict` / `relations_of_kind` / `relations_from_plugin` / `relations_to_plugin`） |
+| `lca/harness/profile/capability_plan_resolver.py` | `project_capability_plan()` 从 `ResolvedProfile` 投影 CapabilityPlan；`validate_targets` 校验 source / target 引用 |
+| `tests/plan/test_11_relations.py` | 11 关系枚举 / TypedRelation / ProviderBinding / CapabilityPlan / hash 稳定 / order invariance / resolver 全覆盖（58 测试） |
 
 修改文件：
 
-- `lca/contracts/atoms/__init__.py` — re-export `FunctionalGroup` / `Scope`
-- `lca/contracts/protocols/__init__.py` — re-export `LogicAddress` / `LogicAddressScore`
-- `lca/contracts/harness/__init__.py` — re-export `PluginContract` 系列
-- `lca/harness/plugin_api.py` — `PluginDefinition` 新增 4 个 opt-in 字段 + `@plugin` 接受 4 个新 kwargs
-- `lca/harness/profile/control_plan_resolver.py` — 优先读 typed control 字段，回退到 meta
-- `tests/harness/test_control_plan_resolver.py` — 更新 opt-in 测试（plan 不再为空）
-- `lca/plugins/gates/repeat_tool_call.py` — 迁移到 typed control（think.guard）
-- `lca/plugins/gates/tool_loop_breaker.py` — 迁移到 typed control（think.guard）
-- `lca/plugins/runtime/stop_rule.py` — 迁移到 typed control（stop.decide）
+- `lca/contracts/atoms/__init__.py` — re-export `Relation` 系列
+- `lca/contracts/protocols/__init__.py` — re-export `CapabilityPlan` / `ProviderBinding` / `TypedRelation` 系列
 
 ### 4.3 实现要点
 
-- `FunctionalGroup` 是 `str Enum`，13 群 G0..G12（ADR-0069 §一）
-- `V3_TO_0069_MAPPING` 把 v3 9 群显式映射到 ADR-0069 13 群；v3 1 群可能映射到 0069 1-2 群（v3 是认知内化分类，0069 是工程外化分类）
-- `Scope` 是 7+1 项闭集，ADR-0074 §三把 invocation 与 turn 合并但保留 invocation 字段作为 `SCOPE_ALIAS` 折叠（`canonical_scope(invocation) == turn`）
-- `LogicAddress` 6 维全部 optional；missing = warning 而非 error
-- `LogicAddressScore.level` 4 档（≥75 good / 50-74 partial / <50 missing）；缺字段不阻断 PR 合并
-- `PluginContract` 9 段全部 optional；与 `PluginDefinition.control` 字段是同一信息的两种表达（tracker §12.1 决策："可选并存"）
-- `PluginDefinition` 新增 4 个 opt-in 字段（`control: tuple[Any, ...]` / `functional_group: FunctionalGroup | None` / `logic_address: LogicAddress | None` / `contract: PluginContract | None`）；缺失字段 → plugin 行为不变
-- `@plugin` 装饰器接受 4 个新 kwargs（`control=` / `functional_group=` / `logic_address=` / `contract=`），签名层强制；`functional_group=` 接受 str / enum
-- 3 个核心插件已迁移：`gate.repeat-tool-call` / `gate.tool-loop-breaker` 投 `think.guard`；`stop_rule.default` 投 `stop.decide`
+- **11 关系代数闭集**：5 老 + 6 新；新增第 12 关系需 ADR（C6 改闭集必 ADR）
+- **`Relation` enum** 是 `str Enum`，字符串值稳定（序列化 / plan_ref 引用）；与 `lca.contracts.atoms.functional_group.FunctionalGroup` 等其它 atoms 同源
+- **`TypedRelation` dataclass** 命名刻意区别于 `Relation` enum（避免 `lca.contracts.relation.Relation` 双重定义歧义）
+- **`ProviderBinding`** 把 ADR-0061 capabilities DAG（``provides`` → owner）与 ADR-0062 effect class 合流到 typed 表达
+- **`CapabilityPlan` 不放方法**（ADR-0015 contracts 纯类型契约）；访问器全部 module-level 函数
+- **`capability_plan_hash`** 先按稳定 key 排序 bindings / relations 再 SHA-256 → 跨运行稳定
+- **PR-2.5 阶段运行时不解** `CapabilityPlan`（PR-3 PlanCompiler 才消费）；本 resolver 是纯数据面
+- **target 校验**：source 必填（默认 = plugin.id）；target 可指 plugin / capability / `descriptor:` / `fact:` / `journal.` 前缀引用；reads_fact / emits_fact 的 target 必须是 fact descriptor 风格
 
 ### 4.4 不变量
 
 - **不改 ADR 文件**（0066/0067/0068/0069/0071/0073/0070/0072/0062 任何文件一字不改）
 - **不动 layer 分层**：contracts/ 不能 import 实现层
-- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-2 新增 89 测试全过，**无新增失败**）
-- **不删除 `_loop` / `_emit` / `middleware_bag`**（PR-0 只观察不修复）
-- **不扩张到 PR-2.5 范围**（不在 PR-2 内顺手做 11 关系代数）
-- **不做 PR-3 PlanCompiler 工作**（PlanCompiler 编译 ControlPlan 为 CompiledRunPlan 是 PR-3）
-- **不引入第 14 群**（新增原语群需 ADR）
+- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-2.5 新增 58 测试全过，**无新增失败**）
+- **不扩张到 PR-3 范围**（不在 PR-2.5 内顺手做 CompiledRunPlan / PlanCompiler）
 - **不放方法在 contracts/@dataclass**（ADR-0015；访问器为 module-level 函数）
+- **不引入第 12 关系**（新增关系需 ADR）
+- **不删除 5 老关系**（ADR-0061 capabilities DAG 已支持；PR-2.5 是扩展而非替换）
+- **不改 `Relation` enum 字符串值**（序列化 / plan_ref 引用稳定；break wire 触发 PR-6 ExecutionEnvelope）
 
 ### 4.5 验证流程
 
 ```sh
 # 1. ruff check + format
-uv run ruff check --fix lca/contracts/atoms/functional_group.py lca/contracts/atoms/scope.py lca/contracts/protocols/logic_address.py lca/contracts/harness/plugin_contract.py lca/harness/plugin_api.py lca/harness/profile/control_plan_resolver.py lca/plugins/gates/repeat_tool_call.py lca/plugins/gates/tool_loop_breaker.py lca/plugins/runtime/stop_rule.py tests/harness/test_functional_group.py tests/harness/test_logic_address.py tests/harness/test_plugin_contract.py tests/harness/test_plugin_optional_fields.py
+uv run ruff check --fix lca/contracts/atoms/relation.py lca/contracts/protocols/relation.py lca/contracts/protocols/capability_plan.py lca/harness/profile/capability_plan_resolver.py tests/plan/test_11_relations.py
 uv run ruff format ...
 
-# 2. PR-2 L1 sign-off 命令（acceptance-criteria §4.1-§4.4）
-uv run python -c "from lca.contracts.atoms.functional_group import FunctionalGroup; print(len(FunctionalGroup))"
-# 预期: 13
+# 2. PR-2.5 L1 sign-off 命令（acceptance-criteria §4.5 V11）
+uv run python -c "from lca.contracts.atoms.relation import Relation, all_relation_values; print(len(all_relation_values()))"
+# 预期: 11
 
-uv run python -c "from lca.contracts.protocols.logic_address import LogicAddress, LogicAddressScore, score_logic_address; print(score_logic_address(LogicAddress()))"
-# 预期: LogicAddressScore(...total=0)
-
-# 3. 新增 4 个测试文件
-uv run pytest --no-cov tests/harness/test_functional_group.py tests/harness/test_logic_address.py tests/harness/test_plugin_contract.py tests/harness/test_plugin_optional_fields.py -v
+# 3. CapabilityPlan hash 稳定 + order invariance
+uv run pytest --no-cov tests/plan/test_11_relations.py -v -k "Hash"
 
 # 4. 不破坏既有测试（除 §11 已登记的 pre-existing 19 失败）
-uv run pytest --no-cov tests/harness/ tests/test_contracts.py -q
+uv run pytest --no-cov tests/harness/ tests/test_contracts.py tests/plan/ -q
 ```
 
 ### 4.6 完成判据
 
-- 4 个新测试文件全过（89 测试，0 失败）
-- harness/ 测试无新增失败
+- 1 个新测试文件全过（58 测试，0 失败）
+- harness/ + contracts/ + plan/ 测试无新增失败
 - ruff 无新增警告
-- mypy 无新增错误（除 pre-existing journal.py:949）
-- 3 个核心插件（`gate.repeat-tool-call` / `gate.tool-loop-breaker` / `stop_rule.default`）正确产出 typed control 字段
-- `web-standard.yaml` profile 投影出 3 条 ControlEntry（不是空 plan）
-- `FunctionalGroup` 枚举 13 成员；`LogicAddress` 6 维字段；`PluginContract` 9 段
+- mypy 无新增错误
+- 11 关系枚举闭合（5 老 + 6 新）
+- `web-standard.yaml` profile 投影出 ≥ 30 ProviderBinding（42 plugins）+ 0 explicit relations
+- CapabilityPlan hash 稳定（cross-run determinism）
 
 ### 4.7 提交规范
 
 ```text
-feat(contracts+harness): PR-2 PluginDefinition.control + LogicAddress + FunctionalGroup + PluginContract
+feat(contracts+harness): PR-2.5 11 relations algebra + CapabilityPlan data layer
 
-- 新增 lca/contracts/atoms/functional_group.py (13 群枚举 + v3 映射)
-- 新增 lca/contracts/atoms/scope.py (8 scope 闭集 + invocation 折叠)
-- 新增 lca/contracts/protocols/logic_address.py (LogicAddress 6 维 + V9 评分)
-- 新增 lca/contracts/harness/plugin_contract.py (PluginContract 9 段 typed)
-- 新增 lca/harness/plugin_api.py: PluginDefinition 4 个 opt-in 字段 + @plugin kwargs
-- 迁移 3 个核心插件到 typed control (repeat_tool_call / tool_loop_breaker / stop_rule)
-- 4 个新测试文件 (test_functional_group / test_logic_address / test_plugin_contract / test_plugin_optional_fields)
-- ADR-0074 PR-2 落地
+- 新增 lca/contracts/atoms/relation.py (11 关系枚举 + NEW_RELATIONS + group hint)
+- 新增 lca/contracts/protocols/relation.py (TypedRelation dataclass + accessors)
+- 新增 lca/contracts/protocols/capability_plan.py (CapabilityPlan + ProviderBinding + accessors)
+- 新增 lca/harness/profile/capability_plan_resolver.py (project_capability_plan + validate_targets)
+- 新增 tests/plan/test_11_relations.py (58 测试)
+- ADR-0074 PR-2.5 落地
 
-Refs: ADR-0074 phase 1 / PR-2 / ADR-0069 §一 §二 §六 + tracker §12
-+ acceptance-criteria §4.1-§4.4
+Refs: ADR-0074 phase 1 / PR-2.5 / ADR-0069 §三 + ADR-0068 §一 +
+tracker §15.3 + acceptance-criteria §4.5 V11
 ```
 
 ### 4.8 完成后如何更新本追踪
@@ -311,40 +295,17 @@ Refs: ADR-0074 phase 1 / PR-2 / ADR-0069 §一 §二 §六 + tracker §12
 9. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
 10. 把追踪文件 commit 与代码 commit 分开（避免一个 commit 含两类变更）
 
-### 4.9 已知陷阱（PR-2 新增）
+### 4.9 已知陷阱（PR-2.5 新增）
 
-- `LogicAddress` / `LogicAddressScore` / `PluginContract` 等 contracts/@datlass**不放方法**（遵循 ADR-0015 contracts 纯类型契约）。访问派生值必须用 module-level 函数：`is_complete_address(addr)` / `declared_dim_count(addr)` / `canonical_scope_of(addr)` / `logic_address_to_dict(addr)` / `score_level(score)` / `is_plugin_contract_empty(c)` / `plugin_contract_control_slots(c)` / `plugin_contract_functional_group(c)`。
-- `Scope.INVOCATION` 字段保留但通过 `canonical_scope()` 折叠到 `Scope.TURN`（ADR-0074 §三裁剪）；plugin 作者倾向直接使用 `turn`（V9 评分同样接受 invocation，但工具输出以 canonical 形式呈现）。
-- `LogicAddress` str Enum 输入会被自动归一化（`functional_group="G6"` → `FunctionalGroup.G6_DECISION`）；str 拼写错误在 `__post_init__` 抛出 `ValueError`（fast-fail）。
-- `@plugin control=` 必须是 list/tuple；dict 形式 → `TypeError`。这是 typed field 的硬约束：避免 plugin 作者用 dict 形式时类型层不能表达 `order: int` / `aggregation: AggregationMode` 等强类型。
+- **`Relation` enum 与 `TypedRelation` dataclass 同名冲突**：enum 在 `lca.contracts.atoms.relation`，dataclass 在 `lca.contracts.protocols.relation`（命名刻意区分 `TypedRelation` 而非 `Relation`，避免 `lca.contracts.relation.Relation` 双重定义）。PR-3 PlanCompiler 引用时按需 `from lca.contracts.atoms.relation import Relation` 或 `from lca.contracts.protocols.relation import TypedRelation`。
+- **`CapabilityPlan.relations` 在 PR-2.5 阶段为 opt-in**：plugin 作者未在 ``meta.relations:`` 段声明 → plan 只有 provider_bindings（来自 `provides`），无 typed relations；这是 PR-2 / PR-2.5 迁移期的合法状态。PR-3 PlanCompiler 落地后，PlanCompiler 会基于 ControlPlan + provider_bindings 推断部分关系（governs / executes / delegates），补足到 CapabilityPlan.relations。
+- **`TypedRelation.source` 默认 = plugin.id**：用户在 ``meta.relations:`` 不指定 source 时，resolver 默认填 plugin.id。**这意味着 self-relation（source == plugin.id）合法**（用于描述 plugin 自己的 governance / evaluation 行为）。如果用户显式指定 source 为不存在的 plugin id → `CapabilityPlanResolveError`（PR-2.5 阶段 fail-fast）。
+- **`TypedRelation.target` 校验可关闭**：`CapabilityPlanOptions(validate_targets=False)` 时，target 不校验（用于 PR-3 PlanCompiler 推断阶段）；默认 `validate_targets=True`。
+- **`capability_plan_hash` 不包含 resolver options**：options 改变（如 `include_disabled=True`）→ hash 变化（因 bindings 数量变化）。跨运行同 options → 同 hash。
 
 ---
 
----|---|---|
-| `f980ace0` | v3.1 宪法补丁（§1 双层分类 + §2 C1 闭集细化 + CV1-CV6 验收） | `docs/design/2026-08-21-cognitive-primitive-constitution-v3-1.md`（+156） |
-| `c8c1b007` | ADR-0074 重排（PR 顺序 + V9 评分 + Boot 失实修正 + 兼容性表） | `docs/adr/0074-plugin-everything-trimmed-implementation.md`（+371） |
-| `5e32e704` | README 收尾（0062/0070/0072 Accepted + 元 ADR 例外） | `docs/adr/README.md`（±32） |
-
-**Phase 0 总评审**：8/10 架构优雅度。
-
-**Phase 0 留下的关键约束**（详见 §2 决策表）。
-
-## 5. 已完成 Phase 详情
-
-### Phase 1 PR-0：audit 测量网（2026-08-21）
-
-**Goal**：让 reviewer 一行命令看清当前 hardcode 在哪（Control Slot 投稿 / State 写入 / 直接 effect 调用 / 残留 hook 挂载点）。
-
-**Commit**：`8f8469eb`
-
-**交付**：
-
-- 4 个 pure-function AST 扫描器 + 4 个测试文件（47 测试全过）
-- `lca-ops audit-control-surface` / `audit-state-writers` / `audit-direct-commands` / `audit-hook-attach` 注册到 `lca/layer0_infra/ops/cli.py`
-- 基线数据（PR-0 终点快照，是后续 PR 的对照点）：
-
-| 子命令 | 命中数 | 含义 |
-|:-:|:-:|---|
+---|
 | `audit-control-surface` | 0 | V1 基线：尚未硬编码 slot 字符串 |
 | `audit-state-writers` | 40 | V3 / C4 基线：40 处直接 state 写入待 PR-7 收口 |
 | `audit-direct-commands` | 2 | V4 基线：2 处 Body 直接 import transport |
@@ -353,6 +314,26 @@ Refs: ADR-0074 phase 1 / PR-2 / ADR-0069 §一 §二 §六 + tracker §12
 **详见**：§4 PR-0 完成判据；§10 V/CV 验收闭环。
 
 ---
+
+## 5. 已完成 Phase 详情
+
+### Phase 0：宪法对齐与顺序重排（2026-08-21）
+
+**Goal**：在不破坏 v3 宪法的前提下，让 ADR-0074 的 PR 序列在宪法层面对齐、可被下游 agent 无歧义执行。
+
+**Commits**：
+
+| Commit | 内容 | 文件 |
+|---|---|---|
+| `f980ace0` | v3.1 宪法补丁（§1 双层分类 + §2 C1 闭集细化 + CV1-CV6 验收） | `docs/design/2026-08-21-cognitive-primitive-constitution-v3-1.md`（+156） |
+| `c8c1b007` | ADR-0074 重排（PR 顺序 + V9 评分 + Boot 失实修正 + 兼容性表） | `docs/adr/0074-plugin-everything-trimmed-implementation.md`（+371） |
+| `5e32e704` | README 收尾（0062/0070/0072 Accepted + 元 ADR 例外） | `docs/adr/README.md`（±32） |
+
+**Phase 0 总评审**：8/10 架构优雅度。
+
+**Phase 0 留下的关键约束**（详见 §2 决策表）。
+
+### Phase 1 PR-0：audit 测量网（2026-08-21）
 
 ## 6. tracker 自身的执行（ADR 监督 = 5 ADR 监督）
 
