@@ -58,7 +58,7 @@
 | **0068 §一** | CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan | ⛔ → ✅ (PR-3) | PR-3 | |
 | **0068 §一** | plan_ref × Journal 绑定 (V5) | ⛔ → ✅ (PR-6) | PR-6 (commit 026716c1) | 每条 journal fact 携带 plan_ref；replay by plan_ref |
 | **0068 §二** | PluginContract 概念 | ⏳ → ✅ (PR-2) | PR-2 可选段 | 详见 §12；0074 §四 不替换 PluginDefinition |
-| **0068 §五** | CommandEnvelope = effect 唯一入口 | ⛔ | PR-7 | architecture test 路径见 §14 |
+| **0068 §五** | CommandEnvelope = effect 唯一入口 | ⛔ → ✅ (PR-7) | PR-7 (commit afbac7a7) | architecture test gate 守护 mint_envelope |
 | **0068 §六** | Boot 双轨消除 | ✅ Done | ADR-0062 PR-3/PR-4 (`e0eb2484`) | 已落地，详见 §3.3 |
 | **0068 §七** | ArtifactController | ⛔ | PR-8 | 4 状态机 |
 | **0069 §一** | 13 原语群分类学 | ⏳ taxonomy 部分 → ✅ (PR-2) | PR-2 functional_group 字段 | 群名见 §15.2 |
@@ -94,15 +94,15 @@
 | **2** | 4 | think.guard / stop.decide 原子化 | ✅ Done | `007bae8c` | 2026-08-21 | PR-3 |
 | **2** | 5 | spawn.bind_plan | ✅ Done | `309dddcc` | 2026-08-21 | PR-3 + ADR-0071 |
 | **3** | 6 | plan_ref × Journal 绑定 | ✅ Done | `026716c1` | 2026-08-21 | PR-5 |
-| **3** | 7 | RunFact / CommandEnvelope 收口 | ⛔ Blocked | — | — | PR-6 + ADR-0073 |
+| **3** | 7 | RunFact / CommandEnvelope 收口 | ✅ Done | `afbac7a7` | 2026-08-21 | PR-6 + ADR-0073 |
 | **3** | 8 | ArtifactController（4 状态机） | ⛔ Blocked | — | — | PR-7 |
 | **4** | 9 | Creator 4 面化 | ⛔ Blocked | — | — | PR-8 |
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-7（RunFact / CommandEnvelope 收口）。
+**Next Action**：PR-8（ArtifactController 4 状态机）。
 
-**累计完成**：11 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：12 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -193,88 +193,95 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-6（plan_ref × Journal 绑定）
+## 4. 已完成 PR 详情：PR-7（RunFact / CommandEnvelope 收口）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
-> PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 完成细节见 §5 Phase 1。
+> PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 完成细节见 §5 Phase 1。
 
 ### 4.1 目标
 
-落地 V5 hard constraint：每条 journal fact 必须携带 ``plan_ref``（来自 CompiledRunPlan）。实现：
+落地 V4 hard constraint：外部 effect 必经 CommandEnvelope（5 闸单调聚合）。
+实现：
 
-- ``plan_ref`` ContextVar + ``set/get/reset/plan_ref_scope`` helpers
-- ``StampedEvent.plan_ref`` 字段（auto-stamped at append）
-- ``RunStore.append`` / ``seal`` 自动从 ContextVar 读取并盖章
-- ``JournalRecord.plan_ref`` 字段（v2 envelope 序列化 round-trip）
-- 100 events property test 守护（V5 acceptance §3.3 step 3-4）
+- ``CommandEnvelope`` frozen dataclass（plan_ref / scope_ref / decision_ref /
+  provider / grant / budget_reservation / idempotency_key /
+  policy_verdict_refs / execution_space_ref）
+- ``mint_envelope`` factory（接受 dict / Decision 对象 / DecisionRef 输入）
+- ``PipelineSafeExecutor.execute`` 入口 mint envelope（V4 acceptance）
+- ``scripts/check_command_envelope_required.py`` AST architecture test gate
+- RunFact / RunDelta / DecisionRef / Verdict / EnvelopeVerdict 类型
+- ADR-0073 Session Path Convergence 仍为 Proposed；本 PR-7 落地数据面
 
 ### 4.2 新增 / 修改文件
 
 | 文件 | 作用 |
 |---|---|
-| `lca/contracts/models/observability/plan_ref.py` | ``_run_plan_ref`` ContextVar + ``get_current_plan_ref`` / ``set_current_plan_ref`` / ``reset_current_plan_ref`` / ``plan_ref_scope`` (context manager) / ``stamped_event_has_plan_ref`` helper |
-| `lca/contracts/models/observability/__init__.py` | re-export 5 plan_ref symbols |
-| `lca/contracts/models/observability/journal.py` | ``StampedEvent`` 新增 ``plan_ref`` 字段（默认 ``""`` 向后兼容）；``JournalRecord`` 新增 ``plan_ref`` 字段 + ``to_dict`` / ``from_dict`` 序列化；``stamped_to_journal_record`` 桥接传播 plan_ref |
-| `lca/layer0_infra/observability/journal/engine.py` | ``RunStore.append`` 自动从 ContextVar 读取 plan_ref 并盖章到 ``StampedEvent``；``RunStore.seal`` 同样传播 plan_ref |
-| `tests/observability/test_plan_ref.py` | 20 测试覆盖 ContextVar helpers / StampedEvent.plan_ref / RunStore.append auto-stamp / JournalRecord round-trip / V5 acceptance（every fact carries plan_ref in a run）/ 100 events property test |
-| `tests/journal/test_plan_ref_replay.py` | 8 V5 replay 测试 — 100 events property test, plan_ref 变更 mid-run, ReplayRegistry filter by plan_ref, journal facts → 重放 CompiledRunPlan（capability/control/scope） |
+| `lca/contracts/protocols/command_envelope.py` | ``CommandEnvelope`` frozen dataclass + ``CapabilityGrant`` + ``BudgetReservation`` nested dataclasses; ``RunFact`` / ``RunDelta`` / ``DecisionRef`` types; ``Verdict`` / ``EnvelopeVerdict`` enums; ``mint_envelope`` factory; module-level accessors (command_envelope_to_dict / envelope_is_authorized / envelope_aggregate_verdict / warn_deprecated_envelope_constructor) |
+| `lca/contracts/protocols/__init__.py` | re-export 13 new symbols (CommandEnvelope 系列) |
+| `lca/layer1_cognitive/body/pipeline_safe_executor.py` | ``PipelineSafeExecutor.execute`` 入口 mint envelope (plan_ref from ContextVar + scope_ref from RunScope + default verdict "policy.pre_execute") |
+| `scripts/check_command_envelope_required.py` | AST architecture test gate — 扫描 body layer, 验证 execute() 含 mint_envelope; 缺 mint → exit 1 + 打印违规 |
+| `tests/harness/test_command_envelope.py` | 33 测试覆盖 CommandEnvelope / mint_envelope / CapabilityGrant / BudgetReservation / RunFact / RunDelta / DecisionRef / Verdict / envelope_is_authorized / envelope_aggregate_verdict / command_envelope_to_dict / V4 architecture test gate |
+| `tests/harness/test_tool_pipeline_plugins.py` | 加 plan_ref_scope() 包装 (V5 acceptance: empty plan_ref rejected by mint_envelope) |
 
 ### 4.3 实现要点
 
-- **ContextVar 注入**：plan_ref 与 ``_run_scope`` 同源（``ContextVar``），避免 kwargs 污染公共 API；未 set plan_ref → empty ``""``（legacy 兼容）
-- **empty plan_ref = legacy path**：测试 / projector previews / 未走 CompiledRunPlan 路径的代码可继续工作；新代码建议显式 ``with plan_ref_scope(ref): ...``
-- **RunStore.append 自动盖章**：append 时从 ContextVar 读取 → StampedEvent.plan_ref；调用方无需额外 kwargs
-- **JournalRecord v2 envelope 扩展**：``plan_ref`` 字段在 v2 envelope 中序列化（to_dict 增加 / from_dict 缺省值 ``""`` 兼容旧 envelope）；stamped_to_journal_record 桥接传播
-- **mid-run plan_ref 变更**：ContextVar 是 reentrant，可在不同 phase 用不同 ``plan_ref_scope``；events 按 append 时点确定 plan_ref
+- **CommandEnvelope 是 frozen dataclass**（ADR-0015 contracts 纯类型）；访问器全部 module-level
+- **mint_envelope factory**：接受多种 decision 输入（dict / Decision object / DecisionRef / id-attr object / str / None）；empty plan_ref → V5 acceptance 拒绝（与 PR-6 V5 一致）
+- **5 闸单调聚合** 数据面：policy_verdict_refs 是 tuple of refs；PR-7 阶段默认授权 (`policy.pre_execute`)；PR-8 接入完整 5 闸 pipeline (authorize / budget / constrain / execute / safe-boundary)
+- **grant 单调**：子代理 grant ⊆ 父代理（V8 守护）；PR-7 仅单层 grant；嵌套授权树（grant tree）由 PR-8 落地
+- **pipeline_safe_executor 集成**：execute 入口 mint envelope；envelope 是 immutable record (后续 PR-8 在 envelope 上 apply 5 闸 verdict)
+- **Deprecation warning**：直接构造 CommandEnvelope 触发 DeprecationWarning（PR-8 强制走 mint_envelope factory）
 
 ### 4.4 不变量
 
 - **不改 ADR 文件**（0066/0067/0068/0069/0071/0073/0070/0072/0062 任何文件一字不改）
 - **不动 layer 分层**：contracts/ 不能 import 实现层
-- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-6 新增 28 测试全过，**无新增失败**）
-- **不改 plan_ref 字符串格式**：仍是 16 字符 SHA-256 hex（PR-3 跨进程稳定）
-- **不改 v2 envelope schema 破坏性**：旧 envelope（无 plan_ref 字段）解析为 plan_ref=``""``；新 envelope（plan_ref 存在）正常序列化
-- **不放方法在 contracts/@datlass**（ADR-0015；plan_ref_scope 是 contextmanager）
+- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-7 新增 33 测试全过，**无新增失败**）
+- **不改 envelope schema 破坏性**：所有字段都是 optional with defaults；PR-7 阶段 envelope 不引入 wire-format breaking
+- **不放方法在 contracts/@datlass**（ADR-0015）
+- **V4 acceptance 守护**：scripts/check_command_envelope_required.py 扫描所有 body execute 方法，缺 mint → exit 1
+- **V5 acceptance 守护**：mint_envelope empty plan_ref → ValueError（与 PR-6 plan_ref 守护一致）
 
 ### 4.5 验证流程
 
 ```sh
 # 1. ruff check + format
-uv run ruff check --fix lca/contracts/models/observability/plan_ref.py lca/contracts/models/observability/journal.py lca/layer0_infra/observability/journal/engine.py tests/observability/test_plan_ref.py tests/journal/test_plan_ref_replay.py
+uv run ruff check --fix lca/contracts/protocols/command_envelope.py lca/layer1_cognitive/body/pipeline_safe_executor.py scripts/check_command_envelope_required.py tests/harness/test_command_envelope.py
 uv run ruff format ...
 
-# 2. PR-6 V5 acceptance 命令（acceptance-criteria §3.3）
-uv run pytest --no-cov tests/journal/test_plan_ref_replay.py -v
+# 2. V4 architecture test gate
+uv run python scripts/check_command_envelope_required.py
 
-# 3. plan_ref ContextVar / RunStore auto-stamp 测试
-uv run pytest --no-cov tests/observability/test_plan_ref.py -v
+# 3. PR-7 L2 sign-off (acceptance §3.4 V4)
+uv run pytest --no-cov tests/harness/test_command_envelope.py -v
 
-# 4. 既有测试无回归（除 §11 已登记的 pre-existing 2 失败：preview boundary + run http）
-uv run pytest --no-cov tests/harness/ tests/test_contracts.py tests/plan/ tests/layer4_app/ -q
+# 4. 既有测试无回归（plan_ref_scope 包装）
+uv run pytest --no-cov tests/harness/ tests/test_contracts.py tests/plan/ tests/layer4_app/ tests/observability/ tests/journal/ -q
 ```
 
 ### 4.6 完成判据
 
-- 28 新测试全过（test_plan_ref 20 + test_plan_ref_replay 8）
-- harness/ + contracts/ + plan/ + layer4_app/ + observability/ + journal/ 测试无新增失败（465 passed）
+- 33 新测试全过（test_command_envelope 33）
+- harness/ + contracts/ + plan/ + layer4_app/ + observability/ + journal/ 测试无新增失败（498 passed）
 - ruff 无新增警告
 - mypy 无新增错误
-- V5 acceptance：每条 journal fact 携带 plan_ref；plan_ref 与 compiled_run_plan_ref(plan) 匹配
-- JournalRecord v2 envelope round-trip 兼容（旧 envelope plan_ref=""）
+- V4 architecture test gate 通过：scripts/check_command_envelope_required.py exit 0
+- V5 acceptance: empty plan_ref rejected by mint_envelope
+- pipeline_safe_executor.execute stack trace 含 mint_envelope（V4 硬约束）
 
 ### 4.7 提交规范
 
 ```text
-feat(journal): PR-6 plan_ref × Journal 绑定 (V5 hard constraint)
+feat(envelope): PR-7 RunFact / CommandEnvelope 收口 (V4 hard constraint)
 
-- plan_ref ContextVar + helpers (lca/contracts/models/observability/plan_ref.py)
-- StampedEvent.plan_ref field (auto-stamped at append)
-- JournalRecord.plan_ref field (v2 envelope round-trip)
-- RunStore.append auto-stamps plan_ref
-- 28 tests (test_plan_ref 20 + test_plan_ref_replay 8)
+- CommandEnvelope + mint_envelope factory (V5 plan_ref 守护)
+- RunFact / RunDelta / DecisionRef / Verdict types
+- PipelineSafeExecutor.execute 集成 mint_envelope
+- scripts/check_command_envelope_required.py AST architecture test gate
+- 33 tests + pipeline test 修复 (plan_ref_scope 包装)
 
-Refs: ADR-0074 phase 3 / PR-6 / ADR-0068 §一 + tracker §PR-6 +
-acceptance-criteria §3.3 V5
+Refs: ADR-0074 phase 3 / PR-7 / ADR-0068 §五 + ADR-0066 §四 +
+tracker §PR-7 + acceptance-criteria §3.4 V4
 ```
 
 ### 4.8 完成后如何更新本追踪
@@ -290,13 +297,13 @@ acceptance-criteria §3.3 V5
 9. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
 10. 把追踪文件 commit 与代码 commit 分开（避免一个 commit 含两类变更）
 
-### 4.9 已知陷阱（PR-6 新增）
+### 4.9 已知陷阱（PR-7 新增）
 
-- **plan_ref ContextVar 在跨线程场景需要单独管理**：ContextVar 是 asyncio + thread-local；多线程并发场景每个 thread 需独立 set/reset。本 PR-6 假设 single-threaded runtime（per-task）；PR-10 golden profile 验证跨 thread 边界。
-- **JournalRecord v2 envelope schema 不再 strict**：``plan_ref`` 字段是 optional；旧 envelope（无 plan_ref）解析为 ``""``。这意味着 **V5 acceptance 要求 runtime 强制 set plan_ref**（否则 fact 携带空 plan_ref = 缺 V5 守护）。PR-7 RunFact 阶段应在 Record 层强制检查 plan_ref 非空。
-- **2 个 pre-existing test 失败**（与 PR-6 无关）：test_journal_preview_boundary.py::test_result_preview_has_no_new_production_readers + test_run_http.py::test_post_runs_202_then_live_is_journal。这些是 §11 已登记的 19 个 pre-existing 失败；PR-6 不引入新失败。
-- **StampedEvent.plan_ref 是 plan-level 而非 event-level**：每个 event 携带的是同一 plan_ref（同 run）；event 之间不应该有不同的 plan_ref（mid-run plan 变更是新的 run）。
-- **plan_ref 与 trace_id 正交**：plan_ref 标识 plan（compiled plan），trace_id 标识 run trace（执行）。replay test 用 plan_ref 重放 plan；用 trace_id 重建执行链。两者解耦。
+- **mint_envelope empty plan_ref → V5 拒绝**：所有 mint_envelope 调用必须保证 plan_ref ContextVar 已 set；tests 加 plan_ref_scope 包装；runtime 必须保证 plan 已 compile + ContextVar active。**PR-8 阶段建议 RuntimeKernel 在 run() 入口强制 set plan_ref**（否则所有 envelope 创建都失败）。
+- **5 闸聚合未实现**：PR-7 仅数据面 + 1 个默认 verdict (`policy.pre_execute`)；PR-8 阶段接入 authorize / budget / constrain / execute / safe-boundary 完整 pipeline。**V4 acceptance 当前是"execute 必含 mint_envelope"（最小）；PR-8 后 V4 升级为"5 闸全过才执行 effect"**。
+- **ADR-0073 Session Path Convergence 仍为 Proposed**：PR-7 mint_envelope 仅含 envelope 本体字段；SessionService Protocol / SessionService.record() 集成由 PR-7 后段 / PR-10 golden profile 落地（acceptance §7.3）。
+- **grant 单调未验证**：PR-7 仅 data class + factory；V8 capability monotonicity property test (子 ⊆ 父 grant) 留 PR-8 stage migration 阶段。
+- **2 个 pre-existing test 失败**（与 PR-7 无关）：test_journal_preview_boundary + test_run_http（§11 已登记 19 个 pre-existing 失败）。
 
 ---
 
@@ -308,8 +315,6 @@ acceptance-criteria §3.3 V5
 **Phase 0 总评审**：8/10 架构优雅度。
 
 **Phase 0 留下的关键约束**（详见 §2 决策表）。
-
-### Phase 1 PR-0：audit 测量网（2026-08-21）
 
 ## 5. 已完成 Phase 详情
 
