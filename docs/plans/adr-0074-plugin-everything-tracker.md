@@ -54,7 +54,7 @@
 | **0067 §一-§三** | SpacetimeContext 5 子空间 | 暂缓 | ADR Draft | 0074 §三 裁剪到 ExecutionSpace + LifecycleSpace |
 | **0067 §四** | 8 状态机 | ⛔ → ✅ | **PR-8** (commit 17906ee0) | 0074 §三 裁剪到 4 状态；映射见 §18 |
 | **0067 §五** | 6 道闸 | ⛔ | PR-4 | 0074 §三 裁剪到 3 道闸 |
-| **0067 §七** | 7 Creator 面 | ⛔ | PR-9 | 0074 §三 裁剪到 4 面；映射见 §18 |
+| **0067 §七** | 7 Creator 面 → 4 Creator 面 | ⛔ → ✅ | PR-9 (commit d17d8447) | 0074 §三 裁剪到 4 面；映射见 §18 |
 | **0068 §一** | CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan | ⛔ → ✅ (PR-3) | PR-3 | |
 | **0068 §一** | plan_ref × Journal 绑定 (V5) | ⛔ → ✅ (PR-6) | PR-6 (commit 026716c1) | 每条 journal fact 携带 plan_ref；replay by plan_ref |
 | **0068 §二** | PluginContract 概念 | ⏳ → ✅ (PR-2) | PR-2 可选段 | 详见 §12；0074 §四 不替换 PluginDefinition |
@@ -96,13 +96,13 @@
 | **3** | 6 | plan_ref × Journal 绑定 | ✅ Done | `026716c1` | 2026-08-21 | PR-5 |
 | **3** | 7 | RunFact / CommandEnvelope 收口 | ✅ Done | `afbac7a7` | 2026-08-21 | PR-6 + ADR-0073 |
 | **3** | 8 | ArtifactController（4 状态机） | ✅ Done | `17906ee0` | 2026-08-21 | PR-7 |
-| **4** | 9 | Creator 4 面化 | ⛔ Blocked | — | — | PR-8 |
+| **4** | 9 | Creator 4 面化 | ✅ Done | `d17d8447` | 2026-08-21 | PR-8 |
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-9（Creator 4 面化）。
+**Next Action**：PR-10（Golden profile + 文档更新）。
 
-**累计完成**：13 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 / PR-8 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：14 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 / PR-8 / PR-9 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -193,7 +193,7 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-8（ArtifactController 4 状态机）
+## 4. 已完成 PR 详情：PR-9（Creator 4 面化）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
 > PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 完成细节见 §5 Phase 1。
