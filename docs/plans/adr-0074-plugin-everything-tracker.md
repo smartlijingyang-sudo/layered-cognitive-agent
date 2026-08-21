@@ -25,6 +25,7 @@
 
 - `/home/lichao/layered-cognitive-agent/AGENTS.md`
 - `/home/lichao/layered-cognitive-agent/docs/adr/0074-plugin-everything-trimmed-implementation.md`（**只读 §一~§五的设计意图，不读 §"实施序列"**——该章节与本 tracker 一致但 PR 编号不同，是参考而非执行依据）
+- `/home/lichao/layered-cognitive-agent/docs/plans/adr-0074-acceptance-criteria.md`（**验收规约**：每条 V/CV 承诺对应一条 `uv run …` 命令；判定"是否真正达到预期架构效果"的唯一标准；本文件 tracker 标 ✅ Done 不代表验收通过）
 - 当前 PR 涉及的具体 ADR 章节（仅当该 ADR 提供具体设计而非 PR 排期时）
 
 ---
@@ -38,7 +39,7 @@
 | **ADR-0066** Control Slot（9 槽 + 单调聚合）| Refined by ADR-0074 §一 | ⛔ 待 PR-1 | PR-1 dataclass → PR-2 Manifest 字段 → PR-3 compile → PR-4 migrate-first |
 | **ADR-0067** Spacetime Runtime（5 子空间 / 8 状态 / 7 Creator 面 / 6 闸）| Superseded(部分) by ADR-0074 §三 | ⏳ 部分已裁剪 | 4 状态→PR-8 / 4 Creator 面→PR-9 / 6→3 闸→PR-4 / 子空间→ADR Draft 待 owner |
 | **ADR-0068** Compiled Plugin Kernel（3 子 plan + CommandEnvelope + ArtifactController）| Refined by ADR-0074 §二 | ⛔ 待 PR-3 | PR-3 plan+compiler / PR-7 envelope / PR-8 artifact 4 状态 |
-| **ADR-0069** Agent Primitive System（13 群 + LogicAddress + 11 关系 + 6 verbs + PlanTemplate + PluginContract）| Refined by ADR-0074 §四 | ⏳ taxonomy | PR-2 字段 / PR-2.5 data / PR-12 template / 6 verbs 含 0074 §四 |
+| **ADR-0069** Agent Primitive System（13 群 + LogicAddress + 11 关系 + 6 verbs + PlanTemplate + PluginContract）| Refined by ADR-0074 §四 | ⏳ taxonomy (PR-2 ✅ 字段) | PR-2 functional_group + logic_address + contract 字段 / PR-2.5 11 关系 data / PR-12 template / 6 verbs 含 0074 §四 |
 | **ADR-0074** Plugin-Everything 本体 | 自身实施计划 | ⏳ 4 / 17 | §1 状态总览追踪 PR-0..PR-12 |
 
 ### 实施矩阵（ADR § × clause → 交付 PR）
@@ -55,16 +56,16 @@
 | **0067 §五** | 6 道闸 | ⛔ | PR-4 | 0074 §三 裁剪到 3 道闸 |
 | **0067 §七** | 7 Creator 面 | ⛔ | PR-9 | 0074 §三 裁剪到 4 面；映射见 §18 |
 | **0068 §一** | CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan | ⛔ | PR-3 | |
-| **0068 §二** | PluginContract 概念 | ⏳ | PR-2 可选段 | 详见 §12；0074 §四 不替换 PluginDefinition |
+| **0068 §二** | PluginContract 概念 | ⏳ → ✅ (PR-2) | PR-2 可选段 | 详见 §12；0074 §四 不替换 PluginDefinition |
 | **0068 §五** | CommandEnvelope = effect 唯一入口 | ⛔ | PR-7 | architecture test 路径见 §14 |
 | **0068 §六** | Boot 双轨消除 | ✅ Done | ADR-0062 PR-3/PR-4 (`e0eb2484`) | 已落地，详见 §3.3 |
 | **0068 §七** | ArtifactController | ⛔ | PR-8 | 4 状态机 |
-| **0069 §一** | 13 原语群分类学 | ⏳ taxonomy 部分 | PR-2 functional_group 字段 | 群名见 §15.2 |
-| **0069 §二** | LogicAddress 6 维 | ⛔ | PR-2 logic_address 字段 | 评分细则见 §15.3 |
+| **0069 §一** | 13 原语群分类学 | ⏳ taxonomy 部分 → ✅ (PR-2) | PR-2 functional_group 字段 | 群名见 §15.2 |
+| **0069 §二** | LogicAddress 6 维 | ⛔ → ✅ (PR-2) | PR-2 logic_address 字段 | 评分细则见 §15.3 |
 | **0069 §三** | 11 关系代数 | ⛔ | PR-2.5 数据面 + PR-12 可视化 | |
 | **0069 §四** | 6 contribution verbs | ⛔ | PR-3 PlanCompiler | verb 集见 §1 实施序列 §四 |
 | **0069 §五** | PlanTemplate 实例（RAG / prompt chain / routing …） | ⛔ | PR-12 | 12 个 template 见 §16.2 |
-| **0069 §六** | PluginContract 9 段 | ⏳ | PR-2 可选段 + PR-12 | 详见 §12 |
+| **0069 §六** | PluginContract 9 段 | ⏳ → ✅ (PR-2) | PR-2 可选段 + PR-12 | 详见 §12 |
 | **0074 §一** | 接受 0066 / 0068 / 0069 核心 | ✅ Done | Phase 0 | |
 | **0074 §二** | 接受 0068 CompiledRunPlan + §五 CommandEnvelope | ✅ Done | Phase 0 | |
 | **0074 §三** | 裁剪 0067（4 状态 / 4 Creator 面 / 3 闸 / 2 子空间） | ✅ Done | Phase 0 | |
@@ -86,7 +87,7 @@
 | **1** | 0 | audit 测量网 | ✅ Done | `8f8469eb` | 2026-08-21 | — |
 | **1** | 0.5 | 清 19 个 pre-existing 失败 | ⏳ Ready（与 PR-0 并行） | — | — | — |
 | **1** | 1 | ControlSlot + ControlPlan 数据面 | ✅ Done | `e2043986` | 2026-08-21 | PR-0 |
-| **1** | 2 | PluginDefinition.control 可选段 | ⛔ Blocked | — | — | PR-1 |
+| **1** | 2 | PluginDefinition.control 可选段 | ✅ Done | `396c89ba` | 2026-08-21 | PR-1 |
 | **1** | 2.5 | 11 关系代数扩展 CapabilityPlan | ⛔ Blocked | — | — | PR-2 |
 | **2** | 3 | CompiledRunPlan + PlanCompiler | ⛔ Blocked | — | — | PR-2.5 |
 | **2** | 4 | think.guard / stop.decide 原子化 | ⛔ Blocked | — | — | PR-3 |
@@ -98,9 +99,9 @@
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-2（PluginDefinition.control 可选段 + LogicAddress + FunctionalGroup + PluginContract）。
+**Next Action**：PR-2.5（11 关系代数扩展 CapabilityPlan）。
 
-**累计完成**：5 / 17（PR-0 完成；PR-1 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：6 / 17（PR-0 / PR-1 / PR-2 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -191,94 +192,110 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-1（ControlSlot + ControlPlan 数据面）
+## 4. 已完成 PR 详情：PR-2（PluginDefinition.control + LogicAddress + FunctionalGroup + PluginContract）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
-> PR-0 完成细节（audit 测量网）见 §5 Phase 1。
+> PR-0 / PR-1 完成细节见 §5 Phase 1。
 
 ### 4.1 目标
 
-9 个槽位有限枚举 + ControlPlan dataclass + Resolver 投影（**不动运行时**）。PR-1 是"声明什么存在"的数据面；PR-3 PlanCompiler 才把这些声明编译为可运行 plan。
+plugin 作者能声明自己投到哪个 slot（完全可选，不填则行为不变）；同时按 ADR-0069 §一-§六 把 13 群 / LogicAddress / PluginContract 作为可选段附加到 `PluginDefinition`，L1 sign-off 全部达成（acceptance-criteria §4.1-§4.4）。
 
 ### 4.2 新增文件
 
 | 文件 | 作用 |
 |---|---|
-| `lca/contracts/atoms/control_slot.py` | `ControlSlot` 枚举（11 项 = 9 槽位 + observe.checkpoint + act.safe-boundary）+ `phase_owner` / `parse_slot` 等工厂函数 |
-| `lca/contracts/protocols/control_plan.py` | `Activation` / `AggregationMode` / `FailureMode` / `ControlEntry` / `ControlPlan` 契约 + Activation DSL 校验 + `compute_control_plan_hash` |
-| `lca/harness/profile/control_plan_resolver.py` | `project_control_plan()` 从 `ResolvedProfile` 投影 ControlPlan；`explain_control_slot()` 是 `lca-ops explain control <slot>` 的最小版本 |
-| `tests/harness/test_control_slot.py` | 11 槽位枚举 / 阶段归属 / parse_slot / audit 漂移守护测试 |
-| `tests/harness/test_control_plan_resolver.py` | Activation DSL / ControlEntry / ControlPlan 排序 / hash 稳定 / opt-in 语义 / explain 工具测试 |
+| `lca/contracts/atoms/functional_group.py` | `FunctionalGroup` 枚举（13 项 G0..G12，ADR-0069 §一）+ `V3_TO_0069_MAPPING`（v3 9 群 → 13 群映射）+ `parse_functional_group` |
+| `lca/contracts/atoms/scope.py` | `Scope` 枚举（7+1 项：release / profile / agent / run / turn / invocation / experiment / device，ADR-0074 §三裁剪；invocation → turn 折叠）+ `canonical_scope` |
+| `lca/contracts/protocols/logic_address.py` | `LogicAddress` dataclass（6 维：FunctionalGroup × ControlSlot × Scope × Authority × Evidence × Revision）+ `LogicAddressScore`（V9 评分 4 维各 25 分）+ `score_logic_address` |
+| `lca/contracts/harness/plugin_contract.py` | `PluginContract` 9 段 typed dataclass：identity / architecture / capabilities / ownership / authority / lifecycle / observability / verification / contribution（ADR-0069 §六 + tracker §12 不替换 PluginDefinition） |
+| `tests/harness/test_functional_group.py` | 13 群枚举 / v3 映射 / parse_functional_group 校验 |
+| `tests/harness/test_logic_address.py` | LogicAddress 6 维构造 / 派生值 / V9 评分 4 档边界 |
+| `tests/harness/test_plugin_contract.py` | PluginContract 9 段构造 / is_empty / 派生 helper |
+| `tests/harness/test_plugin_optional_fields.py` | @plugin 装饰器 4 个新 kwargs / 迁移插件验证 / resolver 集成 |
 
 修改文件：
 
-- `lca/contracts/atoms/__init__.py` — re-export `ControlSlot`
-- `lca/contracts/protocols/__init__.py` — re-export ControlPlan 契约
-- `lca/harness/diagnostics/audit_control_surface.py` — `KNOWN_CONTROL_SLOTS` 改为从 `ControlSlot` 枚举派生（DRY）
+- `lca/contracts/atoms/__init__.py` — re-export `FunctionalGroup` / `Scope`
+- `lca/contracts/protocols/__init__.py` — re-export `LogicAddress` / `LogicAddressScore`
+- `lca/contracts/harness/__init__.py` — re-export `PluginContract` 系列
+- `lca/harness/plugin_api.py` — `PluginDefinition` 新增 4 个 opt-in 字段 + `@plugin` 接受 4 个新 kwargs
+- `lca/harness/profile/control_plan_resolver.py` — 优先读 typed control 字段，回退到 meta
+- `tests/harness/test_control_plan_resolver.py` — 更新 opt-in 测试（plan 不再为空）
+- `lca/plugins/gates/repeat_tool_call.py` — 迁移到 typed control（think.guard）
+- `lca/plugins/gates/tool_loop_breaker.py` — 迁移到 typed control（think.guard）
+- `lca/plugins/runtime/stop_rule.py` — 迁移到 typed control（stop.decide）
 
 ### 4.3 实现要点
 
-- `ControlSlot` 是 `str Enum`，值与 ADR-0066 §二 + tracker §19 表述一致；枚举冻结保证序列化兼容
-- `SLOT_PHASE_OWNER` 把每个槽位映射到 v3 宪法 C1 阶段；横切 `observe.*` / `observe.checkpoint` → `None`
-- `SLOT_DEFAULT_AGGREGATION` / `SLOT_DEFAULT_FAILURE` 落地 ADR-0066 §四单调聚合表
-- Activation DSL 是 allowlist-only 数据结构：操作符白名单（`always / all / any / not / in / not_in / eq / ne / lt / le / gt / ge / exists / missing`）+ 叶子形状 `{"fact": <descriptor>, <op>: <value>}`；resolver / lint 必须拒绝集合外操作符
-- `ControlPlan` 是 frozen dataclass，**不放方法**（遵守 ADR-0015 contracts 纯类型契约）；访问器作为 module-level 函数：`slot_entries(plan, slot)` / `slots_covered(plan)` / `slots_missing(plan)` / `is_slot_empty(plan, slot)` / `control_plan_to_dict(plan)`
-- `project_control_plan` 是 **opt-in**：未声明 `control:` 段的插件不产生 entry → 当前所有 profile 投影为空 ControlPlan（plan_hash 由 entries 列表派生，空 entries 仍稳定）
-- `compute_control_plan_hash` 先按 `(slot, order, plugin_id)` 排序再 SHA-256 → 跨运行稳定；profile + entries → 同 hash
+- `FunctionalGroup` 是 `str Enum`，13 群 G0..G12（ADR-0069 §一）
+- `V3_TO_0069_MAPPING` 把 v3 9 群显式映射到 ADR-0069 13 群；v3 1 群可能映射到 0069 1-2 群（v3 是认知内化分类，0069 是工程外化分类）
+- `Scope` 是 7+1 项闭集，ADR-0074 §三把 invocation 与 turn 合并但保留 invocation 字段作为 `SCOPE_ALIAS` 折叠（`canonical_scope(invocation) == turn`）
+- `LogicAddress` 6 维全部 optional；missing = warning 而非 error
+- `LogicAddressScore.level` 4 档（≥75 good / 50-74 partial / <50 missing）；缺字段不阻断 PR 合并
+- `PluginContract` 9 段全部 optional；与 `PluginDefinition.control` 字段是同一信息的两种表达（tracker §12.1 决策："可选并存"）
+- `PluginDefinition` 新增 4 个 opt-in 字段（`control: tuple[Any, ...]` / `functional_group: FunctionalGroup | None` / `logic_address: LogicAddress | None` / `contract: PluginContract | None`）；缺失字段 → plugin 行为不变
+- `@plugin` 装饰器接受 4 个新 kwargs（`control=` / `functional_group=` / `logic_address=` / `contract=`），签名层强制；`functional_group=` 接受 str / enum
+- 3 个核心插件已迁移：`gate.repeat-tool-call` / `gate.tool-loop-breaker` 投 `think.guard`；`stop_rule.default` 投 `stop.decide`
 
 ### 4.4 不变量
 
 - **不改 ADR 文件**（0066/0067/0068/0069/0071/0073/0070/0072/0062 任何文件一字不改）
-- **不动 layer 分层**：contracts/ 不能 import 实现层（`mypy` + `lint-imports` 守护）
-- **不修 19 个 pre-existing 失败**（那是 PR-0.5 范围；PR-1 新增 103 测试全过，**无新增失败**）
+- **不动 layer 分层**：contracts/ 不能 import 实现层
+- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-2 新增 89 测试全过，**无新增失败**）
 - **不删除 `_loop` / `_emit` / `middleware_bag`**（PR-0 只观察不修复）
-- **不扩张到 PR-2 范围**（不在 PR-1 内顺手做 `PluginDefinition.control` typed 字段 / LogicAddress / FunctionalGroup / PluginContract）
-- **不做运行时 activation 求值**（PR-3 PlanCompiler 的职责）
-- **不引入第 12 槽位**（新增槽位需 ADR）
+- **不扩张到 PR-2.5 范围**（不在 PR-2 内顺手做 11 关系代数）
+- **不做 PR-3 PlanCompiler 工作**（PlanCompiler 编译 ControlPlan 为 CompiledRunPlan 是 PR-3）
+- **不引入第 14 群**（新增原语群需 ADR）
 - **不放方法在 contracts/@dataclass**（ADR-0015；访问器为 module-level 函数）
 
 ### 4.5 验证流程
 
 ```sh
 # 1. ruff check + format
-uv run ruff check --fix lca/contracts/atoms/control_slot.py lca/contracts/protocols/control_plan.py lca/harness/profile/control_plan_resolver.py lca/harness/diagnostics/audit_control_surface.py tests/harness/test_control_slot.py tests/harness/test_control_plan_resolver.py
-uv run ruff format lca/contracts/atoms/control_slot.py lca/contracts/protocols/control_plan.py lca/harness/profile/control_plan_resolver.py lca/harness/diagnostics/audit_control_surface.py tests/harness/test_control_slot.py tests/harness/test_control_plan_resolver.py
+uv run ruff check --fix lca/contracts/atoms/functional_group.py lca/contracts/atoms/scope.py lca/contracts/protocols/logic_address.py lca/contracts/harness/plugin_contract.py lca/harness/plugin_api.py lca/harness/profile/control_plan_resolver.py lca/plugins/gates/repeat_tool_call.py lca/plugins/gates/tool_loop_breaker.py lca/plugins/runtime/stop_rule.py tests/harness/test_functional_group.py tests/harness/test_logic_address.py tests/harness/test_plugin_contract.py tests/harness/test_plugin_optional_fields.py
+uv run ruff format ...
 
-# 2. 新增的 2 个测试文件
-uv run pytest --no-cov tests/harness/test_control_slot.py tests/harness/test_control_plan_resolver.py -v
+# 2. PR-2 L1 sign-off 命令（acceptance-criteria §4.1-§4.4）
+uv run python -c "from lca.contracts.atoms.functional_group import FunctionalGroup; print(len(FunctionalGroup))"
+# 预期: 13
 
-# 3. mypy on new files
-uv run mypy lca/contracts/atoms/control_slot.py lca/contracts/protocols/control_plan.py lca/harness/profile/control_plan_resolver.py
+uv run python -c "from lca.contracts.protocols.logic_address import LogicAddress, LogicAddressScore, score_logic_address; print(score_logic_address(LogicAddress()))"
+# 预期: LogicAddressScore(...total=0)
 
-# 4. audit 漂移守护测试
-uv run pytest --no-cov tests/harness/test_audit_control_surface.py -v
+# 3. 新增 4 个测试文件
+uv run pytest --no-cov tests/harness/test_functional_group.py tests/harness/test_logic_address.py tests/harness/test_plugin_contract.py tests/harness/test_plugin_optional_fields.py -v
 
-# 5. 不破坏既有测试（除 §11 已登记的 pre-existing 19 失败）
+# 4. 不破坏既有测试（除 §11 已登记的 pre-existing 19 失败）
 uv run pytest --no-cov tests/harness/ tests/test_contracts.py -q
 ```
 
 ### 4.6 完成判据
 
-- 2 个新测试文件全过（103 测试，0 失败）
-- harness/ 测试无新增失败（pre-existing 19 个保持原状；其中 1 个是 contracts_purity，与 PR-1 无关）
+- 4 个新测试文件全过（89 测试，0 失败）
+- harness/ 测试无新增失败
 - ruff 无新增警告
-- mypy 无新增错误
-- audit 测试 `test_audit_known_slots_matches_enum` 守护 audit 漂移
-- `web-standard.yaml` profile 投影出空 ControlPlan（opt-in 语义正确）
+- mypy 无新增错误（除 pre-existing journal.py:949）
+- 3 个核心插件（`gate.repeat-tool-call` / `gate.tool-loop-breaker` / `stop_rule.default`）正确产出 typed control 字段
+- `web-standard.yaml` profile 投影出 3 条 ControlEntry（不是空 plan）
+- `FunctionalGroup` 枚举 13 成员；`LogicAddress` 6 维字段；`PluginContract` 9 段
 
 ### 4.7 提交规范
 
 ```text
-feat(contracts+harness): PR-1 ControlSlot + ControlPlan 数据面
+feat(contracts+harness): PR-2 PluginDefinition.control + LogicAddress + FunctionalGroup + PluginContract
 
-- 新增 lca/contracts/atoms/control_slot.py（11 槽位枚举 + phase_owner）
-- 新增 lca/contracts/protocols/control_plan.py（Activation DSL / ControlEntry / ControlPlan）
-- 新增 lca/harness/profile/control_plan_resolver.py（投影 ResolvedProfile → ControlPlan）
-- 新增 tests/harness/test_control_slot.py + test_control_plan_resolver.py（103 测试）
-- 重构 audit_control_surface.py：KNOWN_CONTROL_SLOTS 从 enum 派生（DRY）
-- ADR-0074 PR-1 落地
+- 新增 lca/contracts/atoms/functional_group.py (13 群枚举 + v3 映射)
+- 新增 lca/contracts/atoms/scope.py (8 scope 闭集 + invocation 折叠)
+- 新增 lca/contracts/protocols/logic_address.py (LogicAddress 6 维 + V9 评分)
+- 新增 lca/contracts/harness/plugin_contract.py (PluginContract 9 段 typed)
+- 新增 lca/harness/plugin_api.py: PluginDefinition 4 个 opt-in 字段 + @plugin kwargs
+- 迁移 3 个核心插件到 typed control (repeat_tool_call / tool_loop_breaker / stop_rule)
+- 4 个新测试文件 (test_functional_group / test_logic_address / test_plugin_contract / test_plugin_optional_fields)
+- ADR-0074 PR-2 落地
 
-Refs: ADR-0074 phase 1 / PR-1 / ADR-0066 §二 + §六 + tracker §19
+Refs: ADR-0074 phase 1 / PR-2 / ADR-0069 §一 §二 §六 + tracker §12
++ acceptance-criteria §4.1-§4.4
 ```
 
 ### 4.8 完成后如何更新本追踪
@@ -294,24 +311,16 @@ Refs: ADR-0074 phase 1 / PR-1 / ADR-0066 §二 + §六 + tracker §19
 9. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
 10. 把追踪文件 commit 与代码 commit 分开（避免一个 commit 含两类变更）
 
-### 4.9 已知陷阱（PR-1 新增）
+### 4.9 已知陷阱（PR-2 新增）
 
-- `lca/contracts/protocols/control_plan.py` 放 module-level 函数（`slot_entries` 等）而非方法——遵循 ADR-0015 contracts 纯类型契约（`@dataclass` 不允许自定义方法）。**这意味着从 `ControlPlan` 对象访问 entry 需要 `slot_entries(plan, slot)` 而不是 `plan.slot_entries(slot)`**，迁移成本由各调用方承担。**强烈建议 PR-2 起任何新代码都遵循此模式**（保持 contracts/ 纯净）。
-- Activation DSL 叶子形状采用 ADR-0066 §三原文 `{"fact": <descriptor>, <op>: <value>}`；操作符 `always / all / any / not` 必须作为顶层字典的唯一 key（dict 单 key 校验）。其他形状（如 `{"op": {"fact": ...}}`）拒绝。
-- audit script 改为从 `ControlSlot` 枚举派生 `KNOWN_CONTROL_SLOTS`，未来 ADR 增加新槽位时**自动覆盖**，但测试 `test_audit_known_slots_matches_enum` 会保证 audit ↔ enum 永同步。
+- `LogicAddress` / `LogicAddressScore` / `PluginContract` 等 contracts/@datlass**不放方法**（遵循 ADR-0015 contracts 纯类型契约）。访问派生值必须用 module-level 函数：`is_complete_address(addr)` / `declared_dim_count(addr)` / `canonical_scope_of(addr)` / `logic_address_to_dict(addr)` / `score_level(score)` / `is_plugin_contract_empty(c)` / `plugin_contract_control_slots(c)` / `plugin_contract_functional_group(c)`。
+- `Scope.INVOCATION` 字段保留但通过 `canonical_scope()` 折叠到 `Scope.TURN`（ADR-0074 §三裁剪）；plugin 作者倾向直接使用 `turn`（V9 评分同样接受 invocation，但工具输出以 canonical 形式呈现）。
+- `LogicAddress` str Enum 输入会被自动归一化（`functional_group="G6"` → `FunctionalGroup.G6_DECISION`）；str 拼写错误在 `__post_init__` 抛出 `ValueError`（fast-fail）。
+- `@plugin control=` 必须是 list/tuple；dict 形式 → `TypeError`。这是 typed field 的硬约束：避免 plugin 作者用 dict 形式时类型层不能表达 `order: int` / `aggregation: AggregationMode` 等强类型。
 
 ---
 
-## 5. 已完成 Phase 详情
-
-### Phase 0：宪法对齐与顺序重排（2026-08-21）
-
-**Goal**：在不破坏 v3 宪法的前提下，让 ADR-0074 的 PR 序列在宪法层面对齐、可被下游 agent 无歧义执行。
-
-**Commits**：
-
-| Commit | 内容 | 文件 |
-|---|---|---|
+---|---|---|
 | `f980ace0` | v3.1 宪法补丁（§1 双层分类 + §2 C1 闭集细化 + CV1-CV6 验收） | `docs/design/2026-08-21-cognitive-primitive-constitution-v3-1.md`（+156） |
 | `c8c1b007` | ADR-0074 重排（PR 顺序 + V9 评分 + Boot 失实修正 + 兼容性表） | `docs/adr/0074-plugin-everything-trimmed-implementation.md`（+371） |
 | `5e32e704` | README 收尾（0062/0070/0072 Accepted + 元 ADR 例外） | `docs/adr/README.md`（±32） |
@@ -319,6 +328,8 @@ Refs: ADR-0074 phase 1 / PR-1 / ADR-0066 §二 + §六 + tracker §19
 **Phase 0 总评审**：8/10 架构优雅度。
 
 **Phase 0 留下的关键约束**（详见 §2 决策表）。
+
+## 5. 已完成 Phase 详情
 
 ### Phase 1 PR-0：audit 测量网（2026-08-21）
 
