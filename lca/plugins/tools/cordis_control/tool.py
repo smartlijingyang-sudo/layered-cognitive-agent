@@ -105,7 +105,7 @@ class CordisControlTool:
 
         ``on_mounted`` 是 mount 成功后的回调（可选）：
         签名 ``(name, instance, meta) -> None``；上层可借此把刚挂载的 plugin
-        注册到 ToolsService（DSH 风格：mount 后 capability 自动可调用）。
+        注册到 ToolsService（mount 后 capability 自动可调用）。
         ``meta`` 是 plugin_meta dict（含 ``implements`` / ``policy_class`` 等）。
         """
         self._composer = composer

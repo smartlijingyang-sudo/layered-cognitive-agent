@@ -47,6 +47,10 @@ from lca.contracts.observability.ports import (
     ScorerFn,
     TracerBackend,
 )
+from lca.contracts.observability.evidence import (
+    EvidencePolicy,
+    EvidenceStore,
+)
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
@@ -96,14 +100,17 @@ def set_session(session_id: str | None) -> None:
 
 
 # ── BoundObservability：当前 run 激活的 backend 引用集 ─────────────
-# 纯引用 dataclass，4 字段，不持有逻辑；assemble_observability 在 boot 期构造，
+# 纯引用 dataclass，5 字段，不持有逻辑；assemble_observability 在 boot 期构造，
 # bind() 装入 ContextVar。后端实现见各 plugin：journal_* / tracer_* / fact_scorer_*
+# evidence_store 单独持有(0065 §四 L5)；emitter 通过它_准备受治理 state 证据。
 @dataclass(frozen=True)
 class BoundObservability:
     journal: JournalBackend | None = None
     tracer: TracerBackend | None = None
     policy: AttributePolicyBackend | None = None
     scorers: tuple[ScorerFn, ...] = ()
+    evidence_store: EvidenceStore | None = None
+    evidence_policy: EvidencePolicy | None = None
 
     def with_journal_projection(self, projection: Any) -> BoundObservability:
         """返回追加 run-scoped journal projection 后的新 BoundObservability。

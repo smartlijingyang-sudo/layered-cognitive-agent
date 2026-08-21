@@ -167,10 +167,7 @@ class InboxSpliced:
 @session_event("assistant.responded.v1")
 @dataclass(frozen=True)
 class AssistantResponded:
-    """Assistant text response — surface event for derive_messages().
-
-    Aligned with DSH ``assistant/message`` surface event.
-    """
+    """Assistant text response — surface event for derive_messages()."""
 
     turn: int
     step: int

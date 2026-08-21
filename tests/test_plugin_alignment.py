@@ -1,10 +1,9 @@
-"""Plugin alignment to DSH spec — coverage, interaction uniqueness, seam runtime, inline instantiation.
+"""Plugin alignment — coverage, interaction uniqueness, seam runtime, inline instantiation.
 
 These four assertions cover the criteria from the alignment plan:
 
 * (a) Declaration shape scan — every ``lca/plugins/**/*.py`` ``@plugin`` module
-  declares ``name + inject + implements`` (``implements`` is the DSH
-  ``extends Service`` analogue).  Coverage = 100% minus an allowlist of
+  declares ``name + inject + implements`` ().  Coverage = 100% minus an allowlist of
   at most 10 shim modules (each allowlist entry has a one-line comment
   explaining why it cannot adopt the canonical shape).
 

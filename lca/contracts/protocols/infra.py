@@ -24,13 +24,6 @@ from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
 
 
 @runtime_checkable
-class DshRuntime(Protocol):
-    """External DeepSeek Harness turn runner. Driver, not a plane."""
-
-    def run_turn(self, spec: Any, on_event: Any) -> Any: ...
-
-
-@runtime_checkable
 class LLMAdapter(Protocol):
     """LLM 适配器接口：屏蔽 provider 差异。
 

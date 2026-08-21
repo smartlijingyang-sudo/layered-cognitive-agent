@@ -1,6 +1,6 @@
-"""穷尽 match 工具 —— 事件处理的编译期完备性保证（DSH-inspired）。
+"""穷尽 match 工具 —— 事件处理的编译期完备性保证。
 
-设计来源：DSH ``switch on discriminant tags`` + TypeScript 的 ``assertNever``
+Python 没有 TypeScript 的声明合并和 ``assertNever``，可以用
 穷尽检查。Python 没有 TypeScript 的声明合并和 ``assertNever``，但可以用
 ``match`` + ``assert_never`` 达到类似效果：
 
@@ -30,6 +30,5 @@ def assert_never(value: NoReturn) -> NoReturn:
     用法：在 match 的 ``case _:`` 分支调用。mypy 会在有遗漏时
     报类型错误（因为 ``value`` 的类型不是 ``NoReturn``）。
 
-    设计来源：DSH/TypeScript ``assertNever`` 模式。
     """
     raise AssertionError(f"未覆盖的事件类型: {value!r}")

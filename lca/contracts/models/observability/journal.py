@@ -27,7 +27,8 @@ from typing import Any, Literal
 from lca.contracts.atoms.ids import RunId, TraceId, new_run_id, new_trace_id
 from lca.contracts.models.observability.event import OperationOutcome, RuntimeKind
 from lca.contracts.observability.evidence import (
-    EvidenceRef as _EvidenceRef,  # used in JournalRecord.evidence
+    EvidenceRef,
+    EvidenceRef as _EvidenceRef,  # alias for JournalRecord.evidence compat
 )
 
 # ── 关联骨架 ─────────────────────────────────────────────
@@ -42,7 +43,7 @@ class RunScope:
     - ``delegation_id``：生成此 run 的委派 id（无则 None）；
     - ``agent_role``：当前 run 的角色（委派发射点用作 caller_role）。
 
-    品牌化 ID（DSH-inspired）：trace_id/run_id 在类型层面不可互换，
+    品牌化 ID：trace_id/run_id 在类型层面不可互换，
     防止关联骨架 ID 混传。运行时零成本。
     """
 
@@ -75,7 +76,7 @@ def adopt_run_scope(*, role: str) -> tuple[RunScope, bool]:
     ``Agent`` / ``Team``.run. The first actor claims that id. Nested actors
     (delegation, another speaker) mint a child. Returns ``(scope, is_root)``.
 
-    使用品牌化 ID 工厂（DSH-inspired）：trace_id 和 run_id 在类型层面区分，
+    使用品牌化 ID 工厂：trace_id 和 run_id 在类型层面区分，
     防止关联骨架 ID 混传。
     """
     inherited = get_current_run_scope()

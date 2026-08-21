@@ -73,6 +73,20 @@ from lca.layer1_cognitive.body.tool_journal_emit import (  # noqa: E402
 )
 
 
+def _resolve_evidence_pair() -> tuple[Any, Any]:
+    """Return (evidence_store, evidence_policy) from current bound observability。
+
+    注入 safe_executor 在 boot 时已通过 seam plugin 拿到 capability;如果没有
+    配 seam(测试场景),这里返回 (None, None) → emitter 走 typed fields 路径。
+    """
+    from lca.layer0_infra.observability.facade import current_bound
+
+    bound = current_bound()
+    if bound is None:
+        return None, None
+    return bound.evidence_store, bound.evidence_policy
+
+
 class SimpleSafeExecutor(SafeExecutor):
     """Permission → validate → ToolStarted → cache → retry → sandbox execute → ToolInvoked."""
 
@@ -108,7 +122,15 @@ class SimpleSafeExecutor(SafeExecutor):
         invocation_id = invocation_id.strip() or new_id("inv")
         args_preview = compact_args_preview(args)
         started_state = build_started_plugin_state(tool.name, args)
-        emit_tool_started(tool, args_preview, invocation_id, started_state)
+        evidence_store, evidence_policy = _resolve_evidence_pair()
+        emit_tool_started(
+            tool,
+            args_preview,
+            invocation_id,
+            started_state,
+            evidence_store=evidence_store,
+            evidence_policy=evidence_policy,
+        )
 
         with tool_invocation_scope(invocation_id):
             return await self._execute_with_retry(
@@ -217,6 +239,7 @@ class SimpleSafeExecutor(SafeExecutor):
         # Prefer sandbox/tool-provided id; fall back to SafeExecutor-assigned id.
         # ToolInvoked emission is delegated to tool_journal_emit so the
         # boundary guard sees a single canonical site (this module).
+        evidence_store, evidence_policy = _resolve_evidence_pair()
         emit_tool_invoked(
             tool,
             args,
@@ -225,6 +248,8 @@ class SimpleSafeExecutor(SafeExecutor):
             latency_ms=latency_ms,
             attempt=attempt,
             invocation_id=invocation_id,
+            evidence_store=evidence_store,
+            evidence_policy=evidence_policy,
         )
 
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:

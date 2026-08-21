@@ -7,8 +7,7 @@ Architecture:
   (``gateway/runs/execute.py``) is a thin caller: it reads the active
   driver via ``ctx.inject("run_loop_driver_registry")`` and delegates to
   ``driver.execute(ctx, ...)``.
-* :mod:`cognitive` and :mod:`dsh` register their respective drivers
-  into that registry.
+* :mod:`cognitive` registers the default driver into that registry.
 
 Profiles swap drivers by enabling/disabling loop plugins. There is no
 module-level singleton.

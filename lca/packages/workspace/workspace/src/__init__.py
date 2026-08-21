@@ -1,1 +1,0 @@
-"""Mirrors ``workspace/workspace/src/``."""

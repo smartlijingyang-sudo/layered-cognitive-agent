@@ -1,11 +1,10 @@
 """迁移脚本测试 —— ADR-0065 PR-11。
 
 ``scripts/migrate_traces_flat_to_v2_layout.py`` 把 ``traces/runs/<id>.jsonl``
-+ ``<id>.doctor.json`` + ``<id>.dsh.jsonl`` 一次性挪进 ``<root>/runs/<id>/``:
++ ``<id>.doctor.json`` 一次性挪进 ``<root>/runs/<id>/``:
 
 - ``<id>.jsonl``        → ``<id>/journal.jsonl``
 - ``<id>.doctor.json``  → 合并进 ``<id>/manifest.json`` 的 ``extra.doctor_report``
-- ``<id>.dsh.jsonl``    → ``<id>/dsh.jsonl``
 - 一次写 ``<root>/latest.json``(原子 rename,指向 mtime 最大的 run)
 
 测试只验证纯函数 + 文件系统副作用;不依赖 gateway 启动。
@@ -49,13 +48,13 @@ class ScanFlatArtifacts(unittest.TestCase):
             (root / "runs" / "run_aaa1.jsonl").write_text("{}", encoding="utf-8")
             (root / "runs" / "run_aaa1.doctor.json").write_text("{}", encoding="utf-8")
             (root / "runs" / "run_bbb2.jsonl").write_text("{}", encoding="utf-8")
-            (root / "runs" / "run_bbb2.dsh.jsonl").write_text("{}", encoding="utf-8")
+            (root / "runs" / "run_bbb2.diagnostic.jsonl").write_text("{}", encoding="utf-8")
             arts = _scan_flat_artifacts(root / "runs")
             run_ids = {(a.run_id, a.suffix) for a in arts}
             self.assertIn(("run_aaa1", ".jsonl"), run_ids)
             self.assertIn(("run_aaa1", ".doctor.json"), run_ids)
             self.assertIn(("run_bbb2", ".jsonl"), run_ids)
-            self.assertIn(("run_bbb2", ".dsh.jsonl"), run_ids)
+            self.assertIn(("run_bbb2", ".diagnostic.jsonl"), run_ids)
         finally:
             tmp.cleanup()
 
@@ -112,21 +111,9 @@ class LedgerMetadataExtractors(unittest.TestCase):
             _write_jsonl(
                 path,
                 [
-                    {
-                        "seq": 1,
-                        "event_type": "AgentRunStarted",
-                        "scope": {"event_id": "started1"},
-                    },
-                    {
-                        "seq": 2,
-                        "event_type": "AgentRunFinished",
-                        "scope": {"event_id": "finished2"},
-                    },
-                    {
-                        "seq": 3,
-                        "event_type": "AgentRunFinished",
-                        "scope": {"event_id": "finished3"},
-                    },
+                    {"seq": 1, "event_type": "AgentRunStarted", "scope": {"event_id": "started1"}},
+                    {"seq": 2, "event_type": "AgentRunFinished", "scope": {"event_id": "finished2"}},
+                    {"seq": 3, "event_type": "AgentRunFinished", "scope": {"event_id": "finished3"}},
                 ],
             )
             self.assertEqual(_terminal_event_id_for(path), "finished3")
@@ -141,7 +128,7 @@ class LedgerMetadataExtractors(unittest.TestCase):
             s1 = _ledger_summary_for(path)
             s2 = _ledger_summary_for(path)
             self.assertEqual(s1, s2)
-            self.assertEqual(len(s1), 64)  # sha256 hex
+            self.assertEqual(len(s1), 64)
         finally:
             tmp.cleanup()
 
@@ -160,7 +147,6 @@ class PlanAndExecute(unittest.TestCase):
             )
             self.assertEqual(len(plan.journal_moves), 1)
             self.assertEqual(len(plan.manifest_writes), 1)
-            # 干跑不删不写
             self.assertTrue(journal.exists())
             self.assertTrue(doctor.exists())
         finally:
@@ -183,7 +169,6 @@ class PlanAndExecute(unittest.TestCase):
                 json.dumps({"schema": "doctor.v2", "summary": "ok"}),
                 encoding="utf-8",
             )
-            (root / "runs" / "run_aaa1.dsh.jsonl").write_text("{}", encoding="utf-8")
 
             arts = _scan_flat_artifacts(root / "runs")
             plan = _build_plan(root=root, artifacts=arts)
@@ -191,21 +176,15 @@ class PlanAndExecute(unittest.TestCase):
 
             self.assertEqual(counts["journal_moved"], 1)
             self.assertEqual(counts["manifest_written"], 1)
-            self.assertEqual(counts["dsh_moved"], 1)
             self.assertEqual(counts["latest_written"], 1)
 
-            # 新布局产物存在
             run_dir = root / "runs" / "run_aaa1"
             self.assertTrue((run_dir / "journal.jsonl").exists())
             self.assertTrue((run_dir / "manifest.json").exists())
-            self.assertTrue((run_dir / "dsh.jsonl").exists())
 
-            # 老 flat 已清理
             self.assertFalse((root / "runs" / "run_aaa1.jsonl").exists())
             self.assertFalse((root / "runs" / "run_aaa1.doctor.json").exists())
-            self.assertFalse((root / "runs" / "run_aaa1.dsh.jsonl").exists())
 
-            # manifest 内容校验
             payload = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["run_id"], "run_aaa1")
             self.assertEqual(payload["ledger_high_watermark"], 2)
@@ -213,7 +192,6 @@ class PlanAndExecute(unittest.TestCase):
             self.assertEqual(payload["extra"]["doctor_report"]["summary"], "ok")
             self.assertIn("migrated_from", payload["extra"])
 
-            # latest.json 指向 run_aaa1
             latest = json.loads((root / "latest.json").read_text(encoding="utf-8"))
             self.assertEqual(latest["kind"], "run_pointer")
             self.assertEqual(latest["run_id"], "run_aaa1")
@@ -223,10 +201,8 @@ class PlanAndExecute(unittest.TestCase):
     def test_idempotent_skips_already_migrated(self) -> None:
         root, tmp = _fresh_root()
         try:
-            # 已经迁移:run_aaa1/ 目录存在 + journal.jsonl 存在
             (root / "runs" / "run_aaa1").mkdir()
             (root / "runs" / "run_aaa1" / "journal.jsonl").write_text("{}", encoding="utf-8")
-            # 同时存在一份残留的 flat 文件(模拟历史不完整迁移)
             (root / "runs" / "run_aaa1.jsonl").write_text("{}", encoding="utf-8")
             plan = _build_plan(
                 root=root,
@@ -240,7 +216,6 @@ class PlanAndExecute(unittest.TestCase):
     def test_orphan_flat_files_are_left_alone(self) -> None:
         root, tmp = _fresh_root()
         try:
-            # 只有 .doctor.json 没 .jsonl —— 不能建账本目录
             (root / "runs" / "run_orphan1.doctor.json").write_text("{}", encoding="utf-8")
             plan = _build_plan(
                 root=root,

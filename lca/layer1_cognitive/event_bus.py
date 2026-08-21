@@ -5,7 +5,7 @@
 subscribe / waterfall / serial / drain）。不再保留私有的 SimpleEventBus 字典
 实现 —— 任何 LCA 业务代码只能走这条路径。
 
-设计来源：DSH Cordis 5 模分发（emit / parallel / serial / bail / waterfall）。
+设计：cordis 5 模事件分发（emit / parallel / serial / bail / waterfall）。
 
 Public entry points:
 - :class:`CordisEventBus` — production wrapper around a booted cordis Context.

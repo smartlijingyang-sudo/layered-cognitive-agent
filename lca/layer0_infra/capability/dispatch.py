@@ -1,10 +1,10 @@
 """Named provider table used by every Definition service.
 
-Mirrors DSH registry seams (``ctx.llm.registerAdapter``, ``ctx.web``):
+
 - ``register`` returns an idempotent disposer so provider installation is a
   reversible effect (Cordis: "registrations are effects").
 - ``replace`` swaps one provider's routing in a single synchronous section,
-  emitting the change (DSH ``AdapterRegistrationHandle.replace``).
+  emitting the change.
 - ``use`` / ``current`` / ``get`` / ``names`` keep the single-active pattern.
 """
 
@@ -20,7 +20,7 @@ T = TypeVar("T")
 class ProviderDispatch(Generic[T]):
     """Definition 内部的 Provider 挂载表：register / use / current / replace。
 
-    与 DSH 多 provider registry seam（llm / web / skills / subagents）对齐：
+    多 provider registry seam（llm / web / skills / subagents）的统一形态：
     - ``register`` 返回幂等 disposer，卸载即撤销该 provider 的路由；
     - ``replace`` 在一个同步区段内完成原子路由替换（无空窗期）。
     """

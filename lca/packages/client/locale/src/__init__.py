@@ -1,1 +1,0 @@
-"""Mirrors ``client/locale/src/``."""

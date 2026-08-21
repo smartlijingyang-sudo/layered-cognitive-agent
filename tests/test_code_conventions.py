@@ -115,9 +115,6 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/layer0_infra/ops/services/daemon.py": (
         "Daemon 单模块承载 process 管理 + uptime + health"
     ),
-    "lca/layer0_infra/ops/upstream_mirror.py": (
-        "Upstream mirror 单模块承载 fork / mirror / patch 应用"
-    ),
     "lca/layer0_infra/openai_compat.py": (
         "OpenAI compat 单模块承载 chat / completion / embedding 适配"
     ),
@@ -135,9 +132,6 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     ),
     "lca/layer4_app/api.py": (
         "L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"
-    ),
-    "lca/packages/client/runtime/src/client/index.py": (
-        "Upstream TypeScript port stub（lobehub-ui 同名；不计入 LCA 行数硬限）"
     ),
 }
 

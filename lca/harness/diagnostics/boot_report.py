@@ -1,4 +1,4 @@
-"""Boot report — DSH-style plugin inventory + capability graph.
+"""Boot report — plugin inventory + capability graph.
 
 Emitted once at gateway startup and by ``lca-ops debug tree``. Walks the
 cordis Context for entries, prints one row per plugin, then prints the

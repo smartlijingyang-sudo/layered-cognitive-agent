@@ -151,11 +151,10 @@ entries:
     $module: lca.plugins.loop_drivers.cognitive
     config:
       target: cognitive
-  # lca-loop-dsh is NOT loaded here: deployments that ship DSH opt in via
-  # bundles/loop-dsh.yaml in their profile. Avoids registering a driver
-  # whose runtime (DSH daemon) may not be deployed.
+  # Cognitive is the default loop driver; the bundle decides whether to load
+  # alternative loops alongside it.
 
-  # ── Compose-time named factories (DSH-style) ──────────
+  # ── Compose-time named factories ──────────
   # Provide fresh capability service instances at compose time
   # so the composition root never instantiates concrete classes inline.
   - id: tools.compose_service

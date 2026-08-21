@@ -57,34 +57,13 @@ export interface AgentRunAckMessage {
   reason?: string;
 }
 
-export interface DshNotificationMessage {
-  type: 'dsh_notification';
-  turnId: string;
-  method: string;
-  payload?: Record<string, unknown>;
-}
-
-export interface DshTurnFinishedMessage {
-  type: 'dsh_turn_finished';
-  turnId: string;
-  result: {
-    success?: boolean;
-    session_id?: string;
-    final_response?: string;
-    finish_reason?: string | null;
-    error?: string;
-  };
-}
-
 export type ClientMessage =
   | AuthMessage
   | HeartbeatMessage
   | ToolCallResponseMessage
   | RpcResponseMessage
   | SystemInfoResponseMessage
-  | AgentRunAckMessage
-  | DshNotificationMessage
-  | DshTurnFinishedMessage;
+  | AgentRunAckMessage;
 
 // ─── Server → Client ───
 
@@ -121,26 +100,12 @@ export interface RpcRequestMessage {
   timeout?: number;
 }
 
-export interface DshRunTurnRequestMessage {
-  type: 'dsh_run_turn_request';
-  turnId: string;
-  params: Record<string, unknown>;
-  timeout?: number;
-}
-
-export interface DshCancelTurnMessage {
-  type: 'dsh_cancel_turn';
-  turnId: string;
-}
-
 export type ServerMessage =
   | AuthSuccessMessage
   | AuthFailedMessage
   | HeartbeatAckMessage
   | ToolCallRequestMessage
-  | RpcRequestMessage
-  | DshRunTurnRequestMessage
-  | DshCancelTurnMessage;
+  | RpcRequestMessage;
 
 // ─── Shared ───
 

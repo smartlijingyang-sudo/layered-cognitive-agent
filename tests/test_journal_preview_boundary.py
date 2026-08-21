@@ -29,7 +29,6 @@ _PREVIEW_ALLOWLIST = {
     "lca/layer0_infra/observability/journal/otel_mapping.py",
     "lca/layer0_infra/observability/journal/sse_frames.py",
     "lca/layer0_infra/observability/journal/fact_stream_projector.py",
-    "lca/layer0_infra/dsh/projector.py",
 }
 
 

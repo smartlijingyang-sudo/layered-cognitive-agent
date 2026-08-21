@@ -1,4 +1,4 @@
-"""认知循环 → journal 直接发射（开闭原则，ADR-0037）+ Waterfall 拦截（DSH-inspired）。
+"""认知循环 → journal 直接发射（开闭原则，ADR-0037）+ Waterfall 拦截。
 
 认知循环的横切事实（action_degraded / step_completed）由 hook 捕获后
 直接构造 ``JournalEvent`` 实例，通过 ``JournalEmitFn`` 回调写入 journal。
@@ -7,7 +7,7 @@
 telemetry_bridge 桥接层是纯粹的间接浪费——emit/subscribe/record 三点一线，
 中间总线毫无存在必要。
 
-Waterfall 拦截（DSH-inspired）：
+Waterfall 拦截：
     在事件发射前，可以通过 waterfall 链进行拦截/修改/过滤。
     每个 waterfall listener 可以：
     - 修改事件字段（enrichment）
@@ -38,7 +38,7 @@ JournalEmitFn = Callable[[JournalEvent], None]
 """接收已构造的 JournalEvent 并写入 journal 的回调。
 组合根注入 ``lca.layer0_infra.observability.facade.record``。"""
 
-# ── Waterfall 拦截器类型（DSH-inspired）──
+# ── Waterfall 拦截器类型 ──
 JournalEventWaterfallFn = Callable[[JournalEvent, AgentState], JournalEvent | None]
 """Waterfall 拦截器：接收事件和状态，返回修改后的事件或 None（过滤）。
 用于事件发射前的拦截/修改/过滤链。"""
@@ -89,7 +89,7 @@ def make_journal_emitting_hook(
 
     ``emit`` 由组合根注入（通常是 ``facade.record``），L2 不依赖 L0。
 
-    ``waterfall`` 是可选的拦截器链（DSH-inspired）：
+    ``waterfall`` 是可选的拦截器链：
     - 每个拦截器可以修改事件或返回 None 过滤掉事件
     - 拦截器按顺序执行，前一个的输出是后一个的输入
     - 任何拦截器返回 None 则事件不会被发射
@@ -112,7 +112,7 @@ def make_journal_emitting_hook(
         if event is None:
             return
 
-        # Waterfall 拦截链（DSH-inspired）
+        # Waterfall 拦截链
         if waterfall:
             for interceptor in waterfall:
                 event = interceptor(event, state)

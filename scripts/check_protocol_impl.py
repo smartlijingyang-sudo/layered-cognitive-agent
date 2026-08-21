@@ -226,7 +226,7 @@ def _is_implicit_impl(cls: ClassInfo, proto: ProtocolInfo) -> bool:
 def _extract_stem(protocol_name: str) -> str:
     """从 Protocol 名称提取核心词干。
 
-    ``DshRuntime`` → ``DshRuntime``, ``TeamStrategy`` → ``Team``,
+    ``TeamStrategy`` → ``Team``,
     ``ActionRegistryProtocol`` → ``ActionRegistry``.
     """
     stem = protocol_name.removesuffix("Protocol")

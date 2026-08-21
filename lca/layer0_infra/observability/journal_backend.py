@@ -40,7 +40,7 @@ class MemoryJournal(JournalBackend):
 
     @property
     def store(self) -> RunStore:
-        """暴露 RunStore 给需要直接 append 的低层代码（如 DSH sink）。"""
+        """暴露 RunStore 给需要直接 append 的低层代码。"""
         return self._store
 
     def with_projection(self, projection: JournalProjector) -> MemoryJournal:

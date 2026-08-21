@@ -1,6 +1,6 @@
-"""工具执行管线契约 —— 五阶段可拦截管线（DSH-inspired）。
+"""工具执行管线契约 —— 五阶段可拦截管线。
 
-设计来源：DSH ``packages/core/tools`` 的 pre-execute → guards → execute
+pre-execute → guards → execute
 → post-execute → result 管线。将"工具执行"从一步调用展开为五阶段管线，
 每个阶段都是可插拔的拦截点。
 

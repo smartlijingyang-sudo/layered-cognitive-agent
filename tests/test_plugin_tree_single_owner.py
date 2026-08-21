@@ -27,7 +27,6 @@ DEAD_DEFAULT_IDS = frozenset(
         "lca-attachment-provider",
         "lca-llm-provider",
         "lca-team-lead-board",
-        "lca-dsh-bridge",
         "lca-blackboard-memory",
         "lca-synthesizer-concat",
         "lca-brain-modular",
@@ -406,30 +405,3 @@ async def test_unknown_execution_target_writes_journal_and_session_error(
     journal = session2.jsonl_path.read_text(encoding="utf-8")
     assert "AgentRunFinished" in journal
     assert "no-such-loop" in journal
-
-
-@pytest.mark.asyncio
-async def test_dsh_loop_is_a_real_plugin(no_llm_key: None) -> None:
-    """lca-loop-dsh registers DshRunDriver into the runtime registry.
-
-    Opt-in via ``bundles/loop-dsh.yaml``; web-app.yaml does not ship it
-    by default because DSH is a separate deployment artifact.
-    """
-    from pathlib import Path
-
-    import yaml as _yaml
-
-    from lca.harness.profile.boot import boot_entries, load_profile_entries
-
-    webapp_ids = {e["id"] for e in load_profile_entries(DEFAULT_PROFILE)}
-    assert "lca-loop-cognitive" in webapp_ids
-    assert "lca-loop-dsh" not in webapp_ids
-
-    loop_dsh_entries = _yaml.safe_load(Path("bundles/loop-dsh.yaml").read_text())["entries"]
-    entries = load_profile_entries(DEFAULT_PROFILE) + loop_dsh_entries
-    ctx = await boot_entries(entries)
-    registry = ctx.inject("run_loop_driver_registry")
-    assert registry.contains("cognitive")
-    assert registry.contains("dsh")
-    assert registry.resolve("cognitive") is registry.resolve("cognitive")
-    assert registry.resolve("dsh") is not registry.resolve("cognitive")

@@ -8,7 +8,7 @@ from lca.contracts.mechanisms.capability import MissingCapabilityError
 
 
 class CapabilityHub:
-    """DSH ctx 的 Python 实现。mount 一次；之后只通过键取 Definition。"""
+    """进程内 ctx 的 Python 实现。mount 一次；之后只通过键取 Definition。"""
 
     def __init__(self) -> None:
         self._services: dict[str, Any] = {}

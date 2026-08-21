@@ -1,1 +1,0 @@
-"""Mirrors ``attachment/attachment/src/``."""

@@ -1,4 +1,4 @@
-"""Capability context — Definition 拥有的活服务键（DSH ctx 的 Python 形态）。"""
+"""Capability context — Definition 拥有的活服务键。"""
 
 from __future__ import annotations
 

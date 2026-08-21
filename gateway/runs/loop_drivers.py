@@ -21,7 +21,6 @@ from gateway.modes import (
     SOLO_MODE_KEY,
     SOLO_ROLE,
 )
-from gateway.runs.dsh_execute import execute_dsh_session
 from gateway.runs.session import RunSession
 from lca.contracts.atoms.ids import RunId, TraceId
 from lca.contracts.mechanisms.capability import (
@@ -171,29 +170,6 @@ class CognitiveRunDriver:
             result=result,
             error=result.error or "",
         )
-
-
-class DshRunDriver:
-    """DSH sub-process driver (production path).
-
-    Plane hint must arrive as ``plane: 'machine'`` from the wire; the driver
-    never overrides the request.
-    """
-
-    async def execute(
-        self,
-        session: RunSession,
-        *,
-        question: str,
-        mode: str,
-        hub: BoundObservability,
-        bindings: Any,
-        run_context: RunContext,
-        ctx: Context,
-    ) -> DriverOutcome:
-        del question, mode, hub, bindings, run_context, ctx
-        await execute_dsh_session(session)
-        return DriverOutcome(success=not session.error, error=session.error)
 
 
 # ── Helpers (private; nothing else in the gateway constructs an Agent/Team) ──

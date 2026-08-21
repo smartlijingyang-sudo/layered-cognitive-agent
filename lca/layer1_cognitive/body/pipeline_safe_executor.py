@@ -1,4 +1,4 @@
-"""Pipeline-based SafeExecutor — DSH-inspired 五阶段管线集成。
+"""Pipeline-based SafeExecutor — 五阶段管线集成。
 
 将 SafeExecutor 的执行流程重构为五阶段管线：
 1. pre-execute: 权限检查、参数校验
@@ -7,7 +7,7 @@
 4. post-execute: 结果处理、缓存更新
 5. finalize: 纯函数变换（如日志脱敏）
 
-这个实现展示了如何将 DSH 的 Tool Pipeline 模式集成到 LCA 的架构中，
+这个实现展示了如何将 Tool Pipeline 模式集成到 LCA 的架构中，
 同时保持原有的功能（权限、校验、重试、缓存、Journal 记录）。
 
 关键设计决策：

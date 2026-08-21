@@ -78,8 +78,8 @@ def _cognitive_driver_factory() -> Any:
     effects="none",
     description=(
         "Provide the legacy agent_loop factory and register the cognitive "
-        "RunLoopDriver. Other loop plugins (e.g. lca-loop-dsh) register "
-        "their own drivers the same way; the bundle decides which are loaded."
+        "RunLoopDriver. The bundle decides whether alternative loop plugins "
+        "are loaded alongside the cognitive one."
     ),
     test_suite="tests/test_plugin_tree_single_owner.py",
     kind=PluginKind.PRIMITIVE,

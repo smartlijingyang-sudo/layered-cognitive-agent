@@ -66,7 +66,7 @@ stop
   ./scripts/lca-ops logs daemon       sandbox 连接器
 
   事实（decision / step / tool / llm）→ 观察（insight：冗余/循环/成本/关键路径）
-  与 DSH 架构对齐：模型可见的一切都可从 journal 重建。
+  模型可见的一切都可从 journal 重建。
 
 ────────────────────────────────
 单服务
@@ -93,17 +93,21 @@ daemon     sandbox-user 连 gateway
   ./scripts/lca-ops provision
 
 ────────────────────────────────
-上游镜像  upstream
+Run 复盘  coding-agent tools(ADR-0065 §六 / PR-9,只读)
 ────────────────────────────────
-check-upstream
-  对比 lca/packages/ 与 ~/deepseek-harness/packages/ 的结构差异。
-  三个层级都查：顶层包、子包、src/ 文件（.ts ↔ .py）。
-  ./scripts/lca-ops check-upstream                  看差异
-  ./scripts/lca-ops check-upstream --sync           生成缺失的骨架（不覆盖）
-  ./scripts/lca-ops check-upstream --sync --force   强制覆盖
-  ./scripts/lca-ops check-upstream --json           结构化输出（CI）
-  ./scripts/lca-ops check-upstream --upstream <p>   自定义上游根目录
-  退出码：0=一致；1=有缺失。CI 可据此判定。
+  7 个只读工具 —— trace / explain / optimize / graph-run / minimal-repro /
+  diff-context / diff-runs / cost。默认走人类可读,加 --json 给 agent。
+  ./scripts/lca-ops trace <run_id>           通用轨迹
+  ./scripts/lca-ops explain <run_id>         失败路径投影
+  ./scripts/lca-ops optimize <run_id>        优化候选(延迟/token/重试)
+  ./scripts/lca-ops graph-run <run_id>       Mermaid 插件交互图
+  ./scripts/lca-ops minimal-repro <run_id>   失败因果链 + evidence refs
+  ./scripts/lca-ops diff-context <run_id>    同 run step 上下文
+  ./scripts/lca-ops diff-runs <a> <b>        两次 run 对比
+  ./scripts/lca-ops cost <run_id>            LlmCallCompleted 成本累加
+
+  diagnose <alias> 已内置 4 个 alias:model-not-seen / loop-stuck /
+  memory-poisoned / approval-rejected(看 DIAGNOSE_HINTS 拿修复建议)。
 
 ────────────────────────────────
 通用参数
@@ -449,7 +453,7 @@ def _follow_journal(
 ) -> None:
     """Resilient journal SSE consumer with rich fact-stream rendering.
 
-    Three-layer architecture (DSH-aligned: model-visible = logged):
+    Three-layer architecture (model-visible = logged):
     - Transport: SSE connection with auto-reconnect + Last-Event-ID
     - Domain: SSE record → StampedEvent adapter
     - Render: FactStreamProjector (every event as a structured fact)
@@ -601,6 +605,226 @@ def _stream_live(
         # Exponential backoff with cap.
         _time.sleep(backoff)
         backoff = min(backoff * 2, max_backoff)
+
+
+# ── Coding Agent Tools —— ADR-0065 §六 / PR-9 CLI 包装 ───────────────────────
+#
+# 7 个只读工具(TraceInspector / FailureExplainer / OptimizationFinder /
+# PluginGraphRenderer / MinimalReproduction / DiffContext / RunDiff) 已在
+# ``lca/layer0_infra/observability/coding_agent_tools/`` 实现;本节把它们
+# 暴露成 ``lca-ops`` 子命令。全部 read-only;不调用 RunLedger.append。
+# 每个子命令支持 ``--json`` 给 agent / 仪表盘消费;默认走人类可读渲染。
+
+
+def _resolve_journal_path(jsonl: Path | None, run_id: str | None) -> Path:
+    """Resolve journal.jsonl: 显式参数 → ``traces/lca_journal.jsonl`` →
+    ``traces/runs/<run_id>/journal.jsonl``。
+    """
+    if jsonl is not None:
+        if not jsonl.exists():
+            print(f"No journal file at {jsonl}")
+            raise typer.Exit(1)
+        return jsonl
+    default_global = Path("traces/lca_journal.jsonl")
+    if default_global.exists():
+        return default_global
+    if run_id is not None:
+        per_run = Path(f"traces/runs/{run_id}/journal.jsonl")
+        if per_run.exists():
+            return per_run
+    print(f"No journal file found (tried {default_global} and traces/runs/<id>/journal.jsonl)")
+    raise typer.Exit(1)
+
+
+def _emit_report(report: object, *, json_mode: bool) -> None:
+    """输出 coding_agent tool 的 report:json 模式全 dump,否则走 ``str()`` 渲染。"""
+    if json_mode:
+        typer.echo(json.dumps(report, ensure_ascii=False, default=str))
+        return
+    if isinstance(report, str):
+        typer.echo(report)
+        return
+    if isinstance(report, dict):
+        typer.echo(json.dumps(report, ensure_ascii=False, indent=2, default=str))
+        return
+    if isinstance(report, list):
+        for item in report:
+            typer.echo(json.dumps(item, ensure_ascii=False, indent=2, default=str))
+        return
+    typer.echo(str(report))
+
+
+@app.command(name="trace")
+def trace(
+    run_id: str = typer.Argument(..., help="Run id"),
+    jsonl: Path = typer.Option(
+        None, "--jsonl", help="journal.jsonl 路径(默认 traces/lca_journal.jsonl)"
+    ),
+    json_mode: bool = typer.Option(False, "--json", help="JSON 输出,给 agent"),
+    focus: str = typer.Option("all", "--focus", help="焦点:all / llm / tools / delegation"),
+    depth: int = typer.Option(24, "--depth", help="事件深度"),
+) -> None:
+    """检查一个 run 的 journal 轨迹(只读)。"""
+    from lca.layer0_infra.observability.coding_agent_tools.trace_inspector_tool import (
+        TraceInspectorToolImpl,
+    )
+
+    path = _resolve_journal_path(jsonl, run_id)
+    report = TraceInspectorToolImpl(path).inspect_trace(run_id=run_id, focus=focus, depth=depth)
+    _emit_report(report, json_mode=json_mode)
+
+
+@app.command(name="explain")
+def explain(
+    run_id: str = typer.Argument(..., help="Run id"),
+    jsonl: Path = typer.Option(None, "--jsonl"),
+    json_mode: bool = typer.Option(False, "--json"),
+    depth: int = typer.Option(24, "--depth"),
+) -> None:
+    """失败路径投影 —— 给出失败 event 与因果祖先。"""
+    from lca.layer0_infra.observability.coding_agent_tools.failure_explainer import (
+        FailureExplainer,
+    )
+
+    path = _resolve_journal_path(jsonl, run_id)
+    report = FailureExplainer(path).explain_failure(run_id=run_id, depth=depth)
+    _emit_report(report, json_mode=json_mode)
+
+
+@app.command(name="optimize")
+def optimize(
+    run_id: str = typer.Argument(..., help="Run id"),
+    jsonl: Path = typer.Option(None, "--jsonl"),
+    json_mode: bool = typer.Option(False, "--json"),
+    limit: int = typer.Option(5, "--limit", "-n"),
+) -> None:
+    """优化候选 —— 按延迟/token/重试排序。"""
+    from lca.layer0_infra.observability.coding_agent_tools.optimization_finder import (
+        OptimizationFinder,
+    )
+
+    path = _resolve_journal_path(jsonl, run_id)
+    candidates = OptimizationFinder(path).find_optimization_candidates(run_id=run_id, limit=limit)
+    _emit_report(candidates, json_mode=json_mode)
+
+
+@app.command(name="graph-run")
+def graph_run(
+    run_id: str = typer.Argument(..., help="Run id"),
+    jsonl: Path = typer.Option(None, "--jsonl"),
+) -> None:
+    """Mermaid 插件交互图(写到 stdout;供 docs / dashboard 嵌入)。"""
+    from lca.layer0_infra.observability.coding_agent_tools.plugin_graph_renderer import (
+        PluginGraphRenderer,
+    )
+
+    path = _resolve_journal_path(jsonl, run_id)
+    mermaid = PluginGraphRenderer(path).render(run_id=run_id)
+    typer.echo(mermaid)
+
+
+@app.command(name="minimal-repro")
+def minimal_repro(
+    run_id: str = typer.Argument(..., help="Run id"),
+    jsonl: Path = typer.Option(None, "--jsonl"),
+    json_mode: bool = typer.Option(False, "--json"),
+) -> None:
+    """失败因果链 + 必要 evidence refs(供离线复现)。"""
+    from lca.layer0_infra.observability.coding_agent_tools.minimal_reproduction import (
+        MinimalReproduction,
+    )
+
+    path = _resolve_journal_path(jsonl, run_id)
+    pkg = MinimalReproduction(path).export(run_id=run_id)
+    payload = {
+        "schema": "lca.minimal_reproduction/1",
+        "run_id": run_id,
+        "failure_seq": pkg.failure_seq,
+        "failure_event_type": pkg.failure_event_type,
+        "causal_chain": list(pkg.causal_chain),
+        "evidence_refs": list(pkg.evidence_refs),
+        "extra": dict(pkg.extra),
+    }
+    _emit_report(payload, json_mode=json_mode)
+
+
+@app.command(name="diff-context")
+def diff_context(
+    run_id: str = typer.Argument(..., help="Run id"),
+    jsonl: Path = typer.Option(None, "--jsonl"),
+    json_mode: bool = typer.Option(False, "--json"),
+    step: int = typer.Option(0, "--step", help="DiffContext.diff 的 step 参数"),
+) -> None:
+    """同 run 在 step 处的上下文快照(返回 ContextDiff)。"""
+    from lca.layer0_infra.observability.coding_agent_tools.diff_context import (
+        DiffContext,
+    )
+
+    path = _resolve_journal_path(jsonl, run_id)
+    diff = DiffContext(path).diff(run_id=run_id, step=step)
+    payload = {
+        "run_id": diff.run_id,
+        "step_a": diff.step_a,
+        "step_b": diff.step_b,
+        "items_added": list(diff.items_added),
+        "items_removed": list(diff.items_removed),
+    }
+    _emit_report(payload, json_mode=json_mode)
+
+
+@app.command(name="diff-runs")
+def diff_runs(
+    run_id_a: str = typer.Argument(..., help="Run id A"),
+    run_id_b: str = typer.Argument(..., help="Run id B"),
+    jsonl: Path = typer.Option(None, "--jsonl"),
+    json_mode: bool = typer.Option(False, "--json"),
+    step: int = typer.Option(0, "--step"),
+) -> None:
+    """两次 run 同 step 的差异(prompt_hash + delta)。"""
+    from lca.layer0_infra.observability.coding_agent_tools.run_diff import (
+        RunDiffToolImpl,
+    )
+
+    path = _resolve_journal_path(jsonl, run_id_a)
+    diff = RunDiffToolImpl(path).diff(run_id_a=run_id_a, run_id_b=run_id_b, step=step)
+    payload = {
+        "run_id_a": diff.run_id_a,
+        "run_id_b": diff.run_id_b,
+        "step": diff.step,
+        "prompt_hash_a": diff.prompt_hash_a,
+        "prompt_hash_b": diff.prompt_hash_b,
+        "delta": dict(diff.delta),
+    }
+    _emit_report(payload, json_mode=json_mode)
+
+
+@app.command(name="cost")
+def cost(
+    run_id: str = typer.Argument(..., help="Run id"),
+    jsonl: Path = typer.Option(None, "--jsonl"),
+    json_mode: bool = typer.Option(False, "--json"),
+    pricing_ref: str = typer.Option("", "--pricing-ref", help="按 pricing_ref 过滤"),
+) -> None:
+    """按 LlmCallCompleted 累加成本(ADR-0065 §六 / PR-6 CostProjector)。"""
+    from lca.layer0_infra.observability.cost.projector import CostProjector
+    from lca.layer0_infra.observability.journal.journal_io import record_to_stamped
+
+    path = _resolve_journal_path(jsonl, run_id)
+    projector = CostProjector()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        stamped = record_to_stamped(payload)
+        if stamped is not None:
+            projector.on_event(stamped)
+    report = projector.render()
+    if pricing_ref:
+        report["filtered_pricing_ref"] = pricing_ref
+    _emit_report(report, json_mode=json_mode)
 
 
 # ── Entry Point ───────────────────────────────────────────────────────
@@ -857,58 +1081,6 @@ def _render_diagnostic_trace_line(item: dict[str, Any]) -> None:
         print(f"  output: {json.dumps(output, ensure_ascii=False, sort_keys=True)}")
     if item.get("error_type"):
         print(f"  error: {item['error_type']}: {item.get('error_message', '')}")
-
-
-@app.command(name="check-upstream")
-def check_upstream(
-    upstream: Path = typer.Option(
-        Path.home() / "deepseek-harness" / "packages",
-        "--upstream",
-        help="Upstream packages root (default: ~/deepseek-harness/packages).",
-    ),
-    target: Path = typer.Option(
-        Path("lca/packages"),
-        "--target",
-        help="Local mirror root (default: lca/packages).",
-    ),
-    sync: bool = typer.Option(
-        False,
-        "--sync",
-        help="Generate missing skeleton files (idempotent; never overwrites).",
-    ),
-    populate: bool = typer.Option(
-        False,
-        "--populate",
-        help="With --sync, also fill stubs with surface-correct Python exports (passes check_port_surface.py).",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force",
-        help="With --sync, overwrite existing files (use sparingly).",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="JSON report for CI."),
-) -> None:
-    """Compare local ``lca/packages/`` against upstream ``deepseek-harness/packages/``.
-
-    Reports missing/extra at three levels (top-level package, sub-package, src/ files)
-    and, with ``--sync``, generates Python skeleton files mirroring the upstream layout.
-    Each upstream ``.ts`` file becomes a local ``.py`` stub with a header pointing back
-    to its upstream source. Hyphenated upstream names become underscored Python names
-    (e.g. ``llm-deepseek`` → ``llm_deepseek``).
-
-    Exit code: ``0`` when in sync (or after a successful sync), ``1`` otherwise.
-    """
-    from lca.layer0_infra.ops.upstream_mirror import cli_run
-
-    code = cli_run(
-        upstream=upstream,
-        target=target,
-        sync=sync,
-        force=force,
-        populate=populate,
-        json_output=json_output,
-    )
-    raise typer.Exit(code)
 
 
 # ── Diagnostics (Phase J / spec §24.5) ──────────────────────────────

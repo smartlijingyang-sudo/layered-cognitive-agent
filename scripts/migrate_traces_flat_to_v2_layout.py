@@ -6,7 +6,6 @@
     └── runs/
         ├── run_xxx.jsonl              # 账本
         ├── run_xxx.doctor.json        # 终态诊断
-        ├── run_yyy.dsh.jsonl          # DSH archive
         └── ...
 
 新布局(0065 §七)::
@@ -16,7 +15,6 @@
         └── run_xxx/
             ├── journal.jsonl          # 来自 <id>.jsonl
             ├── manifest.json          # 合并 <id>.doctor.json 的 doctor_report
-            ├── dsh.jsonl              # 来自 <id>.dsh.jsonl(若存在)
             ├── evidence/              # 空(留作未来)
             └── materializations/<id>/<v>/  # 空(留作未来)
 
@@ -57,9 +55,8 @@ _RUN_ID_RE = re.compile(r"^run_[a-z0-9]{4,26}$")
 # 老布局文件名后缀:
 # - .jsonl                  → journal 账本
 # - .doctor.json            → doctor 终态报告(并入 manifest.extra.doctor_report)
-# - .dsh.jsonl              → DSH archive
 # - .diagnostic.jsonl       → 旧诊断流(并入 journal 后已停用;保留为 legacy)
-_FLAT_SUFFIXES = (".jsonl", ".doctor.json", ".dsh.jsonl", ".diagnostic.jsonl")
+_FLAT_SUFFIXES = (".jsonl", ".doctor.json", ".diagnostic.jsonl")
 
 # SHA256 摘要用的常量与 execute.py _ledger_summary_for 保持一致
 _LEDGER_TAIL_BYTES = 1_048_576
@@ -70,7 +67,7 @@ class FlatArtifact:
     """一条老布局的文件。"""
 
     run_id: str
-    suffix: str  # 之一:.jsonl / .doctor.json / .dsh.jsonl
+    suffix: str  # 之一:.jsonl / .doctor.json
     src_path: Path
     mtime: float
 
@@ -84,7 +81,6 @@ class MigrationPlan:
     manifest_writes: list[tuple[FlatArtifact, FlatArtifact | None, Path]] = field(
         default_factory=list
     )
-    dsh_moves: list[tuple[FlatArtifact, Path]] = field(default_factory=list)
     diagnostic_moves: list[tuple[FlatArtifact, Path]] = field(default_factory=list)
     skipped_existing_dirs: list[str] = field(default_factory=list)
     skipped_unrelated: list[Path] = field(default_factory=list)
@@ -98,8 +94,8 @@ def _scan_flat_artifacts(runs_dir: Path) -> list[FlatArtifact]:
         if entry.is_dir():
             continue
         name = entry.name
-        # 注意:``.jsonl`` 与 ``.dsh.jsonl`` / ``.diagnostic.jsonl`` 同后缀结尾;
-        # 必须先尝试**最长**后缀,再试短后缀,否则 ``run_xxx.dsh.jsonl`` 会被错配为 ``.jsonl``。
+        # 注意:``.jsonl`` 与 ``.diagnostic.jsonl`` 同后缀结尾;
+        # 必须先尝试**最长**后缀,再试短后缀,否则 ``run_xxx.diagnostic.jsonl`` 会被错配为 ``.jsonl``。
         for suffix in sorted(_FLAT_SUFFIXES, key=len, reverse=True):
             if not name.endswith(suffix):
                 continue
@@ -194,36 +190,28 @@ def _build_plan(
     for run_id, items in by_run.items():
         run_dir = root / "runs" / run_id
         # 只迁移 .diagnostic.jsonl 的 helper 文件(无 .jsonl / .doctor.json 依赖);
-        # 已迁移过的 run 跳过主体逻辑,但仍可收 diagnostic / dsh helper。
+        # 已迁移过的 run 跳过主体逻辑,但仍可收 diagnostic helper。
         diagnostic_alone: FlatArtifact | None = None
-        dsh_alone: FlatArtifact | None = None
         if run_dir.exists():
             for item in items:
                 if item.suffix == ".diagnostic.jsonl":
                     diagnostic_alone = item
-                elif item.suffix == ".dsh.jsonl":
-                    dsh_alone = item
             if diagnostic_alone is not None:
                 plan.diagnostic_moves.append((diagnostic_alone, run_dir / "diagnostic.jsonl"))
-            if dsh_alone is not None:
-                plan.dsh_moves.append((dsh_alone, run_dir / "dsh.jsonl"))
             # 没有 helper 需要补:记为已迁移
-            if diagnostic_alone is None and dsh_alone is None:
+            if diagnostic_alone is None:
                 plan.skipped_existing_dirs.append(run_id)
             else:
                 plan.artifacts.extend(items)
             continue
         journal: FlatArtifact | None = None
         doctor: FlatArtifact | None = None
-        dsh: FlatArtifact | None = None
         diagnostic: FlatArtifact | None = None
         for item in items:
             if item.suffix == ".jsonl":
                 journal = item
             elif item.suffix == ".doctor.json":
                 doctor = item
-            elif item.suffix == ".dsh.jsonl":
-                dsh = item
             elif item.suffix == ".diagnostic.jsonl":
                 diagnostic = item
         if journal is None:
@@ -239,8 +227,6 @@ def _build_plan(
                 run_dir / "manifest.json",
             )
         )
-        if dsh is not None:
-            plan.dsh_moves.append((dsh, run_dir / "dsh.jsonl"))
         if diagnostic is not None:
             plan.diagnostic_moves.append((diagnostic, run_dir / "diagnostic.jsonl"))
     return plan
@@ -262,7 +248,6 @@ def _execute_plan(*, root: Path, plan: MigrationPlan) -> dict[str, int]:
     counts = {
         "journal_moved": 0,
         "manifest_written": 0,
-        "dsh_moved": 0,
         "diagnostic_moved": 0,
         "latest_written": 0,
         "src_deleted": 0,
@@ -287,11 +272,6 @@ def _execute_plan(*, root: Path, plan: MigrationPlan) -> dict[str, int]:
             encoding="utf-8",
         )
         counts["manifest_written"] += 1
-
-    for dsh, dst in plan.dsh_moves:
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(dsh.src_path), str(dst))
-        counts["dsh_moved"] += 1
 
     for diagnostic, dst in plan.diagnostic_moves:
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -381,7 +361,6 @@ def _format_report(
     lines.append(f"flat artifacts found: {len(plan.artifacts)}")
     lines.append(f"  - journal moves: {len(plan.journal_moves)}")
     lines.append(f"  - manifest writes: {len(plan.manifest_writes)}")
-    lines.append(f"  - dsh moves: {len(plan.dsh_moves)}")
     lines.append(f"  - diagnostic moves: {len(plan.diagnostic_moves)}")
     lines.append(f"skipped (already a per-run dir): {len(plan.skipped_existing_dirs)}")
     lines.append(f"skipped (orphan / unrelated): {len(plan.skipped_unrelated)}")
@@ -399,7 +378,7 @@ def _format_report(
         for path in plan.skipped_unrelated[:20]:
             lines.append(f"  - {path}")
     lines.append(
-        f"action verb: {verb} {len(plan.journal_moves)} journal moves + {len(plan.manifest_writes)} manifest writes + {len(plan.dsh_moves)} dsh moves + {len(plan.diagnostic_moves)} diagnostic moves"
+        f"action verb: {verb} {len(plan.journal_moves)} journal moves + {len(plan.manifest_writes)} manifest writes + {len(plan.diagnostic_moves)} diagnostic moves"
     )
     return "\n".join(lines)
 

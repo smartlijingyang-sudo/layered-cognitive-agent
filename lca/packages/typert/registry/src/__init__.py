@@ -1,1 +1,0 @@
-"""Mirrors ``typert/registry/src/``."""

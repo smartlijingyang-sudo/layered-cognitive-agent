@@ -2,7 +2,7 @@
 """check_no_flat_runs —— ADR-0065 §七 / PR-11。
 
 0065 强制 traces/runs/ 顶层只能有 per-run 目录 ``<run_id>/``;
-flat 文件 ``<id>.jsonl`` / ``<id>.doctor.json`` / ``<id>.dsh.jsonl`` /
+flat 文件 ``<id>.jsonl`` / ``<id>.doctor.json`` /
 ``<id>.*.jsonl`` 都是旧 v1 残留,新代码不应再产生。
 
 检查范围::
@@ -11,7 +11,6 @@ flat 文件 ``<id>.jsonl`` / ``<id>.doctor.json`` / ``<id>.dsh.jsonl`` /
     ├── run_<hex>/                     OK —— per-run 目录
     ├── run_xxx.jsonl                  VIOLATION —— flat 账本(应移进 run_xxx/journal.jsonl)
     ├── run_xxx.doctor.json            VIOLATION —— flat 诊断(应并入 run_xxx/manifest.json)
-    ├── run_xxx.dsh.jsonl              VIOLATION —— flat DSH archive(应移进 run_xxx/dsh.jsonl)
     └── unrelated.txt                  VIOLATION —— 任何非目录文件
 
 run_id 命名合法性由 ``scripts/check_run_naming.py`` 独立把守;本脚本只管
@@ -29,7 +28,7 @@ RUNS_DIR = REPO / "traces" / "runs"
 
 # 已知会"误判为遗留"的合法场景:无 — 若有必须 ADR 化(0065 §一 拒绝自由形状)。
 _LEGACY_FLAT_SUFFIXES = (
-    ".jsonl",  # 账本 / DSH archive 共用后缀
+    ".jsonl",  # 账本后缀
     ".doctor.json",  # 老 doctor 报告
 )
 

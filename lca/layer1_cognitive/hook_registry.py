@@ -5,7 +5,7 @@
 相位 span 在 trigger 边界统一发射（观察者模式），属性从 hook kwargs 提取后
 经 ambient 策略脱敏/截断（写入期强制）。
 
-设计：DSH 把生命周期钩子作为 cordis events 暴露（``agent/pre-step`` 、
+设计：把生命周期钩子作为 cordis events 暴露（``agent/pre-step`` 、
 ``tools/pre-execute`` 等都是 ``ctx.on`` 的 listener）。LCA 把 ``HookEvent``
 枚举映射成 ``hook/<event>`` 命名空间，单一 dispatch 后端——cordis events。
 """

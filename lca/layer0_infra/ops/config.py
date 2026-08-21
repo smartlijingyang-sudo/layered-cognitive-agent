@@ -100,22 +100,6 @@ class OnlyboxesConfig(BaseModel):
         return f"./{self.build_script} && ./{self.configure_script}"
 
 
-class DshConfig(BaseModel):
-    """DSH (DeepSeek Harness) SDK — installed in the shared LCA venv."""
-
-    venv_dir: str = "/opt/lca/venv"
-    install_script: str = "deploy/dsh/install-dsh-sdk.sh"
-    sdk_package: str = "deepseek-harness-sdk"
-
-    @property
-    def install_cmd(self) -> str:
-        return f"./{self.install_script}"
-
-    @property
-    def sdk_python(self) -> Path:
-        return Path(self.venv_dir) / "bin" / "python3"
-
-
 class DaemonConfig(BaseModel):
     """Agent CLI daemon (sandbox-user connect)."""
 
@@ -142,7 +126,6 @@ class OpsConfig(BaseModel):
     infra: InfraConfig = Field(default_factory=InfraConfig)
     daemon: DaemonConfig = Field(default_factory=DaemonConfig)
     onlyboxes: OnlyboxesConfig = Field(default_factory=OnlyboxesConfig)
-    dsh: DshConfig = Field(default_factory=DshConfig)
     run_dir: str = ".lca-ops"
     sudo_pass_file: str = ".lobehub-stack/sudo.pass"
 
@@ -184,10 +167,7 @@ class OpsConfig(BaseModel):
             ob = ob.model_copy(update={"worker_service": service})
 
         dsh = self.dsh
-        if venv := os.environ.get("DSH_VENV_DIR"):
-            dsh = dsh.model_copy(update={"venv_dir": venv})
-
-        return self.model_copy(update={"gateway": gw, "lobehub": lh, "onlyboxes": ob, "dsh": dsh})
+        return self.model_copy(update={"gateway": gw, "lobehub": lh, "onlyboxes": ob})
 
     @property
     def root(self) -> Path:

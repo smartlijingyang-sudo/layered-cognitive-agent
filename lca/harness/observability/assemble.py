@@ -121,6 +121,8 @@ def assemble_observability(
         tracer=tracer,
         policy=policy,
         scorers=tuple(scorers),
+        evidence_store=_maybe("evidence_store"),
+        evidence_policy=_maybe("evidence_policy"),
     )
     provide = getattr(ctx, "provide", None)
     if callable(provide):

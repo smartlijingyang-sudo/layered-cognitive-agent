@@ -50,11 +50,6 @@ onlyboxes:
   worker_service: onlyboxes-worker-docker
   terminal_image: onlyboxes-terminal-local:lca
 
-# ── DSH (DeepSeek Harness compare driver) ─────────────────────────────
-dsh:
-  venv_dir: /opt/lca/venv
-  install_script: deploy/dsh/install-dsh-sdk.sh
-
 # ── Runtime state ─────────────────────────────────────────────────────
 run_dir: .lca-ops
 sudo_pass_file: .lobehub-stack/sudo.pass
