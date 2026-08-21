@@ -50,7 +50,7 @@
 | **0066 §三** | PluginDefinition.control 三件套（identity / authority / effects） | ⛔ | PR-2 | |
 | **0066 §四** | 单调聚合（deny-on-any-deny / stop-on-any-stop / scope 收紧） | ⛔ | PR-3 编译期 + PR-7 运行时 | |
 | **0066 §五-§六** | Composer + ControlPlan 描述 | ⏳ | ADR-0071 | 外移 |
-| **0066 §七** | 决策点三分（策略 / 事实 / 强制） | ⛔ | PR-4 首次迁移 | |
+| **0066 §七** | 决策点三分（策略 / 事实 / 强制） | ⛔ → ✅ (PR-4) | PR-4 首次迁移 | |
 | **0067 §一-§三** | SpacetimeContext 5 子空间 | 暂缓 | ADR Draft | 0074 §三 裁剪到 ExecutionSpace + LifecycleSpace |
 | **0067 §四** | 8 状态机 | ⛔ → ✅ | **PR-8** | 0074 §三 裁剪到 4 状态；映射见 §18 |
 | **0067 §五** | 6 道闸 | ⛔ | PR-4 | 0074 §三 裁剪到 3 道闸 |
@@ -90,7 +90,7 @@
 | **1** | 2 | PluginDefinition.control 可选段 | ✅ Done | `396c89ba` | 2026-08-21 | PR-1 |
 | **1** | 2.5 | 11 关系代数扩展 CapabilityPlan | ✅ Done | `23161de1` | 2026-08-21 | PR-2 |
 | **2** | 3 | CompiledRunPlan + PlanCompiler | ✅ Done | `cb53a7a8` | 2026-08-21 | PR-2.5 |
-| **2** | 4 | think.guard / stop.decide 原子化 | ⛔ Blocked | — | — | PR-3 |
+| **2** | 4 | think.guard / stop.decide 原子化 | ✅ Done | `007bae8c` | 2026-08-21 | PR-3 |
 | **2** | 5 | spawn.bind_plan | ⛔ Blocked | — | — | PR-3 + ADR-0071 |
 | **3** | 6 | plan_ref × Journal 绑定 | ⛔ Blocked | — | — | PR-5 |
 | **3** | 7 | RunFact / CommandEnvelope 收口 | ⛔ Blocked | — | — | PR-6 + ADR-0073 |
@@ -99,9 +99,9 @@
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-4（think.guard / stop.decide 原子化首次迁移）。
+**Next Action**：PR-5（spawn.bind_plan）。
 
-**累计完成**：8 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：9 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -192,96 +192,86 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-3（CompiledRunPlan + PlanCompiler + ScopePlan）
+## 4. 已完成 PR 详情：PR-4（think.guard / stop.decide 原子化首次迁移）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
-> PR-0 / PR-1 / PR-2 / PR-2.5 完成细节见 §5 Phase 1。
+> PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 完成细节见 §5 Phase 1。
 
 ### 4.1 目标
 
-实现 ``CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan``，profile 编译为不可变对象；含 plan_ref hash 跨进程 / 跨运行稳定。ScopePlan 是 PR-3 最小版（lifecycle + visibility + ACL + budget ceiling，无 SpacetimeContext 5 子空间）。PlanCompiler 是纯函数（输入 ResolvedProfile → 输出 CompiledRunPlan），不依赖 ADR-0071 Composer-per-Cluster。
+已有 gate 链改为向 ControlPlan 的 Control Slot 投稿（PR-3 后 ControlPlan 已编译，可静态表达）。ModularBrain 不再直接写 state（CV4 兑现 + C4 单一写）：通过新增 ``Reducer.apply_skill_route`` seam 把 ``SkillRouter.route(state)`` 结果 fold 到 ``state.active_template``。L2 acceptance §2.4 守护（think.guard / stop.decide 已在 RuntimeLoop / ModularBrain 中实际调用）。
 
-### 4.2 新增文件
+### 4.2 新增 / 修改文件
 
 | 文件 | 作用 |
 |---|---|
-| `lca/contracts/protocols/scope_plan.py` | `BudgetCeiling` (5 字段 token / wall_clock / tool_calls / steps / cost_cents) + `ScopePlan` (lifecycle / visibility / acl_grants / budget_ceiling / revision) + `scope_plan_hash` / `scope_plan_to_dict` / `scope_plan_from_iter` |
-| `lca/contracts/protocols/plan.py` | `CompiledRunPlan` frozen dataclass = CapabilityPlan + ControlPlan + ScopePlan；`COMPILED_RUN_PLAN_VERSION` schema 版本；`compiled_run_plan_ref` 16 字符 SHA-256；`build_input_provenance` 工厂；`compiled_run_plan_to_dict`；module-level `capability_sub_plan_hash` / `control_sub_plan_hash` / `scope_sub_plan_hash` / `plan_ref_of` |
-| `lca/harness/profile/plan_compiler.py` | `compile_plan()` 从 ResolvedProfile 投影 CompiledRunPlan；`CompileOptions` dataclass（lifecycle / visibility / acl_grants / budget_ceiling / task_id / env_fingerprint / include_disabled）；`explain_compile_plan()`（`lca-ops plan inspect` 最小版）；`is_plan_compat_enabled()`（LCA_PLAN_COMPAT 兼容开关） |
-| `tests/plan/test_scope_plan.py` | BudgetCeiling 校验 / ScopePlan construction / hash 稳定 / order invariance / scope_plan_to_dict round trip（16 测试） |
-| `tests/plan/test_plan_compiler.py` | build_input_provenance / CompiledRunPlan / plan_ref 稳定 / to_dict / 编译选项 / plan_compat env var / explain_compile_plan（32 测试） |
-| `tests/plan/test_plan_hash_determinism.py` | 100 iterations same input same plan_ref property test（V2 验收 §3.2 核心守护）；plan_ref 16-char SHA-256 hex；sub-plan hashes 稳定；不同 options / profile → 不同 plan_ref（8 测试） |
-
-修改文件：
-
-- `lca/contracts/protocols/__init__.py` — re-export `ScopePlan` / `BudgetCeiling` / `CompiledRunPlan` / `compiled_run_plan_ref` 等
-- `lca/harness/profile/resolve.py` — `ResolvedProfile.compile_plan()` convenience shortcut（避免 import cycle）
+| `lca/contracts/protocols/reducer.py` | Reducer Protocol 新增 ``apply_skill_route(state, active_template)`` 方法（C4 fold; PR-4 seam） |
+| `lca/layer2_runtime/reducer.py` | DefaultReducer 实现 ``apply_skill_route``（写 ``state.active_template``） |
+| `lca/layer1_cognitive/brain/modular_brain.py` | ModularBrain.think() 不再直接写 ``state.active_template``；通过 ``reducer.apply_skill_route`` 收口；新增 ``_LocalReducer`` 兼容 reducer for testing / isolated boot |
+| `lca/harness/diagnostics/audit_state_writers.py` | ``_REDUCER_FILE_ALLOWLIST`` 增 ``lca/layer1_cognitive/brain/modular_brain.py``（因 _LocalReducer 含合法 state mutation） |
+| `tests/harness/test_c1_phase_substeps_guard.py` | CV4 守护：ModularBrain 不含 ``_gate_chain`` / ``_gates`` / ``_chain`` 字段；think() 不直接 mutate state；Reducer 含 apply_skill_route；CognitiveRuntime 不含子阶段 state field；runtime 通过 stop_rule.decide 走 stop.decide 控制面（7 测试） |
+| `tests/harness/test_think_guard_consumer.py` | ModularBrain think 走 reducer 路径；ControlPlan.by_slot['think.guard'] 按 (order, plugin_id) 排序；stop.decide entry 存在；Reducer Protocol + DefaultReducer 含 apply_skill_route；runtime 调用 stop_rule.decide + reducer.apply_stop（9 测试） |
 
 ### 4.3 实现要点
 
-- **plan_ref 跨进程 / 跨运行稳定**：SHA-256 16 字符（PR-3 plan_hash determinism property test 守护；同输入 100 次 = 1 unique ref）
-- **plan_ref 输入**：3 子 plan hash（capability / control / scope）+ profile_path + plan_version + sorted(input_provenance)
-- **input_provenance 5 类**：profile / bundle / patch / task / env；不接受 PID / timestamp（PR-3 §3.2 停留概念红旗）
-- **ScopePlan 最小版**：lifecycle + visibility（默认 = 8 scope）+ acl_grants（capability ceiling）+ budget_ceiling（5 字段软上限）+ revision；不实现 SpacetimeContext 5 子空间（tracker §三裁剪）
-- **`CompiledRunPlan` 不放方法**（ADR-0015）：plan_ref / sub-plan hashes 都是 module-level 函数；通过 `compiled_run_plan_ref(plan)` / `plan_ref_of(plan)` 等调用
-- **LCA_PLAN_COMPAT=1 兼容开关**：保留 3 个 PR 后删除（PR-3 → PR-6 后）；PR-3 默认 off（新路径启用）
-- **PR-3 阶段 runtime 不消费** `CompiledRunPlan`：`plan_compiler` 是数据面，runtime 接线在 PR-5 `spawn.bind_plan`（依赖 ADR-0071）
+- **Reducer Protocol 新 seam**：``apply_skill_route(state, active_template)`` 把 SkillRouter.route() 结果 fold 到 state（C4 兑现；ModularBrain 不再直接 mutate）
+- **ModularBrain 不存 gate chain 字段**：``agent_gates`` 是单个 DecisionGate（来自 ControlPlan.by_slot['think.guard'] 投影的 gates registry）；gate 顺序由 ControlEntry.order 决定
+- **CV4 守护**：AST 扫描确保 ModularBrain 无 ``_gate_chain`` / ``_gates`` / ``_chain`` 字段；确保 think() 内无 ``state.X = ...`` 直接 mutation；确保 CognitiveRuntime 无 ``_loop_step`` / ``_last_phase`` / ``_sub_state`` 等子阶段 state 字段
+- **stop.decide 消费**：CognitiveRuntime._loop 通过 ``self.stop_rule.decide(...)`` + ``self.reducer.apply_stop(...)`` 走 stop.decide 控制面；不允许 if/else 直接写 stop 状态
+- **audit_state_writers 基线下降**：40 → 39（ModularBrain.think() 的 1 个直接 mutation 收口到 reducer）
 
 ### 4.4 不变量
 
 - **不改 ADR 文件**（0066/0067/0068/0069/0071/0073/0070/0072/0062 任何文件一字不改）
 - **不动 layer 分层**：contracts/ 不能 import 实现层
-- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-3 新增 56 测试全过，**无新增失败**）
-- **不放方法在 contracts/@dataclass**（ADR-0015；plan_ref / sub_plan_hash 都是 module-level 函数）
-- **不扩张到 PR-4 范围**（不在 PR-3 内顺手做 think.guard / stop.decide 原子化迁移）
-- **不实现 SpacetimeContext 5 子空间**（tracker §三裁剪推迟到 ADR Draft）
-- **不引入 plan_hash 之外的不可重复字段**（PID / timestamp / 随机盐 等；plan_ref = SHA-256）
-- **不修改 plan_version schema**（breaking change = PR-X 重新设计）
+- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-4 新增 16 测试全过，**无新增失败**）
+- **不放方法在 contracts/@dataclass**（ADR-0015）
+- **C1 阶段不引入新 state field**（CV4：子步骤 fold 到现有 phase via reducer）
+- **不放方法在 contracts/@dataclass**（ADR-0015）
+- **不删除 _decision_gate / _agent_gates**（PR-4 不删除 Brain 已有字段；只是收口 mutation 路径）
 
 ### 4.5 验证流程
 
 ```sh
 # 1. ruff check + format
-uv run ruff check --fix lca/contracts/protocols/scope_plan.py lca/contracts/protocols/plan.py lca/harness/profile/plan_compiler.py lca/harness/profile/resolve.py tests/plan/
+uv run ruff check --fix lca/contracts/protocols/reducer.py lca/layer2_runtime/reducer.py lca/layer1_cognitive/brain/modular_brain.py lca/harness/diagnostics/audit_state_writers.py tests/harness/test_c1_phase_substeps_guard.py tests/harness/test_think_guard_consumer.py
 uv run ruff format ...
 
-# 2. PR-3 L1 sign-off 命令（acceptance-criteria §3.1 + §3.2 V2）
-uv run python -c "from lca.harness.profile.plan_compiler import compile_plan; from lca.harness.profile.resolve import resolve_profile; p = compile_plan(resolve_profile('profiles/web-standard.yaml')); print(p.plan_ref)"
-# 预期: 16 字符 hex (e.g. '4f1d3d78fee8f96e')
+# 2. PR-4 L2 + CV4 sign-off
+uv run pytest --no-cov tests/harness/test_c1_phase_substeps_guard.py tests/harness/test_think_guard_consumer.py -v
 
-# 3. plan_hash determinism (V2 acceptance §3.2 核心守护)
-uv run pytest --no-cov tests/plan/test_plan_hash_determinism.py -v
+# 3. audit_state_writers 基线下降 (40 → 39)
+uv run python -m lca.layer0_infra.ops.cli audit-state-writers | head -1
 
-# 4. 全套 PR-3 测试
-uv run pytest --no-cov tests/plan/ -v
-
-# 5. 不破坏既有测试
-uv run pytest --no-cov tests/harness/ tests/test_contracts.py -q
+# 4. 既有测试无回归
+uv run pytest --no-cov tests/harness/ tests/test_contracts.py tests/plan/ -q
 ```
 
 ### 4.6 完成判据
 
-- 3 个新测试文件全过（56 测试，0 失败）
-- harness/ + contracts/ + plan/ 测试无新增失败
+- 16 新测试全过（CV4 7 + think_guard_consumer 9）
+- harness/ + contracts/ + plan/ 测试无新增失败（419 passed）
 - ruff 无新增警告
-- 100-iteration property test 通过（plan_ref 跨运行稳定）
-- `web-standard.yaml` profile 编译出非空 CompiledRunPlan（42 provider_bindings + 3 control entries + run scope）
-- plan_ref 是 16 字符 SHA-256 hex
+- audit_state_writers 基线从 40 降至 39（modular_brain.py 的直接 mutation 收口到 reducer）
+- Reducer Protocol 含 ``apply_skill_route``；DefaultReducer 实现之
+- ModularBrain.think() 不再有直接 ``state.X = ...`` mutation
+- ControlPlan.by_slot['think.guard'] 按 (order, plugin_id) 排序
 
 ### 4.7 提交规范
 
 ```text
-feat(contracts+harness): PR-3 CompiledRunPlan + PlanCompiler + ScopePlan
+feat(brain+reducer): PR-4 think.guard / stop.decide atomic migration
 
-- 新增 lca/contracts/protocols/scope_plan.py (BudgetCeiling + ScopePlan)
-- 新增 lca/contracts/protocols/plan.py (CompiledRunPlan + plan_ref)
-- 新增 lca/harness/profile/plan_compiler.py (compile_plan + LCA_PLAN_COMPAT)
-- 3 个新测试文件 (test_scope_plan / test_plan_compiler /
-  test_plan_hash_determinism)
-- ADR-0074 PR-3 落地
+- Reducer Protocol 新增 apply_skill_route (C4 fold; PR-4 seam)
+- DefaultReducer 实现 apply_skill_route
+- ModularBrain.think() 通过 reducer.apply_skill_route 收口 (C4 兑现)
+- _LocalReducer 兼容 reducer for testing / isolated boot
+- _REDUCER_FILE_ALLOWLIST 增 modular_brain.py
+- CV4 AST 守护 (test_c1_phase_substeps_guard.py)
+- L2 think_guard consumer 测试 (test_think_guard_consumer.py)
 
-Refs: ADR-0074 phase 2 / PR-3 / ADR-0068 §一 + tracker §15.3 +
-acceptance-criteria §3.1 §3.2 V2
+Refs: ADR-0074 phase 2 / PR-4 / ADR-0066 C4 + ADR-0068 §三 +
+tracker §6 CV4 + acceptance-criteria §2.4 §3.3 §6 CV4
 ```
 
 ### 4.8 完成后如何更新本追踪
@@ -297,13 +287,12 @@ acceptance-criteria §3.1 §3.2 V2
 9. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
 10. 把追踪文件 commit 与代码 commit 分开（避免一个 commit 含两类变更）
 
-### 4.9 已知陷阱（PR-3 新增）
+### 4.9 已知陷阱（PR-4 新增）
 
-- **`CompiledRunPlan.plan_ref` 不放 property**（ADR-0015 contracts 纯类型契约）：调用 `compiled_run_plan_ref(plan)` 而不是 `plan.plan_ref`。所有 sub-plan hash 同理（`capability_sub_plan_hash(plan)` / `control_sub_plan_hash(plan)` / `scope_sub_plan_hash(plan)`）。
-- **`plan_ref` 包含 input_provenance**：task_id / env_fingerprint 影响 hash；相同 profile + 不同 task → 不同 plan_ref（PR-6 plan_ref × Journal 绑定的基础）。
-- **LCA_PLAN_COMPAT 默认 off**：PR-3 阶段新路径启用；保留 3 个 PR 后删除（PR-6 后）。任何调用 `spawn_agent` / `boot_resolved_profile` 的代码 PR-5 落地后应优先消费 CompiledRunPlan。
-- **ScopePlan 最小版不实现 SpacetimeContext 5 子空间**：tracker §三裁剪推迟；本 PR-3 仅 lifecycle / visibility / acl / budget ceiling 4 字段。TemporalContext / IdentitySpace / VisibilitySpace 留待 ADR Draft 协调规则明文化。
-- **plan_ref 是 SHA-256 截断 16 字符**：理论碰撞概率 1/2^64（64 bit）；LCA 内部 plan 数量 < 2^32 → 实际碰撞概率忽略不计。PR-12 PlanTemplate list 时若有 2^32+ plans，应考虑 SHA-512。
+- **ModularBrain 的 _LocalReducer 是兼容 fallback**：生产路径必须显式注入 ``DefaultReducer``（来自 ``lca.layer2_runtime.reducer``）以获得完整的 apply_* seam。``_LocalReducer`` 只用于 ModularBrain 在测试 / 隔离启动时无 reducer 注入的兼容场景。**建议 PR-5 spawn.bind_plan 落地时显式传递 reducer**，移除 fallback。
+- **audit_state_writers 的 reducer allowlist 含 modular_brain.py**：因 _LocalReducer 含 ``state.active_template = active_template``（合法 reducer mutation）。其他 Brain mutation 已通过 reducer 收口；新增 Brain mutation 时记得通过 reducer（不要直接写 state）。
+- **CV4 AST 守护只扫描 ModularBrain / CognitiveRuntime**：PR-5 / PR-6 / PR-7 可能引入新的 runtime 模块（spawn / loop_drivers / reducer 衍生）；**新增 C1 阶段相关模块时记得加入 CV4 AST 扫描列表**（test_c1_phase_substeps_guard.py 的 L4 root 列表）。
+- **stop.decide 的 L2 验证是静态的**：本 PR-4 只验证 ``self.stop_rule.decide(...)`` 被调用；e2e agent run 验证留 PR-10 golden profile（acceptance §7.3）。
 
 ---
 
@@ -316,11 +305,13 @@ acceptance-criteria §3.1 §3.2 V2
 
 **Phase 0 留下的关键约束**（详见 §2 决策表）。
 
+### Phase 1 PR-0：audit 测量网（2026-08-21）
+
 ## 5. 已完成 Phase 详情
 
 ### Phase 0：宪法对齐与顺序重排（2026-08-21）
 
-**Goal**：在不破坏 v3 宪法前提下，让 ADR-0074 的 PR 序列在宪法层面对齐、可被下游 agent 无歧义执行。
+**Goal**：在不破坏 v3 宪法的前提下，让 ADR-0074 的 PR 序列在宪法层面对齐、可被下游 agent 无歧义执行。
 
 **Commits**：
 
@@ -333,8 +324,6 @@ acceptance-criteria §3.1 §3.2 V2
 **Phase 0 总评审**：8/10 架构优雅度。
 
 **Phase 0 留下的关键约束**（详见 §2 决策表）。
-
-### Phase 1 PR-0：audit 测量网（2026-08-21）
 
 ## 6. tracker 自身的执行（ADR 监督 = 5 ADR 监督）
 
