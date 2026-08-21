@@ -85,6 +85,10 @@ from lca.layer0_infra.observability.event_catalog import (
     descriptor_for,
     may_export_externally,
 )
+from lca.layer0_infra.observability.event_descriptor_env import (
+    bind_descriptors,
+    current_descriptors,
+)
 from lca.layer0_infra.observability.event_descriptor_registry import (
     DuplicateEventDescriptorError,
     InMemoryEventDescriptorRegistry,
@@ -257,10 +261,12 @@ __all__ = [
     "annotate",
     "bind",
     "bind_backends",
+    "bind_descriptors",
     "build_default_genai_registry",
     "build_default_registry",
     "current_bound",
     "current_context",
+    "current_descriptors",
     "descriptor_for",
     "detached_span",
     "fold_run_state",
