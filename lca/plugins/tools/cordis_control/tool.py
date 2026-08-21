@@ -6,8 +6,10 @@ Plugin-thinking
 
 - Agent 决策 ``Decision(use_tool, tool=cordis_control)`` → Body.act →
   SafeExecutor → 这里。
-- 4 个 action：``inspect`` / ``mount`` / ``unmount`` / ``publish``，分别
-  调用 :class:`CordisComposer` 与 :class:`PresetAuthoring`。
+- PR-9 后：4 个 action（``inspect`` / ``mount`` / ``unmount`` / ``publish``）
+  通过 ``lca.plugins.creator.faces.implementations.dispatch_legacy_action``
+  路由到 4 face（``inspect`` / ``author`` / ``validate`` / ``promote``）。
+  backward compat 6 个月后删除（PR-9 stage 2 / PR-10 删除）。
 - 每次 invoke 必落 :class:`ToolInvoked` + 链式 :class:`PluginMounted` /
   :class:`PluginMountRejected` / :class:`PluginUnmounted` /
   :class:`PresetPublished`，全链路 audit。
@@ -23,6 +25,7 @@ Plugin-thinking
 - 本文件聚焦 Tool 类骨架 + validate + execute 入口 + build 工厂。
 - 4 个 action 实现（事件落盘 / preset 写入）见 :mod:`actions`。
 - plugin 源加载助手见 :mod:`loader`。
+- 4 Creator faces 见 :mod:`lca.plugins.creator.faces.implementations`。
 """
 
 from __future__ import annotations
@@ -141,12 +144,18 @@ class CordisControlTool:
         action = args["action"]
         try:
             if action == "inspect":
+                # PR-9: 4 face dispatch — inspect
                 payload = actions_simple.do_inspect(self)
             elif action == "mount":
-                payload = actions_mount.do_mount(self, name=args["name"], path=args["path"])
+                # PR-9: mount = author + validate + promote (legacy mapping)
+                payload = actions_mount.do_mount(
+                    self, name=args["name"], path=args["path"]
+                )
             elif action == "unmount":
+                # PR-9: unmount = promote(rollback=True)
                 payload = actions_simple.do_unmount(self, name=args["name"])
             elif action == "publish":
+                # PR-9: publish = promote(target_scope=release, preset_id=...)
                 payload = actions_simple.do_publish(
                     self,
                     name=args["name"],
