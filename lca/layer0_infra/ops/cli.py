@@ -111,6 +111,16 @@ Run 复盘  coding-agent tools(ADR-0065 §六 / PR-9,只读)
   diagnose <alias> 已内置 4 个 alias:model-not-seen / loop-stuck /
   memory-poisoned / approval-rejected(看 DIAGNOSE_HINTS 拿修复建议)。
 
+────────────────────────────
+Audit 测量网  ADR-0074 PR-0（只读）
+────────────────────────────
+  4 个 AST 扫描器,让 reviewer 一行命令看清 hardcode 在哪。
+  默认走人类可读,加 --json 给 agent。有发现时 exit 1（CI 可识别）。
+  ./scripts/lca-ops audit-control-surface  Control Slot 投稿分布 + 缺 control 段
+  ./scripts/lca-ops audit-state-writers     state.* 写入点(Reducer 单写校验基线)
+  ./scripts/lca-ops audit-direct-commands   Body 直接 import sandbox/transport 的路径
+  ./scripts/lca-ops audit-hook-attach       hooks.trigger / middleware_bag / _emit 残留
+
 ────────────────────────────────
 通用参数
 ────────────────────────────────
@@ -1336,6 +1346,116 @@ def _resolve_diagnose_journal_path(
     if fallback.exists():
         return fallback
     return None
+
+
+# ── Audit 测量网 (ADR-0074 PR-0) ───────────────────────────────────
+
+
+def _resolve_repo_root() -> Path:
+    """Return the LCA repository root (where lca-ops was invoked from)."""
+    return Path.cwd()
+
+
+def _audit_roots(*names: str) -> list[Path]:
+    """Build the default scan roots under the repo, ignoring missing dirs."""
+    root = _resolve_repo_root()
+    return [root / name for name in names]
+
+
+@app.command(name="audit-control-surface")
+def audit_control_surface_cmd(
+    json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
+) -> None:
+    """Scan plugins / bundles / profiles for Control Slot references and missing
+    ``control:`` field declarations (ADR-0074 PR-0 / V1 baseline).
+
+    Exit ``0`` when no findings; ``1`` when findings exist (CI hook).
+    """
+    from lca.harness.diagnostics.audit_control_surface import (
+        format_report,
+        scan_control_surface,
+    )
+
+    roots = _audit_roots("lca/plugins", "bundles", "profiles")
+    findings = scan_control_surface(roots)
+    report = format_report(findings, json_mode=json_mode)
+    sys.stdout.write(report)
+    total = sum(len(v) for v in findings.values())
+    raise typer.Exit(0 if total == 0 else 1)
+
+
+@app.command(name="audit-state-writers")
+def audit_state_writers_cmd(
+    json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
+) -> None:
+    """Scan ``lca/layer{1,2,3}_*`` for direct ``state.<attr> = ...`` writes
+    outside the reducer (ADR-0074 PR-0 / C4 / V3 baseline).
+
+    Exit ``0`` when no findings; ``1`` when findings exist.
+    """
+    from lca.harness.diagnostics.audit_state_writers import (
+        format_report,
+        scan_state_writers,
+    )
+
+    roots = _audit_roots(
+        "lca/layer1_cognitive",
+        "lca/layer2_runtime",
+        "lca/layer3_agent",
+    )
+    findings = scan_state_writers(roots)
+    report = format_report(findings, json_mode=json_mode)
+    sys.stdout.write(report)
+    raise typer.Exit(0 if not findings else 1)
+
+
+@app.command(name="audit-direct-commands")
+def audit_direct_commands_cmd(
+    json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
+) -> None:
+    """Scan Body code for direct ``sandbox.*`` / ``transport.*`` calls
+    bypassing ``SafeExecutor`` / seams (ADR-0074 PR-0 / V4 baseline).
+
+    Exit ``0`` when no findings; ``1`` when findings exist.
+    """
+    from lca.harness.diagnostics.audit_direct_commands import (
+        format_report,
+        scan_direct_commands,
+    )
+
+    roots = _audit_roots("lca/layer1_cognitive/body", "lca/plugins/body")
+    findings = scan_direct_commands(roots)
+    report = format_report(findings, json_mode=json_mode)
+    sys.stdout.write(report)
+    raise typer.Exit(0 if not findings else 1)
+
+
+@app.command(name="audit-hook-attach")
+def audit_hook_attach_cmd(
+    json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
+) -> None:
+    """Scan ``lca/layer{1,2,3,4}_*`` for residual hook-mounting patterns
+    (``hooks.trigger`` / ``middleware_bag.<attr>`` / ``_emit`` calls /
+    ``register_hook|attach_hook|subscribe``) that PR-7 retires
+    (ADR-0074 PR-0 / V5 baseline).
+
+    Exit ``0`` when no findings; ``1`` when findings exist.
+    """
+    from lca.harness.diagnostics.audit_hook_attach import (
+        format_report,
+        scan_hook_attach,
+    )
+
+    roots = _audit_roots(
+        "lca/layer1_cognitive",
+        "lca/layer2_runtime",
+        "lca/layer3_agent",
+        "lca/layer4_app",
+    )
+    findings = scan_hook_attach(roots)
+    report = format_report(findings, json_mode=json_mode)
+    sys.stdout.write(report)
+    raise typer.Exit(0 if not findings else 1)
 
 
 def main() -> None:
