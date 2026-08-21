@@ -89,6 +89,7 @@ from gateway.runs.api import (
     get_context,
     get_run,
     get_run_doctor,
+    get_run_evidence,
     health_payload,
     stream_journal_live,
     stream_run_live,
@@ -138,6 +139,7 @@ def _build_routes() -> list[Route | WebSocketRoute]:
         Route("/runs/{run_id}", get_run, methods=["GET"]),
         Route("/runs/{run_id}/live", stream_run_live, methods=["GET", "OPTIONS"]),
         Route("/runs/{run_id}/doctor", get_run_doctor, methods=["GET"]),
+        Route("/runs/{run_id}/evidence/{ref:path}", get_run_evidence, methods=["GET"]),
         Route("/runs/{run_id}/cancel", cancel_run, methods=["POST", "OPTIONS"]),
         Route("/runs/{run_id}/answer", answer_run, methods=["POST", "OPTIONS"]),
         Route("/v1/sessions", create_session, methods=["POST", "OPTIONS"]),
@@ -307,6 +309,10 @@ def create_app(
     application.state.device_hub = device_hub
     application.state.device_settings = device_settings
     application.state.profile_path = resolved_profile
+    # bound_observability is None until lifespan boots harness profile;
+    # the /runs/{id}/evidence/{ref} endpoint uses ``request.app.state.bound_observability``
+    # at request time so it picks up the live seam (0065 L5/L8).
+    application.state.bound_observability = None
 
     # Session spine: AgentRegistry + CommandGateway. Constructed at
     # ``create_app`` time so request handlers can resolve them, but

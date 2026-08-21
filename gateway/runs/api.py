@@ -305,6 +305,150 @@ async def get_run_doctor(request: Request) -> JSONResponse:
     return JSONResponse(report.as_dict(), headers=cors_headers())
 
 
+async def get_run_evidence(request: Request) -> JSONResponse:
+    """GET /runs/{run_id}/evidence/{ref} —— fetch evidence by content hash.
+
+    ADR-0065 §四 L5: 大 UI state 走 EvidenceStore(``state_ref``);本端点
+    接受 ``EvidenceRef.digest`` (``sha256:<hex>`` 或裸 hex),从
+    ``EvidenceStore.get()`` 取出并验证完整性(L5)。响应 body 是
+    JSON-decoded dict,即原始 ``plugin_state``。
+
+    实现路径:
+    1. 在 run 的 journal.jsonl 里查 ``state_ref.digest`` 匹配的 Tool* 事件
+       (typed field ``state_ref`` 在 v2 envelope 里有完整 EvidenceRef,
+       含 ``byte_length`` / ``classification`` 等;ref-only URL 不可信,
+       必须用 journal 里记录的完整 EvidenceRef 调 store.get())。
+    2. 拿到的完整 EvidenceRef 调 ``EvidenceStore.get(requester, audience)``,
+       store 内部做 sha256 + byte_length + classification 校验(L5)。
+    3. payload 必须是 JSON,decode 后作为 ``data`` 字段返回。
+
+    Status codes:
+    - 200 找到 + 完整性校验通过
+    - 400 ref 格式非法
+    - 403 audience 拒绝
+    - 404 EvidenceStore 未配 / run 不存在 / ref 不属于 run
+    - 500 摘要校验失败 / payload 非 JSON(0065 §四 不允许静默)
+    """
+    from lca.contracts.observability.evidence import (
+        Classification,
+        EvidenceIntegrityError,
+    )
+    from lca.layer0_infra.observability.journal.journal_io import (
+        record_normalize,
+    )
+
+    run_id = request.path_params["run_id"]
+    ref_str = request.path_params["ref"]
+    bound = getattr(request.app.state, "bound_observability", None)
+    if bound is None or bound.evidence_store is None:
+        return JSONResponse(
+            {"error": "evidence store not configured", "run_id": run_id, "ref": ref_str},
+            status_code=404,
+            headers=cors_headers(),
+        )
+    # Parse ref: accept "sha256:<hex>" or bare hex
+    raw = ref_str.strip()
+    if raw.startswith("sha256:"):
+        digest_only = raw[len("sha256:"):]
+    elif len(raw) == 64 and all(c in "0123456789abcdef" for c in raw.lower()):
+        digest_only = raw.lower()
+    else:
+        return JSONResponse(
+            {"error": "invalid ref format", "ref": ref_str},
+            status_code=400,
+            headers=cors_headers(),
+        )
+
+    # Locate the run's journal.jsonl via the registry; if not running,
+    # the bootstrap fallback in registry.jsonl_path_for is used.
+    registry = getattr(request.app.state, "registry", None)
+    jsonl_path = None
+    if registry is not None:
+        try:
+            jsonl_path = registry.jsonl_path_for(run_id)
+        except Exception:
+            jsonl_path = None
+    if jsonl_path is None or not jsonl_path.is_file():
+        # try canonical "traces/lca_journal.jsonl" as a last resort
+        from pathlib import Path
+
+        candidate = Path("traces") / "lca_journal.jsonl"
+        if candidate.is_file():
+            jsonl_path = candidate
+    if jsonl_path is None or not jsonl_path.is_file():
+        return JSONResponse(
+            {"error": "run not found", "run_id": run_id, "ref": ref_str},
+            status_code=404,
+            headers=cors_headers(),
+        )
+
+    # Find the full EvidenceRef for this digest in the journal (typed field).
+    ref = None
+    for line in jsonl_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        normalized = record_normalize(payload)
+        if normalized.get("schema") != "lca.journal/2":
+            continue
+        sr = normalized.get("data", {}).get("state_ref")
+        if not isinstance(sr, dict):
+            continue
+        if str(sr.get("digest", "")).lower() == digest_only:
+            try:
+                from lca.contracts.observability.evidence import EvidenceRef
+
+                ref = EvidenceRef.from_dict(sr)
+            except (ValueError, TypeError, KeyError):
+                ref = None
+            break
+    if ref is None:
+        return JSONResponse(
+            {"error": "evidence ref not found in run journal", "run_id": run_id, "ref": ref_str},
+            status_code=404,
+            headers=cors_headers(),
+        )
+
+    requester = f"gateway:{run_id}"
+    try:
+        payload = bound.evidence_store.get(
+            ref, requester=requester, audience=Classification.INTERNAL
+        )
+    except EvidenceIntegrityError as exc:
+        return JSONResponse(
+            {"error": "evidence integrity violation", "detail": str(exc), "ref": ref_str},
+            status_code=500,
+            headers=cors_headers(),
+        )
+    except KeyError as exc:
+        return JSONResponse(
+            {"error": "evidence ref not found", "detail": str(exc), "ref": ref_str},
+            status_code=404,
+            headers=cors_headers(),
+        )
+    except PermissionError as exc:
+        return JSONResponse(
+            {"error": "audience rejected", "detail": str(exc), "ref": ref_str},
+            status_code=403,
+            headers=cors_headers(),
+        )
+    try:
+        decoded = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return JSONResponse(
+            {"error": "evidence payload not json-decodable", "ref": ref_str, "byte_length": len(payload)},
+            status_code=500,
+            headers=cors_headers(),
+        )
+    return JSONResponse(
+        {"run_id": run_id, "ref": ref_str, "byte_length": len(payload), "data": decoded},
+        headers=cors_headers(),
+    )
+
+
 async def cancel_run(request: Request) -> JSONResponse:
     run_id = request.path_params["run_id"]
     session = _registry_of(request).get(run_id)

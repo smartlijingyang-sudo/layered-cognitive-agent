@@ -8,6 +8,7 @@ All service access goes through ServiceRegistry.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any, cast
 
@@ -105,6 +106,7 @@ Run 复盘  coding-agent tools(ADR-0065 §六 / PR-9,只读)
   ./scripts/lca-ops diff-context <run_id>    同 run step 上下文
   ./scripts/lca-ops diff-runs <a> <b>        两次 run 对比
   ./scripts/lca-ops cost <run_id>            LlmCallCompleted 成本累加
+  ./scripts/lca-ops evidence <run_id> <ref>  查 state_ref → evidence payload
 
   diagnose <alias> 已内置 4 个 alias:model-not-seen / loop-stuck /
   memory-poisoned / approval-rejected(看 DIAGNOSE_HINTS 拿修复建议)。
@@ -824,6 +826,97 @@ def cost(
     report = projector.render()
     if pricing_ref:
         report["filtered_pricing_ref"] = pricing_ref
+    _emit_report(report, json_mode=json_mode)
+
+
+@app.command(name="evidence")
+def evidence(
+    run_id: str = typer.Argument(..., help="Run id"),
+    ref: str = typer.Argument(..., help="EvidenceRef digest (sha256:<hex> 或裸 64-hex)"),
+    jsonl: Path = typer.Option(None, "--jsonl"),
+    json_mode: bool = typer.Option(False, "--json", help="JSON 输出,给 agent"),
+) -> None:
+    """按 digest 从 run 的 journal.jsonl 查 ``state_ref`` 命中 Tool* 事件,
+    从 boot-time EvidenceStore 取回完整 payload(0065 §四 L5)。
+
+    退出码:
+    - 0 找到 + 摘要校验通过;stdout 是 JSON-decoded dict(``--json``)
+      或 human-rendered dict
+    - 1 ref 格式非法 / 摘要校验失败 / 找不到
+    - 2 EvidenceStore 未配(boot 时缺 seam)
+    """
+    from lca.contracts.observability.evidence import (
+        Classification,
+        EvidenceIntegrityError,
+        EvidenceRef,
+    )
+    from lca.layer0_infra.observability.facade import current_bound
+
+    raw = ref.strip()
+    if raw.startswith("sha256:"):
+        digest_only = raw[len("sha256:"):]
+    elif len(raw) == 64 and all(c in "0123456789abcdef" for c in raw.lower()):
+        digest_only = raw.lower()
+    else:
+        print(f"ERROR: invalid ref format: {ref!r}", file=sys.stderr)
+        raise typer.Exit(1)
+
+    path = _resolve_journal_path(jsonl, run_id)
+    # 1) 在 journal.jsonl 里查 state_ref.digest 命中的 Tool* 事件
+    full_ref: EvidenceRef | None = None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        sr_raw = payload.get("data", {}).get("state_ref")
+        if not isinstance(sr_raw, dict):
+            continue
+        if str(sr_raw.get("digest", "")).lower() != digest_only:
+            continue
+        try:
+            full_ref = EvidenceRef.from_dict(sr_raw)
+        except (ValueError, TypeError, KeyError):
+            full_ref = None
+        break
+
+    if full_ref is None:
+        print(
+            f"ERROR: no evidence referenced — run {run_id!r} has no Tool* event "
+            f"with state_ref.digest={digest_only!r}",
+            file=sys.stderr,
+        )
+        raise typer.Exit(1)
+
+    # 2) EvidenceStore 取回
+    bound = current_bound()
+    if bound is None or bound.evidence_store is None:
+        print("ERROR: evidence_store not configured (no seam)", file=sys.stderr)
+        raise typer.Exit(2)
+
+    requester = f"lca-ops:evidence:{run_id}"
+    try:
+        payload = bound.evidence_store.get(
+            full_ref, requester=requester, audience=Classification.INTERNAL
+        )
+    except EvidenceIntegrityError as exc:
+        print(f"ERROR: integrity violation: {exc}", file=sys.stderr)
+        raise typer.Exit(1) from exc
+
+    try:
+        decoded = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        print(f"ERROR: evidence payload not JSON: {exc}", file=sys.stderr)
+        raise typer.Exit(1) from exc
+
+    report = {
+        "run_id": run_id,
+        "ref": raw,
+        "byte_length": len(payload),
+        "data": decoded,
+    }
     _emit_report(report, json_mode=json_mode)
 
 

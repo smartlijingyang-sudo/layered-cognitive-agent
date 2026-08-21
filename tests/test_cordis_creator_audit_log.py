@@ -80,7 +80,9 @@ def query_journal(
         if event_type is not None and stamped.event_type != event_type:
             continue
         record_dict = stamped_to_record(stamped)
-        event_payload = record_dict.get("event", {})
+        # lca.journal/2 envelope: payload lives under ``data``. Legacy
+        # ``event`` field tolerated for backward compat.
+        event_payload = record_dict.get("data") or record_dict.get("event") or {}
         if actor_role is not None and event_payload.get("actor_role") != actor_role:
             continue
         if plugin_name is not None and event_payload.get("plugin_name") != plugin_name:

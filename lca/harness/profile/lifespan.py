@@ -97,11 +97,27 @@ async def starlette_profile_lifespan(
     """
     async with profile_lifespan(profile_path) as state:
         app.state.ctx = state["ctx"]
+        # Bind the boot-time BoundObservability (with evidence_store / evidence_policy
+        # capability seams from lca-evidence-store-seam) to app.state so the
+        # /runs/{id}/evidence/{ref} endpoint can resolve it. ADR-0065 §四 L5.
+        from lca.contracts.mechanisms.capability import require_capability
+        from lca.layer0_infra.observability import BoundObservability
+
+        bound: BoundObservability | None = None
+        try:
+            cand = require_capability(state["ctx"], "observability")
+            if isinstance(cand, BoundObservability):
+                bound = cand
+        except Exception:
+            bound = None
+        app.state.bound_observability = bound
         try:
             yield state
         finally:
             with suppress(AttributeError):
                 del app.state.ctx
+            with suppress(AttributeError):
+                del app.state.bound_observability
 
 
 @asynccontextmanager

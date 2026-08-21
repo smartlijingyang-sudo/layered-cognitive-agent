@@ -74,9 +74,9 @@ class TestJsonlJournalProjector(unittest.TestCase):
             for line in lines:
                 self.assertEqual(line["schema"], JOURNAL_SCHEMA_VERSION)
                 self.assertIn("scope", line)
-                self.assertIn("event_type", line)
-                self.assertIn("event", line)
-            types = {x["event_type"] for x in lines}
+                self.assertIn("descriptor", line)
+                self.assertEqual(line["descriptor"]["type"], line["descriptor"]["type"])
+            types = {x["descriptor"]["type"] for x in lines}
             self.assertIn("AgentRunStarted", types)
             self.assertIn("AgentRunFinished", types)
 

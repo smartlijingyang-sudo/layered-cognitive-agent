@@ -28,6 +28,8 @@ from lca.contracts.atoms.ids import RunId, TraceId, new_run_id, new_trace_id
 from lca.contracts.models.observability.event import OperationOutcome, RuntimeKind
 from lca.contracts.observability.evidence import (
     EvidenceRef,
+)
+from lca.contracts.observability.evidence import (
     EvidenceRef as _EvidenceRef,  # alias for JournalRecord.evidence compat
 )
 
@@ -165,6 +167,13 @@ class StampedEvent:
     - ``parent_seq`` — immediate causal parent seq (None for root events).
     - ``correlation_ids`` — reserved for future multi-trace joining; never written.
     - ``event`` — the typed payload (frozen dataclass).
+    - ``event_id`` — global unique id (ADR-0065 §三 / L3); computed by engine
+      at append time, propagated to ``JournalRecord.event_id`` in the v2
+      envelope. ``""`` for events constructed outside the ledger (tests,
+      projector previews).
+    - ``parent_event_id`` — global id of the immediate causal parent
+      (ADR-0065 §三 / causation); engine looks up from seq→event_id map at
+      append. ``""`` for root events or pre-flip replays.
     """
 
     seq: int
@@ -175,6 +184,8 @@ class StampedEvent:
     data: dict[str, object] = field(default_factory=dict)
     parent_seq: int | None = None
     correlation_ids: tuple[str, ...] = ()
+    event_id: str = ""
+    parent_event_id: str = ""
 
 
 class DelegationMechanism(str, Enum):
@@ -428,11 +439,23 @@ class ToolCallStreaming(JournalEvent):
     在 LLM 响应完成前发出，让前端尽早渲染工具卡片占位——消除思考结束到
     工具执行之间的空白期。与 ``ToolStarted``（执行前、参数完整）互补。
     ``tool_call_id`` 即后续 ToolStarted/Invoked 的 ``invocation_id``（同一张卡）。
+
+    ADR-0065 §四 typed UI state: ``code`` / ``command`` / ``language`` /
+    ``skill_id`` 替代 ``plugin_state`` dict 逃逸口;``state_ref`` 指向大对象。
     """
 
     tool_name: str = ""
     tool_call_id: str = ""
     arguments_preview: str = ""
+    # typed UI state (ADR-0065 §四 —— 替代 plugin_state 逃逸口)
+    code: str = ""
+    language: str = ""
+    command: str = ""
+    skill_id: str = ""
+    skill_inputs: Mapping[str, object] = field(default_factory=dict)
+    description: str = ""
+    state_ref: EvidenceRef | None = None
+    # view-only 字段(emit 时剥离)
     plugin_state: dict[str, Any] = field(default_factory=dict)
 
 
@@ -440,8 +463,9 @@ class ToolCallStreaming(JournalEvent):
 class ToolStarted(JournalEvent):
     """工具调用开始（执行前；与 ToolInvoked 经 invocation_id 关联）。
 
-    ``arguments_preview`` 是截断字符串（OTel/console）；``plugin_state`` 是 UI
-    一等字段（完整 code/command 等，dict 不受 AttributePolicy 2k 截断）。
+    ADR-0065 §四 typed UI state: ``code`` / ``command`` / ``language`` /
+    ``skill_id`` / ``skill_inputs`` / ``description`` / ``execution_env``
+    替代 ``plugin_state`` dict 逃逸口;``state_ref`` 指向大对象。
 
     ``idempotency_key`` (PR6) 由 ExecutionEnvelope 注入；为空表示工具未声明幂等。
     """
@@ -449,33 +473,61 @@ class ToolStarted(JournalEvent):
     tool_name: str = ""
     arguments_preview: str = ""
     invocation_id: str = ""
-    plugin_state: dict[str, Any] = field(default_factory=dict)
     idempotency_key: str = ""
+    # typed UI state (ADR-0065 §四 —— 替代 plugin_state 逃逸口)
+    code: str = ""
+    language: str = ""
+    command: str = ""
+    skill_id: str = ""
+    skill_inputs: Mapping[str, object] = field(default_factory=dict)
+    description: str = ""
+    execution_env: str = ""
+    state_ref: EvidenceRef | None = None
+    # view-only 字段(emit 时剥离)
+    plugin_state: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class ToolInvoked(JournalEvent):
     """工具调用完成。
 
-    ``plugin_state`` / ``files`` 是 UI 与产品通道（journal 不截断）。
-    ``arguments_preview`` / ``result_preview`` 只给 jsonl 与 OTel（2k 有损）。
-    Live SSE 必须抹掉两个 preview，浏览器不得读到。
+    ADR-0065 §四 typed UI state: ``code`` / ``command`` / ``language`` /
+    ``skill_id`` / ``execution_env`` 替代 ``plugin_state`` dict;``files``
+    已是 typed 字段。``state_ref`` 指向大 state 对象(EvidenceStore)。
+    ``arguments_preview`` / ``result_preview`` / ``plugin_state`` /
+    ``output_truncated`` 保留为 view-only,emit 时 journal_io 不写入 disk。
+
+    Live SSE 必须抹掉两个 preview,浏览器不得读到(plugin_state 也需
+    在 live SSE 中脱敏——见 sse_frames._LIVE_REDACT_KEYS)。
 
     ``idempotency_key`` (PR6) 与 ``ToolStarted`` 同步；用于 resume dedupe
     via ``RunStore.find_terminal_tool_invoked``。
     """
 
     tool_name: str = ""
-    arguments_preview: str = ""
-    result_preview: str = ""
     ok: bool = True
     latency_ms: int = 0
     attempt: int = 1
     error: str = ""
     invocation_id: str = ""  # optional link to in-flight streaming deltas
-    files: tuple[dict[str, Any], ...] = ()
-    plugin_state: dict[str, Any] = field(default_factory=dict)
     idempotency_key: str = ""
+    files: tuple[dict[str, Any], ...] = ()
+    # typed UI state (ADR-0065 §四)
+    code: str = ""
+    language: str = ""
+    command: str = ""
+    skill_id: str = ""
+    skill_inputs: Mapping[str, object] = field(default_factory=dict)
+    description: str = ""
+    execution_env: str = ""
+    state_ref: EvidenceRef | None = None
+    # typed 主体 (与 preview 区分)
+    output_text: str = ""
+    # view-only 字段(emit 时剥离)
+    arguments_preview: str = ""
+    result_preview: str = ""
+    output_truncated: bool = False
+    plugin_state: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -898,7 +950,9 @@ class JournalRecord:
         causation = Causation.from_dict(payload.get("causation", {}) or {})
         descriptor = DescriptorRef.from_dict(payload.get("descriptor", {}) or {})
         evidence_raw = payload.get("evidence", ()) or ()
-        evidence = tuple(_EvidenceRef.from_dict(item) for item in evidence_raw if isinstance(item, Mapping))
+        evidence = tuple(
+            _EvidenceRef.from_dict(item) for item in evidence_raw if isinstance(item, Mapping)
+        )
         return cls(
             schema="lca.journal/2",
             event_id=str(payload.get("event_id", "")),
@@ -929,6 +983,7 @@ def _scope_to_dict(scope: RunScope) -> dict[str, object]:
 
 def _scope_from_dict(payload: Mapping[str, object]) -> RunScope:
     """从 dict 重建 RunScope;brand-typed 字段转回 str,None 原样保留。"""
+
     def _opt_str(key: str) -> str | None:
         value = payload.get(key)
         if value is None:

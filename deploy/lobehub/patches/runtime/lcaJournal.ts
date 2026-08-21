@@ -33,6 +33,58 @@ export function toolCallId(payload: Record<string, unknown>, fallback: string): 
   return fallback;
 }
 
+/**
+ * ADR-0065 §四 state_ref-first read for Tool* events.
+ *
+ * Order of precedence (v2 envelope):
+ * 1. ``state_ref`` (typed field) — payload lives in EvidenceStore at
+ *    ``/runs/{id}/evidence/{ref}``; this function returns a state marker
+ *    that the consuming React component (``ExecuteCodeRender``,
+ *    ``RunCommandRender``) resolves asynchronously.
+ * 2. typed fields — ``code`` / ``command`` / ``language`` / ``skill_id`` /
+ *    ``description`` / ``execution_env`` / ``output_text``. These are
+ *    LobeHub-renderable directly without an evidence fetch.
+ * 3. legacy ``plugin_state`` (view-only, pre-flip) — fall through so
+ *    older replays still render. The disk writer no longer produces this
+ *    (0065 §四 stripping) but reads must keep working.
+ */
+export function buildToolState(
+  payload: Record<string, unknown>,
+  frame: JournalFrame,
+): Record<string, unknown> {
+  const state: Record<string, unknown> = {};
+  // (1) state_ref first — read by hydration layer via /runs/{id}/evidence/{ref}
+  const stateRef = payload.state_ref;
+  if (stateRef && typeof stateRef === 'object') {
+    state.__state_ref__ = stateRef;
+  }
+  // (2) typed fields (LobeHub-renderable directly)
+  for (const key of [
+    'code',
+    'command',
+    'language',
+    'skill_id',
+    'description',
+    'execution_env',
+    'output_text',
+  ]) {
+    const value = payload[key];
+    if (typeof value === 'string' && value) state[key] = value;
+  }
+  const skillInputs = payload.skill_inputs;
+  if (skillInputs && typeof skillInputs === 'object') {
+    state.skill_inputs = skillInputs;
+  }
+  // (3) legacy plugin_state fallback (only when neither typed nor state_ref provided)
+  if (Object.keys(state).length === 0 || (!('__state_ref__' in state) && !state.code && !state.command)) {
+    const legacy = payload.plugin_state;
+    if (legacy && typeof legacy === 'object') {
+      Object.assign(state, legacy);
+    }
+  }
+  return state;
+}
+
 export function parseSseBlock(block: string): JournalFrame | null {
   let eventName = '';
   let idLine = '';
@@ -83,7 +135,13 @@ export function projectJournalFrame(frame: JournalFrame): Projected {
       return {
         idHint: toolCallId(payload, `call_${frame.seq ?? 0}`),
         kind: 'tool-start',
-        state: (payload.plugin_state as Record<string, unknown> | undefined) ?? {},
+        // ADR-0065 §四: read ``payload.state_ref`` first; if present, the
+        // lobehub UI patch will fetch the typed fields + evidence payload
+        // via /runs/{id}/evidence/{ref}. Falls back to legacy plugin_state
+        // for pre-flip replays; the React component fills typed defaults
+        // (code / command / language / skill_id / description / execution_env)
+        // from the typed fields present on the event.
+        state: buildToolState(payload, frame),
         toolName: String(payload.tool_name ?? ''),
       };
     case 'SandboxOutputDelta':
@@ -98,7 +156,8 @@ export function projectJournalFrame(frame: JournalFrame): Projected {
         files: payload.files,
         kind: 'tool-invoked',
         payload,
-        state: (payload.plugin_state as Record<string, unknown> | undefined) ?? {},
+        // ADR-0065 §四: same state_ref-first read; see ToolStarted case.
+        state: buildToolState(payload, frame),
       };
     case 'ToolDenied':
       return {

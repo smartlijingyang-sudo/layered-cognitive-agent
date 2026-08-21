@@ -2,8 +2,8 @@
 
 Per spec §9.1 + journal boundary guard, ``lca.layer1_cognitive.body.safe_executor``
 is the single canonical emitter for the three tool lifecycle events.
-Other consumers (e.g. ``pipeline_safe_executor``) must route through
-this module so the journal sees exactly one emission site per event.
+All consumers (tool call sites, projectors) must route through this module
+so the journal sees exactly one emission site per event.
 
 ADR-0065 §四 L5 / L8: ``plugin_state`` 超过 inline 阈值时,evidence 通过
 ``EvidenceStore.prepare()`` 落到 evidence/<sha256>.json,event 的
@@ -19,19 +19,19 @@ from typing import Any
 
 from lca.contracts.models.core.decision import Observation, ToolCall  # noqa: F401
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
-from lca.contracts.observability.evidence import (
-    EvidencePolicy,
-    EvidenceRef,
-    EvidenceStore,
-)
 from lca.contracts.models.observability.journal import (
     ToolDenied,
     ToolInvoked,
     ToolStarted,
 )
+from lca.contracts.observability.evidence import (
+    EvidencePolicy,
+    EvidenceRef,
+    EvidenceStore,
+)
 from lca.contracts.protocols.infra import Tool
 from lca.layer0_infra.observability import record, record_runtime
-from lca.layer1_cognitive.body.tool_result_preview import (
+from lca.layer1_cognitive.body.tool_ui_state import (
     tool_files,
     tool_plugin_state,
 )

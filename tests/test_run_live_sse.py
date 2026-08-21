@@ -77,35 +77,56 @@ async def test_live_data_matches_stamped_to_record() -> None:
     _, event_name, payload = _parse_frame(frames[0])
     record = stamped_to_record(stamped)
     assert event_name == "ReasoningDelta"
-    assert payload["event_type"] == record["event_type"]
-    assert payload["event"] == record["event"]
-    assert payload["seq"] == 1
+    assert payload["descriptor"]["type"] == record["descriptor"]["type"]
+    assert payload["data"] == record["data"]
+    assert payload["run_seq"] == 1
 
 
 @pytest.mark.asyncio
-async def test_tool_started_plugin_state_is_not_rewritten() -> None:
-    state = {"code": "print(1)", "language": "python", "executionEnv": "sandbox"}
+async def test_tool_started_typed_fields_propagate_to_live_sse() -> None:
+    """ADR-0065 §四: typed fields (code / language / execution_env) 通过
+    live SSE 帧传到浏览器;plugin_state (view-only) 不进 SSE payload。"""
     tail = LiveTail()
     tail.on_event(
-        _stamped(1, ToolStarted(tool_name="execute_code", invocation_id="i", plugin_state=state))
+        _stamped(
+            1,
+            ToolStarted(
+                tool_name="execute_code",
+                invocation_id="i",
+                code="print(1)",
+                language="python",
+                execution_env="sandbox",
+                plugin_state={"code": "print(1)", "language": "python"},
+            ),
+        )
     )
     tail.close()
     frames = [frame async for frame in iter_live_sse(tail, after_seq=0, heartbeat_s=30)]
     _, _, payload = _parse_frame(frames[0])
-    assert payload["event"]["plugin_state"] == state
+    assert payload["data"]["code"] == "print(1)"
+    assert payload["data"]["language"] == "python"
+    assert payload["data"]["execution_env"] == "sandbox"
+    # plugin_state 不在 SSE
+    assert "plugin_state" not in payload["data"]
 
 
 @pytest.mark.asyncio
-async def test_ops_stream_keeps_preview_strings() -> None:
+async def test_ops_stream_keeps_typed_fields_no_preview() -> None:
+    """ADR-0065 §四: preview 不在 SSE payload(无论 redact 模式);typed
+    fields 完整传递。"""
     tail = LiveTail()
     tail.on_event(
         _stamped(
             1,
             ToolInvoked(
-                tool_name="ls",
+                tool_name="executeCode",
                 arguments_preview="ls -la",
                 result_preview="ok",
                 invocation_id="i",
+                code="print(2)",
+                language="python",
+                command="ls -la",
+                output_text="ok",
             ),
         )
     )
@@ -114,8 +135,14 @@ async def test_ops_stream_keeps_preview_strings() -> None:
         frame async for frame in iter_live_sse(tail, after_seq=0, heartbeat_s=30, redact=False)
     ]
     _, _, payload = _parse_frame(frames[0])
-    assert payload["event"]["arguments_preview"] == "ls -la"
-    assert payload["event"]["result_preview"] == "ok"
+    # preview 已剥离
+    assert "arguments_preview" not in payload["data"]
+    assert "result_preview" not in payload["data"]
+    # typed fields 保留
+    assert payload["data"]["code"] == "print(2)"
+    assert payload["data"]["language"] == "python"
+    assert payload["data"]["command"] == "ls -la"
+    assert payload["data"]["output_text"] == "ok"
 
 
 @pytest.mark.asyncio
@@ -185,7 +212,7 @@ async def test_default_text_channel_filters_decision_deltas() -> None:
     names = [_parse_frame(frame)[1] for frame in frames]
     assert names == ["StepTextDelta"]
     _, _, payload = _parse_frame(frames[0])
-    assert payload["event"]["channel"] == StreamChannel.ANSWER.value
+    assert payload["data"]["channel"] == StreamChannel.ANSWER.value
 
 
 @pytest.mark.asyncio

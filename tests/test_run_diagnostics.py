@@ -58,13 +58,13 @@ def test_diagnostic_event_is_run_scoped_and_redacted(tmp_path: Path) -> None:
     bound.journal.flush()  # type: ignore[union-attr]
     bound.journal.close()  # type: ignore[union-attr]
     [event] = _events(path)
-    # JsonlJournalProjector emits journal.v1 records (seq/scope/event/...)
-    assert event["schema"] == "journal.v1"
+    # ADR-0065 §三 / PR-3: v2 envelope
+    assert event["schema"] == "lca.journal/2"
     assert event["scope"]["run_id"] == "run_123"
     assert event["scope"]["trace_id"] == "trace_456"
-    prompt = event["event"]["attributes"]["prompt_preview"]
-    assert "sk-1234567890abcdef" not in prompt
-    assert "[REDACTED]" in prompt
+    # ADR-0065 §四: prompt_preview / response_preview 是 view-only 字段,emit 时从 disk 剥离
+    assert "prompt_preview" not in event["data"].get("attributes", {})
+    assert "response_preview" not in event["data"].get("output", {})
 
 
 def test_observe_operation_emits_started_and_terminal_status(tmp_path: Path) -> None:
@@ -91,12 +91,11 @@ def test_observe_operation_emits_started_and_terminal_status(tmp_path: Path) -> 
     bound.journal.flush()  # type: ignore[union-attr]
     bound.journal.close()  # type: ignore[union-attr]
     started, completed = _events(path)
-    assert started["event"]["outcome"] == "started"
-    assert completed["event"]["outcome"] == "ok"
-    assert completed["event"]["output"] == {
-        "result_preview": "4",
-        "duration_ms": completed["event"]["output"]["duration_ms"],
-    }
+    assert started["data"]["outcome"] == "started"
+    assert completed["data"]["outcome"] == "ok"
+    # ADR-0065 §四: result_preview 是 view-only 字段,emit 时从 disk 剥离
+    assert "result_preview" not in completed["data"]["output"]
+    assert "duration_ms" in completed["data"]["output"]
 
 
 @pytest.mark.asyncio
@@ -120,7 +119,7 @@ async def test_hook_trigger_uses_diagnostic_stream_not_stderr_logger(tmp_path: P
     bound.journal.flush()  # type: ignore[union-attr]
     bound.journal.close()  # type: ignore[union-attr]
     [event] = _events(path)
-    payload = event["event"]
+    payload = event["data"]
     assert payload["operation"] == "hook.trigger"
     assert payload["source"] == "hook_registry.simple"
     assert payload["attributes"]["hook_event"] == HookEvent.PRE_THINK.value

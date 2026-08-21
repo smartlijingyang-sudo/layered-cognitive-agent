@@ -41,15 +41,15 @@ from lca.contracts.models.observability.journal import (
     RuntimeObserved,
     StampedEvent,
 )
+from lca.contracts.observability.evidence import (
+    EvidencePolicy,
+    EvidenceStore,
+)
 from lca.contracts.observability.ports import (
     AttributePolicyBackend,
     JournalBackend,
     ScorerFn,
     TracerBackend,
-)
-from lca.contracts.observability.evidence import (
-    EvidencePolicy,
-    EvidenceStore,
 )
 
 _F = TypeVar("_F", bound=Callable[..., Any])

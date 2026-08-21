@@ -49,26 +49,45 @@ def test_no_third_vocabulary_in_production() -> None:
     assert hits == []
 
 
-def test_plugin_state_live_equals_jsonl_record() -> None:
+def test_typed_fields_propagate_to_disk() -> None:
+    """ADR-0065 §四: typed fields (code / language) 持久化到 disk;
+    plugin_state (view-only) 不在 disk data 字段中。
+    """
     state = {"code": "print(2)", "language": "python"}
     stamped = StampedEvent(
         seq=4,
         ts=4.0,
         scope=RunScope(trace_id="t", run_id="r"),
-        event=ToolStarted(tool_name="execute_code", invocation_id="i", plugin_state=state),
+        event=ToolStarted(
+            tool_name="execute_code",
+            invocation_id="i",
+            plugin_state=state,
+            code="print(2)",
+            language="python",
+        ),
     )
     record = stamped_to_record(stamped)
-    assert record["event"]["plugin_state"] == state
+    assert record["data"]["code"] == "print(2)"
+    assert record["data"]["language"] == "python"
+    # view-only fields stripped from disk
+    assert "plugin_state" not in record["data"]
 
 
 @pytest.mark.asyncio
 async def test_live_frame_matches_jsonl_record() -> None:
+    """Live SSE frame 与 jsonl disk record 共享 typed fields(不再保留 plugin_state)。"""
     state = {"code": "print(2)", "language": "python"}
     stamped = StampedEvent(
         seq=1,
         ts=1.0,
         scope=RunScope(trace_id="t", run_id="r"),
-        event=ToolStarted(tool_name="execute_code", invocation_id="i", plugin_state=state),
+        event=ToolStarted(
+            tool_name="execute_code",
+            invocation_id="i",
+            plugin_state=state,
+            code="print(2)",
+            language="python",
+        ),
     )
     tail = LiveTail()
     tail.on_event(stamped)
@@ -77,7 +96,8 @@ async def test_live_frame_matches_jsonl_record() -> None:
     data_line = next(line for line in frames[0].decode().splitlines() if line.startswith("data: "))
     live = json.loads(data_line[6:])
     record = stamped_to_record(stamped)
-    assert live["event"]["plugin_state"] == record["event"]["plugin_state"]
+    assert live["data"]["code"] == record["data"]["code"]
+    assert live["data"]["language"] == record["data"]["language"]
     assert "http://127.0.0.1" not in data_line
 
 

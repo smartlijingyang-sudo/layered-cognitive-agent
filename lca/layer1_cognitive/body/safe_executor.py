@@ -26,7 +26,7 @@ from lca.contracts.models.core.result import ApprovalPendingError, ToolExecution
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols import SafeExecutor, Tool
 from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
-from lca.layer1_cognitive.body.tool_result_preview import (
+from lca.layer1_cognitive.body.tool_ui_state import (
     build_started_plugin_state,
     compact_args_preview,
     compact_payload_for_preview,
@@ -79,7 +79,7 @@ def _resolve_evidence_pair() -> tuple[Any, Any]:
     注入 safe_executor 在 boot 时已通过 seam plugin 拿到 capability;如果没有
     配 seam(测试场景),这里返回 (None, None) → emitter 走 typed fields 路径。
     """
-    from lca.layer0_infra.observability.facade import current_bound
+    from lca.layer0_infra.observability import current_bound
 
     bound = current_bound()
     if bound is None:
