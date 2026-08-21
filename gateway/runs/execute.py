@@ -101,37 +101,6 @@ def llm_status(ctx: Any) -> dict[str, bool]:
     return {"llm_available": resolver.is_available()}
 
 
-# ── Legacy shim — kept only for tests that haven't migrated to ``ctx``. ──────
-# Production code reads ``ctx.inject("llm_resolver")`` exclusively.
-
-_default_llm_resolver: Any | None = None
-
-
-def get_llm_resolver() -> Any:
-    return _default_llm_resolver
-
-
-def set_llm_resolver(resolver: Any) -> None:
-    global _default_llm_resolver
-    _default_llm_resolver = resolver
-    # Push the override onto the cached default ctx so ``ctx.inject``
-    # returns the new adapter. Tests rely on this shim.
-    try:
-        from lca.layer4_app.api import _default_ctx_holder
-
-        cached = _default_ctx_holder.ctx
-    except Exception:
-        cached = None
-    if cached is not None:
-        if resolver is not None:
-            cached.provide("llm_resolver", resolver)
-        else:
-            # own_bindings is on the runtime cordis.Context; the audited
-            # PluginContext Protocol intentionally omits it. Cast for the
-            # narrow binding-teardown path.
-            cast("Any", cached).own_bindings.pop("llm_resolver", None)
-
-
 def sanitize_error(error: str) -> str:
     """Three regexes. No sanitizer protocol theatre."""
     if not error:
@@ -207,16 +176,12 @@ def assemble_run_hub(
 def create_hub_for_session(
     session: RunSession,
     *,
-    ctx: Any | None = None,
+    ctx: Any,
     settings: ObservabilitySettings | None = None,
 ) -> BoundObservability:
     """Used by tests that assemble a session first. Production uses create_run_session."""
     if session.hub is not None:
         return session.hub
-    if ctx is None:
-        from lca.layer4_app.api import get_or_create_default_ctx
-
-        ctx = get_or_create_default_ctx()
     hub = assemble_run_hub(
         jsonl_path=session.jsonl_path, tail=session.tail, ctx=ctx, settings=settings
     )
@@ -237,17 +202,13 @@ def create_run_session(
     plane: str = "",
     extra_plane: str = "",
     execution_target: str = "",
-    ctx: Any | None = None,
+    ctx: Any,
 ) -> RunSession:
     run_id = new_id("run")
     trace_id = new_id("trace")
     jsonl_path = registry.jsonl_path_for(run_id)
     cleaned_ids = tuple(str(i).strip() for i in attachment_ids if str(i).strip())
     tail = LiveTail()
-    if ctx is None:
-        from lca.layer4_app.api import get_or_create_default_ctx
-
-        ctx = get_or_create_default_ctx()
     hub = assemble_run_hub(
         jsonl_path=jsonl_path,
         tail=tail,
@@ -313,20 +274,18 @@ async def execute_run(
     run_id: str,
     question: str,
     mode: str = DEFAULT_MODE,
-    ctx: Any | None = None,
+    ctx: Any,
 ) -> None:
-    """Drive one Run. ``ctx`` is the boot-time plugin tree; legacy callers
-    (tests) may pass ``None`` and rely on ``set_llm_resolver`` + default ctx."""
+    """Drive one Run. ``ctx`` is the boot-time plugin tree.
+
+    The boot-time plugin tree is non-optional: callers must supply a
+    booted ``ctx``. The legacy "pass None, fall back to a global cache"
+    path is gone — boot once during server startup, then hand the same
+    ``ctx`` to every run.
+    """
     session = registry.get(run_id)
     if session is None:
         return
-    if ctx is None:
-        from lca.layer4_app.api import get_or_create_default_ctx
-
-        ctx = get_or_create_default_ctx()
-    # Test shim: ``set_llm_resolver`` pushes onto ctx when no resolver yet.
-    if _default_llm_resolver is not None and "llm_resolver" not in ctx.own_bindings:
-        ctx.provide("llm_resolver", _default_llm_resolver)
     session.status = RunStatus.RUNNING
     hub = session.hub if session.hub is not None else create_hub_for_session(session, ctx=ctx)
     workspace_ref: list[Any] = [None]
@@ -816,7 +775,7 @@ def schedule_run(
     registry: RunRegistry,
     session: RunSession,
     *,
-    ctx: Any | None = None,
+    ctx: Any,
 ) -> asyncio.Task[Any]:
     task = asyncio.create_task(
         execute_run(

@@ -18,7 +18,8 @@ from gateway.app import create_app
 @pytest.fixture()
 def client():
     app = create_app()
-    return TestClient(app)
+    with TestClient(app) as client:
+        yield client
 
 
 class TestHarnessSpineE2E:

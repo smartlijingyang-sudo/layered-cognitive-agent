@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from starlette.testclient import TestClient
 
 from gateway.app import create_app
@@ -113,9 +114,14 @@ def test_process_journal_survives_bind_close() -> None:
     assert hub.tail.last_seq == 1
 
 
-def test_create_run_session_publishes_to_process_journal(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_create_run_session_publishes_to_process_journal(tmp_path: Path) -> None:
+    from lca.harness.profile.lifespan import profile_lifespan
+
     registry = RunRegistry(runs_dir=tmp_path)
-    session = create_run_session(registry, question="q", user_text="q")
+    async with profile_lifespan("profiles/web-standard.yaml") as state:
+        ctx = state["ctx"]
+        session = create_run_session(registry, question="q", user_text="q", ctx=ctx)
     assert session.hub is not None
     with bind_backends(session.hub):
         record(AgentRunStarted(agent_role="助手", objective="q"))
@@ -126,9 +132,14 @@ def test_create_run_session_publishes_to_process_journal(tmp_path: Path) -> None
     assert not registry.journal.tail.is_closed
 
 
-def test_journal_live_keeps_tool_preview(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_journal_live_keeps_tool_preview(tmp_path: Path) -> None:
+    from lca.harness.profile.lifespan import profile_lifespan
+
     registry = RunRegistry(runs_dir=tmp_path)
-    session = create_run_session(registry, question="q", user_text="q")
+    async with profile_lifespan("profiles/web-standard.yaml") as state:
+        ctx = state["ctx"]
+        session = create_run_session(registry, question="q", user_text="q", ctx=ctx)
     assert session.hub is not None
     with bind_backends(session.hub):
         record(

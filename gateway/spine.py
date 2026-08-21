@@ -1,7 +1,20 @@
-"""Process-wide session spine handles. Default unused (flag off)."""
+"""Session spine handles: AgentRegistry + CommandGateway + projections.
+
+The session spine is gateway infrastructure, not part of the harness
+profile. It is constructed at ``create_app()`` time, but the cordis
+ctx it hands to live agent builders is resolved **per call** from
+``app.state.ctx`` — which is set by the lifespan after the harness
+profile boots.
+
+This decouples session spine construction from profile boot: the
+spine is wired up eagerly so request handlers can find it on
+``app.state``, but the ctx it provides comes from the boot-time
+plugin tree when each session is created.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -12,23 +25,27 @@ from lca.harness.projection.web import ActivityProjection, ConversationProjectio
 from lca.harness.skills import SkillsProjection
 from lca.layer4_app.harness_bridge import build_live_agent
 
-_registry: AgentRegistry | None = None
-_gateway: CommandGateway | None = None
-_projections: InMemoryProjectionRegistry | None = None
-
 
 def bind_session_spine(
     *,
     sessions_dir: Path,
+    ctx_provider: Callable[[], Any | None] | None = None,
     cordis_ctx: Any | None = None,
 ) -> tuple[AgentRegistry, CommandGateway, InMemoryProjectionRegistry]:
-    """Bind the session spine to disk persistence.
+    """Bind the session spine with a lazy ctx provider.
 
-    `cordis_ctx` is the cordis.Context produced by boot_profile(); AgentRegistry
-    uses it to resolve live agent builders, llm, tools, etc. via ctx.inject().
-    Falls back to None (which AgentRegistry handles gracefully).
+    Args:
+        sessions_dir: Where session JSONL files live.
+        ctx_provider: Callable returning the booted cordis ctx. Called
+            per session creation. If None, falls back to ``cordis_ctx``
+            (deprecated) or None (library fallback path).
+        cordis_ctx: Deprecated eager ctx — used only if ``ctx_provider``
+            is None.
+
+    Returns:
+        ``(registry, command_gateway, projections)``. Bind them onto
+        ``app.state`` and let request handlers use them.
     """
-    global _registry, _gateway, _projections
     projections = InMemoryProjectionRegistry()
     projections.register(ConversationProjection())
     projections.register(ActivityProjection())
@@ -37,22 +54,23 @@ def bind_session_spine(
         sessions_dir=sessions_dir,
         projections=projections,
         live_builder=build_live_agent,
+        ctx_provider=ctx_provider,
         cordis_ctx=cordis_ctx,
     )
     gateway = CommandGateway(registry, projections)
-    _registry = registry
-    _gateway = gateway
-    _projections = projections
     return registry, gateway, projections
 
 
-def command_gateway() -> CommandGateway | None:
-    return _gateway
+def ctx_provider_from_app(app: Any) -> Callable[[], Any | None]:
+    """Build a ctx_provider that reads ``app.state.ctx``.
 
+    Use this when constructing the session spine: pass the returned
+    callable to :func:`bind_session_spine`. The callable resolves
+    ``app.state.ctx`` on each call, so it picks up the booted ctx
+    after the lifespan runs without holding a stale reference.
+    """
 
-def agent_registry() -> AgentRegistry | None:
-    return _registry
+    def _provider() -> Any | None:
+        return getattr(app.state, "ctx", None)
 
-
-def projections() -> InMemoryProjectionRegistry | None:
-    return _projections
+    return _provider

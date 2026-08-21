@@ -8,10 +8,9 @@ from dataclasses import dataclass
 import pytest
 from starlette.testclient import TestClient
 
-from gateway.runs.execute import create_run_session, execute_run, resume_run, set_llm_resolver
+from gateway.runs.execute import create_run_session, execute_run, resume_run
 from gateway.runs.session import RunRegistry, RunStatus
 from lca.contracts.protocols import LLMAdapter
-from lca.layer0_infra.llm_resolver import ProductionLLMResolver
 from tests.harness.scripted_llm import ScriptedLLMAdapter, respond, use_tool
 from tests.support.gateway_app import create_scripted_app
 
@@ -60,23 +59,25 @@ def _no_langfuse(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LCA_OBS_BACKENDS", "console")
 
 
-@pytest.fixture
-def _restore_resolver() -> None:
-    yield
-    set_llm_resolver(ProductionLLMResolver())
-
-
 @pytest.mark.asyncio
-async def test_waiting_input_does_not_close_tail(_restore_resolver: None) -> None:
-    set_llm_resolver(_Resolver(_ask_then_reply()))
+async def test_waiting_input_does_not_close_tail() -> None:
+    from lca.harness.profile.lifespan import profile_lifespan
+
+    resolver = _Resolver(_ask_then_reply())
     registry = RunRegistry()
-    session = create_run_session(
-        registry,
-        question="请用户选方案",
-        user_text="请用户选方案",
-        mode="solo",
-    )
-    await execute_run(registry, run_id=session.run_id, question=session.question, mode="solo")
+    async with profile_lifespan("profiles/web-standard.yaml") as state:
+        ctx = state["ctx"]
+        ctx.provide("llm_resolver", resolver)
+        session = create_run_session(
+            registry,
+            question="请用户选方案",
+            user_text="请用户选方案",
+            mode="solo",
+            ctx=ctx,
+        )
+        await execute_run(
+            registry, run_id=session.run_id, question=session.question, mode="solo", ctx=ctx
+        )
 
     assert session.status == RunStatus.WAITING_INPUT
     assert not session.tail.is_closed
@@ -88,16 +89,24 @@ async def test_waiting_input_does_not_close_tail(_restore_resolver: None) -> Non
 
 
 @pytest.mark.asyncio
-async def test_answer_resumes_same_run_and_finalizes(_restore_resolver: None) -> None:
-    set_llm_resolver(_Resolver(_ask_then_reply()))
+async def test_answer_resumes_same_run_and_finalizes() -> None:
+    from lca.harness.profile.lifespan import profile_lifespan
+
+    resolver = _Resolver(_ask_then_reply())
     registry = RunRegistry()
-    session = create_run_session(
-        registry,
-        question="请用户选方案",
-        user_text="请用户选方案",
-        mode="solo",
-    )
-    await execute_run(registry, run_id=session.run_id, question=session.question, mode="solo")
+    async with profile_lifespan("profiles/web-standard.yaml") as state:
+        ctx = state["ctx"]
+        ctx.provide("llm_resolver", resolver)
+        session = create_run_session(
+            registry,
+            question="请用户选方案",
+            user_text="请用户选方案",
+            mode="solo",
+            ctx=ctx,
+        )
+        await execute_run(
+            registry, run_id=session.run_id, question=session.question, mode="solo", ctx=ctx
+        )
     assert session.status == RunStatus.WAITING_INPUT
     tail = session.tail
 
@@ -108,7 +117,7 @@ async def test_answer_resumes_same_run_and_finalizes(_restore_resolver: None) ->
     assert session.hub is not None
 
 
-def test_http_waiting_input_snapshot_and_answer(_restore_resolver: None) -> None:
+def test_http_waiting_input_snapshot_and_answer() -> None:
     registry = RunRegistry()
     app = create_scripted_app(registry, llm_resolver=_Resolver(_ask_then_reply()))
     with TestClient(app) as client:

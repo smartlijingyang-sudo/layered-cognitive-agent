@@ -42,14 +42,22 @@ class AgentRegistry:
         projections: InMemoryProjectionRegistry,
         live_builder: LiveBuilder,
         cordis_ctx: Any | None = None,
+        ctx_provider: Callable[[], Any | None] | None = None,
         plugin_scope: Any | None = None,  # DEPRECATED: use cordis_ctx
     ) -> None:
         self._sessions_dir = sessions_dir
         self._sessions_dir.mkdir(parents=True, exist_ok=True)
         self._projections = projections
         self._live_builder = live_builder
-        # Prefer cordis_ctx; fall back to deprecated plugin_scope for back-compat.
-        self._cordis_ctx = cordis_ctx if cordis_ctx is not None else plugin_scope
+        # Prefer ctx_provider (resolves per-call from app.state.ctx after
+        # the lifespan boots). Fall back to cordis_ctx if supplied
+        # directly. plugin_scope is the deprecated alias.
+        if ctx_provider is not None:
+            self._ctx_provider = ctx_provider
+        elif cordis_ctx is not None:
+            self._ctx_provider = lambda: cordis_ctx
+        else:
+            self._ctx_provider = lambda: plugin_scope
         self._live: dict[str, _AgentEntry] = {}
         self._idempotency: dict[str, CommandReceipt] = {}
 
@@ -87,7 +95,7 @@ class AgentRegistry:
         store.subscribe(self._projections.on_event)
         self._projections.bind_session(sid)
         inbox = Inbox(store)
-        handle = self._live_builder(store, inbox, sid, options, self._cordis_ctx)
+        handle = self._live_builder(store, inbox, sid, options, self._ctx_provider())
         self._live[sid] = _AgentEntry(handle=handle, store=store, inbox=inbox)
         await store.append(SessionCreated(profile=profile, preset=preset), actor="system")
         return handle
@@ -101,7 +109,7 @@ class AgentRegistry:
         store.subscribe(self._projections.on_event)
         self._projections.replay(session_id, list(store.events()))
         inbox = Inbox(store)
-        handle = self._live_builder(store, inbox, session_id, None, self._cordis_ctx)
+        handle = self._live_builder(store, inbox, session_id, None, self._ctx_provider())
         status = self._status_from_store(store)
         agent = handle.agent
         if hasattr(agent, "_status"):

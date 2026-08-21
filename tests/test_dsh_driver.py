@@ -262,7 +262,7 @@ async def test_execute_run_uses_dsh_driver(tmp_path: Path, monkeypatch: pytest.M
             )
         )
 
-    monkeypatch.setattr("gateway.runs.execute._freeze_bindings", lambda session: bindings)
+    monkeypatch.setattr("gateway.runs.execute._freeze_bindings", lambda session, ctx: bindings)
     monkeypatch.setattr("gateway.runs.execute._stage_machine_attachments", _noop_stage)
     monkeypatch.setattr(
         "gateway.runs.dsh_execute.resolve_machine_transport", lambda _id: _Transport()
@@ -273,15 +273,22 @@ async def test_execute_run_uses_dsh_driver(tmp_path: Path, monkeypatch: pytest.M
     )
     monkeypatch.setattr("gateway.runs.dsh_execute.run_dsh_machine_turn", _fake_machine_turn)
 
+    from lca.harness.profile.lifespan import profile_lifespan
+
     registry = RunRegistry(runs_dir=tmp_path)
-    session = create_run_session(
-        registry,
-        question="hello",
-        user_text="hello",
-        mode="solo",
-        execution_target="dsh",
-    )
-    await execute_run(registry, run_id=session.run_id, question=session.question, mode="solo")
+    async with profile_lifespan("profiles/web-standard.yaml") as state:
+        ctx = state["ctx"]
+        session = create_run_session(
+            registry,
+            question="hello",
+            user_text="hello",
+            mode="solo",
+            execution_target="dsh",
+            ctx=ctx,
+        )
+        await execute_run(
+            registry, run_id=session.run_id, question=session.question, mode="solo", ctx=ctx
+        )
     assert session.status == RunStatus.COMPLETED
     archive = tmp_path / f"{session.run_id}.dsh.jsonl"
     assert archive.is_file()

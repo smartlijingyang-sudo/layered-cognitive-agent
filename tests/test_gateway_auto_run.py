@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 import unittest
 
-from gateway.runs.execute import create_run_session, execute_run, set_llm_resolver
+from gateway.runs.execute import create_run_session, execute_run
 from gateway.runs.session import RunRegistry, RunStatus
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols import LLMAdapter
-from lca.layer0_infra.llm_resolver import ProductionLLMResolver
+from lca.harness.profile.lifespan import profile_lifespan
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
 
@@ -45,9 +45,6 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.registry = RunRegistry()
 
-    def tearDown(self) -> None:
-        set_llm_resolver(ProductionLLMResolver())
-
     async def test_team_mode_casts_team_and_completes(self) -> None:
         plan = json.dumps(
             {
@@ -63,20 +60,24 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
         llm = ScriptedLLMAdapter(
             {"caster": [LLMResponse(text=plan, model="scripted-llm")]}, default_respond=True
         )
-        set_llm_resolver(_ScriptedResolver(llm))
 
-        session = create_run_session(
-            self.registry,
-            question="给新功能的发布写一句宣传文案",
-            user_text="给新功能的发布写一句宣传文案",
-            mode="team",
-        )
-        await execute_run(
-            self.registry,
-            run_id=session.run_id,
-            question=session.question,
-            mode=session.mode,
-        )
+        async with profile_lifespan("profiles/web-standard.yaml") as state:
+            ctx = state["ctx"]
+            ctx.provide("llm_resolver", _ScriptedResolver(llm))
+            session = create_run_session(
+                self.registry,
+                question="给新功能的发布写一句宣传文案",
+                user_text="给新功能的发布写一句宣传文案",
+                mode="team",
+                ctx=ctx,
+            )
+            await execute_run(
+                self.registry,
+                run_id=session.run_id,
+                question=session.question,
+                mode=session.mode,
+                ctx=ctx,
+            )
         self.assertEqual(session.status, RunStatus.COMPLETED)
         event_types = _journal_event_types(session)
         self.assertIn("CastingStarted", event_types)
@@ -88,28 +89,25 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
         Agent 无 scope 时曾用 loop.run_until_complete(boot_profile)，
         触发 RuntimeError: This event loop is already running。
         """
-        import lca.layer4_app.api as api
-
-        previous_ctx = api._cached_default_ctx
-        api._cached_default_ctx = None
         llm = ScriptedLLMAdapter({}, default_respond=True)
-        set_llm_resolver(_ScriptedResolver(llm))
 
-        session = create_run_session(
-            self.registry,
-            question="你好",
-            user_text="你好",
-            mode="solo",
-        )
-        try:
+        async with profile_lifespan("profiles/web-standard.yaml") as state:
+            ctx = state["ctx"]
+            ctx.provide("llm_resolver", _ScriptedResolver(llm))
+            session = create_run_session(
+                self.registry,
+                question="你好",
+                user_text="你好",
+                mode="solo",
+                ctx=ctx,
+            )
             await execute_run(
                 self.registry,
                 run_id=session.run_id,
                 question=session.question,
                 mode=session.mode,
+                ctx=ctx,
             )
-        finally:
-            api._cached_default_ctx = previous_ctx
         self.assertNotIn(
             "already running",
             (session.error or "").lower(),
@@ -135,20 +133,24 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
             {"caster": [LLMResponse(text="完全不是 JSON", model="scripted-llm")]},
             default_respond=False,
         )
-        set_llm_resolver(_ScriptedResolver(llm))
 
-        session = create_run_session(
-            self.registry,
-            question="随便做点什么",
-            user_text="随便做点什么",
-            mode="team",
-        )
-        await execute_run(
-            self.registry,
-            run_id=session.run_id,
-            question=session.question,
-            mode=session.mode,
-        )
+        async with profile_lifespan("profiles/web-standard.yaml") as state:
+            ctx = state["ctx"]
+            ctx.provide("llm_resolver", _ScriptedResolver(llm))
+            session = create_run_session(
+                self.registry,
+                question="随便做点什么",
+                user_text="随便做点什么",
+                mode="team",
+                ctx=ctx,
+            )
+            await execute_run(
+                self.registry,
+                run_id=session.run_id,
+                question=session.question,
+                mode=session.mode,
+                ctx=ctx,
+            )
         self.assertEqual(session.status, RunStatus.FAILED)
         assert session.error is not None
         self.assertIn("自动组队失败", session.error)

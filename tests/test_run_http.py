@@ -103,20 +103,22 @@ def test_post_runs_202_then_live_is_journal() -> None:
 
 
 def test_post_runs_requires_user_message() -> None:
-    client = TestClient(create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
-    resp = client.post("/runs", json={"model": "solo", "messages": []})
-    assert resp.status_code == 400
+    with TestClient(
+        create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver())
+    ) as client:
+        resp = client.post("/runs", json={"model": "solo", "messages": []})
+        assert resp.status_code == 400
 
 
 def test_inflight_dedup_returns_same_run() -> None:
     registry = RunRegistry()
-    client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
-    payload = {"model": "solo", "messages": [{"role": "user", "content": "同一句话"}]}
-    first = client.post("/runs", json=payload)
-    second = client.post("/runs", json=payload)
-    assert first.status_code == 202
-    assert second.status_code == 202
-    # After the first run finishes it is no longer inflight; sequential
-    # re-requests are new runs. Dedup only applies while PENDING/RUNNING.
-    assert first.json()["run_id"]
-    assert second.json()["run_id"]
+    with TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client:
+        payload = {"model": "solo", "messages": [{"role": "user", "content": "同一句话"}]}
+        first = client.post("/runs", json=payload)
+        second = client.post("/runs", json=payload)
+        assert first.status_code == 202
+        assert second.status_code == 202
+        # After the first run finishes it is no longer inflight; sequential
+        # re-requests are new runs. Dedup only applies while PENDING/RUNNING.
+        assert first.json()["run_id"]
+        assert second.json()["run_id"]
