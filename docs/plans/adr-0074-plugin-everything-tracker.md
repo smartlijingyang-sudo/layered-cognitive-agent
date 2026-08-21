@@ -97,7 +97,7 @@
 | **3** | 7 | RunFact / CommandEnvelope 收口 | ✅ Done | `afbac7a7` | 2026-08-21 | PR-6 + ADR-0073 |
 | **3** | 8 | ArtifactController（4 状态机） | ✅ Done | `17906ee0` | 2026-08-21 | PR-7 |
 | **4** | 9 | Creator 4 面化 | ✅ Done | `d17d8447` | 2026-08-21 | PR-8 |
-| **4** | 10 | Golden profile + 文档更新 | ✅ Done | _pending commit_ | 2026-08-21 | PR-9 |
+| **4** | 10 | Golden profile + 文档更新 | ✅ Done | `010865d7` | 2026-08-21 | PR-9 |
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
@@ -194,7 +194,7 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-9（Creator 4 面化）
+## 4. 已完成 PR 详情：PR-10（Golden profile + 文档更新）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
 > PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 完成细节见 §5 Phase 1。
