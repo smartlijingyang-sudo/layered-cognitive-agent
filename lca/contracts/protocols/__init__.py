@@ -134,6 +134,15 @@ from lca.contracts.protocols.orchestration import (
     TeamStrategy,
 )
 
+# ── ScopePlan + CompiledRunPlan（ADR-0068 §一 + ADR-0074 PR-3）──────
+from lca.contracts.protocols.plan import (
+    COMPILED_RUN_PLAN_VERSION,
+    CompiledRunPlan,
+    build_input_provenance,
+    compiled_run_plan_ref,
+    compiled_run_plan_to_dict,
+)
+
 # ── L2 Runtime 协议 ──────────────────────────────────────
 from lca.contracts.protocols.reducer import (
     LoopPhase,
@@ -147,6 +156,13 @@ from lca.contracts.protocols.relation import (
     typed_relations_from_iter,
 )
 from lca.contracts.protocols.runtime import Runtime, StopOutcomePolicy, StopRule
+from lca.contracts.protocols.scope_plan import (
+    BudgetCeiling,
+    ScopePlan,
+    scope_plan_from_iter,
+    scope_plan_hash,
+    scope_plan_to_dict,
+)
 
 # ── 工具执行管线（五阶段可拦截管线）────────────
 from lca.contracts.protocols.tool_pipeline import (
@@ -162,6 +178,7 @@ from lca.contracts.protocols.tool_pipeline import (
 
 __all__ = [
     "ALLOWED_OPERATORS",
+    "COMPILED_RUN_PLAN_VERSION",
     "SANDBOX_SKILL_MOUNT_PREFIX",
     "SLOT_DEFAULT_AGGREGATION",
     "SLOT_DEFAULT_FAILURE",
@@ -174,8 +191,10 @@ __all__ = [
     "Brain",
     "BrainFactory",
     "BudgetAware",
+    "BudgetCeiling",
     "BudgetPolicy",
     "CapabilityPlan",
+    "CompiledRunPlan",
     "ComponentRegistryProtocol",
     "ControlEntry",
     "ControlPlan",
@@ -208,6 +227,7 @@ __all__ = [
     "SafeExecutor",
     "Sandbox",
     "SandboxRuntime",
+    "ScopePlan",
     "Sensor",
     "SensorDisabled",
     "SharedMemoryStore",
@@ -244,9 +264,12 @@ __all__ = [
     "TransportRegistryProtocol",
     "TypedRelation",
     "always",
+    "build_input_provenance",
     "canonical_scope_of",
     "capability_plan_hash",
     "capability_plan_to_dict",
+    "compiled_run_plan_ref",
+    "compiled_run_plan_to_dict",
     "compute_control_plan_hash",
     "control_plan_to_dict",
     "declared_dim_count",
@@ -256,6 +279,9 @@ __all__ = [
     "relations_from_plugin",
     "relations_of_kind",
     "relations_to_plugin",
+    "scope_plan_from_iter",
+    "scope_plan_hash",
+    "scope_plan_to_dict",
     "score_logic_address",
     "slot_entries",
     "slots_covered",

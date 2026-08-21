@@ -55,6 +55,23 @@ class ResolvedProfile:
     manifest_hash: str
     env_refs: tuple[tuple[str, str, bool], ...]  # (plugin_id, field, required)
 
+    def compile_plan(self, **kwargs: Any) -> Any:
+        """Convenience shortcut: ``compile_plan(self, **kwargs)`` (PR-3).
+
+        Equivalent to ``plan_compiler.compile_plan(self, options=...)``.
+        Returns ``CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan``.
+
+        Returns ``Any`` to avoid import cycle (resolved ResolvedProfile is
+        imported by plan_compiler; type is ``CompiledRunPlan``).
+        """
+        from lca.harness.profile.plan_compiler import (
+            CompileOptions,
+            compile_plan,
+        )
+
+        opts = kwargs.pop("options", None) or CompileOptions(**kwargs)
+        return compile_plan(self, options=opts)
+
 
 def resolve_profile(
     profile_path: Path | str,
