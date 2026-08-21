@@ -85,7 +85,7 @@
 | **0** | D | README 收尾 | ✅ Done | `5e32e704` | 2026-08-21 | — |
 | **1** | 0 | audit 测量网 | ✅ Done | `8f8469eb` | 2026-08-21 | — |
 | **1** | 0.5 | 清 19 个 pre-existing 失败 | ⏳ Ready（与 PR-0 并行） | — | — | — |
-| **1** | 1 | ControlSlot + ControlPlan 数据面 | ⛔ Blocked | — | — | PR-0 |
+| **1** | 1 | ControlSlot + ControlPlan 数据面 | ✅ Done | `e2043986` | 2026-08-21 | PR-0 |
 | **1** | 2 | PluginDefinition.control 可选段 | ⛔ Blocked | — | — | PR-1 |
 | **1** | 2.5 | 11 关系代数扩展 CapabilityPlan | ⛔ Blocked | — | — | PR-2 |
 | **2** | 3 | CompiledRunPlan + PlanCompiler | ⛔ Blocked | — | — | PR-2.5 |
@@ -98,9 +98,9 @@
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-1（ControlSlot + ControlPlan 数据面）。
+**Next Action**：PR-2（PluginDefinition.control 可选段 + LogicAddress + FunctionalGroup + PluginContract）。
 
-**累计完成**：4 / 17（PR-0 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：5 / 17（PR-0 完成；PR-1 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -191,89 +191,99 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-0（audit 测量网，commit `8f8469eb`）
+## 4. 已完成 PR 详情：PR-1（ControlSlot + ControlPlan 数据面）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
+> PR-0 完成细节（audit 测量网）见 §5 Phase 1。
 
 ### 4.1 目标
 
-让 reviewer 一行命令看清当前 hardcode 在哪（Control Slot 投稿分布 / State 写入点 / 直接 effect 调用 / 残留 hook 挂载点）。
+9 个槽位有限枚举 + ControlPlan dataclass + Resolver 投影（**不动运行时**）。PR-1 是"声明什么存在"的数据面；PR-3 PlanCompiler 才把这些声明编译为可运行 plan。
 
 ### 4.2 新增文件
 
 | 文件 | 作用 |
 |---|---|
-| `lca/harness/diagnostics/audit_control_surface.py` | 扫描 plugin Manifest / Profile，输出每个 Control Slot 的投稿清单 |
-| `lca/harness/diagnostics/audit_state_writers.py` | 用 `ast` 扫描 `lca/layer1_cognitive/`、`lca/layer2_runtime/`、`lca/layer3_agent/`，输出 `state.x = ...` 字面位置 |
-| `lca/harness/diagnostics/audit_direct_commands.py` | 扫描 Body/SafeExecutor 内直接调用 sandbox/transport 的路径 |
-| `lca/harness/diagnostics/audit_hook_attach.py` | 扫描 `hooks.trigger` / `_emit` / `middleware_bag` 残留调用点 |
-| `tests/harness/test_audit_control_surface.py` | 4 个对应测试 |
-| `tests/harness/test_audit_state_writers.py` | |
-| `tests/harness/test_audit_direct_commands.py` | |
-| `tests/harness/test_audit_hook_attach.py` | |
+| `lca/contracts/atoms/control_slot.py` | `ControlSlot` 枚举（11 项 = 9 槽位 + observe.checkpoint + act.safe-boundary）+ `phase_owner` / `parse_slot` 等工厂函数 |
+| `lca/contracts/protocols/control_plan.py` | `Activation` / `AggregationMode` / `FailureMode` / `ControlEntry` / `ControlPlan` 契约 + Activation DSL 校验 + `compute_control_plan_hash` |
+| `lca/harness/profile/control_plan_resolver.py` | `project_control_plan()` 从 `ResolvedProfile` 投影 ControlPlan；`explain_control_slot()` 是 `lca-ops explain control <slot>` 的最小版本 |
+| `tests/harness/test_control_slot.py` | 11 槽位枚举 / 阶段归属 / parse_slot / audit 漂移守护测试 |
+| `tests/harness/test_control_plan_resolver.py` | Activation DSL / ControlEntry / ControlPlan 排序 / hash 稳定 / opt-in 语义 / explain 工具测试 |
 
 修改文件：
 
-- `scripts/lca-ops`：注册 4 个 audit 子命令（参考现有 audit / diagnose 子命令注册方式）
+- `lca/contracts/atoms/__init__.py` — re-export `ControlSlot`
+- `lca/contracts/protocols/__init__.py` — re-export ControlPlan 契约
+- `lca/harness/diagnostics/audit_control_surface.py` — `KNOWN_CONTROL_SLOTS` 改为从 `ControlSlot` 枚举派生（DRY）
 
 ### 4.3 实现要点
 
-- `audit_*.py` 是 **pure-function**：输入路径 → 输出 `dict[str, list[Finding]]`
-- 用 `ast` 模块扫描，避免 import 时副作用
-- `Finding` dataclass：`path / line / col / kind / message`
-- 子命令输出格式：人类可读 + `--json` 给机器用（参考 `lca-ops inspect-tree` 的现有风格）
+- `ControlSlot` 是 `str Enum`，值与 ADR-0066 §二 + tracker §19 表述一致；枚举冻结保证序列化兼容
+- `SLOT_PHASE_OWNER` 把每个槽位映射到 v3 宪法 C1 阶段；横切 `observe.*` / `observe.checkpoint` → `None`
+- `SLOT_DEFAULT_AGGREGATION` / `SLOT_DEFAULT_FAILURE` 落地 ADR-0066 §四单调聚合表
+- Activation DSL 是 allowlist-only 数据结构：操作符白名单（`always / all / any / not / in / not_in / eq / ne / lt / le / gt / ge / exists / missing`）+ 叶子形状 `{"fact": <descriptor>, <op>: <value>}`；resolver / lint 必须拒绝集合外操作符
+- `ControlPlan` 是 frozen dataclass，**不放方法**（遵守 ADR-0015 contracts 纯类型契约）；访问器作为 module-level 函数：`slot_entries(plan, slot)` / `slots_covered(plan)` / `slots_missing(plan)` / `is_slot_empty(plan, slot)` / `control_plan_to_dict(plan)`
+- `project_control_plan` 是 **opt-in**：未声明 `control:` 段的插件不产生 entry → 当前所有 profile 投影为空 ControlPlan（plan_hash 由 entries 列表派生，空 entries 仍稳定）
+- `compute_control_plan_hash` 先按 `(slot, order, plugin_id)` 排序再 SHA-256 → 跨运行稳定；profile + entries → 同 hash
 
 ### 4.4 不变量
 
 - **不改 ADR 文件**（0066/0067/0068/0069/0071/0073/0070/0072/0062 任何文件一字不改）
-- **不动 layer 分层**：contracts/ 不能 import 实现层
-- **不修 19 个 pre-existing 失败**（那是 PR-0.5 范围）
+- **不动 layer 分层**：contracts/ 不能 import 实现层（`mypy` + `lint-imports` 守护）
+- **不修 19 个 pre-existing 失败**（那是 PR-0.5 范围；PR-1 新增 103 测试全过，**无新增失败**）
 - **不删除 `_loop` / `_emit` / `middleware_bag`**（PR-0 只观察不修复）
-- **不扩张到 PR-1 范围**（不在 PR-0 内顺手做 ControlSlot 枚举或 control 字段）
+- **不扩张到 PR-2 范围**（不在 PR-1 内顺手做 `PluginDefinition.control` typed 字段 / LogicAddress / FunctionalGroup / PluginContract）
+- **不做运行时 activation 求值**（PR-3 PlanCompiler 的职责）
+- **不引入第 12 槽位**（新增槽位需 ADR）
+- **不放方法在 contracts/@dataclass**（ADR-0015；访问器为 module-level 函数）
 
 ### 4.5 验证流程
 
 ```sh
 # 1. ruff check + format
-uv run ruff check --fix lca/harness/diagnostics/ scripts/lca-ops tests/harness/test_audit_*.py
-uv run ruff format lca/harness/diagnostics/ scripts/lca-ops tests/harness/test_audit_*.py
+uv run ruff check --fix lca/contracts/atoms/control_slot.py lca/contracts/protocols/control_plan.py lca/harness/profile/control_plan_resolver.py lca/harness/diagnostics/audit_control_surface.py tests/harness/test_control_slot.py tests/harness/test_control_plan_resolver.py
+uv run ruff format lca/contracts/atoms/control_slot.py lca/contracts/protocols/control_plan.py lca/harness/profile/control_plan_resolver.py lca/harness/diagnostics/audit_control_surface.py tests/harness/test_control_slot.py tests/harness/test_control_plan_resolver.py
 
-# 2. 新增的 4 个 audit 测试
-uv run pytest --no-cov tests/harness/test_audit_*.py -v
+# 2. 新增的 2 个测试文件
+uv run pytest --no-cov tests/harness/test_control_slot.py tests/harness/test_control_plan_resolver.py -v
 
-# 3. lca-ops 子命令可调用
-uv run python scripts/lca-ops audit control-surface 2>&1 | head -30
-uv run python scripts/lca-ops audit state-writers 2>&1 | head -30
-uv run python scripts/lca-ops audit direct-commands 2>&1 | head -30
-uv run python scripts/lca-ops audit hook-attach 2>&1 | head -30
+# 3. mypy on new files
+uv run mypy lca/contracts/atoms/control_slot.py lca/contracts/protocols/control_plan.py lca/harness/profile/control_plan_resolver.py
 
-# 4. 不破坏既有测试
-uv run pytest --no-cov tests/harness/ -q
+# 4. audit 漂移守护测试
+uv run pytest --no-cov tests/harness/test_audit_control_surface.py -v
+
+# 5. 不破坏既有测试（除 §11 已登记的 pre-existing 19 失败）
+uv run pytest --no-cov tests/harness/ tests/test_contracts.py -q
 ```
 
 ### 4.6 完成判据
 
-- 4 个 audit 子命令输出**有内容**（不是空报告），且格式可读
-- 4 个测试文件全过
-- harness 测试无新增失败（pre-existing 19 个保持原状）
+- 2 个新测试文件全过（103 测试，0 失败）
+- harness/ 测试无新增失败（pre-existing 19 个保持原状；其中 1 个是 contracts_purity，与 PR-1 无关）
 - ruff 无新增警告
+- mypy 无新增错误
+- audit 测试 `test_audit_known_slots_matches_enum` 守护 audit 漂移
+- `web-standard.yaml` profile 投影出空 ControlPlan（opt-in 语义正确）
 
 ### 4.7 提交规范
 
 ```text
-feat(harness): PR-0 audit scripts — control-surface / state-writers / direct-commands / hook-attach
+feat(contracts+harness): PR-1 ControlSlot + ControlPlan 数据面
 
-- 新增 lca/harness/diagnostics/audit_*.py（4 个 pure-function 扫描器）
-- 新增 tests/harness/test_audit_*.py（4 个对应测试）
-- scripts/lca-ops 注册 audit 子命令
-- ADR-0074 PR-0 落地
+- 新增 lca/contracts/atoms/control_slot.py（11 槽位枚举 + phase_owner）
+- 新增 lca/contracts/protocols/control_plan.py（Activation DSL / ControlEntry / ControlPlan）
+- 新增 lca/harness/profile/control_plan_resolver.py（投影 ResolvedProfile → ControlPlan）
+- 新增 tests/harness/test_control_slot.py + test_control_plan_resolver.py（103 测试）
+- 重构 audit_control_surface.py：KNOWN_CONTROL_SLOTS 从 enum 派生（DRY）
+- ADR-0074 PR-1 落地
 
-Refs: ADR-0074 phase 1 / PR-0
+Refs: ADR-0074 phase 1 / PR-1 / ADR-0066 §二 + §六 + tracker §19
 ```
 
 ### 4.8 完成后如何更新本追踪
 
-1. 在 `git commit` 后 commit hash
+1. 在 `git commit` 后 commit hash（见 §1 状态总览对应行）
 2. 更新 §1 状态总览：对应 PR 行 → ✅ Done
 3. 更新「ADR 监督范围」实施矩阵：把对应 ADR § 行状态从 ⛔ 改为 ⏳/✅
 4. 把 §4 标题从 "当前 PR 详情" 重命名为 "已完成 PR 详情：<N>"
@@ -283,6 +293,12 @@ Refs: ADR-0074 phase 1 / PR-0
 8. 如果发现新陷阱，追加到 §7
 9. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
 10. 把追踪文件 commit 与代码 commit 分开（避免一个 commit 含两类变更）
+
+### 4.9 已知陷阱（PR-1 新增）
+
+- `lca/contracts/protocols/control_plan.py` 放 module-level 函数（`slot_entries` 等）而非方法——遵循 ADR-0015 contracts 纯类型契约（`@dataclass` 不允许自定义方法）。**这意味着从 `ControlPlan` 对象访问 entry 需要 `slot_entries(plan, slot)` 而不是 `plan.slot_entries(slot)`**，迁移成本由各调用方承担。**强烈建议 PR-2 起任何新代码都遵循此模式**（保持 contracts/ 纯净）。
+- Activation DSL 叶子形状采用 ADR-0066 §三原文 `{"fact": <descriptor>, <op>: <value>}`；操作符 `always / all / any / not` 必须作为顶层字典的唯一 key（dict 单 key 校验）。其他形状（如 `{"op": {"fact": ...}}`）拒绝。
+- audit script 改为从 `ControlSlot` 枚举派生 `KNOWN_CONTROL_SLOTS`，未来 ADR 增加新槽位时**自动覆盖**，但测试 `test_audit_known_slots_matches_enum` 会保证 audit ↔ enum 永同步。
 
 ---
 
