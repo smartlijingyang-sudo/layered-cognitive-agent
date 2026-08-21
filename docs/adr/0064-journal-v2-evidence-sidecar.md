@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Accepted — 2026-08-21**
+**Superseded by [ADR-0065](0065-recoverable-evidence-ledger.md) — 2026-08-21**
 
 Amends: [ADR-0037](0037-journal-as-truth.md)（journal-as-truth 三原则的可执行细化）
 Amends: [ADR-0063](0063-run-trace-ssot.md)（追加 journal.v2 schema、evidence sidecar、per-run 目录、EventMeta、coding agent 工具包）
