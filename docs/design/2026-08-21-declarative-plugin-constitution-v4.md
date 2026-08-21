@@ -581,6 +581,12 @@ v4 的最终可读性不以目录结构或 Python 插件数量为准，而以一
 
 这条增补同样明确一个反直觉边界：**不是一切东西都可替换，而是一切独立变化都可声明；不可替换的是使声明保持可信的最小内核。** 因此 Runtime 时序、状态提交、effect 窄门、scope 衰减、artifact transition 与 Evidence Ledger 属于内核；sensor、gate、action、policy、tool、memory、strategy 与 renderer 属于插件贡献。
 
+## 15. 总原语体系与填空规则
+
+本宪章此前定义了认知闭集、插件群、时空、动态创造和唯一运行计划；《[Agent 原语体系宪章](2026-08-21-agent-primitive-system-constitution.md)》在此基础上给出覆盖全部 Agent 概念的规范坐标：G0–G12 原语群、六维 `LogicAddress`、有限关系代数、六类 contribution operation、PlanTemplate 模式目录与新逻辑填空决策树。[ADR-0069](../adr/0069-agent-primitive-system-and-declarative-grammar.md) 将其确立为新模块、策略、协议、插件和动态能力的唯一主归属规则。
+
+此后代码审查首先不是问“这个文件放哪个目录”，而是问“它的主群、slot、scope、authority、evidence、revision 分别是什么”。只有答案明确，才允许选择目录和实现语言；目录只是该概念地址的投影，不能反过来定义架构。
+
 ## 参考
 
 [1]: 2026-08-19-cognitive-primitive-constitution-v3.md "认知原语插件宪法 v3.0"
