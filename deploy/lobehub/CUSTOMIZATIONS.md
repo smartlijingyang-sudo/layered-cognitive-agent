@@ -27,7 +27,7 @@ Title / embeddings 仍走 `openai_shim`（`/v1/chat|embeddings|responses`），�
 | `file_list_gateway_preview` | A | 组级 FileListViewer 对 `/files` 走 URL 预览，不进 LobeHub file-store |
 | `file_proxy_rewrite` | A | 浏览器要拿产物；rewrite `/files`、`/lca-api/runs`、presence/console |
 | `default_model` | C | 默认模型必须是 `solo` |
-| `lca_model_catalog` | A | 选择器只暴露 solo / team / auto，屏蔽厂商模型 |
+| `lca_model_catalog` | A | 选择器只暴露 solo / team / auto / creator，屏蔽厂商模型 |
 | `openai_guard` | B | 标题等小请求仍走 model-runtime，防止 `solo` 进 Responses |
 | `host_console` | D | 本机 host sidecar 终端投影；不是 Run |
 | `execution_target` | C | 执行环境：用电脑 / 用 DSH / 云沙箱 / 自动；去掉无设备与下载桌面 |

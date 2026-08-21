@@ -1,4 +1,4 @@
-"""Patch: LobeHub model picker only exposes solo / team / auto."""
+"""Patch: LobeHub model picker only exposes solo / team / auto / creator."""
 
 from __future__ import annotations
 
@@ -8,19 +8,19 @@ _HOOK = "src/hooks/useEnabledChatModels.ts"
 _SELECTION = "src/features/ChatInput/hooks/useAgentModelSelection.ts"
 _MODEL = "src/features/ChatInput/ActionBar/Model/index.tsx"
 _LABEL = "src/features/ChatInput/ActionBar/ModelLabel/index.tsx"
-_MARKER = "LCA: picker only solo/team/auto"
+_MARKER = "LCA: picker only solo/team/auto/creator"
 
 meta = PatchMeta(
     name="lca_model_catalog",
-    description="Chat model picker shows only solo / team / auto",
+    description="Chat model picker shows only solo / team / auto / creator",
     files=(_HOOK, _SELECTION, _MODEL, _LABEL),
     risk="medium",
     category="provider",
     depends_on=(),
     why="Users must pick an LCA mode, not a vendor model; vendor ids leak into /webapi/chat",
     technical_detail=(
-        "useEnabledChatModels returns a fixed LCA catalog. "
-        "useAgentModelSelection remaps any other stored model to solo."
+        "useEnabledChatModels returns a fixed LCA catalog (solo/team/auto/creator). "
+        "useAgentModelSelection remaps any non-LCA stored model to solo."
     ),
     verify_file=_HOOK,
     verify_marker=_MARKER,
@@ -28,11 +28,11 @@ meta = PatchMeta(
 
 _HOOK_TS = """import { type EnabledProviderWithModels } from '@/types/aiProvider';
 
-/* LCA: picker only solo/team/auto */
+/* LCA: picker only solo/team/auto/creator */
 
 export const LCA_CHAT_PROVIDER = 'openai';
 
-export const LCA_CHAT_MODELS = ['solo', 'team', 'auto'] as const;
+export const LCA_CHAT_MODELS = ['solo', 'team', 'auto', 'cordis-creator'] as const;
 
 export type LcaChatModel = (typeof LCA_CHAT_MODELS)[number];
 
@@ -75,7 +75,9 @@ const LCA_CATALOG: EnabledProviderWithModels[] = [
 ];
 
 export function resolveLcaChatModel(model: string | undefined): LcaChatModel {
-  return model === 'team' || model === 'auto' ? model : 'solo';
+  return (LCA_CHAT_MODELS as readonly string[]).includes(model ?? '')
+    ? (model as LcaChatModel)
+    : 'solo';
 }
 
 export const useEnabledChatModels = (): EnabledProviderWithModels[] => LCA_CATALOG;
@@ -89,10 +91,10 @@ _SELECTION_NEEDLE = """  return {
     provider: effectiveModel.provider ?? sharedProvider,
 """
 
-_SELECTION_REPLACEMENT = """  /* LCA: picker only solo/team/auto */
-  const lcaModel =
-    effectiveModel.model === 'team' || effectiveModel.model === 'auto'
-      ? effectiveModel.model
+_SELECTION_REPLACEMENT = """  /* LCA: picker only solo/team/auto/creator */
+  const lcaModel: LcaChatModel =
+    (LCA_CHAT_MODELS as readonly string[]).includes(effectiveModel.model)
+      ? (effectiveModel.model as LcaChatModel)
       : 'solo';
 
   return {
@@ -107,10 +109,22 @@ _SELECTION_REPLACEMENT = """  /* LCA: picker only solo/team/auto */
 def apply(ctx: PatchContext) -> bool:
     changed = ctx.write_if_changed(_HOOK, _HOOK_TS)
     text = ctx.read(_SELECTION)
-    if not ("provider: 'openai'" in text and "lcaModel" in text):
+    if _MARKER not in text:
+        if "from '@/hooks/useEnabledChatModels'" not in text:
+            import_anchor = "import { usePermission } from '@/hooks/usePermission';\n"
+            if import_anchor not in text:
+                raise SystemExit("[lca_model_catalog] selection hook import anchor not found")
+            text = text.replace(
+                import_anchor,
+                import_anchor
+                + "import { LCA_CHAT_MODELS, type LcaChatModel } from "
+                + "'@/hooks/useEnabledChatModels';\n",
+                1,
+            )
         if _SELECTION_NEEDLE not in text:
             raise SystemExit("[lca_model_catalog] selection hook anchor not found")
-        ctx.write(_SELECTION, text.replace(_SELECTION_NEEDLE, _SELECTION_REPLACEMENT, 1))
+        text = text.replace(_SELECTION_NEEDLE, _SELECTION_REPLACEMENT, 1)
+        ctx.write(_SELECTION, text)
         changed = True
     for rel in (_MODEL, _LABEL):
         body = ctx.read(rel)
