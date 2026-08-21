@@ -18,10 +18,11 @@ from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import ContextCompacted, MemoryCommitted
-from lca.contracts.protocols import MemorySystem, SharedMemoryStore
+from lca.contracts.protocols import MemorySystem, RetrievalPolicy, SharedMemoryStore
 from lca.layer0_infra.observability import record
 
 # v3 §8 / PR7.D.6/7: the system is wired
+from lca.layer1_cognitive.memory.null_retrieval_policy import NullRetrievalPolicy
 from lca.layer1_cognitive.memory.policy import (
     CompactionPolicy,
     MemoryCommitResult,
@@ -53,12 +54,14 @@ class SimpleMemorySystem(MemorySystem):
         *,
         policy: MemoryPolicy | None = None,
         compaction: CompactionPolicy | None = None,
+        retrieval: RetrievalPolicy | None = None,
     ) -> None:
         self._shared_store: SharedMemoryStore | None = shared_store
         # Public attrs so tests / hot-reload can swap in custom policies
         # via ``system.policy = ...`` (PR7.D.6/7).
         self.policy: MemoryPolicy = policy or SimpleMemoryPolicy()
         self.compaction: CompactionPolicy = compaction or SimpleCompactionPolicy()
+        self.retrieval: RetrievalPolicy = retrieval or NullRetrievalPolicy()
         self._private_layers: dict[MemoryLayer, list[MemoryRecord]] = {
             MemoryLayer.WORKING: [],
             MemoryLayer.SEMANTIC: [],
@@ -78,20 +81,26 @@ class SimpleMemorySystem(MemorySystem):
             self._private_layers[layer].append(record)
 
     async def perceive(self, state: AgentState) -> AgentState:
-        records: list[MemoryRecord] = []
-        for layer_name in self._private_layers:
-            records.extend(self._get_layer_records(layer_name))
-        # PR7.D.7: shadow-compact inside perceive; emit ContextCompacted
-        # with the original vs kept kinds.  Empty compaction is still
-        # journaled (every Perceive gets an audit trail).
-        compacted = self._shadow_compact(records)
+        # PR7.D.7: fold each layer's records; emit ContextCompacted with
+        # original vs kept kinds.  Empty compaction is still journaled
+        # (every Perceive gets an audit trail).
+        layers_snapshot: dict[MemoryLayer, list[MemoryRecord]] = {
+            layer_name: self._get_layer_records(layer_name) for layer_name in self._private_layers
+        }
+        # ADR-0068: RetrievalPolicy is the 4-layer weighted selection seam.
+        # Default NullRetrievalPolicy returns ``[]``; standard bundle upgrades
+        # to LayeredRetrievalPolicy which preserves WORKING + prioritizes
+        # SEMANTIC / PROCEDURAL.
+        candidates = self.retrieval.retrieve(layers_snapshot, budget=_DEFAULT_MAX_WORKING)
+        # CompactionPolicy applies the final cap on the retrieval selection.
+        compacted = list(self.compaction.compact(tuple(candidates), budget=_DEFAULT_MAX_WORKING))
         kinds = tuple(
             r.kind.value if hasattr(r.kind, "value") else str(r.kind)
-            for r in records
+            for r in layers_snapshot.values()
+            for r in r
         )
         kept_kinds = tuple(
-            r.kind.value if hasattr(r.kind, "value") else str(r.kind)
-            for r in compacted
+            r.kind.value if hasattr(r.kind, "value") else str(r.kind) for r in compacted
         )
         record(
             ContextCompacted(
@@ -103,18 +112,9 @@ class SimpleMemorySystem(MemorySystem):
         state.retrieved_context = compacted
         return state
 
-    def _shadow_compact(
-        self, records: list[MemoryRecord]
-    ) -> list[MemoryRecord]:
-        """Shadow-compact the in-memory snapshot (PR7.D.7).
-
-        Delegates to ``CompactionPolicy.compact`` with a working-layer
-        budget (default 20); the result becomes ``state.retrieved_context``.
-        Original records stay intact in the layer storage — compaction
-        is presentation-side only.
-        """
-        # Working-memory is the snapshot we render into prompts; cap it
-        # at ``_DEFAULT_MAX_WORKING`` so the prompt doesn't grow unbounded.
+    def _shadow_compact(self, records: list[MemoryRecord]) -> list[MemoryRecord]:
+        """保留作为 compact 路径的兼容 helper；ADR-0068 后实际由
+        ``CompactionPolicy.compact`` 直接调用。"""
         budget = _DEFAULT_MAX_WORKING
         return list(self.compaction.compact(tuple(records), budget=budget))
 
@@ -151,8 +151,8 @@ class SimpleMemorySystem(MemorySystem):
         self, state: AgentState, observation: Observation, reflection: Reflection
     ) -> None:
         # 追加到 working memory 而非覆盖，确保多步委派历史对 agent 可见
-        for record in self._working_records_for(state, observation):
-            self._private_layers[MemoryLayer.WORKING].append(record)
+        for rec in self._working_records_for(state, observation):
+            self._private_layers[MemoryLayer.WORKING].append(rec)
         # 防止 working memory 无限增长
         if len(self._private_layers[MemoryLayer.WORKING]) > _DEFAULT_MAX_WORKING:
             self._private_layers[MemoryLayer.WORKING] = self._private_layers[MemoryLayer.WORKING][

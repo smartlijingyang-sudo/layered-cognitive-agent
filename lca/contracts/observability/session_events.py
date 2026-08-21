@@ -2,6 +2,7 @@
 
 "session everything" 原则: any state mutation corresponds to a SessionEventType.
 """
+
 from __future__ import annotations
 
 from enum import Enum

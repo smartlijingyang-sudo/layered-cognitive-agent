@@ -165,9 +165,7 @@ class PluginFactory:
 
     name: str
     factory: Any  # Callable[[], Any] — 实际签名见 mount 处的检查
-    plugin_meta: PluginMeta = field(
-        default_factory=lambda: cast("PluginMeta", {})
-    )
+    plugin_meta: PluginMeta = field(default_factory=lambda: cast("PluginMeta", {}))
     source_path: str = ""
 
 

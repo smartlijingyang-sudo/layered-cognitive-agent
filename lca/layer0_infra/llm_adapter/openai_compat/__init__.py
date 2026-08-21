@@ -60,13 +60,11 @@ class OpenAICompatAdapter(LLMAdapter):
     ) -> None:
         from lca.layer0_infra.llm.config import DEFAULT_CHAT_MODEL
 
-        self._model: str = model if model is not None else os.getenv("LLM_MODEL", DEFAULT_CHAT_MODEL)
-        resolved_key = api_key if api_key is not None else os.getenv("LLM_API_KEY", "")
-        resolved_base = (
-            base_url
-            if base_url is not None
-            else (os.getenv("LLM_BASE_URL") or "")
+        self._model: str = (
+            model if model is not None else os.getenv("LLM_MODEL", DEFAULT_CHAT_MODEL)
         )
+        resolved_key = api_key if api_key is not None else os.getenv("LLM_API_KEY", "")
+        resolved_base = base_url if base_url is not None else (os.getenv("LLM_BASE_URL") or "")
         if resolved_key is None:
             resolved_key = ""
         style = _resolve_api_style(api, base_url=resolved_base)

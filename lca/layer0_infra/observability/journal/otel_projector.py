@@ -235,9 +235,7 @@ class OtelProjector(JournalProjector):
         event = cast("LlmCallCompleted", stamped.event)
         base = genai.llm_call_attrs(event)
         merged = self._merge_genai(stamped, base)
-        self._emit_timed_span(
-            stamped, SpanName.LLM_CHAT.value, merged, event.latency_ms
-        )
+        self._emit_timed_span(stamped, SpanName.LLM_CHAT.value, merged, event.latency_ms)
 
     def _on_tool_invoked(self, stamped: StampedEvent) -> None:
         event = cast("ToolInvoked", stamped.event)
@@ -250,9 +248,7 @@ class OtelProjector(JournalProjector):
             event.latency_ms,
         )
 
-    def _merge_genai(
-        self, stamped: StampedEvent, base: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _merge_genai(self, stamped: StampedEvent, base: dict[str, Any]) -> dict[str, Any]:
         """若配了 genai_mapper_registry，把 mapper 产生的属性并入基础属性。"""
         if self._genai_registry is None:
             return base

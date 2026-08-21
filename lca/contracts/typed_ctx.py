@@ -11,6 +11,7 @@ Therefore TypedContext references ONLY Protocol types already declared in
 `lca/contracts/protocols/`. Concrete service classes (`LlmService`,
 `ToolsService`, `CommandGateway`, etc.) are not imported here.
 """
+
 from __future__ import annotations
 
 from typing import Protocol

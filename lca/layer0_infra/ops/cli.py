@@ -854,7 +854,7 @@ def evidence(
 
     raw = ref.strip()
     if raw.startswith("sha256:"):
-        digest_only = raw[len("sha256:"):]
+        digest_only = raw[len("sha256:") :]
     elif len(raw) == 64 and all(c in "0123456789abcdef" for c in raw.lower()):
         digest_only = raw.lower()
     else:

@@ -18,7 +18,7 @@ from lca.contracts.models.core.state import AgentState
 class MemorySystem(Protocol):
     """记忆系统：检索感知 + 多级写入 + 显式查询。
 
-    两阶段语义：
+    三阶段语义：
     - perceive：think 之前，刷新 retrieved_context
     - update：reflect 之后，写入 observation + reflection（ADR-0066 计划拆
       为 propose + commit；本 PR 仅集中 reducer 调用入口，拆 deferred）
@@ -32,3 +32,19 @@ class MemorySystem(Protocol):
     ) -> None: ...
 
     def query(self, layer: MemoryLayer) -> list[MemoryRecord]: ...
+
+
+@runtime_checkable
+class RetrievalPolicy(Protocol):
+    """按 4 层语义从记忆存储挑选记录到 ``retrieved_context``（ADR-0068）。
+
+    默认实现 ``NullRetrievalPolicy`` 不选任何 record（宪法 §3.4 默认 no-op）；
+    标准 bundle 装 ``LayeredRetrievalPolicy``：working 永保留，semantic/procedural
+    按 recency 共享 70% budget，episodic 仅余量填充 30%。
+    """
+
+    def retrieve(
+        self,
+        layers: dict[MemoryLayer, list[MemoryRecord]],
+        budget: int,
+    ) -> list[MemoryRecord]: ...

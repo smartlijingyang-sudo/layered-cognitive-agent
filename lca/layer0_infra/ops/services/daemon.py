@@ -286,7 +286,9 @@ class DaemonService:
         self._sudo.run(["cp", "-r", str(gw_src / "dist"), str(gw_dest / "dist")])
         self._sudo.run(["cp", str(gw_src / "package.json"), str(gw_dest / "package.json")])
         if (gw_src / "node_modules").exists():
-            self._sudo.run(["cp", "-r", str(gw_src / "node_modules"), str(gw_dest / "node_modules")])
+            self._sudo.run(
+                ["cp", "-r", str(gw_src / "node_modules"), str(gw_dest / "node_modules")]
+            )
         self._sudo.run(["chmod", "-R", "a+rX", str(self._cli_dir)])
 
         if not self._deploy_python_runtime():

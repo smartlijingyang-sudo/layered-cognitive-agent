@@ -1,7 +1,13 @@
-"""ModularBrain —— Brain 串联 Reasoner / Critic，直接构建 Decision。"""
+"""ModularBrain —— Brain 串联 Reasoner / Critic，直接构建 Decision。
+
+ADR-0068：默认 reflect 实现为 Brain 内部 ``_default_reflect`` 私有方法
+（不调 Critic Protocol）；Critic 协议保留作 custom 注入接口。
+"""
 
 from __future__ import annotations
 
+from lca.contracts.atoms.enums import ReflectionVerdict
+from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import (
@@ -25,7 +31,7 @@ class ModularBrain(Brain):
     def __init__(
         self,
         reasoner: Reasoner,
-        critic: Critic,
+        critic: Critic | None = None,
         skill_router: SkillRouter | None = None,
         decision_gate: DecisionGate | None = None,
         agent_gates: DecisionGate | None = None,
@@ -59,4 +65,20 @@ class ModularBrain(Brain):
         return decision
 
     async def reflect(self, state: AgentState, observation: Observation) -> Reflection:
-        return await self.critic.critique(state, observation)
+        if self.critic is not None:
+            return await self.critic.critique(state, observation)
+        return self._default_reflect(state, observation)
+
+    @staticmethod
+    def _default_reflect(state: AgentState, observation: Observation) -> Reflection:
+        """Default reflect: ON_TRACK, no lesson (ADR-0068 Null 默认)。
+
+        reasoner 不依赖 reflect 的输出做后续决策；reasoning 失败或
+        lesson 缺失由 upstream Gate / StopRule 捕获。这里只返回
+        协议要求的最小合法 ``Reflection``。
+        """
+        return Reflection(
+            reflection_id=new_id("refl"),
+            verdict=ReflectionVerdict.ON_TRACK,
+            lesson=None,
+        )

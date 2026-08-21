@@ -74,8 +74,7 @@ class _JournalSensor(Sensor):
                 yield stamped
 
     @abstractmethod
-    def _project(self, event: StampedEvent) -> dict[str, Any]:
-        ...
+    def _project(self, event: StampedEvent) -> dict[str, Any]: ...
 
 
 class InboxFactsSensor(_JournalSensor):

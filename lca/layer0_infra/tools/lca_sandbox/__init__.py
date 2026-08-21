@@ -92,7 +92,9 @@ def build_sandbox_tools(**kwargs: Any) -> list:
     return build_tools_from_manifest(
         MANIFEST,
         executor,
-        invoke_fn=cast("Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor),
+        invoke_fn=cast(
+            "Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor
+        ),
         observation_builder=_sandbox_obs_builder(store),
     )
 

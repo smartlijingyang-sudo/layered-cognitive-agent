@@ -107,7 +107,11 @@ class SpanHandle:
             self.attributes.setdefault("error_message", str(exc)[:_ERROR_MESSAGE_MAX])
             self._otel.record_exception(exc)
             self._otel.set_status(StatusCode.ERROR)
-        prepared = self._policy.prepare(self.attributes) if self._policy is not None else dict(self.attributes)
+        prepared = (
+            self._policy.prepare(self.attributes)
+            if self._policy is not None
+            else dict(self.attributes)
+        )
         # 单次 set_attributes 比循环 set_attribute 省 N-1 次 OTel SDK 调用（评估文档 §89）
         self._otel.set_attributes(prepared)
         self._otel.end()

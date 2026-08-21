@@ -128,7 +128,9 @@ class PipelineSafeExecutor(SafeExecutor):
         pipeline.add_pre_execute(self._pre_execute_check(tool))
         return pipeline
 
-    def _pre_execute_check(self, tool: Tool) -> Callable[[ToolExecutionContext], Awaitable[ToolPreDecision]]:
+    def _pre_execute_check(
+        self, tool: Tool
+    ) -> Callable[[ToolExecutionContext], Awaitable[ToolPreDecision]]:
         async def check(ctx: ToolExecutionContext) -> ToolPreDecision:
             return self._check_permission_and_args(tool, ctx.args)
 

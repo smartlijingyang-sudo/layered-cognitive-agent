@@ -229,9 +229,7 @@ class RunStore:
         """
         with self._lock:
             if self._sealed:
-                raise LedgerSealedError(
-                    f"run_id={self._run_id!r} is already sealed (L7)"
-                )
+                raise LedgerSealedError(f"run_id={self._run_id!r} is already sealed (L7)")
             stamped: StampedEvent | None = None
             if terminal_event is not None:
                 # Reuse append path;but we already hold the lock so we can't

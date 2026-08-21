@@ -68,7 +68,7 @@ from lca.contracts.protocols.infra import (
 from lca.contracts.protocols.journal import JournalProjector
 
 # ── L1 Memory 协议 ───────────────────────────────────────
-from lca.contracts.protocols.memory import MemorySystem
+from lca.contracts.protocols.memory import MemorySystem, RetrievalPolicy
 
 # ── 可观测性协议（业务层唯一发射门面）──────────────────
 from lca.contracts.protocols.observability import (
@@ -149,6 +149,7 @@ __all__ = [
     "PerceiveHub",
     "Reasoner",
     "Reducer",
+    "RetrievalPolicy",
     "RoleLibrary",
     "Runtime",
     "SafeExecutor",

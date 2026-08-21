@@ -1,5 +1,4 @@
-"""ToolGenAIMapper —— ToolInvoked / ToolStarted / ToolDenied → gen_ai.tool.* 属性。
-"""
+"""ToolGenAIMapper —— ToolInvoked / ToolStarted / ToolDenied → gen_ai.tool.* 属性。"""
 
 from __future__ import annotations
 

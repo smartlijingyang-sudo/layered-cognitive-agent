@@ -10,6 +10,7 @@ PluginContext Protocol is the stable type alias for migration-period
 compatibility. Uses ONLY cordis's public surface (provide / inject / on /
 once / scope / dispose).
 """
+
 from __future__ import annotations
 
 import warnings

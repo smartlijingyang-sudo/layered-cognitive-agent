@@ -82,7 +82,9 @@ def build_computer_tools(
     return build_tools_from_manifest(
         CLOUD_SANDBOX_MANIFEST,
         executor,
-        invoke_fn=cast("Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor),
+        invoke_fn=cast(
+            "Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor
+        ),
         observation_builder=_computer_obs_builder(store),
     )
 
@@ -101,7 +103,9 @@ def build_machine_computer_tools(
     return build_tools_from_manifest(
         MACHINE_MANIFEST,
         executor,
-        invoke_fn=cast("Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor),
+        invoke_fn=cast(
+            "Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor
+        ),
         observation_builder=_computer_obs_builder(store),
         name_prefix="local_",
     )

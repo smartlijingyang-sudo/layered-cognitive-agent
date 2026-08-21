@@ -17,8 +17,25 @@ from lca.contracts.atoms.enums import MemoryLayer, ReflectionVerdict
 from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState, Budget
+from lca.contracts.protocols import RetrievalPolicy
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
+
+
+class _RetrieveAllPolicy(RetrievalPolicy):
+    """Test-only policy that returns all records (pre-ADR-0068 behavior).
+
+    Production defaults to NullRetrievalPolicy (empty), but these tests
+    verify shared memory isolation semantics, not retrieval strategy.
+    """
+
+    def retrieve(
+        self, layers: dict[MemoryLayer, list[MemoryRecord]], budget: int
+    ) -> list[MemoryRecord]:
+        result: list[MemoryRecord] = []
+        for records in layers.values():
+            result.extend(records)
+        return result[:budget] if len(result) > budget else result
 
 
 def _make_state(trace_id: str = "trace-1") -> AgentState:
@@ -78,8 +95,8 @@ class TestSharedMemoryIsolation(unittest.IsolatedAsyncioTestCase):
     """未声明共享时，两个成员的 semantic memory 互不可见。"""
 
     async def test_private_semantic_not_visible_across_members(self) -> None:
-        mem_a = SimpleMemorySystem()
-        mem_b = SimpleMemorySystem()
+        mem_a = SimpleMemorySystem(retrieval=_RetrieveAllPolicy())
+        mem_b = SimpleMemorySystem(retrieval=_RetrieveAllPolicy())
 
         # 直接向私有层写入（模拟不共享场景）
         record = _make_semantic_record("agent-a-private-knowledge")
@@ -102,8 +119,8 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a = SimpleMemorySystem(shared_store=store)  # was bind
-        mem_b = SimpleMemorySystem(shared_store=store)  # was bind
+        mem_a = SimpleMemorySystem(shared_store=store, retrieval=_RetrieveAllPolicy())  # was bind
+        mem_b = SimpleMemorySystem(shared_store=store, retrieval=_RetrieveAllPolicy())  # was bind
 
         record = _make_semantic_record("shared-knowledge")
         mem_a.write_shared_record(MemoryLayer.SEMANTIC, record)
@@ -116,8 +133,8 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.PROCEDURAL])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a = SimpleMemorySystem(shared_store=store)  # was bind
-        mem_b = SimpleMemorySystem(shared_store=store)  # was bind
+        mem_a = SimpleMemorySystem(shared_store=store, retrieval=_RetrieveAllPolicy())  # was bind
+        mem_b = SimpleMemorySystem(shared_store=store, retrieval=_RetrieveAllPolicy())  # was bind
 
         record = MemoryRecord(
             record_id="proc-1",
@@ -135,8 +152,8 @@ class TestSharedMemoryVisibility(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC, MemoryLayer.PROCEDURAL])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a = SimpleMemorySystem(shared_store=store)  # was bind
-        mem_b = SimpleMemorySystem(shared_store=store)  # was bind
+        mem_a = SimpleMemorySystem(shared_store=store, retrieval=_RetrieveAllPolicy())  # was bind
+        mem_b = SimpleMemorySystem(shared_store=store, retrieval=_RetrieveAllPolicy())  # was bind
 
         mem_a.write_shared_record(MemoryLayer.SEMANTIC, _make_semantic_record("fact-1"))
         mem_a.write_shared_record(
@@ -162,8 +179,8 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a = SimpleMemorySystem(shared_store=store)  # was bind
-        mem_b = SimpleMemorySystem(shared_store=store)  # was bind
+        mem_a = SimpleMemorySystem(shared_store=store, retrieval=_RetrieveAllPolicy())  # was bind
+        mem_b = SimpleMemorySystem(shared_store=store, retrieval=_RetrieveAllPolicy())  # was bind
 
         # 通过 update 触发 episodic 写入
         await mem_a.update(_make_state("trace-a"), _make_observation(), _make_reflection())
@@ -181,8 +198,8 @@ class TestEpisodicWorkingRemainPrivate(unittest.IsolatedAsyncioTestCase):
         store = TeamSharedMemoryStore([MemoryLayer.SEMANTIC])
         mem_a = SimpleMemorySystem()
         mem_b = SimpleMemorySystem()
-        mem_a = SimpleMemorySystem(shared_store=store)  # was bind
-        mem_b = SimpleMemorySystem(shared_store=store)  # was bind
+        mem_a = SimpleMemorySystem(shared_store=store, retrieval=_RetrieveAllPolicy())  # was bind
+        mem_b = SimpleMemorySystem(shared_store=store, retrieval=_RetrieveAllPolicy())  # was bind
 
         await mem_a.update(
             _make_state("trace-a"),
@@ -235,6 +252,8 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
         mem_a.write_shared_record(
             MemoryLayer.SEMANTIC, _make_semantic_record("orchestrator-shared-fact")
         )
+        # Inject retrieval policy for test (production uses NullRetrievalPolicy by default)
+        mem_b.retrieval = _RetrieveAllPolicy()
         state_b = await mem_b.perceive(_make_state())
         b_contents = [r.content for r in state_b.retrieved_context]
         self.assertIn("orchestrator-shared-fact", b_contents)

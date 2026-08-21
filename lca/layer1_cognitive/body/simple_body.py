@@ -110,9 +110,7 @@ class SimpleBody(Body):
         self._maybe_record_action_degraded(decision, observation, state)
         return observation
 
-    async def finalize(
-        self, observation: Observation, state: AgentState
-    ) -> None:
+    async def finalize(self, observation: Observation, state: AgentState) -> None:
         """手平面 finalize（v3 §9.2：OfficeWorksSealer 迁移点）。
 
         当前 turn 即将关闭（RESPOND / STOP / ASK_HUMAN）或到达预算上限时

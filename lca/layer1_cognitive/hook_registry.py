@@ -167,6 +167,7 @@ async def default_logging_hook(envelope: Any) -> None:
         hook_extra=safe_extra,
     )
 
+
 def cordis_hook_registry(ctx: Any) -> CordisHookRegistry:
     """Return a :class:`CordisHookRegistry` wrapping *ctx*."""
     return CordisHookRegistry(ctx)
@@ -203,9 +204,7 @@ class SimpleHookRegistry(CordisHookRegistry):
                     params = list(inspect.signature(hook).parameters)
                 except (TypeError, ValueError):
                     params = []
-                self._legacy_signatures[hook] = (
-                    "legacy" if len(params) >= 2 else "envelope"
-                )
+                self._legacy_signatures[hook] = "legacy" if len(params) >= 2 else "envelope"
 
             async def _trigger(name: str, state: Any, **kwargs: Any) -> Any:
                 envelope = {"event_name": name, "state": state, **kwargs}

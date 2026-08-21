@@ -41,5 +41,10 @@ def expand_profile(path: Path | str) -> Any:
 def compose_bundles(*paths: Path | str) -> Any:
     """Stub for back-compat (cordis.Loader handles bundle composition)."""
     import warnings
-    warnings.warn("compose_bundles is deprecated; use cordis.Loader.merge_bundles", DeprecationWarning, stacklevel=2)
+
+    warnings.warn(
+        "compose_bundles is deprecated; use cordis.Loader.merge_bundles",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return load_yaml(paths[0]) if paths else None

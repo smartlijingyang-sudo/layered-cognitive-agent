@@ -93,6 +93,7 @@ class DecisionGate(Protocol):
         decision: Decision,
     ) -> Decision: ...
 
+
 @runtime_checkable
 class SupportsShortcut(Protocol):
     """可选能力：允许 DecisionGate 在认知管线之前提供确定性快速路径。

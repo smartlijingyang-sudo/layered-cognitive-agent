@@ -53,9 +53,7 @@ class ResultNormalizer:
     def from_task_result(result: Any) -> NormalizedResult:
         status = getattr(result, "status", None)
         status_value = (
-            cast("Any", status).value
-            if hasattr(status, "value")
-            else str(status or "unknown")
+            cast("Any", status).value if hasattr(status, "value") else str(status or "unknown")
         )
         if status_value == "input-required":
             status_value = "waiting_input"
