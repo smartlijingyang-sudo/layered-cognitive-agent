@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from starlette.testclient import TestClient
 
@@ -26,14 +26,17 @@ class TestOpenAiCompatGateway(unittest.TestCase):
         response = client.get("/v1/models")
         self.assertEqual(response.status_code, 200)
         ids = [item["id"] for item in response.json()["data"]]
-        self.assertEqual(ids, ["solo", "team", "auto"])
+        # Per PR-9 + PR-10 cordis-creator mode, LCA_UI_MODELS = (solo, team, auto, cordis-creator)
+        self.assertEqual(ids, ["solo", "team", "auto", "cordis-creator"])
 
     def test_chat_completions_housekeeper_passthrough(self) -> None:
         registry = RunRegistry()
         client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
         with patch(
             "gateway.openai_shim.create_simple_completion",
-            return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2}),
+            new=AsyncMock(
+                return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2})
+            ),
         ):
             response = client.post(
                 "/v1/chat/completions",
@@ -223,12 +226,12 @@ class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
         client = TestClient(create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
         with patch(
             "gateway.openai_shim.create_embeddings",
-            return_value={
+            new=AsyncMock(return_value={
                 "object": "list",
                 "data": [{"object": "embedding", "index": 0, "embedding": [0.1, 0.2]}],
                 "model": "text-embedding-3-small",
                 "usage": {"prompt_tokens": 2, "total_tokens": 2},
-            },
+            }),
         ):
             response = client.post(
                 "/v1/embeddings",
