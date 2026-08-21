@@ -395,28 +395,36 @@ class TestComputeControlPlanHash:
 class TestProjectControlPlanOptIn:
     """PR-1 阶段：插件默认不声明 control 段 → 空 ControlPlan。
 
-    PR-2 引入 typed control 字段后，本测试保持 opt-in 语义。
+    PR-2 引入 typed control 字段后，本测试**升级**：现在有 3 个核心
+    插件声明了 control（gate.repeat-tool-call / gate.tool-loop-breaker /
+    stop_rule.default），web-standard.yaml 投影出 3 条 entry。
     """
 
-    def test_web_standard_profile_yields_empty_plan(self) -> None:
-        """No plugin in web-standard.yaml currently declares control: []."""
+    def test_web_standard_profile_yields_three_entries(self) -> None:
+        """PR-2 阶段：3 个核心插件已声明 control 段。"""
         resolved = resolve_profile("profiles/web-standard.yaml")
         plan = project_control_plan(resolved)
-        assert plan.entries == ()
-        assert plan.by_slot == {}
-        assert slots_missing(plan) == tuple(ControlSlot)
+        # 3 migrated plugins contribute:
+        # - gate.repeat-tool-call (think.guard, order 10)
+        # - gate.tool-loop-breaker (think.guard, order 20)
+        # - stop_rule.default (stop.decide, order 100)
+        assert len(plan.entries) == 3
+        # 2 of 11 slots covered
+        assert len(slots_covered(plan)) == 2
+        assert ControlSlot.THINK_GUARD in slots_covered(plan)
+        assert ControlSlot.STOP_DECIDE in slots_covered(plan)
         # Hash is stable across runs (determinism check).
         plan_again = project_control_plan(resolved)
         assert plan.plan_hash == plan_again.plan_hash
 
-    def test_include_disabled_keeps_empty_plan(self) -> None:
-        """Disabled plugins also don't declare control yet — opt-in holds."""
+    def test_include_disabled_keeps_three_entries(self) -> None:
+        """Disabled plugins also don't declare control — opt-in holds for disabled."""
         resolved = resolve_profile("profiles/web-standard.yaml")
         plan = project_control_plan(resolved, options=ControlPlanOptions(include_disabled=True))
-        assert plan.entries == ()
+        assert len(plan.entries) == 3
 
     def test_hash_unaffected_by_projection_options(self) -> None:
-        """include_disabled does not change hash for empty opt-in plans."""
+        """include_disabled does not change hash for opt-in plans (no disabled has control)."""
         resolved = resolve_profile("profiles/web-standard.yaml")
         plan_default = project_control_plan(resolved)
         plan_with_disabled = project_control_plan(

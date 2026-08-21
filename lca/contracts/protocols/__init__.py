@@ -81,6 +81,16 @@ from lca.contracts.protocols.infra import (
 # ── 执行日志投影协议（ADR-0037 Journal-as-Truth）────────
 from lca.contracts.protocols.journal import JournalProjector
 
+# ── LogicAddress 6 维（ADR-0069 §二 + ADR-0074 V9）────────────────
+from lca.contracts.protocols.logic_address import (
+    LogicAddress,
+    LogicAddressScore,
+    canonical_scope_of,
+    declared_dim_count,
+    is_complete_address,
+    score_logic_address,
+)
+
 # ── L1 Memory 协议 ───────────────────────────────────────
 from lca.contracts.protocols.memory import MemorySystem, RetrievalPolicy
 
@@ -160,6 +170,8 @@ __all__ = [
     "HookRegistry",
     "JournalProjector",
     "LLMAdapter",
+    "LogicAddress",
+    "LogicAddressScore",
     "LoopPhase",
     "LoopPhaseKind",
     "LoopTopology",
@@ -212,5 +224,14 @@ __all__ = [
     "ToolRenderer",
     "TransportRegistryProtocol",
     "always",
+    "canonical_scope_of",
     "compute_control_plan_hash",
+    "control_plan_to_dict",
+    "declared_dim_count",
+    "is_complete_address",
+    "is_slot_empty",
+    "score_logic_address",
+    "slot_entries",
+    "slots_covered",
+    "slots_missing",
 ]

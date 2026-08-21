@@ -10,13 +10,18 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from cordis.plugin import Plugin as CordisPlugin
 from cordis.plugin import plugin as _cordis_plugin
 from pydantic import BaseModel
 
 from lca.contracts.capabilities import Capability, cap_key
+
+if TYPE_CHECKING:
+    from lca.contracts.atoms.functional_group import FunctionalGroup
+    from lca.contracts.harness.plugin_contract import PluginContract
+    from lca.contracts.protocols.logic_address import LogicAddress
 
 __all__ = [
     "EffectClass",
@@ -86,7 +91,18 @@ class PluginContext(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class PluginDefinition:
-    """Immutable Manifest read from a module's ``@plugin`` decoration."""
+    """Immutable Manifest read from a module's ``@plugin`` decoration.
+
+    PR-2 / ADR-0069 / ADR-0074 PR-2 新增 4 个可选字段（**全部 opt-in**）：
+
+    - ``control`` — 该 plugin 投到哪些 Control Slot（ADR-0066 §三 + ADR-0074 §一）
+    - ``functional_group`` — 13 原语群主归属（ADR-0069 §一）
+    - ``logic_address`` — 6 维 LogicAddress（ADR-0069 §二）
+    - ``contract`` — PluginContract 9 段 typed section（ADR-0069 §六；可选并存）
+
+    缺失字段 → plugin 行为不变（旧 plugin 不破）；``lca plugin check``
+    输出 warning（不阻断）。``lca plugin check --strict`` 才报错退出码 1。
+    """
 
     id: str
     Config: type[Any] | None
@@ -100,6 +116,11 @@ class PluginDefinition:
     description: str
     setup: PluginSetupFn
     module: str | None = None
+    # PR-2 新增字段（全部 Optional）
+    control: tuple[Any, ...] = ()  # raw control entries (parsed at resolve time)
+    functional_group: FunctionalGroup | None = None
+    logic_address: LogicAddress | None = None
+    contract: PluginContract | None = None
 
 
 def _normalize_keys(values: Sequence[Capability[Any] | str] | None) -> tuple[str, ...]:
@@ -122,6 +143,40 @@ def _config_from_annotations(fn: Callable[..., Any]) -> type[Any] | None:
     except Exception:
         return None
     return None
+
+
+def _resolve_functional_group(
+    value: Any,
+) -> Any:
+    """Resolve FunctionalGroup from str / enum / None; returns enum or None."""
+    if value is None:
+        return None
+    from lca.contracts.atoms.functional_group import (
+        FunctionalGroup,
+        parse_functional_group,
+    )
+
+    if isinstance(value, FunctionalGroup):
+        return value
+    if isinstance(value, str):
+        try:
+            return parse_functional_group(value)
+        except ValueError as exc:
+            raise ValueError(f"@plugin functional_group: {exc}") from exc
+    raise TypeError(
+        f"@plugin functional_group must be str or FunctionalGroup, got {type(value).__name__}"
+    )
+
+
+def _normalize_control(
+    value: Sequence[Any] | None,
+) -> tuple[Any, ...]:
+    """Normalize control= decorator arg into tuple; raise on non-iterable non-None."""
+    if value is None:
+        return ()
+    if isinstance(value, (list, tuple)):
+        return tuple(value)
+    raise TypeError(f"@plugin control must be list/tuple, got {type(value).__name__}")
 
 
 def _normalize_implements(values: Any) -> tuple[str, ...]:
@@ -183,12 +238,27 @@ def plugin(
     test_suite: str | None = None,
     description: str | None = None,
     meta: dict[str, Any] | None = None,
+    control: Sequence[Any] | None = None,
+    functional_group: FunctionalGroup | str | None = None,
+    logic_address: LogicAddress | None = None,
+    contract: PluginContract | None = None,
 ) -> Any:
-    """Declare a plugin Manifest (ADR-0062 §1).
+    """Declare a plugin Manifest (ADR-0062 §1 + ADR-0074 PR-2).
 
     Required: ``id``, ``layer`` (``L0``–``L4``), ``kind``.
     Optional: ``provides``, ``requires``, ``implements``, ``effects``,
-    ``Config``, ``test_suite``, ``description``, ``meta``.
+    ``Config``, ``test_suite``, ``description``, ``meta``,
+    ``control`` (PR-2), ``functional_group`` (PR-2),
+    ``logic_address`` (PR-2), ``contract`` (PR-2).
+
+    PR-2 新增字段：
+
+    - ``control`` — 该 plugin 投到哪些 Control Slot（raw dict 列表；
+      resolver 阶段投影为 ControlEntry）
+    - ``functional_group`` — 13 原语群主归属（FunctionalGroup enum）
+    - ``logic_address`` — 6 维 LogicAddress（v9 评分输入）
+    - ``contract`` — PluginContract 9 段 typed section（不替换元字段，
+      作为可选并存）
 
     No legacy kwargs (``name``, ``inject``, ``side_effects``,
     ``policy_class``, taxonomy ``service``/``provider``/``behavior``/
@@ -212,6 +282,8 @@ def plugin(
         effect_set = _normalize_effects(effects)
         suite = test_suite or ""
         desc = description or ""
+        fg = _resolve_functional_group(functional_group)
+        control_tuple = _normalize_control(control)
 
         merged_meta: dict[str, Any] = dict(meta) if meta else {}
         merged_meta.update(
@@ -227,6 +299,8 @@ def plugin(
                 "description": desc,
             }
         )
+        if fg is not None:
+            merged_meta["functional_group"] = fg.value
         cordis_plugin = _cordis_plugin(
             fn,
             Config=config_cls,
@@ -249,6 +323,10 @@ def plugin(
                 test_suite=suite,
                 description=desc,
                 setup=fn,
+                control=control_tuple,
+                functional_group=fg,
+                logic_address=logic_address,
+                contract=contract,
             ),
         )
         return cordis_plugin
@@ -278,6 +356,10 @@ def definition_from_plugin(
                 description=cached.description,
                 setup=cached.setup,
                 module=module,
+                control=cached.control,
+                functional_group=cached.functional_group,
+                logic_address=cached.logic_address,
+                contract=cached.contract,
             )
         return cached
 
@@ -291,6 +373,7 @@ def definition_from_plugin(
     if layer_raw not in _LAYER_VALUES:
         raise ValueError(f"plugin {plugin_id!r} has invalid layer={layer_raw!r}")
     effect_set = _normalize_effects(effects_raw)
+    fg = _resolve_functional_group(meta.get("functional_group"))
     setup_fn = getattr(plugin_obj, "setup", plugin_obj)
     return PluginDefinition(
         id=plugin_id,
@@ -305,6 +388,7 @@ def definition_from_plugin(
         description=str(meta.get("description") or ""),
         setup=setup_fn,
         module=module,
+        functional_group=fg,
     )
 
 

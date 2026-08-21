@@ -161,22 +161,25 @@ def explain_control_slot(
 
 
 def _extract_entries(plugin: ResolvedPlugin) -> list[ControlEntry]:
-    """从 plugin meta 提取 control 段并解析为 ControlEntry 列表。
+    """从 plugin definition / meta 提取 control 段并解析为 ControlEntry 列表。
 
-    当前 PR-1 阶段：插件 control 字段是 opt-in；本函数返回空列表是合法
-    结果。PR-2 引入 ``PluginDefinition.control`` typed 字段后，本函数
-    是唯一切换点。
+    PR-2 阶段：``PluginDefinition.control`` 是 typed tuple 字段；本函数
+    优先读该字段，回退到 plugin ``meta`` 的 ``control:`` 段（向后兼容
+    旧 plugin 通过 meta 注入控制段的做法）。
+
+    当前 PR-2 阶段：插件 control 字段是 opt-in；本函数返回空列表是合法
+    结果。
     """
     definition = plugin.definition
+    # PR-2: typed field takes priority
+    if definition.control:
+        return _parse_control_list(plugin, definition.control)
+    # Fallback: meta["control"] (legacy / non-decorator usage)
     setup_obj = definition.setup
     raw_meta: Mapping[str, Any] | None = getattr(setup_obj, "meta", None)
-    # cordis Plugin exposes meta attribute; if not present, fall back to
-    # plugin_api plugin() decorator which stores _lca_definition.
     meta: dict[str, Any] = {}
     if isinstance(raw_meta, Mapping):
         meta.update(raw_meta)
-    # Some plugin setups expose a module-level ``META`` dict — be tolerant
-    # but do not silently invent entries.
     module_meta = getattr(setup_obj, "plugin_meta", None)
     if isinstance(module_meta, Mapping):
         meta.update(module_meta)
