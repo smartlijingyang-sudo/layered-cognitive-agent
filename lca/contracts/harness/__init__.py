@@ -7,6 +7,22 @@ Phase A scope: ``plugin.py``. Legacy ``PluginSpec`` adaptation lives in
 ``lca.harness.kernel.compat`` (contracts must not import implementations).
 """
 
+from lca.contracts.harness.artifact import (
+    LEGACY_TO_NEW_STATE,
+    ArtifactController,
+    CapabilityArtifact,
+    InvalidStateTransitionError,
+    artifact_with_state,
+    capability_artifact_to_dict,
+    is_terminal_state,
+    legal_next_states,
+    make_capability_artifact,
+    migrate_artifact,
+    migrate_legacy_state,
+    migrate_to_active,
+    migrate_to_retired,
+    migrate_to_verified,
+)
 from lca.contracts.harness.composer import (
     AgentGraph,
     Composer,
@@ -29,20 +45,34 @@ from lca.contracts.harness.plugin_contract import (
 )
 
 __all__ = [
+    "LEGACY_TO_NEW_STATE",
     "AgentGraph",
     "ArchitectureContract",
+    "ArtifactController",
     "AuthorityContract",
+    "CapabilityArtifact",
     "CapabilityContract",
     "Composer",
     "EvidenceContract",
+    "InvalidStateTransitionError",
     "LifecycleContract",
     "OwnershipContract",
     "PluginContract",
     "PluginIdentity",
     "TeamGraph",
     "VerificationContract",
+    "artifact_with_state",
+    "capability_artifact_to_dict",
     "is_plugin_contract_empty",
+    "is_terminal_state",
+    "legal_next_states",
+    "make_capability_artifact",
     "merge_agent_graphs",
+    "migrate_artifact",
+    "migrate_legacy_state",
+    "migrate_to_active",
+    "migrate_to_retired",
+    "migrate_to_verified",
     "plugin_contract_control_slots",
     "plugin_contract_functional_group",
 ]
