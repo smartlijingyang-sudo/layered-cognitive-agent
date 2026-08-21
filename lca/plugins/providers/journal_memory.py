@@ -42,6 +42,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         *,
         projections: tuple[Any, ...] = (),
         policy: AttributePolicy | None = None,
+        descriptor_registry: Any = None,
         **_: Any,
     ) -> JournalBackend:
         cfg = settings or ObservabilitySettings()
@@ -52,6 +53,10 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         )
         from lca.layer0_infra.observability.journal_backend import MemoryJournal
 
-        return MemoryJournal(policy=pol, projections=projections)
+        return MemoryJournal(
+            policy=pol,
+            projections=projections,
+            descriptor_registry=descriptor_registry,
+        )
 
     registry.register("memory", _make_memory)

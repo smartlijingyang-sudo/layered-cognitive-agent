@@ -51,6 +51,7 @@ from lca.layer0_infra.observability import (
     record_runtime,
     run_scope,
 )
+from lca.layer0_infra.observability.event_descriptor_env import bind_descriptors
 from lca.layer0_infra.observability.journal.reducer import RunStatus as JRunStatus
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.plane.machine import resolve_machine, resolve_machine_transport
@@ -376,7 +377,21 @@ async def execute_run(
                             error=str(exc),
                         )
                 await _stage_machine_attachments(session, file_store)
-                with bind_backends(hub):
+                # ADR-0065 L4: run 边把 boot 期注入的 EventDescriptorRegistry 装到
+                # ambient ContextVar,供 SSE 帧选择器 / 控制台渲染器 / Inspector
+                # 走 cordis 路径(RunStore 走 self._descriptor_registry 直传,无需
+                # ContextVar)。无 boot registry 时(specialty 测试)退回 module fallback。
+                _descriptor_registry = ctx.inject(
+                    "event_descriptor_registry", default=None
+                )
+                if _descriptor_registry is None:
+                    from lca.layer0_infra.observability.event_catalog import (
+                        EVENT_DESCRIPTOR_REGISTRY,
+                    )
+
+                    _descriptor_registry = EVENT_DESCRIPTOR_REGISTRY
+
+                with bind_backends(hub), bind_descriptors(_descriptor_registry):
                     outcome = await driver.execute(
                         session,
                         question=question,

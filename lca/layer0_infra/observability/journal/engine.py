@@ -34,6 +34,7 @@ from lca.contracts.models.observability.journal import (
     get_current_run_scope,
 )
 from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
+from lca.contracts.observability.event_descriptor_registry import EventDescriptorRegistry
 from lca.contracts.observability.journal_store import JournalStoreBackend
 from lca.contracts.observability.ledger import (
     LedgerDurabilityError,
@@ -85,6 +86,7 @@ class RunStore:
         registry: ProjectionRegistry | None = None,
         backend: JournalStoreBackend | None = None,
         run_id: str = "",
+        descriptor_registry: EventDescriptorRegistry | None = None,
     ) -> None:
         if registry is not None and projections:
             raise ValueError("RunStore accepts projections or registry, not both")
@@ -93,6 +95,7 @@ class RunStore:
             backend if backend is not None else InMemoryJournalStore()
         )
         self._registry = registry if registry is not None else ProjectionRegistry(projections)
+        self._descriptor_registry = descriptor_registry
         self._run_id = run_id
         self._lock = threading.Lock()
         self._sealed: bool = False
@@ -273,7 +276,11 @@ class RunStore:
             self._backend.close()
 
     def _apply_policy(self, event: JournalEvent) -> JournalEvent:
-        descriptor = descriptor_for(event)
+        if self._descriptor_registry is not None:
+            type_name = type(event).__name__
+            descriptor = self._descriptor_registry.require(type_name)
+        else:
+            descriptor = descriptor_for(event)
         aggressive = (
             descriptor.sensitivity is EventSensitivity.CONFIDENTIAL
             or descriptor.audience is EventAudience.RESTRICTED

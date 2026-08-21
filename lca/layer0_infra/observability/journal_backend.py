@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from lca.contracts.models.observability.journal import JournalEvent, StampedEvent
+from lca.contracts.observability.event_descriptor_registry import EventDescriptorRegistry
 from lca.contracts.observability.ports import JournalBackend
 from lca.layer0_infra.observability.journal.engine import RunStore
 
@@ -29,8 +30,13 @@ class MemoryJournal(JournalBackend):
         *,
         policy: AttributePolicyBackend | None = None,
         projections: tuple[JournalProjector, ...] = (),
+        descriptor_registry: EventDescriptorRegistry | None = None,
     ) -> None:
-        self._store = RunStore(policy=policy, projections=projections)
+        self._store = RunStore(
+            policy=policy,
+            projections=projections,
+            descriptor_registry=descriptor_registry,
+        )
 
     @property
     def store(self) -> RunStore:
