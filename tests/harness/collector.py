@@ -86,6 +86,16 @@ class InMemoryObservability(BoundObservability):
     def clear(self) -> None:
         self._memory_exporter.clear()
 
+    @property
+    def store(self) -> "RunStore":
+        """Backward compat (§11 pre-existing tests): expose RunStore via .store.
+
+        The _RunStoreBackend has its own .store property that returns
+        the underlying RunStore, which has an .events property. We chain:
+        collector.store → journal.store → RunStore.events.
+        """
+        return self.journal.store
+
 
 class LiveCollector(InMemoryObservability):
     """Memory + journal console projector (same narrative as real apps)."""
