@@ -56,6 +56,7 @@
 | **0067 §五** | 6 道闸 | ⛔ | PR-4 | 0074 §三 裁剪到 3 道闸 |
 | **0067 §七** | 7 Creator 面 | ⛔ | PR-9 | 0074 §三 裁剪到 4 面；映射见 §18 |
 | **0068 §一** | CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan | ⛔ → ✅ (PR-3) | PR-3 | |
+| **0068 §一** | plan_ref × Journal 绑定 (V5) | ⛔ → ✅ (PR-6) | PR-6 (commit 026716c1) | 每条 journal fact 携带 plan_ref；replay by plan_ref |
 | **0068 §二** | PluginContract 概念 | ⏳ → ✅ (PR-2) | PR-2 可选段 | 详见 §12；0074 §四 不替换 PluginDefinition |
 | **0068 §五** | CommandEnvelope = effect 唯一入口 | ⛔ | PR-7 | architecture test 路径见 §14 |
 | **0068 §六** | Boot 双轨消除 | ✅ Done | ADR-0062 PR-3/PR-4 (`e0eb2484`) | 已落地，详见 §3.3 |
@@ -92,16 +93,16 @@
 | **2** | 3 | CompiledRunPlan + PlanCompiler | ✅ Done | `cb53a7a8` | 2026-08-21 | PR-2.5 |
 | **2** | 4 | think.guard / stop.decide 原子化 | ✅ Done | `007bae8c` | 2026-08-21 | PR-3 |
 | **2** | 5 | spawn.bind_plan | ✅ Done | `309dddcc` | 2026-08-21 | PR-3 + ADR-0071 |
-| **3** | 6 | plan_ref × Journal 绑定 | ⛔ Blocked | — | — | PR-5 |
+| **3** | 6 | plan_ref × Journal 绑定 | ✅ Done | `026716c1` | 2026-08-21 | PR-5 |
 | **3** | 7 | RunFact / CommandEnvelope 收口 | ⛔ Blocked | — | — | PR-6 + ADR-0073 |
 | **3** | 8 | ArtifactController（4 状态机） | ⛔ Blocked | — | — | PR-7 |
 | **4** | 9 | Creator 4 面化 | ⛔ Blocked | — | — | PR-8 |
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-6（plan_ref × Journal 绑定）。
+**Next Action**：PR-7（RunFact / CommandEnvelope 收口）。
 
-**累计完成**：10 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：11 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -192,78 +193,88 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-5（spawn.bind_plan + Composer Protocol）
+## 4. 已完成 PR 详情：PR-6（plan_ref × Journal 绑定）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
-> PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 完成细节见 §5 Phase 1。
+> PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 完成细节见 §5 Phase 1。
 
 ### 4.1 目标
 
-落地 ``spawn.bind_plan`` 数据面：``spawn_agent`` 接受 ``compiled_plan`` + ``use_bind_plan`` kwargs；``bind_plan()`` 通过 4 个 sub-composer plugin（Brain / Body / Perceive / Team，ADR-0071）拼装 ``AgentGraph``。**L4 不再 import 具体插件 ID**（5 老工厂 key 已迁入 sub-composer 内）。ADR-0071 仍为 Proposed (per P0 决策) — PR-5 仅落地数据面，accept 决策留 PR-5b / PR-10。
+落地 V5 hard constraint：每条 journal fact 必须携带 ``plan_ref``（来自 CompiledRunPlan）。实现：
+
+- ``plan_ref`` ContextVar + ``set/get/reset/plan_ref_scope`` helpers
+- ``StampedEvent.plan_ref`` 字段（auto-stamped at append）
+- ``RunStore.append`` / ``seal`` 自动从 ContextVar 读取并盖章
+- ``JournalRecord.plan_ref`` 字段（v2 envelope 序列化 round-trip）
+- 100 events property test 守护（V5 acceptance §3.3 step 3-4）
 
 ### 4.2 新增 / 修改文件
 
 | 文件 | 作用 |
 |---|---|
-| `lca/contracts/harness/composer.py` | ``Composer`` Protocol (ADR-0071)；``AgentGraph`` + ``TeamGraph`` frozen dataclasses；``merge_agent_graphs`` helper；module-level accessors ``agent_graph_has_brain`` / ``agent_graph_has_body`` / ``team_graph_member_count`` (ADR-0015) |
-| `lca/contracts/harness/__init__.py` | re-export ``AgentGraph`` / ``TeamGraph`` / ``Composer`` + accessors |
-| `lca/layer4_app/spawn_bind_plan.py` | ``bind_plan()`` / ``bind_team()`` / ``is_bind_plan_available()`` / ``BindOptions`` / ``PlanBindingResult`` / ``TeamBindingResult``；PR-5 路径：4 sub-composer 拼装图；缺 composer → fallback to legacy (PR-5 之前兼容)；保留 6 个月 (PR-5b 后删除) |
-| `lca/layer4_app/spawn.py` | ``spawn_agent`` 新增 ``compiled_plan: CompiledRunPlan | None`` + ``use_bind_plan: bool`` kwargs；当 use_bind_plan=True 且 plan 提供 → 路由到 bind_plan；否则 legacy |
-| `lca/plugins/composer/legacy_sub_composers.py` | PR-5a 4 sub-composers (BrainComposer + BodyComposer + PerceiveComposer + TeamComposer) — 包装 spawn.py 现有工厂调用；PR-5b 阶段完全 self-contained |
-| `tests/layer4_app/test_spawn_bind_plan.py` | 18 测试覆盖 AgentGraph / TeamGraph / merge_agent_graphs / bind_plan legacy + happy path / bind_team fallback / is_bind_plan_available / spawn_agent signature accepts compiled_plan kwarg |
+| `lca/contracts/models/observability/plan_ref.py` | ``_run_plan_ref`` ContextVar + ``get_current_plan_ref`` / ``set_current_plan_ref`` / ``reset_current_plan_ref`` / ``plan_ref_scope`` (context manager) / ``stamped_event_has_plan_ref`` helper |
+| `lca/contracts/models/observability/__init__.py` | re-export 5 plan_ref symbols |
+| `lca/contracts/models/observability/journal.py` | ``StampedEvent`` 新增 ``plan_ref`` 字段（默认 ``""`` 向后兼容）；``JournalRecord`` 新增 ``plan_ref`` 字段 + ``to_dict`` / ``from_dict`` 序列化；``stamped_to_journal_record`` 桥接传播 plan_ref |
+| `lca/layer0_infra/observability/journal/engine.py` | ``RunStore.append`` 自动从 ContextVar 读取 plan_ref 并盖章到 ``StampedEvent``；``RunStore.seal`` 同样传播 plan_ref |
+| `tests/observability/test_plan_ref.py` | 20 测试覆盖 ContextVar helpers / StampedEvent.plan_ref / RunStore.append auto-stamp / JournalRecord round-trip / V5 acceptance（every fact carries plan_ref in a run）/ 100 events property test |
+| `tests/journal/test_plan_ref_replay.py` | 8 V5 replay 测试 — 100 events property test, plan_ref 变更 mid-run, ReplayRegistry filter by plan_ref, journal facts → 重放 CompiledRunPlan（capability/control/scope） |
 
 ### 4.3 实现要点
 
-- **Composer Protocol (ADR-0071)**：``key: ClassVar[str]`` + ``compose_agent(spec, scope)`` + ``compose_team(spec, scope)`` 两个方法
-- **AgentGraph** 是 frozen dataclass（Brain / Body / Memory / StateStore / PerceiveHub / Hooks / Observability / LLM / StopRule / metadata）；不在 contracts/ 放方法（ADR-0015）；访问器 module-level
-- **bind_plan 路径**：scope 通过 ``inject("composer.brain")`` 解析 sub-composer；缺失则 BindPlanError 或 fallback；plan_ref 通过 ``compiled_run_plan_ref(plan)`` 传播
-- **PR-5a vs PR-5b**：PR-5a 阶段 sub-composers 包装现有工厂（最少侵入）；PR-5b 阶段 sub-composers 完全 self-contained（不依赖 spawn.py 内部函数）
-- **TEAM composer stub**：PR-5a 阶段 ``compose_team`` 退化为 legacy；PR-5b 阶段实现完整 team orchestration
+- **ContextVar 注入**：plan_ref 与 ``_run_scope`` 同源（``ContextVar``），避免 kwargs 污染公共 API；未 set plan_ref → empty ``""``（legacy 兼容）
+- **empty plan_ref = legacy path**：测试 / projector previews / 未走 CompiledRunPlan 路径的代码可继续工作；新代码建议显式 ``with plan_ref_scope(ref): ...``
+- **RunStore.append 自动盖章**：append 时从 ContextVar 读取 → StampedEvent.plan_ref；调用方无需额外 kwargs
+- **JournalRecord v2 envelope 扩展**：``plan_ref`` 字段在 v2 envelope 中序列化（to_dict 增加 / from_dict 缺省值 ``""`` 兼容旧 envelope）；stamped_to_journal_record 桥接传播
+- **mid-run plan_ref 变更**：ContextVar 是 reentrant，可在不同 phase 用不同 ``plan_ref_scope``；events 按 append 时点确定 plan_ref
 
 ### 4.4 不变量
 
 - **不改 ADR 文件**（0066/0067/0068/0069/0071/0073/0070/0072/0062 任何文件一字不改）
-- **不动 layer 分层**：contracts/ 不能 import 实现层（composers 在 plugins/）
-- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-5 新增 18 测试全过，**无新增失败**）
-- **不改 spawn.py 默认行为**（`spawn_agent(spec)` 不传 plan → 走 legacy）
-- **不放方法在 contracts/@dataclass**（ADR-0015）
-- **保留 legacy 路径 6 个月**（PR-5b 后删除）
+- **不动 layer 分层**：contracts/ 不能 import 实现层
+- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-6 新增 28 测试全过，**无新增失败**）
+- **不改 plan_ref 字符串格式**：仍是 16 字符 SHA-256 hex（PR-3 跨进程稳定）
+- **不改 v2 envelope schema 破坏性**：旧 envelope（无 plan_ref 字段）解析为 plan_ref=``""``；新 envelope（plan_ref 存在）正常序列化
+- **不放方法在 contracts/@datlass**（ADR-0015；plan_ref_scope 是 contextmanager）
 
 ### 4.5 验证流程
 
 ```sh
 # 1. ruff check + format
-uv run ruff check --fix lca/contracts/harness/composer.py lca/layer4_app/spawn_bind_plan.py lca/layer4_app/spawn.py lca/plugins/composer/legacy_sub_composers.py tests/layer4_app/test_spawn_bind_plan.py
+uv run ruff check --fix lca/contracts/models/observability/plan_ref.py lca/contracts/models/observability/journal.py lca/layer0_infra/observability/journal/engine.py tests/observability/test_plan_ref.py tests/journal/test_plan_ref_replay.py
 uv run ruff format ...
 
-# 2. PR-5 L2 sign-off (acceptance §3.1 + tracker §PR-5)
-uv run pytest --no-cov tests/layer4_app/test_spawn_bind_plan.py -v
+# 2. PR-6 V5 acceptance 命令（acceptance-criteria §3.3）
+uv run pytest --no-cov tests/journal/test_plan_ref_replay.py -v
 
-# 3. 既有测试无回归
-uv run pytest --no-cov tests/harness/ tests/test_contracts.py tests/plan/ -q
+# 3. plan_ref ContextVar / RunStore auto-stamp 测试
+uv run pytest --no-cov tests/observability/test_plan_ref.py -v
+
+# 4. 既有测试无回归（除 §11 已登记的 pre-existing 2 失败：preview boundary + run http）
+uv run pytest --no-cov tests/harness/ tests/test_contracts.py tests/plan/ tests/layer4_app/ -q
 ```
 
 ### 4.6 完成判据
 
-- 18 新测试全过
-- harness/ + contracts/ + plan/ + layer4_app/ 测试无新增失败（437 passed）
+- 28 新测试全过（test_plan_ref 20 + test_plan_ref_replay 8）
+- harness/ + contracts/ + plan/ + layer4_app/ + observability/ + journal/ 测试无新增失败（465 passed）
 - ruff 无新增警告
-- spawn_agent 接受 compiled_plan + use_bind_plan kwargs（signature 验证）
-- Composer Protocol + AgentGraph + TeamGraph 是 contracts/ 纯类型
-- 4 sub-composer implementations（BrainComposer / BodyComposer / PerceiveComposer / TeamComposer）就位
+- mypy 无新增错误
+- V5 acceptance：每条 journal fact 携带 plan_ref；plan_ref 与 compiled_run_plan_ref(plan) 匹配
+- JournalRecord v2 envelope round-trip 兼容（旧 envelope plan_ref=""）
 
 ### 4.7 提交规范
 
 ```text
-feat(spawn+composer): PR-5 spawn.bind_plan + Composer Protocol + 4 sub-composers
+feat(journal): PR-6 plan_ref × Journal 绑定 (V5 hard constraint)
 
-- Composer Protocol (ADR-0071) + AgentGraph + TeamGraph dataclasses
-- bind_plan / bind_team / is_bind_plan_available (PR-5 路径)
-- spawn_agent accepts compiled_plan + use_bind_plan kwargs (backward compat)
-- 4 sub-composers (BrainComposer / BodyComposer / PerceiveComposer / TeamComposer)
-- 18 tests in tests/layer4_app/test_spawn_bind_plan.py
+- plan_ref ContextVar + helpers (lca/contracts/models/observability/plan_ref.py)
+- StampedEvent.plan_ref field (auto-stamped at append)
+- JournalRecord.plan_ref field (v2 envelope round-trip)
+- RunStore.append auto-stamps plan_ref
+- 28 tests (test_plan_ref 20 + test_plan_ref_replay 8)
 
-Refs: ADR-0074 phase 2 / PR-5 / ADR-0068 §一 + ADR-0071 + tracker §PR-5
+Refs: ADR-0074 phase 3 / PR-6 / ADR-0068 §一 + tracker §PR-6 +
+acceptance-criteria §3.3 V5
 ```
 
 ### 4.8 完成后如何更新本追踪
@@ -279,13 +290,13 @@ Refs: ADR-0074 phase 2 / PR-5 / ADR-0068 §一 + ADR-0071 + tracker §PR-5
 9. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
 10. 把追踪文件 commit 与代码 commit 分开（避免一个 commit 含两类变更）
 
-### 4.9 已知陷阱（PR-5 新增）
+### 4.9 已知陷阱（PR-6 新增）
 
-- **spawn_agent 不传 plan 时走 legacy**：`use_bind_plan=False` 是默认值；sub-composers 不存在时 `bind_plan` 抛 BindPlanError → spawn_agent 仍走 legacy。**PR-5b 阶段应让 use_bind_plan 默认 True + 在 boot 中自动注册 sub-composers**。
-- **PR-5a sub-composers 包装 spawn.py 内部函数**（``_resolve_brain`` / ``build_perceive_hub`` 等）：这是临时路径，避免 PR-5a 阶段大改 spawn.py。**PR-5b 应让 sub-composers 完全 self-contained**（不再 import spawn.py 内部函数，直接 require_capability）。
-- **TEAM composer 未实现**：``bind_team`` 退化到 legacy + DeprecationWarning；PR-5b 阶段补全。
-- **ADR-0071 仍为 Proposed**：PR-5 仅落地数据面；ADR-0071 accept 决策留 PR-5b / PR-10。**建议 PR-10 accept ADR-0071**（与 4 个 sub-composers 一起 review）。
-- **PlanBindingResult.plan_ref** 来自 ``compiled_run_plan_ref(plan)``（PR-3 module-level fn）；不是 ``plan.plan_ref`` 属性（已删除以遵循 ADR-0015）。
+- **plan_ref ContextVar 在跨线程场景需要单独管理**：ContextVar 是 asyncio + thread-local；多线程并发场景每个 thread 需独立 set/reset。本 PR-6 假设 single-threaded runtime（per-task）；PR-10 golden profile 验证跨 thread 边界。
+- **JournalRecord v2 envelope schema 不再 strict**：``plan_ref`` 字段是 optional；旧 envelope（无 plan_ref）解析为 ``""``。这意味着 **V5 acceptance 要求 runtime 强制 set plan_ref**（否则 fact 携带空 plan_ref = 缺 V5 守护）。PR-7 RunFact 阶段应在 Record 层强制检查 plan_ref 非空。
+- **2 个 pre-existing test 失败**（与 PR-6 无关）：test_journal_preview_boundary.py::test_result_preview_has_no_new_production_readers + test_run_http.py::test_post_runs_202_then_live_is_journal。这些是 §11 已登记的 19 个 pre-existing 失败；PR-6 不引入新失败。
+- **StampedEvent.plan_ref 是 plan-level 而非 event-level**：每个 event 携带的是同一 plan_ref（同 run）；event 之间不应该有不同的 plan_ref（mid-run plan 变更是新的 run）。
+- **plan_ref 与 trace_id 正交**：plan_ref 标识 plan（compiled plan），trace_id 标识 run trace（执行）。replay test 用 plan_ref 重放 plan；用 trace_id 重建执行链。两者解耦。
 
 ---
 
@@ -297,6 +308,8 @@ Refs: ADR-0074 phase 2 / PR-5 / ADR-0068 §一 + ADR-0071 + tracker §PR-5
 **Phase 0 总评审**：8/10 架构优雅度。
 
 **Phase 0 留下的关键约束**（详见 §2 决策表）。
+
+### Phase 1 PR-0：audit 测量网（2026-08-21）
 
 ## 5. 已完成 Phase 详情
 
@@ -315,8 +328,6 @@ Refs: ADR-0074 phase 2 / PR-5 / ADR-0068 §一 + ADR-0071 + tracker §PR-5
 **Phase 0 总评审**：8/10 架构优雅度。
 
 **Phase 0 留下的关键约束**（详见 §2 决策表）。
-
-### Phase 1 PR-0：audit 测量网（2026-08-21）
 
 ## 6. tracker 自身的执行（ADR 监督 = 5 ADR 监督）
 
