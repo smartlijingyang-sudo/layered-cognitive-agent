@@ -65,7 +65,7 @@
 | **0069 §二** | LogicAddress 6 维 | ⛔ → ✅ (PR-2) | PR-2 logic_address 字段 | 评分细则见 §15.3 |
 | **0069 §三** | 11 关系代数 | ⛔ → ✅ (PR-2.5) | PR-2.5 数据面 + PR-12 可视化 | |
 | **0069 §四** | 6 contribution verbs | ⛔ | PR-3 PlanCompiler | verb 集见 §1 实施序列 §四 |
-| **0069 §五** | PlanTemplate 实例（RAG / prompt chain / routing …） | ⛔ | PR-12 | 12 个 template 见 §16.2 |
+| **0069 §五** | PlanTemplate 实例（RAG / prompt chain / routing …） | ⛔ → ✅ | PR-12 (commit 4b8a61ed) | 12 个 template 见 §16.2 |
 | **0069 §六** | PluginContract 9 段 | ⏳ → ✅ (PR-2) | PR-2 可选段 + PR-12 | 详见 §12 |
 | **0074 §一** | 接受 0066 / 0068 / 0069 核心 | ✅ Done | Phase 0 | |
 | **0074 §二** | 接受 0068 CompiledRunPlan + §五 CommandEnvelope | ✅ Done | Phase 0 | |
@@ -98,12 +98,13 @@
 | **3** | 8 | ArtifactController（4 状态机） | ✅ Done | `17906ee0` | 2026-08-21 | PR-7 |
 | **4** | 9 | Creator 4 面化 | ✅ Done | `d17d8447` | 2026-08-21 | PR-8 |
 | **4** | 10 | Golden profile + 文档更新 | ✅ Done | `010865d7` | 2026-08-21 | PR-9 |
-| **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
+| **5** | 12 | PlanTemplate + 关系图谱可视化 | ✅ Done | `4b8a61ed` | 2026-08-21 | PR-10 |
+| **5** | 11 | legacy 6 个月 cleanup（删 stage/retire/publish 字符串 + CordisControlTool 7-action 字符串）| ⛔ Blocked | — | — | PR-12 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-12（PlanTemplate + 关系图谱可视化）。
+**Next Action**：PR-11（cleanup 任务，6 个月后删除 legacy action 字符串；不阻塞当前架构）。
 
-**累计完成**：15 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 / PR-8 / PR-9 / PR-10 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：16 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 / PR-8 / PR-9 / PR-10 / PR-12 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -194,7 +195,7 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-10（Golden profile + 文档更新）
+## 4. 已完成 PR 详情：PR-12（PlanTemplate + 关系图谱可视化）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
 > PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 完成细节见 §5 Phase 1。
