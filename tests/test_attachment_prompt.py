@@ -11,7 +11,6 @@ from lca.layer0_infra.attachment import (
     FileStoreAttachmentIdentity,
     format_machine_uploaded_files_prompt,
     format_sandbox_uploaded_files_prompt,
-    render_dsh_workspace_context,
     reset_attachment_settings_for_tests,
     sandbox_attachment_path,
 )
@@ -78,20 +77,6 @@ class TestAttachmentPrompt(unittest.TestCase):
             preamble = skill_preamble()
         self.assertIn("/home/sandbox-user/.lca/inbox/run_skill/deck.pptx", preamble)
         self.assertIn("exact paths", preamble)
-
-    def test_dsh_workspace_context_wraps_uploaded_files(self) -> None:
-        meta = self.store.put(
-            data=b"pptx", name="deck.pptx", mime_type="application/vnd.ms-powerpoint"
-        )
-        ctx = render_dsh_workspace_context(
-            "/home/sandbox-user",
-            "run_dsh",
-            (meta.attachment_id,),
-            self.store,
-        )
-        self.assertIn("<uploaded_files>", ctx)
-        self.assertIn("/home/sandbox-user/.lca/inbox/run_dsh/deck.pptx", ctx)
-        self.assertIn("files_info", ctx)
 
 
 if __name__ == "__main__":
