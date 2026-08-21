@@ -33,9 +33,8 @@ class DefaultReducer(Reducer):
     def apply_perception(self, state: AgentState, manifest: ContextManifest) -> AgentState:
         """fold ContextManifest 到 state。
 
-        当前 Hub 已经写入 ``state.extra["current_manifest"]`` 与
-        ``state.extra["gate_decided"]``（perceive_state 模块）。Reducer
-        追加 ``state.extra["manifest_digest"]`` 作为 idempotency token
+        当前 Hub 已经通过 perceive_state 模块写入 current_manifest 和 gate_decided。
+        Reducer 追加 manifest_digest 到 state.extra 作为 idempotency token
         ——用于 replay / cache 校验。
         """
         state.extra["manifest_digest"] = manifest.digest
