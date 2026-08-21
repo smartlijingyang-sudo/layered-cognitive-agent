@@ -38,6 +38,16 @@ class Reducer(Protocol):
         """追加 ``Turn`` 到 ``state.history``。"""
         ...
 
+    def apply_skill_route(self, state: AgentState, active_template: str | None) -> AgentState:
+        """fold ``SkillRouter.route(state)`` 的 active_template 到 state。
+
+        ADR-0066 C4：所有 state mutation 集中此 seam；ModularBrain 不再直接
+        写 ``state.active_template``（PR-4 think.guard 原子化迁移）。
+        ``active_template`` 是 SkillRouter.route() 返回的 prompt 模板名，
+        Reasoner 在生成 thought 时读取；空 = 使用 default template。
+        """
+        ...
+
     def apply_activation(
         self, state: AgentState, activated: tuple[ActivatedSkill, ...]
     ) -> AgentState:

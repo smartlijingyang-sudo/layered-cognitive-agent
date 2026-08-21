@@ -44,6 +44,16 @@ class DefaultReducer(Reducer):
         state.history.append(turn)
         return state
 
+    def apply_skill_route(self, state: AgentState, active_template: str | None) -> AgentState:
+        """fold SkillRouter.route(state) 返回的 active_template 到 state。
+
+        PR-4 think.guard 原子化迁移：ModularBrain 不再直接写
+        ``state.active_template``；通过 reducer 收口（C4 兑现）。
+        active_template 是 prompt template 名字；空 = use default。
+        """
+        state.active_template = active_template
+        return state
+
     def apply_activation(
         self, state: AgentState, activated: tuple[ActivatedSkill, ...]
     ) -> AgentState:

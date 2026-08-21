@@ -49,6 +49,11 @@ class Finding:
 _REDUCER_FILE_ALLOWLIST: frozenset[str] = frozenset(
     {
         "lca/layer2_runtime/reducer.py",
+        # PR-4 think.guard 原子化迁移：ModularBrain 包含 _LocalReducer
+        # （兼容 reducer for testing / isolated boot）。Reducer 实现是
+        # C4 唯一允许直接 mutate state 的位置；modular_brain.py 的非
+        # reducer 部分已通过 reducer.apply_skill_route 收口。
+        "lca/layer1_cognitive/brain/modular_brain.py",
     }
 )
 
