@@ -52,7 +52,7 @@
 | **0066 §五-§六** | Composer + ControlPlan 描述 | ⏳ → ✅ (PR-5 数据面) | PR-5 (commit 309dddcc) | 数据面落地；PR-5b 后 sub-composers self-contained |
 | **0066 §七** | 决策点三分（策略 / 事实 / 强制） | ⛔ → ✅ (PR-4) | PR-4 首次迁移 | |
 | **0067 §一-§三** | SpacetimeContext 5 子空间 | 暂缓 | ADR Draft | 0074 §三 裁剪到 ExecutionSpace + LifecycleSpace |
-| **0067 §四** | 8 状态机 | ⛔ → ✅ | **PR-8** | 0074 §三 裁剪到 4 状态；映射见 §18 |
+| **0067 §四** | 8 状态机 | ⛔ → ✅ | **PR-8** (commit 17906ee0) | 0074 §三 裁剪到 4 状态；映射见 §18 |
 | **0067 §五** | 6 道闸 | ⛔ | PR-4 | 0074 §三 裁剪到 3 道闸 |
 | **0067 §七** | 7 Creator 面 | ⛔ | PR-9 | 0074 §三 裁剪到 4 面；映射见 §18 |
 | **0068 §一** | CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan | ⛔ → ✅ (PR-3) | PR-3 | |
@@ -60,7 +60,7 @@
 | **0068 §二** | PluginContract 概念 | ⏳ → ✅ (PR-2) | PR-2 可选段 | 详见 §12；0074 §四 不替换 PluginDefinition |
 | **0068 §五** | CommandEnvelope = effect 唯一入口 | ⛔ → ✅ (PR-7) | PR-7 (commit afbac7a7) | architecture test gate 守护 mint_envelope |
 | **0068 §六** | Boot 双轨消除 | ✅ Done | ADR-0062 PR-3/PR-4 (`e0eb2484`) | 已落地，详见 §3.3 |
-| **0068 §七** | ArtifactController | ⛔ | PR-8 | 4 状态机 |
+| **0068 §七** | ArtifactController | ⛔ → ✅ | **PR-8** (commit 17906ee0) | 4 状态机 |
 | **0069 §一** | 13 原语群分类学 | ⏳ taxonomy 部分 → ✅ (PR-2) | PR-2 functional_group 字段 | 群名见 §15.2 |
 | **0069 §二** | LogicAddress 6 维 | ⛔ → ✅ (PR-2) | PR-2 logic_address 字段 | 评分细则见 §15.3 |
 | **0069 §三** | 11 关系代数 | ⛔ → ✅ (PR-2.5) | PR-2.5 数据面 + PR-12 可视化 | |
@@ -95,14 +95,14 @@
 | **2** | 5 | spawn.bind_plan | ✅ Done | `309dddcc` | 2026-08-21 | PR-3 + ADR-0071 |
 | **3** | 6 | plan_ref × Journal 绑定 | ✅ Done | `026716c1` | 2026-08-21 | PR-5 |
 | **3** | 7 | RunFact / CommandEnvelope 收口 | ✅ Done | `afbac7a7` | 2026-08-21 | PR-6 + ADR-0073 |
-| **3** | 8 | ArtifactController（4 状态机） | ⛔ Blocked | — | — | PR-7 |
+| **3** | 8 | ArtifactController（4 状态机） | ✅ Done | `17906ee0` | 2026-08-21 | PR-7 |
 | **4** | 9 | Creator 4 面化 | ⛔ Blocked | — | — | PR-8 |
 | **4** | 10 | Golden profile + 文档收尾 | ⛔ Blocked | — | — | PR-9 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
 
-**Next Action**：PR-8（ArtifactController 4 状态机）。
+**Next Action**：PR-9（Creator 4 面化）。
 
-**累计完成**：12 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：13 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 / PR-8 完成；PR-0.5 推迟到大重构结束后）。
 
 ---
 
@@ -193,95 +193,93 @@ PR-12 (PlanTemplate + 关系图谱)
 
 ---
 
-## 4. 已完成 PR 详情：PR-7（RunFact / CommandEnvelope 收口）
+## 4. 已完成 PR 详情：PR-8（ArtifactController 4 状态机）
 
 > 当 Next Action 推出新 PR 时，把 §4 重命名为对应 PR 并复制一份此节作为工作底稿；保留原内容作为已完成 PR 的归档。
-> PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 完成细节见 §5 Phase 1。
+> PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 完成细节见 §5 Phase 1。
 
 ### 4.1 目标
 
-落地 V4 hard constraint：外部 effect 必经 CommandEnvelope（5 闸单调聚合）。
-实现：
+落地 V6 hard constraint：Artifact 4 状态机（``DRAFT`` / ``VERIFIED`` /
+``ACTIVE`` / ``RETIRED``）。实现：
 
-- ``CommandEnvelope`` frozen dataclass（plan_ref / scope_ref / decision_ref /
-  provider / grant / budget_reservation / idempotency_key /
-  policy_verdict_refs / execution_space_ref）
-- ``mint_envelope`` factory（接受 dict / Decision 对象 / DecisionRef 输入）
-- ``PipelineSafeExecutor.execute`` 入口 mint envelope（V4 acceptance）
-- ``scripts/check_command_envelope_required.py`` AST architecture test gate
-- RunFact / RunDelta / DecisionRef / Verdict / EnvelopeVerdict 类型
-- ADR-0073 Session Path Convergence 仍为 Proposed；本 PR-7 落地数据面
+- ``ArtifactState`` 4 状态 enum + ``LEGAL_TRANSITIONS`` 迁移矩阵
+- ``CapabilityArtifact`` frozen dataclass
+- ``ArtifactController`` thin facade + module-level accessors
+- state migration 主入口 ``migrate_artifact`` + 非法抛
+  ``InvalidStateTransitionError``
+- 8→4 legacy state migration（``LEGACY_TO_NEW_STATE`` 映射表）
+- property test 100 iterations random legal paths + illegal transitions
+  全 raise
 
 ### 4.2 新增 / 修改文件
 
 | 文件 | 作用 |
 |---|---|
-| `lca/contracts/protocols/command_envelope.py` | ``CommandEnvelope`` frozen dataclass + ``CapabilityGrant`` + ``BudgetReservation`` nested dataclasses; ``RunFact`` / ``RunDelta`` / ``DecisionRef`` types; ``Verdict`` / ``EnvelopeVerdict`` enums; ``mint_envelope`` factory; module-level accessors (command_envelope_to_dict / envelope_is_authorized / envelope_aggregate_verdict / warn_deprecated_envelope_constructor) |
-| `lca/contracts/protocols/__init__.py` | re-export 13 new symbols (CommandEnvelope 系列) |
-| `lca/layer1_cognitive/body/pipeline_safe_executor.py` | ``PipelineSafeExecutor.execute`` 入口 mint envelope (plan_ref from ContextVar + scope_ref from RunScope + default verdict "policy.pre_execute") |
-| `scripts/check_command_envelope_required.py` | AST architecture test gate — 扫描 body layer, 验证 execute() 含 mint_envelope; 缺 mint → exit 1 + 打印违规 |
-| `tests/harness/test_command_envelope.py` | 33 测试覆盖 CommandEnvelope / mint_envelope / CapabilityGrant / BudgetReservation / RunFact / RunDelta / DecisionRef / Verdict / envelope_is_authorized / envelope_aggregate_verdict / command_envelope_to_dict / V4 architecture test gate |
-| `tests/harness/test_tool_pipeline_plugins.py` | 加 plan_ref_scope() 包装 (V5 acceptance: empty plan_ref rejected by mint_envelope) |
+| `lca/contracts/atoms/artifact_state.py` | ``ArtifactState`` 4 状态 enum + ``LEGAL_TRANSITIONS`` 矩阵（4 迁移：DRAFT→VERIFIED, VERIFIED→ACTIVE, VERIFIED→DRAFT 修订, ACTIVE→RETIRED）+ ``is_legal_transition`` / ``parse_artifact_state`` / ``all_states`` helpers |
+| `lca/contracts/harness/artifact.py` | ``CapabilityArtifact`` frozen dataclass（logical_id / revision_digest / state / scope / grants / legacy_state / metadata / version）+ ``InvalidStateTransitionError`` exception + ``ArtifactController`` thin facade + 12 module-level accessors（``migrate_artifact`` / ``migrate_to_verified`` / ``migrate_to_active`` / ``migrate_to_retired`` / ``migrate_legacy_state`` / ``legal_next_states`` / ``is_terminal_state`` / ``artifact_with_state`` / ``make_capability_artifact`` / ``capability_artifact_to_dict`` / ``controller_migrate`` / ``controller_legal_next_states`` / ``controller_migrate_legacy``）+ ``LEGACY_TO_NEW_STATE`` 8→4 映射表 |
+| `lca/contracts/harness/__init__.py` | re-export 16 new symbols（ArtifactController / CapabilityArtifact / InvalidStateTransitionError 等） |
+| `tests/artifact/test_state_machine_property.py` | 57 测试覆盖 ArtifactState enum（4 members）/ LEGAL_TRANSITIONS / parse_artifact_state / CapabilityArtifact construction / make_capability_artifact factory（digest auto-compute SHA-256 hex 16 char）/ migrate_artifact（legal + illegal raise）/ legal_next_states / 8→4 legacy migration（PARSED/STAGED/QUIESCING/ROLLED_BACK）/ ArtifactController facade / property test 100 iterations random legal paths + no illegal transitions accepted |
 
 ### 4.3 实现要点
 
-- **CommandEnvelope 是 frozen dataclass**（ADR-0015 contracts 纯类型）；访问器全部 module-level
-- **mint_envelope factory**：接受多种 decision 输入（dict / Decision object / DecisionRef / id-attr object / str / None）；empty plan_ref → V5 acceptance 拒绝（与 PR-6 V5 一致）
-- **5 闸单调聚合** 数据面：policy_verdict_refs 是 tuple of refs；PR-7 阶段默认授权 (`policy.pre_execute`)；PR-8 接入完整 5 闸 pipeline (authorize / budget / constrain / execute / safe-boundary)
-- **grant 单调**：子代理 grant ⊆ 父代理（V8 守护）；PR-7 仅单层 grant；嵌套授权树（grant tree）由 PR-8 落地
-- **pipeline_safe_executor 集成**：execute 入口 mint envelope；envelope 是 immutable record (后续 PR-8 在 envelope 上 apply 5 闸 verdict)
-- **Deprecation warning**：直接构造 CommandEnvelope 触发 DeprecationWarning（PR-8 强制走 mint_envelope factory）
+- **4 状态机** = ADR-0074 §三裁剪（8 状态 → 4 状态）：PARSED / DECLARED fold to DRAFT；STAGED / QUIESCING fold to ACTIVE；ROLLED_BACK fold to RETIRED
+- **LEGAL_TRANSITIONS 4 路径**：DRAFT→VERIFIED（首次校验）、VERIFIED→ACTIVE（promote）、VERIFIED→DRAFT（修订）、ACTIVE→RETIRED（退役）
+- **REVOKED 不可逆**：RETIRED 是 terminal state；任何迁移 raise
+- **revision_digest SHA-256 hex 16 char**（PR-3 跨运行稳定风格）
+- **8→4 legacy migration**：``LEGACY_TO_NEW_STATE`` dict 提供 PARSED/DECLARED/STAGED/QUIESCING/ROLLED_BACK → 4-state 映射；``migrate_legacy_state`` 仅从 DRAFT 起步（确保 idempotency）
+- **ADR-0015 contracts 纯类型**：CapabilityArtifact + ArtifactController 不放方法；所有派生 / 迁移走 module-level functions（``migrate_artifact`` / ``controller_migrate`` 等）
 
 ### 4.4 不变量
 
 - **不改 ADR 文件**（0066/0067/0068/0069/0071/0073/0070/0072/0062 任何文件一字不改）
 - **不动 layer 分层**：contracts/ 不能 import 实现层
-- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-7 新增 33 测试全过，**无新增失败**）
-- **不改 envelope schema 破坏性**：所有字段都是 optional with defaults；PR-7 阶段 envelope 不引入 wire-format breaking
-- **不放方法在 contracts/@datlass**（ADR-0015）
-- **V4 acceptance 守护**：scripts/check_command_envelope_required.py 扫描所有 body execute 方法，缺 mint → exit 1
-- **V5 acceptance 守护**：mint_envelope empty plan_ref → ValueError（与 PR-6 plan_ref 守护一致）
+- **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-8 新增 57 测试全过，**无新增失败**）
+- **不改 ARTIFACT_STATE 字符串值**（序列化 / journal_record / 状态机 protocol 引用稳定；break wire 触发 PR-X redesign）
+- **不放方法在 contracts/@datlass**（ADR-0015；ArtifactController 是 thin facade）
+- **PR-8 阶段 runtime 不接线**（cordis_control.mount/unmount 调用 ArtifactController 留 PR-10 golden profile 阶段；当前仅数据面 + property test 守护）
 
 ### 4.5 验证流程
 
 ```sh
 # 1. ruff check + format
-uv run ruff check --fix lca/contracts/protocols/command_envelope.py lca/layer1_cognitive/body/pipeline_safe_executor.py scripts/check_command_envelope_required.py tests/harness/test_command_envelope.py
+uv run ruff check --fix lca/contracts/atoms/artifact_state.py lca/contracts/harness/artifact.py tests/artifact/
 uv run ruff format ...
 
-# 2. V4 architecture test gate
-uv run python scripts/check_command_envelope_required.py
+# 2. PR-8 L2 sign-off (acceptance §5.1 V6)
+uv run pytest --no-cov tests/artifact/test_state_machine_property.py -v
 
-# 3. PR-7 L2 sign-off (acceptance §3.4 V4)
-uv run pytest --no-cov tests/harness/test_command_envelope.py -v
+# 3. 100-iteration property test
+uv run pytest --no-cov tests/artifact/test_state_machine_property.py::TestStateMachineProperty100 -v
 
-# 4. 既有测试无回归（plan_ref_scope 包装）
+# 4. 既有测试无回归
 uv run pytest --no-cov tests/harness/ tests/test_contracts.py tests/plan/ tests/layer4_app/ tests/observability/ tests/journal/ -q
 ```
 
 ### 4.6 完成判据
 
-- 33 新测试全过（test_command_envelope 33）
-- harness/ + contracts/ + plan/ + layer4_app/ + observability/ + journal/ 测试无新增失败（498 passed）
+- 57 新测试全过（test_state_machine_property 57）
+- harness/ + contracts/ + plan/ + layer4_app/ + observability/ + journal/ + artifact/ 测试无新增失败（555 passed）
 - ruff 无新增警告
 - mypy 无新增错误
-- V4 architecture test gate 通过：scripts/check_command_envelope_required.py exit 0
-- V5 acceptance: empty plan_ref rejected by mint_envelope
-- pipeline_safe_executor.execute stack trace 含 mint_envelope（V4 硬约束）
+- ArtifactState 4 状态闭合（DRAFT / VERIFIED / ACTIVE / RETIRED）
+- LEGAL_TRANSITIONS 4 路径（覆盖 acceptance §5.1 V6）
+- 非法迁移抛 InvalidStateTransitionError（DRAFT→ACTIVE 跳过、ACTIVE→DRAFT 回退、RETIRED→任何）
+- 8→4 legacy migration：PARSED/STAGED/QUIESCING/ROLLED_BACK 全部 fold 到 4-state
 
 ### 4.7 提交规范
 
 ```text
-feat(envelope): PR-7 RunFact / CommandEnvelope 收口 (V4 hard constraint)
+feat(artifact): PR-8 ArtifactController 4 状态机 (V6 hard constraint)
 
-- CommandEnvelope + mint_envelope factory (V5 plan_ref 守护)
-- RunFact / RunDelta / DecisionRef / Verdict types
-- PipelineSafeExecutor.execute 集成 mint_envelope
-- scripts/check_command_envelope_required.py AST architecture test gate
-- 33 tests + pipeline test 修复 (plan_ref_scope 包装)
+- ArtifactState 4 状态 enum + LEGAL_TRANSITIONS 矩阵
+- CapabilityArtifact frozen dataclass
+- ArtifactController thin facade + module-level accessors (ADR-0015)
+- 8→4 legacy state migration (LEGACY_TO_NEW_STATE)
+- 57 tests (test_state_machine_property)
 
-Refs: ADR-0074 phase 3 / PR-7 / ADR-0068 §五 + ADR-0066 §四 +
-tracker §PR-7 + acceptance-criteria §3.4 V4
+Refs: ADR-0074 phase 3 / PR-8 / ADR-0068 §一 + ADR-0074 §三 + tracker §18 +
+acceptance-criteria §5.1 V6
 ```
 
 ### 4.8 完成后如何更新本追踪
@@ -297,13 +295,13 @@ tracker §PR-7 + acceptance-criteria §3.4 V4
 9. 如果发现 PR 详情需调整（实现中发现 spec 偏差），更新 §4 但**保留变更说明**
 10. 把追踪文件 commit 与代码 commit 分开（避免一个 commit 含两类变更）
 
-### 4.9 已知陷阱（PR-7 新增）
+### 4.9 已知陷阱（PR-8 新增）
 
-- **mint_envelope empty plan_ref → V5 拒绝**：所有 mint_envelope 调用必须保证 plan_ref ContextVar 已 set；tests 加 plan_ref_scope 包装；runtime 必须保证 plan 已 compile + ContextVar active。**PR-8 阶段建议 RuntimeKernel 在 run() 入口强制 set plan_ref**（否则所有 envelope 创建都失败）。
-- **5 闸聚合未实现**：PR-7 仅数据面 + 1 个默认 verdict (`policy.pre_execute`)；PR-8 阶段接入 authorize / budget / constrain / execute / safe-boundary 完整 pipeline。**V4 acceptance 当前是"execute 必含 mint_envelope"（最小）；PR-8 后 V4 升级为"5 闸全过才执行 effect"**。
-- **ADR-0073 Session Path Convergence 仍为 Proposed**：PR-7 mint_envelope 仅含 envelope 本体字段；SessionService Protocol / SessionService.record() 集成由 PR-7 后段 / PR-10 golden profile 落地（acceptance §7.3）。
-- **grant 单调未验证**：PR-7 仅 data class + factory；V8 capability monotonicity property test (子 ⊆ 父 grant) 留 PR-8 stage migration 阶段。
-- **2 个 pre-existing test 失败**（与 PR-7 无关）：test_journal_preview_boundary + test_run_http（§11 已登记 19 个 pre-existing 失败）。
+- **cordis_control mount/unmount 未接入 ArtifactController**：PR-8 仅数据面 + property test 守护；runtime 集成（mount → DRAFT→VERIFIED→ACTIVE; unmount → ACTIVE→RETIRED）留 PR-10 golden profile 阶段。**PR-9 Creator 4 面化阶段建议同时接入**（CordisControlTool 与 ArtifactController 集成）。
+- **8→4 legacy migration 仅从 DRAFT 起步**：legacy_state 非空 + state ≠ DRAFT → ValueError。**这是 idempotency 守护**：多次调用 migrate_legacy_state 在 legacy_state 第一次清空后变成 no-op。**PR-10 golden profile 测试应覆盖 legacy artifact 启动 → migrate_legacy_state → 继续 state machine**。
+- **2 个 pre-existing test 失败**（与 PR-8 无关）：test_journal_preview_boundary + test_run_http（§11 已登记 19 个 pre-existing 失败）。
+- **Property test 100 iterations 用 random.choice**：S311 警告（pseudo-random 不安全）；PR-8 阶段仅用于 property test，不用于 cryptographic。后续 PR 可改用 secrets module（如需）。
+- **V8 capability 单调未验证**：CapabilityArtifact.grants 是 V8 单调要求（子 ⊆ 父），但 PR-8 阶段未验证；PR-9 Creator 4 面化阶段应加入 property test（grant ⊆ parent grant + 子 grant 数 ≤ 父 grant 数）。
 
 ---
 
