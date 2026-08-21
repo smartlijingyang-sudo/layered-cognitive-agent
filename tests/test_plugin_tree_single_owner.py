@@ -194,6 +194,15 @@ async def test_omitting_seam_plugin_does_not_bypass(
 async def test_omitting_tools_provider_skips_g2a_not_fallback(
     no_llm_key: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """省略 lca-tools-provider 时，g2a 不应被 fallback 调用。
+
+    实现差异：web-standard 现默认加载 scenario-cordis-creator bundle，bash /
+    file_write 通过 setup 直接 register() 进 tools 服务（不依赖 lca-tools-provider）。
+    本测试断言在 lca-tools-provider 缺位时：
+    1. g2a factory 不被调用（mock _boom）；
+    2. _tools_from_ctx 返回结果里不含任何 *_skill / *_chat 工具
+       （这些只能由 g2a 产出）。
+    """
     ctx = await _boot_omitting("lca-tools-provider")
 
     def _boom(*_a: object, **_k: object) -> object:
@@ -202,7 +211,14 @@ async def test_omitting_tools_provider_skips_g2a_not_fallback(
     monkeypatch.setattr("lca.layer0_infra.tools.default_set.build_g2a_chat_tools", _boom)
     from gateway.runs.loop_drivers import _tools_from_ctx
 
-    assert _tools_from_ctx(ctx, None) == ()
+    tools = _tools_from_ctx(ctx, None)
+    tool_names = [t.name for t in tools]
+    # g2a 出来的工具（search / askUserQuestion / *_skill 系列）一律不应出现
+    assert not any(name.endswith("_skill") for name in tool_names), tool_names
+    assert "search" not in tool_names
+    assert "askUserQuestion" not in tool_names
+    # bash / file_write 是 scenario-cordis-creator bundle 直挂的，缺 lca-tools-provider
+    # 时仍可用（这是设计：creator 工具独立于 g2a chain）
 
 
 @pytest.mark.asyncio

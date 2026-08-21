@@ -8,17 +8,27 @@ module-level singleton.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from itertools import count
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from gateway.modes import SOLO_MODE_KEY, SOLO_ROLE
+from gateway.modes import (
+    CORDIS_CREATOR_MODE_KEY,
+    CORDIS_CREATOR_ROLE,
+    SOLO_MODE_KEY,
+    SOLO_ROLE,
+)
 from gateway.runs.dsh_execute import execute_dsh_session
 from gateway.runs.session import RunSession
 from lca.contracts.atoms.ids import RunId, TraceId
-from lca.contracts.mechanisms.capability import provider_current, require_capability
+from lca.contracts.mechanisms.capability import (
+    MissingCapabilityError,
+    provider_current,
+    require_capability,
+)
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.plane import PlaneBindings
 from lca.contracts.models.observability.journal import (
@@ -121,6 +131,16 @@ class CognitiveRunDriver:
                 scope=scope,
                 tools=tools,
             )
+        elif mode == CORDIS_CREATOR_MODE_KEY:
+            # Creator §13.3 single-port 入口：保持 web-standard booted ctx，
+            # 但 persona 切到 cordis-creator + tool_permission_manifest 缩到
+            # 三件创作工具（cordis_control / file_write / bash）。
+            runnable = _build_cordis_creator_agent(
+                llm,
+                observability=hub,
+                scope=scope,
+                tools=tools,
+            )
         else:
             runnable = await _build_team(
                 question,
@@ -212,6 +232,120 @@ def _build_solo_agent(
         llm=llm,
         observability=observability,
         scope=scope,
+    )
+
+
+def _build_cordis_creator_agent(
+    llm: Any,
+    *,
+    observability: Any,
+    scope: Context | None = None,
+    tools: Sequence[Tool] | None = None,
+) -> Agent:
+    """Creator §13.3 single-port agent：cordis-creator persona + 创作工具集。
+
+    设计：web-standard profile booted 后，scenario-cordis-creator bundle 把
+    cordis_control / file_write / bash 三个工具都注册到 ``tools`` 服务；
+    本函数从此全局工具池里**只挑这三件**，再叠加 cordis-creator 的
+    persona（goal / backstory / persona_boundaries），用 list 形式传
+    ``Agent.tools=``，最终 :class:`ToolPermissionManifest.allowed_tools`
+    自动收敛到 cordis_control / file_write / bash 三件。
+    """
+    # 只从 tools 池里挑 creator 必需的 file_write / bash；cordis_control
+    # 单独用 composer 工厂现场构造（需要 cordis.Context）
+    creator_tools: dict[str, Tool] = {}
+    for tool in tools or ():
+        if tool.name in {"file_write", "bash"}:
+            creator_tools[tool.name] = tool
+
+    # 加载 cordis-creator role profile（persona + boundaries）
+    from lca.plugins.roles.cordis_creator import build_cordis_creator_role_profile
+
+    creator_profile = build_cordis_creator_role_profile()
+    # 从 ctx.providers 取 Composer 工厂（cordis-creator 工具集需要；AdHoc 注入）
+    composer_factory = None
+    if scope is not None:
+        try:
+            composer_factory = require_capability(scope, "composer.compose_factory")
+        except MissingCapabilityError:
+            composer_factory = None
+
+    # 现场构造 cordis_control 工具 —— 同一 session 共用一个 Composer 实例
+    # （python 引用：每个工具 = 共享同一 ctx 引用），caller_grant ＝ 全集
+    if composer_factory is not None:
+        try:
+            composer = composer_factory(scope)
+            from lca.plugins.tools.cordis_control import build_cordis_control_tool
+
+            creator_tools["cordis_control"] = build_cordis_control_tool(
+                composer=composer,
+                caller_grant=(
+                    "cordis_control.inspect",
+                    "cordis_control.mount",
+                    "cordis_control.unmount",
+                    "cordis_control.publish",
+                    "tool_fs.read",
+                    "tool_fs.write",
+                    "tool_bash",
+                    "file_write",
+                ),
+                actor_role=CORDIS_CREATOR_ROLE,
+            )
+        except Exception as exc:
+            # Composer 工厂失败时不强求 cordis_control；file_write + bash
+            # 仍足够让 agent 知道 capabilities 缺失
+            logging.getLogger(__name__).warning(
+                "cordis_creator.composer_resolve_failed",
+                extra={"actor_role": CORDIS_CREATOR_ROLE, "error": str(exc)},
+            )
+
+    return Agent(
+        role=creator_profile.role,
+        goal=creator_profile.goal,
+        backstory=creator_profile.backstory,
+        tools=tuple(creator_tools.values()),
+        llm=llm,
+        observability=observability,
+        scope=scope,
+    )
+
+
+def _reinject_cordis_control(
+    original_tool: Tool,
+    *,
+    composer_factory: Any,
+    scope: Context,
+    actor_role: str,
+) -> Tool:
+    """用 ctx 里的 composer 工厂重绑 cordis_control（保留 preset_root 与 actor_role）。
+
+    web-standard profile booted 后，code 上 ``ctx.inject("composer.compose_factory")``
+    返回 :func:`build_composer_factory` 工厂；调用它拿到当前 session 的
+    :class:`CordisComposer` 实例，重新构造一个 cordis_control（带 caller_grant 全集）。
+    """
+    try:
+        composer = composer_factory(scope)
+    except Exception:
+        return original_tool
+
+    from lca.plugins.tools.cordis_control import build_cordis_control_tool
+
+    # 取原 tool 的 preset_root（如果构造时传过）
+    preset_root = getattr(original_tool, "_preset_root", None)
+    return build_cordis_control_tool(
+        composer=composer,
+        caller_grant=(
+            "cordis_control.inspect",
+            "cordis_control.mount",
+            "cordis_control.unmount",
+            "cordis_control.publish",
+            "tool_fs.read",
+            "tool_fs.write",
+            "tool_bash",
+            "file_write",
+        ),
+        actor_role=actor_role,
+        preset_root=preset_root,
     )
 
 

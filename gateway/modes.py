@@ -48,19 +48,51 @@ EXAMPLE_PROMPTS: Final[dict[str, tuple[str, ...]]] = {
 
 DEFAULT_MODE: Final[str] = "solo"
 
-LCA_UI_MODELS: Final[tuple[str, ...]] = ("solo", "team", "auto")
-"""LobeHub 模型选择器唯一对外的三个入口。真实 LLM 由 gateway 解析。"""
+LCA_UI_MODELS: Final[tuple[str, ...]] = ("solo", "team", "auto", "cordis-creator")
+"""LobeHub 模型选择器唯一对外的入口。真实 LLM / agent persona 由 gateway 解析。
+
+- ``solo``    —— 默认独享 agent（web-standard profile 的 default role）
+- ``team``    —— LLM casting 自动组队（ADR-0042）
+- ``auto``    —— 同 team（显式别名）
+- ``cordis-creator`` —— Creator §13.3 自 plugin 创作 persona；同一 web-standard
+  profile 上下文，工具集由 cordis-creator role 的 manifest 限定为
+  ``cordis_control / file_write / bash`` 三件。
+"""
 
 SOLO_MODE_KEY: Final[str] = "solo"
 """Solo 入口：裸模型，零角色概念，不进 MODE_DEFINITIONS（ADR-0052）。"""
 
+CORDIS_CREATOR_MODE_KEY: Final[str] = "cordis-creator"
+"""Creator 入口：cordis-creator persona + 创作工具集（single-port 多 persona）。"""
+
 SOLO_ROLE: Final[str] = "助手"
 """Solo agent 的 role 标签 —— 纯展示用，不影响行为（对齐 LobeHub systemRole=''）。"""
 
+CORDIS_CREATOR_ROLE: Final[str] = "cordis-creator"
+"""Creator persona 的 role tag；与 profile.cordis-creator.yaml 的 role 字段一致。"""
+
 
 def resolve_lca_mode(model: str) -> str:
-    """Map OpenAI model id → LCA gateway mode ('solo' or 'team')."""
+    """Map OpenAI model id → LCA gateway mode ('solo' / 'team' / 'cordis-creator')。"""
     key = model.strip().lower()
     if key in {"team", "auto"}:
         return "team"
+    if key == CORDIS_CREATOR_MODE_KEY:
+        return CORDIS_CREATOR_MODE_KEY
     return "solo"
+
+
+def is_cordis_creator_mode(model: str) -> bool:
+    """model 是否是 cordis-creator（前端发来 "cordis-creator" 时返回 True）。"""
+    return resolve_lca_mode(model) == CORDIS_CREATOR_MODE_KEY
+
+
+def resolve_agent_role(model: str) -> str:
+    """Map model → agent role tag for :class:`Agent` + :class:`RoleProfile`。
+
+    - ``cordis-creator`` → ``cordis-creator``（Creator §13.3 persona）
+    - 其它 → ``SOLO_ROLE``（默认助手 persona）
+    """
+    if is_cordis_creator_mode(model):
+        return CORDIS_CREATOR_ROLE
+    return SOLO_ROLE

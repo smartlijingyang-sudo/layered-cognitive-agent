@@ -2,6 +2,14 @@
 # Per spec §13.3: standard + Composer.mount/unmount + cordis_control tool.
 
 entries:
+  # CordisComposer provider (Tier-2) — 把 CordisComposer 工厂挂到
+  # ``composer.compose_factory`` 命名 seam，供 cordis_control 工具运行时
+  # 拿到 composer 实例。single-port 模式下 web-standard 绑此 bundle 即可。
+  - id: lca-composer-provider
+    name: lca_composer_provider
+    $module: lca.plugins.providers.composition_provider
+    config: {}
+
   # Cordis control tool (Tier-3) — mount/unmount/inspect/publish
   - id: lca-tool-cordis-control
     name: lca_tool_cordis_control

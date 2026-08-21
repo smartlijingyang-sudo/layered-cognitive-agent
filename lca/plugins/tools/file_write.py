@@ -143,3 +143,36 @@ def build_file_write_tool() -> Tool:
 
 
 __all__ = ["IDENTIFIER", "MANIFEST", "FileWriteTool", "build_file_write_tool"]
+
+
+# ── Plugin manifest setup ─────────────────────────────────────
+
+
+from pydantic import BaseModel, ConfigDict  # noqa: E402
+
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402
+
+
+class Config(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+
+@plugin(
+    id="lca-tool-file-write",
+    provides=["tools.file_write"],
+    requires=["tools"],
+    implements=["Tool"],
+    layer="L1",
+    effects="tools",
+    description="file_write Tool — Creator §13.3 file/shell primitive",
+    test_suite="tests/test_cordis_creator_real_scenario.py",
+    kind=PluginKind.PRIMITIVE,
+)
+async def setup(ctx: PluginContext, config: Config) -> None:
+    """把 file_write Tool 注册到 tools 服务（供单 port cordis-creator 使用）。
+
+    同 :mod:`lca.plugins.tools.bash` 的 setup 模式。
+    """
+    tool = build_file_write_tool()
+    if tool is not None:
+        ctx.inject("tools").register(tool)

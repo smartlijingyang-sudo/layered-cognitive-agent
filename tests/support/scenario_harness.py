@@ -56,6 +56,7 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "lca-state-store-provider",
         "lca-search-provider",
         "lca-tools-provider",
+        "lca-composer-provider",
         "lca-transport-provider",
         "lca-skills-provider",
         "lca-file-store-provider",

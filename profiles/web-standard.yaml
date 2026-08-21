@@ -1,10 +1,13 @@
 # web-standard profile — default deployment configuration.
 # Bundles: base (Tier-1 services + Tier-2 providers) + web-app (Tier-3 behaviors)
+# + scenario-cordis-creator（Creator §13.3 工具集注册到全局 tools 服务，
+# 但启用受 model=cordis-creator 请求触发 + RoleProfile.tool_permission_manifest 闸控）。
 # LLM secrets are owned by lca-llm-resolver (loads project .env at setup).
 
 bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
 
 patch:
   - id: lca-llm-resolver

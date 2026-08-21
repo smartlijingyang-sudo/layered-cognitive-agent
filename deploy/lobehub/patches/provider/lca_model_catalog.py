@@ -60,6 +60,13 @@ const LCA_CATALOG: EnabledProviderWithModels[] = [
         displayName: 'Auto',
         id: 'auto',
       },
+      {
+        abilities: { functionCall: true, vision: true },
+        contextWindowTokens: 1_000_000,
+        description: 'Creator §13.3 — agent self-authors plugins and persists them.',
+        displayName: 'Creator',
+        id: 'cordis-creator',
+      },
     ],
     id: LCA_CHAT_PROVIDER,
     name: 'LCA',

@@ -29,3 +29,35 @@ __all__ = [
     "CordisControlTool",
     "build_cordis_control_tool",
 ]
+
+
+# ── Plugin manifest setup ─────────────────────────────────────
+# This sub-package is referenced as ``$module: lca.plugins.tools.cordis_control``
+# by ``bundles/scenario-cordis-creator.yaml``；provide a no-op setup that
+# registers the plugin metadata so the resolve path finds a callable.
+# The actual Tool is built via :func:`build_cordis_control_tool` at Agent
+# composition time (after the Composer is constructed).
+
+
+from pydantic import BaseModel, ConfigDict
+
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+
+@plugin(
+    id="lca-tool-cordis-control",
+    provides=["tools.cordis_control"],
+    implements=["Tool"],
+    layer="L1",
+    effects="world",
+    description="cordis_control Tool — Creator §13.3 control plane",
+    test_suite="tests/test_cordis_creator_e2e.py",
+    kind=PluginKind.PRIMITIVE,
+)
+async def setup(ctx: PluginContext, config: Config) -> None:
+    """cordis_control Tool is consumed at Agent construction time; this
+    setup is a no-op that only registers the plugin metadata."""

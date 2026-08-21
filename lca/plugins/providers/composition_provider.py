@@ -55,7 +55,8 @@ class Config(BaseModel):
 
 @plugin(
     id="lca-composer-provider",
-    requires=["composer.compose_factory"],
+    provides=["composer.compose_factory"],
+    requires=[],
     implements=["Composer"],
     layer="L0",
     effects="world",

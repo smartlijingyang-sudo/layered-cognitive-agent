@@ -175,3 +175,44 @@ def build_bash_tool() -> Tool:
 
 
 __all__ = ["IDENTIFIER", "MANIFEST", "BashTool", "build_bash_tool"]
+
+
+# ── Plugin manifest setup ─────────────────────────────────────
+# This module is referenced as ``$module: lca.plugins.tools.bash`` by
+# ``bundles/scenario-cordis-creator.yaml``；provide a no-op setup that
+# registers the tool with the tools service so the resolve path
+# finds a callable. The actual tool is consumed via ``build_bash_tool()``
+# in the Agent composition path; this setup merely keeps the resolved
+# plugin graph well-formed.
+
+
+from pydantic import BaseModel, ConfigDict  # noqa: E402
+
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402
+
+
+class Config(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+
+@plugin(
+    id="lca-tool-bash",
+    provides=["tools.bash"],
+    requires=["tools"],
+    implements=["Tool"],
+    layer="L1",
+    effects="tools",
+    description="bash Tool — Creator §13.3 file/shell primitive",
+    test_suite="tests/test_cordis_creator_real_scenario.py",
+    kind=PluginKind.PRIMITIVE,
+)
+async def setup(ctx: PluginContext, config: Config) -> None:
+    """把 bash Tool 注册到 tools 服务（供单 port cordis-creator 使用）。
+
+    web-standard profile booted 后，scenario-cordis-creator bundle 激活
+    本 plugin；本 setup 把 bash Tool 实例塞进 ``tools.compose_service``，
+    让 _build_cordis_creator_agent 通过 materialize() 拿到它。
+    """
+    tool = build_bash_tool()
+    if tool is not None:
+        ctx.inject("tools").register(tool)
