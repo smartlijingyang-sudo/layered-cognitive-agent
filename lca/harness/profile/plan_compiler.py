@@ -127,7 +127,11 @@ def compile_plan(
         actor_grant=tuple(opts.acl_grants),
         include_disabled=opts.include_disabled,
     )
-    declarative.validation_report.require_valid()
+    # 只有显式选择了 PhaseExecutor 的 Profile 才是可运行的 ADR-0075
+    # cognitive graph，必须 fail-closed。迁移/结构测试 Profile 仍生成 v2
+    # projection 与诊断，但不会被误认为可执行 runtime plan。
+    if declarative.phase_bindings:
+        declarative.validation_report.require_valid()
 
     return CompiledRunPlan(
         profile_path=resolved.profile_path,

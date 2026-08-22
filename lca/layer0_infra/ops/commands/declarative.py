@@ -58,6 +58,32 @@ def register(app: typer.Typer) -> None:
         if strict and not report["valid"]:
             raise typer.Exit(1)
 
+    @plan_app.callback(invoke_without_command=True)
+    def plan_compat(
+        ctx: typer.Context,
+        subcommand: str | None = typer.Option(
+            None,
+            "--sub",
+            "-s",
+            help="Compatibility alias: list-templates",
+        ),
+        json_mode: bool = typer.Option(False, "--json", help="输出 JSON"),
+    ) -> None:
+        """兼容 ADR-0074 的 ``plan [--sub] list-templates`` 入口。"""
+        if ctx.invoked_subcommand is not None:
+            return
+        selected = subcommand or "list-templates"
+        if selected != "list-templates":
+            _fail(f"plan: unsupported compatibility command: {selected}")
+        _emit_plan_templates(json_mode=json_mode)
+
+    @plan_app.command("list-templates")
+    def plan_list_templates(
+        json_mode: bool = typer.Option(False, "--json", help="输出 JSON"),
+    ) -> None:
+        """列出既有标准 PlanTemplate（兼容命令）。"""
+        _emit_plan_templates(json_mode=json_mode)
+
     @plan_app.command("compile")
     def plan_compile(
         profile: Path = typer.Argument(..., help="Profile YAML"),
@@ -118,6 +144,31 @@ def register(app: typer.Typer) -> None:
         emit_report(report, json_mode=json_mode)
         if report["violations"]:
             raise typer.Exit(1)
+
+
+def _emit_plan_templates(*, json_mode: bool) -> None:
+    from lca.contracts.atoms.plan_template import (
+        all_plan_template_ids,
+        plan_template_to_dict,
+        standard_plan_templates,
+    )
+
+    templates = standard_plan_templates()
+    payload = {
+        "count": len(templates),
+        "template_ids": [template.value for template in all_plan_template_ids()],
+        "templates": [plan_template_to_dict(template) for template in templates],
+    }
+    if json_mode:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    typer.echo(f"PlanTemplate count: {payload['count']}")
+    for template in templates:
+        typer.echo(
+            f"  {template.template_id}: {template.name} ({template.scope.value}) — "
+            f"{len(template.relations)} relations, {len(template.control_slots)} slots, "
+            f"{len(template.required_groups)} groups"
+        )
 
 
 def explain_declarative_plan(profile: Path) -> dict[str, Any]:

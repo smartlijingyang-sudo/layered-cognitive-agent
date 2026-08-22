@@ -14,6 +14,7 @@ SPEC = standard_phase_spec(
     plugin_id="phase.remember.standard",
     phase=SemanticPhase.REMEMBER,
     module="lca.plugins.phase_executors.remember",
+    effects=("memory",),
 )
 
 

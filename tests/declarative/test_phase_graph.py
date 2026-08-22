@@ -7,6 +7,8 @@ import pytest
 from lca.contracts.protocols.declarative_phase_graph import (
     PhaseEdge,
     PhaseGraphValidator,
+    PhaseInput,
+    PhaseResult,
     PluginRelation,
     RelationType,
     SemanticPhase,
@@ -87,3 +89,47 @@ async def test_generic_interpreter_runs_only_from_phase_bindings(standard_plan) 
     result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
     assert [visit.semantic_phase for visit in result.visits] == list(SemanticPhase)
     assert result.terminal_node == "stop.main"
+
+
+class _PrepareContribution:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def execute(self, _context, input: PhaseInput) -> PhaseResult:
+        self.calls += 1
+        return PhaseResult(result_kind="context", payload={"prepared": input.artifact})
+
+
+@pytest.mark.asyncio
+async def test_prepare_contribution_is_resolved_and_executed(standard_plan) -> None:
+    from lca.contracts.protocols.declarative_phase_graph import ContributionRole, PhaseContribution
+
+    prepare = _PrepareContribution()
+    bindings = tuple(
+        replace(
+            binding,
+            contributions=(
+                PhaseContribution(
+                    phase=SemanticPhase.PERCEIVE,
+                    role=ContributionRole.PREPARE,
+                    executor="contribution.prepare.fixture",
+                    output="prepared.context",
+                    order=0,
+                ),
+            ),
+        )
+        if binding.semantic_phase is SemanticPhase.PERCEIVE
+        else binding
+        for binding in standard_plan.phase_bindings
+    )
+    plan = replace(standard_plan, phase_bindings=bindings)
+    capabilities = {
+        f"phase.{phase.value}.standard": StandardPhaseExecutor(phase)
+        for phase in SemanticPhase
+    }
+    capabilities["contribution.prepare.fixture"] = prepare
+    executable = GraphAssembler().assemble(plan, MappingRestrictedScope(capabilities))
+
+    await GenericPlanInterpreter().run(executable, state={"immutable": True})
+
+    assert prepare.calls == 1

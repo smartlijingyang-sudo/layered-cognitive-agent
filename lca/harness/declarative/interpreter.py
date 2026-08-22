@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from lca.contracts.protocols.command_envelope import RunDelta, RunFact
 from lca.contracts.protocols.declarative_phase_graph import (
+    ContributionRole,
     DeclarativeValidationError,
     EffectGateway,
     JournalCommitter,
+    PhaseContext,
     PhaseInput,
     PhaseResult,
     SemanticPhase,
@@ -21,7 +23,7 @@ from lca.harness.declarative.assembler import ExecutablePlan
 
 
 @dataclass(slots=True)
-class InMemoryJournalCommitter:
+class InMemoryJournalCommitter(JournalCommitter):
     """无外部 Journal 时可用的确定性 committer，主要供测试和纯驱动使用。"""
 
     facts: list[RunFact] = field(default_factory=list)
@@ -42,7 +44,7 @@ class InMemoryJournalCommitter:
 
 
 @dataclass(slots=True)
-class RestrictedPhaseContext:
+class RestrictedPhaseContext(PhaseContext):
     """MTK 创建的最小阶段上下文；不持有可透传的 live scope。"""
 
     plan_ref: str
@@ -56,7 +58,7 @@ class RestrictedPhaseContext:
     _proposed_deltas: list[RunDelta] = field(default_factory=list)
 
     def emit_fact(self, fact: RunFact) -> str:
-        return self.journal.commit_fact(fact, plan_ref=self.plan_ref, node_ref=self.node_ref)
+        return str(self.journal.commit_fact(fact, plan_ref=self.plan_ref, node_ref=self.node_ref))
 
     def propose_delta(self, delta: RunDelta) -> None:
         self._proposed_deltas.append(delta)
@@ -142,18 +144,35 @@ class GenericPlanInterpreter:
                 capabilities=capabilities,
                 tracing=tracing,
             )
-            result = await executable_node.executor.execute(context, current_input)
+            prepared_input = await self._prepare_input(executable_node, context, current_input)
+            result = await executable_node.executor.execute(context, prepared_input)
             if not isinstance(result, PhaseResult):
                 raise DeclarativeValidationError("RT-002", f"executor returned non-PhaseResult: {node.id}")
             self._validate_result(node.semantic_phase, result)
+            result = await self._apply_post_contributions(
+                executable_node,
+                context,
+                result,
+            )
+            self._validate_result(node.semantic_phase, result)
+            phase_fact = RunFact(
+                fact_id=f"{plan_ref}:{node.id}:{visit_counts[node.id]}",
+                plan_ref=plan_ref,
+                kind="phase.result",
+                payload={
+                    "node": node.id,
+                    "semantic_phase": node.semantic_phase.value,
+                    "result_kind": result.result_kind,
+                },
+            )
+            self._journal.commit_fact(phase_fact, plan_ref=plan_ref, node_ref=node.id)
+            facts.append(phase_fact)
             for fact in result.facts:
                 self._journal.commit_fact(fact, plan_ref=plan_ref, node_ref=node.id)
                 facts.append(fact)
             for evidence_ref in result.evidence_refs:
                 self._journal.commit_evidence(evidence_ref, plan_ref=plan_ref, node_ref=node.id)
-            deltas = (*result.deltas, *context.proposed_deltas)
-            for delta in deltas:
-                current_state = self._apply_delta(current_state, delta)
+            effect_receipt = None
             if result.command_envelope is not None:
                 if self._effect_gateway is None:
                     raise DeclarativeValidationError("PG-003", "effectful result has no EffectGateway")
@@ -161,17 +180,21 @@ class GenericPlanInterpreter:
                     raise DeclarativeValidationError("PS-006", "effectful result has no EffectPolicy")
                 if result.command_envelope.plan_ref != plan_ref:
                     raise DeclarativeValidationError("RT-003", "CommandEnvelope plan_ref does not match run plan")
-                observation = await self._effect_gateway.execute(result.command_envelope, plan.effect_policy)
-                self._journal.commit_observation(observation, plan_ref=plan_ref, node_ref=node.id)
-                artifact_map["observation"] = observation
+                effect_receipt = await self._effect_gateway.execute(result.command_envelope, plan.effect_policy)
+                self._journal.commit_observation(effect_receipt, plan_ref=plan_ref, node_ref=node.id)
+                artifact_map["observation"] = effect_receipt
+            deltas = (*result.deltas, *context.proposed_deltas)
+            for delta in deltas:
+                current_state = self._apply_delta(current_state, delta)
+            effective_payload = result.payload if result.payload is not None else effect_receipt
             artifact_map["result"] = result
-            artifact_map["payload"] = result.payload
-            artifact_map[node.semantic_phase.value] = result.payload
+            artifact_map["payload"] = effective_payload
+            artifact_map[node.semantic_phase.value] = effective_payload
             if node.terminal and _terminal_result(result):
                 visits.append(PhaseVisit(node.id, node.semantic_phase, result.result_kind, None))
                 return InterpretationResult(
                     state=current_state,
-                    artifact=result.payload,
+                    artifact=effective_payload,
                     visits=tuple(visits),
                     facts=tuple(facts),
                     terminal_node=node.id,
@@ -185,7 +208,68 @@ class GenericPlanInterpreter:
                 raise DeclarativeValidationError("PG-007", f"loop edge budget exhausted: {edge.source}->{edge.target}")
             visits.append(PhaseVisit(node.id, node.semantic_phase, result.result_kind, edge.target))
             current_id = edge.target
-            current_input = PhaseInput(artifact=result.payload, causation_refs=result.evidence_refs)
+            current_input = PhaseInput(artifact=effective_payload, causation_refs=result.evidence_refs)
+
+    async def _prepare_input(
+        self,
+        executable_node: Any,
+        context: RestrictedPhaseContext,
+        input: PhaseInput,
+    ) -> PhaseInput:
+        prepared = input
+        for contribution in executable_node.contributions:
+            if contribution.declaration.role is not ContributionRole.PREPARE:
+                continue
+            outcome = await contribution.executor.execute(context, prepared)
+            self._require_contribution_result(contribution.declaration.executor, outcome)
+            if outcome.command_envelope is not None:
+                raise DeclarativeValidationError("PG-003", "prepare contribution may not execute an effect")
+            if outcome.payload is not None:
+                prepared = PhaseInput(artifact=outcome.payload, causation_refs=outcome.evidence_refs)
+        return prepared
+
+    async def _apply_post_contributions(
+        self,
+        executable_node: Any,
+        context: RestrictedPhaseContext,
+        result: PhaseResult,
+    ) -> PhaseResult:
+        combined = result
+        for contribution in executable_node.contributions:
+            role = contribution.declaration.role
+            if role is ContributionRole.PREPARE:
+                continue
+            outcome = await contribution.executor.execute(
+                context,
+                PhaseInput(artifact=combined.payload, causation_refs=combined.evidence_refs),
+            )
+            self._require_contribution_result(contribution.declaration.executor, outcome)
+            if role is ContributionRole.GOVERN and not _verdict_allows(outcome.payload):
+                raise DeclarativeValidationError(
+                    "RT-002",
+                    f"govern contribution denied phase execution: {contribution.declaration.executor}",
+                )
+            if role in {ContributionRole.TRANSFORM, ContributionRole.FINALIZE} and outcome.payload is not None:
+                combined = replace(
+                    combined,
+                    result_kind=outcome.result_kind,
+                    payload=outcome.payload,
+                    command_envelope=outcome.command_envelope or combined.command_envelope,
+                )
+            combined = replace(
+                combined,
+                facts=(*combined.facts, *outcome.facts),
+                deltas=(*combined.deltas, *outcome.deltas),
+                evidence_refs=(*combined.evidence_refs, *outcome.evidence_refs),
+            )
+        return combined
+
+    @staticmethod
+    def _require_contribution_result(capability: str, outcome: Any) -> None:
+        if not isinstance(outcome, PhaseResult):
+            raise DeclarativeValidationError(
+                "RT-002", f"contribution returned non-PhaseResult: {capability}"
+            )
 
     def _apply_delta(self, state: Any, delta: RunDelta) -> Any:
         if self._reducer is None:
@@ -223,6 +307,17 @@ class GenericPlanInterpreter:
             if _evaluate_predicate(edge.when, result=result, artifacts=artifacts):
                 return edge
         return None
+
+
+def _verdict_allows(payload: Any) -> bool:
+    if isinstance(payload, Mapping):
+        if "allowed" in payload:
+            return bool(payload["allowed"])
+        if "verdict" in payload:
+            return str(payload["verdict"]).lower() in {"allow", "allowed", "authorized", "ok"}
+    if isinstance(payload, bool):
+        return payload
+    return True
 
 
 def _terminal_result(result: PhaseResult) -> bool:

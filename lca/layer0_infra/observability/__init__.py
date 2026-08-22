@@ -131,6 +131,7 @@ from lca.layer0_infra.observability.journal import (
 )
 from lca.layer0_infra.observability.journal.backends import InMemoryJournalStore
 from lca.layer0_infra.observability.journal.journal_io import read_journal, stamped_to_record
+from lca.layer0_infra.observability.journal.serialization import stamped_to_journal_record
 from lca.layer0_infra.observability.langfuse_conventions import (
     FRAMEWORK_TAG,
     LANGFUSE_ENVIRONMENT,
@@ -150,6 +151,8 @@ from lca.layer0_infra.observability.narrative import plan_steps_joined
 from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
 from lca.layer0_infra.observability.projection_registry import EventProjection, ProjectionRegistry
 from lca.layer0_infra.observability.run_context import (
+    TEAM_CONTAINER_ROLE,
+    adopt_run_scope,
     get_current_run_scope,
     run_scope,
 )
@@ -185,6 +188,7 @@ __all__ = [
     "OBSERVATION_TYPE_AGENT",
     "OBSERVATION_TYPE_GENERATION",
     "OBSERVATION_TYPE_TOOL",
+    "TEAM_CONTAINER_ROLE",
     "ActionDegraded",
     "AgentRunFinished",
     "AgentRunStarted",
@@ -260,6 +264,7 @@ __all__ = [
     "UnknownEventDescriptorError",
     "UnregisteredJournalEventError",
     "Verbosity",
+    "adopt_run_scope",
     "annotate",
     "bind",
     "bind_backends",
@@ -292,6 +297,7 @@ __all__ = [
     "set_actor",
     "set_session",
     "span",
+    "stamped_to_journal_record",
     "stamped_to_record",
     "team_id_for",
     "traced",

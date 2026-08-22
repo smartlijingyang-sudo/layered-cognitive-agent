@@ -763,11 +763,11 @@ def declarative_plan_hash(value: Any) -> str:
 
 
 def plugin_spec_to_dict(spec: PluginSpec) -> dict[str, Any]:
-    return cast(dict[str, Any], _canonicalize(spec))
+    return cast("dict[str, Any]", _canonicalize(spec))
 
 
 def phase_graph_to_dict(graph: CognitivePhaseGraphPlan) -> dict[str, Any]:
-    return cast(dict[str, Any], _canonicalize(graph))
+    return cast("dict[str, Any]", _canonicalize(graph))
 
 
 def validation_report_to_dict(report: ValidationReport) -> dict[str, Any]:

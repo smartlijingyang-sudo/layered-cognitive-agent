@@ -34,11 +34,17 @@ class MappingRestrictedScope:
 
 
 @dataclass(frozen=True, slots=True)
+class ExecutableContribution:
+    declaration: PhaseContribution
+    executor: PhaseExecutor
+
+
+@dataclass(frozen=True, slots=True)
 class ExecutableNode:
     node_id: str
     executor_capability: str
     executor: PhaseExecutor
-    contributions: tuple[PhaseContribution, ...]
+    contributions: tuple[ExecutableContribution, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,16 +79,37 @@ class GraphAssembler:
                         "PS-002",
                         f"capability does not implement PhaseExecutor: {binding.executor_capability}",
                     )
+            contributions: list[ExecutableContribution] = []
+            for contribution in binding.contributions:
+                try:
+                    contribution_executor = scope.resolve(contribution.executor)
+                except KeyError as exc:
+                    raise DeclarativeValidationError(
+                        "PS-002", f"missing assembled contribution capability: {contribution.executor}"
+                    ) from exc
+                execute = getattr(contribution_executor, "execute", None)
+                if not callable(execute):
+                    raise DeclarativeValidationError(
+                        "PS-002",
+                        f"contribution does not implement executable protocol: {contribution.executor}",
+                    )
+                contributions.append(
+                    ExecutableContribution(
+                        declaration=contribution,
+                        executor=contribution_executor,
+                    )
+                )
             nodes[binding.node_id] = ExecutableNode(
                 node_id=binding.node_id,
                 executor_capability=binding.executor_capability,
                 executor=executor,
-                contributions=binding.contributions,
+                contributions=tuple(contributions),
             )
         return ExecutablePlan(plan=plan, nodes=nodes)
 
 
 __all__ = [
+    "ExecutableContribution",
     "ExecutableNode",
     "ExecutablePlan",
     "GraphAssembler",

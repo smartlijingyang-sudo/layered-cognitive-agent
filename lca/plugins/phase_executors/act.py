@@ -14,6 +14,7 @@ SPEC = standard_phase_spec(
     plugin_id="phase.act.standard",
     phase=SemanticPhase.ACT,
     module="lca.plugins.phase_executors.act",
+    effects=("tools",),
 )
 
 

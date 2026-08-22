@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
+from importlib import import_module
 from typing import Any, Literal
 
 from lca.contracts.atoms.ids import RunId, TraceId
@@ -954,8 +955,35 @@ def _scope_from_dict(payload: Mapping[str, object]) -> RunScope:
     )
 
 
+def run_scope(scope: RunScope):
+    """兼容导出：经 observability 包根转发唯一 RunScope 实现。"""
+
+    facade = import_module("lca.layer0_infra.observability")
+    return getattr(facade, "run_scope")(scope)
+
+
+def get_current_run_scope() -> RunScope | None:
+    """兼容导出：读取当前环境的唯一 RunScope。"""
+
+    facade = import_module("lca.layer0_infra.observability")
+    return getattr(facade, "get_current_run_scope")()
+
+
+def stamped_to_journal_record(
+    stamped: StampedEvent,
+    **kwargs: object,
+) -> JournalRecord:
+    """兼容导出：将 Journal 账本事件投影为 v2 JournalRecord。"""
+
+    facade = import_module("lca.layer0_infra.observability")
+    return getattr(facade, "stamped_to_journal_record")(stamped, **kwargs)
+
+
 __all__ = [
     "Causation",
     "DescriptorRef",
     "JournalRecord",
+    "get_current_run_scope",
+    "run_scope",
+    "stamped_to_journal_record",
 ]

@@ -8,13 +8,20 @@ from typing import Any
 
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.result import Result
-from lca.contracts.protocols.command_envelope import RunDelta
+from lca.contracts.protocols.command_envelope import CommandEnvelope, RunDelta, RunFact
+from lca.contracts.protocols.declarative_phase_graph import (
+    DeclarativeValidationError,
+    EffectGateway,
+    EffectPolicyPlan,
+    JournalCommitter,
+)
 from lca.contracts.protocols.plan import CompiledRunPlan
 from lca.harness.declarative import (
     GenericPlanInterpreter,
     GraphAssembler,
     MappingRestrictedScope,
 )
+from lca.layer0_infra.observability import record_runtime
 from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
 
 
@@ -27,6 +34,92 @@ class RuntimePhaseCapabilities:
     memory: Any
     perceive_hub: Any
     stop_rule: Any
+
+
+class RuntimeJournalCommitter(JournalCommitter):
+    """将通用解释器产生的事实写入当前已绑定的正式 Journal backend。"""
+
+    def __init__(self) -> None:
+        self._sequence = 0
+
+    def commit_fact(self, fact: RunFact, *, plan_ref: str, node_ref: str) -> str:
+        return self._record(
+            operation="phase.fact",
+            source=node_ref,
+            plan_ref=plan_ref,
+            attributes={"fact_id": fact.fact_id, "kind": fact.kind, "payload": dict(fact.payload)},
+        )
+
+    def commit_evidence(self, evidence_ref: str, *, plan_ref: str, node_ref: str) -> str:
+        return self._record(
+            operation="phase.evidence",
+            source=node_ref,
+            plan_ref=plan_ref,
+            attributes={"evidence_ref": evidence_ref},
+        )
+
+    def commit_observation(self, observation: Any, *, plan_ref: str, node_ref: str) -> str:
+        return self._record(
+            operation="effect.receipt",
+            source=node_ref,
+            plan_ref=plan_ref,
+            attributes={"observation_type": type(observation).__name__, "observation": observation},
+        )
+
+    def _record(
+        self,
+        *,
+        operation: str,
+        source: str,
+        plan_ref: str,
+        attributes: Mapping[str, Any],
+    ) -> str:
+        self._sequence += 1
+        stamped = record_runtime(
+            "journal",
+            operation,
+            plugin=source,
+            attributes={"plan_ref": plan_ref, **dict(attributes)},
+        )
+        event_id = getattr(stamped, "event_id", "") if stamped is not None else ""
+        return event_id or f"{plan_ref}:{source}:{operation}:{self._sequence}"
+
+
+class RuntimeEffectGateway(EffectGateway):
+    """声明式运行时唯一允许调用 body/memory 的受控 effect handler。"""
+
+    def __init__(self, capabilities: RuntimePhaseCapabilities) -> None:
+        self._capabilities = capabilities
+
+    async def execute(self, envelope: CommandEnvelope, policy: EffectPolicyPlan) -> Any:
+        metadata = envelope.metadata
+        effect_class = str(metadata.get("effect_class", envelope.grant.effect_class))
+        if effect_class not in policy.allowed_effects:
+            raise DeclarativeValidationError("PS-006", f"effect class is denied by plan: {effect_class}")
+        if effect_class in policy.idempotency_required and not envelope.idempotency_key:
+            raise DeclarativeValidationError("PS-006", "effect requires an idempotency key")
+        if effect_class in policy.approval_required and not bool(metadata.get("approved", False)):
+            raise DeclarativeValidationError("PS-006", f"effect requires approval: {effect_class}")
+        operation = metadata.get("operation")
+        if operation == "body.act":
+            state = metadata.get("state")
+            decision = metadata.get("decision")
+            if state is None or decision is None:
+                raise DeclarativeValidationError("RT-002", "body effect lacks state or recorded Decision")
+            return await self._capabilities.body.act(decision, state)
+        if operation == "memory.update":
+            state = metadata.get("state")
+            observation = metadata.get("observation")
+            reflection = metadata.get("reflection")
+            if state is None or observation is None or reflection is None:
+                raise DeclarativeValidationError("RT-002", "memory effect lacks admitted WriteSet inputs")
+            await self._capabilities.memory.update(state, observation, reflection)
+            return {
+                "receipt": "memory.updated",
+                "idempotency_key": envelope.idempotency_key,
+                "plan_ref": envelope.plan_ref,
+            }
+        raise DeclarativeValidationError("PG-003", f"undeclared effect operation: {operation}")
 
 
 class ReducerDeltaAdapter:
@@ -82,7 +175,9 @@ class DeclarativeRuntimeDriver:
             MappingRestrictedScope(self._phase_executors),
         )
         interpretation = await GenericPlanInterpreter(
-            reducer=ReducerDeltaAdapter(self._reducer)
+            journal=RuntimeJournalCommitter(),
+            effect_gateway=RuntimeEffectGateway(self._capabilities),
+            reducer=ReducerDeltaAdapter(self._reducer),
         ).run(
             executable,
             state=state,
@@ -98,4 +193,10 @@ class DeclarativeRuntimeDriver:
         return Result.from_state(final_state)
 
 
-__all__ = ["DeclarativeRuntimeDriver", "ReducerDeltaAdapter", "RuntimePhaseCapabilities"]
+__all__ = [
+    "DeclarativeRuntimeDriver",
+    "ReducerDeltaAdapter",
+    "RuntimeEffectGateway",
+    "RuntimeJournalCommitter",
+    "RuntimePhaseCapabilities",
+]

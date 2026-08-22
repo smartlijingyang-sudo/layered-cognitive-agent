@@ -283,7 +283,7 @@ class PipelineSafeExecutor(SafeExecutor):
             command_envelope_to_dict,
             mint_envelope,
         )
-        from lca.layer0_infra.observability.run_context import get_current_run_scope
+        from lca.layer0_infra.observability import get_current_run_scope
 
         current_scope = get_current_run_scope()
         scope_ref = (

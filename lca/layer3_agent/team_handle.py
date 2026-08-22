@@ -18,17 +18,15 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.protocols import AgentUnit, TeamStrategy, TeamUnit
 from lca.layer0_infra.observability import (
     BoundObservability,
+    TEAM_CONTAINER_ROLE,
     TeamTraceProfile,
+    adopt_run_scope,
     bind_backends,
     objective_preview,
     plan_steps_joined,
     record,
-    set_session,
-)
-from lca.layer0_infra.observability.run_context import (
-    TEAM_CONTAINER_ROLE,
-    adopt_run_scope,
     run_scope,
+    set_session,
 )
 
 

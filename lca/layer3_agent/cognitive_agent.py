@@ -30,14 +30,12 @@ from lca.contracts.protocols import AgentUnit, Runtime
 from lca.contracts.protocols.capabilities import HasHooks
 from lca.layer0_infra.observability import (
     BoundObservability,
+    adopt_run_scope,
     bind_backends,
     objective_preview,
     record,
-    set_session,
-)
-from lca.layer0_infra.observability.run_context import (
-    adopt_run_scope,
     run_scope,
+    set_session,
 )
 from lca.layer0_infra.workspace import effective_agent_wall_clock, get_run_workspace
 

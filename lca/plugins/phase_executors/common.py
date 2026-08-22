@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.command_envelope import RunDelta
+from lca.contracts.protocols.command_envelope import CapabilityGrant, RunDelta, mint_envelope
 from lca.contracts.protocols.declarative_phase_graph import (
     CapabilityDeclaration,
     ContributionRole,
@@ -15,6 +15,7 @@ from lca.contracts.protocols.declarative_phase_graph import (
     LifecycleDeclaration,
     OwnershipDeclaration,
     PhaseContribution,
+    PhaseExecutor,
     PhaseInput,
     PhaseResult,
     PluginConfiguration,
@@ -31,7 +32,7 @@ class StandardPhaseConfig(BaseModel):
 
 
 @dataclass(frozen=True, slots=True)
-class StandardPhaseExecutor:
+class StandardPhaseExecutor(PhaseExecutor):
     """安全的最小 PhaseExecutor。
 
     它用于 Null / smoke Profile：不读取 live Context、不产生世界效果，并返回可由
@@ -80,8 +81,21 @@ class StandardPhaseExecutor:
             decision = context.artifacts.get("think")
             if body is None or decision is None:
                 return _fallback(self.phase, input)
-            observation = await body.act(decision, context.state)
-            return PhaseResult(result_kind="observation", payload=observation)
+            envelope = mint_envelope(
+                plan_ref=context.plan_ref,
+                scope_ref=context.node_ref,
+                decision=decision,
+                provider="effect.body",
+                grant=CapabilityGrant(capability="body.act", scope="run", effect_class="tools"),
+                idempotency_key=f"{context.plan_ref}:{context.node_ref}:{decision.decision_id}",
+                metadata={
+                    "effect_class": "tools",
+                    "operation": "body.act",
+                    "state": context.state,
+                    "decision": decision,
+                },
+            )
+            return PhaseResult(result_kind="observation", command_envelope=envelope)
         if self.phase is SemanticPhase.REFLECT:
             brain = _capability(capabilities, "brain")
             observation = context.artifacts.get("act")
@@ -96,10 +110,25 @@ class StandardPhaseExecutor:
             reflection = context.artifacts.get("reflect")
             if memory is None or decision is None or observation is None or reflection is None:
                 return _fallback(self.phase, input)
-            await memory.update(context.state, observation, reflection)
+            envelope = mint_envelope(
+                plan_ref=context.plan_ref,
+                scope_ref=context.node_ref,
+                decision=decision,
+                provider="effect.memory",
+                grant=CapabilityGrant(capability="memory.update", scope="run", effect_class="memory"),
+                idempotency_key=f"{context.plan_ref}:{context.node_ref}:{decision.decision_id}",
+                metadata={
+                    "effect_class": "memory",
+                    "operation": "memory.update",
+                    "state": context.state,
+                    "observation": observation,
+                    "reflection": reflection,
+                },
+            )
             return PhaseResult(
                 result_kind="write_set",
                 payload={"admitted": True},
+                command_envelope=envelope,
                 deltas=(
                     RunDelta(
                         plan_ref=context.plan_ref,
