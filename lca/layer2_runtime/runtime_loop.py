@@ -17,17 +17,14 @@ from collections.abc import Mapping
 
 import structlog
 
-from lca.contracts.atoms.control_slot import ControlSlot
-from lca.contracts.atoms.enums import ActionType, HookEvent, SnapshotReason
+from lca.contracts.atoms.enums import ActionType, HookEvent
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY
-from lca.contracts.models.core.decision import Decision, Observation, Reflection, ToolCall, Turn
-from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.contracts.models.core.result import ApprovalPendingError, BudgetExceededError, Result
+from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
+from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import AgentState, StateSnapshot
-from lca.contracts.models.core.stop import StopDecision, StopReason
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import (
     Body,
@@ -39,20 +36,9 @@ from lca.contracts.protocols import (
     StateStore,
     StopRule,
 )
-from lca.contracts.protocols.control_plan import ControlPlan
 from lca.contracts.protocols.plan import CompiledRunPlan
 from lca.contracts.protocols.reducer import LoopTopology
 from lca.layer0_infra.observability import get_span_context
-from lca.layer0_infra.skills.activation_scope import get_newly_activated
-from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
-
-from lca.layer2_runtime.control_runtime import (
-    ControlEvaluation,
-    ControlSelection,
-    ControlVerdictKind,
-    aggregate_control_verdicts,
-    select_control_entries,
-)
 from lca.layer2_runtime.loop_topology import ClosedSetTopology
 from lca.layer2_runtime.reducer import DefaultReducer
 
@@ -125,26 +111,30 @@ class CognitiveRuntime(Runtime):
         if ctx and ctx.extra.get(PRIOR_CONVERSATION_WM_KEY):
             state.extra[PRIOR_CONVERSATION_WM_KEY] = ctx.extra[PRIOR_CONVERSATION_WM_KEY]
         await self.hooks.trigger(HookEvent.ON_START.value, state)
-        if self.compiled_plan is not None and self.phase_executors:
-            from lca.layer2_runtime.declarative_runtime import (
-                DeclarativeRuntimeDriver,
-                RuntimePhaseCapabilities,
+        if self.compiled_plan is None or not self.phase_executors:
+            raise ValueError(
+                "CognitiveRuntime requires a compiled_plan and phase_executors. "
+                "Legacy runtime loop has been removed (ADR-0074/0075 declarative cutover)."
             )
+        
+        from lca.layer2_runtime.declarative_runtime import (
+            DeclarativeRuntimeDriver,
+            RuntimePhaseCapabilities,
+        )
 
-            return await DeclarativeRuntimeDriver(
-                plan=self.compiled_plan,
-                phase_executors=self.phase_executors,
-                capabilities=RuntimePhaseCapabilities(
-                    brain=self.brain,
-                    body=self.body,
-                    memory=self.memory,
-                    perceive_hub=self.perceive_hub,
-                    stop_rule=self.stop_rule,
-                ),
-                reducer=self.reducer,
-                hooks=self.hooks,
-            ).run(state)
-        return await self._loop(state, max_steps)
+        return await DeclarativeRuntimeDriver(
+            plan=self.compiled_plan,
+            phase_executors=self.phase_executors,
+            capabilities=RuntimePhaseCapabilities(
+                brain=self.brain,
+                body=self.body,
+                memory=self.memory,
+                perceive_hub=self.perceive_hub,
+                stop_rule=self.stop_rule,
+            ),
+            reducer=self.reducer,
+            hooks=self.hooks,
+        ).run(state)
 
     async def resume(
         self,
@@ -174,267 +164,46 @@ class CognitiveRuntime(Runtime):
             turn = Turn(decision=answer_decision, observation=answer_obs)
         state = self.reducer.apply_resume(state, input, turn)
         
-        # 检查是否有声明式 cursor，如果有则委托给 declarative driver
+        # 检查是否有声明式 cursor，委托给 declarative driver
         phase_cursor = getattr(state, "phase_cursor", None)
-        if phase_cursor is not None and self.compiled_plan is not None:
-            from lca.layer2_runtime.declarative_runtime import (
-                DeclarativeCheckpoint,
-                DeclarativeRuntimeDriver,
-                RuntimePhaseCapabilities,
+        if phase_cursor is None or self.compiled_plan is None:
+            raise ValueError(
+                "CognitiveRuntime.resume requires a declarative phase_cursor and compiled_plan. "
+                "Legacy runtime loop has been removed (ADR-0074/0075 declarative cutover)."
             )
-            
-            checkpoint = DeclarativeCheckpoint(
-                state_snapshot=snapshot,
-                cursor=phase_cursor,
-                plan_ref=phase_cursor.plan_ref,
-            )
-            
-            # 构建 phase executors 映射
-            phase_executors = {}
-            if self.phase_executors:
-                phase_executors.update(self.phase_executors)
-            
-            capabilities = RuntimePhaseCapabilities(
-                brain=self.brain,
-                body=self.body,
-                memory=self.memory,
-                perceive_hub=self.perceive_hub,
-                stop_rule=self.stop_rule,
-            )
-            
-            return await DeclarativeRuntimeDriver(
-                plan=self.compiled_plan,
-                phase_executors=phase_executors,
-                capabilities=capabilities,
-                reducer=self.reducer,
-                hooks=self.hooks,
-            ).resume(checkpoint)
         
-        # 没有声明式 plan，回退到旧循环（Task 6 将删除此回退）
-        return await self._loop(state, max_steps)
-
-    def select_control(self, slot: ControlSlot, state: AgentState) -> ControlSelection | None:
-        """返回当前阶段激活的控制投稿；诊断调用不改变运行时。"""
-        if self.control_plan is None:
-            return None
-        return select_control_entries(self.control_plan, slot, state)
-
-
-
-    async def _loop(self, state: AgentState, max_steps: int) -> Result:
-        """六步闭集编排（ADR-0066）。
-
-        state mutation 经 ``self.reducer``；hook 触发直接调
-        ``self.hooks.trigger(hook_name, state, **kwargs)``。
-        """
-        decision = observation = reflection = None
-        for step in range(state.step, max_steps):
-            state = self.reducer.apply_step_advanced(state, step)
-            try:
-                # ── Phase 1: Perceive (PR3a — Hub is the SOLE emitter) ──
-                perceive_control = self.evaluate_control(ControlSlot.PERCEIVE_CONTEXT, state)
-                if _must_stop(perceive_control):
-                    return await self._finish_control_stop(state, perceive_control)
-                await self.hooks.trigger(HookEvent.PRE_PERCEIVE.value, state)
-                manifest = await self.perceive_hub.perceive(state)
-                state = self.reducer.apply_perception(state, manifest)
-                await self.hooks.trigger(HookEvent.POST_PERCEIVE.value, state)
-                # ── Phase 2: Think ──
-                self.evaluate_control(ControlSlot.THINK_GUARD, state)
-                await self.hooks.trigger(HookEvent.PRE_THINK.value, state)
-                decision = await self.brain.think(state)
-                think_control = self.evaluate_control(
-                    ControlSlot.THINK_GUARD, state, decision=decision
-                )
-                if _must_stop(think_control):
-                    return await self._finish_control_stop(state, think_control)
-                await self.hooks.trigger(HookEvent.POST_THINK.value, state, decision=decision)
-                # ── Phase 3: Act ──
-                act_evaluations = tuple(
-                    self.evaluate_control(slot, state, decision=decision)
-                    for slot in (
-                        ControlSlot.ACT_AUTHORIZE,
-                        ControlSlot.ACT_BUDGET,
-                        ControlSlot.ACT_CONSTRAIN,
-                        ControlSlot.ACT_EXECUTE,
-                        ControlSlot.ACT_SAFE_BOUNDARY,
-                    )
-                )
-                await self.hooks.trigger(HookEvent.PRE_ACT.value, state, decision=decision)
-                terminal_act = next(
-                    (evaluation for evaluation in act_evaluations if _must_stop(evaluation)), None
-                )
-                if terminal_act is not None:
-                    return await self._finish_control_stop(state, terminal_act)
-                blocking_act = next(
-                    (evaluation for evaluation in act_evaluations if _is_blocking(evaluation)), None
-                )
-                observation = (
-                    _control_denied_observation(decision, blocking_act)
-                    if blocking_act is not None
-                    else await self.body.act(decision, state)
-                )
-                await self.hooks.trigger(
-                    HookEvent.POST_ACT.value, state, decision=decision, observation=observation
-                )
-                # ── Phase 3.5: Sync activation state (PR5) ──
-                state = self.reducer.apply_activation(state, _drain_newly_activated(state))
-                # ── Phase 4: Reflect ──
-                await self.hooks.trigger(
-                    HookEvent.PRE_REFLECT.value, state, observation=observation
-                )
-                reflection = await self.brain.reflect(state, observation)
-                await self.hooks.trigger(HookEvent.POST_REFLECT.value, state, reflection=reflection)
-                # ── Phase 5: Record + Remember ──
-                turn = Turn(decision=decision, observation=observation, reflection=reflection)
-                state = self.reducer.apply_turn(state, turn)
-                remember_control = self.evaluate_control(
-                    ControlSlot.REMEMBER_ADMIT,
-                    state,
-                    decision=decision,
-                    observation=observation,
-                    reflection=reflection,
-                )
-                if not _is_blocking(remember_control):
-                    await self.memory.update(state, observation, reflection)
-                state = self.reducer.apply_memory(state, None)
-            except ApprovalPendingError as exc:
-                snap = await self._checkpoint(state, reason=SnapshotReason.PRE_APPROVAL)
-                state = self.reducer.apply_paused(state, snap.state_ref)
-                await self.hooks.trigger(HookEvent.ON_PAUSE.value, state)
-                result = Result.from_state(state)
-                result.extra["state_snapshot"] = snap
-                result.extra["approval_request"] = exc.approval_request
-                return result
-            except Exception as err:
-                _log.exception("unexpected_loop_error", step=step, error=str(err))
-                await self.hooks.trigger(HookEvent.ON_ERROR.value, state, error=err)
-                state = self.reducer.apply_error(state, err)
-                await self._checkpoint(state, reason=SnapshotReason.ON_ERROR)
-                break
-            # ── Phase 6: Checkpoint + Stop ──
-            await self._checkpoint(state)
-            stop_control = self.evaluate_control(
-                ControlSlot.STOP_DECIDE,
-                state,
-                decision=decision,
-                observation=observation,
-                reflection=reflection,
-            )
-            stop = (
-                _control_stop_decision(stop_control)
-                if _must_stop(stop_control)
-                else self.stop_rule.decide(state, decision, observation, reflection)
-            )
-            state = self.reducer.apply_stop(state, stop)
-            if stop.should_stop:
-                if stop.reason == StopReason.BUDGET_EXCEEDED:
-                    await self.hooks.trigger(
-                        HookEvent.ON_ERROR.value, state, error=BudgetExceededError()
-                    )
-                break
-        await self.hooks.trigger(HookEvent.ON_COMPLETE.value, state)
-        state = self.reducer.apply_artifact_closure(state, synthesize_artifact_closure() or "")
-        return Result.from_state(state)
-
-    async def _checkpoint(
-        self, state: AgentState, reason: SnapshotReason = SnapshotReason.PERIODIC
-    ) -> StateSnapshot:
-        self.evaluate_control(
-            ControlSlot.OBSERVE_CHECKPOINT,
-            state,
-            checkpoint_reason=reason,
+        from lca.layer2_runtime.declarative_runtime import (
+            DeclarativeCheckpoint,
+            DeclarativeRuntimeDriver,
+            RuntimePhaseCapabilities,
         )
-        self.evaluate_control(
-            ControlSlot.OBSERVE_WILDCARD,
-            state,
-            checkpoint_reason=reason,
+        
+        checkpoint = DeclarativeCheckpoint(
+            state_snapshot=snapshot,
+            cursor=phase_cursor,
+            plan_ref=phase_cursor.plan_ref,
         )
-        checkpoint_count = len(state.checkpoints)
-        snap = state.snapshot(reason=reason)
-        try:
-            ref = await self.state_store.save(state)
-        except BaseException:
-            if len(state.checkpoints) == checkpoint_count + 1 and state.checkpoints[-1] is snap:
-                state.checkpoints.pop()
-            raise
-        snap.state_ref = ref
-        return snap
-
-    async def _finish_control_stop(
-        self,
-        state: AgentState,
-        evaluation: ControlEvaluation | None,
-    ) -> Result:
-        """Fold a terminal control verdict through Reducer and return a final result."""
-        state = self.reducer.apply_stop(state, _control_stop_decision(evaluation))
-        await self._checkpoint(state, reason=SnapshotReason.ON_ERROR)
-        await self.hooks.trigger(HookEvent.ON_COMPLETE.value, state)
-        state = self.reducer.apply_artifact_closure(state, synthesize_artifact_closure() or "")
-        return Result.from_state(state)
-
-
-def _is_blocking(evaluation: ControlEvaluation | None) -> bool:
-    return evaluation is not None and evaluation.is_blocking
-
-
-def _must_stop(evaluation: ControlEvaluation | None) -> bool:
-    return (
-        evaluation is not None
-        and evaluation.blocking_verdict is not None
-        and evaluation.blocking_verdict.kind is ControlVerdictKind.STOP
-    )
-
-
-def _control_stop_decision(evaluation: ControlEvaluation | None) -> StopDecision:
-    effective = evaluation.blocking_verdict if evaluation is not None else None
-    detail = effective.detail if effective is not None else "control stopped run"
-    reason = (
-        StopReason.BUDGET_EXCEEDED
-        if effective is not None and effective.kind is ControlVerdictKind.EXHAUSTED
-        else StopReason.ERROR
-    )
-    return StopDecision(
-        should_stop=True,
-        reason=reason,
-        final_output=detail,
-        status=TaskStatus.FAILED,
-    )
-
-
-def _control_denied_observation(
-    decision: Decision,
-    evaluation: ControlEvaluation,
-) -> Observation:
-    effective = evaluation.blocking_verdict
-    if effective is None:
-        raise ValueError("blocking control evaluation has no blocking verdict")
-    return Observation(
-        observation_id=new_id("obs"),
-        success=False,
-        payload=None,
-        error=f"control {evaluation.selection.slot.value} {effective.kind.value}: {effective.detail}",
-        extra={
-            "control_slot": evaluation.selection.slot.value,
-            "control_plugin": effective.plugin_id,
-            "control_verdict": effective.kind.value,
-            "decision_id": decision.decision_id,
-        },
-    )
-
-
-def _drain_newly_activated(state: AgentState) -> tuple:
-    """Drain the contextvar activation scope into a tuple."""
-    from lca.contracts.models.core.activation import ActivatedSkill
-
-    return tuple(
-        ActivatedSkill(
-            skill_id=s.skill_id,
-            name=s.name,
-            activated_at_step=state.step,
+        
+        # 构建 phase executors 映射
+        phase_executors = {}
+        if self.phase_executors:
+            phase_executors.update(self.phase_executors)
+        
+        capabilities = RuntimePhaseCapabilities(
+            brain=self.brain,
+            body=self.body,
+            memory=self.memory,
+            perceive_hub=self.perceive_hub,
+            stop_rule=self.stop_rule,
         )
-        for s in get_newly_activated(state.activated_skills)
-    )
+        
+        return await DeclarativeRuntimeDriver(
+            plan=self.compiled_plan,
+            phase_executors=phase_executors,
+            capabilities=capabilities,
+            reducer=self.reducer,
+            hooks=self.hooks,
+        ).resume(checkpoint)
 
 
 __all__ = ["CognitiveRuntime"]
