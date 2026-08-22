@@ -60,6 +60,10 @@ ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `smartlijingyang-sudo`）
 
 完整接受 ADR-0066 §二 Control Slot 定义及 ADR-0074 tracker §19 的 `observe.checkpoint` / `act.safe-boundary` 补充、§三（Manifest control 段三件套：identity / authority / effects）、§四（单调聚合 deny-on-any-deny / deny-on-exhausted / stop-on-any-stop / decision-priority / scope-只收紧）、§七（capability / budget / constraint / approval / stop 的策略-事实-强制点三分）。每个 CompiledRunPlan 必须闭合覆盖 11 槽；未被具体 plugin 声明的槽位由类型化 no-op 投稿承接。
 
+标准 profile 以 12 条具体 ControlEntry 覆盖 11 个槽位：`perceive` 提供 `perceive.context`，两个 think gate 提供 `think.guard`，`body.simple` 提供五个 `act.*` 槽位，`lca-memory-provider` 提供 `remember.admit`，`stop_rule.default` 提供 `stop.decide`，`hook_registry.simple` 提供两个 `observe.*` 槽位。多槽插件以稳定的 `contribution_id` 生成唯一 ControlEntry 身份；标准计划不得退化为 `control.default.*` 投稿。
+
+`DefaultControlPolicyEngine` 仅以阶段已物化的 State、Decision、Observation、Reflection 与 checkpoint reason 生成 verdict。`CognitiveRuntime` 通过 `aggregate_control_verdicts` 消费 verdict：deny 或 exhausted 生成失败 Observation 并跳过 Body，stop 在感知、思考或行动边界经 Reducer 立即结束 run，记忆准入拒绝则跳过 MemorySystem.update。`no_aggregate` 槽位保留所有独立 verdict，同时任何 deny、exhausted、ask_human 或 stop verdict 仍阻断所属阶段。
+
 裁剪 §五 Composer 与 §六 ControlPlan 描述——L4 Composer 拆为 4 个 sub-composer plugin 移交给本地 ADR-0071（Composer-per-Cluster）。
 
 **实施映射**：PR-1 / PR-2 / PR-3 直接对应该 ADR 的 PR-2 / PR-3 / PR-4。

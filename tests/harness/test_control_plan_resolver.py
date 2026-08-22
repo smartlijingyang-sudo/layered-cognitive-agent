@@ -407,8 +407,9 @@ class TestProjectControlPlanClosure:
             "gate.tool-loop-breaker",
         ]
         assert [entry.plugin_id for entry in slot_entries(plan, ControlSlot.ACT_BUDGET)] == [
-            "control.default.act.budget"
+            "body.simple.act-budget"
         ]
+        assert all(not entry.plugin_id.startswith("control.default.") for entry in plan.entries)
         plan_again = project_control_plan(resolved)
         assert plan.plan_hash == plan_again.plan_hash
 

@@ -68,14 +68,22 @@ class ControlEvaluation:
     effective: ControlVerdict | None
 
     @property
-    def is_blocking(self) -> bool:
-        """Whether the effective verdict prevents normal phase progression."""
-        return self.effective is not None and self.effective.kind in {
+    def blocking_verdict(self) -> ControlVerdict | None:
+        """Return the first phase-blocking verdict, including no-aggregate slots."""
+        blocking = {
             ControlVerdictKind.DENY,
             ControlVerdictKind.EXHAUSTED,
             ControlVerdictKind.STOP,
             ControlVerdictKind.ASK_HUMAN,
         }
+        if self.effective is not None and self.effective.kind in blocking:
+            return self.effective
+        return next((verdict for verdict in self.verdicts if verdict.kind in blocking), None)
+
+    @property
+    def is_blocking(self) -> bool:
+        """Whether any independent or aggregated verdict blocks this phase."""
+        return self.blocking_verdict is not None
 
 
 def select_control_entries(

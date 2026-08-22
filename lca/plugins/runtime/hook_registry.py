@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import HookEvent
 from lca.contracts.capabilities import HOOKS
 from lca.contracts.protocols import HookRegistry
@@ -12,6 +13,30 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
+
+
+_OBSERVE_CONTROL: tuple[dict, ...] = (
+    {
+        "contribution_id": "hook_registry.simple.observe-checkpoint",
+        "slot": ControlSlot.OBSERVE_CHECKPOINT.value,
+        "order": 10,
+        "failure_mode": "ignore",
+        "effect_class": "none",
+        "reads": ["state.step", "checkpoint.reason"],
+        "emits": ["policy.observe.checkpoint"],
+        "authority": ("checkpoint.write",),
+    },
+    {
+        "contribution_id": "hook_registry.simple.observe-wildcard",
+        "slot": ControlSlot.OBSERVE_WILDCARD.value,
+        "order": 20,
+        "failure_mode": "ignore",
+        "effect_class": "none",
+        "reads": ["state.status"],
+        "emits": ["policy.observe.wildcard"],
+        "authority": ("observe.read",),
+    },
+)
 
 
 def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
@@ -40,6 +65,7 @@ def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
     description="Register CordisHookRegistry factory as hooks['simple'].",
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
+    control=_OBSERVE_CONTROL,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

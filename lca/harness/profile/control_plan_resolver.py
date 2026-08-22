@@ -251,9 +251,14 @@ def _parse_control_entry(
     )
 
     activation = _parse_activation(plugin, idx, raw.get("activation"))
+    contribution_id = raw.get("contribution_id", plugin.id)
+    if not isinstance(contribution_id, str) or not contribution_id.strip():
+        raise ControlPlanResolveError(
+            f"plugin {plugin.id}: control[{idx}].contribution_id must be a non-empty string"
+        )
 
     return ControlEntry(
-        plugin_id=plugin.id,
+        plugin_id=contribution_id,
         slot=slot,
         activation=activation,
         order=int(raw.get("order", 100)),
