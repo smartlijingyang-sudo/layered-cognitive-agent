@@ -13,7 +13,7 @@ from collections import defaultdict, deque
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import Any, Literal, Protocol, cast, runtime_checkable
 
 from lca.contracts.protocols.command_envelope import CommandEnvelope, RunDelta, RunFact
 
@@ -310,6 +310,59 @@ class ValidationReport:
         if self.errors:
             first = self.errors[0]
             raise DeclarativeValidationError(first.code, first.message)
+
+
+@dataclass(frozen=True, slots=True)
+class DeclarativeRunOutcome:
+    """ADR-0075 Task 3: 声明式运行结果的标准类型。
+
+    将所有执行路径（完成、暂停、失败、效果不确定）收敛为统一的 outcome 类型,
+    而不是抛出异常或返回模糊的 Result 对象。
+    """
+
+    kind: Literal["completed", "paused", "failed", "effect_uncertain"]
+    cursor: PhaseRunCursor
+    stop: Any  # StopDecision - imported lazily to avoid circular dependency
+    error_fact: Any | None = None  # RunFact - optional error fact for failed/effect_uncertain
+
+    def __post_init__(self) -> None:
+        if self.kind not in {"completed", "paused", "failed", "effect_uncertain"}:
+            raise DeclarativeValidationError(
+                "PG-009",
+                f"outcome kind must be one of: completed, paused, failed, effect_uncertain; got {self.kind!r}",
+            )
+        if not isinstance(self.cursor, PhaseRunCursor):
+            raise DeclarativeValidationError("PG-009", "outcome must carry a PhaseRunCursor")
+
+
+@dataclass(frozen=True, slots=True)
+class PhaseRunCursor:
+    """ADR-0075 Task 2: 可持久化的阶段运行游标。
+
+    捕获解释器执行位置，用于 checkpoint 和 resume。所有字段必须可序列化，
+    不包含 live Context 引用。
+    """
+
+    plan_ref: str
+    node_id: str
+    visit_counts: tuple[tuple[str, int], ...]
+    edge_counts: tuple[tuple[str, str, int], ...]
+    artifacts: dict[str, Any]
+    causation_refs: tuple[str, ...]
+    budget_snapshot: dict[str, Any]
+
+    def __post_init__(self) -> None:
+        if not self.plan_ref:
+            raise DeclarativeValidationError("PG-008", "cursor plan_ref must be non-empty")
+        if not self.node_id:
+            raise DeclarativeValidationError("PG-008", "cursor node_id must be non-empty")
+        # Ensure tuples are immutable
+        if not isinstance(self.visit_counts, tuple):
+            object.__setattr__(self, "visit_counts", tuple(self.visit_counts))
+        if not isinstance(self.edge_counts, tuple):
+            object.__setattr__(self, "edge_counts", tuple(self.edge_counts))
+        if not isinstance(self.causation_refs, tuple):
+            object.__setattr__(self, "causation_refs", tuple(self.causation_refs))
 
 
 @dataclass(frozen=True, slots=True)
@@ -913,6 +966,7 @@ __all__ = [
     "PhaseInput",
     "PhaseNode",
     "PhaseResult",
+    "PhaseRunCursor",
     "PlanProvenance",
     "PluginConfiguration",
     "PluginImplementation",

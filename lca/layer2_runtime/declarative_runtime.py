@@ -14,6 +14,7 @@ from lca.contracts.protocols.declarative_phase_graph import (
     EffectGateway,
     EffectPolicyPlan,
     JournalCommitter,
+    PhaseRunCursor,
 )
 from lca.contracts.protocols.plan import CompiledRunPlan
 from lca.harness.declarative import (
@@ -23,6 +24,15 @@ from lca.harness.declarative import (
 )
 from lca.layer0_infra.observability import record_runtime
 from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
+
+
+@dataclass(frozen=True, slots=True)
+class DeclarativeCheckpoint:
+    """声明式恢复所需的 checkpoint 数据"""
+
+    state_snapshot: Any
+    cursor: PhaseRunCursor
+    plan_ref: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,8 +202,55 @@ class DeclarativeRuntimeDriver:
         )
         return Result.from_state(final_state)
 
+    async def resume(self, checkpoint: DeclarativeCheckpoint) -> Result:
+        """从 checkpoint 恢复执行
+
+        Args:
+            checkpoint: 包含 cursor 和 plan_ref 的恢复点
+
+        Returns:
+            Result: 执行结果
+
+        Raises:
+            DeclarativeValidationError: 如果 plan_ref 不匹配
+        """
+        # 验证 plan_ref 匹配
+        if checkpoint.plan_ref != self._plan.plan_hash:
+            raise DeclarativeValidationError(
+                "PG-008",
+                f"plan_ref mismatch: checkpoint.plan_ref ({checkpoint.plan_ref}) != plan.plan_hash ({self._plan.plan_hash})"
+            )
+
+        # 组装可执行计划
+        executable = GraphAssembler().assemble(
+            self._plan,
+            MappingRestrictedScope(self._phase_executors),
+        )
+
+        # 使用 interpreter 的 resume 方法
+        interpreter = GenericPlanInterpreter(
+            journal=RuntimeJournalCommitter(),
+            effect_gateway=RuntimeEffectGateway(self._capabilities),
+            reducer=ReducerDeltaAdapter(self._reducer),
+        )
+
+        interpretation = await interpreter.resume(
+            executable,
+            state=checkpoint.state_snapshot.state,
+            cursor=checkpoint.cursor,
+        )
+
+        # 映射 interpretation 到 Result
+        final_state = interpretation.state
+        await self._hooks.trigger("on_complete", final_state)
+        final_state = self._reducer.apply_artifact_closure(
+            final_state, synthesize_artifact_closure() or ""
+        )
+        return Result.from_state(final_state)
+
 
 __all__ = [
+    "DeclarativeCheckpoint",
     "DeclarativeRuntimeDriver",
     "ReducerDeltaAdapter",
     "RuntimeEffectGateway",

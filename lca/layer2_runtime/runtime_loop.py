@@ -180,6 +180,44 @@ class CognitiveRuntime(Runtime):
             )
             turn = Turn(decision=answer_decision, observation=answer_obs)
         state = self.reducer.apply_resume(state, input, turn)
+        
+        # 检查是否有声明式 cursor，如果有则委托给 declarative driver
+        phase_cursor = getattr(state, "phase_cursor", None)
+        if phase_cursor is not None and self.compiled_plan is not None:
+            from lca.layer2_runtime.declarative_runtime import (
+                DeclarativeCheckpoint,
+                DeclarativeRuntimeDriver,
+                RuntimePhaseCapabilities,
+            )
+            
+            checkpoint = DeclarativeCheckpoint(
+                state_snapshot=snapshot,
+                cursor=phase_cursor,
+                plan_ref=phase_cursor.plan_ref,
+            )
+            
+            # 构建 phase executors 映射
+            phase_executors = {}
+            if self.phase_executors:
+                phase_executors.update(self.phase_executors)
+            
+            capabilities = RuntimePhaseCapabilities(
+                brain=self.brain,
+                body=self.body,
+                memory=self.memory,
+                perceive_hub=self.perceive_hub,
+                stop_rule=self.stop_rule,
+            )
+            
+            return await DeclarativeRuntimeDriver(
+                plan=self.compiled_plan,
+                phase_executors=phase_executors,
+                capabilities=capabilities,
+                reducer=self.reducer,
+                hooks=self.hooks,
+            ).resume(checkpoint)
+        
+        # 回退到旧循环（将在 Task 6 中删除）
         return await self._loop(state, max_steps)
 
     def select_control(self, slot: ControlSlot, state: AgentState) -> ControlSelection | None:

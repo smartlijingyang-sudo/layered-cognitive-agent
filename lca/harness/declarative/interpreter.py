@@ -10,15 +10,18 @@ from typing import Any
 from lca.contracts.protocols.command_envelope import RunDelta, RunFact
 from lca.contracts.protocols.declarative_phase_graph import (
     ContributionRole,
+    DeclarativeRunOutcome,
     DeclarativeValidationError,
     EffectGateway,
     JournalCommitter,
     PhaseContext,
     PhaseInput,
     PhaseResult,
+    PhaseRunCursor,
     SemanticPhase,
 )
 from lca.contracts.protocols.plan import compiled_run_plan_ref
+from lca.contracts.models.core.result import ApprovalPendingError
 from lca.harness.declarative.assembler import ExecutablePlan
 
 
@@ -83,6 +86,8 @@ class InterpretationResult:
     visits: tuple[PhaseVisit, ...]
     facts: tuple[RunFact, ...]
     terminal_node: str
+    cursor: PhaseRunCursor | None = None
+    outcome: DeclarativeRunOutcome | None = None
 
 
 class GenericPlanInterpreter:
@@ -110,105 +115,289 @@ class GenericPlanInterpreter:
         artifacts: Mapping[str, Any] | None = None,
         tracing: Any = None,
     ) -> InterpretationResult:
+        """Execute the plan from the beginning."""
+        return await self._drive(
+            executable,
+            state=state,
+            input=input,
+            budget=budget,
+            capabilities=capabilities,
+            artifacts=artifacts,
+            tracing=tracing,
+            resume_cursor=None,
+        )
+
+    async def resume(
+        self,
+        executable: ExecutablePlan,
+        *,
+        state: Any,
+        cursor: PhaseRunCursor,
+        input: PhaseInput | None = None,
+        budget: Any = None,
+        capabilities: Any = None,
+        tracing: Any = None,
+    ) -> InterpretationResult:
+        """Resume execution from a saved cursor position."""
+        plan = executable.plan
+        if not plan.phase_graph:
+            raise DeclarativeValidationError("PG-001", "plan has no phase graph")
+        plan.validation_report.require_valid()
+        
+        # Validate cursor belongs to this plan
+        expected_plan_ref = compiled_run_plan_ref(plan)
+        if cursor.plan_ref != expected_plan_ref:
+            raise DeclarativeValidationError(
+                "PG-008",
+                f"cursor plan_ref {cursor.plan_ref!r} does not match executable plan {expected_plan_ref!r}",
+            )
+        
+        return await self._drive(
+            executable,
+            state=state,
+            input=input,
+            budget=budget,
+            capabilities=capabilities,
+            artifacts=dict(cursor.artifacts),
+            tracing=tracing,
+            resume_cursor=cursor,
+        )
+
+    async def _drive(
+        self,
+        executable: ExecutablePlan,
+        *,
+        state: Any,
+        input: PhaseInput | None,
+        budget: Any,
+        capabilities: Any,
+        artifacts: Mapping[str, Any] | None,
+        tracing: Any,
+        resume_cursor: PhaseRunCursor | None,
+    ) -> InterpretationResult:
         plan = executable.plan
         if not plan.phase_graph:
             raise DeclarativeValidationError("PG-001", "plan has no phase graph")
         plan.validation_report.require_valid()
         graph = plan.phase_graph
         node_by_id = {node.id: node for node in graph.nodes}
-        current_id = graph.entry
-        current_input = input or PhaseInput()
+        
+        # Resume from cursor or start from entry
+        if resume_cursor is not None:
+            current_id = resume_cursor.node_id
+            visit_counts: dict[str, int] = dict(resume_cursor.visit_counts)
+            edge_counts: dict[tuple[str, str], int] = dict(
+                (k, v) for k, v in resume_cursor.edge_counts
+            )
+            artifact_map = dict(resume_cursor.artifacts)
+            current_input = input or PhaseInput(
+                artifact=artifact_map.get("payload"),
+                causation_refs=resume_cursor.causation_refs,
+            )
+        else:
+            current_id = graph.entry
+            visit_counts = {}
+            edge_counts = {}
+            artifact_map = dict(artifacts or {})
+            current_input = input or PhaseInput()
+        
         current_state = state
-        visit_counts: dict[str, int] = {}
-        edge_counts: dict[tuple[str, str], int] = {}
         facts: list[RunFact] = []
         visits: list[PhaseVisit] = []
-        artifact_map = dict(artifacts or {})
         plan_ref = compiled_run_plan_ref(plan)
 
-        while True:
-            node = node_by_id.get(current_id)
-            executable_node = executable.nodes.get(current_id)
-            if node is None or executable_node is None:
-                raise DeclarativeValidationError("PG-001", f"unassembled phase node: {current_id}")
-            visit_counts[current_id] = visit_counts.get(current_id, 0) + 1
-            if visit_counts[current_id] > node.max_visits:
-                raise DeclarativeValidationError("PG-007", f"node visit budget exhausted: {current_id}")
-            context = RestrictedPhaseContext(
+        def _build_cursor(node_id: str, evidence_refs: tuple[str, ...] = ()) -> PhaseRunCursor:
+            """Helper to build cursor at current execution point."""
+            return PhaseRunCursor(
                 plan_ref=plan_ref,
-                node_ref=node.id,
-                state=current_state,
-                journal=self._journal,
-                budget=budget,
-                artifacts=artifact_map,
-                capabilities=capabilities,
-                tracing=tracing,
+                node_id=node_id,
+                visit_counts=tuple(sorted(visit_counts.items())),
+                edge_counts=tuple(((k[0], k[1]), v) for k, v in edge_counts.items()),
+                artifacts=dict(artifact_map),
+                causation_refs=evidence_refs,
+                budget_snapshot={"step": 0},
             )
-            prepared_input = await self._prepare_input(executable_node, context, current_input)
-            result = await executable_node.executor.execute(context, prepared_input)
-            if not isinstance(result, PhaseResult):
-                raise DeclarativeValidationError("RT-002", f"executor returned non-PhaseResult: {node.id}")
-            self._validate_result(node.semantic_phase, result)
-            result = await self._apply_post_contributions(
-                executable_node,
-                context,
-                result,
+
+        def _build_stop_decision(should_stop: bool = True) -> Any:
+            """Build minimal stop decision for outcome."""
+            from lca.contracts.models.core.stop import StopDecision, StopReason
+            return StopDecision(
+                should_stop=should_stop,
+                reason=StopReason.TASK_COMPLETED if should_stop else StopReason.CONTINUE,
+                final_output=None,
             )
-            self._validate_result(node.semantic_phase, result)
-            phase_fact = RunFact(
-                fact_id=f"{plan_ref}:{node.id}:{visit_counts[node.id]}",
-                plan_ref=plan_ref,
-                kind="phase.result",
-                payload={
-                    "node": node.id,
-                    "semantic_phase": node.semantic_phase.value,
-                    "result_kind": result.result_kind,
-                },
-            )
-            self._journal.commit_fact(phase_fact, plan_ref=plan_ref, node_ref=node.id)
-            facts.append(phase_fact)
-            for fact in result.facts:
-                self._journal.commit_fact(fact, plan_ref=plan_ref, node_ref=node.id)
-                facts.append(fact)
-            for evidence_ref in result.evidence_refs:
-                self._journal.commit_evidence(evidence_ref, plan_ref=plan_ref, node_ref=node.id)
-            effect_receipt = None
-            if result.command_envelope is not None:
-                if self._effect_gateway is None:
-                    raise DeclarativeValidationError("PG-003", "effectful result has no EffectGateway")
-                if plan.effect_policy is None:
-                    raise DeclarativeValidationError("PS-006", "effectful result has no EffectPolicy")
-                if result.command_envelope.plan_ref != plan_ref:
-                    raise DeclarativeValidationError("RT-003", "CommandEnvelope plan_ref does not match run plan")
-                effect_receipt = await self._effect_gateway.execute(result.command_envelope, plan.effect_policy)
-                self._journal.commit_observation(effect_receipt, plan_ref=plan_ref, node_ref=node.id)
-                artifact_map["observation"] = effect_receipt
-            deltas = (*result.deltas, *context.proposed_deltas)
-            for delta in deltas:
-                current_state = self._apply_delta(current_state, delta)
-            effective_payload = result.payload if result.payload is not None else effect_receipt
-            artifact_map["result"] = result
-            artifact_map["payload"] = effective_payload
-            artifact_map[node.semantic_phase.value] = effective_payload
-            if node.terminal and _terminal_result(result):
-                visits.append(PhaseVisit(node.id, node.semantic_phase, result.result_kind, None))
-                return InterpretationResult(
+
+        try:
+            while True:
+                node = node_by_id.get(current_id)
+                executable_node = executable.nodes.get(current_id)
+                if node is None or executable_node is None:
+                    raise DeclarativeValidationError("PG-001", f"unassembled phase node: {current_id}")
+                visit_counts[current_id] = visit_counts.get(current_id, 0) + 1
+                if visit_counts[current_id] > node.max_visits:
+                    raise DeclarativeValidationError("PG-007", f"node visit budget exhausted: {current_id}")
+                context = RestrictedPhaseContext(
+                    plan_ref=plan_ref,
+                    node_ref=node.id,
                     state=current_state,
-                    artifact=effective_payload,
-                    visits=tuple(visits),
-                    facts=tuple(facts),
-                    terminal_node=node.id,
+                    journal=self._journal,
+                    budget=budget,
+                    artifacts=artifact_map,
+                    capabilities=capabilities,
+                    tracing=tracing,
                 )
-            edge = self._select_edge(graph.edges, node.id, result, artifact_map)
-            if edge is None:
-                raise DeclarativeValidationError("PG-006", f"no validated next edge from node: {node.id}")
-            key = (edge.source, edge.target)
-            edge_counts[key] = edge_counts.get(key, 0) + 1
-            if edge.loop and edge_counts[key] > edge.loop.max_iterations:
-                raise DeclarativeValidationError("PG-007", f"loop edge budget exhausted: {edge.source}->{edge.target}")
-            visits.append(PhaseVisit(node.id, node.semantic_phase, result.result_kind, edge.target))
-            current_id = edge.target
-            current_input = PhaseInput(artifact=effective_payload, causation_refs=result.evidence_refs)
+                prepared_input = await self._prepare_input(executable_node, context, current_input)
+                result = await executable_node.executor.execute(context, prepared_input)
+                if not isinstance(result, PhaseResult):
+                    raise DeclarativeValidationError("RT-002", f"executor returned non-PhaseResult: {node.id}")
+                self._validate_result(node.semantic_phase, result)
+                result = await self._apply_post_contributions(
+                    executable_node,
+                    context,
+                    result,
+                )
+                self._validate_result(node.semantic_phase, result)
+                phase_fact = RunFact(
+                    fact_id=f"{plan_ref}:{node.id}:{visit_counts[node.id]}",
+                    plan_ref=plan_ref,
+                    kind="phase.result",
+                    payload={
+                        "node": node.id,
+                        "semantic_phase": node.semantic_phase.value,
+                        "result_kind": result.result_kind,
+                    },
+                )
+                self._journal.commit_fact(phase_fact, plan_ref=plan_ref, node_ref=node.id)
+                facts.append(phase_fact)
+                for fact in result.facts:
+                    self._journal.commit_fact(fact, plan_ref=plan_ref, node_ref=node.id)
+                    facts.append(fact)
+                for evidence_ref in result.evidence_refs:
+                    self._journal.commit_evidence(evidence_ref, plan_ref=plan_ref, node_ref=node.id)
+                effect_receipt = None
+                if result.command_envelope is not None:
+                    if self._effect_gateway is None:
+                        raise DeclarativeValidationError("PG-003", "effectful result has no EffectGateway")
+                    if plan.effect_policy is None:
+                        raise DeclarativeValidationError("PS-006", "effectful result has no EffectPolicy")
+                    if result.command_envelope.plan_ref != plan_ref:
+                        raise DeclarativeValidationError("RT-003", "CommandEnvelope plan_ref does not match run plan")
+                    effect_receipt = await self._effect_gateway.execute(result.command_envelope, plan.effect_policy)
+                    self._journal.commit_observation(effect_receipt, plan_ref=plan_ref, node_ref=node.id)
+                    artifact_map["observation"] = effect_receipt
+                deltas = (*result.deltas, *context.proposed_deltas)
+                for delta in deltas:
+                    current_state = self._apply_delta(current_state, delta)
+                effective_payload = result.payload if result.payload is not None else effect_receipt
+                artifact_map["result"] = result
+                artifact_map["payload"] = effective_payload
+                artifact_map[node.semantic_phase.value] = effective_payload
+                if node.terminal and _terminal_result(result):
+                    visits.append(PhaseVisit(node.id, node.semantic_phase, result.result_kind, None))
+                    cursor = _build_cursor(node.id, result.evidence_refs)
+                    outcome = DeclarativeRunOutcome(
+                        kind="completed",
+                        cursor=cursor,
+                        stop=_build_stop_decision(should_stop=True),
+                        error_fact=None,
+                    )
+                    return InterpretationResult(
+                        state=current_state,
+                        artifact=effective_payload,
+                        visits=tuple(visits),
+                        facts=tuple(facts),
+                        terminal_node=node.id,
+                        cursor=cursor,
+                        outcome=outcome,
+                    )
+                edge = self._select_edge(graph.edges, node.id, result, artifact_map)
+                if edge is None:
+                    raise DeclarativeValidationError("PG-006", f"no validated next edge from node: {node.id}")
+                key = (edge.source, edge.target)
+                edge_counts[key] = edge_counts.get(key, 0) + 1
+                if edge.loop and edge_counts[key] > edge.loop.max_iterations:
+                    raise DeclarativeValidationError("PG-007", f"loop edge budget exhausted: {edge.source}->{edge.target}")
+                visits.append(PhaseVisit(node.id, node.semantic_phase, result.result_kind, edge.target))
+                current_id = edge.target
+                current_input = PhaseInput(artifact=effective_payload, causation_refs=result.evidence_refs)
+        except ApprovalPendingError as exc:
+            # Capture cursor at failure point and return paused outcome
+            cursor = _build_cursor(current_id)
+            error_fact = RunFact(
+                fact_id=f"{plan_ref}:{current_id}:approval_pending",
+                plan_ref=plan_ref,
+                kind="run.paused",
+                payload={"reason": "approval_pending", "error": str(exc)},
+            )
+            self._journal.commit_fact(error_fact, plan_ref=plan_ref, node_ref=current_id)
+            facts.append(error_fact)
+            outcome = DeclarativeRunOutcome(
+                kind="paused",
+                cursor=cursor,
+                stop=_build_stop_decision(should_stop=False),
+                error_fact=error_fact,
+            )
+            return InterpretationResult(
+                state=current_state,
+                artifact=None,
+                visits=tuple(visits),
+                facts=tuple(facts),
+                terminal_node=current_id,
+                cursor=cursor,
+                outcome=outcome,
+            )
+        except DeclarativeValidationError as exc:
+            # Capture cursor at failure point and return failed outcome
+            cursor = _build_cursor(current_id)
+            error_fact = RunFact(
+                fact_id=f"{plan_ref}:{current_id}:validation_error",
+                plan_ref=plan_ref,
+                kind="run.failed",
+                payload={"reason": "validation_error", "error_code": exc.code, "error": str(exc)},
+            )
+            self._journal.commit_fact(error_fact, plan_ref=plan_ref, node_ref=current_id)
+            facts.append(error_fact)
+            outcome = DeclarativeRunOutcome(
+                kind="failed",
+                cursor=cursor,
+                stop=_build_stop_decision(should_stop=True),
+                error_fact=error_fact,
+            )
+            return InterpretationResult(
+                state=current_state,
+                artifact=None,
+                visits=tuple(visits),
+                facts=tuple(facts),
+                terminal_node=current_id,
+                cursor=cursor,
+                outcome=outcome,
+            )
+        except Exception as exc:
+            # Capture cursor at failure point and return failed outcome
+            cursor = _build_cursor(current_id)
+            error_fact = RunFact(
+                fact_id=f"{plan_ref}:{current_id}:execution_error",
+                plan_ref=plan_ref,
+                kind="run.failed",
+                payload={"reason": "execution_error", "error": str(exc)},
+            )
+            self._journal.commit_fact(error_fact, plan_ref=plan_ref, node_ref=current_id)
+            facts.append(error_fact)
+            outcome = DeclarativeRunOutcome(
+                kind="failed",
+                cursor=cursor,
+                stop=_build_stop_decision(should_stop=True),
+                error_fact=error_fact,
+            )
+            return InterpretationResult(
+                state=current_state,
+                artifact=None,
+                visits=tuple(visits),
+                facts=tuple(facts),
+                terminal_node=current_id,
+                cursor=cursor,
+                outcome=outcome,
+            )
 
     async def _prepare_input(
         self,
