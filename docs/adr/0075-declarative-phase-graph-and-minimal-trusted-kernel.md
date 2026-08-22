@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Proposed — 2026-08-22**
+**Accepted — 2026-08-22**
 
 Refines: [ADR-0061](0061-plugin-manifest-resolve-boot.md)、[ADR-0066](0066-declarative-atomic-control-plugins.md)、[ADR-0068](0068-compiled-plugin-kernel-and-unified-run-plan.md)、[ADR-0069](0069-agent-primitive-system-and-declarative-grammar.md)、[ADR-0074](0074-plugin-everything-trimmed-implementation.md)。
 
@@ -157,6 +157,12 @@ CI 必须将以下规则作为架构门禁：
 实现必须遵守 [`../specs/declarative-phase-graph-spec.md`](../specs/declarative-phase-graph-spec.md)。该规范定义 `PluginSpec`、`PhaseGraph`、PlanCompiler、通用解释器、协议、错误分类、CLI、迁移和验收测试。
 
 迁移的第一步是修复现有运行范围导入断裂并恢复聚焦测试收集；随后将现有 phase、gate、body、memory 和 stop 路径映射为 explicit PluginSpec。不得以新增平行的第三套 Manifest 或运行计划逃避现有 `CompiledRunPlan`，而应演进其 schema 版本。
+
+**实施状态（2026-08-22 完成）：**
+
+核心声明式路径已完全上线：`CompiledRunPlan` → `GraphAssembler` → `GenericPlanInterpreter` → `RuntimeEffectGateway` 为默认生产路径。Legacy runtime loop、control_policies engine、v1 composer fallback、dual-write 已从生产代码中移除（Tasks 1-6）。Effect idempotency 通过 `RuntimeIdempotencyStore` 实现 at-most-once 语义（Task 7）。Recovery profile 配置为设计文档（`profiles/web-standard-recovery.yaml`），完整 plugin 实现延迟。
+
+验收矩阵已通过 68+ 项测试；Ruff、Mypy、`plugin check --strict`、`plan validate` 与 `audit declarative-boundaries` 均通过。架构守护测试 `test_production_sources_do_not_reference_removed_runtime_modules()` 验证无 legacy 引用。详见 [`0075-implementation-audit.md`](0075-implementation-audit.md)。
 
 ## 替代方案
 
