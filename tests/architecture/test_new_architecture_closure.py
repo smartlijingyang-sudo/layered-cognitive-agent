@@ -63,3 +63,24 @@ def test_creator_action_vocabulary_is_closed() -> None:
         token not in source
         for token in ("dispatch_legacy_action", "actions_mount", "actions_simple")
     )
+
+
+def test_production_sources_do_not_reference_removed_runtime_modules() -> None:
+    """Task 8 Step 1: Verify no production code imports removed legacy modules.
+    
+    ADR-0074/0075 declarative cutover removed:
+    - lca.layer2_runtime.control_policies (Task 5 Part 2)
+    - lca.harness.command.dual_write (Task 6)
+    """
+    source = _python_source()
+    forbidden = (
+        "from lca.layer2_runtime.control_policies",
+        "from lca.layer2_runtime import control_policies",
+        "import lca.layer2_runtime.control_policies",
+        "from lca.harness.command.dual_write",
+        "from lca.harness.command import dual_write",
+        "import lca.harness.command.dual_write",
+    )
+    assert all(
+        token not in source for token in forbidden
+    ), f"Production code still references removed modules: {[t for t in forbidden if t in source]}"
