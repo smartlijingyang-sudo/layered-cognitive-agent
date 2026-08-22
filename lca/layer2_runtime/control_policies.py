@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import ActionType, SnapshotReason
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.gate_policy import GateDecided
+from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols.control_plan import ControlEntry
 from lca.layer2_runtime.control_runtime import (
@@ -112,7 +114,16 @@ class DefaultControlPolicyEngine:
             )
         if not _is_known_action(context.decision):
             return self._verdict(entry, ControlVerdictKind.STOP, "candidate action type is unknown")
-        return self._verdict(entry, ControlVerdictKind.ALLOW, "decision gate contribution accepted")
+        event = _latest_gate_event(entry.plugin_id, context.state)
+        if event is None:
+            return self._verdict(
+                entry, ControlVerdictKind.ALLOW, "decision gate contribution accepted"
+            )
+        kind = _gate_verdict_kind(event)
+        detail = event.rationale or (
+            event.policy_fact.message if event.policy_fact is not None else event.verdict
+        )
+        return self._verdict(entry, kind, detail)
 
     def _act_authorize(
         self,
@@ -229,6 +240,30 @@ class DefaultControlPolicyEngine:
             )
         reason = context.checkpoint_reason.value if context.checkpoint_reason else "periodic"
         return self._verdict(entry, ControlVerdictKind.ALLOW, f"checkpoint is valid: {reason}")
+
+
+_GATE_CONTRIBUTIONS: dict[str, str] = {
+    "gate.repeat-tool-call": "RepeatToolCallGate",
+    "gate.tool-loop-breaker": "ToolLoopBreakerGate",
+}
+
+
+def _latest_gate_event(plugin_id: str, state: AgentState) -> GateDecided | None:
+    """Return the latest typed gate event owned by one concrete contribution."""
+    expected_gate = _GATE_CONTRIBUTIONS.get(plugin_id)
+    if expected_gate is None:
+        return None
+    events = PerceiveState.from_agent_state(state).gate_decided
+    return next((event for event in reversed(events) if event.gate == expected_gate), None)
+
+
+def _gate_verdict_kind(event: GateDecided) -> ControlVerdictKind:
+    """Translate the pre-existing GateDecided vocabulary into ControlVerdict."""
+    if event.verdict == "rewrite" or event.is_rewritten:
+        return ControlVerdictKind.REWRITE
+    if event.verdict == "deny":
+        return ControlVerdictKind.REWRITE
+    return ControlVerdictKind.ALLOW
 
 
 def _is_known_action(decision: Decision) -> bool:

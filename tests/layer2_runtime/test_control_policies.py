@@ -6,7 +6,9 @@ from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import ActionType, ReflectionVerdict
 from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.decision import Decision, Observation, Reflection, ToolCall
+from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.lifecycle import TaskStatus
+from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
 from lca.harness.profile.control_plan_resolver import project_control_plan
 from lca.harness.profile.resolve import resolve_profile
@@ -14,7 +16,11 @@ from lca.layer2_runtime.control_policies import (
     ControlPolicyContext,
     DefaultControlPolicyEngine,
 )
-from lca.layer2_runtime.control_runtime import ControlVerdictKind, select_control_entries
+from lca.layer2_runtime.control_runtime import (
+    ControlVerdictKind,
+    aggregate_control_verdicts,
+    select_control_entries,
+)
 
 
 def _state(*, max_steps: int = 4, used_steps: int = 0) -> AgentState:
@@ -106,6 +112,39 @@ def test_perceive_context_stops_non_working_run(engine: DefaultControlPolicyEngi
     )
 
     assert verdict.kind is ControlVerdictKind.STOP
+
+
+def test_think_guard_projects_recorded_gate_rewrite(
+    engine: DefaultControlPolicyEngine, plan
+) -> None:
+    state = _state()
+    view = PerceiveState.from_agent_state(state)
+    view.gate_decided.append(
+        GateDecided(
+            event_id="gate-loop-break",
+            gate="ToolLoopBreakerGate",
+            verdict="rewrite",
+            is_rewritten=True,
+            rationale="tool loop break",
+            policy_fact=PolicyFact(
+                kind="tool_loop_break",
+                message="stop retrying",
+                source="tool_loop_breaker",
+            ),
+        )
+    )
+    view.commit(state)
+    context = ControlPolicyContext(state=state, decision=_decision())
+    selection = select_control_entries(plan, ControlSlot.THINK_GUARD, state)
+
+    evaluation = aggregate_control_verdicts(selection, engine.evaluate(selection, context))
+
+    assert [verdict.kind for verdict in evaluation.verdicts] == [
+        ControlVerdictKind.ALLOW,
+        ControlVerdictKind.REWRITE,
+    ]
+    assert evaluation.effective is not None
+    assert evaluation.effective.kind is ControlVerdictKind.REWRITE
 
 
 def test_authorize_denies_malformed_tool_action(engine: DefaultControlPolicyEngine, plan) -> None:
