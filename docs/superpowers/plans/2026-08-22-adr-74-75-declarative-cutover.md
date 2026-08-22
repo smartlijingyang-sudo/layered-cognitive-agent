@@ -712,14 +712,56 @@ git commit -m "docs(adr-074-075): record declarative runtime cutover"
 | 8 | `DeclarativeRuntimeDriver.run()` 的 effect gateway 检查幂等键存在性 | 确认：`declarative_runtime.py:100` 只检查 `not envelope.idempotency_key`，无 claim store | Task 7 Step 3 新增 `RuntimeIdempotencyStore` |
 | 9 | `harness_live.py` 引用 | 确认文件存在（`lca/layer4_app/harness_live.py`） | 无需修正 |
 
-## References
+## 8. 风险评估
 
-[1]: `docs/plans/adr-0074-plugin-everything-tracker.md` — ADR-0074 17/17 交付和当前监督状态。
+| 风险 | 影响 | 缓解措施 |
+|---|---|---|
+| 控制聚合语义改变导致行为回归 | 高 | Task 5 使用与旧 engine 完全相同的聚合逻辑（deny-on-any-deny、first-terminal、ordered-rewrite）；删除前先用双轨模式验证新路径输出与旧 engine 一致 |
+| 删除 `_loop()` 后发现未覆盖的边界情况 | 高 | Task 1 已建立 characterization 基线；Task 6 删除前必须确保 characterization 测试全部 GREEN |
+| 生产 Profile 缺少 `CompiledRunPlan` | 中 | Task 6 fail-closed 实施前确认所有生产 profile YAML 已包含声明式 plan；提供 profile 验证脚本 |
+| 幂等 claim store 持久化层引入性能问题 | 低 | Task 7 使用现有 `StateStore` 接口；可回退到内存实现 + 重启去重（不保证跨重启幂等，但保证单次运行内幂等） |
+| ADR-0075 状态更新与实施事实不一致 | 低 | Task 8 明确：只有所有验收矩阵项全绿才能改 Accepted；否则保留 Proposed 并记录未完成项 |
 
-[2]: `docs/adr/0075-implementation-audit.md` — 默认 plan-bound assembly/runtime 的已确认证据与历史补齐记录。
+## 9. 文档更新
 
-[3]: `lca/layer2_runtime/runtime_loop.py` — 当前 `run()` 优先声明式、`resume()` 回落 `_loop()`，以及旧 control/checkpoint/pause/error 实现。
+完成所有任务后需更新：
 
-[4]: `lca/plugins/composer/plan_binding.py` — 当前 declarative capability binding 与非 declarative v1 composer fallback。
+| 文档 | 更新内容 |
+|---|---|
+| `docs/adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md` | 状态从 `Proposed` → `Accepted`（仅当验收矩阵全绿）；更新"后果"章节引用 Task 1-7 的测试命令和 commit hash |
+| `docs/adr/README.md` | ADR-0075 状态标记为 `Accepted` |
+| `docs/plans/adr-0074-plugin-everything-tracker.md` | 追加"ADR-0075 消费切换"监督条目，引用 Task 5-6 的 commit |
+| `docs/specs/declarative-phase-graph-spec.md` | 删除"迁移计划"章节；更新"实施状态"为"已完成" |
 
-[5]: `docs/specs/declarative-phase-graph-spec.md` — MTK、PG-001 至 PG-008、EffectGateway、可恢复失败和 cutover 验收要求。
+**注意**：不伪造历史 PR 状态。若 Task 7 的恢复 e2e 未通过，ADR-0075 保留 `Proposed` 状态。
+
+## 10. 开放问题
+
+**Q1: Task 7 的 `RuntimeIdempotencyStore` 应使用什么持久化后端？**
+- **选项 A**：使用现有 `StateStore` 接口（与 `AgentState` 共用 backend）
+- **选项 B**：使用独立 `EffectReceiptStore` 接口（更隔离但增加复杂度）
+- **建议**：选项 A，减少新增原语；若性能测试发现问题再拆分为选项 B
+
+**Q2: 删除 `dual_write.py` 是否影响外部集成测试？**
+- **答案**：`dual_write.py` 仅在生产路径执行"双轨写入"（legacy + declarative），外部集成测试不依赖它；删除前用 `grep -r "dual_write" tests/` 确认无引用
+
+**Q3: 是否需要提供 `CompiledRunPlan` 生成工具？**
+- **答案**：不需要。现有 `profiles/web-standard.yaml` 已包含声明式 plan；用户通过修改 YAML 调整行为，不需要程序化生成工具
+
+---
+
+## 执行策略
+
+**方法**：使用 `superpowers:subagent-driven-development` 逐任务实施。每个任务由独立 subagent 完成，主 agent 负责：
+1. 分配任务给 subagent
+2. 审查 subagent 提交的代码（spec 合规性、测试覆盖、commit 质量）
+3. 拒绝不合格的实现，要求重新执行
+4. 任务间执行全量门禁（ruff + mypy + pytest + lint-imports + vulture）
+
+**提交边界**：每个任务独立 commit，commit message 引用任务编号和 ADR。
+
+**并行性**：Task 5 和 Task 6 可部分并行（Task 5 创建新模块，Task 6 删除旧模块），但 Task 6 必须在 Task 5 验证 GREEN 后执行删除。
+
+---
+
+**计划完成时间估计**：8 个任务 × 平均 2-3 小时/任务 = 16-24 小时（含测试和门禁验证）。

@@ -71,7 +71,7 @@ async def test_act_budget_exhausted():
     executor = ActBudgetExecutor()
     state = _make_working_state()
     state.budget = Budget(max_steps=0)
-    state.budget.steps_used = 1
+    state.budget.used_steps = 1
     context = MockContext(state)
     result = await executor.execute(context, PhaseInput())
     assert result.payload.kind == ControlVerdictKind.EXHAUSTED
@@ -159,7 +159,7 @@ async def test_stop_decide_stops_on_exhaustion():
     executor = StopDecideExecutor()
     state = _make_working_state()
     state.budget = Budget(max_steps=0)
-    state.budget.steps_used = 1
+    state.budget.used_steps = 1
     context = MockContext(state)
     result = await executor.execute(context, PhaseInput())
     assert result.payload.kind == ControlVerdictKind.STOP
