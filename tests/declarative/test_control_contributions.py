@@ -85,6 +85,8 @@ async def test_act_authorize_allows_valid_tool_action():
     decision = Decision(
         decision_id="d1",
         action_type=ActionType.USE_TOOL,
+        rationale="test",
+        confidence=1.0,
         tool_calls=[ToolCall(call_id="c1", tool_name="bash", arguments={})],
     )
     context = MockContext(state, decision=decision)
@@ -100,6 +102,8 @@ async def test_act_authorize_denies_unnamed_tool():
     decision = Decision(
         decision_id="d1",
         action_type=ActionType.USE_TOOL,
+        rationale="test",
+        confidence=1.0,
         tool_calls=[ToolCall(call_id="c1", tool_name="", arguments={})],
     )
     context = MockContext(state, decision=decision)
@@ -115,6 +119,8 @@ async def test_act_constrain_allows_valid_call_ids():
     decision = Decision(
         decision_id="d1",
         action_type=ActionType.USE_TOOL,
+        rationale="test",
+        confidence=1.0,
         tool_calls=[
             ToolCall(call_id="c1", tool_name="bash", arguments={}),
             ToolCall(call_id="c2", tool_name="ls", arguments={}),
@@ -133,6 +139,8 @@ async def test_act_constrain_denies_duplicate_call_ids():
     decision = Decision(
         decision_id="d1",
         action_type=ActionType.USE_TOOL,
+        rationale="test",
+        confidence=1.0,
         tool_calls=[
             ToolCall(call_id="c1", tool_name="bash", arguments={}),
             ToolCall(call_id="c1", tool_name="ls", arguments={}),
