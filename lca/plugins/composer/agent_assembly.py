@@ -6,6 +6,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Protocol
 
 from lca.contracts.atoms.enums import ActionScope, ComponentKind
+from lca.contracts.capabilities import COMPONENT_REGISTRY
 from lca.contracts.mechanisms import consume
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
 from lca.contracts.models.team.team_coordination import LeadMandate, gate_name_for_mandate
@@ -15,7 +16,7 @@ from lca.contracts.protocols.spec import AgentSpec
 from lca.layer0_infra.observability import BoundObservability
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
-from lca.plugins.composer.plan_binding import bind_plan
+from lca.plugins.composer.plan_binding import bind_plan, compiled_plan_from_scope
 from lca.plugins.composer.plan_composition_support import (
     AgentCompositionRequest,
     resolve_decision_gate,
@@ -71,7 +72,7 @@ class PlanBoundAgentAssembler:
     ) -> CognitiveAgent:
         """Compile the profile plan, bind the graph, and close one Agent."""
 
-        plan = _compiled_plan_from_scope(scope)
+        plan = compiled_plan_from_scope(scope)
         request = AgentCompositionRequest(
             spec=spec,
             action_scope=action_scope,
@@ -119,7 +120,7 @@ class PlanBoundAgentAssembler:
             decision_gate=resolve_decision_gate(gate_name_for_mandate(mandate), scope=scope),
             scope=scope,
         )
-        components = require_capability(scope, "component_registry")
+        components = require_capability(scope, COMPONENT_REGISTRY.key)
         policy = components.require(ComponentKind.BUDGET_POLICY, _LEAD_BUDGET_POLICY_KEY)()
         if not isinstance(policy, BudgetPolicy):
             raise TypeError(f"lead budget policy must be BudgetPolicy, got {type(policy).__name__}")
@@ -138,17 +139,6 @@ def promote_lead(lead: CognitiveAgent, policy: BudgetPolicy) -> CognitiveAgent:
         max_wall_clock_seconds=limits.max_wall_clock_seconds,
         plan_ref=lead.plan_ref,
     )
-
-
-def _compiled_plan_from_scope(scope: Context) -> CompiledRunPlan:
-    """Compile the resolved boot Profile into the only runnable input plan."""
-
-    resolved = getattr(scope, "resolved_profile", None)
-    if resolved is None:
-        raise MissingCapabilityError("resolved_profile")
-    from lca.harness.profile.plan_compiler import compile_plan
-
-    return compile_plan(resolved)
 
 
 def _agent_from_bound_graph(

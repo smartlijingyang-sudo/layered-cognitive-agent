@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass
 
@@ -86,6 +87,43 @@ async def test_waiting_input_does_not_close_tail() -> None:
     assert session.runnable is not None
     assert session.approval_request is not None
     assert session.approval_request["type"] == "ask_user_question"
+
+
+class _HangingResumable:
+    async def resume(self, snapshot: object, *, input: str) -> object:
+        del snapshot, input
+        await asyncio.Event().wait()
+
+
+@pytest.mark.asyncio
+async def test_resume_cancellation_terminalizes_run() -> None:
+    from lca.harness.profile.lifespan import profile_lifespan
+
+    registry = RunRegistry()
+    async with profile_lifespan("profiles/web-standard.yaml") as state:
+        ctx = state["ctx"]
+        ctx.provide("llm_resolver", _Resolver(_ask_then_reply()))
+        session = create_run_session(
+            registry,
+            question="请用户选方案",
+            user_text="请用户选方案",
+            mode="solo",
+            ctx=ctx,
+        )
+        await execute_run(
+            registry, run_id=session.run_id, question=session.question, mode="solo", ctx=ctx
+        )
+
+    assert session.status == RunStatus.WAITING_INPUT
+    session.runnable = _HangingResumable()
+    task = asyncio.create_task(resume_run(session, registry, "A"))
+    await asyncio.sleep(0)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert session.status == RunStatus.CANCELED
+    assert session.tail.is_closed
 
 
 @pytest.mark.asyncio

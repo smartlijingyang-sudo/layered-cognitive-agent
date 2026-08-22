@@ -25,6 +25,7 @@ from lca.layer0_infra.observability.journal.reducer import RunStatus as JournalR
 from lca.layer0_infra.tools.run_finalizer import finalize_run
 
 _EXPORT_DISPOSE_TIMEOUT_S = 3.0
+_TERMINAL_EVENT_TYPES = frozenset({"AgentRunFinished", "RunFinished", "RunSealed"})
 _log = structlog.get_logger(__name__)
 
 
@@ -211,11 +212,7 @@ def _terminal_event_id_for(session: RunSession) -> str:
             _log.debug("terminal_event_id_from_hub_failed", run_id=session.run_id, error=str(exc))
         for stamped in reversed(events):
             event = getattr(stamped, "event", None)
-            if event is not None and type(event).__name__ in {
-                "AgentRunFinished",
-                "RunFinished",
-                "RunSealed",
-            }:
+            if event is not None and type(event).__name__ in _TERMINAL_EVENT_TYPES:
                 return str(getattr(stamped, "event_id", "") or "")
     return _terminal_event_id_from_file(session.jsonl_path)
 
@@ -252,7 +249,7 @@ def _terminal_event_id_from_file(path: Path) -> str:
                     row = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if row.get("event_type") == "AgentRunFinished":
+                if row.get("event_type") in _TERMINAL_EVENT_TYPES:
                     last = str(row.get("event_id") or row.get("scope", {}).get("event_id") or "")
     except OSError:
         return ""

@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from lca.contracts.atoms.enums import ActionScope, MemoryLayer
-from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.models.team.team_coordination import Coordination, LeadMandate
 from lca.contracts.protocols import SharedMemoryStore, TeamUnit
 from lca.contracts.protocols.infra import AgentTransport
@@ -20,7 +19,7 @@ from lca.contracts.protocols.spec import (
 from lca.layer0_infra.observability import BoundObservability
 from lca.layer3_agent.team_handle import TeamHandle
 from lca.plugins.composer.agent_assembly import PlanBoundAgentAssembler, promote_lead
-from lca.plugins.composer.plan_binding import bind_team
+from lca.plugins.composer.plan_binding import bind_team, compiled_plan_from_scope
 from lca.plugins.composer.plan_composition_support import (
     _format_tools_xml,
     _render_available_skills,
@@ -56,17 +55,6 @@ def _ensure_scope(scope: Context | None) -> Context:
     from lca.layer4_app.api import get_or_create_default_ctx
 
     return get_or_create_default_ctx()
-
-
-def _compiled_plan_from_scope(scope: Context) -> object:
-    """Compile the resolved boot Profile for TeamGraph binding."""
-
-    resolved = getattr(scope, "resolved_profile", None)
-    if resolved is None:
-        raise MissingCapabilityError("resolved_profile")
-    from lca.harness.profile.plan_compiler import compile_plan
-
-    return compile_plan(resolved)
 
 
 def spawn_agent(
@@ -169,7 +157,7 @@ def spawn_team(
             ),
             observability=observability,
         )
-    bound = bind_team(spec, _compiled_plan_from_scope(bound_scope), scope=bound_scope)
+    bound = bind_team(spec, compiled_plan_from_scope(bound_scope), scope=bound_scope)
     graph = bound.graph
     lead_agent = graph.metadata.get("lead")
     return TeamHandle(

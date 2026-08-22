@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.protocols.plan import compiled_run_plan_ref
 
 if TYPE_CHECKING:
@@ -38,6 +39,17 @@ class TeamBindingResult:
 
 class BindPlanError(ValueError):
     """A booted Profile cannot satisfy the complete plan-binding contract."""
+
+
+def compiled_plan_from_scope(scope: Context) -> CompiledRunPlan:
+    """Compile the resolved boot profile into the single runnable input plan."""
+
+    resolved = getattr(scope, "resolved_profile", None)
+    if resolved is None:
+        raise MissingCapabilityError("resolved_profile")
+    from lca.harness.profile.plan_compiler import compile_plan
+
+    return compile_plan(resolved)
 
 
 def bind_plan(
@@ -145,4 +157,11 @@ def _validate_capability_bindings(
             ) from last_error
 
 
-__all__ = ["BindPlanError", "PlanBindingResult", "TeamBindingResult", "bind_plan", "bind_team"]
+__all__ = [
+    "BindPlanError",
+    "PlanBindingResult",
+    "TeamBindingResult",
+    "bind_plan",
+    "bind_team",
+    "compiled_plan_from_scope",
+]

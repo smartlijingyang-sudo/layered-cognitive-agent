@@ -182,6 +182,24 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             # terminal_event_id 可能为空(seq/trace 无 event_id 字段),但 ledger_high_watermark 必为 7
             self.assertEqual(payload["ledger_high_watermark"], 7)
 
+    def test_terminal_event_id_fallback_accepts_run_finished(self) -> None:
+        with self._fresh_root() as root:
+            run_id = "run_terminal_fallback"
+            jsonl_path = root / "runs" / run_id / "journal.jsonl"
+            terminal = _row(3, "RunFinished", {"ok": True})
+            terminal["event_id"] = "evt-run-finished"
+            _write_jsonl(jsonl_path, [_row(1, "AgentRunStarted", {}), terminal])
+            session = _make_session(
+                run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
+            )
+
+            _record_terminal_materialization(session)
+
+            payload = json.loads(
+                (root / "runs" / run_id / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(payload["terminal_event_id"], "evt-run-finished")
+
     def test_failure_does_not_propagate(self) -> None:
         """任何 IO 错误必须 swallow + 记日志,不能污染 run 关闭。"""
         with self._fresh_root() as root:

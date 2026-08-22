@@ -372,7 +372,6 @@ async def execute_run(
                             run_id=session.run_id,
                             error=str(exc),
                         )
-                await _stage_machine_attachments(session, file_store)
                 # ADR-0065 L4: run 边把 boot 期注入的 EventDescriptorRegistry 装到
                 # ambient ContextVar,供 SSE 帧选择器 / 控制台渲染器 / Inspector
                 # 走 cordis 路径(RunStore 走 self._descriptor_registry 直传,无需
@@ -386,6 +385,7 @@ async def execute_run(
                     _descriptor_registry = EVENT_DESCRIPTOR_REGISTRY
 
                 with bind_backends(hub), bind_descriptors(_descriptor_registry):
+                    await _stage_machine_attachments(session, file_store)
                     outcome = await driver.execute(
                         session,
                         question=question,
@@ -445,6 +445,7 @@ async def execute_run(
 async def resume_run(session: RunSession, registry: RunRegistry, answer: str) -> None:
     """HIL resume. Same finalize as execute. Must not close tail while waiting."""
     success = False
+    session.status = RunStatus.RUNNING
     try:
         bindings = session.bindings
         scope = plane_bindings_scope(bindings) if bindings is not None else nullcontext()
@@ -478,7 +479,11 @@ async def resume_run(session: RunSession, registry: RunRegistry, answer: str) ->
             run_id=session.run_id,
             trace_id=session.trace_id,
         )
-    await RunTerminalizer(registry).terminalize(session, workspace=None, success=success)
+    finally:
+        if session.status == RunStatus.WAITING_INPUT:
+            registry.mark_paused(session)
+        else:
+            await RunTerminalizer(registry).terminalize(session, workspace=None, success=success)
 
 
 def _record_run_failure(session: RunSession, exc: BaseException | None, hub: Any) -> None:
