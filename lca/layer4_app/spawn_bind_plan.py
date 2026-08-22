@@ -48,11 +48,12 @@ if TYPE_CHECKING:
 # Re-export at runtime for testing / inspection (avoid TYPE_CHECKING-only F821)
 from lca.contracts.protocols.plan import (  # noqa: F401
     CompiledRunPlan as _CompiledRunPlan,
+)
+from lca.contracts.protocols.plan import (
     compiled_run_plan_ref,
 )
 from lca.contracts.protocols.spec import (  # noqa: F401
     AgentSpec as _AgentSpec,
-    TeamSpec as _TeamSpec,
 )
 
 
@@ -134,7 +135,7 @@ def bind_plan(
         return _legacy_bind_plan(spec, plan, scope=scope)
 
     # Plan / spec 一致性校验（软检查；只 warn 不 raise）
-    spec_name = getattr(spec, "name", "unknown")
+    spec_name = getattr(spec, "name", "")
     plan_path = getattr(plan, "profile_path", "") or ""
     if (
         plan_path
@@ -142,12 +143,12 @@ def bind_plan(
         and isinstance(spec_name, str)
         and not plan_path.endswith(spec_name or "")
     ):
-            warnings.warn(
-                f"bind_plan: plan.profile_path={plan_path!r} "
-                f"may not match spec; proceeding with bind_plan",
-                UserWarning,
-                stacklevel=2,
-            )
+        warnings.warn(
+            f"bind_plan: plan.profile_path={plan_path!r} "
+            f"may not match spec; proceeding with bind_plan",
+            UserWarning,
+            stacklevel=2,
+        )
 
     # Import here to avoid circular imports
     from lca.contracts.harness.composer import merge_agent_graphs
@@ -206,15 +207,31 @@ def bind_team(
     4. 编排 strategy / stage / transport
     5. 返回 ``TeamBindingResult``
     """
-    # PR-5b 之前退化：always use legacy fallback
-    if True:
+    try:
+        composer = _resolve_composer(scope, "team")
+    except _ComposerMissingError:
         warnings.warn(
-            "bind_team: TEAM composer not yet implemented (PR-5b); "
-            "falling back to _legacy_bind_team()",
+            "bind_team: TEAM composer not yet implemented or unavailable; "
+            "falling back to compatibility binding",
             DeprecationWarning,
             stacklevel=2,
         )
         return _legacy_bind_team(spec, plan, scope=scope)
+
+    graph = composer.compose_team(spec, scope)
+    if (
+        not graph.members
+        or graph.strategy is None
+        or graph.stage is None
+        or graph.transport is None
+    ):
+        raise BindPlanError("bind_team: TeamComposer returned an incomplete TeamGraph")
+    return TeamBindingResult(
+        graph=graph,
+        plan_ref=compiled_run_plan_ref(plan),
+        plan=plan,
+        metadata={"composer_key": "team"},
+    )
 
 
 # ── Composer resolution ──────────────────────────────────────────────
@@ -266,13 +283,25 @@ def _validate_capability_bindings(
     if not callable(inject):
         return
     for binding in bindings:
-        try:
-            inject(binding.capability)
-        except (KeyError, LookupError) as exc:
+        capability = binding.capability
+        registry_key = capability.split("[", 1)[0]
+        candidates = [capability, registry_key]
+        if "." in registry_key:
+            candidates.append(registry_key.split(".", 1)[0])
+
+        last_error: Exception | None = None
+        for candidate in dict.fromkeys(candidates):
+            try:
+                inject(candidate)
+                break
+            except (KeyError, LookupError) as error:
+                last_error = error
+        else:
             raise BindPlanError(
-                f"bind_plan: capability {binding.capability!r} "
-                f"(owner={binding.owner_plugin!r}) not resolvable in scope: {exc}"
-            ) from exc
+                f"bind_plan: capability {capability!r} "
+                f"(owner={binding.owner_plugin!r}) has no resolvable registry "
+                f"among {tuple(dict.fromkeys(candidates))!r}: {last_error}"
+            ) from last_error
 
 
 # ── Legacy compat (PR-5 之前路径；保留 6 个月) ─────────────────────

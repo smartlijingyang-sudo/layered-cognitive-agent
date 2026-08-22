@@ -15,13 +15,13 @@ from __future__ import annotations
 
 import structlog
 
+from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import ActionType, HookEvent, SnapshotReason
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY
 from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
-from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import ApprovalPendingError, BudgetExceededError, Result
 from lca.contracts.models.core.state import AgentState, StateSnapshot
 from lca.contracts.models.core.stop import StopReason
@@ -36,10 +36,12 @@ from lca.contracts.protocols import (
     StateStore,
     StopRule,
 )
+from lca.contracts.protocols.control_plan import ControlPlan
 from lca.contracts.protocols.reducer import LoopTopology
 from lca.layer0_infra.observability import get_span_context
 from lca.layer0_infra.skills.activation_scope import get_newly_activated
 from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
+from lca.layer2_runtime.control_runtime import ControlSelection, select_control_entries
 from lca.layer2_runtime.loop_topology import ClosedSetTopology
 from lca.layer2_runtime.reducer import DefaultReducer
 
@@ -69,6 +71,7 @@ class CognitiveRuntime(Runtime):
         *,
         reducer: Reducer | None = None,
         topology: LoopTopology | None = None,
+        control_plan: ControlPlan | None = None,
     ) -> None:
         self.brain = brain
         self.body = body
@@ -79,6 +82,7 @@ class CognitiveRuntime(Runtime):
         self.perceive_hub = perceive_hub
         self.reducer: Reducer = reducer if reducer is not None else DefaultReducer()
         self.topology: LoopTopology = topology if topology is not None else ClosedSetTopology()
+        self.control_plan = control_plan
 
     async def run(
         self,
@@ -115,9 +119,8 @@ class CognitiveRuntime(Runtime):
         max_steps: int = DEFAULT_MAX_STEPS,
     ) -> Result:
         state = await self.state_store.load(snapshot.state_ref)
-        state.status = TaskStatus.WORKING
+        turn: Turn | None = None
         if input is not None:
-            state.working_memory["resume_input"] = input
             answer_text = input if isinstance(input, str) else str(input)
             answer_obs = Observation(
                 observation_id=new_id("obs"),
@@ -134,11 +137,15 @@ class CognitiveRuntime(Runtime):
                     ToolCall(call_id=new_id("tc"), tool_name="askUserQuestion", arguments={}),
                 ],
             )
-            state.history.append(
-                Turn(decision=answer_decision, observation=answer_obs),
-            )
-            state.step += 1
+            turn = Turn(decision=answer_decision, observation=answer_obs)
+        state = self.reducer.apply_resume(state, input, turn)
         return await self._loop(state, max_steps)
+
+    def select_control(self, slot: ControlSlot, state: AgentState) -> ControlSelection | None:
+        """运行时读取当前不可变计划，选择该槽位的有效投稿。"""
+        if self.control_plan is None:
+            return None
+        return select_control_entries(self.control_plan, slot, state)
 
     async def _loop(self, state: AgentState, max_steps: int) -> Result:
         """六步闭集编排（ADR-0066）。
@@ -151,15 +158,25 @@ class CognitiveRuntime(Runtime):
             state = self.reducer.apply_step_advanced(state, step)
             try:
                 # ── Phase 1: Perceive (PR3a — Hub is the SOLE emitter) ──
+                self.select_control(ControlSlot.PERCEIVE_CONTEXT, state)
                 await self.hooks.trigger(HookEvent.PRE_PERCEIVE.value, state)
                 manifest = await self.perceive_hub.perceive(state)
                 state = self.reducer.apply_perception(state, manifest)
                 await self.hooks.trigger(HookEvent.POST_PERCEIVE.value, state)
                 # ── Phase 2: Think ──
+                self.select_control(ControlSlot.THINK_GUARD, state)
                 await self.hooks.trigger(HookEvent.PRE_THINK.value, state)
                 decision = await self.brain.think(state)
                 await self.hooks.trigger(HookEvent.POST_THINK.value, state, decision=decision)
                 # ── Phase 3: Act ──
+                for slot in (
+                    ControlSlot.ACT_AUTHORIZE,
+                    ControlSlot.ACT_BUDGET,
+                    ControlSlot.ACT_CONSTRAIN,
+                    ControlSlot.ACT_EXECUTE,
+                    ControlSlot.ACT_SAFE_BOUNDARY,
+                ):
+                    self.select_control(slot, state)
                 await self.hooks.trigger(HookEvent.PRE_ACT.value, state, decision=decision)
                 observation = await self.body.act(decision, state)
                 await self.hooks.trigger(
@@ -176,6 +193,7 @@ class CognitiveRuntime(Runtime):
                 # ── Phase 5: Record + Remember ──
                 turn = Turn(decision=decision, observation=observation, reflection=reflection)
                 state = self.reducer.apply_turn(state, turn)
+                self.select_control(ControlSlot.REMEMBER_ADMIT, state)
                 await self.memory.update(state, observation, reflection)
                 state = self.reducer.apply_memory(state, None)
             except ApprovalPendingError as exc:
@@ -194,6 +212,7 @@ class CognitiveRuntime(Runtime):
                 break
             # ── Phase 6: Checkpoint + Stop ──
             await self._checkpoint(state)
+            self.select_control(ControlSlot.STOP_DECIDE, state)
             stop = self.stop_rule.decide(state, decision, observation, reflection)
             state = self.reducer.apply_stop(state, stop)
             if stop.should_stop:
@@ -203,29 +222,14 @@ class CognitiveRuntime(Runtime):
                     )
                 break
         await self.hooks.trigger(HookEvent.ON_COMPLETE.value, state)
-        self._apply_artifact_closure(state)
+        state = self.reducer.apply_artifact_closure(state, synthesize_artifact_closure())
         return Result.from_state(state)
-
-    @staticmethod
-    def _apply_artifact_closure(state: AgentState) -> None:
-        """Append workspace deliverables to final output (LobeHub workRegistration-style).
-
-        仍原地修改 state.final_output / state.status；计划在 AgentState
-        转 frozen 后迁入 reducer.apply_artifact_closure。
-        """
-        closure = synthesize_artifact_closure()
-        if closure:
-            if state.final_output:
-                if closure.strip() not in state.final_output:
-                    state.final_output = state.final_output.rstrip() + "\n\n" + closure
-            else:
-                state.final_output = closure
-            if state.status == TaskStatus.WORKING:
-                state.status = TaskStatus.COMPLETED
 
     async def _checkpoint(
         self, state: AgentState, reason: SnapshotReason = SnapshotReason.PERIODIC
     ) -> StateSnapshot:
+        self.select_control(ControlSlot.OBSERVE_CHECKPOINT, state)
+        self.select_control(ControlSlot.OBSERVE_WILDCARD, state)
         snap = state.snapshot(reason=reason)
         ref = await self.state_store.save(state)
         snap.state_ref = ref

@@ -48,8 +48,8 @@ from lca.contracts.protocols import (
     TransportRegistryProtocol,
 )
 from lca.contracts.protocols.action import Action
+from lca.contracts.protocols.command_envelope import command_envelope_to_dict
 from lca.layer0_infra.observability import record
-from lca.layer0_infra.transport.invocation import handoff_task_traced, send_and_wait
 from lca.layer1_cognitive.body.delegation_cache import (
     cached_delegation_observation,
     tag_delegation_extra,
@@ -65,6 +65,7 @@ from lca.layer1_cognitive.member_status.tracking import (
     duty_consult,
     record_delegation_return,
 )
+from lca.layer1_cognitive.transport_envelope import delegate_via_envelope, handoff_via_envelope
 
 _ERR_DEADLINE_EXPIRED = "delegate 超时(deadline 已过期)"
 _ERR_TIMEOUT = "delegate 超时"
@@ -326,13 +327,17 @@ class DelegateOperation(Action):
             return _timeout_observation(_ERR_DEADLINE_EXPIRED)
         try:
             with delegator_scope(state.agent_role):
-                observation = await send_and_wait(
+                observation, envelope = await delegate_via_envelope(
                     transport,
                     agent_card,
                     spec.subtask,
                     spec.context_refs,
                     timeout_s=timeout_s,
+                    decision_ref=spec.target_agent_id or spec.target_role or "delegate",
+                    protocol=spec.protocol,
                 )
+                observation.extra = dict(observation.extra or {})
+                observation.extra["command_envelope"] = command_envelope_to_dict(envelope)
         except TimeoutError:
             return _timeout_observation(_ERR_TIMEOUT)
         # transport 已 harvest 时直接透传（含 partial payload）
@@ -367,12 +372,21 @@ class HandoffOperation(Action):
         if agent_card is None:
             raise ToolExecutionError("handoff 动作缺少目标（agent_card / agent_id / role 均为空）")
         with delegator_scope(state.agent_role):
-            task_id = await handoff_task_traced(
-                transport, agent_card, spec.subtask, spec.context_refs
+            task_id, envelope = await handoff_via_envelope(
+                transport,
+                agent_card,
+                spec.subtask,
+                spec.context_refs,
+                decision_ref=spec.target_agent_id or spec.target_role or "handoff",
+                protocol=spec.protocol,
             )
         return Observation(
             observation_id=new_id("obs"),
             success=True,
             payload=f"handoff to {spec.target_role or spec.target_agent_id}",
-            extra={OBS_TASK_ID: task_id, OBS_HANDOFF: True},
+            extra={
+                OBS_TASK_ID: task_id,
+                OBS_HANDOFF: True,
+                "command_envelope": command_envelope_to_dict(envelope),
+            },
         )
