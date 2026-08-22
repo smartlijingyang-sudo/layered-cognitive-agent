@@ -187,6 +187,42 @@ uv run vulture lca --min-confidence 80
 | `scripts/verify_md_links.py` | Markdown 相对链接必须解析（目标文件存在 + `#fragment` 指向真实标题） |
 | `scripts/verify_doc_budgets.py` | 文档字数预算超限拒绝（预算清单在 `scripts/doc_budgets.json`） |
 
+### 3.4 Git 与 SSH
+
+**远程仓库**：`git@github.com:smartlijingyang-sudo/layered-cognitive-agent.git`
+
+**GitHub SSH 密钥**：`~/.ssh/id_ed25519_github`（`~/.ssh/config` 已配置 Host github.com 指向此密钥）
+
+**已知问题**：系统 SSH 配置 `/etc/ssh/ssh_config.d/05-redhat.conf` 由 `nobody:nobody` 持有，权限不合规，触发 `Bad owner or permissions on /etc/ssh/ssh_config.d/05-redhat.conf`。`ssh`/`git` 拒绝加载。
+
+**规避方法**：用 `GIT_SSH_COMMAND` 绕过系统配置，显式指定密钥：
+
+```sh
+# 单次命令
+GIT_SSH_COMMAND='ssh -F /dev/null -i ~/.ssh/id_ed25519_github' git push origin main
+GIT_SSH_COMMAND='ssh -F /dev/null -i ~/.ssh/id_ed25519_github' git pull --rebase origin main
+
+# 或写入当前 shell（会话内持久）
+export GIT_SSH_COMMAND='ssh -F /dev/null -i ~/.ssh/id_ed25519_github'
+```
+
+`-F /dev/null` 跳过系统级 `ssh_config`，`-i ...` 显式指定密钥，`IdentitiesOnly yes` 阻止 agent 转发其它身份。不要修改 `/etc/ssh/ssh_config.d/`（需要 root，且会污染系统）。
+
+**常规工作流**：
+
+```sh
+# 1. 拉取远程最新
+GIT_SSH_COMMAND='ssh -F /dev/null -i ~/.ssh/id_ed25519_github' git pull --rebase origin main
+
+# 2. 本地开发与提交（git add / commit 不需要 SSH）
+git add -A && git commit -m "..."
+
+# 3. 推送
+GIT_SSH_COMMAND='ssh -F /dev/null -i ~/.ssh/id_ed25519_github' git push origin main
+```
+
+遇到 `non-fast-forward` / `divergent branches` 时优先 `--rebase` 保持线性历史，避免 `merge` 提交。
+
 ## 4. 编码规范
 
 - 方法 ≤ 200 行，文件 ≤ 1500 行；超过就拆
