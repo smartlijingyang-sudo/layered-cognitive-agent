@@ -28,6 +28,20 @@ def test_phase_run_cursor_is_immutable_and_contains_only_resume_data() -> None:
         cursor.node_id = "stop.main"  # type: ignore[misc]
 
 
+class _AllowContribution:
+    async def execute(self, _context, _input):
+        from lca.contracts.protocols.declarative_phase_graph import PhaseResult
+
+        return PhaseResult(result_kind="policy", payload={"verdict": "allow"})
+
+
+def _phase_capabilities(semantic_phase):
+    return {
+        **{f"phase.{phase.value}.standard": _PhaseExecutor(phase) for phase in semantic_phase},
+        "control.standard": _AllowContribution(),
+    }
+
+
 class _ReceiptGateway:
     def __init__(self) -> None:
         self.calls = 0
@@ -90,9 +104,7 @@ async def test_resume_continues_at_saved_node_without_reexecuting_confirmed_effe
     plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
     executable = GraphAssembler().assemble(
         plan,
-        MappingRestrictedScope(
-            {f"phase.{phase.value}.standard": _PhaseExecutor(phase) for phase in SemanticPhase}
-        ),
+        MappingRestrictedScope(_phase_capabilities(SemanticPhase)),
     )
     gateway = _ReceiptGateway()
     interpreter = GenericPlanInterpreter(effect_gateway=gateway)
@@ -157,10 +169,7 @@ async def test_govern_pause_returns_journal_backed_resumable_outcome() -> None:
         plan,
         MappingRestrictedScope(
             {
-                **{
-                    f"phase.{phase.value}.standard": _PhaseExecutor(phase)
-                    for phase in SemanticPhase
-                },
+                **_phase_capabilities(SemanticPhase),
                 "control.pause.fixture": _PauseContribution(),
             }
         ),
@@ -194,9 +203,7 @@ async def test_unconfirmed_effect_receipt_returns_effect_uncertain_outcome() -> 
     plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
     executable = GraphAssembler().assemble(
         plan,
-        MappingRestrictedScope(
-            {f"phase.{phase.value}.standard": _PhaseExecutor(phase) for phase in SemanticPhase}
-        ),
+        MappingRestrictedScope(_phase_capabilities(SemanticPhase)),
     )
 
     result = await GenericPlanInterpreter(effect_gateway=_UncertainGateway()).run(
@@ -207,3 +214,110 @@ async def test_unconfirmed_effect_receipt_returns_effect_uncertain_outcome() -> 
     assert result.outcome.kind == "effect_uncertain"
     assert result.cursor is not None
     assert any(fact.kind == "run.effect_uncertain" for fact in result.facts)
+
+
+class _DenyContribution:
+    async def execute(self, _context, _input):
+        from lca.contracts.protocols.declarative_phase_graph import PhaseResult
+
+        return PhaseResult(
+            result_kind="policy",
+            payload={"verdict": "deny", "reason": "tool call lacks authorization"},
+        )
+
+
+@pytest.mark.asyncio
+async def test_govern_deny_blocks_effect_and_returns_failed_outcome() -> None:
+    from dataclasses import replace
+
+    from lca.contracts.protocols.declarative_phase_graph import (
+        ContributionRole,
+        PhaseContribution,
+        SemanticPhase,
+    )
+    from lca.harness.declarative import (
+        GenericPlanInterpreter,
+        GraphAssembler,
+        MappingRestrictedScope,
+    )
+    from lca.harness.profile.plan_compiler import compile_plan
+    from lca.harness.profile.resolve import resolve_profile
+
+    standard_plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
+    deny = PhaseContribution(
+        phase=SemanticPhase.ACT,
+        role=ContributionRole.GOVERN,
+        executor="control.deny.fixture",
+        output="control.deny",
+        aggregation="deny-on-any-deny",
+    )
+    plan = replace(
+        standard_plan,
+        phase_bindings=tuple(
+            replace(binding, contributions=(*binding.contributions, deny))
+            if binding.semantic_phase is SemanticPhase.ACT
+            else binding
+            for binding in standard_plan.phase_bindings
+        ),
+    )
+    executable = GraphAssembler().assemble(
+        plan,
+        MappingRestrictedScope(
+            {
+                **_phase_capabilities(SemanticPhase),
+                "control.deny.fixture": _DenyContribution(),
+            }
+        ),
+    )
+    gateway = _ReceiptGateway()
+
+    result = await GenericPlanInterpreter(effect_gateway=gateway).run(executable, state={})
+
+    assert result.outcome is not None
+    assert result.outcome.kind == "failed"
+    assert gateway.calls == 0
+    assert any(fact.kind == "run.failed" for fact in result.facts)
+
+
+class _ApprovalPendingGateway:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def execute(self, _envelope, _policy):
+        from lca.contracts.models.core.result import ApprovalPendingError
+
+        self.calls += 1
+        raise ApprovalPendingError({"kind": "tool_approval", "request_id": "approval:test"})
+
+
+@pytest.mark.asyncio
+async def test_effect_approval_pending_returns_journal_backed_paused_outcome() -> None:
+    from lca.contracts.protocols.declarative_phase_graph import SemanticPhase
+    from lca.harness.declarative import (
+        GenericPlanInterpreter,
+        GraphAssembler,
+        MappingRestrictedScope,
+    )
+    from lca.harness.profile.plan_compiler import compile_plan
+    from lca.harness.profile.resolve import resolve_profile
+
+    plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
+    executable = GraphAssembler().assemble(
+        plan,
+        MappingRestrictedScope(_phase_capabilities(SemanticPhase)),
+    )
+    gateway = _ApprovalPendingGateway()
+
+    result = await GenericPlanInterpreter(effect_gateway=gateway).run(executable, state={})
+
+    assert gateway.calls == 1
+    assert result.outcome is not None
+    assert result.outcome.kind == "paused"
+    assert result.cursor is not None
+    assert result.cursor.node_id == "act.main"
+    assert any(fact.kind == "run.paused" for fact in result.facts)
+    assert result.outcome.error_fact is not None
+    assert result.outcome.error_fact.payload["approval_request"] == {
+        "kind": "tool_approval",
+        "request_id": "approval:test",
+    }

@@ -9,9 +9,9 @@ from typing import Any
 from lca.contracts.atoms.enums import SnapshotReason
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.protocols.command_envelope import CommandEnvelope, RunDelta, RunFact
 from lca.contracts.protocols.declarative_phase_graph import (
+    DeclarativeCheckpoint,
     DeclarativeValidationError,
     EffectGateway,
     EffectPolicyPlan,
@@ -90,10 +90,16 @@ class RuntimeJournalCommitter(JournalCommitter):
 
 
 class RuntimeEffectGateway(EffectGateway):
-    """声明式运行时唯一允许调用 body/memory 的受控 effect handler。"""
+    """按已绑定 capability 调用 effect handler 的通用网关。"""
 
-    def __init__(self, capabilities: RuntimePhaseCapabilities) -> None:
-        self._capabilities = capabilities
+    def __init__(
+        self,
+        _capabilities: RuntimePhaseCapabilities,
+        *,
+        effect_handlers: Mapping[str, Any] | None = None,
+    ) -> None:
+        self._capabilities = _capabilities
+        self._effect_handlers = dict(effect_handlers or {})
 
     async def execute(self, envelope: CommandEnvelope, policy: EffectPolicyPlan) -> Any:
         metadata = envelope.metadata
@@ -106,30 +112,18 @@ class RuntimeEffectGateway(EffectGateway):
             raise DeclarativeValidationError("PS-006", "effect requires an idempotency key")
         if effect_class in policy.approval_required and not bool(metadata.get("approved", False)):
             raise DeclarativeValidationError("PS-006", f"effect requires approval: {effect_class}")
-        operation = metadata.get("operation")
-        if operation == "body.act":
-            state = metadata.get("state")
-            decision = metadata.get("decision")
-            if state is None or decision is None:
-                raise DeclarativeValidationError(
-                    "RT-002", "body effect lacks state or recorded Decision"
-                )
-            return await self._capabilities.body.act(decision, state)
-        if operation == "memory.update":
-            state = metadata.get("state")
-            observation = metadata.get("observation")
-            reflection = metadata.get("reflection")
-            if state is None or observation is None or reflection is None:
-                raise DeclarativeValidationError(
-                    "RT-002", "memory effect lacks admitted WriteSet inputs"
-                )
-            await self._capabilities.memory.update(state, observation, reflection)
-            return {
-                "receipt": "memory.updated",
-                "idempotency_key": envelope.idempotency_key,
-                "plan_ref": envelope.plan_ref,
-            }
-        raise DeclarativeValidationError("PG-003", f"undeclared effect operation: {operation}")
+        capability = envelope.grant.capability
+        handler = self._effect_handlers.get(capability)
+        if handler is None:
+            raise DeclarativeValidationError(
+                "PG-003", f"no effect handler bound for capability: {capability}"
+            )
+        execute = getattr(handler, "execute", None)
+        if not callable(execute):
+            raise DeclarativeValidationError(
+                "PS-002", f"effect handler is not executable: {capability}"
+            )
+        return await execute(envelope, self._capabilities)
 
 
 class ReducerDeltaAdapter:
@@ -161,15 +155,6 @@ class ReducerDeltaAdapter:
         return state
 
 
-@dataclass(frozen=True, slots=True)
-class DeclarativeCheckpoint:
-    """由声明式 driver 产生的可恢复 checkpoint。"""
-
-    state_snapshot: StateSnapshot
-    cursor: PhaseRunCursor
-    plan_ref: str
-
-
 class DeclarativeRuntimeDriver:
     """运行已验证 PhaseGraph；业务阶段能力均由 plan binding 选择。"""
 
@@ -182,6 +167,7 @@ class DeclarativeRuntimeDriver:
         reducer: Any,
         hooks: Any,
         state_store: Any | None = None,
+        effect_handlers: Mapping[str, Any] | None = None,
     ) -> None:
         self._plan = plan
         self._phase_executors = phase_executors
@@ -189,12 +175,13 @@ class DeclarativeRuntimeDriver:
         self._reducer = reducer
         self._hooks = hooks
         self._state_store = state_store
+        self._effect_handlers = dict(effect_handlers or {})
 
-    async def run(self, state: Any) -> Result:
+    async def execute(self, state: Any) -> Result:
         interpretation = await self._interpret(state)
         return await self._result_from_interpretation(interpretation)
 
-    async def resume(
+    async def resume_from_checkpoint(
         self,
         checkpoint: DeclarativeCheckpoint,
         *,
@@ -234,7 +221,10 @@ class DeclarativeRuntimeDriver:
         )
         return await GenericPlanInterpreter(
             journal=RuntimeJournalCommitter(),
-            effect_gateway=RuntimeEffectGateway(self._capabilities),
+            effect_gateway=RuntimeEffectGateway(
+                self._capabilities,
+                effect_handlers=self._effect_handlers,
+            ),
             reducer=ReducerDeltaAdapter(self._reducer),
         ).run(
             executable,
@@ -268,9 +258,16 @@ class DeclarativeRuntimeDriver:
                     "plan_ref": checkpoint.plan_ref,
                 }
             )
+            if outcome.kind == "paused" and outcome.error_fact is not None:
+                approval_request = outcome.error_fact.payload.get("approval_request")
+                if approval_request is not None:
+                    result.extra["approval_request"] = approval_request
             return result
         if outcome is not None and outcome.kind == "failed":
             state = self._reducer.apply_error(state, RuntimeError("declarative run failed"))
+            result = Result.from_state(state)
+            result.extra.update({"outcome": "failed", "plan_ref": self._plan_ref})
+            return result
         await self._hooks.trigger("on_complete", state)
         state = self._reducer.apply_artifact_closure(state, synthesize_artifact_closure() or "")
         result = Result.from_state(state)
@@ -288,7 +285,13 @@ class DeclarativeRuntimeDriver:
         if self._state_store is None:
             raise DeclarativeValidationError("RT-004", "declarative pause requires a StateStore")
         snapshot = state.snapshot(reason=reason)
-        reference = await self._state_store.save(state)
+        try:
+            reference = await self._state_store.save(state)
+        except Exception:
+            checkpoints = getattr(state, "checkpoints", None)
+            if isinstance(checkpoints, list) and checkpoints and checkpoints[-1] is snapshot:
+                checkpoints.pop()
+            raise
         snapshot.state_ref = reference
         return DeclarativeCheckpoint(
             state_snapshot=snapshot,

@@ -120,9 +120,9 @@ class CognitiveLiveAgent:
         mid = new_id("msg")
         if self._last_result is not None:
             extra = getattr(self._last_result, "extra", {}) or {}
-            snapshot = extra.get("state_snapshot")
-            if snapshot is not None:
-                result = await self._agent.resume(snapshot, input=text)
+            checkpoint = extra.get("declarative_checkpoint")
+            if checkpoint is not None:
+                result = await self._agent.resume(checkpoint, input=text)
                 return await self._record_result(mid, text, result)
         return await self.followup(UserMessage(content=text, message_id=mid))
 

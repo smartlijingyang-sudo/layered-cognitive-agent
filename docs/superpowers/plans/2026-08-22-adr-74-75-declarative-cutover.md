@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.11、dataclasses、Pydantic、Cordis、pytest、ruff、mypy、import-linter、vulture。
 
-**Spec:** `docs/adr/0074-plugin-everything-trimmed-implementation.md`、`docs/adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md`、`docs/specs/declarative-phase-graph-spec.md`、`docs/adr/0075-implementation-audit.md`、`docs/design/2026-08-19-cognitive-primitive-constitution-v3.md`。
+**Spec:** `docs/adr/0074-plugin-everything-trimmed-implementation.md`、`docs/adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md`、`docs/specs/declarative-phase-graph-spec.md`、`docs/audits/adr-0075-implementation-audit.md`、`docs/design/2026-08-19-cognitive-primitive-constitution-v3.md`。
 
 ## Global Constraints
 
@@ -50,7 +50,7 @@ ADR-0074 的 tracker 已记录 17/17 交付项完成，包括 `CompiledRunPlan`�
 | `lca/plugins/loop_drivers/cognitive.py` 与 `gateway/runs/loop_drivers.py` | 只启动 plan-bound runnable；删除 legacy agent-loop factory 和 shadow-authoritative 执行选择。 |
 | `lca/layer2_runtime/control_policies.py`、`lca/harness/command/dual_write.py` | 在所有调用迁移后删除；其行为改由 PluginSpec contribution、effect handler 和离线 trace comparator 覆盖。 |
 | `tests/declarative/`、`tests/architecture/`、`tests/layer2_runtime/`、`tests/gateway/` | 以 e2e、resume、failure、AST/路径守卫证明没有可达旧流程。 |
-| `docs/adr/0075-implementation-audit.md`、`docs/adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md`、`docs/adr/README.md` | 基于验收证据更新 ADR-0075 状态、审计结论和迁移说明；不回写已归档 ADR 的历史事实。 |
+| `docs/audits/adr-0075-implementation-audit.md`、`docs/adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md`、`docs/adr/README.md` | 基于验收证据更新 ADR-0075 状态、审计结论和迁移说明；不回写已归档 ADR 的历史事实。 |
 
 ## 2. 可执行任务
 
@@ -506,7 +506,7 @@ git commit -m "feat(adr-075): add bounded declarative recovery and effect idempo
 ### Task 8: 更新 ADR 状态、运行审计和不可回退门禁
 
 **Files:**
-- Modify: `docs/adr/0075-implementation-audit.md`
+- Modify: `docs/audits/adr-0075-implementation-audit.md`
 - Modify: `docs/adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md`
 - Modify: `docs/adr/README.md`
 - Modify: `docs/plans/adr-0074-plugin-everything-tracker.md`
@@ -589,7 +589,7 @@ git commit -m "docs(adr-074-075): record declarative runtime cutover"
 
 [1]: `docs/plans/adr-0074-plugin-everything-tracker.md` — ADR-0074 17/17 交付和当前监督状态。
 
-[2]: `docs/adr/0075-implementation-audit.md` — 默认 plan-bound assembly/runtime 的已确认证据与历史补齐记录。
+[2]: `docs/audits/adr-0075-implementation-audit.md` — 默认 plan-bound assembly/runtime 的已确认证据与历史补齐记录。
 
 [3]: `lca/layer2_runtime/runtime_loop.py` — 当前 `run()` 优先声明式、`resume()` 回落 `_loop()`，以及旧 control/checkpoint/pause/error 实现。
 

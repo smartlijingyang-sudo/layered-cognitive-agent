@@ -25,9 +25,16 @@ def standard_plan():
     return compile_plan(resolve_profile("profiles/web-standard.yaml"))
 
 
+class _AllowContribution:
+    async def execute(self, _context, _input: PhaseInput) -> PhaseResult:
+        return PhaseResult(result_kind="policy", payload={"verdict": "allow"})
+
+
 def test_standard_profile_has_complete_plugin_specs_and_six_phase_graph(standard_plan) -> None:
     assert standard_plan.validation_report.is_valid
-    assert {binding.semantic_phase for binding in standard_plan.phase_bindings} == set(SemanticPhase)
+    assert {binding.semantic_phase for binding in standard_plan.phase_bindings} == set(
+        SemanticPhase
+    )
     assert standard_plan.phase_graph is not None
     assert {node.semantic_phase for node in standard_plan.phase_graph.nodes} == set(SemanticPhase)
     assert len(standard_plan.plugin_specs) >= 6
@@ -41,7 +48,9 @@ def test_plan_hash_is_deterministic_for_identical_inputs() -> None:
     assert len(hashes) == 1
 
 
-def test_phase_executor_replacement_changes_plan_hash_without_assembler_change(standard_plan) -> None:
+def test_phase_executor_replacement_changes_plan_hash_without_assembler_change(
+    standard_plan,
+) -> None:
     think = next(item for item in standard_plan.plugin_specs if item.id == "phase.think.standard")
     replacement = replace(
         think,
@@ -68,7 +77,10 @@ def test_validator_rejects_unbounded_reentry(standard_plan) -> None:
     assert standard_plan.phase_graph is not None
     graph = replace(
         standard_plan.phase_graph,
-        edges=(*standard_plan.phase_graph.edges, PhaseEdge(source="stop.main", target="perceive.main", when="true")),
+        edges=(
+            *standard_plan.phase_graph.edges,
+            PhaseEdge(source="stop.main", target="perceive.main", when="true"),
+        ),
     )
     report = PhaseGraphValidator().validate(
         graph,
@@ -82,9 +94,9 @@ def test_validator_rejects_unbounded_reentry(standard_plan) -> None:
 @pytest.mark.asyncio
 async def test_generic_interpreter_runs_only_from_phase_bindings(standard_plan) -> None:
     capabilities = {
-        f"phase.{phase.value}.standard": StandardPhaseExecutor(phase)
-        for phase in SemanticPhase
+        f"phase.{phase.value}.standard": StandardPhaseExecutor(phase) for phase in SemanticPhase
     }
+    capabilities["control.standard"] = _AllowContribution()
     executable = GraphAssembler().assemble(standard_plan, MappingRestrictedScope(capabilities))
     result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
     assert [visit.semantic_phase for visit in result.visits] == list(SemanticPhase)
@@ -124,9 +136,9 @@ async def test_prepare_contribution_is_resolved_and_executed(standard_plan) -> N
     )
     plan = replace(standard_plan, phase_bindings=bindings)
     capabilities = {
-        f"phase.{phase.value}.standard": StandardPhaseExecutor(phase)
-        for phase in SemanticPhase
+        f"phase.{phase.value}.standard": StandardPhaseExecutor(phase) for phase in SemanticPhase
     }
+    capabilities["control.standard"] = _AllowContribution()
     capabilities["contribution.prepare.fixture"] = prepare
     executable = GraphAssembler().assemble(plan, MappingRestrictedScope(capabilities))
 

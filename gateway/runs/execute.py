@@ -397,7 +397,7 @@ async def execute_run(
                     )
                     if outcome.waiting_input:
                         session.status = RunStatus.WAITING_INPUT
-                        session.snapshot = outcome.snapshot
+                        session.declarative_checkpoint = outcome.declarative_checkpoint
                         session.runnable = outcome.resumable
                         session.approval_request = outcome.approval_request
                         _log.info(
@@ -450,10 +450,13 @@ async def resume_run(session: RunSession, registry: RunRegistry, answer: str) ->
         bindings = session.bindings
         scope = plane_bindings_scope(bindings) if bindings is not None else nullcontext()
         with scope:
-            result = await session.runnable.resume(session.snapshot, input=answer)
-        if result.status == TaskStatus.INPUT_REQUIRED:
+            result = await session.runnable.resume(
+                session.declarative_checkpoint,
+                input=answer,
+            )
+        if result.status == TaskStatus.INPUT_REQUIRED and result.extra.get("outcome") == "paused":
             session.status = RunStatus.WAITING_INPUT
-            session.snapshot = result.extra.get("state_snapshot")
+            session.declarative_checkpoint = result.extra.get("declarative_checkpoint")
             session.approval_request = result.extra.get("approval_request")
             registry.mark_paused(session)
             return

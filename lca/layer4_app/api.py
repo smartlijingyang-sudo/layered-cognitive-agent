@@ -27,7 +27,6 @@ from lca.contracts.atoms.enums import MemoryLayer
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, DEFAULT_MAX_WALL_CLOCK_SECONDS
 from lca.contracts.models.core.message import AgentMessage
 from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.models.team.graph import ExecutionGraph
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.run_context import RunContext
@@ -52,6 +51,7 @@ from lca.contracts.protocols import (
     TeamUnit,
     Tool,
 )
+from lca.contracts.protocols.declarative_phase_graph import DeclarativeCheckpoint
 from lca.contracts.protocols.spec import (
     BRAIN_CHOICE_DEFAULT,
     DEFAULT_DELEGATE_MAX_ATTEMPTS,
@@ -251,9 +251,9 @@ class Agent(AgentUnit):
         return await self._agent.run(task, ctx)
 
     async def resume(
-        self, snapshot: StateSnapshot, input: str | AgentMessage | None = None
+        self, checkpoint: DeclarativeCheckpoint, input: str | AgentMessage | None = None
     ) -> Result:
-        return await self._agent.resume(snapshot, input)
+        return await self._agent.resume(checkpoint, input)
 
     async def cancel(self) -> None:
         await self._agent.cancel()

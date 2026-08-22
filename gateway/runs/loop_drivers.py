@@ -48,7 +48,7 @@ class DriverOutcome:
     success: bool
     result: Any | None = None
     waiting_input: bool = False
-    snapshot: Any | None = None
+    declarative_checkpoint: Any | None = None
     approval_request: dict[str, Any] | None = None
     resumable: Any | None = None
     error: str = ""
@@ -126,12 +126,12 @@ class CognitiveRunDriver:
             if isinstance(runnable, Agent)
             else await runnable.run(question)
         )
-        if result.status == TaskStatus.INPUT_REQUIRED:
+        if result.status == TaskStatus.INPUT_REQUIRED and result.extra.get("outcome") == "paused":
             return DriverOutcome(
                 success=False,
                 result=result,
                 waiting_input=True,
-                snapshot=result.extra.get("state_snapshot"),
+                declarative_checkpoint=result.extra.get("declarative_checkpoint"),
                 approval_request=result.extra.get("approval_request"),
                 resumable=runnable,
             )

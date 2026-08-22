@@ -349,7 +349,7 @@ async def get_run_evidence(request: Request) -> JSONResponse:
     # Parse ref: accept "sha256:<hex>" or bare hex
     raw = ref_str.strip()
     if raw.startswith("sha256:"):
-        digest_only = raw[len("sha256:"):]
+        digest_only = raw[len("sha256:") :]
     elif len(raw) == 64 and all(c in "0123456789abcdef" for c in raw.lower()):
         digest_only = raw.lower()
     else:
@@ -439,7 +439,11 @@ async def get_run_evidence(request: Request) -> JSONResponse:
         decoded = json.loads(payload.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return JSONResponse(
-            {"error": "evidence payload not json-decodable", "ref": ref_str, "byte_length": len(payload)},
+            {
+                "error": "evidence payload not json-decodable",
+                "ref": ref_str,
+                "byte_length": len(payload),
+            },
             status_code=500,
             headers=cors_headers(),
         )
@@ -486,7 +490,7 @@ async def answer_run(request: Request) -> JSONResponse:
         return JSONResponse(
             {"error": "answer is required"}, status_code=400, headers=cors_headers()
         )
-    if session.snapshot is None or session.runnable is None:
+    if session.declarative_checkpoint is None or session.runnable is None:
         return JSONResponse(
             {"error": "no resume state available"},
             status_code=500,

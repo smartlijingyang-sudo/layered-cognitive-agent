@@ -83,16 +83,17 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
     "W3CValidationResult": frozenset({"reject"}),
     "CostCalculator": frozenset({"compute"}),
     "EvidenceRef": frozenset({"to_dict", "from_dict"}),
-    "RunManifest": frozenset(
-        {"materializer_default_version", "to_dict", "from_dict"}
-    ),
+    "RunManifest": frozenset({"materializer_default_version", "to_dict", "from_dict"}),
     # 旧 API 行为类（refactor 留待 PR-0.5 大重构周期后）
     "MountResult": frozenset({"ok"}),
     "UnmountResult": frozenset({"ok"}),
     "InspectResult": frozenset({"mounted_count"}),
-    "InMemoryContentAddressableStore": frozenset(
-        {"put", "get", "contains", "sweep_orphan"}
-    ),
+    "InMemoryContentAddressableStore": frozenset({"put", "get", "contains", "sweep_orphan"}),
+    # ADR-0075 最小可信内核：这些方法均为不可变契约的查询/验证辅助，
+    # 不含外部 I/O、状态写入或默认业务实现。
+    "ValidationReport": frozenset({"errors", "warnings", "is_valid", "require_valid"}),
+    "PhaseRunCursor": frozenset({"visit_count_for", "edge_count_for"}),
+    "CompiledRunPlan": frozenset({"schema_version", "plan_hash", "is_declarative"}),
 }
 
 # 已存在的非 dataclass / 非 Protocol / 非异常 / 非枚举类——
@@ -108,6 +109,9 @@ _GRANDFATHERED_CLASSES: frozenset[str] = frozenset(
         # 旧 API 行为类（refactor 留待 PR-0.5 大重构周期后）
         "FactoryRegistry",
         "NamedRegistry",
+        # ADR-0075 的纯 schema / 拓扑验证器；仅接收契约数据并返回 ValidationReport。
+        "PluginSpecValidator",
+        "PhaseGraphValidator",
     }
 )
 

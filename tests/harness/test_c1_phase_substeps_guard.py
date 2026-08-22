@@ -185,20 +185,15 @@ class TestCV4RuntimeNoSubPhaseState:
 
 
 class TestCV4StopRuleFlow:
-    """CV4: ``CognitiveRuntime._loop`` 通过 ``self.stop_rule.decide(...)`` + reducer
-    fold 走 ``stop.decide`` 控制面；不允许 if/else 直接写 stop 状态。
-    """
+    """CV4: 声明式 ``stop`` phase 通过 StopRule 生成可 reducer fold 的 stop 决策。"""
 
-    def test_runtime_loop_uses_stop_rule(self) -> None:
-        """Runtime 必须通过 ``self.stop_rule.decide(...)`` 走 ControlPlan
-        编译产物；不允许 ``if decision.action_type == STOP: ...`` 直接 stop。
-        """
-        source = RUNTIME_FILE.read_text(encoding="utf-8")
-        # Must use stop_rule.decide
-        assert "self.stop_rule.decide" in source, (
-            "CognitiveRuntime._loop must invoke self.stop_rule.decide(...) "
-            "(stop.decide control surface; PR-4 atomic migration)"
+    def test_declarative_stop_phase_uses_stop_rule(self) -> None:
+        """StopRule 必须由可替换的标准 phase executor 调用，而非硬编码 Runtime 循环。"""
+        source = (LCA_ROOT / "plugins" / "phase_executors" / "common.py").read_text(
+            encoding="utf-8"
         )
+        assert "stop_rule.decide" in source
+        assert "def _loop" not in RUNTIME_FILE.read_text(encoding="utf-8")
 
 
 class TestCV4AllControlSlot11:

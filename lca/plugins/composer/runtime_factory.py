@@ -22,12 +22,9 @@ from lca.contracts.protocols import (
     StateStore,
     StopRule,
 )
-from lca.contracts.protocols.control_plan import ControlPlan
 from lca.contracts.protocols.plan import CompiledRunPlan
-from lca.contracts.protocols.reducer import LoopTopology
 from lca.contracts.protocols.runtime import StopOutcomePolicy
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
-from lca.layer2_runtime.loop_topology import ClosedSetTopology
 from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
 from lca.layer2_runtime.reducer import DefaultReducer
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
@@ -49,10 +46,9 @@ class RuntimeDeps:
     stop_rule: StopRule = field(default=None)  # type: ignore[assignment]
     outcome_policy: StopOutcomePolicy = field(default_factory=DefaultStopOutcomePolicy)
     reducer: Reducer = field(default_factory=DefaultReducer)
-    topology: LoopTopology = field(default_factory=ClosedSetTopology)
-    control_plan: ControlPlan | None = None
     compiled_plan: CompiledRunPlan | None = None
     phase_executors: Mapping[str, Any] = field(default_factory=dict)
+    effect_handlers: Mapping[str, Any] = field(default_factory=dict)
 
 
 def build_cognitive_runtime(deps: RuntimeDeps) -> CognitiveRuntime:
@@ -68,10 +64,9 @@ def build_cognitive_runtime(deps: RuntimeDeps) -> CognitiveRuntime:
         stop_rule=stop_rule,
         perceive_hub=deps.perceive_hub,
         reducer=deps.reducer,
-        topology=deps.topology,
-        control_plan=deps.control_plan,
         compiled_plan=deps.compiled_plan,
         phase_executors=deps.phase_executors,
+        effect_handlers=deps.effect_handlers,
     )
 
 

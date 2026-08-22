@@ -13,6 +13,9 @@ from lca.contracts.protocols.declarative_phase_graph import SemanticPhase
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+from lca.plugins.control_contributions.standard import StandardControlContribution
+from lca.plugins.effect_handlers.body_act import BodyActEffectHandler
+from lca.plugins.effect_handlers.memory_update import MemoryUpdateEffectHandler
 from lca.plugins.phase_executors.common import StandardPhaseExecutor
 
 
@@ -88,8 +91,15 @@ async def test_cognitive_runtime_executes_compiled_phase_graph() -> None:
         perceive_hub=_PerceiveHub(),
         compiled_plan=plan,
         phase_executors={
-            f"phase.{phase.value}.standard": StandardPhaseExecutor(phase)
-            for phase in SemanticPhase
+            **{
+                f"phase.{phase.value}.standard": StandardPhaseExecutor(phase)
+                for phase in SemanticPhase
+            },
+            "control.standard": StandardControlContribution(),
+        },
+        effect_handlers={
+            "body.act": BodyActEffectHandler(),
+            "memory.update": MemoryUpdateEffectHandler(),
         },
     )
 

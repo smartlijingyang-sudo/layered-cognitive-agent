@@ -21,7 +21,8 @@ async def test_default_profile_agent_runs_compiled_phase_graph_not_legacy_loop()
     runtime = agent.runtime
     assert runtime.compiled_plan is not None
     assert runtime.compiled_plan.is_declarative
-    assert len(runtime.phase_executors) == 6
+    assert len([key for key in runtime.phase_executors if key.startswith("phase.")]) == 6
+    assert "control.standard" in runtime.phase_executors
 
     async def legacy_loop_must_not_run(*_args, **_kwargs):
         raise AssertionError("default Profile fell back to CognitiveRuntime._loop")

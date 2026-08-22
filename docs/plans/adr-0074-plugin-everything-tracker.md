@@ -489,7 +489,7 @@ PR-0 audit 测量网对全仓库扫一次得到 42 条违规基线，路由如�
 
 | V 约束 | 自动化证据 | 在哪个 PR 完成时首次生效 | PR 完成判据的强制性条款 |
 |:-:|---|---|---|
-| **V1** 控制面单一入口 | `./scripts/lca-ops explain control <slot>` 列出该 slot 的所有 entry、来源 bundle/patch、order、activation 表达式 | **PR-3**（ControlPlan Resolver 编译产出后）| PR-3 完成时新增 `tests/layer2_runtime/test_control_runtime_execution.py`，覆盖投影 ControlPlan 的运行时执行路径 |
+| **V1** 控制面单一入口 | `./scripts/lca-ops explain control <slot>` 列出该 slot 的所有 entry、来源 bundle/patch、order、activation 表达式 | **PR-3**（ControlPlan Resolver 编译产出后）| ADR 75 切换后以 `tests/declarative/test_standard_control_contribution.py` 与 `tests/declarative/test_interpreter_checkpoint_resume.py` 覆盖默认 govern contribution 的授权、暂停、拒绝与 effect 阻断路径 |
 | **V2** CompiledRunPlan 确定性 | 同 profile × TaskContract × Environment → 同 plan_hash | **PR-3**（PlanCompiler 落地）| PR-3 完成时必须新增 property test：固定输入 → 固定 hash，跨 100 次随机运行 |
 | **V3** Reducer 唯一写 State | `./scripts/lca-ops audit-state-writers` 输出空集（除 reducer） | **PR-0**（audit 测量网建立基线） + **PR-7**（RunFact 收口 effect 后最终成立） | PR-0 完成判据："audit state-writers 输出非空且可读"；PR-7 完成判据："audit state-writers 输出 `No state mutations detected.`" |
 | **V4** CommandEnvelope 必经 5 闸 | architecture test 拒绝无 envelope 的 tool call；Body.execute stack trace 必含 `command_envelope.mint` | **PR-7**（CommandEnvelope 收口） | PR-7 完成时必须新增 `tests/architecture/test_command_envelope_required.py`：AST 扫描所有 Body.execute 调用，确保 mint_envelope 在 stack trace |

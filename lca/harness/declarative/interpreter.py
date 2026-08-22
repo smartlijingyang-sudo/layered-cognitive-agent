@@ -5,8 +5,9 @@ from __future__ import annotations
 import ast
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any
+from typing import Any, Literal
 
+from lca.contracts.models.core.result import ApprovalPendingError
 from lca.contracts.protocols.command_envelope import RunDelta, RunFact
 from lca.contracts.protocols.declarative_phase_graph import (
     ContributionRole,
@@ -260,6 +261,50 @@ class GenericPlanInterpreter:
                 try:
                     effect_receipt = await self._effect_gateway.execute(
                         result.command_envelope, plan.effect_policy
+                    )
+                except ApprovalPendingError as exc:
+                    effective_payload = result.payload
+                    artifact_map["result"] = result
+                    artifact_map["payload"] = effective_payload
+                    artifact_map[node.semantic_phase.value] = effective_payload
+                    artifact_map["approval_request"] = exc.approval_request
+                    paused_fact = RunFact(
+                        fact_id=f"{plan_ref}:{node.id}:{visit_counts[node.id]}:paused",
+                        plan_ref=plan_ref,
+                        kind="run.paused",
+                        payload={
+                            "node": node.id,
+                            "reason": "approval_pending",
+                            "approval_request": exc.approval_request,
+                        },
+                    )
+                    self._journal.commit_fact(paused_fact, plan_ref=plan_ref, node_ref=node.id)
+                    facts.append(paused_fact)
+                    paused_cursor = self._cursor(
+                        plan_ref=plan_ref,
+                        node_id=node.id,
+                        visit_counts=visit_counts,
+                        edge_counts=edge_counts,
+                        artifacts=artifact_map,
+                        causation_refs=result.evidence_refs,
+                        budget=budget,
+                    )
+                    outcome = DeclarativeRunOutcome(
+                        kind="paused",
+                        cursor=paused_cursor,
+                        error_fact=paused_fact,
+                    )
+                    return InterpretationResult(
+                        state=current_state,
+                        artifact=effective_payload,
+                        visits=(
+                            *visits,
+                            PhaseVisit(node.id, node.semantic_phase, result.result_kind, None),
+                        ),
+                        facts=tuple(facts),
+                        terminal_node=None,
+                        cursor=paused_cursor,
+                        outcome=outcome,
                     )
                 except DeclarativeValidationError as exc:
                     if exc.code != "RT-003":
@@ -558,7 +603,9 @@ class GenericPlanInterpreter:
         return None
 
 
-def _govern_terminal_kind(payload: Any) -> str | None:
+def _govern_terminal_kind(
+    payload: Any,
+) -> Literal["paused", "failed", "effect_uncertain"] | None:
     if not isinstance(payload, Mapping):
         return None
     verdict = str(payload.get("verdict", "")).lower()
@@ -566,6 +613,8 @@ def _govern_terminal_kind(payload: Any) -> str | None:
         return "paused"
     if verdict in {"effect_uncertain", "uncertain"}:
         return "effect_uncertain"
+    if verdict in {"deny", "denied", "stop", "stopped"}:
+        return "failed"
     return None
 
 

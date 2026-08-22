@@ -181,9 +181,9 @@ def _agent_from_bound_graph(
             state_store=consume("state_store", graph.state_store, CognitiveRuntime),
             perceive_hub=graph.perceive_hub,
             stop_rule=graph.stop_rule,
-            control_plan=plan.control,
             compiled_plan=plan,
             phase_executors=_phase_executor_bindings(plan, scope),
+            effect_handlers=_effect_handler_bindings(plan, scope),
         )
     )
     return CognitiveAgent(
@@ -197,16 +197,40 @@ def _agent_from_bound_graph(
 
 
 def _phase_executor_bindings(plan: CompiledRunPlan, scope: Context) -> dict[str, object]:
-    """Resolve exactly the phase executor capabilities declared by the plan."""
+    """Resolve every executor and contribution capability declared by the plan."""
 
     inject = getattr(scope, "inject", None)
     if not callable(inject):
         raise MissingCapabilityError("phase executor binding requires a booted Context")
+    capabilities = {phase_binding.executor_capability for phase_binding in plan.phase_bindings}
+    capabilities.update(
+        contribution.executor
+        for phase_binding in plan.phase_bindings
+        for contribution in phase_binding.contributions
+    )
     bindings: dict[str, object] = {}
-    for phase_binding in plan.phase_bindings:
-        capability = phase_binding.executor_capability
+    for capability in sorted(capabilities):
         try:
             bindings[capability] = inject(capability)
+        except (KeyError, LookupError) as exc:
+            raise MissingCapabilityError(capability) from exc
+    return bindings
+
+
+def _effect_handler_bindings(plan: CompiledRunPlan, scope: Context) -> dict[str, object]:
+    """Resolve declared ``effect.handler.*`` capabilities without naming handlers in Runtime."""
+
+    inject = getattr(scope, "inject", None)
+    if not callable(inject):
+        raise MissingCapabilityError("effect handler binding requires a booted Context")
+    bindings: dict[str, object] = {}
+    for binding in plan.capability_bindings:
+        capability = binding.capability
+        if not capability.startswith("effect.handler."):
+            continue
+        protected_capability = capability.removeprefix("effect.handler.")
+        try:
+            bindings[protected_capability] = inject(capability)
         except (KeyError, LookupError) as exc:
             raise MissingCapabilityError(capability) from exc
     return bindings

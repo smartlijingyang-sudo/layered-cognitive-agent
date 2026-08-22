@@ -74,17 +74,31 @@ def bind_plan(
     if not composed:
         raise BindPlanError("compiled plan declares no Agent composer capability")
     graph = merge_agent_graphs(*(item[1] for item in composed))
+    missing = tuple(
+        name
+        for name in (
+            "brain",
+            "body",
+            "memory",
+            "state_store",
+            "perceive_hub",
+            "hooks",
+            "observability",
+            "llm",
+            "stop_rule",
+        )
+        if getattr(graph, name, None) is None
+    )
+    if missing:
+        raise BindPlanError(
+            "bind_plan: AgentComposer returned an incomplete AgentGraph: " + ", ".join(missing)
+        )
     _validate_capability_bindings(plan, graph, scope)
     return PlanBindingResult(
         graph=graph,
         plan_ref=compiled_run_plan_ref(plan),
         plan=plan,
-        metadata={
-            "composers": tuple(
-                capability.removeprefix("composer.") if not plan.is_declarative else capability
-                for capability, _ in composed
-            )
-        },
+        metadata={"composers": tuple(capability for capability, _ in composed)},
     )
 
 
@@ -123,13 +137,7 @@ def bind_team(
         graph=graph,
         plan_ref=compiled_run_plan_ref(plan),
         plan=plan,
-        metadata={
-            "composer": (
-                team_composers[0][0].removeprefix("composer.")
-                if not plan.is_declarative
-                else team_composers[0][0]
-            )
-        },
+        metadata={"composer": team_composers[0][0]},
     )
 
 
@@ -148,27 +156,17 @@ def _composer_bindings(
     inject = getattr(scope, "inject", None)
     if not callable(inject):
         raise BindPlanError("plan binding requires a booted cordis Context with inject()")
+    if not plan.is_declarative:
+        raise BindPlanError("plan binding requires a declarative CompiledRunPlan")
     declared_capabilities = {binding.capability for binding in plan.capability_bindings}
-    if plan.is_declarative:
-        candidates = sorted(
-            capability
-            for capability in declared_capabilities
-            if capability.startswith("composer.")
-        )
-    else:
-        # Read-only v1 compatibility for persisted plans that predate v2 bindings.
-        candidates = (
-            ("composer.team",)
-            if operation == "compose_team"
-            else ("composer.brain", "composer.body", "composer.perceive")
-        )
+    candidates = sorted(
+        capability for capability in declared_capabilities if capability.startswith("composer.")
+    )
     resolved: list[tuple[str, Any]] = []
     for capability in candidates:
         try:
             composer = inject(capability)
-        except (KeyError, LookupError) as exc:
-            if not plan.is_declarative:
-                raise BindPlanError(f"required {capability} is not registered in the booted Profile") from exc
+        except (KeyError, LookupError):
             continue
         if composer is not None and callable(getattr(composer, operation, None)):
             resolved.append((capability, composer))

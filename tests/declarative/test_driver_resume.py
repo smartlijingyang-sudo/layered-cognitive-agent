@@ -78,6 +78,11 @@ class _Executor:
         )
 
 
+class _AllowControl:
+    async def execute(self, _context, _input) -> PhaseResult:
+        return PhaseResult(result_kind="policy", payload={"verdict": "allow"})
+
+
 class _PauseOnce:
     def __init__(self) -> None:
         self._calls = 0
@@ -110,6 +115,7 @@ async def test_driver_resumes_a_paused_cursor_through_the_same_declarative_plan(
     )
     executors = {
         **{f"phase.{phase.value}.standard": _Executor(phase) for phase in SemanticPhase},
+        "control.standard": _AllowControl(),
         "control.pause.once": _PauseOnce(),
     }
     # Force early assembly to make the test exercise the same capability map as the driver.
@@ -126,12 +132,63 @@ async def test_driver_resumes_a_paused_cursor_through_the_same_declarative_plan(
     )
     initial = AgentState(trace_id="trace:driver", task="resume", budget=create_budget(max_steps=4))
 
-    paused = await driver.run(initial)
+    paused = await driver.execute(initial)
 
     assert paused.status is TaskStatus.INPUT_REQUIRED
     checkpoint = paused.extra["declarative_checkpoint"]
 
-    resumed = await driver.resume(checkpoint, input="approved")
+    resumed = await driver.resume_from_checkpoint(checkpoint, input="approved")
 
     assert resumed.status is TaskStatus.COMPLETED
     assert resumed.extra["outcome"] == "completed"
+
+
+class _DenyControl:
+    async def execute(self, _context, _input) -> PhaseResult:
+        return PhaseResult(
+            result_kind="policy",
+            payload={"verdict": "deny", "reason": "authorization denied"},
+        )
+
+
+@pytest.mark.asyncio
+async def test_driver_reports_failed_govern_outcome_as_failed_result() -> None:
+    standard_plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
+    deny = PhaseContribution(
+        phase=SemanticPhase.ACT,
+        role=ContributionRole.GOVERN,
+        executor="control.deny.fixture",
+        output="control.deny",
+        aggregation="deny-on-any-deny",
+    )
+    plan = replace(
+        standard_plan,
+        phase_bindings=tuple(
+            replace(binding, contributions=(*binding.contributions, deny))
+            if binding.semantic_phase is SemanticPhase.ACT
+            else binding
+            for binding in standard_plan.phase_bindings
+        ),
+    )
+    executors = {
+        **{f"phase.{phase.value}.standard": _Executor(phase) for phase in SemanticPhase},
+        "control.standard": _AllowControl(),
+        "control.deny.fixture": _DenyControl(),
+    }
+    driver = DeclarativeRuntimeDriver(
+        plan=plan,
+        phase_executors=executors,
+        capabilities=RuntimePhaseCapabilities(
+            brain=None, body=None, memory=None, perceive_hub=None, stop_rule=None
+        ),
+        reducer=DefaultReducer(),
+        hooks=_Hooks(),
+        state_store=_StateStore(),
+    )
+    initial = AgentState(trace_id="trace:failed", task="deny", budget=create_budget(max_steps=4))
+
+    result = await driver.execute(initial)
+
+    assert result.status is TaskStatus.FAILED
+    assert result.extra["outcome"] == "failed"
+    assert result.extra["outcome"] != "completed"

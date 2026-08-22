@@ -89,6 +89,8 @@ class _Composer:
 
     def compose_agent(self, request: AgentCompositionRequest, scope: object) -> AgentGraph:
         del request, scope
+        if self.key == "team":
+            raise TypeError("only agent composers compose agents")
         values: dict[str, Any] = {
             "brain": {"brain": "brain", "llm": "llm"},
             "body": {"body": "body", "hooks": "hooks"},
@@ -141,7 +143,7 @@ def _full_scope() -> _StubScope:
 class TestStrictPlanBinding:
     def test_missing_required_composer_fails(self) -> None:
         scope = _StubScope({"composer.brain": _Composer("brain")})
-        with pytest.raises(BindPlanError, match=r"required composer\.body"):
+        with pytest.raises(BindPlanError, match="incomplete AgentGraph: body"):
             bind_plan(_request(), _plan(), scope=scope)
 
     def test_scope_without_inject_fails(self) -> None:
@@ -153,7 +155,9 @@ class TestStrictPlanBinding:
         assert isinstance(result, PlanBindingResult)
         assert result.graph.brain == "brain"
         assert result.graph.body == "body"
-        assert result.metadata == {"composers": ("brain", "body", "perceive")}
+        assert result.metadata == {
+            "composers": ("composer.body", "composer.brain", "composer.perceive")
+        }
 
     def test_plan_ref_is_propagated(self) -> None:
         from lca.contracts.protocols.plan import compiled_run_plan_ref
@@ -169,14 +173,14 @@ class TestStrictPlanBinding:
 
 class TestStrictTeamBinding:
     def test_missing_team_composer_fails(self) -> None:
-        with pytest.raises(BindPlanError, match=r"required composer\.team"):
+        with pytest.raises(BindPlanError, match="must resolve exactly one Team composer"):
             bind_team(_team_spec(), _plan(), scope=_StubScope())
 
     def test_complete_team_composer_returns_binding(self) -> None:
         result = bind_team(_team_spec(), _plan(), scope=_full_scope())
         assert isinstance(result, TeamBindingResult)
         assert result.graph.members == ("member",)
-        assert result.metadata == {"composer": "team"}
+        assert result.metadata == {"composer": "composer.team"}
 
 
 class TestDefaultProfilePlanBinding:
@@ -204,6 +208,13 @@ def _plan(*, with_binding: bool = False) -> Any:
     from lca.contracts.atoms.scope import Scope
     from lca.contracts.protocols.capability_plan import CapabilityPlan, ProviderBinding
     from lca.contracts.protocols.control_plan import ControlPlan
+    from lca.contracts.protocols.declarative_phase_graph import (
+        CapabilityBinding,
+        CognitivePhaseGraphPlan,
+        PhaseBinding,
+        PhaseNode,
+        SemanticPhase,
+    )
     from lca.contracts.protocols.plan import CompiledRunPlan
     from lca.contracts.protocols.scope_plan import BudgetCeiling, ScopePlan
 
@@ -224,6 +235,32 @@ def _plan(*, with_binding: bool = False) -> Any:
             visibility=(Scope.RUN,),
             acl_grants=(),
             budget_ceiling=BudgetCeiling(),
+        ),
+        capability_bindings=(
+            CapabilityBinding("composer.brain", "test", "one"),
+            CapabilityBinding("composer.body", "test", "one"),
+            CapabilityBinding("composer.perceive", "test", "one"),
+            CapabilityBinding("composer.team", "test", "one"),
+        ),
+        phase_graph=CognitivePhaseGraphPlan(
+            entry="perceive.main",
+            nodes=(
+                PhaseNode(
+                    id="perceive.main",
+                    semantic_phase=SemanticPhase.PERCEIVE,
+                    binding="phase.perceive.fixture",
+                    max_visits=1,
+                    terminal=True,
+                ),
+            ),
+            edges=(),
+        ),
+        phase_bindings=(
+            PhaseBinding(
+                node_id="perceive.main",
+                semantic_phase=SemanticPhase.PERCEIVE,
+                executor_capability="phase.perceive.fixture",
+            ),
         ),
     )
 

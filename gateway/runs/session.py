@@ -84,7 +84,7 @@ class RunSession:
     error: str = ""
     task: asyncio.Task[Any] | None = None
     cancel_requested: bool = False
-    snapshot: Any = None
+    declarative_checkpoint: Any = None
     runnable: Any = None
     approval_request: dict[str, Any] | None = None
     closed_at: float | None = None

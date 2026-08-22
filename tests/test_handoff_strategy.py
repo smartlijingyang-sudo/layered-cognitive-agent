@@ -11,7 +11,6 @@ from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer3_agent.orchestration_strategies import HandoffStrategy
-from lca.layer4_app.runtime_factory import NullPerceiveHub
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
@@ -176,60 +175,6 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(ToolExecutionError):
             await body.act(decision, state)
-
-
-class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
-    """CognitiveRuntime 在 handoff 时应停止循环。"""
-
-    async def test_runtime_stops_on_handoff(self) -> None:
-        """handoff action 应触发 StopRule 返回 should_stop=True。"""
-        from lca.layer2_runtime.default_stop_rule import DefaultStopRule
-        from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
-            DefaultStopOutcomePolicy,
-        )
-        from lca.layer2_runtime.runtime_loop import CognitiveRuntime
-
-        brain = MagicMock()
-        body = MagicMock()
-        memory = MagicMock()
-        hooks = MagicMock()
-        state_store = MagicMock()
-
-        hooks.trigger = AsyncMock()
-        memory.perceive = AsyncMock(side_effect=lambda s: s)
-        memory.update = AsyncMock()
-
-        decision = Decision(
-            decision_id="d1",
-            action_type="handoff",
-            rationale="handoff to expert",
-            confidence=0.9,
-            delegations=[DelegationSpec(subtask="help", target_role="expert")],
-        )
-        brain.think = AsyncMock(return_value=decision)
-        brain.reflect = AsyncMock(
-            return_value=MagicMock(verdict="on_track"),
-        )
-
-        observation = MagicMock()
-        observation.success = True
-        body.act = AsyncMock(return_value=observation)
-
-        state_store.save = AsyncMock(return_value="ref")
-
-        runtime = CognitiveRuntime(
-            brain,
-            body,
-            memory,
-            hooks,
-            state_store,
-            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
-            perceive_hub=NullPerceiveHub(),
-        )
-        result = await runtime.run("test task", max_steps=10)
-
-        self.assertEqual(result.status, "completed")
-        brain.think.assert_awaited_once()
 
 
 class TestHandoffRegistration(unittest.TestCase):

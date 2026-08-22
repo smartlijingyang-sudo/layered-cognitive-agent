@@ -13,7 +13,6 @@ from lca.contracts.models.core.message import (
     agent_message_text,
 )
 from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
@@ -28,6 +27,7 @@ from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import AgentUnit, Runtime
 from lca.contracts.protocols.capabilities import HasHooks
+from lca.contracts.protocols.declarative_phase_graph import DeclarativeCheckpoint
 from lca.layer0_infra.observability import (
     BoundObservability,
     adopt_run_scope,
@@ -155,7 +155,7 @@ class CognitiveAgent(AgentUnit):
 
     async def resume(
         self,
-        snapshot: StateSnapshot,
+        checkpoint: DeclarativeCheckpoint,
         input: str | AgentMessage | None = None,
     ) -> Result:
         msg = None
@@ -163,7 +163,7 @@ class CognitiveAgent(AgentUnit):
             msg = input
         elif isinstance(input, str):
             msg = agent_message_text(input)
-        return await self.runtime.resume(snapshot, input=msg, max_steps=self.max_steps)
+        return await self.runtime.resume(checkpoint, input=msg, max_steps=self.max_steps)
 
     async def cancel(self) -> None:
         return None

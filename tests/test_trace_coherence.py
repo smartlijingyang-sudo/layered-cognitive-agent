@@ -3,9 +3,9 @@
 对一次真实（scripted）团队运行断言：
 1. 单树性：唯一 run.team 根，所有 span 可回溯到根；
 2. 资源 span 归属：llm.chat / tool.execute / memory.* 必在 run.agent 子树内；
-   四相边界标记（pre/post）在每个 run.agent 子树内齐全；
+   LLM span 必须带有执行 agent 身份；
 3. 委派连续性：成员 run.agent 祖先链必含 delegation（ADR-0037 一等委派）；
-4. 身份完备：相位/资源 span 必带 agent_role；
+4. 身份完备：LLM span 必带 agent_role；
 5. 内容完备：llm.chat 必带 model 与 prompt 预览。
 """
 
@@ -82,21 +82,6 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
                     f"{name} 不在任何 run.agent 子树内：{s.span_id}",
                 )
 
-    def test_all_four_phase_markers_present_per_agent(self) -> None:
-        """每个 run.agent 子树必含四相边界标记（相位完整性）。"""
-        phase_names = {
-            SpanName.LOOP_PHASE_PERCEIVE.value,
-            SpanName.LOOP_PHASE_THINK.value,
-            SpanName.LOOP_PHASE_ACT.value,
-            SpanName.LOOP_PHASE_REFLECT.value,
-        }
-        for agent_root in self.bundle.by_name(SpanName.RUN_AGENT.value):
-            subtree_names = {n.name for n in self.bundle.walk(agent_root)}
-            missing = phase_names - subtree_names
-            self.assertEqual(
-                missing, set(), f"run.agent 子树缺少相位标记：{missing}（{agent_root.span_id}）"
-            )
-
     def test_member_runs_chain_through_delegation(self) -> None:
         member_runs = [
             s
@@ -110,13 +95,8 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
                 f"成员 run.agent 缺少 delegation 祖先（委派断链）：{s.span_id}",
             )
 
-    def test_phase_spans_carry_actor_identity(self) -> None:
-        for name in (
-            SpanName.LOOP_PHASE_PERCEIVE.value,
-            SpanName.LOOP_PHASE_THINK.value,
-            SpanName.LOOP_PHASE_ACT.value,
-            SpanName.LOOP_PHASE_REFLECT.value,
-        ):
+    def test_llm_spans_carry_actor_identity(self) -> None:
+        for name in (SpanName.LLM_CHAT.value,):
             for s in self.bundle.by_name(name):
                 self.assertTrue(
                     s.attributes.get(ATTR_AGENT_ROLE),

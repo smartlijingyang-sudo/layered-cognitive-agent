@@ -83,15 +83,15 @@ async def test_waiting_input_does_not_close_tail() -> None:
     assert session.status == RunStatus.WAITING_INPUT
     assert not session.tail.is_closed
     assert session.hub is not None
-    assert session.snapshot is not None
+    assert session.declarative_checkpoint is not None
     assert session.runnable is not None
     assert session.approval_request is not None
     assert session.approval_request["type"] == "ask_user_question"
 
 
 class _HangingResumable:
-    async def resume(self, snapshot: object, *, input: str) -> object:
-        del snapshot, input
+    async def resume(self, checkpoint: object, *, input: str) -> object:
+        del checkpoint, input
         await asyncio.Event().wait()
 
 
@@ -155,7 +155,7 @@ async def test_answer_resumes_same_run_and_finalizes() -> None:
     assert session.hub is not None
 
 
-def test_http_waiting_input_snapshot_and_answer() -> None:
+def test_http_waiting_input_checkpoint_and_answer() -> None:
     registry = RunRegistry()
     app = create_scripted_app(registry, llm_resolver=_Resolver(_ask_then_reply()))
     with TestClient(app) as client:
@@ -167,19 +167,19 @@ def test_http_waiting_input_snapshot_and_answer() -> None:
         run_id = created.json()["run_id"]
 
         status = ""
-        snapshot = {}
+        payload = {}
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             resp = client.get(f"/runs/{run_id}")
             assert resp.status_code == 200
-            snapshot = resp.json()
-            status = snapshot["status"]
+            payload = resp.json()
+            status = payload["status"]
             if status in {"waiting_input", "failed", "completed", "canceled"}:
                 break
             time.sleep(0.05)
 
-        assert status == "waiting_input", snapshot
-        assert snapshot["approval_request"]["type"] == "ask_user_question"
+        assert status == "waiting_input", payload
+        assert payload["approval_request"]["type"] == "ask_user_question"
         session = registry.get(run_id)
         assert session is not None
         assert not session.tail.is_closed

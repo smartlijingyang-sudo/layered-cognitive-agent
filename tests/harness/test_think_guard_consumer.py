@@ -212,10 +212,18 @@ class TestReducerProtocolNewMethod:
 
 
 class TestStopRuleControlSurface:
-    """stop.decide 控制面：Runtime 通过 self.stop_rule.decide(...) 折叠。"""
+    """stop.decide 控制面：声明式 stop executor 生成由 reducer 折叠的 delta。"""
 
-    def test_runtime_loop_calls_stop_rule(self) -> None:
-        runtime_file = __import__("pathlib").Path("lca/layer2_runtime/runtime_loop.py")
-        source = runtime_file.read_text(encoding="utf-8")
-        assert "self.stop_rule.decide" in source
-        assert "self.reducer.apply_stop" in source
+    def test_declarative_stop_executor_calls_stop_rule(self) -> None:
+        source = (
+            __import__("pathlib")
+            .Path("lca/plugins/phase_executors/common.py")
+            .read_text(encoding="utf-8")
+        )
+        runtime_source = (
+            __import__("pathlib")
+            .Path("lca/layer2_runtime/declarative_runtime.py")
+            .read_text(encoding="utf-8")
+        )
+        assert "stop_rule.decide" in source
+        assert "apply_stop" in runtime_source

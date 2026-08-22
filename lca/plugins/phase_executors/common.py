@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols.command_envelope import CapabilityGrant, RunDelta, mint_envelope
 from lca.contracts.protocols.declarative_phase_graph import (
     CapabilityDeclaration,
@@ -77,6 +78,21 @@ class StandardPhaseExecutor(PhaseExecutor):
             decision = await brain.think(context.state)
             return PhaseResult(result_kind="decision", payload=decision)
         if self.phase is SemanticPhase.ACT:
+            resume_input = _resume_input(context.state)
+            approval_request = context.artifacts.get("approval_request")
+            if resume_input is not None and approval_request is not None:
+                return PhaseResult(
+                    result_kind="observation",
+                    payload=Observation(
+                        observation_id=f"{context.plan_ref}:{context.node_ref}:human-input",
+                        success=True,
+                        payload=resume_input,
+                        extra={
+                            "source": "human_input",
+                            "approval_request": approval_request,
+                        },
+                    ),
+                )
             body = _capability(capabilities, "body")
             decision = context.artifacts.get("think")
             if body is None or decision is None:
@@ -115,7 +131,9 @@ class StandardPhaseExecutor(PhaseExecutor):
                 scope_ref=context.node_ref,
                 decision=decision,
                 provider="effect.memory",
-                grant=CapabilityGrant(capability="memory.update", scope="run", effect_class="memory"),
+                grant=CapabilityGrant(
+                    capability="memory.update", scope="run", effect_class="memory"
+                ),
                 idempotency_key=f"{context.plan_ref}:{context.node_ref}:{decision.decision_id}",
                 metadata={
                     "effect_class": "memory",
@@ -154,8 +172,17 @@ class StandardPhaseExecutor(PhaseExecutor):
         return PhaseResult(
             result_kind="stop_decision",
             payload=stop,
-            deltas=(RunDelta(plan_ref=context.plan_ref, metadata={"operation": "stop", "stop": stop}),),
+            deltas=(
+                RunDelta(plan_ref=context.plan_ref, metadata={"operation": "stop", "stop": stop}),
+            ),
         )
+
+
+def _resume_input(state: Any) -> Any | None:
+    working_memory = getattr(state, "working_memory", None)
+    if isinstance(working_memory, dict):
+        return working_memory.get("resume_input")
+    return None
 
 
 def _capability(capabilities: Any, name: str) -> Any:
@@ -194,7 +221,9 @@ def standard_phase_spec(
         kind=PluginSpecKind.PHASE_EXECUTOR,
         layer="L2",
         functional_group="cognitive-phase",
-        implementation=PluginImplementation(module=module, setup="setup", factory="create_executor"),
+        implementation=PluginImplementation(
+            module=module, setup="setup", factory="create_executor"
+        ),
         configuration=PluginConfiguration(
             schema="lca.plugins.phase_executors.common.StandardPhaseConfig"
         ),
@@ -215,7 +244,9 @@ def standard_phase_spec(
         ),
         lifecycle=LifecycleDeclaration(scopes=("run",), activation="true", disposal="required"),
         relations=(),
-        evidence=EvidenceDeclaration(emits=(f"Phase{phase.value.title()}Completed",), replay="required"),
+        evidence=EvidenceDeclaration(
+            emits=(f"Phase{phase.value.title()}Completed",), replay="required"
+        ),
         verification=VerificationDeclaration(
             test_suite="tests/declarative/test_phase_graph.py",
             properties=("phase_result_contract", "no_state_mutation"),

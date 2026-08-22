@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.enums import ActionType, LLMStreamEventType, ReflectionVerdict
-from lca.contracts.atoms.ids import new_id
-from lca.contracts.models.core.decision import Decision, Observation, Reflection
+from lca.contracts.atoms.enums import ActionType, LLMStreamEventType
+from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.lifecycle import AgentCard, TaskStatus
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.result import UnregisteredActionError
@@ -15,7 +14,6 @@ from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManif
 from lca.contracts.models.team.team_coordination import Debate
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.action import ActionRegistryProtocol
-from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.brain.critic import SimpleCritic
@@ -23,12 +21,7 @@ from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 from lca.layer1_cognitive.brain.skill_router import StaticSkillRouter
-from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
-from lca.layer2_runtime.default_stop_rule import DefaultStopRule
-from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer4_app.api import Agent, Team, ensure_default_ctx
-from lca.layer4_app.runtime_factory import NullPerceiveHub
 
 
 def _state() -> AgentState:
@@ -59,53 +52,6 @@ class TestDegradationFirstClass:
         with pytest.raises(UnregisteredActionError) as ei:
             await body.act(decision, _state())
         assert ei.value.action_type == "invented"
-
-
-class TestCheckpointResume:
-    async def test_checkpoint_persists_via_state_store(self) -> None:
-        store = InMemoryStateStore()
-
-        class _Mem:
-            async def perceive(self, s: AgentState) -> AgentState:
-                return s
-
-            async def update(self, s: AgentState, o: Observation, r: Reflection) -> None:
-                return None
-
-        class _Brain:
-            async def think(self, s: AgentState) -> Decision:
-                return Decision(
-                    decision_id=new_id("d"),
-                    action_type=ActionType.RESPOND,
-                    rationale="done",
-                    confidence=1.0,
-                    response_text="DONE",
-                )
-
-            async def reflect(self, s: AgentState, o: Observation) -> Reflection:
-                return Reflection(reflection_id=new_id("r"), verdict=ReflectionVerdict.ON_TRACK)
-
-        class _Body:
-            async def act(self, d: Decision, s: AgentState) -> Observation:
-                return Observation(
-                    observation_id=new_id("o"), success=True, payload=d.response_text
-                )
-
-            def bind_channel(self, t: object) -> None:
-                return None
-
-        rt = CognitiveRuntime(
-            brain=_Brain(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
-            body=_Body(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
-            memory=_Mem(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
-            hooks=SimpleHookRegistry(),
-            state_store=store,
-            perceive_hub=NullPerceiveHub(),
-            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
-        )
-        result = await rt.run("checkpoint me", max_steps=3)
-        assert result.status == TaskStatus.COMPLETED
-        assert any(k.startswith("mem://") for k in store._store)
 
 
 class TestSkillRouterTemplate:

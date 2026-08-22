@@ -43,6 +43,7 @@ async def _boot_default_ctx_for_module() -> None:
     """Team/Agent construction needs a warm default plugin ctx (ADR-0062 PR-4)."""
     await ensure_default_ctx()
 
+
 # team 模式（board 治理探针）的期望
 MODE_EXPECT: dict[str, dict] = {
     "team": {
@@ -241,9 +242,7 @@ async def test_llm_chat_span_emitted() -> None:
     agent = Agent(role="Solo", goal="g", backstory="b", tools=[], llm=llm, observability=col)
     await agent.run("hello")
     names = col.bundle().names()
-    assert SpanName.LLM_CHAT.value in names and SpanName.LOOP_PHASE_THINK.value in names, (
-        format_case_digest(col.bundle())
-    )
+    assert SpanName.LLM_CHAT.value in names, format_case_digest(col.bundle())
 
 
 @pytest.mark.asyncio

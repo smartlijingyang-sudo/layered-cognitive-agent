@@ -29,3 +29,18 @@ entries:
     name: phase_stop_standard
     $module: lca.plugins.phase_executors.stop
     config: {}
+
+  - id: control.standard
+    name: control_standard
+    $module: lca.plugins.control_contributions.standard
+    config: {}
+
+  - id: effect.handler.body.act
+    name: effect_handler_body_act
+    $module: lca.plugins.effect_handlers.body_act
+    config: {}
+
+  - id: effect.handler.memory.update
+    name: effect_handler_memory_update
+    $module: lca.plugins.effect_handlers.memory_update
+    config: {}

@@ -7,9 +7,9 @@ from typing import Protocol, runtime_checkable
 from lca.contracts.models.core.budget import BudgetLimits
 from lca.contracts.models.core.message import AgentMessage
 from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.run_context import RunContext
+from lca.contracts.protocols.declarative_phase_graph import DeclarativeCheckpoint
 
 
 @runtime_checkable
@@ -25,7 +25,7 @@ class AgentUnit(Protocol):
     ) -> Result: ...
 
     async def resume(
-        self, snapshot: StateSnapshot, input: str | AgentMessage | None = None
+        self, checkpoint: DeclarativeCheckpoint, input: str | AgentMessage | None = None
     ) -> Result: ...
 
     async def cancel(self) -> None: ...

@@ -104,6 +104,21 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/contracts/protocols/control_plan.py": (
         "PR-1 11 ControlSlot + Activation DSL + ControlPlan + plan_hash"
     ),
+    "lca/contracts/protocols/declarative_phase_graph.py": (
+        "ADR-0075 最小可信内核：PluginSpec、PhaseGraph、cursor、outcome 与验证契约必须同源闭合"
+    ),
+    "lca/contracts/protocols/plan.py": (
+        "ADR-0075 CompiledRunPlan 将旧子计划与声明式图、binding、effect policy 纳入同一可哈希输入"
+    ),
+    "lca/harness/declarative/compiler.py": (
+        "ADR-0075 声明式计划编译：插件贡献、阶段图、effect policy 与验证报告必须在单一纯编译入口收敛"
+    ),
+    "lca/harness/declarative/interpreter.py": (
+        "ADR-0075 通用解释器：有界图执行、Journal、effect、pause/failed/effect_uncertain outcome 与 cursor 恢复需要同一事务边界"
+    ),
+    "lca/layer2_runtime/declarative_runtime.py": (
+        "ADR-0075 声明式 driver：受限 runtime capability、handler gateway、reducer adapter 与可恢复 checkpoint 共同构成执行适配层"
+    ),
     "lca/harness/profile/control_plan_resolver.py": (
         "ADR-0074 ControlPlan 单一投影入口：声明解析、严格校验、11 槽默认闭合与 explain 投影"
     ),
@@ -124,10 +139,6 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     ),
     "lca/layer4_app/spawn_bind_plan.py": (
         "PR-5 bind_plan + BindOptions + PlanBindingResult + legacy fallback"
-    ),
-    "lca/layer2_runtime/runtime_loop.py": (
-        "CognitiveRuntime 单模块承载 v3 6 阶段闭环编排 + 协议边界 record()"
-        "（perceive→think→act→reflect→remember→stop，ADR-0002 + PR10 落地）"
     ),
     "lca/layer0_infra/observability/journal/engine.py": (
         "RunStore 单模块承载事件索引 + get/get_event/get_blob/find_terminal"

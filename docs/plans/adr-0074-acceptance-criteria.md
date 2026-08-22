@@ -424,7 +424,7 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 | **R3** | audit_state_writers 命中数没下降 | `./scripts/lca-ops audit-state-writers` | PR-0 基线 = 40；PR-7 终点必须 = 0（除 reducer） | ✅ GREEN（输出 `No state mutations detected.`） |
 | **R4** | audit_direct_commands 命中数没下降 | `./scripts/lca-ops audit-direct-commands` | PR-0 基线 = 2；PR-7 终点必须 = 0 | ✅ GREEN（无违规输出） |
 | **R5** | LogicAddress `functional_group` 字段在所有 plugin 都空 | `uv run python -c "..."` 全仓扫描 | < 30% plugin 填写 → CV2 warning 不触发即可；≥ 80% 填写才算 V10 落实 | ✅ GREEN (functional_group tests pass) |
-| **R6** | ControlPlan 在 runtime 路径上从未被读取 | `uv run pytest --no-cov tests/layer2_runtime/test_control_runtime_execution.py -v` | 命中必须含 `plan.control.slot_entries` 或等价调用；否则 = 装饰性新增 | ✅ GREEN（运行时经 `evaluate_control` 消费投影计划；3 项执行路径测试通过） |
+| **R6** | 声明式 control contribution 未在运行路径生效 | `uv run pytest --no-cov tests/declarative/test_standard_control_contribution.py tests/declarative/test_interpreter_checkpoint_resume.py -v` | 默认 Profile 必须编译 govern contribution，拒绝 verdict 必须阻断 effect 并产生可审计 outcome；否则 = 装饰性新增 | ✅ GREEN（`control.standard` 经 phase binding 装配；暂停与拒绝均由通用解释器收敛） |
 | **R7** | plan_ref 在 JournalEntry 总是 None | `uv run pytest --no-cov tests/observability/test_plan_ref.py -v` | 全非空；否则 V5 未生效 | ✅ GREEN (plan_ref tests exist and pass) |
 | **R8** | envelope 五闸顺序在 body/execute 里被跳闸 | `uv run pytest --no-cov tests/architecture/test_envelope_gate_order.py -v` | 全过；任一闸缺失 = V4 红 | ✅ GREEN (envelope tests pass, 33/33) |
 | **R9** | Capability 衰减被绕过（子代理 grant ⊄ 父代理） | `uv run pytest --no-cov tests/test_capability_monotonicity.py -v` | property test 100 次随机；V8 | ✅ GREEN（capability monotonicity 测试通过） |
@@ -444,7 +444,7 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 
 | V | 承诺 | 验收命令 | 通过条件 | 当前状态（2026-08-22） |
 |:-:|---|---|---|:-:|
-| **V1** | 控制面单一入口（11 slot） | §2.5 `./scripts/lca-ops explain control <slot>` + `tests/layer2_runtime/test_control_runtime_execution.py` | 11 slot 全部 L2 接线 + explain 命令可执行 | ✅ GREEN（`evaluate_control` 是运行循环的唯一控制面读取路径；explain 输出 entry、聚合与阶段归属） |
+| **V1** | 控制面单一入口（声明式 govern contribution） | §2.5 `./scripts/lca-ops explain control <slot>` + `tests/declarative/test_standard_control_contribution.py` | 默认 control contribution 必须经 phase binding 装配，且 verdict 在 effect 前由解释器收敛 | ✅ GREEN（`control.standard` 是默认 Profile 的 govern capability；Runtime 不再读取或分派 control plan） |
 | **V2** | CompiledRunPlan 确定性 | §3.2 plan_hash property test | 100 次随机同输入同 hash | ✅ GREEN（`tests/plan/test_plan_hash_determinism.py`：8 passed） |
 | **V3** | Reducer 唯一写 State | `./scripts/lca-ops audit-state-writers` | PR-0 = 40 → PR-7 = 0 | ✅ GREEN（输出 `No state mutations detected.`） |
 | **V4** | CommandEnvelope 必经 5 闸 | §3.4 architecture test | exit 0 + stack 含 mint_envelope | ✅ GREEN（封套脚本通过；相关测试 35 passed） |

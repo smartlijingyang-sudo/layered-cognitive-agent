@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
 from typing import Any, Literal, Protocol, cast, runtime_checkable
 
+from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.protocols.command_envelope import CommandEnvelope, RunDelta, RunFact
 
 PLUGIN_SPEC_VERSION = "lca/plugin-spec/v1"
@@ -497,6 +498,15 @@ class PhaseRunCursor:
             (item_source, item_target): count
             for item_source, item_target, count in self.edge_counts
         }.get((source, target), 0)
+
+
+@dataclass(frozen=True, slots=True)
+class DeclarativeCheckpoint:
+    """声明式恢复协议的不可变 checkpoint，不暴露 runtime 私有状态。"""
+
+    state_snapshot: StateSnapshot
+    cursor: PhaseRunCursor
+    plan_ref: str
 
 
 @dataclass(frozen=True, slots=True)

@@ -959,14 +959,14 @@ def run_scope(scope: RunScope):
     """兼容导出：经 observability 包根转发唯一 RunScope 实现。"""
 
     facade = import_module("lca.layer0_infra.observability")
-    return getattr(facade, "run_scope")(scope)
+    return facade.run_scope(scope)
 
 
 def get_current_run_scope() -> RunScope | None:
     """兼容导出：读取当前环境的唯一 RunScope。"""
 
     facade = import_module("lca.layer0_infra.observability")
-    return getattr(facade, "get_current_run_scope")()
+    return facade.get_current_run_scope()
 
 
 def stamped_to_journal_record(
@@ -976,7 +976,7 @@ def stamped_to_journal_record(
     """兼容导出：将 Journal 账本事件投影为 v2 JournalRecord。"""
 
     facade = import_module("lca.layer0_infra.observability")
-    return getattr(facade, "stamped_to_journal_record")(stamped, **kwargs)
+    return facade.stamped_to_journal_record(stamped, **kwargs)
 
 
 __all__ = [

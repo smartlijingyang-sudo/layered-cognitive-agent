@@ -17,8 +17,8 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.protocols import AgentUnit, TeamStrategy, TeamUnit
 from lca.layer0_infra.observability import (
-    BoundObservability,
     TEAM_CONTAINER_ROLE,
+    BoundObservability,
     TeamTraceProfile,
     adopt_run_scope,
     bind_backends,

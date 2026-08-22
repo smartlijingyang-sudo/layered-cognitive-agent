@@ -1,86 +1,57 @@
 #!/usr/bin/env python3
-"""CI 15.4：校验 CognitiveRuntime._loop 调用顺序符合 ADR-0002。
+"""CI 15.4：验证默认 Profile 的声明式认知阶段拓扑。
 
-期望序列（相对顺序，按源码行号）：
-  perceive_and_retrieve | perceive
-  → think
-  → act
-  → reflect
-  → update_multi_level | update
-  → stop_rule.decide  (StopRule; may also call outcome resolve internally)
+ADR-0075 移除了 ``CognitiveRuntime._loop``。运行顺序由编译后的
+``CognitivePhaseGraphPlan`` 表达，因此本检查通过真实 Profile 编译验证：
+
+``perceive → think → act → reflect → remember → stop``。
+
+它同时拒绝非声明式默认计划和缺少相邻因果边的图，防止薄 Runtime 重新承载
+硬编码编排逻辑。
 """
 
 from __future__ import annotations
 
-import ast
 import sys
+from itertools import pairwise
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LOOP_FILE = ROOT / "lca" / "layer2_runtime" / "runtime_loop.py"
-
-EXPECTED_STEPS: list[tuple[str, frozenset[str]]] = [
-    ("perceive", frozenset({"perceive_and_retrieve", "perceive"})),
-    ("think", frozenset({"think"})),
-    ("act", frozenset({"act"})),
-    ("reflect", frozenset({"reflect"})),
-    ("update", frozenset({"update_multi_level", "update"})),
-    ("stop", frozenset({"decide", "resolve"})),
-]
-
-
-def _attr_name(func: ast.AST) -> str | None:
-    if isinstance(func, ast.Attribute):
-        return func.attr
-    if isinstance(func, ast.Name):
-        return func.id
-    return None
-
-
-def _collect_calls_in_order(func: ast.AsyncFunctionDef | ast.FunctionDef) -> list[tuple[int, str]]:
-    """按源码行号收集函数体内的调用名。"""
-    found: list[tuple[int, str]] = []
-    for node in ast.walk(func):
-        if not isinstance(node, ast.Call):
-            continue
-        name = _attr_name(node.func)
-        if name is None:
-            continue
-        found.append((node.lineno, name))
-    found.sort(key=lambda x: x[0])
-    return found
+EXPECTED_PHASES = ("perceive", "think", "act", "reflect", "remember", "stop")
 
 
 def main() -> int:
-    source = LOOP_FILE.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=str(LOOP_FILE))
-    loop_func: ast.AsyncFunctionDef | ast.FunctionDef | None = None
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "_loop":
-            loop_func = node
-            break
-    if loop_func is None:
-        print("FAIL: 未找到 CognitiveRuntime._loop")
+    sys.path.insert(0, str(ROOT))
+    from lca.harness.profile.plan_compiler import compile_plan
+    from lca.harness.profile.resolve import resolve_profile
+
+    plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
+    if not plan.is_declarative or plan.phase_graph is None:
+        print("FAIL: 默认 Profile 未编译为声明式 PhaseGraph")
+        return 1
+    if not plan.validation_report.is_valid:
+        print("FAIL: 默认声明式计划未通过校验")
         return 1
 
-    ordered = _collect_calls_in_order(loop_func)
-    calls = [name for _, name in ordered]
-    cursor = 0
-    matched: list[str] = []
-    for step_name, aliases in EXPECTED_STEPS:
-        found_at = None
-        for i in range(cursor, len(calls)):
-            if calls[i] in aliases:
-                found_at = i
-                break
-        if found_at is None:
-            print(f"FAIL: _loop 中未找到步骤 {step_name}（期望调用 {sorted(aliases)}）")
-            print(f"  实际调用序列: {calls}")
-            return 1
-        matched.append(step_name)
-        cursor = found_at + 1
+    graph = plan.phase_graph
+    phase_by_node = {node.id: node.semantic_phase.value for node in graph.nodes}
+    observed = tuple(phase_by_node[node.id] for node in graph.nodes)
+    if observed != EXPECTED_PHASES:
+        print(f"FAIL: 阶段序列不匹配：期望 {EXPECTED_PHASES}，实际 {observed}")
+        return 1
 
-    print(f"OK: cognitive loop order = {' → '.join(matched)}")
+    causal_edges = {
+        (phase_by_node[edge.source], phase_by_node[edge.target])
+        for edge in graph.edges
+        if edge.source in phase_by_node and edge.target in phase_by_node
+    }
+    missing = tuple(pairwise(EXPECTED_PHASES))
+    absent = [edge for edge in missing if edge not in causal_edges]
+    if absent:
+        print(f"FAIL: 声明式图缺少相邻因果边：{absent}")
+        return 1
+
+    print(f"OK: declarative cognitive phase order = {' → '.join(EXPECTED_PHASES)}")
     return 0
 
 
