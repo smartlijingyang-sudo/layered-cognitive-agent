@@ -208,12 +208,20 @@ def _verify_supervision_matrix(text: str) -> list[Finding]:
 
 
 def _verify_next_action_is_reachable(text: str) -> list[Finding]:
-    """Next Action PR must exist in §1 with status Ready or Blocked (not Done)."""
+    """Validate the documented next action, including a completed terminal roadmap."""
     findings: list[Finding] = []
-    na_match = re.search(r"\*\*Next Action\*\*[：:]\s*PR-(\d+)", text)
+    na_match = re.search(r"\*\*Next Action\*\*[：:]\s*([^\n]+)", text)
     if not na_match:
         return [Finding("warn", "§1", "no Next Action marker found")]
-    next_pr_num = int(na_match.group(1))
+
+    next_action = na_match.group(1).strip().lower()
+    if next_action.startswith(("none", "无", "n/a")):
+        return findings
+
+    pr_match = re.match(r"PR-(\d+)", next_action, flags=re.IGNORECASE)
+    if pr_match is None:
+        return [Finding("error", "§1", f"invalid Next Action marker: {na_match.group(1).strip()}")]
+    next_pr_num = int(pr_match.group(1))
 
     section = _section_text(text, r"1\.\s*状态总览")
     if section is None:

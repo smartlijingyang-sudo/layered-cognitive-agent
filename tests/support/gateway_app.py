@@ -12,7 +12,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
-from gateway.app import create_app
 from gateway.runs.session import RunRegistry
 from lca.harness.profile.lifespan import profile_lifespan
 from tests.support.gateway_scripted import ScriptedLLMResolver
@@ -35,6 +34,11 @@ def create_scripted_app(
     resolver injection both run on Starlette's startup loop, so no
     side-thread hack and no module-level cache pollution.
     """
+    # ``test_gateway_lazy_reexport`` intentionally reloads ``gateway.app``.
+    # Resolve the factory at call time so route handlers and any patched
+    # module globals belong to the same live module instance.
+    from gateway.app import create_app
+
     resolver = llm_resolver if llm_resolver is not None else ScriptedLLMResolver()
 
     @asynccontextmanager

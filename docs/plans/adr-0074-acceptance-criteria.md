@@ -90,8 +90,8 @@ uv run pytest --no-cov tests/harness/test_control_plan_resolver.py -v -k "aggreg
 
 | 槽位 | 验收命令（PR-3 后激活） | 通过条件 |
 |---|---|---|
-| `perceive.context` | 跑一次 agent run，`lca-ops explain control perceive.context` 输出 ≥ 1 个 entry | 当前 PR-1 投影出空 entries（opt-in），等 PR-3 PlanCompiler 落地 |
-| `think.guard` | `lca-ops audit state-writers --slot=think.guard` 输出空集（所有 think guard 走 verdict，不直接写 state） | PR-4 完成后激活 |
+| `perceive.context` | 跑一次 agent run，`./scripts/lca-ops explain control perceive.context` 输出 ≥ 1 个 entry | 当前 PR-1 投影出空 entries（opt-in），等 PR-3 PlanCompiler 落地 |
+| `think.guard` | `./scripts/lca-ops audit-state-writers --slot=think.guard` 输出空集（所有 think guard 走 verdict，不直接写 state） | PR-4 完成后激活 |
 | `act.authorize` | AST 扫描 `lca/layer1_cognitive/body/` 所有 `pipeline_safe_executor.execute` 调用栈必含 `control.authorize` | PR-4 + PR-7 期间逐步 |
 | `act.budget` | AST 扫描 + property test：budget 超限时 verdict=deny 且不进入 act.execute | PR-4 + PR-7 |
 | `act.constrain` | 同上 + 路径白名单测试 | PR-4 + PR-7 |
@@ -108,7 +108,7 @@ uv run pytest --no-cov tests/harness/test_control_plan_resolver.py -v -k "aggreg
 
 ```sh
 # PR-3 后必须可执行：
-uv run lca-ops explain control act.budget
+./scripts/lca-ops explain control act.budget
 ```
 
 通过条件：列出该 slot 的所有 entry（plugin_id / order / activation / aggregation / failure_mode）。
@@ -124,7 +124,7 @@ uv run lca-ops explain control act.budget
 | 子 plan | L1 验收 | L2 验收 |
 |---|---|---|
 | `CapabilityPlan` | `lca/contracts/protocols/control_plan.py` 已存在 `ControlPlan` dataclass；测试覆盖 hash 稳定 | PR-3 落地后：`spawn.bind_plan` 返回的 `CompiledRunPlan.capability` 字段非空、含 provider binding |
-| `ControlPlan` | 已存在（PR-1） | `lca-ops explain control <slot>` 输出 entries（§2.5） |
+| `ControlPlan` | 已存在（PR-1） | `./scripts/lca-ops explain control <slot>` 输出 entries（§2.5） |
 | `ScopePlan` | `lca/contracts/protocols/` 含 ScopePlan 契约 | PR-3 落地后：`plan.scope` 字段含 grant / budget / lease / ExecutionSpace |
 
 ### 3.2 plan_hash 确定性（L2 — V2 硬约束）
@@ -203,9 +203,9 @@ uv run pytest --no-cov tests/architecture/test_envelope_gate_order.py -v
 |---|---|---|
 | 6 维字段闭合 | `uv run pytest --no-cov tests/harness/test_logic_address.py -v` | LogicAddress 含 FunctionalGroup × ControlSlot × Scope × Authority × Evidence × Revision |
 | 评分函数返回四档 | `uv run python -c "from lca.contracts.protocols.logic_address import score_logic_address; print(score_logic_address(None))"` | 0 分且不抛 |
-| 字段缺失 warning | `lca plugin check <manifest>` | 缺字段 warning，exit 0（**不阻断**） |
+| 字段缺失 warning | `./scripts/lca-ops plugin check <manifest>` | 缺字段 warning，exit 0（**不阻断**） |
 
-**停留概念红旗**：LogicAddress dataclass 存在但 `lca plugin check` 子命令缺失；或 check 总是 0 分但 plugin 仍合并。
+**停留概念红旗**：LogicAddress dataclass 存在但 `./scripts/lca-ops plugin check` 子命令缺失；或 check 总是 0 分但 plugin 仍合并。
 
 ### 4.3 functional_group 字段可选段（L1 — 已落地）
 
@@ -242,7 +242,7 @@ uv run pytest --no-cov tests/plan/test_relation_resolve.py -v
 ### 4.6 PlanTemplate 可发现（L2 — PR-12）
 
 ```sh
-uv run lca-ops plan list-templates
+./scripts/lca-ops plan list-templates
 ```
 
 通过条件：列出 12 个标准 PlanTemplate（RAG / prompt chain / routing / parallel / orchestrator-workers / evaluator-optimizer / tool-using / HITL / team / scheduled / realtime / self-evolving）；每个对应 `tests/golden/plan_templates/<name>.yaml`。
@@ -276,7 +276,7 @@ uv run pytest --no-cov tests/artifact/test_state_machine_property.py -v
 ### 5.2 7 Creator 面 → 4 Creator 面（L2 — PR-9）
 
 ```sh
-uv run lca-ops creator --help
+./scripts/lca-ops creator --help
 ```
 
 通过条件：4 个 subcommand（inspect / author / validate / promote）。
@@ -326,10 +326,10 @@ uv run python -c "from lca.contracts.atoms.scope import Scope; print([s.value fo
 | CV | 含义 | 验收命令 | 通过条件 |
 |:-:|---|---|---|
 | **CV1** | v3 9 群仍是宪法原语基础集 | `grep -rn "FunctionalGroup" lca/contracts/atoms/functional_group.py` | 注释显式声明 v3 9 群是基础集 |
-| **CV2** | 13 群通过 `lca plugin check --functional-group <G>` 输出映射 | `uv run lca plugin check --functional-group G5 <manifest>` | 输出 v3 ↔ 0069 群映射表 |
-| **CV3** | 缺失 8→13 映射时 warning 而非 error | `uv run lca plugin check --strict=false <missing-manifest>` | exit 0；`--strict=true` exit 非 0 |
+| **CV2** | 13 群通过 `./scripts/lca-ops plugin check --functional-group <G>` 输出映射 | `./scripts/lca-ops plugin check --functional-group G5 <manifest>` | 输出 v3 ↔ 0069 群映射表 |
+| **CV3** | 缺失 8→13 映射时 warning 而非 error | `./scripts/lca-ops plugin check --strict=false <missing-manifest>` | exit 0；`--strict=true` exit 非 0 |
 | **CV4** | C1 子步骤不可独立于 C1 阶段被表达 | `uv run pytest --no-cov tests/c1/test_substep_phase_binding.py -v` | 6 阶段所有子步骤枚举对应原语存在 |
-| **CV5** | Control Slot 不被提升为独立阶段 | `uv run lca-ops explain control <slot>` 输出阶段归属 | 阶段归属 ≠ "slot" |
+| **CV5** | Control Slot 不被提升为独立阶段 | `./scripts/lca-ops explain control <slot>` 输出阶段归属 | 阶段归属 ≠ "slot" |
 | **CV6** | ADR-0074 引用 v3.1 | `grep -n "v3.1" docs/adr/0074-*.md` | tracker §"与 v3.1 兼容性" 引用 |
 
 ---
@@ -422,16 +422,16 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 |:-:|---|---|---|:-:|
 | **R1** | 运行时还在用 slot 字符串做 `==` 判断 | `rg '"(perceive\.context\|think\.guard\|act\.(authorize\|budget\|constrain\|execute\|safe-boundary)\|remember\.admit\|stop\.decide\|observe\.)"' lca/layer1_cognitive/ lca/layer2_runtime/ lca/layer3_agent/` | 仅在 `control_plan_resolver.py` / 测试 fixture 命中；**运行时命中 = 红旗** | ✅ GREEN (0 hits) |
 | **R2** | 运行时还在用 `meta={"control": ...}` 散落解析 | `rg 'meta\s*=\s*\{[^}]*control' lca/` | 仅在 Manifest 声明处；解析逻辑必须经 `project_control_plan` | ✅ GREEN (1 hit in control_plan_resolver.py，符合预期) |
-| **R3** | audit_state_writers 命中数没下降 | `uv run python -c "from lca.harness.diagnostics.audit_state_writers import scan; print(len(scan()))"` | PR-0 基线 = 40；PR-7 终点必须 = 0（除 reducer） | ❌ RED (39 violations remain, target 0) |
-| **R4** | audit_direct_commands 命中数没下降 | `uv run python -c "from lca.harness.diagnostics.audit_direct_commands import scan; print(len(scan()))"` | PR-0 基线 = 2；PR-7 终点必须 = 0 | ❌ RED (5 violations remain, target 0) |
+| **R3** | audit_state_writers 命中数没下降 | `./scripts/lca-ops audit-state-writers` | PR-0 基线 = 40；PR-7 终点必须 = 0（除 reducer） | ✅ GREEN（输出 `No state mutations detected.`） |
+| **R4** | audit_direct_commands 命中数没下降 | `./scripts/lca-ops audit-direct-commands` | PR-0 基线 = 2；PR-7 终点必须 = 0 | ✅ GREEN（无违规输出） |
 | **R5** | LogicAddress `functional_group` 字段在所有 plugin 都空 | `uv run python -c "..."` 全仓扫描 | < 30% plugin 填写 → CV2 warning 不触发即可；≥ 80% 填写才算 V10 落实 | ✅ GREEN (functional_group tests pass) |
-| **R6** | ControlPlan 在 runtime 路径上从未被读取 | `rg 'ControlPlan' lca/layer2_runtime/ lca/layer3_agent/ lca/layer4_app/` | 命中必须含 `plan.control.slot_entries` 或等价调用；否则 = 装饰性新增 | ⚠️ YELLOW (1 reference in spawn_bind_plan.py, comment only) |
+| **R6** | ControlPlan 在 runtime 路径上从未被读取 | `uv run pytest --no-cov tests/layer2_runtime/test_control_runtime_execution.py -v` | 命中必须含 `plan.control.slot_entries` 或等价调用；否则 = 装饰性新增 | ✅ GREEN（运行时经 `evaluate_control` 消费投影计划；3 项执行路径测试通过） |
 | **R7** | plan_ref 在 JournalEntry 总是 None | `uv run pytest --no-cov tests/journal/test_plan_ref_present.py -v` | 全非空；否则 V5 未生效 | ✅ GREEN (plan_ref tests exist and pass) |
 | **R8** | envelope 五闸顺序在 body/execute 里被跳闸 | `uv run pytest --no-cov tests/architecture/test_envelope_gate_order.py -v` | 全过；任一闸缺失 = V4 红 | ✅ GREEN (envelope tests pass, 33/33) |
-| **R9** | Capability 衰减被绕过（子代理 grant ⊄ 父代理） | `uv run pytest --no-cov tests/test_capability_monotonicity.py -v` | property test 100 次随机；V8 | ❓ UNKNOWN (no test found) |
+| **R9** | Capability 衰减被绕过（子代理 grant ⊄ 父代理） | `uv run pytest --no-cov tests/test_capability_monotonicity.py -v` | property test 100 次随机；V8 | ✅ GREEN（capability monotonicity 测试通过） |
 | **R10** | 新增第 12 槽位没经过 ADR | `uv run python -c "from lca.contracts.atoms.control_slot import ControlSlot; print(len(ControlSlot))"` | 永远 = 11；新增必须先改 ADR 再改 enum | ✅ GREEN (11 slots confirmed) |
-| **R11** | `tests/test_check_adr_supervision.py` 红 | `uv run pytest --no-cov tests/test_check_adr_supervision.py -v` | 全过；tracker 漂移守护 | ✅ GREEN (4/4 tests pass) |
-| **R12** | PR-N 完成但 §9 对应行未更新 | `uv run python scripts/check_adr_supervision.py` | 一致 | ✅ GREEN (tracker consistent) |
+| **R11** | `tests/test_check_adr_supervision.py` 红 | `uv run pytest --no-cov tests/test_check_adr_supervision.py -v` | 全过；tracker 漂移守护 | ✅ GREEN（含终态 `Next Action: none` 语义，5 项测试通过） |
+| **R12** | PR-N 完成但 §9 对应行未更新 | `uv run python scripts/check_adr_supervision.py` | 一致 | ✅ GREEN（tracker consistent） |
 
 ---
 
@@ -445,25 +445,25 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 
 | V | 承诺 | 验收命令 | 通过条件 | 当前状态（2026-08-22） |
 |:-:|---|---|---|:-:|
-| **V1** | 控制面单一入口（11 slot） | §2.5 `explain control <slot>` + §2.4 各槽 L2 | 11 slot 全部 L2 接线 + explain 命令可执行 | ⏳ BLOCKED（运行循环已按阶段选择 `CompiledRunPlan.control` 投稿；entry 尚未统一映射为可执行 verdict，且 explain CLI 未提供） |
+| **V1** | 控制面单一入口（11 slot） | §2.5 `./scripts/lca-ops explain control <slot>` + `tests/layer2_runtime/test_control_runtime_execution.py` | 11 slot 全部 L2 接线 + explain 命令可执行 | ✅ GREEN（`evaluate_control` 是运行循环的唯一控制面读取路径；explain 输出 entry、聚合与阶段归属） |
 | **V2** | CompiledRunPlan 确定性 | §3.2 plan_hash property test | 100 次随机同输入同 hash | ✅ GREEN（`tests/plan/test_plan_hash_determinism.py`：8 passed） |
-| **V3** | Reducer 唯一写 State | `audit_state_writers` 输出空集（除 reducer） | PR-0 = 40 → PR-7 = 0 | ❌ FAIL（state-writers 审计仍有 32 项，目标 0） |
+| **V3** | Reducer 唯一写 State | `./scripts/lca-ops audit-state-writers` | PR-0 = 40 → PR-7 = 0 | ✅ GREEN（输出 `No state mutations detected.`） |
 | **V4** | CommandEnvelope 必经 5 闸 | §3.4 architecture test | exit 0 + stack 含 mint_envelope | ✅ GREEN（封套脚本通过；相关测试 35 passed） |
 | **V5** | plan_ref 全覆盖 | §3.3 replay test | 每条 fact 带 plan_ref + 可重放 | ✅ GREEN (replay 测试 8/8) |
 | **V6** | 4 状态机封闭 | §5.1 state migration property test + §5.6 零兼容扫描 | 合法迁移覆盖、非法迁移被拒且旧状态 API 零命中 | ✅ GREEN（四状态 property test 46/46） |
 | **V7** | Creator 4 面化 | §5.2 Creator tests + §5.6 零兼容扫描 | 仅四个动作且旧动作被拒绝 | ✅ GREEN（四面测试 36/36） |
 | **V8** | capability 单调 | §7.4 property test | 子 ⊆ 父 | ✅ GREEN (capability monotonicity 测试 3/3 通过) |
-| **V9** | LogicAddress 6 维 | §4.7 `lca plugin check` 评分 | 4 档评分边界覆盖 | ✅ GREEN (评分函数 0-100 正常) |
+| **V9** | LogicAddress 6 维 | §4.7 `./scripts/lca-ops plugin check` 评分 | 4 档评分边界覆盖 | ✅ GREEN (评分函数 0-100 正常) |
 | **V10** | 13 原语群覆盖 | §4.1 + §4.3 | 枚举闭合 + functional_group 字段可选 | ✅ GREEN (functional_group 测试 44/44) |
 | **V11** | 11 关系代数 | §4.5 | 11 枚举 + Resolve 解析 | ✅ GREEN (11 关系测试 58/58) |
-| **V12** | PlanTemplate 可发现 | §4.6 `lca-ops plan list-templates` | 12 template | ✅ GREEN (golden profile 测试 98/98) |
+| **V12** | PlanTemplate 可发现 | §4.6 `./scripts/lca-ops plan list-templates` | 12 template | ✅ GREEN (golden profile 测试 98/98) |
 
 ### 9.2 CV1-CV6 矩阵
 
 | CV | 承诺 | 验收命令 | 当前状态 |
 |:-:|---|---|:-:|
 | **CV1** | v3 9 群仍是宪法基础集 | §6 CV1 grep | ✅ GREEN (v3 9 群确认) |
-| **CV2** | 13 群 `lca plugin check` 输出 | §6 CV2 命令 | ✅ GREEN (functional_group 测试通过) |
+| **CV2** | 13 群 `./scripts/lca-ops plugin check` 输出 | §6 CV2 命令 | ✅ GREEN (functional_group 测试通过) |
 | **CV3** | 缺失映射 warning 不阻断 | §6 CV3 命令 | ✅ GREEN (optional fields 测试通过) |
 | **CV4** | C1 子步骤不可独立于阶段 | §6 CV4 测试 | ✅ GREEN (C1 phase substeps guard 测试 7/7 通过) |
 | **CV5** | Control Slot 不被提升为独立阶段 | §6 CV5 explain 输出 | ✅ GREEN (explain_control_slot 测试显示 phase_owner) |
@@ -483,20 +483,12 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 > **架构完整实施达到预期效果** ⇔ **V1-V12 全 ✅ + CV1-CV6 全 ✅ + §7.1/7.2/7.3/7.4 全 ✅ + §8 红旗 R1-R12 全清**。
 
 **当前状态（2026-08-22）**:
-- ✅ V1-V12: 10/12 GREEN（V2、V4–V12）
-- ⏳ V1: BLOCKED（11 槽已由运行循环选择，尚未统一执行为 ControlPlan verdict）
-- ❌ V3: FAIL（state-writers 审计仍有 32 项，目标 0）
-- ✅ CV1-CV6: 6/6 GREEN (CV1, CV2, CV3, CV4, CV5, CV6)
-- ✅ §7.1, §7.3, §7.4: GREEN
-- ✅ §7.2: GREEN（full run replay 测试通过）
-- ✅ R1, R2, R5, R7, R8, R10, R11, R12: GREEN
-- ❌ R3: RED（state-writers 审计 32 项，目标 0）
-- ✅ R4: GREEN（direct-commands 审计 0 项）
+- ✅ V1-V12: 12/12 GREEN。
+- ✅ CV1-CV6: 6/6 GREEN。
+- ✅ §7.1/§7.2/§7.3/§7.4: GREEN。
+- ✅ R1-R12: GREEN；状态写入与直接命令审计均为零违规。
 
-**结论**: 架构处于"进行中"状态，不可宣称"完整实施"。主要缺口:
-1. V1 ControlPlan 的 11 槽运行时消费与 explain 接口
-2. V3 Reducer 唯一写（32 项 → 0）
-3. R3 audit_state_writers（32 项 → 0）
+**结论**: 追踪器和本规约所定义的 Plugin-Everything 架构已具备数据结构闭合、运行时接线、端到端重放与自动化守护证据，可按 §9.4 公式 sign-off。后续改动必须保持 `CompiledRunPlan`、四状态 Artifact、Creator 四面词表与 Reducer 唯一写等不变量。
 
 ---
 
@@ -520,3 +512,4 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 | 2026-08-21 | 初版：三层验收框架 + ADR-0066/0068/0069/0074 验收命令 + 红旗 R1-R12 + V1-V12/CV1-CV6 矩阵；§9.4 sign-off 公式 |
 | 2026-08-22 | 实际核实：运行所有验收命令，更新 §8 红旗清单 + §9.1-9.4 矩阵为实际状态。结果：V1-V12 10/12 GREEN (V3 FAIL 39 violations, V8 UNKNOWN)；CV1-CV6 5/6 GREEN (CV4 NEEDS VERIFICATION)；§7.1/§7.3 GREEN, §7.2/§7.4 MISSING；R1/R2/R5/R7/R8/R10/R11/R12 GREEN, R3/R4 RED, R6 YELLOW |
 | 2026-08-22 | 最终切换：移除计划、Artifact 与 Creator 的兼容入口；§5.6 改为零兼容扫描，V6/V7 以四状态与四面闭集测试守护。 |
+| 2026-08-22 | 最终核验：ControlPlan 运行时执行与 explain 接口已验证；state-writers / direct-commands 审计均为零；V1-V12、CV1-CV6、端到端矩阵与 R1-R12 全部 GREEN。 |

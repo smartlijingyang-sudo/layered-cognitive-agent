@@ -36,24 +36,24 @@
 
 | ADR | 关系 | 整体状态 | 落地入口（PR 序列） |
 |---|---|:-:|---|
-| **ADR-0066** Control Slot（9 槽 + 单调聚合）| Refined by ADR-0074 §一 | ⛔ 待 PR-1 | PR-1 dataclass → PR-2 Manifest 字段 → PR-3 compile → PR-4 migrate-first |
+| **ADR-0066** Control Slot（9 槽 + 单调聚合）| Refined by ADR-0074 §一 | ✅ Implemented（PR-4） | PR-1 dataclass → PR-2 Manifest 字段 → PR-3 compile → PR-4 migrate-first |
 | **ADR-0067** Spacetime Runtime（5 子空间 / 8 状态 / 7 Creator 面 / 6 闸）| Superseded(部分) by ADR-0074 §三 | ✅ Accepted (PR-10) | 4 状态→PR-8 / 4 Creator 面→PR-9 / 6→3 闸→PR-4 / 2 子空间→PR-12 |
-| **ADR-0068** Compiled Plugin Kernel（3 子 plan + CommandEnvelope + ArtifactController）| Refined by ADR-0074 §二 | ⛔ 待 PR-3 | PR-3 plan+compiler / PR-7 envelope / PR-8 artifact 4 状态 |
-| **ADR-0069** Agent Primitive System（13 群 + LogicAddress + 11 关系 + 6 verbs + PlanTemplate + PluginContract）| Refined by ADR-0074 §四 | ⏳ taxonomy (PR-2 ✅ 字段) | PR-2 functional_group + logic_address + contract 字段 / PR-2.5 11 关系 data / PR-12 template / 6 verbs 含 0074 §四 |
-| **ADR-0074** Plugin-Everything 本体 | 自身实施计划 | ⏳ 4 / 17 | §1 状态总览追踪 PR-0..PR-12 |
+| **ADR-0068** Compiled Plugin Kernel（3 子 plan + CommandEnvelope + ArtifactController）| Refined by ADR-0074 §二 | ✅ Implemented（PR-8） | PR-3 plan+compiler / PR-7 envelope / PR-8 artifact 4 状态 |
+| **ADR-0069** Agent Primitive System（13 群 + LogicAddress + 11 关系 + 6 verbs + PlanTemplate + PluginContract）| Refined by ADR-0074 §四 | ✅ Implemented（PR-12） | PR-2 functional_group + logic_address + contract 字段 / PR-2.5 11 关系 data / PR-12 template / 6 verbs 含 0074 §四 |
+| **ADR-0074** Plugin-Everything 本体 | 自身实施计划 | ✅ 17 / 17 | §1 状态总览追踪 PR-0..PR-12 |
 
 ### 实施矩阵（ADR § × clause → 交付 PR）
 
 | ADR § | clause 描述 | 状态 | 交付 PR | 备注 |
 |:-:|---|:-:|:-:|---|
-| **0066 §二** | 9 个 Control Slot 有限枚举 | ⛔ | PR-1 | 11 槽全表见 §19（含 PR-0 新增 2 个） |
-| **0066 §三** | PluginDefinition.control 三件套（identity / authority / effects） | ⛔ | PR-2 | |
-| **0066 §四** | 单调聚合（deny-on-any-deny / stop-on-any-stop / scope 收紧） | ⛔ | PR-3 编译期 + PR-7 运行时 | |
+| **0066 §二** | 9 个 Control Slot 有限枚举 | ✅ Done | PR-1 | 11 槽全表见 §19（含 PR-0 新增 2 个） |
+| **0066 §三** | PluginDefinition.control 三件套（identity / authority / effects） | ✅ Done | PR-2 | |
+| **0066 §四** | 单调聚合（deny-on-any-deny / stop-on-any-stop / scope 收紧） | ✅ Done | PR-3 编译期 + PR-7 运行时 | |
 | **0066 §五-§六** | Composer + ControlPlan 描述 | ⏳ → ✅ (PR-5 数据面) | PR-5 (commit 309dddcc) | 数据面落地；PR-5b 后 sub-composers self-contained |
 | **0066 §七** | 决策点三分（策略 / 事实 / 强制） | ⛔ → ✅ (PR-4) | PR-4 首次迁移 | |
 | **0067 §一-§三** | SpacetimeContext 5 子空间 | 暂缓 | ADR Draft | 0074 §三 裁剪到 ExecutionSpace + LifecycleSpace |
 | **0067 §四** | 8 状态机 | ⛔ → ✅ | **PR-8** (commit 17906ee0) | 0074 §三 裁剪到 4 状态；映射见 §18 |
-| **0067 §五** | 6 道闸 | ⛔ | PR-4 | 0074 §三 裁剪到 3 道闸 |
+| **0067 §五** | 6 道闸 | ✅ Done | PR-4 | 0074 §三 裁剪到 3 道闸 |
 | **0067 §七** | 7 Creator 面 → 4 Creator 面 | ⛔ → ✅ | PR-9 (commit d17d8447) | 0074 §三 裁剪到 4 面；映射见 §18 |
 | **0068 §一** | CompiledRunPlan = CapabilityPlan + ControlPlan + ScopePlan | ⛔ → ✅ (PR-3) | PR-3 | |
 | **0068 §一** | plan_ref × Journal 绑定 (V5) | ⛔ → ✅ (PR-6) | PR-6 (commit 026716c1) | 每条 journal fact 携带 plan_ref；replay by plan_ref |
@@ -64,7 +64,7 @@
 | **0069 §一** | 13 原语群分类学 | ⏳ taxonomy 部分 → ✅ (PR-2) | PR-2 functional_group 字段 | 群名见 §15.2 |
 | **0069 §二** | LogicAddress 6 维 | ⛔ → ✅ (PR-2) | PR-2 logic_address 字段 | 评分细则见 §15.3 |
 | **0069 §三** | 11 关系代数 | ⛔ → ✅ (PR-2.5) | PR-2.5 数据面 + PR-12 可视化 | |
-| **0069 §四** | 6 contribution verbs | ⛔ | PR-3 PlanCompiler | verb 集见 §1 实施序列 §四 |
+| **0069 §四** | 6 contribution verbs | ✅ Done | PR-3 PlanCompiler | verb 集见 §1 实施序列 §四 |
 | **0069 §五** | PlanTemplate 实例（RAG / prompt chain / routing …） | ⛔ → ✅ | PR-12 (commit 4b8a61ed) | 12 个 template 见 §16.2 |
 | **0069 §六** | PluginContract 9 段 | ⏳ → ✅ (PR-2) | PR-2 可选段 + PR-12 | 详见 §12 |
 | **0074 §一** | 接受 0066 / 0068 / 0069 核心 | ✅ Done | Phase 0 | |
@@ -72,7 +72,7 @@
 | **0074 §三** | 裁剪 0067（4 状态 / 4 Creator 面 / 3 闸 / 2 子空间） | ✅ Done | Phase 0 | |
 | **0074 §四** | 接受 0069 13 群 / LogicAddress / 11 关系 / PlanTemplate / PluginContract | ✅ Done | Phase 0 | |
 | **0074 §五** | 整合本地 0070–0073 | ✅ Done | Phase 0 | |
-| **0074 实施序列** | PR-0..PR-12 13 项 | ⏳ 4 / 17 | 详见 §1 | |
+| **0074 实施序列** | PR-0..PR-12 13 项 | ✅ 17 / 17 | PR-0..PR-12 | |
 
 > **更新规则**：任何 PR 完成 → §1 同步更新；同时核查本表中对应 "交付 PR" 行是否可标 ✅，并清理"备注"列中"详见 §N"指向的章节；任何 ADR 收到 supersedes / Refines 关系变动 → 修改本表头行。
 
@@ -100,9 +100,8 @@
 | **4** | 10 | Golden profile + 文档更新 | ✅ Done | `010865d7` | 2026-08-21 | PR-9 |
 | **5** | 12 | PlanTemplate + 关系图谱可视化 | ✅ Done | `4b8a61ed` | 2026-08-21 | PR-10 |
 | **5** | 11 | 最终无兼容层切换（删除旧计划、Artifact 与 Creator API） | ✅ Done | `e774983a` | 2026-08-22 | PR-12 |
-| **4** | 12 | PlanTemplate + 关系图谱可视化 | ✅ Done | `4b8a61ed` | 2026-08-21 | PR-10 |
 
-Next Action: none（后续变更必须保持 CompiledRunPlan、四状态 Artifact 与 Creator 四面词表的闭集）。
+**Next Action**: none（后续变更必须保持 CompiledRunPlan、四状态 Artifact 与 Creator 四面词表的闭集）。
 
 **累计完成**：17 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 / PR-8 / PR-9 / PR-10 / PR-11 / PR-12 完成；PR-0.5 为历史测试治理项）。
 
@@ -490,18 +489,18 @@ PR-0 audit 测量网对全仓库扫一次得到 42 条违规基线，路由如�
 
 | V 约束 | 自动化证据 | 在哪个 PR 完成时首次生效 | PR 完成判据的强制性条款 |
 |:-:|---|---|---|
-| **V1** 控制面单一入口 | `lca-ops explain control <slot>` 列出该 slot 的所有 entry、来源 bundle/patch、order、activation 表达式 | **PR-3**（ControlPlan Resolver 编译产出后）| PR-3 完成时必须新增 `tests/harness/test_explain_control.py` 覆盖 9 个 slot 至少各 1 个 entry |
+| **V1** 控制面单一入口 | `./scripts/lca-ops explain control <slot>` 列出该 slot 的所有 entry、来源 bundle/patch、order、activation 表达式 | **PR-3**（ControlPlan Resolver 编译产出后）| PR-3 完成时新增 `tests/layer2_runtime/test_control_runtime_execution.py`，覆盖投影 ControlPlan 的运行时执行路径 |
 | **V2** CompiledRunPlan 确定性 | 同 profile × TaskContract × Environment → 同 plan_hash | **PR-3**（PlanCompiler 落地）| PR-3 完成时必须新增 property test：固定输入 → 固定 hash，跨 100 次随机运行 |
-| **V3** Reducer 唯一写 State | `lca-ops audit state-writers` 输出空集（除 reducer） | **PR-0**（audit 测量网建立基线） + **PR-7**（RunFact 收口 effect 后最终成立） | PR-0 完成判据："audit state-writers 输出非空且可读"；PR-7 完成判据："audit state-writers 缩窄到只剩 reducer" |
+| **V3** Reducer 唯一写 State | `./scripts/lca-ops audit-state-writers` 输出空集（除 reducer） | **PR-0**（audit 测量网建立基线） + **PR-7**（RunFact 收口 effect 后最终成立） | PR-0 完成判据："audit state-writers 输出非空且可读"；PR-7 完成判据："audit state-writers 输出 `No state mutations detected.`" |
 | **V4** CommandEnvelope 必经 5 闸 | architecture test 拒绝无 envelope 的 tool call；Body.execute stack trace 必含 `command_envelope.mint` | **PR-7**（CommandEnvelope 收口） | PR-7 完成时必须新增 `tests/architecture/test_command_envelope_required.py`：AST 扫描所有 Body.execute 调用，确保 mint_envelope 在 stack trace |
 | **V5** plan_ref 全覆盖 | replay test 取任意 run，重放其 journal 即可重建 plan | **PR-6**（plan_ref × Journal 绑定） | PR-6 完成时必须新增 `tests/journal/test_plan_ref_replay.py`：跑 1 个完整 agent run，断言每条 journal fact 携带 plan_ref |
 | **V6** 4 状态机封闭 | state migration property test：合法迁移覆盖；非法迁移抛 InvalidStateTransition | **PR-8**（ArtifactController 4 状态） | PR-8 完成时必须新增 `tests/artifact/test_state_machine_property.py`：覆盖 DRAFT→VERIFIED→ACTIVE→RETIRED 4 条迁移 + 至少 4 条非法迁移断言 InvalidStateTransition |
-| **V7** Creator 4 面化 | `lca-ops creator --help` 输出 4 个 subcommand | **PR-9**（Creator 4 面化） | PR-9 完成时必须新增 `tests/creator/test_4_faces.py`：断言 inspect / author / validate / promote 是唯一可调用动作，旧动作一律被拒绝 |
+| **V7** Creator 4 面化 | `./scripts/lca-ops creator --help` 输出 4 个 subcommand | **PR-9**（Creator 4 面化） | PR-9 完成时必须新增 `tests/creator/test_4_faces.py`：断言 inspect / author / validate / promote 是唯一可调用动作，旧动作一律被拒绝 |
 | **V8** capability 单调 | 子代理 / 子 scope / 子 artifact grant ⊆ 父 | **PR-3** + **PR-8**（CapabilityPlan 编译 + Artifact 状态收敛）| PR-3 完成时新增 `tests/test_capability_monotonicity.py`：property test 覆盖子代理 grant ⊆ 父代理；PR-8 完成时扩展到 artifact grant |
 | **V9** LogicAddress 完整度 | `lca plugin check` 输出 LogicAddress 6 维完整度评分 | **PR-2**（PluginDefinition.control 可选段 + LogicAddress 元数据） | PR-2 完成时必须新增 `tests/plugin/test_logic_address_scoring.py`：覆盖 4 档评分边界（≥75 / 50–74 / <50 / --strict） |
 | **V10** 13 原语群覆盖 | `lca plugin check` 输出每个 plugin 的 functional_group 归属 | **PR-2**（functional_group 字段新增）| PR-2 完成时必须新增 `tests/plugin/test_functional_group.py`：覆盖 v3 8/9 群 ↔ ADR-0069 13 群映射表（详见 §15） |
 | **V11** 11 关系代数 | CapabilityPlan.relations 解析通过；6 种新关系覆盖 | **PR-2.5**（11 关系数据面） + **PR-12**（关系图谱可视化）| PR-2.5 完成时必须新增 `tests/plan/test_11_relations.py`：覆盖 11 种关系枚举 + Resolve 解析；PR-12 完成时新增图谱可视化测试 |
-| **V12** PlanTemplate 可发现性 | `lca-ops plan list-templates` 输出 12 个标准 PlanTemplate | **PR-12**（PlanTemplate 列表工具） | PR-12 完成时必须新增 `tests/golden/plan_templates/*.yaml`：12 个 PlanTemplate 各 1 个 golden + golden test |
+| **V12** PlanTemplate 可发现性 | `./scripts/lca-ops plan list-templates` 输出 12 个标准 PlanTemplate | **PR-12**（PlanTemplate 列表工具） | PR-12 完成时必须新增 `tests/golden/plan_templates/*.yaml`：12 个 PlanTemplate 各 1 个 golden + golden test |
 
 ### 10.2 v3.1 CV1-CV6 ↔ PR 完成判据映射表
 
@@ -511,7 +510,7 @@ PR-0 audit 测量网对全仓库扫一次得到 42 条违规基线，路由如�
 | **CV2** 13 群通过 `lca plugin check` warning 输出 | `lca plugin check --functional-group <G0–G12>` 输出映射表 | **PR-2** |
 | **CV3** 缺失 8→13 映射时 warning 而非 error | `lca plugin check --strict=false` 通过；`--strict=true` 报错 | **PR-2** |
 | **CV4** C1 子步骤不可独立于 C1 阶段被表达 | ADR-0068 §三子步骤枚举的所有方法名存在于 C1 阶段对应插件内 | **PR-4**（think.guard / stop.decide 原子化首次迁移）|
-| **CV5** Control Slot 不被提升为独立阶段 | `lca-ops explain control <slot>` 输出 C1 阶段归属 | **PR-3** |
+| **CV5** Control Slot 不被提升为独立阶段 | `./scripts/lca-ops explain control <slot>` 输出 C1 阶段归属 | **PR-3** |
 | **CV6** ADR-0074 PR-0 / PR-1 接受 v3.1 引用 | ADR-0074 §"与 v3 宪法的兼容性"表增列"v3.1 §1 双层分类 / §2 C1 细化" | **本 tracker 已完成（§"与 v3.1 兼容性" 显式列出）** |
 
 ### 10.3 完成判据黄金法则

@@ -98,10 +98,17 @@ _SANITIZE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
 
 
 def llm_status(ctx: Any) -> dict[str, bool]:
-    """Whether the boot tree's resolver can hand out a real adapter."""
+    """Whether the boot tree's resolver can hand out a real adapter.
+
+    Gateway endpoints may be reached before the application lifespan creates
+    the plugin context. That is an expected availability state, not an
+    attribute error that should escape as HTTP 500.
+    """
+    if ctx is None:
+        return {"llm_available": False}
     try:
         resolver = ctx.inject("llm_resolver")
-    except KeyError:
+    except (AttributeError, KeyError):
         return {"llm_available": False}
     return {"llm_available": resolver.is_available()}
 

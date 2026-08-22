@@ -31,11 +31,13 @@ class TestOpenAiCompatGateway(unittest.TestCase):
 
     def test_chat_completions_housekeeper_passthrough(self) -> None:
         registry = RunRegistry()
-        client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
-        with patch(
-            "gateway.openai_shim.create_simple_completion",
-            new=AsyncMock(
-                return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2})
+        with (
+            TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
+            patch(
+                "gateway.openai_shim.create_simple_completion",
+                new=AsyncMock(
+                    return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2})
+                ),
             ),
         ):
             response = client.post(
@@ -75,6 +77,16 @@ class TestOpenAiCompatGateway(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 503)
+
+    def test_unbooted_compat_endpoints_return_503(self) -> None:
+        """Missing lifespan context is an availability error, never a server error."""
+        client = TestClient(create_app(RunRegistry()))
+        for path, payload in (
+            ("/v1/embeddings", {"model": "text-embedding-3-small", "input": "hello"}),
+            ("/v1/responses", {"model": "solo", "input": "hello"}),
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(client.post(path, json=payload).status_code, 503)
 
 
 class TestRunRegistryDedup(unittest.TestCase):
@@ -223,15 +235,21 @@ class TestOpenAiStructuredHelpers(unittest.TestCase):
 
 class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
     def test_embeddings_create_returns_vectors(self) -> None:
-        client = TestClient(create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
-        with patch(
-            "gateway.openai_shim.create_embeddings",
-            new=AsyncMock(return_value={
-                "object": "list",
-                "data": [{"object": "embedding", "index": 0, "embedding": [0.1, 0.2]}],
-                "model": "text-embedding-3-small",
-                "usage": {"prompt_tokens": 2, "total_tokens": 2},
-            }),
+        with (
+            TestClient(
+                create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver())
+            ) as client,
+            patch(
+                "gateway.openai_shim.create_embeddings",
+                new=AsyncMock(
+                    return_value={
+                        "object": "list",
+                        "data": [{"object": "embedding", "index": 0, "embedding": [0.1, 0.2]}],
+                        "model": "text-embedding-3-small",
+                        "usage": {"prompt_tokens": 2, "total_tokens": 2},
+                    }
+                ),
+            ),
         ):
             response = client.post(
                 "/v1/embeddings",
@@ -246,10 +264,12 @@ class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
 class TestOpenAiResponsesEndpoint(unittest.TestCase):
     def test_responses_without_schema_is_housekeeper(self) -> None:
         registry = RunRegistry()
-        client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
-        with patch(
-            "gateway.openai_shim.create_simple_completion",
-            return_value=("ok", {}),
+        with (
+            TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
+            patch(
+                "gateway.openai_shim.create_simple_completion",
+                return_value=("ok", {}),
+            ),
         ):
             response = client.post(
                 "/v1/responses",
@@ -264,12 +284,14 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
 
     def test_responses_create_returns_output_text(self) -> None:
         registry = RunRegistry()
-        client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
-        with patch(
-            "gateway.openai_shim.create_structured_completion",
-            return_value=(
-                '{"satisfied": true}',
-                {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},
+        with (
+            TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
+            patch(
+                "gateway.openai_shim.create_structured_completion",
+                return_value=(
+                    '{"satisfied": true}',
+                    {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},
+                ),
             ),
         ):
             response = client.post(
@@ -292,14 +314,16 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
         self.assertIn("satisfied", payload["output_text"])
 
     def test_responses_missing_schema_without_user_message_returns_400(self) -> None:
-        client = TestClient(create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
-        response = client.post(
-            "/v1/responses",
-            json={
-                "model": "gpt-5.4-mini",
-                "input": [],
-            },
-        )
+        with TestClient(
+            create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver())
+        ) as client:
+            response = client.post(
+                "/v1/responses",
+                json={
+                    "model": "gpt-5.4-mini",
+                    "input": [],
+                },
+            )
         self.assertEqual(response.status_code, 400)
 
 

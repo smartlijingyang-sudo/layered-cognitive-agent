@@ -37,7 +37,7 @@ def _span_name_for_hook(event_name: str) -> str:
 
 
 def _extract_span_attributes(event_name: str, kwargs: dict[str, Any]) -> dict[str, Any]:
-    """从 hook kwargs 提取属性（原值；脱敏/截断由属性策略在写入期强制）。"""
+    """Extract attributes from a hook payload without bypassing policy enforcement."""
     attrs: dict[str, Any] = {"event": event_name}
 
     state = kwargs.get("state")
@@ -104,7 +104,7 @@ class CordisHookRegistry(HookRegistry):
     async def trigger(self, event_name: str, state: AgentState, **kwargs: Any) -> Any:
         # Ambient actor: nested llm/tool/memory span auto-tags, runtime body zero telemetry.
         set_actor(state.agent_role, state.step)
-        attrs = _extract_span_attributes(event_name, kwargs)
+        attrs = _extract_span_attributes(event_name, {"state": state, **kwargs})
         attrs[ATTR_STEP] = state.step
         # cordis events.serial / parallel / waterfall only accept positional
         # payloads; we fold state + kwargs into a single envelope so the

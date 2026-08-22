@@ -13,6 +13,7 @@ from gateway.runs.execute import create_run_session, schedule_run
 from gateway.runs.session import RunRegistry, RunStatus
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
+from tests.support.gateway_scripted import ScriptedLLMResolver
 
 
 @pytest.fixture(autouse=True)
@@ -61,11 +62,12 @@ async def test_execute_run_cancel_no_otel_detach_noise(caplog: pytest.LogCapture
     registry = RunRegistry()
     async with profile_lifespan("profiles/web-standard.yaml") as state:
         ctx = state["ctx"]
+        ctx.provide("llm_resolver", ScriptedLLMResolver())
         session = create_run_session(
             registry, question="hang", user_text="hang", mode="solo", ctx=ctx
         )
         with patch(
-            "gateway.runs.loop_drivers.build_solo_agent", return_value=_LazyHubAgent(session)
+            "gateway.runs.loop_drivers._build_solo_agent", return_value=_LazyHubAgent(session)
         ):
             task = schedule_run(registry, session, ctx=ctx)
             await asyncio.sleep(0)

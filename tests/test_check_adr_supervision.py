@@ -110,6 +110,16 @@ class TestCheckAdrSupervision:
         # 既不通过（0），也不是 error（1）—— 走 warning-only 路径
         assert "Next Action" in output or rc in (0, 1)
 
+    def test_terminal_next_action_none_passes(self) -> None:
+        """A fully completed roadmap may explicitly declare no next action."""
+        text = _minimal_valid_tracker().replace(
+            "**Next Action**：PR-1（next PR to work on）.",
+            "**Next Action**: none（all roadmap items are complete）.",
+        )
+        rc, output = _run_check_with_tracker(text)
+        assert rc == 0, f"expected terminal tracker to pass, got {rc}: {output}"
+        assert "OK" in output
+
     def test_real_repo_passes(self) -> None:
         """The actual repo tracker should pass (smoke test)."""
         if "scripts.check_adr_supervision" in sys.modules:
