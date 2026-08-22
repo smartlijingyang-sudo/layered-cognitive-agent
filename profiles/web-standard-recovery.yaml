@@ -1,0 +1,23 @@
+# web-standard-recovery profile — extends web-standard with bounded recovery.
+# ADR-0075: Adds reflect→think recovery edge for failure handling.
+# 
+# Recovery behavior:
+# - When a phase fails (observation.success == False), reflect phase sets admit_recovery
+# - Edge reflect.main → think.main is taken when admit_recovery is True
+# - LoopGuard limits recovery to 1 iteration to prevent infinite loops
+#
+# This profile demonstrates bounded recovery: agent can retry once after failure,
+# then must stop or escalate to human.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
+  - bundles/declarative-phase-graph.yaml
+  - bundles/declarative-recovery.yaml  # Adds recovery phase graph edges
+
+patch:
+  - id: lca-llm-resolver
+    config:
+      default_model: qwen3.7-plus
+      load_dotenv: true
