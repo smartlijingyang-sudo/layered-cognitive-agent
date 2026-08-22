@@ -99,7 +99,7 @@
 | **4** | 9 | Creator 4 面化 | ✅ Done | `d17d8447` | 2026-08-21 | PR-8 |
 | **4** | 10 | Golden profile + 文档更新 | ✅ Done | `010865d7` | 2026-08-21 | PR-9 |
 | **5** | 12 | PlanTemplate + 关系图谱可视化 | ✅ Done | `4b8a61ed` | 2026-08-21 | PR-10 |
-| **5** | 11 | 最终无兼容层切换（删除旧计划、Artifact 与 Creator API） | ✅ Done | `193f76f3` | 2026-08-22 | PR-12 |
+| **5** | 11 | 最终无兼容层切换（删除旧计划、Artifact 与 Creator API） | ✅ Done | `e774983a` | 2026-08-22 | PR-12 |
 | **4** | 12 | PlanTemplate + 关系图谱可视化 | ✅ Done | `4b8a61ed` | 2026-08-21 | PR-10 |
 
 Next Action: none（后续变更必须保持 CompiledRunPlan、四状态 Artifact 与 Creator 四面词表的闭集）。
