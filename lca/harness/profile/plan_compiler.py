@@ -142,7 +142,7 @@ def explain_compile_plan(plan: CompiledRunPlan) -> dict[str, Any]:
             "control": {
                 "plan_hash": control_sub_plan_hash(plan),
                 "entry_count": len(plan.control.entries),
-                "covered_slots": [s.value for s in plan.control.by_slot],
+                "covered_slots": sorted(s.value for s in plan.control.by_slot),
             },
             "scope": {
                 "plan_hash": scope_sub_plan_hash(plan),

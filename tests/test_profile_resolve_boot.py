@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from lca.harness.plugin_api import AuditedPluginContext
 from lca.harness.profile.boot import boot_profile, boot_resolved_profile
 from lca.harness.profile.resolve import ProfileResolveError, dump_resolved, resolve_profile
 
@@ -66,6 +67,14 @@ def test_unknown_config_field_fails(tmp_path: Path) -> None:
     )
     with pytest.raises(ProfileResolveError, match=r"gate\.repeat-tool-call"):
         resolve_profile(profile)
+
+
+def test_audited_context_hides_raw_container() -> None:
+    definition = resolve_profile(DEFAULT).plugins[0].definition
+    context = AuditedPluginContext(object(), definition)
+
+    with pytest.raises(AttributeError):
+        _ = context._inner  # type: ignore[attr-defined]
 
 
 def test_boot_default_profile() -> None:

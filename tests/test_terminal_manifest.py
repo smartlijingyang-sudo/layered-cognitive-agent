@@ -200,6 +200,49 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             )
             self.assertEqual(payload["terminal_event_id"], "evt-run-finished")
 
+    def test_v2_envelope_fallback_preserves_watermark_and_terminal_event(self) -> None:
+        with self._fresh_root() as root:
+            run_id = "run_terminal_v2"
+            jsonl_path = root / "runs" / run_id / "journal.jsonl"
+            _write_jsonl(
+                jsonl_path,
+                [
+                    {
+                        "schema": JOURNAL_SCHEMA_VERSION,
+                        "event_id": "evt-v2-finished",
+                        "run_id": run_id,
+                        "run_seq": 7,
+                        "occurred_at": 7.0,
+                        "committed_at": 7.0,
+                        "scope": {
+                            "trace_id": "t",
+                            "run_id": run_id,
+                            "agent_role": "agt_x",
+                            "step": 0,
+                        },
+                        "causation": {"parent_event_id": "", "links": []},
+                        "descriptor": {
+                            "type": "AgentRunFinished",
+                            "version": 1,
+                            "payload_schema_version": 1,
+                        },
+                        "data": {"status": "completed", "output_text": "done", "error": ""},
+                        "evidence": [],
+                    }
+                ],
+            )
+            session = _make_session(
+                run_id=run_id, jsonl_path=jsonl_path, status=RunStatus.COMPLETED
+            )
+
+            _record_terminal_materialization(session)
+
+            payload = json.loads(
+                (root / "runs" / run_id / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(payload["ledger_high_watermark"], 7)
+            self.assertEqual(payload["terminal_event_id"], "evt-v2-finished")
+
     def test_failure_does_not_propagate(self) -> None:
         """任何 IO 错误必须 swallow + 记日志,不能污染 run 关闭。"""
         with self._fresh_root() as root:

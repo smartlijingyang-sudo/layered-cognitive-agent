@@ -394,9 +394,9 @@ def definition_from_plugin(
 
 @dataclass
 class AuditedPluginContext:
-    """Wraps cordis.Context; records provide/require and enforces Manifest bounds."""
+    """Wraps a Context and expose only Manifest-audited setup interactions."""
 
-    _inner: Any
+    __inner: Any
     _definition: PluginDefinition
     provided: set[str] = field(default_factory=set)
     required: set[str] = field(default_factory=set)
@@ -411,7 +411,7 @@ class AuditedPluginContext:
                 f"{list(self._definition.provides)}"
             )
         self.provided.add(k)
-        self._inner.provide(k, value, **kwargs)
+        self.__inner.provide(k, value, **kwargs)
 
     def require(self, key: Capability[Any] | str) -> Any:
         k = cap_key(key)
@@ -421,7 +421,7 @@ class AuditedPluginContext:
                 f"{list(self._definition.requires)}"
             )
         self.required.add(k)
-        return self._inner.inject(k)
+        return self.__inner.inject(k)
 
     def inject(self, key: str, *, default: Any = ...) -> Any:
         """Compat alias for require(); undeclared keys fail unless default given."""
@@ -434,9 +434,9 @@ class AuditedPluginContext:
             return default
         self.required.add(key)
         if default is ...:
-            return self._inner.inject(key)
+            return self.__inner.inject(key)
         try:
-            return self._inner.inject(key)
+            return self.__inner.inject(key)
         except KeyError:
             return default
 
@@ -448,21 +448,27 @@ class AuditedPluginContext:
                 f"requires or provides"
             )
         self.registered.add((k, name))
-        svc = self._inner.inject(k)
+        svc = self.__inner.inject(k)
         register = getattr(svc, "register", None)
         if not callable(register):
             raise TypeError(f"capability {k!r} has no register()")
         register(name, value, **kwargs)
 
+    @property
+    def events(self) -> Any:
+        """Expose the event bus without exposing capability mutation or injection."""
+
+        events = getattr(self.__inner, "events", None)
+        if events is None:
+            raise AttributeError("underlying context has no events")
+        return events
+
     def emit(self, event: str, *args: Any, **kwargs: Any) -> Any:
         self.emitted.add(event)
-        events = getattr(self._inner, "events", None)
+        events = getattr(self.__inner, "events", None)
         if events is not None and hasattr(events, "emit"):
             return events.emit(event, *args, **kwargs)
-        emit_fn = getattr(self._inner, "emit", None)
+        emit_fn = getattr(self.__inner, "emit", None)
         if callable(emit_fn):
             return emit_fn(event, *args, **kwargs)
         raise AttributeError("underlying context has no emit")
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._inner, name)

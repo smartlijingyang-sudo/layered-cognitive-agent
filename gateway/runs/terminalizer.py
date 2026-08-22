@@ -21,6 +21,7 @@ from lca.layer0_infra.observability import (
     BoundObservability,
     fold_run_state,
 )
+from lca.layer0_infra.observability.journal.journal_io import record_normalize
 from lca.layer0_infra.observability.journal.reducer import RunStatus as JournalRunStatus
 from lca.layer0_infra.tools.run_finalizer import finalize_run
 
@@ -103,6 +104,8 @@ def _derive_terminal_status(session: RunSession, success: bool) -> None:
         else:
             derived = fold_run_state(store.events)
             session.status = _journal_to_session_status(derived.status)
+            if session.status == RunStatus.RUNNING:
+                _fallback_terminal_status(session, success)
     else:
         _fallback_terminal_status(session, success)
     if session.status in {RunStatus.CANCELED, RunStatus.FAILED, RunStatus.COMPLETED}:
@@ -116,12 +119,12 @@ def _journal_to_session_status(journal_status: JournalRunStatus | None) -> RunSt
         JournalRunStatus.COMPLETED: RunStatus.COMPLETED,
         JournalRunStatus.FAILED: RunStatus.FAILED,
         JournalRunStatus.CANCELED: RunStatus.CANCELED,
-        JournalRunStatus.RUNNING: RunStatus.COMPLETED,
+        JournalRunStatus.RUNNING: RunStatus.RUNNING,
         JournalRunStatus.WAITING_INPUT: RunStatus.WAITING_INPUT,
     }
     if journal_status is None:
-        return RunStatus.COMPLETED
-    return mapping.get(journal_status, RunStatus.COMPLETED)
+        return RunStatus.RUNNING
+    return mapping.get(journal_status, RunStatus.RUNNING)
 
 
 def _fallback_terminal_status(session: RunSession, success: bool) -> None:
@@ -131,6 +134,8 @@ def _fallback_terminal_status(session: RunSession, success: bool) -> None:
         session.status = RunStatus.FAILED
     elif success:
         session.status = RunStatus.COMPLETED
+    else:
+        session.status = RunStatus.FAILED
 
 
 def _record_terminal_materialization(session: RunSession) -> None:
@@ -230,7 +235,11 @@ def _watermark_from_file(path: Path) -> int:
                     row = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                last = max(last, int(row.get("seq", 0) or 0))
+                normalized = record_normalize(row)
+                last = max(
+                    last,
+                    int(normalized.get("run_seq", row.get("seq", 0)) or 0),
+                )
     except OSError:
         return 0
     return last
@@ -249,8 +258,16 @@ def _terminal_event_id_from_file(path: Path) -> str:
                     row = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if row.get("event_type") in _TERMINAL_EVENT_TYPES:
-                    last = str(row.get("event_id") or row.get("scope", {}).get("event_id") or "")
+                normalized = record_normalize(row)
+                descriptor = normalized.get("descriptor", {}) or {}
+                event_type = descriptor.get("type") or row.get("event_type")
+                if event_type in _TERMINAL_EVENT_TYPES:
+                    last = str(
+                        normalized.get("event_id")
+                        or row.get("event_id")
+                        or row.get("scope", {}).get("event_id")
+                        or ""
+                    )
     except OSError:
         return ""
     return last

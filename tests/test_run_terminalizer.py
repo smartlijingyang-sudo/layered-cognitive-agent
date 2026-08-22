@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -44,6 +45,28 @@ async def test_terminalize_closes_then_materializes_and_cleans_registry() -> Non
 
     assert session.status == RunStatus.COMPLETED
     assert events == ["close", "clear", "prune", "materialize"]
+
+
+@pytest.mark.asyncio
+async def test_missing_journal_finish_uses_failure_fallback() -> None:
+    session = _session()
+    session.hub = SimpleNamespace(
+        journal=SimpleNamespace(store=SimpleNamespace(events=[])),
+        close=lambda: None,
+        flush=lambda: None,
+    )
+    registry = MagicMock()
+
+    async def close_run(_run_id: str) -> None:
+        return None
+
+    await RunTerminalizer(
+        registry,
+        finalizer=close_run,
+        materializer=lambda _session: None,
+    ).terminalize(session, workspace=None, success=False)
+
+    assert session.status == RunStatus.FAILED
 
 
 @pytest.mark.asyncio

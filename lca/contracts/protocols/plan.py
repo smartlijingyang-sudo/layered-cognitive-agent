@@ -155,7 +155,7 @@ def compiled_run_plan_to_dict(plan: CompiledRunPlan) -> dict[str, Any]:
             "profile_path": plan.control.profile_path,
             "plan_hash": compute_control_plan_hash(plan.control.entries, plan.control.profile_path),
             "entry_count": len(plan.control.entries),
-            "covered_slots": [s.value for s in plan.control.by_slot],
+            "covered_slots": sorted(s.value for s in plan.control.by_slot),
         },
         "scope": {
             "profile_path": plan.scope.profile_path,
@@ -184,8 +184,8 @@ def build_input_provenance(
     """从 profile / bundles / patches / task 构造 input_provenance。
 
     provenance 项是 ``(kind, path)`` tuple，``kind`` ∈ ``profile`` /
-    ``bundle`` / ``patch`` / ``task`` / ``env``。sorted by kind for
-    hash determinism。
+    ``bundle`` / ``patch`` / ``task`` / ``env``，保留输入声明顺序以便解释
+    profile 的装配来源。``compiled_run_plan_ref`` 会在哈希时排序该数据。
     """
     out: list[tuple[str, str]] = []
     out.append(("profile", str(profile_path)))

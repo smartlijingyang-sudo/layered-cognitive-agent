@@ -479,6 +479,7 @@ async def resume_run(session: RunSession, registry: RunRegistry, answer: str) ->
             run_id=session.run_id,
             trace_id=session.trace_id,
         )
+        _record_run_failure(session, exc, session.hub)
     finally:
         if session.status == RunStatus.WAITING_INPUT:
             registry.mark_paused(session)

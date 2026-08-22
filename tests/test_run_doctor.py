@@ -95,6 +95,39 @@ def test_doctor_broken_hop_is_first_false(tmp_path: Path) -> None:
     assert report.broken_hop == "H2"
 
 
+def test_doctor_reads_v2_envelope_fields(tmp_path: Path) -> None:
+    path = tmp_path / "run_x.jsonl"
+    _write_jsonl(
+        path,
+        [
+            {
+                "schema": JOURNAL_SCHEMA_VERSION,
+                "event_id": "evt-finished",
+                "run_id": "run_x",
+                "run_seq": 4,
+                "occurred_at": 4.0,
+                "committed_at": 4.0,
+                "scope": {"trace_id": "t", "run_id": "run_x", "agent_role": "助手", "step": 0},
+                "causation": {"parent_event_id": "", "links": []},
+                "descriptor": {
+                    "type": "AgentRunFinished",
+                    "version": 1,
+                    "payload_schema_version": 1,
+                },
+                "data": {"status": "completed", "output_text": "done", "error": ""},
+                "evidence": [],
+            }
+        ],
+    )
+    session = _session(status=RunStatus.COMPLETED, tail=LiveTail(), jsonl_path=path)
+
+    report = diagnose(session, path)
+
+    assert report.hops["H2"].ok is True
+    assert report.hops["H2"].extra["last_seq"] == 4
+    assert report.hops["H2"].extra["counts"] == {"AgentRunFinished": 1}
+
+
 def test_doctor_works_from_jsonl_without_session(tmp_path: Path) -> None:
     path = tmp_path / "run_x.jsonl"
     _write_jsonl(

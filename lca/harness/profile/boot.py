@@ -93,7 +93,7 @@ async def boot_resolved_profile(resolved: ResolvedProfile) -> Context:
             # context, NOT the fiber's child ctx).
             fiber = ctx.registry.plugin(item.definition.setup, config=item.config)
             fibers.append(fiber)
-            audited = AuditedPluginContext(_inner=ctx, _definition=item.definition)
+            audited = AuditedPluginContext(ctx, item.definition)
             try:
                 result = await _run_setup(item.definition.setup, audited, item.config)
             except BaseException:
@@ -148,7 +148,7 @@ async def boot_entries(entries: list[dict[str, Any]]) -> Context:
         for entry, definition, config in prepared:
             fiber = ctx.registry.plugin(definition.setup, config=config)
             fibers.append(fiber)
-            audited = AuditedPluginContext(_inner=ctx, _definition=definition)
+            audited = AuditedPluginContext(ctx, definition)
             result = await _run_setup(definition.setup, audited, config)
             disposer = _as_disposer(result)
             if disposer is not None:

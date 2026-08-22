@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from lca.layer0_infra.observability.journal.journal_io import record_normalize
+
 _TERMINAL = frozenset({"completed", "failed", "canceled"})
 _OPEN = frozenset({"running", "waiting_input"})
 _TOOL_DONE = frozenset({"ToolInvoked", "ToolDenied"})
@@ -317,12 +319,14 @@ def _scan_jsonl(path: Path) -> _JsonlScan:
         if not isinstance(record, dict):
             continue
         rows += 1
-        event_type = str(record.get("event_type") or "")
+        normalized = record_normalize(record)
+        descriptor = normalized.get("descriptor", {}) or {}
+        event_type = str(descriptor.get("type") or record.get("event_type") or "")
         counts[event_type] += 1
-        seq_raw = record.get("seq") or 0
+        seq_raw = normalized.get("run_seq", record.get("seq")) or 0
         if isinstance(seq_raw, (int, float)) or (isinstance(seq_raw, str) and seq_raw.isdigit()):
             last_seq = max(last_seq, int(seq_raw))
-        raw_event = record.get("event")
+        raw_event = normalized.get("data") or record.get("event")
         event: dict[str, Any] = raw_event if isinstance(raw_event, dict) else {}
         if event_type in _RUN_FINISHED:
             journal_status = str(event.get("status") or "")
