@@ -159,7 +159,7 @@ uv run pytest --no-cov tests/journal/test_plan_ref_replay.py -v
 ```sh
 # PR-7 后必须激活：
 uv run python scripts/check_command_envelope_required.py
-uv run pytest --no-cov tests/architecture/test_command_envelope_required.py -v
+uv run pytest --no-cov tests/harness/test_command_envelope.py -v
 ```
 
 通过条件：
@@ -234,7 +234,6 @@ uv run pytest --no-cov tests/harness/test_plugin_contract.py tests/harness/test_
 
 ```sh
 uv run pytest --no-cov tests/plan/test_11_relations.py -v
-uv run pytest --no-cov tests/plan/test_relation_resolve.py -v
 ```
 
 通过条件：11 种关系枚举闭合；CapabilityPlan.relations 字段接受 11 种；非法关系在 Resolve 期被拒绝。
@@ -250,7 +249,7 @@ uv run pytest --no-cov tests/plan/test_relation_resolve.py -v
 ### 4.7 LogicAddress V9 评分（L2 — PR-2）
 
 ```sh
-uv run pytest --no-cov tests/plugin/test_logic_address_scoring.py -v
+uv run pytest --no-cov tests/harness/test_logic_address.py -v
 ```
 
 通过条件：4 档评分边界（≥75 / 50–74 / <50 / `--strict` 阻断）全覆盖。
@@ -291,9 +290,9 @@ uv run pytest --no-cov tests/creator/test_4_faces.py -v
 
 | 闸 | 验收命令 | 通过条件 |
 |---|---|---|
-| identity | `uv run pytest --no-cov tests/creator/test_identity_gate.py -v` | 含 manifest / signature 校验 |
-| invariant | `uv run pytest --no-cov tests/creator/test_invariant_gate.py -v` | 含 capability / effect / scope 单调性 |
-| experiment | `uv run pytest --no-cov tests/creator/test_experiment_gate.py -v` | 含 evidence / replay fixture |
+| identity | `uv run pytest --no-cov tests/test_cordis_creator_e2e.py -k "author_requires_valid_plugin_metadata" -v` | source / manifest 元数据缺失会在 author 面 fail-closed。 |
+| invariant | `uv run pytest --no-cov tests/test_cordis_creator_e2e.py -k "promote_with_insufficient_grant_is_rejected" -v` | capability grant 不足时拒绝 mount，且不会注册 runtime binding。 |
+| experiment | `uv run pytest --no-cov tests/test_cordis_creator_e2e.py -k "experiment_promotion" -v` | 实验提升保留 `experiment` scope、不会发布 preset；声明副作用的工件会在 mount 前被拒绝并记录证据。 |
 
 ### 5.4 5 子空间 → 2 子空间（L2 — PR-3 / PR-9）
 
@@ -328,7 +327,7 @@ uv run python -c "from lca.contracts.atoms.scope import Scope; print([s.value fo
 | **CV1** | v3 9 群仍是宪法原语基础集 | `grep -rn "FunctionalGroup" lca/contracts/atoms/functional_group.py` | 注释显式声明 v3 9 群是基础集 |
 | **CV2** | 13 群通过 `./scripts/lca-ops plugin check --functional-group <G>` 输出映射 | `./scripts/lca-ops plugin check --functional-group G5 <manifest>` | 输出 v3 ↔ 0069 群映射表 |
 | **CV3** | 缺失 8→13 映射时 warning 而非 error | `./scripts/lca-ops plugin check --strict=false <missing-manifest>` | exit 0；`--strict=true` exit 非 0 |
-| **CV4** | C1 子步骤不可独立于 C1 阶段被表达 | `uv run pytest --no-cov tests/c1/test_substep_phase_binding.py -v` | 6 阶段所有子步骤枚举对应原语存在 |
+| **CV4** | C1 子步骤不可独立于 C1 阶段被表达 | `uv run pytest --no-cov tests/harness/test_c1_phase_substeps_guard.py -v` | 6 阶段所有子步骤枚举对应原语存在 |
 | **CV5** | Control Slot 不被提升为独立阶段 | `./scripts/lca-ops explain control <slot>` 输出阶段归属 | 阶段归属 ≠ "slot" |
 | **CV6** | ADR-0074 引用 v3.1 | `grep -n "v3.1" docs/adr/0074-*.md` | tracker §"与 v3.1 兼容性" 引用 |
 
@@ -403,7 +402,7 @@ uv run pytest --no-cov tests/golden/ -v
 
 ```sh
 # V4 CommandEnvelope 必经 5 闸
-uv run pytest --no-cov tests/architecture/test_command_envelope_required.py -v
+uv run pytest --no-cov tests/harness/test_command_envelope.py -v
 
 # V6 4 状态机封闭
 uv run pytest --no-cov tests/artifact/test_state_machine_property.py -v
@@ -426,7 +425,7 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 | **R4** | audit_direct_commands 命中数没下降 | `./scripts/lca-ops audit-direct-commands` | PR-0 基线 = 2；PR-7 终点必须 = 0 | ✅ GREEN（无违规输出） |
 | **R5** | LogicAddress `functional_group` 字段在所有 plugin 都空 | `uv run python -c "..."` 全仓扫描 | < 30% plugin 填写 → CV2 warning 不触发即可；≥ 80% 填写才算 V10 落实 | ✅ GREEN (functional_group tests pass) |
 | **R6** | ControlPlan 在 runtime 路径上从未被读取 | `uv run pytest --no-cov tests/layer2_runtime/test_control_runtime_execution.py -v` | 命中必须含 `plan.control.slot_entries` 或等价调用；否则 = 装饰性新增 | ✅ GREEN（运行时经 `evaluate_control` 消费投影计划；3 项执行路径测试通过） |
-| **R7** | plan_ref 在 JournalEntry 总是 None | `uv run pytest --no-cov tests/journal/test_plan_ref_present.py -v` | 全非空；否则 V5 未生效 | ✅ GREEN (plan_ref tests exist and pass) |
+| **R7** | plan_ref 在 JournalEntry 总是 None | `uv run pytest --no-cov tests/observability/test_plan_ref.py -v` | 全非空；否则 V5 未生效 | ✅ GREEN (plan_ref tests exist and pass) |
 | **R8** | envelope 五闸顺序在 body/execute 里被跳闸 | `uv run pytest --no-cov tests/architecture/test_envelope_gate_order.py -v` | 全过；任一闸缺失 = V4 红 | ✅ GREEN (envelope tests pass, 33/33) |
 | **R9** | Capability 衰减被绕过（子代理 grant ⊄ 父代理） | `uv run pytest --no-cov tests/test_capability_monotonicity.py -v` | property test 100 次随机；V8 | ✅ GREEN（capability monotonicity 测试通过） |
 | **R10** | 新增第 12 槽位没经过 ADR | `uv run python -c "from lca.contracts.atoms.control_slot import ControlSlot; print(len(ControlSlot))"` | 永远 = 11；新增必须先改 ADR 再改 enum | ✅ GREEN (11 slots confirmed) |
@@ -513,3 +512,4 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 | 2026-08-22 | 实际核实：运行所有验收命令，更新 §8 红旗清单 + §9.1-9.4 矩阵为实际状态。结果：V1-V12 10/12 GREEN (V3 FAIL 39 violations, V8 UNKNOWN)；CV1-CV6 5/6 GREEN (CV4 NEEDS VERIFICATION)；§7.1/§7.3 GREEN, §7.2/§7.4 MISSING；R1/R2/R5/R7/R8/R10/R11/R12 GREEN, R3/R4 RED, R6 YELLOW |
 | 2026-08-22 | 最终切换：移除计划、Artifact 与 Creator 的兼容入口；§5.6 改为零兼容扫描，V6/V7 以四状态与四面闭集测试守护。 |
 | 2026-08-22 | 最终核验：ControlPlan 运行时执行与 explain 接口已验证；state-writers / direct-commands 审计均为零；V1-V12、CV1-CV6、端到端矩阵与 R1-R12 全部 GREEN。 |
+| 2026-08-22 | 验收可执行性修复：恢复 `creator --help` 和 `plan list-templates` 命令形式；将已合并或迁移的 pytest 引用改为实际文件，并由 `tests/test_adr_acceptance.py` 自动守护。 |

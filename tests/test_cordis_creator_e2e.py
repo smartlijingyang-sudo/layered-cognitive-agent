@@ -42,14 +42,18 @@ def _dump_journal(journal: MemoryJournal, path: Path) -> None:
     )
 
 
-def _plugin_source(name: str, capability: str = "tool_fs.read") -> str:
+def _plugin_source(
+    name: str,
+    capability: str = "tool_fs.read",
+    side_effects: str = "none",
+) -> str:
     return f'''
 plugin_meta = {{
     "name": "{name}",
     "layer": "behavior",
     "implements": ["Plugin"],
     "capabilities": ["{capability}"],
-    "side_effects": "none",
+    "side_effects": "{side_effects}",
     "policy_class": "execute",
     "test_suite": "tests/test_{name}.py",
 }}
@@ -131,6 +135,70 @@ class TestCordisCreatorEnd2End:
             assert instance('{"foo": 1, "bar": 2}') == ["bar", "foo"]
             assert PresetAuthoring.list_visible_presets(root=root) == ("json_keys",)
             _dump_journal(journal, SCRATCH / "cordis_creator_run.jsonl")
+
+    @pytest.mark.asyncio
+    async def test_experiment_promotion_retains_scope_without_publishing_release(self, full_grant) -> None:
+        """Experiment promotion stays scoped and cannot create a durable preset."""
+        root = _preset_root("experiment_scope")
+        path = root / "experiment_only.py"
+        path.write_text(_plugin_source("experiment_only"), encoding="utf-8")
+
+        with bind_journal():
+            tool = _tool(_new_composer(), root, full_grant)
+            assert (
+                await tool.execute(
+                    {"action": "author", "name": "experiment_only", "path": str(path)}
+                )
+            ).success
+            assert (await tool.execute({"action": "validate", "name": "experiment_only"})).success
+            promoted = await tool.execute(
+                {
+                    "action": "promote",
+                    "name": "experiment_only",
+                    "target_scope": "experiment",
+                }
+            )
+
+        assert promoted.success
+        assert promoted.payload["target_scope"] == "experiment"
+        assert promoted.payload["artifact"]["scope"] == "experiment"
+        assert promoted.payload["preset_layout"] is None
+        assert PresetAuthoring.list_visible_presets(root=root) == ()
+
+    @pytest.mark.asyncio
+    async def test_experiment_promotion_rejects_declared_side_effects(self, full_grant) -> None:
+        """The experiment gate fail-closes before mounting an effectful artifact."""
+        root = _preset_root("experiment_effect_rejected")
+        path = root / "effectful.py"
+        path.write_text(
+            _plugin_source("effectful", side_effects="network"), encoding="utf-8"
+        )
+
+        with bind_journal() as journal:
+            composer = _new_composer()
+            tool = _tool(composer, root, full_grant)
+            assert (
+                await tool.execute({"action": "author", "name": "effectful", "path": str(path)})
+            ).success
+            assert (await tool.execute({"action": "validate", "name": "effectful"})).success
+            rejected = await tool.execute(
+                {
+                    "action": "promote",
+                    "name": "effectful",
+                    "target_scope": "experiment",
+                }
+            )
+
+        assert not rejected.success
+        assert rejected.extra["error_code"] == ComposerErrorCode.INVARIANT_VIOLATION.value
+        assert composer._ctx.own_bindings.get("plugin:effectful") is None
+        mount_rejections = [
+            item.event
+            for item in journal.store.events
+            if isinstance(item.event, PluginMountRejected) and item.event.plugin_name == "effectful"
+        ]
+        assert len(mount_rejections) == 1
+        assert mount_rejections[0].reason_code == ComposerErrorCode.INVARIANT_VIOLATION.value
 
     @pytest.mark.asyncio
     async def test_promote_with_insufficient_grant_is_rejected(self) -> None:

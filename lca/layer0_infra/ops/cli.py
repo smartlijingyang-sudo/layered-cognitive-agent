@@ -142,7 +142,7 @@ app = typer.Typer(
     rich_markup_mode=None,
     add_completion=False,
     invoke_without_command=True,
-    context_settings={"help_option_names": []},
+    context_settings={"help_option_names": ["--help", "-h"]},
 )
 
 
@@ -1666,11 +1666,16 @@ def creator_cmd(
 
 @app.command(name="plan")
 def plan_cmd(
-    subcommand: str = typer.Option(
-        "list-templates",
+    command: str | None = typer.Argument(
+        None,
+        metavar="[COMMAND]",
+        help="Plan command: list-templates / relations",
+    ),
+    subcommand: str | None = typer.Option(
+        None,
         "--sub",
         "-s",
-        help="Plan subcommand: list-templates / relations",
+        help="Compatibility alias for the positional plan command",
     ),
     template_id: str = typer.Option(
         "", "--template", "-t", help="template id (for relations subcommand)"
@@ -1688,13 +1693,24 @@ def plan_cmd(
     - ``relations --plugin <id>`` —— 输出某 plugin 的关系图谱 (V11 acceptance)
 
     Examples:
-        lca-ops plan --sub list-templates
-        lca-ops plan --sub list-templates --json
-        lca-ops plan --sub relations --plugin plugin.a
+        lca-ops plan list-templates
+        lca-ops plan list-templates --json
+        lca-ops plan relations --plugin plugin.a
+
+    ``--sub`` remains accepted as a compatibility alias for automation that
+    used the pre-ADR-0074 command form.
     """
     import json as _json
 
-    if subcommand == "list-templates":
+    if command and subcommand and command != subcommand:
+        print(
+            f"plan: positional command {command!r} conflicts with --sub {subcommand!r}",
+            file=sys.stderr,
+        )
+        raise typer.Exit(2)
+    selected_command = command or subcommand or "list-templates"
+
+    if selected_command == "list-templates":
         from lca.contracts.atoms.plan_template import (
             all_plan_template_ids,
             plan_template_to_dict,
@@ -1726,7 +1742,7 @@ def plan_cmd(
                 )
         raise typer.Exit(0)
 
-    if subcommand == "relations":
+    if selected_command == "relations":
         if not plugin_id:
             print("plan relations: --plugin <id> required", file=sys.stderr)
             raise typer.Exit(2)
@@ -1786,7 +1802,7 @@ def plan_cmd(
                 print(f"    {r.source} → {r.kind.value}")
         raise typer.Exit(0)
 
-    print(f"plan: unknown subcommand {subcommand!r}", file=sys.stderr)
+    print(f"plan: unknown command {selected_command!r}", file=sys.stderr)
     raise typer.Exit(2)
 
 

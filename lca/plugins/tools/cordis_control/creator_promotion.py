@@ -7,11 +7,17 @@ from typing import TYPE_CHECKING, Any
 from lca.contracts.atoms.artifact_state import ArtifactState
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.harness.artifact import (
+    artifact_with_scope,
     capability_artifact_to_dict,
     migrate_to_active,
     migrate_to_retired,
 )
-from lca.contracts.mechanisms.composition import ComposerError, ComposerErrorCode, PluginFactory
+from lca.contracts.mechanisms.composition import (
+    ComposerError,
+    ComposerErrorCode,
+    InvariantViolation,
+    PluginFactory,
+)
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
 from lca.contracts.models.observability.journal import (
     PluginMounted,
@@ -46,6 +52,17 @@ def promote(
     )
     if rollback:
         return _retire(tool, authored, item)
+
+    resolved_scope = Scope(target_scope or Scope.RUN.value)
+    if resolved_scope is Scope.EXPERIMENT and item.metadata.get("side_effects") != "none":
+        error = InvariantViolation(
+            f"experiment promotion for plugin {name!r} requires side_effects='none'",
+            plugin_name=name,
+            check_name="experiment_effect_boundary",
+        )
+        _record_rejected(tool, name, error, item.metadata)
+        raise error
+
     factory = PluginFactory(
         name=name,
         factory=item.factory,
@@ -61,7 +78,7 @@ def promote(
     except ComposerError as exc:
         _record_rejected(tool, name, exc, item.metadata)
         raise
-    artifact = migrate_to_active(item.artifact)
+    artifact = artifact_with_scope(migrate_to_active(item.artifact), resolved_scope)
     authored[name] = with_artifact(item, artifact)
     if tool._on_mounted is not None:
         instance = tool._composer._ctx.own_bindings.get(mounted.context_key)
@@ -83,7 +100,7 @@ def promote(
         plugin=name,
         attributes={
             "actor_role": tool._actor_role,
-            "target_scope": target_scope or Scope.RUN.value,
+            "target_scope": resolved_scope.value,
         },
         status=DiagnosticStatus.SUCCEEDED,
     )
@@ -92,6 +109,7 @@ def promote(
         "artifact": capability_artifact_to_dict(artifact),
         "context_key": mounted.context_key,
         "capabilities": list(mounted.capabilities),
+        "target_scope": resolved_scope.value,
         "mount_event_seq": stamped.seq if stamped else None,
         "preset_layout": layout.relative_paths() if layout else None,
     }

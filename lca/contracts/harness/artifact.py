@@ -56,6 +56,25 @@ def artifact_with_state(artifact: CapabilityArtifact, state: ArtifactState) -> C
     )
 
 
+def artifact_with_scope(artifact: CapabilityArtifact, scope: Scope | str) -> CapabilityArtifact:
+    """Return a new Artifact value with a declared target lifecycle scope.
+
+    Promotion is the only caller that changes an artifact scope. Keeping this
+    operation immutable makes the target boundary observable in the artifact
+    evidence rather than leaving it as an unverified command argument.
+    """
+
+    return CapabilityArtifact(
+        logical_id=artifact.logical_id,
+        revision_digest=artifact.revision_digest,
+        state=artifact.state,
+        scope=parse_scope(scope) if isinstance(scope, str) else scope,
+        grants=artifact.grants,
+        metadata=artifact.metadata,
+        version=artifact.version,
+    )
+
+
 def legal_next_states(artifact: CapabilityArtifact) -> tuple[ArtifactState, ...]:
     """Return legal target states in stable enum order."""
 
@@ -167,6 +186,7 @@ __all__ = [
     "ArtifactController",
     "CapabilityArtifact",
     "InvalidStateTransitionError",
+    "artifact_with_scope",
     "artifact_with_state",
     "capability_artifact_to_dict",
     "controller_legal_next_states",
