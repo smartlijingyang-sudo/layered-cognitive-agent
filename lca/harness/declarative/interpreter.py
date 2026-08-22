@@ -16,6 +16,7 @@ from lca.contracts.protocols.declarative_phase_graph import (
     PhaseContext,
     PhaseInput,
     PhaseResult,
+    PhaseRunCursor,
     SemanticPhase,
 )
 from lca.contracts.protocols.plan import compiled_run_plan_ref
@@ -82,7 +83,8 @@ class InterpretationResult:
     artifact: Any
     visits: tuple[PhaseVisit, ...]
     facts: tuple[RunFact, ...]
-    terminal_node: str
+    terminal_node: str | None
+    cursor: PhaseRunCursor | None = None
 
 
 class GenericPlanInterpreter:
@@ -109,22 +111,40 @@ class GenericPlanInterpreter:
         capabilities: Any = None,
         artifacts: Mapping[str, Any] | None = None,
         tracing: Any = None,
+        cursor: PhaseRunCursor | None = None,
+        max_nodes: int | None = None,
     ) -> InterpretationResult:
         plan = executable.plan
         if not plan.phase_graph:
             raise DeclarativeValidationError("PG-001", "plan has no phase graph")
         plan.validation_report.require_valid()
+        if max_nodes is not None and max_nodes <= 0:
+            raise DeclarativeValidationError("RT-004", "safe boundary max_nodes must be positive")
         graph = plan.phase_graph
         node_by_id = {node.id: node for node in graph.nodes}
-        current_id = graph.entry
-        current_input = input or PhaseInput()
+        plan_ref = compiled_run_plan_ref(plan)
+        if cursor is None:
+            current_id = graph.entry
+            current_input = input or PhaseInput()
+            visit_counts: dict[str, int] = {}
+            edge_counts: dict[tuple[str, str], int] = {}
+            artifact_map = dict(artifacts or {})
+        else:
+            if cursor.plan_ref != plan_ref:
+                raise DeclarativeValidationError(
+                    "RT-004", "cursor plan_ref does not match executable plan"
+                )
+            current_id = cursor.node_id
+            current_input = input or PhaseInput(
+                artifact=cursor.artifacts.get("payload"),
+                causation_refs=cursor.causation_refs,
+            )
+            visit_counts = dict(cursor.visit_counts)
+            edge_counts = {(source, target): count for source, target, count in cursor.edge_counts}
+            artifact_map = dict(cursor.artifacts)
         current_state = state
-        visit_counts: dict[str, int] = {}
-        edge_counts: dict[tuple[str, str], int] = {}
         facts: list[RunFact] = []
         visits: list[PhaseVisit] = []
-        artifact_map = dict(artifacts or {})
-        plan_ref = compiled_run_plan_ref(plan)
 
         while True:
             node = node_by_id.get(current_id)
@@ -133,7 +153,9 @@ class GenericPlanInterpreter:
                 raise DeclarativeValidationError("PG-001", f"unassembled phase node: {current_id}")
             visit_counts[current_id] = visit_counts.get(current_id, 0) + 1
             if visit_counts[current_id] > node.max_visits:
-                raise DeclarativeValidationError("PG-007", f"node visit budget exhausted: {current_id}")
+                raise DeclarativeValidationError(
+                    "PG-007", f"node visit budget exhausted: {current_id}"
+                )
             context = RestrictedPhaseContext(
                 plan_ref=plan_ref,
                 node_ref=node.id,
@@ -147,7 +169,9 @@ class GenericPlanInterpreter:
             prepared_input = await self._prepare_input(executable_node, context, current_input)
             result = await executable_node.executor.execute(context, prepared_input)
             if not isinstance(result, PhaseResult):
-                raise DeclarativeValidationError("RT-002", f"executor returned non-PhaseResult: {node.id}")
+                raise DeclarativeValidationError(
+                    "RT-002", f"executor returned non-PhaseResult: {node.id}"
+                )
             self._validate_result(node.semantic_phase, result)
             result = await self._apply_post_contributions(
                 executable_node,
@@ -175,13 +199,23 @@ class GenericPlanInterpreter:
             effect_receipt = None
             if result.command_envelope is not None:
                 if self._effect_gateway is None:
-                    raise DeclarativeValidationError("PG-003", "effectful result has no EffectGateway")
+                    raise DeclarativeValidationError(
+                        "PG-003", "effectful result has no EffectGateway"
+                    )
                 if plan.effect_policy is None:
-                    raise DeclarativeValidationError("PS-006", "effectful result has no EffectPolicy")
+                    raise DeclarativeValidationError(
+                        "PS-006", "effectful result has no EffectPolicy"
+                    )
                 if result.command_envelope.plan_ref != plan_ref:
-                    raise DeclarativeValidationError("RT-003", "CommandEnvelope plan_ref does not match run plan")
-                effect_receipt = await self._effect_gateway.execute(result.command_envelope, plan.effect_policy)
-                self._journal.commit_observation(effect_receipt, plan_ref=plan_ref, node_ref=node.id)
+                    raise DeclarativeValidationError(
+                        "RT-003", "CommandEnvelope plan_ref does not match run plan"
+                    )
+                effect_receipt = await self._effect_gateway.execute(
+                    result.command_envelope, plan.effect_policy
+                )
+                self._journal.commit_observation(
+                    effect_receipt, plan_ref=plan_ref, node_ref=node.id
+                )
                 artifact_map["observation"] = effect_receipt
             deltas = (*result.deltas, *context.proposed_deltas)
             for delta in deltas:
@@ -201,14 +235,107 @@ class GenericPlanInterpreter:
                 )
             edge = self._select_edge(graph.edges, node.id, result, artifact_map)
             if edge is None:
-                raise DeclarativeValidationError("PG-006", f"no validated next edge from node: {node.id}")
+                raise DeclarativeValidationError(
+                    "PG-006", f"no validated next edge from node: {node.id}"
+                )
             key = (edge.source, edge.target)
             edge_counts[key] = edge_counts.get(key, 0) + 1
             if edge.loop and edge_counts[key] > edge.loop.max_iterations:
-                raise DeclarativeValidationError("PG-007", f"loop edge budget exhausted: {edge.source}->{edge.target}")
+                raise DeclarativeValidationError(
+                    "PG-007", f"loop edge budget exhausted: {edge.source}->{edge.target}"
+                )
             visits.append(PhaseVisit(node.id, node.semantic_phase, result.result_kind, edge.target))
             current_id = edge.target
-            current_input = PhaseInput(artifact=effective_payload, causation_refs=result.evidence_refs)
+            current_input = PhaseInput(
+                artifact=effective_payload, causation_refs=result.evidence_refs
+            )
+            if max_nodes is not None and len(visits) >= max_nodes:
+                return InterpretationResult(
+                    state=current_state,
+                    artifact=effective_payload,
+                    visits=tuple(visits),
+                    facts=tuple(facts),
+                    terminal_node=None,
+                    cursor=self._cursor(
+                        plan_ref=plan_ref,
+                        node_id=current_id,
+                        visit_counts=visit_counts,
+                        edge_counts=edge_counts,
+                        artifacts=artifact_map,
+                        causation_refs=current_input.causation_refs,
+                        budget=budget,
+                    ),
+                )
+
+    async def run_until_safe_boundary(
+        self,
+        executable: ExecutablePlan,
+        *,
+        state: Any,
+        max_nodes: int,
+        input: PhaseInput | None = None,
+        budget: Any = None,
+        capabilities: Any = None,
+        artifacts: Mapping[str, Any] | None = None,
+        tracing: Any = None,
+    ) -> InterpretationResult:
+        """推进到 phase 边界并返回可用于下一解释器实例的 cursor。"""
+        return await self.run(
+            executable,
+            state=state,
+            input=input,
+            budget=budget,
+            capabilities=capabilities,
+            artifacts=artifacts,
+            tracing=tracing,
+            max_nodes=max_nodes,
+        )
+
+    async def resume(
+        self,
+        executable: ExecutablePlan,
+        *,
+        state: Any,
+        cursor: PhaseRunCursor,
+        input: PhaseInput | None = None,
+        budget: Any = None,
+        capabilities: Any = None,
+        tracing: Any = None,
+    ) -> InterpretationResult:
+        """从已验证的 cursor 恢复；不回放 cursor 之前已提交的 phase/effect。"""
+        return await self.run(
+            executable,
+            state=state,
+            input=input,
+            budget=budget,
+            capabilities=capabilities,
+            tracing=tracing,
+            cursor=cursor,
+        )
+
+    @staticmethod
+    def _cursor(
+        *,
+        plan_ref: str,
+        node_id: str,
+        visit_counts: Mapping[str, int],
+        edge_counts: Mapping[tuple[str, str], int],
+        artifacts: Mapping[str, Any],
+        causation_refs: tuple[str, ...],
+        budget: Any,
+    ) -> PhaseRunCursor:
+        budget_snapshot = dict(budget) if isinstance(budget, Mapping) else {}
+        return PhaseRunCursor(
+            plan_ref=plan_ref,
+            node_id=node_id,
+            visit_counts=tuple(sorted(visit_counts.items())),
+            edge_counts=tuple(
+                sorted((source, target, count) for (source, target), count in edge_counts.items())
+            ),
+            artifacts=dict(artifacts),
+            causation_refs=causation_refs,
+            budget_snapshot=budget_snapshot,
+        )
 
     async def _prepare_input(
         self,
@@ -223,9 +350,13 @@ class GenericPlanInterpreter:
             outcome = await contribution.executor.execute(context, prepared)
             self._require_contribution_result(contribution.declaration.executor, outcome)
             if outcome.command_envelope is not None:
-                raise DeclarativeValidationError("PG-003", "prepare contribution may not execute an effect")
+                raise DeclarativeValidationError(
+                    "PG-003", "prepare contribution may not execute an effect"
+                )
             if outcome.payload is not None:
-                prepared = PhaseInput(artifact=outcome.payload, causation_refs=outcome.evidence_refs)
+                prepared = PhaseInput(
+                    artifact=outcome.payload, causation_refs=outcome.evidence_refs
+                )
         return prepared
 
     async def _apply_post_contributions(
@@ -249,7 +380,10 @@ class GenericPlanInterpreter:
                     "RT-002",
                     f"govern contribution denied phase execution: {contribution.declaration.executor}",
                 )
-            if role in {ContributionRole.TRANSFORM, ContributionRole.FINALIZE} and outcome.payload is not None:
+            if (
+                role in {ContributionRole.TRANSFORM, ContributionRole.FINALIZE}
+                and outcome.payload is not None
+            ):
                 combined = replace(
                     combined,
                     result_kind=outcome.result_kind,
@@ -280,7 +414,9 @@ class GenericPlanInterpreter:
         folded = getattr(self._reducer, "fold", None)
         if callable(folded):
             return folded(state, delta)
-        raise DeclarativeValidationError("RT-001", "configured reducer has no apply_delta/fold operation")
+        raise DeclarativeValidationError(
+            "RT-001", "configured reducer has no apply_delta/fold operation"
+        )
 
     @staticmethod
     def _validate_result(phase: SemanticPhase, result: PhaseResult) -> None:
@@ -297,11 +433,19 @@ class GenericPlanInterpreter:
             raise DeclarativeValidationError(
                 "RT-002", f"result kind {result.result_kind!r} violates {phase.value} contract"
             )
-        if phase is SemanticPhase.ACT and result.command_envelope is not None and not result.command_envelope.decision_ref:
-            raise DeclarativeValidationError("PG-002", "act CommandEnvelope has no Decision reference")
+        if (
+            phase is SemanticPhase.ACT
+            and result.command_envelope is not None
+            and not result.command_envelope.decision_ref
+        ):
+            raise DeclarativeValidationError(
+                "PG-002", "act CommandEnvelope has no Decision reference"
+            )
 
     @staticmethod
-    def _select_edge(edges: tuple[Any, ...], source: str, result: PhaseResult, artifacts: Mapping[str, Any]) -> Any | None:
+    def _select_edge(
+        edges: tuple[Any, ...], source: str, result: PhaseResult, artifacts: Mapping[str, Any]
+    ) -> Any | None:
         candidates = [edge for edge in edges if edge.source == source]
         for edge in candidates:
             if _evaluate_predicate(edge.when, result=result, artifacts=artifacts):
@@ -329,7 +473,9 @@ def _terminal_result(result: PhaseResult) -> bool:
     return True
 
 
-def _evaluate_predicate(expression: str, *, result: PhaseResult, artifacts: Mapping[str, Any]) -> bool:
+def _evaluate_predicate(
+    expression: str, *, result: PhaseResult, artifacts: Mapping[str, Any]
+) -> bool:
     """执行受限且无副作用的 activation/edge DSL。"""
     if expression.strip().lower() == "true":
         return True
@@ -338,7 +484,9 @@ def _evaluate_predicate(expression: str, *, result: PhaseResult, artifacts: Mapp
     try:
         tree = ast.parse(expression, mode="eval")
     except SyntaxError as exc:
-        raise DeclarativeValidationError("PS-001", f"invalid restricted predicate: {expression!r}") from exc
+        raise DeclarativeValidationError(
+            "PS-001", f"invalid restricted predicate: {expression!r}"
+        ) from exc
     allowed_roots = {
         "result": result,
         "artifact": artifacts.get("payload"),

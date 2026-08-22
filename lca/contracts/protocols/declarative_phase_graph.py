@@ -331,7 +331,8 @@ class LoopGuard:
     def __post_init__(self) -> None:
         if self.max_iterations <= 0 or not self.budget or not self.terminal_predicate:
             raise DeclarativeValidationError(
-                "PG-007", "loop guard requires positive max_iterations, budget and terminal predicate"
+                "PG-007",
+                "loop guard requires positive max_iterations, budget and terminal predicate",
             )
 
 
@@ -347,7 +348,9 @@ class PhaseNode:
         if not isinstance(self.semantic_phase, SemanticPhase):
             object.__setattr__(self, "semantic_phase", SemanticPhase(self.semantic_phase))
         if not self.id or not self.binding or self.max_visits <= 0:
-            raise DeclarativeValidationError("PG-001", "phase node id, binding and positive max_visits required")
+            raise DeclarativeValidationError(
+                "PG-001", "phase node id, binding and positive max_visits required"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -359,7 +362,9 @@ class PhaseEdge:
 
     def __post_init__(self) -> None:
         if not self.source or not self.target or not self.when:
-            raise DeclarativeValidationError("PG-001", "phase edge source, target and predicate required")
+            raise DeclarativeValidationError(
+                "PG-001", "phase edge source, target and predicate required"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -388,7 +393,9 @@ class PhaseBinding:
         if not isinstance(self.semantic_phase, SemanticPhase):
             object.__setattr__(self, "semantic_phase", SemanticPhase(self.semantic_phase))
         if not self.node_id or not self.executor_capability:
-            raise DeclarativeValidationError("PG-001", "phase binding node_id and executor required")
+            raise DeclarativeValidationError(
+                "PG-001", "phase binding node_id and executor required"
+            )
         if not isinstance(self.contributions, tuple):
             object.__setattr__(self, "contributions", tuple(self.contributions))
 
@@ -426,7 +433,9 @@ class EffectPolicyPlan:
 
     def __post_init__(self) -> None:
         if not self.gateway_capability:
-            raise DeclarativeValidationError("PS-006", "effect policy requires a gateway capability")
+            raise DeclarativeValidationError(
+                "PS-006", "effect policy requires a gateway capability"
+            )
         if not self.allowed_effects:
             raise DeclarativeValidationError("PS-006", "effect policy must declare allowed effects")
 
@@ -445,6 +454,49 @@ class PlanProvenance:
 class PhaseInput:
     artifact: Any = None
     causation_refs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PhaseRunCursor:
+    """声明式 phase graph 的可持久、可恢复推进位置。
+
+    Cursor 只包含已验证 plan 的标识与可序列化的推进事实；它不保存 live
+    ``PhaseContext``、executor 或 scope。调用者可将同一 cursor 安全地交给
+    新建的解释器实例恢复执行。
+    """
+
+    plan_ref: str
+    node_id: str
+    visit_counts: tuple[tuple[str, int], ...] = ()
+    edge_counts: tuple[tuple[str, str, int], ...] = ()
+    artifacts: Mapping[str, Any] = field(default_factory=dict)
+    causation_refs: tuple[str, ...] = ()
+    budget_snapshot: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.plan_ref or not self.node_id:
+            raise DeclarativeValidationError("RT-004", "cursor requires plan_ref and node_id")
+        if not isinstance(self.visit_counts, tuple):
+            object.__setattr__(self, "visit_counts", tuple(self.visit_counts))
+        if not isinstance(self.edge_counts, tuple):
+            object.__setattr__(self, "edge_counts", tuple(self.edge_counts))
+        if not isinstance(self.causation_refs, tuple):
+            object.__setattr__(
+                self, "causation_refs", tuple(str(item) for item in self.causation_refs)
+            )
+        if not isinstance(self.artifacts, Mapping):
+            object.__setattr__(self, "artifacts", dict(self.artifacts))
+        if not isinstance(self.budget_snapshot, Mapping):
+            object.__setattr__(self, "budget_snapshot", dict(self.budget_snapshot))
+
+    def visit_count_for(self, node_id: str) -> int:
+        return dict(self.visit_counts).get(node_id, 0)
+
+    def edge_count_for(self, source: str, target: str) -> int:
+        return {
+            (item_source, item_target): count
+            for item_source, item_target, count in self.edge_counts
+        }.get((source, target), 0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -467,7 +519,9 @@ class PhaseResult:
         if not isinstance(self.deltas, tuple):
             object.__setattr__(self, "deltas", tuple(self.deltas))
         if not isinstance(self.evidence_refs, tuple):
-            object.__setattr__(self, "evidence_refs", tuple(str(item) for item in self.evidence_refs))
+            object.__setattr__(
+                self, "evidence_refs", tuple(str(item) for item in self.evidence_refs)
+            )
         if not isinstance(self.next_hints, Mapping):
             object.__setattr__(self, "next_hints", dict(self.next_hints))
 
@@ -576,7 +630,9 @@ class PluginSpecValidator:
                 PluginSpecKind.PROVIDER,
             }:
                 issues.append(
-                    ValidationIssue("PS-006", "effectful plugin kind has no gateway-compatible role", spec.id)
+                    ValidationIssue(
+                        "PS-006", "effectful plugin kind has no gateway-compatible role", spec.id
+                    )
                 )
         for capability, providers in provided.items():
             if len(providers) > 1 and any(
@@ -612,7 +668,9 @@ class PhaseGraphValidator:
         issues: list[ValidationIssue] = []
         nodes = {node.id: node for node in graph.nodes}
         if graph.entry not in nodes:
-            issues.append(ValidationIssue("PG-001", "graph entry does not identify a node", graph.entry))
+            issues.append(
+                ValidationIssue("PG-001", "graph entry does not identify a node", graph.entry)
+            )
         if len(nodes) != len(graph.nodes):
             issues.append(ValidationIssue("PG-001", "phase node ids must be unique"))
         phase_nodes: dict[SemanticPhase, list[PhaseNode]] = defaultdict(list)
@@ -625,16 +683,28 @@ class PhaseGraphValidator:
         for node in graph.nodes:
             binding = bindings.get(node.id)
             if binding is None:
-                issues.append(ValidationIssue("PG-001", f"node has no phase binding: {node.id}", node.id))
+                issues.append(
+                    ValidationIssue("PG-001", f"node has no phase binding: {node.id}", node.id)
+                )
             elif binding.semantic_phase is not node.semantic_phase:
-                issues.append(ValidationIssue("PG-001", f"binding semantic phase mismatch: {node.id}", node.id))
+                issues.append(
+                    ValidationIssue(
+                        "PG-001", f"binding semantic phase mismatch: {node.id}", node.id
+                    )
+                )
             elif binding.executor_capability != node.binding:
-                issues.append(ValidationIssue("PG-001", f"binding executor mismatch: {node.id}", node.id))
+                issues.append(
+                    ValidationIssue("PG-001", f"binding executor mismatch: {node.id}", node.id)
+                )
         edge_targets: dict[str, list[PhaseEdge]] = defaultdict(list)
         reverse: dict[str, list[str]] = defaultdict(list)
         for edge in graph.edges:
             if edge.source not in nodes or edge.target not in nodes:
-                issues.append(ValidationIssue("PG-001", "edge references unknown node", f"{edge.source}->{edge.target}"))
+                issues.append(
+                    ValidationIssue(
+                        "PG-001", "edge references unknown node", f"{edge.source}->{edge.target}"
+                    )
+                )
                 continue
             edge_targets[edge.source].append(edge)
             reverse[edge.target].append(edge.source)
@@ -642,12 +712,16 @@ class PhaseGraphValidator:
             reachable = _reachable(graph.entry, edge_targets)
             for phase, candidates in phase_nodes.items():
                 if not any(candidate.id in reachable for candidate in candidates):
-                    issues.append(ValidationIssue("PG-001", f"semantic phase is unreachable: {phase.value}"))
+                    issues.append(
+                        ValidationIssue("PG-001", f"semantic phase is unreachable: {phase.value}")
+                    )
             terminals = [node.id for node in graph.nodes if node.terminal]
             if not terminals or not any(terminal in reachable for terminal in terminals):
                 issues.append(ValidationIssue("PG-006", "graph has no reachable terminal path"))
         self._validate_cycles(nodes, edge_targets, issues)
-        self._validate_causality(graph, nodes, edge_targets, phase_bindings, specs, effect_policy, issues)
+        self._validate_causality(
+            graph, nodes, edge_targets, phase_bindings, specs, effect_policy, issues
+        )
         self._validate_contribution_order(phase_bindings, specs, issues)
         return ValidationReport(tuple(issues))
 
@@ -659,7 +733,9 @@ class PhaseGraphValidator:
     ) -> None:
         for component in _strongly_connected_components(nodes, outgoing):
             is_cycle = len(component) > 1 or any(
-                edge.target == node_id for node_id in component for edge in outgoing.get(node_id, ())
+                edge.target == node_id
+                for node_id in component
+                for edge in outgoing.get(node_id, ())
             )
             if not is_cycle:
                 continue
@@ -678,7 +754,11 @@ class PhaseGraphValidator:
                 <= phase_rank[nodes[edge.source].semantic_phase]
             ]
             if not back_edges or any(edge.loop is None for edge in back_edges):
-                issues.append(ValidationIssue("PG-007", "cycle back-edge lacks loop guard", ",".join(sorted(component))))
+                issues.append(
+                    ValidationIssue(
+                        "PG-007", "cycle back-edge lacks loop guard", ",".join(sorted(component))
+                    )
+                )
 
     def _validate_causality(
         self,
@@ -690,15 +770,18 @@ class PhaseGraphValidator:
         effect_policy: EffectPolicyPlan,
         issues: list[ValidationIssue],
     ) -> None:
-        by_phase = {phase: [node.id for node in nodes.values() if node.semantic_phase is phase] for phase in SemanticPhase}
-        if not _has_path_between_any(by_phase[SemanticPhase.PERCEIVE], by_phase[SemanticPhase.THINK], outgoing):
-            issues.append(ValidationIssue("PG-001", "think must be causally reachable after perceive"))
-        binding_by_node = {binding.node_id: binding for binding in bindings}
-        offered_by_capability = {
-            offer.key: spec
-            for spec in specs
-            for offer in spec.provides
+        by_phase = {
+            phase: [node.id for node in nodes.values() if node.semantic_phase is phase]
+            for phase in SemanticPhase
         }
+        if not _has_path_between_any(
+            by_phase[SemanticPhase.PERCEIVE], by_phase[SemanticPhase.THINK], outgoing
+        ):
+            issues.append(
+                ValidationIssue("PG-001", "think must be causally reachable after perceive")
+            )
+        binding_by_node = {binding.node_id: binding for binding in bindings}
+        offered_by_capability = {offer.key: spec for spec in specs for offer in spec.provides}
         effectful_act_nodes = []
         for node_id in by_phase[SemanticPhase.ACT]:
             binding = binding_by_node.get(node_id)
@@ -708,12 +791,18 @@ class PhaseGraphValidator:
         if effectful_act_nodes and not _has_path_between_any(
             by_phase[SemanticPhase.THINK], effectful_act_nodes, outgoing
         ):
-            issues.append(ValidationIssue("PG-002", "effectful act lacks think/Decision predecessor"))
+            issues.append(
+                ValidationIssue("PG-002", "effectful act lacks think/Decision predecessor")
+            )
         if effectful_act_nodes and not effect_policy.gateway_capability:
             issues.append(ValidationIssue("PG-003", "effectful act has no EffectGateway policy"))
-        if not _has_path_between_any(by_phase[SemanticPhase.REFLECT], by_phase[SemanticPhase.REMEMBER], outgoing):
+        if not _has_path_between_any(
+            by_phase[SemanticPhase.REFLECT], by_phase[SemanticPhase.REMEMBER], outgoing
+        ):
             issues.append(ValidationIssue("PG-004", "remember must be reachable after reflect"))
-        if not _has_path_between_any(by_phase[SemanticPhase.REMEMBER], by_phase[SemanticPhase.STOP], outgoing):
+        if not _has_path_between_any(
+            by_phase[SemanticPhase.REMEMBER], by_phase[SemanticPhase.STOP], outgoing
+        ):
             issues.append(ValidationIssue("PG-006", "stop must be reachable after remember"))
 
     def _validate_contribution_order(
@@ -726,18 +815,26 @@ class PhaseGraphValidator:
         for binding in bindings:
             local = list(binding.contributions)
             transforms_or_governs = [
-                item for item in local if item.role in {ContributionRole.TRANSFORM, ContributionRole.GOVERN}
+                item
+                for item in local
+                if item.role in {ContributionRole.TRANSFORM, ContributionRole.GOVERN}
             ]
             orders = [item.order for item in transforms_or_governs]
             if len(transforms_or_governs) > 1 and any(order is None for order in orders):
                 issues.append(
                     ValidationIssue(
-                        "PG-009", "phase-local transform/govern contributions need deterministic order", binding.node_id
+                        "PG-009",
+                        "phase-local transform/govern contributions need deterministic order",
+                        binding.node_id,
                     )
                 )
             declared_orders = [order for order in orders if order is not None]
             if len(declared_orders) != len(set(declared_orders)):
-                issues.append(ValidationIssue("PG-009", "phase-local contribution order conflict", binding.node_id))
+                issues.append(
+                    ValidationIssue(
+                        "PG-009", "phase-local contribution order conflict", binding.node_id
+                    )
+                )
         # relation cycles are checked over explicit before/after targets where target IDs exist.
         adjacency: dict[str, set[str]] = defaultdict(set)
         for spec in specs:
@@ -755,7 +852,9 @@ class PhaseGraphValidator:
 def canonical_json(value: Any) -> str:
     """跨进程稳定的 canonical JSON，用于 plan_hash。"""
 
-    return json.dumps(_canonicalize(value), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return json.dumps(
+        _canonicalize(value), sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    )
 
 
 def declarative_plan_hash(value: Any) -> str:
@@ -787,7 +886,10 @@ def _canonicalize(value: Any) -> Any:
             for key, item in asdict(value).items()  # type: ignore[arg-type]
         }
     if isinstance(value, Mapping):
-        return {str(key): _canonicalize(item) for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))}
+        return {
+            str(key): _canonicalize(item)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        }
     if isinstance(value, (tuple, list, set, frozenset)):
         return [_canonicalize(item) for item in value]
     return value
