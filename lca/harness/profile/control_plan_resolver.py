@@ -102,6 +102,7 @@ def project_control_plan(
     for entry in sorted_entries:
         by_slot.setdefault(entry.slot, []).append(entry)
     frozen_by_slot = {slot: tuple(items) for slot, items in by_slot.items()}
+    _validate_slot_aggregations(frozen_by_slot)
 
     plan_hash = compute_control_plan_hash(sorted_entries, resolved.profile_path)
 
@@ -157,6 +158,20 @@ def explain_control_slot(
 
 
 # ── Internals ────────────────────────────────────────────────────────
+
+
+def _validate_slot_aggregations(
+    by_slot: dict[ControlSlot, tuple[ControlEntry, ...]],
+) -> None:
+    """Reject aggregation conflicts before a compiled plan reaches runtime."""
+
+    for slot, entries in by_slot.items():
+        modes = {entry.aggregation or SLOT_DEFAULT_AGGREGATION[slot] for entry in entries}
+        if len(modes) > 1:
+            values = ", ".join(sorted(mode.value for mode in modes))
+            raise ControlPlanResolveError(
+                f"control slot {slot.value!r} has conflicting aggregation modes: {values}"
+            )
 
 
 def _default_entries_for_uncovered_slots(entries: list[ControlEntry]) -> list[ControlEntry]:

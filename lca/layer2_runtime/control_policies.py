@@ -262,7 +262,7 @@ def _gate_verdict_kind(event: GateDecided) -> ControlVerdictKind:
     if event.verdict == "rewrite" or event.is_rewritten:
         return ControlVerdictKind.REWRITE
     if event.verdict == "deny":
-        return ControlVerdictKind.REWRITE
+        return ControlVerdictKind.STOP
     return ControlVerdictKind.ALLOW
 
 

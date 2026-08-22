@@ -147,6 +147,28 @@ def test_think_guard_projects_recorded_gate_rewrite(
     assert evaluation.effective.kind is ControlVerdictKind.REWRITE
 
 
+def test_think_guard_stops_recorded_gate_deny(engine: DefaultControlPolicyEngine, plan) -> None:
+    state = _state()
+    view = PerceiveState.from_agent_state(state)
+    view.gate_decided.append(
+        GateDecided(
+            event_id="gate-loop-deny",
+            gate="ToolLoopBreakerGate",
+            verdict="deny",
+            is_rewritten=False,
+            rationale="unsafe repeated tool call",
+        )
+    )
+    view.commit(state)
+    context = ControlPolicyContext(state=state, decision=_decision())
+    selection = select_control_entries(plan, ControlSlot.THINK_GUARD, state)
+
+    evaluation = aggregate_control_verdicts(selection, engine.evaluate(selection, context))
+
+    assert evaluation.effective is not None
+    assert evaluation.effective.kind is ControlVerdictKind.STOP
+
+
 def test_authorize_denies_malformed_tool_action(engine: DefaultControlPolicyEngine, plan) -> None:
     verdict = _verdict(
         engine,

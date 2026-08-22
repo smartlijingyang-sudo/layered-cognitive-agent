@@ -107,9 +107,15 @@ def compile_plan(
         revision="v1",
     )
 
+    patches = tuple(
+        f"{resolved.profile_path}#patch.{item.id}"
+        for item in sorted(resolved.plugins, key=lambda item: item.index)
+        if "+patch" in item.source
+    )
     input_provenance = build_input_provenance(
         profile_path=resolved.profile_path,
         bundles=resolved.bundles,
+        patches=patches,
         task_id=opts.task_id,
         env_fingerprint=opts.env_fingerprint,
     )

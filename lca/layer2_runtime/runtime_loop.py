@@ -317,8 +317,14 @@ class CognitiveRuntime(Runtime):
             state,
             checkpoint_reason=reason,
         )
+        checkpoint_count = len(state.checkpoints)
         snap = state.snapshot(reason=reason)
-        ref = await self.state_store.save(state)
+        try:
+            ref = await self.state_store.save(state)
+        except BaseException:
+            if len(state.checkpoints) == checkpoint_count + 1 and state.checkpoints[-1] is snap:
+                state.checkpoints.pop()
+            raise
         snap.state_ref = ref
         return snap
 

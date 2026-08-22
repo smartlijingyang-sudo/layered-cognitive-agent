@@ -13,6 +13,8 @@ This test covers:
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from lca.contracts.atoms.scope import Scope
@@ -76,6 +78,29 @@ class TestBuildInputProvenance:
             ("task", "task-123"),
             ("env", "env-v1"),
         )
+
+
+class TestCompiledPlanPatchProvenance:
+    def test_patched_resolved_plugin_contributes_to_plan_provenance(self) -> None:
+        resolved = resolve_profile("profiles/web-standard.yaml")
+        patched_plugin = replace(
+            resolved.plugins[0],
+            source=f"{resolved.plugins[0].source}+patch",
+        )
+        patched = replace(
+            resolved,
+            plugins=(patched_plugin, *resolved.plugins[1:]),
+        )
+
+        original_plan = compile_plan(resolved)
+        patched_plan = compile_plan(patched)
+
+        assert (
+            "patch",
+            f"{patched.profile_path}#patch.{patched_plugin.id}",
+        ) in patched_plan.input_provenance
+        assert compiled_run_plan_ref(patched_plan) == compiled_run_plan_ref(compile_plan(patched))
+        assert compiled_run_plan_ref(patched_plan) != compiled_run_plan_ref(original_plan)
 
 
 # ── CompiledRunPlan ─────────────────────────────────────────────────

@@ -40,6 +40,8 @@ from lca.contracts.protocols.control_plan import (
 )
 from lca.harness.profile.control_plan_resolver import (
     ControlPlanOptions,
+    ControlPlanResolveError,
+    _validate_slot_aggregations,
     explain_control_slot,
     project_control_plan,
 )
@@ -387,6 +389,25 @@ class TestComputeControlPlanHash:
         h1 = compute_control_plan_hash((e1,), "x.yaml")
         h2 = compute_control_plan_hash((e2,), "x.yaml")
         assert h1 != h2
+
+
+class TestResolverAggregationValidation:
+    def test_conflicting_aggregation_modes_fail_before_runtime(self) -> None:
+        entries = (
+            ControlEntry(
+                plugin_id="policy.a",
+                slot=ControlSlot.ACT_AUTHORIZE,
+                aggregation=AggregationMode.DENY_ON_ANY_DENY,
+            ),
+            ControlEntry(
+                plugin_id="policy.b",
+                slot=ControlSlot.ACT_AUTHORIZE,
+                aggregation=AggregationMode.DENY_ON_EXHAUSTED,
+            ),
+        )
+
+        with pytest.raises(ControlPlanResolveError, match="conflicting aggregation modes"):
+            _validate_slot_aggregations({ControlSlot.ACT_AUTHORIZE: entries})
 
 
 # ── Resolver — eleven-slot closure ─────────────────────────────────
