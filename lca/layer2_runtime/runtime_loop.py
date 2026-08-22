@@ -83,7 +83,6 @@ class CognitiveRuntime(Runtime):
         reducer: Reducer | None = None,
         topology: LoopTopology | None = None,
         control_plan: ControlPlan | None = None,
-        control_policies: DefaultControlPolicyEngine | None = None,
         compiled_plan: CompiledRunPlan | None = None,
         phase_executors: Mapping[str, object] | None = None,
     ) -> None:
@@ -99,9 +98,6 @@ class CognitiveRuntime(Runtime):
         self.control_plan = control_plan
         self.compiled_plan = compiled_plan
         self.phase_executors = dict(phase_executors or {})
-        self.control_policies = (
-            control_policies if control_policies is not None else DefaultControlPolicyEngine()
-        )
 
     async def run(
         self,
@@ -214,7 +210,7 @@ class CognitiveRuntime(Runtime):
                 hooks=self.hooks,
             ).resume(checkpoint)
         
-        # 回退到旧循环（将在 Task 6 中删除）
+        # 没有声明式 plan，回退到旧循环（Task 6 将删除此回退）
         return await self._loop(state, max_steps)
 
     def select_control(self, slot: ControlSlot, state: AgentState) -> ControlSelection | None:
@@ -223,31 +219,7 @@ class CognitiveRuntime(Runtime):
             return None
         return select_control_entries(self.control_plan, slot, state)
 
-    def evaluate_control(
-        self,
-        slot: ControlSlot,
-        state: AgentState,
-        *,
-        decision: Decision | None = None,
-        observation: Observation | None = None,
-        reflection: Reflection | None = None,
-        checkpoint_reason: SnapshotReason | None = None,
-    ) -> ControlEvaluation | None:
-        """执行活跃投稿并以唯一聚合器生成该槽位的有效 verdict。"""
-        if self.control_plan is None:
-            return None
-        selection = select_control_entries(self.control_plan, slot, state)
-        verdicts = self.control_policies.evaluate(
-            selection,
-            ControlPolicyContext(
-                state=state,
-                decision=decision,
-                observation=observation,
-                reflection=reflection,
-                checkpoint_reason=checkpoint_reason,
-            ),
-        )
-        return aggregate_control_verdicts(selection, verdicts)
+
 
     async def _loop(self, state: AgentState, max_steps: int) -> Result:
         """六步闭集编排（ADR-0066）。
