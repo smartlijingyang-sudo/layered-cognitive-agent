@@ -3,25 +3,24 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 import time
 from collections.abc import Sequence
 from contextlib import nullcontext
-from pathlib import Path
 from typing import Any, cast
 
 import structlog
 
 from gateway.modes import DEFAULT_MODE
+from gateway.runs import terminalizer
 from gateway.runs._journal_factory import (
     create_run_journal_components as _create_run_journal_components,
 )
-from gateway.runs.doctor import diagnose
 from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.intent import resolve_run_intent
 from gateway.runs.live import LiveTail
 from gateway.runs.session import RunRegistry, RunSession, RunStatus
+from gateway.runs.terminalizer import RunTerminalizer
 from lca.contracts.atoms.ids import RunId, TraceId, new_id
 from lca.contracts.mechanisms.capability import (
     MissingCapabilityError,
@@ -39,8 +38,6 @@ from lca.contracts.models.observability.journal import (
     RunScope,
 )
 from lca.contracts.models.team.run_context import RunContext
-from lca.contracts.observability.run_locator import RunLocator
-from lca.contracts.observability.run_manifest import IntegrityState, ManifestEvidence, RunManifest
 from lca.contracts.protocols import JournalProjector
 from lca.contracts.protocols.infra import Sandbox
 from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
@@ -48,13 +45,11 @@ from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.observability import (
     BoundObservability,
     bind_backends,
-    fold_run_state,
     record,
     record_runtime,
     run_scope,
 )
 from lca.layer0_infra.observability.event_descriptor_env import bind_descriptors
-from lca.layer0_infra.observability.journal.reducer import RunStatus as JRunStatus
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.plane.machine import resolve_machine, resolve_machine_transport
 from lca.layer0_infra.plane.resolve import (
@@ -68,7 +63,7 @@ from lca.layer0_infra.plane.scope import plane_bindings_scope
 from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime
 from lca.layer0_infra.search.scope import search_run_scope
 from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
-from lca.layer0_infra.tools.run_finalizer import finalize_run, run_id_scope
+from lca.layer0_infra.tools.run_finalizer import run_id_scope
 from lca.layer0_infra.workspace import run_workspace_scope
 from lca.plugins.loop_drivers.registry import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
@@ -210,16 +205,6 @@ def create_hub_for_session(
     )
     session.hub = hub
     return hub
-
-
-def _locator_or_default(ctx: Any) -> RunLocator:
-    """从 ctx 拉 run_locator;缺失时退回 traces/ 默认 fs locator(测试场景)。"""
-    try:
-        return ctx.require("run_locator")  # type: ignore[no-any-return]
-    except Exception:
-        from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
-
-        return FilesystemRunLocator(root="traces")
 
 
 def create_run_session(
@@ -452,7 +437,9 @@ async def execute_run(
         if session.status == RunStatus.WAITING_INPUT:
             registry.mark_paused(session)
         else:
-            await finalize(session, registry, workspace_ref[0], success)
+            await RunTerminalizer(registry).terminalize(
+                session, workspace=workspace_ref[0], success=success
+            )
 
 
 async def resume_run(session: RunSession, registry: RunRegistry, answer: str) -> None:
@@ -491,314 +478,16 @@ async def resume_run(session: RunSession, registry: RunRegistry, answer: str) ->
             run_id=session.run_id,
             trace_id=session.trace_id,
         )
-    await finalize(session, registry, None, success)
-
-
-async def finalize(
-    session: RunSession,
-    registry: RunRegistry,
-    workspace: Any,
-    success: bool,
-) -> None:
-    """The only teardown. Nested finally. HIL must not call this.
-
-    终态从 journal 推导（fold_run_state），不再独立写 status——消灭双 owner。
-    cancel_requested 是 session 级信号，覆盖推导结果。
-    """
-    try:
-        if session.hub is not None:
-            _emit_artifact_closure_if_needed(workspace, session, session.hub)
-        await finalize_run(session.run_id)
-    except Exception:
-        _log.exception("finalize_run_pre_close_failed", hop="H2", run_id=session.run_id)
-    finally:
-        try:
-            if session.hub is not None:
-                session.hub.close()
-        finally:
-            _derive_terminal_status(session, success)
-            registry.clear_inflight(session.run_id)
-            registry.prune()
-            _record_terminal_materialization(session)
-            if session.hub is not None:
-                await _dispose_export(session.hub)
-
-
-async def _dispose_export(hub: BoundObservability) -> None:
-    """Langfuse / OTel teardown off the event loop. Live readers already closed.
-
-    BoundObservability 用 ``flush()`` 冲刷缓冲；新模型 journal backend 自身
-    实现 ``close()``，OTel tracer 同样关闭当前 span——但 release()/dispose()
-    是老 ObservabilityHub 的语义，已迁移到 close()。
-    """
-    try:
-        await asyncio.wait_for(asyncio.to_thread(hub.flush), timeout=_EXPORT_DISPOSE_TIMEOUT_S)
-    except TimeoutError:
-        _log.warning("observability_export_flush_timeout", hop="H3")
-    except Exception:
-        _log.warning("observability_export_flush_failed", hop="H3", exc_info=True)
-
-
-def _journal_store(hub: BoundObservability | None) -> Any:
-    """从 BoundObservability 提取 RunStore；hub/journal 缺失时返回 None。"""
-    if hub is None or hub.journal is None:
-        return None
-    return getattr(hub.journal, "store", hub.journal)
-
-
-def _derive_terminal_status(session: RunSession, success: bool) -> None:
-    """终态推导：优先从 journal 事件流推导，fallback 到 session 信号。
-
-    不变量 N3：状态是事件流的纯函数。cancel_requested 和 session.error
-    是 session 级信号，在推导结果之上覆盖（处理 run 异常早退、无 finish 事件的场景）。
-    """
-    if session.cancel_requested:
-        session.status = RunStatus.CANCELED
-    elif session.error:
-        session.status = RunStatus.FAILED
-    elif session.hub is not None:
-        store = _journal_store(session.hub)
-        if store is None:
-            _fallback_terminal_status(session, success)
-        else:
-            derived = fold_run_state(store.events)
-            session.status = _journal_to_session_status(derived.status)
-    else:
-        _fallback_terminal_status(session, success)
-    if session.status in {RunStatus.CANCELED, RunStatus.FAILED, RunStatus.COMPLETED}:
-        session.closed_at = time.time()
-
-
-def _journal_to_session_status(journal_status: JRunStatus | None) -> RunStatus:
-    """映射 journal reducer 的 RunStatus 到 session 的 RunStatus。"""
-    mapping: dict[JRunStatus, RunStatus] = {
-        JRunStatus.COMPLETED: RunStatus.COMPLETED,
-        JRunStatus.FAILED: RunStatus.FAILED,
-        JRunStatus.CANCELED: RunStatus.CANCELED,
-        JRunStatus.RUNNING: RunStatus.COMPLETED,  # 无 finish 事件但 teardown 到达 → 视为完成
-        JRunStatus.WAITING_INPUT: RunStatus.WAITING_INPUT,
-    }
-    if journal_status is None:
-        return RunStatus.COMPLETED
-    return mapping.get(journal_status, RunStatus.COMPLETED)
-
-
-def _fallback_terminal_status(session: RunSession, success: bool) -> None:
-    """Hub 不存在时的 fallback——保持旧行为。"""
-    if session.error:
-        session.status = RunStatus.FAILED
-    elif success:
-        session.status = RunStatus.COMPLETED
-
-
-def _record_terminal_materialization(session: RunSession) -> None:
-    """ADR-0065 §一 / §六 / PR-11:终态写 manifest.json + 更新 latest.json。
-
-    manifest.json 是 terminal materialization + 完整性状态,**不是事实 owner**;
-    任意 run 都可由 ledger.jsonl 重建。latest.json 是原子指针(临时文件 +
-    ``os.replace``),**仅供人机导航**,不可作为重放输入。
-
-    doctor 报告(payload + 各 hop verdict)合并进 ``extra["doctor_report"]``;
-    ``hops`` / ``consistency`` / ``factory`` 都纳入,与原 ``<id>.doctor.json``
-    形状兼容(`doctor.v2 schema` + `as_dict()` 字段)。
-    """
-    locator: RunLocator = _session_locator(session)
-    try:
-        report = diagnose(session, session.jsonl_path)
-        if report.broken_hop or not report.factory["ok"]:
-            _log.error(
-                "run_doctor_verdict",
-                hop=report.broken_hop or "factory",
-                run_id=session.run_id,
-                broken_hop=report.broken_hop,
-                summary=report.summary,
-            )
-        manifest_path = locator.manifest_path(session.run_id)
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        ledger_summary = _ledger_summary_for(session)
-        ledger_high_watermark = _ledger_high_watermark_for(session)
-        terminal_event_id = _terminal_event_id_for(session)
-        manifest = RunManifest(
-            run_id=session.run_id,
-            terminal_event_id=terminal_event_id,
-            ledger_high_watermark=ledger_high_watermark,
-            ledger_summary=ledger_summary,
-            materializer_version=RunManifest.materializer_default_version(),
-            evidence_integrity=_evidence_integrity_for(locator, session.run_id),
-            started_at=session.started_at,
-            closed_at=session.closed_at if session.closed_at is not None else time.time(),
-            extra={"doctor_report": report.as_dict()},
-        )
-        manifest_path.write_text(
-            json.dumps(manifest.to_dict(), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        # 终态封存完成后,原子指针指向当前 run(便于 `lca-ops logs --replay` / 导航)
-        locator.update_latest_pointer(session.run_id)
-    except Exception:
-        _log.warning(
-            "run_terminal_materialization_failed", hop="H2", run_id=session.run_id, exc_info=True
-        )
-
-
-def _session_locator(session: RunSession) -> RunLocator:
-    """从 session.locator 拿 locator;测试 / 直构造的 session 退回 fs(由 jsonl_path 推断)。"""
-    if session.locator is not None:
-        return session.locator
-    # journal_path = <root>/runs/<run_id>/journal.jsonl → root = parent.parent.parent
-    from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
-
-    root = session.jsonl_path.parent.parent.parent
-    return FilesystemRunLocator(root=root)
-
-
-def _ledger_high_watermark_for(session: RunSession) -> int:
-    """从 BoundObservability 的 RunStore 取最后 seq;hub 缺失时回退读 journal.jsonl。"""
-    store = _journal_store(getattr(session, "hub", None))
-    if store is not None:
-        try:
-            events = store.events  # type: ignore[attr-defined]
-            return max((int(getattr(e, "seq", 0) or 0) for e in events), default=0)
-        except Exception as exc:
-            _log.debug(
-                "ledger_high_watermark_from_hub_failed",
-                run_id=session.run_id,
-                error=str(exc),
-            )
-    return _watermark_from_file(session.jsonl_path)
-
-
-def _terminal_event_id_for(session: RunSession) -> str:
-    """从 journal 最后一条 AgentRunFinished / RunFinished / 等终态事件拿 event_id。
-
-    hub 缺失时回退扫描 journal.jsonl。
-    """
-    store = _journal_store(getattr(session, "hub", None))
-    if store is not None:
-        events: list[object] = []
-        try:
-            events = list(store.events)  # type: ignore[attr-defined]
-        except Exception as exc:
-            _log.debug(
-                "terminal_event_id_from_hub_failed",
-                run_id=session.run_id,
-                error=str(exc),
-            )
-            events = []
-        for stamped in reversed(events):
-            evt = getattr(stamped, "event", None)
-            if evt is None:
-                continue
-            name = type(evt).__name__
-            if name in {"AgentRunFinished", "RunFinished", "RunSealed"}:
-                return str(getattr(stamped, "event_id", "") or "")
-    return _terminal_event_id_from_file(session.jsonl_path)
-
-
-def _watermark_from_file(path: Path) -> int:
-    """扫描 journal.jsonl 最后一行取 seq;空 / 缺失回退 0。"""
-    if not path.exists():
-        return 0
-    last = 0
-    try:
-        with path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    row = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                seq = int(row.get("seq", 0) or 0)
-                if seq > last:
-                    last = seq
-    except OSError:
-        return 0
-    return last
-
-
-def _terminal_event_id_from_file(path: Path) -> str:
-    """扫描 journal.jsonl 最后一条 ``event_type=AgentRunFinished`` 的 event_id。"""
-    if not path.exists():
-        return ""
-    last = ""
-    try:
-        with path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    row = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if row.get("event_type") == "AgentRunFinished":
-                    last = str(row.get("event_id") or row.get("scope", {}).get("event_id") or "")
-    except OSError:
-        return ""
-    return last
-
-
-def _evidence_integrity_for(locator: RunLocator, run_id: str) -> tuple[ManifestEvidence, ...]:
-    """校验 evidence/<sha256-*.*> 文件存在;缺失记 MISSING。"""
-    ev_dir = locator.evidence_dir(run_id)
-    if not ev_dir.exists():
-        return ()
-    out: list[ManifestEvidence] = []
-    for path in sorted(ev_dir.iterdir()):
-        if not path.is_file():
-            continue
-        name = path.name
-        if not name.startswith("sha256-"):
-            continue
-        digest = name.removeprefix("sha256-").split(".", 1)[0]
-        if path.exists() and path.stat().st_size > 0:
-            state, detail = IntegrityState.OK, ""
-        else:
-            state, detail = IntegrityState.MISSING, f"empty evidence blob: {name}"
-        out.append(
-            ManifestEvidence(ref_digest=digest, ref_algorithm="sha256", state=state, detail=detail)
-        )
-    return tuple(out)
-
-
-def _ledger_summary_for(session: RunSession) -> str:
-    """对 journal.jsonl 最后 1MB 算 sha256(完整性指纹;不替代内容寻址)。"""
-    path = session.jsonl_path
-    if not path.exists():
-        return ""
-    try:
-        import hashlib
-
-        h = hashlib.sha256()
-        with path.open("rb") as fh:
-            # 末 1MB,够覆盖尾段摘要
-            fh.seek(0, 2)
-            size = fh.tell()
-            fh.seek(max(0, size - 1_048_576))
-            for chunk in iter(lambda: fh.read(65_536), b""):
-                h.update(chunk)
-        return h.hexdigest()
-    except Exception:
-        return ""
+    await RunTerminalizer(registry).terminalize(session, workspace=None, success=success)
 
 
 def _record_run_failure(session: RunSession, exc: BaseException | None, hub: Any) -> None:
-    """Emit ``AgentRunStarted`` + ``AgentRunFinished(error=...)`` so the
-    failure is visible to the journal (jsonl + SSE + ``lca-ops logs``).
+    """Record an observable failed run before terminalization closes the journal."""
 
-    The reducer (``lca/layer0_infra/observability/journal/reducer.py``,
-    rule-2) derives ``RunStatus.FAILED`` from any root-level finished
-    event, keeping ``session.error`` and the snapshot endpoint consistent.
-    """
     if hub is None:
         return
     from lca.contracts.models.core.lifecycle import TaskStatus
-    from lca.contracts.models.observability.journal import (
-        AgentRunFinished,
-        AgentRunStarted,
-    )
+    from lca.contracts.models.observability.journal import AgentRunFinished, AgentRunStarted
 
     message = session.error or (f"{type(exc).__name__}: {exc}" if exc else "run failed")
     try:
@@ -829,52 +518,24 @@ def _record_run_failure(session: RunSession, exc: BaseException | None, hub: Any
                 )
             )
     except Exception:
-        _log.warning(
-            "run_failure_journal_failed",
-            run_id=session.run_id,
-            exc_info=True,
-        )
+        _log.warning("run_failure_journal_failed", run_id=session.run_id, exc_info=True)
 
 
-def _emit_artifact_closure_if_needed(
-    workspace: Any, session: RunSession, hub: BoundObservability
+def _record_terminal_materialization(session: RunSession) -> None:
+    """Compatibility wrapper for terminal-manifest callers."""
+
+    terminalizer._record_terminal_materialization(session)
+
+
+async def finalize(
+    session: RunSession,
+    registry: RunRegistry,
+    workspace: Any,
+    success: bool,
 ) -> None:
-    if workspace is None:
-        return
-    artifacts = workspace.artifacts.snapshot().artifacts
-    if not artifacts:
-        return
-    closure = workspace.artifacts.closure_text()
-    if not closure:
-        return
-    from lca.contracts.atoms.enums import StreamChannel
-    from lca.contracts.models.observability.journal import StepTextDelta
+    """Compatibility entry point for callers that finalize a run directly."""
 
-    try:
-        store = _journal_store(hub)
-        if store is not None:
-            store.append(
-                StepTextDelta(
-                    step=-1,
-                    text_delta="\n\n" + closure,
-                    seq=0,
-                    channel=StreamChannel.ANSWER.value,
-                )
-            )
-        _log.info(
-            "artifact_closure_emitted",
-            hop="H2",
-            run_id=session.run_id,
-            artifact_count=len(artifacts),
-            status=session.status.value,
-        )
-    except Exception:
-        _log.warning(
-            "artifact_closure_emit_failed",
-            hop="H2",
-            run_id=session.run_id,
-            exc_info=True,
-        )
+    await RunTerminalizer(registry).terminalize(session, workspace=workspace, success=success)
 
 
 def _freeze_bindings(session: RunSession, ctx: Any) -> PlaneBindings:

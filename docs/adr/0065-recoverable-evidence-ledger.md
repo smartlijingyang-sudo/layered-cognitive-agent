@@ -130,6 +130,8 @@ Evidence 写入采用“准备、验证、引用、提交”的协议。`Evidenc
 
 恢复从账本而不是摘要或索引开始：读取全部已提交记录，验证 `run_seq` 连续性、descriptor 版本、因果引用和所需 evidence receipt，然后由 reducer 纯函数重建状态。外部副作用恢复仍以 `invocation_id` 与 `idempotency_key` 判断，不得因重放再次执行。每个 terminal event 都生成可验证的 `RunManifest` 物化视图，其中含 `run_id`、终态 `event_id`、账本高水位、账本摘要、materializer 版本与证据完整性状态；它是导航和校验入口，不是新的事实 owner。
 
+`gateway/runs/terminalizer.py:RunTerminalizer` 是执行入口与恢复入口共享的终态封存 module。它以 `terminalize(session, workspace, success)` 统一工件 closure、运行资源关闭、Journal 派生状态、registry 清理、manifest 物化与 exporter flush 的顺序。该 module 只在终态事件后生成物化与完整性检查；它不得把 manifest、registry 状态或 exporter 结果提升为账本事实。
+
 `SourceLocation` 不是账本写入热路径的隐式 `inspect.stack()` 副作用。需要源码定位时，受控 instrumentation 可以显式记录构建修订、模块、符号和可选行号，并由 descriptor 分类为诊断数据；调用栈采集仅能作为按需诊断物化，不得对每条业务记录默认执行或泄露绝对路径。
 
 ### 六、物化视图、成本与 Coding Agent 查询

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.composer.agent_assembly import PlanBoundAgentAssembler
 from lca.plugins.composer.plan_composers import (
     BodyComposer,
     BrainComposer,
@@ -37,7 +38,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     ctx.provide("composer.brain", BrainComposer())
     ctx.provide("composer.body", BodyComposer())
     ctx.provide("composer.perceive", PerceiveComposer())
-    ctx.provide("composer.team", TeamComposer())
+    ctx.provide("composer.team", TeamComposer(PlanBoundAgentAssembler()))
 
 
 __all__ = ["Config", "setup"]

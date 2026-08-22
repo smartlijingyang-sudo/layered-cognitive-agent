@@ -12,7 +12,7 @@ from lca.contracts.protocols.spec import LeadSpec, TeamSpec, strategy_key_for_go
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 from lca.layer3_agent.member_invoke import TransportMemberInvoker
-from lca.layer4_app.team_wiring import build_team_transport
+from lca.plugins.composer.agent_assembly import AgentAssemblyPort
 from lca.plugins.composer.plan_composition_support import (
     AgentCompositionRequest,
     apply_lead_brain,
@@ -26,6 +26,7 @@ from lca.plugins.composer.plan_composition_support import (
     resolve_state_store,
     resolve_team_observability,
 )
+from lca.plugins.composer.team_transport import build_team_transport
 
 if TYPE_CHECKING:
     from cordis import Context
@@ -136,17 +137,18 @@ class PerceiveComposer:
 
 
 class TeamComposer:
-    """Compose the collaboration cluster through recursively plan-bound Agents."""
+    """Compose the collaboration cluster through an explicit Agent assembly seam."""
 
     key = "team"
+
+    def __init__(self, agent_assembler: AgentAssemblyPort) -> None:
+        self._agent_assembler = agent_assembler
 
     def compose_agent(self, request: AgentCompositionRequest, scope: Context) -> AgentGraph:
         del request, scope
         raise TypeError("TeamComposer cannot compose an AgentGraph")
 
     def compose_team(self, spec: TeamSpec, scope: Context) -> TeamGraph:
-        from lca.layer4_app.spawn import spawn_lead, spawn_member
-
         observability = resolve_team_observability(spec, scope)
         shared_store = (
             TeamSharedMemoryStore(list(spec.shared_memory_layers))
@@ -154,8 +156,11 @@ class TeamComposer:
             else None
         )
         members = tuple(
-            spawn_member(
-                member, shared_store=shared_store, observability=observability, scope=scope
+            self._agent_assembler.assemble_member(
+                member,
+                shared_store=shared_store,
+                observability=observability,
+                scope=scope,
             )
             for member in spec.members
         )
@@ -165,7 +170,7 @@ class TeamComposer:
         transport = build_team_transport(list(members))
         stage = TeamStage(members=members, invoker=TransportMemberInvoker(transport))
         lead = (
-            spawn_lead(
+            self._agent_assembler.assemble_lead(
                 spec.governance.agent,
                 transport=transport,
                 mandate=spec.governance.mandate,

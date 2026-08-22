@@ -247,11 +247,11 @@ def team_trace_profile(spec: TeamSpec, graph: TeamGraph) -> TeamTraceProfile:
 
 __all__ = [
     "AgentCompositionRequest",
-    "apply_lead_brain",
-    "build_perceive_hub",
     "_format_tools_xml",
     "_render_available_skills",
     "_skill_store_from_scope",
+    "apply_lead_brain",
+    "build_perceive_hub",
     "fork_transport",
     "instrument_llm",
     "require_factory",

@@ -46,6 +46,16 @@ def test_artifact_contract_is_four_state_only() -> None:
     )
 
 
+def test_team_composer_uses_the_agent_assembly_seam() -> None:
+    source = (ROOT / "lca" / "plugins" / "composer" / "plan_composers.py").read_text(
+        encoding="utf-8"
+    )
+    assert "lca.layer4_app.spawn" not in source
+    assert "lca.layer4_app.team_wiring" not in source
+    assert "self._agent_assembler.assemble_member" in source
+    assert "self._agent_assembler.assemble_lead" in source
+
+
 def test_creator_action_vocabulary_is_closed() -> None:
     assert ALLOWED_ACTIONS == ("inspect", "author", "validate", "promote")
     source = _python_source()

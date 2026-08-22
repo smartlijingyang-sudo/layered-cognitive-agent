@@ -42,6 +42,10 @@ _PLUGINS_DIR = _ROOT / "lca" / "plugins"
 # <= 10.
 ALLOWLIST: tuple[tuple[str, str], ...] = (
     ("__init__.py", "plugin package marker"),
+    ("composer/agent_assembly.py", "implementation helper owned by lca-plan-sub-composers"),
+    ("composer/plan_binding.py", "implementation helper owned by lca-plan-sub-composers"),
+    ("composer/runtime_factory.py", "implementation helper owned by lca-plan-sub-composers"),
+    ("composer/team_transport.py", "implementation helper owned by lca-plan-sub-composers"),
     # ToolsComposeService / TransportComposeService declare the
     # shape; keep them in coverage.
 )
