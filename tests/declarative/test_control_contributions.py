@@ -85,7 +85,7 @@ async def test_act_authorize_allows_valid_tool_action():
     decision = Decision(
         decision_id="d1",
         action_type=ActionType.USE_TOOL,
-        tool_calls=[ToolCall(tool_name="bash", arguments={})],
+        tool_calls=[ToolCall(call_id="c1", tool_name="bash", arguments={})],
     )
     context = MockContext(state, decision=decision)
     result = await executor.execute(context, PhaseInput())
@@ -100,7 +100,7 @@ async def test_act_authorize_denies_unnamed_tool():
     decision = Decision(
         decision_id="d1",
         action_type=ActionType.USE_TOOL,
-        tool_calls=[ToolCall(tool_name="", arguments={})],
+        tool_calls=[ToolCall(call_id="c1", tool_name="", arguments={})],
     )
     context = MockContext(state, decision=decision)
     result = await executor.execute(context, PhaseInput())
