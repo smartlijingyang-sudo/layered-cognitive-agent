@@ -34,9 +34,8 @@ from lca.contracts.models.observability.journal import (
     DelegationIssued,
     DelegationMechanism,
     RunScope,
-    get_current_run_scope,
-    run_scope,
 )
+from lca.layer0_infra.observability.run_context import get_current_run_scope, run_scope
 from lca.contracts.models.team.delegation_context import (
     delegation_scope,
     get_delegator_context,

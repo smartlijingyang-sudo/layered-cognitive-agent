@@ -117,15 +117,10 @@ def register(app: typer.Typer) -> None:
             help="Profile YAML path",
         ),
     ) -> None:
-        """Print the plugin DAG edges (provider → consumer)."""
-        from lca.harness.profile.resolve import resolve_profile
+        """Print the compiled capability / phase / replacement graph as Mermaid."""
+        from lca.layer0_infra.ops.commands.declarative import render_declarative_graph
 
-        resolved = resolve_profile(profile)
-        print(f"manifest_hash: {resolved.manifest_hash}")
-        print(f"nodes: {sum(1 for p in resolved.plugins if not p.disabled)}")
-        print(f"edges: {len(resolved.dag_edges)}")
-        for src, dst in resolved.dag_edges:
-            print(f"  {src} → {dst}")
+        print(render_declarative_graph(profile))
 
     @app.command()
     def debug(

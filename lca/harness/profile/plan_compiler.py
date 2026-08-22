@@ -33,6 +33,7 @@ from lca.contracts.protocols.plan import (
     scope_sub_plan_hash,
 )
 from lca.contracts.protocols.scope_plan import BudgetCeiling, ScopePlan
+from lca.harness.declarative.compiler import compile_declarative_projection
 from lca.harness.profile.capability_plan_resolver import (
     CapabilityPlanOptions,
     project_capability_plan,
@@ -119,6 +120,14 @@ def compile_plan(
         task_id=opts.task_id,
         env_fingerprint=opts.env_fingerprint,
     )
+    declarative = compile_declarative_projection(
+        resolved,
+        task_contract=opts.task_id or "",
+        environment=opts.env_fingerprint or "",
+        actor_grant=tuple(opts.acl_grants),
+        include_disabled=opts.include_disabled,
+    )
+    declarative.validation_report.require_valid()
 
     return CompiledRunPlan(
         profile_path=resolved.profile_path,
@@ -127,7 +136,16 @@ def compile_plan(
         scope=scope,
         plan_version=COMPILED_RUN_PLAN_VERSION,
         input_provenance=input_provenance,
-        revision="v1",
+        revision="v2",
+        plugin_specs=declarative.plugin_specs,
+        capability_bindings=declarative.capability_bindings,
+        phase_graph=declarative.phase_graph,
+        phase_bindings=declarative.phase_bindings,
+        control_entries=declarative.control_entries,
+        replacement_map=declarative.replacement_map,
+        effect_policy=declarative.effect_policy,
+        provenance=declarative.provenance,
+        validation_report=declarative.validation_report,
     )
 
 
@@ -139,6 +157,32 @@ def explain_compile_plan(plan: CompiledRunPlan) -> dict[str, Any]:
         "plan_version": plan.plan_version,
         "revision": plan.revision,
         "input_provenance": [{"kind": kind, "path": path} for kind, path in plan.input_provenance],
+        "declarative": {
+            "schema_version": plan.schema_version,
+            "plugin_count": len(plan.plugin_specs),
+            "phase_nodes": len(plan.phase_graph.nodes) if plan.phase_graph else 0,
+            "phase_bindings": [
+                {
+                    "node": binding.node_id,
+                    "phase": binding.semantic_phase.value,
+                    "executor": binding.executor_capability,
+                    "contributions": [contribution.executor for contribution in binding.contributions],
+                }
+                for binding in plan.phase_bindings
+            ],
+            "replacement_map": [
+                {"target": item.target, "winner": item.winner, "mode": item.mode, "reason": item.reason}
+                for item in plan.replacement_map
+            ],
+            "effect_policy": {
+                "gateway": plan.effect_policy.gateway_capability if plan.effect_policy else "",
+                "allowed_effects": list(plan.effect_policy.allowed_effects) if plan.effect_policy else [],
+            },
+            "validation": {
+                "valid": plan.validation_report.is_valid,
+                "errors": [issue.code for issue in plan.validation_report.errors],
+            },
+        },
         "sub_plans": {
             "capability": {
                 "plan_hash": capability_sub_plan_hash(plan),

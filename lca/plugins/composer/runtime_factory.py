@@ -7,8 +7,9 @@ or the HTTP carrier.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.state import AgentState
@@ -22,6 +23,7 @@ from lca.contracts.protocols import (
     StopRule,
 )
 from lca.contracts.protocols.control_plan import ControlPlan
+from lca.contracts.protocols.plan import CompiledRunPlan
 from lca.contracts.protocols.reducer import LoopTopology
 from lca.contracts.protocols.runtime import StopOutcomePolicy
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
@@ -49,6 +51,8 @@ class RuntimeDeps:
     reducer: Reducer = field(default_factory=DefaultReducer)
     topology: LoopTopology = field(default_factory=ClosedSetTopology)
     control_plan: ControlPlan | None = None
+    compiled_plan: CompiledRunPlan | None = None
+    phase_executors: Mapping[str, Any] = field(default_factory=dict)
 
 
 def build_cognitive_runtime(deps: RuntimeDeps) -> CognitiveRuntime:
@@ -66,6 +70,8 @@ def build_cognitive_runtime(deps: RuntimeDeps) -> CognitiveRuntime:
         reducer=deps.reducer,
         topology=deps.topology,
         control_plan=deps.control_plan,
+        compiled_plan=deps.compiled_plan,
+        phase_executors=deps.phase_executors,
     )
 
 

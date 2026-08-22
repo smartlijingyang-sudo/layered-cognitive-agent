@@ -53,6 +53,21 @@ def register(app: typer.Typer) -> None:
         ),
     ) -> None:
         """Explain a run failure or a resolved ControlPlan slot."""
+        if target == "plan":
+            selected_profile = Path(slot) if slot is not None else profile
+            if not selected_profile.exists():
+                print(f"Profile not found: {selected_profile}", file=sys.stderr)
+                raise typer.Exit(2)
+            from lca.layer0_infra.ops.commands.declarative import explain_declarative_plan
+
+            try:
+                report = explain_declarative_plan(selected_profile)
+            except (TypeError, ValueError) as exc:
+                print(f"explain plan: {exc}", file=sys.stderr)
+                raise typer.Exit(2) from exc
+            emit_report(report, json_mode=json_mode)
+            raise typer.Exit(0)
+
         if target == "control":
             if slot is None:
                 print("explain control requires <slot>", file=sys.stderr)

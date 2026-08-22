@@ -13,6 +13,8 @@ L2 层职责：
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import structlog
 
 from lca.contracts.atoms.control_slot import ControlSlot
@@ -38,6 +40,7 @@ from lca.contracts.protocols import (
     StopRule,
 )
 from lca.contracts.protocols.control_plan import ControlPlan
+from lca.contracts.protocols.plan import CompiledRunPlan
 from lca.contracts.protocols.reducer import LoopTopology
 from lca.layer0_infra.observability import get_span_context
 from lca.layer0_infra.skills.activation_scope import get_newly_activated
@@ -84,6 +87,8 @@ class CognitiveRuntime(Runtime):
         topology: LoopTopology | None = None,
         control_plan: ControlPlan | None = None,
         control_policies: DefaultControlPolicyEngine | None = None,
+        compiled_plan: CompiledRunPlan | None = None,
+        phase_executors: Mapping[str, object] | None = None,
     ) -> None:
         self.brain = brain
         self.body = body
@@ -95,6 +100,8 @@ class CognitiveRuntime(Runtime):
         self.reducer: Reducer = reducer if reducer is not None else DefaultReducer()
         self.topology: LoopTopology = topology if topology is not None else ClosedSetTopology()
         self.control_plan = control_plan
+        self.compiled_plan = compiled_plan
+        self.phase_executors = dict(phase_executors or {})
         self.control_policies = (
             control_policies if control_policies is not None else DefaultControlPolicyEngine()
         )
@@ -125,6 +132,25 @@ class CognitiveRuntime(Runtime):
         if ctx and ctx.extra.get(PRIOR_CONVERSATION_WM_KEY):
             state.extra[PRIOR_CONVERSATION_WM_KEY] = ctx.extra[PRIOR_CONVERSATION_WM_KEY]
         await self.hooks.trigger(HookEvent.ON_START.value, state)
+        if self.compiled_plan is not None and self.phase_executors:
+            from lca.layer2_runtime.declarative_runtime import (
+                DeclarativeRuntimeDriver,
+                RuntimePhaseCapabilities,
+            )
+
+            return await DeclarativeRuntimeDriver(
+                plan=self.compiled_plan,
+                phase_executors=self.phase_executors,
+                capabilities=RuntimePhaseCapabilities(
+                    brain=self.brain,
+                    body=self.body,
+                    memory=self.memory,
+                    perceive_hub=self.perceive_hub,
+                    stop_rule=self.stop_rule,
+                ),
+                reducer=self.reducer,
+                hooks=self.hooks,
+            ).run(state)
         return await self._loop(state, max_steps)
 
     async def resume(

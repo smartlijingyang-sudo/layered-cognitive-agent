@@ -8,6 +8,7 @@ bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
+  - bundles/declarative-phase-graph.yaml
 
 patch:
   - id: lca-llm-resolver

@@ -81,7 +81,13 @@ class PlanBoundAgentAssembler:
             shared_store=shared_store,
         )
         bound = bind_plan(request, plan, scope=scope)
-        return _agent_from_bound_graph(spec, bound.graph, plan=bound.plan, plan_ref=bound.plan_ref)
+        return _agent_from_bound_graph(
+            spec,
+            bound.graph,
+            plan=bound.plan,
+            plan_ref=bound.plan_ref,
+            scope=scope,
+        )
 
     def assemble_member(
         self,
@@ -147,6 +153,7 @@ def _agent_from_bound_graph(
     *,
     plan: CompiledRunPlan,
     plan_ref: str,
+    scope: Context,
 ) -> CognitiveAgent:
     """Close a complete AgentGraph into a CognitiveAgent that interprets ``plan``."""
 
@@ -175,6 +182,8 @@ def _agent_from_bound_graph(
             perceive_hub=graph.perceive_hub,
             stop_rule=graph.stop_rule,
             control_plan=plan.control,
+            compiled_plan=plan,
+            phase_executors=_phase_executor_bindings(plan, scope),
         )
     )
     return CognitiveAgent(
@@ -185,6 +194,22 @@ def _agent_from_bound_graph(
         max_wall_clock_seconds=spec.max_wall_clock_seconds,
         plan_ref=plan_ref,
     )
+
+
+def _phase_executor_bindings(plan: CompiledRunPlan, scope: Context) -> dict[str, object]:
+    """Resolve exactly the phase executor capabilities declared by the plan."""
+
+    inject = getattr(scope, "inject", None)
+    if not callable(inject):
+        raise MissingCapabilityError("phase executor binding requires a booted Context")
+    bindings: dict[str, object] = {}
+    for phase_binding in plan.phase_bindings:
+        capability = phase_binding.executor_capability
+        try:
+            bindings[capability] = inject(capability)
+        except (KeyError, LookupError) as exc:
+            raise MissingCapabilityError(capability) from exc
+    return bindings
 
 
 __all__ = ["AgentAssemblyPort", "PlanBoundAgentAssembler", "promote_lead"]

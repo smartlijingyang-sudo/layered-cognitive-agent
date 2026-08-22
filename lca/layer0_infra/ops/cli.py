@@ -16,6 +16,7 @@ import lca.layer0_infra.ops.steps  # noqa: F401
 from lca.layer0_infra.ops.commands import (
     audit,
     creator_plan,
+    declarative,
     diagnostics,
     journal,
     profile_inspect,
@@ -164,6 +165,7 @@ profile_inspect.register(app)
 diagnostics.register(app)
 audit.register(app)
 creator_plan.register(app)
+declarative.register(app)
 
 
 def main() -> None:

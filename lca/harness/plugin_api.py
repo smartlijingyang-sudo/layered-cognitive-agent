@@ -121,6 +121,7 @@ class PluginDefinition:
     functional_group: FunctionalGroup | None = None
     logic_address: LogicAddress | None = None
     contract: PluginContract | None = None
+    spec: Any | None = None
 
 
 def _normalize_keys(values: Sequence[Capability[Any] | str] | None) -> tuple[str, ...]:
@@ -242,6 +243,7 @@ def plugin(
     functional_group: FunctionalGroup | str | None = None,
     logic_address: LogicAddress | None = None,
     contract: PluginContract | None = None,
+    spec: Any | None = None,
 ) -> Any:
     """Declare a plugin Manifest (ADR-0062 §1 + ADR-0074 PR-2).
 
@@ -327,6 +329,7 @@ def plugin(
                 functional_group=fg,
                 logic_address=logic_address,
                 contract=contract,
+                spec=spec,
             ),
         )
         return cordis_plugin
@@ -360,6 +363,7 @@ def definition_from_plugin(
                 functional_group=cached.functional_group,
                 logic_address=cached.logic_address,
                 contract=cached.contract,
+                spec=cached.spec,
             )
         return cached
 

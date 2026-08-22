@@ -62,17 +62,29 @@ def bind_plan(
 
     from lca.contracts.harness.composer import merge_agent_graphs
 
-    composer_keys = ("brain", "body", "perceive")
-    graphs = tuple(
-        _resolve_composer(scope, key).compose_agent(request, scope) for key in composer_keys
-    )
-    graph = merge_agent_graphs(*graphs)
+    composer_bindings = _composer_bindings(plan, scope, operation="compose_agent")
+    composed = []
+    for capability, composer in composer_bindings:
+        try:
+            composed.append((capability, composer.compose_agent(request, scope)))
+        except TypeError:
+            # The Protocol implementation rejects an unsupported composition kind.
+            # This is capability behavior, not an implementation identity branch.
+            continue
+    if not composed:
+        raise BindPlanError("compiled plan declares no Agent composer capability")
+    graph = merge_agent_graphs(*(item[1] for item in composed))
     _validate_capability_bindings(plan, graph, scope)
     return PlanBindingResult(
         graph=graph,
         plan_ref=compiled_run_plan_ref(plan),
         plan=plan,
-        metadata={"composers": composer_keys},
+        metadata={
+            "composers": tuple(
+                capability.removeprefix("composer.") if not plan.is_declarative else capability
+                for capability, _ in composed
+            )
+        },
     )
 
 
@@ -84,7 +96,19 @@ def bind_team(
 ) -> TeamBindingResult:
     """Bind the required Team composer and reject every incomplete TeamGraph."""
 
-    graph = _resolve_composer(scope, "team").compose_team(spec, scope)
+    team_candidates = _composer_bindings(plan, scope, operation="compose_team")
+    team_composers = []
+    for capability, composer in team_candidates:
+        try:
+            team_composers.append((capability, composer.compose_team(spec, scope)))
+        except TypeError:
+            continue
+    if len(team_composers) != 1:
+        raise BindPlanError(
+            "compiled plan must resolve exactly one Team composer capability; "
+            f"got {[capability for capability, _ in team_composers]!r}"
+        )
+    graph = team_composers[0][1]
     missing = tuple(
         name
         for name in ("members", "strategy", "stage", "transport", "observability")
@@ -99,25 +123,56 @@ def bind_team(
         graph=graph,
         plan_ref=compiled_run_plan_ref(plan),
         plan=plan,
-        metadata={"composer": "team"},
+        metadata={
+            "composer": (
+                team_composers[0][0].removeprefix("composer.")
+                if not plan.is_declarative
+                else team_composers[0][0]
+            )
+        },
     )
 
 
-def _resolve_composer(scope: Context, key: str) -> Any:
-    """Resolve a required profile-provided Composer or fail the binding."""
+def _composer_bindings(
+    plan: CompiledRunPlan,
+    scope: Context,
+    *,
+    operation: str,
+) -> tuple[tuple[str, Any], ...]:
+    """Discover composer capabilities solely from the compiled plan.
+
+    The binding algorithm knows the composer *Protocol* operation but no concrete
+    composer key, factory identity or implementation name.
+    """
 
     inject = getattr(scope, "inject", None)
     if not callable(inject):
         raise BindPlanError("plan binding requires a booted cordis Context with inject()")
-    try:
-        composer = inject(f"composer.{key}")
-    except (KeyError, LookupError) as exc:
-        raise BindPlanError(
-            f"required composer.{key} is not registered in the booted Profile"
-        ) from exc
-    if composer is None:
-        raise BindPlanError(f"required composer.{key} resolved to None")
-    return composer
+    declared_capabilities = {binding.capability for binding in plan.capability_bindings}
+    if plan.is_declarative:
+        candidates = sorted(
+            capability
+            for capability in declared_capabilities
+            if capability.startswith("composer.")
+        )
+    else:
+        # Read-only v1 compatibility for persisted plans that predate v2 bindings.
+        candidates = (
+            ("composer.team",)
+            if operation == "compose_team"
+            else ("composer.brain", "composer.body", "composer.perceive")
+        )
+    resolved: list[tuple[str, Any]] = []
+    for capability in candidates:
+        try:
+            composer = inject(capability)
+        except (KeyError, LookupError) as exc:
+            if not plan.is_declarative:
+                raise BindPlanError(f"required {capability} is not registered in the booted Profile") from exc
+            continue
+        if composer is not None and callable(getattr(composer, operation, None)):
+            resolved.append((capability, composer))
+    return tuple(resolved)
 
 
 def _validate_capability_bindings(

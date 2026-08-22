@@ -1,0 +1,31 @@
+# ADR-0075: 默认认知阶段只通过显式 PhaseExecutor capability 选择。
+entries:
+  - id: phase.perceive.standard
+    name: phase_perceive_standard
+    $module: lca.plugins.phase_executors.perceive
+    config: {}
+
+  - id: phase.think.standard
+    name: phase_think_standard
+    $module: lca.plugins.phase_executors.think
+    config: {}
+
+  - id: phase.act.standard
+    name: phase_act_standard
+    $module: lca.plugins.phase_executors.act
+    config: {}
+
+  - id: phase.reflect.standard
+    name: phase_reflect_standard
+    $module: lca.plugins.phase_executors.reflect
+    config: {}
+
+  - id: phase.remember.standard
+    name: phase_remember_standard
+    $module: lca.plugins.phase_executors.remember
+    config: {}
+
+  - id: phase.stop.standard
+    name: phase_stop_standard
+    $module: lca.plugins.phase_executors.stop
+    config: {}

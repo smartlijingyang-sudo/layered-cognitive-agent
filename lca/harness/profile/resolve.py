@@ -174,6 +174,11 @@ def resolve_profile(
                 description=definition.description,
                 setup=definition.setup,
                 module=definition.module,
+                control=definition.control,
+                functional_group=definition.functional_group,
+                logic_address=definition.logic_address,
+                contract=definition.contract,
+                spec=definition.spec,
             )
         if config_cls is not None:
             try:
