@@ -81,7 +81,7 @@ def compile_declarative_projection(
     active_specs, replacements = _resolve_replacements(specs)
     bindings = _compile_capability_bindings(active_specs, resolved)
     phase_bindings = _compile_phase_bindings(active_specs)
-    graph = _compile_phase_graph(phase_bindings)
+    graph = _compile_phase_graph(phase_bindings, specs)
     controls = _compile_control_entries(phase_bindings)
     effect_policy = _compile_effect_policy(active_specs)
     provenance = PlanProvenance(
@@ -292,7 +292,9 @@ def _compile_phase_bindings(specs: tuple[PluginSpec, ...]) -> tuple[PhaseBinding
     return tuple(bindings)
 
 
-def _compile_phase_graph(bindings: tuple[PhaseBinding, ...]) -> CognitivePhaseGraphPlan:
+def _compile_phase_graph(
+    bindings: tuple[PhaseBinding, ...], specs: tuple[PluginSpec, ...]
+) -> CognitivePhaseGraphPlan:
     node_by_phase = {binding.semantic_phase: binding for binding in bindings}
     nodes = tuple(
         PhaseNode(
@@ -329,12 +331,50 @@ def _compile_phase_graph(bindings: tuple[PhaseBinding, ...]) -> CognitivePhaseGr
                 ),
             )
         )
+    # Add recovery and other declarative edges from plugins
+    edges.extend(_compile_phase_edges_from_specs(specs, node_by_phase))
     entry = node_by_phase.get(SemanticPhase.PERCEIVE)
     return CognitivePhaseGraphPlan(
         entry=entry.node_id if entry else "perceive.main",
         nodes=nodes,
         edges=tuple(edges),
     )
+
+
+def _compile_phase_edges_from_specs(
+    specs: tuple[PluginSpec, ...], node_by_phase: dict[SemanticPhase, PhaseBinding]
+) -> list[PhaseEdge]:
+    """Extract phase edge declarations from plugin specs.
+
+    Plugins that provide "phase.edge.*" capabilities can declare custom edges
+    in their configuration. This allows recovery profiles and other control
+    flows to add edges to the phase graph declaratively.
+    """
+    edges: list[PhaseEdge] = []
+    for spec in specs:
+        # Check if this spec provides a phase edge capability
+        if not any(cap.key.startswith("phase.edge.") for cap in spec.provides):
+            continue
+        # Extract edge configuration from plugin values
+        edge_config = spec.configuration.values
+        if not edge_config:
+            continue
+        source = str(edge_config.get("source", ""))
+        target = str(edge_config.get("target", ""))
+        when = str(edge_config.get("when", "true"))
+        if not source or not target:
+            continue
+        # Parse loop guard if present
+        loop_config = edge_config.get("loop")
+        loop_guard = None
+        if isinstance(loop_config, dict):
+            loop_guard = LoopGuard(
+                max_iterations=int(loop_config.get("max_iterations", 1)),
+                budget=str(loop_config.get("budget", "run.steps")),
+                terminal_predicate=str(loop_config.get("terminal_predicate", "false")),
+            )
+        edges.append(PhaseEdge(source=source, target=target, when=when, loop=loop_guard))
+    return edges
 
 
 def _compile_control_entries(bindings: tuple[PhaseBinding, ...]) -> tuple[ControlEntry, ...]:
