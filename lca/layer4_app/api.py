@@ -18,7 +18,9 @@ Example::
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.atoms.enums import MemoryLayer
@@ -73,7 +75,6 @@ _DEFAULT_PROFILE = "profiles/web-standard.yaml"
 # Module-level cached default context (boot profile lazily on first Agent creation).
 # ADR-0033 forbids ``global`` statements in the facade; the cache lives on a
 # dedicated holder dataclass so each access is a single attribute read.
-from dataclasses import dataclass
 
 
 @dataclass
@@ -87,7 +88,9 @@ class _DefaultCtxHolder:
     """
 
     ctx: PluginContext | None = None
-    lock: asyncio.Lock | None = None
+    boot_lock: threading.Lock = field(default_factory=threading.Lock)
+    boot_complete: threading.Event = field(default_factory=threading.Event)
+    booting: bool = False
 
 
 _default_ctx_holder = _DefaultCtxHolder()
@@ -105,32 +108,56 @@ def __getattr__(name: str) -> object:
     raise AttributeError(name)
 
 
-def _default_ctx_lock() -> asyncio.Lock:
-    if _default_ctx_holder.lock is None:
-        _default_ctx_holder.lock = asyncio.Lock()
-    return _default_ctx_holder.lock
+def _claim_default_ctx_boot() -> tuple[bool, threading.Event]:
+    """Claim the single process-wide lazy boot or return its completion event."""
+    with _default_ctx_holder.boot_lock:
+        if _default_ctx_holder.ctx is not None:
+            return False, _default_ctx_holder.boot_complete
+        if not _default_ctx_holder.booting:
+            _default_ctx_holder.booting = True
+            _default_ctx_holder.boot_complete.clear()
+            return True, _default_ctx_holder.boot_complete
+        return False, _default_ctx_holder.boot_complete
+
+
+def _publish_default_ctx(ctx: Context | None) -> None:
+    """Publish a successful boot or release waiters after its failure."""
+    with _default_ctx_holder.boot_lock:
+        if ctx is not None:
+            _default_ctx_holder.ctx = ctx
+        _default_ctx_holder.booting = False
+        _default_ctx_holder.boot_complete.set()
 
 
 def set_default_ctx(ctx: Context) -> None:
     """Bind an already-booted cordis Context as the process default."""
-    _default_ctx_holder.ctx = ctx
+    with _default_ctx_holder.boot_lock:
+        existing = _default_ctx_holder.ctx
+        if existing is not None and existing is not ctx:
+            raise RuntimeError("default plugin context is already bound")
+        _default_ctx_holder.ctx = ctx
+        _default_ctx_holder.booting = False
+        _default_ctx_holder.boot_complete.set()
 
 
 async def ensure_default_ctx() -> Context:
-    """Return the cached default ctx, awaiting boot on the current loop if needed.
-
-    This is the only legal way to lazy-boot inside a running event loop.
-    ``loop.run_until_complete`` on that loop raises RuntimeError.
-    """
-    if _default_ctx_holder.ctx is not None:
-        return _default_ctx_holder.ctx
-    async with _default_ctx_lock():
+    """Return the process-default ctx, coordinating lazy boot across event loops."""
+    while True:
         if _default_ctx_holder.ctx is not None:
             return _default_ctx_holder.ctx
-        from lca.harness.profile.boot import boot_profile
+        owner, complete = _claim_default_ctx_boot()
+        if not owner:
+            await asyncio.to_thread(complete.wait)
+            continue
+        try:
+            from lca.harness.profile.boot import boot_profile
 
-        _default_ctx_holder.ctx = await boot_profile(_DEFAULT_PROFILE)
-        return _default_ctx_holder.ctx
+            ctx = await boot_profile(_DEFAULT_PROFILE)
+        except BaseException:
+            _publish_default_ctx(None)
+            raise
+        _publish_default_ctx(ctx)
+        return ctx
 
 
 def get_or_create_default_ctx() -> Context:
@@ -147,13 +174,24 @@ def get_or_create_default_ctx() -> Context:
     if _default_ctx_holder.ctx is not None:
         return _default_ctx_holder.ctx
 
-    from lca.harness.profile.boot import boot_profile
-
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        _default_ctx_holder.ctx = asyncio.run(boot_profile(_DEFAULT_PROFILE))
-        return _default_ctx_holder.ctx
+        owner, complete = _claim_default_ctx_boot()
+        if not owner:
+            complete.wait()
+            if _default_ctx_holder.ctx is not None:
+                return _default_ctx_holder.ctx
+            return get_or_create_default_ctx()
+        try:
+            from lca.harness.profile.boot import boot_profile
+
+            ctx = asyncio.run(boot_profile(_DEFAULT_PROFILE))
+        except BaseException:
+            _publish_default_ctx(None)
+            raise
+        _publish_default_ctx(ctx)
+        return ctx
     raise RuntimeError(
         "default plugin context is not booted; await ensure_default_ctx() "
         "or pass scope= from the already-booted cordis Context"

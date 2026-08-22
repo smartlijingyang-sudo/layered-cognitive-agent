@@ -175,13 +175,31 @@ async def test_legacy_safe_executor_uses_provider_pipeline_contract() -> None:
     assert result.success is True
     assert result.payload == "hello"
     assert result.extra["policy_verdict_refs"] == [
-        "act.authorize:allow",
-        "act.budget:allow",
-        "act.constrain:allow",
-        "act.execute:allow",
-        "act.safe-boundary:allow",
+        "executor.permission:allow",
+        "executor.reservation:valid",
+        "executor.grant:valid",
+        "executor.plan-boundary:valid",
+        "executor.pipeline:completed",
     ]
-    assert result.extra["command_envelope"]["plan_ref"] == "test_plan_ref_for_pipeline_test"
+    envelope = result.extra["command_envelope"]
+    assert envelope["plan_ref"] == "test_plan_ref_for_pipeline_test"
+    assert envelope["provider"] == "legacy-safe-executor"
+    assert envelope["metadata"]["tool_name"] == "legacy_echo"
+
+
+@pytest.mark.asyncio
+async def test_legacy_safe_executor_requires_active_compiled_plan_ref() -> None:
+    from lca.contracts.models.core.result import ToolExecutionError
+
+    executor = PipelineSafeExecutor(ToolPermissionManifest(allowed_tools=["legacy_echo"]))
+
+    with pytest.raises(ToolExecutionError, match="active compiled plan_ref"):
+        await executor.execute(
+            _LegacyEchoTool(),
+            {"message": "must be plan bound"},
+            RetryPolicy(max_retries=0),
+            CacheConfig(enabled=False),
+        )
 
 
 @pytest.mark.asyncio

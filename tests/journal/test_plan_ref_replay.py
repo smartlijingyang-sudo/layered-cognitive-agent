@@ -23,6 +23,9 @@ ReplayRegistry 可按 plan_ref 过滤 journal facts 并重放 CompiledRunPlan
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.models.observability.event import OperationOutcome
 from lca.contracts.models.observability.journal import (
@@ -292,6 +295,29 @@ class TestJournalRecordPlanRefV5:
             committed_at=0.0,
         )
         assert record.plan_ref == "replay_plan_ref_123"
+
+    def test_disk_replay_preserves_plan_ref(self, tmp_path: Path) -> None:
+        from lca.layer0_infra.observability.journal.engine import RunStore
+        from lca.layer0_infra.observability.journal.journal_io import (
+            read_journal,
+            stamped_to_record,
+        )
+
+        store = RunStore(run_id="run_disk_plan_ref")
+        with plan_ref_scope("disk_plan_ref_123"):
+            stamped = store.append(
+                RuntimeObserved(
+                    operation="disk_round_trip",
+                    source="plan_ref_replay_test",
+                    outcome=OperationOutcome.OK,
+                )
+            )
+        path = tmp_path / "journal.jsonl"
+        path.write_text(json.dumps(stamped_to_record(stamped)) + "\n", encoding="utf-8")
+
+        replayed = read_journal(path)
+
+        assert [event.plan_ref for event in replayed] == ["disk_plan_ref_123"]
 
     def test_legacy_journal_record_parsed_with_empty_plan_ref(self) -> None:
         """旧 v2 envelope 不含 plan_ref → JournalRecord.plan_ref = ""。"""

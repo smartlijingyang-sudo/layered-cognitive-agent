@@ -16,7 +16,11 @@ def mint_transport_envelope(
     protocol: str,
     target: str,
 ) -> CommandEnvelope:
-    """为 transport effect 创建不可变封套；legacy run 使用稳定兼容计划引用。"""
+    """为 transport effect 创建不可变封套。
+
+    RuntimeKernel owns the compiled act.* controls.  This transport helper must
+    not mint synthetic allow facts before that control boundary has executed.
+    """
     plan_ref = get_current_plan_ref() or "legacy-transport"
     return mint_envelope(
         plan_ref=plan_ref,
@@ -25,8 +29,13 @@ def mint_transport_envelope(
         provider=f"transport:{protocol}",
         grant=CapabilityGrant(capability="transport", scope="turn", effect_class="transport"),
         idempotency_key=f"{operation}:{decision_ref}:{target}",
-        policy_verdict_refs=("act.authorize:allow", "act.safe-boundary:allow"),
-        metadata={"operation": operation, "protocol": protocol, "target": target},
+        policy_verdict_refs=(),
+        metadata={
+            "operation": operation,
+            "protocol": protocol,
+            "target": target,
+            "plan_ref_source": "compiled" if plan_ref != "legacy-transport" else "compatibility",
+        },
     )
 
 

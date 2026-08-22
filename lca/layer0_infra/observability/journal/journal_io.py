@@ -315,6 +315,7 @@ def record_to_stamped(
         parent_seq=parent_seq,
         event_id=str(normalized.get("event_id", "")),
         parent_event_id=parent_event_id,
+        plan_ref=str(normalized.get("plan_ref", "")),
     )
 
 

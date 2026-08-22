@@ -270,8 +270,9 @@ class PipelineSafeExecutor(SafeExecutor):
 
         PR-7 V4 hard constraint：mint_envelope() 在 stack trace
         (architecture test 守护，scripts/check_command_envelope_required.py)。
-        envelope 携带 plan_ref / scope_ref / provider / verdict refs，
-        经 5 闸单调聚合后才执行 effect。
+        RuntimeKernel owns the five compiled control gates before this Body
+        boundary.  This executor only records its local defensive checks and
+        must not present them as compiled ``act.*`` policy verdicts.
         """
         invocation_id = invocation_id.strip() or new_id("inv")
 
@@ -288,25 +289,27 @@ class PipelineSafeExecutor(SafeExecutor):
         scope_ref = (
             str(current_scope.run_id) if current_scope and current_scope.run_id else "default"
         )
-        plan_ref = get_current_plan_ref() or "legacy-uncompiled"
+        plan_ref = get_current_plan_ref()
+        if not plan_ref:
+            raise ToolExecutionError("tool execution requires an active compiled plan_ref")
         envelope = mint_envelope(
             plan_ref=plan_ref,
             scope_ref=scope_ref,
             decision={"decision_id": invocation_id, "action_type": "use_tool"},
-            provider=tool.name,
+            provider=_LegacyToolProvider.provider_id,
             grant=CapabilityGrant(capability=tool.name, scope="turn", effect_class="tools"),
             budget_reservation=BudgetReservation(tool_calls=1),
             idempotency_key=f"{invocation_id}:{tool.name}",
+            metadata={"tool_name": tool.name},
         )
 
-        # The four policy gates run before the existing pipeline invokes a
-        # provider.  Each successful decision is retained in the immutable
-        # envelope; a later gate can only add a stricter outcome, never clear
-        # an earlier denial.
+        # These are local compatibility safeguards.  They remain distinct from
+        # RuntimeKernel control-plan facts, which use the canonical ``act.*``
+        # vocabulary and are the only evidence accepted by envelope_is_authorized.
         authorization = self._check_permission_and_args(tool, args)
         if authorization.kind != "allow":
             raise ToolExecutionError(authorization.reason or "authorization denied")
-        verdict_refs = ["act.authorize:allow"]
+        verdict_refs = ["executor.permission:allow"]
 
         reservation = envelope.budget_reservation
         if (
@@ -319,22 +322,22 @@ class PipelineSafeExecutor(SafeExecutor):
             < 0
         ):
             raise ToolExecutionError("budget reservation must not be negative")
-        verdict_refs.append("act.budget:allow")
+        verdict_refs.append("executor.reservation:valid")
 
         if envelope.grant.capability != tool.name or envelope.grant.effect_class != "tools":
             raise ToolExecutionError(
                 "command envelope capability constraint rejected tool execution"
             )
-        verdict_refs.append("act.constrain:allow")
+        verdict_refs.append("executor.grant:valid")
 
         if not envelope.plan_ref or not envelope.scope_ref:
             raise ToolExecutionError("command envelope failed safe-boundary validation")
 
-        verdict_refs.append("act.execute:allow")
+        verdict_refs.append("executor.plan-boundary:valid")
         result = await self._pipeline_for(tool, retry_policy, cache_config).execute(
             tool.name, args, invocation_id=invocation_id
         )
-        verdict_refs.append("act.safe-boundary:allow")
+        verdict_refs.append("executor.pipeline:completed")
         envelope = replace(envelope, policy_verdict_refs=tuple(verdict_refs))
 
         # 如果管线返回 deny，抛出异常

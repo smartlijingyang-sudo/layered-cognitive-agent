@@ -112,25 +112,23 @@ class TestMintEnvelopeFactory:
         assert env.decision_ref == "dec_4"
 
     def test_string_input(self) -> None:
-        """str 输入 → decision_id = input string itself。"""
+        """A stable string decision id is preserved as the envelope reference."""
         env = mint_envelope(
             plan_ref="abc",
             scope_ref="run_1",
             decision="dec_5_str",
             provider="bash",
         )
-        # getattr("dec_5_str", "decision_id", "") returns "" (str has no attr)
-        # so decision_id = "" or getattr(id) = "" → "" — empty
-        assert env.decision_ref == ""
+        assert env.decision_ref == "dec_5_str"
 
-    def test_none_input(self) -> None:
-        env = mint_envelope(
-            plan_ref="abc",
-            scope_ref="run_1",
-            decision=None,
-            provider="bash",
-        )
-        assert env.decision_ref == ""
+    def test_none_input_rejected(self) -> None:
+        with pytest.raises(ValueError, match="non-empty decision_id"):
+            mint_envelope(
+                plan_ref="abc",
+                scope_ref="run_1",
+                decision=None,
+                provider="bash",
+            )
 
     def test_empty_plan_ref_raises(self) -> None:
         """V5 acceptance: empty plan_ref 拒绝（empty == legacy path）。"""
@@ -327,13 +325,29 @@ class TestEnvelopeIsAuthorized:
         )
         assert envelope_is_authorized(env) is False
 
-    def test_non_empty_verdict_refs_authorized(self) -> None:
+    def test_partial_verdict_refs_are_not_authorized(self) -> None:
         env = mint_envelope(
             plan_ref="abc",
             scope_ref="run_1",
             decision={"decision_id": "dec_1"},
             provider="bash",
-            policy_verdict_refs=("policy.pre_execute",),
+            policy_verdict_refs=("act.authorize:allow",),
+        )
+        assert envelope_is_authorized(env) is False
+
+    def test_all_canonical_gate_allows_authorize_envelope(self) -> None:
+        env = mint_envelope(
+            plan_ref="abc",
+            scope_ref="run_1",
+            decision={"decision_id": "dec_1"},
+            provider="bash",
+            policy_verdict_refs=(
+                "act.authorize:allow",
+                "act.budget:allow",
+                "act.constrain:allow",
+                "act.execute:allow",
+                "act.safe-boundary:allow",
+            ),
         )
         assert envelope_is_authorized(env) is True
 
@@ -345,7 +359,13 @@ class TestEnvelopeAggregateVerdict:
             scope_ref="run_1",
             decision={"decision_id": "dec_1"},
             provider="bash",
-            policy_verdict_refs=("policy.authorize",),
+            policy_verdict_refs=(
+                "act.authorize:allow",
+                "act.budget:allow",
+                "act.constrain:allow",
+                "act.execute:allow",
+                "act.safe-boundary:allow",
+            ),
         )
         assert envelope_aggregate_verdict(env) is Verdict.AUTHORIZED
 

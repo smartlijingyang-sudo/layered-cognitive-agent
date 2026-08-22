@@ -238,11 +238,16 @@ def mint_envelope(
     if not provider:
         raise ValueError("mint_envelope: provider must be non-empty string")
 
-    # decision may be Decision object, DecisionRef, dict, or any object with decision_id
-    if isinstance(decision, dict):
+    # decision may be a stable decision id string, Decision object, DecisionRef,
+    # dict, or any object with a decision_id/id attribute.
+    if isinstance(decision, str):
+        decision_id = decision.strip()
+    elif isinstance(decision, dict):
         decision_id = str(decision.get("decision_id", "") or decision.get("id", "") or "")
     else:
         decision_id = str(getattr(decision, "decision_id", "") or getattr(decision, "id", "") or "")
+    if not decision_id:
+        raise ValueError("mint_envelope: decision must provide a non-empty decision_id")
 
     return CommandEnvelope(
         plan_ref=plan_ref,
@@ -285,9 +290,26 @@ def command_envelope_to_dict(envelope: CommandEnvelope) -> dict[str, Any]:
     }
 
 
+_REQUIRED_ALLOW_REFS: frozenset[str] = frozenset(
+    {
+        "act.authorize:allow",
+        "act.budget:allow",
+        "act.constrain:allow",
+        "act.execute:allow",
+        "act.safe-boundary:allow",
+    }
+)
+
+
 def envelope_is_authorized(envelope: CommandEnvelope) -> bool:
-    """envelope 是否已授权（policy_verdict_refs 非空 = 通过 5 闸聚合）。"""
-    return len(envelope.policy_verdict_refs) > 0
+    """Return whether all five canonical control allow facts are present.
+
+    Local executor safeguards and partial observations are useful diagnostics, but
+    they are not proof that a compiled control plan authorized an effect.  The
+    helper therefore stays fail-closed until every required ``act.*`` fact is
+    attached by the control boundary.
+    """
+    return _REQUIRED_ALLOW_REFS.issubset(envelope.policy_verdict_refs)
 
 
 def envelope_aggregate_verdict(envelope: CommandEnvelope) -> Verdict:
