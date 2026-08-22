@@ -263,20 +263,15 @@ class TestResolverPicksTypedControl:
         resolved = resolve_profile("profiles/web-standard.yaml")
         plan = project_control_plan(resolved)
 
-        # 3 migrated plugins contribute:
-        # - gate.repeat-tool-call (think.guard, order 10)
-        # - gate.tool-loop-breaker (think.guard, order 20)
-        # - stop_rule.default (stop.decide, order 100)
-        assert len(plan.entries) == 3
+        # Three concrete contributions remain visible; uncovered slots gain
+        # stable constitutional no-op contributors so every plan covers 11 slots.
+        assert len(plan.entries) == 12
 
-        # Sorted by (slot, order, plugin_id):
-        # "stop.decide" < "think.guard" alphabetically → stop_rule.default first
-        plugins_in_order = [e.plugin_id for e in plan.entries]
-        assert plugins_in_order == [
-            "stop_rule.default",
-            "gate.repeat-tool-call",
-            "gate.tool-loop-breaker",
-        ]
+        plugins_in_order = [entry.plugin_id for entry in plan.entries]
+        assert "gate.repeat-tool-call" in plugins_in_order
+        assert "gate.tool-loop-breaker" in plugins_in_order
+        assert "stop_rule.default" in plugins_in_order
+        assert "control.default.act.budget" in plugins_in_order
 
         # by_slot index
         from lca.contracts.protocols.control_plan import slot_entries

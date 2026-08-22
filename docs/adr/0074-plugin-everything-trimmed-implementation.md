@@ -56,9 +56,9 @@ ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `smartlijingyang-sudo`）
 
 ## 决策
 
-### 一、接受 ADR-0066 核心：9 Control Slot + 单调聚合
+### 一、接受 ADR-0066 核心：11 Control Slot + 单调聚合
 
-完整接受 ADR-0066 §二（9 Control Slot 定义）、§三（Manifest control 段三件套：identity / authority / effects）、§四（单调聚合 deny-on-any-deny / stop-on-any-stop / scope-只收紧）、§七（capability / budget / constraint / approval / stop 的策略-事实-强制点三分）。
+完整接受 ADR-0066 §二 Control Slot 定义及 ADR-0074 tracker §19 的 `observe.checkpoint` / `act.safe-boundary` 补充、§三（Manifest control 段三件套：identity / authority / effects）、§四（单调聚合 deny-on-any-deny / deny-on-exhausted / stop-on-any-stop / decision-priority / scope-只收紧）、§七（capability / budget / constraint / approval / stop 的策略-事实-强制点三分）。每个 CompiledRunPlan 必须闭合覆盖 11 槽；未被具体 plugin 声明的槽位由类型化 no-op 投稿承接。
 
 裁剪 §五 Composer 与 §六 ControlPlan 描述——L4 Composer 拆为 4 个 sub-composer plugin 移交给本地 ADR-0071（Composer-per-Cluster）。
 
@@ -276,7 +276,7 @@ ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `smartlijingyang-sudo`）
 
 | 编号 | 约束 | 自动化证据 |
 |---|---|---|
-| **V1** | 控制面单一入口 | `lca-ops explain control <slot>` 列出该 slot 的所有 entry、来源 bundle/patch、order、activation 表达式 |
+| **V1** | 控制面单一入口 | `lca-ops explain control <slot>` 列出该 slot 的所有 entry、来源 bundle/patch、order、activation 表达式；运行循环仅经统一聚合器评估 11 槽的激活投稿与 typed verdict |
 | **V2** | CompiledRunPlan 确定性 | 同 profile × TaskContract × Environment → 同 plan_hash；回归测试守护 |
 | **V3** | Reducer 唯一写 State | `lca-ops audit state-writers` 输出空集（除 reducer）；22 个 pre-existing failure 全部清零 |
 | **V4** | CommandEnvelope 必经 5 闸 | architecture test 拒绝无 envelope 的 tool call；Body.execute stack trace 必含 `command_envelope.mint` |
@@ -310,7 +310,7 @@ ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `smartlijingyang-sudo`）
 | C1 六步闭集 | 否 | PR-3 (CompiledRunPlan) 引用 v3.1 §2 C1.1 闭集内部细化；PR-4 think.guard / stop.decide 在已有阶段内投稿 |
 | C2 双平面 | 否 | ADR-0070 已落地；本计划 §二直接引用 |
 | C3 Journal 唯一事实 | 加强 | PR-6 加 plan_ref 字段 |
-| C4 Reducer 唯一写 | 加强 | PR-7 收口 effect；PR-0 + PR-4 验证状态写入路径 |
+| C4 Reducer 唯一写 | 加强 | `audit_state_writers` 仅识别类型化 `AgentState` 的真实变更；局部同名字典与只读调用不计入违规，所有检索上下文经显式返回值而非直接状态写入 |
 | C5 Capability 衰减 | 否 | PR-5 / PR-8 维持；V8 守护 |
 | C6 改闭集必 ADR | 本计划本身就是新 ADR | 0066 / 0067 / 0068 / 0069 接受/裁剪流程由本计划 §一/§二/§三/§四 显式记录 |
 | C7 原语默认 no-op | 间接加强 | ADR-0072 已落地 Null 实现家族；本计划 §二引用 |

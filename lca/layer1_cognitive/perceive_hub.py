@@ -104,11 +104,11 @@ class SequentialPerceiveHub(PerceiveHub):
                 )
                 continue
 
-        # 2. Memory adapter (per spec §5.5): records, not raw state.
+        # 2. Memory adapter (per spec §5.5): consume its returned state value.
         if self._memory is not None:
             try:
-                await self._memory.perceive(state)
-                items.extend(_memory_items(state))
+                memory_state = await self._memory.perceive(state)
+                items.extend(_memory_items(memory_state))
             except Exception as exc:
                 _log.warning("memory_perceive_failed", error=str(exc))
                 record_runtime(
@@ -129,7 +129,7 @@ class SequentialPerceiveHub(PerceiveHub):
 
 
 def _memory_items(state: AgentState) -> list[ContextItem]:
-    """Fold state.retrieved_context into a single ``memory`` item."""
+    """Fold the memory protocol's returned retrieval context into one item."""
     if not state.retrieved_context:
         return []
     return [

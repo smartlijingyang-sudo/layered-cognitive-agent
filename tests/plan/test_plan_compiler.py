@@ -303,7 +303,8 @@ class TestCompilePlan:
         assert plan.plan_version == COMPILED_RUN_PLAN_VERSION
         # 3 sub-plans have non-empty content
         assert len(plan.capability.provider_bindings) >= 30
-        assert len(plan.control.entries) == 3  # 3 migrated plugins
+        assert len(plan.control.entries) == 12  # 3 concrete + 9 default no-op contributions
+        assert len(plan.control.by_slot) == 11
         assert plan.scope.lifecycle is Scope.RUN
         assert len(plan.scope.visibility) == 8  # all Scope items
 
@@ -368,7 +369,8 @@ class TestExplainCompilePlan:
         assert info["plan_version"] == COMPILED_RUN_PLAN_VERSION
         # sub_plans
         assert info["sub_plans"]["capability"]["binding_count"] >= 30
-        assert info["sub_plans"]["control"]["entry_count"] == 3
+        assert info["sub_plans"]["control"]["entry_count"] == 12
+        assert len(info["sub_plans"]["control"]["covered_slots"]) == 11
         assert "stop.decide" in info["sub_plans"]["control"]["covered_slots"]
         assert "think.guard" in info["sub_plans"]["control"]["covered_slots"]
         assert info["sub_plans"]["scope"]["lifecycle"] == "run"

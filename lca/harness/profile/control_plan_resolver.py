@@ -8,10 +8,9 @@
 4. 计算 ``plan_hash`` 用于 PR-3 / PR-6 plan_ref 绑定
 5. 不做运行时 activation 求值（那是 PR-3 PlanCompiler 的职责）
 
-PR-1 阶段：插件默认不声明 ``control`` 段，profile 解析后产出
-**空** ControlPlan（plan_hash 由 entries 列表 hash 得到；空 entries
-hash 仍稳定）。这是 §4 不变量的"不变量 1 — 不扩张到 PR-2 范围"的
-具体形态：保持 control 是 opt-in，不静默注入默认投稿。
+每个解析后的计划都覆盖 11 个 ControlSlot。具体插件声明其真实控制投稿；
+未被声明的槽位由稳定的 ``control.default.<slot>`` no-op 投稿承接，确保
+解释、聚合与运行时消费无需对缺失槽位分支。
 
 激活路径：
 
@@ -87,16 +86,16 @@ def project_control_plan(
     4. 建 by_slot 索引
     5. 计算 ``plan_hash``
 
-    任何 plugin **未**声明 control 段 → 不产生 entry。这是 PR-1 阶段
-    的目标行为：保留 opt-in 语义。
+    未被具体 plugin 声明的槽位由稳定 no-op entry 补齐；具体 plugin
+    投稿始终优先且不会被默认投稿稀释。
     """
     opts = options or ControlPlanOptions()
     entries: list[ControlEntry] = []
     for plugin in resolved.plugins:
         if plugin.disabled and not opts.include_disabled:
             continue
-        for entry in _extract_entries(plugin):
-            entries.append(entry)
+        entries.extend(_extract_entries(plugin))
+    entries.extend(_default_entries_for_uncovered_slots(entries))
 
     sorted_entries = tuple(sorted(entries, key=lambda e: (e.slot.value, e.order, e.plugin_id)))
     by_slot: dict[ControlSlot, list[ControlEntry]] = {}
@@ -158,6 +157,22 @@ def explain_control_slot(
 
 
 # ── Internals ────────────────────────────────────────────────────────
+
+
+def _default_entries_for_uncovered_slots(entries: list[ControlEntry]) -> list[ControlEntry]:
+    """Return one stable constitutional no-op contribution for each uncovered slot."""
+    covered = {entry.slot for entry in entries}
+    return [
+        ControlEntry(
+            plugin_id=f"control.default.{slot.value}",
+            slot=slot,
+            order=0,
+            effect_class="none",
+            source="builtin:control-default",
+        )
+        for slot in ControlSlot
+        if slot not in covered
+    ]
 
 
 def _extract_entries(plugin: ResolvedPlugin) -> list[ControlEntry]:

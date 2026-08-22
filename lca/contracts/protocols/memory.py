@@ -19,7 +19,7 @@ class MemorySystem(Protocol):
     """记忆系统：检索感知 + 多级写入 + 显式查询。
 
     三阶段语义：
-    - perceive：think 之前，刷新 retrieved_context
+    - perceive：think 之前，返回携带检索上下文的新 ``AgentState`` 值，不修改传入实例
     - update：reflect 之后，写入 observation + reflection（ADR-0066 计划拆
       为 propose + commit；本 PR 仅集中 reducer 调用入口，拆 deferred）
     - query：显式检索指定层的记录（共享记忆统一入口）

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
@@ -81,6 +82,7 @@ class SimpleMemorySystem(MemorySystem):
             self._private_layers[layer].append(record)
 
     async def perceive(self, state: AgentState) -> AgentState:
+        """Return a context-enriched state value without mutating the input instance."""
         # PR7.D.7: fold each layer's records; emit ContextCompacted with
         # original vs kept kinds.  Empty compaction is still journaled
         # (every Perceive gets an audit trail).
@@ -95,12 +97,13 @@ class SimpleMemorySystem(MemorySystem):
         # CompactionPolicy applies the final cap on the retrieval selection.
         compacted = list(self.compaction.compact(tuple(candidates), budget=_DEFAULT_MAX_WORKING))
         kinds = tuple(
-            r.kind.value if hasattr(r.kind, "value") else str(r.kind)
-            for r in layers_snapshot.values()
-            for r in r
+            record.kind.value if hasattr(record.kind, "value") else str(record.kind)
+            for records in layers_snapshot.values()
+            for record in records
         )
         kept_kinds = tuple(
-            r.kind.value if hasattr(r.kind, "value") else str(r.kind) for r in compacted
+            record.kind.value if hasattr(record.kind, "value") else str(record.kind)
+            for record in compacted
         )
         record(
             ContextCompacted(
@@ -109,8 +112,7 @@ class SimpleMemorySystem(MemorySystem):
                 kept_kinds=kept_kinds,
             )
         )
-        state.retrieved_context = compacted
-        return state
+        return replace(state, retrieved_context=compacted)
 
     def _shadow_compact(self, records: list[MemoryRecord]) -> list[MemoryRecord]:
         """保留作为 compact 路径的兼容 helper；ADR-0068 后实际由

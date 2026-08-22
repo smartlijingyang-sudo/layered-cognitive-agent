@@ -100,6 +100,7 @@ Run 复盘  coding-agent tools(ADR-0065 §六 / PR-9,只读)
   diff-context / diff-runs / cost。默认走人类可读,加 --json 给 agent。
   ./scripts/lca-ops trace <run_id>           通用轨迹
   ./scripts/lca-ops explain <run_id>         失败路径投影
+  ./scripts/lca-ops explain control <slot>   解析 profile 的 ControlPlan 槽位投稿
   ./scripts/lca-ops optimize <run_id>        优化候选(延迟/token/重试)
   ./scripts/lca-ops graph-run <run_id>       Mermaid 插件交互图
   ./scripts/lca-ops minimal-repro <run_id>   失败因果链 + evidence refs
@@ -692,18 +693,53 @@ def trace(
 
 @app.command(name="explain")
 def explain(
-    run_id: str = typer.Argument(..., help="Run id"),
+    target: str = typer.Argument(..., help="Run id, or control"),
+    slot: str | None = typer.Argument(None, help="ControlSlot (only when target is control)"),
     jsonl: Path = typer.Option(None, "--jsonl"),
     json_mode: bool = typer.Option(False, "--json"),
     depth: int = typer.Option(24, "--depth"),
+    profile: Path = typer.Option(
+        Path("profiles/web-standard.yaml"),
+        "--profile",
+        "-p",
+        help="Profile YAML for explain control",
+    ),
 ) -> None:
-    """失败路径投影 —— 给出失败 event 与因果祖先。"""
+    """Explain a run failure or a resolved ControlPlan slot.
+
+    ``lca-ops explain control <slot>`` is a plan diagnostic. It resolves the
+    supplied profile and reports the exact ordered entries, activation DSL,
+    default aggregation and failure policy consumed by the runtime.
+    """
+    if target == "control":
+        if slot is None:
+            print("explain control requires <slot>", file=sys.stderr)
+            raise typer.Exit(2)
+        if not profile.exists():
+            print(f"Profile not found: {profile}", file=sys.stderr)
+            raise typer.Exit(2)
+        from lca.harness.profile.control_plan_resolver import explain_control_slot
+        from lca.harness.profile.plan_compiler import compile_plan
+        from lca.harness.profile.resolve import resolve_profile
+
+        try:
+            plan = compile_plan(resolve_profile(profile))
+            report = explain_control_slot(plan.control, slot)
+        except (TypeError, ValueError) as exc:
+            print(f"explain control: {exc}", file=sys.stderr)
+            raise typer.Exit(2) from exc
+        _emit_report(report, json_mode=json_mode)
+        raise typer.Exit(0)
+
+    if slot is not None:
+        print("explain <run_id> does not accept a second positional argument", file=sys.stderr)
+        raise typer.Exit(2)
     from lca.layer0_infra.observability.coding_agent_tools.failure_explainer import (
         FailureExplainer,
     )
 
-    path = _resolve_journal_path(jsonl, run_id)
-    report = FailureExplainer(path).explain_failure(run_id=run_id, depth=depth)
+    path = _resolve_journal_path(jsonl, target)
+    report = FailureExplainer(path).explain_failure(run_id=target, depth=depth)
     _emit_report(report, json_mode=json_mode)
 
 
@@ -1536,9 +1572,7 @@ def creator_cmd(
     name: str = typer.Option(
         "", "--name", "-n", help="plugin name (required for author/validate/promote)"
     ),
-    path: str = typer.Option(
-        "", "--path", "-p", help="plugin source path (for author face)"
-    ),
+    path: str = typer.Option("", "--path", "-p", help="plugin source path (for author face)"),
     preset_id: str = typer.Option(
         "", "--preset-id", help="preset id (for promote with target_scope=release)"
     ),

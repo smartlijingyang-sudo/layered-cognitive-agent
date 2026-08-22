@@ -104,6 +104,9 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/contracts/protocols/control_plan.py": (
         "PR-1 11 ControlSlot + Activation DSL + ControlPlan + plan_hash"
     ),
+    "lca/harness/profile/control_plan_resolver.py": (
+        "ADR-0074 ControlPlan 单一投影入口：声明解析、严格校验、11 槽默认闭合与 explain 投影"
+    ),
     "lca/layer0_infra/observability/__init__.py": (
         "observability 模块统一 re-export（journal / evidence / otel）"
     ),
@@ -147,9 +150,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/layer0_infra/ops/services/lobehub.py": (
         "LobeHub deploy service 单模块承载 dev/prod/restart/logs/upgrade"
     ),
-    "lca/layer0_infra/ops/services/daemon.py": (
-        "Daemon 单模块承载 process 管理 + uptime + health"
-    ),
+    "lca/layer0_infra/ops/services/daemon.py": ("Daemon 单模块承载 process 管理 + uptime + health"),
     "lca/layer0_infra/openai_compat.py": (
         "OpenAI compat 单模块承载 chat / completion / embedding 适配"
     ),
@@ -165,9 +166,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/contracts/models/observability/journal_catalog.py": (
         "JOURNAL_EVENT_CLASSES + JournalSchemaMeta 单文件（PR-7 后 EventDescriptor 单一源移到 event_descriptors_data.py）"
     ),
-    "lca/layer4_app/api.py": (
-        "L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"
-    ),
+    "lca/layer4_app/api.py": ("L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"),
 }
 
 
