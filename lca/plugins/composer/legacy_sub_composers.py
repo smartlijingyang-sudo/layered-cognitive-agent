@@ -19,8 +19,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from lca.contracts.atoms.enums import ActionScope
 from lca.contracts.capabilities import (
     BODIES,
+    STOP_RULES,
     STRATEGIES,
 )
 from lca.contracts.harness.composer import AgentGraph, TeamGraph
@@ -37,10 +39,10 @@ class BrainComposer:
     key: str = "brain"
 
     def compose_agent(self, spec: Any, scope: Any) -> AgentGraph:
-        from lca.layer4_app.spawn import _apply_lead_brain, _resolve_brain
+        from lca.layer4_app.spawn import _apply_lead_brain, _instrument_llm, _resolve_brain
 
-        # 调用 spawn.py 内部工厂（PR-5 期间临时路径；PR-5b 后由 sub-composer 自实现）
-        brain = _resolve_brain(spec, spec.profile, spec.llm, scope=scope)
+        llm = _instrument_llm(spec.llm)
+        brain = _resolve_brain(spec, spec.profile, llm, scope=scope)
         if getattr(spec, "decision_gate", None) is not None:
             brain = _apply_lead_brain(brain, decision_gate=spec.decision_gate)
 
@@ -52,7 +54,7 @@ class BrainComposer:
             perceive_hub=None,
             hooks=None,
             observability=None,
-            llm=getattr(spec, "llm", None),
+            llm=llm,
             stop_rule=None,
             metadata={"composer_key": "brain"},
         )
@@ -86,18 +88,19 @@ class BodyComposer:
         for tool in spec.tools:
             tool_registry.register(tool)
 
-        safe_executor_cls = _require_factory(scope, "safe.executor.simple")
+        safe_executor_cls = _require_factory(scope, "safe_executor.simple")
         safe_executor = safe_executor_cls(spec.profile.tool_permission_manifest)
         transport_registry = _fork_transport(
             require_capability(scope, "transport"),
             getattr(spec, "team_channel", None),
             scope,
         )
+        action_scope = getattr(spec, "action_scope", None) or ActionScope.SOLO
         action_registry = build_default_action_registry(
             tool_registry,
             safe_executor,
             transport_registry,
-            scope=getattr(spec, "action_scope", None),
+            scope=action_scope,
         )
         body = require_capability(scope, BODIES.key).create(
             "simple",
@@ -172,6 +175,7 @@ class PerceiveComposer:
             scope=scope,
             action_scope=getattr(spec, "action_scope", None),
         )
+        stop_rule = require_capability(scope, STOP_RULES.key).create("default")
         return AgentGraph(
             brain=None,
             body=None,
@@ -181,7 +185,7 @@ class PerceiveComposer:
             hooks=None,
             observability=hub,
             llm=None,
-            stop_rule=None,
+            stop_rule=stop_rule,
             metadata={"composer_key": "perceive"},
         )
 

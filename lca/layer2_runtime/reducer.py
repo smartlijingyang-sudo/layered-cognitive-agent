@@ -84,6 +84,32 @@ class DefaultReducer(Reducer):
         state.last_error = repr(error)
         return state
 
+    def apply_resume(
+        self,
+        state: AgentState,
+        input_value: object | None,
+        turn: Turn | None,
+    ) -> AgentState:
+        state.status = TaskStatus.WORKING
+        if input_value is not None:
+            state.working_memory["resume_input"] = input_value
+        if turn is not None:
+            state.history.append(turn)
+            state.step += 1
+        return state
+
+    def apply_artifact_closure(self, state: AgentState, closure: str) -> AgentState:
+        if not closure:
+            return state
+        if state.final_output:
+            if closure.strip() not in state.final_output:
+                state.final_output = state.final_output.rstrip() + "\n\n" + closure
+        else:
+            state.final_output = closure
+        if state.status == TaskStatus.WORKING:
+            state.status = TaskStatus.COMPLETED
+        return state
+
     def apply_paused(self, state: AgentState, snapshot_ref: object) -> AgentState:
         state.status = TaskStatus.INPUT_REQUIRED
         return state

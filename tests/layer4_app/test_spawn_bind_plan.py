@@ -107,6 +107,33 @@ class TestMergeAgentGraphs:
         merged = merge_agent_graphs(graph)
         assert merged is graph
 
+    def test_absent_partial_field_preserves_prior_contribution(self) -> None:
+        g1 = AgentGraph(
+            brain="brain1",
+            body=None,
+            memory=None,
+            state_store=None,
+            perceive_hub=None,
+            hooks=None,
+            observability=None,
+            llm=None,
+            stop_rule=None,
+        )
+        g2 = AgentGraph(
+            brain=None,
+            body="body2",
+            memory=None,
+            state_store=None,
+            perceive_hub=None,
+            hooks=None,
+            observability=None,
+            llm=None,
+            stop_rule=None,
+        )
+        merged = merge_agent_graphs(g1, g2)
+        assert merged.brain == "brain1"
+        assert merged.body == "body2"
+
     def test_later_wins_per_field(self) -> None:
         g1 = AgentGraph(
             brain="brain1",
@@ -183,6 +210,7 @@ class TestBindPlanLegacyPath:
             result = bind_plan(spec, plan, scope=scope, options=BindOptions(use_legacy_spawn=True))
         assert result.metadata.get("legacy") is True
         from lca.contracts.protocols.plan import compiled_run_plan_ref
+
         assert result.plan_ref == compiled_run_plan_ref(plan)
 
     def test_no_composers_raises(self) -> None:
@@ -221,6 +249,7 @@ class TestBindPlanHappyPath:
         plan = _make_minimal_plan()
         result = bind_plan(plan=plan, spec=_make_minimal_spec(), scope=scope)
         from lca.contracts.protocols.plan import compiled_run_plan_ref
+
         assert result.plan_ref == compiled_run_plan_ref(plan)
 
     def test_disable_capability_validation_skips_check(self) -> None:
@@ -281,6 +310,21 @@ class TestIsBindPlanAvailable:
 # ── spawn_agent integration ─────────────────────────────────────────
 
 
+class TestDefaultProfilePlanBinding:
+    @pytest.mark.asyncio
+    async def test_default_profile_binds_compiled_plan_to_solo_agent(self) -> None:
+        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.layer4_app.api import ensure_default_ctx
+        from lca.layer4_app.spawn import spawn_agent
+        from tests.support.agent_specs import make_spec
+
+        scope = await ensure_default_ctx()
+        agent = spawn_agent(make_spec("plan-bound", MockLLMAdapter()), scope=scope)
+
+        assert agent.plan_ref
+        assert agent.runtime is not None
+
+
 class TestSpawnAgentBindPlanKwarg:
     """spawn_agent 接受 compiled_plan + use_bind_plan kwarg (PR-5 signature)。
 
@@ -310,18 +354,14 @@ def _make_minimal_plan(plan_ref: str = "0123456789abcdef") -> Any:
     Uses the actual CompiledRunPlan dataclass to ensure plan_ref is
     hashable + JSON-serializable (avoid MagicMock json errors).
     """
+    from lca.contracts.atoms.scope import Scope
     from lca.contracts.protocols.capability_plan import CapabilityPlan
     from lca.contracts.protocols.control_plan import ControlPlan
     from lca.contracts.protocols.plan import CompiledRunPlan
     from lca.contracts.protocols.scope_plan import BudgetCeiling, ScopePlan
-    from lca.contracts.atoms.scope import Scope
 
-    capability = CapabilityPlan(
-        profile_path="test.yaml", provider_bindings=(), relations=()
-    )
-    control = ControlPlan(
-        profile_path="test.yaml", entries=(), by_slot={}, plan_hash="0" * 16
-    )
+    capability = CapabilityPlan(profile_path="test.yaml", provider_bindings=(), relations=())
+    control = ControlPlan(profile_path="test.yaml", entries=(), by_slot={}, plan_hash="0" * 16)
     scope = ScopePlan(
         profile_path="test.yaml",
         lifecycle=Scope.RUN,
@@ -330,7 +370,6 @@ def _make_minimal_plan(plan_ref: str = "0123456789abcdef") -> Any:
         budget_ceiling=BudgetCeiling(),
     )
     # Compute plan_ref manually (call compiled_run_plan_ref)
-    from lca.contracts.protocols.plan import compiled_run_plan_ref
 
     plan = CompiledRunPlan(
         profile_path="test.yaml",
@@ -344,6 +383,7 @@ def _make_minimal_plan(plan_ref: str = "0123456789abcdef") -> Any:
 
 def _make_minimal_plan_with_bindings() -> Any:
     """Plan with capability bindings (some unresolvable)."""
+    from lca.contracts.atoms.scope import Scope
     from lca.contracts.protocols.capability_plan import (
         CapabilityPlan,
         ProviderBinding,
@@ -351,7 +391,6 @@ def _make_minimal_plan_with_bindings() -> Any:
     from lca.contracts.protocols.control_plan import ControlPlan
     from lca.contracts.protocols.plan import CompiledRunPlan
     from lca.contracts.protocols.scope_plan import BudgetCeiling, ScopePlan
-    from lca.contracts.atoms.scope import Scope
 
     capability = CapabilityPlan(
         profile_path="test.yaml",
@@ -363,9 +402,7 @@ def _make_minimal_plan_with_bindings() -> Any:
         ),
         relations=(),
     )
-    control = ControlPlan(
-        profile_path="test.yaml", entries=(), by_slot={}, plan_hash="0" * 16
-    )
+    control = ControlPlan(profile_path="test.yaml", entries=(), by_slot={}, plan_hash="0" * 16)
     scope = ScopePlan(
         profile_path="test.yaml",
         lifecycle=Scope.RUN,

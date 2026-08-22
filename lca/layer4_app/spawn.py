@@ -331,6 +331,59 @@ def _fork_transport(
     return child
 
 
+def _compiled_plan_from_scope(scope: object) -> CompiledRunPlan | None:
+    """Compile the booted profile into the immutable plan consumed by L4."""
+    resolved = getattr(scope, "resolved_profile", None)
+    if resolved is None:
+        return None
+    from lca.harness.profile.plan_compiler import compile_plan
+
+    return compile_plan(resolved)
+
+
+def _agent_from_bound_graph(
+    spec: AgentSpec,
+    graph: object,
+    *,
+    plan_ref: str,
+) -> CognitiveAgent:
+    """Construct a live agent only from a complete plan-bound graph."""
+    required = (
+        "brain",
+        "body",
+        "memory",
+        "state_store",
+        "perceive_hub",
+        "hooks",
+        "observability",
+        "stop_rule",
+    )
+    missing = [field for field in required if getattr(graph, field, None) is None]
+    if missing:
+        raise MissingCapabilityError(
+            "plan-bound AgentGraph is incomplete; missing " + ", ".join(missing)
+        )
+    runtime = build_cognitive_runtime(
+        RuntimeDeps(
+            brain=graph.brain,
+            body=graph.body,
+            memory=consume("memory", graph.memory, CognitiveRuntime),
+            hooks=graph.hooks,
+            state_store=consume("state_store", graph.state_store, CognitiveRuntime),
+            perceive_hub=graph.perceive_hub,
+            stop_rule=graph.stop_rule,
+        )
+    )
+    return CognitiveAgent(
+        runtime,
+        spec.profile,
+        graph.observability,
+        max_steps=spec.max_steps,
+        max_wall_clock_seconds=spec.max_wall_clock_seconds,
+        plan_ref=plan_ref,
+    )
+
+
 def spawn_agent(
     spec: AgentSpec,
     *,
@@ -349,33 +402,33 @@ def spawn_agent(
     plugin 通过 cordis Context 提供拼装策略。否则走 legacy 路径（保留 6
     个月，PR-6 后删除）。
     """
-    # PR-5: bind_plan 路径（当显式启用 + compiled_plan 提供时）
-    if use_bind_plan and compiled_plan is not None:
-        from lca.layer4_app.spawn_bind_plan import (
-            bind_plan,
-            is_bind_plan_available,
-        )
-
-        scope = _ensure_scope(scope)
-        if not is_bind_plan_available(scope):
-            import warnings
-
-            warnings.warn(
-                "spawn_agent: use_bind_plan=True but sub-composers missing; "
-                "falling back to legacy path",
-                UserWarning,
-                stacklevel=2,
-            )
-        else:
-            bind_plan(spec, compiled_plan, scope=scope)  # PR-5b: graph 注入 CognitiveAgent
-            # TODO (PR-5b): when TEAM composer lands, hook into CognitiveAgent
-            # For now, the graph is informational; legacy path still constructs
-            # CognitiveAgent below.
-            # PR-5 阶段：仅 plan_ref 写入 metadata（PR-6 plan_ref × Journal 绑定落地）
-            import lca.layer4_app.spawn_bind_plan as _bind_module
-
-            _ = _bind_module  # avoid unused import
     scope = _ensure_scope(scope)
+
+    # SOLO is the complete sub-composer path.  Team and lead assembly keep
+    # their dedicated contracts until TeamComposer can return a complete
+    # TeamGraph, rather than silently accepting an incomplete plan graph.
+    if (
+        action_scope is ActionScope.SOLO
+        and team_channel is None
+        and decision_gate is None
+        and shared_store is None
+    ):
+        selected_plan = compiled_plan or _compiled_plan_from_scope(scope)
+        if selected_plan is not None:
+            from lca.layer4_app.spawn_bind_plan import bind_plan, is_bind_plan_available
+
+            if is_bind_plan_available(scope):
+                bound = bind_plan(spec, selected_plan, scope=scope)
+                return _agent_from_bound_graph(spec, bound.graph, plan_ref=bound.plan_ref)
+            if use_bind_plan:
+                import warnings
+
+                warnings.warn(
+                    "spawn_agent: plan binding requested but sub-composers are unavailable; "
+                    "falling back to the compatibility path",
+                    UserWarning,
+                    stacklevel=2,
+                )
     profile = spec.profile
     if isinstance(spec.observability, str):
         # Boot 期 ``assemble_observability`` 已把 ``BoundObservability`` 挂到

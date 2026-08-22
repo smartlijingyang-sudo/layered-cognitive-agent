@@ -10,9 +10,10 @@ import sys
 import unittest
 from dataclasses import dataclass
 from io import StringIO
+from pathlib import Path
 from unittest import mock
 
-_REPO = "/home/lichao/layered-cognitive-agent"
+_REPO = str(Path(__file__).resolve().parents[1])
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
@@ -47,7 +48,7 @@ class TestRouteLegacyPatterns:
         )
         from scripts import route_legacy_patterns as route
 
-        fake_root = "/home/lichao/layered-cognitive-agent"
+        fake_root = _REPO
         fake_state = [
             _FakeFinding(path=f"{fake_root}/lca/layer1_cognitive/body/a.py"),
             _FakeFinding(path=f"{fake_root}/lca/layer1_cognitive/brain/b.py"),

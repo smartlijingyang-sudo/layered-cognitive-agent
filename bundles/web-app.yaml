@@ -149,6 +149,12 @@ entries:
   # Cognitive is the default loop driver; the bundle decides whether to load
   # alternative loops alongside it.
 
+  # ── Plan-driven sub-composers ───────────────
+  - id: lca-plan-sub-composers
+    name: lca_plan_sub_composers
+    $module: lca.plugins.composer.sub_composers
+    config: {}
+
   # ── Compose-time named factories ──────────
   # Provide fresh capability service instances at compose time
   # so the composition root never instantiates concrete classes inline.

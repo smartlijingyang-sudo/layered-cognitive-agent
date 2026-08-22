@@ -174,3 +174,30 @@ async def test_legacy_safe_executor_uses_provider_pipeline_contract() -> None:
 
     assert result.success is True
     assert result.payload == "hello"
+    assert result.extra["policy_verdict_refs"] == [
+        "act.authorize:allow",
+        "act.budget:allow",
+        "act.constrain:allow",
+        "act.execute:allow",
+        "act.safe-boundary:allow",
+    ]
+    assert result.extra["command_envelope"]["plan_ref"] == "test_plan_ref_for_pipeline_test"
+
+
+@pytest.mark.asyncio
+async def test_legacy_safe_executor_denies_before_provider_execution() -> None:
+    from lca.contracts.models.core.result import ToolExecutionError
+    from lca.contracts.models.observability.plan_ref import plan_ref_scope
+
+    executor = PipelineSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
+
+    with (
+        plan_ref_scope("denied_plan_ref"),
+        pytest.raises(ToolExecutionError, match="未在 ToolPermissionManifest"),
+    ):
+        await executor.execute(
+            _LegacyEchoTool(),
+            {"message": "must not execute"},
+            RetryPolicy(max_retries=0),
+            CacheConfig(enabled=False),
+        )

@@ -21,7 +21,6 @@ from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.models.core.conversation import PRIOR_CONVERSATION_WM_KEY
 from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
-from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import ApprovalPendingError, BudgetExceededError, Result
 from lca.contracts.models.core.state import AgentState, StateSnapshot
 from lca.contracts.models.core.stop import StopReason
@@ -115,9 +114,8 @@ class CognitiveRuntime(Runtime):
         max_steps: int = DEFAULT_MAX_STEPS,
     ) -> Result:
         state = await self.state_store.load(snapshot.state_ref)
-        state.status = TaskStatus.WORKING
+        turn: Turn | None = None
         if input is not None:
-            state.working_memory["resume_input"] = input
             answer_text = input if isinstance(input, str) else str(input)
             answer_obs = Observation(
                 observation_id=new_id("obs"),
@@ -134,10 +132,8 @@ class CognitiveRuntime(Runtime):
                     ToolCall(call_id=new_id("tc"), tool_name="askUserQuestion", arguments={}),
                 ],
             )
-            state.history.append(
-                Turn(decision=answer_decision, observation=answer_obs),
-            )
-            state.step += 1
+            turn = Turn(decision=answer_decision, observation=answer_obs)
+        state = self.reducer.apply_resume(state, input, turn)
         return await self._loop(state, max_steps)
 
     async def _loop(self, state: AgentState, max_steps: int) -> Result:
@@ -203,25 +199,8 @@ class CognitiveRuntime(Runtime):
                     )
                 break
         await self.hooks.trigger(HookEvent.ON_COMPLETE.value, state)
-        self._apply_artifact_closure(state)
+        state = self.reducer.apply_artifact_closure(state, synthesize_artifact_closure())
         return Result.from_state(state)
-
-    @staticmethod
-    def _apply_artifact_closure(state: AgentState) -> None:
-        """Append workspace deliverables to final output (LobeHub workRegistration-style).
-
-        仍原地修改 state.final_output / state.status；计划在 AgentState
-        转 frozen 后迁入 reducer.apply_artifact_closure。
-        """
-        closure = synthesize_artifact_closure()
-        if closure:
-            if state.final_output:
-                if closure.strip() not in state.final_output:
-                    state.final_output = state.final_output.rstrip() + "\n\n" + closure
-            else:
-                state.final_output = closure
-            if state.status == TaskStatus.WORKING:
-                state.status = TaskStatus.COMPLETED
 
     async def _checkpoint(
         self, state: AgentState, reason: SnapshotReason = SnapshotReason.PERIODIC

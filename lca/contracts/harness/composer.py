@@ -150,26 +150,31 @@ class Composer(Protocol):
 
 
 def merge_agent_graphs(*graphs: AgentGraph) -> AgentGraph:
-    """Merge multiple ``AgentGraph`` into one (later wins per field)。
+    """Merge partial ``AgentGraph`` values without discarding prior fields.
 
-    PR-5 sub-composer 装配：BrainComposer + BodyComposer +
-    PerceiveComposer 各自返回部分 ``AgentGraph``，L4 spawn 合并成完整图。
+    Sub-composers each own a disjoint part of the graph.  A ``None`` field is
+    therefore absence of a contribution, not an instruction to clear a
+    dependency supplied by an earlier composer.  When more than one composer
+    supplies a non-null value for the same field, the later composer wins.
     """
     if not graphs:
         raise ValueError("merge_agent_graphs requires at least one graph")
     merged = graphs[0]
     for graph in graphs[1:]:
-        # later graph's fields override earlier graph's fields
         merged = AgentGraph(
-            brain=graph.brain,
-            body=graph.body,
-            memory=graph.memory,
-            state_store=graph.state_store,
-            perceive_hub=graph.perceive_hub,
-            hooks=graph.hooks,
-            observability=graph.observability,
-            llm=graph.llm,
-            stop_rule=graph.stop_rule,
+            brain=graph.brain if graph.brain is not None else merged.brain,
+            body=graph.body if graph.body is not None else merged.body,
+            memory=graph.memory if graph.memory is not None else merged.memory,
+            state_store=graph.state_store if graph.state_store is not None else merged.state_store,
+            perceive_hub=(
+                graph.perceive_hub if graph.perceive_hub is not None else merged.perceive_hub
+            ),
+            hooks=graph.hooks if graph.hooks is not None else merged.hooks,
+            observability=(
+                graph.observability if graph.observability is not None else merged.observability
+            ),
+            llm=graph.llm if graph.llm is not None else merged.llm,
+            stop_rule=graph.stop_rule if graph.stop_rule is not None else merged.stop_rule,
             metadata={**merged.metadata, **graph.metadata},
         )
     return merged

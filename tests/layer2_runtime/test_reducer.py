@@ -96,6 +96,38 @@ def test_apply_paused_marks_input_required() -> None:
     assert out.status == TaskStatus.INPUT_REQUIRED
 
 
+def test_apply_resume_records_input_turn_and_restores_working_status() -> None:
+    state = _state()
+    state.status = TaskStatus.INPUT_REQUIRED
+    turn = Turn(
+        decision=Decision(
+            decision_id="resume-decision",
+            action_type="ask_human",  # type: ignore[arg-type]
+            rationale="answer received",
+            confidence=1.0,
+        ),
+        observation=Observation(observation_id="resume-observation", success=True, payload="yes"),
+    )
+
+    out = DefaultReducer().apply_resume(state, "yes", turn)
+
+    assert out.status == TaskStatus.WORKING
+    assert out.working_memory["resume_input"] == "yes"
+    assert out.history == [turn]
+    assert out.step == 1
+
+
+def test_apply_artifact_closure_appends_once_and_completes_working_state() -> None:
+    state = _state()
+    state.final_output = "answer"
+
+    out = DefaultReducer().apply_artifact_closure(state, "[artifact](sandbox:/out.txt)")
+    duplicate = DefaultReducer().apply_artifact_closure(out, "[artifact](sandbox:/out.txt)")
+
+    assert out.status == TaskStatus.COMPLETED
+    assert duplicate.final_output.count("sandbox:/out.txt") == 1
+
+
 def test_closed_set_topology_has_six_phases_in_canonical_order() -> None:
     phases = ClosedSetTopology().phases()
     kinds = [p.kind.value for p in phases]

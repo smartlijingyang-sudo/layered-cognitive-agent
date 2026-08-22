@@ -404,15 +404,17 @@ class TestV4ArchitectureTestGate:
         """V4 acceptance §3.4: scripts/check_command_envelope_required.py exit 0。"""
         import subprocess
         import sys
+        from pathlib import Path
 
-        result = subprocess.run(
+        repository_root = Path(__file__).resolve().parents[2]
+        result = subprocess.run(  # noqa: S603 -- fixed repository-local verifier
             [
                 sys.executable,
-                "/home/lichao/layered-cognitive-agent/scripts/check_command_envelope_required.py",
+                str(repository_root / "scripts/check_command_envelope_required.py"),
             ],
             capture_output=True,
             text=True,
-            cwd="/home/lichao/layered-cognitive-agent",
+            cwd=repository_root,
         )
         assert result.returncode == 0, (
             f"architecture test failed: stdout={result.stdout}, stderr={result.stderr}"

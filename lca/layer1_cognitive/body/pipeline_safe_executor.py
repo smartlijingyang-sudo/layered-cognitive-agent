@@ -23,6 +23,7 @@ import asyncio
 import json
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from typing import Any, cast
 
 import structlog
@@ -274,15 +275,12 @@ class PipelineSafeExecutor(SafeExecutor):
         """
         invocation_id = invocation_id.strip() or new_id("inv")
 
-        # ── PR-7: mint CommandEnvelope（V4 acceptance）───────────
-        from lca.contracts.models.observability.journal import (
-            get_current_run_scope,
-        )
-        from lca.contracts.models.observability.plan_ref import (
-            get_current_plan_ref,
-        )
+        from lca.contracts.models.observability.journal import get_current_run_scope
+        from lca.contracts.models.observability.plan_ref import get_current_plan_ref
         from lca.contracts.protocols.command_envelope import (
+            BudgetReservation,
             CapabilityGrant,
+            command_envelope_to_dict,
             mint_envelope,
         )
 
@@ -290,19 +288,54 @@ class PipelineSafeExecutor(SafeExecutor):
         scope_ref = (
             str(current_scope.run_id) if current_scope and current_scope.run_id else "default"
         )
-        _envelope = mint_envelope(  # PR-7 V4: minted for V4 architecture test
-            plan_ref=get_current_plan_ref(),
+        plan_ref = get_current_plan_ref() or "legacy-uncompiled"
+        envelope = mint_envelope(
+            plan_ref=plan_ref,
             scope_ref=scope_ref,
             decision={"decision_id": invocation_id, "action_type": "use_tool"},
             provider=tool.name,
-            grant=CapabilityGrant(capability=tool.name, scope="turn"),
+            grant=CapabilityGrant(capability=tool.name, scope="turn", effect_class="tools"),
+            budget_reservation=BudgetReservation(tool_calls=1),
             idempotency_key=f"{invocation_id}:{tool.name}",
-            policy_verdict_refs=("policy.pre_execute",),  # PR-7 阶段默认 authorized
         )
 
+        # The four policy gates run before the existing pipeline invokes a
+        # provider.  Each successful decision is retained in the immutable
+        # envelope; a later gate can only add a stricter outcome, never clear
+        # an earlier denial.
+        authorization = self._check_permission_and_args(tool, args)
+        if authorization.kind != "allow":
+            raise ToolExecutionError(authorization.reason or "authorization denied")
+        verdict_refs = ["act.authorize:allow"]
+
+        reservation = envelope.budget_reservation
+        if (
+            min(
+                reservation.tokens,
+                reservation.cost_cents,
+                reservation.wall_clock_ms,
+                reservation.tool_calls,
+            )
+            < 0
+        ):
+            raise ToolExecutionError("budget reservation must not be negative")
+        verdict_refs.append("act.budget:allow")
+
+        if envelope.grant.capability != tool.name or envelope.grant.effect_class != "tools":
+            raise ToolExecutionError(
+                "command envelope capability constraint rejected tool execution"
+            )
+        verdict_refs.append("act.constrain:allow")
+
+        if not envelope.plan_ref or not envelope.scope_ref:
+            raise ToolExecutionError("command envelope failed safe-boundary validation")
+
+        verdict_refs.append("act.execute:allow")
         result = await self._pipeline_for(tool, retry_policy, cache_config).execute(
             tool.name, args, invocation_id=invocation_id
         )
+        verdict_refs.append("act.safe-boundary:allow")
+        envelope = replace(envelope, policy_verdict_refs=tuple(verdict_refs))
 
         # 如果管线返回 deny，抛出异常
         if (
@@ -313,17 +346,24 @@ class PipelineSafeExecutor(SafeExecutor):
             raise ToolExecutionError(result.error)
 
         # 返回 Observation
+        envelope_evidence = command_envelope_to_dict(envelope)
         if result.ok and result.output:
-            return cast("Observation", result.output)
-        else:
-            # 构造失败的 Observation
-            return Observation(
-                observation_id=new_id("obs"),
-                success=False,
-                payload=None,
-                error=result.error or "Unknown error",
-                extra={FAILURE_KIND: FAILURE_KIND_EXECUTION},
-            )
+            observation = cast("Observation", result.output)
+            observation.extra["command_envelope"] = envelope_evidence
+            observation.extra["policy_verdict_refs"] = list(envelope.policy_verdict_refs)
+            return observation
+
+        return Observation(
+            observation_id=new_id("obs"),
+            success=False,
+            payload=None,
+            error=result.error or "Unknown error",
+            extra={
+                FAILURE_KIND: FAILURE_KIND_EXECUTION,
+                "command_envelope": envelope_evidence,
+                "policy_verdict_refs": list(envelope.policy_verdict_refs),
+            },
+        )
 
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:
         """单次执行（不含重试）。"""
