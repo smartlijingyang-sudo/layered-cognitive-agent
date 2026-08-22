@@ -19,10 +19,10 @@ from lca.contracts.protocols import (
     TransportRegistryProtocol,
 )
 from lca.contracts.protocols.action import ActionRegistryProtocol
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.action_handlers import record_decision_made
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
+from lca.layer1_cognitive.transport_registry_factory import build_transport_registry
 
 
 class SimpleBody(Body):
@@ -56,11 +56,9 @@ class SimpleBody(Body):
         if transport_registry is not None:
             self.transport_registry = transport_registry
         elif transport is not None:
-            registry = TransportRegistry()
-            registry.register(transport)
-            self.transport_registry = registry
+            self.transport_registry = build_transport_registry(transport)
         else:
-            self.transport_registry = TransportRegistry()
+            self.transport_registry = build_transport_registry()
 
         if action_registry is not None:
             self.action_registry = action_registry

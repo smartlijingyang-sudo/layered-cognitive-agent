@@ -346,6 +346,7 @@ def _agent_from_bound_graph(
     graph: object,
     *,
     plan_ref: str,
+    compiled_plan: CompiledRunPlan | None = None,
 ) -> CognitiveAgent:
     """Construct a live agent only from a complete plan-bound graph."""
     required = (
@@ -372,6 +373,7 @@ def _agent_from_bound_graph(
             state_store=consume("state_store", graph.state_store, CognitiveRuntime),
             perceive_hub=graph.perceive_hub,
             stop_rule=graph.stop_rule,
+            control_plan=compiled_plan.control if compiled_plan is not None else None,
         )
     )
     return CognitiveAgent(
@@ -419,7 +421,12 @@ def spawn_agent(
 
             if is_bind_plan_available(scope):
                 bound = bind_plan(spec, selected_plan, scope=scope)
-                return _agent_from_bound_graph(spec, bound.graph, plan_ref=bound.plan_ref)
+                return _agent_from_bound_graph(
+                    spec,
+                    bound.graph,
+                    plan_ref=bound.plan_ref,
+                    compiled_plan=bound.plan,
+                )
             if use_bind_plan:
                 import warnings
 

@@ -445,10 +445,10 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 
 | V | 承诺 | 验收命令 | 通过条件 | 当前状态（2026-08-22） |
 |:-:|---|---|---|:-:|
-| **V1** | 控制面单一入口（11 slot） | §2.5 `explain control <slot>` + §2.4 各槽 L2 | 11 slot 全部 L2 接线 + explain 命令可执行 | ✅ GREEN (explain_control_slot 测试 5/5) |
-| **V2** | CompiledRunPlan 确定性 | §3.2 plan_hash property test | 100 次随机同输入同 hash | ✅ GREEN (plan_hash determinism 测试 19/19) |
-| **V3** | Reducer 唯一写 State | `audit_state_writers` 输出空集（除 reducer） | PR-0 = 40 → PR-7 = 0 | ❌ FAIL (39 违规，目标 0) |
-| **V4** | CommandEnvelope 必经 5 闸 | §3.4 architecture test | exit 0 + stack 含 mint_envelope | ✅ GREEN (envelope 测试 33/33，含 V4ArchitectureTestGate) |
+| **V1** | 控制面单一入口（11 slot） | §2.5 `explain control <slot>` + §2.4 各槽 L2 | 11 slot 全部 L2 接线 + explain 命令可执行 | ⏳ BLOCKED（运行循环已按阶段选择 `CompiledRunPlan.control` 投稿；entry 尚未统一映射为可执行 verdict，且 explain CLI 未提供） |
+| **V2** | CompiledRunPlan 确定性 | §3.2 plan_hash property test | 100 次随机同输入同 hash | ✅ GREEN（`tests/plan/test_plan_hash_determinism.py`：8 passed） |
+| **V3** | Reducer 唯一写 State | `audit_state_writers` 输出空集（除 reducer） | PR-0 = 40 → PR-7 = 0 | ❌ FAIL（state-writers 审计仍有 32 项，目标 0） |
+| **V4** | CommandEnvelope 必经 5 闸 | §3.4 architecture test | exit 0 + stack 含 mint_envelope | ✅ GREEN（封套脚本通过；相关测试 35 passed） |
 | **V5** | plan_ref 全覆盖 | §3.3 replay test | 每条 fact 带 plan_ref + 可重放 | ✅ GREEN (replay 测试 8/8) |
 | **V6** | 4 状态机封闭 | §5.1 state migration property test | 合法迁移覆盖 + 非法抛 InvalidStateTransition | ✅ GREEN (状态机测试 57/57) |
 | **V7** | Creator 4 面化 | §5.2 `lca-ops creator --help` | 4 subcommand | ✅ GREEN (creator 测试 43/43) |
@@ -474,7 +474,7 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 | 验证项 | 当前状态 |
 |---|:-:|
 | §7.1 harness spine E2E | ✅ GREEN (2/2 通过，1 跳过因无 LLM 凭证) |
-| §7.2 full run plan_ref × Journal 重放 | ❌ MISSING (tests/e2e/ 目录不存在) |
+| §7.2 full run plan_ref × Journal 重放 | ✅ GREEN（`tests/e2e/test_full_run_replay.py`：2 passed） |
 | §7.3 golden profile 8 类全跑 | ✅ GREEN (98/98 通过) |
 | §7.4 architecture test 三件套 | ✅ GREEN (test_envelope_gate_order 2/2 通过 + test_command_envelope 33/33 通过) |
 
@@ -483,19 +483,20 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 > **架构完整实施达到预期效果** ⇔ **V1-V12 全 ✅ + CV1-CV6 全 ✅ + §7.1/7.2/7.3/7.4 全 ✅ + §8 红旗 R1-R12 全清**。
 
 **当前状态（2026-08-22）**:
-- ✅ V1-V12: 11/12 GREEN (V1, V2, V4, V5, V6, V7, V8, V9, V10, V11, V12)
-- ❌ V3: FAIL (39 violations remain, target 0)
+- ✅ V1-V12: 10/12 GREEN（V2、V4–V12）
+- ⏳ V1: BLOCKED（11 槽已由运行循环选择，尚未统一执行为 ControlPlan verdict）
+- ❌ V3: FAIL（state-writers 审计仍有 32 项，目标 0）
 - ✅ CV1-CV6: 6/6 GREEN (CV1, CV2, CV3, CV4, CV5, CV6)
 - ✅ §7.1, §7.3, §7.4: GREEN
-- ❌ §7.2: 需真实 agent run（仅测试 plan_ref 机制）
+- ✅ §7.2: GREEN（full run replay 测试通过）
 - ✅ R1, R2, R5, R7, R8, R10, R11, R12: GREEN
-- ❌ R3, R4: RED (violations remain)
+- ❌ R3: RED（state-writers 审计 32 项，目标 0）
+- ✅ R4: GREEN（direct-commands 审计 0 项）
 
 **结论**: 架构处于"进行中"状态，不可宣称"完整实施"。主要缺口:
-1. V3 Reducer 唯一写 (39 violations → 0)
-2. R3 audit_state_writers (39 violations → 0)
-3. R4 audit_direct_commands (5 violations → 0)
-4. §7.2 full run replay (需真实 agent run with LLM)
+1. V1 ControlPlan 的 11 槽运行时消费与 explain 接口
+2. V3 Reducer 唯一写（32 项 → 0）
+3. R3 audit_state_writers（32 项 → 0）
 
 ---
 

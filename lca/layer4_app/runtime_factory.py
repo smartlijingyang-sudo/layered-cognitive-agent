@@ -33,6 +33,7 @@ from lca.contracts.protocols import (
     StateStore,
     StopRule,
 )
+from lca.contracts.protocols.control_plan import ControlPlan
 from lca.contracts.protocols.reducer import LoopTopology
 from lca.contracts.protocols.runtime import StopOutcomePolicy
 from lca.layer2_runtime.default_stop_rule import DefaultStopRule
@@ -65,6 +66,7 @@ class RuntimeDeps:
     outcome_policy: StopOutcomePolicy = field(default_factory=DefaultStopOutcomePolicy)
     reducer: Reducer = field(default_factory=DefaultReducer)
     topology: LoopTopology = field(default_factory=ClosedSetTopology)
+    control_plan: ControlPlan | None = None
 
 
 def build_cognitive_runtime(deps: RuntimeDeps) -> CognitiveRuntime:
@@ -84,6 +86,7 @@ def build_cognitive_runtime(deps: RuntimeDeps) -> CognitiveRuntime:
         perceive_hub=deps.perceive_hub,
         reducer=deps.reducer,
         topology=deps.topology,
+        control_plan=deps.control_plan,
     )
 
 

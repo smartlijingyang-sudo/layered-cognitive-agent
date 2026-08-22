@@ -207,15 +207,31 @@ def bind_team(
     4. 编排 strategy / stage / transport
     5. 返回 ``TeamBindingResult``
     """
-    # PR-5b 之前退化：always use legacy fallback
-    if True:
+    try:
+        composer = _resolve_composer(scope, "team")
+    except _ComposerMissingError:
         warnings.warn(
-            "bind_team: TEAM composer not yet implemented (PR-5b); "
-            "falling back to _legacy_bind_team()",
+            "bind_team: TEAM composer not yet implemented or unavailable; "
+            "falling back to compatibility binding",
             DeprecationWarning,
             stacklevel=2,
         )
         return _legacy_bind_team(spec, plan, scope=scope)
+
+    graph = composer.compose_team(spec, scope)
+    if (
+        not graph.members
+        or graph.strategy is None
+        or graph.stage is None
+        or graph.transport is None
+    ):
+        raise BindPlanError("bind_team: TeamComposer returned an incomplete TeamGraph")
+    return TeamBindingResult(
+        graph=graph,
+        plan_ref=compiled_run_plan_ref(plan),
+        plan=plan,
+        metadata={"composer_key": "team"},
+    )
 
 
 # ── Composer resolution ──────────────────────────────────────────────

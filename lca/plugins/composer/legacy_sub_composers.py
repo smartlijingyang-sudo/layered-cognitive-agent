@@ -202,25 +202,57 @@ class TeamComposer:
         raise NotImplementedError("TeamComposer.compose_agent — teams have no single agent")
 
     def compose_team(self, spec: Any, scope: Any) -> TeamGraph:
+        from lca.contracts.models.team.role_team import TeamAssembly
+        from lca.contracts.protocols.spec import LeadSpec
+        from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
         from lca.layer4_app.spawn import (
-            _governance_from,
+            _build_stage,
             _resolve_team_observability,
+            spawn_lead,
+            spawn_member,
         )
 
-        governance = _governance_from(
-            getattr(spec, "lead", None), getattr(spec, "coordination", None)
+        observability = _resolve_team_observability(spec)
+        shared_store = (
+            TeamSharedMemoryStore(list(spec.shared_memory_layers))
+            if spec.shared_memory_layers
+            else None
         )
-        assembly = require_capability(scope, STRATEGIES.key)
+        members = tuple(
+            spawn_member(
+                member_spec,
+                shared_store=shared_store,
+                observability=observability,
+                scope=scope,
+            )
+            for member_spec in spec.members
+        )
+        stage, transport = _build_stage(members)
+        governance = spec.governance
+        lead = None
+        if isinstance(governance, LeadSpec):
+            lead = spawn_lead(
+                governance.agent,
+                transport=transport,
+                mandate=governance.mandate,
+                observability=observability,
+                scope=scope,
+            )
+        assembly = TeamAssembly(
+            governance=governance,
+            stage=stage,
+            lead=lead,
+            delegate_max_attempts=spec.delegate_max_attempts,
+        )
         strategy_key = _governance_strategy_key(governance)
-        strategy = assembly.create(strategy_key, assembly)
-        # Stage + transport (stub — real impl PR-5b)
+        strategy = require_capability(scope, STRATEGIES.key).create(strategy_key, assembly)
         return TeamGraph(
-            members=(),
+            members=members,
             strategy=strategy,
-            stage=None,
-            transport=None,
-            observability=_resolve_team_observability(spec),
-            metadata={"composer_key": "team", "stub": True},
+            stage=stage,
+            transport=transport,
+            observability=observability,
+            metadata={"composer_key": "team", "lead": lead},
         )
 
 
