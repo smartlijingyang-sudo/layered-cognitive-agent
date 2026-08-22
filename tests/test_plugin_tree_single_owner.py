@@ -8,12 +8,14 @@ import pytest
 
 from gateway.runs.execute import create_run_session, execute_run
 from gateway.runs.session import RunRegistry, RunStatus
+from lca.contracts.atoms.enums import ActionScope
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_entries
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.llm_resolver import live_credential
 from lca.layer4_app.api import Agent
-from lca.layer4_app.spawn import build_perceive_hub, spawn_agent
+from lca.layer4_app.spawn import spawn_agent
+from lca.plugins.composer.plan_composition_support import build_perceive_hub
 
 DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
@@ -242,7 +244,12 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
     from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
     with pytest.raises(MissingCapabilityError, match="skills"):
-        build_perceive_hub(SimpleMemorySystem(), scope=ctx)
+        build_perceive_hub(
+            SimpleMemorySystem(),
+            hub=object(),
+            scope=ctx,
+            action_scope=ActionScope.SOLO,
+        )
 
     registry = RunRegistry()
     session = create_run_session(registry, question="ping", user_text="ping", mode="solo", ctx=ctx)

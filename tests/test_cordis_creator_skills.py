@@ -34,6 +34,10 @@ _EXPECTED_BUNDLED_IDS: tuple[str, ...] = (
     CORDIS_PLUGIN_DEVELOPMENT_SKILL_ID,
     EDITING_LCA_COMPOSITIONS_SKILL_ID,
 )
+_EXPECTED_VERSIONS = {
+    CORDIS_PLUGIN_DEVELOPMENT_SKILL_ID: "2.0.0",
+    EDITING_LCA_COMPOSITIONS_SKILL_ID: "1.0.0",
+}
 
 
 def _stub_scope_with_skill_store(store: DiskSkillPackageStore) -> SimpleNamespace:
@@ -58,11 +62,10 @@ def _fake_tool(name: str) -> Any:
 
 
 def _patch_skill_store_resolution(monkeypatch: Any, store: DiskSkillPackageStore) -> None:
-    """Replace ``_skill_store_from_scope`` so ``_render_available_skills``
-    can read from a store without booting the full cordis context."""
-    from lca.layer4_app import spawn as spawn_module
+    """Replace the plan-composition skill resolver without booting Cordis."""
+    from lca.plugins.composer import plan_composition_support as support_module
 
-    monkeypatch.setattr(spawn_module, "_skill_store_from_scope", lambda _scope: store)
+    monkeypatch.setattr(support_module, "_skill_store_from_scope", lambda _scope: store)
 
 
 class TestBundledCordisCreatorSkills(unittest.TestCase):
@@ -119,7 +122,7 @@ class TestBundledCordisCreatorSkills(unittest.TestCase):
                 package = self.store.get(skill_id)
                 self.assertEqual(package.skill_id, skill_id)
                 self.assertTrue(package.source_url.startswith("bundled:"))
-                self.assertEqual(package.version, "1.0.0")
+                self.assertEqual(package.version, _EXPECTED_VERSIONS[skill_id])
 
     def test_ensure_is_idempotent_when_hashes_match(self) -> None:
         first = ensure_bundled_skills(self.store, root=default_bundled_skills_root())
@@ -180,8 +183,9 @@ class TestRenderAvailableSkills(unittest.TestCase):
         for skill_id in _EXPECTED_BUNDLED_IDS:
             package = self.store.get(skill_id)
             with self.subTest(skill_id=skill_id):
-                self.assertEqual(package.version, "1.0.0")
-                self.assertIn("v1.0.0", rendered)
+                expected = _EXPECTED_VERSIONS[skill_id]
+                self.assertEqual(package.version, expected)
+                self.assertIn(f"v{expected}", rendered)
 
     def test_catalog_handles_empty_store(self) -> None:
         """Empty store should produce the documented fallback string."""
@@ -447,6 +451,7 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
         self.assertIn(CORDIS_PLUGIN_DEVELOPMENT_SKILL_ID, prompt)
         self.assertIn(EDITING_LCA_COMPOSITIONS_SKILL_ID, prompt)
         # Format: ``- {id}: {name} — {summary} (v{version})``
+        self.assertIn("v2.0.0", prompt)
         self.assertIn("v1.0.0", prompt)
         # The new summary-bearing format vs the legacy ``{id}: {name}`` only.
         self.assertIn(

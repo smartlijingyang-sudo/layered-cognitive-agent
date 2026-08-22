@@ -1,4 +1,4 @@
-"""Creator §13.3 真场景端到端：CSV 统计 plugin 由 agent 自己写 + 挂载 + 使用。
+"""Creator 四面端到端：CSV 统计 plugin 由 agent 自己创作、验证、发布并使用。
 
 场景故事
 --------
@@ -8,12 +8,14 @@
 1. think → 没有 csv_stats 工具；
 2. cordis_control.inspect → 看到当前 Context 派生能力图；
 3. file_write → 把 csv_stats.py 插件源码写到 preset 目录；
-4. cordis_control.mount → 把 plugin 挂入 cordis Context；
-5. csv_stats → 用刚挂载的新工具算 mean / median / std；
-6. respond → 把结果输出给用户。
+4. cordis_control.author → 读取 plugin 源并创建 DRAFT artifact；
+5. cordis_control.validate → 将 artifact 转为 VERIFIED；
+6. cordis_control.promote → 发布 artifact 并挂入 cordis Context；
+7. csv_stats → 用刚挂载的新工具算 mean / median / std；
+8. respond → 把结果输出给用户。
 
 然后 **重启 session**（preset 自动加载），同一个 agent 接到同一任务：
-- 不需要任何 cordis_control.mount 调用；
+- 不需要任何 Creator control 调用；
 - 直接 csv_stats 工具已在 Context 中。
 
 为什么这是真场景
@@ -23,9 +25,9 @@
   不是 fake 数据；
 - **真实 preset 复用**：第二个 session 真的从 preset 目录加载 bundle.yaml → 动态
   import → factory() 实例化 → 注入 ctx（不依赖任何 cordis_control 调用）；
-- **真实 journal**：每次 mount/unmount/inspect/publish 都落 typed JournalEvent
+- **真实 journal**：每次 Creator face 都落对应的 typed JournalEvent
   到 in-memory journal（可被 read_journal() 反序列化）；
-- **真实 Tool 链路**：cordis_control.execute() → Composer.mount() →
+- **真实 Tool 链路**：cordis_control.execute() → CreatorRuntime.promote() → Composer.mount() →
   ctx.provide() → ctx.own_bindings[plugin:xxx] 可被下一行代码读取。
 
 驱动方式
@@ -120,6 +122,7 @@ class SequenceScriptedLLM(LLMAdapter):
     @staticmethod
     def _extract_role(prompt: str) -> str | None:
         import re
+
         m = re.search(r"^ROLE:\s*(.+)$", prompt, re.MULTILINE)
         return m.group(1).strip() if m else None
 
@@ -278,7 +281,7 @@ def _build_creator_toolkit(preset_root: Path):
     返回 ``(tools_list, composer_instance, tool_registry)``，调用方在
     ``bind_journal()`` 块内使用以让 record() 落到 journal。
 
-    on_mounted 回调：mount 成功后把新挂载的 instance 包成 Tool 并注册到
+    on_mounted 回调：promote 成功后把新挂载的 instance 包成 Tool 并注册到
     ``tool_registry``（与 spawn_agent 的 fork_for_run 输出同一份 ToolsService），
     这样 agent 的下一次 ``use_tool("csv_stats", ...)`` 能命中。
     """
@@ -294,28 +297,26 @@ def _build_creator_toolkit(preset_root: Path):
 
     caller_grant = (
         "cordis_control.inspect",
-        "cordis_control.mount",
-        "cordis_control.unmount",
-        "cordis_control.publish",
+        "cordis_control.author",
+        "cordis_control.validate",
+        "cordis_control.promote",
         "tool_fs.read",
         "tool_fs.write",
         "tool_bash",
         "file_write",
     )
 
-    def _on_mounted(
-        name: str, instance: Any, meta: dict[str, Any]
-    ) -> None:
+    def _on_mounted(name: str, instance: Any, meta: dict[str, Any]) -> None:
         """把新挂载的 plugin 包成 Tool 并注册到 tool_registry。
 
         设计决策：mount 阶段已经过 cordis_control 的 C5 / PR12 / §23.2
-        三道闸，safe_executor 的 permission_manifest.allowed_tools 检查是
+        Creator 校验与 Composer policy 检查，safe_executor 的 permission_manifest.allowed_tools 检查是
         二级防御；对 Creator 模式而言新挂载的 tool 自动视为已授权
         （动态扩展 manifest 由 :func:`_sync_safe_executor_manifest` 兜底）。
         """
         tool_obj = _wrap_plugin_as_tool(name=name, instance=instance, meta=meta)
         tool_registry.register(tool_obj)
-        # 动态扩展：每次 mount 后立即尝试扩展 safe_executor manifest
+        # 动态扩展：每次 promote 后立即尝试扩展 safe_executor manifest
         _sync_safe_executor_manifest(tool_name=name)
 
     cordis_control = build_cordis_control_tool(
@@ -355,6 +356,7 @@ def _build_creator_toolkit_with_preset(preset_id: str, preset_root: Path):
     bundle_path = preset_root / preset_id / "bundle.yaml"
     text = bundle_path.read_text(encoding="utf-8")
     import yaml
+
     entries = (yaml.safe_load(text) or {}).get("entries") or []
     assert entries, f"preset 无 entry：{preset_id}"
     entry = entries[0]
@@ -362,11 +364,13 @@ def _build_creator_toolkit_with_preset(preset_id: str, preset_root: Path):
     plugin_path = preset_root / preset_id / entry["config"]["source_path"]
 
     import sys
+
     preset_root_str = str(preset_root)
     sys.path.insert(0, preset_root_str)
     try:
         module_name = entry["$module"]
         import importlib.util
+
         spec = importlib.util.spec_from_file_location(module_name, str(plugin_path))
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -501,7 +505,7 @@ class TestCreatorRealScenario:
         # Agent 期望 plugin 文件写到这里（preset 根目录 = preset_root）
         plugin_target = preset_root / "csv_stats" / "plugins" / "csv_stats.py"
 
-        # ScriptedLLM：think → inspect → write → mount → csv_stats → respond
+        # ScriptedLLM：think → inspect → write → author → validate → promote → csv_stats → respond
         script = [
             _use_tool("cordis_control", {"action": "inspect"}),
             _use_tool(
@@ -513,10 +517,16 @@ class TestCreatorRealScenario:
             ),
             _use_tool(
                 "cordis_control",
+                {"action": "author", "name": "csv_stats", "path": str(plugin_target)},
+            ),
+            _use_tool("cordis_control", {"action": "validate", "name": "csv_stats"}),
+            _use_tool(
+                "cordis_control",
                 {
-                    "action": "mount",
+                    "action": "promote",
                     "name": "csv_stats",
-                    "path": str(plugin_target),
+                    "target_scope": "release",
+                    "preset_id": "csv_stats",
                 },
             ),
             _use_tool(
@@ -561,7 +571,9 @@ class TestCreatorRealScenario:
             )
 
         # ── 行为断言 ──
-        assert result.status == "completed", f"agent 未完成：status={result.status}, error={result.error}"
+        assert result.status == "completed", (
+            f"agent 未完成：status={result.status}, error={result.error}"
+        )
         assert result.output is not None and "15204.17" in result.output, (
             f"agent 输出不含统计结果：{result.output!r}"
         )
@@ -572,7 +584,7 @@ class TestCreatorRealScenario:
         written = plugin_target.read_text(encoding="utf-8")
         assert "csv_stats" in written and "factory()" in written
 
-        # 2) bundle.yaml 也被 PresetAuthoring 写入（cordis_control.mount 自动触发）
+        # 2) release promote 通过 PresetAuthoring 写入 bundle.yaml
         bundle_path = preset_root / "csv_stats" / "bundle.yaml"
         assert bundle_path.is_file(), "preset bundle.yaml 未生成"
         bundle_text = bundle_path.read_text(encoding="utf-8")
@@ -592,13 +604,14 @@ class TestCreatorRealScenario:
         ev_types = {s.event_type for s in journal.store.events}
         assert "PluginInspected" in ev_types  # Step 1 inspect
         assert "PluginAuthored" in ev_types  # Step 3 author（file_write 触发）
-        assert "PluginMounted" in ev_types  # Step 4 mount
-        assert "PresetPublished" in ev_types  # Step 4 mount 自动 publish
-        assert "ToolInvoked" in ev_types  # Step 5 csv_stats 调用
+        assert "PluginMounted" in ev_types  # promote
+        assert "PresetPublished" in ev_types  # release promote
+        assert "ToolInvoked" in ev_types  # csv_stats 调用
 
         # 5) csv_stats ToolInvoked 事件 payload 含正确 tool_name + ok=true
         csv_invoked = [
-            s for s in journal.store.events
+            s
+            for s in journal.store.events
             if s.event_type == "ToolInvoked" and getattr(s.event, "tool_name", "") == "csv_stats"
         ]
         assert len(csv_invoked) == 1
@@ -614,7 +627,7 @@ class TestCreatorRealScenario:
         )
 
     def test_preset_reuse_in_new_session_no_cordis_control_needed(self) -> None:
-        """第二 session：preset 已自挂，agent 直接用 csv_stats，不调 cordis_control.mount。
+        """第二 session：preset 已自挂，agent 直接用 csv_stats，不调 Creator control。
 
         关键约束：
         - 不调 cordis_control（preset 在 boot 阶段已自动挂入 csv_stats）；
@@ -647,7 +660,7 @@ class TestCreatorRealScenario:
         )
 
         # ── 阶段 1：第二 session —— agent 用 csv_stats 不需要 cordis_control ──
-        # 关键差异：脚本里只有 use_tool("csv_stats", ...) + respond；没有 mount 步骤
+        # 关键差异：脚本里只有 use_tool("csv_stats", ...) + respond；没有 Creator control 步骤
         script = [
             _use_tool(
                 "csv_stats",
@@ -668,8 +681,7 @@ class TestCreatorRealScenario:
             # 关键断言工具集不含 cordis_control —— 因为新 session 不再需要它
             tool_names = [t.name for t in tools]
             assert "cordis_control" not in tool_names, (
-                f"新 session 工具集应不含 cordis_control（preset 自动挂载已足够），"
-                f"got={tool_names}"
+                f"新 session 工具集应不含 cordis_control（preset 自动挂载已足够），got={tool_names}"
             )
             assert "csv_stats" not in tool_names, (
                 "csv_stats 是 preset 挂入 ctx 的 instance 后再 wrap 进 tool_registry"
@@ -688,9 +700,7 @@ class TestCreatorRealScenario:
             )
             # 注入 preset 自挂后的 tool_registry（已含 csv_stats + file_write + bash）
             _install_tool_registry(agent=agent, tool_registry=tool_registry)
-            result = asyncio.run(
-                agent.run(f"再分析一次 {sales_csv} 的 monthly_total 列统计")
-            )
+            result = asyncio.run(agent.run(f"再分析一次 {sales_csv} 的 monthly_total 列统计"))
 
         # ── 断言 ──
         assert result.status == "completed", f"agent 未完成：{result.status}, {result.error}"
@@ -699,7 +709,8 @@ class TestCreatorRealScenario:
 
         # journal 里 csv_stats ToolInvoked 至少出现 1 次
         csv_invoked = [
-            s for s in journal.store.events
+            s
+            for s in journal.store.events
             if s.event_type == "ToolInvoked" and getattr(s.event, "tool_name", "") == "csv_stats"
         ]
         assert len(csv_invoked) == 1
@@ -707,7 +718,8 @@ class TestCreatorRealScenario:
 
         # journal 里 **不**应有 cordis_control ToolInvoked（关键反证）
         cordis_invoked = [
-            s for s in journal.store.events
+            s
+            for s in journal.store.events
             if s.event_type == "ToolInvoked"
             and getattr(s.event, "tool_name", "") == "cordis_control"
         ]
@@ -734,6 +746,7 @@ class TestCreatorRealScenario:
 def _dump_session_evidence(*, journal: MemoryJournal, session: str, stage: str) -> None:
     """把 captured journal dump 到 SCRATCH，便于 verifier 复核 / 调试回溯。"""
     import dataclasses
+
     out_dir = SCRATCH / "evidence"
     out_dir.mkdir(exist_ok=True)
     jsonl_path = out_dir / f"{session}__{stage}.jsonl"

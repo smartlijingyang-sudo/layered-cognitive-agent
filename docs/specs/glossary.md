@@ -209,7 +209,6 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **CastingError** | 自动组队判定失败：解析 / 白名单校验 / 纠正重试全部失败 |
 | **RoleNotFoundError** | role_id 不存在于角色库 |
 
-| **BindOptions** (PR-5) | spawn.bind_plan 配置：use_legacy_spawn / include_disabled / enforce_capability_plan 等 |
 | **FailureExplainer** (PR-3 + PR-4) | 失败诊断与解释器（lca-ops diagnose 子命令） |
 | **HostEnvironment** (PR-12) | 主机环境封装（lca-ops heal 子命令）：uptime + health + start-stop |
 | **Lease** (v3 §11 / PR-9b) | Blackboard 共享工件的租约协议（团队协作隔离） |
@@ -228,6 +227,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 
 | 已废弃术语 | 替代 / 状态 |
 |---|---|
+| **BindOptions** | 计划绑定兼容选项；已退役 — 替代：严格的 `bind_plan(request, plan, scope)` |
 | **DshConfig** | DeepSeek Harness 适配器；v2 遗产，已退役 — 替代：lca-ops daemon / native config |
 | **DshNotification** | DSH 桥接；v2 遗产，已退役 — 替代：lca layer0_infra observability |
 | **DshProbe** | DSH 桥接；v2 遗产，已退役 — 替代：lca-ops doctor |

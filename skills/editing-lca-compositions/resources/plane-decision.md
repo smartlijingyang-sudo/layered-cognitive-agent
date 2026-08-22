@@ -71,8 +71,8 @@ uv run lint-imports
 
 | Operation | Required capability |
 |---|---|
-| `cordis_control.mount` with `capabilities: ["tool_fs.read"]` | caller must have `tool_fs.read` |
-| `cordis_control.publish` (writes to `$LCA_AGENT_PRESETS_HOME`) | caller must have `file_write` |
+| `cordis_control.promote` for an Artifact with `capabilities: ["tool_fs.read"]` | caller must have `tool_fs.read` |
+| release `cordis_control.promote` (writes to `$LCA_AGENT_PRESETS_HOME`) | caller must have `file_write` |
 | `bash.run` (subprocess) | caller must have `tool_bash` |
 | `file_write.write` | caller must have `tool_fs.write` |
 

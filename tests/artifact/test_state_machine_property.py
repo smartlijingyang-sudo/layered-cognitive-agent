@@ -23,7 +23,6 @@ This test covers:
 - migrate_artifact: legal transitions succeed
 - migrate_artifact: illegal transitions raise InvalidStateTransitionError
 - legal_next_states: from each state, return correct set of targets
-- 8 → 4 state migration via migrate_legacy_state
 - ArtifactController facade methods
 - Property test: 100 iterations of state machine traversal (no invalid transitions)
 """
@@ -41,7 +40,6 @@ from lca.contracts.atoms.artifact_state import (
 )
 from lca.contracts.atoms.scope import Scope
 from lca.contracts.harness.artifact import (
-    LEGACY_TO_NEW_STATE,
     ArtifactController,
     CapabilityArtifact,
     InvalidStateTransitionError,
@@ -49,12 +47,10 @@ from lca.contracts.harness.artifact import (
     capability_artifact_to_dict,
     controller_legal_next_states,
     controller_migrate,
-    controller_migrate_legacy,
     is_terminal_state,
     legal_next_states,
     make_capability_artifact,
     migrate_artifact,
-    migrate_legacy_state,
     migrate_to_active,
     migrate_to_retired,
     migrate_to_verified,
@@ -159,7 +155,6 @@ class TestCapabilityArtifactConstruction:
         assert art.state is ArtifactState.DRAFT
         assert art.scope is Scope.RUN
         assert art.grants == ()
-        assert art.legacy_state is None
         assert art.version == 1
 
     def test_blank_logical_id_rejected(self) -> None:
@@ -326,112 +321,6 @@ class TestLegalNextStates:
         assert is_terminal_state(active) is False
 
 
-# ── 8 → 4 state migration ────────────────────────────────────────
-
-
-class TestLegacyToNewState:
-    """8 → 4 状态机迁移（tracker §18.1 + ADR-0074 §三裁剪）。"""
-
-    def test_legacy_mapping_size(self) -> None:
-        """8 old states (DRAFT, PARSED, DECLARED, VERIFIED, STAGED, ACTIVE,
-        QUIESCING, RETIRED) + ROLLED_BACK = 9."""
-        assert len(LEGACY_TO_NEW_STATE) == 9
-
-    def test_legacy_to_new_mapping(self) -> None:
-        """PARSED + DECLARED → DRAFT; STAGED + QUIESCING → ACTIVE; ROLLED_BACK → RETIRED."""
-        assert LEGACY_TO_NEW_STATE["draft"] == ArtifactState.DRAFT
-        assert LEGACY_TO_NEW_STATE["parsed"] == ArtifactState.DRAFT
-        assert LEGACY_TO_NEW_STATE["declared"] == ArtifactState.DRAFT
-        assert LEGACY_TO_NEW_STATE["verified"] == ArtifactState.VERIFIED
-        assert LEGACY_TO_NEW_STATE["staged"] == ArtifactState.ACTIVE
-        assert LEGACY_TO_NEW_STATE["active"] == ArtifactState.ACTIVE
-        assert LEGACY_TO_NEW_STATE["quiescing"] == ArtifactState.ACTIVE
-        assert LEGACY_TO_NEW_STATE["retired"] == ArtifactState.RETIRED
-        assert LEGACY_TO_NEW_STATE["rolled_back"] == ArtifactState.RETIRED
-
-    def test_migrate_legacy_from_draft(self) -> None:
-        """DRAFT (legacy) → migrate → 4-state DRAFT (no-op)."""
-        art = make_capability_artifact(
-            "plugin.a",
-            "content",
-            state=ArtifactState.DRAFT,
-            legacy_state="draft",
-        )
-        migrated = migrate_legacy_state(art)
-        assert migrated.state is ArtifactState.DRAFT
-        assert migrated.legacy_state is None  # cleared
-
-    def test_migrate_legacy_parsed_to_draft(self) -> None:
-        """PARSED (legacy) → 4-state DRAFT。"""
-        art = make_capability_artifact(
-            "plugin.a",
-            "content",
-            state=ArtifactState.DRAFT,
-            legacy_state="parsed",
-        )
-        migrated = migrate_legacy_state(art)
-        assert migrated.state is ArtifactState.DRAFT
-
-    def test_migrate_legacy_staged_to_active(self) -> None:
-        """STAGED (legacy) → 4-state ACTIVE。"""
-        art = make_capability_artifact(
-            "plugin.a",
-            "content",
-            state=ArtifactState.DRAFT,
-            legacy_state="staged",
-        )
-        migrated = migrate_legacy_state(art)
-        assert migrated.state is ArtifactState.ACTIVE
-
-    def test_migrate_legacy_quiescing_to_active(self) -> None:
-        """QUIESCING (legacy) → 4-state ACTIVE (退出协议非独立状态)。"""
-        art = make_capability_artifact(
-            "plugin.a",
-            "content",
-            state=ArtifactState.DRAFT,
-            legacy_state="quiescing",
-        )
-        migrated = migrate_legacy_state(art)
-        assert migrated.state is ArtifactState.ACTIVE
-
-    def test_migrate_legacy_rolled_back_to_retired(self) -> None:
-        """ROLLED_BACK (legacy) → 4-state RETIRED。"""
-        art = make_capability_artifact(
-            "plugin.a",
-            "content",
-            state=ArtifactState.DRAFT,
-            legacy_state="rolled_back",
-        )
-        migrated = migrate_legacy_state(art)
-        assert migrated.state is ArtifactState.RETIRED
-
-    def test_migrate_legacy_noop_for_new_artifact(self) -> None:
-        """新 artifact (legacy_state=None) → no-op。"""
-        art = make_capability_artifact("plugin.a", "content")
-        migrated = migrate_legacy_state(art)
-        assert migrated is art
-
-    def test_migrate_legacy_rejects_non_draft_state(self) -> None:
-        """legacy migration 只从 DRAFT 起步。"""
-        art = make_capability_artifact(
-            "plugin.a",
-            "content",
-            state=ArtifactState.ACTIVE,  # not DRAFT
-            legacy_state="staged",
-        )
-        with pytest.raises(ValueError, match="cannot migrate legacy_state"):
-            migrate_legacy_state(art)
-
-    def test_migrate_legacy_unknown_state_raises(self) -> None:
-        art = make_capability_artifact(
-            "plugin.a",
-            "content",
-            legacy_state="unknown_legacy_state",
-        )
-        with pytest.raises(ValueError, match="unknown legacy state"):
-            migrate_legacy_state(art)
-
-
 # ── artifact_with_state / capability_artifact_to_dict ──────────────
 
 
@@ -482,18 +371,6 @@ class TestArtifactControllerFacade:
         next_states = controller_legal_next_states(controller, art)
         assert ArtifactState.ACTIVE in next_states
         assert ArtifactState.DRAFT in next_states
-
-    def test_controller_migrate_legacy(self) -> None:
-        controller = ArtifactController()
-        art = make_capability_artifact(
-            "plugin.a",
-            "content",
-            state=ArtifactState.DRAFT,
-            legacy_state="parsed",
-        )
-        migrated = controller_migrate_legacy(controller, art)
-        assert migrated.state is ArtifactState.DRAFT
-        assert migrated.legacy_state is None
 
 
 # ── Property test: state machine traversal ────────────────────────

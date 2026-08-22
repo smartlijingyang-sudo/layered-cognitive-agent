@@ -1,4 +1,4 @@
-"""PresetAuthoring —— Creator §13.3 publish 动作的唯一 I/O 入口（L4 组合根）。
+"""PresetAuthoring —— Creator promote(release) 的唯一 I/O 入口（L4 组合根）。
 
 Plugin-thinking
 ---------------
@@ -7,11 +7,11 @@ Plugin-thinking
 
 - ``CordisComposer``（Tier-2 provider）只操作 cordis Context，**不写文件**。
 - ``PresetAuthoring``（L4 组合根）是**唯一**写盘的协调者；它由
-  :class:`cordis_control` Tool 在 mount 成功后回调触发，把 plugin 源码与
+  :class:`cordis_control` 的 release promote 成功后调用，把 plugin 源码与
   bundle YAML 落盘。
 
 为什么这样切：unit test 可以用 in-memory ctx + in-memory journal 跑全部
-mount/unmount/inspect 闭环，只有 publish 这一动作触真实磁盘（也可通过
+Creator 四面闭环，只有 release promote 的 preset 写入触真实磁盘（也可通过
 显式 ``root`` 参数注入 tmp 路径）。
 
 Preset 目录结构
@@ -24,7 +24,7 @@ Preset 目录结构
             <plugin_name>.py   # plugin 源文件（factory 函数）
 
 下次 boot 时，若加载了该 preset bundle，plugin 会在 boot 期自动挂入
-Context，**无需任何 cordis_control.mount 调用**——这就是「可复用 preset」
+Context，**无需任何 Creator control 调用**——这就是「可复用 preset」
 语义（§13.3.4 流程后的关键收益）。
 """
 
@@ -70,7 +70,7 @@ class PresetLayout:
 
 
 class PresetAuthoring:
-    """§13.3 publish 动作的唯一 I/O 入口；类级别只读静态方法，无 module singleton。"""
+    """release promote 的唯一 I/O 入口；类级别静态方法，无 module singleton。"""
 
     @staticmethod
     def presets_home(*, override: Path | None = None) -> Path:

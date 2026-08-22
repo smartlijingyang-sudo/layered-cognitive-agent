@@ -22,9 +22,9 @@ profile:
   role: cordis-creator
   capability_grant:
     - cordis_control.inspect
-    - cordis_control.mount
-    - cordis_control.unmount
-    - cordis_control.publish
+    - cordis_control.author
+    - cordis_control.validate
+    - cordis_control.promote
     - tool_fs.read
     - tool_fs.write
     - tool_bash

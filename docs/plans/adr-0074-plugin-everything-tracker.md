@@ -99,12 +99,12 @@
 | **4** | 9 | Creator 4 面化 | ✅ Done | `d17d8447` | 2026-08-21 | PR-8 |
 | **4** | 10 | Golden profile + 文档更新 | ✅ Done | `010865d7` | 2026-08-21 | PR-9 |
 | **5** | 12 | PlanTemplate + 关系图谱可视化 | ✅ Done | `4b8a61ed` | 2026-08-21 | PR-10 |
-| **5** | 11 | legacy 6 个月 cleanup（删 stage/retire/publish 字符串 + CordisControlTool 7-action 字符串）| ⛔ Blocked | — | — | PR-12 |
-| **4** | 12 | PlanTemplate + 关系图谱可视化 | ⛔ Blocked | — | — | PR-10 |
+| **5** | 11 | 最终无兼容层切换（删除旧计划、Artifact 与 Creator API） | ✅ Done | `193f76f3` | 2026-08-22 | PR-12 |
+| **4** | 12 | PlanTemplate + 关系图谱可视化 | ✅ Done | `4b8a61ed` | 2026-08-21 | PR-10 |
 
-**Next Action**：PR-11（cleanup 任务，6 个月后删除 legacy action 字符串；不阻塞当前架构）。
+Next Action: none（后续变更必须保持 CompiledRunPlan、四状态 Artifact 与 Creator 四面词表的闭集）。
 
-**累计完成**：16 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 / PR-8 / PR-9 / PR-10 / PR-12 完成；PR-0.5 推迟到大重构结束后）。
+**累计完成**：17 / 17（PR-0 / PR-1 / PR-2 / PR-2.5 / PR-3 / PR-4 / PR-5 / PR-6 / PR-7 / PR-8 / PR-9 / PR-10 / PR-11 / PR-12 完成；PR-0.5 为历史测试治理项）。
 
 ---
 
@@ -210,7 +210,7 @@ PR-12 (PlanTemplate + 关系图谱)
 - ``ArtifactController`` thin facade + module-level accessors
 - state migration 主入口 ``migrate_artifact`` + 非法抛
   ``InvalidStateTransitionError``
-- 8→4 legacy state migration（``LEGACY_TO_NEW_STATE`` 映射表）
+- 仅保留四状态 Artifact 生命周期；旧状态字段和映射不再存在
 - property test 100 iterations random legal paths + illegal transitions
   全 raise
 
@@ -219,9 +219,9 @@ PR-12 (PlanTemplate + 关系图谱)
 | 文件 | 作用 |
 |---|---|
 | `lca/contracts/atoms/artifact_state.py` | ``ArtifactState`` 4 状态 enum + ``LEGAL_TRANSITIONS`` 矩阵（4 迁移：DRAFT→VERIFIED, VERIFIED→ACTIVE, VERIFIED→DRAFT 修订, ACTIVE→RETIRED）+ ``is_legal_transition`` / ``parse_artifact_state`` / ``all_states`` helpers |
-| `lca/contracts/harness/artifact.py` | ``CapabilityArtifact`` frozen dataclass（logical_id / revision_digest / state / scope / grants / legacy_state / metadata / version）+ ``InvalidStateTransitionError`` exception + ``ArtifactController`` thin facade + 12 module-level accessors（``migrate_artifact`` / ``migrate_to_verified`` / ``migrate_to_active`` / ``migrate_to_retired`` / ``migrate_legacy_state`` / ``legal_next_states`` / ``is_terminal_state`` / ``artifact_with_state`` / ``make_capability_artifact`` / ``capability_artifact_to_dict`` / ``controller_migrate`` / ``controller_legal_next_states`` / ``controller_migrate_legacy``）+ ``LEGACY_TO_NEW_STATE`` 8→4 映射表 |
-| `lca/contracts/harness/__init__.py` | re-export 16 new symbols（ArtifactController / CapabilityArtifact / InvalidStateTransitionError 等） |
-| `tests/artifact/test_state_machine_property.py` | 57 测试覆盖 ArtifactState enum（4 members）/ LEGAL_TRANSITIONS / parse_artifact_state / CapabilityArtifact construction / make_capability_artifact factory（digest auto-compute SHA-256 hex 16 char）/ migrate_artifact（legal + illegal raise）/ legal_next_states / 8→4 legacy migration（PARSED/STAGED/QUIESCING/ROLLED_BACK）/ ArtifactController facade / property test 100 iterations random legal paths + no illegal transitions accepted |
+| `lca/contracts/harness/artifact.py` | ``CapabilityArtifact`` frozen dataclass（logical_id / revision_digest / state / scope / grants / metadata / version）+ ``InvalidStateTransitionError`` + 四状态迁移及序列化接口；不含 legacy 字段或迁移映射 |
+| `lca/contracts/harness/__init__.py` | re-export 当前四状态 Artifact 公共接口 |
+| `tests/artifact/test_state_machine_property.py` | 46 个测试覆盖四状态 enum、合法/非法迁移、factory、序列化、控制器 facade 与随机路径 property test |
 
 ### 4.3 实现要点
 
@@ -229,7 +229,7 @@ PR-12 (PlanTemplate + 关系图谱)
 - **LEGAL_TRANSITIONS 4 路径**：DRAFT→VERIFIED（首次校验）、VERIFIED→ACTIVE（promote）、VERIFIED→DRAFT（修订）、ACTIVE→RETIRED（退役）
 - **REVOKED 不可逆**：RETIRED 是 terminal state；任何迁移 raise
 - **revision_digest SHA-256 hex 16 char**（PR-3 跨运行稳定风格）
-- **8→4 legacy migration**：``LEGACY_TO_NEW_STATE`` dict 提供 PARSED/DECLARED/STAGED/QUIESCING/ROLLED_BACK → 4-state 映射；``migrate_legacy_state`` 仅从 DRAFT 起步（确保 idempotency）
+- **四状态闭集**：旧 8 状态、映射表与迁移函数均已删除；持久化和运行时只接受 DRAFT / VERIFIED / ACTIVE / RETIRED
 - **ADR-0015 contracts 纯类型**：CapabilityArtifact + ArtifactController 不放方法；所有派生 / 迁移走 module-level functions（``migrate_artifact`` / ``controller_migrate`` 等）
 
 ### 4.4 不变量
@@ -239,7 +239,7 @@ PR-12 (PlanTemplate + 关系图谱)
 - **不修 19 个 pre-existing 失败**（PR-0.5 范围；PR-8 新增 57 测试全过，**无新增失败**）
 - **不改 ARTIFACT_STATE 字符串值**（序列化 / journal_record / 状态机 protocol 引用稳定；break wire 触发 PR-X redesign）
 - **不放方法在 contracts/@datlass**（ADR-0015；ArtifactController 是 thin facade）
-- **PR-8 阶段 runtime 不接线**（cordis_control.mount/unmount 调用 ArtifactController 留 PR-10 golden profile 阶段；当前仅数据面 + property test 守护）
+- **运行时已接线**：CreatorRuntime 的 author → validate → promote 路径实际驱动 DRAFT → VERIFIED → ACTIVE，rollback 驱动 ACTIVE → RETIRED
 
 ### 4.5 验证流程
 
@@ -260,14 +260,14 @@ uv run pytest --no-cov tests/harness/ tests/test_contracts.py tests/plan/ tests/
 
 ### 4.6 完成判据
 
-- 57 新测试全过（test_state_machine_property 57）
+- 46 个四状态测试全过（test_state_machine_property）
 - harness/ + contracts/ + plan/ + layer4_app/ + observability/ + journal/ + artifact/ 测试无新增失败（555 passed）
 - ruff 无新增警告
 - mypy 无新增错误
 - ArtifactState 4 状态闭合（DRAFT / VERIFIED / ACTIVE / RETIRED）
 - LEGAL_TRANSITIONS 4 路径（覆盖 acceptance §5.1 V6）
 - 非法迁移抛 InvalidStateTransitionError（DRAFT→ACTIVE 跳过、ACTIVE→DRAFT 回退、RETIRED→任何）
-- 8→4 legacy migration：PARSED/STAGED/QUIESCING/ROLLED_BACK 全部 fold 到 4-state
+- 无旧状态迁移入口：历史状态字段、映射表与兼容 API 零命中
 
 ### 4.7 提交规范
 
@@ -299,8 +299,7 @@ acceptance-criteria §5.1 V6
 
 ### 4.9 已知陷阱（PR-8 新增）
 
-- **cordis_control mount/unmount 未接入 ArtifactController**：PR-8 仅数据面 + property test 守护；runtime 集成（mount → DRAFT→VERIFIED→ACTIVE; unmount → ACTIVE→RETIRED）留 PR-10 golden profile 阶段。**PR-9 Creator 4 面化阶段建议同时接入**（CordisControlTool 与 ArtifactController 集成）。
-- **8→4 legacy migration 仅从 DRAFT 起步**：legacy_state 非空 + state ≠ DRAFT → ValueError。**这是 idempotency 守护**：多次调用 migrate_legacy_state 在 legacy_state 第一次清空后变成 no-op。**PR-10 golden profile 测试应覆盖 legacy artifact 启动 → migrate_legacy_state → 继续 state machine**。
+- **最终切换已完成**：CreatorRuntime 实际执行 author → validate → promote → rollback，并由 Artifact 四状态机承载；不允许恢复 mount/unmount 或 legacy Artifact 迁移入口。
 - **2 个 pre-existing test 失败**（与 PR-8 无关）：test_journal_preview_boundary + test_run_http（§11 已登记 19 个 pre-existing 失败）。
 - **Property test 100 iterations 用 random.choice**：S311 警告（pseudo-random 不安全）；PR-8 阶段仅用于 property test，不用于 cryptographic。后续 PR 可改用 secrets module（如需）。
 - **V8 capability 单调未验证**：CapabilityArtifact.grants 是 V8 单调要求（子 ⊆ 父），但 PR-8 阶段未验证；PR-9 Creator 4 面化阶段应加入 property test（grant ⊆ parent grant + 子 grant 数 ≤ 父 grant 数）。
@@ -497,7 +496,7 @@ PR-0 audit 测量网对全仓库扫一次得到 42 条违规基线，路由如�
 | **V4** CommandEnvelope 必经 5 闸 | architecture test 拒绝无 envelope 的 tool call；Body.execute stack trace 必含 `command_envelope.mint` | **PR-7**（CommandEnvelope 收口） | PR-7 完成时必须新增 `tests/architecture/test_command_envelope_required.py`：AST 扫描所有 Body.execute 调用，确保 mint_envelope 在 stack trace |
 | **V5** plan_ref 全覆盖 | replay test 取任意 run，重放其 journal 即可重建 plan | **PR-6**（plan_ref × Journal 绑定） | PR-6 完成时必须新增 `tests/journal/test_plan_ref_replay.py`：跑 1 个完整 agent run，断言每条 journal fact 携带 plan_ref |
 | **V6** 4 状态机封闭 | state migration property test：合法迁移覆盖；非法迁移抛 InvalidStateTransition | **PR-8**（ArtifactController 4 状态） | PR-8 完成时必须新增 `tests/artifact/test_state_machine_property.py`：覆盖 DRAFT→VERIFIED→ACTIVE→RETIRED 4 条迁移 + 至少 4 条非法迁移断言 InvalidStateTransition |
-| **V7** Creator 4 面化 | `lca-ops creator --help` 输出 4 个 subcommand | **PR-9**（Creator 4 面化） | PR-9 完成时必须新增 `tests/creator/test_4_faces.py`：断言 `lca-ops creator {inspect,author,validate,promote}` 4 个 subcommand 都可调用，且 stage/retire/publish 通过 promote flags 实现 |
+| **V7** Creator 4 面化 | `lca-ops creator --help` 输出 4 个 subcommand | **PR-9**（Creator 4 面化） | PR-9 完成时必须新增 `tests/creator/test_4_faces.py`：断言 inspect / author / validate / promote 是唯一可调用动作，旧动作一律被拒绝 |
 | **V8** capability 单调 | 子代理 / 子 scope / 子 artifact grant ⊆ 父 | **PR-3** + **PR-8**（CapabilityPlan 编译 + Artifact 状态收敛）| PR-3 完成时新增 `tests/test_capability_monotonicity.py`：property test 覆盖子代理 grant ⊆ 父代理；PR-8 完成时扩展到 artifact grant |
 | **V9** LogicAddress 完整度 | `lca plugin check` 输出 LogicAddress 6 维完整度评分 | **PR-2**（PluginDefinition.control 可选段 + LogicAddress 元数据） | PR-2 完成时必须新增 `tests/plugin/test_logic_address_scoring.py`：覆盖 4 档评分边界（≥75 / 50–74 / <50 / --strict） |
 | **V10** 13 原语群覆盖 | `lca plugin check` 输出每个 plugin 的 functional_group 归属 | **PR-2**（functional_group 字段新增）| PR-2 完成时必须新增 `tests/plugin/test_functional_group.py`：覆盖 v3 8/9 群 ↔ ADR-0069 13 群映射表（详见 §15） |

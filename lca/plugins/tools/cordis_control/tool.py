@@ -1,32 +1,4 @@
-"""CordisControlTool —— Creator §13.3 的运行时 plugin 编排入口（Tier-3 behavior）。
-
-Plugin-thinking
----------------
-``cordis_control`` 是 **普通 Tool**（非认知 Hook），按宪法 §13.3.2：
-
-- Agent 决策 ``Decision(use_tool, tool=cordis_control)`` → Body.act →
-  SafeExecutor → 这里。
-- PR-9 后：4 个 action（``inspect`` / ``mount`` / ``unmount`` / ``publish``）
-  通过 ``lca.plugins.creator.faces.implementations.dispatch_legacy_action``
-  路由到 4 face（``inspect`` / ``author`` / ``validate`` / ``promote``）。
-  backward compat 6 个月后删除（PR-9 stage 2 / PR-10 删除）。
-- 每次 invoke 必落 :class:`ToolInvoked` + 链式 :class:`PluginMounted` /
-  :class:`PluginMountRejected` / :class:`PluginUnmounted` /
-  :class:`PresetPublished`，全链路 audit。
-
-挂载入口
---------
-本模块暴露 :func:`build_cordis_control_tool`，返回一个
-:class:`lca.contracts.protocols.Tool` 实例；该实例在装配期通过
-``tools_service.register(tool)`` 注册到 :class:`ToolsService` 注册表。
-
-文件组织
---------
-- 本文件聚焦 Tool 类骨架 + validate + execute 入口 + build 工厂。
-- 4 个 action 实现（事件落盘 / preset 写入）见 :mod:`actions`。
-- plugin 源加载助手见 :mod:`loader`。
-- 4 Creator faces 见 :mod:`lca.plugins.creator.faces.implementations`。
-"""
+"""CordisControlTool exposes the Creator four-face protocol as one governed Tool."""
 
 from __future__ import annotations
 
@@ -40,10 +12,10 @@ from lca.contracts.mechanisms.composition import ComposerError
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
-from lca.plugins.tools.cordis_control import actions_mount, actions_simple
+from lca.plugins.tools.cordis_control.creator_runtime import CreatorRuntime
 
 IDENTIFIER = "cordis-control"
-ALLOWED_ACTIONS = ("inspect", "mount", "unmount", "publish")
+ALLOWED_ACTIONS = ("inspect", "author", "validate", "promote")
 
 MANIFEST = ToolManifest(
     identifier=IDENTIFIER,
@@ -51,22 +23,23 @@ MANIFEST = ToolManifest(
     api=(
         ToolApi(
             name="cordisControl",
-            description=(
-                "Composer 控制面：inspect 当前 Context 派生能力图、"
-                "mount 临时 plugin、unmount 已挂载 plugin、publish 把"
-                "plugin 源码持久化到 preset 目录。"
-            ),
+            description="Creator 控制面：inspect、author、validate、promote 四个受治理动作。",
             parameters={
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
                         "enum": list(ALLOWED_ACTIONS),
-                        "description": "控制动作；inspect/mount/unmount/publish 四选一",
+                        "description": "Creator 动作：inspect/author/validate/promote 四选一",
                     },
-                    "name": {"type": "string", "description": "plugin 名；mount/unmount 必填"},
-                    "path": {"type": "string", "description": "mount 时 plugin 源码路径"},
-                    "preset_id": {"type": "string", "description": "publish 时 preset 目录名"},
+                    "name": {
+                        "type": "string",
+                        "description": "artifact 名；author/validate/promote 必填",
+                    },
+                    "path": {"type": "string", "description": "author 时的 plugin 源码路径"},
+                    "target_scope": {"type": "string", "description": "promote 的目标 scope"},
+                    "rollback": {"type": "boolean", "description": "promote 时退休已激活 artifact"},
+                    "preset_id": {"type": "string", "description": "release promote 的 preset 名"},
                 },
                 "required": ["action"],
             },
@@ -77,17 +50,13 @@ MANIFEST = ToolManifest(
     meta=ToolMeta(
         avatar="🧬",
         title="cordis_control",
-        description="Creator §13.3 Composer control surface",
+        description="Creator four-face control surface",
     ),
 )
 
 
 class CordisControlTool(Tool):
-    """cordis_control Tool 实现（构造期绑定 Composer 与 caller_grant）。
-
-    实例方法 :meth:`execute` 是 Body.act 唯一调用入口；具体 action 行为
-    委派给 :mod:`actions`，本类只负责参数校验 + dispatch + 错误包 Observation。
-    """
+    """Run the four Creator faces through one Composer-bound artifact lifecycle."""
 
     name: ClassVar[str] = "cordis_control"
     description: ClassVar[str] = MANIFEST.api[0].description
@@ -104,86 +73,70 @@ class CordisControlTool(Tool):
         preset_root: Path | None = None,
         on_mounted: Any | None = None,
     ) -> None:
-        """cordis_control Tool 实例。
-
-        ``on_mounted`` 是 mount 成功后的回调（可选）：
-        签名 ``(name, instance, meta) -> None``；上层可借此把刚挂载的 plugin
-        注册到 ToolsService（mount 后 capability 自动可调用）。
-        ``meta`` 是 plugin_meta dict（含 ``implements`` / ``policy_class`` 等）。
-        """
         self._composer = composer
         self._caller_grant = tuple(caller_grant)
         self._actor_role = actor_role
         self._preset_root = preset_root
         self._on_mounted = on_mounted
+        self._creator = CreatorRuntime(self)
 
     def validate(self, args: dict[str, Any]) -> str | None:
         action = args.get("action")
         if action not in ALLOWED_ACTIONS:
             return f"action {action!r} 非法；必须是 {list(ALLOWED_ACTIONS)}"
-        if action in {"mount", "unmount"} and not args.get("name"):
+        if action in {"author", "validate", "promote"} and not args.get("name"):
             return f"action={action!r} 必填 name"
-        if action == "mount" and not args.get("path"):
-            return "action='mount' 必填 path（plugin 源码路径）"
+        if action == "author" and not args.get("path"):
+            return "action='author' 必填 path（plugin 源码路径）"
+        if action != "promote" and any(
+            key in args for key in ("target_scope", "rollback", "preset_id")
+        ):
+            return "target_scope、rollback 与 preset_id 仅可用于 action='promote'"
         return None
 
     async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
+        started = time.monotonic()
         validation = self.validate(args)
         if validation is not None:
-            latency_ms = int((time.monotonic() - start) * 1000)
-            return Observation(
-                observation_id=new_id("obs"),
-                success=False,
-                payload=None,
-                error=validation,
-                latency_ms=latency_ms,
-                extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
-            )
-
-        action = args["action"]
+            return self._failure(validation, started)
         try:
+            action = args["action"]
             if action == "inspect":
-                # PR-9: 4 face dispatch — inspect
-                payload = actions_simple.do_inspect(self)
-            elif action == "mount":
-                # PR-9: mount = author + validate + promote (legacy mapping)
-                payload = actions_mount.do_mount(
-                    self, name=args["name"], path=args["path"]
-                )
-            elif action == "unmount":
-                # PR-9: unmount = promote(rollback=True)
-                payload = actions_simple.do_unmount(self, name=args["name"])
-            elif action == "publish":
-                # PR-9: publish = promote(target_scope=release, preset_id=...)
-                payload = actions_simple.do_publish(
-                    self,
+                payload = self._creator.inspect(target=args.get("name"))
+            elif action == "author":
+                payload = self._creator.author(name=args["name"], path=args["path"])
+            elif action == "validate":
+                payload = self._creator.validate(name=args["name"])
+            else:
+                payload = self._creator.promote(
                     name=args["name"],
-                    path=args["path"],
-                    preset_id=args.get("preset_id") or args["name"],
+                    target_scope=args.get("target_scope"),
+                    rollback=bool(args.get("rollback", False)),
+                    preset_id=args.get("preset_id"),
                 )
-            else:  # pragma: no cover — guarded by validate()
-                raise ValueError(f"unreachable action={action!r}")
-            latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
                 observation_id=new_id("obs"),
                 success=True,
                 payload=payload,
-                latency_ms=latency_ms,
+                latency_ms=int((time.monotonic() - started) * 1000),
             )
-        except ComposerError as exc:
-            latency_ms = int((time.monotonic() - start) * 1000)
-            return Observation(
-                observation_id=new_id("obs"),
-                success=False,
-                payload=None,
-                error=f"{exc.code.value}: {exc}",
-                latency_ms=latency_ms,
-                extra={
-                    FAILURE_KIND: FAILURE_KIND_VALIDATION,
-                    "error_code": exc.code.value,
-                },
-            )
+        except (ComposerError, ValueError, OSError) as exc:
+            return self._failure(str(exc), started, error_code=getattr(exc, "code", None))
+
+    def _failure(
+        self, message: str, started: float, *, error_code: object | None = None
+    ) -> Observation:
+        extra = {FAILURE_KIND: FAILURE_KIND_VALIDATION}
+        if error_code is not None:
+            extra["error_code"] = getattr(error_code, "value", str(error_code))
+        return Observation(
+            observation_id=new_id("obs"),
+            success=False,
+            payload=None,
+            error=message,
+            latency_ms=int((time.monotonic() - started) * 1000),
+            extra=extra,
+        )
 
 
 def build_cordis_control_tool(
@@ -194,33 +147,29 @@ def build_cordis_control_tool(
     preset_root: Path | None = None,
     on_mounted: Any | None = None,
 ) -> Tool:
-    """返回 cordis_control Tool 实例（caller 负责 tools_service.register）。
+    """Build the protocol Tool bound to one governed Creator runtime."""
 
-    ``on_mounted``（可选）：挂载成功后回调，签名 ``(name, instance, meta)``，
-    上层可借此把新 plugin 注册到 ToolsService（让 agent 的下一次 use_tool 调用
-    能命中）。
-    """
-    tool_impl = CordisControlTool(
+    implementation = CordisControlTool(
         composer=composer,
         caller_grant=caller_grant,
         actor_role=actor_role,
         preset_root=preset_root,
         on_mounted=on_mounted,
     )
-    tool_cls = type(
+    tool_type = type(
         "Tool_cordis_control",
         (Tool,),
         {
-            "name": tool_impl.name,
-            "description": tool_impl.description,
-            "parameters": tool_impl.parameters,
-            "is_idempotent": tool_impl.is_idempotent,
-            "default_timeout_s": tool_impl.default_timeout_s,
-            "execute": tool_impl.execute,
-            "validate": tool_impl.validate,
+            "name": implementation.name,
+            "description": implementation.description,
+            "parameters": implementation.parameters,
+            "is_idempotent": implementation.is_idempotent,
+            "default_timeout_s": implementation.default_timeout_s,
+            "execute": implementation.execute,
+            "validate": implementation.validate,
         },
     )
-    return tool_cls()  # type: ignore[no-any-return]
+    return tool_type()  # type: ignore[no-any-return]
 
 
 __all__ = [

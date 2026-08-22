@@ -271,7 +271,7 @@ uv run pytest --no-cov tests/artifact/test_state_machine_property.py -v
 - 合法迁移覆盖：DRAFT→VERIFIED、VERIFIED→ACTIVE、ACTIVE→RETIRED、VERIFIED→DRAFT（修订）
 - 非法迁移抛 `InvalidStateTransition`：PARSED→VERIFIED（旧路径直接进 VERIFIED）、DRAFT→ACTIVE（跳过 VERIFIED）、ACTIVE→DRAFT（不可回退）
 
-**停留概念红旗**：迁移测试通过，但 `ArtifactController.migrate_legacy_state()` 缺失 6 个月兼容入口——见 §5.6。
+**架构红旗**：生产代码仍出现 `legacy_state`、`migrate_legacy_state` 或 8 状态映射；四状态模型不提供迁移兼容入口——见 §5.6。
 
 ### 5.2 7 Creator 面 → 4 Creator 面（L2 — PR-9）
 
@@ -285,7 +285,7 @@ uv run lca-ops creator --help
 uv run pytest --no-cov tests/creator/test_4_faces.py -v
 ```
 
-通过条件：`stage` / `retire` / `publish` 三个旧 subcommand 作为 `promote(...)` 别名存在 6 个月（tracker §18.3 软链接）。
+通过条件：旧动作 `mount` / `unmount` / `stage` / `retire` / `publish` 均被拒绝；唯一动作词表是 inspect / author / validate / promote。
 
 ### 5.3 6 闸 → 3 闸（L2 — PR-4 + PR-7 + PR-8）
 
@@ -311,13 +311,13 @@ uv run python -c "from lca.contracts.atoms.scope import Scope; print([s.value fo
 
 通过条件：release / profile / agent / run / turn 共 5 项；invocation 与 turn 合并（tracker §15.4）。
 
-### 5.6 6 个月软迁移路径（L2 — PR-8 / PR-9）
+### 5.6 无兼容层守卫（L2 — 最终切换）
 
-| 兼容入口 | 验收命令 | 通过条件 |
+| 禁止残留 | 验收命令 | 通过条件 |
 |---|---|---|
-| 旧 artifact state | `grep -rn "migrate_legacy_state" lca/` | 含在 `ArtifactController` |
-| 旧 Creator API | `grep -rn "_legacy_aliases" lca/plugins/creator/` | 含软链接文件 |
-| 旧 spawn | `grep -rn "_legacy_spawn_objects" lca/layer4_app/spawn.py` | 含 compat 入口 + LCA_LEGACY_SPAWN flag |
+| 旧 Artifact 状态 API | `! grep -RInE 'legacy_state|migrate_legacy_state|LEGACY_TO_NEW_STATE' lca/` | exit 0；四状态 Artifact 无兼容字段或映射 |
+| 旧 Creator 动作 | `! grep -RInE 'dispatch_legacy_action|actions_mount|actions_simple' lca/` | exit 0；工具词表仅四面 |
+| 旧计划装配回退 | `! grep -RInE 'LCA_PLAN_COMPAT|use_legacy_spawn|legacy_sub_composers' lca/` | exit 0；Spawn 只接受 CompiledRunPlan |
 
 ---
 
@@ -450,8 +450,8 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 | **V3** | Reducer 唯一写 State | `audit_state_writers` 输出空集（除 reducer） | PR-0 = 40 → PR-7 = 0 | ❌ FAIL（state-writers 审计仍有 32 项，目标 0） |
 | **V4** | CommandEnvelope 必经 5 闸 | §3.4 architecture test | exit 0 + stack 含 mint_envelope | ✅ GREEN（封套脚本通过；相关测试 35 passed） |
 | **V5** | plan_ref 全覆盖 | §3.3 replay test | 每条 fact 带 plan_ref + 可重放 | ✅ GREEN (replay 测试 8/8) |
-| **V6** | 4 状态机封闭 | §5.1 state migration property test | 合法迁移覆盖 + 非法抛 InvalidStateTransition | ✅ GREEN (状态机测试 57/57) |
-| **V7** | Creator 4 面化 | §5.2 `lca-ops creator --help` | 4 subcommand | ✅ GREEN (creator 测试 43/43) |
+| **V6** | 4 状态机封闭 | §5.1 state migration property test + §5.6 零兼容扫描 | 合法迁移覆盖、非法迁移被拒且旧状态 API 零命中 | ✅ GREEN（四状态 property test 46/46） |
+| **V7** | Creator 4 面化 | §5.2 Creator tests + §5.6 零兼容扫描 | 仅四个动作且旧动作被拒绝 | ✅ GREEN（四面测试 36/36） |
 | **V8** | capability 单调 | §7.4 property test | 子 ⊆ 父 | ✅ GREEN (capability monotonicity 测试 3/3 通过) |
 | **V9** | LogicAddress 6 维 | §4.7 `lca plugin check` 评分 | 4 档评分边界覆盖 | ✅ GREEN (评分函数 0-100 正常) |
 | **V10** | 13 原语群覆盖 | §4.1 + §4.3 | 枚举闭合 + functional_group 字段可选 | ✅ GREEN (functional_group 测试 44/44) |
@@ -519,3 +519,4 @@ uv run pytest --no-cov tests/test_capability_monotonicity.py -v
 |---|---|
 | 2026-08-21 | 初版：三层验收框架 + ADR-0066/0068/0069/0074 验收命令 + 红旗 R1-R12 + V1-V12/CV1-CV6 矩阵；§9.4 sign-off 公式 |
 | 2026-08-22 | 实际核实：运行所有验收命令，更新 §8 红旗清单 + §9.1-9.4 矩阵为实际状态。结果：V1-V12 10/12 GREEN (V3 FAIL 39 violations, V8 UNKNOWN)；CV1-CV6 5/6 GREEN (CV4 NEEDS VERIFICATION)；§7.1/§7.3 GREEN, §7.2/§7.4 MISSING；R1/R2/R5/R7/R8/R10/R11/R12 GREEN, R3/R4 RED, R6 YELLOW |
+| 2026-08-22 | 最终切换：移除计划、Artifact 与 Creator 的兼容入口；§5.6 改为零兼容扫描，V6/V7 以四状态与四面闭集测试守护。 |

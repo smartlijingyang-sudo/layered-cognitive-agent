@@ -17,15 +17,14 @@ That's §5.1 (V6 acceptance for ArtifactController).
 
 Acceptance §5.2:
 - lca-ops creator --help 输出 4 subcommand (inspect / author / validate / promote)
-- tests/creator/test_4_faces.py 验收 stage / retire / publish 软链接到 promote flags
+- Creator action vocabulary is closed to those four faces
 
 This test covers:
 
 - CreatorFace enum: 4 members
 - PromoteSpec dataclass + flags
 - 4 face implementations: inspect / author / validate / promote
-- Stage / retire / publish as promote flag aliases
-- dispatch_creator_face + dispatch_legacy_action
+- dispatch_creator_face accepts only the four declared faces
 """
 
 from __future__ import annotations
@@ -42,7 +41,6 @@ from lca.plugins.creator.faces import (
 )
 from lca.plugins.creator.faces.implementations import (
     dispatch_creator_face,
-    dispatch_legacy_action,
     do_author,
     do_inspect,
     do_promote,
@@ -83,7 +81,7 @@ class TestParseCreatorFace:
 
     def test_unknown_string_raises(self) -> None:
         with pytest.raises(ValueError, match="unknown creator face"):
-            parse_creator_face("stage")  # stage is legacy, not 4-face
+            parse_creator_face("stage")
 
     def test_non_string_raises(self) -> None:
         with pytest.raises(TypeError):
@@ -142,7 +140,8 @@ class TestAuthorFace:
 
     def test_author_with_path(self) -> None:
         result = do_author(
-            name="plugin.x", path="/tmp/example.py"  # noqa: S108
+            name="plugin.x",
+            path="/tmp/example.py",  # noqa: S108
         )
         assert result.payload["path"] == "/tmp/example.py"  # noqa: S108
 
@@ -177,21 +176,19 @@ class TestPromoteFace:
         assert result.state_after is ArtifactState.ACTIVE
 
     def test_rollback_promote_retired(self) -> None:
-        """rollback=True → ACTIVE → RETIRED（retire 软链接）。"""
+        """rollback=True projects ACTIVE → RETIRED."""
         result = do_promote(name="plugin.x", spec=PromoteSpec(rollback=True))
         assert result.state_after is ArtifactState.RETIRED
         assert result.payload["operation"] == "rollback"
 
-    def test_stage_promote_experiment(self) -> None:
-        """stage 软链接：target_scope=experiment → ACTIVE。"""
-        result = do_promote(
-            name="plugin.x", spec=PromoteSpec(target_scope="experiment")
-        )
+    def test_experiment_promote(self) -> None:
+        """A promotion may target the experiment scope."""
+        result = do_promote(name="plugin.x", spec=PromoteSpec(target_scope="experiment"))
         assert result.state_after is ArtifactState.ACTIVE
         assert result.payload["target_scope"] == "experiment"
 
-    def test_publish_promote_release_with_preset(self) -> None:
-        """publish 软链接：target_scope=release + preset_id。"""
+    def test_release_promote_with_preset(self) -> None:
+        """A release promotion may name its preset."""
         result = do_promote(
             name="plugin.x",
             spec=PromoteSpec(target_scope="release", preset_id="my-preset"),
@@ -222,9 +219,7 @@ class TestDispatchCreatorFace:
         assert result.face is CreatorFace.VALIDATE
 
     def test_dispatch_promote(self) -> None:
-        result = dispatch_creator_face(
-            CreatorFace.PROMOTE, name="plugin.x"
-        )
+        result = dispatch_creator_face(CreatorFace.PROMOTE, name="plugin.x")
         assert result.face is CreatorFace.PROMOTE
 
     def test_dispatch_with_string(self) -> None:
@@ -237,101 +232,8 @@ class TestDispatchCreatorFace:
             dispatch_creator_face("unknown_face")
 
 
-# ── Legacy action dispatch (backward compat) ─────────────────────
-
-
-class TestDispatchLegacyAction:
-    """PR-9 stage 2 backward compat：7 旧 action → 4 face。
-
-    6 个月后删除（tracker §PR-9 stage 2）。
-    """
-
-    def test_inspect_action_to_inspect_face(self) -> None:
-        result = dispatch_legacy_action("inspect", name="plugin.x")
-        assert result.face is CreatorFace.INSPECT
-
-    def test_mount_action_to_promote_face(self) -> None:
-        """mount = author + validate + promote chain."""
-        result = dispatch_legacy_action(
-            "mount", name="plugin.x", path="/tmp/plugin.py"  # noqa: S108
-        )
-        # 最终 promote → ACTIVE
-        assert result.face is CreatorFace.PROMOTE
-        assert result.state_after is ArtifactState.ACTIVE
-
-    def test_unmount_action_to_promote_with_rollback(self) -> None:
-        """unmount = promote(rollback=True) → RETIRED."""
-        result = dispatch_legacy_action("unmount", name="plugin.x")
-        assert result.state_after is ArtifactState.RETIRED
-
-    def test_publish_action_to_promote_release(self) -> None:
-        """publish = promote(target_scope=release, preset_id=...)."""
-        result = dispatch_legacy_action(
-            "publish",
-            name="plugin.x",
-            path="/tmp/plugin.py",  # noqa: S108
-            preset_id="my-preset",
-        )
-        assert result.face is CreatorFace.PROMOTE
-        assert result.state_after is ArtifactState.ACTIVE
-        assert result.payload["target_scope"] == "release"
-        assert result.payload["preset_id"] == "my-preset"
-
-    def test_stage_action_to_promote_experiment(self) -> None:
-        """stage = promote(target_scope=experiment)."""
-        result = dispatch_legacy_action("stage", name="plugin.x")
-        assert result.face is CreatorFace.PROMOTE
-        assert result.payload["target_scope"] == "experiment"
-
-    def test_promote_action_direct(self) -> None:
-        """promote → ACTIVE."""
-        result = dispatch_legacy_action("promote", name="plugin.x")
-        assert result.face is CreatorFace.PROMOTE
-        assert result.state_after is ArtifactState.ACTIVE
-
-    def test_retire_action_to_promote_with_rollback(self) -> None:
-        """retire = promote(rollback=True) → RETIRED."""
-        result = dispatch_legacy_action("retire", name="plugin.x")
-        assert result.state_after is ArtifactState.RETIRED
-
-    def test_unknown_action_raises(self) -> None:
-        with pytest.raises(ValueError, match="unknown legacy action"):
-            dispatch_legacy_action("nonexistent_action")
-
-
-# ── V7 acceptance: stage / retire / publish as promote flag aliases ───
-
-
-class TestV7AcceptancePromoteAliases:
-    """V7 acceptance §5.2: stage / retire / publish 三个旧 face 通过 promote flags 实现。
-
-    验证：dispatch_legacy_action 的 3 个 action 都路由到 PROMOTE face，
-    state_after 与 flags 对应。
-    """
-
-    def test_stage_routes_to_promote(self) -> None:
-        result = dispatch_legacy_action("stage", name="plugin.x")
-        assert result.face is CreatorFace.PROMOTE
-
-    def test_retire_routes_to_promote_with_rollback(self) -> None:
-        result = dispatch_legacy_action("retire", name="plugin.x")
-        assert result.face is CreatorFace.PROMOTE
-        assert result.state_after is ArtifactState.RETIRED
-
-    def test_publish_routes_to_promote_with_release(self) -> None:
-        result = dispatch_legacy_action(
-            "publish", name="plugin.x", path="/tmp/plugin.py"  # noqa: S108, preset_id="x"
-        )
-        assert result.face is CreatorFace.PROMOTE
-        assert result.payload["target_scope"] == "release"
-
-    def test_all_three_aliases_share_promote_face(self) -> None:
-        """3 个旧 face (stage/retire/publish) 全部路由到 PROMOTE（PR-9 V7 acceptance）。"""
-        stage_result = dispatch_legacy_action("stage", name="plugin.x")
-        retire_result = dispatch_legacy_action("retire", name="plugin.x")
-        publish_result = dispatch_legacy_action(
-            "publish", name="plugin.x", path="/tmp/plugin.py"  # noqa: S108, preset_id="x"
-        )
-        assert stage_result.face is CreatorFace.PROMOTE
-        assert retire_result.face is CreatorFace.PROMOTE
-        assert publish_result.face is CreatorFace.PROMOTE
+class TestCreatorVocabularyClosure:
+    @pytest.mark.parametrize("old_action", ("mount", "unmount", "stage", "retire", "publish"))
+    def test_old_action_is_not_a_creator_face(self, old_action: str) -> None:
+        with pytest.raises(ValueError, match="unknown creator face"):
+            dispatch_creator_face(old_action)

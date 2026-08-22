@@ -38,7 +38,7 @@ plugins in one preset = multiple entries.
 | Plugin module path resolves on `sys.path` | boot loader | `ModuleNotFoundError` |
 | `plugin_meta` is non-empty dict | `CordisComposer.mount` (PR12) | `PluginMetaMissing` |
 | `plugin_meta.policy_class != "control"` | `build_default_invariant_checker` (§23.2) | `InvariantViolation` |
-| `caller_grant` ⊇ `plugin_meta.capabilities` | mount (C5) | `CapabilityGrantExceeded` |
+| `caller_grant` ⊇ `plugin_meta.capabilities` | promote (C5) | `CapabilityGrantExceeded` |
 | `plugin_meta.name` matches directory name | `sanitize_skill_id` / convention | `IllegalSkillId` (when treated as skill) |
 
 ## Generation vs hand-authoring
@@ -46,7 +46,7 @@ plugins in one preset = multiple entries.
 `PresetAuthoring.publish` is the only writer. Hand-authoring is allowed for
 fixtures and tests, but the publish flow always regenerates the YAML to
 match what is actually on disk — a hand-authored YAML will be overwritten
-on the next `cordis_control.publish`.
+on the next release `cordis_control.promote`.
 
 ## Reading path on disk
 
@@ -96,6 +96,6 @@ example (csv_stats computing mean / median / std for `monthly_total`).
 | Symptom | Cause | Fix |
 |---|---|---|
 | `ModuleNotFoundError: lca_agent_presets.<id>.plugins.<name>` | Preset root not on `sys.path` | Boot-time injection must include the preset root; check `lca/harness/profile/boot.py` |
-| Mount rejects with `PluginMetaMissing` | `plugin_meta` absent from `.py` | Add `plugin_meta = {...}` at module top |
+| Author rejects with `PluginMetaMissing` | `plugin_meta` absent from `.py` | Add `plugin_meta = {...}` at module top |
 | `IllegalSkillId` on skill-side | `preset_id` contains `..` or `/` | Strip to alphanumeric + dash/underscore/dot |
 | Bundle loads but no tools appear | `factory()` returned None or wrong type | Verify `factory()` returns an object with `name` attribute matching the manifest |

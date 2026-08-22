@@ -1,109 +1,54 @@
-"""L4 spawn — close AgentSpec / TeamSpec into live object graphs.
-
-ADR-0056 / ADR-0062 §5: bind per-agent spec from a booted capability scope
-only. No concrete service fallbacks. No ``Registries`` / ``defaults.py``.
-"""
+"""Plan-bound L4 composition root for Agent and Team runnables."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from cordis import Context
-
-    from lca.contracts.protocols.plan import CompiledRunPlan
-
-from lca.contracts.atoms.enums import (
-    ActionScope,
-    ComponentKind,
-    DecisionGateName,
-    MemoryLayer,
-)
-from lca.contracts.capabilities import (
-    BODIES,
-    BRAINS,
-    COMPONENT_REGISTRY,
-    HOOKS,
-    STOP_RULES,
-    STRATEGIES,
-)
+from lca.contracts.atoms.enums import ActionScope, ComponentKind, MemoryLayer
 from lca.contracts.mechanisms import consume
-from lca.contracts.mechanisms.capability import (
-    CapabilityKey,
-    MissingCapabilityError,
-    provider_current,
-    require_capability,
-)
-from lca.contracts.models.team.role_team import RoleProfile
+from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
 from lca.contracts.models.team.team_coordination import (
     Coordination,
     LeadMandate,
     gate_name_for_mandate,
 )
-from lca.contracts.protocols import (
-    AgentUnit,
-    Brain,
-    BudgetPolicy,
-    DecisionGate,
-    LLMAdapter,
-    MemorySystem,
-    ObservabilityBackend,
-    PerceiveHub,
-    SharedMemoryStore,
-    StateStore,
-    TeamAssembly,
-    TeamStage,
-    TeamUnit,
-)
-from lca.contracts.protocols.infra import AgentTransport, Tool
+from lca.contracts.protocols import BudgetPolicy, SharedMemoryStore, TeamUnit
+from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.protocols.spec import (
     DEFAULT_DELEGATE_MAX_ATTEMPTS,
     AgentSpec,
     Governance,
     LeadSpec,
     TeamSpec,
-    strategy_key_for_governance,
 )
-from lca.harness.observability import make_minimal_bound
-from lca.layer0_infra.observability import (
-    BoundObservability,
-    TeamTraceProfile,
-    team_id_for,
-)
-from lca.layer0_infra.observability.adapters import TelemetryLLMAdapter, TelemetryMemoryAdapter
-from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.reasoner import PromptReasoner
-from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
+from lca.layer0_infra.observability import BoundObservability
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
-from lca.layer3_agent.member_invoke import TransportMemberInvoker
 from lca.layer3_agent.team_handle import TeamHandle
 from lca.layer4_app.policies import LEAD_BUDGET_POLICY_KEY
 from lca.layer4_app.runtime_factory import RuntimeDeps, build_cognitive_runtime
-from lca.layer4_app.team_wiring import (
-    build_default_transport_registry,
-    build_team_transport,
+from lca.plugins.composer.plan_composition_support import (
+    AgentCompositionRequest,
+    _format_tools_xml,
+    _render_available_skills,
+    build_perceive_hub,
+    resolve_decision_gate,
+    team_trace_profile,
 )
 
-__all__ = [
-    "build_default_transport_registry",
-    "build_perceive_hub",
-    "build_team_transport",
-    "promote_lead",
-    "spawn_agent",
-    "spawn_lead",
-    "spawn_member",
-    "spawn_team",
-]
+if TYPE_CHECKING:
+    from cordis import Context
 
-T = TypeVar("T")
-_NEEDS_SKILLS = "skills"
+    from lca.contracts.protocols import DecisionGate
+    from lca.contracts.protocols.plan import CompiledRunPlan
 
 
-def _ensure_scope(scope: Context | None) -> Any:
+__all__ = ["promote_lead", "spawn_agent", "spawn_lead", "spawn_member", "spawn_team"]
+
+
+def _ensure_scope(scope: Context | None) -> Context:
     if scope is not None:
         if not callable(getattr(scope, "inject", None)):
             raise TypeError("spawn scope must be a booted cordis Context with inject()")
@@ -113,229 +58,12 @@ def _ensure_scope(scope: Context | None) -> Any:
     return get_or_create_default_ctx()
 
 
-def _scope_is_team(scope: object | None) -> bool:
-    if scope is None:
-        return False
-    value = getattr(scope, "value", None)
-    if value is not None:
-        return str(value).lower() in {"member", "lead", "team"}
-    marker = getattr(scope, "team_scope", None) or getattr(scope, "_team_scope", None)
-    if marker is None:
-        return False
-    return str(marker).lower() in {"lead", "member", "team"}
+def _compiled_plan_from_scope(scope: Context) -> CompiledRunPlan:
+    """Compile the resolved boot Profile into the only runnable input plan."""
 
-
-def _run_store_from_scope(scope: object | None) -> Any | None:
-    if scope is None:
-        return None
-    return getattr(scope, "run_store", None) or getattr(scope, "_run_store", None)
-
-
-def _require_factory(scope: object, key: str) -> Any:
-    return require_capability(scope, key)
-
-
-def _skill_store_from_scope(scope: object) -> Any:
-    store = provider_current(require_capability(scope, "skills"))
-    if store is None:
-        raise MissingCapabilityError("skills")
-    return store
-
-
-def _resolve_component(
-    reg: Any,
-    category: str,
-    value: object,
-    expected_type: type[T],
-) -> T:
-    result = reg.require(category, value)() if isinstance(value, str) else value
-    if not isinstance(result, expected_type):
-        raise TypeError(
-            f"{category} expected {expected_type.__name__}, got {type(result).__name__}"
-        )
-    return result
-
-
-def _unwrap_llm(llm: LLMAdapter) -> LLMAdapter:
-    if isinstance(llm, TelemetryLLMAdapter):
-        return llm._inner
-    return llm
-
-
-def _format_tools_xml(tools: Sequence[Tool]) -> str:
-    if not tools:
-        return "（无可用工具）"
-    lines = []
-    for tool in tools:
-        desc = tool.description or tool.name
-        lines.append(f'<tool name="{tool.name}">{desc}</tool>')
-    return "\n".join(lines)
-
-
-def promote_lead(lead: CognitiveAgent, policy: BudgetPolicy) -> CognitiveAgent:
-    limits = policy.resolve(lead)
-    return CognitiveAgent(
-        lead.runtime,
-        lead.role_profile,
-        lead.observability,
-        max_steps=limits.max_steps,
-        max_wall_clock_seconds=limits.max_wall_clock_seconds,
-    )
-
-
-def _instrument_llm(llm: LLMAdapter) -> LLMAdapter:
-    return TelemetryLLMAdapter(_unwrap_llm(llm))
-
-
-def _render_available_skills(scope: object) -> str:
-    store = _skill_store_from_scope(scope)
-    try:
-        installed = store.list_installed()
-    except Exception:
-        return "（技能库不可用）"
-    if not installed:
-        return "（本地无已安装 skill，用 search_skill 从 Market 搜索）"
-    lines: list[str] = []
-    for entry in installed:
-        suffix = f" (v{entry.version})" if entry.version else ""
-        summary = f" — {entry.summary}" if entry.summary else ""
-        lines.append(f"- {entry.skill_id}: {entry.name}{summary}{suffix}")
-    return "\n".join(lines)
-
-
-def _build_hooks(scope: object) -> Any:
-    return require_capability(scope, HOOKS.key).create("simple")
-
-
-def build_perceive_hub(
-    memory: MemorySystem,
-    *,
-    hub: object | None = None,
-    scope: object | None = None,
-    action_scope: ActionScope | None = None,
-) -> PerceiveHub:
-    """Assemble PerceiveHub from the perceive group service on *scope*."""
-    if scope is None or not callable(getattr(scope, "inject", None)):
-        raise MissingCapabilityError("perceive")
-    store_cls = _require_factory(scope, "journal_store")
-    store = getattr(hub, "_run_store", None) or _run_store_from_scope(scope) or store_cls()
-    team = _scope_is_team(action_scope) or _scope_is_team(scope)
-    service = require_capability(scope, "perceive")
-    skill_store = None
-    members = cast("Any", service).members(team=team)
-    if any(getattr(entry, "needs", None) == _NEEDS_SKILLS for entry in members):
-        skill_store = _skill_store_from_scope(scope)
-    return cast(
-        "PerceiveHub",
-        cast("Any", service).assemble(
-            memory,
-            store=store,
-            skill_store=skill_store,
-            team=team,
-        ),
-    )
-
-
-def _apply_lead_brain(brain: Brain, *, decision_gate: DecisionGate) -> Brain:
-    if not isinstance(brain, ModularBrain):
-        raise TypeError(f"lead composition requires ModularBrain (got {type(brain).__name__})")
-    return ModularBrain(
-        reasoner=brain.reasoner,
-        critic=brain.critic,
-        skill_router=brain.skill_router,
-        decision_gate=decision_gate,
-        agent_gates=brain.agent_gates,
-    )
-
-
-def _resolve_memory(
-    choice: str | MemorySystem,
-    shared_store: SharedMemoryStore | None,
-    memory_service: Any,
-) -> MemorySystem:
-    if shared_store is not None:
-        mem: MemorySystem = memory_service.create(shared_store=shared_store)
-    elif not isinstance(choice, str):
-        mem = choice
-    elif choice in memory_service.providers.names():
-        mem = memory_service.providers.get(choice)()
-    else:
-        raise MissingCapabilityError("memory")
-    return TelemetryMemoryAdapter(mem)
-
-
-def _resolve_state_store(choice: str | StateStore, service: Any) -> StateStore:
-    if not isinstance(choice, str):
-        return choice
-    if choice in cast("Any", service).providers.names():
-        return cast("StateStore", cast("Any", service).providers.get(choice)())
-    raise MissingCapabilityError("state_store")
-
-
-def _resolve_brain(
-    spec: AgentSpec,
-    profile: RoleProfile,
-    llm: LLMAdapter,
-    *,
-    scope: object,
-) -> Brain:
-    if not isinstance(spec.brain, str):
-        return spec.brain
-    brains = require_capability(scope, BRAINS.key)
-    try:
-        factory = brains.resolve(spec.brain)
-    except KeyError as exc:
-        raise ValueError(f"Unknown brain: {spec.brain!r}. Available: {brains.names()}") from exc
-    resolved: Brain = factory(
-        consume("llm", llm, PromptReasoner),
-        profile,
-        _format_tools_xml(spec.tools),
-        tools=list(spec.tools),
-        available_skills=_render_available_skills(scope),
-    )
-    return resolved
-
-
-def _resolve_decision_gate(
-    name: DecisionGateName,
-    *,
-    scope: object,
-) -> DecisionGate | None:
-    if name == DecisionGateName.NONE:
-        return None
-    if name == DecisionGateName.MUST_CONSULT_ALL:
-        gates = require_capability(scope, "gates")
-        result = gates.create("must-consult-all")
-    else:
-        components = require_capability(scope, COMPONENT_REGISTRY.key)
-        factory = components.require(ComponentKind.DECISION_GATE, name)
-        result = factory()
-    if not isinstance(result, DecisionGate):
-        raise TypeError(
-            f"decision_gate factory produced {type(result).__name__}, expected DecisionGate"
-        )
-    return result
-
-
-def _fork_transport(
-    parent: Any,
-    extra: AgentTransport | None,
-    scope: object,
-) -> Any:
-    factory = _require_factory(scope, "transport.compose_service")
-    child = factory()
-    for protocol in parent.list_protocols():
-        child.register(parent.resolve(protocol))
-    if extra is not None:
-        child.register(extra)
-    return child
-
-
-def _compiled_plan_from_scope(scope: object) -> CompiledRunPlan | None:
-    """Compile the booted profile into the immutable plan consumed by L4."""
     resolved = getattr(scope, "resolved_profile", None)
     if resolved is None:
-        return None
+        raise MissingCapabilityError("resolved_profile")
     from lca.harness.profile.plan_compiler import compile_plan
 
     return compile_plan(resolved)
@@ -345,10 +73,11 @@ def _agent_from_bound_graph(
     spec: AgentSpec,
     graph: object,
     *,
+    plan: CompiledRunPlan,
     plan_ref: str,
-    compiled_plan: CompiledRunPlan | None = None,
 ) -> CognitiveAgent:
-    """Construct a live agent only from a complete plan-bound graph."""
+    """Close a complete AgentGraph into a CognitiveAgent that interprets ``plan``."""
+
     required = (
         "brain",
         "body",
@@ -373,7 +102,7 @@ def _agent_from_bound_graph(
             state_store=consume("state_store", graph.state_store, CognitiveRuntime),
             perceive_hub=graph.perceive_hub,
             stop_rule=graph.stop_rule,
-            control_plan=compiled_plan.control if compiled_plan is not None else None,
+            control_plan=plan.control,
         )
     )
     return CognitiveAgent(
@@ -394,120 +123,35 @@ def spawn_agent(
     decision_gate: DecisionGate | None = None,
     shared_store: SharedMemoryStore | None = None,
     scope: Context | None = None,
-    compiled_plan: CompiledRunPlan | None = None,
-    use_bind_plan: bool = False,
 ) -> CognitiveAgent:
-    """Close one AgentSpec into a CognitiveAgent from a booted capability scope.
+    """Bind one AgentSpec to the booted Profile plan and return a live Agent."""
 
-    PR-5: 当 ``use_bind_plan=True`` 且 ``compiled_plan`` 提供时，路由到
-    ``bind_plan`` (PR-5 路径) — spawn 不再自己造对象图，4 个 sub-composer
-    plugin 通过 cordis Context 提供拼装策略。否则走 legacy 路径（保留 6
-    个月，PR-6 后删除）。
-    """
-    scope = _ensure_scope(scope)
-
-    # SOLO is the complete sub-composer path.  Team and lead assembly keep
-    # their dedicated contracts until TeamComposer can return a complete
-    # TeamGraph, rather than silently accepting an incomplete plan graph.
-    if (
-        action_scope is ActionScope.SOLO
-        and team_channel is None
-        and decision_gate is None
-        and shared_store is None
-    ):
-        selected_plan = compiled_plan or _compiled_plan_from_scope(scope)
-        if selected_plan is not None:
-            from lca.layer4_app.spawn_bind_plan import bind_plan, is_bind_plan_available
-
-            if is_bind_plan_available(scope):
-                bound = bind_plan(spec, selected_plan, scope=scope)
-                return _agent_from_bound_graph(
-                    spec,
-                    bound.graph,
-                    plan_ref=bound.plan_ref,
-                    compiled_plan=bound.plan,
-                )
-            if use_bind_plan:
-                import warnings
-
-                warnings.warn(
-                    "spawn_agent: plan binding requested but sub-composers are unavailable; "
-                    "falling back to the compatibility path",
-                    UserWarning,
-                    stacklevel=2,
-                )
-    profile = spec.profile
-    if isinstance(spec.observability, str):
-        # Boot 期 ``assemble_observability`` 已把 ``BoundObservability`` 挂到
-        # ctx.observability；spec.observability 字符串选择仅用于跨团队互操作，
-        # 当前未启用解析路径。Fallback 保留以应对 boot 未装该 seam 的极端场景。
-        try:
-            hub = require_capability(scope, "observability")
-        except MissingCapabilityError:
-            hub = make_minimal_bound()
-    elif isinstance(spec.observability, BoundObservability):
-        hub = spec.observability
-    else:
-        # Legacy path: instantiate from make_minimal_bound (lossy — backends come later)
-        hub = make_minimal_bound()
-    mem = _resolve_memory(
-        spec.memory, shared_store, require_capability(scope, CapabilityKey.MEMORY.value)
+    bound_scope = _ensure_scope(scope)
+    plan = _compiled_plan_from_scope(bound_scope)
+    request = AgentCompositionRequest(
+        spec=spec,
+        action_scope=action_scope,
+        team_channel=team_channel,
+        decision_gate=decision_gate,
+        shared_store=shared_store,
     )
-    state_store = _resolve_state_store(
-        spec.state_store, require_capability(scope, CapabilityKey.STATE_STORE.value)
-    )
+    from lca.layer4_app.spawn_bind_plan import bind_plan
 
-    require_capability(scope, CapabilityKey.LLM.value)
-    spec_llm = _instrument_llm(spec.llm)
+    bound = bind_plan(request, plan, scope=bound_scope)
+    return _agent_from_bound_graph(spec, bound.graph, plan=bound.plan, plan_ref=bound.plan_ref)
 
-    require_capability(scope, CapabilityKey.TOOLS.value)
-    tools_factory = _require_factory(scope, "tools.compose_service")
-    tool_registry = tools_factory()
-    for tool in spec.tools:
-        tool_registry.register(tool)
-    safe_executor_cls = _require_factory(scope, "safe_executor.simple")
-    safe_executor = safe_executor_cls(profile.tool_permission_manifest)
-    transport_registry = _fork_transport(
-        require_capability(scope, CapabilityKey.TRANSPORT.value), team_channel, scope
-    )
-    action_registry = build_default_action_registry(
-        tool_registry,
-        safe_executor,
-        transport_registry,
-        scope=action_scope,
-    )
 
-    brain = _resolve_brain(spec, profile, spec_llm, scope=scope)
-    if decision_gate is not None:
-        brain = _apply_lead_brain(brain, decision_gate=decision_gate)
+def promote_lead(lead: CognitiveAgent, policy: BudgetPolicy) -> CognitiveAgent:
+    """Apply the declared lead budget policy without changing the bound plan."""
 
-    body = require_capability(scope, BODIES.key).create(
-        "simple",
-        tool_registry=tool_registry,
-        safe_executor=safe_executor,
-        transport_registry=transport_registry,
-        action_registry=action_registry,
-    )
-    hooks = _build_hooks(scope)
-    perceive_hub = build_perceive_hub(mem, hub=hub, scope=scope, action_scope=action_scope)
-    stop_rule = require_capability(scope, STOP_RULES.key).create("default")
-    runtime = build_cognitive_runtime(
-        RuntimeDeps(
-            brain=brain,
-            body=body,
-            memory=consume("memory", mem, CognitiveRuntime),
-            hooks=hooks,
-            state_store=consume("state_store", state_store, CognitiveRuntime),
-            perceive_hub=perceive_hub,
-            stop_rule=stop_rule,
-        )
-    )
+    limits = policy.resolve(lead)
     return CognitiveAgent(
-        runtime,
-        profile,
-        hub,
-        max_steps=spec.max_steps,
-        max_wall_clock_seconds=spec.max_wall_clock_seconds,
+        lead.runtime,
+        lead.role_profile,
+        lead.observability,
+        max_steps=limits.max_steps,
+        max_wall_clock_seconds=limits.max_wall_clock_seconds,
+        plan_ref=lead.plan_ref,
     )
 
 
@@ -519,25 +163,22 @@ def spawn_lead(
     observability: BoundObservability | None = None,
     scope: Context | None = None,
 ) -> CognitiveAgent:
-    """Close a lead AgentSpec with mandate-specific decision gate."""
-    scope = _ensure_scope(scope)
+    """Bind a lead Agent through the same plan path as every other Agent."""
+
+    bound_scope = _ensure_scope(scope)
     lead_spec = replace(spec, observability=observability) if observability is not None else spec
-    gate = _resolve_decision_gate(gate_name_for_mandate(mandate), scope=scope)
-    composed = spawn_agent(
+    agent = spawn_agent(
         lead_spec,
         action_scope=ActionScope.LEAD,
         team_channel=transport,
-        decision_gate=gate,
-        scope=scope,
+        decision_gate=resolve_decision_gate(gate_name_for_mandate(mandate), scope=bound_scope),
+        scope=bound_scope,
     )
-    components = require_capability(scope, COMPONENT_REGISTRY.key)
-    policy = _resolve_component(
-        components,
-        ComponentKind.BUDGET_POLICY,
-        LEAD_BUDGET_POLICY_KEY,
-        BudgetPolicy,  # type: ignore[type-abstract]
-    )
-    return promote_lead(composed, policy)
+    components = require_capability(bound_scope, "component_registry")
+    policy = components.require(ComponentKind.BUDGET_POLICY, LEAD_BUDGET_POLICY_KEY)()
+    if not isinstance(policy, BudgetPolicy):
+        raise TypeError(f"lead budget policy must be BudgetPolicy, got {type(policy).__name__}")
+    return promote_lead(agent, policy)
 
 
 def spawn_member(
@@ -547,8 +188,9 @@ def spawn_member(
     observability: BoundObservability | None = None,
     scope: Context | None = None,
 ) -> CognitiveAgent:
-    """Close a team member AgentSpec."""
-    member_spec = replace(spec, observability=observability) if observability is not None else spec  # type: ignore[arg-type]
+    """Bind a member Agent through the plan path with its declared shared memory."""
+
+    member_spec = replace(spec, observability=observability) if observability is not None else spec
     return spawn_agent(
         member_spec,
         action_scope=ActionScope.MEMBER,
@@ -567,51 +209,6 @@ def _governance_from(lead: LeadSpec | None, coordination: Coordination | None) -
     raise ValueError("Team requires exactly one of lead= or coordination=")
 
 
-def _build_stage(members: tuple[CognitiveAgent, ...]) -> tuple[TeamStage, AgentTransport]:
-    roles = [member.role_profile.role for member in members]
-    if any(not role for role in roles):
-        raise ValueError("member role_profile.role is required for transport invoke")
-    if len(set(roles)) != len(roles):
-        raise ValueError(f"duplicate member roles in team: {sorted(roles)}")
-    transport = build_team_transport(list(members))
-    return TeamStage(members=members, invoker=TransportMemberInvoker(transport)), transport
-
-
-def _trace_profile(
-    strategy_key: str,
-    governance: Governance,
-    members: tuple[CognitiveAgent, ...],
-    lead: AgentUnit | None,
-) -> TeamTraceProfile:
-    mandate = governance.mandate.value if isinstance(governance, LeadSpec) else None
-    return TeamTraceProfile(
-        team_id=team_id_for(strategy_key),
-        strategy_key=strategy_key,
-        mandate=mandate,
-        lead_role=lead.role_profile.role if lead is not None else "",
-        member_roles=tuple(member.role_profile.role for member in members),
-    )
-
-
-def _resolve_team_observability(spec: TeamSpec) -> BoundObservability:
-    candidates: list[str | ObservabilityBackend | BoundObservability] = []
-    if spec.observability is not None:
-        candidates.append(spec.observability)
-    candidates.extend(member.observability for member in spec.members)
-    governance = spec.governance
-    if isinstance(governance, LeadSpec):
-        candidates.append(governance.agent.observability)
-    for choice in candidates:
-        if isinstance(choice, BoundObservability):
-            return choice
-        if isinstance(choice, str):
-            # Temporary shim: assemble_observability is the boot-time path; for
-            # runtime spec selection we wrap the legacy hub in an empty BoundObservability.
-            # TODO: replace with seam-driven bound resolution once boot seam provides it.
-            return make_minimal_bound()
-    return make_minimal_bound()
-
-
 def spawn_team(
     spec: TeamSpec | None = None,
     *,
@@ -623,15 +220,15 @@ def spawn_team(
     observability: str | BoundObservability | None = None,
     scope: Context | None = None,
 ) -> TeamUnit:
-    """Close a TeamSpec (or kwargs) into a TeamHandle."""
-    scope = _ensure_scope(scope)
+    """Bind one TeamSpec to the booted Profile plan and return a TeamHandle."""
+
+    bound_scope = _ensure_scope(scope)
     if spec is None:
         if members is None:
             raise ValueError("spawn_team requires spec= or members=")
-        governance = _governance_from(lead, coordination)
         spec = TeamSpec(
             members=tuple(members),
-            governance=governance,
+            governance=_governance_from(lead, coordination),
             shared_memory_layers=tuple(shared_memory_layers or ()),
             delegate_max_attempts=(
                 delegate_max_attempts
@@ -640,39 +237,15 @@ def spawn_team(
             ),
             observability=observability,
         )
-    shared_obs = _resolve_team_observability(spec)
-    shared_store: SharedMemoryStore | None = (
-        TeamSharedMemoryStore(list(spec.shared_memory_layers))
-        if spec.shared_memory_layers
-        else None
+    from lca.layer4_app.spawn_bind_plan import bind_team
+
+    bound = bind_team(spec, _compiled_plan_from_scope(bound_scope), scope=bound_scope)
+    graph = bound.graph
+    lead_agent = graph.metadata.get("lead")
+    return TeamHandle(
+        graph.strategy,
+        team_trace_profile(spec, graph),
+        graph.observability,
+        graph.members,
+        lead_agent,
     )
-    closed_members = tuple(
-        spawn_member(
-            member_spec,
-            shared_store=shared_store,
-            observability=shared_obs,
-            scope=scope,
-        )
-        for member_spec in spec.members
-    )
-    stage, transport = _build_stage(closed_members)
-    governance = spec.governance
-    closed_lead: CognitiveAgent | None = None
-    if isinstance(governance, LeadSpec):
-        closed_lead = spawn_lead(
-            governance.agent,
-            transport=transport,
-            mandate=governance.mandate,
-            observability=shared_obs,
-            scope=scope,
-        )
-    assembly = TeamAssembly(
-        governance=governance,
-        stage=stage,
-        lead=closed_lead,
-        delegate_max_attempts=spec.delegate_max_attempts,
-    )
-    strategy_key = strategy_key_for_governance(spec.governance)
-    strategy = require_capability(scope, STRATEGIES.key).create(strategy_key, assembly)
-    profile = _trace_profile(strategy_key, spec.governance, closed_members, assembly.lead)
-    return TeamHandle(strategy, profile, shared_obs, closed_members, assembly.lead)

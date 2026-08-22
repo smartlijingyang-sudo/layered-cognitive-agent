@@ -4,7 +4,7 @@ Plan step 3 —— preset reuse test：
 - 复用第 2 步落盘的 preset 目录，boot 一个新的 mock session；
 - **不调用任何 cordis_control** —— 直接走 preset bundle 的加载路径；
 - 断言新工具在 boot 后的 ToolRegistry / cordis Context 里已存在并能直接调用
-  （证明 preset 在 boot 阶段被自动挂入，而非依赖 cordis_control.mount）。
+  （证明 preset 在 boot 阶段被自动挂入，而非依赖 Creator control 调用）。
 
 Preset bundle 加载约定
 ----------------------
@@ -129,15 +129,15 @@ def _parse_bundle_entries(text: str) -> list[dict[str, Any]]:
 
 
 class TestPresetReuse:
-    """Boot 阶段自动挂入 preset —— 不调用 cordis_control.mount。"""
+    """Boot 阶段自动挂入 preset —— 不调用 Creator control。"""
 
     def test_preset_publish_then_reuse_in_new_session(self) -> None:
-        """Happy path：先用 cordis_control.mount 把 plugin 写到 preset，
+        """Happy path：先经 author、validate、release promote 发布 plugin，
         再开一个全新 session boot preset，断言 plugin 已挂入 Context。
         """
         from cordis import Context
 
-        # ── 阶段 1：creator session 用 cordis_control.mount 写 plugin 到 preset ──
+        # ── 阶段 1：Creator 四面流程发布 plugin 到 preset ──
         preset_root = SCRATCH / "preset_reuse"
         preset_root.mkdir(parents=True, exist_ok=True)
 
@@ -146,8 +146,9 @@ class TestPresetReuse:
             tool = build_cordis_control_tool(
                 composer=composer,
                 caller_grant=(
-                    "cordis_control.mount",
-                    "cordis_control.publish",
+                    "cordis_control.author",
+                    "cordis_control.validate",
+                    "cordis_control.promote",
                     "tool_fs.read",
                 ),
                 actor_role="cordis-creator",
@@ -159,10 +160,14 @@ class TestPresetReuse:
 
             import asyncio
 
+            assert asyncio.run(
+                tool.execute({"action": "author", "name": "json_keys", "path": str(plugin_path)})
+            ).success
+            assert asyncio.run(tool.execute({"action": "validate", "name": "json_keys"})).success
             r = asyncio.run(
-                tool.execute({"action": "mount", "name": "json_keys", "path": str(plugin_path)})
+                tool.execute({"action": "promote", "name": "json_keys", "target_scope": "release"})
             )
-            assert r.success, f"creator mount 失败：{r.error}"
+            assert r.success, f"creator promote 失败：{r.error}"
 
         # ── 阶段 2：全新 session，boot 加载 preset，不调用 cordis_control ──
         new_ctx = Context()
@@ -179,7 +184,7 @@ class TestPresetReuse:
             assert plugin_name == "json_keys"
             assert instance is not None
 
-            # 关键断言：新 session 不需要任何 cordis_control.mount 调用，
+            # 关键断言：新 session 不需要任何 Creator control 调用，
             # plugin 已经直接可用
             assert new_ctx.own_bindings.get("plugin:json_keys") is instance
 
@@ -204,8 +209,9 @@ class TestPresetReuse:
             tool = build_cordis_control_tool(
                 composer=composer,
                 caller_grant=(
-                    "cordis_control.mount",
-                    "cordis_control.publish",
+                    "cordis_control.author",
+                    "cordis_control.validate",
+                    "cordis_control.promote",
                     "tool_fs.read",
                 ),
                 actor_role="cordis-creator",
@@ -217,8 +223,14 @@ class TestPresetReuse:
 
             import asyncio
 
+            assert asyncio.run(
+                tool.execute({"action": "author", "name": "meta_plugin", "path": str(plugin_path)})
+            ).success
+            assert asyncio.run(tool.execute({"action": "validate", "name": "meta_plugin"})).success
             r = asyncio.run(
-                tool.execute({"action": "mount", "name": "meta_plugin", "path": str(plugin_path)})
+                tool.execute(
+                    {"action": "promote", "name": "meta_plugin", "target_scope": "release"}
+                )
             )
             assert r.success
 

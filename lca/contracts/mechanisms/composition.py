@@ -2,15 +2,16 @@
 
 设计哲学
 --------
-创造模式让 agent 通过普通 Tool 调用 ``cordis_control.mount/unmount`` 把自己
-写的 plugin 挂到当前 Context。Plugin-thinking 一以贯之：**Composer 自身也
-是 plugin**（Tier-1 seam + Tier-2 provider + Tier-3 behavior 三层），不是
-游离在 plugin 体系外的单例。
+创造模式让 agent 只能通过 ``cordis_control`` 的 ``author``、``validate`` 与
+``promote`` 四面生命周期驱动 plugin：Composer 的 mount/unmount 是 promote
+内部实现细节，不构成 Agent 可调用词表。Plugin-thinking 一以贯之：**Composer
+自身也是 plugin**（Tier-1 seam + Tier-2 provider + Tier-3 behavior 三层），
+不是游离在 plugin 体系外的单例。
 
 本模块落宪法 §13.3.1 五条硬约束（C3/C4/C5/PR12/§23.2）到协议层：
 
-- **C3 Journal 单一事实源** — mount/unmount/inspect/publish 全部走
-  ``JournalBackend.write``；本模块导出 ``ComposerErrorCode`` 让拒绝事件
+- **C3 Journal 单一事实源** — Creator 四面产生的 mount/unmount/inspect/
+  publish 事实全部走 ``JournalBackend.write``；本模块导出 ``ComposerErrorCode`` 让拒绝事件
   携带机器可读错误码。
 - **C4 不写 AgentState** — Composer 是群 Composition 唯一组装者；Sensor
   / Gate / Body 不得直接调用 mount。

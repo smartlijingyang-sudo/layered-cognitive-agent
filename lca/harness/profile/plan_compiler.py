@@ -9,12 +9,6 @@
    lifecycle / visibility / acl_grants / budget_ceiling
 4. 计算 ``plan_ref``（PR-3 plan_hash determinism property test 守护）
 
-LCA_PLAN_COMPAT 兼容开关：
-
-- ``LCA_PLAN_COMPAT=1`` 启用 compat 路径（保留旧 ResolvedProfile-only
-  消费方式）
-- 默认 off（PR-3）：所有 run 通过 PlanCompiler 编译
-
 PR-3 阶段：PlanCompiler **不修改** RuntimeKernel，只提供 ``plan_ref``
 作为 PR-6 plan_ref × Journal 绑定的基础。
 
@@ -25,8 +19,6 @@ Composer-per-Cluster；PlanCompiler 是纯函数（输入 ResolvedProfile →
 
 from __future__ import annotations
 
-import os
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -54,10 +46,6 @@ from lca.harness.profile.resolve import ResolvedProfile
 
 class PlanCompilerError(ValueError):
     """PlanCompiler 编译失败（profile 不合法 / 子 plan 投影失败）。"""
-
-
-# LCA_PLAN_COMPAT 兼容开关：保留 3 个 PR 后删除（PR-3 → PR-6 后）
-LCA_PLAN_COMPAT_ENV: str = "LCA_PLAN_COMPAT"
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,16 +125,6 @@ def compile_plan(
     )
 
 
-def is_plan_compat_enabled(env: Mapping[str, str] | None = None) -> bool:
-    """``LCA_PLAN_COMPAT=1`` 环境变量检查（兼容开关，PR-6 后删除）。
-
-    默认 off（PR-3 阶段）。当 on 时，spawn / boot 路径可不消费
-    CompiledRunPlan，保留旧 ResolvedProfile-only 路径 3 个 PR。
-    """
-    source = env if env is not None else os.environ
-    return source.get(LCA_PLAN_COMPAT_ENV) == "1"
-
-
 def explain_compile_plan(plan: CompiledRunPlan) -> dict[str, Any]:
     """``lca-ops plan inspect <profile>`` 的最小输出（PR-3）。"""
     return {
@@ -177,10 +155,8 @@ def explain_compile_plan(plan: CompiledRunPlan) -> dict[str, Any]:
 
 
 __all__ = [
-    "LCA_PLAN_COMPAT_ENV",
     "CompileOptions",
     "PlanCompilerError",
     "compile_plan",
     "explain_compile_plan",
-    "is_plan_compat_enabled",
 ]

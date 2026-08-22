@@ -8,7 +8,6 @@ Phase A scope: ``plugin.py``. Legacy ``PluginSpec`` adaptation lives in
 """
 
 from lca.contracts.harness.artifact import (
-    LEGACY_TO_NEW_STATE,
     ArtifactController,
     CapabilityArtifact,
     InvalidStateTransitionError,
@@ -18,7 +17,6 @@ from lca.contracts.harness.artifact import (
     legal_next_states,
     make_capability_artifact,
     migrate_artifact,
-    migrate_legacy_state,
     migrate_to_active,
     migrate_to_retired,
     migrate_to_verified,
@@ -45,7 +43,6 @@ from lca.contracts.harness.plugin_contract import (
 )
 
 __all__ = [
-    "LEGACY_TO_NEW_STATE",
     "AgentGraph",
     "ArchitectureContract",
     "ArtifactController",
@@ -69,7 +66,6 @@ __all__ = [
     "make_capability_artifact",
     "merge_agent_graphs",
     "migrate_artifact",
-    "migrate_legacy_state",
     "migrate_to_active",
     "migrate_to_retired",
     "migrate_to_verified",

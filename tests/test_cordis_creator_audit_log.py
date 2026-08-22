@@ -175,7 +175,7 @@ def _brief(stamped: StampedEvent) -> str:
 
 
 def _drive_creator_full_loop(preset_root: Path) -> tuple[MemoryJournal, list[dict[str, object]]]:
-    """跑一遍 inspect → mount → unmount 闭环并返回 journal + 审计序列。"""
+    """执行 inspect → author → validate → promote → rollback 并返回审计序列。"""
     from cordis import Context
 
     ctx = Context()
@@ -184,9 +184,9 @@ def _drive_creator_full_loop(preset_root: Path) -> tuple[MemoryJournal, list[dic
         composer=composer,
         caller_grant=(
             "cordis_control.inspect",
-            "cordis_control.mount",
-            "cordis_control.unmount",
-            "cordis_control.publish",
+            "cordis_control.author",
+            "cordis_control.validate",
+            "cordis_control.promote",
             "tool_fs.read",
         ),
         actor_role="cordis-creator",
@@ -201,14 +201,22 @@ def _drive_creator_full_loop(preset_root: Path) -> tuple[MemoryJournal, list[dic
         # Step 1：inspect
         r1 = asyncio.run(tool.execute({"action": "inspect"}))
         assert r1.success
-        # Step 2：mount
+        # Step 2：author
         r2 = asyncio.run(
-            tool.execute({"action": "mount", "name": "json_keys", "path": str(plugin_path)})
+            tool.execute({"action": "author", "name": "json_keys", "path": str(plugin_path)})
         )
         assert r2.success
-        # Step 3：unmount
-        r3 = asyncio.run(tool.execute({"action": "unmount", "name": "json_keys"}))
+        # Step 3：validate
+        r3 = asyncio.run(tool.execute({"action": "validate", "name": "json_keys"}))
         assert r3.success
+        # Step 4：release promote
+        r4 = asyncio.run(
+            tool.execute({"action": "promote", "name": "json_keys", "target_scope": "release"})
+        )
+        assert r4.success
+        # Step 5：rollback
+        r5 = asyncio.run(tool.execute({"action": "promote", "name": "json_keys", "rollback": True}))
+        assert r5.success
 
         sequence = linear_audit_sequence(journal.store.events)
         return journal, sequence
@@ -349,21 +357,23 @@ class TestCordisCreatorAuditLog:
             composer = _new_composer()
             tool = build_cordis_control_tool(
                 composer=composer,
-                caller_grant=("tool_fs.read",),  # 缺 publish
+                caller_grant=("tool_fs.read",),  # 缺 promote
                 actor_role="cordis-creator",
                 preset_root=preset_root,
             )
             plugin_path = preset_root / "high_cap.py"
             plugin_path.write_text(
-                _plugin_source("high_cap", capability="cordis_control.publish"),
+                _plugin_source("high_cap", capability="cordis_control.promote"),
                 encoding="utf-8",
             )
 
             import asyncio
 
-            r = asyncio.run(
-                tool.execute({"action": "mount", "name": "high_cap", "path": str(plugin_path)})
-            )
+            assert asyncio.run(
+                tool.execute({"action": "author", "name": "high_cap", "path": str(plugin_path)})
+            ).success
+            assert asyncio.run(tool.execute({"action": "validate", "name": "high_cap"})).success
+            r = asyncio.run(tool.execute({"action": "promote", "name": "high_cap"}))
             assert not r.success
 
             rejected_stamped = [
@@ -377,7 +387,7 @@ class TestCordisCreatorAuditLog:
             assert ev.reason_code == "CapabilityGrantExceeded"
             assert ev.plugin_meta_present is True
             assert "tool_fs.read" in ev.capability_grant
-            assert "cordis_control.publish" in ev.requested_capabilities
+            assert "cordis_control.promote" in ev.requested_capabilities
             # scope 字段存在（trace_id 由 ambient run_scope 盖章；测试不强制 mint）
             assert stamped.scope.run_id is not None  # 字段就位即可
             assert stamped.scope.agent_role == ""  # 未设置 ambient 时留空

@@ -39,11 +39,9 @@ from lca.contracts.protocols.scope_plan import (
     scope_plan_hash,
 )
 from lca.harness.profile.plan_compiler import (
-    LCA_PLAN_COMPAT_ENV,
     CompileOptions,
     compile_plan,
     explain_compile_plan,
-    is_plan_compat_enabled,
 )
 from lca.harness.profile.resolve import resolve_profile
 
@@ -295,7 +293,7 @@ class TestCompiledRunPlanToDict:
 class TestCompilePlan:
     def test_default_compile_web_standard(self) -> None:
         """PR-3 默认编译：web-standard.yaml → CompiledRunPlan with
-        3 sub-plans populated; LCA_PLAN_COMPAT off by default.
+        3 sub-plans populated.
         """
         resolved = resolve_profile("profiles/web-standard.yaml")
         plan = compile_plan(resolved)
@@ -340,23 +338,6 @@ class TestCompilePlan:
         plan1 = compile_plan(resolved, options=CompileOptions(task_id="t1"))
         plan2 = compile_plan(resolved, options=CompileOptions(task_id="t2"))
         assert compiled_run_plan_ref(plan1) != compiled_run_plan_ref(plan2)
-
-
-class TestIsPlanCompatEnabled:
-    def test_default_off(self) -> None:
-        """LCA_PLAN_COMPAT 默认 off（PR-3 阶段新路径启用）。"""
-        # Use empty env dict (not os.environ, which may have it set)
-        assert is_plan_compat_enabled({}) is False
-
-    def test_env_var_on(self) -> None:
-        assert is_plan_compat_enabled({LCA_PLAN_COMPAT_ENV: "1"}) is True
-
-    def test_env_var_off_explicit_zero(self) -> None:
-        assert is_plan_compat_enabled({LCA_PLAN_COMPAT_ENV: "0"}) is False
-
-    def test_env_var_other_value(self) -> None:
-        """Only ``=1`` enables compat; any other value = off."""
-        assert is_plan_compat_enabled({LCA_PLAN_COMPAT_ENV: "true"}) is False
 
 
 class TestExplainCompilePlan:

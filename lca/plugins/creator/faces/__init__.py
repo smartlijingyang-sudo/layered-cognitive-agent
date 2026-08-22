@@ -1,21 +1,4 @@
-"""Creator 4 faces (ADR-0074 §三 + PR-9 + acceptance §5.2 V7).
-
-Per tracker §PR-9 + ADR-0074 §三裁剪:
-
-| Old 7 Creator face | New 4 Creator face | Mapping |
-|---|---|---|
-| inspect | inspect | direct |
-| author | author | direct |
-| validate | validate | direct |
-| stage | promote (target_scope=experiment) | fold |
-| promote | promote | direct |
-| retire | promote (rollback=True) | fold |
-| publish | promote (target_scope=release) | fold |
-
-PR-9 阶段：4 face 数据面 + CordisControlTool 路由到 faces（向后兼容
-旧 7 action 字符串；6 个月删除期）。lca-ops creator --help 输出
-4 subcommand（PR-9 stage 2 落地）。
-"""
+"""Creator four-face vocabulary and result contracts."""
 
 from __future__ import annotations
 
@@ -46,8 +29,8 @@ class PromoteSpec:
     Attributes:
         target_scope: 目标 scope（release / profile / agent / run / turn /
             experiment / device）。``None`` = 默认 = run.
-        rollback: True → 反向迁移（ACTIVE → RETIRED）；False = 正向迁移。
-        preset_id: publish 模式（target_scope=release 时）preset 目录名。
+        rollback: True → ACTIVE 到 RETIRED；False = VERIFIED 到 ACTIVE。
+        preset_id: release promote 的 preset 目录名。
     """
 
     target_scope: str | None = None
@@ -89,9 +72,7 @@ def parse_creator_face(value: object) -> CreatorFace:
             raise ValueError(
                 f"unknown creator face {value!r}; valid: {[f.value for f in CreatorFace]}"
             ) from exc
-    raise TypeError(
-        f"creator face must be str or CreatorFace, got {type(value).__name__}"
-    )
+    raise TypeError(f"creator face must be str or CreatorFace, got {type(value).__name__}")
 
 
 def all_creator_faces() -> tuple[CreatorFace, ...]:

@@ -1,17 +1,11 @@
-"""Plan-driven L4 sub-composer provider.
-
-The provider exposes the four composition capabilities consumed by
-``spawn_bind_plan``.  They are ordinary profile plugins: their identity and
-availability are visible in the resolved capability graph rather than being
-implicit fallbacks in the L4 composition root.
-"""
+"""Profile-visible plan sub-composer provider."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.composer.legacy_sub_composers import (
+from lca.plugins.composer.plan_composers import (
     BodyComposer,
     BrainComposer,
     PerceiveComposer,
@@ -20,7 +14,7 @@ from lca.plugins.composer.legacy_sub_composers import (
 
 
 class Config(BaseModel):
-    """Strict configuration for the built-in sub-composer provider."""
+    """Strict configuration for the built-in plan composer provider."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -32,13 +26,14 @@ class Config(BaseModel):
     implements=["Composer"],
     layer="L4",
     effects="none",
-    description="Profile-visible sub-composers for CompiledRunPlan binding",
+    description="Plan-bound composers for agent and team graphs.",
     test_suite="tests/layer4_app/test_spawn_bind_plan.py",
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    """Provide the four stateless sub-composers to a booted profile scope."""
+    """Provide the complete set of plan composers to the booted Profile scope."""
 
+    del config
     ctx.provide("composer.brain", BrainComposer())
     ctx.provide("composer.body", BodyComposer())
     ctx.provide("composer.perceive", PerceiveComposer())
