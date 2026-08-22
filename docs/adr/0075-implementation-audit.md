@@ -43,3 +43,58 @@
 新增真实默认 Profile 端到端测试在运行前将旧 `_loop` 替换为失败函数，Agent 仍成功完成任务，证明默认 boot → compose → run 已经通过 `CompiledRunPlan` → `GraphAssembler` → `GenericPlanInterpreter` → `RuntimeEffectGateway` 的新架构路径。核心验收集已通过 82 项测试；Ruff、Mypy、`plugin check --strict`、`plan validate` 与 `audit declarative-boundaries` 均通过。
 
 旧 `_loop` 仍作为无 `CompiledRunPlan` 的历史直接构造测试适配路径保留；它不是默认 Profile 的可达路径。生产 Profile 通过显式六阶段 bindings 启动时，运行时不会执行该 fallback。
+
+## Task 5-8 最终验收（2026-08-22）
+
+Task 5-8 完成了 ADR-0075 的最后实施阶段：
+
+**Task 5: Control Contributions 接入**
+- `lca/plugins/control_contributions/` 包含 10 个真实控制插件（11 → 10）
+- 每个插件实现 `prepare`、`govern`、`transform`、`observe`、`finalize` 五角色之一
+- `tests/declarative/test_control_contributions.py` 验证所有贡献通过 `plugin check --strict`
+
+**Task 6: Legacy Runtime 完全移除**
+- 删除 `CognitiveRuntime._loop()`、`_checkpoint()`、`_finish_control_stop()` 和相关 control policy 方法
+- 删除 `lca/harness/command/dual_write.py` 及其测试
+- `plan_binding.py` 移除 v1 composer fallback，只接受 declarative plans
+- 删除 `tests/layer2_runtime/test_checkpoint_atomic.py` 和 `test_control_runtime_execution.py`
+- 新增 `tests/architecture/test_declarative_production_closure.py` 守护测试
+
+**Task 7: Effect Idempotency 和 Recovery Profile**
+- Step 1: 实现 `RuntimeIdempotencyStore` 于 `lca/layer2_runtime/declarative_runtime.py`
+  - `ClaimResult` dataclass 包含 status: `new` / `completed` / `in_progress`
+  - `RuntimeEffectGateway` 在执行 effect 前调用 `store.claim()`
+  - `completed` 返回已有 receipt；`in_progress` 抛 RT-003 错误
+  - 6 个 E2E 测试验证幂等性和 crash 恢复
+- Step 2: 创建 recovery profile 配置文件（设计文档）
+  - `profiles/web-standard-recovery.yaml` 扩展 web-standard
+  - `bundles/declarative-recovery.yaml` 声明 `reflect.main → think.main` recovery edge
+  - 注意：完整 recovery plugin 实现延迟到未来工作
+
+**Task 8: ADR 文档更新和架构门禁**
+- Step 1: 新增 `test_production_sources_do_not_reference_removed_runtime_modules()`
+  - 验证生产代码不导入已删除的 legacy modules
+  - 检查 `lca.layer2_runtime.control_policies` 和 `lca.harness.command.dual_write`
+- Step 3: 更新 ADR-0075 状态为 Accepted
+- 运行 `uv run pytest` 验证所有测试通过
+
+## 最终验收矩阵
+
+| 验证项 | 状态 | 证据 |
+|--------|------|------|
+| 单一 v2 运行计划 | ✅ | `CompiledRunPlan` 携带 PluginSpec、bindings、图、替换、effect policy |
+| 默认 Profile 显式六阶段 | ✅ | `bundles/declarative-phase-graph.yaml` + 6 个 PhaseExecutor |
+| 通用编译与解释 | ✅ | `PlanCompiler` + `GraphAssembler` + `GenericPlanInterpreter` |
+| 默认 Agent 装配接线 | ✅ | `DeclarativeRuntimeDriver` 为默认路径 |
+| 严格工具链 | ✅ | `plugin check --strict`、`plan compile`、`plan validate`、`audit` |
+| Effect Gateway 唯一入口 | ✅ | `RuntimeEffectGateway` 为唯一 body/memory 调用点 |
+| Journal 事实边界 | ✅ | `RuntimeJournalCommitter` 通过 observability facade |
+| 控制贡献执行 | ✅ | `GraphAssembler` 解析 contributions；解释器执行 govern |
+| Legacy Runtime 完全移除 | ✅ | `_loop`、`_checkpoint`、`control_policies` 已从生产代码删除 |
+| V1 Composer Fallback 移除 | ✅ | `plan_binding.py` 只接受 declarative plans |
+| Dual Write 移除 | ✅ | `lca/harness/command/dual_write.py` 及其测试已删除 |
+| Effect Idempotency | ✅ | `RuntimeIdempotencyStore` + `RuntimeEffectGateway` claim/complete |
+| Recovery Profile 配置 | ⚠️ | YAML 配置文件已创建；完整 plugin 实现延迟 |
+| 生产代码无 legacy 引用 | ✅ | `test_production_sources_do_not_reference_removed_runtime_modules()` |
+
+**结论**：ADR-0075 的核心目标已达成。默认生产路径完全由 `CompiledRunPlan` → `GraphAssembler` → `GenericPlanInterpreter` → `RuntimeEffectGateway` 驱动，legacy runtime 和 composer fallback 已完全移除，effect idempotency 已实现。Recovery profile 的完整 plugin 实现作为未来工作延迟。

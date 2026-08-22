@@ -144,6 +144,18 @@ CI 必须将以下规则作为架构门禁：
 | 图可解释 | `inspect-tree`、`graph`、`explain plan` 输出每个 binding、关系、替换赢家、scope、grant、顺序和 provenance |
 | 禁止双轨 | 旧 `meta` 回退、隐式 no-op、固定 composer 选择和 legacy control map 不存在于生产路径 |
 
+## 实施后果
+
+实现必须遵守 [`../specs/declarative-phase-graph-spec.md`](../specs/declarative-phase-graph-spec.md)。该规范定义 `PluginSpec`、`PhaseGraph`、PlanCompiler、通用解释器、协议、错误分类、CLI、迁移和验收测试。
+
+迁移的第一步是修复现有运行范围导入断裂并恢复聚焦测试收集；随后将现有 phase、gate、body、memory 和 stop 路径映射为 explicit PluginSpec。不得以新增平行的第三套 Manifest 或运行计划逃避现有 `CompiledRunPlan`，而应演进其 schema 版本。
+
+**实施状态（2026-08-22 完成）：**
+
+核心声明式路径已完全上线：`CompiledRunPlan` → `GraphAssembler` → `GenericPlanInterpreter` → `RuntimeEffectGateway` 为默认生产路径。Legacy runtime loop、control_policies engine、v1 composer fallback、dual-write 已从生产代码中移除（Tasks 1-6）。Effect idempotency 通过 `RuntimeIdempotencyStore` 实现 at-most-once 语义（Task 7）。Recovery profile 配置为设计文档（`profiles/web-standard-recovery.yaml`），完整 plugin 实现延迟。
+
+验收矩阵已通过 68+ 项测试；Ruff、Mypy、`plugin check --strict`、`plan validate` 与 `audit declarative-boundaries` 均通过。架构守护测试 `test_production_sources_do_not_reference_removed_runtime_modules()` 验证无 legacy 引用。详见 [`0075-implementation-audit.md`](0075-implementation-audit.md)。
+
 ## 后果
 
 此决策使系统的可变部分形成一个可读、可编译、可验证和可回放的架构语言。开发者应能仅通过 Profile 和 `CompiledRunPlan` 回答“启用了什么、依赖什么、在何时运行、能读什么、能写什么、能产生哪些效果、替换了谁、为何生效”。
