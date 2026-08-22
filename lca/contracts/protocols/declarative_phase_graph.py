@@ -13,7 +13,7 @@ from collections import defaultdict, deque
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import Any, Literal, Protocol, cast, runtime_checkable
 
 from lca.contracts.protocols.command_envelope import CommandEnvelope, RunDelta, RunFact
 
@@ -497,6 +497,20 @@ class PhaseRunCursor:
             (item_source, item_target): count
             for item_source, item_target, count in self.edge_counts
         }.get((source, target), 0)
+
+
+@dataclass(frozen=True, slots=True)
+class DeclarativeRunOutcome:
+    """解释器对可恢复终止的标准描述，不以异常充当控制流。"""
+
+    kind: Literal["completed", "paused", "failed", "effect_uncertain"]
+    cursor: PhaseRunCursor | None = None
+    stop: Any = None
+    error_fact: RunFact | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind in {"paused", "effect_uncertain"} and self.cursor is None:
+            raise DeclarativeValidationError("RT-004", f"{self.kind} outcome requires a cursor")
 
 
 @dataclass(frozen=True, slots=True)

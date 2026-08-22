@@ -6,14 +6,18 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from lca.contracts.atoms.enums import SnapshotReason
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.result import Result
+from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.protocols.command_envelope import CommandEnvelope, RunDelta, RunFact
 from lca.contracts.protocols.declarative_phase_graph import (
     DeclarativeValidationError,
     EffectGateway,
     EffectPolicyPlan,
     JournalCommitter,
+    PhaseInput,
+    PhaseRunCursor,
 )
 from lca.contracts.protocols.plan import CompiledRunPlan
 from lca.harness.declarative import (
@@ -95,7 +99,9 @@ class RuntimeEffectGateway(EffectGateway):
         metadata = envelope.metadata
         effect_class = str(metadata.get("effect_class", envelope.grant.effect_class))
         if effect_class not in policy.allowed_effects:
-            raise DeclarativeValidationError("PS-006", f"effect class is denied by plan: {effect_class}")
+            raise DeclarativeValidationError(
+                "PS-006", f"effect class is denied by plan: {effect_class}"
+            )
         if effect_class in policy.idempotency_required and not envelope.idempotency_key:
             raise DeclarativeValidationError("PS-006", "effect requires an idempotency key")
         if effect_class in policy.approval_required and not bool(metadata.get("approved", False)):
@@ -105,14 +111,18 @@ class RuntimeEffectGateway(EffectGateway):
             state = metadata.get("state")
             decision = metadata.get("decision")
             if state is None or decision is None:
-                raise DeclarativeValidationError("RT-002", "body effect lacks state or recorded Decision")
+                raise DeclarativeValidationError(
+                    "RT-002", "body effect lacks state or recorded Decision"
+                )
             return await self._capabilities.body.act(decision, state)
         if operation == "memory.update":
             state = metadata.get("state")
             observation = metadata.get("observation")
             reflection = metadata.get("reflection")
             if state is None or observation is None or reflection is None:
-                raise DeclarativeValidationError("RT-002", "memory effect lacks admitted WriteSet inputs")
+                raise DeclarativeValidationError(
+                    "RT-002", "memory effect lacks admitted WriteSet inputs"
+                )
             await self._capabilities.memory.update(state, observation, reflection)
             return {
                 "receipt": "memory.updated",
@@ -151,6 +161,15 @@ class ReducerDeltaAdapter:
         return state
 
 
+@dataclass(frozen=True, slots=True)
+class DeclarativeCheckpoint:
+    """由声明式 driver 产生的可恢复 checkpoint。"""
+
+    state_snapshot: StateSnapshot
+    cursor: PhaseRunCursor
+    plan_ref: str
+
+
 class DeclarativeRuntimeDriver:
     """运行已验证 PhaseGraph；业务阶段能力均由 plan binding 选择。"""
 
@@ -162,38 +181,124 @@ class DeclarativeRuntimeDriver:
         capabilities: RuntimePhaseCapabilities,
         reducer: Any,
         hooks: Any,
+        state_store: Any | None = None,
     ) -> None:
         self._plan = plan
         self._phase_executors = phase_executors
         self._capabilities = capabilities
         self._reducer = reducer
         self._hooks = hooks
+        self._state_store = state_store
 
     async def run(self, state: Any) -> Result:
+        interpretation = await self._interpret(state)
+        return await self._result_from_interpretation(interpretation)
+
+    async def resume(
+        self,
+        checkpoint: DeclarativeCheckpoint,
+        *,
+        input: object | None = None,
+    ) -> Result:
+        if checkpoint.plan_ref != self._plan_ref:
+            raise DeclarativeValidationError(
+                "RT-004", "checkpoint plan_ref differs from bound declarative plan"
+            )
+        if self._state_store is None:
+            raise DeclarativeValidationError("RT-004", "declarative resume requires a StateStore")
+        state = await self._state_store.load(checkpoint.state_snapshot.state_ref)
+        state = self._reducer.apply_resume(state, input, None)
+        interpretation = await self._interpret(
+            state,
+            cursor=checkpoint.cursor,
+            input=PhaseInput(artifact=input) if input is not None else None,
+        )
+        return await self._result_from_interpretation(interpretation)
+
+    @property
+    def _plan_ref(self) -> str:
+        from lca.contracts.protocols.plan import compiled_run_plan_ref
+
+        return compiled_run_plan_ref(self._plan)
+
+    async def _interpret(
+        self,
+        state: Any,
+        *,
+        cursor: PhaseRunCursor | None = None,
+        input: PhaseInput | None = None,
+    ) -> Any:
         executable = GraphAssembler().assemble(
             self._plan,
             MappingRestrictedScope(self._phase_executors),
         )
-        interpretation = await GenericPlanInterpreter(
+        return await GenericPlanInterpreter(
             journal=RuntimeJournalCommitter(),
             effect_gateway=RuntimeEffectGateway(self._capabilities),
             reducer=ReducerDeltaAdapter(self._reducer),
         ).run(
             executable,
             state=state,
+            input=input,
             budget=state.budget,
             capabilities=self._capabilities,
             artifacts={"task": state.task},
+            cursor=cursor,
         )
-        final_state = interpretation.state
-        await self._hooks.trigger("on_complete", final_state)
-        final_state = self._reducer.apply_artifact_closure(
-            final_state, synthesize_artifact_closure() or ""
+
+    async def _result_from_interpretation(self, interpretation: Any) -> Result:
+        state = interpretation.state
+        outcome = interpretation.outcome
+        if outcome is not None and outcome.kind in {"paused", "effect_uncertain"}:
+            checkpoint = await self._save_checkpoint(
+                state,
+                outcome.cursor,
+                SnapshotReason.PRE_APPROVAL
+                if outcome.kind == "paused"
+                else SnapshotReason.ON_ERROR,
+            )
+            state = self._reducer.apply_paused(state, checkpoint.state_snapshot.state_ref)
+            await self._hooks.trigger("on_pause", state)
+            result = Result.from_state(state)
+            result.extra.update(
+                {
+                    "declarative_checkpoint": checkpoint,
+                    "outcome": outcome.kind,
+                    "phase_cursor": outcome.cursor,
+                    "plan_ref": checkpoint.plan_ref,
+                }
+            )
+            return result
+        if outcome is not None and outcome.kind == "failed":
+            state = self._reducer.apply_error(state, RuntimeError("declarative run failed"))
+        await self._hooks.trigger("on_complete", state)
+        state = self._reducer.apply_artifact_closure(state, synthesize_artifact_closure() or "")
+        result = Result.from_state(state)
+        result.extra.update({"outcome": "completed", "plan_ref": self._plan_ref})
+        return result
+
+    async def _save_checkpoint(
+        self,
+        state: Any,
+        cursor: PhaseRunCursor | None,
+        reason: SnapshotReason,
+    ) -> DeclarativeCheckpoint:
+        if cursor is None:
+            raise DeclarativeValidationError("RT-004", "resumable outcome has no cursor")
+        if self._state_store is None:
+            raise DeclarativeValidationError("RT-004", "declarative pause requires a StateStore")
+        snapshot = state.snapshot(reason=reason)
+        reference = await self._state_store.save(state)
+        snapshot.state_ref = reference
+        return DeclarativeCheckpoint(
+            state_snapshot=snapshot,
+            cursor=cursor,
+            plan_ref=self._plan_ref,
         )
-        return Result.from_state(final_state)
 
 
 __all__ = [
+    "DeclarativeCheckpoint",
     "DeclarativeRuntimeDriver",
     "ReducerDeltaAdapter",
     "RuntimeEffectGateway",

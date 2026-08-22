@@ -107,3 +107,103 @@ async def test_resume_continues_at_saved_node_without_reexecuting_confirmed_effe
 
     assert resumed.terminal_node == "stop.main"
     assert gateway.calls == 1
+
+
+class _PauseContribution:
+    async def execute(self, _context, _input):
+        from lca.contracts.protocols.declarative_phase_graph import PhaseResult
+
+        return PhaseResult(
+            result_kind="policy",
+            payload={"verdict": "pause", "reason": "approval required"},
+        )
+
+
+@pytest.mark.asyncio
+async def test_govern_pause_returns_journal_backed_resumable_outcome() -> None:
+    from dataclasses import replace
+
+    from lca.contracts.protocols.declarative_phase_graph import (
+        ContributionRole,
+        PhaseContribution,
+        SemanticPhase,
+    )
+    from lca.harness.declarative import (
+        GenericPlanInterpreter,
+        GraphAssembler,
+        MappingRestrictedScope,
+    )
+    from lca.harness.profile.plan_compiler import compile_plan
+    from lca.harness.profile.resolve import resolve_profile
+
+    standard_plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
+    pause = PhaseContribution(
+        phase=SemanticPhase.THINK,
+        role=ContributionRole.GOVERN,
+        executor="control.pause.fixture",
+        output="control.pause",
+        aggregation="first-terminal",
+    )
+    plan = replace(
+        standard_plan,
+        phase_bindings=tuple(
+            replace(binding, contributions=(*binding.contributions, pause))
+            if binding.semantic_phase is SemanticPhase.THINK
+            else binding
+            for binding in standard_plan.phase_bindings
+        ),
+    )
+    executable = GraphAssembler().assemble(
+        plan,
+        MappingRestrictedScope(
+            {
+                **{
+                    f"phase.{phase.value}.standard": _PhaseExecutor(phase)
+                    for phase in SemanticPhase
+                },
+                "control.pause.fixture": _PauseContribution(),
+            }
+        ),
+    )
+    result = await GenericPlanInterpreter().run(executable, state={})
+
+    assert result.outcome is not None
+    assert result.outcome.kind == "paused"
+    assert result.cursor is not None
+    assert any(fact.kind == "run.paused" for fact in result.facts)
+
+
+class _UncertainGateway:
+    async def execute(self, _envelope, _policy):
+        from lca.contracts.protocols.declarative_phase_graph import DeclarativeValidationError
+
+        raise DeclarativeValidationError("RT-003", "effect receipt cannot be confirmed")
+
+
+@pytest.mark.asyncio
+async def test_unconfirmed_effect_receipt_returns_effect_uncertain_outcome() -> None:
+    from lca.contracts.protocols.declarative_phase_graph import SemanticPhase
+    from lca.harness.declarative import (
+        GenericPlanInterpreter,
+        GraphAssembler,
+        MappingRestrictedScope,
+    )
+    from lca.harness.profile.plan_compiler import compile_plan
+    from lca.harness.profile.resolve import resolve_profile
+
+    plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
+    executable = GraphAssembler().assemble(
+        plan,
+        MappingRestrictedScope(
+            {f"phase.{phase.value}.standard": _PhaseExecutor(phase) for phase in SemanticPhase}
+        ),
+    )
+
+    result = await GenericPlanInterpreter(effect_gateway=_UncertainGateway()).run(
+        executable, state={}
+    )
+
+    assert result.outcome is not None
+    assert result.outcome.kind == "effect_uncertain"
+    assert result.cursor is not None
+    assert any(fact.kind == "run.effect_uncertain" for fact in result.facts)

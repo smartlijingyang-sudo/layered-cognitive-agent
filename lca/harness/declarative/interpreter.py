@@ -10,6 +10,7 @@ from typing import Any
 from lca.contracts.protocols.command_envelope import RunDelta, RunFact
 from lca.contracts.protocols.declarative_phase_graph import (
     ContributionRole,
+    DeclarativeRunOutcome,
     DeclarativeValidationError,
     EffectGateway,
     JournalCommitter,
@@ -85,6 +86,7 @@ class InterpretationResult:
     facts: tuple[RunFact, ...]
     terminal_node: str | None
     cursor: PhaseRunCursor | None = None
+    outcome: DeclarativeRunOutcome | None = None
 
 
 class GenericPlanInterpreter:
@@ -173,7 +175,7 @@ class GenericPlanInterpreter:
                     "RT-002", f"executor returned non-PhaseResult: {node.id}"
                 )
             self._validate_result(node.semantic_phase, result)
-            result = await self._apply_post_contributions(
+            result, terminal_govern = await self._apply_post_contributions(
                 executable_node,
                 context,
                 result,
@@ -196,6 +198,51 @@ class GenericPlanInterpreter:
                 facts.append(fact)
             for evidence_ref in result.evidence_refs:
                 self._journal.commit_evidence(evidence_ref, plan_ref=plan_ref, node_ref=node.id)
+            if terminal_govern is not None:
+                deltas = (*result.deltas, *context.proposed_deltas)
+                for delta in deltas:
+                    current_state = self._apply_delta(current_state, delta)
+                effective_payload = result.payload
+                artifact_map["result"] = result
+                artifact_map["payload"] = effective_payload
+                artifact_map[node.semantic_phase.value] = effective_payload
+                outcome_fact = RunFact(
+                    fact_id=f"{plan_ref}:{node.id}:{visit_counts[node.id]}:{terminal_govern}",
+                    plan_ref=plan_ref,
+                    kind=f"run.{terminal_govern}",
+                    payload={
+                        "node": node.id,
+                        "reason": str(result.next_hints.get("govern_reason", "")),
+                    },
+                )
+                self._journal.commit_fact(outcome_fact, plan_ref=plan_ref, node_ref=node.id)
+                facts.append(outcome_fact)
+                paused_cursor = self._cursor(
+                    plan_ref=plan_ref,
+                    node_id=node.id,
+                    visit_counts=visit_counts,
+                    edge_counts=edge_counts,
+                    artifacts=artifact_map,
+                    causation_refs=result.evidence_refs,
+                    budget=budget,
+                )
+                outcome = DeclarativeRunOutcome(
+                    kind=terminal_govern,
+                    cursor=paused_cursor,
+                    error_fact=outcome_fact,
+                )
+                return InterpretationResult(
+                    state=current_state,
+                    artifact=effective_payload,
+                    visits=(
+                        *visits,
+                        PhaseVisit(node.id, node.semantic_phase, result.result_kind, None),
+                    ),
+                    facts=tuple(facts),
+                    terminal_node=None,
+                    cursor=paused_cursor,
+                    outcome=outcome,
+                )
             effect_receipt = None
             if result.command_envelope is not None:
                 if self._effect_gateway is None:
@@ -210,9 +257,51 @@ class GenericPlanInterpreter:
                     raise DeclarativeValidationError(
                         "RT-003", "CommandEnvelope plan_ref does not match run plan"
                     )
-                effect_receipt = await self._effect_gateway.execute(
-                    result.command_envelope, plan.effect_policy
-                )
+                try:
+                    effect_receipt = await self._effect_gateway.execute(
+                        result.command_envelope, plan.effect_policy
+                    )
+                except DeclarativeValidationError as exc:
+                    if exc.code != "RT-003":
+                        raise
+                    effective_payload = result.payload
+                    artifact_map["result"] = result
+                    artifact_map["payload"] = effective_payload
+                    artifact_map[node.semantic_phase.value] = effective_payload
+                    uncertainty_fact = RunFact(
+                        fact_id=f"{plan_ref}:{node.id}:{visit_counts[node.id]}:effect_uncertain",
+                        plan_ref=plan_ref,
+                        kind="run.effect_uncertain",
+                        payload={"node": node.id, "error": str(exc)},
+                    )
+                    self._journal.commit_fact(uncertainty_fact, plan_ref=plan_ref, node_ref=node.id)
+                    facts.append(uncertainty_fact)
+                    uncertain_cursor = self._cursor(
+                        plan_ref=plan_ref,
+                        node_id=node.id,
+                        visit_counts=visit_counts,
+                        edge_counts=edge_counts,
+                        artifacts=artifact_map,
+                        causation_refs=result.evidence_refs,
+                        budget=budget,
+                    )
+                    outcome = DeclarativeRunOutcome(
+                        kind="effect_uncertain",
+                        cursor=uncertain_cursor,
+                        error_fact=uncertainty_fact,
+                    )
+                    return InterpretationResult(
+                        state=current_state,
+                        artifact=effective_payload,
+                        visits=(
+                            *visits,
+                            PhaseVisit(node.id, node.semantic_phase, result.result_kind, None),
+                        ),
+                        facts=tuple(facts),
+                        terminal_node=None,
+                        cursor=uncertain_cursor,
+                        outcome=outcome,
+                    )
                 self._journal.commit_observation(
                     effect_receipt, plan_ref=plan_ref, node_ref=node.id
                 )
@@ -364,8 +453,9 @@ class GenericPlanInterpreter:
         executable_node: Any,
         context: RestrictedPhaseContext,
         result: PhaseResult,
-    ) -> PhaseResult:
+    ) -> tuple[PhaseResult, str | None]:
         combined = result
+        terminal_govern: str | None = None
         for contribution in executable_node.contributions:
             role = contribution.declaration.role
             if role is ContributionRole.PREPARE:
@@ -375,11 +465,26 @@ class GenericPlanInterpreter:
                 PhaseInput(artifact=combined.payload, causation_refs=combined.evidence_refs),
             )
             self._require_contribution_result(contribution.declaration.executor, outcome)
-            if role is ContributionRole.GOVERN and not _verdict_allows(outcome.payload):
-                raise DeclarativeValidationError(
-                    "RT-002",
-                    f"govern contribution denied phase execution: {contribution.declaration.executor}",
-                )
+            if role is ContributionRole.GOVERN:
+                verdict = _govern_terminal_kind(outcome.payload)
+                if verdict is not None:
+                    terminal_govern = verdict
+                    combined = replace(
+                        combined,
+                        facts=(*combined.facts, *outcome.facts),
+                        deltas=(*combined.deltas, *outcome.deltas),
+                        evidence_refs=(*combined.evidence_refs, *outcome.evidence_refs),
+                        next_hints={
+                            **dict(combined.next_hints),
+                            "govern_reason": _verdict_reason(outcome.payload),
+                        },
+                    )
+                    break
+                if not _verdict_allows(outcome.payload):
+                    raise DeclarativeValidationError(
+                        "RT-002",
+                        f"govern contribution denied phase execution: {contribution.declaration.executor}",
+                    )
             if (
                 role in {ContributionRole.TRANSFORM, ContributionRole.FINALIZE}
                 and outcome.payload is not None
@@ -396,7 +501,7 @@ class GenericPlanInterpreter:
                 deltas=(*combined.deltas, *outcome.deltas),
                 evidence_refs=(*combined.evidence_refs, *outcome.evidence_refs),
             )
-        return combined
+        return combined, terminal_govern
 
     @staticmethod
     def _require_contribution_result(capability: str, outcome: Any) -> None:
@@ -451,6 +556,23 @@ class GenericPlanInterpreter:
             if _evaluate_predicate(edge.when, result=result, artifacts=artifacts):
                 return edge
         return None
+
+
+def _govern_terminal_kind(payload: Any) -> str | None:
+    if not isinstance(payload, Mapping):
+        return None
+    verdict = str(payload.get("verdict", "")).lower()
+    if verdict in {"pause", "paused", "defer"}:
+        return "paused"
+    if verdict in {"effect_uncertain", "uncertain"}:
+        return "effect_uncertain"
+    return None
+
+
+def _verdict_reason(payload: Any) -> str:
+    if isinstance(payload, Mapping):
+        return str(payload.get("reason", payload.get("detail", "")))
+    return ""
 
 
 def _verdict_allows(payload: Any) -> bool:
