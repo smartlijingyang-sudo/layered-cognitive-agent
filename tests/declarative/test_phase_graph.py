@@ -81,14 +81,28 @@ def test_validator_rejects_unbounded_reentry(standard_plan) -> None:
 
 @pytest.mark.asyncio
 async def test_generic_interpreter_runs_only_from_phase_bindings(standard_plan) -> None:
-    capabilities = {
-        f"phase.{phase.value}.standard": StandardPhaseExecutor(phase)
-        for phase in SemanticPhase
-    }
+    capabilities = _capabilities_for(standard_plan)
     executable = GraphAssembler().assemble(standard_plan, MappingRestrictedScope(capabilities))
     result = await GenericPlanInterpreter().run(executable, state={"immutable": True})
     assert [visit.semantic_phase for visit in result.visits] == list(SemanticPhase)
     assert result.terminal_node == "stop.main"
+
+
+class _AllowContribution:
+    async def execute(self, _context, _input: PhaseInput) -> PhaseResult:
+        return PhaseResult(result_kind="control", payload={"verdict": "allow"})
+
+
+def _capabilities_for(plan):
+    capabilities = {
+        f"phase.{phase.value}.standard": StandardPhaseExecutor(phase)
+        for phase in SemanticPhase
+    }
+    allow = _AllowContribution()
+    for binding in plan.phase_bindings:
+        for contribution in binding.contributions:
+            capabilities[contribution.executor] = allow
+    return capabilities
 
 
 class _PrepareContribution:
@@ -123,10 +137,7 @@ async def test_prepare_contribution_is_resolved_and_executed(standard_plan) -> N
         for binding in standard_plan.phase_bindings
     )
     plan = replace(standard_plan, phase_bindings=bindings)
-    capabilities = {
-        f"phase.{phase.value}.standard": StandardPhaseExecutor(phase)
-        for phase in SemanticPhase
-    }
+    capabilities = _capabilities_for(plan)
     capabilities["contribution.prepare.fixture"] = prepare
     executable = GraphAssembler().assemble(plan, MappingRestrictedScope(capabilities))
 

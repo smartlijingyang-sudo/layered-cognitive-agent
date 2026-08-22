@@ -20,7 +20,11 @@ class ObserveCheckpointExecutor:
                     plugin_id="control.executor.observe-checkpoint",
                 ),
             )
-        reason = context.checkpoint_reason.value if context.checkpoint_reason else "periodic"
+        reason = (
+            getattr(context.checkpoint_reason, "value", str(context.checkpoint_reason))
+            if context.checkpoint_reason
+            else "periodic"
+        )
         return PhaseResult(
             result_kind="control",
             payload=ControlVerdict(

@@ -55,25 +55,15 @@ class RecoveryReflectExecutor:
         base_executor = StandardPhaseExecutor(SemanticPhase.REFLECT)
         base_result = await base_executor.execute(context, input)
 
-        # Augment payload with admit_recovery flag
-        base_payload = base_result.payload
-        if isinstance(base_payload, Mapping):
-            augmented_payload = {**base_payload, "admit_recovery": is_failure}
-        elif base_payload is not None:
-            augmented_payload = {
-                "reflection": base_payload,
-                "admit_recovery": is_failure,
-            }
-        else:
-            augmented_payload = {"admit_recovery": is_failure}
-
+        # Recovery is edge-routing metadata, not a replacement for the
+        # typed Reflection contract consumed by remember/stop policies.
         return PhaseResult(
             result_kind=base_result.result_kind,
             facts=base_result.facts,
             deltas=base_result.deltas,
             evidence_refs=base_result.evidence_refs,
-            next_hints=base_result.next_hints,
-            payload=augmented_payload,
+            next_hints={**dict(base_result.next_hints), "admit_recovery": is_failure},
+            payload=base_result.payload,
             command_envelope=base_result.command_envelope,
         )
 

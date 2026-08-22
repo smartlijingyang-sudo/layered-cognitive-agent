@@ -225,6 +225,53 @@ def _resolve_layer_kind(
     return layer, PluginKind(kind) if not isinstance(kind, PluginKind) else kind
 
 
+def _native_spec_from_declaration(
+    *, plugin_id: str, config_cls: type[Any] | None, provides: tuple[str, ...],
+    requires: tuple[str, ...], layer: str, kind: PluginKind,
+    effects: frozenset[EffectClass], test_suite: str, functional_group: Any,
+    module: str,
+) -> Any:
+    """Create the baseline typed spec at plugin declaration time.
+
+    Explicit ``spec=`` remains authoritative.  The baseline uses only typed
+    decorator arguments, so PlanCompiler no longer owns a compatibility
+    projection or a second architecture source of truth.
+    """
+    from lca.contracts.protocols.declarative_phase_graph import (
+        CapabilityDeclaration,
+        EvidenceDeclaration,
+        LifecycleDeclaration,
+        OwnershipDeclaration,
+        PluginConfiguration,
+        PluginImplementation,
+        PluginSpec,
+        PluginSpecKind,
+        VerificationDeclaration,
+    )
+    kind_map = {
+        PluginKind.SEAM: PluginSpecKind.SEAM, PluginKind.PROVIDER: PluginSpecKind.PROVIDER,
+        PluginKind.PRIMITIVE: PluginSpecKind.PROVIDER, PluginKind.COMPOSITE: PluginSpecKind.COMPOSITE,
+        PluginKind.DRIVER: PluginSpecKind.DRIVER, PluginKind.BRIDGE: PluginSpecKind.PROVIDER,
+    }
+    spec_kind = kind_map[kind]
+    effect_values = tuple(sorted(item.value for item in effects)) or ("none",)
+    if spec_kind is PluginSpecKind.SEAM and any(item != "none" for item in effect_values):
+        spec_kind = PluginSpecKind.PROVIDER
+    config_name = f"{config_cls.__module__}.{config_cls.__name__}" if config_cls else "builtins.dict"
+    return PluginSpec(
+        api_version="lca/plugin-spec/v1", id=plugin_id, revision="1.0.0", kind=spec_kind,
+        layer=layer, functional_group=(functional_group.value if functional_group else f"declared-{layer.lower()}"),
+        implementation=PluginImplementation(module=module, setup="setup"),
+        configuration=PluginConfiguration(schema=config_name),
+        provides=tuple(CapabilityDeclaration(key=key, cardinality="many", protocol="object") for key in provides),
+        requires=tuple(CapabilityDeclaration(key=key, cardinality="optional", protocol="object") for key in requires),
+        effects=effect_values, ownership=OwnershipDeclaration(state_mutation="forbidden"),
+        lifecycle=LifecycleDeclaration(scopes=("profile", "run"), activation="true", disposal="required"),
+        relations=(), evidence=EvidenceDeclaration(emits=("RuntimeObserved",), replay="required"),
+        verification=VerificationDeclaration(test_suite=test_suite or "tests", properties=("typed_plugin_spec",)),
+    )
+
+
 def plugin(
     setup: PluginSetupFn | None = None,
     *,
@@ -329,7 +376,12 @@ def plugin(
                 functional_group=fg,
                 logic_address=logic_address,
                 contract=contract,
-                spec=spec,
+                spec=spec or _native_spec_from_declaration(
+                    plugin_id=id, config_cls=config_cls, provides=provide_keys,
+                    requires=require_keys, layer=resolved_layer, kind=resolved_kind,
+                    effects=effect_set, test_suite=suite, functional_group=fg,
+                    module=fn.__module__,
+                ),
             ),
         )
         return cordis_plugin

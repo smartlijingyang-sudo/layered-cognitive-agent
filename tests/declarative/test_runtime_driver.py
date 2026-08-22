@@ -9,7 +9,7 @@ from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.stop import StopDecision, StopReason
-from lca.contracts.protocols.declarative_phase_graph import SemanticPhase
+from lca.contracts.protocols.declarative_phase_graph import PhaseInput, PhaseResult, SemanticPhase
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
@@ -63,6 +63,11 @@ class _PerceiveHub:
         return ContextManifest(items=())
 
 
+class _AllowContribution:
+    async def execute(self, _context, _input: PhaseInput) -> PhaseResult:
+        return PhaseResult(result_kind="control", payload={"verdict": "allow"})
+
+
 class _Stop:
     def decide(self, _state, _decision, _observation, _reflection) -> StopDecision:
         return StopDecision(
@@ -78,6 +83,14 @@ async def test_cognitive_runtime_executes_compiled_phase_graph() -> None:
     plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
     body = _Body()
     memory = _Memory()
+    phase_executors = {
+        f"phase.{phase.value}.standard": StandardPhaseExecutor(phase)
+        for phase in SemanticPhase
+    }
+    allow = _AllowContribution()
+    for binding in plan.phase_bindings:
+        for contribution in binding.contributions:
+            phase_executors[contribution.executor] = allow
     runtime = CognitiveRuntime(
         brain=_Brain(),
         body=body,
@@ -87,10 +100,7 @@ async def test_cognitive_runtime_executes_compiled_phase_graph() -> None:
         stop_rule=_Stop(),
         perceive_hub=_PerceiveHub(),
         compiled_plan=plan,
-        phase_executors={
-            f"phase.{phase.value}.standard": StandardPhaseExecutor(phase)
-            for phase in SemanticPhase
-        },
+        phase_executors=phase_executors,
     )
 
     result = await runtime.run("declarative runtime", max_steps=1)

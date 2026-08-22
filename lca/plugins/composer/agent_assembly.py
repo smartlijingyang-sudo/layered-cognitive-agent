@@ -197,14 +197,26 @@ def _agent_from_bound_graph(
 
 
 def _phase_executor_bindings(plan: CompiledRunPlan, scope: Context) -> dict[str, object]:
-    """Resolve exactly the phase executor capabilities declared by the plan."""
+    """Resolve only executor and contribution capabilities declared by ``plan``.
+
+    The GraphAssembler receives no ambient Cordis scope.  Every phase executor
+    and every control/observer contribution is therefore selected from the
+    immutable plan before interpretation begins.
+    """
 
     inject = getattr(scope, "inject", None)
     if not callable(inject):
         raise MissingCapabilityError("phase executor binding requires a booted Context")
+    capabilities = {
+        capability
+        for phase_binding in plan.phase_bindings
+        for capability in (
+            phase_binding.executor_capability,
+            *(contribution.executor for contribution in phase_binding.contributions),
+        )
+    }
     bindings: dict[str, object] = {}
-    for phase_binding in plan.phase_bindings:
-        capability = phase_binding.executor_capability
+    for capability in sorted(capabilities):
         try:
             bindings[capability] = inject(capability)
         except (KeyError, LookupError) as exc:

@@ -3,8 +3,8 @@
 #
 # Recovery flow:
 # 1. Phase fails (e.g., tool call returns error)
-# 2. Reflect phase detects failure and sets result.admit_recovery = True
-# 3. Edge reflect.main → think.main is taken (when: result.admit_recovery)
+# 2. Reflect phase detects failure and sets result.next_hints.admit_recovery = True
+# 3. Edge reflect.main → think.main is taken (when: result.next_hints.admit_recovery)
 # 4. Think phase retries with adjusted strategy
 # 5. LoopGuard limits to 1 recovery iteration (maxIterations: 1)
 #
@@ -18,7 +18,7 @@ entries:
     config:
       source: reflect.main
       target: think.main
-      when: result.admit_recovery
+      when: result.next_hints.admit_recovery
       loop:
         maxIterations: 1
         budget: run.steps

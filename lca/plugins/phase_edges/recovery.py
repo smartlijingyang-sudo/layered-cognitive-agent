@@ -15,10 +15,10 @@ from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugi
 
 class RecoveryEdgeConfig(BaseModel):
     """Configuration for recovery phase edge."""
-    
+
     source: str = "reflect.main"
     target: str = "think.main"
-    when: str = "result.admit_recovery"
+    when: str = "result.next_hints.admit_recovery"
     max_iterations: int = 1
     budget: str = "run.steps"
 
@@ -34,7 +34,7 @@ class RecoveryEdgeConfig(BaseModel):
 )
 async def setup(ctx: PluginContext, config: RecoveryEdgeConfig) -> None:
     """Provide recovery edge configuration.
-    
+
     The edge is declarative and will be picked up by the compiler
     to add to the phase graph.
     """
@@ -48,7 +48,7 @@ async def setup(ctx: PluginContext, config: RecoveryEdgeConfig) -> None:
             "loop": {
                 "max_iterations": config.max_iterations,
                 "budget": config.budget,
-                "terminal_predicate": "not result.admit_recovery",
+                "terminal_predicate": "not result.next_hints.admit_recovery",
             },
         },
     )

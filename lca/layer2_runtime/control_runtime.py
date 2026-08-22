@@ -228,7 +228,7 @@ def control_facts(
     facts: dict[str, Any] = {
         "task": state.task,
         "state.step": state.step,
-        "state.status": state.status.value,
+        "state.status": getattr(state.status, "value", str(state.status)),
         "state.agent_role": state.agent_role,
         "state.wall_clock": budget.max_wall_clock_seconds,
         "state.budget.max_steps": budget.max_steps,

@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
+from lca.contracts.models.core.result import ApprovalPendingError
 from lca.contracts.protocols.command_envelope import RunDelta, RunFact
 from lca.contracts.protocols.declarative_phase_graph import (
     ContributionRole,
@@ -21,7 +22,6 @@ from lca.contracts.protocols.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.contracts.protocols.plan import compiled_run_plan_ref
-from lca.contracts.models.core.result import ApprovalPendingError
 from lca.harness.declarative.assembler import ExecutablePlan
 
 
@@ -48,8 +48,12 @@ class InMemoryJournalCommitter(JournalCommitter):
 
 @dataclass(slots=True)
 class RestrictedPhaseContext(PhaseContext):
-    """MTK 创建的最小阶段上下文；不持有可透传的 live scope。"""
+    """MTK 创建的最小阶段上下文；不持有可透传的 live scope。
 
+    ``decision``、``observation`` 与 ``reflection`` 是当前阶段的只读
+    投影，专供显式 control contribution 使用；它们不是可变 runtime
+    object graph，也不会越过 ``artifacts``/Journal 的证据边界。
+    """
     plan_ref: str
     node_ref: str
     state: Any
@@ -58,7 +62,12 @@ class RestrictedPhaseContext(PhaseContext):
     artifacts: Mapping[str, Any]
     capabilities: Any
     tracing: Any = None
+    decision: Any = None
+    observation: Any = None
+    reflection: Any = None
+    checkpoint_reason: str | None = None
     _proposed_deltas: list[RunDelta] = field(default_factory=list)
+
 
     def emit_fact(self, fact: RunFact) -> str:
         return str(self.journal.commit_fact(fact, plan_ref=self.plan_ref, node_ref=self.node_ref))
@@ -143,7 +152,7 @@ class GenericPlanInterpreter:
         if not plan.phase_graph:
             raise DeclarativeValidationError("PG-001", "plan has no phase graph")
         plan.validation_report.require_valid()
-        
+
         # Validate cursor belongs to this plan
         expected_plan_ref = compiled_run_plan_ref(plan)
         if cursor.plan_ref != expected_plan_ref:
@@ -151,7 +160,7 @@ class GenericPlanInterpreter:
                 "PG-008",
                 f"cursor plan_ref {cursor.plan_ref!r} does not match executable plan {expected_plan_ref!r}",
             )
-        
+
         return await self._drive(
             executable,
             state=state,
@@ -181,14 +190,12 @@ class GenericPlanInterpreter:
         plan.validation_report.require_valid()
         graph = plan.phase_graph
         node_by_id = {node.id: node for node in graph.nodes}
-        
+
         # Resume from cursor or start from entry
         if resume_cursor is not None:
             current_id = resume_cursor.node_id
             visit_counts: dict[str, int] = dict(resume_cursor.visit_counts)
-            edge_counts: dict[tuple[str, str], int] = dict(
-                (k, v) for k, v in resume_cursor.edge_counts
-            )
+            edge_counts: dict[tuple[str, str], int] = dict(resume_cursor.edge_counts)
             artifact_map = dict(resume_cursor.artifacts)
             current_input = input or PhaseInput(
                 artifact=artifact_map.get("payload"),
@@ -200,7 +207,7 @@ class GenericPlanInterpreter:
             edge_counts = {}
             artifact_map = dict(artifacts or {})
             current_input = input or PhaseInput()
-        
+
         current_state = state
         facts: list[RunFact] = []
         visits: list[PhaseVisit] = []
@@ -289,6 +296,7 @@ class GenericPlanInterpreter:
                 for evidence_ref in result.evidence_refs:
                     self._journal.commit_evidence(evidence_ref, plan_ref=plan_ref, node_ref=node.id)
                 effect_receipt = None
+                effect_output = None
                 if result.command_envelope is not None:
                     if self._effect_gateway is None:
                         raise DeclarativeValidationError("PG-003", "effectful result has no EffectGateway")
@@ -297,12 +305,21 @@ class GenericPlanInterpreter:
                     if result.command_envelope.plan_ref != plan_ref:
                         raise DeclarativeValidationError("RT-003", "CommandEnvelope plan_ref does not match run plan")
                     effect_receipt = await self._effect_gateway.execute(result.command_envelope, plan.effect_policy)
+                    # Gateways return a receipt-shaped mapping for idempotency and
+                    # audit.  The next phase must consume the handler's domain
+                    # output (for example an Observation), never the receipt
+                    # envelope itself.
+                    effect_output = (
+                        effect_receipt.get("result", effect_receipt)
+                        if isinstance(effect_receipt, Mapping)
+                        else effect_receipt
+                    )
                     self._journal.commit_observation(effect_receipt, plan_ref=plan_ref, node_ref=node.id)
-                    artifact_map["observation"] = effect_receipt
+                    artifact_map["observation"] = effect_output
                 deltas = (*result.deltas, *context.proposed_deltas)
                 for delta in deltas:
                     current_state = self._apply_delta(current_state, delta)
-                effective_payload = result.payload if result.payload is not None else effect_receipt
+                effective_payload = result.payload if result.payload is not None else effect_output
                 artifact_map["result"] = result
                 artifact_map["payload"] = effective_payload
                 artifact_map[node.semantic_phase.value] = effective_payload
@@ -312,7 +329,7 @@ class GenericPlanInterpreter:
                     outcome = DeclarativeRunOutcome(
                         kind="completed",
                         cursor=cursor,
-                        stop=_build_stop_decision(should_stop=True),
+                        stop=_terminal_stop_decision(should_stop=True),
                         error_fact=None,
                     )
                     return InterpretationResult(
@@ -348,7 +365,7 @@ class GenericPlanInterpreter:
             outcome = DeclarativeRunOutcome(
                 kind="paused",
                 cursor=cursor,
-                stop=_build_stop_decision(should_stop=False),
+                stop=_terminal_stop_decision(should_stop=False),
                 error_fact=error_fact,
             )
             return InterpretationResult(
@@ -374,7 +391,7 @@ class GenericPlanInterpreter:
             outcome = DeclarativeRunOutcome(
                 kind="failed",
                 cursor=cursor,
-                stop=_build_stop_decision(should_stop=True),
+                stop=_terminal_stop_decision(should_stop=True),
                 error_fact=error_fact,
             )
             return InterpretationResult(
@@ -400,7 +417,7 @@ class GenericPlanInterpreter:
             outcome = DeclarativeRunOutcome(
                 kind="failed",
                 cursor=cursor,
-                stop=_build_stop_decision(should_stop=True),
+                stop=_terminal_stop_decision(should_stop=True),
                 error_fact=error_fact,
             )
             return InterpretationResult(
@@ -441,7 +458,7 @@ class GenericPlanInterpreter:
         node_id: str,
     ) -> tuple[PhaseResult, DeclarativeRunOutcome | None]:
         """Apply post-execution contributions and handle govern verdicts.
-        
+
         Returns:
             Tuple of (updated_result, outcome_if_terminal)
         """
@@ -450,8 +467,27 @@ class GenericPlanInterpreter:
             role = contribution.declaration.role
             if role is ContributionRole.PREPARE:
                 continue
-            outcome = await contribution.executor.execute(
+            contribution_context = replace(
                 context,
+                decision=(
+                    combined.payload
+                    if executable_node.node_id.startswith("think.")
+                    else context.artifacts.get("think")
+                ),
+                observation=(
+                    combined.payload
+                    if executable_node.node_id.startswith("act.")
+                    else context.artifacts.get("act")
+                ),
+                reflection=(
+                    combined.payload
+                    if executable_node.node_id.startswith("reflect.")
+                    else context.artifacts.get("reflect")
+                ),
+                checkpoint_reason=f"phase:{executable_node.node_id}",
+            )
+            outcome = await contribution.executor.execute(
+                contribution_context,
                 PhaseInput(artifact=combined.payload, causation_refs=combined.evidence_refs),
             )
             self._require_contribution_result(contribution.declaration.executor, outcome)
@@ -469,13 +505,13 @@ class GenericPlanInterpreter:
                         },
                     )
                     self._journal.commit_fact(deny_fact, plan_ref=plan_ref, node_ref=node_id)
-                    
+
                     # Build cursor and outcome
                     cursor = PhaseRunCursor(
                         plan_ref=plan_ref,
                         node_id=node_id,
-                        visit_counts=tuple(sorted(context.visit_counts.items())),
-                        edge_counts=tuple(((k[0], k[1]), v) for k, v in context.edge_counts.items()),
+                        visit_counts=(),
+                        edge_counts=(),
                         artifacts=dict(context.artifacts),
                         causation_refs=combined.evidence_refs,
                         budget_snapshot={"step": context.state.step},
@@ -483,7 +519,7 @@ class GenericPlanInterpreter:
                     fail_outcome = DeclarativeRunOutcome(
                         kind="failed",
                         cursor=cursor,
-                        stop=_build_stop_decision(should_stop=True),
+                        stop=_terminal_stop_decision(should_stop=True),
                         error_fact=deny_fact,
                     )
                     return combined, fail_outcome
@@ -499,13 +535,13 @@ class GenericPlanInterpreter:
                         },
                     )
                     self._journal.commit_fact(pause_fact, plan_ref=plan_ref, node_ref=node_id)
-                    
+
                     # Build cursor and outcome
                     cursor = PhaseRunCursor(
                         plan_ref=plan_ref,
                         node_id=node_id,
-                        visit_counts=tuple(sorted(context.visit_counts.items())),
-                        edge_counts=tuple(((k[0], k[1]), v) for k, v in context.edge_counts.items()),
+                        visit_counts=(),
+                        edge_counts=(),
                         artifacts=dict(context.artifacts),
                         causation_refs=combined.evidence_refs,
                         budget_snapshot={"step": context.state.step},
@@ -513,7 +549,7 @@ class GenericPlanInterpreter:
                     pause_outcome = DeclarativeRunOutcome(
                         kind="paused",
                         cursor=cursor,
-                        stop=_build_stop_decision(should_stop=False),
+                        stop=_terminal_stop_decision(should_stop=False),
                         error_fact=pause_fact,
                     )
                     return combined, pause_outcome
@@ -524,7 +560,7 @@ class GenericPlanInterpreter:
                             combined,
                             payload=outcome.payload,
                         )
-            
+
             # Handle other contribution roles
             if role in {ContributionRole.TRANSFORM, ContributionRole.FINALIZE} and outcome.payload is not None:
                 combined = replace(
@@ -588,11 +624,11 @@ class GenericPlanInterpreter:
 
 def _classify_verdict(payload: Any) -> Literal["allow", "deny", "rewrite", "pause", "stop", "defer"]:
     """Classify a control verdict from contribution payload.
-    
+
     Returns one of: allow, deny, rewrite, pause, stop, defer.
     """
     from lca.layer2_runtime.control_runtime import ControlVerdict, ControlVerdictKind
-    
+
     if isinstance(payload, ControlVerdict):
         kind_map = {
             ControlVerdictKind.ALLOW: "allow",
@@ -603,7 +639,7 @@ def _classify_verdict(payload: Any) -> Literal["allow", "deny", "rewrite", "paus
             ControlVerdictKind.REWRITE: "rewrite",
         }
         return kind_map.get(payload.kind, "allow")
-    
+
     # Fallback for dict payloads
     if isinstance(payload, Mapping):
         verdict = payload.get("verdict")
@@ -623,9 +659,20 @@ def _classify_verdict(payload: Any) -> Literal["allow", "deny", "rewrite", "paus
                 return "defer"
         if "allowed" in payload:
             return "allow" if bool(payload["allowed"]) else "deny"
-    
+
     # Default to allow for backward compatibility
     return "allow"
+
+
+def _terminal_stop_decision(*, should_stop: bool) -> Any:
+    """Build the protocol-level stop marker for control-originated outcomes."""
+    from lca.contracts.models.core.stop import StopDecision, StopReason
+
+    return StopDecision(
+        should_stop=should_stop,
+        reason=StopReason.TASK_COMPLETED if should_stop else StopReason.CONTINUE,
+        final_output=None,
+    )
 
 
 def _terminal_result(result: PhaseResult) -> bool:

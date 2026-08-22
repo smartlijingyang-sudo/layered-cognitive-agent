@@ -3,16 +3,11 @@
 from __future__ import annotations
 
 from lca.contracts.protocols.declarative_phase_graph import (
-    CapabilityBinding,
     CapabilityDeclaration,
-    CognitivePhaseGraphPlan,
     EvidenceDeclaration,
     LifecycleDeclaration,
-    LoopGuard,
     OwnershipDeclaration,
     PhaseBinding,
-    PhaseEdge,
-    PhaseNode,
     PluginConfiguration,
     PluginImplementation,
     PluginSpec,
@@ -20,7 +15,7 @@ from lca.contracts.protocols.declarative_phase_graph import (
     SemanticPhase,
     VerificationDeclaration,
 )
-from lca.harness.declarative.compiler import _compile_phase_graph, _compile_phase_edges_from_specs
+from lca.harness.declarative.compiler import _compile_phase_edges_from_specs, _compile_phase_graph
 
 
 def _make_recovery_spec() -> PluginSpec:
@@ -92,7 +87,7 @@ def test_recovery_edge_from_spec() -> None:
     )
 
     edges = _compile_phase_edges_from_specs((spec,), {b.semantic_phase: b for b in bindings})
-    
+
     assert len(edges) == 1
     edge = edges[0]
     assert edge.source == "reflect.main"
@@ -118,10 +113,11 @@ def test_phase_graph_includes_recovery_edge() -> None:
     )
 
     graph = _compile_phase_graph(bindings, (recovery_spec,))
-    
-    # Should have standard linear edges + stop->perceive loop + recovery edge
-    assert len(graph.edges) == 7  # 5 linear + 1 loop + 1 recovery
-    
+
+    # Compiler must not add a hidden standard topology.  With only this
+    # provider selected, the graph contains only its declared recovery edge.
+    assert len(graph.edges) == 1
+
     # Find recovery edge
     recovery_edges = [e for e in graph.edges if e.source == "reflect.main" and e.target == "think.main"]
     assert len(recovery_edges) == 1
@@ -134,7 +130,7 @@ def test_no_edge_without_phase_edge_capability() -> None:
         ContributionRole,
         PhaseContribution,
     )
-    
+
     spec = PluginSpec(
         api_version="lca/plugin-spec/v1",
         id="phase.reflect.standard",
@@ -256,7 +252,7 @@ def test_recovery_edge_without_loop_guard() -> None:
     )
 
     edges = _compile_phase_edges_from_specs((spec,), {b.semantic_phase: b for b in bindings})
-    
+
     assert len(edges) == 1
     edge = edges[0]
     assert edge.source == "think.main"

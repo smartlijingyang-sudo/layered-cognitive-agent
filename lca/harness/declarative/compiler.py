@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from lca.contracts.protocols.declarative_phase_graph import (
@@ -116,7 +116,10 @@ def _spec_from_resolved(item: ResolvedPlugin) -> PluginSpec:
     if isinstance(declared, PluginSpec):
         if declared.id != item.id:
             raise ValueError(f"PS-001: PluginSpec id {declared.id!r} != profile id {item.id!r}")
-        return declared
+        # Profile/Bundle configuration is part of the immutable plan fact.
+        # Native specs declare the schema; the selected profile supplies values.
+        values = {**dict(declared.configuration.values), **_config_values(item.config)}
+        return replace(declared, configuration=replace(declared.configuration, values=values))
     return _project_definition_to_spec(item, definition)
 
 
@@ -306,33 +309,9 @@ def _compile_phase_graph(
         )
         for binding in bindings
     )
-    linear = (
-        (SemanticPhase.PERCEIVE, SemanticPhase.THINK),
-        (SemanticPhase.THINK, SemanticPhase.ACT),
-        (SemanticPhase.ACT, SemanticPhase.REFLECT),
-        (SemanticPhase.REFLECT, SemanticPhase.REMEMBER),
-        (SemanticPhase.REMEMBER, SemanticPhase.STOP),
-    )
-    edges = [
-        PhaseEdge(source=node_by_phase[source].node_id, target=node_by_phase[target].node_id, when="true")
-        for source, target in linear
-        if source in node_by_phase and target in node_by_phase
-    ]
-    if SemanticPhase.STOP in node_by_phase and SemanticPhase.PERCEIVE in node_by_phase:
-        edges.append(
-            PhaseEdge(
-                source=node_by_phase[SemanticPhase.STOP].node_id,
-                target=node_by_phase[SemanticPhase.PERCEIVE].node_id,
-                when="not result.payload.should_stop",
-                loop=LoopGuard(
-                    max_iterations=8,
-                    budget="run.steps",
-                    terminal_predicate="result.payload.should_stop",
-                ),
-            )
-        )
-    # Add recovery and other declarative edges from plugins
-    edges.extend(_compile_phase_edges_from_specs(specs, node_by_phase))
+    # Topology is selected by Profile/Bundle edge providers.  The compiler
+    # never supplies a business default order or loop on behalf of a profile.
+    edges = _compile_phase_edges_from_specs(specs, node_by_phase)
     entry = node_by_phase.get(SemanticPhase.PERCEIVE)
     return CognitivePhaseGraphPlan(
         entry=entry.node_id if entry else "perceive.main",
@@ -355,42 +334,71 @@ def _compile_phase_edges_from_specs(
         # Check if this spec provides a phase edge capability
         if not any(cap.key.startswith("phase.edge.") for cap in spec.provides):
             continue
-        # Extract edge configuration from plugin values
+        # A provider may declare one edge or an ordered edge list.  Both are
+        # pure plan data; no compiler-owned topology is appended.
         edge_config = spec.configuration.values
         if not edge_config:
             continue
-        source = str(edge_config.get("source", ""))
-        target = str(edge_config.get("target", ""))
-        when = str(edge_config.get("when", "true"))
-        if not source or not target:
+        declarations = edge_config.get("edges", (edge_config,))
+        if not isinstance(declarations, (list, tuple)):
             continue
-        # Parse loop guard if present
-        loop_config = edge_config.get("loop")
-        loop_guard = None
-        if isinstance(loop_config, dict):
-            loop_guard = LoopGuard(
-                max_iterations=int(loop_config.get("max_iterations", 1)),
-                budget=str(loop_config.get("budget", "run.steps")),
-                terminal_predicate=str(loop_config.get("terminal_predicate", "false")),
-            )
-        edges.append(PhaseEdge(source=source, target=target, when=when, loop=loop_guard))
+        for declaration in declarations:
+            if not isinstance(declaration, dict):
+                continue
+            source = str(declaration.get("source", ""))
+            target = str(declaration.get("target", ""))
+            when = str(declaration.get("when", "true")).lower()
+            if not source or not target:
+                continue
+            loop_config = declaration.get("loop")
+            loop_guard = None
+            if isinstance(loop_config, dict):
+                loop_guard = LoopGuard(
+                    max_iterations=int(loop_config.get("max_iterations", 1)),
+                    budget=str(loop_config.get("budget", "run.steps")),
+                    terminal_predicate=str(loop_config.get("terminal_predicate", "false")),
+                )
+            edges.append(PhaseEdge(source=source, target=target, when=when, loop=loop_guard))
     return edges
 
 
 def _compile_control_entries(bindings: tuple[PhaseBinding, ...]) -> tuple[ControlEntry, ...]:
+    """Project every declared control contribution into the executable plan.
+
+    Govern contributions own blocking verdicts.  Cross-cutting observe
+    contributions are explicit entries as well, preventing an implicit hook
+    path for ``observe.checkpoint`` and ``observe.*``.
+    """
     entries: list[ControlEntry] = []
+    seen: set[tuple[SemanticPhase, str]] = set()
     for binding in bindings:
         for contribution in binding.contributions:
-            if contribution.role is ContributionRole.GOVERN:
-                entries.append(
-                    ControlEntry(
-                        phase=binding.semantic_phase,
-                        executor_capability=contribution.executor,
-                        predicate="true",
-                        aggregation=contribution.aggregation or "deny-on-any-deny",
-                        evidence_required=True,
-                    )
+            is_control = (
+                contribution.role is ContributionRole.GOVERN
+                or contribution.output.startswith("observe.")
+            )
+            if not is_control:
+                continue
+            key = (binding.semantic_phase, contribution.executor)
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append(
+                ControlEntry(
+                    phase=binding.semantic_phase,
+                    executor_capability=contribution.executor,
+                    predicate="true",
+                    aggregation=(
+                        contribution.aggregation
+                        or (
+                            "deny-on-any-deny"
+                            if contribution.role is ContributionRole.GOVERN
+                            else "all-allow"
+                        )
+                    ),
+                    evidence_required=True,
                 )
+            )
     return tuple(entries)
 
 

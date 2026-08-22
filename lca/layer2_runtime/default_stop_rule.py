@@ -38,9 +38,9 @@ class DefaultStopRule(StopRule):
     ) -> StopDecision:
         outcome = self._outcome_policy.resolve(state, decision, act_result, reflection)
 
-        if state.budget.exceeded():
-            return self._on_budget_exceeded(act_result, state)
-
+        # A response completed on the final permitted turn is a successful
+        # outcome, not a budget failure.  Checking the outcome first also
+        # preserves the terminal text for a one-step declarative profile.
         if outcome.should_stop:
             final_output = outcome.final_output if isinstance(outcome.final_output, str) else None
             return StopDecision(
@@ -49,6 +49,9 @@ class DefaultStopRule(StopRule):
                 final_output=final_output,
                 status=coerce_status(outcome.status) or TaskStatus.COMPLETED,
             )
+
+        if state.budget.exceeded():
+            return self._on_budget_exceeded(act_result, state)
 
         return StopDecision()
 

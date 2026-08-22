@@ -8,7 +8,6 @@ from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.protocols.declarative_phase_graph import PhaseInput, PhaseResult
 from lca.layer2_runtime.control_runtime import ControlVerdict, ControlVerdictKind
 
-
 _GATE_CONTRIBUTIONS = {
     "gate.repeat-tool-call": "RepeatToolCallGate",
     "gate.tool-loop-breaker": "ToolLoopBreakerGate",
