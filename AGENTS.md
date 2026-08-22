@@ -223,6 +223,66 @@ GIT_SSH_COMMAND='ssh -F /dev/null -i ~/.ssh/id_ed25519_github' git push origin m
 
 遇到 `non-fast-forward` / `divergent branches` 时优先 `--rebase` 保持线性历史，避免 `merge` 提交。
 
+#### Commit 信息规范（Conventional Commits）
+
+所有 commit 必须遵循 [Conventional Commits](https://www.conventionalcommits.org/) 格式：
+
+**格式**：
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**类型（type）**：
+- `feat`: 新功能
+- `fix`: 修复 bug
+- `docs`: 文档变更（README、ADR、规范等）
+- `refactor`: 重构（不改变功能）
+- `test`: 添加/修改测试
+- `chore`: 构建/工具变更（不影响代码）
+- `style`: 格式调整（不影响代码逻辑）
+- `perf`: 性能优化
+
+**作用域（scope）**：可选，标注影响的模块或 ADR，如 `adr-075`、`compiler`、`reflect`
+
+**主题（subject）**：
+- 不超过 50 字符
+- 使用祈使语气（"add" 而非 "added"）
+- 首字母小写，末尾不加句号
+- 简洁明确，避免冗余
+
+**正文（body）**：
+- 每行不超过 72 字符
+- 使用 `-` 列表说明具体变更
+- 解释"做了什么"和"为什么"，而非"怎么做"
+- 每个列表项应独立可读
+
+**页脚（footer）**：
+- 引用相关 ADR/任务：`Completes Task X Step Y from ADR-XXXX implementation audit.`
+- 破坏性变更：`BREAKING CHANGE: <description>`
+
+**示例**（实际提交 `2c834c53`）：
+```
+feat(adr-075): implement recovery plugin for bounded failure recovery
+
+- Create lca/plugins/phase_edges/ with recovery module
+- Implement RecoveryReflectExecutor to detect failures and set admit_recovery
+- Modify compiler to read phase edge declarations from plugin specs
+- Add recovery edge (reflect→think) with loop guard for bounded recovery
+- Add comprehensive tests for recovery edge functionality
+
+Completes Task 7 Step 2 from ADR-0075 implementation audit.
+```
+
+**禁止事项**：
+- ❌ 单行 commit（必须有 body 说明变更）
+- ❌ 模糊主题（"update code"、"fix bug"、"changes"）
+- ❌ 多语言混合（统一使用英文）
+- ❌ 一次 commit 包含多个不相关变更（应拆分）
+
 ## 4. 编码规范
 
 - 方法 ≤ 200 行，文件 ≤ 1500 行；超过就拆
