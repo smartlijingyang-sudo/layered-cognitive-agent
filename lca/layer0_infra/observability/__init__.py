@@ -71,8 +71,6 @@ from lca.contracts.models.observability.journal import (
     ToolDenied,
     ToolInvoked,
     ToolStarted,
-    get_current_run_scope,
-    run_scope,
 )
 from lca.contracts.models.observability.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
@@ -151,6 +149,10 @@ from lca.layer0_infra.observability.langfuse_conventions import (
 from lca.layer0_infra.observability.narrative import plan_steps_joined
 from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
 from lca.layer0_infra.observability.projection_registry import EventProjection, ProjectionRegistry
+from lca.layer0_infra.observability.run_context import (
+    get_current_run_scope,
+    run_scope,
+)
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.observability.team_profile import (
     TeamTraceProfile,

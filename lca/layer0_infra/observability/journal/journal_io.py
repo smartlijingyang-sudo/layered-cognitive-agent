@@ -35,10 +35,12 @@ from lca.contracts.models.observability.journal import (
     JournalRecord,
     RunScope,
     StampedEvent,
-    stamped_to_journal_record,
 )
 from lca.contracts.models.observability.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
+)
+from lca.layer0_infra.observability.journal.serialization import (
+    stamped_to_journal_record,
 )
 
 # ── Schema 常量 ─────────────────────────────────────────────────────

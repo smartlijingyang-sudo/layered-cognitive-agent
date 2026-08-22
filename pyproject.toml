@@ -177,6 +177,7 @@ ignore = [
 "lca/contracts/mechanisms.py" = ["ARG002"]
 "lca/contracts/action.py" = ["ARG002"]
 "lca/layer0_infra/ops/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
+"lca/layer0_infra/ops/commands/*.py" = ["B008", "S603"]  # typer defaults + tail logs
 "lca/layer0_infra/ops/config.py" = ["S105"]  # sudo_pass_file is a path, not a secret
 "lca/layer0_infra/ops/sudo.py" = ["S603"]  # privileged subprocess wrapper
 "lca/layer0_infra/ops/service.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for process management

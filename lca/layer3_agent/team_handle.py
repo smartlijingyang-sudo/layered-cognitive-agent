@@ -12,10 +12,8 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.message import AgentMessage, agent_message_as_text
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.observability.journal import (
-    TEAM_CONTAINER_ROLE,
     TeamRunFinished,
     TeamRunStarted,
-    adopt_run_scope,
 )
 from lca.contracts.protocols import AgentUnit, TeamStrategy, TeamUnit
 from lca.layer0_infra.observability import (
@@ -25,8 +23,12 @@ from lca.layer0_infra.observability import (
     objective_preview,
     plan_steps_joined,
     record,
-    run_scope,
     set_session,
+)
+from lca.layer0_infra.observability.run_context import (
+    TEAM_CONTAINER_ROLE,
+    adopt_run_scope,
+    run_scope,
 )
 
 

@@ -11,7 +11,6 @@ from gateway.app import create_app
 from gateway.runs.execute import create_run_session
 from gateway.runs.process_journal import ProcessJournal
 from gateway.runs.session import RunRegistry
-from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
 from lca.contracts.models.observability.journal import (
     AgentRunStarted,
     DecisionMade,
@@ -21,6 +20,7 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.layer0_infra.observability import bind_backends, record
+from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
 from lca.layer0_infra.ops.journal_log import (
     extract_seq_from_record,
     parse_sse_block,

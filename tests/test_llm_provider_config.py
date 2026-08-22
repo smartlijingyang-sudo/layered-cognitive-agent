@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 from lca.layer0_infra.llm.config import LLMProviderSettings, normalize_llm_environ
 

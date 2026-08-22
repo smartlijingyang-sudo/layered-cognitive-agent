@@ -27,6 +27,9 @@ from lca.contracts.observability.evidence import (
     EvidenceRef,
     RetentionClass,
 )
+from lca.layer0_infra.observability.journal.serialization import (
+    stamped_to_journal_record,
+)
 
 
 def test_causation_links_round_trip() -> None:

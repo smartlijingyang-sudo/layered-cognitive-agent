@@ -17,7 +17,6 @@ from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
-    adopt_run_scope,
 )
 from lca.contracts.models.observability.plan_ref import plan_ref_scope
 from lca.contracts.models.team.partial_buffer import (
@@ -34,8 +33,11 @@ from lca.layer0_infra.observability import (
     bind_backends,
     objective_preview,
     record,
-    run_scope,
     set_session,
+)
+from lca.layer0_infra.observability.run_context import (
+    adopt_run_scope,
+    run_scope,
 )
 from lca.layer0_infra.workspace import effective_agent_wall_clock, get_run_workspace
 

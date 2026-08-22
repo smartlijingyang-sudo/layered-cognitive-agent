@@ -30,6 +30,10 @@ from lca.layer0_infra.observability import (
     record,
 )
 from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
+from lca.layer0_infra.observability.run_context import (
+    get_current_run_scope,
+    run_scope,
+)
 from tests.support.observability_helpers import make_test_bound
 
 

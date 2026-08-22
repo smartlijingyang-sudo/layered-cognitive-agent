@@ -29,6 +29,9 @@ from lca.contracts.models.observability.plan_ref import (
     set_current_plan_ref,
     stamped_event_has_plan_ref,
 )
+from lca.layer0_infra.observability.journal.serialization import (
+    stamped_to_journal_record,
+)
 
 # ── plan_ref module helpers ──────────────────────────────────────────
 

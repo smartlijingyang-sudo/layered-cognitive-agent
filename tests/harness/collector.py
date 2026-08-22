@@ -87,7 +87,7 @@ class InMemoryObservability(BoundObservability):
         self._memory_exporter.clear()
 
     @property
-    def store(self) -> "RunStore":
+    def store(self) -> RunStore:
         """Backward compat (§11 pre-existing tests): expose RunStore via .store.
 
         The _RunStoreBackend has its own .store property that returns

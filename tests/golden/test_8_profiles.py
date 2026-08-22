@@ -32,11 +32,9 @@ from lca.contracts.protocols.plan import (
     compiled_run_plan_ref,
 )
 from lca.harness.profile.plan_compiler import (
-    CompileOptions,
     compile_plan as compile_plan_factory,
 )
 from lca.harness.profile.resolve import resolve_profile
-
 
 GOLDEN_PROFILES_DIR = Path("tests/golden/profiles")
 

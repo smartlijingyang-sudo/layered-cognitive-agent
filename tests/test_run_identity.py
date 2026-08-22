@@ -7,9 +7,9 @@ import unittest
 from gateway.runs.identity import default_agent_ref, parse_agent_ref
 from gateway.runs.live import LiveTail
 from gateway.runs.session import RunRegistry, RunSession, RunStatus, run_dedup_key
-from lca.contracts.models.observability.journal import (
+from lca.contracts.models.observability.journal import RunScope
+from lca.layer0_infra.observability.run_context import (
     TEAM_CONTAINER_ROLE,
-    RunScope,
     adopt_run_scope,
     run_scope,
 )

@@ -147,6 +147,9 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "lca-ops CLI 单模块承载 dev/restart/stop/status/heal/provision"
         "/diagnose/dump-profile/inspect-tree 全子命令"
     ),
+    "lca/layer0_infra/ops/commands/tools.py": (
+        "coding-agent tools CLI 封装（ADR-0065 §六 / PR-9）：9 个只读子命令从旧 cli.py 拆出"
+    ),
     "lca/layer0_infra/ops/services/lobehub.py": (
         "LobeHub deploy service 单模块承载 dev/prod/restart/logs/upgrade"
     ),

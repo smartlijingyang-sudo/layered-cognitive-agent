@@ -9,15 +9,12 @@ This test verifies the complete agent run replay capability:
 
 from __future__ import annotations
 
-import pytest
-
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.models.observability.journal import StampedEvent
-from lca.contracts.models.observability.plan_ref import plan_ref_scope, get_current_plan_ref
+from lca.contracts.models.observability.plan_ref import get_current_plan_ref, plan_ref_scope
 from lca.contracts.protocols.capability_plan import CapabilityPlan, ProviderBinding
 from lca.contracts.protocols.control_plan import ControlPlan
 from lca.contracts.protocols.plan import CompiledRunPlan, compiled_run_plan_ref
-from lca.contracts.protocols.scope_plan import ScopePlan, BudgetCeiling
+from lca.contracts.protocols.scope_plan import BudgetCeiling, ScopePlan
 
 
 class TestFullRunReplay:
@@ -29,7 +26,7 @@ class TestFullRunReplay:
         with plan_ref_scope("test_plan_hash"):
             # Verify plan_ref is set in context
             assert get_current_plan_ref() == "test_plan_hash"
-        
+
         # After context exit, plan_ref should be empty
         assert get_current_plan_ref() == ""
 
@@ -56,14 +53,14 @@ class TestFullRunReplay:
             acl_grants=(),
             budget_ceiling=BudgetCeiling(),
         )
-        
+
         plan = CompiledRunPlan(
             profile_path="test.yaml",
             capability=capability,
             control=control,
             scope=scope,
         )
-        
+
         # Compute plan_hash
         plan_hash = compiled_run_plan_ref(plan)
         assert plan_hash  # Non-empty

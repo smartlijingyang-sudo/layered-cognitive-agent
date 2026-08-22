@@ -4,11 +4,16 @@ The control plan owns *which* contributions are active.  This module owns the
 pure, deterministic decision made by each active contribution from the current
 run facts.  It has no side effects and never mutates ``AgentState``; the
 runtime maps the aggregated outcome to phase behavior.
+
+Policy handlers are registered per ControlSlot, making the engine extensible
+without modifying the dispatch logic.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.enums import ActionType, SnapshotReason
@@ -35,6 +40,16 @@ class ControlPolicyContext:
     checkpoint_reason: SnapshotReason | None = None
 
 
+class ControlPolicyHandler(Protocol):
+    """Protocol for control slot handlers."""
+
+    def __call__(
+        self,
+        entry: ControlEntry,
+        context: ControlPolicyContext,
+    ) -> ControlVerdict: ...
+
+
 class DefaultControlPolicyEngine:
     """Evaluate the standard profile's concrete control contributions.
 
@@ -42,7 +57,25 @@ class DefaultControlPolicyEngine:
     it neither reads live workspaces nor invokes tools.  A profile can still
     retain the constitutional ``control.default.*`` no-op entry; that entry is
     explicitly evaluated as allow and is never mistaken for a real policy.
+
+    Policy handlers are registered per ControlSlot via the ``_handlers`` registry,
+    making the engine extensible without modifying dispatch logic.
     """
+
+    def __init__(self) -> None:
+        """Initialize the engine with registered policy handlers."""
+        self._handlers: dict[ControlSlot, ControlPolicyHandler] = {
+            ControlSlot.PERCEIVE_CONTEXT: self._perceive_context,
+            ControlSlot.THINK_GUARD: self._think_guard,
+            ControlSlot.ACT_AUTHORIZE: self._act_authorize,
+            ControlSlot.ACT_BUDGET: self._act_budget,
+            ControlSlot.ACT_CONSTRAIN: self._act_constrain,
+            ControlSlot.ACT_EXECUTE: self._act_execute,
+            ControlSlot.ACT_SAFE_BOUNDARY: self._act_safe_boundary,
+            ControlSlot.REMEMBER_ADMIT: self._remember_admit,
+            ControlSlot.STOP_DECIDE: self._stop_decide,
+            ControlSlot.OBSERVE_CHECKPOINT: self._observe_checkpoint,
+        }
 
     def evaluate(
         self,
@@ -60,31 +93,17 @@ class DefaultControlPolicyEngine:
         slot: ControlSlot,
         context: ControlPolicyContext,
     ) -> ControlVerdict:
+        # Constitutional no-op fallback
         if entry.plugin_id.startswith("control.default."):
             return self._verdict(entry, ControlVerdictKind.ALLOW, "constitutional no-op fallback")
-        if slot is ControlSlot.PERCEIVE_CONTEXT:
-            return self._perceive_context(entry, context)
-        if slot is ControlSlot.THINK_GUARD:
-            return self._think_guard(entry, context)
-        if slot is ControlSlot.ACT_AUTHORIZE:
-            return self._act_authorize(entry, context)
-        if slot is ControlSlot.ACT_BUDGET:
-            return self._act_budget(entry, context)
-        if slot is ControlSlot.ACT_CONSTRAIN:
-            return self._act_constrain(entry, context)
-        if slot is ControlSlot.ACT_EXECUTE:
-            return self._act_execute(entry, context)
-        if slot is ControlSlot.ACT_SAFE_BOUNDARY:
-            return self._act_safe_boundary(entry, context)
-        if slot is ControlSlot.REMEMBER_ADMIT:
-            return self._remember_admit(entry, context)
-        if slot is ControlSlot.STOP_DECIDE:
-            return self._stop_decide(entry, context)
-        if slot is ControlSlot.OBSERVE_CHECKPOINT:
-            return self._observe_checkpoint(entry, context)
+        # Wildcard observation contribution
         if slot is ControlSlot.OBSERVE_WILDCARD:
             return self._verdict(entry, ControlVerdictKind.ALLOW, "observe contribution recorded")
-        raise ValueError(f"unsupported control slot: {slot.value}")
+        # Dispatch to registered handler
+        handler = self._handlers.get(slot)
+        if handler is None:
+            raise ValueError(f"unsupported control slot: {slot.value}")
+        return handler(entry, context)
 
     @staticmethod
     def _verdict(

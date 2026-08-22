@@ -275,7 +275,6 @@ class PipelineSafeExecutor(SafeExecutor):
         """
         invocation_id = invocation_id.strip() or new_id("inv")
 
-        from lca.contracts.models.observability.journal import get_current_run_scope
         from lca.contracts.models.observability.plan_ref import get_current_plan_ref
         from lca.contracts.protocols.command_envelope import (
             BudgetReservation,
@@ -283,6 +282,7 @@ class PipelineSafeExecutor(SafeExecutor):
             command_envelope_to_dict,
             mint_envelope,
         )
+        from lca.layer0_infra.observability.run_context import get_current_run_scope
 
         current_scope = get_current_run_scope()
         scope_ref = (

@@ -31,7 +31,6 @@ from lca.contracts.models.observability.journal import (
     RunScope,
     RuntimeObserved,
     StampedEvent,
-    get_current_run_scope,
 )
 from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
 from lca.contracts.observability.event_descriptor_registry import EventDescriptorRegistry
@@ -47,6 +46,7 @@ from lca.layer0_infra.observability.event_catalog import descriptor_for
 from lca.layer0_infra.observability.journal.backends.memory import InMemoryJournalStore
 from lca.layer0_infra.observability.policy import AttributePolicy, redact_restricted
 from lca.layer0_infra.observability.projection_registry import EventProjection, ProjectionRegistry
+from lca.layer0_infra.observability.run_context import get_current_run_scope
 
 
 class UnregisteredJournalEventError(LedgerUnregisteredError):

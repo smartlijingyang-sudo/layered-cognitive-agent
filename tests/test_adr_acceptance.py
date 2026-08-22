@@ -14,7 +14,6 @@ from typer.testing import CliRunner
 
 from lca.layer0_infra.ops.cli import app
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 ACCEPTANCE_CRITERIA = REPOSITORY_ROOT / "docs/plans/adr-0074-acceptance-criteria.md"
 TEST_PATH_PATTERN = re.compile(r"tests/[A-Za-z0-9_./-]+\.py")
