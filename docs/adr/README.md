@@ -1,6 +1,6 @@
-# Architecture Decision Records
+# ADR
 
-本目录只收录架构/原则层面的决策；过程文档与命名/清理决策不在收录范围。
+本目录只收录架构决策；过程文档不在此。
 **元 ADR**（如 ADR-0074）记录跨 ADR 接受/裁剪链，是例外。
 
 | ADR | 标题 | 核心决定 |
@@ -49,6 +49,7 @@
 | [0072](0072-null-default-discipline.md) | Null-Default Discipline — Think 群与 Memory retrieval 真 Null 默认 | Accepted |
 | [0073](0073-runsession-sole-session-path.md) | Session Path Convergence — `SessionService` Protocol 统一两条路径的契约 | Proposed |
 | [0074](0074-plugin-everything-trimmed-implementation.md) | Plugin-Everything 裁剪版 — 接受 0066/0068/0069、裁剪 0067 的 14 PR 实施计划 | Proposed |
+| [0075](0075-declarative-phase-graph-and-minimal-trusted-kernel.md) | 阶段图与可信内核 | Proposed |
 
 ## 维护规则
 - 不改旧文件；新决策用 `Supersedes: ADR-XXXX` 标记
