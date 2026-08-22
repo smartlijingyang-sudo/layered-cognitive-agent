@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.result import Result
@@ -24,6 +24,57 @@ from lca.harness.declarative import (
 )
 from lca.layer0_infra.observability import record_runtime
 from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimResult:
+    """幂等性 claim 的结果"""
+
+    status: Literal["new", "completed", "in_progress"]
+    receipt: Any | None = None
+
+
+class RuntimeIdempotencyStore:
+    """持久化幂等性 receipt store。
+
+    确保同一 idempotency_key 在同一个 plan_ref 下至多执行一次。
+    - new: 首次 claim，写入记录并继续执行
+    - completed: 已完成，返回已有 receipt
+    - in_progress: 正在执行中，表示 crash 后重试，应标记 effect_uncertain
+    """
+
+    def __init__(self) -> None:
+        self._claims: dict[tuple[str, str], dict[str, Any]] = {}
+
+    async def claim(self, plan_ref: str, idempotency_key: str) -> ClaimResult:
+        """Claim 一个幂等性 key。
+
+        Args:
+            plan_ref: 计划引用
+            idempotency_key: 幂等性 key
+
+        Returns:
+            ClaimResult: 包含状态和 receipt
+        """
+        key = (plan_ref, idempotency_key)
+
+        if key in self._claims:
+            record = self._claims[key]
+            if record["status"] == "completed":
+                return ClaimResult(status="completed", receipt=record["receipt"])
+            else:
+                # in_progress means crash during execution
+                return ClaimResult(status="in_progress", receipt=None)
+
+        # New claim - mark as in_progress
+        self._claims[key] = {"status": "in_progress", "receipt": None}
+        return ClaimResult(status="new", receipt=None)
+
+    async def complete(self, plan_ref: str, idempotency_key: str, receipt: Any) -> None:
+        """Mark a claim as completed with a receipt."""
+        key = (plan_ref, idempotency_key)
+        if key in self._claims:
+            self._claims[key] = {"status": "completed", "receipt": receipt}
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,8 +149,13 @@ class RuntimeJournalCommitter(JournalCommitter):
 class RuntimeEffectGateway(EffectGateway):
     """声明式运行时唯一允许调用 body/memory 的受控 effect handler。"""
 
-    def __init__(self, capabilities: RuntimePhaseCapabilities) -> None:
+    def __init__(
+        self,
+        capabilities: RuntimePhaseCapabilities,
+        idempotency_store: RuntimeIdempotencyStore | None = None,
+    ) -> None:
         self._capabilities = capabilities
+        self._idempotency_store = idempotency_store or RuntimeIdempotencyStore()
 
     async def execute(self, envelope: CommandEnvelope, policy: EffectPolicyPlan) -> Any:
         metadata = envelope.metadata
@@ -108,6 +164,24 @@ class RuntimeEffectGateway(EffectGateway):
             raise DeclarativeValidationError("PS-006", f"effect class is denied by plan: {effect_class}")
         if effect_class in policy.idempotency_required and not envelope.idempotency_key:
             raise DeclarativeValidationError("PS-006", "effect requires an idempotency key")
+
+        # Check idempotency if key is present
+        if envelope.idempotency_key:
+            claim_result = await self._idempotency_store.claim(
+                envelope.plan_ref, envelope.idempotency_key
+            )
+            if claim_result.status == "completed":
+                # Already executed, return cached receipt
+                return claim_result.receipt
+            elif claim_result.status == "in_progress":
+                # Crash during previous execution - effect uncertain
+                raise DeclarativeValidationError(
+                    "RT-003",
+                    f"effect with idempotency_key {envelope.idempotency_key} was in_progress "
+                    "when previous execution crashed; effect outcome uncertain",
+                )
+            # status == "new", continue with execution
+
         if effect_class in policy.approval_required and not bool(metadata.get("approved", False)):
             raise DeclarativeValidationError("PS-006", f"effect requires approval: {effect_class}")
         operation = metadata.get("operation")
@@ -116,7 +190,20 @@ class RuntimeEffectGateway(EffectGateway):
             decision = metadata.get("decision")
             if state is None or decision is None:
                 raise DeclarativeValidationError("RT-002", "body effect lacks state or recorded Decision")
-            return await self._capabilities.body.act(decision, state)
+            result = await self._capabilities.body.act(decision, state)
+            # Record receipt for idempotency
+            if envelope.idempotency_key:
+                receipt = {
+                    "receipt": "body.acted",
+                    "idempotency_key": envelope.idempotency_key,
+                    "plan_ref": envelope.plan_ref,
+                    "result": result,
+                }
+                await self._idempotency_store.complete(
+                    envelope.plan_ref, envelope.idempotency_key, receipt
+                )
+                return receipt
+            return result
         if operation == "memory.update":
             state = metadata.get("state")
             observation = metadata.get("observation")
@@ -124,11 +211,16 @@ class RuntimeEffectGateway(EffectGateway):
             if state is None or observation is None or reflection is None:
                 raise DeclarativeValidationError("RT-002", "memory effect lacks admitted WriteSet inputs")
             await self._capabilities.memory.update(state, observation, reflection)
-            return {
+            receipt = {
                 "receipt": "memory.updated",
                 "idempotency_key": envelope.idempotency_key,
                 "plan_ref": envelope.plan_ref,
             }
+            if envelope.idempotency_key:
+                await self._idempotency_store.complete(
+                    envelope.plan_ref, envelope.idempotency_key, receipt
+                )
+            return receipt
         raise DeclarativeValidationError("PG-003", f"undeclared effect operation: {operation}")
 
 
@@ -250,10 +342,12 @@ class DeclarativeRuntimeDriver:
 
 
 __all__ = [
+    "ClaimResult",
     "DeclarativeCheckpoint",
     "DeclarativeRuntimeDriver",
     "ReducerDeltaAdapter",
     "RuntimeEffectGateway",
+    "RuntimeIdempotencyStore",
     "RuntimeJournalCommitter",
     "RuntimePhaseCapabilities",
 ]
