@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any
+from typing import Any, Literal
 
 from lca.contracts.protocols.command_envelope import RunDelta, RunFact
 from lca.contracts.protocols.declarative_phase_graph import (
@@ -251,11 +251,25 @@ class GenericPlanInterpreter:
                 if not isinstance(result, PhaseResult):
                     raise DeclarativeValidationError("RT-002", f"executor returned non-PhaseResult: {node.id}")
                 self._validate_result(node.semantic_phase, result)
-                result = await self._apply_post_contributions(
+                result, govern_outcome = await self._apply_post_contributions(
                     executable_node,
                     context,
                     result,
+                    plan_ref=plan_ref,
+                    node_id=node.id,
                 )
+                if govern_outcome is not None:
+                    # Govern verdict caused early termination
+                    visits.append(PhaseVisit(node.id, node.semantic_phase, result.result_kind, None))
+                    return InterpretationResult(
+                        state=current_state,
+                        artifact=None,
+                        visits=tuple(visits),
+                        facts=tuple(facts),
+                        terminal_node=node.id,
+                        cursor=govern_outcome.cursor,
+                        outcome=govern_outcome,
+                    )
                 self._validate_result(node.semantic_phase, result)
                 phase_fact = RunFact(
                     fact_id=f"{plan_ref}:{node.id}:{visit_counts[node.id]}",
@@ -422,7 +436,15 @@ class GenericPlanInterpreter:
         executable_node: Any,
         context: RestrictedPhaseContext,
         result: PhaseResult,
-    ) -> PhaseResult:
+        *,
+        plan_ref: str,
+        node_id: str,
+    ) -> tuple[PhaseResult, DeclarativeRunOutcome | None]:
+        """Apply post-execution contributions and handle govern verdicts.
+        
+        Returns:
+            Tuple of (updated_result, outcome_if_terminal)
+        """
         combined = result
         for contribution in executable_node.contributions:
             role = contribution.declaration.role
@@ -433,11 +455,77 @@ class GenericPlanInterpreter:
                 PhaseInput(artifact=combined.payload, causation_refs=combined.evidence_refs),
             )
             self._require_contribution_result(contribution.declaration.executor, outcome)
-            if role is ContributionRole.GOVERN and not _verdict_allows(outcome.payload):
-                raise DeclarativeValidationError(
-                    "RT-002",
-                    f"govern contribution denied phase execution: {contribution.declaration.executor}",
-                )
+            if role is ContributionRole.GOVERN:
+                verdict_class = _classify_verdict(outcome.payload)
+                if verdict_class == "deny":
+                    # Generate control.denied fact
+                    deny_fact = RunFact(
+                        fact_id=f"{plan_ref}:{node_id}:control_denied",
+                        plan_ref=plan_ref,
+                        kind="control.denied",
+                        payload={
+                            "contribution": contribution.declaration.executor,
+                            "verdict": verdict_class,
+                        },
+                    )
+                    self._journal.commit_fact(deny_fact, plan_ref=plan_ref, node_ref=node_id)
+                    
+                    # Build cursor and outcome
+                    cursor = PhaseRunCursor(
+                        plan_ref=plan_ref,
+                        node_id=node_id,
+                        visit_counts=tuple(sorted(context.visit_counts.items())),
+                        edge_counts=tuple(((k[0], k[1]), v) for k, v in context.edge_counts.items()),
+                        artifacts=dict(context.artifacts),
+                        causation_refs=combined.evidence_refs,
+                        budget_snapshot={"step": context.state.step},
+                    )
+                    fail_outcome = DeclarativeRunOutcome(
+                        kind="failed",
+                        cursor=cursor,
+                        stop=_build_stop_decision(should_stop=True),
+                        error_fact=deny_fact,
+                    )
+                    return combined, fail_outcome
+                elif verdict_class == "pause":
+                    # Generate control.paused fact
+                    pause_fact = RunFact(
+                        fact_id=f"{plan_ref}:{node_id}:control_paused",
+                        plan_ref=plan_ref,
+                        kind="control.paused",
+                        payload={
+                            "contribution": contribution.declaration.executor,
+                            "verdict": verdict_class,
+                        },
+                    )
+                    self._journal.commit_fact(pause_fact, plan_ref=plan_ref, node_ref=node_id)
+                    
+                    # Build cursor and outcome
+                    cursor = PhaseRunCursor(
+                        plan_ref=plan_ref,
+                        node_id=node_id,
+                        visit_counts=tuple(sorted(context.visit_counts.items())),
+                        edge_counts=tuple(((k[0], k[1]), v) for k, v in context.edge_counts.items()),
+                        artifacts=dict(context.artifacts),
+                        causation_refs=combined.evidence_refs,
+                        budget_snapshot={"step": context.state.step},
+                    )
+                    pause_outcome = DeclarativeRunOutcome(
+                        kind="paused",
+                        cursor=cursor,
+                        stop=_build_stop_decision(should_stop=False),
+                        error_fact=pause_fact,
+                    )
+                    return combined, pause_outcome
+                elif verdict_class == "rewrite":
+                    # Replace PhaseResult.payload decision_ref and continue
+                    if isinstance(outcome.payload, Mapping) and "decision_ref" in outcome.payload:
+                        combined = replace(
+                            combined,
+                            payload=outcome.payload,
+                        )
+            
+            # Handle other contribution roles
             if role in {ContributionRole.TRANSFORM, ContributionRole.FINALIZE} and outcome.payload is not None:
                 combined = replace(
                     combined,
@@ -451,7 +539,7 @@ class GenericPlanInterpreter:
                 deltas=(*combined.deltas, *outcome.deltas),
                 evidence_refs=(*combined.evidence_refs, *outcome.evidence_refs),
             )
-        return combined
+        return combined, None
 
     @staticmethod
     def _require_contribution_result(capability: str, outcome: Any) -> None:
@@ -498,15 +586,46 @@ class GenericPlanInterpreter:
         return None
 
 
-def _verdict_allows(payload: Any) -> bool:
+def _classify_verdict(payload: Any) -> Literal["allow", "deny", "rewrite", "pause", "stop", "defer"]:
+    """Classify a control verdict from contribution payload.
+    
+    Returns one of: allow, deny, rewrite, pause, stop, defer.
+    """
+    from lca.layer2_runtime.control_runtime import ControlVerdict, ControlVerdictKind
+    
+    if isinstance(payload, ControlVerdict):
+        kind_map = {
+            ControlVerdictKind.ALLOW: "allow",
+            ControlVerdictKind.DENY: "deny",
+            ControlVerdictKind.EXHAUSTED: "stop",
+            ControlVerdictKind.STOP: "stop",
+            ControlVerdictKind.ASK_HUMAN: "pause",
+            ControlVerdictKind.REWRITE: "rewrite",
+        }
+        return kind_map.get(payload.kind, "allow")
+    
+    # Fallback for dict payloads
     if isinstance(payload, Mapping):
+        verdict = payload.get("verdict")
+        if verdict:
+            verdict_lower = str(verdict).lower()
+            if verdict_lower in {"allow", "allowed", "authorized", "ok"}:
+                return "allow"
+            if verdict_lower in {"deny", "denied", "rejected"}:
+                return "deny"
+            if verdict_lower in {"rewrite", "rewritten"}:
+                return "rewrite"
+            if verdict_lower in {"pause", "ask_human"}:
+                return "pause"
+            if verdict_lower in {"stop", "halt", "terminate"}:
+                return "stop"
+            if verdict_lower in {"defer", "deferred"}:
+                return "defer"
         if "allowed" in payload:
-            return bool(payload["allowed"])
-        if "verdict" in payload:
-            return str(payload["verdict"]).lower() in {"allow", "allowed", "authorized", "ok"}
-    if isinstance(payload, bool):
-        return payload
-    return True
+            return "allow" if bool(payload["allowed"]) else "deny"
+    
+    # Default to allow for backward compatibility
+    return "allow"
 
 
 def _terminal_result(result: PhaseResult) -> bool:
