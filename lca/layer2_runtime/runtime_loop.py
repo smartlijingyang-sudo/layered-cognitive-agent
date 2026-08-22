@@ -45,10 +45,7 @@ from lca.contracts.protocols.reducer import LoopTopology
 from lca.layer0_infra.observability import get_span_context
 from lca.layer0_infra.skills.activation_scope import get_newly_activated
 from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
-from lca.layer2_runtime.control_policies import (
-    ControlPolicyContext,
-    DefaultControlPolicyEngine,
-)
+
 from lca.layer2_runtime.control_runtime import (
     ControlEvaluation,
     ControlSelection,
