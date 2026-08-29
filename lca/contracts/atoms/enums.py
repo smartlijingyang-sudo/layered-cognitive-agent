@@ -202,3 +202,7 @@ class ComponentKind(str, Enum):
     MEMORY = "memory"
     EVENT_BUS = "event_bus"
     BUDGET_POLICY = "budget_policy"
+    # Branch-specific (not on main): DECISION_GATE is referenced by
+    # lca/layer4_app/spawn.py and lca/plugins/registries/component_registry.py
+    # which the back-ui-821 branch carries. Keep in lock-step with those callers.
+    DECISION_GATE = "decision_gate"
