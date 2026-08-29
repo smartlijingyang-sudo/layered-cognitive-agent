@@ -193,13 +193,12 @@ class ComponentKind(str, Enum):
     """组件注册表分类键 —— 值域有限，适用契约 1（值域即类型）。
 
     对应 ComponentRegistryProtocol.register(category, name, impl) 中的
-    category 参数。name 参数视情况使用已有枚举（如 DecisionGateName）
-    或保留字符串（如角色名，来自配置）。
+    category 参数。name 由所属领域的 profile 选择规则定义；注册表只承载
+    当前仍需按类别发现的基础设施与策略实现。
     """
 
     OBSERVABILITY = "observability"
     STATE_STORE = "state_store"
     MEMORY = "memory"
     EVENT_BUS = "event_bus"
-    DECISION_GATE = "decision_gate"
     BUDGET_POLICY = "budget_policy"

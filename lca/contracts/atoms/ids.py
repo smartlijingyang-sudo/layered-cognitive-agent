@@ -1,4 +1,4 @@
-"""契约层纯工具：稳定 id / 时间戳生成 + 品牌化 ID（DSH-inspired）。
+"""契约层纯工具：稳定 id / 时间戳生成 + 品牌化 ID。
 
 提供全局唯一的 trace-id / span-id 生成和 UTC 时间戳。
 被 contracts 各模块及上层广泛引用，不得引入业务依赖。
@@ -6,8 +6,6 @@
 品牌化 ID（Branded IDs）：
     用 ``NewType`` 在类型层面区分不同用途的 ID，防止 ``run_id`` 和
     ``delegation_id`` 混传。运行时零成本（编译期检查）。
-
-    设计来源：DSH ``packages/util/brand`` Branded<B> 模式。
 """
 
 from __future__ import annotations
