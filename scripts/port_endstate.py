@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_BASE = "bae32d8c27ee2b59312303fbfa68d4738c2f316f"
+_DEFAULT_BASE = "bae32d8c27ee2b59312303fbfa68d4738c2f316f"  # pragma: allowlist secret  # git merge-base SHA, not a credential
 _DEFAULT_HEAD = "origin/main"
 _DEFAULT_OUTPUT = "docs/port/main-port-plan.md"
 

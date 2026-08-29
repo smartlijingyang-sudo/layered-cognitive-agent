@@ -56,7 +56,10 @@ def test_apply_check_fails_with_conflict_returns_error() -> None:
     # we'd need a constructed tree state, which is out of scope for unit tests.
     # We instead just assert that apply_cluster on a normal cluster completes.
     r = apply_cluster(
-        "C1", base="bae32d8c27ee2b59312303fbfa68d4738c2f316f", head="origin/main", commit=False
+        "C1",
+        base="bae32d8c27ee2b59312303fbfa68d4738c2f316f",  # pragma: allowlist secret  # git SHA, not a credential
+        head="origin/main",
+        commit=False,
     )
     # Either applied or no-op; both valid.
     assert r.rc in (0, 1)

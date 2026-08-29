@@ -40,7 +40,7 @@ if str(_ROOT) not in sys.path:
 from scripts.port_endstate import CLUSTER_PATHS  # noqa: E402
 
 _ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_BASE = "bae32d8c27ee2b59312303fbfa68d4738c2f316f"
+_DEFAULT_BASE = "bae32d8c27ee2b59312303fbfa68d4738c2f316f"  # pragma: allowlist secret  # git merge-base SHA, not a credential
 _DEFAULT_HEAD = "origin/main"
 
 
