@@ -25,7 +25,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C10: C10 cluster
 
 - **Lane**: A
@@ -39,7 +39,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C11: C11 cluster
 
 - **Lane**: A
@@ -53,7 +53,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C12: C12 cluster
 
 - **Lane**: A
@@ -67,7 +67,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C13: C13 cluster
 
 - **Lane**: A
@@ -81,7 +81,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C14: C14 cluster
 
 - **Lane**: A
@@ -95,7 +95,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C15: C15 cluster
 
 - **Lane**: B
@@ -109,7 +109,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C16: C16 cluster
 
 - **Lane**: B
@@ -123,7 +123,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C17: C17 cluster
 
 - **Lane**: B
@@ -137,7 +137,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C18: C18 cluster
 
 - **Lane**: B
@@ -151,7 +151,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C19: C19 cluster
 
 - **Lane**: B
@@ -165,7 +165,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C2: C2 cluster
 
 - **Lane**: A
@@ -179,7 +179,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C20: C20 cluster
 
 - **Lane**: B
@@ -193,7 +193,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C21: C21 cluster
 
 - **Lane**: B
@@ -207,7 +207,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C22: C22 cluster
 
 - **Lane**: B
@@ -221,7 +221,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C23: C23 cluster
 
 - **Lane**: B
@@ -235,7 +235,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C24: C24 cluster
 
 - **Lane**: B
@@ -249,7 +249,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C25: C25 cluster
 
 - **Lane**: B
@@ -263,7 +263,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C26: C26 cluster
 
 - **Lane**: B
@@ -277,7 +277,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C27: C27 cluster
 
 - **Lane**: B
@@ -291,7 +291,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C28: C28 cluster
 
 - **Lane**: B
@@ -305,7 +305,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C29: C29 cluster
 
 - **Lane**: B
@@ -319,7 +319,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C3: C3 cluster
 
 - **Lane**: A
@@ -333,7 +333,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C30: C30 cluster
 
 - **Lane**: B
@@ -347,7 +347,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C31: C31 cluster
 
 - **Lane**: B
@@ -361,7 +361,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C32: C32 cluster
 
 - **Lane**: B
@@ -375,7 +375,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C33: C33 cluster
 
 - **Lane**: B
@@ -389,7 +389,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C34: C34 cluster
 
 - **Lane**: B
@@ -403,7 +403,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C35: C35 cluster
 
 - **Lane**: B
@@ -417,7 +417,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C36: C36 cluster
 
 - **Lane**: C
@@ -431,7 +431,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: skip (Lane C: soft-lock / chore / cleanup)
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] skip
 ### C37: C37 cluster
 
 - **Lane**: C
@@ -445,7 +445,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: skip (Lane C: soft-lock / chore / cleanup)
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] skip
 ### C38: C38 cluster
 
 - **Lane**: C
@@ -459,7 +459,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: skip (Lane C: soft-lock / chore / cleanup)
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] skip
 ### C39: C39 cluster
 
 - **Lane**: C
@@ -473,7 +473,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: skip (Lane C: soft-lock / chore / cleanup)
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] skip
 ### C4: C4 cluster
 
 - **Lane**: A
@@ -487,7 +487,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C40: C40 cluster
 
 - **Lane**: C
@@ -501,7 +501,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: skip (Lane C: soft-lock / chore / cleanup)
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] skip
 ### C41: C41 cluster
 
 - **Lane**: B
@@ -515,7 +515,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C42: C42 cluster
 
 - **Lane**: B
@@ -529,7 +529,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C43: C43 cluster
 
 - **Lane**: B
@@ -543,7 +543,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C44: C44 cluster
 
 - **Lane**: A
@@ -557,7 +557,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: tests/architecture/test_action_authority_single_path.py, tests/architecture/test_approval_state_machine.py, tests/architecture/test_brain_prompt_catalog_capability.py, tests/architecture/test_capability_snapshot.py, tests/architecture/test_casting_prompt_renderer_capability.py
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C45: C45 cluster
 
 - **Lane**: B
@@ -571,7 +571,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: tests/architecture/test_action_authority_single_path.py, tests/architecture/test_approval_state_machine.py, tests/architecture/test_brain_prompt_catalog_capability.py, tests/architecture/test_capability_snapshot.py, tests/architecture/test_casting_prompt_renderer_capability.py
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C46: C46 cluster
 
 - **Lane**: B
@@ -585,7 +585,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: tests/architecture/test_action_authority_single_path.py, tests/architecture/test_approval_state_machine.py, tests/architecture/test_brain_prompt_catalog_capability.py, tests/architecture/test_capability_snapshot.py, tests/architecture/test_casting_prompt_renderer_capability.py
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] investigate
 ### C47: C47 cluster
 
 - **Lane**: C
@@ -599,7 +599,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: skip (Lane C: soft-lock / chore / cleanup)
 - **Test plan**: tests/architecture/test_action_authority_single_path.py, tests/architecture/test_approval_state_machine.py, tests/architecture/test_brain_prompt_catalog_capability.py, tests/architecture/test_capability_snapshot.py, tests/architecture/test_casting_prompt_renderer_capability.py
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] skip
 ### C5: C5 cluster
 
 - **Lane**: A
@@ -613,7 +613,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C6: C6 cluster
 
 - **Lane**: A
@@ -627,7 +627,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C7: C7 cluster
 
 - **Lane**: A
@@ -641,7 +641,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C8: C8 cluster
 
 - **Lane**: A
@@ -655,7 +655,7 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
 ### C9: C9 cluster
 
 - **Lane**: A
@@ -669,4 +669,4 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Default recommendation**: port as-is
 - **Test plan**: no test path auto-detected; recommend manual review
 - **DAG deps**: (none)
-- **Mark**: [ ] port  [ ] skip  [ ] hold  [ ] investigate
+- **Mark**: [ ] port
