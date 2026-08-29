@@ -498,7 +498,17 @@ async def finalize(
     """
     try:
         if session.hub is not None:
-            _emit_artifact_closure_if_needed(workspace, session, session.hub)
+            # ADR-0051 Phase 2 § 九：artifact 闭合 StepTextDelta 必须带 scope。
+            # 164b58011 把 emit 从 BoundObservability.store 切到 _journal_store(hub)，
+            # 后者依赖 get_current_run_scope() ContextVar；但 finalize 在 execute_run 的
+            # with run_scope() 块退出后才被调，ContextVar 已失效。局部包一层恢复。
+            with run_scope(
+                RunScope(
+                    trace_id=cast("TraceId", session.trace_id),
+                    run_id=cast("RunId", session.run_id),
+                )
+            ):
+                _emit_artifact_closure_if_needed(workspace, session, session.hub)
         await finalize_run(session.run_id)
     except Exception:
         _log.exception("finalize_run_pre_close_failed", hop="H2", run_id=session.run_id)
