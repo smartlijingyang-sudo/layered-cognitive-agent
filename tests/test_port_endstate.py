@@ -69,8 +69,9 @@ def test_render_one_calls_real_git() -> None:
 
 def test_cluster_paths_cover_47_distinct_clusters() -> None:
     expected = {f"C{i}" for i in range(1, 48)}
-    assert expected.issubset(CLUSTER_PATHS.keys()), \
+    assert expected.issubset(CLUSTER_PATHS.keys()), (
         f"missing: {sorted(expected - CLUSTER_PATHS.keys())}"
+    )
 
 
 def test_soft_lock_clusters_listed() -> None:

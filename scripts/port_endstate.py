@@ -41,7 +41,10 @@ CLUSTER_PATHS: dict[str, dict[str, object]] = {
     "C6": {"paths": ["lca/contracts/capabilities.py"], "lane": "A"},
     "C7": {"paths": ["docs/adr/"], "lane": "A"},
     "C8": {"paths": ["docs/specs/", "docs/design/"], "lane": "A"},
-    "C9": {"paths": ["lca/harness/profile/", "lca/harness/boot.py", "lca/harness/resolve.py"], "lane": "A"},
+    "C9": {
+        "paths": ["lca/harness/profile/", "lca/harness/boot.py", "lca/harness/resolve.py"],
+        "lane": "A",
+    },
     "C10": {"paths": ["lca/harness/session/", "lca/harness/agent/"], "lane": "A"},
     "C11": {"paths": ["lca/harness/middleware/"], "lane": "A"},
     "C12": {"paths": ["lca/harness/plugin_api.py"], "lane": "A"},
@@ -56,27 +59,39 @@ CLUSTER_PATHS: dict[str, dict[str, object]] = {
     "C21": {"paths": ["lca/layer0_infra/plane/"], "lane": "B"},
     "C22": {"paths": ["lca/layer1_cognitive/brain/"], "lane": "B"},
     "C23": {"paths": ["lca/layer1_cognitive/body/"], "lane": "B"},
-    "C24": {"paths": ["lca/layer1_cognitive/perceive_hub.py", "lca/layer1_cognitive/perceive_sink.py"], "lane": "B"},
+    "C24": {
+        "paths": ["lca/layer1_cognitive/perceive_hub.py", "lca/layer1_cognitive/perceive_sink.py"],
+        "lane": "B",
+    },
     "C25": {"paths": ["lca/layer1_cognitive/sensors/"], "lane": "B"},
-    "C26": {"paths": [
-        "lca/layer1_cognitive/collaboration/",
-        "lca/layer1_cognitive/event_bus.py",
-        "lca/layer1_cognitive/hook_registry.py",
-    ], "lane": "B"},
-    "C27": {"paths": ["lca/layer1_cognitive/memory/", "lca/layer1_cognitive/member_status/"], "lane": "B"},
+    "C26": {
+        "paths": [
+            "lca/layer1_cognitive/collaboration/",
+            "lca/layer1_cognitive/event_bus.py",
+            "lca/layer1_cognitive/hook_registry.py",
+        ],
+        "lane": "B",
+    },
+    "C27": {
+        "paths": ["lca/layer1_cognitive/memory/", "lca/layer1_cognitive/member_status/"],
+        "lane": "B",
+    },
     "C28": {"paths": ["lca/layer2_runtime/"], "lane": "B"},
     "C29": {"paths": ["lca/plugins/guards/"], "lane": "B"},
     "C30": {"paths": ["lca/layer3_agent/"], "lane": "B"},
     "C31": {"paths": ["lca/layer4_app/"], "lane": "B"},
     "C32": {"paths": ["lca/plugins/seam_definitions/"], "lane": "B"},
     "C33": {"paths": ["lca/plugins/providers/"], "lane": "B"},
-    "C34": {"paths": [
-        "lca/plugins/brain/",
-        "lca/plugins/reasoner/",
-        "lca/plugins/synthesizer/",
-        "lca/plugins/loop_cognitive/",
-        "lca/plugins/team_lead/",
-    ], "lane": "B"},
+    "C34": {
+        "paths": [
+            "lca/plugins/brain/",
+            "lca/plugins/reasoner/",
+            "lca/plugins/synthesizer/",
+            "lca/plugins/loop_cognitive/",
+            "lca/plugins/team_lead/",
+        ],
+        "lane": "B",
+    },
     "C35": {"paths": ["lca/plugins/dsh/"], "lane": "B"},
     "C36": {"paths": ["gateway/runs/api.py"], "lane": "C"},
     "C37": {"paths": ["gateway/runs/execute.py"], "lane": "C"},
@@ -179,7 +194,7 @@ def render_card(
 
 - **Lane**: {lane}
 - **Path(s)**: {", ".join(f"`{p}`" for p in paths)}
-- **Main commits touching this cluster**: {commit_count} (range {_DEFAULT_BASE[:7]}..{_DEFAULT_HEAD.split('/')[-1]})
+- **Main commits touching this cluster**: {commit_count} (range {_DEFAULT_BASE[:7]}..{_DEFAULT_HEAD.split("/")[-1]})
 - **Branch HEAD**: `{branch_sha[:7]}` — {branch_subject}
 - **Main tip**: `{main_tip_sha[:7]}` — {main_tip_subject}
 - **End-state delta**: {delta}
@@ -277,8 +292,9 @@ def _self_test() -> int:
 
     # Cluster coverage
     expected = {f"C{i}" for i in range(1, 48)}
-    assert expected.issubset(CLUSTER_PATHS.keys()), \
+    assert expected.issubset(CLUSTER_PATHS.keys()), (
         f"missing: {sorted(expected - CLUSTER_PATHS.keys())}"
+    )
 
     print(f"self-test OK: {len(CLUSTER_PATHS)} cluster cards")
     return 0
