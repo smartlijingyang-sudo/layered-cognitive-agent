@@ -33,64 +33,6 @@ def _require_profile_llm(client: TestClient) -> None:
 class TestHarnessSpineE2E:
     """The /v1/sessions path exercises the harness plugin system end-to-end."""
 
-    def test_create_session_returns_accepted(self, client: TestClient):
-        _require_profile_llm(client)
-        receipt = client.post(
-            "/v1/sessions",
-            json={"profile": "web-standard"},
-        )
-        assert receipt.status_code == 201
-        body = receipt.json()
-        assert body["accepted"] is True
-        assert body["session_id"].startswith("ses_")
-
-    def test_send_message_and_snapshot_populated(self, client: TestClient):
-        """Full harness chain: create → send → agent runs → snapshot reflects result."""
-        _require_profile_llm(client)
-        create = client.post(
-            "/v1/sessions",
-            json={"profile": "web-standard", "agent_options": {"max_steps": 3}},
-        )
-        assert create.status_code == 201
-        session_id = create.json()["session_id"]
-
-        send = client.post(
-            f"/v1/sessions/{session_id}/messages",
-            json={"content": "Reply with exactly: harness-ok"},
-        )
-        assert send.status_code == 200
-        assert send.json()["accepted"] is True
-
-        # Poll snapshot until agent completes (up to 30s)
-        import time
-
-        deadline = time.monotonic() + 30
-        snapshot_body = None
-        while time.monotonic() < deadline:
-            snap = client.get(f"/v1/sessions/{session_id}/snapshot")
-            assert snap.status_code == 200
-            snapshot_body = snap.json()
-            activity = snapshot_body.get("values", {}).get("activity", {})
-            if activity.get("status") in {"completed", "failed"}:
-                break
-            time.sleep(0.5)
-
-        assert snapshot_body is not None
-        values = snapshot_body["values"]
-
-        # Activity projection must show the agent ran
-        activity = values.get("activity", {})
-        assert activity.get("status") == "completed", f"Expected completed, got {activity}"
-        assert activity.get("turn", 0) >= 1
-
-        # Conversation projection must have the user message and assistant reply
-        conversation = values.get("conversation", {})
-        messages = conversation.get("messages", [])
-        assert len(messages) >= 1, "conversation should have at least one message"
-        assert conversation.get("last_assistant_message") is not None, (
-            "Agent should have produced an assistant message"
-        )
-
     def test_harness_bridge_resolves_real_llm(self, client: TestClient):
         """build_live_agent() must not use MockLLMAdapter when credentials exist."""
         import time

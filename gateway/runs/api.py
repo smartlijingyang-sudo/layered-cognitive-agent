@@ -236,7 +236,20 @@ async def stream_journal_live(request: Request) -> StreamingResponse | JSONRespo
     if request.method == "OPTIONS":
         return JSONResponse({}, headers=cors_headers())
     after = parse_last_event_id(request.headers.get("last-event-id"))
-    tail = _registry_of(request).journal.tail
+    try:
+        tail = _registry_of(request).journal.tail
+    except RuntimeError:
+        # Session Spine lazy-binds the process projection on first run; before
+        # any /runs has executed, /journal/live has nothing to stream. Surface
+        # this as a structured 503 so ``lca-ops logs`` can pick the right
+        # hint instead of falling back to a generic 500.
+        return _err(
+            "process-wide journal streaming is unavailable on the Session Spine; "
+            "use the per-run live stream instead.",
+            status_code=503,
+            error_type="service_unavailable",
+            code="legacy_process_journal_unavailable",
+        )
 
     async def _gen() -> AsyncIterator[bytes]:
         async for frame in iter_live_sse(
