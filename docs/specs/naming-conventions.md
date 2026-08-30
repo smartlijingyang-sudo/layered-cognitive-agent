@@ -1,4 +1,12 @@
-# Layered 架构命名规范
+# Layered 架构命名规范（已并入命名宪法，保留为后缀附录）
+
+> **状态：** Superseded by [`docs/design/naming-constitution.md`](../design/naming-constitution.md)
+> 本文档保留为"语义后缀附录"。新增命名请直接参考命名宪法。
+> 决策记录：[ADR-0106](../adr/0106-naming-constitution.md)。
+
+---
+
+# Layered 架构命名规范（原版）
 
 ## 目标
 
