@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.infrastructure.dsh.driver import DshTurnSpec
-from lca.infrastructure.dsh.settings import DshSettings
+from lca.infrastructure.comparison.dsh_driver.driver import DshTurnSpec
+from lca.infrastructure.comparison.dsh_driver.settings import DshSettings
 
 
 def build_turn_config(

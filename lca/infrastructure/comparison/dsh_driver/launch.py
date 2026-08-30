@@ -10,7 +10,7 @@ from lca.contracts.models.core.plane import PlaneRef
 from lca.infrastructure.attachment import get_attachment_policy
 from lca.infrastructure.attachment.layout import sanitize_run_segment
 from lca.infrastructure.attachment.prompt import render_dsh_workspace_context
-from lca.infrastructure.dsh.settings import DshSettings
+from lca.infrastructure.comparison.dsh_driver.settings import DshSettings
 from lca.infrastructure.file_store import FileStore, LocalFileStore
 
 

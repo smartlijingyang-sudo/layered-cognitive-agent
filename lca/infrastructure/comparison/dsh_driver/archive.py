@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.infrastructure.dsh.models import DshNotification
+from lca.infrastructure.comparison.dsh_driver.models import DshNotification
 
 
 class JsonlEventArchive:

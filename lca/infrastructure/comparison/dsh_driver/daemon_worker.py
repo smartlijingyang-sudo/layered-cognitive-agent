@@ -7,10 +7,10 @@ import sys
 import traceback
 from typing import Any
 
-from lca.infrastructure.dsh.driver import DshTurnSpec
-from lca.infrastructure.dsh.models import DshNotification, DshTurnResult
-from lca.infrastructure.dsh.runtime import DshUnavailableError, SdkDshRuntime
-from lca.infrastructure.dsh.wire import (
+from lca.infrastructure.comparison.dsh_driver.driver import DshTurnSpec
+from lca.infrastructure.comparison.dsh_driver.models import DshNotification, DshTurnResult
+from lca.infrastructure.comparison.dsh_driver.runtime import DshUnavailableError, SdkDshRuntime
+from lca.infrastructure.comparison.dsh_driver.wire import (
     WORKER_KIND_ERROR,
     WORKER_KIND_FINISHED,
     WORKER_KIND_NOTIFICATION,

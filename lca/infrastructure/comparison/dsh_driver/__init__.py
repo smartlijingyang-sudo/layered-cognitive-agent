@@ -17,14 +17,14 @@ __all__ = [
 ]
 
 _LAZY_IMPORTS = {
-    "DshTurnDriver": ("lca.infrastructure.dsh.driver", "DshTurnDriver"),
-    "DshTurnSpec": ("lca.infrastructure.dsh.driver", "DshTurnSpec"),
-    "DshNotification": ("lca.infrastructure.dsh.models", "DshNotification"),
-    "DshTurnResult": ("lca.infrastructure.dsh.models", "DshTurnResult"),
-    "compose_dsh_prompt": ("lca.infrastructure.dsh.prompt", "compose_dsh_prompt"),
-    "is_dsh_driver": ("lca.infrastructure.dsh.routing", "is_dsh_driver"),
-    "run_dsh_machine_turn": ("lca.infrastructure.dsh.run", "run_dsh_machine_turn"),
-    "DshSettings": ("lca.infrastructure.dsh.settings", "DshSettings"),
+    "DshTurnDriver": ("lca.infrastructure.comparison.dsh_driver.driver", "DshTurnDriver"),
+    "DshTurnSpec": ("lca.infrastructure.comparison.dsh_driver.driver", "DshTurnSpec"),
+    "DshNotification": ("lca.infrastructure.comparison.dsh_driver.models", "DshNotification"),
+    "DshTurnResult": ("lca.infrastructure.comparison.dsh_driver.models", "DshTurnResult"),
+    "compose_dsh_prompt": ("lca.infrastructure.comparison.dsh_driver.prompt", "compose_dsh_prompt"),
+    "is_dsh_driver": ("lca.infrastructure.comparison.dsh_driver.routing", "is_dsh_driver"),
+    "run_dsh_machine_turn": ("lca.infrastructure.comparison.dsh_driver.run", "run_dsh_machine_turn"),
+    "DshSettings": ("lca.infrastructure.comparison.dsh_driver.settings", "DshSettings"),
 }
 
 

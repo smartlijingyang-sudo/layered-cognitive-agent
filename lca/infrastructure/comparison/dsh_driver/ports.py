@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from lca.contracts.models.observability.journal import JournalEvent
-from lca.infrastructure.dsh.models import DshNotification
+from lca.infrastructure.comparison.dsh_driver.models import DshNotification
 
 
 class DshEventSink(Protocol):

@@ -6,9 +6,9 @@ from collections.abc import Callable
 from typing import Any
 
 from lca.contracts.protocols import DshRuntime
-from lca.infrastructure.dsh.driver import DshTurnSpec
-from lca.infrastructure.dsh.models import DshNotification, DshTurnResult
-from lca.infrastructure.dsh.settings import DshSettings
+from lca.infrastructure.comparison.dsh_driver.driver import DshTurnSpec
+from lca.infrastructure.comparison.dsh_driver.models import DshNotification, DshTurnResult
+from lca.infrastructure.comparison.dsh_driver.settings import DshSettings
 
 
 class DshUnavailableError(RuntimeError):

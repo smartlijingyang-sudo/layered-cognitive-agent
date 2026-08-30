@@ -10,18 +10,21 @@ import structlog
 from lca.contracts.models.core.conversation import ConversationTurn
 from lca.contracts.models.core.plane import PlaneRef
 from lca.contracts.protocols import DshRuntime
+from lca.infrastructure.comparison.dsh_driver.archive import JsonlEventArchive
+from lca.infrastructure.comparison.dsh_driver.driver import DshTurnDriver, DshTurnSpec
+from lca.infrastructure.comparison.dsh_driver.harvest import (
+    harvest_machine_outputs,
+    record_dsh_harvest,
+)
+from lca.infrastructure.comparison.dsh_driver.launch import build_harness_env
+from lca.infrastructure.comparison.dsh_driver.machine_runtime import MachineDshRuntime
+from lca.infrastructure.comparison.dsh_driver.models import DshTurnResult
+from lca.infrastructure.comparison.dsh_driver.projector import DshJournalProjector
+from lca.infrastructure.comparison.dsh_driver.prompt import compose_dsh_prompt
+from lca.infrastructure.comparison.dsh_driver.runtime import DshUnavailableError
+from lca.infrastructure.comparison.dsh_driver.settings import DshSettings
+from lca.infrastructure.comparison.dsh_driver.sink import HandleJournalSink
 from lca.infrastructure.computer.machine import MachineTransport
-from lca.infrastructure.dsh.archive import JsonlEventArchive
-from lca.infrastructure.dsh.driver import DshTurnDriver, DshTurnSpec
-from lca.infrastructure.dsh.harvest import harvest_machine_outputs, record_dsh_harvest
-from lca.infrastructure.dsh.launch import build_harness_env
-from lca.infrastructure.dsh.machine_runtime import MachineDshRuntime
-from lca.infrastructure.dsh.models import DshTurnResult
-from lca.infrastructure.dsh.projector import DshJournalProjector
-from lca.infrastructure.dsh.prompt import compose_dsh_prompt
-from lca.infrastructure.dsh.runtime import DshUnavailableError
-from lca.infrastructure.dsh.settings import DshSettings
-from lca.infrastructure.dsh.sink import HandleJournalSink
 from lca.infrastructure.file_store import FileStore, LocalFileStore
 
 _log = structlog.get_logger(__name__)

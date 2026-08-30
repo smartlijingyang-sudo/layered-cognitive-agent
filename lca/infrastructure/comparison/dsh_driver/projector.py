@@ -16,9 +16,9 @@ from lca.contracts.models.observability.journal import (
     ToolInvoked,
     ToolStarted,
 )
-from lca.infrastructure.dsh.mapping import project_tool_call, project_tool_result
-from lca.infrastructure.dsh.models import DshNotification
-from lca.infrastructure.dsh.ports import DshEventSink
+from lca.infrastructure.comparison.dsh_driver.mapping import project_tool_call, project_tool_result
+from lca.infrastructure.comparison.dsh_driver.models import DshNotification
+from lca.infrastructure.comparison.dsh_driver.ports import DshEventSink
 
 _JSON = dict[str, Any]
 

@@ -7,9 +7,9 @@ from dataclasses import dataclass
 
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.protocols import DshRuntime
-from lca.infrastructure.dsh.models import DshNotification, DshTurnResult
-from lca.infrastructure.dsh.ports import DshEventArchive
-from lca.infrastructure.dsh.projector import DshJournalProjector
+from lca.infrastructure.comparison.dsh_driver.models import DshNotification, DshTurnResult
+from lca.infrastructure.comparison.dsh_driver.ports import DshEventArchive
+from lca.infrastructure.comparison.dsh_driver.projector import DshJournalProjector
 
 
 @dataclass(frozen=True)

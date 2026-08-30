@@ -18,10 +18,10 @@ import structlog
 
 from lca.contracts.models.core.plane import PlaneRef
 from lca.contracts.protocols import DshRuntime
+from lca.infrastructure.comparison.dsh_driver.driver import DshTurnSpec
+from lca.infrastructure.comparison.dsh_driver.models import DshNotification, DshTurnResult
+from lca.infrastructure.comparison.dsh_driver.settings import DshSettings
 from lca.infrastructure.computer.machine import MachineTransport
-from lca.infrastructure.dsh.driver import DshTurnSpec
-from lca.infrastructure.dsh.models import DshNotification, DshTurnResult
-from lca.infrastructure.dsh.settings import DshSettings
 
 _log = structlog.get_logger(__name__)
 

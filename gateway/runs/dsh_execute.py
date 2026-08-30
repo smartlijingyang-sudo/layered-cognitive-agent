@@ -10,14 +10,14 @@ from gateway.runs.session import RunSession
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.models.observability.journal import AgentRunFinished
 from lca.contracts.protocols import DshRuntime
+from lca.infrastructure.comparison.dsh_driver.archive import JsonlEventArchive
+from lca.infrastructure.comparison.dsh_driver.models import DshTurnResult
+from lca.infrastructure.comparison.dsh_driver.projector import DshJournalProjector
+from lca.infrastructure.comparison.dsh_driver.run import run_dsh_machine_turn
+from lca.infrastructure.comparison.dsh_driver.runtime import DshUnavailableError
+from lca.infrastructure.comparison.dsh_driver.settings import DshSettings
+from lca.infrastructure.comparison.dsh_driver.sink import HandleJournalSink
 from lca.infrastructure.computer.machine import MachineTransport
-from lca.infrastructure.dsh.archive import JsonlEventArchive
-from lca.infrastructure.dsh.models import DshTurnResult
-from lca.infrastructure.dsh.projector import DshJournalProjector
-from lca.infrastructure.dsh.run import run_dsh_machine_turn
-from lca.infrastructure.dsh.runtime import DshUnavailableError
-from lca.infrastructure.dsh.settings import DshSettings
-from lca.infrastructure.dsh.sink import HandleJournalSink
 from lca.infrastructure.plane.machine import resolve_machine_transport
 from lca.infrastructure.plane.resolve import ref_of
 
@@ -34,7 +34,7 @@ def default_runtime(
     hub = device_hub()
     if hub is not None:
         return StreamingDshRuntime(hub, machine.id, settings)
-    from lca.infrastructure.dsh.machine_runtime import MachineDshRuntime
+    from lca.infrastructure.comparison.dsh_driver.machine_runtime import MachineDshRuntime
 
     return MachineDshRuntime(transport, machine, settings)
 
