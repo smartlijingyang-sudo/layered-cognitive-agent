@@ -177,9 +177,9 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Key symbols touched**: `lca/contracts/mechanisms/__init__.py`, `lca/contracts/mechanisms/capability.py`, `lca/contracts/mechanisms/composition.py`, `lca/contracts/mechanisms/content_addressable.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: port as-is
-- **Test plan**: no test path auto-detected; recommend manual review
+- **Test plan**: `tests/test_contracts.py`, `tests/test_contracts_purity.py`, `tests/test_plugin_alignment.py` (require_capability consumers)
 - **DAG deps**: (none)
-- **Mark**: [ ] port
+- **Mark**: [x] port (commit `a09bb493` + pre-port grandfather cleanup `acb038ee`)
 ### C20: C20 cluster
 
 - **Lane**: B
