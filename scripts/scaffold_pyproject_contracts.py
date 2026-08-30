@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import sys
-import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -50,7 +48,7 @@ def parse_readme_sections(readme_path: Path) -> dict[str, str]:
     text = readme_path.read_text(encoding="utf-8")
     sections: dict[str, str] = {}
     for match in re.finditer(r"^## (\d+)\. (.+?)\n(.*?)(?=\n## |\Z)", text, re.MULTILINE | re.DOTALL):
-        num, title, body = match.groups()
+        _num, title, body = match.groups()
         sections[title.strip()] = body.strip()
     return sections
 
