@@ -54,15 +54,15 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     ),
     RuntimeClosureRequirement(
         "effect_gateway_factory",
-        "lca.plugins.providers.declarative_runtime_seams",
+        "lca.plugins.providers.journal.declarative_runtime_seams",
     ),
     RuntimeClosureRequirement(
         "checkpoint_state_resolver_factory",
-        "lca.plugins.providers.declarative_runtime_seams",
+        "lca.plugins.providers.journal.declarative_runtime_seams",
     ),
     RuntimeClosureRequirement(
         "result_finalizer_factory",
-        "lca.plugins.providers.declarative_runtime_seams",
+        "lca.plugins.providers.journal.declarative_runtime_seams",
     ),
     RuntimeClosureRequirement(
         "delta_handler_registry",
@@ -70,19 +70,19 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     ),
     RuntimeClosureRequirement(
         "delta_reducer_factory",
-        "lca.plugins.providers.declarative_runtime_seams",
+        "lca.plugins.providers.journal.declarative_runtime_seams",
     ),
     RuntimeClosureRequirement(
         "declarative_interpreter_factory",
-        "lca.plugins.providers.declarative_runtime_seams",
+        "lca.plugins.providers.journal.declarative_runtime_seams",
     ),
     RuntimeClosureRequirement(
         "runtime_journal_factory",
-        "lca.plugins.providers.declarative_runtime_seams",
+        "lca.plugins.providers.journal.declarative_runtime_seams",
     ),
     RuntimeClosureRequirement(
         "loop_guard_evaluator",
-        "lca.plugins.providers.loop_guard",
+        "lca.plugins.providers.think.loop_guard",
     ),
     RuntimeClosureRequirement(
         "evidence_store",
@@ -98,11 +98,11 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     ),
     RuntimeClosureRequirement(
         "artifact_closure",
-        "lca.plugins.providers.artifact_closure",
+        "lca.plugins.providers.journal.artifact_closure",
     ),
     RuntimeClosureRequirement(
         "phase_observer",
-        "lca.plugins.providers.phase_observer",
+        "lca.plugins.providers.perceive.phase_observer",
     ),
     RuntimeClosureRequirement(
         "resume_input_adapters",

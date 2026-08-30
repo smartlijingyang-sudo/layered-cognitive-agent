@@ -26,17 +26,17 @@ from lca.harness.declarative.dispatch import RegistryEffectGateway
 from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
 from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
 from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
-from lca.plugins.providers.action_handlers import (
+from lca.plugins.providers.act.action_handlers import (
     DefaultActionHandlerRegistry,
     InMemoryActionHandlerRegistry,
     register_default_action_handlers,
 )
-from lca.plugins.providers.delta_handlers import (
+from lca.plugins.providers.act.delta_handlers import (
     DefaultDeltaHandlerRegistry,
     InMemoryDeltaHandlerRegistry,
     register_default_delta_handlers,
 )
-from lca.plugins.providers.effect_handlers import (
+from lca.plugins.providers.act.effect_handlers import (
     InMemoryEffectHandlerRegistry,
 )
 

@@ -3,16 +3,16 @@
 import pytest
 
 from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
-from lca.plugins.providers.action_handlers import (
+from lca.plugins.providers.act.action_handlers import (
     DefaultActionHandlerRegistry,
     DelegateActionHandler,
     HandoffActionHandler,
     RespondActionHandler,
     UseToolActionHandler,
 )
-from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
-from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
-from lca.plugins.providers.delta_handlers import (
+from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
+from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.providers.act.delta_handlers import (
     ActivationDeltaHandler,
     ArtifactClosureDeltaHandler,
     DefaultDeltaHandlerRegistry,
@@ -26,13 +26,13 @@ from lca.plugins.providers.delta_handlers import (
     StopDeltaHandler,
     TurnDeltaHandler,
 )
-from lca.plugins.providers.effect_handlers import (
+from lca.plugins.providers.act.effect_handlers import (
     BodyActEffectHandler,
     InMemoryEffectHandlerRegistry,
     MemoryUpdateEffectHandler,
     register_default_effect_handlers,
 )
-from lca.plugins.providers.gate_chain_composer import DefaultGateChainComposer
+from lca.plugins.providers.gate.gate_chain_composer import DefaultGateChainComposer
 
 
 class TestDefaultDecisionClassifier:

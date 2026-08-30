@@ -23,7 +23,7 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.plugins.providers.action_handlers import InMemoryActionHandlerRegistry
+    from lca.plugins.providers.act.action_handlers import InMemoryActionHandlerRegistry
 
     # 接缝只提供中性能力容器；默认 handler 由独立 provider 统一安装。
     ctx.provide("action_handler_registry", InMemoryActionHandlerRegistry())

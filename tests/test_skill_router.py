@@ -14,7 +14,7 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.cognition.brain.modular_brain import ModularBrain
 from lca.cognition.brain.skill_router import KeywordSkillRouter, StaticSkillRouter
 from lca.runtime.reducer import DefaultReducer
-from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
 
 
 def _make_state(task: str) -> AgentState:

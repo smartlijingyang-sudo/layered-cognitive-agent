@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.capabilities import COMPOSITION_COMPOSE_FACTORY, COMPOSITION_INVARIANT_CHECKER
 from lca.contracts.mechanisms.composition import InvariantChecker
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.providers.composition_composer import (
+from lca.plugins.providers.think.composition_composer import (
     CordisComposer,
     build_default_invariant_checker,
 )

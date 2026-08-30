@@ -12,13 +12,11 @@ from typing import cast
 from pydantic import BaseModel
 
 from lca.contracts.mechanisms import HookRegistry
-from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
-from lca.contracts.protocols.declarative.declarative_phase_graph import DeltaReducer, EffectGateway
-from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.act.effect_handler import EffectCapabilities, EffectHandlerRegistry
+from lca.contracts.protocols.declarative.declarative_phase_graph import DeltaReducer, EffectGateway
+from lca.contracts.protocols.journal.artifact_closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency import IdempotencyStore
 from lca.contracts.protocols.runtime.infra import StateStore
-from lca.contracts.protocols.state.reducer import Reducer
 from lca.contracts.protocols.runtime.runtime_composition import (
     CheckpointStateResolver,
     CheckpointStateResolverFactory,
@@ -32,6 +30,8 @@ from lca.contracts.protocols.runtime.runtime_composition import (
     RuntimeJournalFactory,
 )
 from lca.contracts.protocols.runtime.runtime_lifecycle import RuntimeLifecyclePublisher
+from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
+from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.declarative import GenericPlanInterpreter
 from lca.harness.declarative.dispatch import RegistryDeltaReducer, RegistryEffectGateway
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin

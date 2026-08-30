@@ -22,7 +22,7 @@ from lca.cognition.gate_service import GateService
 from lca.cognition.memory.simple_memory import SimpleMemorySystem
 from lca.cognition.memory.temporal_memory import TemporalMemorySystem
 from lca.application.policies import LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy
-from lca.plugins.providers.component_budget_policy import (
+from lca.plugins.providers.state.component_budget_policy import (
     ComponentRegistryLeadBudgetPolicyResolver,
 )
 

@@ -236,7 +236,7 @@ class InvariantChecker(Protocol):
     """mount 前的轻量 invariant 检查钩子（§23.2）。
 
     Plugin-thinking 一以贯之：InvariantChecker 也是 plugin；默认实现见
-    ``lca/plugins/providers/composition.py::DefaultInvariantChecker``。
+    ``lca/plugins/providers/think/composition_composer.py::DefaultInvariantChecker``。
     测试可注入 ``AlwaysAllow`` / ``AlwaysDeny`` 实现。
     """
 
@@ -257,7 +257,7 @@ class Composer(Protocol):
     """群 Composition 唯一组装者（plugin 化）。
 
     实现由 Tier-2 provider 注入；默认 :class:`CordisComposer` 见
-    ``lca/plugins/providers/composition.py``。
+    ``lca/plugins/providers/think/composition_composer.py``。
 
     所有动作的硬约束：
 

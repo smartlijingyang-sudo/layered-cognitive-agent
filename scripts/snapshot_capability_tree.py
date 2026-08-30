@@ -59,17 +59,9 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
             "layers": {"L0", "L1", "L2", "L3"},
             "module_patterns": [
                 r"^lca/plugins/seams/observability/",
-                r"^lca/plugins/providers/attribute_policy",
-                r"^lca/plugins/providers/cli_debug",
-                r"^lca/plugins/providers/event_descriptor",
-                r"^lca/plugins/providers/evidence_store",
-                r"^lca/plugins/providers/fact_reader",
-                r"^lca/plugins/providers/fact_scorer",
-                r"^lca/plugins/providers/fact_store",
-                r"^lca/plugins/providers/genai_",
-                r"^lca/plugins/providers/journal",
-                r"^lca/plugins/providers/tracer",
-                r"^lca/plugins/providers/trace_tool",
+                r"^lca/plugins/providers/observability/",
+                r"^lca/plugins/providers/journal/fact_store_memory",
+                r"^lca/plugins/providers/memory/journal_memory",
                 # Learning plugins consume completed-run evidence and produce
                 # candidates/decisions; they remain cross-cutting rather than
                 # introducing an ungoverned seventh runtime plane.

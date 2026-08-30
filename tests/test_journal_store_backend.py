@@ -110,7 +110,7 @@ def test_seam_provides_journal_store() -> None:
 def test_provider_registers_memory_factory() -> None:
     """provider plugin 模块可导入并暴露 memory factory。"""
     from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers import fact_store_memory as mod
+    from lca.plugins.providers.journal import fact_store_memory as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

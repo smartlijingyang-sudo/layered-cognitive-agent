@@ -16,7 +16,7 @@ from lca.contracts.protocols.act.command_envelope import CommandEnvelope
 from lca.harness.declarative.dispatch import RegistryEffectGateway
 from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
 from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
-from lca.plugins.providers.effect_handlers import (
+from lca.plugins.providers.act.effect_handlers import (
     InMemoryEffectHandlerRegistry,
     register_default_effect_handlers,
 )

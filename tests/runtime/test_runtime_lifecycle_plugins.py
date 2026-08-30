@@ -27,7 +27,7 @@ from lca.runtime.runtime_event_publisher import (
     RuntimeLifecyclePublisherError,
 )
 from lca.runtime.runtime_loop import CognitiveRuntime, _event_type_for_result
-from lca.plugins.providers import runtime_lifecycle, runtime_lifecycle_logging
+from lca.plugins.providers.state import runtime_lifecycle, runtime_lifecycle_logging
 
 
 @dataclass

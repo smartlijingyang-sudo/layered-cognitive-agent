@@ -6,7 +6,7 @@ import unittest
 
 from lca.contracts.models.core.llm import LLMResponse
 from lca.cognition.brain.leaked_tool_call import recover_leaked_tool_calls
-from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
 
 
 class TestRecoverLeakedToolCall(unittest.TestCase):

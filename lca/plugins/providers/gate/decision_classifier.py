@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from lca.cognition.brain.leaked_tool_call import recover_leaked_tool_calls
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, DelegationSpec, ToolCall
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.cognition.brain.leaked_tool_call import recover_leaked_tool_calls
 
 _PARSE_FAILURE_USER_MESSAGE = "抱歉，模型未返回有效决策，请重试。"
 _DELEGATE_TOOL_NAME = "delegate"

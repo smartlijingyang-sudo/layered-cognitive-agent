@@ -13,7 +13,7 @@ from lca.contracts.models.observability.journal import PluginMounted, PluginMoun
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
 from lca.infrastructure.observability.journal_backend import MemoryJournal
 from lca.application.preset_authoring import PresetAuthoring
-from lca.plugins.providers.composition_composer import (
+from lca.plugins.providers.think.composition_composer import (
     CordisComposer,
     build_default_invariant_checker,
 )

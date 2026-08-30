@@ -100,7 +100,7 @@ def test_seam_provides_tools() -> None:
 
 def test_provider_registers_all_tools() -> None:
     from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers import trace_tool as mod
+    from lca.plugins.providers.observability import trace_tool as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

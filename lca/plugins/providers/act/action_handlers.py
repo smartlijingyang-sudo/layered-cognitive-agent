@@ -20,8 +20,8 @@ from lca.contracts.capabilities import ACTION_HANDLERS, TOOL_BATCH_EXECUTION_POL
 from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.contracts.protocols.act.action import Action
 from lca.contracts.protocols.act.action_handler import ActionHandler, ActionHandlerRegistry
-from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.contracts.protocols.act.tool_batch_execution import ToolBatchExecutionPolicy
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.handler_registry import UniqueOperationRegistry
 

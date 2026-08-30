@@ -30,7 +30,7 @@ from lca.contracts.protocols.act.command_envelope import RunDelta
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.providers.delta_handler_registry import (
+from lca.plugins.providers.act.delta_handler_registry import (
     DefaultDeltaHandlerRegistry,
     InMemoryDeltaHandlerRegistry,
     register_default_delta_handlers,

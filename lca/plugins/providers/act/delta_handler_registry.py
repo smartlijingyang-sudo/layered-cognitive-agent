@@ -32,7 +32,7 @@ class InMemoryDeltaHandlerRegistry(UniqueOperationRegistry[DeltaHandler], DeltaH
 
 def register_default_delta_handlers(registry: DeltaHandlerRegistry) -> None:
     """Register the provider-owned handlers on ``registry``."""
-    from lca.plugins.providers.delta_handlers import (
+    from lca.plugins.providers.act.delta_handlers import (
         ActivationDeltaHandler,
         ArtifactClosureDeltaHandler,
         ErrorDeltaHandler,

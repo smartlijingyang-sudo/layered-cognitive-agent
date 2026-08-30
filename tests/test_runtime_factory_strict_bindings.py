@@ -31,7 +31,7 @@ from lca.plugins.composer.runtime_factory import (
     build_cognitive_runtime,
     build_fixture_cognitive_runtime,
 )
-from lca.plugins.providers.declarative_runtime_seams import (
+from lca.plugins.providers.journal.declarative_runtime_seams import (
     DefaultCheckpointStateResolverFactory,
     DefaultDeclarativeInterpreterFactory,
     DefaultResultFinalizerFactory,

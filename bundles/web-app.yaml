@@ -97,7 +97,7 @@ entries:
   # barrier while allowing adjacent idempotent/read-only calls to overlap.
   - id: lca-tool-batch-execution-policy
     name: lca_tool_batch_execution_policy
-    $module: lca.plugins.providers.tool_batch_execution_policy
+    $module: lca.plugins.providers.act.tool_batch_execution_policy
     config:
       mode: segmented_safe
 
@@ -111,7 +111,7 @@ entries:
 
   - id: lca-action-handler-provider
     name: lca_action_handler_provider
-    $module: lca.plugins.providers.action_handlers
+    $module: lca.plugins.providers.act.action_handlers
     config: {}
 
   # ── Act / world plane ──
@@ -252,17 +252,17 @@ entries:
 
   - id: lca-component-state-store-contributor
     name: lca_component_state_store_contributor
-    $module: lca.plugins.providers.component_state_store
+    $module: lca.plugins.providers.state.component_state_store
     config: {}
 
   - id: lca-component-memory-contributor
     name: lca_component_memory_contributor
-    $module: lca.plugins.providers.component_memory
+    $module: lca.plugins.providers.memory.component_memory
     config: {}
 
   - id: lca-component-budget-policy-contributor
     name: lca_component_budget_policy_contributor
-    $module: lca.plugins.providers.component_budget_policy
+    $module: lca.plugins.providers.state.component_budget_policy
     config: {}
 
   # ── Team strategy factories (ADR-0062 §7 / PR-4) ──

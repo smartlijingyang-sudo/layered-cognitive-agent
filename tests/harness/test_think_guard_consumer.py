@@ -25,7 +25,7 @@ from lca.contracts.protocols import (
 )
 from lca.cognition.brain.modular_brain import ModularBrain
 from lca.runtime.reducer import DefaultReducer
-from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
 
 # ── Test doubles ─────────────────────────────────────────────────────
 

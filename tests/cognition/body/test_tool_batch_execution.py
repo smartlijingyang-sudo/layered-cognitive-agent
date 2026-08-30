@@ -23,7 +23,7 @@ from lca.cognition.body.tool_batch_execution import (
     SegmentedSafeToolBatchExecutionPolicy,
     SequentialToolBatchExecutionPolicy,
 )
-from lca.plugins.providers.tool_batch_execution_policy import build_tool_batch_execution_policy
+from lca.plugins.providers.act.tool_batch_execution_policy import build_tool_batch_execution_policy
 
 
 class _Tool:

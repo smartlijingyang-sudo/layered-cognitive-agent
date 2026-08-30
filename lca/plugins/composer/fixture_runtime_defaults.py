@@ -9,9 +9,9 @@ from lca.contracts.protocols.journal.idempotency import IdempotencyStore
 from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
-from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
-from lca.plugins.providers.delta_handlers import DefaultDeltaHandlerRegistry
-from lca.plugins.providers.effect_handlers import (
+from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
+from lca.plugins.providers.act.delta_handlers import DefaultDeltaHandlerRegistry
+from lca.plugins.providers.act.effect_handlers import (
     InMemoryEffectHandlerRegistry,
     register_default_effect_handlers,
 )

@@ -16,7 +16,7 @@ from lca.contracts.models.observability.journal import (
 from lca.infrastructure.observability import TraceInspector
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 from lca.infrastructure.observability.journal.engine.journal_io import read_journal, stamped_to_record
-from lca.plugins.providers.cli_debug_trace import _DebugTraceCommand
+from lca.plugins.providers.observability.cli_debug_trace import _DebugTraceCommand
 
 
 def _scope() -> RunScope:
@@ -88,7 +88,7 @@ def test_seam_provides_debug_registry() -> None:
 
 def test_trace_command_registered() -> None:
     from lca.plugins import providers  # noqa: F401
-    from lca.plugins.providers import cli_debug_trace as mod
+    from lca.plugins.providers.observability import cli_debug_trace as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

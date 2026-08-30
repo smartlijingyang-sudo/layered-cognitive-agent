@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from lca.application.policies import LEAD_BUDGET_POLICY_KEY
 from lca.contracts.atoms.enums import ComponentKind
 from lca.contracts.capabilities import COMPONENT_REGISTRY, LEAD_BUDGET_POLICY_RESOLVER
 from lca.contracts.mechanisms import ComponentRegistryProtocol
 from lca.contracts.protocols import BudgetPolicy, LeadBudgetPolicyResolver
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.application.policies import LEAD_BUDGET_POLICY_KEY
 
 
 class Config(BaseModel):

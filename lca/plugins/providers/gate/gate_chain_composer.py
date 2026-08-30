@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.protocols.think.cognition import DecisionGate
 from lca.contracts.protocols.gate.gate_chain_composer import GateChainComposer
+from lca.contracts.protocols.think.cognition import DecisionGate
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

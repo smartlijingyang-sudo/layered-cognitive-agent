@@ -23,7 +23,7 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.plugins.providers.effect_handlers import InMemoryEffectHandlerRegistry
+    from lca.plugins.providers.act.effect_handlers import InMemoryEffectHandlerRegistry
 
     # A seam declares an empty capability container.  The separately enabled
     # provider plugin owns all default handler registration.

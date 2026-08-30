@@ -32,7 +32,7 @@ from lca.cognition.member_status import (
 )
 from lca.cognition.member_status.tracking import _next_role_status
 from lca.runtime.reducer import DefaultReducer
-from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
 
 # ── helpers ──
 

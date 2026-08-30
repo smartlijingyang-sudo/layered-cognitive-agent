@@ -21,7 +21,7 @@ from lca.cognition.brain.decision_gates.artifact_respond_injector import (
 from lca.cognition.brain.decision_gates.office_works_sealer import OfficeWorksSealer
 from lca.cognition.brain.decision_gates.terminal_respond import TerminalRespondGate
 from lca.cognition.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
-from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
+from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
 
 
 class TestSafeBoundary:

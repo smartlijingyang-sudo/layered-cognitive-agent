@@ -24,12 +24,12 @@ entries:
   # replace either provider without changing the Brain facade or Agent Loop.
   - id: lca-cognitive-think-pipeline-standard
     name: lca_cognitive_think_pipeline_standard
-    $module: lca.plugins.providers.cognitive_think_pipeline
+    $module: lca.plugins.providers.think.cognitive_think_pipeline
     config: {}
 
   - id: lca-cognitive-reflection-pipeline-standard
     name: lca_cognitive_reflection_pipeline_standard
-    $module: lca.plugins.providers.cognitive_reflection_pipeline
+    $module: lca.plugins.providers.think.cognitive_reflection_pipeline
     config: {}
 
   - id: lca-tools-service
@@ -102,25 +102,25 @@ entries:
 
   - id: lca-memory-provider
     name: lca_providers_memory
-    $module: lca.plugins.providers.memory
+    $module: lca.plugins.providers.memory.memory
     config:
       providers: [simple, temporal]
 
   - id: lca-state-store-provider
     name: lca_providers_state_store
-    $module: lca.plugins.providers.state_store
+    $module: lca.plugins.providers.state.state_store
     config:
       providers: [memory]
       active_provider: memory
 
   - id: lca-session-persistence-jsonl-provider
     name: lca_providers_session_persistence_jsonl
-    $module: lca.plugins.providers.session_persistence
+    $module: lca.plugins.providers.collaboration.session_persistence
     config: {}
 
   - id: lca-session-projection-memory-provider
     name: lca_providers_session_projection_memory
-    $module: lca.plugins.providers.session_projections
+    $module: lca.plugins.providers.collaboration.session_projections
     config: {}
 
   # The active Session owns exactly one cancellable turn task.  Alternative
@@ -128,7 +128,7 @@ entries:
   # this provider without coupling command routing to a concrete Agent Loop.
   - id: lca-session-turn-controller-factory
     name: lca_providers_session_turn_controller
-    $module: lca.plugins.providers.session_turn_controller
+    $module: lca.plugins.providers.collaboration.session_turn_controller
     config: {}
 
   # Follow-up admission is distinct from task ownership. The default safely
@@ -136,7 +136,7 @@ entries:
   # strict rejection without changing the LiveAgent or command router.
   - id: lca-session-followup-policy
     name: lca_providers_session_followup_policy
-    $module: lca.plugins.providers.session_followup_policy
+    $module: lca.plugins.providers.collaboration.session_followup_policy
     config:
       mode: enqueue
 
@@ -145,42 +145,42 @@ entries:
   # or live-agent control flow.
   - id: lca-session-command-ledger
     name: lca_providers_session_command_ledger
-    $module: lca.plugins.providers.session_command_ledger
+    $module: lca.plugins.providers.collaboration.session_command_ledger
     config: {}
 
   - id: lca-search-provider
     name: lca_providers_search
-    $module: lca.plugins.providers.search
+    $module: lca.plugins.providers.memory.search
     config:
       providers: [tavily]
 
   - id: lca-tools-provider
     name: lca_providers_tools
-    $module: lca.plugins.providers.tools
+    $module: lca.plugins.providers.act.tools
     config:
       factories: [g2a]
 
   - id: lca-transport-provider
     name: lca_providers_transport
-    $module: lca.plugins.providers.transport
+    $module: lca.plugins.providers.act.transport
     config:
       providers: [internal, a2a, mcp]
 
   - id: lca-skills-provider
     name: lca_providers_skills
-    $module: lca.plugins.providers.skills
+    $module: lca.plugins.providers.memory.skills
     config:
       providers: [disk]
 
   - id: lca-file-store-provider
     name: lca_providers_file_store
-    $module: lca.plugins.providers.file_store
+    $module: lca.plugins.providers.memory.file_store
     config:
       providers: [local]
 
   - id: lca-sandbox-provider
     name: lca_providers_sandbox
-    $module: lca.plugins.providers.sandbox
+    $module: lca.plugins.providers.act.sandbox
     config:
       providers: [local]
 
@@ -192,7 +192,7 @@ entries:
 
   - id: lca-event-descriptor-bootstrap
     name: lca_providers_event_descriptor
-    $module: lca.plugins.providers.event_descriptor
+    $module: lca.plugins.providers.observability.event_descriptor
     config: {}
 
   # ── ADR-0063 PR-8: JournalStoreBackend factory registry ──
@@ -203,7 +203,7 @@ entries:
 
   - id: lca-fact-store-memory-factory
     name: lca_providers_fact_store_memory
-    $module: lca.plugins.providers.fact_store_memory
+    $module: lca.plugins.providers.journal.fact_store_memory
     config: {}
 
   # ── Facade plugin-ification: 4 backend seams + providers ──
@@ -234,42 +234,42 @@ entries:
 
   - id: lca-journal-memory-factory
     name: lca_providers_journal_memory
-    $module: lca.plugins.providers.journal_memory
+    $module: lca.plugins.providers.memory.journal_memory
     config: {}
 
   - id: lca-tracer-otel-factory
     name: lca_providers_tracer_otel
-    $module: lca.plugins.providers.tracer_otel
+    $module: lca.plugins.providers.observability.tracer_otel
     config: {}
 
   - id: lca-attribute-policy-default-factory
     name: lca_providers_attribute_policy
-    $module: lca.plugins.providers.attribute_policy
+    $module: lca.plugins.providers.observability.attribute_policy
     config: {}
 
   - id: lca-fact-reader-console-factory
     name: lca_providers_fact_reader_console
-    $module: lca.plugins.providers.fact_reader_console
+    $module: lca.plugins.providers.observability.fact_reader_console
     config: {}
 
   - id: lca-fact-reader-jsonl-factory
     name: lca_providers_fact_reader_jsonl
-    $module: lca.plugins.providers.fact_reader_jsonl
+    $module: lca.plugins.providers.observability.fact_reader_jsonl
     config: {}
 
   - id: lca-fact-reader-otel-factory
     name: lca_providers_fact_reader_otel
-    $module: lca.plugins.providers.fact_reader_otel
+    $module: lca.plugins.providers.observability.fact_reader_otel
     config: {}
 
   - id: lca-fact-reader-langfuse-factory
     name: lca_providers_fact_reader_langfuse
-    $module: lca.plugins.providers.fact_reader_langfuse
+    $module: lca.plugins.providers.observability.fact_reader_langfuse
     config: {}
 
   - id: lca-langfuse-eval-scorer
     name: lca_providers_fact_scorer_langfuse
-    $module: lca.plugins.providers.fact_scorer_langfuse
+    $module: lca.plugins.providers.observability.fact_scorer_langfuse
     config: {}
 
   # ── ADR-0063 PR-9: TraceInspector tools + CLI debug commands ──
@@ -280,7 +280,7 @@ entries:
 
   - id: lca-trace-tool-provider
     name: lca_providers_trace_tool
-    $module: lca.plugins.providers.trace_tool
+    $module: lca.plugins.providers.observability.trace_tool
     config: {}
 
   - id: lca-cli-debug-command-seam
@@ -290,7 +290,7 @@ entries:
 
   - id: lca-cli-debug-trace
     name: lca_providers_cli_debug_trace
-    $module: lca.plugins.providers.cli_debug_trace
+    $module: lca.plugins.providers.observability.cli_debug_trace
     config: {}
 
   # ── ADR-0063 PR-10: GenAI semantic mappers ──
@@ -301,12 +301,12 @@ entries:
 
   - id: lca-genai-llm-mapper
     name: lca_providers_genai_llm
-    $module: lca.plugins.providers.genai_llm
+    $module: lca.plugins.providers.observability.genai_llm
     config: {}
 
   - id: lca-genai-tool-mapper
     name: lca_providers_genai_tool
-    $module: lca.plugins.providers.genai_tool
+    $module: lca.plugins.providers.observability.genai_tool
     config: {}
 
   # ── ADR-0075 / full-plugin-remediation §5: durable effect receipts ──
@@ -327,7 +327,7 @@ entries:
 
   - id: lca-effect-handler-provider
     name: lca_effect_handler_provider
-    $module: lca.plugins.providers.effect_handlers
+    $module: lca.plugins.providers.act.effect_handlers
     config: {}
 
   # ── ADR-0074: Delta handler registry + provider ──
@@ -340,7 +340,7 @@ entries:
 
   - id: lca-delta-handler-provider
     name: lca_delta_handler_provider
-    $module: lca.plugins.providers.delta_handlers
+    $module: lca.plugins.providers.act.delta_handlers
     config: {}
 
   # ── Declarative runtime mechanism factories ──
@@ -348,28 +348,28 @@ entries:
   # Profile selects the concrete gateway, delta adapter, and per-turn journal.
   - id: lca-declarative-runtime-seams-provider
     name: lca_declarative_runtime_seams_provider
-    $module: lca.plugins.providers.declarative_runtime_seams
+    $module: lca.plugins.providers.journal.declarative_runtime_seams
     config: {}
 
   # LoopGuard policy is separate from phase topology. Profiles can replace the
   # evaluator while retaining the same declarative graph and phase executors.
   - id: lca-declarative-loop-guard
     name: lca_declarative_loop_guard
-    $module: lca.plugins.providers.loop_guard
+    $module: lca.plugins.providers.think.loop_guard
     config: {}
 
   # The complete Agent Loop is selected through this Provider. Alternative
   # runtime implementations replace this entry without changing L3/L4 assembly.
   - id: lca-cognitive-runtime-factory
     name: lca_cognitive_runtime_factory
-    $module: lca.plugins.providers.runtime_factory
+    $module: lca.plugins.providers.journal.runtime_factory
     config: {}
 
   # ── ADR-0074: Artifact closure seam/provider ──
   # Loop exit consumes this typed seam instead of the legacy free function.
   - id: lca-artifact-closure-provider
     name: lca_artifact_closure_provider
-    $module: lca.plugins.providers.artifact_closure
+    $module: lca.plugins.providers.journal.artifact_closure
     config: {}
 
   # ── Declarative phase observation ──
@@ -382,12 +382,12 @@ entries:
 
   - id: lca-phase-observer-tracing-provider
     name: lca_phase_observer_tracing_provider
-    $module: lca.plugins.providers.phase_observer_tracing
+    $module: lca.plugins.providers.perceive.phase_observer_tracing
     config: {}
 
   - id: lca-phase-observer-provider
     name: lca_phase_observer_provider
-    $module: lca.plugins.providers.phase_observer
+    $module: lca.plugins.providers.perceive.phase_observer
     config:
       failure_mode: fail_open
 
@@ -402,13 +402,13 @@ entries:
 
   - id: lca-runtime-lifecycle-logging-provider
     name: lca_runtime_lifecycle_logging_provider
-    $module: lca.plugins.providers.runtime_lifecycle_logging
+    $module: lca.plugins.providers.state.runtime_lifecycle_logging
     config:
       priority: 100
 
   - id: lca-runtime-lifecycle-publisher
     name: lca_runtime_lifecycle_publisher
-    $module: lca.plugins.providers.runtime_lifecycle
+    $module: lca.plugins.providers.state.runtime_lifecycle
     config:
       failure_mode: fail_open
 

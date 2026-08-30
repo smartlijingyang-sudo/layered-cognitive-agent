@@ -13,7 +13,7 @@ entries:
   # 拿到 composer 实例。single-port 模式下 web-standard 绑此 bundle 即可。
   - id: lca-composer-provider
     name: lca_composer_provider
-    $module: lca.plugins.providers.composition_provider
+    $module: lca.plugins.providers.think.composition_provider
     config: {}
 
   # Creator persona is a profile capability rather than an adapter-local

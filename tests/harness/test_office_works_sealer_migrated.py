@@ -30,7 +30,7 @@ from lca.cognition.body.safe_executor import SimpleSafeExecutor
 from lca.cognition.body.simple_body import SimpleBody
 from lca.cognition.body.tool_registry import SimpleToolRegistry
 from lca.cognition.transport_registry_factory import build_transport_registry
-from lca.plugins.providers.gate_chain_composer import DefaultGateChainComposer
+from lca.plugins.providers.gate.gate_chain_composer import DefaultGateChainComposer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEALER_PATH = (
