@@ -118,8 +118,17 @@ async def load_bytes(ref: FileRef, fetcher: FileFetcher) -> tuple[bytes, str]:
     return data, actual_mime
 
 
-def try_resolve_local_file(ref: FileRef, store: FileStore) -> str | None:
+def try_resolve_local_file(ref: FileRef, store: FileStore | None) -> str | None:
     """Resolve local ``/files/{id}`` and LobeHub-ID references without HTTP."""
+    # Defensive guard: callers that boot the gateway without a bootstrap_factory
+    # (e.g. ``scripts/serve_observability.py``) historically arrived here with
+    # ``store is None`` and surfaced ``AttributeError: 'NoneType' object has
+    # no attribute 'exists'`` as a 500 on POST /runs for any message that
+    # carried a ``fileList`` / ``imageList``. Returning ``None`` lets the
+    # remote/cache/loader fallback path try to attach the file instead of
+    # failing the whole run.
+    if store is None:
+        return None
     url = ref.url.strip()
     match = _LOCAL_FILE_URL_RE.match(url)
     if match is None:

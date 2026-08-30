@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -71,9 +72,6 @@ from gateway.session_routes import (
 from gateway.spine import bind_session_spine
 from lca.layer0_infra.file_store import LocalFileStore
 
-
-
-
 _registry = RunRegistry()
 _file_store = None  # set by bootstrap factory or lifespan
 _device_settings = DeviceGatewaySettings()
@@ -83,8 +81,6 @@ _device_hub = DeviceHub(_devices)
 
 def get_registry() -> RunRegistry:
     return _registry
-
-
 
 
 async def _options(_request: Request) -> JSONResponse:
@@ -236,7 +232,6 @@ def create_app(
         _registry = registry
     if file_store is not None:
         _file_store = file_store
-        set_default_file_store(file_store)
     if devices is not None:
         _devices = devices
         _device_hub = DeviceHub(devices)
@@ -301,6 +296,7 @@ def create_app(
     application.state.device_settings = _device_settings
     if run_port is None:
         from gateway.runs.legacy_adapter import RegistryRunAdapter
+
         run_port = RegistryRunAdapter(_registry)
     application.state.run_port = run_port
     application.state.run_registry = _registry
@@ -386,6 +382,7 @@ def create_app(
                     # (test_gateway_bootstrap::test_gateway_lifespan_reuses_
                     # bootstrap_file_store asserts this).
                     from lca.layer0_infra.capability.files import FileStoreService
+
                     file_store_svc = FileStoreService()
                     file_store_svc.register("bootstrap", product.file_store, activate=True)
                     ctx.provide("file_store", file_store_svc)
@@ -426,4 +423,17 @@ def create_app(
     return application
 
 
-app = create_app()
+# Module-load ``app = create_app()`` is what ``scripts/serve_observability.py``
+# imports under ``gateway.app:app``. That script does not pass a
+# ``bootstrap_factory`` (it just runs uvicorn against this module), so without
+# an explicit ``file_store=`` the resulting app would have
+# ``app.state.file_store is None`` and any incoming POST with a
+# ``fileList`` / ``imageList`` would 500 inside ``try_resolve_local_file``
+# with ``AttributeError: 'NoneType' object has no attribute 'exists'``
+# (regression observed on POST /runs in the gateway log; commit
+# ``fix(sse+file-store)`` ships both this default and the defensive guard
+# so a future caller that drops the store can't regress the wire).
+# Bootstrap-aware callers (tests, ``lca.ops`` boot) still pass their own
+# ``file_store=`` and win.
+_default_fs_root = Path(os.environ.get("LCA_FILE_STORE_ROOT", "traces/files"))
+app = create_app(file_store=LocalFileStore(_default_fs_root))
