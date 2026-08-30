@@ -162,6 +162,7 @@ from lca.contracts.protocols.idempotency import IdempotencyClaim, IdempotencySto
 from lca.contracts.protocols.infra import (
     AgentTransport,
     AttachmentIdentity,
+    DshRuntime,
     LLMAdapter,
     SafeExecutor,
     Sandbox,

@@ -233,3 +233,23 @@ class LocalFileStore:
         if len(text) > max_chars:
             return text[:max_chars] + "…"
         return text
+
+
+# Backwards-compat shim — main moved the default-file-store global into
+# the composition root (gateway/bootstrap.py). Branch-side code that
+# still uses this helper is the restored DSH execute path. Provide a
+# thin singleton so the soft-lock surface imports cleanly.
+_default_store: LocalFileStore | None = None
+
+
+def get_default_file_store() -> LocalFileStore:
+    global _default_store
+    if _default_store is None:
+        _default_store = LocalFileStore()
+    return _default_store
+
+
+def set_default_file_store(store: LocalFileStore | None) -> None:
+    """Test hook / composition root injection."""
+    global _default_store
+    _default_store = store

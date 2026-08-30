@@ -261,3 +261,14 @@ class TransportRegistryProtocol(Protocol):
     def resolve(self, protocol_name: str) -> AgentTransport: ...
 
     def list_protocols(self) -> list[str]: ...
+
+
+# Backwards-compat shim — DSH was removed on main (f0ba4058). Branch-side
+# code (gateway/runs/dsh_execute.py, the restored dsh streaming runtime)
+# still imports DshRuntime from this module. Preserve as a thin Protocol
+# so the soft-locked loop_drivers + execute + api surface keeps loading.
+@runtime_checkable
+class DshRuntime(Protocol):
+    """External DeepSeek Harness turn runner. Driver, not a plane."""
+
+    def run_turn(self, spec: Any, on_event: Any) -> Any: ...
