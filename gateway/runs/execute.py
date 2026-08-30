@@ -239,41 +239,39 @@ def create_run_session(
     execution_target: str = "",
     ctx: Any | None = None,
 ) -> RunSession:
-    run_id = new_id("run")
-    trace_id = new_id("trace")
-    jsonl_path = registry.jsonl_path_for(run_id)
-    cleaned_ids = tuple(str(i).strip() for i in attachment_ids if str(i).strip())
-    tail = LiveTail()
+    """Soft-locked compatibility facade for legacy RunSession creation.
+
+    Per ADR-0103 §2: ``gateway/runs/execute.py`` finalize/closure logic can
+    evolve. The original branch-era implementation called
+    ``registry.journal.bind()`` (which doesn't exist on main's ProcessJournalBinding;
+    main's bind() requires a factory arg). Main's RunSessionFactory owns
+    the lifecycle; we delegate to it.
+
+    If ctx is None, fall back to the process-default ctx (lobehub FastAPI
+    caller pattern; main's factories require ctx to be explicit).
+    """
     if ctx is None:
         from lca.layer4_app.api import get_or_create_default_ctx
 
         ctx = get_or_create_default_ctx()
-    hub = assemble_run_hub(
-        jsonl_path=jsonl_path,
-        tail=tail,
-        ctx=ctx,
-        extra_projectors=(registry.journal.bind(),),
+
+    from gateway.runs.session_setup import RunSessionFactory
+    from gateway.runs.session_setup_types import RunSessionRequest
+
+    return RunSessionFactory(registry, ctx=ctx).create(
+        RunSessionRequest(
+            question=question,
+            user_text=user_text,
+            mode=mode,
+            attachment_ids=tuple(str(i).strip() for i in attachment_ids if str(i).strip()),
+            prior_turns=tuple(prior_turns),
+            agent=agent,
+            device_id=device_id.strip(),
+            plane=plane.strip(),
+            extra_plane=extra_plane.strip(),
+            execution_target=execution_target.strip(),
+        )
     )
-    session = RunSession(
-        run_id=run_id,
-        trace_id=trace_id,
-        jsonl_path=jsonl_path,
-        tail=tail,
-        hub=hub,
-        question=question,
-        user_text=user_text,
-        mode=mode,
-        prior_turns=tuple(prior_turns),
-        attachment_ids=cleaned_ids,
-        agent=agent if agent is not None else default_agent_ref(),
-        device_id=device_id.strip(),
-        plane=plane.strip(),
-        extra_plane=extra_plane.strip(),
-        execution_target=execution_target.strip(),
-    )
-    registry.put(session)
-    _emit_plugin_inventory(session, ctx, hub)
-    return session
 
 
 def _emit_plugin_inventory(session: RunSession, ctx: Any, hub: BoundObservability) -> None:

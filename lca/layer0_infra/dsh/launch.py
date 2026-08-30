@@ -11,7 +11,7 @@ from lca.layer0_infra.attachment import get_attachment_policy
 from lca.layer0_infra.attachment.layout import sanitize_run_segment
 from lca.layer0_infra.attachment.prompt import render_dsh_workspace_context
 from lca.layer0_infra.dsh.settings import DshSettings
-from lca.layer0_infra.file_store import FileStore, get_default_file_store
+from lca.layer0_infra.file_store import FileStore
 
 
 def build_harness_env(
@@ -48,7 +48,7 @@ def build_harness_env(
     prompt = cfg.system_prompt.strip()
     ids = tuple(str(i).strip() for i in (attachment_ids or ()) if str(i).strip())
     if ids and root:
-        active_store = store if store is not None else get_default_file_store()
+        active_store = store if store is not None else LocalFileStore()
         workspace_ctx = render_dsh_workspace_context(root, run_id, ids, active_store)
         if workspace_ctx:
             prompt = f"{prompt}\n\n{workspace_ctx}".strip() if prompt else workspace_ctx

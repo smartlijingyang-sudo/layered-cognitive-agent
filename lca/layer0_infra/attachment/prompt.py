@@ -15,7 +15,7 @@ from lca.contracts.models.core.sandbox import (
 )
 from lca.layer0_infra.attachment.layout import AttachmentLayout, sanitize_attachment_name
 from lca.layer0_infra.attachment.settings import get_attachment_policy
-from lca.layer0_infra.file_store import FileStore, get_default_file_store
+from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.sandbox.paths import ONLYBOXES
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.run_finalizer import get_current_run_id
@@ -175,7 +175,7 @@ def format_skill_attachment_block() -> str:
     if machine is None:
         machine = resolve_machine()
 
-    store = get_default_file_store()
+    store = LocalFileStore()
     policy = get_attachment_policy()
 
     if machine is not None and (machine.root or "").strip():
@@ -215,5 +215,5 @@ def machine_uploaded_files_for_ambient(root: str) -> str:
         root.strip(),
         run_id,
         ids,
-        get_default_file_store(),
+        LocalFileStore(),
     )

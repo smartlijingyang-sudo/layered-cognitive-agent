@@ -22,7 +22,7 @@ from lca.layer0_infra.dsh.prompt import compose_dsh_prompt
 from lca.layer0_infra.dsh.runtime import DshUnavailableError
 from lca.layer0_infra.dsh.settings import DshSettings
 from lca.layer0_infra.dsh.sink import HandleJournalSink
-from lca.layer0_infra.file_store import FileStore, get_default_file_store
+from lca.layer0_infra.file_store import FileStore
 
 _log = structlog.get_logger(__name__)
 
@@ -63,7 +63,7 @@ async def run_dsh_machine_turn(
     """
     cfg = settings if settings is not None else DshSettings()
     cwd = resolve_dsh_cwd(machine, cfg)
-    active_store = store if store is not None else get_default_file_store()
+    active_store = store if store is not None else LocalFileStore()
     prompt = compose_dsh_prompt(question, prior_turns)
     harness_env = build_harness_env(
         machine,

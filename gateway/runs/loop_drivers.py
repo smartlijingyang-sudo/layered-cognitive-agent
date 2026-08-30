@@ -90,6 +90,14 @@ class CognitiveRunDriver:
     never by the driver itself.
     """
 
+    def __init__(self, assembler: CognitiveRunnableAssembler | None = None) -> None:
+        # Soft-locked per ADR-0103 §2. Main's loop_drivers had a __init__
+        # accepting an assembler; the bulk port (46094979) brought main's
+        # class body but lost the constructor. Tests + plugin tree
+        # instantiate CognitiveRunDriver(CognitiveRunnableAssembler(...));
+        # accepting None preserves both call sites.
+        self._assembler = assembler
+
     async def execute(
         self,
         session: RunSession,
