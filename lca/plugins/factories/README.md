@@ -1,11 +1,11 @@
-# lca.plugins.compose
+# lca.plugins.factories
 
 > 状态：稳定 | 草稿 | 弃用
 > 所有者：@lca-maintainers
 > schema_version: 1.0.0
 
 ## 1. 职责
-lca.plugins.compose: 组合插件。本 README 由脚手架生成，待包负责人补充具体细节。
+lca.plugins.factories: 组合插件。本 README 由脚手架生成，待包负责人补充具体细节。
 
 ## 2. 不负责
 跨层职责（详见 spec §3.4 闭集纪律）

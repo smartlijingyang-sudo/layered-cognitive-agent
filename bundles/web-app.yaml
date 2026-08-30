@@ -234,12 +234,12 @@ entries:
   # so the composition root never instantiates concrete classes inline.
   - id: tools.compose_service
     name: tools_compose_service
-    $module: lca.plugins.compose.tools
+    $module: lca.plugins.factories.tools
     config: {}
 
   - id: transport.compose_service
     name: transport_compose_service
-    $module: lca.plugins.compose.transport
+    $module: lca.plugins.factories.transport
     config: {}
 
   # ── Component discovery registry (ADR-0062 §7 / ADR-0074 Phase 3) ──

@@ -1623,8 +1623,8 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.plugins.compose"]
-responsibility = "lca.plugins.compose: 组合插件。本 README 由脚手架生成，待包负责人补充具体细节。"
+[tool.lca.package_contracts."lca.plugins.factories"]
+responsibility = "lca.plugins.factories: 组合插件。本 README 由脚手架生成，待包负责人补充具体细节。"
 not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
 allowed_dependencies = [
     "lca.contracts",
@@ -1637,7 +1637,7 @@ side_effects = [
     "log:emit",
 ]
 public_api = [
-    "lca.plugins.compose",
+    "lca.plugins.factories",
 ]
 schema_version = "1.0.0"
 

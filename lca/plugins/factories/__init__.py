@@ -9,5 +9,5 @@ Adding a new compose-time service:
 
 1. Add a module here exposing ``build_<name>_compose()``.
 2. Decorate ``setup()`` with ``@plugin(provides=["<name>.compose_service"], ...)``.
-3. Reference ``$module: lca.plugins.compose.<name>`` from the bundle.
+3. Reference ``$module: lca.plugins.factories.<name>`` from the bundle.
 """

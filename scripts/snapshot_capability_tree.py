@@ -143,7 +143,7 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
             "module_patterns": [
                 r"^lca/plugins/seams/",
                 r"^lca/plugins/providers/",
-                r"^lca/plugins/compose/",
+                r"^lca.plugins.factories/",
                 r"^lca/plugins/registries/",
                 r"^lca/plugins/bundles/",
             ],
