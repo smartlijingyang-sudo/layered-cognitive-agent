@@ -293,3 +293,31 @@ async def test_text_channel_none_disables_filter() -> None:
     ]
     names = [_parse_frame(frame)[1] for frame in frames]
     assert names == ["StepTextDelta", "StepTextDelta"]
+
+
+@pytest.mark.asyncio
+async def test_gateway_api_iter_live_sse_emits_frames() -> None:
+    """Regression: ``gateway.runs.api.iter_live_sse`` must not pass ``redact``.
+
+    The local copy of ``iter_live_sse`` in ``gateway/runs/api.py`` historically
+    called ``stamped_to_sse_frame(item, redact=redact)`` even though the
+    serializer signature no longer accepts ``redact``. The TypeError surfaced
+    in the streaming generator crashed the ASGI app and produced empty
+    responses for ``/runs/{id}/live`` — the LobeHub frontend then saw
+    "Empty reply from server" and treated it as 500. This test exercises the
+    gateway-local generator directly so a future signature drift cannot
+    silently regress the wire.
+    """
+    from gateway.runs.api import iter_live_sse as gateway_iter_live_sse
+
+    tail = LiveTail()
+    stamped = _stamped(1, ReasoningDelta(step=0, text_delta="hello", seq=0))
+    tail.on_event(stamped)
+    tail.close()
+
+    frames = [frame async for frame in gateway_iter_live_sse(tail, after_seq=0, heartbeat_s=30)]
+    assert frames, "gateway iter_live_sse yielded no frames"
+    frame_id, event_name, payload = _parse_frame(frames[0])
+    _ = frame_id
+    assert event_name == "ReasoningDelta"
+    assert payload["run_seq"] == 1

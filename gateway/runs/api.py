@@ -92,7 +92,6 @@ async def iter_live_sse(
     *,
     after_seq: int = 0,
     heartbeat_s: float = _HEARTBEAT_INTERVAL_S,
-    redact: bool = True,
     text_channel: str | None = _TEXT_CHANNEL_ANSWER,
 ) -> AsyncIterator[bytes]:
     """Journal frames + comment heartbeats. No projection, no adapter.
@@ -119,7 +118,7 @@ async def iter_live_sse(
             continue
         if not _is_visible_text_channel(item, text_channel):
             continue
-        yield stamped_to_sse_frame(item, redact=redact).encode()
+        yield stamped_to_sse_frame(item).encode()
 
 
 async def create_run(request: Request) -> JSONResponse:
@@ -252,9 +251,7 @@ async def stream_journal_live(request: Request) -> StreamingResponse | JSONRespo
         )
 
     async def _gen() -> AsyncIterator[bytes]:
-        async for frame in iter_live_sse(
-            tail, after_seq=after, redact=False, text_channel=_TEXT_CHANNEL_ALL
-        ):
+        async for frame in iter_live_sse(tail, after_seq=after, text_channel=_TEXT_CHANNEL_ALL):
             yield frame
 
     return StreamingResponse(

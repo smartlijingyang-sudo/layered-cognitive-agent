@@ -46,16 +46,31 @@ export function parseSseBlock(block: string): JournalFrame | null {
   }
   if (!eventName || !dataLines.length) return null;
   try {
-    const data = JSON.parse(dataLines.join('\n')) as Record<string, unknown>;
+    const parsed = JSON.parse(dataLines.join('\n')) as Record<string, unknown>;
+    // ADR-0096 MVA-1 / 5204fd56 follow-up: v2 envelope 顶层字段从 data → payload (v2.0.0);
+    // 兼容 lca.journal/2 disk/SSE envelope（payload 在 data 下）与 Session Spine deltas
+    // 通道（SessionEvent 嵌 envelope.event）。按优先级尝试三种来源。
+    const payload = (parsed.payload ?? parsed.data) as Record<string, unknown> | undefined;
     const inner =
-      data.event && typeof data.event === 'object' ? (data.event as Record<string, unknown>) : data;
+      payload && typeof payload === 'object'
+        ? payload
+        : parsed.event && typeof parsed.event === 'object'
+          ? (parsed.event as Record<string, unknown>)
+          : parsed;
     const scope =
-      data.scope && typeof data.scope === 'object' ? (data.scope as Record<string, unknown>) : {};
+      parsed.scope && typeof parsed.scope === 'object'
+        ? (parsed.scope as Record<string, unknown>)
+        : {};
     const seqFromId = Number(idLine);
     return {
       event: eventName,
       eventPayload: inner,
-      seq: typeof data.seq === 'number' ? data.seq : Number.isFinite(seqFromId) ? seqFromId : undefined,
+      seq:
+        typeof parsed.seq === 'number'
+          ? parsed.seq
+          : Number.isFinite(seqFromId)
+            ? seqFromId
+            : undefined,
       speaker: typeof scope.agent_role === 'string' ? scope.agent_role : '',
     };
   } catch {
