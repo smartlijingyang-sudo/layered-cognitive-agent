@@ -24,6 +24,7 @@ from lca.contracts.protocols.session_persistence import (
     SessionPersistenceFactory,
 )
 from lca.harness.session.inbox import Inbox
+from lca.harness.session.persistence import JsonlSessionPersistenceFactory
 from lca.harness.session.recovery import recover_live_agent
 from lca.harness.session.store import SessionStore
 
@@ -52,17 +53,20 @@ class SessionActivator:
         self._sessions_dir = sessions_dir
         self._sessions_dir.mkdir(parents=True, exist_ok=True)
         self._projections = projections
-        self._live_builder_provider = live_builder_provider
         self._ctx_provider = ctx_provider
-        # Backwards-compat: if the boot-time provider chain can't resolve
-        # the SessionPersistenceFactory (e.g. legacy bundles without
-        # lca-session-persistence-jsonl-provider activated), fall back to
-        # JsonlSessionPersistenceFactory so soft-locked callers keep working.
+        # Backwards-compat: provider chain can return None (boot-time
+        # capability not bound). Wrap to fall back so soft-locked callers
+        # keep loading.
+        if live_builder_provider is None:
+            self._live_builder_provider = lambda: _StubSessionLiveBuilder()
+        else:
+            _orig_live = live_builder_provider
+            self._live_builder_provider = lambda: (_orig_live() or _StubSessionLiveBuilder())
         if persistence_factory_provider is None:
-            from lca.harness.session.persistence import JsonlSessionPersistenceFactory
             self._persistence_factory_provider = lambda: JsonlSessionPersistenceFactory()
         else:
-            self._persistence_factory_provider = persistence_factory_provider
+            _orig_pers = persistence_factory_provider
+            self._persistence_factory_provider = lambda: (_orig_pers() or JsonlSessionPersistenceFactory())
         self._live: dict[str, LiveSession] = {}
 
     def get(self, session_id: str) -> LiveAgent | None:
@@ -183,3 +187,34 @@ class SessionActivator:
 
 
 __all__ = ["LiveSession", "SessionActivator"]
+
+
+
+class _StubSessionLiveBuilder:
+    """Backwards-compat default when SessionLiveBuilder provider is None.
+
+    Returns a minimal in-memory placeholder LiveAgent so the spine can
+    complete session creation. Real SessionLiveBuilder implementations
+    are plugin-provided (lca-session-live-builder entry).
+    """
+
+    def __call__(self, store, inbox, session_id, options, ctx):  # type: ignore[no-untyped-def]
+        from lca.contracts.atoms.ids import new_id
+        from lca.contracts.harness.agent import LiveAgent
+        from lca.contracts.models.core.lifecycle import TaskStatus
+        from lca.contracts.models.core.plane import PlaneKind, PlaneRef
+
+        plane_ref = PlaneRef(
+            id=session_id,
+            label=session_id,
+            kind=PlaneKind.MACHINE,
+            root="",
+            outputs_dir="",
+        )
+        return LiveAgent(
+            session_id=session_id,
+            run_id=new_id("run"),
+            plane_ref=plane_ref,
+            status=TaskStatus.WORKING,
+            snapshot=None,
+        )

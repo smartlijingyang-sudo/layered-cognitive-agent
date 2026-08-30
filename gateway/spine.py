@@ -52,7 +52,16 @@ class LazySessionProjectionRegistry(SessionProjectionRegistry):
 
     def _delegate(self) -> SessionProjectionRegistry:
         if self._delegate_registry is None:
-            self._delegate_registry = self._factory_provider().create()
+            factory = self._factory_provider()
+            if factory is None:
+                from lca.harness.projection.registry import (
+                    InMemoryProjectionRegistry as InMemorySessionProjectionRegistry,
+                )
+                factory = InMemorySessionProjectionRegistry()
+            if hasattr(factory, "create"):
+                self._delegate_registry = factory.create()
+            else:
+                self._delegate_registry = factory
             for listener in self._pending_listeners:
                 self._delegate_registry.subscribe_changes(listener)
             self._pending_listeners.clear()
