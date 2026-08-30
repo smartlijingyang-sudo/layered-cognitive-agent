@@ -32,7 +32,7 @@ _HOOK_TS = """import { type EnabledProviderWithModels } from '@/types/aiProvider
 
 export const LCA_CHAT_PROVIDER = 'openai';
 
-export const LCA_CHAT_MODELS = ['solo', 'team', 'auto'] as const;
+export const LCA_CHAT_MODELS = ['solo', 'team', 'auto', 'cordis-creator'] as const;
 
 export type LcaChatModel = (typeof LCA_CHAT_MODELS)[number];
 
@@ -59,6 +59,13 @@ const LCA_CATALOG: EnabledProviderWithModels[] = [
         description: 'Same as Team. Kept as an explicit entry.',
         displayName: 'Auto',
         id: 'auto',
+      },
+      {
+        abilities: { functionCall: true, vision: true },
+        contextWindowTokens: 1_000_000,
+        description: 'Cordis creator: plugin authoring + preset reuse.',
+        displayName: 'Cordis Creator',
+        id: 'cordis-creator',
       },
     ],
     id: LCA_CHAT_PROVIDER,
