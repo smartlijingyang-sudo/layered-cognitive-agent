@@ -11,7 +11,7 @@ from lca.layer0_infra.attachment import get_attachment_policy
 from lca.layer0_infra.attachment.layout import sanitize_run_segment
 from lca.layer0_infra.attachment.prompt import render_dsh_workspace_context
 from lca.layer0_infra.dsh.settings import DshSettings
-from lca.layer0_infra.file_store import FileStore
+from lca.layer0_infra.file_store import FileStore, LocalFileStore
 
 
 def build_harness_env(

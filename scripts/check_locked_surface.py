@@ -68,8 +68,8 @@ def _soft_paths(adr: Path) -> list[str]:
 
 
 def _diff_names(base: str) -> list[str]:
-    p = subprocess.run(
-        ["git", "diff", "--name-only", f"{base}..HEAD"],
+    p = subprocess.run(  # noqa: S603
+        ["git", "diff", "--name-only", f"{base}..HEAD"],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,
@@ -80,7 +80,7 @@ def _diff_names(base: str) -> list[str]:
 
 def _head_message() -> str:
     p = subprocess.run(
-        ["git", "log", "-1", "--format=%B"],
+        ["git", "log", "-1", "--format=%B"],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,

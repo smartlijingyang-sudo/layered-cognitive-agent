@@ -22,7 +22,7 @@ from lca.layer0_infra.dsh.prompt import compose_dsh_prompt
 from lca.layer0_infra.dsh.runtime import DshUnavailableError
 from lca.layer0_infra.dsh.settings import DshSettings
 from lca.layer0_infra.dsh.sink import HandleJournalSink
-from lca.layer0_infra.file_store import FileStore
+from lca.layer0_infra.file_store import FileStore, LocalFileStore
 
 _log = structlog.get_logger(__name__)
 

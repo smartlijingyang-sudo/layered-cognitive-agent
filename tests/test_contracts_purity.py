@@ -121,7 +121,6 @@ _GRANDFATHERED_CLASSES: frozenset[str] = frozenset(
         # 不是 @dataclass 也不是 Protocol，但属于 v3 spec 显式要求的契约。
         "PluginMeta",
         "MissingCapabilityError",
-        "PluginMeta",
         "EnvelopeV2",  # Pydantic BaseModel used for v2 journal envelope wire serialization,
         "PluginConfig",
         # 旧 API 行为类（refactor 留待 PR-0.5 大重构周期后）

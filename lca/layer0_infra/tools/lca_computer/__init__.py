@@ -9,6 +9,7 @@ from lca.contracts.protocols import Sandbox, Tool
 from lca.contracts.protocols.infra import MachineTransport
 from lca.layer0_infra.computer.machine import MachineComputer
 from lca.layer0_infra.computer.ops import ComputerOps
+
 # Lazy import SandboxComputer below to break circular: computer ↔ tools.
 from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.tools.builder import build_tools_from_manifest
@@ -67,9 +68,8 @@ def build_computer_tools(
     if ops is not None:
         runtime = ops
     elif sandbox is not None:
-        from lca.layer0_infra.plane.resolve import sandbox_ref_from
-
         from lca.layer0_infra.computer.sandbox_computer import SandboxComputer
+        from lca.layer0_infra.plane.resolve import sandbox_ref_from
         runtime = SandboxComputer(
             plane=plane or sandbox_ref_from(sandbox),
             sandbox=sandbox,

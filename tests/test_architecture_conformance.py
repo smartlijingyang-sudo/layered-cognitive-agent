@@ -322,7 +322,7 @@ class TestProtocolImplInheritance:
         script = ROOT / "scripts" / "check_protocol_impl.py"
         if not script.exists():
             pytest.skip("check_protocol_impl.py not present")
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             [sys.executable, str(script)],
             cwd=ROOT,
             capture_output=True,
@@ -348,7 +348,7 @@ class TestLoopOrder:
         script = ROOT / "tools" / "ci" / "check_cognitive_loop_order.py"
         if not script.exists():
             pytest.skip("check_cognitive_loop_order.py not present")
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             [sys.executable, str(script)],
             cwd=ROOT,
             capture_output=True,
