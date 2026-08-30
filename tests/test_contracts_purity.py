@@ -82,6 +82,10 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
     "Causation": frozenset({"to_dict", "from_dict"}),
     "DescriptorRef": frozenset({"to_dict", "from_dict"}),
     "JournalRecord": frozenset({"to_dict", "from_dict"}),
+    # C3 follow-up — journal.py 内部 shim _StampedRecordAdapter 与
+    # observability/evidence.py scaffold 引入的 to_dict/from_dict 序列化方法。
+    "_StampedRecordAdapter": frozenset({"to_record", "stamped_to_kwargs"}),
+    "EvidenceRef": frozenset({"to_dict", "from_dict"}),
 }
 
 # 已存在的非 dataclass / 非 Protocol / 非异常 / 非枚举类——
