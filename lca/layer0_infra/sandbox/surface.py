@@ -34,7 +34,7 @@ def skill_preamble(store: FileStore | None = None) -> str:
     from lca.layer0_infra.attachment.prompt import format_skill_attachment_block
 
     lines = ["当前工作目录是工作根。交付物写相对路径 outputs/。"]
-    attachment_block = format_skill_attachment_block(store)
+    attachment_block = format_skill_attachment_block()
     if attachment_block:
         lines.append(attachment_block)
     return "\n".join(lines) + "\n"
