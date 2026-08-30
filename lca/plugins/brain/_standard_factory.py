@@ -44,7 +44,7 @@ def build_standard_cognitive_brain_factory(ctx: PluginContext) -> BrainFactory:
     immutable profile configuration.
     """
 
-    from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
+    from lca.cognition.brain.default_factory import SimpleBrainFactory
 
     gates = ctx.require("gates")
     return SimpleBrainFactory(

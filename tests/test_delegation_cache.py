@@ -16,7 +16,7 @@ from lca.contracts.models.core.decision import DelegationSpec, Observation
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.delegation import DelegationResult
 from lca.contracts.models.team.team_awareness import TeamAwareness
-from lca.layer1_cognitive.body.delegation_cache import (
+from lca.cognition.body.delegation_cache import (
     cached_delegation_observation,
     tag_delegation_extra,
 )

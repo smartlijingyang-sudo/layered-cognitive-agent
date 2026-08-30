@@ -38,7 +38,7 @@ _NAME_EXEMPT: dict[str, str] = {
 
 _SCAN_PACKAGES = [
     "lca.infrastructure",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -50,7 +50,7 @@ _SCAN_PACKAGES = [
 # under "Gateway 概念" but not required to have bold entries.
 _GLOSSARY_COVERAGE_SCAN_PACKAGES = [
     "lca.infrastructure",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -243,7 +243,7 @@ def _read_glossary_terms() -> set[str]:
 _REVERSE_SCAN_PACKAGES = (
     "lca.contracts",
     "lca.infrastructure",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",

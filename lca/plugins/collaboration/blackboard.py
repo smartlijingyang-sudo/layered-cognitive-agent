@@ -22,6 +22,6 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide InMemoryBlackboard as ``blackboard.in-memory``."""
-    from lca.layer1_cognitive.collaboration.blackboard import InMemoryBlackboard
+    from lca.cognition.collaboration.blackboard import InMemoryBlackboard
 
     ctx.provide("blackboard.in-memory", InMemoryBlackboard)

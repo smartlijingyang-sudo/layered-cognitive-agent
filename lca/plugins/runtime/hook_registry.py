@@ -15,7 +15,7 @@ class Config(BaseModel):
 
 
 def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
-    from lca.layer1_cognitive.hook_registry import CordisHookRegistry
+    from lca.cognition.hook_registry import CordisHookRegistry
 
     hooks = CordisHookRegistry(ctx)
     try:

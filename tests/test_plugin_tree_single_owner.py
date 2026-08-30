@@ -244,7 +244,7 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
 
     monkeypatch.setattr("lca.infrastructure.skills.factory.resolve_skill_store", _boom)
 
-    from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+    from lca.cognition.memory.simple_memory import SimpleMemorySystem
 
     with pytest.raises(MissingCapabilityError, match="skills"):
         build_perceive_hub(

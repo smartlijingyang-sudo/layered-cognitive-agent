@@ -11,8 +11,8 @@ from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManif
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
-from lca.layer1_cognitive.brain.reasoner import build_teammates_text
-from lca.layer1_cognitive.member_status import InMemoryMemberStatus
+from lca.cognition.brain.reasoner import build_teammates_text
+from lca.cognition.member_status import InMemoryMemberStatus
 
 
 def _make_profile(role: str, goal: str = "test") -> RoleProfile:
@@ -129,7 +129,7 @@ class TestPromptReasonerSolo:
     """Without awareness the reasoner renders the plain role prompt."""
 
     async def test_solo_prompt_only(self) -> None:
-        from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+        from lca.cognition.brain.reasoner import PromptReasoner
 
         llm = _CapturingStreamLLM()
         reasoner = PromptReasoner(
@@ -148,7 +148,7 @@ class TestPromptReasonerAwareness:
     """With awareness the reasoner merges awareness vars and its default template."""
 
     async def test_teammates_injected_from_awareness(self) -> None:
-        from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+        from lca.cognition.brain.reasoner import PromptReasoner
 
         llm = _CapturingStreamLLM()
         reasoner = PromptReasoner(
@@ -169,7 +169,7 @@ class TestPromptReasonerAwareness:
         assert "write code" in prompt
 
     async def test_active_template_override(self) -> None:
-        from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+        from lca.cognition.brain.reasoner import PromptReasoner
 
         llm = _CapturingStreamLLM()
         reasoner = PromptReasoner(

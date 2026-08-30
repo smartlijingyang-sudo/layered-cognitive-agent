@@ -38,6 +38,6 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide the named SafeExecutor factory ``safe_executor.simple``."""
-    from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
+    from lca.cognition.body.safe_executor import SimpleSafeExecutor
 
     ctx.provide(SAFE_EXECUTOR_SIMPLE.key, SimpleSafeExecutor)

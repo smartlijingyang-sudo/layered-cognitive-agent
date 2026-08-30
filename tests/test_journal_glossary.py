@@ -24,7 +24,7 @@ def _infer_layer(emitter: str) -> str:
         return "gateway"
     if emitter.startswith("lca.infrastructure."):
         return "L0"
-    if emitter.startswith("lca.layer1_cognitive."):
+    if emitter.startswith("lca.cognition."):
         return "L1"
     if emitter.startswith("lca.layer2_runtime."):
         return "L2"

@@ -16,14 +16,14 @@ from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import TeamMessagePublished
 from lca.infrastructure.observability.journal.engine import RunStore
-from lca.layer1_cognitive.body.team_message_tool import (
+from lca.cognition.body.team_message_tool import (
     TEAM_MESSAGE_TOOL_NAME,
     build_team_message_publish_tool,
     publish_team_message,
 )
-from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import JournalSink
-from lca.layer1_cognitive.sensors import TeamInboxSensor
+from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive_sink import JournalSink
+from lca.cognition.sensors import TeamInboxSensor
 
 
 class TestTeamMessageTool:

@@ -35,7 +35,7 @@ class DefaultTeamSharedMemoryResolver(TeamSharedMemoryResolverProtocol):
     ) -> SharedMemoryStore | None:
         """Return no store when the Team did not declare shared memory layers."""
 
-        from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
+        from lca.cognition.memory.team_shared_memory import TeamSharedMemoryStore
 
         layers = shared_layers or tuple(spec.shared_memory_layers)
         return TeamSharedMemoryStore(list(layers)) if layers else None

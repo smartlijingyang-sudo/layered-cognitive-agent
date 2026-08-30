@@ -24,6 +24,6 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide NullCritic as ``critic.null``."""
-    from lca.layer1_cognitive.brain.null_critic import NullCritic
+    from lca.cognition.brain.null_critic import NullCritic
 
     ctx.provide("critic.null", NullCritic)

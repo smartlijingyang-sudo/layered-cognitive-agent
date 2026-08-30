@@ -36,7 +36,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer1_cognitive.sensors.skill_catalog import build_skill_catalog_sensor
+    from lca.cognition.sensors.skill_catalog import build_skill_catalog_sensor
 
     ctx.require("perceive").add(
         build_skill_catalog_sensor, id="skill-catalog", order=60, needs="skills"

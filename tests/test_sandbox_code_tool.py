@@ -32,7 +32,7 @@ from lca.infrastructure.tools.sandbox_runtime_tools import (
     SandboxExecuteTool,
     SandboxInspectTool,
 )
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
 from tests.support.inline_sandbox import InlineSandbox
 from tests.support.observability_helpers import make_test_bound
 

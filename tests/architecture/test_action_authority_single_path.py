@@ -6,11 +6,11 @@ import pytest
 
 from lca.contracts.models.team.role_team import ToolPermissionManifest
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.layer1_cognitive.body import action_catalog
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+from lca.cognition.body import action_catalog
+from lca.cognition.body.action_registry import ActionRegistry
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.simple_body import SimpleBody
+from lca.cognition.body.tool_registry import SimpleToolRegistry
 
 
 def test_action_catalog_does_not_reintroduce_assembly_paths() -> None:

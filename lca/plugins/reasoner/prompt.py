@@ -29,6 +29,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     Composer or an alternate Brain factory resolve the Standard reasoner
     without importing layer1.
     """
-    from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+    from lca.cognition.brain.reasoner import PromptReasoner
 
     ctx.provide("reasoner.prompt", PromptReasoner)

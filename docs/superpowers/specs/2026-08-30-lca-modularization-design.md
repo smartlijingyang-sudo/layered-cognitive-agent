@@ -14,7 +14,7 @@ LCA 现有架构基础较强：五层单向分层（`contracts → layer0_infra 
 但当前状态在三个具体方面没有强约束，导致新贡献者上手成本依然偏高：
 
 1. **包职责不外显**：开发者必须先读 AGENTS.md §3 + 多个 ADR + `docs/specs/lca-structured-cognition-guide.md` 才能判断"这个包能放什么、不能放什么"。每个包没有机器可读的契约。
-2. **层名是编号不是语义**：`lca.infrastructure` / `lca.layer1_cognitive` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 表达顺序清晰，但表达职责模糊；新人需要"先背 L0–L4 顺序 → 再查 ADR-0001 才知道每个层做什么"。
+2. **层名是编号不是语义**：`lca.infrastructure` / `lca.cognition` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 表达顺序清晰，但表达职责模糊；新人需要"先背 L0–L4 顺序 → 再查 ADR-0001 才知道每个层做什么"。
 3. **命名规范只在文档**：`docs/specs/naming-conventions.md` 已经明确禁 `Impl / Manager / Helper / Common`，但仓库仍有历史违规文件（如 `trace_tool.py` 一类的"tool" 后缀），且无 CI 强约束，新代码仍可能继续引入模糊命名。
 
 这三点不是"再增加新层"能解决的；最有效的方向是**把已有架构约束显式化、可机器验证、覆盖老代码**。
@@ -48,7 +48,7 @@ LCA 现有架构基础较强：五层单向分层（`contracts → layer0_infra 
 
 **I2.** Phase 1 完成后，所有一级 + 二级包都有 `README.md` + `pyproject.toml` 段 + `import-linter` 规则。少一个即不通过 L4 check。
 
-**I3.** Phase 2 完成后，仓库内**不存在** `lca.infrastructure` / `lca.layer1_cognitive` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 五个旧名（grep 全仓库为零）。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不变。
+**I3.** Phase 2 完成后，仓库内**不存在** `lca.infrastructure` / `lca.cognition` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 五个旧名（grep 全仓库为零）。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不变。
 
 **I4.** Phase 3 完成后，新提交的 Python 文件名**不匹配** filename blacklist（`util` / `helper` / `manager` / `impl` / `common` / `misc`）。匹配的文件必须先在对应包 L2 段声明 `filename_whitelist` 或在仓库根 `legacy_blacklist.txt` 中登记。
 
@@ -203,7 +203,7 @@ not_responsible_for = "实现细节、I/O、配置解析"
 allowed_dependencies = []
 forbidden_dependencies = [
     "lca.infrastructure",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -293,7 +293,7 @@ def main() -> int:  # exit 0 if all pass, 1 otherwise
 | 旧 | 新 | 状态 |
 |---|---|---|
 | `lca.infrastructure` | `lca.infrastructure` | 重命名 |
-| `lca.layer1_cognitive` | `lca.cognition` | 重命名 |
+| `lca.cognition` | `lca.cognition` | 重命名 |
 | `lca.layer2_runtime` | `lca.runtime` | 重命名 |
 | `lca.layer3_agent` | `lca.agent` | 重命名 |
 | `lca.layer4_app` | `lca.application` | 重命名 |
@@ -362,7 +362,7 @@ Proposed → Accepted（PR 合并后）
 
 ### Breaking Changes
 - `lca.infrastructure` → `lca.infrastructure`
-- `lca.layer1_cognitive` → `lca.cognition`
+- `lca.cognition` → `lca.cognition`
 - `lca.layer2_runtime` → `lca.runtime`
 - `lca.layer3_agent` → `lca.agent`
 - `lca.layer4_app` → `lca.application`

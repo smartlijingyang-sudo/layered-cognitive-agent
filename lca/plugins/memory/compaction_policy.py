@@ -8,8 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.capabilities import MEMORY_COMPACTION_POLICY
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer1_cognitive.memory.policy import CompactionPolicy
-from lca.layer1_cognitive.memory.semantic_compaction import SemanticCompactionPolicy
+from lca.cognition.memory.policy import CompactionPolicy
+from lca.cognition.memory.semantic_compaction import SemanticCompactionPolicy
 
 
 class Config(BaseModel):

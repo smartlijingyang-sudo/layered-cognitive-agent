@@ -24,6 +24,6 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide NullSynthesizer as ``synthesizer.null``."""
-    from lca.layer1_cognitive.brain.null_synthesizer import NullSynthesizer
+    from lca.cognition.brain.null_synthesizer import NullSynthesizer
 
     ctx.provide("synthesizer.null", NullSynthesizer)

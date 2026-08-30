@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+from lca.cognition.body.tool_registry import SimpleToolRegistry
 
 
 @dataclass

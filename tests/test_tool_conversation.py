@@ -12,8 +12,8 @@ from lca.infrastructure.llm_adapter.openai_compat._history import (
     anthropic_messages_with_history,
     openai_messages_with_history,
 )
-from lca.layer1_cognitive.brain.reasoner import _context_lines
-from lca.layer1_cognitive.brain.tool_conversation import build_tool_history
+from lca.cognition.brain.reasoner import _context_lines
+from lca.cognition.brain.tool_conversation import build_tool_history
 
 
 def _tool_turn() -> Turn:

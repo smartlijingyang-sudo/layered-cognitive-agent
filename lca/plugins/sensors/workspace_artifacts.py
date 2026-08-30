@@ -36,7 +36,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer1_cognitive.sensors.workspace_artifacts import build_workspace_artifacts_sensor
+    from lca.cognition.sensors.workspace_artifacts import build_workspace_artifacts_sensor
 
     ctx.require("perceive").add(
         build_workspace_artifacts_sensor, id="workspace-artifacts", order=20

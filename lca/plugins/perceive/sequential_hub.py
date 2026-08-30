@@ -11,7 +11,7 @@ from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.cognition import PerceiveHubAssembler
 from lca.contracts.protocols.logic_address import LogicAddress
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive_hub import SequentialPerceiveHub
 
 
 class Config(BaseModel):

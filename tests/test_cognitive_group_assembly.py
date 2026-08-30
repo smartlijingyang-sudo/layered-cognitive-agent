@@ -8,8 +8,8 @@ from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.protocols.cognition import DecisionGateAssembler, PerceiveHubAssembler
-from lca.layer1_cognitive.gate_service import GateService
-from lca.layer1_cognitive.perceive_service import PerceiveService
+from lca.cognition.gate_service import GateService
+from lca.cognition.perceive_service import PerceiveService
 
 
 @dataclass

@@ -22,9 +22,9 @@ from lca.contracts.models.observability.journal import ContextManifested
 from lca.contracts.protocols import PerceiveHub, Sensor
 from lca.contracts.protocols.cognition import SensorDisabledError
 from lca.infrastructure.observability.journal.engine import RunStore
-from lca.layer1_cognitive.brain.decision_gates import record_gate_decided
-from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import JournalSink
+from lca.cognition.brain.decision_gates import record_gate_decided
+from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive_sink import JournalSink
 
 
 def _state() -> AgentState:

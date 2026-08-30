@@ -36,7 +36,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer1_cognitive.brain.decision_gates.progress_loop_detector import (
+    from lca.cognition.brain.decision_gates.progress_loop_detector import (
         ProgressLoopDetector,
     )
 

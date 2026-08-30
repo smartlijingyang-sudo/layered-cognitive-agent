@@ -37,18 +37,18 @@ from lca.infrastructure.tools.calculator import build_tools as build_calculator_
 from lca.infrastructure.tools.weather import build_tools as build_weather_tools
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+from lca.cognition.body.action_registry import ActionRegistry
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.simple_body import SimpleBody
+from lca.cognition.body.tool_registry import SimpleToolRegistry
 
 # L1
-from lca.layer1_cognitive.brain.critic import SimpleCritic
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.reasoner import PromptReasoner
-from lca.layer1_cognitive.event_bus import CordisEventBus
-from lca.layer1_cognitive.hook_registry import CordisHookRegistry
-from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+from lca.cognition.brain.critic import SimpleCritic
+from lca.cognition.brain.modular_brain import ModularBrain
+from lca.cognition.brain.reasoner import PromptReasoner
+from lca.cognition.event_bus import CordisEventBus
+from lca.cognition.hook_registry import CordisHookRegistry
+from lca.cognition.memory.simple_memory import SimpleMemorySystem
 
 # L2
 from lca.layer2_runtime.reducer import DefaultReducer

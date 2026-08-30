@@ -12,7 +12,7 @@ from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.infrastructure.search.constants import WEB_SEARCH_TOOL
-from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+from lca.cognition.brain.reasoner import PromptReasoner
 
 
 def _empty_manifest() -> ToolPermissionManifest:

@@ -28,7 +28,7 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide NullRetrievalPolicy as ``retrieval.null``."""
-    from lca.layer1_cognitive.memory.null_retrieval_policy import NullRetrievalPolicy
+    from lca.cognition.memory.null_retrieval_policy import NullRetrievalPolicy
 
     ctx.provide("retrieval.null", NullRetrievalPolicy)
     ctx.provide(MEMORY_RETRIEVAL_POLICY.key, NullRetrievalPolicy)

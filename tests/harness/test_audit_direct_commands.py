@@ -106,8 +106,8 @@ class TestScanDirectCommands:
         py_file.write_text(
             '"""A well-behaved Body module."""\n'
             "\n"
-            "from lca.layer1_cognitive.body import ActionRegistry, SafeExecutor\n"
-            "from lca.layer1_cognitive.body.action_registry import ActionDescriptor\n"
+            "from lca.cognition.body import ActionRegistry, SafeExecutor\n"
+            "from lca.cognition.body.action_registry import ActionDescriptor\n"
             "\n"
             "\n"
             "def register_ping(registry: ActionRegistry) -> None:\n"

@@ -37,7 +37,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsultAllMembers
+    from lca.cognition.brain.decision_gates.must_consult_all import MustConsultAllMembers
 
     ctx.require("gates").add(
         MustConsultAllMembers,

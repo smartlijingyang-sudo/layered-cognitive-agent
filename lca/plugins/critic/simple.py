@@ -24,6 +24,6 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide SimpleCritic as ``critic.simple``."""
-    from lca.layer1_cognitive.brain.critic import SimpleCritic
+    from lca.cognition.brain.critic import SimpleCritic
 
     ctx.provide("critic.simple", SimpleCritic)

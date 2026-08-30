@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 一次性切换 `lca.infrastructure` / `lca.layer1_cognitive` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 到语义名 `lca.infrastructure` / `lca.cognition` / `lca.runtime` / `lca.agent` / `lca.application`，无兼容期。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不变。
+**Goal:** 一次性切换 `lca.infrastructure` / `lca.cognition` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 到语义名 `lca.infrastructure` / `lca.cognition` / `lca.runtime` / `lca.agent` / `lca.application`，无兼容期。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不变。
 
 **Architecture:** ADR-0104 先写 → 迁移辅助脚本 dry-run 演练 → 5 个原子 PR（每个映射一个）→ import-linter contracts 更新 → L1/L2 段同步 → 文档/Profile/patches 同步 → CHANGELOG + 外部消费方通知。
 
@@ -91,7 +91,7 @@ from dataclasses import dataclass
 
 LAYER_TO_SEMANTIC: dict[str, str] = {
     "lca.infrastructure": "lca.infrastructure",
-    "lca.layer1_cognitive": "lca.cognition",
+    "lca.cognition": "lca.cognition",
     "lca.layer2_runtime": "lca.runtime",
     "lca.layer3_agent": "lca.agent",
     "lca.layer4_app": "lca.application",
@@ -253,11 +253,11 @@ gh pr create --title "refactor!: rename lca.infrastructure to lca.infrastructure
 
 ---
 
-## Task 4: 原子切换 lca.layer1_cognitive → lca.cognition
+## Task 4: 原子切换 lca.cognition → lca.cognition
 
 **Files:**
 - Rename: `lca/layer1_cognitive/` → `lca/cognition/`
-- Modify: 所有引用 `lca.layer1_cognitive` 的 import
+- Modify: 所有引用 `lca.cognition` 的 import
 
 - [ ] **Step 1: 创建分支 `rename/layer1-cognition`**
 
@@ -275,11 +275,11 @@ grep -rl "lca\.layer1_cognitive" lca/ gateway/ tests/ | xargs sed -i 's/lca\.lay
 
 - [ ] **Step 3: 更新 import-linter contracts layers**
 
-`pyproject.toml [tool.importlinter.contracts]` 第 1 条 layers 改 `lca.layer1_cognitive` 为 `lca.cognition`。
+`pyproject.toml [tool.importlinter.contracts]` 第 1 条 layers 改 `lca.cognition` 为 `lca.cognition`。
 
 - [ ] **Step 4: 更新 L1/L2 段**
 
-L1 README 段 5/6、L2 pyproject `forbidden_dependencies` 中所有 `lca.layer1_cognitive` 改 `lca.cognition`。
+L1 README 段 5/6、L2 pyproject `forbidden_dependencies` 中所有 `lca.cognition` 改 `lca.cognition`。
 
 - [ ] **Step 5: 跑全量 CI**
 
@@ -298,13 +298,13 @@ grep -rn "lca\.layer1_cognitive" lca/ gateway/ tests/ profiles/ deploy/ docs/
 
 ```bash
 git add -A
-git commit -m "refactor!: rename lca.layer1_cognitive to lca.cognition
+git commit -m "refactor!: rename lca.cognition to lca.cognition
 
-BREAKING CHANGE: lca.layer1_cognitive is now lca.cognition. Update imports.
+BREAKING CHANGE: lca.cognition is now lca.cognition. Update imports.
 
 Ref: ADR-0104"
 git push origin rename/layer1-cognition
-gh pr create --title "refactor!: rename lca.layer1_cognitive to lca.cognition" --body "ADR-0104"
+gh pr create --title "refactor!: rename lca.cognition to lca.cognition" --body "ADR-0104"
 ```
 
 - [ ] **Step 8: Review + merge**
@@ -623,7 +623,7 @@ git commit -m "refactor(deploy): update LobeHub patches to semantic layer names 
 
 ### Breaking Changes
 - `lca.infrastructure` → `lca.infrastructure`
-- `lca.layer1_cognitive` → `lca.cognition`
+- `lca.cognition` → `lca.cognition`
 - `lca.layer2_runtime` → `lca.runtime`
 - `lca.layer3_agent` → `lca.agent`
 - `lca.layer4_app` → `lca.application`

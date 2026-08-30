@@ -40,14 +40,14 @@ from lca.contracts.models.observability.journal import (
     InboxFollowupCreated,
 )
 from lca.infrastructure.observability.journal.engine import RunStore
-from lca.layer1_cognitive.brain.decision_gates import (
+from lca.cognition.brain.decision_gates import (
     ChainedDecisionGate,
     RepeatToolCallGate,
     ToolLoopBreakerGate,
 )
-from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import JournalSink
-from lca.layer1_cognitive.sensors import (
+from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive_sink import JournalSink
+from lca.cognition.sensors import (
     InboxFactsSensor,
     build_clock_sensor,
     build_workspace_artifacts_sensor,
@@ -223,7 +223,7 @@ class TestRalphLoop:
         are conditional on a workspace being present.  The sensor
         handles the empty case gracefully.
         """
-        from lca.layer1_cognitive.sensors import WorkspaceArtifactsSensor
+        from lca.cognition.sensors import WorkspaceArtifactsSensor
 
         state = AgentState(
             trace_id=new_id("trace"),
@@ -279,7 +279,7 @@ class TestComplexScenarios:
         """A complex run with multiple gates firing produces one
         GateDecided per gate (excluding allow).
         """
-        from lca.layer1_cognitive.brain.decision_gates import (
+        from lca.cognition.brain.decision_gates import (
             ProgressLoopDetector,
             TerminalRespondGate,
         )

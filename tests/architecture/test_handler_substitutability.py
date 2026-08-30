@@ -23,7 +23,7 @@ from lca.contracts.protocols.declarative_phase_graph import (
 from lca.contracts.protocols.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.contracts.protocols.effect_handler import EffectHandler, EffectHandlerRegistry
 from lca.harness.declarative.dispatch import RegistryEffectGateway
-from lca.layer1_cognitive.body.tool_batch_execution import SafeToolBatchExecutionPolicy
+from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
 from lca.layer2_runtime.declarative_runtime import RuntimePhaseCapabilities
 from lca.layer2_runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 from lca.plugins.providers.action_handlers import (

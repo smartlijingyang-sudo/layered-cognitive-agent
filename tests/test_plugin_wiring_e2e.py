@@ -116,12 +116,12 @@ class TestLayerBoundary:
 
 class TestHubConstruction:
     def test_hub_accepts_sink_protocol(self) -> None:
-        from lca.layer1_cognitive.perceive_sink import ManifestSink, NullSink
+        from lca.cognition.perceive_sink import ManifestSink, NullSink
 
         assert isinstance(NullSink(), ManifestSink)
 
     def test_hub_default_sink_is_journal(self) -> None:
-        from lca.layer1_cognitive.perceive_sink import JournalSink, default_sink
+        from lca.cognition.perceive_sink import JournalSink, default_sink
 
         assert isinstance(default_sink(), JournalSink)
 
@@ -129,7 +129,7 @@ class TestHubConstruction:
         from lca.contracts.models.core.perception import ContextManifest
         from lca.contracts.models.observability.journal import ContextManifested
         from lca.contracts.observability.ports import JournalBackend
-        from lca.layer1_cognitive.perceive_sink import JournalSink
+        from lca.cognition.perceive_sink import JournalSink
 
         class WriteOnlyJournal:
             def __init__(self) -> None:
@@ -156,7 +156,7 @@ class TestHubConstruction:
     def test_hub_constructor_signature(self) -> None:
         import inspect
 
-        from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
+        from lca.cognition.perceive_hub import SequentialPerceiveHub
 
         sig = inspect.signature(SequentialPerceiveHub.__init__)
         params = list(sig.parameters.keys())
@@ -167,7 +167,7 @@ class TestHubConstruction:
 
 class TestSensorBaseClass:
     def test_inbox_sensor_subclasses_journal_sensor(self) -> None:
-        from lca.layer1_cognitive.sensors.journal_backed import (
+        from lca.cognition.sensors.journal_backed import (
             InboxFactsSensor,
             _JournalSensor,
         )
@@ -175,7 +175,7 @@ class TestSensorBaseClass:
         assert issubclass(InboxFactsSensor, _JournalSensor)
 
     def test_team_inbox_sensor_subclasses_journal_sensor(self) -> None:
-        from lca.layer1_cognitive.sensors.journal_backed import (
+        from lca.cognition.sensors.journal_backed import (
             TeamInboxSensor,
             _JournalSensor,
         )
@@ -187,7 +187,7 @@ class TestSensorBaseClass:
         from lca.contracts.models.core.state import AgentState, Budget
         from lca.contracts.models.observability.journal import InboxFollowupCreated
         from lca.infrastructure.observability.journal.engine import RunStore
-        from lca.layer1_cognitive.sensors.journal_backed import InboxFactsSensor
+        from lca.cognition.sensors.journal_backed import InboxFactsSensor
 
         store = RunStore()
         store.append(

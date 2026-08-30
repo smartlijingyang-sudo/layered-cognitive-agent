@@ -26,7 +26,7 @@ from lca.infrastructure.observability.journal.journal_io import load_journal_rec
 from lca.infrastructure.observability.journal.jsonl_projector import JsonlJournalProjector
 from lca.infrastructure.observability.policy import Verbosity
 from lca.infrastructure.ops.cli import app
-from lca.layer1_cognitive.hook_registry import CordisHookRegistry
+from lca.cognition.hook_registry import CordisHookRegistry
 from tests.support.observability_helpers import RuntimeCategoryFilter, make_test_bound
 
 

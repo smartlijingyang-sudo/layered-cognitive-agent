@@ -2,7 +2,7 @@
 
 import pytest
 
-from lca.layer1_cognitive.body.tool_batch_execution import SafeToolBatchExecutionPolicy
+from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
 from lca.plugins.providers.action_handlers import (
     DefaultActionHandlerRegistry,
     DelegateActionHandler,

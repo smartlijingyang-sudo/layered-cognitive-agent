@@ -33,7 +33,7 @@ from lca.contracts.models.core.decision import (
 )
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.layer1_cognitive.body.action_handlers import DelegateOperation
+from lca.cognition.body.action_handlers import DelegateOperation
 
 
 def _state() -> AgentState:

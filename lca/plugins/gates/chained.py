@@ -11,7 +11,7 @@ from lca.contracts.protocols import DecisionGate
 from lca.contracts.protocols.cognition import DecisionGateAssembler
 from lca.contracts.protocols.logic_address import LogicAddress
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer1_cognitive.brain.decision_gates.chained import ChainedDecisionGate
+from lca.cognition.brain.decision_gates.chained import ChainedDecisionGate
 
 
 class Config(BaseModel):

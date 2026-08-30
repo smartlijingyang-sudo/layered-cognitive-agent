@@ -35,6 +35,6 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer1_cognitive.perceive_service import PerceiveService
+    from lca.cognition.perceive_service import PerceiveService
 
     ctx.provide("perceive", PerceiveService())

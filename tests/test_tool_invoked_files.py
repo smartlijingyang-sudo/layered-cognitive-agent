@@ -21,8 +21,8 @@ from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPe
 from lca.infrastructure.file_store import LocalFileStore
 from lca.infrastructure.observability import bind_backends, run_scope
 from lca.infrastructure.tools.write_file import build_tools as build_write_file_tools
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.tool_result_preview import tool_files
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.tool_result_preview import tool_files
 from tests.support.observability_helpers import make_test_bound
 
 

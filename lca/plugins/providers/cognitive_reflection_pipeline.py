@@ -35,7 +35,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     """Bind the standard, stateless Reflect pipeline to the capability graph."""
 
     del config
-    from lca.layer1_cognitive.brain.cognitive_pipeline import (
+    from lca.cognition.brain.cognitive_pipeline import (
         StandardCognitiveReflectionPipeline,
     )
 

@@ -35,7 +35,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     """Bind the standard, stateless Think pipeline to the capability graph."""
 
     del config
-    from lca.layer1_cognitive.brain.cognitive_pipeline import StandardCognitiveThinkPipeline
+    from lca.cognition.brain.cognitive_pipeline import StandardCognitiveThinkPipeline
 
     ctx.provide(COGNITIVE_THINK_PIPELINE.key, StandardCognitiveThinkPipeline())
 

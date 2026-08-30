@@ -20,7 +20,7 @@ lca.harness.middleware: 中间件 harness。本 README 由脚手架生成，待�
 lca.contracts,lca.harness
 
 ## 6. 禁止依赖
-lca.layer1_cognitive,lca.layer2_runtime,lca.layer3_agent,lca.layer4_app
+lca.cognition,lca.layer2_runtime,lca.layer3_agent,lca.layer4_app
 
 ## 7. 副作用
 log:emit

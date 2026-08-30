@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from lca.contracts.models.observability.plan_ref import plan_ref_scope
-from lca.layer1_cognitive.transport_envelope import mint_transport_envelope
+from lca.cognition.transport_envelope import mint_transport_envelope
 
 
 def test_transport_envelope_marks_unbound_compatibility_path() -> None:

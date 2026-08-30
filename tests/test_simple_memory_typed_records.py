@@ -15,7 +15,7 @@ from lca.contracts.atoms.semantic_keys import (
 from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.state import AgentState
-from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+from lca.cognition.memory.simple_memory import SimpleMemorySystem
 
 
 def _state(step: int = 0) -> AgentState:

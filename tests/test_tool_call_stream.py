@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from lca.layer1_cognitive.brain.tool_call_stream import (
+from lca.cognition.brain.tool_call_stream import (
     parse_partial_tool_args,
     push_tool_call_stream,
 )

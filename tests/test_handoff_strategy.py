@@ -112,8 +112,8 @@ class TestHandoffActionType(unittest.TestCase):
         from lca.contracts.models.team.role_team import ToolPermissionManifest
         from lca.infrastructure.transport.agent_transport import InternalTransport
         from lca.infrastructure.transport.transport_registry import TransportRegistry
-        from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-        from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+        from lca.cognition.body.safe_executor import SimpleSafeExecutor
+        from lca.cognition.body.tool_registry import SimpleToolRegistry
 
         tool_reg = SimpleToolRegistry()
         safe_exec = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))

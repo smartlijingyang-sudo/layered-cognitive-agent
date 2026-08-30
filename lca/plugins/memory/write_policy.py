@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.capabilities import MEMORY_WRITE_POLICY
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer1_cognitive.memory.policy import MemoryPolicy, SimpleMemoryPolicy
+from lca.cognition.memory.policy import MemoryPolicy, SimpleMemoryPolicy
 
 
 class Config(BaseModel):

@@ -12,9 +12,9 @@ from lca.contracts.models.team.role_team import ToolPermissionManifest
 from lca.infrastructure.component_registry import RegistryKeyError
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+from lca.cognition.body.action_registry import ActionRegistry
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.tool_registry import SimpleToolRegistry
 from tests.support.action_authority import build_test_action_registry
 
 

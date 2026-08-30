@@ -450,7 +450,7 @@ class TestV4ArchitectureTestGate:
         """
         import inspect
 
-        from lca.layer1_cognitive.body.pipeline_safe_executor import (
+        from lca.cognition.body.pipeline_safe_executor import (
             PipelineSafeExecutor,
         )
 

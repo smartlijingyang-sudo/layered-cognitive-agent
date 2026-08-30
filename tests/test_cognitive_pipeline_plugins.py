@@ -21,7 +21,7 @@ from lca.contracts.protocols import (
 )
 from lca.harness.plugin_declaration import definition_from_plugin
 from lca.harness.profile.resolve import resolve_profile
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
+from lca.cognition.brain.modular_brain import ModularBrain
 from lca.plugins.brain._standard_factory import STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS
 
 REPO = Path(__file__).resolve().parents[1]

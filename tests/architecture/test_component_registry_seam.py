@@ -18,9 +18,9 @@ from lca.contracts.protocols.spec import (
 from lca.harness.profile.boot import boot_profile
 from lca.infrastructure.component_registry import ComponentRegistry, RegistryKeyError
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
-from lca.layer1_cognitive.gate_service import GateService
-from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-from lca.layer1_cognitive.memory.temporal_memory import TemporalMemorySystem
+from lca.cognition.gate_service import GateService
+from lca.cognition.memory.simple_memory import SimpleMemorySystem
+from lca.cognition.memory.temporal_memory import TemporalMemorySystem
 from lca.layer4_app.policies import LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy
 from lca.plugins.providers.component_budget_policy import (
     ComponentRegistryLeadBudgetPolicyResolver,

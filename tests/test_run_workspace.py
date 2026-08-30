@@ -15,12 +15,12 @@ from lca.infrastructure.workspace.artifact_ledger import (
     rewrite_artifact_markdown,
 )
 from lca.infrastructure.workspace.scope import effective_agent_wall_clock, run_workspace_scope
-from lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector import (
+from lca.cognition.brain.decision_gates.artifact_respond_injector import (
     ArtifactRespondInjector,
 )
-from lca.layer1_cognitive.brain.decision_gates.office_works_sealer import OfficeWorksSealer
-from lca.layer1_cognitive.brain.decision_gates.terminal_respond import TerminalRespondGate
-from lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
+from lca.cognition.brain.decision_gates.office_works_sealer import OfficeWorksSealer
+from lca.cognition.brain.decision_gates.terminal_respond import TerminalRespondGate
+from lca.cognition.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
 from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
 
 
@@ -313,7 +313,7 @@ class TestArtifactClosure:
 class TestArtifactRespondInjector:
     async def test_rewrites_relative_images_and_appends_links(self) -> None:
         from lca.contracts.models.core.perceive_state import PerceiveState
-        from lca.layer1_cognitive.brain.context_manifest import build_manifest_from_items
+        from lca.cognition.brain.context_manifest import build_manifest_from_items
 
         gate = ArtifactRespondInjector()
         with run_workspace_scope("run_inj", wall_clock_seconds=60) as workspace:
@@ -365,7 +365,7 @@ class TestArtifactRespondInjector:
 
     async def test_keeps_ledger_urls_and_drops_unknown_ones(self) -> None:
         from lca.contracts.models.core.perceive_state import PerceiveState
-        from lca.layer1_cognitive.brain.context_manifest import build_manifest_from_items
+        from lca.cognition.brain.context_manifest import build_manifest_from_items
 
         gate = ArtifactRespondInjector()
         with run_workspace_scope("run_inj2", wall_clock_seconds=60) as workspace:

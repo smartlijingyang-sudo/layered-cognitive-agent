@@ -9,7 +9,7 @@ from lca.contracts.protocols.infra import (
     ToolRegistry,
     TransportRegistryProtocol,
 )
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
+from lca.cognition.body.action_registry import ActionRegistry
 
 
 def build_action_registry_from_authority(

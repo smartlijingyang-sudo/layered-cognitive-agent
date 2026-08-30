@@ -36,7 +36,7 @@ class TestWorkspaceInstructionsSensor:
         agents_md = tmp_path / "AGENTS.md"
         agents_md.write_text("Hello from AGENTS.md\n", encoding="utf-8")
 
-        from lca.layer1_cognitive.sensors.workspace_instructions import (
+        from lca.cognition.sensors.workspace_instructions import (
             WorkspaceInstructionsSensor,
         )
 
@@ -51,7 +51,7 @@ class TestWorkspaceInstructionsSensor:
         self, tmp_path: Path
     ) -> None:
         """A missing AGENTS.md MUST yield zero items, not an exception."""
-        from lca.layer1_cognitive.sensors.workspace_instructions import (
+        from lca.cognition.sensors.workspace_instructions import (
             WorkspaceInstructionsSensor,
         )
 
@@ -62,7 +62,7 @@ class TestWorkspaceInstructionsSensor:
 
     async def test_workspace_instructions_named_factory_exists(self) -> None:
         """``build_workspace_instructions_sensor`` MUST be exposed."""
-        from lca.layer1_cognitive.sensors.workspace_instructions import (
+        from lca.cognition.sensors.workspace_instructions import (
             build_workspace_instructions_sensor,
         )
 
@@ -90,7 +90,7 @@ class TestSkillCatalogSensor:
                     ),
                 )
 
-        from lca.layer1_cognitive.sensors.skill_catalog import (
+        from lca.cognition.sensors.skill_catalog import (
             build_skill_catalog_sensor,
         )
 
@@ -110,7 +110,7 @@ class TestSkillCatalogSensor:
             def list_installed(self) -> tuple[SkillIndexEntry, ...]:
                 return ()
 
-        from lca.layer1_cognitive.sensors.skill_catalog import (
+        from lca.cognition.sensors.skill_catalog import (
             build_skill_catalog_sensor,
         )
 

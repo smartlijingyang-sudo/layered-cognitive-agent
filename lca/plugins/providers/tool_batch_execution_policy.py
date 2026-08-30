@@ -13,7 +13,7 @@ from lca.contracts.capabilities import TOOL_BATCH_EXECUTION_POLICY
 from lca.contracts.protocols.logic_address import LogicAddress
 from lca.contracts.protocols.tool_batch_execution import ToolBatchExecutionPolicy
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer1_cognitive.body.tool_batch_execution import (
+from lca.cognition.body.tool_batch_execution import (
     ParallelToolBatchExecutionPolicy,
     SafeToolBatchExecutionPolicy,
     SegmentedSafeToolBatchExecutionPolicy,

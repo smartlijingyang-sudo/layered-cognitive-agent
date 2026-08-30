@@ -14,7 +14,7 @@ from lca.contracts.models.core.result import ApprovalPendingError
 from lca.infrastructure.computer.machine import MachineComputer
 from lca.infrastructure.file_store import LocalFileStore
 from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
-from lca.layer1_cognitive.body.tool_result_preview import tool_files
+from lca.cognition.body.tool_result_preview import tool_files
 
 
 class _FakeTransport:

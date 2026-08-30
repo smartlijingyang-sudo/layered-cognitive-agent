@@ -203,7 +203,7 @@ def test_v4_arguments_or_ref_always_set_after_emit() -> None:
     走 emit_tool_started / emit_tool_invoked 的公共路径时,即使没有
     evidence_store,inline ``arguments`` 也会填充 args(退路)。
     """
-    from lca.layer1_cognitive.body.tool_journal_emit import (
+    from lca.cognition.body.tool_journal_emit import (
         emit_tool_invoked,
         emit_tool_started,
     )
@@ -236,7 +236,7 @@ def test_v4_arguments_or_ref_always_set_after_emit() -> None:
 
 def test_v4_disk_record_keeps_arguments_inline() -> None:
     """V4:inline arguments 落盘后保留(走 emit 公共路径)。"""
-    from lca.layer1_cognitive.body.tool_journal_emit import emit_tool_started
+    from lca.cognition.body.tool_journal_emit import emit_tool_started
 
     class _Tool:
         name = "demo"
@@ -265,7 +265,7 @@ def test_emit_tool_started_returns_ref_when_evidence_bound() -> None:
         EvidenceReceipt,
         RetentionClass,
     )
-    from lca.layer1_cognitive.body.tool_journal_emit import emit_tool_started
+    from lca.cognition.body.tool_journal_emit import emit_tool_started
 
     class _Tool:
         name = "demo"
@@ -318,7 +318,7 @@ def test_inline_path_activated_by_should_inline_true() -> None:
         Classification,
         RetentionClass,
     )
-    from lca.layer1_cognitive.body.tool_journal_emit import emit_tool_started
+    from lca.cognition.body.tool_journal_emit import emit_tool_started
 
     class _Tool:
         name = "demo"

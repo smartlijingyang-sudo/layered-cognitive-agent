@@ -36,7 +36,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer1_cognitive.sensors.workspace_instructions import (
+    from lca.cognition.sensors.workspace_instructions import (
         build_workspace_instructions_sensor,
     )
 

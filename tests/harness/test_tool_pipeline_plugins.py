@@ -18,7 +18,7 @@ from lca.contracts.protocols.tool_pipeline import (
     ToolPreDecision,
 )
 from lca.infrastructure.tool_pipeline import DefaultToolExecutionPipeline
-from lca.layer1_cognitive.body.pipeline_safe_executor import PipelineSafeExecutor
+from lca.cognition.body.pipeline_safe_executor import PipelineSafeExecutor
 
 
 class _EchoProvider:

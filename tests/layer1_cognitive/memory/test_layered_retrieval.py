@@ -4,7 +4,7 @@ import pytest
 
 from lca.contracts.atoms.enums import MemoryLayer
 from lca.contracts.models.core.memory import MemoryRecord
-from lca.layer1_cognitive.memory.layered_retrieval_policy import (
+from lca.cognition.memory.layered_retrieval_policy import (
     LayeredRetrievalPolicy,
 )
 

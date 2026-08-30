@@ -36,6 +36,6 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer1_cognitive.brain.decision_gates.repeat_tool_call import RepeatToolCallGate
+    from lca.cognition.brain.decision_gates.repeat_tool_call import RepeatToolCallGate
 
     ctx.require("gates").add(RepeatToolCallGate, id="repeat-tool-call", slot="loop", order=10)

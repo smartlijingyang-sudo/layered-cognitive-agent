@@ -399,12 +399,12 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
         from lca.contracts.atoms.ids import new_id
         from lca.contracts.models.core.budget import Budget
         from lca.contracts.models.core.state import AgentState
-        from lca.layer1_cognitive.brain.prompts._loader import load_builtin_prompt
-        from lca.layer1_cognitive.brain.reasoner import (
+        from lca.cognition.brain.prompts._loader import load_builtin_prompt
+        from lca.cognition.brain.reasoner import (
             _context_lines,
             _role_prompt_vars,
         )
-        from lca.layer1_cognitive.sensors.skill_catalog import SkillCatalogSensor
+        from lca.cognition.sensors.skill_catalog import SkillCatalogSensor
         from lca.layer4_app.spawn import (
             _format_tools_xml,
             _render_available_skills,

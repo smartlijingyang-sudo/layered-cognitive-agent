@@ -24,6 +24,6 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide ConcatSynthesizer as ``synthesizer.concat``."""
-    from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
+    from lca.cognition.brain.synthesizer import ConcatSynthesizer
 
     ctx.provide("synthesizer.concat", ConcatSynthesizer)

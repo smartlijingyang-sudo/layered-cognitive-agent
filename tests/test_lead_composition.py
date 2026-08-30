@@ -9,9 +9,9 @@ from lca.contracts.atoms.enums import ActionType, DecisionGateName
 from lca.contracts.models.team.team_coordination import LeadMandate, gate_name_for_mandate
 from lca.contracts.protocols.spec import AgentSpec, LeadSpec
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+from lca.cognition.brain.decision_gates import MustConsultAllMembers
+from lca.cognition.brain.modular_brain import ModularBrain
+from lca.cognition.brain.reasoner import PromptReasoner
 from lca.layer2_runtime.reducer import DefaultReducer
 from lca.layer4_app.api import ensure_default_ctx
 from lca.layer4_app.spawn import spawn_agent, spawn_lead, spawn_team

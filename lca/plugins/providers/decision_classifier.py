@@ -10,7 +10,7 @@ from lca.contracts.models.core.decision import Decision, DelegationSpec, ToolCal
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols.decision_classifier import DecisionClassifier
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer1_cognitive.brain.leaked_tool_call import recover_leaked_tool_calls
+from lca.cognition.brain.leaked_tool_call import recover_leaked_tool_calls
 
 _PARSE_FAILURE_USER_MESSAGE = "抱歉，模型未返回有效决策，请重试。"
 _DELEGATE_TOOL_NAME = "delegate"

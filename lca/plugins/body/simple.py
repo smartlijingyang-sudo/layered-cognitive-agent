@@ -38,6 +38,6 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
-    from lca.layer1_cognitive.body.simple_body import SimpleBody
+    from lca.cognition.body.simple_body import SimpleBody
 
     ctx.register(BODIES.key, "simple", SimpleBody)

@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistryProtocol
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
-from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer1_cognitive.transport_registry_factory import build_transport_registry
+from lca.cognition.body.action_registry import ActionRegistry
+from lca.cognition.body.simple_body import SimpleBody
+from lca.cognition.transport_registry_factory import build_transport_registry
 from lca.plugins.composer.action_authority import build_action_registry_from_authority
 from lca.plugins.providers.action_handlers import DefaultActionHandlerRegistry
 

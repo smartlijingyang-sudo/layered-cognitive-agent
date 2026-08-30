@@ -13,8 +13,8 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.delegation import DelegationResult
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.team_awareness import TeamAwareness
-from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
-from lca.layer1_cognitive.brain.reasoner import (
+from lca.cognition.brain.prompts import load_builtin_prompt
+from lca.cognition.brain.reasoner import (
     PromptReasoner,
     build_member_reports_text,
 )

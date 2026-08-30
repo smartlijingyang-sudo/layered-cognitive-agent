@@ -25,11 +25,11 @@ from lca.contracts.models.core.budget import Budget
 from lca.contracts.models.core.decision import Decision, Observation, Turn
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import ToolPermissionManifest
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer1_cognitive.transport_registry_factory import build_transport_registry
+from lca.cognition.body.action_registry import ActionRegistry
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.simple_body import SimpleBody
+from lca.cognition.body.tool_registry import SimpleToolRegistry
+from lca.cognition.transport_registry_factory import build_transport_registry
 from lca.plugins.providers.gate_chain_composer import DefaultGateChainComposer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -57,7 +57,7 @@ def _build_body_for_finalize(seal_office_works_fn: Callable[[], Awaitable[None]]
 class TestOfficeWorksSealerMigration:
     def test_sealer_no_longer_in_composed_gate_chain(self) -> None:
         """The composer-owned default chain MUST NOT include the sealer."""
-        from lca.layer1_cognitive.brain.decision_gates import (
+        from lca.cognition.brain.decision_gates import (
             build_workspace_agent_gate_with_composer,
         )
 
@@ -72,7 +72,7 @@ class TestOfficeWorksSealerMigration:
 
     def test_legacy_builder_fails_instead_of_bypassing_composer_seam(self) -> None:
         """Legacy callers receive a migration error instead of a hidden default chain."""
-        from lca.layer1_cognitive.brain.decision_gates import build_workspace_agent_gate
+        from lca.cognition.brain.decision_gates import build_workspace_agent_gate
 
         with pytest.raises(RuntimeError, match="no longer constructs a default Gate chain"):
             build_workspace_agent_gate()
@@ -81,8 +81,8 @@ class TestOfficeWorksSealerMigration:
         """Layer 1 cannot select strategies or retain a configuration-only seam."""
         from typing import Any, cast
 
-        from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
-        from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+        from lca.cognition.brain.default_factory import SimpleBrainFactory
+        from lca.cognition.brain.reasoner import PromptReasoner
 
         # The calls intentionally omit or add constructor arguments. Cast only
         # this inspection target so static checking does not reject the very
@@ -120,7 +120,7 @@ class TestOfficeWorksSealerMigration:
         if not SEALER_PATH.exists():
             return  # acceptable: file removed outright
         spec = importlib.util.spec_from_file_location(
-            "lca.layer1_cognitive.brain.decision_gates.office_works_sealer",
+            "lca.cognition.brain.decision_gates.office_works_sealer",
             SEALER_PATH,
         )
         assert spec is not None and spec.loader is not None

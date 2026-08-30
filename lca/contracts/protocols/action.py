@@ -3,7 +3,7 @@
 L1 契约层：定义"什么是一个合法的 Agent 行动"以及"如何路由到对应处理器"。
 全系统的唯一事实来源：Prompt 枚举、Schema 校验、执行分发均从此处派生。
 
-具体注册表实现见 ``lca.layer1_cognitive.body.action_registry.ActionRegistry``（ADR-0015）。
+具体注册表实现见 ``lca.cognition.body.action_registry.ActionRegistry``（ADR-0015）。
 """
 
 from __future__ import annotations

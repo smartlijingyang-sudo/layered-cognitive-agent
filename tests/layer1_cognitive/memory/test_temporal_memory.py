@@ -9,7 +9,7 @@ from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.memory import MemoryRecord, MemoryRelationKind, MemoryTrust
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.infrastructure.state_store.sqlite_temporal_memory import SqliteTemporalMemoryStore
-from lca.layer1_cognitive.memory.temporal_memory import TemporalMemorySystem
+from lca.cognition.memory.temporal_memory import TemporalMemorySystem
 
 
 def _record(

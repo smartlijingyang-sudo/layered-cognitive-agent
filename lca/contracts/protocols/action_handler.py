@@ -4,7 +4,7 @@
 每个 handler 知道如何为一个 ActionType（如 "respond"、"use_tool"）创建 Action 实现。
 新增 action type = 注册新 handler，无需修改核心代码。
 
-具体注册表实现见 `lca.layer1_cognitive.body.action_registry.ActionRegistry`。
+具体注册表实现见 `lca.cognition.body.action_registry.ActionRegistry`。
 """
 
 from __future__ import annotations

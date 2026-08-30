@@ -24,8 +24,8 @@ from lca.contracts.models.observability.journal import (
     ContextCompacted,
     MemoryCommitted,
 )
-from lca.layer1_cognitive.memory import SimpleMemorySystem
-from lca.layer1_cognitive.memory.policy import (
+from lca.cognition.memory import SimpleMemorySystem
+from lca.cognition.memory.policy import (
     CompactionPolicy,
     MemoryAuthority,
     MemoryCommitResult,
@@ -35,7 +35,7 @@ from lca.layer1_cognitive.memory.policy import (
     SimpleCompactionPolicy,
     SimpleMemoryPolicy,
 )
-from lca.layer1_cognitive.memory.semantic_compaction import SemanticCompactionPolicy
+from lca.cognition.memory.semantic_compaction import SemanticCompactionPolicy
 
 
 def _agent_state() -> AgentState:

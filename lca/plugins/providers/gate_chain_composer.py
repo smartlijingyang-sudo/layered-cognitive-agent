@@ -43,16 +43,16 @@ class DefaultGateChainComposer(GateChainComposer):
         Returns:
             Composed DecisionGate chain via ChainedDecisionGate.
         """
-        from lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector import (
+        from lca.cognition.brain.decision_gates.artifact_respond_injector import (
             ArtifactRespondInjector,
         )
-        from lca.layer1_cognitive.brain.decision_gates.chained import ChainedDecisionGate
-        from lca.layer1_cognitive.brain.decision_gates.progress_loop_detector import (
+        from lca.cognition.brain.decision_gates.chained import ChainedDecisionGate
+        from lca.cognition.brain.decision_gates.progress_loop_detector import (
             ProgressLoopDetector,
         )
-        from lca.layer1_cognitive.brain.decision_gates.repeat_tool_call import RepeatToolCallGate
-        from lca.layer1_cognitive.brain.decision_gates.terminal_respond import TerminalRespondGate
-        from lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
+        from lca.cognition.brain.decision_gates.repeat_tool_call import RepeatToolCallGate
+        from lca.cognition.brain.decision_gates.terminal_respond import TerminalRespondGate
+        from lca.cognition.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
 
         return ChainedDecisionGate(
             RepeatToolCallGate(),

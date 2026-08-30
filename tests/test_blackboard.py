@@ -26,7 +26,7 @@ def _entry(content: str = "x", written_by: str = "alice") -> dict:
 
 class TestInMemoryBlackboard:
     def test_read_returns_entries_in_version_order(self) -> None:
-        from lca.layer1_cognitive.collaboration.blackboard import (
+        from lca.cognition.collaboration.blackboard import (
             InMemoryBlackboard,
         )
 
@@ -39,7 +39,7 @@ class TestInMemoryBlackboard:
         assert [e.content for e in entries] == ["a", "b", "c"]
 
     def test_append_increments_version(self) -> None:
-        from lca.layer1_cognitive.collaboration.blackboard import (
+        from lca.cognition.collaboration.blackboard import (
             InMemoryBlackboard,
         )
 
@@ -54,7 +54,7 @@ class TestInMemoryBlackboard:
         assert len({first.id, second.id, third.id}) == 3
 
     def test_cas_succeeds_when_expected_version_matches(self) -> None:
-        from lca.layer1_cognitive.collaboration.blackboard import (
+        from lca.cognition.collaboration.blackboard import (
             InMemoryBlackboard,
         )
 
@@ -65,7 +65,7 @@ class TestInMemoryBlackboard:
         assert [e.content for e in bb.read("t")] == ["a", "b"]
 
     def test_cas_fails_when_version_mismatch(self) -> None:
-        from lca.layer1_cognitive.collaboration.blackboard import (
+        from lca.cognition.collaboration.blackboard import (
             InMemoryBlackboard,
         )
 
@@ -78,7 +78,7 @@ class TestInMemoryBlackboard:
         assert [e.content for e in bb.read("t")] == ["a", "b"]
 
     def test_acquire_lease_blocks_other_holders_until_expiry(self) -> None:
-        from lca.layer1_cognitive.collaboration.blackboard import (
+        from lca.cognition.collaboration.blackboard import (
             InMemoryBlackboard,
         )
 
@@ -91,7 +91,7 @@ class TestInMemoryBlackboard:
         assert second is None
 
     def test_acquire_lease_after_release(self) -> None:
-        from lca.layer1_cognitive.collaboration.blackboard import (
+        from lca.cognition.collaboration.blackboard import (
             InMemoryBlackboard,
         )
 
@@ -104,7 +104,7 @@ class TestInMemoryBlackboard:
         assert second.holder == "bob"
 
     def test_release_lease_allows_reacquire(self) -> None:
-        from lca.layer1_cognitive.collaboration.blackboard import (
+        from lca.cognition.collaboration.blackboard import (
             InMemoryBlackboard,
         )
 
@@ -117,7 +117,7 @@ class TestInMemoryBlackboard:
         assert reacquired.lease_id != lease.lease_id
 
     def test_acquire_lease_after_ttl_expiry(self) -> None:
-        from lca.layer1_cognitive.collaboration.blackboard import (
+        from lca.cognition.collaboration.blackboard import (
             InMemoryBlackboard,
         )
 
@@ -148,7 +148,7 @@ class TestInMemoryBlackboard:
 
     def test_protocol_methods_present(self) -> None:
         """InMemoryBlackboard MUST expose the Protocol methods."""
-        from lca.layer1_cognitive.collaboration.blackboard import (
+        from lca.cognition.collaboration.blackboard import (
             Blackboard,
             InMemoryBlackboard,
         )

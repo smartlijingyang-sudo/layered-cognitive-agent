@@ -248,7 +248,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             DelegationCacheHit,
             domain=VocabDomain.TEAM,
-            emitter="lca.layer1_cognitive.body.delegation_cache",
+            emitter="lca.cognition.body.delegation_cache",
             required=("callee_role",),
             description="委派幂等短路",
             durability="best_effort",
@@ -258,7 +258,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             SynthesisCompleted,
             domain=VocabDomain.TEAM,
-            emitter="lca.layer1_cognitive.body.action_handlers",
+            emitter="lca.cognition.body.action_handlers",
             description="收口综合完成",
             durability="required",
             audience="operator",
@@ -268,7 +268,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             DecisionMade,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer1_cognitive.body.action_handlers",
+            emitter="lca.cognition.body.action_handlers",
             required=("action_type",),
             description="决策事实",
             durability="required",
@@ -375,7 +375,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             ToolCallStreaming,
             domain=VocabDomain.RESOURCE,
-            emitter="lca.layer1_cognitive.brain.llm_turn.executor",
+            emitter="lca.cognition.brain.llm_turn.executor",
             required=("tool_name",),
             description="LLM 正在流式生成工具调用参数（早期卡片占位，消除思考→执行空白期）",
             durability="best_effort",
@@ -386,7 +386,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             ToolStarted,
             domain=VocabDomain.RESOURCE,
-            emitter="lca.layer1_cognitive.body.tool_journal_emit",
+            emitter="lca.cognition.body.tool_journal_emit",
             required=("tool_name", "invocation_id"),
             description="工具调用开始；plugin_state 为 UI 完整初始态（code/command）",
             durability="required",
@@ -396,7 +396,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             ToolInvoked,
             domain=VocabDomain.RESOURCE,
-            emitter="lca.layer1_cognitive.body.tool_journal_emit",
+            emitter="lca.cognition.body.tool_journal_emit",
             required=("tool_name",),
             description="工具调用完成；plugin_state/files 为 UI 一等字段（不截断）",
             durability="required",
@@ -406,7 +406,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             ToolDenied,
             domain=VocabDomain.RESOURCE,
-            emitter="lca.layer1_cognitive.body.tool_journal_emit",
+            emitter="lca.cognition.body.tool_journal_emit",
             required=("tool_name",),
             description="工具调用被拒",
             durability="required",
@@ -460,7 +460,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             ContextManifested,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer1_cognitive.brain.context_manifest",
+            emitter="lca.cognition.brain.context_manifest",
             required=("digest",),
             description="PerceiveHub 一次性发出当 step 的 ContextManifest",
             durability="required",
@@ -470,7 +470,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             PerceptionMerged,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer1_cognitive.perceive_hub",
+            emitter="lca.cognition.perceive_hub",
             required=("delta_ref",),
             description="Hub fold 终态",
             durability="required",
@@ -480,7 +480,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             GateDecided,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer1_cognitive.brain.decision_gates",
+            emitter="lca.cognition.brain.decision_gates",
             required=("gate", "verdict"),
             description="DecisionGate 裁决（warn/rewrite/deny）",
             durability="required",
@@ -510,7 +510,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             ApprovalRequested,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer1_cognitive.body.safe_executor",
+            emitter="lca.cognition.body.safe_executor",
             required=("envelope_id", "tool_name"),
             description="执行信封触发审批",
             durability="required",
@@ -520,7 +520,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             ApprovalResolved,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer1_cognitive.body.safe_executor",
+            emitter="lca.cognition.body.safe_executor",
             required=("envelope_id",),
             description="审批决议",
             durability="required",
@@ -530,7 +530,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             MemoryCommitted,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer1_cognitive.memory.simple_memory",
+            emitter="lca.cognition.memory.simple_memory",
             required=("layer", "record_id"),
             description="记忆提交",
             durability="best_effort",
@@ -540,7 +540,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             ContextCompacted,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer1_cognitive.memory.simple_memory",
+            emitter="lca.cognition.memory.simple_memory",
             required=("step",),
             description="影子 CompactionPolicy 应用",
             durability="best_effort",

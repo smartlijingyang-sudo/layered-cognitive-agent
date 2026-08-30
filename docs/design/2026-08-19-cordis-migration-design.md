@@ -265,7 +265,7 @@ async def setup(ctx, config):
 
 | 位置 | 允许 import | 禁止 import |
 |---|---|---|
-| `lca/plugins/foo.py` 模块顶层 | `cordis.*` / `lca.contracts.*` | `lca.infrastructure.*` / `lca.layer1_cognitive.*` / `lca.layer2_runtime.*` / `lca.layer3_agent.*` / `lca.layer4_app.*` |
+| `lca/plugins/foo.py` 模块顶层 | `cordis.*` / `lca.contracts.*` | `lca.infrastructure.*` / `lca.cognition.*` / `lca.layer2_runtime.*` / `lca.layer3_agent.*` / `lca.layer4_app.*` |
 | `@plugin` setup 函数体内部 | 任意（延迟到 load 时） | — |
 | `lca/plugins/guards/*.py` 顶层 | `cordis.*` / `lca.contracts.*` / `lca.layer2_runtime.loop_intervention_mw` / `lca.layer2_runtime.budget_policy` | 同上 + 跨 plugin 互引（避免循环） |
 
@@ -276,7 +276,7 @@ type = forbidden
 source_modules = lca.plugins
 forbidden_modules =
     lca.infrastructure
-    lca.layer1_cognitive
+    lca.cognition
     lca.layer2_runtime
     lca.layer3_agent
     lca.layer4_app
@@ -642,8 +642,8 @@ from lca.contracts.typed_ctx import TypedContext
 @plugin(name="lca-brain-modular")
 async def setup(ctx: TypedContext, config):
     """Mount the default ModularBrain strategy as the brain factory."""
-    from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-    from lca.layer1_cognitive.brain.default_factory import BrainFactory
+    from lca.cognition.brain.modular_brain import ModularBrain
+    from lca.cognition.brain.default_factory import BrainFactory
 
     factory = ctx.brain_factory
     factory.register("modular", ModularBrain)
@@ -1266,7 +1266,7 @@ P4 / P6 必跑：
 - `rg "ctx\.llm\." lca/layer4_app/` 找到至少 5 处 typed property 使用（验证精修项 2）
 - `rg "@plugin" lca/plugins/ | wc -l` = 38（精确 plugin 数）
 - `uv run lint-imports` plugin top-level 0 违规（精修项 4）
-- `rg "from lca.infrastructure\|from lca.layer1_cognitive\|from lca.layer2_runtime\|from lca.layer3_agent\|from lca.layer4_app" lca/plugins/*/` 仅命中 plugin setup 函数体内部（非模块顶层）
+- `rg "from lca.infrastructure\|from lca.cognition\|from lca.layer2_runtime\|from lca.layer3_agent\|from lca.layer4_app" lca/plugins/*/` 仅命中 plugin setup 函数体内部（非模块顶层）
 
 **功能验收**：
 

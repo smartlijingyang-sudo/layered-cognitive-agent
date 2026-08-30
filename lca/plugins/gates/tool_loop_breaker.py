@@ -36,6 +36,6 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
+    from lca.cognition.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
 
     ctx.require("gates").add(ToolLoopBreakerGate, id="tool-loop-breaker", slot="loop", order=20)

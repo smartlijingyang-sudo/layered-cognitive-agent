@@ -6,7 +6,7 @@ from lca.contracts.atoms.enums import ReflectionVerdict
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.state import AgentState
-from lca.layer1_cognitive.brain.null_critic import NullCritic
+from lca.cognition.brain.null_critic import NullCritic
 
 
 @pytest.fixture()

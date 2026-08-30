@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 
 from lca.contracts.models.core.llm import LLMResponse
-from lca.layer1_cognitive.brain.leaked_tool_call import recover_leaked_tool_calls
+from lca.cognition.brain.leaked_tool_call import recover_leaked_tool_calls
 from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 
 

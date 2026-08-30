@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
+from lca.cognition.brain.prompts import load_builtin_prompt
 
 
 class TestLoadBuiltinPrompt(unittest.TestCase):

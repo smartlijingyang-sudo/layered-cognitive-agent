@@ -100,25 +100,25 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     # ── 认知域：hook 边界自动发射 ──
     SpanName.LOOP_PHASE_PERCEIVE.value: _span(
         VocabDomain.COGNITIVE,
-        "lca.layer1_cognitive.hook_registry",
+        "lca.cognition.hook_registry",
         required=(ATTR_AGENT_ROLE, ATTR_STEP),
         desc="感知相位",
     ),
     SpanName.LOOP_PHASE_THINK.value: _span(
         VocabDomain.COGNITIVE,
-        "lca.layer1_cognitive.hook_registry",
+        "lca.cognition.hook_registry",
         required=(ATTR_AGENT_ROLE, ATTR_STEP),
         desc="思考相位",
     ),
     SpanName.LOOP_PHASE_ACT.value: _span(
         VocabDomain.COGNITIVE,
-        "lca.layer1_cognitive.hook_registry",
+        "lca.cognition.hook_registry",
         required=(ATTR_AGENT_ROLE, ATTR_STEP),
         desc="行动相位",
     ),
     SpanName.LOOP_PHASE_REFLECT.value: _span(
         VocabDomain.COGNITIVE,
-        "lca.layer1_cognitive.hook_registry",
+        "lca.cognition.hook_registry",
         required=(ATTR_AGENT_ROLE, ATTR_STEP),
         desc="反思相位",
     ),
@@ -131,7 +131,7 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     ),
     SpanName.TOOL_EXECUTE.value: _span(
         VocabDomain.RESOURCE,
-        "lca.layer1_cognitive.body.safe_executor",
+        "lca.cognition.body.safe_executor",
         required=(ATTR_TOOL_NAME,),
         desc="工具执行",
     ),
@@ -163,12 +163,12 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     ),
     SpanName.ERROR.value: _span(
         VocabDomain.RESOURCE,
-        "lca.layer1_cognitive.hook_registry",
+        "lca.cognition.hook_registry",
         desc="hook on_error 错误 span",
     ),
     # ── 事件域 ──
     EventName.DECISION_MADE.value: _event(
-        "lca.layer1_cognitive.body.action_handlers",
+        "lca.cognition.body.action_handlers",
         desc="决策落地（委派/工具/回答动作分发点）",
     ),
     EventName.DELEGATE_REQUESTED.value: _event(
@@ -177,7 +177,7 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
         desc="委派发起",
     ),
     EventName.TOOL_DENIED.value: _event(
-        "lca.layer1_cognitive.body.safe_executor",
+        "lca.cognition.body.safe_executor",
         required=(ATTR_TOOL_NAME,),
         desc="工具调用被安全策略拒绝",
     ),

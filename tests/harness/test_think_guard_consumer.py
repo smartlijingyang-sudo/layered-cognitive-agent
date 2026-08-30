@@ -23,7 +23,7 @@ from lca.contracts.protocols import (
     Reducer,
     SkillRouter,
 )
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
+from lca.cognition.brain.modular_brain import ModularBrain
 from lca.layer2_runtime.reducer import DefaultReducer
 from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 

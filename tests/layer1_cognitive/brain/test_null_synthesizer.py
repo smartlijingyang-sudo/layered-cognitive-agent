@@ -5,7 +5,7 @@ import pytest
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
-from lca.layer1_cognitive.brain.null_synthesizer import NullSynthesizer
+from lca.cognition.brain.null_synthesizer import NullSynthesizer
 
 
 @pytest.fixture()

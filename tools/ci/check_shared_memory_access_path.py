@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 FORBIDDEN_IMPORTS = frozenset(
     {
-        "lca.layer1_cognitive.memory.team_shared_memory",
+        "lca.cognition.memory.team_shared_memory",
     }
 )
 # body/brain 不得直接依赖共享存储具体实现

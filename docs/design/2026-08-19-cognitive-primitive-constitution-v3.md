@@ -1307,7 +1307,7 @@ for step in range(state.step, max_steps):
         break
 ```
 
-PR2：`ContextManifested` 由 **唯一** 模块 `lca.layer1_cognitive.brain.context_manifest` 发射（Reasoner 调用该 helper）。PR3b：catalog emitter 改登记为 Hub 模块，Reasoner 停止调用 helper。
+PR2：`ContextManifested` 由 **唯一** 模块 `lca.cognition.brain.context_manifest` 发射（Reasoner 调用该 helper）。PR3b：catalog emitter 改登记为 Hub 模块，Reasoner 停止调用 helper。
 
 ### 5.4 AST 白名单
 
@@ -1506,7 +1506,7 @@ v2 信封字段 **映射到现网**，缺的才加：
 | `run.paused` / `run.resumed` | 无。暂停靠 `ApprovalPendingError` + `StateStore` + `TaskStatus.INPUT_REQUIRED` | **mint** `RunPaused` / `RunResumed`（required，auditor）。在 `_loop` except 与 `resume` 入口 `record` |
 | `turn.started` / `turn.completed` | harness `TurnStarted`/`TurnEnded`；journal 无。`StepCompleted` 是认知步不是 Turn | 生产 `/runs` 以 step 为轮。**不**强制 mint Turn 事件，除非 LiveAgent 成为生产路径。LiveAgent dual-write 到 journal 时再 mint 或复用 Step |
 | `perception.merged` | 无 | **mint** `PerceptionMerged` |
-| `decision.proposed` | `DecisionMade`（发射点 `lca.layer1_cognitive.body.action_handlers.record_decision_made`，在 Gate 之后、执行前） | **复用且不前移**（catalog 一事件一发射点）。被 Gate 丢弃的候选不发 `DecisionMade`；审计走 `GateDecided.original_decision_id` |
+| `decision.proposed` | `DecisionMade`（发射点 `lca.cognition.body.action_handlers.record_decision_made`，在 Gate 之后、执行前） | **复用且不前移**（catalog 一事件一发射点）。被 Gate 丢弃的候选不发 `DecisionMade`；审计走 `GateDecided.original_decision_id` |
 | `gate.decided` | `ActionDegraded` 仅当 `observation.success` **且** `observation.degraded_from`（emitter：`event_emission`） | **mint** `GateDecided`（单一 helper，所有 workspace Gate）。**分叉：** (1) 词表外 parse → `DegradationPolicy` 填 `degraded_from` → 现网 `ActionDegraded`（成功 Observation 才发）；(2) 词表内 Gate rewrite（Breaker/Progress/Terminal 强制 RESPOND、Repeat 只警告）→ **只** `GateDecided`；PR4 **不**填 `degraded_from`（与现网 Breaker 一致）。把 Breaker 补 `degraded_from` + 放宽 `ActionDegraded` 成功谓词是 **独立后续 PR**，不与 PR4 混写 |
 | `reflection.created` | 无 | **mint** `ReflectionCreated`（best_effort，operator） |
 | `memory.committed` / `memory.write_rejected` | 无 | **mint** `MemoryCommitted` / `MemoryWriteRejected` |
@@ -1889,7 +1889,7 @@ sha256( canonical_json({
 | 阶段 | 行为 |
 |---|---|
 | 现网 | 上表私有路径 |
-| PR2 | helper `lca.layer1_cognitive.brain.context_manifest.record_manifest(...)` 在 Think 前 dual-write（**唯一** `ContextManifested` 发射模块）。Reasoner 仍读 State |
+| PR2 | helper `lca.cognition.brain.context_manifest.record_manifest(...)` 在 Think 前 dual-write（**唯一** `ContextManifested` 发射模块）。Reasoner 仍读 State |
 | PR3b | emitter 迁 Hub；Clock + artifacts 走 Sensor |
 | PR3c | 删除 `datetime.now`、`_with_artifact_context`、`_with_subtasks`、Think 内 search 探测 |
 | PR4 | 删除 `_with_loop_warning` |
@@ -4934,7 +4934,7 @@ Session N 被投毒写入
 10. Protocol 实现显式继承（现有 `check_protocol_impl.py`）。
 11. bundle/profile 变更：plugin meta 可解析；禁止声明 `policy_class=control` 却 listen 认知事件。
 12. TeamMessage/Blackboard（PR9 后）：ACL、TTL、provenance、schema、idempotency。
-13. PR8：importlinter 禁止 `lca.layer1_cognitive` → `lca.harness`。`CognitiveRuntime` 只依赖 `PerceiveHub` Protocol。
+13. PR8：importlinter 禁止 `lca.cognition` → `lca.harness`。`CognitiveRuntime` 只依赖 `PerceiveHub` Protocol。
 
 `@plugin` 名 ↔ §14 编译表的全量 CI 放后期（原第五期），不阻塞 PR1。
 

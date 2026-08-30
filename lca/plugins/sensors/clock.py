@@ -36,6 +36,6 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer1_cognitive.sensors.clock import build_clock_sensor
+    from lca.cognition.sensors.clock import build_clock_sensor
 
     ctx.require("perceive").add(build_clock_sensor, id="clock", order=10)

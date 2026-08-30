@@ -54,7 +54,7 @@ class RespondActionHandler(ActionHandler):
         Returns:
             RespondOperation instance.
         """
-        from lca.layer1_cognitive.body.action_handlers import RespondOperation
+        from lca.cognition.body.action_handlers import RespondOperation
 
         return RespondOperation()
 
@@ -69,7 +69,7 @@ class StopActionHandler(ActionHandler):
         transport_registry: TransportRegistryProtocol,
     ) -> Action | None:
         del tool_registry, safe_executor, transport_registry
-        from lca.layer1_cognitive.body.action_handlers import TerminalOperation
+        from lca.cognition.body.action_handlers import TerminalOperation
 
         return TerminalOperation()
 
@@ -84,7 +84,7 @@ class AskHumanActionHandler(ActionHandler):
         transport_registry: TransportRegistryProtocol,
     ) -> Action | None:
         del tool_registry, safe_executor, transport_registry
-        from lca.layer1_cognitive.body.action_handlers import AskHumanOperation
+        from lca.cognition.body.action_handlers import AskHumanOperation
 
         return AskHumanOperation()
 
@@ -121,7 +121,7 @@ class UseToolActionHandler(ActionHandler):
         Returns:
             UseToolOperation instance.
         """
-        from lca.layer1_cognitive.body.action_handlers import UseToolOperation
+        from lca.cognition.body.action_handlers import UseToolOperation
 
         return UseToolOperation(
             tool_registry,
@@ -153,7 +153,7 @@ class DelegateActionHandler(ActionHandler):
         Returns:
             DelegateOperation instance.
         """
-        from lca.layer1_cognitive.body.action_handlers import DelegateOperation
+        from lca.cognition.body.action_handlers import DelegateOperation
 
         return DelegateOperation(transport_registry)
 
@@ -181,7 +181,7 @@ class HandoffActionHandler(ActionHandler):
         Returns:
             HandoffOperation instance.
         """
-        from lca.layer1_cognitive.body.action_handlers import HandoffOperation
+        from lca.cognition.body.action_handlers import HandoffOperation
 
         return HandoffOperation(transport_registry)
 
@@ -252,7 +252,7 @@ class DefaultActionHandlerRegistry(InMemoryActionHandlerRegistry):
 def _compatibility_safe_batch_policy() -> ToolBatchExecutionPolicy:
     """Return the explicit legacy default used only by the compatibility facade."""
 
-    from lca.layer1_cognitive.body.tool_batch_execution import SafeToolBatchExecutionPolicy
+    from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
 
     return SafeToolBatchExecutionPolicy()
 

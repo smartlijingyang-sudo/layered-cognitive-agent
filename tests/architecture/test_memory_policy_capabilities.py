@@ -14,8 +14,8 @@ from lca.contracts.capabilities import (
 )
 from lca.harness.profile.boot import boot_profile
 from lca.harness.profile.resolve import resolve_profile
-from lca.layer1_cognitive.memory.layered_retrieval_policy import LayeredRetrievalPolicy
-from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+from lca.cognition.memory.layered_retrieval_policy import LayeredRetrievalPolicy
+from lca.cognition.memory.simple_memory import SimpleMemorySystem
 
 REPO = Path(__file__).resolve().parents[2]
 

@@ -20,17 +20,17 @@ from lca.contracts.models.team.role_status_rules import is_success_status, is_te
 from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols import SupportsShortcut
 from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
-from lca.layer1_cognitive.brain.critic import SimpleCritic
-from lca.layer1_cognitive.brain.decision_gates.must_consult_all import (
+from lca.cognition.brain.critic import SimpleCritic
+from lca.cognition.brain.decision_gates.must_consult_all import (
     MustConsultAllMembers,
 )
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.member_status import (
+from lca.cognition.brain.modular_brain import ModularBrain
+from lca.cognition.member_status import (
     InMemoryMemberStatus,
     compute_required_action,
     record_delegation_return,
 )
-from lca.layer1_cognitive.member_status.tracking import _next_role_status
+from lca.cognition.member_status.tracking import _next_role_status
 from lca.layer2_runtime.reducer import DefaultReducer
 from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 

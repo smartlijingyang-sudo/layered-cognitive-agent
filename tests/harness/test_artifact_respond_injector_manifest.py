@@ -20,7 +20,7 @@ from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.protocols import DecisionGate
-from lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector import (
+from lca.cognition.brain.decision_gates.artifact_respond_injector import (
     ArtifactRespondInjector,
 )
 

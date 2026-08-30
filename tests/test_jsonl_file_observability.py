@@ -192,7 +192,7 @@ class TestHookSpanAttributes(unittest.TestCase):
 
     def test_extract_decision_attributes(self) -> None:
         """post_think kwargs with decision extracts action_type and confidence."""
-        from lca.layer1_cognitive.hook_registry import _extract_span_attributes
+        from lca.cognition.hook_registry import _extract_span_attributes
 
         class FakeDecision:
             action_type = "respond"
@@ -207,7 +207,7 @@ class TestHookSpanAttributes(unittest.TestCase):
 
     def test_extract_error_attributes(self) -> None:
         """on_error kwargs extracts error type and message."""
-        from lca.layer1_cognitive.hook_registry import _extract_span_attributes
+        from lca.cognition.hook_registry import _extract_span_attributes
 
         attrs = _extract_span_attributes("on_error", {"error": ValueError("bad input")})
         self.assertEqual(attrs["error_type"], "ValueError")

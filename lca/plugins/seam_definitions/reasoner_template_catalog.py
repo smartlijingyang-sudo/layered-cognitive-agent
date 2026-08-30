@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from lca.contracts.capabilities import REASONER_TEMPLATE_CATALOG
 from lca.contracts.protocols.cognition import ReasonerTemplateCatalog
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
+from lca.cognition.brain.prompts import load_builtin_prompt
 
 _REQUIRED_TEMPLATES: frozenset[str] = frozenset(
     {"react_prompt", "hierarchical_prompt", "routing_prompt"}

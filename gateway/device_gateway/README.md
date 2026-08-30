@@ -20,7 +20,7 @@ gateway.device_gateway: 设备网关。本 README 由脚手架生成，待包负
 lca.contracts,gateway
 
 ## 6. 禁止依赖
-lca.infrastructure,lca.layer1_cognitive,lca.layer2_runtime,lca.layer3_agent,lca.layer4_app,lca.harness,lca.plugins
+lca.infrastructure,lca.cognition,lca.layer2_runtime,lca.layer3_agent,lca.layer4_app,lca.harness,lca.plugins
 
 ## 7. 副作用
 network:http,log:emit

@@ -30,8 +30,8 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
-    from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
-    from lca.layer1_cognitive.memory.temporal_memory import TemporalMemorySystem
+    from lca.cognition.memory.simple_memory import SimpleMemorySystem
+    from lca.cognition.memory.temporal_memory import TemporalMemorySystem
 
     registry = ctx.require(COMPONENT_REGISTRY.key)
     registry.register(ComponentKind.MEMORY, MEMORY_CHOICE_SIMPLE, SimpleMemorySystem)

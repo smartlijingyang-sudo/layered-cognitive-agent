@@ -142,7 +142,7 @@ def _drive_run_with_evidence(jsonl_path: Path, ev_root: Path) -> tuple[str, dict
         RunScope,
         ToolStarted,
     )
-    from lca.layer1_cognitive.body.tool_journal_emit import (
+    from lca.cognition.body.tool_journal_emit import (
         emit_tool_started,
     )
 

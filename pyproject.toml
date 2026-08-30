@@ -48,7 +48,7 @@ type = "layers"
 layers = [
     "lca.layer3_agent",
     "lca.layer2_runtime",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.infrastructure",
     "lca.contracts",
 ]
@@ -61,7 +61,7 @@ type = "forbidden"
 source_modules = [
     "lca.contracts",
     "lca.infrastructure",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
 ]
@@ -74,7 +74,7 @@ type = "forbidden"
 source_modules = ["lca.contracts"]
 forbidden_modules = [
     "lca.infrastructure",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -88,7 +88,7 @@ name = "harness: 不得依赖 L1–L4"
 type = "forbidden"
 source_modules = ["lca.harness"]
 forbidden_modules = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -272,6 +272,181 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
+[tool.lca.package_contracts."lca.cognition"]
+responsibility = "lca/layer1_cognitive. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+]
+forbidden_dependencies = [
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "llm:call",
+    "log:emit",
+]
+public_api = [
+    "lca.cognition",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.cognition.body"]
+responsibility = "lca/layer1_cognitive/body. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+]
+forbidden_dependencies = [
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "llm:call",
+    "log:emit",
+]
+public_api = [
+    "lca.cognition.body",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.cognition.brain"]
+responsibility = "lca/layer1_cognitive/brain. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+]
+forbidden_dependencies = [
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "llm:call",
+    "log:emit",
+]
+public_api = [
+    "lca.cognition.brain",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.cognition.collaboration"]
+responsibility = "lca/layer1_cognitive/collaboration. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+]
+forbidden_dependencies = [
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "llm:call",
+    "log:emit",
+]
+public_api = [
+    "lca.cognition.collaboration",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.cognition.member_status"]
+responsibility = "lca/layer1_cognitive/member_status. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+]
+forbidden_dependencies = [
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "llm:call",
+    "log:emit",
+]
+public_api = [
+    "lca.cognition.member_status",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.cognition.memory"]
+responsibility = "lca/layer1_cognitive/memory. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+]
+forbidden_dependencies = [
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "llm:call",
+    "log:emit",
+]
+public_api = [
+    "lca.cognition.memory",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.cognition.sensors"]
+responsibility = "lca/layer1_cognitive/sensors. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+]
+forbidden_dependencies = [
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "llm:call",
+    "log:emit",
+]
+public_api = [
+    "lca.cognition.sensors",
+]
+schema_version = "1.0.0"
+
 [tool.lca.package_contracts."lca.contracts"]
 responsibility = "数据契约层：Protocol、枚举、dataclass、事件"
 not_responsible_for = "实现细节、I/O、配置解析"
@@ -425,7 +600,7 @@ allowed_dependencies = [
     "lca.contracts",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -446,7 +621,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -467,7 +642,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -488,7 +663,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -509,7 +684,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -531,7 +706,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -552,7 +727,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -573,7 +748,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -595,7 +770,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -616,7 +791,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -637,7 +812,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -660,7 +835,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -682,7 +857,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -703,7 +878,7 @@ allowed_dependencies = [
     "lca.harness",
 ]
 forbidden_dependencies = [
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -1301,181 +1476,6 @@ side_effects = [
 ]
 public_api = [
     "lca.infrastructure.workspace",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer1_cognitive"]
-responsibility = "lca/layer1_cognitive. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
-not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-]
-forbidden_dependencies = [
-    "lca.runtime",
-    "lca.agent",
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "llm:call",
-    "log:emit",
-]
-public_api = [
-    "lca.layer1_cognitive",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer1_cognitive.body"]
-responsibility = "lca/layer1_cognitive/body. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
-not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-]
-forbidden_dependencies = [
-    "lca.runtime",
-    "lca.agent",
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "llm:call",
-    "log:emit",
-]
-public_api = [
-    "lca.layer1_cognitive.body",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer1_cognitive.brain"]
-responsibility = "lca/layer1_cognitive/brain. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
-not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-]
-forbidden_dependencies = [
-    "lca.runtime",
-    "lca.agent",
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "llm:call",
-    "log:emit",
-]
-public_api = [
-    "lca.layer1_cognitive.brain",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer1_cognitive.collaboration"]
-responsibility = "lca/layer1_cognitive/collaboration. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
-not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-]
-forbidden_dependencies = [
-    "lca.runtime",
-    "lca.agent",
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "llm:call",
-    "log:emit",
-]
-public_api = [
-    "lca.layer1_cognitive.collaboration",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer1_cognitive.member_status"]
-responsibility = "lca/layer1_cognitive/member_status. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
-not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-]
-forbidden_dependencies = [
-    "lca.runtime",
-    "lca.agent",
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "llm:call",
-    "log:emit",
-]
-public_api = [
-    "lca.layer1_cognitive.member_status",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer1_cognitive.memory"]
-responsibility = "lca/layer1_cognitive/memory. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
-not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-]
-forbidden_dependencies = [
-    "lca.runtime",
-    "lca.agent",
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "llm:call",
-    "log:emit",
-]
-public_api = [
-    "lca.layer1_cognitive.memory",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer1_cognitive.sensors"]
-responsibility = "lca/layer1_cognitive/sensors. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
-not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-]
-forbidden_dependencies = [
-    "lca.runtime",
-    "lca.agent",
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "llm:call",
-    "log:emit",
-]
-public_api = [
-    "lca.layer1_cognitive.sensors",
 ]
 schema_version = "1.0.0"
 
@@ -2170,7 +2170,7 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.infrastructure",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -2195,7 +2195,7 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.infrastructure",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -2220,7 +2220,7 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.infrastructure",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -2244,7 +2244,7 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.infrastructure",
-    "lca.layer1_cognitive",
+    "lca.cognition",
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
@@ -2261,3 +2261,103 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
+# === PER-PACKAGE FORBIDDEN RULES (auto-generated by scaffold_importlinter_rules.py) ===
+[[tool.importlinter.contracts]]
+name = "Per-package forbidden: lca.contracts.atoms"
+type = "forbidden"
+source_modules = ["lca.contracts.atoms"]
+forbidden_modules = [
+    "lca.infrastructure.llm",
+    "lca.infrastructure.tools",
+    "lca.infrastructure.sandbox",
+]
+
+[[tool.importlinter.contracts]]
+name = "Per-package forbidden: lca.contracts.models"
+type = "forbidden"
+source_modules = ["lca.contracts.models"]
+forbidden_modules = [
+    "lca.infrastructure.llm",
+    "lca.infrastructure.tools",
+    "lca.infrastructure.state_store",
+]
+
+[[tool.importlinter.contracts]]
+name = "Per-package forbidden: lca.contracts.models.core"
+type = "forbidden"
+source_modules = ["lca.contracts.models.core"]
+forbidden_modules = [
+    "lca.infrastructure.llm",
+    "lca.infrastructure.tools",
+]
+
+[[tool.importlinter.contracts]]
+name = "Per-package forbidden: lca.contracts.models.observability"
+type = "forbidden"
+source_modules = ["lca.contracts.models.observability"]
+forbidden_modules = [
+    "lca.infrastructure.llm",
+    "lca.infrastructure.ops",
+]
+
+[[tool.importlinter.contracts]]
+name = "Per-package forbidden: lca.contracts.models.team"
+type = "forbidden"
+source_modules = ["lca.contracts.models.team"]
+forbidden_modules = [
+    "lca.infrastructure.llm",
+    "lca.infrastructure.tools",
+]
+
+[[tool.importlinter.contracts]]
+name = "Per-package forbidden: lca.contracts.observability"
+type = "forbidden"
+source_modules = ["lca.contracts.observability"]
+forbidden_modules = [
+    "lca.infrastructure.llm",
+    "lca.infrastructure.tools",
+    "lca.infrastructure.ops",
+]
+
+[[tool.importlinter.contracts]]
+name = "Per-package forbidden: lca.contracts.observability.schemas"
+type = "forbidden"
+source_modules = ["lca.contracts.observability.schemas"]
+forbidden_modules = [
+    "lca.infrastructure.llm",
+    "lca.infrastructure.tools",
+]
+
+[[tool.importlinter.contracts]]
+name = "Per-package forbidden: lca.contracts.protocols"
+type = "forbidden"
+source_modules = ["lca.contracts.protocols"]
+forbidden_modules = [
+    "lca.infrastructure.llm",
+    "lca.infrastructure.tools",
+    "lca.infrastructure.sandbox",
+]
+
+[[tool.importlinter.contracts]]
+name = "Per-package forbidden: lca.contracts.mechanisms"
+type = "forbidden"
+source_modules = ["lca.contracts.mechanisms"]
+forbidden_modules = [
+    "lca.infrastructure.llm",
+    "lca.infrastructure.tools",
+]
+
+[[tool.importlinter.contracts]]
+name = "Per-package forbidden: lca.contracts.harness"
+type = "forbidden"
+source_modules = ["lca.contracts.harness"]
+forbidden_modules = [
+    "lca.infrastructure.llm",
+    "lca.infrastructure.tools",
+]
+
+[[tool.importlinter.contracts]]
+name = "lca.plugins 子包互不依赖"
+type = "independence"
+modules = []
+# === END PER-PACKAGE ===

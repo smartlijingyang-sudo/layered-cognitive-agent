@@ -2117,7 +2117,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-memory-provider", inject=["memory"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
+    from lca.cognition.memory.simple_memory import SimpleMemorySystem
 
     memory = ctx.inject("memory")
     if "simple" in config.providers:
@@ -2409,8 +2409,8 @@ from lca.contracts.typed_ctx import TypedContext
 
 @plugin(name="lca-brain-modular")
 async def setup(ctx: TypedContext, config) -> None:
-    from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-    from lca.layer1_cognitive.brain.default_factory import brain_factory  # noqa: F401
+    from lca.cognition.brain.modular_brain import ModularBrain
+    from lca.cognition.brain.default_factory import brain_factory  # noqa: F401
 
     factory = ctx.brain_factory
     factory.register("modular", ModularBrain)
@@ -2428,7 +2428,7 @@ from lca.contracts.typed_ctx import TypedContext
 
 @plugin(name="lca-brain-simple")
 async def setup(ctx: TypedContext, config) -> None:
-    from lca.layer1_cognitive.brain.simple_brain import SimpleBrain
+    from lca.cognition.brain.simple_brain import SimpleBrain
     from lca.layer3_agent.brain.factory import BrainFactory
 
     factory = ctx.brain_factory
@@ -2468,7 +2468,7 @@ from lca.contracts.typed_ctx import TypedContext
 
 @plugin(name="lca-reasoner-prompt", inject=["llm"])
 async def setup(ctx: TypedContext, config) -> None:
-    from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+    from lca.cognition.brain.reasoner import PromptReasoner
     from lca.layer3_agent.brain.factory import BrainFactory
 
     factory = ctx.brain_factory
@@ -2492,7 +2492,7 @@ from lca.contracts.typed_ctx import TypedContext
 
 @plugin(name="lca-synthesizer-concat")
 async def setup(ctx: TypedContext, config) -> None:
-    from lca.layer1_cognitive.brain.synthesizer import ConcatSynthesizer
+    from lca.cognition.brain.synthesizer import ConcatSynthesizer
     from lca.layer3_agent.brain.factory import BrainFactory
 
     factory = ctx.brain_factory

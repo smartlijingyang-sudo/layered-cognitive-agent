@@ -6,7 +6,7 @@ Accepted
 
 ## 背景
 
-LCA 当前的一级包名采用 `lca.infrastructure` / `lca.layer1_cognitive` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 编号层。
+LCA 当前的一级包名采用 `lca.infrastructure` / `lca.cognition` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 编号层。
 
 - 编号层能表达顺序（"L0 → L4 越来越上层"），但**难以表达职责**——新人需要先背顺序，再查 ADR-0001 才能知道每个层做什么
 - 5 个 ADR 文本（0001、0084、0085、0094、0095 等）反复出现"lca.layer2_runtime 禁依赖 lca.layer3_agent"这类规则，**对读者没有任何语义提示**
@@ -19,7 +19,7 @@ LCA 当前的一级包名采用 `lca.infrastructure` / `lca.layer1_cognitive` / 
 | 旧 | 新 |
 |---|---|
 | `lca.infrastructure` | `lca.infrastructure` |
-| `lca.layer1_cognitive` | `lca.cognition` |
+| `lca.cognition` | `lca.cognition` |
 | `lca.layer2_runtime` | `lca.runtime` |
 | `lca.layer3_agent` | `lca.agent` |
 | `lca.layer4_app` | `lca.application` |

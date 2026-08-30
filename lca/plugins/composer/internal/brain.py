@@ -14,8 +14,8 @@ from lca.contracts.protocols import (
 )
 from lca.contracts.protocols.spec import AgentSpec
 from lca.infrastructure.observability.adapters import TelemetryLLMAdapter
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+from lca.cognition.brain.modular_brain import ModularBrain
+from lca.cognition.brain.reasoner import PromptReasoner
 from lca.plugins.composer.internal.skill_store import active_skill_store
 
 

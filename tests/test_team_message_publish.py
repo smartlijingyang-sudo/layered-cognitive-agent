@@ -30,8 +30,8 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.protocols import Sensor
 from lca.contracts.protocols.cognition import SensorDisabledError
 from lca.infrastructure.observability.journal.engine import RunStore
-from lca.layer1_cognitive.brain.context_manifest import digest_manifest
-from lca.layer1_cognitive.brain.decision_gates import (
+from lca.cognition.brain.context_manifest import digest_manifest
+from lca.cognition.brain.decision_gates import (
     ChainedDecisionGate,
     ProgressLoopDetector,
     RepeatToolCallGate,
@@ -39,9 +39,9 @@ from lca.layer1_cognitive.brain.decision_gates import (
     ToolLoopBreakerGate,
     record_gate_decided,
 )
-from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-from lca.layer1_cognitive.perceive_sink import JournalSink, NullSink
-from lca.layer1_cognitive.sensors import (
+from lca.cognition.perceive_hub import SequentialPerceiveHub
+from lca.cognition.perceive_sink import JournalSink, NullSink
+from lca.cognition.sensors import (
     InboxFactsSensor,
     TeamInboxSensor,
     build_clock_sensor,
@@ -106,8 +106,8 @@ class TestSensorsPrimitive:
             await _Disabled().read(_state())
         # The Hub path catches the exception and produces an empty
         # contribution.
-        from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
-        from lca.layer1_cognitive.perceive_sink import NullSink
+        from lca.cognition.perceive_hub import SequentialPerceiveHub
+        from lca.cognition.perceive_sink import NullSink
 
         hub = SequentialPerceiveHub(
             sensors=[_Disabled()],
@@ -360,7 +360,7 @@ class TestTeamMessageE2E:
         # The publish tool requires only ``team_id`` + ``thread_id``; the
         # caller picks the topic.  A test confirms the tool accepts the
         # pair.
-        from lca.layer1_cognitive.body.team_message_tool import (
+        from lca.cognition.body.team_message_tool import (
             build_team_message_publish_tool,
         )
 
@@ -429,7 +429,7 @@ def _ok_turn(tool: str):
 class WorkspaceArtifactsSensor:
     """Inline import alias to avoid extra coupling in this test module."""
 
-    from lca.layer1_cognitive.sensors import WorkspaceArtifactsSensor as _Impl
+    from lca.cognition.sensors import WorkspaceArtifactsSensor as _Impl
 
     def __new__(cls):
         return cls._Impl()

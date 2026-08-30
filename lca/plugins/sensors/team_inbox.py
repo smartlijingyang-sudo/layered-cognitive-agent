@@ -36,7 +36,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer1_cognitive.sensors.journal_backed import build_team_inbox_sensor
+    from lca.cognition.sensors.journal_backed import build_team_inbox_sensor
 
     ctx.require("perceive").add(
         build_team_inbox_sensor, id="team-inbox", order=40, team_only=True, needs="store"

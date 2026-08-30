@@ -1,7 +1,7 @@
 """Audit direct ``sandbox`` / ``transport`` calls in Body code.
 
 Bodies and effect-dispatchers should reach world-side effects via
-:class:`~lca.layer1_cognitive.body.safe_executor.SafeExecutor` or via
+:class:`~lca.cognition.body.safe_executor.SafeExecutor` or via
 seams, not by touching ``lca.infrastructure.sandbox`` /
 ``lca.infrastructure.transport`` directly.
 

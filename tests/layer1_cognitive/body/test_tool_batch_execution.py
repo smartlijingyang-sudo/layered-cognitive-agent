@@ -16,8 +16,8 @@ from lca.contracts.protocols.tool_batch_execution import (
     ToolBatchExecutionMode,
     ToolBatchExecutionSegment,
 )
-from lca.layer1_cognitive.body.action_handlers import UseToolOperation
-from lca.layer1_cognitive.body.tool_batch_execution import (
+from lca.cognition.body.action_handlers import UseToolOperation
+from lca.cognition.body.tool_batch_execution import (
     ParallelToolBatchExecutionPolicy,
     SafeToolBatchExecutionPolicy,
     SegmentedSafeToolBatchExecutionPolicy,
@@ -281,7 +281,7 @@ def test_provider_rejects_unknown_policy_mode() -> None:
 async def test_batch_executor_resolves_every_tool_before_dispatch() -> None:
     """缺少任一工具时，批次接缝不得启动部分世界副作用。"""
 
-    from lca.layer1_cognitive.body.tool_batch_executor import ToolBatchExecutor
+    from lca.cognition.body.tool_batch_executor import ToolBatchExecutor
 
     available = _Tool("available", is_idempotent=True)
     executor = _RecordingSafeExecutor()
@@ -303,7 +303,7 @@ async def test_batch_executor_resolves_every_tool_before_dispatch() -> None:
 async def test_batch_executor_marks_single_result_as_tool_result() -> None:
     """单工具路径与批次路径共享工具结果类别这一测试表面。"""
 
-    from lca.layer1_cognitive.body.tool_batch_executor import ToolBatchExecutor
+    from lca.cognition.body.tool_batch_executor import ToolBatchExecutor
 
     read = _Tool("read", is_idempotent=True)
     executor = _RecordingSafeExecutor()

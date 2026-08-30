@@ -17,7 +17,7 @@ from lca.infrastructure.transport.transport_registry import (
     TransportNotFoundError,
     TransportRegistry,
 )
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+from lca.cognition.body.tool_registry import SimpleToolRegistry
 from tests.support.action_authority import build_test_body
 from tests.support.unimplemented_transport import UnimplementedTransport
 

@@ -20,7 +20,7 @@ lca.harness: Agent Session、Profile、Boot、声明式阶段和运行骨架。�
 lca.contracts
 
 ## 6. 禁止依赖
-lca.layer1_cognitive,lca.layer2_runtime,lca.layer3_agent,lca.layer4_app
+lca.cognition,lca.layer2_runtime,lca.layer3_agent,lca.layer4_app
 
 ## 7. 副作用
 log:emit

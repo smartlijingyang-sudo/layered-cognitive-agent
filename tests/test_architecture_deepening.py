@@ -22,16 +22,16 @@ from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer1_cognitive.brain.critic import SimpleCritic
-from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
-from lca.layer1_cognitive.brain.reasoner import PromptReasoner
-from lca.layer1_cognitive.brain.skill_router import StaticSkillRouter
-from lca.layer1_cognitive.hook_registry import CordisHookRegistry
+from lca.cognition.body.action_registry import ActionRegistry
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.simple_body import SimpleBody
+from lca.cognition.body.tool_registry import SimpleToolRegistry
+from lca.cognition.brain.critic import SimpleCritic
+from lca.cognition.brain.modular_brain import ModularBrain
+from lca.cognition.brain.prompts import load_builtin_prompt
+from lca.cognition.brain.reasoner import PromptReasoner
+from lca.cognition.brain.skill_router import StaticSkillRouter
+from lca.cognition.hook_registry import CordisHookRegistry
 from lca.layer2_runtime.reducer import DefaultReducer
 from lca.layer4_app.api import Agent, Team, ensure_default_ctx
 from lca.plugins.composer.runtime_factory import (
@@ -262,6 +262,6 @@ class TestActionRegistryProtocolImport:
         assert isinstance(ActionRegistry(), ActionRegistryProtocol)
 
     def test_no_pass_through_builder_in_handlers(self) -> None:
-        import lca.layer1_cognitive.body.action_handlers as ah
+        import lca.cognition.body.action_handlers as ah
 
         assert not hasattr(ah, "build_default_action_registry")

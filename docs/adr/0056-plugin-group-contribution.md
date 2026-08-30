@@ -57,7 +57,7 @@ Python 在这条设计上的优势（DSH 用 TS 做不到、也不该抄的部�
 ```python
 @plugin
 def clock(perceive: PerceiveService) -> None:
-    from lca.layer1_cognitive.sensors.clock import ClockSensor
+    from lca.cognition.sensors.clock import ClockSensor
     perceive.add(ClockSensor(), id="clock", order=10)
 ```
 
