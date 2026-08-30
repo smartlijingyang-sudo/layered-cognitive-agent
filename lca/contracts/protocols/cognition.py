@@ -6,6 +6,7 @@ PR4 adds: PolicyFact, ExecutionEnvelope, DecisionVerdict.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
@@ -14,6 +15,8 @@ from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.protocols.infra import LLMAdapter, Tool
+from lca.contracts.protocols.memory import MemorySystem
+from lca.contracts.protocols.operational_skills import SkillPackageStore
 
 
 @runtime_checkable
@@ -23,7 +26,7 @@ class Sensor(Protocol):
     Sensors must operate on already-staged state / journal; they must NOT
     issue live workspace reads — gates in PR6 read from the Manifest
     artifact items.  Sensors return a list of ``ContextItem`` (possibly
-    empty) and raise ``SensorDisabled`` to signal the Hub to skip them.
+    empty) and raise ``SensorDisabledError`` to signal the Hub to skip them.
 
     The Hub handles per-Sensor exception isolation (per spec §5.5).
     """
@@ -31,8 +34,16 @@ class Sensor(Protocol):
     async def read(self, state: AgentState) -> list[ContextItem]: ...
 
 
-class SensorDisabled(RuntimeError):
+class SensorDisabledError(RuntimeError):
     """Raised by a Sensor to signal "skip me this turn" (per spec §5.5)."""
+
+
+# Backwards-compat alias — C4 renamed ``SensorDisabled`` → ``SensorDisabledError``
+# for clarity. Downstream code on this branch (lca/layer1_cognitive/perceive_hub,
+# tests/test_journal_reducer_apply_delta_equivalent_to_fold_events,
+# tests/test_team_message_publish) still imports the old name. Restore as thin
+# alias so callers keep working. Mirrors C1/C3 alias precedent.
+SensorDisabled = SensorDisabledError
 
 
 @runtime_checkable
@@ -54,6 +65,36 @@ class PerceiveHub(Protocol):
     """
 
     async def perceive(self, state: AgentState) -> ContextManifest: ...
+
+
+@runtime_checkable
+class PerceiveHubAssembler(Protocol):
+    """Compose one PerceiveHub from profile-selected sensor contributions.
+
+    The Perceive group service owns contribution ordering and supplies the
+    resulting immutable sensor sequence.  The selected assembler owns only
+    the Hub strategy, allowing profiles to replace sequential collection
+    without teaching the loop or the composition root about a concrete Hub.
+    """
+
+    def assemble(
+        self,
+        *,
+        sensors: Sequence[Sensor],
+        memory: MemorySystem,
+    ) -> PerceiveHub: ...
+
+
+@runtime_checkable
+class DecisionGateAssembler(Protocol):
+    """Compose the ordered Gate contributions for one decision slot.
+
+    A GateService owns membership, slot filtering, and ordering.  The
+    selected assembler owns the strategy used to turn that sequence into one
+    DecisionGate, such as a sequential chain or a profile-specific policy.
+    """
+
+    def assemble(self, *, gates: Sequence[DecisionGate]) -> DecisionGate: ...
 
 
 @runtime_checkable
@@ -93,6 +134,7 @@ class DecisionGate(Protocol):
         decision: Decision,
     ) -> Decision: ...
 
+
 @runtime_checkable
 class SupportsShortcut(Protocol):
     """可选能力：允许 DecisionGate 在认知管线之前提供确定性快速路径。
@@ -124,6 +166,52 @@ class SkillRouter(Protocol):
     """运行时动态选择 Prompt 模板 / 工具子集。"""
 
     async def route(self, state: AgentState) -> str: ...
+
+
+@runtime_checkable
+class ReasonerTemplateCatalog(Protocol):
+    """Profile-selected immutable template collection used by PromptReasoner."""
+
+    def templates(self) -> Mapping[str, str]:
+        """Return all templates required by the configured reasoning strategy."""
+        ...
+
+
+@runtime_checkable
+class BrainPromptCatalog(Protocol):
+    """模型可见的工具与技能目录。
+
+    目录内容属于认知输入，而不是 BrainComposer 的隐式实现细节。不同 Profile
+    可以替换其格式、筛选策略或内容来源，但工厂必须在组合期把输入冻结为同一份
+    可重放视图。
+    """
+
+    def render_tools_xml(self) -> str:
+        """Render the tools visible to the selected Brain factory."""
+        ...
+
+    def render_brain_skills(self) -> str:
+        """Render the compact skill catalog visible to the selected Brain factory."""
+        ...
+
+
+@runtime_checkable
+class BrainPromptCatalogFactory(Protocol):
+    """Create one profile-selected, immutable Brain prompt catalog.
+
+    The composer resolves this factory through a capability seam and supplies
+    the already-selected skill store plus Agent-local tools.  Implementations
+    must not reach into ambient composition state or select a separate store.
+    """
+
+    def create(
+        self,
+        *,
+        skill_store: SkillPackageStore,
+        tools: Iterable[Tool],
+    ) -> BrainPromptCatalog:
+        """Build the catalog used by exactly one Agent graph composition."""
+        ...
 
 
 @runtime_checkable

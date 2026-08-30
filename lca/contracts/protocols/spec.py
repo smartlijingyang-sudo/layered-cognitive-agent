@@ -39,6 +39,9 @@ if TYPE_CHECKING:
 MEMORY_CHOICE_SIMPLE = "simple"
 """MemorySystem 内置注册名：SimpleMemorySystem。"""
 
+MEMORY_CHOICE_TEMPORAL = "temporal"
+"""MemorySystem 内置注册名：SQLite-backed TemporalMemorySystem。"""
+
 OBSERVABILITY_CHOICE_CONSOLE = "console"
 """可观测后端内置选择名：console 叙述导出器。"""
 
@@ -51,8 +54,23 @@ OBSERVABILITY_CHOICE_LANGFUSE = "langfuse"
 STATE_STORE_CHOICE_MEMORY = "memory"
 """StateStore 内置注册名：InMemoryStateStore。"""
 
+STATE_STORE_CHOICE_PROFILE_DEFAULT = "profile_default"
+"""StateStore Profile 默认选择：解析当前 ProviderDispatch 的 active 后端。"""
+
+STATE_STORE_CHOICE_SQLITE = "sqlite"
+"""StateStore 内置注册名：SqliteStateStore。"""
+
 BRAIN_CHOICE_DEFAULT = "default"
 """BrainFactory 内置注册名：SimpleBrainFactory。"""
+
+BODY_CHOICE_SIMPLE = "simple"
+"""BodyFactory 内置注册名：SimpleBody。"""
+
+HOOKS_CHOICE_SIMPLE = "simple"
+"""HookRegistryFactory 内置注册名：CordisHookRegistry。"""
+
+RESUME_INPUT_ADAPTER_CHOICE_HUMAN_ANSWER = "human_answer"
+"""ResumeInputAdapter 内置注册名：将人工回复规范化为可审计的 ASK_HUMAN Turn。"""
 
 DEFAULT_DELEGATE_MAX_ATTEMPTS = 3
 """Lead 委派同一成员的最大重试次数（lead 路径唯一默认值，禁止别处另立）。"""
@@ -74,8 +92,31 @@ class AgentSpec:
     max_wall_clock_seconds: int | None = DEFAULT_MAX_WALL_CLOCK_SECONDS
     memory: str | MemorySystem = MEMORY_CHOICE_SIMPLE
     observability: str | ObservabilityBackend = OBSERVABILITY_CHOICE_CONSOLE
-    state_store: str | StateStore = STATE_STORE_CHOICE_MEMORY
+    state_store: str | StateStore = STATE_STORE_CHOICE_PROFILE_DEFAULT
     brain: str | Brain = BRAIN_CHOICE_DEFAULT
+    body: str = BODY_CHOICE_SIMPLE
+    """Factory key resolved through the ``bodies`` capability seam (ADR-0076 §五).
+
+    The BodyComposer consumes this declared key rather than selecting the
+    built-in ``"simple"`` implementation itself.  A profile or caller can
+    therefore replace the executable Body through the same plan-bound seam.
+    """
+
+    hooks: str = HOOKS_CHOICE_SIMPLE
+    """Factory key resolved through the ``hooks`` capability seam (ADR-0076 §五).
+
+    The BodyComposer consumes this declared key rather than choosing the
+    built-in registry.  Profiles can replace lifecycle behavior without
+    modifying the composition path.
+    """
+
+    resume_input_adapter: str = RESUME_INPUT_ADAPTER_CHOICE_HUMAN_ANSWER
+    """Factory key resolved through ``resume_input_adapters`` at runtime binding.
+
+    The key declares how a paused Agent turns carrier input into an auditable
+    ``ResumeInput``. Callers can replace human-answer semantics with approval,
+    retry-token, or structured-form semantics without changing the assembler.
+    """
 
 
 @dataclass(frozen=True)

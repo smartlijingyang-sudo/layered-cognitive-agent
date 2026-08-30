@@ -8,7 +8,7 @@ from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import AgentState, StateSnapshot
-from lca.contracts.models.core.stop import StopDecision, StopOutcome
+from lca.contracts.models.core.stop import StopDecision
 from lca.contracts.models.team.run_context import RunContext
 
 
@@ -34,33 +34,28 @@ class Runtime(Protocol):
 
 
 @runtime_checkable
-class StopOutcomePolicy(Protocol):
-    """单步结果判定策略：决定 Loop 是否继续、最终输出和状态。
-    由 StopRule 组合使用，不再直接被 Runtime 持有。
+class StopPolicy(Protocol):
+    """Decide whether the fixed stop phase ends the current cognitive run.
+
+    This is a State-cluster strategy. It is intentionally visible only through
+    the stop phase's narrow capability view, rather than as a peer AgentGraph
+    dependency or a top-level AgentSpec selection axis.
     """
-
-    def resolve(
-        self,
-        state: AgentState,
-        decision: Decision | None,
-        observation: Observation | None,
-        reflection: Reflection | None,
-    ) -> StopOutcome: ...
-    def resolve_budget_exceeded(
-        self,
-        observation: Observation | None,
-        state: AgentState,
-    ) -> StopOutcome: ...
-
-
-@runtime_checkable
-class StopRule(Protocol):
-    """Decides after each step whether the cognitive loop continues."""
 
     def decide(
         self,
         state: AgentState,
         decision: Decision | None,
-        act_result: Observation | None,
+        observation: Observation | None,
         reflection: Reflection | None,
     ) -> StopDecision: ...
+
+
+# Backwards-compat aliases — C4 renamed both ``StopRule`` and ``StopOutcomePolicy``
+# into the single ``StopPolicy`` (returns StopDecision). Downstream code on this
+# branch (lca.contracts.__init__ re-exports) still references the old names.
+# Restore as thin aliases so the tree imports until the protocol layer is
+# fully migrated. Mirrors commit 945cc3ba (DECISION_GATE) / ecfc5031
+# (StopOutcome) precedent.
+StopRule = StopPolicy
+StopOutcomePolicy = StopPolicy

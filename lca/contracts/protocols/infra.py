@@ -11,6 +11,7 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.decision import AgentCard, Observation
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.models.core.plane import PlaneRef
 from lca.contracts.models.core.sandbox import (
     SANDBOX_MOUNT_ROOT,
     MountManifest,
@@ -21,13 +22,6 @@ from lca.contracts.models.core.sandbox import (
 )
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
-
-
-@runtime_checkable
-class DshRuntime(Protocol):
-    """External DeepSeek Harness turn runner. Driver, not a plane."""
-
-    def run_turn(self, spec: Any, on_event: Any) -> Any: ...
 
 
 @runtime_checkable
@@ -65,6 +59,33 @@ class Tool(Protocol):
     def validate(self, args: dict[str, Any]) -> str | None:
         """可选前置校验：返回 None 表示合法，返回错误字符串表示非法。"""
         return None  # pragma: no cover
+
+
+@runtime_checkable
+class MachineTransport(Protocol):
+    """Trusted transport for a selected machine plane."""
+
+    async def computer_op(
+        self, op: str, args: dict[str, Any], *, timeout_s: int = 60
+    ) -> dict[str, Any]: ...
+
+    async def write_files(
+        self,
+        files: dict[str, bytes | str],
+        *,
+        base_dir: str = "",
+        session_id: str = "",
+        timeout_s: int = 60,
+    ) -> Any: ...
+
+
+@runtime_checkable
+class MachineResolver(Protocol):
+    """Resolve machine plane and transport from application-scoped device state."""
+
+    def resolve_machine(self, device_id: str | None = None) -> PlaneRef | None: ...
+
+    def resolve_transport(self, device_id: str) -> MachineTransport | None: ...
 
 
 @runtime_checkable

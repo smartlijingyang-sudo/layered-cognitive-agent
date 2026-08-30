@@ -121,6 +121,14 @@ class RoleLibrary(Protocol):
         ...
 
 
+class CastingPromptRenderer(Protocol):
+    """从目标和角色索引渲染受 profile 选择的选角提示词。"""
+
+    def render(self, objective: str, index: tuple[RoleIndexEntry, ...]) -> str:
+        """返回供 TeamCaster 使用的完整、稳定提示词。"""
+        ...
+
+
 class TeamCaster(Protocol):
     """选角抽象：把一句话目标变成白名单校验过的 CastingPlan。"""
 

@@ -1,4 +1,4 @@
-"""操作技能库契约 —— SkillPackageStore / SkillImporter（ADR-0048）。
+"""操作技能库契约 —— SkillPackageStore / SkillPackageInstaller / SkillImporter（ADR-0048）。
 
 Role 回答「谁来做」（身份 + 团队分工，组队时刻绑定）；
 Operational Skill 回答「怎么做」（纯操作知识，与身份无关，执行中按需拉取）。
@@ -85,8 +85,24 @@ class SkillPackageStore(Protocol):
         ...
 
 
+class SkillPackageInstaller(SkillPackageStore, Protocol):
+    """已安装技能库的写入接缝，供导入器 materialize 完整技能包。"""
+
+    def install_package(
+        self,
+        *,
+        skill_id: str,
+        skill_md_text: str,
+        resource_files: dict[str, bytes],
+        source_url: str,
+        version: str = "",
+    ) -> SkillPackage:
+        """校验并持久化一个技能包，返回其可读取表示。"""
+        ...
+
+
 class SkillImporter(Protocol):
-    """从 Market / URL / GitHub 拉取技能包并 materialize 到 SkillPackageStore。"""
+    """从 Market / URL / GitHub 拉取技能包并 materialize 到 SkillPackageInstaller。"""
 
     async def search_market(
         self,
