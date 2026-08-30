@@ -361,6 +361,53 @@ def create_app(
         lifespan = install_profile_lifespan(resolved_profile)
     application.router.lifespan_context = lifespan
 
+    # When a bootstrap_factory is supplied, install a helper lifespan that
+    # binds the factory's product (file_store / devices / etc.) into the
+    # booted ctx so handlers + tests can resolve them via ctx.inject.
+    # Soft-lock per ADR-0103 §2.
+    if bootstrap_factory is not None:
+        from gateway.bootstrap import GatewayBootstrapConfig as _GBC
+
+        product = bootstrap_factory.create(
+            bootstrap_config
+            if bootstrap_config is not None
+            else _GBC(file_store_root=Path("traces"))
+        )
+        application.state.bootstrap = product
+        application.state.file_store = product.file_store
+        application.state.devices = product.devices
+        application.state.device_hub = product.device_hub
+        application.state.device_settings = product.device_settings
+        application.state.machine_resolver = product.machine_resolver
+        # rebind globals for downstream handlers
+        _registry = RunRegistry()
+        bind_devices(product.devices, product.device_hub)
+        # Wrap the lifespan so after boot it injects bootstrap services
+        # into the cordis ctx. Stored on application.state for later use.
+        existing_lifespan = lifespan
+        original_lifespan = existing_lifespan
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def _bootstrap_enriched_lifespan(app: Any):
+            async with original_lifespan(app) as state:
+                ctx = state.get("ctx") if state else getattr(app.state, "ctx", None)
+                if ctx is not None:
+                    # Inject via the per-key service definition so callers
+                    # can use .current() to retrieve the active provider
+                    # (test_gateway_bootstrap::test_gateway_lifespan_reuses_
+                    # bootstrap_file_store asserts this).
+                    from lca.layer0_infra.capability.files import FileStoreService
+                    file_store_svc = FileStoreService()
+                    file_store_svc.register("bootstrap", product.file_store, activate=True)
+                    ctx.provide("file_store", file_store_svc)
+                    ctx.provide("devices", product.devices)
+                    ctx.provide("device_hub", product.device_hub)
+                yield state
+
+        application.router.lifespan_context = _bootstrap_enriched_lifespan
+
     spine_dir = Path("traces/sessions")
     # Main-side spine.py refactored bind_session_spine to take per-call
     # callable providers instead of eager cordis_ctx (ADR-0015-cleanliness:

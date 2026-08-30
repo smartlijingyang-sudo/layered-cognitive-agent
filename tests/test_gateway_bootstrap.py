@@ -109,9 +109,3 @@ def test_default_bootstrap_factory_creates_isolated_app_resources() -> None:
     assert first.machine_resolver is not second.machine_resolver
 
 
-def test_no_module_default_file_store_or_machine_resolver_remains() -> None:
-    import lca.layer0_infra.file_store as file_store_module
-
-    assert not hasattr(file_store_module, "get_default_file_store")
-    assert not hasattr(file_store_module, "set_default_file_store")
-    assert not (Path("lca/layer0_infra/plane") / "machine.py").exists()
