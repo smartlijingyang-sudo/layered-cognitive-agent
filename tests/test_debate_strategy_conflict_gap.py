@@ -12,7 +12,7 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.team.team_coordination import Debate
 from lca.contracts.protocols import LLMAdapter
-from lca.layer4_app.api import Agent, Team
+from lca.application.api import Agent, Team
 
 
 def _decision(**kwargs):

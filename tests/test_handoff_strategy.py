@@ -12,7 +12,7 @@ from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdi
 from lca.contracts.protocols.declarative_phase_graph import PhaseInput, PhaseResult
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
-from lca.layer3_agent.orchestration_strategies import HandoffStrategy
+from lca.agent.orchestration_strategies import HandoffStrategy
 from lca.plugins.composer.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,

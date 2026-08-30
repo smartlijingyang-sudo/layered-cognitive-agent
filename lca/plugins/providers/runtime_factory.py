@@ -11,8 +11,8 @@ from pydantic import BaseModel
 
 from lca.contracts.protocols.runtime_composition import RuntimeFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer2_runtime.runtime_bindings import DeclarativeRuntimeBindings
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+from lca.runtime.runtime_bindings import DeclarativeRuntimeBindings
+from lca.runtime.runtime_loop import CognitiveRuntime
 
 
 class Config(BaseModel):

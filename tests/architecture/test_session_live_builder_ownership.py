@@ -26,10 +26,10 @@ def test_session_live_builder_is_owned_by_layer4_app() -> None:
 
     assert provider.is_file()
     assert not legacy.exists()
-    assert "lca.layer4_app.harness_bridge" in _imports(provider)
+    assert "lca.application.harness_bridge" in _imports(provider)
 
 
 def test_plugins_do_not_import_session_live_bridge() -> None:
     """Plugin discovery must not pull an application-owned bridge into plugins."""
     for path in (ROOT / "lca" / "plugins").rglob("*.py"):
-        assert "lca.layer4_app.harness_bridge" not in _imports(path), path
+        assert "lca.application.harness_bridge" not in _imports(path), path

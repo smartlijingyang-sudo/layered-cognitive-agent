@@ -147,7 +147,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             TeamRunStarted,
             domain=VocabDomain.RUN,
-            emitter="lca.layer3_agent.team_handle",
+            emitter="lca.agent.team_handle",
             description="团队 run 开启（场景卡）",
             durability="required",
             audience="auditor",
@@ -156,7 +156,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             TeamRunFinished,
             domain=VocabDomain.RUN,
-            emitter="lca.layer3_agent.team_handle",
+            emitter="lca.agent.team_handle",
             required=("status",),
             description="团队 run 关闭",
             durability="required",
@@ -176,7 +176,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             AgentRunStarted,
             domain=VocabDomain.RUN,
-            emitter="lca.layer3_agent.cognitive_agent",
+            emitter="lca.agent.cognitive_agent",
             required=("agent_role",),
             description="agent run 开启",
             durability="required",
@@ -186,7 +186,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             AgentRunFinished,
             domain=VocabDomain.RUN,
-            emitter="lca.layer3_agent.cognitive_agent",
+            emitter="lca.agent.cognitive_agent",
             required=("status",),
             description="agent run 关闭",
             durability="required",
@@ -278,7 +278,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             StepCompleted,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer2_runtime.event_emission",
+            emitter="lca.runtime.event_emission",
             required=("step",),
             description="步完成",
             durability="best_effort",
@@ -288,7 +288,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             ActionDegraded,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer2_runtime.event_emission",
+            emitter="lca.runtime.event_emission",
             description="动作降级",
             durability="required",
             audience="operator",
@@ -500,7 +500,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             TeamMessagePublished,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer3_agent.team_handle",
+            emitter="lca.agent.team_handle",
             required=("team_id", "thread_id"),
             description="Team 消息发布（每 Team 一个 topic）",
             durability="required",
@@ -550,7 +550,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             RunPaused,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer2_runtime.runtime_loop",
+            emitter="lca.runtime.runtime_loop",
             required=("step", "reason"),
             description="Run 暂停（人工审批等）",
             durability="required",
@@ -560,7 +560,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             RunResumed,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer2_runtime.runtime_lifecycle",
+            emitter="lca.runtime.runtime_lifecycle",
             required=("step", "reason"),
             description="Run 恢复",
             durability="required",
@@ -621,7 +621,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             PresetPublished,
             domain=VocabDomain.EVENT,
-            emitter="lca.layer4_app.preset_authoring",
+            emitter="lca.application.preset_authoring",
             required=("preset_id", "plugin_name"),
             description="plugin 源码 + bundle 已落盘到 preset 目录",
             durability="required",

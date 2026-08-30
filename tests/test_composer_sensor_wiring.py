@@ -59,7 +59,7 @@ def _install_perceive_hub_recorder(recorded):
 @pytest.fixture
 async def booted_scope():
     """Boot the plugin tree so perceive group contributions are available."""
-    from lca.layer4_app.api import ensure_default_ctx
+    from lca.application.api import ensure_default_ctx
 
     return await ensure_default_ctx()
 
@@ -69,7 +69,7 @@ class TestPerceiveServiceWiring:
     async def test_builtin_wires_inbox_facts_sensor(self, booted_scope) -> None:
         """InboxFactsSensor MUST be present in solo assemble."""
         from lca.contracts.atoms.enums import ActionScope
-        from lca.layer4_app.spawn import build_perceive_hub
+        from lca.application.spawn import build_perceive_hub
 
         recorded = _RecordingHub()
         original, hub_module = _install_perceive_hub_recorder(recorded)
@@ -96,7 +96,7 @@ class TestPerceiveServiceWiring:
     async def test_explicit_store_is_used_by_journal_sensors(self, booted_scope) -> None:
         """The composition seam must pass the chosen store directly to sensors."""
         from lca.contracts.atoms.enums import ActionScope
-        from lca.layer4_app.spawn import build_perceive_hub
+        from lca.application.spawn import build_perceive_hub
 
         store = _StubStore()
         recorded = _RecordingHub()
@@ -120,7 +120,7 @@ class TestPerceiveServiceWiring:
     async def test_team_inbox_in_team_mode(self, booted_scope) -> None:
         """TeamInboxSensor MUST be present in team assemble."""
         from lca.contracts.atoms.enums import ActionScope
-        from lca.layer4_app.spawn import build_perceive_hub
+        from lca.application.spawn import build_perceive_hub
 
         recorded = _RecordingHub()
         original, hub_module = _install_perceive_hub_recorder(recorded)
@@ -144,7 +144,7 @@ class TestPerceiveServiceWiring:
     async def test_no_team_inbox_in_solo_mode(self, booted_scope) -> None:
         """TeamInboxSensor MUST NOT be present in solo assemble."""
         from lca.contracts.atoms.enums import ActionScope
-        from lca.layer4_app.spawn import build_perceive_hub
+        from lca.application.spawn import build_perceive_hub
 
         recorded = _RecordingHub()
         original, hub_module = _install_perceive_hub_recorder(recorded)

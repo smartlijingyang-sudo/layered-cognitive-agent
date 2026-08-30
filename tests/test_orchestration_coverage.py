@@ -52,7 +52,7 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("nonexistent_strategy", str(ctx.exception))
 
     async def test_graph_strategy_requires_execution_graph(self) -> None:
-        from lca.layer3_agent.orchestration_strategies import GraphStrategy
+        from lca.agent.orchestration_strategies import GraphStrategy
 
         with self.assertRaises(TypeError):
             GraphStrategy(stage_with_invoker([]))  # type: ignore[call-arg]
@@ -60,7 +60,7 @@ class TestOrchestrationCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_debate_strategy_is_functional(self) -> None:
         from lca.contracts.models.core.result import Result
         from lca.contracts.models.core.state import Budget
-        from lca.layer3_agent.orchestration_strategies import DebateStrategy
+        from lca.agent.orchestration_strategies import DebateStrategy
 
         agent = MagicMock()
         agent.role_profile = MagicMock()

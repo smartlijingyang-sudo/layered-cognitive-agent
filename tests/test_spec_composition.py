@@ -12,7 +12,7 @@ from lca.contracts.protocols import AgentUnit, Brain, TeamUnit
 from lca.contracts.protocols.spec import AgentSpec, LeadSpec
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.cognition.memory.simple_memory import SimpleMemorySystem
-from lca.layer4_app.api import Agent, Team, TeamLead
+from lca.application.api import Agent, Team, TeamLead
 
 
 class _StubBrain(Brain):
@@ -87,7 +87,7 @@ class TestExplicitComposerInjection(unittest.IsolatedAsyncioTestCase):
     """自定义注册必须经显式 composer 贯通 Agent 与 Team（无隐式全局）。"""
 
     async def test_custom_memory_flows_through_team(self) -> None:
-        from lca.layer4_app.api import get_or_create_default_ctx
+        from lca.application.api import get_or_create_default_ctx
 
         ctx = get_or_create_default_ctx()
         ctx.inject("memory").register("custom", SimpleMemorySystem)

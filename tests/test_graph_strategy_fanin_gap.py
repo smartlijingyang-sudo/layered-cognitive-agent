@@ -12,9 +12,9 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.team.graph import EdgeType, ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.protocols import LLMAdapter, TeamStage
-from lca.layer3_agent.member_invoke import TransportMemberInvoker
-from lca.layer3_agent.orchestration_strategies import GraphStrategy
-from lca.layer4_app.api import Agent
+from lca.agent.member_invoke import TransportMemberInvoker
+from lca.agent.orchestration_strategies import GraphStrategy
+from lca.application.api import Agent
 from lca.plugins.composer.team_transport import build_team_transport
 from tests.support.graph_node_executors import build_default_graph_node_executor_registry
 
@@ -48,7 +48,7 @@ class _LLM(LLMAdapter):
 
 class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        from lca.layer4_app.api import ensure_default_ctx
+        from lca.application.api import ensure_default_ctx
 
         await ensure_default_ctx()
 

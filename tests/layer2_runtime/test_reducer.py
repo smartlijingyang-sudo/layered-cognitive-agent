@@ -14,7 +14,7 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision
-from lca.layer2_runtime.reducer import DefaultReducer
+from lca.runtime.reducer import DefaultReducer
 
 
 def _state() -> AgentState:

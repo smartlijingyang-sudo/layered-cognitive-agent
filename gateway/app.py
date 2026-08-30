@@ -142,7 +142,7 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
         return
 
     # Reuse the test-session cached ctx if one exists.
-    from lca.layer4_app.api import _default_ctx_holder
+    from lca.application.api import _default_ctx_holder
 
     # Main refactored boot to use cordis Context, which doesn't expose
     # `.entries`. The original branch check assumed plugin_host-style ctx.
@@ -177,7 +177,7 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
 
     application.state.plugin_tree = ctx
     application.state.ctx = ctx  # cordis Context (replaces plugin_host)
-    from lca.layer4_app.api import set_default_ctx
+    from lca.application.api import set_default_ctx
 
     set_default_ctx(ctx)
     # Loop drivers register themselves as plugins (lca-loop-cognitive /

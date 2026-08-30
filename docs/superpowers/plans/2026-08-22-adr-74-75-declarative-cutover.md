@@ -428,8 +428,8 @@ Expected: FAIL，缺少 `control.verdict` 事实或 rewrite 不生效。
 - [ ] **Step 4: 删除旧 engine 与调用点。**
 
 1. 从 `runtime_loop.py` 中删除：
-   - `from lca.layer2_runtime.control_policies import ControlPolicyContext, DefaultControlPolicyEngine` (L48-51)
-   - `from lca.layer2_runtime.control_runtime import ControlEvaluation, ...` (L52-58)
+   - `from lca.runtime.control_policies import ControlPolicyContext, DefaultControlPolicyEngine` (L48-51)
+   - `from lca.runtime.control_runtime import ControlEvaluation, ...` (L52-58)
    - `control_policies: DefaultControlPolicyEngine | None = None` 构造参数 (L89)
    - `self.control_policies = ...` 赋值 (L105-107)
    - `select_control()` 方法 (L185-189)
@@ -636,7 +636,7 @@ git commit -m "feat(adr-075): add bounded declarative recovery and effect idempo
 ```python
 def test_production_sources_do_not_reference_removed_runtime_modules():
     production = production_python_sources(excluding=("tests",))
-    forbidden = {"lca.layer2_runtime.control_policies", "lca.harness.command.dual_write"}
+    forbidden = {"lca.runtime.control_policies", "lca.harness.command.dual_write"}
     assert not {module for module in imports_of(production) if module in forbidden}
 ```
 

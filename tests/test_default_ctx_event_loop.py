@@ -7,7 +7,7 @@ import threading
 import unittest
 from unittest.mock import patch
 
-import lca.layer4_app.api as api
+import lca.application.api as api
 
 
 class TestDefaultCtxOnRunningLoop(unittest.IsolatedAsyncioTestCase):

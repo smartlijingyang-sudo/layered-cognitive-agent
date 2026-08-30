@@ -284,7 +284,7 @@ def test_booted_web_profile_resolves_declarative_runtime_factories() -> None:
 def test_runtime_phase_capability_projection_is_owned_by_runtime_bindings() -> None:
     """Phase capability projection has one runtime-owned test surface."""
 
-    from lca.layer2_runtime.phase_capabilities import project_runtime_phase_capabilities
+    from lca.runtime.phase_capabilities import project_runtime_phase_capabilities
 
     brain, body, memory, perceive_hub = object(), object(), object(), object()
     projected = project_runtime_phase_capabilities(

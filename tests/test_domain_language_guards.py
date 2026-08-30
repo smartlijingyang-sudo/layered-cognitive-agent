@@ -40,7 +40,7 @@ class TestDomainLanguagePublicSurface(unittest.TestCase):
         for mod in (
             "lca.contracts.orchestration_taxonomy",
             "lca.contracts.supervisor_mode",
-            "lca.layer4_app.assembly",
+            "lca.application.assembly",
         ):
             with self.assertRaises(ModuleNotFoundError):
                 importlib.import_module(mod)

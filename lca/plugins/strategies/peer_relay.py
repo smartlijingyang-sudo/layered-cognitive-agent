@@ -13,7 +13,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 def build_peer_relay_strategy(assembly: TeamAssembly) -> Any:
-    from lca.layer3_agent.orchestration_strategies import RaceStrategy
+    from lca.agent.orchestration_strategies import RaceStrategy
 
     return RaceStrategy(assembly.stage)
 

@@ -18,7 +18,7 @@ from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.infra import MachineResolver, Tool
 from lca.contracts.protocols.run_mode import RunModeRegistryProtocol
 from lca.infrastructure.observability import BoundObservability
-from lca.layer4_app.api import Agent, Team
+from lca.application.api import Agent, Team
 
 if TYPE_CHECKING:
     from cordis import Context

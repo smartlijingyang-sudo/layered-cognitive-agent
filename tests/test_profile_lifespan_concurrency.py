@@ -107,7 +107,7 @@ def test_two_testclients_each_boot_separately() -> None:
 @pytest.mark.asyncio
 async def test_ensure_default_ctx_caches_across_calls() -> None:
     """Library-level default ctx caches so Agent(...) sees one boot."""
-    from lca.layer4_app.api import ensure_default_ctx
+    from lca.application.api import ensure_default_ctx
 
     ctx1 = await ensure_default_ctx()
     ctx2 = await ensure_default_ctx()

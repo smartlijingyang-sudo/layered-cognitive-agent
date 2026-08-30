@@ -60,8 +60,8 @@ def build_cognitive_live_agent(
     tools = opts.get("tools") or ()
 
     from lca.harness.agent.handle import OwnerAgentHandle
-    from lca.layer4_app.api import Agent
-    from lca.layer4_app.harness_live import CognitiveLiveAgent
+    from lca.application.api import Agent
+    from lca.application.harness_live import CognitiveLiveAgent
 
     agent = Agent(
         role=opts.get("role", identity_id),

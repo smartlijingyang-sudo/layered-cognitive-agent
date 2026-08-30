@@ -88,13 +88,13 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     ),
     SpanName.TEAM_ROUND.value: _span(
         VocabDomain.TEAM,
-        "lca.layer3_agent.orchestration_strategies",
+        "lca.agent.orchestration_strategies",
         required=(ATTR_ROUND,),
         desc="对等协作轮次",
     ),
     SpanName.TEAM_SYNTHESIS.value: _span(
         VocabDomain.TEAM,
-        "lca.layer3_agent.orchestration_strategies",
+        "lca.agent.orchestration_strategies",
         desc="结果汇总",
     ),
     # ── 认知域：hook 边界自动发射 ──
@@ -172,7 +172,7 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
         desc="决策落地（委派/工具/回答动作分发点）",
     ),
     EventName.DELEGATE_REQUESTED.value: _event(
-        "lca.layer3_agent.member_invoke",
+        "lca.agent.member_invoke",
         required=(ATTR_DELEGATE_TARGET,),
         desc="委派发起",
     ),
@@ -182,11 +182,11 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
         desc="工具调用被安全策略拒绝",
     ),
     EventName.ACTION_DEGRADED.value: _event(
-        "lca.layer2_runtime.event_emission",
+        "lca.runtime.event_emission",
         desc="动作降级（journal 直写）",
     ),
     EventName.STEP_COMPLETED.value: _event(
-        "lca.layer2_runtime.event_emission",
+        "lca.runtime.event_emission",
         required=(ATTR_STEP,),
         desc="步骤完成（journal 直写）",
     ),

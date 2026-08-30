@@ -125,7 +125,7 @@ async def main() -> int:
 
         # Use mock LLM to avoid needing a real key
         from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
-        from lca.layer4_app.spawn import spawn_agent
+        from lca.application.spawn import spawn_agent
 
         spec = AgentSpec(
             profile=RoleProfile(

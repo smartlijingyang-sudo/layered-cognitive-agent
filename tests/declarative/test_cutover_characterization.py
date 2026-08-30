@@ -23,9 +23,9 @@ import pytest
 
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime
-from lca.layer4_app.api import ensure_default_ctx
-from lca.layer4_app.spawn import spawn_agent
+from lca.runtime.runtime_loop import CognitiveRuntime
+from lca.application.api import ensure_default_ctx
+from lca.application.spawn import spawn_agent
 from tests.support.agent_specs import make_spec
 
 

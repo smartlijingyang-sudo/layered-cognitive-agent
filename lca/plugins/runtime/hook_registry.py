@@ -20,7 +20,7 @@ def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
     hooks = CordisHookRegistry(ctx)
     try:
         from lca.infrastructure.observability import record as _journal_record
-        from lca.layer2_runtime.event_emission import make_journal_emitting_hook
+        from lca.runtime.event_emission import make_journal_emitting_hook
 
         journal_hook = make_journal_emitting_hook(_journal_record)
         for event_name in HookEvent:

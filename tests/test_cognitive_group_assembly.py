@@ -129,7 +129,7 @@ class TestGateGroupAssembly:
 class TestCognitiveGroupPluginWiring:
     @pytest.mark.asyncio
     async def test_default_profile_selects_both_group_assemblers(self) -> None:
-        from lca.layer4_app.api import ensure_default_ctx
+        from lca.application.api import ensure_default_ctx
 
         scope = await ensure_default_ctx()
 

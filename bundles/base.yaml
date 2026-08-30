@@ -492,5 +492,5 @@ entries:
   # requires this plugin to be in the bundle so production boot is fail-closed.
   - id: lca-default-reducer
     name: lca_default_reducer
-    $module: lca.layer2_runtime.reducer
+    $module: lca.runtime.reducer
     config: {}

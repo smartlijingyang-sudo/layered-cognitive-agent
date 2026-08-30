@@ -7,7 +7,7 @@ selects its complete Agent Loop through the profile-provided RuntimeFactory.
 
 from __future__ import annotations
 
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+from lca.runtime.runtime_loop import CognitiveRuntime
 from lca.plugins.composer.fixture_runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,

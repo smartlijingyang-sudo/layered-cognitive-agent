@@ -11,7 +11,7 @@ import pytest
 from lca.contracts.models.team.team_coordination import FanOut, PeerRelay, Pipeline
 from lca.infrastructure.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
 from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
-from lca.layer4_app.api import Agent, Team, TeamLead
+from lca.application.api import Agent, Team, TeamLead
 
 # 加载 .env（如果存在）
 load_dotenv_if_present()

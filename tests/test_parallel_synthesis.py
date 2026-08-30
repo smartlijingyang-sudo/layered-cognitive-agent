@@ -13,7 +13,7 @@ from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
 from lca.contracts.protocols import Synthesizer
 from lca.cognition.brain.synthesizer import ConcatSynthesizer
-from lca.layer3_agent.orchestration_strategies import (
+from lca.agent.orchestration_strategies import (
     ParallelStrategy,
 )
 from tests.support.team_stage import stage_with_invoker

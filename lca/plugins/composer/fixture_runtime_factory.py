@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from lca.contracts.models.core.perception import ContextManifest
 from lca.contracts.models.core.state import AgentState
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+from lca.runtime.runtime_loop import CognitiveRuntime
 from lca.plugins.composer.fixture_runtime_adapter import FixtureRuntimeAdapter
 from lca.plugins.composer.fixture_runtime_input import RuntimeDeps
 from lca.plugins.composer.internal.runtime_binding import build_production_runtime_bindings

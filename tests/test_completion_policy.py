@@ -31,7 +31,7 @@ from lca.cognition.member_status import (
     record_delegation_return,
 )
 from lca.cognition.member_status.tracking import _next_role_status
-from lca.layer2_runtime.reducer import DefaultReducer
+from lca.runtime.reducer import DefaultReducer
 from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 
 # ── helpers ──

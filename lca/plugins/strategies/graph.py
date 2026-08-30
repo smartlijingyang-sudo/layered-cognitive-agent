@@ -15,7 +15,7 @@ from lca.contracts.protocols import (
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 if TYPE_CHECKING:
-    from lca.layer3_agent.orchestration_strategies import GraphStrategy
+    from lca.agent.orchestration_strategies import GraphStrategy
 
 
 def build_graph_strategy(
@@ -25,7 +25,7 @@ def build_graph_strategy(
 ) -> GraphStrategy:
     """Close GraphStrategy with the Profile-selected node primitive registry."""
 
-    from lca.layer3_agent.orchestration_strategies import GraphStrategy
+    from lca.agent.orchestration_strategies import GraphStrategy
 
     governance = assembly.governance
     if not isinstance(governance, Graph):

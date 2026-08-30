@@ -53,7 +53,7 @@ def __getattr__(name: str) -> Any:
 
     if name not in _LAZY_COMPOSITION_SYMBOLS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    api = import_module("lca.layer4_app.api")
+    api = import_module("lca.application.api")
     value = getattr(api, name)
     globals()[name] = value
     return value

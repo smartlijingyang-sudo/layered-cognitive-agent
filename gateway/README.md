@@ -20,7 +20,7 @@ gateway: HTTP/OpenAI/设备等外部入口，薄适配层。本 README 由脚手
 lca.contracts
 
 ## 6. 禁止依赖
-lca.infrastructure,lca.cognition,lca.layer2_runtime,lca.layer3_agent,lca.layer4_app,lca.harness,lca.plugins
+lca.infrastructure,lca.cognition,lca.runtime,lca.agent,lca.application,lca.harness,lca.plugins
 
 ## 7. 副作用
 network:http,log:emit

@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from lca.layer4_app.harness_bridge import (
+from lca.application.harness_bridge import (
     MissingAgentLoopProviderError,
     build_live_agent,
 )

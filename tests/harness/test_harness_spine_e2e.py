@@ -40,7 +40,7 @@ class TestHarnessSpineE2E:
         from lca.contracts.harness.session import SESSION_FORMAT_VERSION, SessionHeader
         from lca.harness.session.inbox import Inbox
         from lca.harness.session.store import SessionStore
-        from lca.layer4_app.harness_bridge import build_live_agent
+        from lca.application.harness_bridge import build_live_agent
 
         _require_profile_llm(client)
 

@@ -19,7 +19,7 @@ from lca.contracts.models.team.graph import (
 )
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import TeamAssembly
-from lca.layer3_agent.orchestration_strategies import GraphStrategy
+from lca.agent.orchestration_strategies import GraphStrategy
 from tests.support.graph_node_executors import build_default_graph_node_executor_registry
 from tests.support.team_stage import stage_with_invoker
 

@@ -51,10 +51,10 @@ from lca.cognition.hook_registry import CordisHookRegistry
 from lca.cognition.memory.simple_memory import SimpleMemorySystem
 
 # L2
-from lca.layer2_runtime.reducer import DefaultReducer
+from lca.runtime.reducer import DefaultReducer
 
 # L3
-from lca.layer3_agent.cognitive_agent import CognitiveAgent
+from lca.agent.cognitive_agent import CognitiveAgent
 from lca.plugins.composer.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,
@@ -289,7 +289,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         from lca.contracts.models.team.team_coordination import (
             Pipeline,
         )
-        from lca.layer4_app.spawn import spawn_team
+        from lca.application.spawn import spawn_team
         from tests.support.agent_specs import make_spec
 
         agent, _rp, _runtime = self._build_agent()
@@ -312,7 +312,7 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
         self.assertIn("default", ctx.inject("brains"))
 
     def test_agent_with_string_brain(self):
-        from lca.layer4_app.api import Agent
+        from lca.application.api import Agent
 
         agent = Agent(
             role="测试",
@@ -329,7 +329,7 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
         from lca.contracts.atoms.ids import new_id
         from lca.contracts.models.core.decision import Decision, Reflection
         from lca.contracts.models.core.state import AgentState
-        from lca.layer4_app.api import Agent
+        from lca.application.api import Agent
 
         class StubBrain(Brain):
             async def think(self, state: AgentState):
@@ -357,7 +357,7 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
         self.assertEqual(result.output, "stub")
 
     def test_agent_with_unknown_brain_raises(self):
-        from lca.layer4_app.api import Agent
+        from lca.application.api import Agent
 
         with self.assertRaises(ValueError) as ctx:
             Agent(

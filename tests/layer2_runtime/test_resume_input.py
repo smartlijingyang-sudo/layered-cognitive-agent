@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.protocols.resume_input import ResumeInput
-from lca.layer2_runtime.resume_input import HumanAnswerResumeInputAdapter
+from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
 
 
 def test_human_answer_adapter_preserves_empty_resume_without_turn() -> None:

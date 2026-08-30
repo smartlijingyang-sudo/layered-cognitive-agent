@@ -481,7 +481,7 @@ Expected: ~15-25 hits across 3 files
 #   from lca.contracts.harness.plugin import ScopeKind
 #   from lca.infrastructure.plugin.kernel._handle import PluginHandle
 #   from lca.infrastructure.plugin.kernel._spec import PluginSpec
-#   from lca.layer4_app.capability_boot import boot_capabilities
+#   from lca.application.capability_boot import boot_capabilities
 ```
 
 Replace `_isolate_agent_scope` body with `raise NotImplementedError("cordis migration; Chunk 5")`. Same for `_resolve_capability_context`.
@@ -520,8 +520,8 @@ Expected: empty
 - [ ] **Step 6: Verify all 3 files import cleanly**
 
 ```bash
-uv run python -c "from lca.layer4_app.composer import AgentComposer; print('composer OK')"
-uv run python -c "from lca.layer4_app.api import Agent, Team; print('api OK')"
+uv run python -c "from lca.application.composer import AgentComposer; print('composer OK')"
+uv run python -c "from lca.application.api import Agent, Team; print('api OK')"
 uv run python -c "import gateway.app; print('gateway OK')"
 ```
 
@@ -642,7 +642,7 @@ def _resolve_module(entry: Entry) -> object:
 - [ ] **Step 5: Verify all 3 files import cleanly**
 
 ```bash
-uv run python -c "from lca.layer4_app.profile import load_profile; from lca.harness.diagnostics.inspect import inspect; print('OK')"
+uv run python -c "from lca.application.profile import load_profile; from lca.harness.diagnostics.inspect import inspect; print('OK')"
 uv run python -c "from lca.harness.profile.boot import boot_profile; print('boot OK')"
 uv run python -c "from lca.harness.profile import boot_profile; print('re-export OK')"  # lca/harness/profile/__init__.py re-exports
 ```
@@ -893,7 +893,7 @@ Expected: empty
 - [ ] **Step 5: Verify `lca/layer2_runtime/hook_middleware.py` and policy plugins still import**
 
 ```bash
-uv run python -c "from lca.layer2_runtime.hook_middleware import hook_middleware; print('OK')"
+uv run python -c "from lca.runtime.hook_middleware import hook_middleware; print('OK')"
 uv run python -c "from lca.plugins.budget_policy import apply; print('OK')"
 ```
 
@@ -1823,7 +1823,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-guard-loop-intervention")
 async def setup(ctx, config: Config):
-    from lca.layer2_runtime.loop_intervention_mw import loop_intervention_middleware
+    from lca.runtime.loop_intervention_mw import loop_intervention_middleware
 
     @ctx.events.on("agent.after_act")
     async def _check(call_result, state):
@@ -2429,7 +2429,7 @@ from lca.contracts.typed_ctx import TypedContext
 @plugin(name="lca-brain-simple")
 async def setup(ctx: TypedContext, config) -> None:
     from lca.cognition.brain.simple_brain import SimpleBrain
-    from lca.layer3_agent.brain.factory import BrainFactory
+    from lca.agent.brain.factory import BrainFactory
 
     factory = ctx.brain_factory
     factory.register("simple", SimpleBrain)
@@ -2469,7 +2469,7 @@ from lca.contracts.typed_ctx import TypedContext
 @plugin(name="lca-reasoner-prompt", inject=["llm"])
 async def setup(ctx: TypedContext, config) -> None:
     from lca.cognition.brain.reasoner import PromptReasoner
-    from lca.layer3_agent.brain.factory import BrainFactory
+    from lca.agent.brain.factory import BrainFactory
 
     factory = ctx.brain_factory
     factory.register_reasoner("prompt", PromptReasoner)
@@ -2493,7 +2493,7 @@ from lca.contracts.typed_ctx import TypedContext
 @plugin(name="lca-synthesizer-concat")
 async def setup(ctx: TypedContext, config) -> None:
     from lca.cognition.brain.synthesizer import ConcatSynthesizer
-    from lca.layer3_agent.brain.factory import BrainFactory
+    from lca.agent.brain.factory import BrainFactory
 
     factory = ctx.brain_factory
     factory.register_synthesizer("concat", ConcatSynthesizer)
@@ -2521,8 +2521,8 @@ from cordis import plugin
 
 @plugin(name="lca-team-lead-board")
 async def setup(ctx, config) -> None:
-    from lca.layer3_agent.team.lead.board import BoardLead
-    from lca.layer3_agent.team.lead.factory import TeamLeadFactory
+    from lca.agent.team.lead.board import BoardLead
+    from lca.agent.team.lead.factory import TeamLeadFactory
 
     factory = ctx.inject("team_lead_factory")
     factory.register("board", BoardLead)
@@ -3015,7 +3015,7 @@ from cordis import Context
 
 @pytest.mark.asyncio
 async def test_isolate_agent_scope_creates_child_with_shadow_services():
-    from lca.layer4_app.composer import _IsolatedAgentScope
+    from lca.application.composer import _IsolatedAgentScope
     from lca.infrastructure.capability.llm import LlmService
 
     parent = Context()

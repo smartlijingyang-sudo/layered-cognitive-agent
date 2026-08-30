@@ -120,7 +120,7 @@ def _infer_source(stamped: StampedEvent) -> str:
     if isinstance(p, PluginAuthored):
         return "lca.plugins.tools.cordis_control"
     if isinstance(p, PresetPublished):
-        return "lca.layer4_app.preset_authoring"
+        return "lca.application.preset_authoring"
     if isinstance(p, RuntimeObserved):
         return str(getattr(p, "source", "") or "runtime")
     return ""

@@ -15,7 +15,7 @@ from lca.contracts.protocols.infra import Tool
 from lca.contracts.protocols.run_mode import ModeAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability import BoundObservability
-from lca.layer4_app.api import Agent
+from lca.application.api import Agent
 from lca.plugins.seam_definitions.run_mode_registry import RunModeRegistry
 
 if TYPE_CHECKING:

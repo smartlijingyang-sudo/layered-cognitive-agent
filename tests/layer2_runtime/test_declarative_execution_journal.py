@@ -7,13 +7,13 @@ import pytest
 
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.harness.declarative.phase_observation import NullPhaseObserver
-from lca.layer2_runtime.declarative_runtime import (
+from lca.runtime.declarative_runtime import (
     DeclarativeExecution,
     DeclarativeRuntimeDriver,
     RuntimePhaseCapabilities,
 )
-from lca.layer2_runtime.runtime_bindings import DeclarativeRuntimeBindings
-from lca.layer2_runtime.runtime_journal import RuntimeJournalCommitter
+from lca.runtime.runtime_bindings import DeclarativeRuntimeBindings
+from lca.runtime.runtime_journal import RuntimeJournalCommitter
 
 
 class _Journal:
@@ -104,16 +104,16 @@ async def test_declarative_execution_uses_the_injected_turn_journal() -> None:
     interpretation = object()
 
     with (
-        patch("lca.layer2_runtime.declarative_runtime.GraphAssembler") as assembler,
+        patch("lca.runtime.declarative_runtime.GraphAssembler") as assembler,
         patch(
-            "lca.layer2_runtime.runtime_bindings.DeclarativeRuntimeBindings.new_interpreter"
+            "lca.runtime.runtime_bindings.DeclarativeRuntimeBindings.new_interpreter"
         ) as interpreter_factory,
         patch(
-            "lca.layer2_runtime.runtime_bindings.DeclarativeRuntimeBindings.require_executable_plan",
+            "lca.runtime.runtime_bindings.DeclarativeRuntimeBindings.require_executable_plan",
             return_value=bindings.plan,
         ),
         patch(
-            "lca.layer2_runtime.runtime_bindings.DeclarativeRuntimeBindings.plan_ref",
+            "lca.runtime.runtime_bindings.DeclarativeRuntimeBindings.plan_ref",
             return_value="compiled-plan-ref",
         ),
     ):
@@ -189,7 +189,7 @@ def test_runtime_journal_committer_exposes_monotonic_turn_sequence() -> None:
 
     journal = RuntimeJournalCommitter()
 
-    with patch("lca.layer2_runtime.runtime_journal.record_runtime", return_value=None):
+    with patch("lca.runtime.runtime_journal.record_runtime", return_value=None):
         first = journal.commit_evidence("evidence-1", plan_ref="plan", node_ref="think")
         second = journal.commit_observation({"ok": True}, plan_ref="plan", node_ref="act")
 

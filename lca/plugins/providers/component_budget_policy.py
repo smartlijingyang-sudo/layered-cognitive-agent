@@ -13,7 +13,7 @@ from lca.contracts.capabilities import COMPONENT_REGISTRY, LEAD_BUDGET_POLICY_RE
 from lca.contracts.mechanisms import ComponentRegistryProtocol
 from lca.contracts.protocols import BudgetPolicy, LeadBudgetPolicyResolver
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer4_app.policies import LEAD_BUDGET_POLICY_KEY
+from lca.application.policies import LEAD_BUDGET_POLICY_KEY
 
 
 class Config(BaseModel):
@@ -51,7 +51,7 @@ class ComponentRegistryLeadBudgetPolicyResolver(LeadBudgetPolicyResolver):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
-    from lca.layer4_app.policies import LeadBudgetPolicy
+    from lca.application.policies import LeadBudgetPolicy
 
     registry: ComponentRegistryProtocol = ctx.require(COMPONENT_REGISTRY.key)
     registry.register(ComponentKind.BUDGET_POLICY, LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy)

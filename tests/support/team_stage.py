@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols import TeamStage
 from lca.infrastructure.transport.agent_transport import InternalTransport
-from lca.layer3_agent.member_invoke import TransportMemberInvoker
+from lca.agent.member_invoke import TransportMemberInvoker
 
 
 def _ensure_string_role(member: object, fallback: str) -> str:

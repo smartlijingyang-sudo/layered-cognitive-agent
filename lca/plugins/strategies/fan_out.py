@@ -14,7 +14,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 def build_fan_out_strategy(assembly: TeamAssembly) -> Any:
     from lca.cognition.brain.synthesizer import ConcatSynthesizer
-    from lca.layer3_agent.orchestration_strategies import ParallelStrategy
+    from lca.agent.orchestration_strategies import ParallelStrategy
 
     return ParallelStrategy(assembly.stage, synthesizer=ConcatSynthesizer())
 

@@ -46,8 +46,8 @@ include_external_packages = true
 name = "严格分层: contracts → L0 → L1 → L2 → L3"
 type = "layers"
 layers = [
-    "lca.layer3_agent",
-    "lca.layer2_runtime",
+    "lca.agent",
+    "lca.runtime",
     "lca.cognition",
     "lca.infrastructure",
     "lca.contracts",
@@ -62,10 +62,10 @@ source_modules = [
     "lca.contracts",
     "lca.infrastructure",
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
+    "lca.runtime",
+    "lca.agent",
 ]
-forbidden_modules = ["lca.layer4_app"]
+forbidden_modules = ["lca.application"]
 
 # ── 契约 3: contracts 是纯数据契约层，不得 import 任何实现细节 ──
 [[tool.importlinter.contracts]]
@@ -75,9 +75,9 @@ source_modules = ["lca.contracts"]
 forbidden_modules = [
     "lca.infrastructure",
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
     "lca.harness",
     "lca.plugins",
 ]
@@ -89,9 +89,9 @@ type = "forbidden"
 source_modules = ["lca.harness"]
 forbidden_modules = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 
 # ── 契约 5: LCA plugin 不得反向依赖 Gateway ──
@@ -269,6 +269,78 @@ forbidden_dependencies = []
 side_effects = []
 public_api = [
     "lca",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.agent"]
+responsibility = "lca.agent: 单 Agent、Team、委派和编排。本 README 由脚手架生成，待包负责人补充具体细节。"
+not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+    "lca.runtime",
+    "lca.agent",
+]
+forbidden_dependencies = [
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "log:emit",
+]
+public_api = [
+    "lca.agent",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.agent.orchestration_strategies"]
+responsibility = "lca.agent.orchestration_strategies: 编排策略。本 README 由脚手架生成，待包负责人补充具体细节。"
+not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+    "lca.runtime",
+    "lca.agent",
+]
+forbidden_dependencies = [
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = []
+public_api = [
+    "lca.agent.orchestration_strategies",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.application"]
+responsibility = "lca.application: 组合根、用例入口、依赖注入、命令处理。本 README 由脚手架生成，待包负责人补充具体细节。"
+not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
+]
+forbidden_dependencies = [
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "log:emit",
+    "file:read",
+    "file:write",
+]
+public_api = [
+    "lca.application",
 ]
 schema_version = "1.0.0"
 
@@ -601,9 +673,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -622,9 +694,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -643,9 +715,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -664,9 +736,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -685,9 +757,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -707,9 +779,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -728,9 +800,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -749,9 +821,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -771,9 +843,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -792,9 +864,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -813,9 +885,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -836,9 +908,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -858,9 +930,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -879,9 +951,9 @@ allowed_dependencies = [
 ]
 forbidden_dependencies = [
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 side_effects = [
     "log:emit",
@@ -1479,126 +1551,6 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer2_runtime"]
-responsibility = "lca.runtime: 运行循环、阶段驱动、停止、恢复、中间件、结果。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-    "lca.runtime",
-]
-forbidden_dependencies = [
-    "lca.agent",
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "log:emit",
-]
-public_api = [
-    "lca.runtime",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer2_runtime.agent_runtime"]
-responsibility = "lca.runtime.agent_runtime: Agent 运行时实例。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-    "lca.runtime",
-]
-forbidden_dependencies = [
-    "lca.agent",
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "log:emit",
-]
-public_api = [
-    "lca.runtime.agent_runtime",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer3_agent"]
-responsibility = "lca.agent: 单 Agent、Team、委派和编排。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-    "lca.runtime",
-    "lca.agent",
-]
-forbidden_dependencies = [
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "log:emit",
-]
-public_api = [
-    "lca.agent",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer3_agent.orchestration_strategies"]
-responsibility = "lca.agent.orchestration_strategies: 编排策略。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-    "lca.runtime",
-    "lca.agent",
-]
-forbidden_dependencies = [
-    "lca.application",
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = []
-public_api = [
-    "lca.agent.orchestration_strategies",
-]
-schema_version = "1.0.0"
-
-[tool.lca.package_contracts."lca.layer4_app"]
-responsibility = "lca.application: 组合根、用例入口、依赖注入、命令处理。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.infrastructure",
-    "lca.cognition",
-    "lca.runtime",
-    "lca.agent",
-    "lca.application",
-]
-forbidden_dependencies = [
-    "lca.harness",
-    "lca.plugins",
-    "gateway",
-]
-side_effects = [
-    "log:emit",
-    "file:read",
-    "file:write",
-]
-public_api = [
-    "lca.application",
-]
-schema_version = "1.0.0"
-
 [tool.lca.package_contracts."lca.plugins"]
 responsibility = "lca.plugins: 可装配的行为单元集合。本 README 由脚手架生成，待包负责人补充具体细节。"
 not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
@@ -2162,6 +2114,54 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
+[tool.lca.package_contracts."lca.runtime"]
+responsibility = "lca.runtime: 运行循环、阶段驱动、停止、恢复、中间件、结果。本 README 由脚手架生成，待包负责人补充具体细节。"
+not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+    "lca.runtime",
+]
+forbidden_dependencies = [
+    "lca.agent",
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "log:emit",
+]
+public_api = [
+    "lca.runtime",
+]
+schema_version = "1.0.0"
+
+[tool.lca.package_contracts."lca.runtime.agent_runtime"]
+responsibility = "lca.runtime.agent_runtime: Agent 运行时实例。本 README 由脚手架生成，待包负责人补充具体细节。"
+not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
+allowed_dependencies = [
+    "lca.contracts",
+    "lca.infrastructure",
+    "lca.cognition",
+    "lca.runtime",
+]
+forbidden_dependencies = [
+    "lca.agent",
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "log:emit",
+]
+public_api = [
+    "lca.runtime.agent_runtime",
+]
+schema_version = "1.0.0"
+
 [tool.lca.package_contracts."gateway"]
 responsibility = "gateway: HTTP/OpenAI/设备等外部入口，薄适配层。本 README 由脚手架生成，待包负责人补充具体细节。"
 not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
@@ -2171,9 +2171,9 @@ allowed_dependencies = [
 forbidden_dependencies = [
     "lca.infrastructure",
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
     "lca.harness",
     "lca.plugins",
 ]
@@ -2196,9 +2196,9 @@ allowed_dependencies = [
 forbidden_dependencies = [
     "lca.infrastructure",
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
     "lca.harness",
     "lca.plugins",
 ]
@@ -2221,9 +2221,9 @@ allowed_dependencies = [
 forbidden_dependencies = [
     "lca.infrastructure",
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
     "lca.harness",
     "lca.plugins",
 ]
@@ -2245,9 +2245,9 @@ allowed_dependencies = [
 forbidden_dependencies = [
     "lca.infrastructure",
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
     "lca.harness",
     "lca.plugins",
 ]

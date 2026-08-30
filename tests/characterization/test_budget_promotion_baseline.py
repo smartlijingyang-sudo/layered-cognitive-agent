@@ -15,9 +15,9 @@ from lca.contracts.models.core.budget import (
     LEAD_MIN_MAX_STEPS,
 )
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.layer3_agent.cognitive_agent import CognitiveAgent
-from lca.layer4_app.policies import LeadBudgetPolicy
-from lca.layer4_app.spawn import promote_lead
+from lca.agent.cognitive_agent import CognitiveAgent
+from lca.application.policies import LeadBudgetPolicy
+from lca.application.spawn import promote_lead
 
 _policy = LeadBudgetPolicy()
 

@@ -22,8 +22,8 @@ from lca.contracts.protocols.plan import CompiledRunPlan
 from lca.contracts.protocols.reducer import Reducer
 from lca.contracts.protocols.resume_input import ResumeInputAdapter
 from lca.harness.declarative.phase_observation import PhaseObserver
-from lca.layer2_runtime.reducer import DefaultReducer
-from lca.layer2_runtime.resume_input import HumanAnswerResumeInputAdapter
+from lca.runtime.reducer import DefaultReducer
+from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
 from lca.plugins.composer.fixture_runtime_adapter import FixtureRuntimeAdapter
 from lca.plugins.composer.runtime_factory import (
     ProductionRuntimeDeps,

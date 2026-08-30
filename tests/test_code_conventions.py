@@ -39,9 +39,9 @@ _NAME_EXEMPT: dict[str, str] = {
 _SCAN_PACKAGES = [
     "lca.infrastructure",
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
     "gateway",
 ]
 
@@ -51,9 +51,9 @@ _SCAN_PACKAGES = [
 _GLOSSARY_COVERAGE_SCAN_PACKAGES = [
     "lca.infrastructure",
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
 ]
 
 # ── 文件行数上限 ─────────────────────────────────────────────────────────
@@ -244,9 +244,9 @@ _REVERSE_SCAN_PACKAGES = (
     "lca.contracts",
     "lca.infrastructure",
     "lca.cognition",
-    "lca.layer2_runtime",
-    "lca.layer3_agent",
-    "lca.layer4_app",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
     "lca.plugins.state",
 )
 _CAMEL_CASE_TERM = re.compile(r"^[A-Z][A-Za-z0-9]*$")

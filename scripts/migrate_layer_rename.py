@@ -18,9 +18,9 @@ from dataclasses import dataclass
 LAYER_TO_SEMANTIC: dict[str, str] = {
     "lca.infrastructure": "lca.infrastructure",
     "lca.cognition": "lca.cognition",
-    "lca.layer2_runtime": "lca.runtime",
-    "lca.layer3_agent": "lca.agent",
-    "lca.layer4_app": "lca.application",
+    "lca.runtime": "lca.runtime",
+    "lca.agent": "lca.agent",
+    "lca.application": "lca.application",
 }
 
 

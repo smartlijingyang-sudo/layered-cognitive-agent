@@ -23,7 +23,7 @@ from lca.contracts.protocols.runtime_lifecycle import (
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.infrastructure.learning.review_ticket_store import InMemoryLearningReviewTicketStore
-from lca.layer2_runtime.runtime_event_publisher import (
+from lca.runtime.runtime_event_publisher import (
     InMemoryRuntimeLifecycleSubscriberRegistry,
 )
 from lca.plugins.insight.failure_analyzer import FailureAnalyzerService

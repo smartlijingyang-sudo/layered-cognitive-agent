@@ -42,9 +42,9 @@ from lca.infrastructure.observability import (
     record,
     run_scope,
 )
-from lca.layer3_agent.role_library import FileRoleLibrary
-from lca.layer4_app.api import Agent, Team
-from lca.layer4_app.casting import LLMTeamCaster, build_from_casting_plan
+from lca.agent.role_library import FileRoleLibrary
+from lca.application.api import Agent, Team
+from lca.application.casting import LLMTeamCaster, build_from_casting_plan
 from lca.plugins.run_loop_driver_registry import (
     RunLoopDriverRegistry as RunLoopDriverRegistry,
 )

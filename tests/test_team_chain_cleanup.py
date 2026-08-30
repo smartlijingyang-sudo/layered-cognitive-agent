@@ -17,12 +17,12 @@ from lca.contracts.models.team.graph import ExecutionGraph, GraphEdge, GraphNode
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.team_coordination import Graph, PeerRelay, PeerSwarm, Pipeline
 from lca.contracts.protocols import TeamAssembly
-from lca.layer3_agent.orchestration_strategies import (
+from lca.agent.orchestration_strategies import (
     HandoffStrategy,
     SequentialStrategy,
     SwarmStrategy,
 )
-from lca.layer4_app.api import Agent, Team, ensure_default_ctx
+from lca.application.api import Agent, Team, ensure_default_ctx
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
@@ -100,7 +100,7 @@ class TestSingleInvokePort(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, ["a"])
 
     def test_member_invoke_source_requires_transport(self) -> None:
-        from lca.layer3_agent.member_invoke import TransportMemberInvoker
+        from lca.agent.member_invoke import TransportMemberInvoker
 
         src = inspect.getsource(TransportMemberInvoker.invoke)
         self.assertIn("send_and_wait", src)

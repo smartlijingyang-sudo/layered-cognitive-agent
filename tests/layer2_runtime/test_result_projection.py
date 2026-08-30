@@ -16,7 +16,7 @@ from lca.contracts.protocols.declarative_phase_graph import (
     DeclarativeValidationError,
     PhaseRunCursor,
 )
-from lca.layer2_runtime.result_projection import TerminalResultProjection
+from lca.runtime.result_projection import TerminalResultProjection
 
 
 class _StateStore:

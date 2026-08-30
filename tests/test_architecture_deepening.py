@@ -32,8 +32,8 @@ from lca.cognition.brain.prompts import load_builtin_prompt
 from lca.cognition.brain.reasoner import PromptReasoner
 from lca.cognition.brain.skill_router import StaticSkillRouter
 from lca.cognition.hook_registry import CordisHookRegistry
-from lca.layer2_runtime.reducer import DefaultReducer
-from lca.layer4_app.api import Agent, Team, ensure_default_ctx
+from lca.runtime.reducer import DefaultReducer
+from lca.application.api import Agent, Team, ensure_default_ctx
 from lca.plugins.composer.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,

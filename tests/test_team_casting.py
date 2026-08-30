@@ -20,9 +20,9 @@ from lca.contracts.protocols.casting import (
     SelectedRole,
 )
 from lca.contracts.protocols.spec import LeadSpec
-from lca.layer3_agent.role_library import FileRoleLibrary
-from lca.layer4_app.api import Team
-from lca.layer4_app.casting import (
+from lca.agent.role_library import FileRoleLibrary
+from lca.application.api import Team
+from lca.application.casting import (
     LLMTeamCaster,
     build_from_casting_plan,
     parse_casting_output,

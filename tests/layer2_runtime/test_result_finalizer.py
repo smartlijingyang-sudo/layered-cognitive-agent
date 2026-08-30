@@ -12,8 +12,8 @@ from lca.contracts.protocols.declarative_phase_graph import (
     PhaseRunCursor,
 )
 from lca.harness.declarative.outcome_projection import InterpretationResult
-from lca.layer2_runtime.reducer import DefaultReducer
-from lca.layer2_runtime.result_finalizer import RuntimeResultFinalizer
+from lca.runtime.reducer import DefaultReducer
+from lca.runtime.result_finalizer import RuntimeResultFinalizer
 
 
 class _Hooks:

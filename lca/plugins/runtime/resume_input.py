@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from lca.contracts.capabilities import RESUME_INPUT_ADAPTERS
 from lca.contracts.protocols.resume_input import ResumeInputAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer2_runtime.resume_input import HumanAnswerResumeInputAdapter
+from lca.runtime.resume_input import HumanAnswerResumeInputAdapter
 
 
 class Config(BaseModel):

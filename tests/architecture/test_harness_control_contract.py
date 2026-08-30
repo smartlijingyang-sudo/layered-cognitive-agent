@@ -38,10 +38,10 @@ def test_control_contract_stays_in_harness_without_layer2_dependency() -> None:
     governance_imports = _imported_modules(PHASE_GOVERNANCE)
     verdict_imports = _imported_modules(GOVERNANCE_VERDICTS)
 
-    assert "lca.layer2_runtime.control_runtime" not in interpreter_imports
-    assert "lca.layer2_runtime.control_runtime" not in transaction_imports
-    assert "lca.layer2_runtime.control_runtime" not in governance_imports
-    assert "lca.layer2_runtime.control_runtime" not in verdict_imports
+    assert "lca.runtime.control_runtime" not in interpreter_imports
+    assert "lca.runtime.control_runtime" not in transaction_imports
+    assert "lca.runtime.control_runtime" not in governance_imports
+    assert "lca.runtime.control_runtime" not in verdict_imports
     assert "lca.contracts.protocols.control_verdict" in verdict_imports
 
 

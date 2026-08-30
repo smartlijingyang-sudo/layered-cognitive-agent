@@ -20,7 +20,7 @@ from lca.contracts.protocols.runtime_lifecycle import (
     RuntimeLifecycleSubscriberRegistry,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer2_runtime.runtime_event_publisher import (
+from lca.runtime.runtime_event_publisher import (
     CompositeRuntimeLifecyclePublisher,
     LifecyclePublisherFailureMode,
 )

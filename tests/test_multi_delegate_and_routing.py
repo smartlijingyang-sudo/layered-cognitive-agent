@@ -19,7 +19,7 @@ from lca.infrastructure.transport.transport_registry import TransportRegistry
 from lca.cognition.body.tool_registry import SimpleToolRegistry
 from lca.cognition.brain.decision_gates.must_consult_all import MustConsultAllMembers
 from lca.cognition.member_status import InMemoryMemberStatus
-from lca.layer3_agent.orchestration_strategies import (
+from lca.agent.orchestration_strategies import (
     LeadStrategy,
     SwarmStrategy,
 )

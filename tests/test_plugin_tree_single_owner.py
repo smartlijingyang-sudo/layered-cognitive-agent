@@ -15,8 +15,8 @@ from lca.harness.profile.boot_products import resolved_profile_from_scope
 from lca.harness.profile.resolve import ProfileResolveError
 from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.infrastructure.llm_resolver import live_credential
-from lca.layer4_app.api import Agent
-from lca.layer4_app.spawn import spawn_agent
+from lca.application.api import Agent
+from lca.application.spawn import spawn_agent
 from lca.plugins.composer.internal.perceive import build_perceive_hub
 
 DEFAULT_PROFILE = "profiles/web-standard.yaml"
@@ -314,8 +314,8 @@ async def test_cognitive_driver_composes_once(
         calls["n"] += 1
         return original(spec, **kwargs)
 
-    monkeypatch.setattr("lca.layer4_app.api.spawn_agent", counted)
-    monkeypatch.setattr("lca.layer4_app.spawn.spawn_agent", counted)
+    monkeypatch.setattr("lca.application.api.spawn_agent", counted)
+    monkeypatch.setattr("lca.application.spawn.spawn_agent", counted)
     registry = RunRegistry()
     session = create_run_session(
         registry, question="hello", user_text="hello", mode="solo", ctx=ctx

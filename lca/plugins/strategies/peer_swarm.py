@@ -13,7 +13,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 def build_peer_swarm_strategy(assembly: TeamAssembly) -> Any:
-    from lca.layer3_agent.orchestration_strategies import SwarmStrategy
+    from lca.agent.orchestration_strategies import SwarmStrategy
 
     governance = assembly.governance
     if not isinstance(governance, PeerSwarm):

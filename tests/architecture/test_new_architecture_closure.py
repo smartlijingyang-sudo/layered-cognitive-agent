@@ -50,8 +50,8 @@ def test_team_composer_uses_the_agent_assembly_seam() -> None:
     source = (ROOT / "lca" / "plugins" / "composer" / "team_composer.py").read_text(
         encoding="utf-8"
     )
-    assert "lca.layer4_app.spawn" not in source
-    assert "lca.layer4_app.team_wiring" not in source
+    assert "lca.application.spawn" not in source
+    assert "lca.application.team_wiring" not in source
     assert "self._agent_assembler.assemble_member" in source
     assert "self._agent_assembler.assemble_lead" in source
 
@@ -69,14 +69,14 @@ def test_production_sources_do_not_reference_removed_runtime_modules() -> None:
     """Task 8 Step 1: Verify no production code imports removed legacy modules.
 
     ADR-0074/0075 declarative cutover removed:
-    - lca.layer2_runtime.control_policies (Task 5 Part 2)
+    - lca.runtime.control_policies (Task 5 Part 2)
     - lca.harness.command.dual_write (Task 6)
     """
     source = _python_source()
     forbidden = (
-        "from lca.layer2_runtime.control_policies",
-        "from lca.layer2_runtime import control_policies",
-        "import lca.layer2_runtime.control_policies",
+        "from lca.runtime.control_policies",
+        "from lca.runtime import control_policies",
+        "import lca.runtime.control_policies",
         "from lca.harness.command.dual_write",
         "from lca.harness.command import dual_write",
         "import lca.harness.command.dual_write",

@@ -86,7 +86,7 @@ CommandEnvelope 和 Effect Gateway 也抓住了关键安全边界：模型输出
 
 `gateway/app.py` 同时暴露旧的 `/runs/*` 路由和新的 `/v1/sessions/*` 路由。旧路径使用 `RunRegistry/RunSession`；新路径使用 Harness 的 `AgentRegistry/CommandGateway`。这不是仅仅保留 API 兼容，而是两套不同的生命周期和事实流并存于生产应用。[4]
 
-更关键的是，新 `CognitiveLiveAgent` 仍然包裹旧的 `lca.layer4_app.api.Agent.run()` 和 `Agent.resume()`；它不是独立的 session-native runtime。旧 `RunSession` 仍保留 `asyncio.Task`、`snapshot` 和 `runnable` live Python 引用，`resume_run()` 直接执行 `session.runnable.resume(session.snapshot)`。[5] [6] [7]
+更关键的是，新 `CognitiveLiveAgent` 仍然包裹旧的 `lca.application.api.Agent.run()` 和 `Agent.resume()`；它不是独立的 session-native runtime。旧 `RunSession` 仍保留 `asyncio.Task`、`snapshot` 和 `runnable` live Python 引用，`resume_run()` 直接执行 `session.runnable.resume(session.snapshot)`。[5] [6] [7]
 
 **建议：** 选定 `/v1/sessions` + CommandGateway + AgentRegistry 为唯一内部主路径。旧 `/runs` 只保留一个薄适配器，把旧请求转换成 typed command，不得再拥有独立 RunRegistry 执行语义。完成迁移后，Gateway 只负责 carrier，不再 import concrete loop、Brain、Body 或旧 runnable。
 

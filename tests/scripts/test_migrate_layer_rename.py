@@ -23,17 +23,17 @@ def test_layer_to_semantic_has_all_5_mappings():
     assert len(LAYER_TO_SEMANTIC) == 5
     assert "lca.infrastructure" in LAYER_TO_SEMANTIC
     assert "lca.cognition" in LAYER_TO_SEMANTIC
-    assert "lca.layer2_runtime" in LAYER_TO_SEMANTIC
-    assert "lca.layer3_agent" in LAYER_TO_SEMANTIC
-    assert "lca.layer4_app" in LAYER_TO_SEMANTIC
+    assert "lca.runtime" in LAYER_TO_SEMANTIC
+    assert "lca.agent" in LAYER_TO_SEMANTIC
+    assert "lca.application" in LAYER_TO_SEMANTIC
 
 
 def test_layer_to_semantic_values():
     assert LAYER_TO_SEMANTIC["lca.infrastructure"] == "lca.infrastructure"
     assert LAYER_TO_SEMANTIC["lca.cognition"] == "lca.cognition"
-    assert LAYER_TO_SEMANTIC["lca.layer2_runtime"] == "lca.runtime"
-    assert LAYER_TO_SEMANTIC["lca.layer3_agent"] == "lca.agent"
-    assert LAYER_TO_SEMANTIC["lca.layer4_app"] == "lca.application"
+    assert LAYER_TO_SEMANTIC["lca.runtime"] == "lca.runtime"
+    assert LAYER_TO_SEMANTIC["lca.agent"] == "lca.agent"
+    assert LAYER_TO_SEMANTIC["lca.application"] == "lca.application"
 
 
 def test_find_references_returns_all_5_keys():

@@ -64,7 +64,7 @@ def _fake_tool(name: str) -> Any:
 
 def _patch_skill_store_resolution(monkeypatch: Any, store: DiskSkillPackageStore) -> None:
     """Replace the composition-root skill resolver without booting Cordis."""
-    from lca.layer4_app import spawn
+    from lca.application import spawn
 
     monkeypatch.setattr(spawn, "active_skill_store", lambda _scope: store)
 
@@ -158,7 +158,7 @@ class TestRenderAvailableSkills(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_catalog_includes_skill_id_and_name(self) -> None:
-        from lca.layer4_app.spawn import _render_available_skills
+        from lca.application.spawn import _render_available_skills
 
         rendered = _render_available_skills(_stub_scope_with_skill_store(self.store))
         self.assertIn(CORDIS_PLUGIN_DEVELOPMENT_SKILL_ID, rendered)
@@ -167,7 +167,7 @@ class TestRenderAvailableSkills(unittest.TestCase):
 
     def test_catalog_includes_summary_for_each_skill(self) -> None:
         """Summaries must surface so the model can route without loading body."""
-        from lca.layer4_app.spawn import _render_available_skills
+        from lca.application.spawn import _render_available_skills
 
         rendered = _render_available_skills(_stub_scope_with_skill_store(self.store))
         for skill_id in _EXPECTED_BUNDLED_IDS:
@@ -178,7 +178,7 @@ class TestRenderAvailableSkills(unittest.TestCase):
                 self.assertIn(package.summary[:32], rendered)
 
     def test_catalog_includes_version_when_present(self) -> None:
-        from lca.layer4_app.spawn import _render_available_skills
+        from lca.application.spawn import _render_available_skills
 
         rendered = _render_available_skills(_stub_scope_with_skill_store(self.store))
         for skill_id in _EXPECTED_BUNDLED_IDS:
@@ -190,7 +190,7 @@ class TestRenderAvailableSkills(unittest.TestCase):
 
     def test_catalog_handles_empty_store(self) -> None:
         """Empty store should produce the documented fallback string."""
-        from lca.layer4_app.spawn import _render_available_skills
+        from lca.application.spawn import _render_available_skills
 
         empty_store = DiskSkillPackageStore(SkillSettings(cache_dir=Path(self._tmp.name) / "empty"))
         _patch_skill_store_resolution(self._monkey, empty_store)
@@ -405,7 +405,7 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
             _role_prompt_vars,
         )
         from lca.cognition.sensors.skill_catalog import SkillCatalogSensor
-        from lca.layer4_app.spawn import (
+        from lca.application.spawn import (
             _format_tools_xml,
             _render_available_skills,
         )

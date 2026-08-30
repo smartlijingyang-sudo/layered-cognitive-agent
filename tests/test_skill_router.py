@@ -13,7 +13,7 @@ from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.cognition.brain.modular_brain import ModularBrain
 from lca.cognition.brain.skill_router import KeywordSkillRouter, StaticSkillRouter
-from lca.layer2_runtime.reducer import DefaultReducer
+from lca.runtime.reducer import DefaultReducer
 from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 
 

@@ -11,7 +11,7 @@ from lca.contracts.models.core.budget import (
 )
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import BudgetAware, BudgetPolicy
-from lca.layer4_app.policies import LeadBudgetPolicy
+from lca.application.policies import LeadBudgetPolicy
 
 
 def _make_aware(

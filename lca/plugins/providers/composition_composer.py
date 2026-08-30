@@ -230,7 +230,7 @@ class CordisComposer(Composer):
         空集合优雅降级（inspect 不依赖 preset 列表）。
         """
         try:
-            from lca.layer4_app.preset_authoring import PresetAuthoring
+            from lca.application.preset_authoring import PresetAuthoring
         except Exception:
             return ()
         try:

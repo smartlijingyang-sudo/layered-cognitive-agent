@@ -23,7 +23,7 @@ from typing import Any, cast
 
 from lca.contracts.harness.plugin_meta import PluginMeta
 from lca.contracts.mechanisms.composition import PluginMetaMissing
-from lca.layer4_app.preset_authoring import PresetAuthoring
+from lca.application.preset_authoring import PresetAuthoring
 
 
 def load_plugin_source(path: str) -> tuple[str, str, int]:

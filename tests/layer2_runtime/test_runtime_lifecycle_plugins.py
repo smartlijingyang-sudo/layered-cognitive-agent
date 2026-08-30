@@ -20,13 +20,13 @@ from lca.contracts.protocols.runtime_lifecycle import (
     RuntimeLifecycleEventType,
     RuntimeLifecycleSubscriberContribution,
 )
-from lca.layer2_runtime.runtime_event_publisher import (
+from lca.runtime.runtime_event_publisher import (
     CompositeRuntimeLifecyclePublisher,
     InMemoryRuntimeLifecycleSubscriberRegistry,
     LifecyclePublisherFailureMode,
     RuntimeLifecyclePublisherError,
 )
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime, _event_type_for_result
+from lca.runtime.runtime_loop import CognitiveRuntime, _event_type_for_result
 from lca.plugins.providers import runtime_lifecycle, runtime_lifecycle_logging
 
 

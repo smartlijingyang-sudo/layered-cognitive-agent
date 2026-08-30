@@ -14,7 +14,7 @@ Accepted
    明确写明：「测试 CLI 探针（`tests/harness/modes.py`）保留 Alice/Bob 剧本
    用于确定性探针；本模块定义面向真实用户的产品角色与示例任务」。
    `gateway/team_factory.py::build_runnable` 消费该模块并经
-   `lca.layer4_app.api`（Agent/Team/TeamLead）组装真实对象图；
+   `lca.application.api`（Agent/Team/TeamLead）组装真实对象图；
    `gateway/run_executor.py` 是唯一生产执行路径。两者均不 import `tests.*`，
    `gateway/llm_resolver.py` 的 docstring 也明确「生产路径只认真实 adapter；
    测试通过依赖注入替换」——网关运行时执行路径本身是干净的。
@@ -78,7 +78,7 @@ Accepted
 
 ### 正面
 - 前端协作模式契约第一次有了名副其实的单一事实源，与网关实际执行路径
-  （`team_factory.py` → `lca.layer4_app.api`）保持一致，不会再出现 UI
+  （`team_factory.py` → `lca.application.api`）保持一致，不会再出现 UI
   选不到已支持模式的漂移（1.2 #6）。
 - 新增的 key 集合守卫把「测试探针覆盖率」和「生产模式定义」锁在一起，新增
   协作模式时两侧都会在 CI 阶段被迫同步。
@@ -96,7 +96,7 @@ Accepted
   gateway 集成测试的 scripted LLM 注入。
 - 不在本 ADR 内设计 `/modes` 运行时端点（见「放弃的方案 2」，判定为不必要
   而非延后）。
-- 不涉及 `gateway/team_factory.py` / `lca.layer4_app` 的运行时组装逻辑 ——
+- 不涉及 `gateway/team_factory.py` / `lca.application` 的运行时组装逻辑 ——
   该路径本次核实已经干净（无 `tests.*` 依赖），不需要「迁移」；需要迁移的
   只是前端契约生成的数据引用。
 

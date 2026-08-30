@@ -18,7 +18,7 @@ _DUTY_MANDATES: frozenset[LeadMandate] = frozenset({LeadMandate.CONSULT, LeadMan
 
 def build_lead_strategy(assembly: TeamAssembly) -> Any:
     from lca.cognition.member_status import InMemoryMemberStatus
-    from lca.layer3_agent.orchestration_strategies import LeadStrategy
+    from lca.agent.orchestration_strategies import LeadStrategy
 
     governance = assembly.governance
     if not isinstance(governance, LeadSpec) or assembly.lead is None:

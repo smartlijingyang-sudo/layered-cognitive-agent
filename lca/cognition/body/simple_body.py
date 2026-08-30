@@ -63,7 +63,7 @@ class SimpleBody(Body):
         """Execute a decision through its already-authorized action handler.
 
         Degradation emission (v3 §4.4 + §10) lives in
-        :func:`lca.layer2_runtime.event_emission._derive_action_degraded`,
+        :func:`lca.runtime.event_emission._derive_action_degraded`,
         which subscribes to ``HookEvent.POST_ACT`` and reads
         ``observation.degraded_from`` that we surface here via
         :meth:`_propagate_degradation`. Body never emits ``ActionDegraded``
@@ -103,7 +103,7 @@ class SimpleBody(Body):
         """Surface the degradation marker on ``Observation`` for downstream emission.
 
         The actual ``ActionDegraded`` journal event is emitted by
-        :func:`lca.layer2_runtime.event_emission._derive_action_degraded`
+        :func:`lca.runtime.event_emission._derive_action_degraded`
         via the ``POST_ACT`` hook (v3 §4.4 + §10). Body is responsible only
         for carrying the marker on the observation; it does not emit.
         """

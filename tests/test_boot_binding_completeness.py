@@ -226,7 +226,7 @@ def test_missing_binding_error_exposes_diagnostic_fields() -> None:
         fallback_policy=FallbackPolicy.PRODUCTION,
         provider_hint="lca.plugins.seam_definitions.effect_handler",
         candidates=("bundle: bundles/base.yaml",),
-        additional=(("reducer", FallbackPolicy.PRODUCTION, "lca.layer2_runtime.reducer"),),
+        additional=(("reducer", FallbackPolicy.PRODUCTION, "lca.runtime.reducer"),),
     )
     msg = str(error)
     assert "effect_handler_registry" in msg
@@ -237,7 +237,7 @@ def test_missing_binding_error_exposes_diagnostic_fields() -> None:
     assert error.fallback_policy is FallbackPolicy.PRODUCTION
     assert error.provider_hint == "lca.plugins.seam_definitions.effect_handler"
     assert error.additional == (
-        ("reducer", FallbackPolicy.PRODUCTION, "lca.layer2_runtime.reducer"),
+        ("reducer", FallbackPolicy.PRODUCTION, "lca.runtime.reducer"),
     )
 
 

@@ -29,7 +29,7 @@ from lca.contracts.protocols.runtime_composition import (
     RuntimeJournalFactory,
 )
 from lca.harness.declarative.loop_guard import DeclarativeLoopGuardEvaluator
-from lca.layer2_runtime.reducer import DefaultReducer
+from lca.runtime.reducer import DefaultReducer
 from lca.plugins.composer import fixture_runtime_defaults
 from lca.plugins.composer.fixture_runtime_input import RuntimeDeps
 from lca.plugins.composer.internal.runtime_deps import ProductionRuntimeDeps

@@ -24,7 +24,7 @@ from lca.contracts.protocols import (
     SkillRouter,
 )
 from lca.cognition.brain.modular_brain import ModularBrain
-from lca.layer2_runtime.reducer import DefaultReducer
+from lca.runtime.reducer import DefaultReducer
 from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 
 # ── Test doubles ─────────────────────────────────────────────────────

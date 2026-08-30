@@ -37,7 +37,7 @@ from lca.contracts.protocols.runtime_composition import (
 )
 from lca.contracts.protocols.runtime_lifecycle import RuntimeLifecyclePublisher
 from lca.harness.declarative.phase_observation import PhaseObserver
-from lca.layer2_runtime.phase_capabilities import (
+from lca.runtime.phase_capabilities import (
     RuntimePhaseCapabilities,
     project_runtime_phase_capabilities,
 )

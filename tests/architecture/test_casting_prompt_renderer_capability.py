@@ -8,7 +8,7 @@ from lca.contracts.capabilities import TEAM_CASTER, TEAM_CASTING_PROMPT_RENDERER
 from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.protocols.casting import RoleCard, RoleIndexEntry, RoleNotFoundError
 from lca.harness.profile.resolve import resolve_profile
-from lca.layer4_app.casting import LLMTeamCaster
+from lca.application.casting import LLMTeamCaster
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
 REPO = Path(__file__).resolve().parents[2]

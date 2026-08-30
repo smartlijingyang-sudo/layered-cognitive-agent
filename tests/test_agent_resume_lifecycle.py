@@ -14,7 +14,7 @@ from lca.contracts.models.observability.journal import (
     RunResumed,
 )
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.layer3_agent.cognitive_agent import CognitiveAgent
+from lca.agent.cognitive_agent import CognitiveAgent
 from tests.support.observability_helpers import _RunStoreBackend, make_test_bound
 
 

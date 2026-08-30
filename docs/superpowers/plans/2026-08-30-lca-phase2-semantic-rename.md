@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 一次性切换 `lca.infrastructure` / `lca.cognition` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 到语义名 `lca.infrastructure` / `lca.cognition` / `lca.runtime` / `lca.agent` / `lca.application`，无兼容期。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不变。
+**Goal:** 一次性切换 `lca.infrastructure` / `lca.cognition` / `lca.runtime` / `lca.agent` / `lca.application` 到语义名 `lca.infrastructure` / `lca.cognition` / `lca.runtime` / `lca.agent` / `lca.application`，无兼容期。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不变。
 
 **Architecture:** ADR-0104 先写 → 迁移辅助脚本 dry-run 演练 → 5 个原子 PR（每个映射一个）→ import-linter contracts 更新 → L1/L2 段同步 → 文档/Profile/patches 同步 → CHANGELOG + 外部消费方通知。
 
@@ -92,9 +92,9 @@ from dataclasses import dataclass
 LAYER_TO_SEMANTIC: dict[str, str] = {
     "lca.infrastructure": "lca.infrastructure",
     "lca.cognition": "lca.cognition",
-    "lca.layer2_runtime": "lca.runtime",
-    "lca.layer3_agent": "lca.agent",
-    "lca.layer4_app": "lca.application",
+    "lca.runtime": "lca.runtime",
+    "lca.agent": "lca.agent",
+    "lca.application": "lca.application",
 }
 
 
@@ -313,11 +313,11 @@ gh pr create --title "refactor!: rename lca.cognition to lca.cognition" --body "
 
 ---
 
-## Task 5: 原子切换 lca.layer2_runtime → lca.runtime
+## Task 5: 原子切换 lca.runtime → lca.runtime
 
 **Files:**
 - Rename: `lca/layer2_runtime/` → `lca/runtime/`
-- Modify: 所有引用 `lca.layer2_runtime` 的 import
+- Modify: 所有引用 `lca.runtime` 的 import
 
 - [ ] **Step 1: 创建分支 `rename/layer2-runtime`**
 
@@ -335,11 +335,11 @@ grep -rl "lca\.layer2_runtime" lca/ gateway/ tests/ | xargs sed -i 's/lca\.layer
 
 - [ ] **Step 3: 更新 import-linter contracts layers**
 
-`pyproject.toml [tool.importlinter.contracts]` 第 1 条 layers 改 `lca.layer2_runtime` 为 `lca.runtime`。
+`pyproject.toml [tool.importlinter.contracts]` 第 1 条 layers 改 `lca.runtime` 为 `lca.runtime`。
 
 - [ ] **Step 4: 更新 L1/L2 段**
 
-L1 README 段 5/6、L2 pyproject `forbidden_dependencies` 中所有 `lca.layer2_runtime` 改 `lca.runtime`。
+L1 README 段 5/6、L2 pyproject `forbidden_dependencies` 中所有 `lca.runtime` 改 `lca.runtime`。
 
 - [ ] **Step 5: 跑全量 CI**
 
@@ -358,13 +358,13 @@ grep -rn "lca\.layer2_runtime" lca/ gateway/ tests/ profiles/ deploy/ docs/
 
 ```bash
 git add -A
-git commit -m "refactor!: rename lca.layer2_runtime to lca.runtime
+git commit -m "refactor!: rename lca.runtime to lca.runtime
 
-BREAKING CHANGE: lca.layer2_runtime is now lca.runtime. Update imports.
+BREAKING CHANGE: lca.runtime is now lca.runtime. Update imports.
 
 Ref: ADR-0104"
 git push origin rename/layer2-runtime
-gh pr create --title "refactor!: rename lca.layer2_runtime to lca.runtime" --body "ADR-0104"
+gh pr create --title "refactor!: rename lca.runtime to lca.runtime" --body "ADR-0104"
 ```
 
 - [ ] **Step 8: Review + merge**
@@ -373,11 +373,11 @@ gh pr create --title "refactor!: rename lca.layer2_runtime to lca.runtime" --bod
 
 ---
 
-## Task 6: 原子切换 lca.layer3_agent → lca.agent
+## Task 6: 原子切换 lca.agent → lca.agent
 
 **Files:**
 - Rename: `lca/layer3_agent/` → `lca/agent/`
-- Modify: 所有引用 `lca.layer3_agent` 的 import
+- Modify: 所有引用 `lca.agent` 的 import
 
 - [ ] **Step 1: 创建分支 `rename/layer3-agent`**
 
@@ -395,11 +395,11 @@ grep -rl "lca\.layer3_agent" lca/ gateway/ tests/ | xargs sed -i 's/lca\.layer3_
 
 - [ ] **Step 3: 更新 import-linter contracts layers**
 
-`pyproject.toml [tool.importlinter.contracts]` 第 1 条 layers 改 `lca.layer3_agent` 为 `lca.agent`。
+`pyproject.toml [tool.importlinter.contracts]` 第 1 条 layers 改 `lca.agent` 为 `lca.agent`。
 
 - [ ] **Step 4: 更新 L1/L2 段**
 
-L1 README 段 5/6、L2 pyproject `forbidden_dependencies` 中所有 `lca.layer3_agent` 改 `lca.agent`。
+L1 README 段 5/6、L2 pyproject `forbidden_dependencies` 中所有 `lca.agent` 改 `lca.agent`。
 
 - [ ] **Step 5: 跑全量 CI**
 
@@ -418,13 +418,13 @@ grep -rn "lca\.layer3_agent" lca/ gateway/ tests/ profiles/ deploy/ docs/
 
 ```bash
 git add -A
-git commit -m "refactor!: rename lca.layer3_agent to lca.agent
+git commit -m "refactor!: rename lca.agent to lca.agent
 
-BREAKING CHANGE: lca.layer3_agent is now lca.agent. Update imports.
+BREAKING CHANGE: lca.agent is now lca.agent. Update imports.
 
 Ref: ADR-0104"
 git push origin rename/layer3-agent
-gh pr create --title "refactor!: rename lca.layer3_agent to lca.agent" --body "ADR-0104"
+gh pr create --title "refactor!: rename lca.agent to lca.agent" --body "ADR-0104"
 ```
 
 - [ ] **Step 8: Review + merge**
@@ -433,11 +433,11 @@ gh pr create --title "refactor!: rename lca.layer3_agent to lca.agent" --body "A
 
 ---
 
-## Task 7: 原子切换 lca.layer4_app → lca.application
+## Task 7: 原子切换 lca.application → lca.application
 
 **Files:**
 - Rename: `lca/layer4_app/` → `lca/application/`
-- Modify: 所有引用 `lca.layer4_app` 的 import
+- Modify: 所有引用 `lca.application` 的 import
 
 - [ ] **Step 1: 创建分支 `rename/layer4-application`**
 
@@ -455,11 +455,11 @@ grep -rl "lca\.layer4_app" lca/ gateway/ tests/ | xargs sed -i 's/lca\.layer4_ap
 
 - [ ] **Step 3: 更新 import-linter contracts layers**
 
-`pyproject.toml [tool.importlinter.contracts]` 第 1 条 layers 改 `lca.layer4_app` 为 `lca.application`。
+`pyproject.toml [tool.importlinter.contracts]` 第 1 条 layers 改 `lca.application` 为 `lca.application`。
 
 - [ ] **Step 4: 更新 L1/L2 段**
 
-L1 README 段 5/6、L2 pyproject `forbidden_dependencies` 中所有 `lca.layer4_app` 改 `lca.application`。
+L1 README 段 5/6、L2 pyproject `forbidden_dependencies` 中所有 `lca.application` 改 `lca.application`。
 
 - [ ] **Step 5: 跑全量 CI**
 
@@ -478,13 +478,13 @@ grep -rn "lca\.layer4_app" lca/ gateway/ tests/ profiles/ deploy/ docs/
 
 ```bash
 git add -A
-git commit -m "refactor!: rename lca.layer4_app to lca.application
+git commit -m "refactor!: rename lca.application to lca.application
 
-BREAKING CHANGE: lca.layer4_app is now lca.application. Update imports.
+BREAKING CHANGE: lca.application is now lca.application. Update imports.
 
 Ref: ADR-0104"
 git push origin rename/layer4-application
-gh pr create --title "refactor!: rename lca.layer4_app to lca.application" --body "ADR-0104"
+gh pr create --title "refactor!: rename lca.application to lca.application" --body "ADR-0104"
 ```
 
 - [ ] **Step 8: Review + merge**
@@ -624,9 +624,9 @@ git commit -m "refactor(deploy): update LobeHub patches to semantic layer names 
 ### Breaking Changes
 - `lca.infrastructure` → `lca.infrastructure`
 - `lca.cognition` → `lca.cognition`
-- `lca.layer2_runtime` → `lca.runtime`
-- `lca.layer3_agent` → `lca.agent`
-- `lca.layer4_app` → `lca.application`
+- `lca.runtime` → `lca.runtime`
+- `lca.agent` → `lca.agent`
+- `lca.application` → `lca.application`
 
 ### Migration
 - 迁移脚本：`scripts/migrate_layer_rename.py`

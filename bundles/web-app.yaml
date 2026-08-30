@@ -202,7 +202,7 @@ entries:
   # profiles, which must not accidentally promise a Session Spine they cannot run.
   - id: lca-session-live-builder-provider
     name: lca_providers_session_live_builder
-    $module: lca.layer4_app.session_live_builder_provider
+    $module: lca.application.session_live_builder_provider
     config: {}
 
   # ── Plan-driven composers (one entry per capability plane) ─────────

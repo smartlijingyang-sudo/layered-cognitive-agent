@@ -62,11 +62,11 @@ git rm tests/layer2_runtime/test_control_policies.py
 **Remove Imports (L48-58):**
 ```python
 # DELETE these lines:
-from lca.layer2_runtime.control_policies import (
+from lca.runtime.control_policies import (
     ControlPolicyContext,
     DefaultControlPolicyEngine,
 )
-from lca.layer2_runtime.control_runtime import (
+from lca.runtime.control_runtime import (
     ControlEvaluation,
     ControlSelection,
     ControlVerdictKind,

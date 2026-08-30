@@ -117,7 +117,7 @@ def set_llm_resolver(resolver: Any) -> None:
     # Push the override onto the cached default ctx so ``ctx.inject``
     # returns the new adapter. Tests rely on this shim.
     try:
-        from lca.layer4_app.api import _default_ctx_holder
+        from lca.application.api import _default_ctx_holder
 
         cached = _default_ctx_holder.ctx
     except Exception:
@@ -214,7 +214,7 @@ def create_hub_for_session(
     if session.hub is not None:
         return session.hub
     if ctx is None:
-        from lca.layer4_app.api import get_or_create_default_ctx
+        from lca.application.api import get_or_create_default_ctx
 
         ctx = get_or_create_default_ctx()
     hub = assemble_run_hub(
@@ -251,7 +251,7 @@ def create_run_session(
     caller pattern; main's factories require ctx to be explicit).
     """
     if ctx is None:
-        from lca.layer4_app.api import get_or_create_default_ctx
+        from lca.application.api import get_or_create_default_ctx
 
         ctx = get_or_create_default_ctx()
 
@@ -319,7 +319,7 @@ async def execute_run(
     if session is None:
         return
     if ctx is None:
-        from lca.layer4_app.api import get_or_create_default_ctx
+        from lca.application.api import get_or_create_default_ctx
 
         ctx = get_or_create_default_ctx()
     # Test shim: ``set_llm_resolver`` pushes onto ctx when no resolver yet.

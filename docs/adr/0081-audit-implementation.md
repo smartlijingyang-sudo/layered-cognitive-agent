@@ -75,7 +75,7 @@ Task 5-8 完成了 ADR-0075 的最后实施阶段：
 **Task 8: ADR 文档更新和架构门禁**
 - Step 1: 新增 `test_production_sources_do_not_reference_removed_runtime_modules()`
   - 验证生产代码不导入已删除的 legacy modules
-  - 检查 `lca.layer2_runtime.control_policies` 和 `lca.harness.command.dual_write`
+  - 检查 `lca.runtime.control_policies` 和 `lca.harness.command.dual_write`
 - Step 3: 更新 ADR-0075 状态为 Accepted
 - 运行 `uv run pytest` 验证所有测试通过
 

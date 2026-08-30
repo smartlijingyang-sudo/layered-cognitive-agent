@@ -18,7 +18,7 @@ from lca.contracts.models.core.terminal_outcome import (
     TextRef,
 )
 from lca.contracts.protocols.declarative_common import DeclarativeValidationError
-from lca.layer2_runtime.reducer import DefaultReducer
+from lca.runtime.reducer import DefaultReducer
 from lca.plugins.state.stop_policy import DefaultStopPolicy
 
 

@@ -8,7 +8,7 @@ from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
 from lca.contracts.models.team.graph import ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.protocols import GraphNodeExecutionContext, GraphNodeExecutor
-from lca.layer3_agent.orchestration_strategies import GraphStrategy
+from lca.agent.orchestration_strategies import GraphStrategy
 from lca.plugins.graph_nodes.aggregator import AggregatorGraphNodeExecutor
 from lca.plugins.graph_nodes.registry import GraphNodeExecutorRegistry
 from lca.plugins.graph_nodes.topology import TopologyGraphNodeExecutor

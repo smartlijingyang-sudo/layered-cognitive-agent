@@ -35,9 +35,9 @@ from lca.contracts.protocols.runtime_lifecycle import RuntimeLifecyclePublisher
 from lca.harness.declarative import GenericPlanInterpreter
 from lca.harness.declarative.dispatch import RegistryDeltaReducer, RegistryEffectGateway
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer2_runtime.checkpoint_resolution import DeclarativeCheckpointStateResolver
-from lca.layer2_runtime.result_finalizer import RuntimeResultFinalizer
-from lca.layer2_runtime.runtime_journal import RuntimeJournalCommitter
+from lca.runtime.checkpoint_resolution import DeclarativeCheckpointStateResolver
+from lca.runtime.result_finalizer import RuntimeResultFinalizer
+from lca.runtime.runtime_journal import RuntimeJournalCommitter
 
 
 class Config(BaseModel):

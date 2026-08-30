@@ -20,7 +20,7 @@ lca.harness.sdk: 外部 SDK 接入。本 README 由脚手架生成，待包负�
 lca.contracts,lca.harness
 
 ## 6. 禁止依赖
-lca.cognition,lca.layer2_runtime,lca.layer3_agent,lca.layer4_app
+lca.cognition,lca.runtime,lca.agent,lca.application
 
 ## 7. 副作用
 log:emit

@@ -29,8 +29,8 @@ from lca.infrastructure.observability import (
     record,
     run_scope,
 )
-from lca.layer4_app.api import Team
-from lca.layer4_app.casting import build_from_casting_plan
+from lca.application.api import Team
+from lca.application.casting import build_from_casting_plan
 from lca.plugins.seam_definitions.run_mode_registry import RunModeRegistry
 
 if TYPE_CHECKING:

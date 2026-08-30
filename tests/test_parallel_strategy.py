@@ -15,7 +15,7 @@ from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
 from lca.contracts.models.team.team_coordination import FanOut
 from lca.contracts.protocols import TeamAssembly
-from lca.layer3_agent.orchestration_strategies import (
+from lca.agent.orchestration_strategies import (
     ParallelStrategy,
 )
 from tests.support.strategy_registry import build_strategy_registry

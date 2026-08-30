@@ -23,7 +23,7 @@ from lca.contracts.models.team.team_coordination import (
 )
 from lca.contracts.protocols import LLMAdapter, ObservabilityBackend, Tool
 from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
-from lca.layer4_app.api import Agent, Team, TeamLead
+from lca.application.api import Agent, Team, TeamLead
 
 _TOOL_BUILDERS: dict[str, object] = {
     "calculator": build_calculator_tools,

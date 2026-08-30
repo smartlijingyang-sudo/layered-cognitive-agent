@@ -26,12 +26,12 @@ def _infer_layer(emitter: str) -> str:
         return "L0"
     if emitter.startswith("lca.cognition."):
         return "L1"
-    if emitter.startswith("lca.layer2_runtime."):
+    if emitter.startswith("lca.runtime."):
         return "L2"
-    if emitter.startswith("lca.layer3_agent."):
+    if emitter.startswith("lca.agent."):
         return "L3"
     if (
-        emitter.startswith("lca.layer4_app.")
+        emitter.startswith("lca.application.")
         or emitter.startswith("lca.harness.")
         or emitter.startswith("lca.plugins.")
     ):

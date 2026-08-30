@@ -16,7 +16,7 @@ from lca.contracts.models.team.team_coordination import (
     Pipeline,
 )
 from lca.contracts.protocols import LLMAdapter
-from lca.layer4_app.api import Agent, Team, TeamLead
+from lca.application.api import Agent, Team, TeamLead
 from tests.harness.collector import InMemoryObservability, TraceBundle
 from tests.harness.scripted_llm import ScriptedLLMAdapter, multi_delegate, respond
 from tests.support.scenario_loader import build_agent, load_scenario

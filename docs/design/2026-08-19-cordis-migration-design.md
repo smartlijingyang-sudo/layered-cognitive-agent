@@ -47,7 +47,7 @@ Tier-3 Behavior    (13)  — Brain / Loop / Guard / Bridge / TeamLead
 cordis Context → L4 组合根只 ctx.<typed-property>
 ```
 
-**L4 组合根 = `ctx.<typed-property>` 唯一合法组装路径**。任何 `from X import Y; Y(...)` 直接构造都视为违规。`lca.layer4_app.capability_boot.py` 全删。
+**L4 组合根 = `ctx.<typed-property>` 唯一合法组装路径**。任何 `from X import Y; Y(...)` 直接构造都视为违规。`lca.application.capability_boot.py` 全删。
 
 **实际 service 文件状态**：
 - `LlmService` **保持不继承 `cordis.Service`**——它是 `LLMAdapter` 实现，不会随 ctx dispose 消失。Plugin 提供 `LlmService()` 实例并 `ctx.provide("llm", ...)`，由 Service Definition 自身管理生命周期。
@@ -265,9 +265,9 @@ async def setup(ctx, config):
 
 | 位置 | 允许 import | 禁止 import |
 |---|---|---|
-| `lca/plugins/foo.py` 模块顶层 | `cordis.*` / `lca.contracts.*` | `lca.infrastructure.*` / `lca.cognition.*` / `lca.layer2_runtime.*` / `lca.layer3_agent.*` / `lca.layer4_app.*` |
+| `lca/plugins/foo.py` 模块顶层 | `cordis.*` / `lca.contracts.*` | `lca.infrastructure.*` / `lca.cognition.*` / `lca.runtime.*` / `lca.agent.*` / `lca.application.*` |
 | `@plugin` setup 函数体内部 | 任意（延迟到 load 时） | — |
-| `lca/plugins/guards/*.py` 顶层 | `cordis.*` / `lca.contracts.*` / `lca.layer2_runtime.loop_intervention_mw` / `lca.layer2_runtime.budget_policy` | 同上 + 跨 plugin 互引（避免循环） |
+| `lca/plugins/guards/*.py` 顶层 | `cordis.*` / `lca.contracts.*` / `lca.runtime.loop_intervention_mw` / `lca.runtime.budget_policy` | 同上 + 跨 plugin 互引（避免循环） |
 
 **enforcement**：`importlinter` 规则加：
 ```ini
@@ -277,9 +277,9 @@ source_modules = lca.plugins
 forbidden_modules =
     lca.infrastructure
     lca.cognition
-    lca.layer2_runtime
-    lca.layer3_agent
-    lca.layer4_app
+    lca.runtime
+    lca.agent
+    lca.application
 ```
 
 **P5 必跑**：`uv run lint-imports` → 比对 plugin top-level imports。
@@ -626,7 +626,7 @@ from .peer_swarm import PeerSwarm
 # lca/plugins/team_lead/board.py  (Tier-3)
 @plugin(name="lca-team-lead-board", inject=["team_strategy_factory"])
 async def setup(ctx, config):
-    from lca.layer3_agent.team.lead.board import BoardLead
+    from lca.agent.team.lead.board import BoardLead
     ctx.inject("team_strategy_factory").register("board", BoardLead)
 ```
 
@@ -1266,7 +1266,7 @@ P4 / P6 必跑：
 - `rg "ctx\.llm\." lca/layer4_app/` 找到至少 5 处 typed property 使用（验证精修项 2）
 - `rg "@plugin" lca/plugins/ | wc -l` = 38（精确 plugin 数）
 - `uv run lint-imports` plugin top-level 0 违规（精修项 4）
-- `rg "from lca.infrastructure\|from lca.cognition\|from lca.layer2_runtime\|from lca.layer3_agent\|from lca.layer4_app" lca/plugins/*/` 仅命中 plugin setup 函数体内部（非模块顶层）
+- `rg "from lca.infrastructure\|from lca.cognition\|from lca.runtime\|from lca.agent\|from lca.application" lca/plugins/*/` 仅命中 plugin setup 函数体内部（非模块顶层）
 
 **功能验收**：
 

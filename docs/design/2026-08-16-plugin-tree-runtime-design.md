@@ -1303,7 +1303,7 @@ MyPlugin(BasePlugin)
 
 组合算法与 DSH `composeEntries` 相同：从空列表开始，按 profile 声明的 bundle 顺序把每个 bundle 的 `insert` 追加进去，再应用 profile 自己的 `patch`（按 `id` **整行替换** `config`，或 `insert` 新行，或 `disabled: true`）。不深合并。
 
-`lca-ops dump-profile`（或 `python -m lca.layer4_app.profile dump lobehub-run`）打印展开后的行列表，每行标注来自哪个 bundle。输出必须与 `boot()` 实际加载的集合一致。
+`lca-ops dump-profile`（或 `python -m lca.application.profile dump lobehub-run`）打印展开后的行列表，每行标注来自哪个 bundle。输出必须与 `boot()` 实际加载的集合一致。
 
 ### 6.2 条目
 
@@ -1384,13 +1384,13 @@ MyPlugin(BasePlugin)
 | event-bus | `lca.cognition.plugins.event_bus` | `events` | — | `SimpleEventBus`（进程一个总线；Run 不 fork） |
 | hooks | `lca.cognition.plugins.hooks` | `hooks` | `events`, `observability` | Hook **工厂**（`create() -> HookRegistry`），不是一棵全局 hook 树给所有 Agent 共用可变状态 |
 | system-prompt | `lca.cognition.plugins.system_prompt` | `system_prompt` | `tools` | 组装 **函数/服务**（`render(profile, tools, plane) -> str`），不是一份全局字符串 |
-| agent | `lca.layer3_agent.plugins.agent` | `agents` | `llm`, `memory`, `state_store`, `hooks`, `observability`, `tools`, `transport`, `system_prompt` | Agent 注册表 + `create(spec, run_ctx)`。**内部**用 L1 `SimpleBrainFactory` / `SimpleBody` 和 L2 `CognitiveRuntime` 接线。`ComponentRegistry`（gates、budget）作为该插件的**私有**表，不另开 ctx 键 |
-| loop-cognitive | `lca.layer2_runtime.plugins.cognitive_loop` | — | — | 只把 `CognitiveRuntime` **类/工厂**登记到 L2 可被 L3 import 的既有模块（今天就是 `runtime_loop.py`）。它**不** `provides agent_loop`，也**不** `set_factory` |
+| agent | `lca.agent.plugins.agent` | `agents` | `llm`, `memory`, `state_store`, `hooks`, `observability`, `tools`, `transport`, `system_prompt` | Agent 注册表 + `create(spec, run_ctx)`。**内部**用 L1 `SimpleBrainFactory` / `SimpleBody` 和 L2 `CognitiveRuntime` 接线。`ComponentRegistry`（gates、budget）作为该插件的**私有**表，不另开 ctx 键 |
+| loop-cognitive | `lca.runtime.plugins.cognitive_loop` | — | — | 只把 `CognitiveRuntime` **类/工厂**登记到 L2 可被 L3 import 的既有模块（今天就是 `runtime_loop.py`）。它**不** `provides agent_loop`，也**不** `set_factory` |
 | loop-dsh | `lca.infrastructure.plugins.dsh_loop` | — | — | 登记 `DshTurnDriver`。默认 `disabled: true`；请求 `execution_target=dsh` 时由 `run-execute` 选用 |
-| agent-loop | `lca.layer3_agent.plugins.agent_loop` | `agent_loop` | `agents` | **L3** 服务：`select(execution_target) -> LoopDriver`。内置 `cognitive`；`dsh` 仅当 `loop-dsh` 已 apply。一次 Run 问一次，**不是**改 profile 行换掉全进程 |
-| team | `lca.layer3_agent.plugins.team` | `teams` | `agents`, `transport` | 今天 `TeamComposer` + orchestration 私有注册表（pipeline/fan-out/lead/…） |
-| role-library | `lca.layer3_agent.plugins.role_library` | `roles` | — | `FileRoleLibrary` |
-| team-caster | `lca.layer4_app.plugins.team_caster` | — | `teams`, `roles`, `llm` | `LLMTeamCaster` |
+| agent-loop | `lca.agent.plugins.agent_loop` | `agent_loop` | `agents` | **L3** 服务：`select(execution_target) -> LoopDriver`。内置 `cognitive`；`dsh` 仅当 `loop-dsh` 已 apply。一次 Run 问一次，**不是**改 profile 行换掉全进程 |
+| team | `lca.agent.plugins.team` | `teams` | `agents`, `transport` | 今天 `TeamComposer` + orchestration 私有注册表（pipeline/fan-out/lead/…） |
+| role-library | `lca.agent.plugins.role_library` | `roles` | — | `FileRoleLibrary` |
+| team-caster | `lca.application.plugins.team_caster` | — | `teams`, `roles`, `llm` | `LLMTeamCaster` |
 
 `brain` / `body` **不是**进程级 `provides` 键。它们是每个 `agents.create` 闭包里 new 出来的实例。`loop-cognitive` 与 `loop-dsh` 可以同时加载；选谁是请求级的 `agent_loop.select`，禁止用 profile overlay 换掉全 Gateway 的 loop（否则同进程不能一个 chip 走认知、一个 chip 走 DSH）。
 

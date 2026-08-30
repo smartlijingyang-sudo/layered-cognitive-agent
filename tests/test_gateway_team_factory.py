@@ -15,9 +15,9 @@ from gateway.plugins.solo_mode import filter_solo_tools
 from lca.contracts.capabilities import TEAM_CASTER, TEAM_ROLE_LIBRARY
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.models.core.llm import LLMResponse
-from lca.layer3_agent.role_library import FileRoleLibrary
-from lca.layer4_app.api import Agent, Team
-from lca.layer4_app.casting import LLMTeamCaster
+from lca.agent.role_library import FileRoleLibrary
+from lca.application.api import Agent, Team
+from lca.application.casting import LLMTeamCaster
 from lca.plugins.seam_definitions.team_casting_prompt_renderer import BuiltinCastingPromptRenderer
 from tests.harness.collector import InMemoryObservability
 from tests.harness.scripted_llm import ScriptedLLMAdapter

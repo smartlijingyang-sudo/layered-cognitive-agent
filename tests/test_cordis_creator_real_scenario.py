@@ -52,7 +52,7 @@ from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, NativeToo
 from lca.contracts.protocols import LLMAdapter
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
 from lca.infrastructure.observability.journal_backend import MemoryJournal
-from lca.layer4_app.preset_authoring import PresetAuthoring
+from lca.application.preset_authoring import PresetAuthoring
 from lca.plugins.providers.composition_composer import (
     CordisComposer,
     build_default_invariant_checker,
@@ -551,7 +551,7 @@ class TestCreatorRealScenario:
 
             # 直接构造 CognitiveAgent：role=cordis-creator，goal/backstory 与
             # build_cordis_creator_role_profile() 对齐
-            from lca.layer4_app.api import Agent
+            from lca.application.api import Agent
 
             role_profile = build_cordis_creator_role_profile()
             # 把 csv_stats 通过 on_mounted 注册到 tool_registry；agent 的
@@ -699,7 +699,7 @@ class TestCreatorRealScenario:
                 "csv_stats 是 preset 挂入 ctx 的 instance 后再 wrap 进 tool_registry"
             )
 
-            from lca.layer4_app.api import Agent
+            from lca.application.api import Agent
 
             agent = Agent(
                 role="cordis-creator",

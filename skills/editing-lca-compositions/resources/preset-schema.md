@@ -51,7 +51,7 @@ on the next release `cordis_control.promote`.
 ## Reading path on disk
 
 ```python
-from lca.layer4_app.preset_authoring import PresetAuthoring
+from lca.application.preset_authoring import PresetAuthoring
 
 layout = PresetAuthoring.publish(
     preset_id="my-preset",

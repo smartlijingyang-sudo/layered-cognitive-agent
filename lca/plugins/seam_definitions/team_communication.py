@@ -38,7 +38,7 @@ class DefaultTeamCommunicationAssembler(TeamCommunicationAssemblerProtocol):
         """Close the default communication pair after all members exist."""
 
         del spec
-        from lca.layer3_agent.member_invoke import TransportMemberInvoker
+        from lca.agent.member_invoke import TransportMemberInvoker
         from lca.plugins.composer.team_transport import build_team_transport
 
         transport = build_team_transport(members)
