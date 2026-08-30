@@ -193,7 +193,7 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
         ctx,
         profile=profile_path,
         bundles=bundle_paths,
-        entries=getattr(ctx, "entries", None),
+        # ADR-0015: ctx.entries is not a seam; build_report derives entries from ctx.plugin inventory.
         elapsed_ms=elapsed_ms,
     )
     text = report.format()

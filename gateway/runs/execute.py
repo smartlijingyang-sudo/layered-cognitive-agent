@@ -276,7 +276,7 @@ def create_run_session(
 
 def _emit_plugin_inventory(session: RunSession, ctx: Any, hub: BoundObservability) -> None:
     """记录本 run 使用的插件声明摘要，不暴露配置值或密钥。"""
-    entries = tuple(getattr(ctx, "entries", ()) or ())
+    # ADR-0015: ctx.entries removed; plugin inventory via plugin_meta_default
     plugins = [
         "|".join(
             (
