@@ -95,6 +95,7 @@ from lca.layer0_infra.observability.event_descriptor_registry import (
 from lca.layer0_infra.observability.event_descriptors_data import build_default_registry
 from lca.layer0_infra.observability.facade import (
     BoundObservability,
+    EvidenceBinding,
     OperationRecorder,
     RunContext,
     SpanContextInfo,
