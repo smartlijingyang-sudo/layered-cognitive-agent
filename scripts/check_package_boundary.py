@@ -3,7 +3,7 @@ from zipfile import ZipFile
 
 
 def main() -> None:
-    wheel = next(Path("/tmp/lca-dist").glob("*.whl"))
+    wheel = next(Path("/tmp/lca-dist").glob("*.whl"))  # noqa: S108
     with ZipFile(wheel) as archive:
         names = archive.namelist()
         print(f"wheel={wheel.name}")

@@ -513,7 +513,9 @@ def test_tool_nesting_indentation() -> None:
     projector = FactStreamProjector(stream=buf)
     projector.on_event(_stamped(1, DecisionMade(step=1, action_type="use_tool", tool_name="bash")))
     projector.on_event(_stamped(2, ToolStarted(tool_name="bash", invocation_id="i")))
-    projector.on_event(_stamped(3, ToolInvoked(tool_name="bash", invocation_id="i", ok=True, latency_ms=100)))
+    projector.on_event(
+        _stamped(3, ToolInvoked(tool_name="bash", invocation_id="i", ok=True, latency_ms=100))
+    )
     output = buf.getvalue()
     lines = output.split("\n")
     # Decision is at "  │" level (2 spaces + │)

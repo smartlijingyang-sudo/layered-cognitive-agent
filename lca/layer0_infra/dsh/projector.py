@@ -189,7 +189,9 @@ class DshJournalProjector:
             failure = reason.get("error") or reason.get("failure")
             if isinstance(failure, dict):
                 error = str(failure.get("message") or "")
-        self._turn_status = TaskStatus.COMPLETED if kind == TaskStatus.COMPLETED else TaskStatus.FAILED
+        self._turn_status = (
+            TaskStatus.COMPLETED if kind == TaskStatus.COMPLETED else TaskStatus.FAILED
+        )
         self._turn_error = error
 
 

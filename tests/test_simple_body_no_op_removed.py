@@ -22,12 +22,12 @@ from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.semantic_keys import OBS_DEGRADED_FROM
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
-from lca.layer1_cognitive.body.simple_body import SimpleBody
-from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
-from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.contracts.models.team.role_team import ToolPermissionManifest
+from lca.layer0_infra.transport.transport_registry import TransportRegistry
+from lca.layer1_cognitive.body.action_registry import ActionRegistry
+from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
+from lca.layer1_cognitive.body.simple_body import SimpleBody
+from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 
 
 def _state() -> AgentState:
@@ -70,10 +70,10 @@ class TestSimpleBodySurface:
 
         class _RespondHandler:
             async def execute(self, _decision: Decision, _state: AgentState):
-                from lca.contracts.models.core.decision import Observation
+                from lca.contracts.atoms.enums import MemoryRecordKind
                 from lca.contracts.atoms.ids import new_id
                 from lca.contracts.atoms.semantic_keys import OBS_RESULT_KIND
-                from lca.contracts.atoms.enums import MemoryRecordKind
+                from lca.contracts.models.core.decision import Observation
 
                 return Observation(
                     observation_id=new_id("obs"),
@@ -90,10 +90,10 @@ class TestSimpleBodySurface:
 
 class TestPropagateDegradationContract:
     def test_propagation_skipped_when_no_degradation(self) -> None:
-        from lca.contracts.models.core.decision import Observation
+        from lca.contracts.atoms.enums import MemoryRecordKind
         from lca.contracts.atoms.ids import new_id
         from lca.contracts.atoms.semantic_keys import OBS_RESULT_KIND
-        from lca.contracts.atoms.enums import MemoryRecordKind
+        from lca.contracts.models.core.decision import Observation
 
         decision = Decision(
             decision_id="d",

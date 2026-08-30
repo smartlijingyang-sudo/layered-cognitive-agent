@@ -22,8 +22,18 @@ import re
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
-_PROJECTION = _ROOT / "deploy" / "lobehub" / "patches" / "runtime" / "lcaToolRender" / "projection.ts"
-_CONTRACTS = _ROOT / "deploy" / "lobehub" / "patches" / "runtime" / "lcaToolRender" / "contracts.generated.ts"
+_PROJECTION = (
+    _ROOT / "deploy" / "lobehub" / "patches" / "runtime" / "lcaToolRender" / "projection.ts"
+)
+_CONTRACTS = (
+    _ROOT
+    / "deploy"
+    / "lobehub"
+    / "patches"
+    / "runtime"
+    / "lcaToolRender"
+    / "contracts.generated.ts"
+)
 
 
 def _read(path: Path) -> str:
@@ -33,9 +43,7 @@ def _read(path: Path) -> str:
 def test_contracts_table_generated_and_present() -> None:
     """``CONTRACTS`` table exists and is wired through the projection module."""
     contracts = _read(_CONTRACTS)
-    assert "export const CONTRACTS" in contracts, (
-        "contracts.generated.ts must export CONTRACTS"
-    )
+    assert "export const CONTRACTS" in contracts, "contracts.generated.ts must export CONTRACTS"
     # Spot-check that skill tools are present
     for tool in ("activate_skill", "read_skill_reference", "runCommand", "executeCode"):
         assert f'"{tool}"' in contracts, f"CONTRACTS missing {tool}"
@@ -52,10 +60,16 @@ def test_projection_applies_wire_key_renames() -> None:
     """Skill tools' ``skill_id`` Python key is mapped to wire_key ``name``."""
     contracts = _read(_CONTRACTS)
     # activate_skill: skill_id → name
-    m = re.search(r'"activate_skill":\s*\{[^}]*args:\s*\[\s*\{\s*pythonKey:\s*"skill_id",\s*wireKey:\s*"name"', contracts)
+    m = re.search(
+        r'"activate_skill":\s*\{[^}]*args:\s*\[\s*\{\s*pythonKey:\s*"skill_id",\s*wireKey:\s*"name"',
+        contracts,
+    )
     assert m is not None, "activate_skill must rename skill_id → name"
     # read_skill_reference: skill_id → id
-    m = re.search(r'"read_skill_reference":\s*\{[^}]*args:\s*\[\s*\{\s*pythonKey:\s*"skill_id",\s*wireKey:\s*"id"', contracts)
+    m = re.search(
+        r'"read_skill_reference":\s*\{[^}]*args:\s*\[\s*\{\s*pythonKey:\s*"skill_id",\s*wireKey:\s*"id"',
+        contracts,
+    )
     assert m is not None, "read_skill_reference must rename skill_id → id"
 
 

@@ -328,6 +328,7 @@ COMPOSITION_COMPOSE_FACTORY = Capability[object](
 # this index updates without a second maintenance step. ``cap_key`` callers
 # can keep using string or Capability interchangeably.
 
+
 def _build_capability_index() -> Mapping[str, Capability[object]]:
     seen: dict[str, Capability[object]] = {}
     for value in _MODULE_GLOBALS.values():
@@ -335,8 +336,7 @@ def _build_capability_index() -> Mapping[str, Capability[object]]:
             existing = seen.get(value.key)
             if existing is not None and existing is not value:
                 raise RuntimeError(
-                    f"duplicate capability key {value.key!r} in "
-                    f"lca.contracts.capabilities"
+                    f"duplicate capability key {value.key!r} in lca.contracts.capabilities"
                 )
             seen[value.key] = value
     return seen

@@ -47,13 +47,11 @@ def test_codegen_output_is_well_formed_typescript() -> None:
     assert ts.count("{") == ts.count("}")
 
 
-@pytest.mark.parametrize("tool_name,identifier,api_name", [
-    (name, c.identifier, c.api_name)
-    for name, c in sorted(REGISTRY.items())
-])
-def test_every_contract_has_a_renderer_file(
-    tool_name: str, identifier: str, api_name: str
-) -> None:
+@pytest.mark.parametrize(
+    "tool_name,identifier,api_name",
+    [(name, c.identifier, c.api_name) for name, c in sorted(REGISTRY.items())],
+)
+def test_every_contract_has_a_renderer_file(tool_name: str, identifier: str, api_name: str) -> None:
     """Each contract must have a renderer .tsx file in the expected path.
 
     Some tool renames point to non-default apiNames (e.g. import_skill →

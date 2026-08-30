@@ -87,6 +87,7 @@ def _normalize_guest_state(state: dict[str, Any], *, tool_name: str = "") -> dic
         state.pop("output", None)
     return state
 
+
 _log = structlog.get_logger(__name__)
 
 

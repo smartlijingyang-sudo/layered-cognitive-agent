@@ -6,7 +6,6 @@ generated from the Python REGISTRY (lca/layer0_infra/tools/contract/codegen_ts.p
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 from lca.layer0_infra.tools.contract import REGISTRY, get_contract, render_registry_to_ts
@@ -37,9 +36,7 @@ def test_registry_has_only_expected_categories() -> None:
 
 def test_frontend_consumes_codegen_output() -> None:
     """contracts.generated.ts is produced by codegen from REGISTRY."""
-    contracts_path = (
-        Path("deploy/lobehub/patches/runtime/lcaToolRender/contracts.generated.ts")
-    )
+    contracts_path = Path("deploy/lobehub/patches/runtime/lcaToolRender/contracts.generated.ts")
     assert contracts_path.is_file(), "contracts.generated.ts missing"
     body = contracts_path.read_text(encoding="utf-8")
     # Sanity: codegen output mentions a known contract key

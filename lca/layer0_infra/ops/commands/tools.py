@@ -282,11 +282,7 @@ def register(app: typer.Typer) -> None:
             # ADR-0101 PR-2:tool 事件带 arguments_ref (ToolStarted) /
             # output_ref (ToolInvoked);state_ref 字段已废弃但保留兼容读。
             data = payload.get("data", {})
-            sr_raw = (
-                data.get("arguments_ref")
-                or data.get("output_ref")
-                or data.get("state_ref")
-            )
+            sr_raw = data.get("arguments_ref") or data.get("output_ref") or data.get("state_ref")
             if not isinstance(sr_raw, dict):
                 continue
             if str(sr_raw.get("digest", "")).lower() != digest_only:

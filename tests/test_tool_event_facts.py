@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+from typing import ClassVar
 
 import pytest
 
@@ -68,9 +69,7 @@ def test_v1_no_typed_or_preview_fields() -> None:
     for cls in (ToolCallStreaming, ToolStarted, ToolInvoked):
         present = _journal_event_field_names(cls)
         for forbidden in _V1_FORBIDDEN_FIELDS:
-            assert forbidden not in present, (
-                f"{cls.__name__} 不应保留 view-only 字段 {forbidden!r}"
-            )
+            assert forbidden not in present, f"{cls.__name__} 不应保留 view-only 字段 {forbidden!r}"
 
 
 def test_v1_dataclass_field_count() -> None:
@@ -80,7 +79,13 @@ def test_v1_dataclass_field_count() -> None:
     (renderer-facing projection) to ToolInvoked.
     """
     started_fields = _journal_event_field_names(ToolStarted)
-    assert started_fields == {"tool_name", "invocation_id", "arguments", "arguments_ref", "idempotency_key"}
+    assert started_fields == {
+        "tool_name",
+        "invocation_id",
+        "arguments",
+        "arguments_ref",
+        "idempotency_key",
+    }
     invoked_fields = _journal_event_field_names(ToolInvoked)
     expected_invoked = {
         "tool_name",
@@ -207,10 +212,10 @@ def test_v4_arguments_or_ref_always_set_after_emit() -> None:
         name = "demo"
 
     class _Obs:
-        success = True
-        payload = {"text": "ok"}
-        error = ""
-        extra: dict[str, object] = {}
+        success: ClassVar[bool] = True
+        payload: ClassVar[dict[str, str]] = {"text": "ok"}
+        error: ClassVar[str] = ""
+        extra: ClassVar[dict[str, object]] = {}
 
     # emit_tool_started: 无 evidence_store → inline 退路,arguments 非空
     ref = emit_tool_started(_MockTool(), {"path": "/x"}, "inv1")

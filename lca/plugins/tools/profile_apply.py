@@ -93,7 +93,10 @@ MANIFEST = ToolManifest(
             parameters={
                 "type": "object",
                 "properties": {
-                    "candidate": {"type": "object", "description": "Versioned profile candidate metadata"},
+                    "candidate": {
+                        "type": "object",
+                        "description": "Versioned profile candidate metadata",
+                    },
                     "dry_run": {
                         "type": "boolean",
                         "description": "Must remain true; this tool never applies production changes",

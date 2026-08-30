@@ -193,8 +193,8 @@ class CognitiveLiveAgent:
 
     async def _record_result(self, message_id: str, result: object) -> MessageReceipt:
         status = getattr(result, "status", None)
-        output = getattr(result, "output", None)
-        error = getattr(result, "error", None)
+
+
         live_status = status_from_task(status)
         pending = (
             resume_point_from_result(result)

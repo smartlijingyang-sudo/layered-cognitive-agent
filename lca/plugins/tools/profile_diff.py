@@ -87,8 +87,14 @@ MANIFEST = ToolManifest(
             parameters={
                 "type": "object",
                 "properties": {
-                    "baseline": {"type": "object", "description": "Current declarative profile payload"},
-                    "candidate": {"type": "object", "description": "Proposed declarative profile payload"},
+                    "baseline": {
+                        "type": "object",
+                        "description": "Current declarative profile payload",
+                    },
+                    "candidate": {
+                        "type": "object",
+                        "description": "Proposed declarative profile payload",
+                    },
                 },
                 "required": ["baseline", "candidate"],
             },

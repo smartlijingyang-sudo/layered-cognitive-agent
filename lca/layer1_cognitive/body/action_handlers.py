@@ -223,9 +223,7 @@ class DelegateOperation(Action):
         )
         return self._aggregate_observations(specs, list(observations))
 
-    async def _resolve_observation(
-        self, spec: DelegationSpec, state: AgentState
-    ) -> Observation:
+    async def _resolve_observation(self, spec: DelegationSpec, state: AgentState) -> Observation:
         """Cache → invoke → record seam shared by single and multi paths.
 
         Single-target delegation reuses this directly; multi-target fans the
