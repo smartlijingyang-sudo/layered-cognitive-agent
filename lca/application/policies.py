@@ -10,7 +10,7 @@ from lca.contracts.models.core.budget import (
     LEAD_MIN_MAX_STEPS,
     BudgetLimits,
 )
-from lca.contracts.protocols import BudgetAware, BudgetPolicy
+from lca.contracts.protocols import BudgetPolicy
 
 LEAD_BUDGET_POLICY_KEY = "lead"
 """lead 预算策略在 ComponentRegistry(BUDGET_POLICY) 下的注册名。"""
@@ -19,10 +19,15 @@ LEAD_BUDGET_POLICY_KEY = "lead"
 class LeadBudgetPolicy(BudgetPolicy):
     """Lead budget floors — ensures team lead has adequate headroom."""
 
-    def resolve(self, agent: BudgetAware) -> BudgetLimits:
+    def resolve(
+        self,
+        *,
+        max_steps: int,
+        max_wall_clock_seconds: int | None,
+        role: str,
+    ) -> BudgetLimits:
+        del role  # currently unused: floor logic is role-agnostic.
         return BudgetLimits(
-            max_steps=max(agent.max_steps, LEAD_MIN_MAX_STEPS),
-            max_wall_clock_seconds=max(
-                agent.max_wall_clock_seconds or 0, DEFAULT_MAX_WALL_CLOCK_SECONDS
-            ),
+            max_steps=max(max_steps, LEAD_MIN_MAX_STEPS),
+            max_wall_clock_seconds=max(max_wall_clock_seconds or 0, DEFAULT_MAX_WALL_CLOCK_SECONDS),
         )

@@ -64,12 +64,7 @@ from lca.contracts.protocols.act.tool_pipeline import (
 )
 
 # ── L3 Agent / Team 入口 ──────────────────────────────────
-from lca.contracts.protocols.collaboration.agent import (
-    AgentUnit,
-    BudgetAware,
-    BudgetPolicy,
-    TeamUnit,
-)
+from lca.contracts.protocols.collaboration.agent import AgentUnit
 
 # ── 自动组队（角色库与选角契约，ADR-0042）────────
 from lca.contracts.protocols.collaboration.casting import RoleLibrary, TeamCaster
@@ -89,6 +84,7 @@ from lca.contracts.protocols.collaboration.orchestration import (
     TeamStrategy,
 )
 from lca.contracts.protocols.collaboration.team_seam import TeamSeamFactoryProtocol
+from lca.contracts.protocols.collaboration.team_unit import TeamUnit
 
 # ── LogicAddress 6 维（ADR-0069 §二 + ADR-0074 V9）────────────────
 from lca.contracts.protocols.composition.logic_address import (
@@ -141,6 +137,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ControlEntry as DeclarativeControlEntry,
 )
+from lca.contracts.protocols.gate.budget_policy import BudgetPolicy
 
 # ── 控制面单一入口（ADR-0066 + tracker §19）─────────────────────
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
@@ -298,6 +295,10 @@ from lca.contracts.protocols.think.cognitive_pipeline import (
 )
 
 __all__ = [
+    "COMPILED_RUN_PLAN_VERSION",
+    "DECLARATIVE_PLAN_VERSION",
+    "PLUGIN_SPEC_VERSION",
+    "SANDBOX_SKILL_MOUNT_PREFIX",
     "ActionAuthorityPlan",
     "ActionHandler",
     "ActionHandlerRegistry",
@@ -313,11 +314,9 @@ __all__ = [
     "BrainFactory",
     "BrainPromptCatalog",
     "BrainPromptCatalogFactory",
-    "BudgetAware",
     "BudgetCeiling",
     "BudgetPolicy",
     "BudgetReservation",
-    "COMPILED_RUN_PLAN_VERSION",
     "CapabilityBinding",
     "CapabilityDeclaration",
     "CapabilityGrant",
@@ -334,7 +333,6 @@ __all__ = [
     "ControlVerdict",
     "ControlVerdictKind",
     "Critic",
-    "DECLARATIVE_PLAN_VERSION",
     "DecisionGate",
     "DecisionGateAssembler",
     "DecisionRef",
@@ -376,7 +374,6 @@ __all__ = [
     "NamedRegistryProtocol",
     "ObservabilityBackend",
     "OrchestrationRegistryProtocol",
-    "PLUGIN_SPEC_VERSION",
     "PerceiveHub",
     "PerceiveHubAssembler",
     "PhaseBinding",
@@ -422,7 +419,6 @@ __all__ = [
     "RuntimeLifecycleSubscriber",
     "RuntimeLifecycleSubscriberContribution",
     "RuntimeLifecycleSubscriberRegistry",
-    "SANDBOX_SKILL_MOUNT_PREFIX",
     "SafeExecutor",
     "Sandbox",
     "SandboxRuntime",

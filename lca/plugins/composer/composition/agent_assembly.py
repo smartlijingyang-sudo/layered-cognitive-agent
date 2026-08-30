@@ -129,7 +129,11 @@ class PlanBoundAgentAssembler(AgentAssemblyPort):
 def promote_lead(lead: CognitiveAgent, policy: BudgetPolicy) -> CognitiveAgent:
     """Apply the declared lead budget policy without changing the bound plan."""
 
-    limits = policy.resolve(lead)
+    limits = policy.resolve(
+        max_steps=lead.max_steps,
+        max_wall_clock_seconds=lead.max_wall_clock_seconds,
+        role=lead.role_profile.role,
+    )
     return CognitiveAgent(
         lead.runtime,
         lead.role_profile,

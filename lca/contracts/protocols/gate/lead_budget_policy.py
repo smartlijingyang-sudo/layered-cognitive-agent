@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.protocols.collaboration.agent import BudgetPolicy
+from lca.contracts.protocols.gate.budget_policy import BudgetPolicy
 
 
 @runtime_checkable
