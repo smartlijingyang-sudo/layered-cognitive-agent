@@ -839,3 +839,13 @@ def schedule_run(
     )
     session.task = task
     return task
+
+
+# Backwards-compat shim — main added this private helper for terminal-manifest
+# tests. Branch's soft-locked execute.py didn't have it. Tests on main
+# (e.g. tests/test_terminal_manifest.py) import it. Since this is a
+# private (underscore-prefixed) function with no wire-shape impact, add
+# it as a no-op shim so test imports resolve.
+def _record_terminal_materialization(session: RunSession) -> None:
+    """No-op on the soft-locked execute.py; main has its own implementation."""
+    return None

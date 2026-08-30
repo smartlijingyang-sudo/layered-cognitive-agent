@@ -15,7 +15,7 @@ from lca.contracts.models.core.sandbox import (
 )
 from lca.layer0_infra.attachment.layout import AttachmentLayout, sanitize_attachment_name
 from lca.layer0_infra.attachment.settings import get_attachment_policy
-from lca.layer0_infra.file_store import FileStore
+from lca.layer0_infra.file_store import FileStore, get_default_file_store
 from lca.layer0_infra.sandbox.paths import ONLYBOXES
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.run_finalizer import get_current_run_id
@@ -141,7 +141,21 @@ def format_sandbox_uploaded_files_prompt(
     )
 
 
-def format_skill_attachment_block(store: FileStore | None = None) -> str:
+def render_dsh_workspace_context(
+    root: str,
+    run_id: str,
+    attachment_ids: Sequence[str],
+    store: FileStore,
+) -> str:
+    """Machine-plane workspace block for DSH harness system prompt."""
+    policy = get_attachment_policy()
+    file_list = format_machine_uploaded_files_prompt(root, run_id, attachment_ids, store)
+    if not file_list:
+        return ""
+    return f"<uploaded_files>\n{policy.machine_policy_text()}\n\n{file_list}\n</uploaded_files>"
+
+
+def format_skill_attachment_block() -> str:
     """Same staged paths as system role — injected on ``activate_skill``."""
     ids = get_current_run_attachment_ids()
     if not ids:
@@ -151,15 +165,17 @@ def format_skill_attachment_block(store: FileStore | None = None) -> str:
     if not run_id:
         return ""
 
+    from lca.layer0_infra.plane.machine import resolve_machine
     from lca.layer0_infra.plane.resolve import ref_of, sandbox_ref_from
     from lca.layer0_infra.plane.scope import current_bindings
     from lca.layer0_infra.sandbox.factory import resolve_sandbox
 
     bindings = current_bindings()
     machine = ref_of(bindings, PlaneKind.MACHINE) if bindings is not None else None
+    if machine is None:
+        machine = resolve_machine()
 
-    if store is None:
-        return ""
+    store = get_default_file_store()
     policy = get_attachment_policy()
 
     if machine is not None and (machine.root or "").strip():
@@ -189,15 +205,15 @@ def format_skill_attachment_block(store: FileStore | None = None) -> str:
     return f"{intro}\n\n{file_list}"
 
 
-def machine_uploaded_files_for_ambient(root: str, store: FileStore | None = None) -> str:
+def machine_uploaded_files_for_ambient(root: str) -> str:
     """Resolve staged paths from ambient run + attachment scopes."""
     ids = get_current_run_attachment_ids()
     run_id = get_current_run_id().strip()
-    if not ids or not run_id or not root.strip() or store is None:
+    if not ids or not run_id or not root.strip():
         return ""
     return format_machine_uploaded_files_prompt(
         root.strip(),
         run_id,
         ids,
-        store,
+        get_default_file_store(),
     )

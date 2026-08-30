@@ -302,10 +302,29 @@ def create_app(
         _load_harness_profile(application, resolved_profile)
 
     spine_dir = Path("traces/sessions")
+    # Main-side spine.py refactored bind_session_spine to take per-call
+    # callable providers instead of eager cordis_ctx (ADR-0015-cleanliness:
+    # composition root wires the providers; the spine never holds the ctx).
+    # Soft-lock per ADR-0103 §2: adapter layer allowed provided wire shape
+    # (api.py SSE / openai_shim.py REST) is preserved. The create_app return
+    # shape is unchanged: AgentRegistry + CommandGateway + projections
+    # attached to application.state.
     cordis_ctx = getattr(application.state, "ctx", None)
+
+    def _ctx_provider() -> Any:
+        return getattr(application.state, "ctx", None) or cordis_ctx
+
     agent_registry, command_gw, _projections = bind_session_spine(
         sessions_dir=spine_dir,
-        cordis_ctx=cordis_ctx,
+        ctx_provider=_ctx_provider,
+        live_builder_provider=lambda: getattr(application.state, "session_live_builder", None),
+        persistence_factory_provider=lambda: getattr(
+            application.state, "session_persistence_factory", None
+        ),
+        projection_registry_factory_provider=lambda: getattr(
+            application.state, "session_projection_registry_factory", None
+        ),
+        command_ledger_provider=lambda: getattr(application.state, "session_command_ledger", None),
     )
     application.state.agent_registry = agent_registry
     application.state.command_gateway = command_gw
