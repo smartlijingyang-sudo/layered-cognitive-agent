@@ -16,8 +16,8 @@ from gateway.runs.terminal.outcome import RunOutcomeApplier
 from gateway.runs.terminal.terminalizer import RunTerminalizer
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.protocols.runtime.infra import MachineResolver
-from lca.infrastructure.plane.resolve import PlaneBindingError
-from lca.infrastructure.plane.scope import plane_bindings_scope
+from lca.infrastructure.runtime_plane.resolve import PlaneBindingError
+from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
 from lca.plugins.loop_drivers.registry import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )

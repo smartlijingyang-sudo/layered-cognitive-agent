@@ -12,7 +12,7 @@ from lca.contracts.protocols.runtime.infra import MachineResolver, Sandbox
 from lca.contracts.protocols.memory.operational_skills import SkillPackageInstaller
 from lca.infrastructure.capability.search import SearchService
 from lca.infrastructure.file_store import FileStore
-from lca.infrastructure.plane.resolve import ref_of, resolve_plane_bindings, sandbox_ref_from
+from lca.infrastructure.runtime_plane.resolve import ref_of, resolve_plane_bindings, sandbox_ref_from
 from lca.infrastructure.sandbox.factory import resolve_sandbox
 from lca.infrastructure.tools import ask_user as ask_user_module
 from lca.infrastructure.tools import lca_computer

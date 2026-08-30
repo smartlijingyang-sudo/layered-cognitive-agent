@@ -42,8 +42,8 @@ def build_cloud_sandbox_prompt(tools: Sequence[Tool], store: FileStore | None = 
 
 
 def _machine_role() -> str:
-    from lca.infrastructure.plane.resolve import ref_of
-    from lca.infrastructure.plane.scope import current_bindings
+    from lca.infrastructure.runtime_plane.resolve import ref_of
+    from lca.infrastructure.runtime_plane.scope import current_bindings
 
     bound = current_bindings()
     machine = ref_of(bound, PlaneKind.MACHINE) if bound is not None else None

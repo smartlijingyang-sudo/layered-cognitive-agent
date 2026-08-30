@@ -77,7 +77,7 @@ def build_sandbox_tools(**kwargs: Any) -> list:
         return []
 
     from lca.infrastructure.computer.sandbox_computer import SandboxComputer
-    from lca.infrastructure.plane.resolve import sandbox_ref_from
+    from lca.infrastructure.runtime_plane.resolve import sandbox_ref_from
     from lca.infrastructure.tools.lca_computer import _invoke_via_executor
 
     plane = kwargs.get("plane") or sandbox_ref_from(sandbox)

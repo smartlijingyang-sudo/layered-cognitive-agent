@@ -1327,8 +1327,8 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.infrastructure.plane"]
-responsibility = "lca/infrastructure/plane. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+[tool.lca.package_contracts."lca.infrastructure.runtime_plane"]
+responsibility = "lca.infrastructure.runtime_plane. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1351,7 +1351,7 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.infrastructure.plane",
+    "lca.infrastructure.runtime_plane",
 ]
 schema_version = "1.0.0"
 

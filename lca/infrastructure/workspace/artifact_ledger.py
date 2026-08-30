@@ -7,8 +7,8 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from lca.contracts.models.core.workspace import ArtifactLedgerSnapshot, WorkspaceArtifact
-from lca.infrastructure.plane.paths import join_under
-from lca.infrastructure.plane.scope import current_primary
+from lca.infrastructure.runtime_plane.paths import join_under
+from lca.infrastructure.runtime_plane.scope import current_primary
 from lca.infrastructure.workspace.deliverable import publishable_file_parts
 
 

@@ -18,8 +18,8 @@ from lca.infrastructure.comparison.dsh_driver.runtime import DshUnavailableError
 from lca.infrastructure.comparison.dsh_driver.settings import DshSettings
 from lca.infrastructure.comparison.dsh_driver.sink import HandleJournalSink
 from lca.infrastructure.computer.machine import MachineTransport
-from lca.infrastructure.plane.machine import resolve_machine_transport
-from lca.infrastructure.plane.resolve import ref_of
+from lca.infrastructure.runtime_plane.machine import resolve_machine_transport
+from lca.infrastructure.runtime_plane.resolve import ref_of
 
 _log = structlog.get_logger(__name__)
 

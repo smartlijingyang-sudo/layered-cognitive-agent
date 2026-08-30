@@ -10,7 +10,7 @@ from lca.contracts.protocols.runtime.infra import MachineTransport
 from lca.infrastructure.computer.machine_exec import MachineExecMixin
 from lca.infrastructure.computer.op_result import ComputerOpResult
 from lca.infrastructure.file_store import FileStore
-from lca.infrastructure.plane.scope import raise_if_out_of_scope
+from lca.infrastructure.runtime_plane.scope import raise_if_out_of_scope
 
 
 class MachineComputer(MachineExecMixin):

@@ -69,7 +69,7 @@ def build_computer_tools(
         runtime = ops
     elif sandbox is not None:
         from lca.infrastructure.computer.sandbox_computer import SandboxComputer
-        from lca.infrastructure.plane.resolve import sandbox_ref_from
+        from lca.infrastructure.runtime_plane.resolve import sandbox_ref_from
         runtime = SandboxComputer(
             plane=plane or sandbox_ref_from(sandbox),
             sandbox=sandbox,

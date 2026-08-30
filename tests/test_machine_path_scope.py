@@ -6,7 +6,7 @@ import pytest
 
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.models.core.result import ApprovalPendingError
-from lca.infrastructure.plane.scope import (
+from lca.infrastructure.runtime_plane.scope import (
     path_needs_approval,
     raise_if_out_of_scope,
     resolve_plane_path,

@@ -16,8 +16,8 @@ from lca.infrastructure.attachment import (
 )
 from lca.infrastructure.attachment.layout import AttachmentLayout
 from lca.infrastructure.file_store import LocalFileStore
-from lca.infrastructure.plane.resolve import PlaneBindings
-from lca.infrastructure.plane.scope import plane_bindings_scope
+from lca.infrastructure.runtime_plane.resolve import PlaneBindings
+from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
 from lca.infrastructure.sandbox.surface import skill_preamble
 from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope
 from lca.infrastructure.tools.run_finalizer import run_id_scope

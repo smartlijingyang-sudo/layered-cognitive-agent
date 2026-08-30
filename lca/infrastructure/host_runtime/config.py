@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from lca.contracts.models.core.preinstall import KEY_PYTHON_IMPORTS
 from lca.contracts.models.core.sandbox import SANDBOX_OUTPUT_SUBDIR
-from lca.infrastructure.plane.paths import join_under
+from lca.infrastructure.runtime_plane.paths import join_under
 
 # ── leaf models ──────────────────────────────────────────────────────
 

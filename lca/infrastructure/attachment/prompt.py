@@ -165,9 +165,9 @@ def format_skill_attachment_block(store: FileStore | None = None) -> str:
     if not run_id:
         return ""
 
-    from lca.infrastructure.plane.machine import resolve_machine
-    from lca.infrastructure.plane.resolve import ref_of, sandbox_ref_from
-    from lca.infrastructure.plane.scope import current_bindings
+    from lca.infrastructure.runtime_plane.machine import resolve_machine
+    from lca.infrastructure.runtime_plane.resolve import ref_of, sandbox_ref_from
+    from lca.infrastructure.runtime_plane.scope import current_bindings
     from lca.infrastructure.sandbox.factory import resolve_sandbox
 
     bindings = current_bindings()

@@ -59,7 +59,7 @@ def resolve_plane_bindings(
     req = request if request is not None else PlaneRequest()
     extra = _parse_kind(req.extra_plane)
 
-    from lca.infrastructure.plane.execution_target import ExecutionTarget, parse_execution_target
+    from lca.infrastructure.runtime_plane.execution_target import ExecutionTarget, parse_execution_target
 
     wanted = _parse_kind(req.plane)
     if wanted is None:
@@ -84,7 +84,7 @@ def _kind_from_execution_target(
     machine: PlaneRef | None,
     sandbox: PlaneRef | None,
 ) -> PlaneKind | None:
-    from lca.infrastructure.plane.execution_target import (
+    from lca.infrastructure.runtime_plane.execution_target import (
         ExecutionTarget,
         parse_execution_target,
         resolve_execution_target,

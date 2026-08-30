@@ -5,12 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from lca.contracts.models.core.plane import PlaneKind
-from lca.infrastructure.plane.preinstall_prompt import render_preinstalled_block
+from lca.infrastructure.runtime_plane.preinstall_prompt import render_preinstalled_block
 from lca.infrastructure.sandbox.surface import plane_system_role
 
 
 def test_yaml_is_the_note_ssot() -> None:
-    text = Path("lca/infrastructure/plane/prompts/preinstall.yaml").read_text(encoding="utf-8")
+    text = Path("lca.infrastructure.runtime_plane/prompts/preinstall.yaml").read_text(encoding="utf-8")
     assert "STSong-Light" in text
     assert "UnicodeCIDFont" in text
     assert "machine:" in text

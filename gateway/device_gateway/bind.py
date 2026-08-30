@@ -8,7 +8,7 @@ from gateway.device_gateway.registry import DeviceRegistry
 from gateway.device_gateway.transport import DeviceTransport
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.protocols.runtime.infra import MachineResolver, MachineTransport
-from lca.infrastructure.plane.paths import outputs_under
+from lca.infrastructure.runtime_plane.paths import outputs_under
 from lca.infrastructure.sandbox.host_settings import load_host_settings
 
 
@@ -72,7 +72,7 @@ def bind_devices(registry: DeviceRegistry, hub: DeviceHub) -> None:
     global _hub
     _hub = hub
 
-    from lca.infrastructure.plane.machine import (
+    from lca.infrastructure.runtime_plane.machine import (
         set_machine_resolver,
         set_machine_transport_resolver,
     )

@@ -14,8 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lca.infrastructure.plane.execution_target import parse_execution_target
-from lca.infrastructure.plane.resolve import PlaneRequest
+from lca.infrastructure.runtime_plane.execution_target import parse_execution_target
+from lca.infrastructure.runtime_plane.resolve import PlaneRequest
 from lca.plugins.loop_drivers.registry import (
     RunLoopDriverRegistry,
     _UnknownExecutionTargetError,

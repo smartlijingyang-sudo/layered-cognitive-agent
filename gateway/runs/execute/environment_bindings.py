@@ -19,7 +19,7 @@ from lca.contracts.mechanisms.capability import provider_current, require_capabi
 from lca.contracts.models.core.plane import PlaneBindings, PlaneKind
 from lca.contracts.protocols.runtime.infra import MachineResolver, Sandbox
 from lca.infrastructure.file_store import FileStore
-from lca.infrastructure.plane.resolve import (
+from lca.infrastructure.runtime_plane.resolve import (
     PlaneRequest,
     ref_of,
     resolve_plane_bindings,

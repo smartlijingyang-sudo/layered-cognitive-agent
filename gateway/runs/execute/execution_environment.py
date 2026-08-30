@@ -39,7 +39,7 @@ from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols.runtime.infra import MachineResolver
 from lca.infrastructure.observability import BoundObservability, bind_backends, run_scope
 from lca.infrastructure.observability.event_descriptor_env import bind_descriptors
-from lca.infrastructure.plane.scope import plane_bindings_scope
+from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
 from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime
 from lca.infrastructure.search.scope import search_run_scope
 from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope

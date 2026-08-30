@@ -51,15 +51,15 @@ from lca.infrastructure.observability import (
 from lca.infrastructure.observability.journal.engine.reducer import RunStatus as JRunStatus
 from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector
 from lca.infrastructure.observability.settings import ObservabilitySettings
-from lca.infrastructure.plane.machine import resolve_machine, resolve_machine_transport
-from lca.infrastructure.plane.resolve import (
+from lca.infrastructure.runtime_plane.machine import resolve_machine, resolve_machine_transport
+from lca.infrastructure.runtime_plane.resolve import (
     PlaneBindingError,
     PlaneRequest,
     ref_of,
     resolve_plane_bindings,
     sandbox_ref_from,
 )
-from lca.infrastructure.plane.scope import plane_bindings_scope
+from lca.infrastructure.runtime_plane.scope import plane_bindings_scope
 from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime
 from lca.infrastructure.search.scope import search_run_scope
 from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope

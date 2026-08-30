@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.infrastructure.file_store import FileStore
-from lca.infrastructure.plane.resolve import (
+from lca.infrastructure.runtime_plane.resolve import (
     make_sandbox_ref,
     resolve_plane_bindings,
     sandbox_ref_from,
 )
-from lca.infrastructure.plane.scope import current_primary
+from lca.infrastructure.runtime_plane.scope import current_primary
 from lca.infrastructure.sandbox.factory import resolve_sandbox
 
 
@@ -42,8 +42,8 @@ def skill_preamble(store: FileStore | None = None) -> str:
 
 def plane_system_role(plane: PlaneRef) -> str:
     if plane.kind is PlaneKind.MACHINE:
-        from lca.infrastructure.plane.preinstall_prompt import render_preinstalled_block
-        from lca.infrastructure.plane.prompts import load_plane_prompt
+        from lca.infrastructure.runtime_plane.preinstall_prompt import render_preinstalled_block
+        from lca.infrastructure.runtime_plane.prompts import load_plane_prompt
         from lca.infrastructure.sandbox.prompt import format_machine_uploaded_files_prompt
 
         template = load_plane_prompt("machine_system_role")

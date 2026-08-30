@@ -16,7 +16,7 @@ from lca.contracts.models.core.sandbox import (
     SANDBOX_PREINSTALLED_CLI_TOOLS,
     SANDBOX_PREINSTALLED_PYTHON_PACKAGES,
 )
-from lca.infrastructure.plane.prompts import load_plane_data
+from lca.infrastructure.runtime_plane.prompts import load_plane_data
 
 _PLANE_KEY = {
     PlaneKind.MACHINE: "machine",

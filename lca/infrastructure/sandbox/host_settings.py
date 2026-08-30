@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from lca.infrastructure.plane.paths import outputs_under
+from lca.infrastructure.runtime_plane.paths import outputs_under
 
 
 class HostRuntimeSettings(BaseSettings):

@@ -1,8 +1,8 @@
 """Product-environment binding — resolve, scope, path audit."""
 
 from lca.contracts.models.core.plane import PlaneBindings, PlaneKind, PlaneRef
-from lca.infrastructure.plane.paths import join_under, outputs_under
-from lca.infrastructure.plane.resolve import (
+from lca.infrastructure.runtime_plane.paths import join_under, outputs_under
+from lca.infrastructure.runtime_plane.resolve import (
     PlaneBindingError,
     PlaneRequest,
     make_sandbox_ref,
@@ -10,7 +10,7 @@ from lca.infrastructure.plane.resolve import (
     resolve_plane_bindings,
     sandbox_ref_from,
 )
-from lca.infrastructure.plane.scope import (
+from lca.infrastructure.runtime_plane.scope import (
     current_bindings,
     current_primary,
     path_needs_approval,

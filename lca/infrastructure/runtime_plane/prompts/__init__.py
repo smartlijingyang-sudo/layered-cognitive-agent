@@ -12,7 +12,7 @@ def load_plane_prompt(name: str) -> str:
 def load_plane_data(filename: str) -> str:
     try:
         return (
-            importlib.resources.files("lca.infrastructure.plane.prompts")
+            importlib.resources.files("lca.infrastructure.runtime_plane.prompts")
             .joinpath(filename)
             .read_text(encoding="utf-8")
         )

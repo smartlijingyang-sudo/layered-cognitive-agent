@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
-from lca.infrastructure.plane.execution_target import (
+from lca.infrastructure.runtime_plane.execution_target import (
     ExecutionTarget,
     parse_execution_target,
     resolve_execution_target,
 )
-from lca.infrastructure.plane.resolve import PlaneRequest, resolve_plane_bindings
+from lca.infrastructure.runtime_plane.resolve import PlaneRequest, resolve_plane_bindings
 
 
 def _machine() -> PlaneRef:
