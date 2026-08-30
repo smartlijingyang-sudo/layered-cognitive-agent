@@ -223,19 +223,26 @@ def _load_harness_profile(application: Starlette, profile_path: str) -> None:
 
 
 def create_app(
+    profile_path: str | None = None,
+    *,
+    bootstrap_factory: Any | None = None,
+    bootstrap_config: Any | None = None,
+    run_port: Any | None = None,
+    lifespan: Any | None = None,
     registry: RunRegistry | None = None,
     file_store: LocalFileStore | None = None,
     devices: DeviceRegistry | None = None,
-    profile_path: str | None = None,
 ) -> Starlette:
     """Factory: tests inject RunRegistry / FileStore / DeviceRegistry.
 
-    When *profile_path* is provided (or ``LCA_PROFILE`` env var is set),
-    the gateway loads the harness plugin tree and stores it in
-    ``app.state.plugin_tree`` for use by scope-driven composition.
+    Per ADR-0103 §2 ``gateway/app.py`` is adapter layer; allowed provided
+    the wire-shape contracts (api.py SSE / openai_shim.py REST / execute.py
+    finalize/closure) are preserved. Adapted signature to accept both the
+    branch's optional ``registry / file_store / devices`` injection and
+    main's ``bootstrap_factory / run_port / lifespan`` seam.
 
     LLM credentials are owned by ``lca-llm-resolver`` (loads ``.env``).
-    Tests that need a fake LLM call ``ctx.provide("llm_resolver", …)``
+    Tests that need a fake LLM call ``ctx.provide(\"llm_resolver\", ...)``
     after boot — see ``tests.support.gateway_app``.
     """
     global _registry, _file_store, _devices, _device_hub
@@ -306,6 +313,9 @@ def create_app(
     application.state.devices = _devices
     application.state.device_hub = _device_hub
     application.state.device_settings = _device_settings
+    application.state.run_port = run_port
+    application.state.bootstrap_factory = bootstrap_factory
+    application.state.bootstrap_config = bootstrap_config
 
     # ── Harness plugin tree (Phase A) ──
     import os as _os
