@@ -126,7 +126,6 @@ class CognitiveRunDriver:
                 llm,
                 observability=hub,
                 role=session.agent.name,
-                bindings=bindings,
                 scope=scope,
                 tools=tools,
             )
@@ -137,7 +136,6 @@ class CognitiveRunDriver:
                 observability=hub,
                 trace_id=session.trace_id,
                 run_id=session.run_id,
-                bindings=bindings,
                 scope=scope,
                 tools=tools,
             )
@@ -274,7 +272,6 @@ async def _build_team(
         resolved_library,
         llm,
         observability=observability,  # type: ignore[arg-type]
-        bindings=bindings,
         scope=scope,
         tools=tools,
     )
