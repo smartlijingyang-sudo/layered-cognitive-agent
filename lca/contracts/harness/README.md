@@ -61,38 +61,13 @@ log:emit
 - `artifact_with_state`
 - `capability_artifact_to_dict`
 - `is_plugin_contract_empty`
-- ... 共 40 项
-
-**模块清单**:
-
-- `lca/contracts/harness/agent.py`
-- `lca/contracts/harness/artifact.py`
-- `lca/contracts/harness/artifact_manifest.py`
-- `lca/contracts/harness/cancellation.py`
-- `lca/contracts/harness/capability_gate.py`
-- `lca/contracts/harness/command.py`
-- `lca/contracts/harness/compensation.py`
-- `lca/contracts/harness/composer.py`
-- `lca/contracts/harness/context_budget.py`
-- `lca/contracts/harness/continuous.py`
-- `lca/contracts/harness/cost_snapshot.py`
-- `lca/contracts/harness/delegation_grant.py`
-- `lca/contracts/harness/effect_receipt.py`
-- `lca/contracts/harness/eval_case.py`
-- `lca/contracts/harness/eval_comparison.py`
-- `lca/contracts/harness/events.py`
-- `lca/contracts/harness/evidence.py`
-- `lca/contracts/harness/handoff.py`
-- `lca/contracts/harness/middleware.py`
-- `lca/contracts/harness/plugin.py`
-- `lca/contracts/harness/plugin_contract.py`
-- `lca/contracts/harness/plugin_meta.py`
-- `lca/contracts/harness/projection.py`
-- `lca/contracts/harness/replan.py`
-- `lca/contracts/harness/result_verifier.py`
-- `lca/contracts/harness/sandbox_limits.py`
-- `lca/contracts/harness/session.py`
-- `lca/contracts/harness/skill.py`
-- `lca/contracts/harness/sse_cursor.py`
-- `lca/contracts/harness/subagent.py`
-- ... 共 36 个
+- `is_terminal_state`
+- `legal_next_states`
+- `make_capability_artifact`
+- `merge_agent_graphs`
+- `migrate_artifact`
+- `migrate_to_active`
+- `migrate_to_retired`
+- `migrate_to_verified`
+- `plugin_contract_control_slots`
+- `plugin_contract_functional_group`
