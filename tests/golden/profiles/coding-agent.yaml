@@ -1,5 +1,5 @@
 # Golden profile: coding-agent (PR-10 V1 acceptance §7.3)
-# Coding scenario — V4 envelope + V7 creator faces.
+# Coding scenario — V4 envelope + V7 creator personas.
 
 bundles:
   - bundles/base.yaml

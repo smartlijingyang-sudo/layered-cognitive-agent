@@ -52,12 +52,12 @@ def register(app: typer.Typer) -> None:
         stage / retire / publish 三个旧 action 通过 promote flags 实现
         （legacy backward compat 6 个月后删除）。
         """
-        from lca.plugins.creator.faces import (
+        from lca.plugins.creator.personas import (
             CreatorFace,
             PromoteSpec,
             parse_creator_face,
         )
-        from lca.plugins.creator.faces.implementations import (
+        from lca.plugins.creator.personas.implementations import (
             dispatch_creator_face,
         )
 

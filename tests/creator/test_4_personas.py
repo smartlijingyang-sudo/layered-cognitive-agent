@@ -32,14 +32,14 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.atoms.artifact_state import ArtifactState
-from lca.plugins.creator.faces import (
+from lca.plugins.creator.personas import (
     CreatorFace,
     CreatorResult,
     PromoteSpec,
-    all_creator_faces,
+    all_creator_personas,
     parse_creator_face,
 )
-from lca.plugins.creator.faces.implementations import (
+from lca.plugins.creator.personas.implementations import (
     dispatch_creator_face,
     do_author,
     do_inspect,
@@ -65,8 +65,8 @@ class TestCreatorFaceEnum:
     def test_str_enum_value_equality(self) -> None:
         assert CreatorFace.PROMOTE == "promote"
 
-    def test_all_creator_faces_returns_all(self) -> None:
-        faces = all_creator_faces()
+    def test_all_creator_personas_returns_all(self) -> None:
+        faces = all_creator_personas()
         assert len(faces) == 4
 
 

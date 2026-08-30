@@ -75,7 +75,7 @@ def parse_creator_face(value: object) -> CreatorFace:
     raise TypeError(f"creator face must be str or CreatorFace, got {type(value).__name__}")
 
 
-def all_creator_faces() -> tuple[CreatorFace, ...]:
+def all_creator_personas() -> tuple[CreatorFace, ...]:
     """全部 Creator faces（enum 顺序）。"""
     return tuple(CreatorFace)
 
@@ -84,6 +84,6 @@ __all__ = [
     "CreatorFace",
     "CreatorResult",
     "PromoteSpec",
-    "all_creator_faces",
+    "all_creator_personas",
     "parse_creator_face",
 ]

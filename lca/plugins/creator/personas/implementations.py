@@ -6,7 +6,7 @@ from typing import Any
 
 from lca.contracts.atoms.artifact_state import ArtifactState
 from lca.contracts.atoms.scope import Scope, parse_scope
-from lca.plugins.creator.faces import CreatorFace, CreatorResult, PromoteSpec, parse_creator_face
+from lca.plugins.creator.personas import CreatorFace, CreatorResult, PromoteSpec, parse_creator_face
 
 
 def do_inspect(*, target: str | None = None, **kwargs: Any) -> CreatorResult:

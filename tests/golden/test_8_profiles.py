@@ -4,7 +4,7 @@ Per acceptance-criteria §7.3, PR-10 stage 1 covers 8 golden profiles:
 
 1. standard-solo — 1 agent (no team); V1 control plane + V2 plan_hash
 2. standard-team — lead + members; V1 lead routing + V11 collaboration
-3. coding-agent — coding scenario; V4 envelope + V7 creator faces
+3. coding-agent — coding scenario; V4 envelope + V7 creator personas
 4. control-slot-coverage — 11 ControlSlot entries; V1 control plane
 5. 11-relations-coverage — 11 Relation enum entries; V11 relations
 6. patch-priority — Bundle + Patch priority; V2 plan_hash determinism
