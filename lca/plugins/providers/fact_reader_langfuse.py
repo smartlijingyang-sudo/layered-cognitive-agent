@@ -1,7 +1,7 @@
 """Langfuse JournalProjector factory plugin (Tier-2) —— 占位实现。
 
 把 Langfuse 读者注册为 ``fact_readers`` 的 factory；真实实现复用
-``lca/layer0_infra/observability/exporters/langfuse.py``（之后 PR 重构）。
+``lca/infrastructure/observability/exporters/langfuse.py``（之后 PR 重构）。
 当前返回 no-op reader：保证 boot 链路通畅，不引入额外网络副作用。
 """
 

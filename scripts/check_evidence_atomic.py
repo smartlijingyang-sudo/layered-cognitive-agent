@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """check_evidence_atomic —— ADR-0065 L5 摘要不匹配必须显式 raise。
 
-扫描 ``lca/layer0_infra/observability/evidence/`` 与
+扫描 ``lca/infrastructure/observability/evidence/`` 与
 ``lca/plugins/{seam,providers}/evidence_*.py``,确保 EvidenceStore.prepare
 实现路径内不出现静默 try/except 把 ``EvidenceIntegrityError`` 吞掉。
 """
@@ -15,7 +15,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 
 SCAN_DIRS = (
-    REPO / "lca" / "layer0_infra" / "observability" / "evidence",
+    REPO / "lca" / "infrastructure" / "observability" / "evidence",
     REPO / "lca" / "plugins",
 )
 

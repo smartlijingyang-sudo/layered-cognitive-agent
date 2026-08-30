@@ -1,7 +1,7 @@
 """System Prompt Service Definition plugin — Tier-1.
 
 The full SystemPromptService (with section assembler) is out of scope for
-this minimal stub. Real implementation lives in lca/layer0_infra/system_prompt/service.py.
+this minimal stub. Real implementation lives in lca/infrastructure/system_prompt/service.py.
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """RenderContract REGISTRY is the SSOT for LCA tool identifiers; the gateway
 ``wire.py`` shim still resolves tool names → (identifier, api_name) tuples
 for legacy OpenAI-compatible endpoints. LobeHub's contract table is now
-generated from the Python REGISTRY (lca/layer0_infra/tools/contract/codegen_ts.py).
+generated from the Python REGISTRY (lca/infrastructure/tools/contract/codegen_ts.py).
 """
 
 from __future__ import annotations

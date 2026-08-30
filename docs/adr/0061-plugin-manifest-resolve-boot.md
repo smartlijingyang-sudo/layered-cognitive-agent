@@ -80,4 +80,4 @@ Amends: [ADR-0004](0004-protocol-first-pluggability.md)、[ADR-0005](0005-compos
 
 - 实现入口：`lca/harness/plugin_api.py`、`lca/harness/profile/resolve.py`、`lca/harness/profile/boot.py`
 - Capability：`lca/contracts/capabilities.py`
-- 群服务：`lca/layer1_cognitive/{perceive,gate}_service.py`
+- 群服务：`lca/cognition/{perceive,gate}_service.py`

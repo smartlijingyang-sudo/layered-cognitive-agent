@@ -28,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 INJECTOR_PATH = (
     REPO_ROOT
     / "lca"
-    / "layer1_cognitive"
+    / "cognition"
     / "brain"
     / "decision_gates"
     / "artifact_respond_injector.py"

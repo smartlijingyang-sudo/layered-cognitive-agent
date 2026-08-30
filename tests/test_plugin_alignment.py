@@ -152,8 +152,8 @@ def test_eventbus_and_hookregistry_single_backend() -> None:
     rather than a parallel local listener table.
     """
     layers = [
-        _ROOT / "lca" / "layer1_cognitive" / "event_bus.py",
-        _ROOT / "lca" / "layer1_cognitive" / "hook_registry.py",
+        _ROOT / "lca" / "cognition" / "event_bus.py",
+        _ROOT / "lca" / "cognition" / "hook_registry.py",
     ]
     forbidden_patterns = [
         re.compile(r"self\._subs\b"),
@@ -274,7 +274,7 @@ def test_compose_root_no_inline_instantiation() -> None:
     Allowlist (≤ 10): each entry is a one-line comment explaining why
     the inline instantiation is unavoidable.
     """
-    composition_root = _ROOT / "lca" / "layer4_app" / "spawn.py"
+    composition_root = _ROOT / "lca" / "application" / "spawn.py"
     text = composition_root.read_text(encoding="utf-8")
 
     # Class names that MUST NOT appear as ``Cls()`` instantiations in the

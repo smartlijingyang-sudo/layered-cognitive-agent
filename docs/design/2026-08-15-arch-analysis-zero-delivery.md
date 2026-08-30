@@ -53,7 +53,7 @@
 
 ### 断裂点 1：内容注入层 —— Unicode 字符未归一化
 
-**文件**: `lca/layer0_infra/attachment/files_info.py` 第 43 行
+**文件**: `lca/infrastructure/attachment/files_info.py` 第 43 行
 
 ```python
 def to_xml(self) -> str:
@@ -81,7 +81,7 @@ def to_xml(self) -> str:
 
 ### 断裂点 2：多工具循环检测缺失
 
-**文件**: `lca/layer1_cognitive/brain/decision_gates/tool_loop_breaker.py`
+**文件**: `lca/cognition/brain/decision_gates/tool_loop_breaker.py`
 
 ```python
 @staticmethod
@@ -109,7 +109,7 @@ writeFile → runCommand → (失败) → readFile → writeFile → runCommand 
 
 ### 断裂点 3：零输出 = 完成的默认假设
 
-**文件**: `lca/layer2_runtime/runtime_loop.py` 第 206-213 行
+**文件**: `lca/runtime/runtime_loop.py` 第 206-213 行
 
 ```python
 @staticmethod
@@ -164,7 +164,7 @@ Doctor 检查的 H1-H5:
 
 ### 断裂点 5：Machine 模式无原生代码执行
 
-**文件**: `lca/layer0_infra/computer/machine.py`
+**文件**: `lca/infrastructure/computer/machine.py`
 
 Machine 模式只有: `writeFile`, `readFile`, `runCommand`, `listFiles`...
 **没有 `executeCode`** (sandbox 模式有)。
@@ -187,7 +187,7 @@ Machine 模式只有: `writeFile`, `readFile`, `runCommand`, `listFiles`...
 ### 3.1 内容注入层: TextNormalizationService
 
 ```
-位置: lca/layer0_infra/attachment/normalizer.py (新增)
+位置: lca/infrastructure/attachment/normalizer.py (新增)
 职责: 注入前归一化文本内容
 
 规则:
@@ -206,7 +206,7 @@ Machine 模式只有: `writeFile`, `readFile`, `runCommand`, `listFiles`...
 ### 3.2 循环检测: ProgressBasedLoopDetector
 
 ```
-位置: lca/layer1_cognitive/brain/decision_gates/progress_loop_detector.py (新增)
+位置: lca/cognition/brain/decision_gates/progress_loop_detector.py (新增)
 
 规则:
 1. 连续 N 步无有效产出 (observation.success=False or None)
@@ -225,7 +225,7 @@ Machine 模式只有: `writeFile`, `readFile`, `runCommand`, `listFiles`...
 ### 3.3 结果验证: OutputValidationGate
 
 ```
-位置: lca/layer2_runtime/completion/output_validation.py (新增)
+位置: lca/runtime/completion/output_validation.py (新增)
 
 规则:
 1. status=COMPLETED 但 output_text="" → 降级为 FAILED
@@ -258,7 +258,7 @@ Machine 模式只有: `writeFile`, `readFile`, `runCommand`, `listFiles`...
 ### 3.5 Machine 代码执行: executeCode via Transport
 
 ```
-位置: lca/layer0_infra/computer/machine.py (增强)
+位置: lca/infrastructure/computer/machine.py (增强)
 
 新增 API:
 async def execute_code(self, *, code: str, language: str = "python") -> ComputerOpResult:

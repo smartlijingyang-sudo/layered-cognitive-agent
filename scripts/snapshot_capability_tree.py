@@ -85,7 +85,7 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
             "layers": {"L0", "L1", "L2"},
             "module_patterns": [
                 r"^lca/contracts/",
-                r"^lca/layer2_runtime/",
+                r"^lca/runtime/",
                 r"^lca/plugins/runtime/",
                 r"^lca/plugins/phase_executors/",
                 r"^lca/plugins/phase_edges/",
@@ -111,7 +111,7 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
             "layers": {"L0", "L1", "L2"},
             "module_patterns": [
                 r"^lca/plugins/(brain|reasoner|critic|synthesizer|perceive|sensors|memory|think|gates|collaboration|state)/",
-                r"^lca/layer1_cognitive/",
+                r"^lca/cognition/",
             ],
             "kind": None,
         },
@@ -136,8 +136,8 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
             "module_patterns": [
                 r"^lca/plugins/(strategies|roles|loop_drivers|composer|team_lead|modes|graph_nodes)/",
                 r"^lca/plugins/run_loop_driver_registry\.py",
-                r"^lca/layer3_agent/",
-                r"^lca/layer4_app/",
+                r"^lca/agent/",
+                r"^lca/application/",
                 r"^gateway/",
             ],
             "kind": None,

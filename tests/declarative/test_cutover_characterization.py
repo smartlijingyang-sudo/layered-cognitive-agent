@@ -110,7 +110,7 @@ def test_runtime_requires_a_valid_declarative_plan() -> None:
     is None or ``phase_executors`` is empty, instead of raising a validation error.
     """
     # Check source code to verify fallback behavior does NOT exist
-    runtime_source = Path("lca/layer2_runtime/runtime_loop.py").read_text()
+    runtime_source = Path("lca/runtime/runtime_loop.py").read_text()
     # The absence of "return await self._loop(state, max_steps)" proves
     # the fallback has been removed
     assert "return await self._loop(state, max_steps)" not in runtime_source, (
@@ -124,7 +124,7 @@ def test_runtime_module_has_no_legacy_loop_or_policy_engine_reference() -> None:
     CURRENTLY FAILS: ``_loop()``, ``DefaultControlPolicyEngine``, and
     ``return await self._loop`` are still present.
     """
-    runtime_source = Path("lca/layer2_runtime/runtime_loop.py").read_text()
+    runtime_source = Path("lca/runtime/runtime_loop.py").read_text()
     assert "def _loop(" not in runtime_source, "_loop() method still exists"
     assert "DefaultControlPolicyEngine" not in runtime_source, (
         "DefaultControlPolicyEngine still imported/used"

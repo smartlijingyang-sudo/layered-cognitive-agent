@@ -62,7 +62,7 @@ flowchart LR
 
 ## 实现设计
 
-`lca/layer0_infra/llm_adapter/failover.py` 定义 `LLMFailoverCandidate(name, adapter)` 与 `FailoverLLMAdapter`。候选名称必须非空且唯一，适配器以固定顺序执行。`complete()` 只会在剩余候选存在且异常是可用性错误时继续；可识别的条件为 LCA 的 `LLMUnavailableError`、标准超时 / 连接 / OS 传输异常，以及带有 `status_code` 的 `401`、`403`、`408`、`409`、`425`、`429` 或 `5xx` 错误。
+`lca/infrastructure/llm_adapter/failover.py` 定义 `LLMFailoverCandidate(name, adapter)` 与 `FailoverLLMAdapter`。候选名称必须非空且唯一，适配器以固定顺序执行。`complete()` 只会在剩余候选存在且异常是可用性错误时继续；可识别的条件为 LCA 的 `LLMUnavailableError`、标准超时 / 连接 / OS 传输异常，以及带有 `status_code` 的 `401`、`403`、`408`、`409`、`425`、`429` 或 `5xx` 错误。
 
 `lca/plugins/seam_definitions/llm_resolver.py` 仍然是唯一 LLM credential owner。`FallbackConfig` 仅声明低优先级候选的 `model`、可选 `api_key`、可选 `base_url` 与可选 `api_style`；缺省项继承 primary 的已解析配置。因此，fallback 的选择是 Profile 组合事实，而不是 Runtime 内的环境变量查找或 Gateway 条件分支。
 

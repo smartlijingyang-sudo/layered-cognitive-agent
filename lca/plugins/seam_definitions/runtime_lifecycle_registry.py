@@ -30,7 +30,7 @@ class Config(BaseModel):
     layer="L2",
     effects="none",
     description="Provide the neutral registry for passive Agent Loop lifecycle subscribers.",
-    test_suite="tests/layer2_runtime/test_runtime_lifecycle_plugins.py",
+    test_suite="tests/runtime/test_runtime_lifecycle_plugins.py",
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:

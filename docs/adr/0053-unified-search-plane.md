@@ -22,7 +22,7 @@ Gaps observed in production runs (e.g. 「今天有什么新闻」):
 
 ## Decision
 
-Introduce a **Unified Search Plane** in `lca/layer0_infra/search/`:
+Introduce a **Unified Search Plane** in `lca/infrastructure/search/`:
 
 | Component | Role |
 |-----------|------|

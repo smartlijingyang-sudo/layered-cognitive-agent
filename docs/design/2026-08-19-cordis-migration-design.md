@@ -12,7 +12,7 @@
 
 ## 0. 一句话
 
-LCA 现有 21 个 capability 插件都还跑在自家 `lca/layer0_infra/plugin/` 这个 in-house kernel 上，它只是 cordis 风格的**简化复刻**。本设计把整个 in-house kernel 删掉，**vendor 引入 `~/taiyi-agent/vendor/cordis`**（DSH cordis 的 1:1 Python 移植），把 21 个插件改写为 cordis 的 `@plugin` 形式，把 bundle / profile / composer 全部接到 cordis 的 loader + context 上。
+LCA 现有 21 个 capability 插件都还跑在自家 `lca/infrastructure/plugin/` 这个 in-house kernel 上，它只是 cordis 风格的**简化复刻**。本设计把整个 in-house kernel 删掉，**vendor 引入 `~/taiyi-agent/vendor/cordis`**（DSH cordis 的 1:1 Python 移植），把 21 个插件改写为 cordis 的 `@plugin` 形式，把 bundle / profile / composer 全部接到 cordis 的 loader + context 上。
 
 不立 dsh 100+ 包的 port flag——cordis 是唯一 vendor 依赖，能力自建。
 
@@ -21,18 +21,18 @@ LCA 现有 21 个 capability 插件都还跑在自家 `lca/layer0_infra/plugin/`
 ## 1. 范围 / 非目标
 
 **In**:
-- 替换 `lca/layer0_infra/plugin/` 为 cordis
+- 替换 `lca/infrastructure/plugin/` 为 cordis
 - 替换 `lca.harness.kernel`（ScopedPluginHost / compat）为 cordis
 - 替换 `lca.harness.profile/boot.py` 为 cordis.Loader 的薄包装
 - 删 `lca/contracts/harness/plugin.py`（保留 `MiddlewareRegistration` 等在 `middleware.py`）— 实际是拆 `plugin.py`：删 `Manifest`/`ExtensionPoint`/`CapabilityGrant`/`ScopeKind`/`PluginKind`/`ProviderMode`，保留 `PluginContext` Protocol
 - 删 `lca/contracts/mechanisms/seam.py` 中的 `SeamRole`/`SeamDeclaration`/`SeamRegistry`/`seam`/`validate_all_seams`；**保留 `consume()`**（composition-time gate，3 个 production 文件 + tests 依赖）
 - 删 `lca/contracts/mechanisms/plugin.py` 中的 `Plugin` Protocol；**保留 `PluginConfig`**（Pydantic 基类，多个 plugin 和 test 依赖）
 - 21 个 `lca/plugins/*` 改写为 `@plugin` 形式（Tier-1 Definition）
-- **30+ Tier-2 Provider plugins** 抽出到 `lca/plugins/providers/{seam}/{provider}.py`（替换 `lca/layer4_app/capability_boot.py:mount_default_providers()` 硬编码）
+- **30+ Tier-2 Provider plugins** 抽出到 `lca/plugins/providers/{seam}/{provider}.py`（替换 `lca/application/capability_boot.py:mount_default_providers()` 硬编码）
 - **15+ Tier-3 Behavior plugins** 抽出到 `lca/plugins/{brain,reasoner,synthesizer,team,guards,dsh}/...`（替换 `composer.py:_resolve_component` + `lca/contracts/models/team/team_coordination.py` 硬编码）
 - `bundles/base.yaml` 包含 Tier-1 + Tier-2 entries；`bundles/web-app.yaml` 追加 Tier-3 entries
-- `lca/layer4_app/composer.py` 全部 `import X; X()` 形式改为 `ctx.inject(...)`/`ctx.provide(...)`
-- `lca/layer4_app/capability_boot.py` 删掉（被 Tier-1 plugin 集合完全替代）
+- `lca/application/composer.py` 全部 `import X; X()` 形式改为 `ctx.inject(...)`/`ctx.provide(...)`
+- `lca/application/capability_boot.py` 删掉（被 Tier-1 plugin 集合完全替代）
 - vendor 引入 `taiyi-cordis` / `taiyi-cosmokit` / `taiyi-schemastery`
 
 **三 Tier 落实"插件贯彻"（精修后总数 46）**：
@@ -70,7 +70,7 @@ cordis Context → L4 组合根只 ctx.<typed-property>
 3. **plugin = 行为单位**。21 个 capability 插件都是有用的；plugin 集不缩——只在文件夹 + 命名上重新组织。
 4. **scope 在 cordis 上重新表达**。LCA 自创的 5-ScopeKind 是语义名词（DEPLOYMENT/PROFILE/TEAM/AGENT/SESSION），cordis 的 `Context.scope(label)` / `Context.fork()` 不需要语义枚举——`"agent:{role}"` 这种 label 字符串足够。把 ScopedPluginHost 从一个类简化成一个 `async with ctx.scope(label)`。
 5. **bundles 是装配面，不是行为面**。bundle 文件只是 entry 列表 + 顺序；行为住在 setup callback 里。`seam_definitions` 这种"纯声明"插件是 cordis 不需要的——`@plugin(name="...")` 自己声明。
-6. **L4 仍是组合根**。Composer（`lca/layer4_app/composer.py`）知道整棵树；其他层只挂自己那一层的插件。
+6. **L4 仍是组合根**。Composer（`lca/application/composer.py`）知道整棵树；其他层只挂自己那一层的插件。
 
 ---
 
@@ -80,7 +80,7 @@ cordis Context → L4 组合根只 ctx.<typed-property>
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 当前（要删）                                      →  目标（cordis）         │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ lca/layer0_infra/plugin/{kernel,loader,include,   delete                    │
+│ lca/infrastructure/plugin/{kernel,loader,include,   delete                    │
 │   scope,expr,builtins}                                                       │
 │ lca/harness/kernel/{scope,compat}                  delete                    │
 │ lca/harness/profile/boot.py                        delete (rewrite)         │
@@ -101,7 +101,7 @@ cordis Context → L4 组合根只 ctx.<typed-property>
 │ bundles/base-spine.yaml                             rewrite → cordis YAML  │
 │ profiles/web-standard.yaml                          rewrite → cordis YAML  │
 │                                                                              │
-│ lca/layer4_app/composer.py                          rewrite isolate scope  │
+│ lca/application/composer.py                          rewrite isolate scope  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -343,13 +343,13 @@ Services:
 
 | 路径 | 动作 | 原因 |
 |---|---|---|
-| `lca/layer0_infra/plugin/kernel/` | 删除 | cordis 替代 |
-| `lca/layer0_infra/plugin/loader/` | 删除 | cordis.Loader 替代 |
-| `lca/layer0_infra/plugin/include/` | 删除 | cordis.Loader.load_yaml 替代 |
-| `lca/layer0_infra/plugin/scope/` | 删除 | cordis.Context.scope 替代 |
-| `lca/layer0_infra/plugin/expr/` | 删除 | cordis.Loader.interpolate 替代 |
-| `lca/layer0_infra/plugin/builtins/` | 删除 | cordis.Fiber.effect 替代 |
-| `lca/layer0_infra/plugin/_test_plugins/` | 删除 | 依赖 `PluginConfig`，删后整个目录无意义 |
+| `lca/infrastructure/plugin/kernel/` | 删除 | cordis 替代 |
+| `lca/infrastructure/plugin/loader/` | 删除 | cordis.Loader 替代 |
+| `lca/infrastructure/plugin/include/` | 删除 | cordis.Loader.load_yaml 替代 |
+| `lca/infrastructure/plugin/scope/` | 删除 | cordis.Context.scope 替代 |
+| `lca/infrastructure/plugin/expr/` | 删除 | cordis.Loader.interpolate 替代 |
+| `lca/infrastructure/plugin/builtins/` | 删除 | cordis.Fiber.effect 替代 |
+| `lca/infrastructure/plugin/_test_plugins/` | 删除 | 依赖 `PluginConfig`，删后整个目录无意义 |
 | `lca/harness/kernel/` | 删除 | cordis 替代 |
 | `lca/harness/profile/boot.py` | 重写为 cordis 包装 | 保留 `boot_profile(Path, *, check_seam_completeness)` 签名（`check_seam_completeness` 改为 no-op 提示） |
 | `lca/contracts/harness/plugin.py` | 拆 | 删 `Manifest`/`ExtensionPoint`/`CapabilityGrant`/`ScopeKind`/`PluginKind`/`ProviderMode`；**保留 `PluginContext` Protocol**（用于 compat/迁移期） |
@@ -358,7 +358,7 @@ Services:
 | `lca/plugins/seam_definitions/` | 删除 | cordis 不需要 |
 | `lca/harness/middleware/registry.py` | 重写 | `COGNITIVE_POINTS` 10 点表迁移到 cordis event 名（`agent.before_step` 等）的 map |
 | `lca/plugins/{llm,tools,transport,skills,file_store,observability,sandbox,memory,search,state_store}_service/__init__.py` | 改为单文件 module | 见 §6.2 |
-| `lca/plugins/agent_service/__init__.py` | 合并入 `lca/layer0_infra/session/` | 见 §6.3 |
+| `lca/plugins/agent_service/__init__.py` | 合并入 `lca/infrastructure/session/` | 见 §6.3 |
 | `lca/plugins/loop_intervention_policy/__init__.py` | 改名 `lca/plugins/guards/loop_intervention.py` | 见 §6.1 |
 | `lca/plugins/budget_policy/__init__.py` | 改名 `lca/plugins/guards/step_budget.py` | 见 §6.1 |
 
@@ -372,31 +372,31 @@ Services:
 
 | # | Plugin | 决策 | 新位置（plugin module） | Service 类归口 |
 |---|---|---|---|---|
-| 1 | `llm_service` | ✅ 保留 | `lca/plugins/llm_service.py` | `lca/layer0_infra/capability/llm.py` |
+| 1 | `llm_service` | ✅ 保留 | `lca/plugins/llm_service.py` | `lca/infrastructure/capability/llm.py` |
 | 2 | `llm_provider` | ✅ 保留 | `lca/plugins/llm_provider.py` | 同上 |
-| 3 | `tools_service` | ✅ 保留 | `lca/plugins/tools_service.py` | `lca/layer0_infra/capability/tools.py` |
-| 4 | `session_service` | ✅ 保留 + 合并 agent_service | `lca/plugins/session_service.py` | `lca/layer0_infra/session/{service,events_assistant,events_tool,events_turn,events_step}.py` |
-| 5 | `system_prompt` | ✅ 保留 | `lca/plugins/system_prompt.py` | `lca/layer0_infra/system_prompt/{sections,assembler,service}.py` |
-| 6 | `transport_service` | ✅ 保留 | `lca/plugins/transport_service.py` | `lca/layer0_infra/capability/transport.py` |
-| 7 | `skills_service` | ✅ 保留 | `lca/plugins/skills_service.py` | `lca/layer0_infra/capability/skills.py` |
-| 8 | `file_store_service` | ✅ 保留 | `lca/plugins/file_store_service.py` | `lca/layer0_infra/capability/files.py` |
-| 9 | `observability_service` | ✅ 保留 | `lca/plugins/observability_service.py` | `lca/layer0_infra/capability/observability.py` |
-| 10 | `sandbox_service` | ✅ 保留 | `lca/plugins/sandbox_service.py` | `lca/layer0_infra/capability/sandbox.py` |
-| 11 | `memory_service` | ✅ 保留 | `lca/plugins/memory_service.py` | `lca/layer0_infra/capability/memory.py` |
-| 12 | `search_service` | ✅ 保留 | `lca/plugins/search_service.py` | `lca/layer0_infra/capability/search.py` |
-| 13 | `state_store_service` | ✅ 保留 | `lca/plugins/state_store_service.py` | `lca/layer0_infra/capability/state_store.py` |
-| 14 | `loop_cognitive` | ✅ 保留 | `lca/plugins/loop_cognitive.py` | `lca/layer3_agent/loop_cognitive.py` |
-| 15 | `loop_dsh_bridge` | ✅ 保留（过渡） | `lca/plugins/loop_dsh_bridge.py` | `lca/layer0_infra/dsh/` |
-| 16 | `loop_replay` | ✅ 保留 | `lca/plugins/loop_replay.py` | `lca/layer2_runtime/loop_replay.py` |
+| 3 | `tools_service` | ✅ 保留 | `lca/plugins/tools_service.py` | `lca/infrastructure/capability/tools.py` |
+| 4 | `session_service` | ✅ 保留 + 合并 agent_service | `lca/plugins/session_service.py` | `lca/infrastructure/session/{service,events_assistant,events_tool,events_turn,events_step}.py` |
+| 5 | `system_prompt` | ✅ 保留 | `lca/plugins/system_prompt.py` | `lca/infrastructure/system_prompt/{sections,assembler,service}.py` |
+| 6 | `transport_service` | ✅ 保留 | `lca/plugins/transport_service.py` | `lca/infrastructure/capability/transport.py` |
+| 7 | `skills_service` | ✅ 保留 | `lca/plugins/skills_service.py` | `lca/infrastructure/capability/skills.py` |
+| 8 | `file_store_service` | ✅ 保留 | `lca/plugins/file_store_service.py` | `lca/infrastructure/capability/files.py` |
+| 9 | `observability_service` | ✅ 保留 | `lca/plugins/observability_service.py` | `lca/infrastructure/capability/observability.py` |
+| 10 | `sandbox_service` | ✅ 保留 | `lca/plugins/sandbox_service.py` | `lca/infrastructure/capability/sandbox.py` |
+| 11 | `memory_service` | ✅ 保留 | `lca/plugins/memory_service.py` | `lca/infrastructure/capability/memory.py` |
+| 12 | `search_service` | ✅ 保留 | `lca/plugins/search_service.py` | `lca/infrastructure/capability/search.py` |
+| 13 | `state_store_service` | ✅ 保留 | `lca/plugins/state_store_service.py` | `lca/infrastructure/capability/state_store.py` |
+| 14 | `loop_cognitive` | ✅ 保留 | `lca/plugins/loop_cognitive.py` | `lca/agent/loop_cognitive.py` |
+| 15 | `loop_dsh_bridge` | ✅ 保留（过渡） | `lca/plugins/loop_dsh_bridge.py` | `lca/infrastructure/dsh/` |
+| 16 | `loop_replay` | ✅ 保留 | `lca/plugins/loop_replay.py` | `lca/runtime/loop_replay.py` |
 | 17 | `gateway_starlette` | ✅ 保留 | `lca/plugins/gateway_starlette.py` | `gateway/` |
-| 18 | `loop_intervention_policy` | 🔄 改名 | `lca/plugins/guards/loop_intervention.py` | `lca/layer2_runtime/loop_intervention_mw.py` |
-| 19 | `budget_policy` | 🔄 改名 | `lca/plugins/guards/step_budget.py` | `lca/layer2_runtime/budget_policy.py` |
+| 18 | `loop_intervention_policy` | 🔄 改名 | `lca/plugins/guards/loop_intervention.py` | `lca/runtime/loop_intervention_mw.py` |
+| 19 | `budget_policy` | 🔄 改名 | `lca/plugins/guards/step_budget.py` | `lca/runtime/budget_policy.py` |
 | 20 | `agent_service` | 🔀 合并入 session_service | — | — |
 | 21 | `seam_definitions` | ❌ 删除 | — | — |
 
 ### 6.2 路径约定：**module per plugin，唯一保留 package 是 `guards/`**
 
-**第一原则**：「plugin 文件 = `@plugin` 装饰 + 1-N 行 setup 函数」。**Service 类不居住在 plugin 文件里**——它住在 `lca/layer0_infra/capability/{name}.py` 或 `lca/layer2_runtime/` 或 `lca/layer3_agent/` 真正属于它的归口模块。plugin 文件只是把 service 挂到 ctx 的接线。
+**第一原则**：「plugin 文件 = `@plugin` 装饰 + 1-N 行 setup 函数」。**Service 类不居住在 plugin 文件里**——它住在 `lca/infrastructure/capability/{name}.py` 或 `lca/runtime/` 或 `lca/agent/` 真正属于它的归口模块。plugin 文件只是把 service 挂到 ctx 的接线。
 
 ```python
 # lca/plugins/llm_service.py  — 4 行
@@ -607,7 +607,7 @@ plugins:
 **Team Coordination 不 plugin 化（精修项 5）**：
 
 ```python
-# lca/layer3_agent/team/coordination/__init__.py  —— plain dataclass 集合
+# lca/agent/team/coordination/__init__.py  —— plain dataclass 集合
 from .pipeline import Pipeline
 from .fanout import FanOut
 from .graph import Graph
@@ -659,7 +659,7 @@ async def setup(ctx: TypedContext, config):
 
 旧的：
 ```python
-# lca/layer4_app/composer.py:225 — 硬编码
+# lca/application/composer.py:225 — 硬编码
 def _resolve_component(...):
     brain = ModularBrain(...)  # 直接 import + 构造
     return brain
@@ -667,7 +667,7 @@ def _resolve_component(...):
 
 新的（plugin 化后）：
 ```python
-# lca/layer4_app/composer.py — 一切来自 ctx
+# lca/application/composer.py — 一切来自 ctx
 def _resolve_component(scope, ...):
     factory = scope.brain_factory
     return factory.resolve("modular", ...)
@@ -740,7 +740,7 @@ class SessionEventType(str, Enum):
 #### 6.4.2 `SessionService.record()` 单一入口
 
 ```python
-# lca/layer0_infra/session/service.py
+# lca/infrastructure/session/service.py
 class SessionService:
     async def record(
         self,
@@ -763,7 +763,7 @@ class SessionService:
 **typed helpers**（可选，让常用事件不易写错）：
 
 ```python
-# lca/layer0_infra/session/typed_helpers.py
+# lca/infrastructure/session/typed_helpers.py
 
 @record_event(SessionEventType.ASSISTANT_MESSAGE)
 async def emit_assistant_message(
@@ -799,7 +799,7 @@ async def emit_step_end(self, session_id: str, turn: int, step: int) -> None: ..
 **Service 类拆 5 个文件**（与 5 个 typed helper 对应）：
 
 ```
-lca/layer0_infra/session/
+lca/infrastructure/session/
 ├── __init__.py
 ├── service.py                   # SessionService（聚合面）
 ├── events_assistant.py          # record_assistant_message + AssistantResponded 构造
@@ -809,7 +809,7 @@ lca/layer0_infra/session/
 └── surface.py                   # DSH surface event 投影（_project_message_accepted 等）
 ```
 
-`SessionService` 内部持 4 个 `*_recorder` 子对象（`self.assistant = AssistantRecorder(self._store)`），`record_*` 委派。`lca/layer0_infra/session/service.py` 主体仍是 plugin setup 的归口。
+`SessionService` 内部持 4 个 `*_recorder` 子对象（`self.assistant = AssistantRecorder(self._store)`），`record_*` 委派。`lca/infrastructure/session/service.py` 主体仍是 plugin setup 的归口。
 
 **plugin module 形状**：
 
@@ -829,7 +829,7 @@ async def setup(ctx, config):
 - `rg "agent_service"` 应只在 `lca/plugins/agent_service/`（删除目录）无引用
 - `rg "agent\.service"` 应只在 `bundles/base-spine.yaml` 引用（之后 P6 同步改名）
 - `rg "AgentService"` 找全 facade 引用
-- 已知 caller：`lca/layer3_agent/` + `lca/layer2_runtime/` + `lca/plugins/loop_cognitive.py` + `lca/plugins/loop_dsh_bridge.py` + `lca/plugins/loop_replay.py` 都需要扫一遍
+- 已知 caller：`lca/agent/` + `lca/runtime/` + `lca/plugins/loop_cognitive.py` + `lca/plugins/loop_dsh_bridge.py` + `lca/plugins/loop_replay.py` 都需要扫一遍
 
 ---
 
@@ -1013,7 +1013,7 @@ patch: []
 
 ---
 
-## 8. `lca/layer4_app/composer.py` 重写
+## 8. `lca/application/composer.py` 重写
 
 ### 8.1 `_isolate_agent_scope` 改动
 
@@ -1126,10 +1126,10 @@ spec 初稿说"约 6 处 `current_scope()`"——**错的**。`rg "current_scope
 
 | 文件 | 行 | 模式 | 替代 |
 |---|---|---|---|
-| `lca/layer4_app/composer.py` | 466 | `parent.fork(ScopeKind.AGENT, f"agent:{role}")` | `parent.scope(f"agent:{role}")` |
-| `lca/layer4_app/composer.py` | 476–492 | `child.provide(handle, key, value)` | `child.provide(key, value)` |
-| `lca/layer4_app/api.py` | 105 | `isinstance(x, ScopedPluginHost)` | `isinstance(x, Context)` |
-| `lca/layer4_app/api.py` | (other) | `scope.resolve(...)` | `ctx.inject(...)` |
+| `lca/application/composer.py` | 466 | `parent.fork(ScopeKind.AGENT, f"agent:{role}")` | `parent.scope(f"agent:{role}")` |
+| `lca/application/composer.py` | 476–492 | `child.provide(handle, key, value)` | `child.provide(key, value)` |
+| `lca/application/api.py` | 105 | `isinstance(x, ScopedPluginHost)` | `isinstance(x, Context)` |
+| `lca/application/api.py` | (other) | `scope.resolve(...)` | `ctx.inject(...)` |
 | `gateway/app.py` | 149–153 | `ScopedPluginHost.wrap(host, ScopeKind.DEPLOYMENT, ...)` | `Context.wrap(host)` + `setup_logging()` |
 | `lca/plugins/loop_cognitive.py` | 99, 105 | `plugin_scope.resolve("llm")` / `plugin_scope.resolve("tools")` | `ctx.inject("llm")` / `ctx.inject("tools")` |
 | `lca/plugins/loop_dsh_bridge.py` | — | `scope.resolve("session_store")` / `scope.resolve("dsh_settings")` | `ctx.inject(...)` |
@@ -1185,15 +1185,15 @@ ctx.provide("llm", service)                    # 2-arg (key, value, *, dispose=N
 | Phase | 内容 | 验证 |
 |---|---|---|
 | **P0** | vendor 引入 cordis + cosmokit + schemastery（`uv sync` 跑通 + `pyproject.toml` 加 `[tool.uv.sources]`） | `uv run python -c "from cordis import Context, plugin"` |
-| **P1** | 删 `lca/layer0_infra/plugin/`（含 `_test_plugins/`）+ `lca/harness/kernel/` | `rg -l lca.infrastructure.plugin` 空 |
+| **P1** | 删 `lca/infrastructure/plugin/`（含 `_test_plugins/`）+ `lca/harness/kernel/` | `rg -l lca.infrastructure.plugin` 空 |
 | **P2** | 拆 `lca/contracts/{harness/plugin.py, mechanisms/plugin.py, mechanisms/seam.py}` 三处：删 LCA seam 抽象，保留 `consume()` / `PluginConfig` | `rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|ScopeKind\|PluginKind\|ProviderMode\|SeamDeclaration\|SeamRegistry\|seam\b"` 仅命中 docstring；`rg "from lca.contracts.mechanisms.seam import consume"` 仍能 import |
 | **P3** | `lca/harness/middleware/registry.py` 10 点 `COGNITIVE_POINTS` 重写为 cordis event 名 map | `tests/test_middleware.py` |
 | **P4** | `lca/harness/profile/boot.py` 重写为 cordis.Loader 薄包装（保留 `boot_profile(path, *, check_seam_completeness: bool = True)` 签名；now no-op 警告） | `gateway/app.py:138` + `tests/harness/test_phase_a_integration.py:225` 跑通 |
-| **P5** | 21 个 Tier-1 plugin 改写为 `@plugin` 形式（module-per-plugin：每个 plugin file ≤ 50 行；service 类搬回 `lca/layer0_infra/capability/` 或 layer2/3 归口模块） | `uv run pytest lca/plugins/ tests/test_plugin_*.py` |
-| **P5.1** | Tier-2 Provider plugins 抽出（30+ entry：每个 capability seam 至少 1 个 default provider；`lca/layer4_app/capability_boot.py` 删除） | `uv run pytest tests/test_provider_*.py` + `lca/lca-ops status` 不再有 `capability_boot` 警告 |
+| **P5** | 21 个 Tier-1 plugin 改写为 `@plugin` 形式（module-per-plugin：每个 plugin file ≤ 50 行；service 类搬回 `lca/infrastructure/capability/` 或 layer2/3 归口模块） | `uv run pytest lca/plugins/ tests/test_plugin_*.py` |
+| **P5.1** | Tier-2 Provider plugins 抽出（30+ entry：每个 capability seam 至少 1 个 default provider；`lca/application/capability_boot.py` 删除） | `uv run pytest tests/test_provider_*.py` + `lca/lca-ops status` 不再有 `capability_boot` 警告 |
 | **P5.2** | Tier-3 Behavior plugins 抽出（15+ entry：brain / reasoner / synthesizer / team coordination / middleware / dsh bridge） | `uv run pytest tests/test_compose_*.py tests/test_team_*.py` |
 | **P6** | bundle / profile YAML 改写（`bundles/base.yaml` + `bundles/web-app.yaml` + `profiles/web-standard.yaml`） | `lca-ops status` + `lca-ops inspect-tree` |
-| **P7** | `composer.py` + `loop_cognitive` + `loop_dsh_bridge` + `loop_replay` + `gateway/app.py` + `lca/layer4_app/api.py` + `lca/harness/diagnostics/tree.py` 改写（`scope.resolve` → `ctx.inject`；`scope.fork` → `ctx.scope`；`scope.provide` → `ctx.provide`） | `uv run pytest lca/layer4_app/ tests/harness/` + `examples/pluggability_demo/` |
+| **P7** | `composer.py` + `loop_cognitive` + `loop_dsh_bridge` + `loop_replay` + `gateway/app.py` + `lca/application/api.py` + `lca/harness/diagnostics/tree.py` 改写（`scope.resolve` → `ctx.inject`；`scope.fork` → `ctx.scope`；`scope.provide` → `ctx.provide`） | `uv run pytest lca/application/ tests/harness/` + `examples/pluggability_demo/` |
 | **P8** | 端到端：`scripts/run_team_mode.py` 跑通真 e2e | Agent reply 在 journal |
 | **P9** | `loop_dsh_bridge` 重新挂上（之前在 P5 跑过 stub） | `lca-ops logs` 看 dsh bridge 记录 |
 
@@ -1206,7 +1206,7 @@ P3 / P5 必跑：
 - `uv run vulture lca --min-confidence 80`（确认删除干净）
 
 P4 / P6 必跑：
-- `uv run mypy lca/layer4_app`（签名变了）
+- `uv run mypy lca/application`（签名变了）
 
 ---
 
@@ -1263,7 +1263,7 @@ P4 / P6 必跑：
 - `lca-ops debug tree` 输出 **38 个 plugin 节点**（21 Tier-1 + 12 Tier-2 + 13 Tier-3），按依赖拓扑排序
 - `lca-ops debug run <id>` 输出 5+ 个 event，覆盖 user/turn/step/llm/assistant 至少 5 种类型
 - `lca-ops debug scope <id>` 输出 11+ 个 service，每个 typed property 可解析
-- `rg "ctx\.llm\." lca/layer4_app/` 找到至少 5 处 typed property 使用（验证精修项 2）
+- `rg "ctx\.llm\." lca/application/` 找到至少 5 处 typed property 使用（验证精修项 2）
 - `rg "@plugin" lca/plugins/ | wc -l` = 38（精确 plugin 数）
 - `uv run lint-imports` plugin top-level 0 违规（精修项 4）
 - `rg "from lca.infrastructure\|from lca.cognition\|from lca.runtime\|from lca.agent\|from lca.application" lca/plugins/*/` 仅命中 plugin setup 函数体内部（非模块顶层）
@@ -1282,7 +1282,7 @@ P4 / P6 必跑：
 
 **精简验收**（精修项 5）：
 
-- `rg "lca\.plugins\.team\.(pipeline|fanout|graph|debate|peer_relay|peer_swarm)"` 仅命中 `lca/layer3_agent/team/coordination/` 内部（非 plugin 形态）
+- `rg "lca\.plugins\.team\.(pipeline|fanout|graph|debate|peer_relay|peer_swarm)"` 仅命中 `lca/agent/team/coordination/` 内部（非 plugin 形态）
 - `rg "lca-team-(pipeline|fanout|graph|debate|peer-relay|peer-swarm)"` 空（精修前存在）
 
 **调试验收**（精修项 6）：
@@ -1298,7 +1298,7 @@ P4 / P6 必跑：
 | 原则 | 实施 | 验证 |
 |---|---|---|
 | **一切皆 plugin** | 38 个 plugin 覆盖 Definition/Provider/Behavior 三层；team coordination 不 plugin 化（无切换意图） | `lca-ops debug tree` |
-| **零硬编码组装** | L4 组合根全部 `ctx.<typed-property>`；`capability_boot.py` 删除 | `rg "from lca\.layer0_infra.*import" lca/layer4_app/` |
+| **零硬编码组装** | L4 组合根全部 `ctx.<typed-property>`；`capability_boot.py` 删除 | `rg "from lca\.infrastructure.*import" lca/application/` |
 | **Plugin 边界清晰** | Module-per-plugin（每个 file ≤ 50 行）；plugin top-level import 受 `importlinter` 约束 | `uv run lint-imports` |
 | **session 一切皆 event** | `SessionService.record(EventType, ...)` 单一入口；`SessionEventType` 枚举 25+ 类型 | `lca-ops debug run <id>` |
 | **types 不是装饰** | `TypedContext` Protocol，`ctx.llm` 等 typed property 优先于 `ctx.inject("llm")` | `rg "ctx\.<service-key>\." lca/` |

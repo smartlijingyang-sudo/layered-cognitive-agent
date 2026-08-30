@@ -151,7 +151,7 @@ class LLMStreamTap:
         # COMPLETED                → reasoning.completed.v1 / assistant.responded.v1
 ```
 
-落地点：`lca/layer1_cognitive/brain/llm_turn/executor.py` 在既有 `LLMStreamEventType` 分支里插入 `await tap.on_stream_event(...)`（不替换既有 yield，新增写入）。
+落地点：`lca/cognition/brain/llm_turn/executor.py` 在既有 `LLMStreamEventType` 分支里插入 `await tap.on_stream_event(...)`（不替换既有 yield，新增写入）。
 
 ### 5.2 `lca/harness/session/live_bus.py`（新）
 

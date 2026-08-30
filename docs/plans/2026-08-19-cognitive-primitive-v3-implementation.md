@@ -88,7 +88,7 @@ All scenarios are **configuration** combinations over the closed primitive set; 
 - [ ] PR4.C.3 — All workspace gates (`OfficeWorksSealer` / `TerminalRespondGate` / `ArtifactRespondInjector`) explicitly inherit `DecisionGate`
 - [ ] PR4.C.4 — Reasoner reads `_with_loop_warning` removed; uses Manifest `policy_fact` item
 - [ ] PR4.C.5 — `test_policy_fact_survives_into_next_manifest.py` green
-- [ ] PR5.C.6 — `runtime_factory.py` in `lca/layer4_app/` (not in `lca-loop-cognitive`)
+- [ ] PR5.C.6 — `runtime_factory.py` in `lca/application/` (not in `lca-loop-cognitive`)
 - [ ] PR5.C.7 — `_emit` return value ignored; `_sync_activated_skills` → `apply_activation`
 - [ ] PR5.C.8 — `DefaultStopRule` pure function returning `StopDecision`; Runtime applies via `apply_stop`
 

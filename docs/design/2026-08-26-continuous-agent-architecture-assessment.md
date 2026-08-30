@@ -203,12 +203,12 @@ LCA 不需要、也不应该把一切做成随意替换的 plugin。你现有架
 
 ## 参考
 
-[1]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/4e42134e/lca/layer2_runtime/runtime_loop.py "CognitiveRuntime：已验证运行绑定与统一执行入口"
+[1]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/4e42134e/lca/runtime/runtime_loop.py "CognitiveRuntime：已验证运行绑定与统一执行入口"
 [2]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/4e42134e/docs/adr/0081-audit-implementation.md "ADR-0075 实施深度审计与 Effect Gateway 收敛证据"
 [3]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/4e42134e/lca/harness/agent/registry.py "AgentRegistry：会话创建、JSONL 事实流重放与 live handle 恢复"
 [4]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/4e42134e/lca/contracts/atoms/plan_template.py "PlanTemplate：scheduled / self_evolving 仅为声明式模板目录"
 [5]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/4e42134e/lca/contracts/models/core/state.py "AgentState：单次运行状态模型"
-[6]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/4e42134e/lca/layer1_cognitive/memory/simple_memory.py "SimpleMemorySystem：四层记忆、策略与当前内存实现"
+[6]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/4e42134e/lca/cognition/memory/simple_memory.py "SimpleMemorySystem：四层记忆、策略与当前内存实现"
 [7]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/4e42134e/lca/harness/session/store.py "SessionStore：append-only JSONL 会话事实流"
 [8]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/4e42134e/docs/design/2026-08-19-cognitive-primitive-constitution-v3.md "认知原语宪法 v3：双平面、协作授权与长期 Agent 目标"
 

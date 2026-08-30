@@ -152,7 +152,7 @@ async def test_modular_brain_delegates_each_phase_to_selected_cognitive_primitiv
 def test_modular_brain_no_longer_owns_fixed_think_or_reflect_implementation() -> None:
     """The facade delegates; the standard sequence and null fallback live in providers."""
 
-    source = (REPO / "lca/layer1_cognitive/brain/modular_brain.py").read_text(encoding="utf-8")
+    source = (REPO / "lca/cognition/brain/modular_brain.py").read_text(encoding="utf-8")
 
     assert "generate_thoughts(" not in source
     assert "_default_reflect" not in source

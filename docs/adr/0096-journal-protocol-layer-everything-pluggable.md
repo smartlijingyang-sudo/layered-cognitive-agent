@@ -377,7 +377,7 @@ uv run vulture lca/plugins/seam_definitions/ lca/contracts/observability/ --min-
 - 新建 `lca/plugins/seam_definitions/journal_schema.py`：seam 声明
 - 新建 `lca/plugins/providers/journal_schema/v2.py`：provider 实现，字段名 `payload` 替 `data`
 - 新建 `lca/contracts/observability/schemas/migrate.py`：v1→v2.0.0 迁移函数
-- 修改 `lca/layer0_infra/observability/journal/journal_io.py`：`_record_to_v2` 改名为 `_record_to_v2_envelope` 并用 Pydantic 校验
+- 修改 `lca/infrastructure/observability/journal/journal_io.py`：`_record_to_v2` 改名为 `_record_to_v2_envelope` 并用 Pydantic 校验
 
 **不变量**：
 - 所有 envelope 字段都有显式 Pydantic 类型
@@ -397,10 +397,10 @@ uv run pytest tests/test_journal_io.py -q
 **改动**：
 - 新建 `lca/plugins/seam_definitions/event_identity.py`：seam 声明
 - 新建 `lca/plugins/providers/event_identity/stable_hash.py`：`_derive_event_id_stable(run_id, seq, event_type)` → sha256 hex
-- 修改 `lca/layer0_infra/observability/journal/engine.py:RunStore.append`：构造 StampedEvent 时**填** event_id
-- 修改 `lca/layer0_infra/observability/journal/journal_io.py`：删除 `_derive_event_id` 的 fallback 分支（stamp 已有 event_id，直接用）
-- 修改 `lca/layer0_infra/observability/journal/engine.py:RunStore.seal`：同上
-- 修改 `lca/layer0_infra/observability/journal/serialization.py`：导出 `current_event_identity()` 供消费者使用
+- 修改 `lca/infrastructure/observability/journal/engine.py:RunStore.append`：构造 StampedEvent 时**填** event_id
+- 修改 `lca/infrastructure/observability/journal/journal_io.py`：删除 `_derive_event_id` 的 fallback 分支（stamp 已有 event_id，直接用）
+- 修改 `lca/infrastructure/observability/journal/engine.py:RunStore.seal`：同上
+- 修改 `lca/infrastructure/observability/journal/serialization.py`：导出 `current_event_identity()` 供消费者使用
 
 **不变量**：
 - `RunStore.append` 返回的 StampedEvent 必有非空 event_id
@@ -426,7 +426,7 @@ uv run pytest tests/test_run_manifest.py::test_terminal_event_id_not_empty -q
   - audience=DOMAIN(domain=resource) + kind=plugin(operation=plugin.inventory) → 不进 SSE live；写 profile snapshot
   - audience=DOMAIN(domain=event) → 进 SSE live
   - audience=DOMAIN(domain=run) → 进 SSE live + jsonl
-- 修改 `lca/layer0_infra/observability/journal/sse_frames.py:stamped_to_sse_frame`：调用 visibility policy 过滤
+- 修改 `lca/infrastructure/observability/journal/sse_frames.py:stamped_to_sse_frame`：调用 visibility policy 过滤
 
 **不变量**：
 - `RuntimeObserved plugin.inventory` 永远不进 SSE live
@@ -541,7 +541,7 @@ uv run pytest tests/test_no_plugin_inventory_in_journal.py -q
 **改动**：
 - 修改 `scripts/migrate_journal_v1_to_v2.py`：支持原地转换 + 备份
 - 新建 `scripts/migrate_top_level_ledger.py`：扫描 `traces/lca_journal.jsonl`，备份到 `.bak`，迁移到 v2
-- 修改 `lca/layer0_infra/observability/journal/process_journal.py`：只接受 v2 输入；v1 → 自动 migrate 一次
+- 修改 `lca/infrastructure/observability/journal/process_journal.py`：只接受 v2 输入；v1 → 自动 migrate 一次
 - 新建 `tests/test_top_level_ledger_migration.py`：断言迁移后无 v1 残留
 
 **不变量**：
@@ -626,13 +626,13 @@ uv run scripts/check_protocol_schema_version.py
 **目标**：删除所有 fallback 与残留硬编码。
 
 **改动**：
-- 删除 `lca/layer0_infra/observability/journal/journal_io.py:_derive_event_id`（已不需要；identity provider 自带）
+- 删除 `lca/infrastructure/observability/journal/journal_io.py:_derive_event_id`（已不需要；identity provider 自带）
 - 删除 `gateway/runs/terminalizer.py:_terminal_event_id_for`（改用 _terminal_event_seq_for）
 - 删除 `deploy/lobehub/patches/runtime/lcaJournal.ts:parseSseBlock` 旧 fallback（用生成的 contract SDK）
 - 删除 `_TEXT_CHANNEL_ALL` 常量
 - 修改 `lca/contracts/observability/run_manifest.py`：删除 `terminal_event_id` 字段
 - 修改 `gateway/runs/api.py:iter_live_sse`：redact 默认 True
-- 修改 `lca/layer0_infra/observability/journal/journal_io.py:_record_to_v2`：删除 `data` 字段，全部用 `payload`
+- 修改 `lca/infrastructure/observability/journal/journal_io.py:_record_to_v2`：删除 `data` 字段，全部用 `payload`
 
 **不变量**：
 - 任何 fallback / 容错代码都必须有 ADR 论证

@@ -120,7 +120,7 @@ CommandEnvelope 和 Effect Gateway 也抓住了关键安全边界：模型输出
 
 ### P1-4：分层合同已经被实际导入路径破坏
 
-当前 `lint-imports` 结果显示：严格分层、L4 组合根隔离、Harness 不依赖 L1–L4、Plugins 不依赖 Gateway 等合同仍有破坏。代表性剩余路径包括 `layer0_infra → lca → layer4_app`、`harness.declarative.interpreter → layer2_runtime.control_runtime` 和 `plugins.loop_drivers.cognitive → gateway`。[1]
+当前 `lint-imports` 结果显示：严格分层、L4 组合根隔离、Harness 不依赖 L1–L4、Plugins 不依赖 Gateway 等合同仍有破坏。代表性剩余路径包括 `infrastructure → lca → application`、`harness.declarative.interpreter → runtime.control_runtime` 和 `plugins.loop_drivers.cognitive → gateway`。[1]
 
 这说明当前层级图在文档上很清楚，但代码中仍有公共包 lazy import、运行时 adapter、CLI 和 plugin factory 穿透边界。长期看，这会让任意新插件都需要理解大量隐式导入关系，维护成本会随插件数量非线性增长。
 
@@ -254,11 +254,11 @@ Typed Command
 [4]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/gateway/app.py "Starlette application and dual route paths"
 [5]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/gateway/runs/execute.py "Production run and resume execution path"
 [6]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/gateway/runs/session.py "RunSession and in-memory RunRegistry"
-[7]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/layer4_app/harness_live.py "Harness LiveAgent adapter"
+[7]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/application/harness_live.py "Harness LiveAgent adapter"
 [8]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/session/store.py "Durable SessionStore prototype"
 [9]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/projection/registry.py "In-memory projection registry"
 [10]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/declarative/compiler.py "Declarative plan compiler and phase/control binding"
-[11]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/layer2_runtime/declarative_runtime.py "Declarative runtime bridge"
+[11]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/runtime/declarative_runtime.py "Declarative runtime bridge"
 [12]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/declarative/interpreter.py "Generic phase graph interpreter"
 [13]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/ADR_66_69_74_75_76_IMPLEMENTATION_AUDIT.md "Current ADR implementation audit"
 [14]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/profiles/web-standard.yaml "Default production profile"

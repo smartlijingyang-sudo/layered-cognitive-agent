@@ -56,7 +56,7 @@ def build_tool_batch_execution_policy(mode: str) -> ToolBatchExecutionPolicy:
         "Provide a profile-selected safe, segmented-safe, parallel, or sequential "
         "strategy for model-emitted multi-tool batches without changing Body or SafeExecutor."
     ),
-    test_suite="tests/layer1_cognitive/body/test_tool_batch_execution.py",
+    test_suite="tests/cognition/body/test_tool_batch_execution.py",
     functional_group=FunctionalGroup.G7_EXECUTION,
     logic_address=LogicAddress(
         functional_group=FunctionalGroup.G7_EXECUTION,

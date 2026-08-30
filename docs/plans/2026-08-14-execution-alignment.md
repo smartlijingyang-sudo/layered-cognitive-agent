@@ -288,8 +288,8 @@ async def upload_files(request: Request) -> JSONResponse:
 ### Task 2.3: GatewayHttpClient — 替代 HostSandbox
 
 **Files:**
-- Create: `lca/layer0_infra/device_gateway/__init__.py`
-- Create: `lca/layer0_infra/device_gateway/client.py`
+- Create: `lca/infrastructure/device_gateway/__init__.py`
+- Create: `lca/infrastructure/device_gateway/client.py`
 
 ```python
 class GatewayHttpClient:
@@ -331,7 +331,7 @@ async def _stage_machine_attachments(session: RunSession) -> None:
 ### 当前 LCA 工具结构（问题）
 
 ```
-lca/layer0_infra/tools/
+lca/infrastructure/tools/
   computer/
     specs.py          # 所有工具定义挤在一个文件
     handlers.py       # 所有 handler 挤在一个文件
@@ -348,7 +348,7 @@ lca/layer0_infra/tools/
 ### 目标结构（对齐 LobeHub）
 
 ```
-lca/layer0_infra/tools/
+lca/infrastructure/tools/
   lca_computer/                    # = builtin-tool-local-system
     __init__.py                    # re-export manifest + executor
     manifest.py                    # Tool manifest (JSON schema for LLM)
@@ -394,7 +394,7 @@ lca/layer0_infra/tools/
 ### Manifest 格式（对齐 LobeHub BuiltinToolManifest）
 
 ```python
-# lca/layer0_infra/tools/lca_computer/manifest.py
+# lca/infrastructure/tools/lca_computer/manifest.py
 from lca.contracts.models.core.tool import ToolManifest, ToolApi
 
 IDENTIFIER = "lca-computer"
@@ -469,7 +469,7 @@ class ToolManifest:
 ### Executor 模式
 
 ```python
-# lca/layer0_infra/tools/lca_computer/executor.py
+# lca/infrastructure/tools/lca_computer/executor.py
 from lca.infrastructure.device_gateway.client import GatewayHttpClient
 
 
@@ -507,7 +507,7 @@ class LcaComputerExecutor:
 ### 工具注册
 
 ```python
-# lca/layer0_infra/tools/default_set.py (重写)
+# lca/infrastructure/tools/default_set.py (重写)
 from lca.infrastructure.tools.lca_computer import MANIFEST as COMPUTER_MANIFEST
 from lca.infrastructure.tools.lca_sandbox import MANIFEST as SANDBOX_MANIFEST
 
@@ -547,7 +547,7 @@ def build_default_tools(store, bindings):
 ### 对齐 LobeHub 的 executionTarget 决策
 
 ```python
-# lca/layer0_infra/plane/execution_target.py (新增)
+# lca/infrastructure/plane/execution_target.py (新增)
 from enum import Enum
 
 
@@ -604,7 +604,7 @@ def resolve_execution_target(
 ### 更新 plane resolution
 
 ```python
-# lca/layer0_infra/plane/resolve.py (更新)
+# lca/infrastructure/plane/resolve.py (更新)
 def resolve_plane_bindings(
     execution_target: ExecutionTarget,
     device_id: str | None = None,
@@ -780,7 +780,7 @@ async function executeWithSandbox(command: string, cwd: string): Promise<ToolRes
 ### Task 6.3: 云沙箱策略
 
 ```python
-# lca/layer0_infra/sandbox/policy.py (新增)
+# lca/infrastructure/sandbox/policy.py (新增)
 # Onlyboxes/Docker 沙箱也应用同样的 SandboxPolicy
 
 
@@ -819,9 +819,9 @@ rm tests/test_presence_*.py
 rm tests/test_host_sandbox.py
 
 # 删除旧的 computer tool 结构
-rm lca/layer0_infra/tools/computer/specs.py
-rm lca/layer0_infra/tools/computer/handlers.py
-rm lca/layer0_infra/tools/computer/descriptions.py
+rm lca/infrastructure/tools/computer/specs.py
+rm lca/infrastructure/tools/computer/handlers.py
+rm lca/infrastructure/tools/computer/descriptions.py
 ```
 
 ### Task 7.2: 更新 start script
@@ -879,8 +879,8 @@ uv run vulture lca --min-confidence 80
 | `gateway/presence/` | ~600 行 | `gateway/device_gateway/` |
 | `gateway/host_sandbox.py` | ~180 行 | `GatewayHttpClient` |
 | `gateway/plane_bind.py` | ~70 行 | `execution_target.py` |
-| `lca/layer0_infra/tools/computer/specs.py` | ~400 行 | `lca_computer/apis/*.py` |
-| `lca/layer0_infra/tools/computer/handlers.py` | ~300 行 | `lca_computer/executor.py` |
+| `lca/infrastructure/tools/computer/specs.py` | ~400 行 | `lca_computer/apis/*.py` |
+| `lca/infrastructure/tools/computer/handlers.py` | ~300 行 | `lca_computer/executor.py` |
 | 旧测试 | ~400 行 | 新测试 |
 | **总计** | **~3150 行** | 干净的新架构 |
 

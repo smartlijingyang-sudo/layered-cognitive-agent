@@ -5,7 +5,7 @@ multi-host layout 都通过实现该契约提供。目录命名:
 - 不可猜测的 ``<run_id>`` 即目录名(不可由本地时间戳 / 部分 hash / 人类命名承担身份)
 - 跨 OS 差异(Linux/macOS/Windows)封装在实现内,调用方只见 capability
 
-默认实现:``FilesystemRunLocator``(``lca/layer0_infra/observability/run_locator_fs.py``)。
+默认实现:``FilesystemRunLocator``(``lca/infrastructure/observability/run_locator_fs.py``)。
 """
 
 from __future__ import annotations

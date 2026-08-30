@@ -183,7 +183,7 @@ DEFAULT_YAML = """\
 #   - Shared layer: system packages, tools, venv, CLI → shared across users
 #   - User layer:   each user gets an account + workspace + daemon
 #
-# See lca/layer0_infra/host_runtime/config.py for the Pydantic models.
+# See lca/infrastructure/host_runtime/config.py for the Pydantic models.
 
 paths:
   tool_dir: /usr/local/bin

@@ -1,6 +1,6 @@
 """Compose-time named factories.
 
-The composition root (``lca/layer4_app/spawn.py``) does not instantiate
+The composition root (``lca/application/spawn.py``) does not instantiate
 concrete services inline — it resolves a factory through the cordis
 context (``ctx.require("<capability>.compose_service")()``). Each module
 in this package provides exactly one such factory.

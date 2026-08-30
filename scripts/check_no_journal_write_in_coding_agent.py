@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """check_no_journal_write_in_coding_agent —— ADR-0065 §六 / PR-8 / L6。
 
-扫描 ``lca/layer0_infra/observability/coding_agent_tools/`` 与
+扫描 ``lca/infrastructure/observability/coding_agent_tools/`` 与
 ``lca/plugins/bundles/coding_agent_tools.py``,确保 7 个 Coding Agent Tool
 实现里**没有**任何账本写入调用:
 
@@ -24,7 +24,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 
 SCAN_PATHS: tuple[Path, ...] = (
-    REPO / "lca" / "layer0_infra" / "observability" / "coding_agent_tools",
+    REPO / "lca" / "infrastructure" / "observability" / "coding_agent_tools",
     REPO / "lca" / "plugins" / "bundles" / "coding_agent_tools.py",
 )
 

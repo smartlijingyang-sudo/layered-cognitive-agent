@@ -1,6 +1,6 @@
 """GateChainComposer Protocol（ADR-0074：可定制决策门链组合）。
 
-当前 ``lca/layer1_cognitive/brain/decision_gates/__init__.py`` 中硬编码了
+当前 ``lca/cognition/brain/decision_gates/__init__.py`` 中硬编码了
 ``build_workspace_agent_gate()`` 函数（lines 29-52），固定了 5-gate 链顺序。
 Gates 本身是插件，但链组合（chain composition）不是。本 Protocol 将链组合
 抽象为可替换 seam：profile 通过 ``ctx.provide("gate_chain_composer", ...)``

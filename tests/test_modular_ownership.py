@@ -99,7 +99,7 @@ def test_doctor_facade_separates_legacy_and_session_spine_read_models() -> None:
 
 def test_temporal_memory_store_delegates_schema_and_record_codec() -> None:
     """The store adapter must not regain DDL or SQLite-row serialization ownership."""
-    source = _source("lca/layer0_infra/state_store/sqlite_temporal_memory.py")
+    source = _source("lca/infrastructure/state_store/sqlite_temporal_memory.py")
 
     assert "sqlite_temporal_codec" in source
     assert "sqlite_temporal_schema" in source
@@ -135,7 +135,7 @@ def test_openai_shim_is_a_facade_over_protocol_service_and_http_adapters() -> No
 
 def test_user_provider_facade_separates_account_workspace_and_cli_resources() -> None:
     """Host-runtime user resources must keep independently managed lifecycles."""
-    source = _source("lca/layer0_infra/host_runtime/providers/user.py")
+    source = _source("lca/infrastructure/host_runtime/providers/user.py")
 
     assert "providers.user_account" in source
     assert "providers.user_workspace" in source

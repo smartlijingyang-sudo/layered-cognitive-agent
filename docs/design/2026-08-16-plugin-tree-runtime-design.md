@@ -203,7 +203,7 @@ Loader 在创建 Fiber 时，dict 形式的值被合并到 child ctx 的 interce
 
 ### 5.2 PluginContext
 
-`lca/layer0_infra/plugin/context.py`。**只允许在 `apply` 和 loop 插件内部使用。** L1–L3 领域类不 import 它。
+`lca/infrastructure/plugin/context.py`。**只允许在 `apply` 和 loop 插件内部使用。** L1–L3 领域类不 import 它。
 
 ```python
 class PluginContext:
@@ -313,7 +313,7 @@ AsyncDisposable = Callable[[], Awaitable[None]]  # disposer 本身可 await
 
 ### 5.3 Loader
 
-`lca/layer0_infra/plugin/loader.py`。
+`lca/infrastructure/plugin/loader.py`。
 
 #### 5.3.1 Boot 流程
 
@@ -1295,11 +1295,11 @@ MyPlugin(BasePlugin)
 
 | 路径 | 职责 |
 |---|---|
-| `lca/layer4_app/profiles/lobehub-run.yaml` | 默认产品 profile：列出 bundle 顺序 |
-| `lca/layer4_app/bundles/lca-base.yaml` | 能力 Definition + 默认 Provider + 工具/技能/Journal |
-| `lca/layer4_app/bundles/lca-cognitive.yaml` | Brain / Body / Memory / Hook / Loop / Agent 工厂 |
-| `lca/layer4_app/bundles/lca-gateway.yaml` | HTTP、ingress、execute、live、openai-shim |
-| `lca/layer4_app/bundles/lca-dsh-loop.yaml` | 启用 `loop-dsh` 插件（登记 DshTurnDriver）。`lobehub-run` 默认已含该行且 `disabled: false` 也可——select 才决定用不用 |
+| `lca/application/profiles/lobehub-run.yaml` | 默认产品 profile：列出 bundle 顺序 |
+| `lca/application/bundles/lca-base.yaml` | 能力 Definition + 默认 Provider + 工具/技能/Journal |
+| `lca/application/bundles/lca-cognitive.yaml` | Brain / Body / Memory / Hook / Loop / Agent 工厂 |
+| `lca/application/bundles/lca-gateway.yaml` | HTTP、ingress、execute、live、openai-shim |
+| `lca/application/bundles/lca-dsh-loop.yaml` | 启用 `loop-dsh` 插件（登记 DshTurnDriver）。`lobehub-run` 默认已含该行且 `disabled: false` 也可——select 才决定用不用 |
 
 组合算法与 DSH `composeEntries` 相同：从空列表开始，按 profile 声明的 bundle 顺序把每个 bundle 的 `insert` 追加进去，再应用 profile 自己的 `patch`（按 `id` **整行替换** `config`，或 `insert` 新行，或 `disabled: true`）。不深合并。
 
@@ -1321,11 +1321,11 @@ MyPlugin(BasePlugin)
 | 层 | 目录 | 可 import |
 |---|---|---|
 | contracts | `lca/contracts/mechanisms/plugin.py` | 无实现 |
-| L0 | `lca/layer0_infra/plugins/` | contracts + L0 |
-| L1 | `lca/layer1_cognitive/plugins/` | ≤ L1 |
-| L2 | `lca/layer2_runtime/plugins/` | ≤ L2 |
-| L3 | `lca/layer3_agent/plugins/` | ≤ L3 |
-| L4 | `lca/layer4_app/plugins/`、`profiles/`、`bundles/` | 全部（组合根） |
+| L0 | `lca/infrastructure/plugins/` | contracts + L0 |
+| L1 | `lca/cognition/plugins/` | ≤ L1 |
+| L2 | `lca/runtime/plugins/` | ≤ L2 |
+| L3 | `lca/agent/plugins/` | ≤ L3 |
+| L4 | `lca/application/plugins/`、`profiles/`、`bundles/` | 全部（组合根） |
 | 进程 | `gateway/plugins/` | lca + gateway |
 
 `lint-imports` 保持现有层约束。插件不是逃逸舱。
@@ -1697,9 +1697,9 @@ S3 完成 = 「加载全部插件，默认 agent 主流程通」。S4 证明以�
 6. 下列命令在实现切片对应范围内绿（S3 时跑 gateway + 脊柱相关测试，提交前按 AGENTS.md 升全量）：
 
 ```
-uv run ruff check --fix lca/layer0_infra/plugin lca/layer0_infra/plugins \
-  lca/layer1_cognitive/plugins lca/layer2_runtime/plugins \
-  lca/layer3_agent/plugins lca/layer4_app lca/contracts/mechanisms \
+uv run ruff check --fix lca/infrastructure/plugin lca/infrastructure/plugins \
+  lca/cognition/plugins lca/runtime/plugins \
+  lca/agent/plugins lca/application lca/contracts/mechanisms \
   gateway/plugins gateway/app.py
 uv run ruff format <同上>
 uv run pytest --no-cov tests/test_plugin_loader.py tests/test_plugin_profile.py \
@@ -1837,7 +1837,7 @@ class RunnableHandle(Protocol):
 
 ## 21. 参考实现：完整可运行 Python 插件内核
 
-> 本节代码是 **独立可运行的教学内核**，用于验证 §5 设计的可行性。它不是 LCA 生产代码；LCA 的 Loader 实现应按 §5.1–5.4 的接口约定、落进 `lca/layer0_infra/plugin/` 和 `lca/layer0_infra/plugins/`。
+> 本节代码是 **独立可运行的教学内核**，用于验证 §5 设计的可行性。它不是 LCA 生产代码；LCA 的 Loader 实现应按 §5.1–5.4 的接口约定、落进 `lca/infrastructure/plugin/` 和 `lca/infrastructure/plugins/`。
 >
 > 该实现刻意只使用 Python 标准库（`asyncio`、`dataclasses`、`enum`、`importlib`、`inspect`、`json`、`pathlib`），覆盖插件系统的完整闭环：动态模块加载、`apply(ctx, config)`、`inject` 依赖门控、具名服务、事件、effect/disposer、服务消失后的依赖级联停用、服务恢复后的自动重载，以及配置更新失败时的回滚。
 
@@ -1977,14 +1977,14 @@ def apply(ctx, config):
 |---|---|---|
 | `PluginSpec` | `lca/contracts/mechanisms/plugin.py`（Protocol） | 加 `Config` pydantic model；加 `provides`；加 `is_class` 标记 |
 | `PluginHandle` | Loader 内部状态 | 加 `entry: PluginEntry` 引用；加 `inertia` 任务追踪；加 `_accessors` |
-| `PluginContext` | `lca/layer0_infra/plugin/context.py` | 对接 `CapabilityHub`；加 `once`/`parallel`/`serial`/`bail`/`accessor`/`mixin`/`inject`/`set` |
-| `EventBus` | `lca/layer1_cognitive/event_bus.py`（已有 `SimpleEventBus`） | 扩 5 种 dispatch；加 Context filter；加 owner 生命周期 |
+| `PluginContext` | `lca/infrastructure/plugin/context.py` | 对接 `CapabilityHub`；加 `once`/`parallel`/`serial`/`bail`/`accessor`/`mixin`/`inject`/`set` |
+| `EventBus` | `lca/cognition/event_bus.py`（已有 `SimpleEventBus`） | 扩 5 种 dispatch；加 Context filter；加 owner 生命周期 |
 | `Service` 基类 | `lca/contracts/mechanisms/service.py` | 新增 ABC；构造即注册 + check + init + resolveConfig |
-| `TimerService` | `lca/layer0_infra/plugins/timer.py` | 作为插件提供 timeout/interval/debounce/throttle |
-| `PluginHost._reconcile` | `lca/layer0_infra/plugin/loader.py` 的 `boot()` | 加 `await_all`；加 `assertEntriesLoaded`；加 `REQUIRED_SEAM_KEYS` |
+| `TimerService` | `lca/infrastructure/plugins/timer.py` | 作为插件提供 timeout/interval/debounce/throttle |
+| `PluginHost._reconcile` | `lca/infrastructure/plugin/loader.py` 的 `boot()` | 加 `await_all`；加 `assertEntriesLoaded`；加 `REQUIRED_SEAM_KEYS` |
 | `PluginHost.create_entry` / `remove_entry` | `loader.py` | 运行时变更 + 文件回写持久化 |
 | `import_plugin`（3 形态） | `loader.py` 的 `_import_module` | 接受 Python import path；支持 Function/Constructor/Object |
-| `load_json_config` | `lca/layer4_app/profile.py` 的 `compose()` | 读 YAML；支持 bundles + patches + 嵌套 entry |
+| `load_json_config` | `lca/application/profile.py` 的 `compose()` | 读 YAML；支持 bundles + patches + 嵌套 entry |
 | `update_config`（三态 diff） | `loader.py` 的 Entry update | config-only 热重启 / name+inject 替换 / disabled 切换 |
 | `DisposableList` / `EffectMeta` | `loader.py` 内部 | O(1) 删除 + 诊断树 |
 | `compose_error` | `loader.py` 内部 | caller 栈拼接 |

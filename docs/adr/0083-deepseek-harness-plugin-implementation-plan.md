@@ -60,10 +60,10 @@
 ```text
 lca/
 ├── contracts/                         # 宪法、Protocol、typed atoms、plan 数据结构
-├── layer0_infra/                      # 低层基础设施纯实现与适配工具
-├── layer1_cognitive/                  # 认知领域纯实现；不得直接写 state
-├── layer2_runtime/                    # 稳定解释器、Reducer、六阶段闭集
-├── layer3_agent/                      # Agent/Team 领域模型与协作纯实现
+├── infrastructure/                      # 低层基础设施纯实现与适配工具
+├── cognition/                  # 认知领域纯实现；不得直接写 state
+├── runtime/                    # 稳定解释器、Reducer、六阶段闭集
+├── agent/                      # Agent/Team 领域模型与协作纯实现
 ├── plugins/
 │   ├── seam_definitions/               # capability/service/registry 的 owner
 │   ├── providers/                      # seam 的具体实现注册或 factory
@@ -147,7 +147,7 @@ flowchart LR
 
 **目标。** 把 runtime interpreter 固定为稳定内核，把可变化行为全部通过 binding 注入。
 
-**主要文件。** `lca/layer2_runtime/runtime_loop.py`、`lca/layer2_runtime/declarative_runtime.py`、`lca/layer2_runtime/reducer.py`、`lca/layer2_runtime/loop_topology.py`、`lca/plugins/providers/effect_handlers.py`、`lca/plugins/providers/delta_handlers.py`、`lca/contracts/protocols/effect_handler.py`、`lca/contracts/protocols/delta_handler.py`、`lca/contracts/protocols/reducer.py`。
+**主要文件。** `lca/runtime/runtime_loop.py`、`lca/runtime/declarative_runtime.py`、`lca/runtime/reducer.py`、`lca/runtime/loop_topology.py`、`lca/plugins/providers/effect_handlers.py`、`lca/plugins/providers/delta_handlers.py`、`lca/contracts/protocols/effect_handler.py`、`lca/contracts/protocols/delta_handler.py`、`lca/contracts/protocols/reducer.py`。
 
 **任务。** 将 `CognitiveRuntime` 的 constructor fallback 分成两个入口：生产入口只接受完整 `RuntimeBinding`；测试入口可显式构造 `NullRuntimeBinding` 或 `TestRuntimeBinding`。`DeclarativeRuntimeDriver` 不得从 context 自行寻找具体 provider。EffectHandler 接收带 grant/scope/effect/idempotency 的 `CommandEnvelope`，返回可持久化 `EffectReceipt`；DeltaHandler 接收 typed `RunDelta`，只生成 reducer 可接受的投影操作；Reducer 继续是唯一状态写入者。
 
@@ -157,7 +157,7 @@ flowchart LR
 
 **目标。** 消除 action catalog 中隐藏的实现选择，使 Decision → ActionHandler → CommandEnvelope → EffectHandler 形成可观察链路。
 
-**主要文件。** `lca/layer1_cognitive/body/action_catalog.py`、`lca/layer1_cognitive/body/simple_body.py`、`lca/plugins/composer/plan_composers.py`、`lca/plugins/seam_definitions/action_handler.py`、`lca/plugins/providers/action_handlers.py`、`lca/contracts/models/core/execution.py`、`lca/contracts/models/core/approval.py`、相关 `tests/contract/test_action_registry.py`。
+**主要文件。** `lca/cognition/body/action_catalog.py`、`lca/cognition/body/simple_body.py`、`lca/plugins/composer/plan_composers.py`、`lca/plugins/seam_definitions/action_handler.py`、`lca/plugins/providers/action_handlers.py`、`lca/contracts/models/core/execution.py`、`lca/contracts/models/core/approval.py`、相关 `tests/contract/test_action_registry.py`。
 
 **任务。** 将 `_SCOPE_ACTIONS` 改造成 typed `ActionAuthorityPolicy`，由 profile/role/scope 编译得到；action handler registry 只负责按 action type 解析处理器，不负责偷偷扩大允许集合。`BodyComposer` 只接收 compiled action registry、tool bindings、safe executor 和 transport binding。默认 handler 可以由 bundle 提供，但不得在 `build_default_action_registry()` 内部重新注册同一组实现。每个 handler 必须声明输入 Decision、输出 CommandEnvelope/Observation、effect class、所需 grant 和失败 receipt。
 
@@ -167,7 +167,7 @@ flowchart LR
 
 **目标。** 保持六阶段闭集，同时让每个 control slot 独立、可组合、可验证。
 
-**主要文件。** `lca/plugins/control_contributions/*.py`、`lca/contracts/protocols/declarative_phase_graph.py`、`lca/contracts/protocols/plan.py`、`lca/harness/declarative/compiler.py`、`lca/layer2_runtime/declarative_runtime.py`、`bundles/declarative-phase-graph.yaml`、`tests/declarative/test_control_contributions.py`、`tests/plan/test_plan_compiler.py`。
+**主要文件。** `lca/plugins/control_contributions/*.py`、`lca/contracts/protocols/declarative_phase_graph.py`、`lca/contracts/protocols/plan.py`、`lca/harness/declarative/compiler.py`、`lca/runtime/declarative_runtime.py`、`bundles/declarative-phase-graph.yaml`、`tests/declarative/test_control_contributions.py`、`tests/plan/test_plan_compiler.py`。
 
 **任务。** 统一每个 contribution 的 typed input/output、`order`、`activation`、`aggregation`、`failure_mode`、`authority`、`reads`、`emits` 和 `effect_class`。对 authorize、budget、constrain、safe-boundary 使用单调收紧聚合；对 observe 使用只读语义；对 perceive.context 要求来源 provenance；对 remember.admit 要求 memory scope；对 stop.decide 要求能解释停止原因。将 phase edge/recovery edge 的触发条件纳入 plan hash，避免同一个 plan_ref 隐含不同恢复图。
 
@@ -187,7 +187,7 @@ flowchart LR
 
 **目标。** 使 Team 的策略、成员调用、transport、shared memory、subagent 和 mode 都能分别替换。
 
-**主要文件。** `lca/plugins/composer/plan_composers.py`、`lca/layer3_agent/member_invoke.py`、`lca/layer1_cognitive/memory/team_shared_memory.py`、`lca/plugins/composer/team_transport.py`、`gateway/runs/runnable_assembly.py`、`gateway/modes.py`、`lca/contracts/protocols/*team*`、`lca/contracts/capabilities.py`。
+**主要文件。** `lca/plugins/composer/plan_composers.py`、`lca/agent/member_invoke.py`、`lca/cognition/memory/team_shared_memory.py`、`lca/plugins/composer/team_transport.py`、`gateway/runs/runnable_assembly.py`、`gateway/modes.py`、`lca/contracts/protocols/*team*`、`lca/contracts/capabilities.py`。
 
 **任务。** 新增并稳定化以下 capability：`team_shared_memory`、`member_invoker`、`team_transport`、`team_stage`、`run_mode_adapter`。TeamComposer 只接收这些 binding，并根据 TeamSpec 生成 TeamAssembly；不得直接实例化 `TeamSharedMemoryStore`、`TransportMemberInvoker` 或调用固定 `build_team_transport`。为 mode adapter 定义 `ModeDefinition`，至少包含 mode id、tool grant、persona sections、composer set、team policy、evidence policy 和 allowed transitions。gateway 只解析请求、鉴权、查找 mode provider 并转发。
 
@@ -239,7 +239,7 @@ Profile 只负责选择 bundle 和提供环境/场景参数。结构性 capabili
 | Runtime closure | phase executor、topology、reducer、effect/delta、control/evidence binding 完整 | `tests/architecture/`, `tests/declarative/` |
 | 替换性 | 替换单个 phase、control slot、action handler、effect handler、delta handler 不改 interpreter/composer | 新增 `tests/substitutability/` |
 | Authority | action scope、tool grant、child subset、Team member authority、Creator promote | `tests/harness/`, `tests/team/`, `tests/creator/` |
-| Effect safety | envelope、approval、sandbox、idempotency、receipt、重复执行 | `tests/layer2_runtime/`, `tests/e2e/` |
+| Effect safety | envelope、approval、sandbox、idempotency、receipt、重复执行 | `tests/runtime/`, `tests/e2e/` |
 | Replay | session log → prompt/tool/context/effect/state reconstruction | `tests/replay/`, `tests/journal/` |
 | Team | strategy、transport、invoker、shared memory 独立替换与清理 | `tests/team/`, `tests/test_team_chain_cleanup.py` |
 | Gateway | 新增 mode 只改 plugin/profile，路由与 payload 稳定 | `tests/test_architecture_gateway.py`, `tests/gateway/` |
@@ -356,7 +356,7 @@ DeepSeek Harness 的核心经验是把运行中的 Agent 看成一棵由 profile
 
 [5]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/harness/plugin_api.py> "LCA Plugin API"
 
-[6]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/layer2_runtime/runtime_loop.py> "LCA Runtime Loop"
+[6]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/runtime_loop.py> "LCA Runtime Loop"
 
 [7]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/bundles/base.yaml> "LCA Base Bundle"
 

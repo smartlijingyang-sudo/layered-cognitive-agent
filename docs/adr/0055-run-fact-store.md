@@ -434,12 +434,12 @@ class RunHandle:
 
 ### 九、DSH 边界 —— 从 observability 子树迁出
 
-当前 `lca/layer0_infra/dsh/` 与 `observability/journal/` 并列，暗示 DSH 是可观测性组件。实际 DSH 是 **execution driver**。
+当前 `lca/infrastructure/dsh/` 与 `observability/journal/` 并列，暗示 DSH 是可观测性组件。实际 DSH 是 **execution driver**。
 
 ```
 目标布局（渐进迁移）：
 
-lca/layer0_infra/
+lca/infrastructure/
   observability/
     journal/
       engine.py          → RunStore（重命名）
@@ -606,7 +606,7 @@ Prompt、模型输出、工具参数可能包含敏感信息。借鉴 Manus 指�
 
 - [ ] 引入 `RunHandle` dataclass
 - [ ] `HandleJournalSink` 替代 `FacadeJournalSink`（显式 store 引用）
-- [ ] `lca/layer0_infra/dsh/` 迁至 `lca/layer0_infra/adapters/drivers/dsh/`
+- [ ] `lca/infrastructure/dsh/` 迁至 `lca/infrastructure/adapters/drivers/dsh/`
 - [ ] `DshJournalProjector` 重命名为 `DshFolder`（纯函数 fold 语义）
 
 **验收**：

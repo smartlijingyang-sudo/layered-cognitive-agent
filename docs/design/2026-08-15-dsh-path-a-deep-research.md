@@ -431,7 +431,7 @@ if __name__ == "__main__":
 ### 6.3 LCA 集成骨架
 
 ```python
-# lca/layer0_infra/tools/dsh_backend.py
+# lca/infrastructure/tools/dsh_backend.py
 
 from __future__ import annotations
 

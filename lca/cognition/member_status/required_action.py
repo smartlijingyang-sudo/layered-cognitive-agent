@@ -2,7 +2,7 @@
 
 Single pure function deciding the consultation state machine step.
 Producer (this module) and consumer (must_consult_all gate) both live in
-layer1_cognitive — layer-private collaboration types stay out of contracts.
+cognition — layer-private collaboration types stay out of contracts.
 
 ADR-0049：优先走证据驱动的 ``compute_consult_next``；本模块保留
 ``RequiredAction`` 薄适配，兼容既有 gate/测试。

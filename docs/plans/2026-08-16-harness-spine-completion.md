@@ -26,8 +26,8 @@
 ## Task 1: Seam Catalog 迁移为 Loader reconcile pass（A.7）
 
 **Files:**
-- Modify: `lca/layer0_infra/plugin/loader/_loader.py` (add `_check_seam_completeness`)
-- Modify: `lca/layer4_app/capability_boot.py` (simplify `register_seam_catalog`)
+- Modify: `lca/infrastructure/plugin/loader/_loader.py` (add `_check_seam_completeness`)
+- Modify: `lca/application/capability_boot.py` (simplify `register_seam_catalog`)
 - Create: `tests/harness/test_seam_completeness.py`
 
 **Interfaces:**
@@ -124,7 +124,7 @@ Expected: FAIL — `Loader` has no `_check_seam_completeness` method
 
 - [ ] **Step 3: Implement `_check_seam_completeness` in Loader**
 
-在 `lca/layer0_infra/plugin/loader/_loader.py` 中添加：
+在 `lca/infrastructure/plugin/loader/_loader.py` 中添加：
 
 ```python
 async def _check_seam_completeness(self, handles: list) -> None:
@@ -175,7 +175,7 @@ Expected: PASS
 - [ ] **Step 5: Simplify `register_seam_catalog()` to delegate to Loader**
 
 ```python
-# lca/layer4_app/capability_boot.py
+# lca/application/capability_boot.py
 def register_seam_catalog() -> None:
     """@deprecated: Loader._check_seam_completeness() 已替代此函数。"""
     import warnings
@@ -190,7 +190,7 @@ def register_seam_catalog() -> None:
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lca/layer0_infra/plugin/loader/_loader.py lca/layer4_app/capability_boot.py tests/harness/test_seam_completeness.py
+git add lca/infrastructure/plugin/loader/_loader.py lca/application/capability_boot.py tests/harness/test_seam_completeness.py
 git commit -m "feat(harness): A.7 seam catalog migration to Loader reconcile pass"
 ```
 
@@ -803,7 +803,7 @@ def test_session_routes_no_concrete_import():
     source = Path("lca/plugins/gateway_starlette/session_routes.py").read_text()
     tree = ast.parse(source)
 
-    forbidden = {"layer1_cognitive", "layer2_runtime", "layer3_agent"}
+    forbidden = {"cognition", "runtime", "agent"}
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             module = getattr(node, "module", None) or ""
@@ -945,7 +945,7 @@ git commit -m "feat(harness): B.7 LegacyApiAdapter for /runs/* → /v1/sessions/
 ## Task 7: CognitiveRuntime Middleware Phase 开放（C.3）
 
 **Files:**
-- Modify: `lca/layer2_runtime/runtime_loop.py`
+- Modify: `lca/runtime/runtime_loop.py`
 - Create: `tests/harness/test_runtime_middleware_integration.py`
 
 **Interfaces:**
@@ -1027,7 +1027,7 @@ Expected: PASS (registry already implemented)
 
 - [ ] **Step 3: Integrate middleware into CognitiveRuntime step()**
 
-In `lca/layer2_runtime/runtime_loop.py`, modify the `step()` or `run()` method to call middleware at each phase boundary:
+In `lca/runtime/runtime_loop.py`, modify the `step()` or `run()` method to call middleware at each phase boundary:
 
 ```python
 async def _run_phase_with_middleware(
@@ -1067,7 +1067,7 @@ def test_runtime_no_hardcoded_hooks():
     import ast
     from pathlib import Path
 
-    source = Path("lca/layer2_runtime/runtime_loop.py").read_text()
+    source = Path("lca/runtime/runtime_loop.py").read_text()
     tree = ast.parse(source)
 
     forbidden_patterns = {"budget_check", "loop_intervention", "journal_emitting"}
@@ -1084,7 +1084,7 @@ def test_runtime_no_hardcoded_hooks():
 Run: `pytest tests/harness/test_runtime_middleware_integration.py tests/test_architecture_runtime.py -v`
 
 ```bash
-git add lca/layer2_runtime/runtime_loop.py tests/harness/test_runtime_middleware_integration.py tests/test_architecture_runtime.py
+git add lca/runtime/runtime_loop.py tests/harness/test_runtime_middleware_integration.py tests/test_architecture_runtime.py
 git commit -m "feat(harness): C.3 CognitiveRuntime middleware phase boundary integration"
 ```
 
@@ -1664,7 +1664,7 @@ def test_gateway_import_boundary():
     source = Path("lca/harness/command/gateway.py").read_text()
     tree = ast.parse(source)
 
-    forbidden = {"layer1_cognitive", "layer2_runtime", "layer3_agent",
+    forbidden = {"cognition", "runtime", "agent",
                  "contracts.harness.agent"}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
@@ -1677,7 +1677,7 @@ def test_gateway_import_boundary():
 
 def test_no_hardcoded_boot_in_composer():
     """AgentComposer.compose(scope=...) does not call boot_capabilities()"""
-    source = Path("lca/layer4_app/composer.py").read_text()
+    source = Path("lca/application/composer.py").read_text()
     # When scope is provided, boot_capabilities should NOT be called
     # This is a soft check — we verify the scope path exists
     assert "scope" in source

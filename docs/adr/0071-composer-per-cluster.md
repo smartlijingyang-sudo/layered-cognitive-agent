@@ -4,7 +4,7 @@
 
 **Partially Accepted — 2026-08-21（PR-5 / PR-10）**
 
-**现行实现**：Composer Protocol + AgentGraph / TeamGraph frozen dataclasses 由 BrainComposer、BodyComposer、PerceiveComposer 与 TeamComposer 实现。TeamComposer 只依赖 `AgentAssemblyPort`；`PlanBoundAgentAssembler` 负责 profile plan 编译、图绑定、Agent 运行时闭合与 lead 预算提升。`lca/plugins/composer/{agent_assembly,plan_binding,runtime_factory,team_transport}.py` 承载组合 implementation，`lca/layer4_app/` 保留兼容导出与 spawn 门面。
+**现行实现**：Composer Protocol + AgentGraph / TeamGraph frozen dataclasses 由 BrainComposer、BodyComposer、PerceiveComposer 与 TeamComposer 实现。TeamComposer 只依赖 `AgentAssemblyPort`；`PlanBoundAgentAssembler` 负责 profile plan 编译、图绑定、Agent 运行时闭合与 lead 预算提升。`lca/plugins/composer/{agent_assembly,plan_binding,runtime_factory,team_transport}.py` 承载组合 implementation，`lca/application/` 保留兼容导出与 spawn 门面。
 
 Keeps: [ADR-0005](0005-composition-root-l4.md)、[ADR-0056](0056-plugin-group-contribution.md)、[ADR-0061](0061-plugin-manifest-resolve-boot.md)
 
@@ -12,7 +12,7 @@ Keeps: [ADR-0005](0005-composition-root-l4.md)、[ADR-0056](0056-plugin-group-co
 
 ## 背景
 
-`lca/layer4_app/spawn.py` 是 L4 组合根门面：解析 booted scope、委托 `PlanBoundAgentAssembler` 闭合 Agent，并闭合 TeamHandle。plan 绑定、运行时构造、Team transport 与成员递归装配属于 `lca/plugins/composer/` 的 implementation。
+`lca/application/spawn.py` 是 L4 组合根门面：解析 booted scope、委托 `PlanBoundAgentAssembler` 闭合 Agent，并闭合 TeamHandle。plan 绑定、运行时构造、Team transport 与成员递归装配属于 `lca/plugins/composer/` 的 implementation。
 
 具体摩擦：
 
@@ -69,7 +69,7 @@ def spawn_agent(spec: AgentSpec, *, scope: Context | None = None) -> CognitiveAg
 
 **验证约束：**
 
-- `tests/layer4_app/test_spawn_bind_plan.py` 覆盖计划绑定、缺失 composer、缺失 capability 与默认 profile Agent 闭合
+- `tests/application/test_spawn_bind_plan.py` 覆盖计划绑定、缺失 composer、缺失 capability 与默认 profile Agent 闭合
 - `tests/test_lead_composition.py` 与 `tests/test_shared_memory_isolation.py` 覆盖 lead 预算与成员共享记忆
 - `tests/test_plugin_tree_single_owner.py` 覆盖默认 profile 的 sub-composer 注入
 - TeamComposer 不得 import L4 `spawn` 或 `team_wiring`

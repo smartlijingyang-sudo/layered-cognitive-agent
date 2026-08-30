@@ -102,28 +102,28 @@ DSH 自身就叫 "DeepSeek Harness"，本 spec 沿用 `harness` 作为**内部�
 
 ### 1.1 Plugin Kernel（已实现，质量高）
 
-**`lca/layer0_infra/plugin/kernel/_host.py`** — `PluginHost`:
+**`lca/infrastructure/plugin/kernel/_host.py`** — `PluginHost`:
 - 纯数据容器：`_services: dict[str, ServiceRecord]`、`events: EventBus`、`_handles: dict[str, PluginHandle]`
 - `provide(handle, name, value, check)` — mount service with ownership
 - `get_service(name)` — lookup without lifecycle check (delegates to lifecycle layer)
 - `remove_owned_services(handle)` — cascade cleanup
 
-**`lca/layer0_infra/plugin/kernel/_context.py`** — `PluginContext`:
+**`lca/infrastructure/plugin/kernel/_context.py`** — `PluginContext`:
 - Plugin-facing API：`get/require/set/mount` 服务、`effect` 可逆副作用、`on/once/emit/waterfall` 事件
 - `child(key, values)` — run-scoped overlay（**关键：这是 Scope 的原型**）
 - `inject(deps, callback)` — dynamic sub-fiber creation
 - `accessor/mixin` — computed properties
 
-**`lca/layer0_infra/plugin/kernel/_lifecycle.py`** — `reconcile()`:
+**`lca/infrastructure/plugin/kernel/_lifecycle.py`** — `reconcile()`:
 - 驱动所有 handle 收敛：LOADING → ACTIVE via dependency resolution
 - Effect LIFO disposal、cascade deactivation、config rollback
 
-**`lca/layer0_infra/plugin/loader/_loader.py`** — `Loader`:
+**`lca/infrastructure/plugin/loader/_loader.py`** — `Loader`:
 - Topological loading：validate shapes → register handles → check provides uniqueness → reconcile → check failures
 - Config validation via pydantic
 - Cycle detection via provides-map reachability
 
-**`lca/layer0_infra/plugin/include/`** — Profile Loader:
+**`lca/infrastructure/plugin/include/`** — Profile Loader:
 - YAML bundle → profile → patch 展开
 - Module import → `PluginEntry` → Loader
 
@@ -131,7 +131,7 @@ DSH 自身就叫 "DeepSeek Harness"，本 spec 沿用 `harness` 作为**内部�
 
 ### 1.2 Capability Boot（当前问题点）
 
-**`lca/layer4_app/capability_boot.py`**:
+**`lca/application/capability_boot.py`**:
 
 ```python
 def boot_capabilities() -> CapabilityHub:
@@ -148,7 +148,7 @@ def boot_capabilities() -> CapabilityHub:
 
 ### 1.3 Composer（直接构造，无间接层）
 
-**`lca/layer4_app/composer.py`** — `AgentComposer.compose()`:
+**`lca/application/composer.py`** — `AgentComposer.compose()`:
 ```
 ctx = boot_capabilities()          # 临时 capability hub
 hub = create_observability(...)     # 直接构造
@@ -200,7 +200,7 @@ else:
 
 ### 1.6 CognitiveRuntime（成熟的认知闭环）
 
-**`lca/layer2_runtime/runtime_loop.py`**:
+**`lca/runtime/runtime_loop.py`**:
 ```
 perceive → think → act → reflect → record → checkpoint → stop
 ```
@@ -283,8 +283,8 @@ lca/
 │   ├── models/                      # 保留现有，逐步扩展
 │   └── protocols/                   # 保留现有
 ├── harness/                         # 新增：Harness 核心实现
-│   ├── kernel/                      # 迁入/复用 layer0_infra/plugin/kernel
-│   ├── profile/                     # 迁入/复用 layer0_infra/plugin/include + 扩展
+│   ├── kernel/                      # 迁入/复用 infrastructure/plugin/kernel
+│   ├── profile/                     # 迁入/复用 infrastructure/plugin/include + 扩展
 │   ├── session/                     # 以 RunStore 为核心的 SessionStore
 │   │   ├── store.py                 # SessionStore: append/read/fork/flush
 │   │   ├── inbox.py                 # Inbox: followup/steer/inject/cancel/when_idle
@@ -337,11 +337,11 @@ lca/
 ├── presets/                         # agent presets
 │   ├── researcher/profile.yaml      # extends: web-standard + plan_graph loop
 │   └── coder/profile.yaml           # extends: web-standard + dsh bridge
-├── layer0_infra/                    # 保留，逐步 re-export 到 harness
-├── layer1_cognitive/                # 保留 Brain/Body/Memory 算法
-├── layer2_runtime/                  # 过渡期保留 → 最终成为 loop_cognitive 实现源
-├── layer3_agent/                    # 保留 Team/roles 领域资产
-├── layer4_app/                      # 过渡期 facade → 最终只做 public API 兼容
+├── infrastructure/                    # 保留，逐步 re-export 到 harness
+├── cognition/                # 保留 Brain/Body/Memory 算法
+├── runtime/                  # 过渡期保留 → 最终成为 loop_cognitive 实现源
+├── agent/                    # 保留 Team/roles 领域资产
+├── application/                      # 过渡期 facade → 最终只做 public API 兼容
 └── gateway/                         # 薄 carrier → 逐步成为 gateway_starlette plugin
 ```
 
@@ -1224,9 +1224,9 @@ Gateway 只 import：
 
 Gateway 不 import：
   contracts/harness/agent.py      — LiveAgent, AgentHandle（封装在 AgentRegistry 内）
-  layer1_cognitive/*              — Brain, Body, Memory
-  layer2_runtime/*                — CognitiveRuntime
-  layer3_agent/*                  — CognitiveAgent, Team
+  cognition/*              — Brain, Body, Memory
+  runtime/*                — CognitiveRuntime
+  agent/*                  — CognitiveAgent, Team
 
 消息传递：
   Gateway → AgentRegistry: 通过 session_id + content，不通过 LiveAgent
@@ -2620,11 +2620,11 @@ async def test_shadow_mode_no_divergence():
 
 | Phase | `layer0`~`layer4` 状态 | `lca/harness/` 状态 | 动作 |
 |---|---|---|---|
-| Phase A 完成 | 保留，import lint 仍生效 | 新建，通过 re-export 连接 | `layer0_infra/plugin/kernel` 标记为 `lca/harness/kernel` 的实现源 |
+| Phase A 完成 | 保留，import lint 仍生效 | 新建，通过 re-export 连接 | `infrastructure/plugin/kernel` 标记为 `lca/harness/kernel` 的实现源 |
 | Phase B 完成 | 保留 | 稳定 | 旧 `RunStore`、`RunRegistry` 标记 `@deprecated` |
-| Phase C 完成 | `layer2_runtime/runtime_loop.py` 标记 `@deprecated` | `loop_cognitive` 成为唯一入口 | `CognitiveRuntime` 移入 `lca/plugins/loop_cognitive/` 内部 |
+| Phase C 完成 | `runtime/runtime_loop.py` 标记 `@deprecated` | `loop_cognitive` 成为唯一入口 | `CognitiveRuntime` 移入 `lca/plugins/loop_cognitive/` 内部 |
 | Phase D 完成 | `gateway/runs/dsh_execute.py` 删除 | `loop_dsh_bridge` 成为唯一入口 | Gateway 不再有 DSH 分支 |
-| Phase E 完成 | `layer1_cognitive` 保留（Brain/Body/Memory 算法） | `lca/plugins/` 承载所有运行时扩展 | `capability_boot.py` 删除 |
+| Phase E 完成 | `cognition` 保留（Brain/Body/Memory 算法） | `lca/plugins/` 承载所有运行时扩展 | `capability_boot.py` 删除 |
 | **收敛期**（Phase E 后 1-2 月） | 逐步将 re-export 转为物理移动 | 物理目录成为主要结构 | import lint 规则更新 |
 | **终态** | `layer0`~`layer4` 只保留算法代码（Brain/Body/Memory/Team/roles） | `lca/harness/` + `lca/plugins/` 承载所有运行时 | `layer` 目录不再包含运行时/装配逻辑 |
 

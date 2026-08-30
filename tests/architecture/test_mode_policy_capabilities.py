@@ -116,7 +116,7 @@ def test_creator_adapter_has_no_local_persona_tools_or_grant_literals() -> None:
 def test_casting_translation_requires_caller_materialized_tools() -> None:
     """The L4 translator cannot restore ``build_default_tools`` behind a fallback."""
 
-    source = (REPO / "lca" / "layer4_app" / "casting.py").read_text(encoding="utf-8")
+    source = (REPO / "lca" / "application" / "casting.py").read_text(encoding="utf-8")
     tools_parameter = inspect.signature(build_from_casting_plan).parameters["tools"]
 
     assert "build_default_tools" not in source

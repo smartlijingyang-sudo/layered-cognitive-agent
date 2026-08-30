@@ -3,11 +3,11 @@
 
 允许：
 - contracts 中的 SharedMemoryStore Protocol
-- layer3_agent 的 TeamOrchestrator
+- agent 的 TeamOrchestrator
 - layer1 memory 实现绑定 store（MemorySystem 路径，既有 CoALA 模型）
 
 禁止：
-- layer1_cognitive/brain/**、body/**（除 memory 协作接口外）直接 import
+- cognition/brain/**、body/**（除 memory 协作接口外）直接 import
   TeamSharedMemoryStore 具体实现
 """
 
@@ -25,8 +25,8 @@ FORBIDDEN_IMPORTS = frozenset(
 )
 # body/brain 不得直接依赖共享存储具体实现
 SCAN_DIRS = [
-    ROOT / "lca" / "layer1_cognitive" / "brain",
-    ROOT / "lca" / "layer1_cognitive" / "body",
+    ROOT / "lca" / "cognition" / "brain",
+    ROOT / "lca" / "cognition" / "body",
 ]
 
 

@@ -14,12 +14,12 @@ Accepted
 
 ### 物理拆分
 - `lca/contracts/team_progress.py` 只保留 `RoleStatus`、`DelegationLedgerProtocol` 以及仅依赖 Protocol 的 hook 函数。
-- `DelegationLedger`（具体 frozen dataclass 实现）迁到 `lca/layer1_cognitive/team_progress/delegation_ledger.py`，与 Brain/Body/Memory 平级。
+- `DelegationLedger`（具体 frozen dataclass 实现）迁到 `lca/cognition/team_progress/delegation_ledger.py`，与 Brain/Body/Memory 平级。
 
 ### 依赖注入
 - `OrchestrationContext` 新增 `ledger_factory: Callable[[frozenset[str]], DelegationLedgerProtocol] | None` 字段。
 - `HierarchicalStrategy` 不再 import 具体类，改为 `context.ledger_factory or _default_ledger_factory`，默认工厂通过 `ComponentRegistry.resolve("delegation_ledger", "default")` 从全局注册表获取。
-- `layer4_app/defaults.py` 注册 `DelegationLedger`：`reg.register("delegation_ledger", "default", DelegationLedger)`。
+- `application/defaults.py` 注册 `DelegationLedger`：`reg.register("delegation_ledger", "default", DelegationLedger)`。
 
 ### 门禁机制
 - 新增 `tests/test_contracts_purity.py`：AST 扫描 `lca/contracts/` 下所有类，非 Protocol 类必须是 `@dataclass` 且不含除 `__post_init__` / dunder 外的自定义方法。

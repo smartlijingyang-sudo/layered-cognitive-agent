@@ -33,14 +33,14 @@ casting 的 `governance.kind` 只能取九个既有值：LeadMandate 的
 routing/consult/board 与 Coordination 策略键 pipeline/fan_out/peer_relay/
 peer_swarm/debate（graph 留待 Phase 2）。这是对 ADR-0030「一元领域语言」
 的复用验证。kind → Coordination 实例用注册表分发
-（`lca/layer4_app/casting.py::_COORDINATION_FACTORY`），不复制
+（`lca/application/casting.py::_COORDINATION_FACTORY`），不复制
 `gateway/team_factory.py::_coordination_for` 的 if 链形态。
 
 ### 3. 内容与机制分离：角色内容不进 `lca` 包
 
 - 契约：`lca/contracts/protocols/casting.py`（RoleLibrary / TeamCaster
   Protocol + RoleCard / CastingPlan 等 frozen dataclass）。
-- 默认实现：`lca/layer4_app/casting.py`（LLMTeamCaster +
+- 默认实现：`lca/application/casting.py`（LLMTeamCaster +
   build_from_casting_plan，L4 组合根）。
 - 内容：仓库根 `roles/`（16 张中文产品角色卡，Markdown + YAML
   frontmatter），`gateway/role_library.py::FileRoleLibrary` 扫描解析；
@@ -68,7 +68,7 @@ ADR-0040 的 `MODE_DEFINITIONS` 生成管线以「固定角色的静态目录」
 
 ### 6. 组队提示词走既有模板机制，但渲染方式为精确替换
 
-模板 `lca/layer1_cognitive/brain/prompts/casting_prompt.md`，经
+模板 `lca/cognition/brain/prompts/casting_prompt.md`，经
 `load_builtin_prompt` 加载——遵守「Prompt 模板迭代不碰 Python」约定。
 因模板内嵌 JSON 示例花括号，与 `str.format` 冲突，占位符
 `{role_catalog}` / `{objective}` 用精确替换渲染（模板头部有注释警告）。
@@ -107,7 +107,7 @@ ADR-0040 的 `MODE_DEFINITIONS` 生成管线以「固定角色的静态目录」
 - 用户一句话即可获得针对性组队，不再需要理解协作词汇表；固定 mode 保留
   为显式选择，行为不变。
 - `lca` 新增两个文件（contracts/protocols/casting.py、
-  layer4_app/casting.py）+ 一个提示词模板 + `decision_parser` 提取函数
+  application/casting.py）+ 一个提示词模板 + `decision_parser` 提取函数
   公开化；gateway 新增 role_library.py、三处小改；前端默认体验变更。
 - 角色库是可插拔内容包：换领域只需换目录，框架代码不动。
 - Alice/Bob 仅存在于 `tests/harness`（确定性探针，ADR-0040 豁免区），

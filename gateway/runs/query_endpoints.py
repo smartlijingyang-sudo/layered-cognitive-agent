@@ -132,7 +132,7 @@ async def stream_run_live(request: Request) -> StreamingResponse | JSONResponse:
     """GET /runs/{run_id}/live — Journal SSE for one run (event = class name).
 
     Tool lifecycle frames carry the renderer-facing ``projected_state``
-    field directly (set by ``lca/layer1_cognitive/body/tool_journal_emit.py``
+    field directly (set by ``lca/cognition/body/tool_journal_emit.py``
     via each Tool's RenderContract). No further lifting is required —
     the frontend's ``projectToolCall()`` reads the projected_state as-is.
     """

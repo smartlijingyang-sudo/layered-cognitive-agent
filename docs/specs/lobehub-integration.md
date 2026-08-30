@@ -51,7 +51,7 @@ LCA Agent/Team
 | `.lobehub-upstream/` | 官方 git 克隆缓存（gitignore） |
 | `scripts/sync_lobehub_ui.sh` | 拉取并 rsync 官方 release |
 | `lca-ops.yaml` | 栈配置 SSOT：端口、路径、服务 |
-| `lca/layer0_infra/ops/` | 编排实现 |
+| `lca/infrastructure/ops/` | 编排实现 |
 | `scripts/lca-ops` | 唯一入口：status / heal / logs / dev |
 | `deploy/lobehub/.env.lca` | LobeHub 本地 env 模板 |
 | `gateway/openai_shim.py` | OpenAI 兼容管家面：标题 / embeddings / responses。不开 Agent |

@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-_LAYER3_DIR = Path(__file__).resolve().parent.parent / "lca" / "layer3_agent"
+_LAYER3_DIR = Path(__file__).resolve().parent.parent / "lca" / "agent"
 
 _FORBIDDEN_GETATTR_ATTRS = frozenset({"body", "brain", "memory", "hooks"})
 
@@ -54,7 +54,7 @@ class TestLayerBoundary(unittest.TestCase):
 
     def test_no_getattr_runtime_penetration_in_layer3(self) -> None:
         py_files = sorted(_LAYER3_DIR.rglob("*.py"))
-        self.assertTrue(py_files, f"layer3_agent 目录下没有 .py 文件: {_LAYER3_DIR}")
+        self.assertTrue(py_files, f"agent 目录下没有 .py 文件: {_LAYER3_DIR}")
 
         all_violations: list[str] = []
         for py_file in py_files:

@@ -66,13 +66,13 @@ v3 落地（PR1–PR12）：
 | 系统 | 接入方式 | 组件位置 |
 |---|---|---|
 | Journal 事实源 | Protocol / 单事件单发射点 | `lca/contracts/models/observability/journal*.py` |
-| Context Lifecycle | PerceiveHub + ContextManifest | `lca/layer1_cognitive/perceive_hub.py` |
+| Context Lifecycle | PerceiveHub + ContextManifest | `lca/cognition/perceive_hub.py` |
 | Execution Control | ExecutionEnvelope + SafeExecutor | `lca/contracts/models/core/execution.py` |
-| Collaboration Control | TeamStrategy + TeamMessage | `lca/layer3_agent/` |
-| 终止判定 | ``StopRule``（纯函数，PR5）+ ``StopOutcomePolicy`` | `lca/layer2_runtime/default_stop_rule.py` |
-| 降级（未知 action → respond/use_tool） | ``DegradationPolicy``（防腐层） | `lca/layer1_cognitive/brain/degradation.py` |
-| 事件发布（step_completed / action_degraded） | Protocol-boundary ``record()``（PR10，not Hook） | `lca/layer2_runtime/event_emission.py` |
-| Checkpoint 写入 | ``StateStore`` + ``reducer.apply_*`` | `lca/layer2_runtime/runtime_loop.py` |
+| Collaboration Control | TeamStrategy + TeamMessage | `lca/agent/` |
+| 终止判定 | ``StopRule``（纯函数，PR5）+ ``StopOutcomePolicy`` | `lca/runtime/default_stop_rule.py` |
+| 降级（未知 action → respond/use_tool） | ``DegradationPolicy``（防腐层） | `lca/cognition/brain/degradation.py` |
+| 事件发布（step_completed / action_degraded） | Protocol-boundary ``record()``（PR10，not Hook） | `lca/runtime/event_emission.py` |
+| Checkpoint 写入 | ``StateStore`` + ``reducer.apply_*`` | `lca/runtime/runtime_loop.py` |
 
 ### v3 CI 门禁（替代原 "AST ≤ 30 / HOOK_NAMES"）
 

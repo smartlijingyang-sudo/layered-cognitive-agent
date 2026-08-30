@@ -25,7 +25,7 @@ class TestScanHookAttach:
 
     def test_detects_hooks_trigger_call(self, tmp_path: Path) -> None:
         """``hooks.trigger("x", cb)`` must be flagged."""
-        root = tmp_path / "layer1_cognitive"
+        root = tmp_path / "cognition"
         root.mkdir()
         _write_py(root / "some_module.py", 'hooks.trigger("x", cb)\n')
 
@@ -40,7 +40,7 @@ class TestScanHookAttach:
 
     def test_detects_middleware_bag_attr(self, tmp_path: Path) -> None:
         """``middleware_bag.append(x)`` must be flagged."""
-        root = tmp_path / "layer2_runtime"
+        root = tmp_path / "runtime"
         root.mkdir()
         _write_py(root / "runtime_core.py", "middleware_bag.append(x)\n")
 
@@ -54,7 +54,7 @@ class TestScanHookAttach:
 
     def test_detects_underscore_emit_call(self, tmp_path: Path) -> None:
         """``self._emit(event)`` must be flagged (call to _emit)."""
-        root = tmp_path / "layer3_agent"
+        root = tmp_path / "agent"
         root.mkdir()
         _write_py(
             root / "agent.py",
@@ -70,7 +70,7 @@ class TestScanHookAttach:
 
     def test_skips_underscore_emit_assign_target(self, tmp_path: Path) -> None:
         """``self._emit = {}`` must NOT be flagged (assign target)."""
-        root = tmp_path / "layer4_app"
+        root = tmp_path / "application"
         root.mkdir()
         _write_py(
             root / "composer.py",
@@ -83,7 +83,7 @@ class TestScanHookAttach:
 
     def test_allowlist_event_bus_clean(self, tmp_path: Path) -> None:
         """Files named ``event_bus.py`` or ``hook_registry.py`` must be skipped."""
-        root = tmp_path / "layer1_cognitive"
+        root = tmp_path / "cognition"
         root.mkdir()
         # event_bus.py legitimately holds _emit
         _write_py(
@@ -102,7 +102,7 @@ class TestScanHookAttach:
 
     def test_detects_register_hook_call(self, tmp_path: Path) -> None:
         """``register_hook(...)`` as a bare call must be flagged."""
-        root = tmp_path / "layer1_cognitive"
+        root = tmp_path / "cognition"
         root.mkdir()
         _write_py(root / "hooks_user.py", "register_hook('on_start', callback)\n")
 
@@ -115,7 +115,7 @@ class TestScanHookAttach:
 
     def test_detects_obj_register_hook_call(self, tmp_path: Path) -> None:
         """``obj.register_hook(...)`` as a method call must be flagged."""
-        root = tmp_path / "layer2_runtime"
+        root = tmp_path / "runtime"
         root.mkdir()
         _write_py(root / "runtime.py", "runtime.register_hook('on_start', callback)\n")
 
@@ -128,7 +128,7 @@ class TestScanHookAttach:
 
     def test_detects_attach_hook_call(self, tmp_path: Path) -> None:
         """``attach_hook(...)`` must be flagged."""
-        root = tmp_path / "layer3_agent"
+        root = tmp_path / "agent"
         root.mkdir()
         _write_py(root / "agent.py", "attach_hook('pre_think', handler)\n")
 
@@ -140,7 +140,7 @@ class TestScanHookAttach:
 
     def test_detects_subscribe_call(self, tmp_path: Path) -> None:
         """``subscribe(...)`` must be flagged."""
-        root = tmp_path / "layer4_app"
+        root = tmp_path / "application"
         root.mkdir()
         _write_py(root / "composer.py", "bus.subscribe('event', handler)\n")
 
@@ -152,7 +152,7 @@ class TestScanHookAttach:
 
     def test_skips_syntax_error_file(self, tmp_path: Path) -> None:
         """Files with syntax errors must be skipped gracefully."""
-        root = tmp_path / "layer1_cognitive"
+        root = tmp_path / "cognition"
         root.mkdir()
         _write_py(root / "broken.py", "def foo(:\n")
 
@@ -167,7 +167,7 @@ class TestScanHookAttach:
 
     def test_multiple_patterns_in_one_file(self, tmp_path: Path) -> None:
         """Multiple patterns in one file must all be detected."""
-        root = tmp_path / "layer1_cognitive"
+        root = tmp_path / "cognition"
         root.mkdir()
         source = (
             "hooks.trigger('x', cb)\n"

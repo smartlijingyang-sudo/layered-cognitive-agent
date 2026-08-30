@@ -22,7 +22,7 @@
 - Do not merge the uncommitted ADR-0099 empty-completion encoder WIP.
 - Tests: `uv run ruff check --fix <paths> && uv run ruff format <paths> && uv run pytest --no-cov <related-tests> -q`.
 - Public Python APIs stay fully typed. No bare `except Exception`. No `print`.
-- Gateway is Carrier: HTTP adapters do not import layer4_app.
+- Gateway is Carrier: HTTP adapters do not import application.
 
 ---
 

@@ -19,9 +19,9 @@ def _imports(path: Path) -> set[str]:
     return imported
 
 
-def test_session_live_builder_is_owned_by_layer4_app() -> None:
+def test_session_live_builder_is_owned_by_application() -> None:
     """The application bridge and its provider must share one ownership module."""
-    provider = ROOT / "lca" / "layer4_app" / "session_live_builder_provider.py"
+    provider = ROOT / "lca" / "application" / "session_live_builder_provider.py"
     legacy = ROOT / "lca" / "plugins" / "providers" / "session_live_builder.py"
 
     assert provider.is_file()

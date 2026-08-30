@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """check_no_preview_fields —— ADR-0065 §四 + PR-3。
 
-扫描 ``lca/contracts/models/observability/`` 与 ``lca/layer1_cognitive/body/``
+扫描 ``lca/contracts/models/observability/`` 与 ``lca/cognition/body/``
 确保 ``*_preview`` 字段全部从 journal event dataclass 字段集删除。
 PR-3 引入期允许多少残留(0),后续 PR 必须保持零。
 """
@@ -15,7 +15,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SCAN_DIRS = (
     REPO / "lca" / "contracts" / "models" / "observability",
-    REPO / "lca" / "layer1_cognitive" / "body",
+    REPO / "lca" / "cognition" / "body",
 )
 ALLOW_FILE_OVERRIDES: tuple[str, ...] = (
     # 0065 显式否决项;暂留迁移期兼容

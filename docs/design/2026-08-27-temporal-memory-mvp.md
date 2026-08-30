@@ -10,13 +10,13 @@
 
 | 能力 | LCA 实现 | 关键模块 |
 |---|---|---|
-| 追加式事实 | SQLite `temporal_memory` 表，使用稳定 `record_id` 保存不可变内容 | `lca/layer0_infra/state_store/sqlite_temporal_memory.py` |
+| 追加式事实 | SQLite `temporal_memory` 表，使用稳定 `record_id` 保存不可变内容 | `lca/infrastructure/state_store/sqlite_temporal_memory.py` |
 | 时态字段 | `created_at_ms`、`observed_at_ms`、`valid_from_ms`、`valid_until_ms`、`retired_at_ms` | `lca/contracts/models/core/memory.py` |
 | 修订与退役 | `revise()` 截止旧事实的有效区间，新增替代事实并添加 `supersedes` 边；`retire()` 仅软退役 | `SqliteTemporalMemoryStore` |
 | 显式关系 | `extends`、`supersedes`、`contradicts` 三种关系可写入关系表 | `MemoryRelationKind` |
 | Scope 隔离 | 每次 recall / list 均强制 `scope_id` 过滤 | `TemporalMemoryStore` |
 | as-of 查询 | `recall(as_of_ms=...)` 依事实有效区间读取历史视图，退役前的历史事实仍可回放 | `TemporalMemoryStore.recall()` |
-| Recall Waterfall | `TemporalMemorySystem.perceive()` 在 Think 前，以任务或显式 `memory_query` 检索 | `lca/layer1_cognitive/memory/temporal_memory.py` |
+| Recall Waterfall | `TemporalMemorySystem.perceive()` 在 Think 前，以任务或显式 `memory_query` 检索 | `lca/cognition/memory/temporal_memory.py` |
 | 自动归档 | `update()` 在 Reflect 后经既有 `MemoryPolicy` 准入并写入 episodic 归档 | `TemporalMemorySystem.update()` |
 | 信任隔离 | 模型可见的时态召回项强制标记 `UNTRUSTED_HISTORY`，单独渲染为证据区 | `PromptReasoner._context_lines()` |
 | 组合与发现 | 注册 `temporal` MemorySystem provider 及 ComponentRegistry 选择项；simple 仍为默认 | `bundles/base.yaml`、`lca/plugins/providers/` |

@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace LCA's in-house plugin kernel (`lca/layer0_infra/plugin/` + `lca/harness/kernel/`) with vendored cordis from `~/taiyi-agent`. Migrate 21 LCA plugins to cordis `@plugin` form. Restructure to 38 plugins across 3 tiers (Definition / Provider / Behavior). Cut all hardcoded assembly from L4 composition root.
+**Goal:** Replace LCA's in-house plugin kernel (`lca/infrastructure/plugin/` + `lca/harness/kernel/`) with vendored cordis from `~/taiyi-agent`. Migrate 21 LCA plugins to cordis `@plugin` form. Restructure to 38 plugins across 3 tiers (Definition / Provider / Behavior). Cut all hardcoded assembly from L4 composition root.
 
 **Architecture:**
 - `vendor/cordis/cosmokit/schemastery` — copy from `~/taiyi-agent/vendor/`
 - `lca/plugins/*` — module-per-plugin, ≤50 lines, only `@plugin` setup
-- `lca/layer0_infra/{capability,session,system_prompt,...}/` — Service Definition classes (NOT plugin files)
-- `lca/layer4_app/` — composition root, only `ctx.<typed-property>` access
+- `lca/infrastructure/{capability,session,system_prompt,...}/` — Service Definition classes (NOT plugin files)
+- `lca/application/` — composition root, only `ctx.<typed-property>` access
 - `lca/contracts/typed_ctx.py` — TypedContext Protocol for IDE/mypy support
 - `bundles/base.yaml` + `bundles/web-app.yaml` — 38 plugin entries across 3 tiers
 
@@ -22,7 +22,7 @@
 
 ## Chunk 1: Vendor + Pre-flight Migration + Delete In-house Kernel (P0-P2)
 
-**Goal:** Replace `lca/layer0_infra/plugin/` + `lca/harness/kernel/` with cordis. Add `SessionEventType` enum. Add `TypedContext` Protocol (only existing imports). Migrate all 30+ production callers of plugin/kernel EXTERNALLY before deleting internals. Drop PluginManifest / ExtensionPoint / CapabilityGrant / ScopeKind / PluginKind / ProviderMode while keeping `consume()` and `PluginConfig`.
+**Goal:** Replace `lca/infrastructure/plugin/` + `lca/harness/kernel/` with cordis. Add `SessionEventType` enum. Add `TypedContext` Protocol (only existing imports). Migrate all 30+ production callers of plugin/kernel EXTERNALLY before deleting internals. Drop PluginManifest / ExtensionPoint / CapabilityGrant / ScopeKind / PluginKind / ProviderMode while keeping `consume()` and `PluginConfig`.
 
 **Critical ordering constraint** (the only way to keep the repo buildable):
 
@@ -31,11 +31,11 @@ Phase 1A: Vendor cordis                         (Tasks 1.1-1.2)
 Phase 1B: Add SessionEventType + TypedContext  (Tasks 1.3-1.4)
 Phase 1C: Migrate production callers            (Tasks 1.5-1.11)
             - lca/harness/__init__.py
-            - lca/layer4_app/composer.py
-            - lca/layer4_app/profile.py
+            - lca/application/composer.py
+            - lca/application/profile.py
             - lca/harness/diagnostics/inspect.py
-            - lca/layer0_infra/dsh_core/* (delete or stub)
-            - lca/layer0_infra/ops/cli.py
+            - lca/infrastructure/dsh_core/* (delete or stub)
+            - lca/infrastructure/ops/cli.py
             - lca/harness/middleware/registry.py
             - lca/contracts/harness/middleware.py
             - 21 lca/plugins/* (drop PluginManifest etc.)
@@ -458,22 +458,22 @@ git commit -m "harness: drop in-house plugin/kernel re-exports from __init__.py"
 ### Task 1.6: Migrate production callers of in-house kernel (composer / gateway / api)
 
 **Files:**
-- Modify: `lca/layer4_app/composer.py`
+- Modify: `lca/application/composer.py`
 - Modify: `gateway/app.py`
-- Modify: `lca/layer4_app/api.py`
+- Modify: `lca/application/api.py`
 
 **Critical**: All three files import `lca.harness.kernel.scope.ScopedPluginHost`. They MUST be migrated before Task 1.16 deletes `lca/harness/kernel/`.
 
 - [ ] **Step 1: Find all in-house kernel references**
 
 ```bash
-rg -n "lca\.layer0_infra\.plugin\|lca\.harness\.kernel\|ScopedPluginHost\|ScopeKind\." \
-    lca/layer4_app/composer.py lca/layer4_app/api.py gateway/app.py
+rg -n "lca\.infrastructure\.plugin\|lca\.harness\.kernel\|ScopedPluginHost\|ScopeKind\." \
+    lca/application/composer.py lca/application/api.py gateway/app.py
 ```
 
 Expected: ~15-25 hits across 3 files
 
-- [ ] **Step 2: For `lca/layer4_app/composer.py`: remove imports; stub affected functions**
+- [ ] **Step 2: For `lca/application/composer.py`: remove imports; stub affected functions**
 
 ```python
 # remove these lines:
@@ -500,7 +500,7 @@ plugin_scope = Context()  # stub; full migration in Chunk 5
 
 If any code path uses `plugin_scope.resolve(...)`, replace with `plugin_scope.inject(...)`.
 
-- [ ] **Step 4: For `lca/layer4_app/api.py`: replace `ScopedPluginHost` isinstance check**
+- [ ] **Step 4: For `lca/application/api.py`: replace `ScopedPluginHost` isinstance check**
 
 ```python
 # before
@@ -514,7 +514,7 @@ Replace any `scope.resolve(...)` with `scope.inject(...)`.
 
 - [ ] **Step 5: Verify all 3 files no longer import in-house kernel**
 
-Run: `rg "lca\.layer0_infra\.plugin\|lca\.harness\.kernel\|ScopedPluginHost\|ScopeKind" lca/layer4_app/composer.py lca/layer4_app/api.py gateway/app.py`
+Run: `rg "lca\.infrastructure\.plugin\|lca\.harness\.kernel\|ScopedPluginHost\|ScopeKind" lca/application/composer.py lca/application/api.py gateway/app.py`
 Expected: empty
 
 - [ ] **Step 6: Verify all 3 files import cleanly**
@@ -535,18 +535,18 @@ Expected: collection succeeds; individual failures acceptable
 - [ ] **Step 8: Commit**
 
 ```bash
-git add lca/layer4_app/composer.py lca/layer4_app/api.py gateway/app.py
+git add lca/application/composer.py lca/application/api.py gateway/app.py
 git commit -m "production callers: composer/gateway/api drop ScopedPluginHost (Chunk 5 stub)"
 ```
 
-**Critical constraint check**: After this task, NO production file outside `lca/harness/kernel/` and `lca/layer0_infra/plugin/` should reference `ScopedPluginHost` or any in-house kernel type. If they do, list them and add migration steps before Task 1.16.
+**Critical constraint check**: After this task, NO production file outside `lca/harness/kernel/` and `lca/infrastructure/plugin/` should reference `ScopedPluginHost` or any in-house kernel type. If they do, list them and add migration steps before Task 1.16.
 
 ---
 
 ### Task 1.7: Migrate profile.py / inspect.py / **boot.py** (B1 fix — boot.py must move out of Chunk 2)
 
 **Files:**
-- Modify: `lca/layer4_app/profile.py`
+- Modify: `lca/application/profile.py`
 - Modify: `lca/harness/diagnostics/inspect.py`
 - Modify: `lca/harness/profile/boot.py`  ← **moved here from Chunk 2 Task 2.1**
 
@@ -554,12 +554,12 @@ git commit -m "production callers: composer/gateway/api drop ScopedPluginHost (C
 
 - [ ] **Step 1: Find plugin/kernel imports**
 
-Run: `rg -n "lca\.layer0_infra\.plugin\|lca\.harness\.kernel" lca/layer4_app/profile.py lca/harness/diagnostics/inspect.py lca/harness/profile/boot.py`
+Run: `rg -n "lca\.infrastructure\.plugin\|lca\.harness\.kernel" lca/application/profile.py lca/harness/diagnostics/inspect.py lca/harness/profile/boot.py`
 
-- [ ] **Step 2: For `lca/layer4_app/profile.py`: drop ProfileLoader; rewrite as thin wrapper around cordis.Loader**
+- [ ] **Step 2: For `lca/application/profile.py`: drop ProfileLoader; rewrite as thin wrapper around cordis.Loader**
 
 ```python
-# lca/layer4_app/profile.py
+# lca/application/profile.py
 """Profile loading — thin wrapper over cordis.Loader."""
 from __future__ import annotations
 from pathlib import Path
@@ -660,46 +660,46 @@ Expected: OK
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lca/layer4_app/profile.py lca/harness/diagnostics/inspect.py lca/harness/profile/boot.py
+git add lca/application/profile.py lca/harness/diagnostics/inspect.py lca/harness/profile/boot.py
 git commit -m "profile + inspect + boot: rewrite as thin wrappers over cordis (boot moved from Chunk 2)"
 ```
 
 ---
 
-### Task 1.8: Delete `lca/layer0_infra/dsh_core/` (was duplicating upstream dsh, never used by cordis path)
+### Task 1.8: Delete `lca/infrastructure/dsh_core/` (was duplicating upstream dsh, never used by cordis path)
 
 **Files:**
-- Delete: `lca/layer0_infra/dsh_core/` (entire dir)
+- Delete: `lca/infrastructure/dsh_core/` (entire dir)
 
 - [ ] **Step 1: Find usages**
 
-Run: `rg -l "lca\.layer0_infra\.dsh_core" lca/ tests/`
+Run: `rg -l "lca\.infrastructure\.dsh_core" lca/ tests/`
 Expected: 5+ files importing dsh_core
 
 - [ ] **Step 2: For each importer, replace with upstream cordis equivalent or comment out**
 
-For `lca/layer0_infra/dsh_core/agent_default_model/__init__.py`:
+For `lca/infrastructure/dsh_core/agent_default_model/__init__.py`:
 - Replace import from `lca.infrastructure.plugin.kernel._context.PluginContext` → `from cordis import Context`
 - Drop `AgentDefaultModel` class (was a stub anyway)
 
-For `lca/layer0_infra/dsh_core/agent_tool_presentation/__init__.py`:
+For `lca/infrastructure/dsh_core/agent_tool_presentation/__init__.py`:
 - Drop or comment out — DSH tool presentation is one of the 100+ dsh packages we DON'T port
 
-For `lca/layer0_infra/dsh_core/scope/__init__.py`:
+For `lca/infrastructure/dsh_core/scope/__init__.py`:
 - Replace `lca.infrastructure.plugin.kernel._context.PluginContext` → `from cordis import Context`
 
-For `lca/layer0_infra/dsh_core/system_prompt/__init__.py`:
+For `lca/infrastructure/dsh_core/system_prompt/__init__.py`:
 - Same: replace context import
 
-- [ ] **Step 3: Delete `lca/layer0_infra/dsh_core/`**
+- [ ] **Step 3: Delete `lca/infrastructure/dsh_core/`**
 
 ```bash
-git rm -r lca/layer0_infra/dsh_core/
+git rm -r lca/infrastructure/dsh_core/
 ```
 
 - [ ] **Step 4: Verify**
 
-Run: `rg "lca\.layer0_infra\.dsh_core" lca/ tests/`
+Run: `rg "lca\.infrastructure\.dsh_core" lca/ tests/`
 Expected: empty
 
 - [ ] **Step 5: Commit**
@@ -711,14 +711,14 @@ git commit -m "dsh_core: delete (was duplicating upstream dsh; not ported)"
 
 ---
 
-### Task 1.9: Migrate `lca/layer0_infra/ops/cli.py` (drop plugin imports)
+### Task 1.9: Migrate `lca/infrastructure/ops/cli.py` (drop plugin imports)
 
 **Files:**
-- Modify: `lca/layer0_infra/ops/cli.py`
+- Modify: `lca/infrastructure/ops/cli.py`
 
 - [ ] **Step 1: Find plugin/kernel imports**
 
-Run: `rg -n "lca\.layer0_infra\.plugin\|lca\.harness\.kernel" lca/layer0_infra/ops/cli.py`
+Run: `rg -n "lca\.infrastructure\.plugin\|lca\.harness\.kernel" lca/infrastructure/ops/cli.py`
 Expected: 1-3 hits (around line 617 per spec §8.2)
 
 - [ ] **Step 2: Drop imports; replace with cordis equivalents**
@@ -737,7 +737,7 @@ Expected: prints help
 - [ ] **Step 4: Commit**
 
 ```bash
-git add lca/layer0_infra/ops/cli.py
+git add lca/infrastructure/ops/cli.py
 git commit -m "ops/cli: drop in-house plugin imports; use cordis"
 ```
 
@@ -828,7 +828,7 @@ git commit -m "middleware/registry: keep ExtensionPoint internal; expose Cogniti
 **Files:**
 - Modify: `lca/contracts/harness/middleware.py`
 
-**Critical**: `MiddlewareRegistration` (frozen dataclass) is used by `lca/layer2_runtime/hook_middleware.py:56` and the budget/loop_intervention policy plugins. Keep the dataclass; only drop the `MiddlewareRegistry` Protocol (which references `ExtensionPoint`).
+**Critical**: `MiddlewareRegistration` (frozen dataclass) is used by `lca/runtime/hook_middleware.py:56` and the budget/loop_intervention policy plugins. Keep the dataclass; only drop the `MiddlewareRegistry` Protocol (which references `ExtensionPoint`).
 
 - [ ] **Step 1: Find ExtensionPoint / MiddlewareRegistry imports**
 
@@ -861,8 +861,8 @@ class MiddlewareRegistration:
     constructor signature used at 4 production callers (F1 fix):
     - lca/plugins/budget_policy/__init__.py:55
     - lca/plugins/loop_intervention_policy/__init__.py:55
-    - lca/layer2_runtime/hook_middleware.py:57
-    - lca/layer2_runtime/loop_intervention_mw.py:47
+    - lca/runtime/hook_middleware.py:57
+    - lca/runtime/loop_intervention_mw.py:47
 
     These callers pass seam_key/priority/plugin_id only — the actual callback
     is registered separately via `InMemoryMiddlewareRegistry.register()`.
@@ -890,7 +890,7 @@ Expected: OK
 Run: `rg "ExtensionPoint\|MiddlewareRegistry" lca/contracts/harness/middleware.py`
 Expected: empty
 
-- [ ] **Step 5: Verify `lca/layer2_runtime/hook_middleware.py` and policy plugins still import**
+- [ ] **Step 5: Verify `lca/runtime/hook_middleware.py` and policy plugins still import**
 
 ```bash
 uv run python -c "from lca.runtime.hook_middleware import hook_middleware; print('OK')"
@@ -1060,15 +1060,15 @@ git commit -m "tests/harness: delete test_phase_{a,c,d} + test_loop_plugin_integ
 
 ---
 
-### Task 1.15: Bulk delete `lca/layer0_infra/plugin/` (entire dir)
+### Task 1.15: Bulk delete `lca/infrastructure/plugin/` (entire dir)
 
 **Files:**
-- Delete: `lca/layer0_infra/plugin/` (entire dir)
+- Delete: `lca/infrastructure/plugin/` (entire dir)
 
 - [ ] **Step 1: Verify NO production caller remains**
 
 ```bash
-rg -l "lca\.layer0_infra\.plugin" lca/ tests/ --type py | sort
+rg -l "lca\.infrastructure\.plugin" lca/ tests/ --type py | sort
 ```
 
 Expected: empty (all callers migrated in Tasks 1.5-1.12)
@@ -1076,7 +1076,7 @@ Expected: empty (all callers migrated in Tasks 1.5-1.12)
 - [ ] **Step 2: Delete the directory**
 
 ```bash
-git rm -r lca/layer0_infra/plugin/
+git rm -r lca/infrastructure/plugin/
 ```
 
 - [ ] **Step 3: Verify imports still work**
@@ -1092,7 +1092,7 @@ Expected: collection succeeds
 - [ ] **Step 5: Commit**
 
 ```bash
-git commit -m "plugin: delete in-house layer0_infra/plugin/{kernel,loader,include,scope,expr,builtins,_test_plugins}"
+git commit -m "plugin: delete in-house infrastructure/plugin/{kernel,loader,include,scope,expr,builtins,_test_plugins}"
 ```
 
 ---
@@ -1189,7 +1189,7 @@ Expected: OK
 
 - [ ] **Step 4: Verify no `mount`/`require` references remain in LCA / tests**
 
-Run: `rg "\.mount\(\|\.require\(" lca/layer4_app/ lca/harness/ tests/`
+Run: `rg "\.mount\(\|\.require\(" lca/application/ lca/harness/ tests/`
 Expected: only `request.method == "OPTIONS"` / unrelated `mount`/`require` (no false positives on `request.require`)
 
 - [ ] **Step 5: Commit**
@@ -1349,7 +1349,7 @@ git commit -m "contracts: drop Plugin Protocol; keep PluginConfig Pydantic base"
 
 - [ ] **Step 1: `rg "lca.infrastructure.plugin" lca/ tests/` — expect empty**
 
-Run: `rg "lca\.layer0_infra\.plugin" lca/ tests/ --type py`
+Run: `rg "lca\.infrastructure\.plugin" lca/ tests/ --type py`
 Expected: empty
 
 - [ ] **Step 2: `rg "lca.harness.kernel" lca/ tests/` — expect empty**
@@ -1409,9 +1409,9 @@ git commit -m "chore: chunk 1 verification fixes" --allow-empty
 
 ---## Chunk 2: Rewrite Boot + Middleware + 21 Plugins (P3-P5)
 
-**Goal:** Rewrite `lca/harness/profile/boot.py` as cordis.Loader thin wrapper. Migrate `lca/harness/middleware/registry.py` to use cordis events. Convert 21 plugins to module-per-plugin `@plugin` form. Delete `lca/layer4_app/capability_boot.py`.
+**Goal:** Rewrite `lca/harness/profile/boot.py` as cordis.Loader thin wrapper. Migrate `lca/harness/middleware/registry.py` to use cordis events. Convert 21 plugins to module-per-plugin `@plugin` form. Delete `lca/application/capability_boot.py`.
 
-**Risk:** Plugins at `lca/plugins/*/` currently use old `manifest = PluginManifest(...)` + `apply()` API. Need rewrite to `@plugin` form. Service classes move to `lca/layer0_infra/{capability,session,system_prompt,...}/`.
+**Risk:** Plugins at `lca/plugins/*/` currently use old `manifest = PluginManifest(...)` + `apply()` API. Need rewrite to `@plugin` form. Service classes move to `lca/infrastructure/{capability,session,system_prompt,...}/`.
 
 ---
 
@@ -1748,7 +1748,7 @@ async def setup(ctx, config):
 
 SessionService currently lives inline in lca/plugins/session_service/__init__.py.
 The rewrite keeps the class inline in this file (the plugin IS the service
-file). Future tasks may extract to lca/layer0_infra/session/ for separation.
+file). Future tasks may extract to lca/infrastructure/session/ for separation.
 """
 from __future__ import annotations
 from cordis import plugin
@@ -1830,7 +1830,7 @@ async def setup(ctx, config: Config):
         return loop_intervention_middleware("agent.after_act", state, None, config={"threshold": config.threshold})
 ```
 
-**Note (F-fix)**: Plan originally said `check_intervention` but the actual function name in `lca/layer2_runtime/loop_intervention_mw.py` is `loop_intervention_middleware`. Also the middleware signature is `(phase, state, context, *, config=None)`.
+**Note (F-fix)**: Plan originally said `check_intervention` but the actual function name in `lca/runtime/loop_intervention_mw.py` is `loop_intervention_middleware`. Also the middleware signature is `(phase, state, context, *, config=None)`.
 
 - [ ] **Step 2: Rewrite step_budget.py using cordis events (fix import path)**
 
@@ -1856,7 +1856,7 @@ async def setup(ctx, config: Config):
         return budget_check_middleware("agent.pre_step", state, None, config={"max_steps": config.max_steps})
 ```
 
-**Note (F-fix)**: Plan originally said `lca/layer2_runtime/budget_policy` but that file doesn't exist — the function lives at `lca/plugins/budget_policy/__init__.py:budget_check_middleware`. After Chunk 2 Task 2.3 renames the file to `lca/plugins/guards/step_budget.py`, the import becomes `from lca.plugins.guards.step_budget import budget_check_middleware`.
+**Note (F-fix)**: Plan originally said `lca/runtime/budget_policy` but that file doesn't exist — the function lives at `lca/plugins/budget_policy/__init__.py:budget_check_middleware`. After Chunk 2 Task 2.3 renames the file to `lca/plugins/guards/step_budget.py`, the import becomes `from lca.plugins.guards.step_budget import budget_check_middleware`.
 
 - [ ] **Step 3: Verify line counts**
 
@@ -1872,24 +1872,24 @@ git commit -m "guards: rewrite loop_intervention/step_budget as @plugin with cor
 
 ---
 
-### Task 2.6: Delete `lca/layer4_app/capability_boot.py` + migrate callers
+### Task 2.6: Delete `lca/application/capability_boot.py` + migrate callers
 
 **Files:**
-- Delete: `lca/layer4_app/capability_boot.py`
-- Modify: `lca/layer4_app/defaults.py` (drop `register_seam_catalog()`)
-- Modify: `lca/layer4_app/composer.py` (drop `_resolve_capability_context` legacy + `_ScopeAsCapabilityContext` adapter)
+- Delete: `lca/application/capability_boot.py`
+- Modify: `lca/application/defaults.py` (drop `register_seam_catalog()`)
+- Modify: `lca/application/composer.py` (drop `_resolve_capability_context` legacy + `_ScopeAsCapabilityContext` adapter)
 
 **Critical**: 3 caller sites missed in original plan:
-- `lca/layer4_app/defaults.py:54,145` calls `register_seam_catalog()`
-- `lca/layer4_app/composer.py:444-448` `_resolve_capability_context` still calls `boot_capabilities()`
-- `lca/layer4_app/composer.py:109` `_ScopeAsCapabilityContext` adapter uses `ScopedPluginHost.resolve()`
+- `lca/application/defaults.py:54,145` calls `register_seam_catalog()`
+- `lca/application/composer.py:444-448` `_resolve_capability_context` still calls `boot_capabilities()`
+- `lca/application/composer.py:109` `_ScopeAsCapabilityContext` adapter uses `ScopedPluginHost.resolve()`
 
 - [ ] **Step 1: Verify all callers**
 
 Run: `rg -l "capability_boot\|boot_capabilities\|register_seam_catalog" lca/ tests/`
 Expected: 4 files
 
-- [ ] **Step 2: Migrate `lca/layer4_app/defaults.py`**
+- [ ] **Step 2: Migrate `lca/application/defaults.py`**
 
 DELETE both occurrences of `register_seam_catalog()` call. The CapabilityHub / SeamRegistry / register_seam_catalog machinery is gone — the Tier-1 plugin tree replaces it.
 
@@ -1912,7 +1912,7 @@ def _resolve_capability_context(ctx):
 - [ ] **Step 4: Delete the file**
 
 ```bash
-git rm lca/layer4_app/capability_boot.py
+git rm lca/application/capability_boot.py
 ```
 
 - [ ] **Step 5: Run tests (collection only)**
@@ -1924,7 +1924,7 @@ Expected: collection passes; individual failures acceptable
 
 ```bash
 git add -A
-git commit -m "layer4_app: delete capability_boot.py + migrate defaults/composer adapters"
+git commit -m "application: delete capability_boot.py + migrate defaults/composer adapters"
 ```
 
 ---
@@ -2507,7 +2507,7 @@ async def setup(ctx: TypedContext, config) -> None:
 
 Note: 6 team coordination strategies (Pipeline / FanOut / Graph / Debate /
 PeerRelay / PeerSwarm) are NOT plugin-ized. They are plain dataclasses in
-`lca/layer3_agent/team/coordination/`. Only team LEAD is plugin-ized because
+`lca/agent/team/coordination/`. Only team LEAD is plugin-ized because
 that's the runtime-switchable concern.
 """
 ```
@@ -2941,11 +2941,11 @@ git commit -m "bundles: delete base-spine.yaml; all references point to base.yam
 ### Task 4.6: Update `lca-ops` to use new bundle paths
 
 **Files:**
-- Modify: `scripts/lca-ops` (and any `lca/layer0_infra/ops/`)
+- Modify: `scripts/lca-ops` (and any `lca/infrastructure/ops/`)
 
 - [ ] **Step 1: Find lca-ops references to bundles**
 
-Run: `rg "base-spine\|base\.yaml" scripts/lca-ops lca/layer0_infra/ops/`
+Run: `rg "base-spine\|base\.yaml" scripts/lca-ops lca/infrastructure/ops/`
 Expected: 1-2 references
 
 - [ ] **Step 2: Update each**
@@ -2960,7 +2960,7 @@ Expected: status command works (or reports no live services)
 - [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/lca-ops lca/layer0_infra/ops/
+git add scripts/lca-ops lca/infrastructure/ops/
 git commit -m "lca-ops: update bundle paths from base-spine.yaml to base.yaml"
 ```
 
@@ -2994,7 +2994,7 @@ git commit -m "chore: chunk 4 verification fixes" --allow-empty
 
 ## Chunk 5: composer.py + Scope Migration (P7)
 
-**Goal:** Rewrite `lca/layer4_app/composer.py:_isolate_agent_scope` to use `cordis.Context.scope(label)`. Migrate 9 callers of `ScopedPluginHost` API. Update `gateway/app.py`, `lca/layer4_app/api.py`, `lca/harness/diagnostics/tree.py`, `loop_cognitive`, `loop_dsh_bridge`, `loop_replay`.
+**Goal:** Rewrite `lca/application/composer.py:_isolate_agent_scope` to use `cordis.Context.scope(label)`. Migrate 9 callers of `ScopedPluginHost` API. Update `gateway/app.py`, `lca/application/api.py`, `lca/harness/diagnostics/tree.py`, `loop_cognitive`, `loop_dsh_bridge`, `loop_replay`.
 
 **Risk:** `current_scope()` doesn't exist; replace with `cordis.Context.current()`. `scope.resolve()` → `ctx.inject()`. `parent.fork(ScopeKind.X, "label")` → `parent.scope("label")`.
 
@@ -3003,12 +3003,12 @@ git commit -m "chore: chunk 4 verification fixes" --allow-empty
 ### Task 5.1: Rewrite `_isolate_agent_scope` as async context manager
 
 **Files:**
-- Modify: `lca/layer4_app/composer.py`
+- Modify: `lca/application/composer.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/layer4_app/test_isolate_agent_scope.py
+# tests/application/test_isolate_agent_scope.py
 import pytest
 from cordis import Context
 
@@ -3031,13 +3031,13 @@ async def test_isolate_agent_scope_creates_child_with_shadow_services():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/layer4_app/test_isolate_agent_scope.py -v --no-cov`
+Run: `uv run pytest tests/application/test_isolate_agent_scope.py -v --no-cov`
 Expected: FAIL (current impl returns ScopedPluginHost)
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# lca/layer4_app/composer.py (replace _isolate_agent_scope function)
+# lca/application/composer.py (replace _isolate_agent_scope function)
 class _IsolatedAgentScope:
     """Async CM that creates a child scope with fresh service instances.
 
@@ -3078,10 +3078,10 @@ def _copy_providers(parent_svc: T, new_svc: T) -> T:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/layer4_app/test_isolate_agent_scope.py -v --no-cov`
+Run: `uv run pytest tests/application/test_isolate_agent_scope.py -v --no-cov`
 Expected: PASS
 
-- [ ] **Step 5: Update consumers in `lca/layer4_app/composer.py:_resolve_component`**
+- [ ] **Step 5: Update consumers in `lca/application/composer.py:_resolve_component`**
 
 Change:
 ```python
@@ -3097,7 +3097,7 @@ async with _IsolatedAgentScope(scope, role) as compose_scope:
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lca/layer4_app/composer.py tests/layer4_app/test_isolate_agent_scope.py
+git add lca/application/composer.py tests/application/test_isolate_agent_scope.py
 git commit -m "composer: rewrite _isolate_agent_scope as async context manager"
 ```
 
@@ -3165,15 +3165,15 @@ git commit -m "loop_dsh_bridge + loop_replay: replace scope.resolve with ctx.inj
 
 ---
 
-### Task 5.4: Migrate `gateway/app.py` and `lca/layer4_app/api.py`
+### Task 5.4: Migrate `gateway/app.py` and `lca/application/api.py`
 
 **Files:**
 - Modify: `gateway/app.py`
-- Modify: `lca/layer4_app/api.py`
+- Modify: `lca/application/api.py`
 
 - [ ] **Step 1: Find ScopedPluginHost references**
 
-Run: `rg "ScopedPluginHost\|current_scope\|scope\.resolve\|scope\.fork" gateway/app.py lca/layer4_app/api.py`
+Run: `rg "ScopedPluginHost\|current_scope\|scope\.resolve\|scope\.fork" gateway/app.py lca/application/api.py`
 Expected: 2-5 references per file
 
 - [ ] **Step 2: Replace with cordis equivalents**
@@ -3187,7 +3187,7 @@ plugin_scope = ctx  # cordis Context is the equivalent
 ```
 
 ```python
-# lca/layer4_app/api.py
+# lca/application/api.py
 # before
 def is_xxx(scope: ScopedPluginHost) -> bool: ...
 # after
@@ -3201,7 +3201,7 @@ Run: `uv run pytest tests/harness/test_gateway_profile_integration.py --no-cov 2
 - [ ] **Step 4: Commit**
 
 ```bash
-git add gateway/app.py lca/layer4_app/api.py
+git add gateway/app.py lca/application/api.py
 git commit -m "gateway/api: migrate ScopedPluginHost/ScopeKind to cordis.Context"
 ```
 
@@ -3256,13 +3256,13 @@ git commit -m "chore: chunk 5 verification fixes" --allow-empty
 ### Task 6.1: Add `lca-ops debug {tree,run,scope}` commands
 
 **Files:**
-- Modify: `lca/layer0_infra/ops/cli.py`
-- Create: `lca/layer0_infra/ops/debug.py`
+- Modify: `lca/infrastructure/ops/cli.py`
+- Create: `lca/infrastructure/ops/debug.py`
 
-- [ ] **Step 1: Create `lca/layer0_infra/ops/debug.py`**
+- [ ] **Step 1: Create `lca/infrastructure/ops/debug.py`**
 
 ```python
-# lca/layer0_infra/ops/debug.py
+# lca/infrastructure/ops/debug.py
 """lca-ops debug subcommands: tree, run, scope."""
 from __future__ import annotations
 import argparse
@@ -3313,7 +3313,7 @@ def register_subcommands(subparsers: argparse._SubParsersAction) -> None:
     scope.add_argument("--profile", default="profiles/web-standard.yaml")
 ```
 
-- [ ] **Step 2: Wire into `lca/layer0_infra/ops/cli.py`**
+- [ ] **Step 2: Wire into `lca/infrastructure/ops/cli.py`**
 
 Add to the CLI dispatcher:
 ```python
@@ -3325,7 +3325,7 @@ register_subcommands(subparsers)
 - [ ] **Step 3: Commit**
 
 ```bash
-git add lca/layer0_infra/ops/debug.py lca/layer0_infra/ops/cli.py
+git add lca/infrastructure/ops/debug.py lca/infrastructure/ops/cli.py
 git commit -m "lca-ops: add debug {tree,run,scope} subcommands"
 ```
 
@@ -3364,14 +3364,14 @@ git commit -m "chore: e2e verification"
 - lca-ops debug tree output 38 plugin nodes
 - lca-ops debug run <id> ≥ 5 events
 - lca-ops debug scope <id> ≥ 11 services
-- rg "ctx\.llm\." lca/layer4_app/ ≥ 5 hits
+- rg "ctx\.llm\." lca/application/ ≥ 5 hits
 - rg "@plugin" lca/plugins/ | wc -l = 38
 - uv run lint-imports clean
 - rg "from lca.layer.*" lca/plugins/*/ top-level empty
 - uv run lca-ops status OK
 - uv run pytest --no-cov all pass
 - scripts/run_team_mode.py e2e OK
-- rg "lca\.layer0_infra\.plugin" lca/ tests/ empty
+- rg "lca\.infrastructure\.plugin" lca/ tests/ empty
 - rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|..." only docstring
 - rg "ScopedPluginHost\|scope\.resolve\|scope\.fork\|ScopeKind\." empty
 ```

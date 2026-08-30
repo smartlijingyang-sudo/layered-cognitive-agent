@@ -78,11 +78,11 @@ Profile / Bundle
 |---|---|---|
 | `lca/contracts/protocols/runtime_lifecycle.py` | 增加 phase 事件闭集以及 `semantic_phase`、`result_kind` 安全字段。 | 复用单一 lifecycle 协议，不引入平行 schema。 |
 | `lca/contracts/protocols/runtime_composition.py` | 将 `RuntimeLifecyclePublisher` 加入 `DeclarativeInterpreterFactory.create` 的显式依赖。 | 自定义解释器工厂也能获得同一冻结发布器。 |
-| `lca/layer2_runtime/runtime_bindings.py` | 从 immutable binding 将 publisher 传入新解释器。 | fresh/resume 共享一致的运行时闭包。 |
+| `lca/runtime/runtime_bindings.py` | 从 immutable binding 将 publisher 传入新解释器。 | fresh/resume 共享一致的运行时闭包。 |
 | `lca/plugins/providers/declarative_runtime_seams.py` | 默认解释器工厂把 publisher 接线到 `GenericPlanInterpreter`。 | 默认 Profile 无需新硬编码即可启用。 |
 | `lca/harness/declarative/interpreter.py` | 在每次 phase transaction 前后发布 started/completed/failed 事件。 | 事件发生在稳定编排边界，发布逻辑不改状态也不选边。 |
 | `tests/declarative/test_phase_lifecycle_publication.py` | 新增正常、故障与安全载荷契约测试。 | 防止进度事件变为内容泄露或错误的控制面。 |
-| `lca/layer0_infra/llm_adapter/failover.py` | 提供候选内 `RetryingLLMAdapter`、有序 `FailoverLLMAdapter` 与不可变候选对象。 | 重试和 provider 切换均限制在 L0，不暴露给 Brain、Gateway 或声明式图。 |
+| `lca/infrastructure/llm_adapter/failover.py` | 提供候选内 `RetryingLLMAdapter`、有序 `FailoverLLMAdapter` 与不可变候选对象。 | 重试和 provider 切换均限制在 L0，不暴露给 Brain、Gateway 或声明式图。 |
 | `lca/plugins/seam_definitions/llm_resolver.py` | Profile `RetryConfig` / `FallbackConfig` 构造候选并注册单一 resilient chat adapter。 | 每个候选先受控重试，备用选择仍由配置声明且凭据只经 resolver plugin 读取。 |
 | `tests/test_llm_failover.py` | 覆盖有序重试后切换、不可重试隔离、流式不拼接与 Profile 组装。 | 防止 retry/failover 造成重复输出或隐藏的 provider 状态修改。 |
 

@@ -98,7 +98,7 @@ Renderer 组件不再需要关心 contract —— 只读 `args.X` 和 `pluginSta
 
 ### 3.4 Codegen
 
-`lca/layer0_infra/tools/contract/codegen_ts.py:render_registry_to_ts()` 输出 `deploy/lobehub/patches/runtime/lcaToolRender/contracts.generated.ts`。**Python REGISTRY 是 SSOT，TS 表每次改 Python 都重新生成**。
+`lca/infrastructure/tools/contract/codegen_ts.py:render_registry_to_ts()` 输出 `deploy/lobehub/patches/runtime/lcaToolRender/contracts.generated.ts`。**Python REGISTRY 是 SSOT，TS 表每次改 Python 都重新生成**。
 
 ---
 
@@ -151,7 +151,7 @@ REGISTRY: dict[str, RenderContract] = {}  # tool_name → contract
 ### 5.1 新增模块
 
 ```
-lca/layer0_infra/tools/contract/
+lca/infrastructure/tools/contract/
 ├── __init__.py            # 重新导出
 ├── render.py              # FieldSpec, RenderContract, REGISTRY, @contract, get_contract
 ├── schema.py              # COMMON 字段表（≥35 个 LCA 已知字段）
@@ -165,9 +165,9 @@ lca/layer0_infra/tools/contract/
 
 | 文件 | 改动 |
 |---|---|
-| `lca/layer1_cognitive/body/tool_journal_emit.py` | `emit_tool_invoked` 调 `project_tool_state()` 并挂 `projected_state` |
+| `lca/cognition/body/tool_journal_emit.py` | `emit_tool_invoked` 调 `project_tool_state()` 并挂 `projected_state` |
 | `lca/contracts/models/observability/journal.py` | `ToolInvoked` 加 `projected_state: Mapping[str, object] = {}` |
-| `lca/layer0_infra/observability/journal/jsonl_projector.py` | `_write` 调用 `_strip_sse_only_fields()` 落盘前剥离 |
+| `lca/infrastructure/observability/journal/jsonl_projector.py` | `_write` 调用 `_strip_sse_only_fields()` 落盘前剥离 |
 | `gateway/runs/query_endpoints.py` | `stream_run_live` 不再 wrap `iter_lifted_journal_sse` |
 | `deploy/lobehub/patches/runtime/LcaRunDriver.ts` | ToolInvoked 分支优先读 `projected_state`，回退到老路径 |
 | `deploy/lobehub/patches/runtime/lca_tool_render.py` | 新 patch metadata 文件 |

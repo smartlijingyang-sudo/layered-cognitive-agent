@@ -12,7 +12,7 @@
 | 默认 Profile 显式六阶段 | 标准 Profile 引入 `bundles/declarative-phase-graph.yaml`，每个 semantic phase 均有原生 `PluginSpec` 和 PhaseExecutor capability。 | `profiles/web-standard.yaml`、`lca/plugins/phase_executors/` |
 | 通用编译与解释 | PlanCompiler 编译 declarative projection；GraphAssembler 按 capability binding 解析；GenericPlanInterpreter 推进 PhaseResult 和 graph edge。 | `lca/harness/declarative/` |
 | 默认 Agent 装配接线 | Agent assembly 将 compiled plan 与 phase executor bindings 注入 CognitiveRuntime，运行时优先走 DeclarativeRuntimeDriver。 | `agent_assembly.py`、`runtime_loop.py`、`declarative_runtime.py` |
-| 严格工具链 | `plugin check --strict`、`plan compile`、`plan validate`、`graph`、`explain plan` 与 `audit declarative-boundaries` 均已接入。 | `lca/layer0_infra/ops/commands/declarative.py` |
+| 严格工具链 | `plugin check --strict`、`plan compile`、`plan validate`、`graph`、`explain plan` 与 `audit declarative-boundaries` 均已接入。 | `lca/infrastructure/ops/commands/declarative.py` |
 
 ## 发现的必须补齐项
 
@@ -57,11 +57,11 @@ Task 5-8 完成了 ADR-0075 的最后实施阶段：
 - 删除 `CognitiveRuntime._loop()`、`_checkpoint()`、`_finish_control_stop()` 和相关 control policy 方法
 - 删除 `lca/harness/command/dual_write.py` 及其测试
 - `plan_binding.py` 移除 v1 composer fallback，只接受 declarative plans
-- 删除 `tests/layer2_runtime/test_checkpoint_atomic.py` 和 `test_control_runtime_execution.py`
+- 删除 `tests/runtime/test_checkpoint_atomic.py` 和 `test_control_runtime_execution.py`
 - 新增 `tests/architecture/test_declarative_production_closure.py` 守护测试
 
 **Task 7: Effect Idempotency 和 Recovery Profile**
-- Step 1: 实现 `RuntimeIdempotencyStore` 于 `lca/layer2_runtime/declarative_runtime.py`
+- Step 1: 实现 `RuntimeIdempotencyStore` 于 `lca/runtime/declarative_runtime.py`
   - `ClaimResult` dataclass 包含 status: `new` / `completed` / `in_progress`
   - `RuntimeEffectGateway` 在执行 effect 前调用 `store.claim()`
   - handler 返回后保存统一 receipt；`completed` 返回已有 receipt；`in_progress` 抛 RT-003 错误

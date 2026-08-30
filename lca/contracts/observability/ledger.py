@@ -9,7 +9,7 @@ L2: 提交先于观察 —— durable commit 完成后才通知投影。
 L3: 身份与顺序不可重铸 —— ``run_seq`` 严格连续;``event_id`` 全局唯一。
 L7: 终态封存 —— terminal event 提交后,账本冻结,拒绝追加领域事实。
 
-实现位置:``lca/layer0_infra/observability/journal/engine.py:RunLedger``。
+实现位置:``lca/infrastructure/observability/journal/engine.py:RunLedger``。
 """
 
 from __future__ import annotations

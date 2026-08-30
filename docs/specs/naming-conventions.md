@@ -37,4 +37,4 @@ Layered 的命名应优先表达**架构职责、边界和生命周期**，而�
 | `TraceInspectorToolImpl` | `TraceInspectorToolAdapter` | 与同类只读工具保持一致的适配器命名 |
 | `ActivationManager` | `SubagentActivationCoordinator` | 消除泛化的 `Manager`，明确协调对象、作用域与生命周期职责 |
 
-> 命名规范本身不改变分层方向：`contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_agent`，而 `layer4_app` 仍作为组合根存在。
+> 命名规范本身不改变分层方向：`contracts → infrastructure → cognition → runtime → agent`，而 `application` 仍作为组合根存在。

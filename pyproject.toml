@@ -185,12 +185,12 @@ ignore = [
 "lca/contracts/protocols/**/*.py" = ["ARG002"]
 "lca/contracts/mechanisms.py" = ["ARG002"]
 "lca/contracts/action.py" = ["ARG002"]
-"lca/layer0_infra/ops/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
-"lca/layer0_infra/ops/commands/*.py" = ["B008", "S603"]  # typer defaults + tail logs
-"lca/layer0_infra/ops/config.py" = ["S105"]  # sudo_pass_file is a path, not a secret
-"lca/layer0_infra/ops/sudo.py" = ["S603"]  # privileged subprocess wrapper
-"lca/layer0_infra/ops/service.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for process management
-"lca/layer0_infra/ops/services/*.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for service management
+"lca/infrastructure/ops/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
+"lca/infrastructure/ops/commands/*.py" = ["B008", "S603"]  # typer defaults + tail logs
+"lca/infrastructure/ops/config.py" = ["S105"]  # sudo_pass_file is a path, not a secret
+"lca/infrastructure/ops/sudo.py" = ["S603"]  # privileged subprocess wrapper
+"lca/infrastructure/ops/service.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for process management
+"lca/infrastructure/ops/services/*.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for service management
 "deploy/lobehub/engine.py" = ["S603", "S607"]  # git describe on .lobehub-upstream (controlled path)
 
 [tool.ruff.format]
@@ -205,7 +205,7 @@ disallow_untyped_defs = true
 check_untyped_defs = true
 exclude = [
     "^lca/contracts/protocols/.*",
-    "^lca/layer0_infra/llm_adapter/openai_compat/.*",
+    "^lca/infrastructure/llm_adapter/openai_compat/.*",
 ]
 # contracts 层使用 stdlib dataclass，不迁移到 Pydantic
 
@@ -240,8 +240,8 @@ filterwarnings = [
 paths = ["lca"]
 exclude = [
     "lca/contracts/protocols",
-    "lca/layer0_infra/llm_adapter/anthropic_llm.py",
-    "lca/layer0_infra/llm_adapter/openai_compat/",
+    "lca/infrastructure/llm_adapter/anthropic_llm.py",
+    "lca/infrastructure/llm_adapter/openai_compat/",
 ]
 ignore_names = ["n", "predicted_state", "version", "agent_card", "context_refs", "subtask"]
 
@@ -345,7 +345,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition"]
-responsibility = "lca/layer1_cognitive. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+responsibility = "lca/cognition. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
 not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
 allowed_dependencies = [
     "lca.contracts",
@@ -370,7 +370,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition.body"]
-responsibility = "lca/layer1_cognitive/body. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+responsibility = "lca/cognition/body. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
 not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
 allowed_dependencies = [
     "lca.contracts",
@@ -395,7 +395,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition.brain"]
-responsibility = "lca/layer1_cognitive/brain. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+responsibility = "lca/cognition/brain. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
 not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
 allowed_dependencies = [
     "lca.contracts",
@@ -420,7 +420,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition.collaboration"]
-responsibility = "lca/layer1_cognitive/collaboration. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+responsibility = "lca/cognition/collaboration. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
 not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
 allowed_dependencies = [
     "lca.contracts",
@@ -445,7 +445,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition.member_status"]
-responsibility = "lca/layer1_cognitive/member_status. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+responsibility = "lca/cognition/member_status. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
 not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
 allowed_dependencies = [
     "lca.contracts",
@@ -470,7 +470,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition.memory"]
-responsibility = "lca/layer1_cognitive/memory. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+responsibility = "lca/cognition/memory. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
 not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
 allowed_dependencies = [
     "lca.contracts",
@@ -495,7 +495,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.cognition.sensors"]
-responsibility = "lca/layer1_cognitive/sensors. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
+responsibility = "lca/cognition/sensors. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。"
 not_responsible_for = "执行副作用、阶段编排、组合根、HTTP 路由"
 allowed_dependencies = [
     "lca.contracts",
@@ -964,7 +964,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure"]
-responsibility = "lca/layer0_infra. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -992,7 +992,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.attachment"]
-responsibility = "lca/layer0_infra/attachment. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/attachment. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1020,7 +1020,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.capability"]
-responsibility = "lca/layer0_infra/capability. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/capability. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1048,7 +1048,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.computer"]
-responsibility = "lca/layer0_infra/computer. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/computer. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1076,7 +1076,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.credentials"]
-responsibility = "lca/layer0_infra/credentials. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/credentials. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1104,7 +1104,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.device_gateway"]
-responsibility = "lca/layer0_infra/device_gateway. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/device_gateway. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1132,7 +1132,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.dsh"]
-responsibility = "lca/layer0_infra/dsh. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/dsh. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1160,7 +1160,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.host_runtime"]
-responsibility = "lca/layer0_infra/host_runtime. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/host_runtime. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1188,7 +1188,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.learning"]
-responsibility = "lca/layer0_infra/learning. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/learning. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1216,7 +1216,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.llm"]
-responsibility = "lca/layer0_infra/llm. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/llm. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1244,7 +1244,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.llm_adapter"]
-responsibility = "lca/layer0_infra/llm_adapter. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/llm_adapter. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1272,7 +1272,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.observability"]
-responsibility = "lca/layer0_infra/observability. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/observability. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1300,7 +1300,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.ops"]
-responsibility = "lca/layer0_infra/ops. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/ops. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1328,7 +1328,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.plane"]
-responsibility = "lca/layer0_infra/plane. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/plane. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1356,7 +1356,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.sandbox"]
-responsibility = "lca/layer0_infra/sandbox. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/sandbox. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1384,7 +1384,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.search"]
-responsibility = "lca/layer0_infra/search. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/search. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1412,7 +1412,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.skills"]
-responsibility = "lca/layer0_infra/skills. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/skills. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1440,7 +1440,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.state_store"]
-responsibility = "lca/layer0_infra/state_store. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/state_store. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1468,7 +1468,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.tools"]
-responsibility = "lca/layer0_infra/tools. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/tools. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1496,7 +1496,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.transport"]
-responsibility = "lca/layer0_infra/transport. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/transport. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1524,7 +1524,7 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.workspace"]
-responsibility = "lca/layer0_infra/workspace. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+responsibility = "lca/infrastructure/workspace. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",

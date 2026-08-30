@@ -46,12 +46,12 @@ ADR-0074 的 tracker 已记录 17/17 交付项完成，包括 `CompiledRunPlan`�
 |---|---|
 | `lca/contracts/protocols/declarative_phase_graph.py` | 声明不可变的 phase-run cursor、checkpoint payload、标准暂停/失败 outcome；保持为纯数据和 Protocol 定义。 |
 | `lca/harness/declarative/interpreter.py` | 推进、持久化并恢复一份已验证 `ExecutablePlan`；统一贡献 verdict、效果 receipt、错误和安全边界。 |
-| `lca/layer2_runtime/declarative_runtime.py` | 提供 runtime-backed Journal、EffectGateway、checkpoint store 与 `DeclarativeRuntimeDriver.run/resume`；不认识具体业务 phase。 |
-| `lca/layer2_runtime/runtime_loop.py` | 保留 `CognitiveRuntime` 作为 thin public façade：创建 state、要求 compiled plan、转发 run/resume；删除 `_loop`、`evaluate_control`、checkpoint 私有实现及 `DefaultControlPolicyEngine` 依赖。 |
+| `lca/runtime/declarative_runtime.py` | 提供 runtime-backed Journal、EffectGateway、checkpoint store 与 `DeclarativeRuntimeDriver.run/resume`；不认识具体业务 phase。 |
+| `lca/runtime/runtime_loop.py` | 保留 `CognitiveRuntime` 作为 thin public façade：创建 state、要求 compiled plan、转发 run/resume；删除 `_loop`、`evaluate_control`、checkpoint 私有实现及 `DefaultControlPolicyEngine` 依赖。 |
 | `lca/plugins/composer/plan_binding.py` | 仅从 `CompiledRunPlan.capability_bindings` 解析 composer；删除 v1 `not plan.is_declarative` 分支。 |
 | `lca/plugins/loop_drivers/cognitive.py` 与 `gateway/runs/loop_drivers.py` | 只启动 plan-bound runnable；删除 legacy agent-loop factory 和 shadow-authoritative 执行选择。 |
-| `lca/layer2_runtime/control_policies.py`、`lca/harness/command/dual_write.py` | 在所有调用迁移后删除；其行为改由 PluginSpec contribution、effect handler 和离线 trace comparator 覆盖。 |
-| `tests/declarative/`、`tests/architecture/`、`tests/layer2_runtime/`、`tests/gateway/` | 以 e2e、resume、failure、AST/路径守卫证明没有可达旧流程。 |
+| `lca/runtime/control_policies.py`、`lca/harness/command/dual_write.py` | 在所有调用迁移后删除；其行为改由 PluginSpec contribution、effect handler 和离线 trace comparator 覆盖。 |
+| `tests/declarative/`、`tests/architecture/`、`tests/runtime/`、`tests/gateway/` | 以 e2e、resume、failure、AST/路径守卫证明没有可达旧流程。 |
 | `docs/adr/0081-audit-implementation.md`、`docs/adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md`、`docs/adr/README.md` | 基于验收证据更新 ADR-0075 状态、审计结论和迁移说明；不回写已归档 ADR 的历史事实。 |
 
 ## 2. 可执行任务
@@ -62,7 +62,7 @@ ADR-0074 的 tracker 已记录 17/17 交付项完成，包括 `CompiledRunPlan`�
 - Create: `tests/declarative/test_cutover_characterization.py`
 - Modify: `tests/declarative/test_default_profile_architecture.py`
 - Modify: `tests/architecture/test_new_architecture_closure.py`
-- Modify: `lca/layer2_runtime/runtime_loop.py`（仅在后续 GREEN 阶段）
+- Modify: `lca/runtime/runtime_loop.py`（仅在后续 GREEN 阶段）
 
 **Interfaces:**
 - Consumes: `CognitiveRuntime.run(task, ctx, *, max_steps, max_wall_clock_seconds, agent_role) -> Result` 与 `CognitiveRuntime.resume(snapshot, input, max_steps) -> Result`。
@@ -88,7 +88,7 @@ async def test_default_profile_run_and_resume_never_invoke_legacy_loop(monkeypat
     assert (await runtime.resume(snapshot, input="approved")).status is not None
 ```
 
-> **注意：** `build_paused_default_runtime()` 必须在 `tests/declarative/conftest.py` 中实现，使用已存在的 `lca/harness/profile/boot.py:boot_profile()` 启动默认 `web-standard.yaml`，并通过 `lca/layer4_app/spawn.py:spawn_agent()` 获得带 `compiled_plan` 的 `CognitiveRuntime`。
+> **注意：** `build_paused_default_runtime()` 必须在 `tests/declarative/conftest.py` 中实现，使用已存在的 `lca/harness/profile/boot.py:boot_profile()` 启动默认 `web-standard.yaml`，并通过 `lca/application/spawn.py:spawn_agent()` 获得带 `compiled_plan` 的 `CognitiveRuntime`。
 
 - [ ] **Step 2: 运行测试，确认当前 `resume()` 因固定调用 `_loop()` 而失败。**
 
@@ -106,7 +106,7 @@ def test_runtime_requires_a_valid_declarative_plan():
 
 
 def test_runtime_module_has_no_legacy_loop_or_policy_engine_reference():
-    source = Path("lca/layer2_runtime/runtime_loop.py").read_text()
+    source = Path("lca/runtime/runtime_loop.py").read_text()
     assert "def _loop(" not in source
     assert "DefaultControlPolicyEngine" not in source
     assert "return await self._loop" not in source
@@ -210,7 +210,7 @@ git commit -m "feat(adr-075): persist declarative phase cursors"
 **Files:**
 - Modify: `lca/contracts/protocols/declarative_phase_graph.py`
 - Modify: `lca/harness/declarative/interpreter.py`
-- Modify: `lca/layer2_runtime/declarative_runtime.py`
+- Modify: `lca/runtime/declarative_runtime.py`
 - Create: `tests/declarative/test_runtime_outcomes.py`
 
 **Interfaces:**
@@ -276,17 +276,17 @@ return result
 
 ```bash
 uv run pytest --no-cov tests/declarative/test_runtime_outcomes.py tests/declarative/test_interpreter_checkpoint_resume.py tests/declarative/test_runtime_driver.py -q
-git add lca/contracts/protocols/declarative_phase_graph.py lca/harness/declarative/interpreter.py lca/layer2_runtime/declarative_runtime.py tests/declarative/
+git add lca/contracts/protocols/declarative_phase_graph.py lca/harness/declarative/interpreter.py lca/runtime/declarative_runtime.py tests/declarative/
 git commit -m "feat(adr-075): model declarative pause and failure outcomes"
 ```
 
 ### Task 4: 让声明式 driver 成为 checkpoint/resume 的唯一入口
 
 **Files:**
-- Modify: `lca/layer2_runtime/declarative_runtime.py`
-- Modify: `lca/layer2_runtime/runtime_loop.py`
-- Modify: `lca/layer3_agent/cognitive_agent.py`
-- Modify: `lca/layer4_app/harness_live.py`
+- Modify: `lca/runtime/declarative_runtime.py`
+- Modify: `lca/runtime/runtime_loop.py`
+- Modify: `lca/agent/cognitive_agent.py`
+- Modify: `lca/application/harness_live.py`
 - Create: `tests/declarative/test_driver_resume.py`
 - Modify: `tests/declarative/test_default_profile_architecture.py`
 
@@ -359,7 +359,7 @@ Expected: PASS。
 - [ ] **Step 5: 提交。**
 
 ```bash
-git add lca/layer2_runtime/declarative_runtime.py lca/layer2_runtime/runtime_loop.py lca/layer3_agent/cognitive_agent.py lca/layer4_app/harness_live.py tests/declarative/ tests/e2e/
+git add lca/runtime/declarative_runtime.py lca/runtime/runtime_loop.py lca/agent/cognitive_agent.py lca/application/harness_live.py tests/declarative/ tests/e2e/
 git commit -m "feat(adr-075): route checkpoint resume through declarative driver"
 ```
 
@@ -370,10 +370,10 @@ git commit -m "feat(adr-075): route checkpoint resume through declarative driver
 - Modify: `lca/harness/declarative/compiler.py`
 - Modify: `lca/plugins/phase_executors/`
 - Create: `lca/plugins/control_contributions/`
-- Delete: `lca/layer2_runtime/control_policies.py`
-- Modify: `lca/layer2_runtime/runtime_loop.py`
+- Delete: `lca/runtime/control_policies.py`
+- Modify: `lca/runtime/runtime_loop.py`
 - Create: `tests/declarative/test_control_contributions.py`
-- Delete: `tests/layer2_runtime/test_control_policies.py`
+- Delete: `tests/runtime/test_control_policies.py`
 
 **Interfaces:**
 - Consumes: `PhaseContribution(role=GOVERN, executor, aggregation, predicate)` 与 `ControlVerdict`。
@@ -383,7 +383,7 @@ git commit -m "feat(adr-075): route checkpoint resume through declarative driver
 - `control_policies.py:52` — `DefaultControlPolicyEngine` 类，被 `runtime_loop.py:50,89,106` 导入和使用。
 - `runtime_loop.py:191-215` — `evaluate_control()` 方法调用 `self.control_policies.evaluate()` 和 `aggregate_control_verdicts()`。
 - `interpreter.py:312-320` — `_verdict_allows()` 是简单的布尔映射，不理解标准 verdict 结构。
-- `tests/layer2_runtime/test_control_policies.py` — 270 行测试直接测试 `DefaultControlPolicyEngine`。
+- `tests/runtime/test_control_policies.py` — 270 行测试直接测试 `DefaultControlPolicyEngine`。
 
 - [ ] **Step 1: 写失败的 contribution 聚合测试。**
 
@@ -437,22 +437,22 @@ Expected: FAIL，缺少 `control.verdict` 事实或 rewrite 不生效。
    - `_finish_control_stop()` 方法 (L357-367)
    - `_loop()` 中对上述方法的所有调用 (L228-320)
 2. 删除 `control_policies.py` 文件和对应测试。
-3. 更新 `lca/layer2_runtime/__init__.py` 的 re-export。
+3. 更新 `lca/runtime/__init__.py` 的 re-export。
 
 - [ ] **Step 5: 运行测试与提交。**
 
 ```bash
 uv run pytest --no-cov tests/declarative/test_control_contributions.py tests/declarative/test_runtime_outcomes.py tests/architecture/test_new_architecture_closure.py -q
 uv run lint-imports
-git add lca/harness/declarative/ lca/plugins/control_contributions/ lca/plugins/phase_executors/ lca/layer2_runtime/runtime_loop.py tests/declarative/ tests/architecture/
-git rm lca/layer2_runtime/control_policies.py tests/layer2_runtime/test_control_policies.py
+git add lca/harness/declarative/ lca/plugins/control_contributions/ lca/plugins/phase_executors/ lca/runtime/runtime_loop.py tests/declarative/ tests/architecture/
+git rm lca/runtime/control_policies.py tests/runtime/test_control_policies.py
 git commit -m "refactor(adr-074): execute controls as phase contributions"
 ```
 
 ### Task 6: 删除 legacy runtime、v1 composer fallback 与 legacy-authoritative dual write
 
 **Files:**
-- Modify: `lca/layer2_runtime/runtime_loop.py`
+- Modify: `lca/runtime/runtime_loop.py`
 - Modify: `lca/plugins/composer/plan_binding.py`
 - Modify: `lca/plugins/loop_drivers/cognitive.py`
 - Modify: `gateway/runs/loop_drivers.py`
@@ -460,7 +460,7 @@ git commit -m "refactor(adr-074): execute controls as phase contributions"
 - Delete: `tests/harness/test_dual_write.py`
 - Modify: `tests/architecture/test_new_architecture_closure.py`
 - Create: `tests/architecture/test_declarative_production_closure.py`
-- Modify: `tests/layer4_app/test_spawn_bind_plan.py`
+- Modify: `tests/application/test_spawn_bind_plan.py`
 
 **Interfaces:**
 - Consumes: `CompiledRunPlan.is_declarative`、`capability_bindings`、`phase_bindings`、`validation_report`。
@@ -477,7 +477,7 @@ git commit -m "refactor(adr-074): execute controls as phase contributions"
 ```python
 def test_production_runtime_and_composer_contain_no_legacy_execution_fallbacks():
     paths = [
-        "lca/layer2_runtime/runtime_loop.py",
+        "lca/runtime/runtime_loop.py",
         "lca/plugins/composer/plan_binding.py",
         "lca/plugins/loop_drivers/cognitive.py",
         "gateway/runs/loop_drivers.py",
@@ -521,14 +521,14 @@ Expected: FAIL，报告上述 legacy token 或 non-declarative plan 可组装。
 
 - [ ] **Step 4: 运行聚焦回归和 vulture。**
 
-Run: `uv run pytest --no-cov tests/architecture/test_declarative_production_closure.py tests/architecture/test_new_architecture_closure.py tests/declarative/ tests/layer4_app/test_spawn_bind_plan.py tests/test_run_*.py -q && uv run vulture lca --min-confidence 80`
+Run: `uv run pytest --no-cov tests/architecture/test_declarative_production_closure.py tests/architecture/test_new_architecture_closure.py tests/declarative/ tests/application/test_spawn_bind_plan.py tests/test_run_*.py -q && uv run vulture lca --min-confidence 80`
 
 Expected: PASS，vulture 不报告删除后新产生的未使用 production symbol。
 
 - [ ] **Step 5: 提交。**
 
 ```bash
-git add lca/layer2_runtime/runtime_loop.py lca/plugins/composer/plan_binding.py lca/plugins/loop_drivers/cognitive.py gateway/runs/loop_drivers.py tests/architecture/ tests/layer4_app/test_spawn_bind_plan.py
+git add lca/runtime/runtime_loop.py lca/plugins/composer/plan_binding.py lca/plugins/loop_drivers/cognitive.py gateway/runs/loop_drivers.py tests/architecture/ tests/application/test_spawn_bind_plan.py
 git rm lca/harness/command/dual_write.py tests/harness/test_dual_write.py
 git commit -m "refactor(adr-074-075): remove legacy runtime and composer fallbacks"
 ```
@@ -536,7 +536,7 @@ git commit -m "refactor(adr-074-075): remove legacy runtime and composer fallbac
 ### Task 7: 完成 effect 幂等、恢复图与计划 revision 的长程验收
 
 **Files:**
-- Modify: `lca/layer2_runtime/declarative_runtime.py`
+- Modify: `lca/runtime/declarative_runtime.py`
 - Modify: `lca/harness/declarative/interpreter.py`
 - Modify: `lca/contracts/protocols/command_envelope.py`
 - Modify: `profiles/web-standard.yaml`
@@ -612,7 +612,7 @@ async def test_new_plan_revision_is_adopted_only_after_safe_boundary():
 
 ```bash
 uv run pytest --no-cov tests/e2e/test_declarative_long_horizon_recovery.py tests/e2e/test_full_run_replay.py tests/declarative/test_driver_resume.py -q
-git add lca/layer2_runtime/declarative_runtime.py lca/harness/declarative/interpreter.py lca/contracts/protocols/command_envelope.py profiles/ tests/e2e/
+git add lca/runtime/declarative_runtime.py lca/harness/declarative/interpreter.py lca/contracts/protocols/command_envelope.py profiles/ tests/e2e/
 git commit -m "feat(adr-075): add bounded declarative recovery and effect idempotency"
 ```
 
@@ -710,7 +710,7 @@ git commit -m "docs(adr-074-075): record declarative runtime cutover"
 | 6 | `runtime_loop.py` 的 `control_policies` 导入在 L48-58 | 确认：L48-51 (`control_policies`) 和 L52-58 (`control_runtime`) | Task 5 Step 4 给出精确行号 |
 | 7 | `plan_binding.py` 的 v1 fallback 在 L158-164 | 确认：`else` 分支在 L158-164，candidates 是 `("composer.brain", "composer.body", "composer.perceive")` | Task 6 Step 3 给出精确替换 |
 | 8 | `DeclarativeRuntimeDriver.run()` 的 effect gateway 检查幂等键存在性 | 确认：`declarative_runtime.py:100` 只检查 `not envelope.idempotency_key`，无 claim store | Task 7 Step 3 新增 `RuntimeIdempotencyStore` |
-| 9 | `harness_live.py` 引用 | 确认文件存在（`lca/layer4_app/harness_live.py`） | 无需修正 |
+| 9 | `harness_live.py` 引用 | 确认文件存在（`lca/application/harness_live.py`） | 无需修正 |
 
 ## 8. 风险评估
 

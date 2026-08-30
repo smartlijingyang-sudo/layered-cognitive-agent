@@ -77,7 +77,7 @@ def clock(perceive: PerceiveService) -> None:
 
 顺序、slot、缺省空链（C7）是群服务的契约，不是 Composer 的名单，也不是 `gate.workspace-agent` 这种 meta 插件。Hub 可用自己的 `config.order` 覆盖投稿上的默认 `order`。未出现在装箱单里的投稿不加载，加载了但未 `add` 的不进入 `assemble()`。
 
-实现类继续留在 `lca/layer1_cognitive/` 等层内（[ADR-0001](0001-five-layer-separation.md)、[ADR-0015](0015-contracts-no-behavior-classes.md)）。插件文件只回答：挂到哪个服务、贡献什么、id / order / slot。
+实现类继续留在 `lca/cognition/` 等层内（[ADR-0001](0001-five-layer-separation.md)、[ADR-0015](0015-contracts-no-behavior-classes.md)）。插件文件只回答：挂到哪个服务、贡献什么、id / order / slot。
 
 ### 3. `@plugin` 从签名派生契约
 
@@ -147,14 +147,14 @@ entries:
 | 问题 | 打开 |
 |---|---|
 | 感知了什么 | `bundles/*.yaml` 里 `sensor.*` 行；契约在 `lca/plugins/perceive/` |
-| clock 怎么感知 | `lca/layer1_cognitive/sensors/clock.py` |
+| clock 怎么感知 | `lca/cognition/sensors/clock.py` |
 | 工具面对模型是什么 | `lca/plugins/tools/<name>.py`（Consumer） |
 | 工具背后的世界能力 | 对应缝的 Definition + Provider |
 | Protocol | `lca/contracts/protocols/` |
 | 这次部署启用了谁 | `profiles/*.yaml` → 它引用的 bundles + patch |
 | 依赖图 | `lca-ops inspect-tree`（Loader 真图） |
 
-投稿插件与实现类一对一、同名、不同层：`plugins/perceive/clock.py` 挂钩，`layer1_cognitive/sensors/clock.py` 实现。禁止第三处再列 `clock`。
+投稿插件与实现类一对一、同名、不同层：`plugins/perceive/clock.py` 挂钩，`cognition/sensors/clock.py` 实现。禁止第三处再列 `clock`。
 
 ## 放弃的方案
 

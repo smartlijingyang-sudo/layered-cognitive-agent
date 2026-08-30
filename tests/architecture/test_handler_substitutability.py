@@ -272,7 +272,7 @@ def test_runtime_gateway_does_not_construct_handlers_by_name() -> None:
 def test_declarative_execution_uses_registry_dispatch() -> None:
     """The production Turn module must route effects and deltas through dispatch."""
 
-    runtime_path = REPO / "lca" / "layer2_runtime" / "declarative_runtime.py"
+    runtime_path = REPO / "lca" / "runtime" / "declarative_runtime.py"
     tree = ast.parse(runtime_path.read_text(encoding="utf-8"))
     execution = next(
         node
@@ -296,7 +296,7 @@ def test_declarative_execution_uses_registry_dispatch() -> None:
 def test_runtime_binding_has_one_declarative_driver_construction_path() -> None:
     """Fresh and resumed Turns must share one closed runtime assembly seam."""
 
-    binding_path = REPO / "lca" / "layer2_runtime" / "runtime_bindings.py"
+    binding_path = REPO / "lca" / "runtime" / "runtime_bindings.py"
     tree = ast.parse(binding_path.read_text(encoding="utf-8"))
     binding_class = next(
         node
@@ -316,7 +316,7 @@ def test_runtime_binding_has_one_declarative_driver_construction_path() -> None:
         "factory so fresh and resumed Turns cannot drift."
     )
 
-    runtime_path = REPO / "lca" / "layer2_runtime" / "runtime_loop.py"
+    runtime_path = REPO / "lca" / "runtime" / "runtime_loop.py"
     assert "DeclarativeRuntimeDriver" not in runtime_path.read_text(encoding="utf-8")
 
 
@@ -327,7 +327,7 @@ def test_runtime_loop_does_not_construct_handlers_by_name() -> None:
     execution module.  This preserves one runtime interface for every plan.
     """
 
-    runtime_path = REPO / "lca" / "layer2_runtime" / "runtime_loop.py"
+    runtime_path = REPO / "lca" / "runtime" / "runtime_loop.py"
     if not runtime_path.exists():
         return
     source = runtime_path.read_text(encoding="utf-8")

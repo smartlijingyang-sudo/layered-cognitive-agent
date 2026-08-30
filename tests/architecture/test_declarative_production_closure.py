@@ -19,7 +19,7 @@ import pytest
 def test_production_runtime_and_composer_contain_no_legacy_execution_fallbacks():
     """Verify that production files contain no legacy execution fallbacks."""
     paths = [
-        "lca/layer2_runtime/runtime_loop.py",
+        "lca/runtime/runtime_loop.py",
         "lca/plugins/composer/plan_binding.py",
         "lca/plugins/loop_drivers/cognitive.py",
         "gateway/runs/loop_drivers.py",

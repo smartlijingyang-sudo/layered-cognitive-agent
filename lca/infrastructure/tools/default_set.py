@@ -1,7 +1,7 @@
 """Shared default tool set for gateway casting and L4 auto-casting.
 
 All tools are now assembled from manifest + executor modules under
-``lca/layer0_infra/tools/<name>/``.
+``lca/infrastructure/tools/<name>/``.
 """
 
 from __future__ import annotations

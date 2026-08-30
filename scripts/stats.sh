@@ -28,7 +28,7 @@ total_files=$(_count_files "${ROOT}/lca" "${ROOT}/gateway" "${ROOT}/scripts" "${
 printf '  总计:     %s 行 / %s 文件\n' "${total_lines}" "${total_files}"
 
 printf '\n  %s\n' "$(_dim '按层分布:')"
-for layer in contracts layer0_infra layer1_cognitive layer2_runtime layer3_agent layer4_app; do
+for layer in contracts infrastructure cognition runtime agent application; do
   dir="${ROOT}/lca/${layer}"
   [[ -d "${dir}" ]] || continue
   lines=$(_count_lines "${dir}")

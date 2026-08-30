@@ -1,7 +1,7 @@
 """Architecture boundary guard for the command gateway & session routes.
 
 The gateway layer must NOT import from concrete cognitive/runtime/agent
-layers (layer1_cognitive / layer2_runtime / layer3_agent). It only sees
+layers (cognition / runtime / agent). It only sees
 the harness contracts and the facade protocols. (N4 constraint)
 """
 
@@ -11,7 +11,7 @@ import ast
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
-FORBIDDEN_MODULES = {"layer1_cognitive", "layer2_runtime", "layer3_agent"}
+FORBIDDEN_MODULES = {"cognition", "runtime", "agent"}
 GUARDED_FILES = (
     "lca/harness/command/gateway.py",
     "lca/plugins/gateway_starlette/session_routes.py",

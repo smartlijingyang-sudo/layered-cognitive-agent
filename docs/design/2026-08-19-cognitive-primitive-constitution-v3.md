@@ -179,7 +179,7 @@ TaskContract（实例级："本次 run 做什么"）
 
 ### 0.1 现网一句话（2026-08-19 核实）
 
-生产认知循环是 `CognitiveRuntime._loop`（`lca/layer2_runtime/runtime_loop.py`），由 `AgentComposer.compose`（`lca/layer4_app/composer.py`）直接构造。`lca-loop-cognitive` 的 `build_cognitive_live_agent` 是 `NotImplementedError`。插件 **不** 驱动 `_loop`。`Sensor` / `PerceiveHub` / `ClockSensor` / `RepeatToolCallGate` / `ContextManifest` / `DegradationPolicy` **都不存在**。Journal-as-Truth 对 run 叙事 / SSE / OTel 成立，**不能**重建下一轮模型 prompt。
+生产认知循环是 `CognitiveRuntime._loop`（`lca/runtime/runtime_loop.py`），由 `AgentComposer.compose`（`lca/application/composer.py`）直接构造。`lca-loop-cognitive` 的 `build_cognitive_live_agent` 是 `NotImplementedError`。插件 **不** 驱动 `_loop`。`Sensor` / `PerceiveHub` / `ClockSensor` / `RepeatToolCallGate` / `ContextManifest` / `DegradationPolicy` **都不存在**。Journal-as-Truth 对 run 叙事 / SSE / OTel 成立，**不能**重建下一轮模型 prompt。
 
 ### 0.2 v3 相对原宪法的 delta
 
@@ -344,7 +344,7 @@ flowchart TB
 
 **DSH loop 落点：** `gateway/runs/loop_drivers.py` 的 `execution_target="dsh"` 换的是 **整段运行时**（`DshRunDriver`），等价于替换整个 `loop:` 插件。它不在六步旁边加阶段。比较驱动（compare-driver）同样是 execution_target，不是认知原语。
 
-**Spawn 落点：** 生产对象图由 `spawn_agent` / `spawn_team` 闭合（`lca/layer4_app/spawn.py`）。群服务组装投稿（`PerceiveService.assemble` 等）；L4 禁止点名 `sensor.*` / `gate.*` 钥匙，禁止 Composer 类。装配纪律见 [ADR-0056](../adr/0056-plugin-group-contribution.md)。插件 **不得** `ctx.events.on("agent.*")` 做控制。
+**Spawn 落点：** 生产对象图由 `spawn_agent` / `spawn_team` 闭合（`lca/application/spawn.py`）。群服务组装投稿（`PerceiveService.assemble` 等）；L4 禁止点名 `sensor.*` / `gate.*` 钥匙，禁止 Composer 类。装配纪律见 [ADR-0056](../adr/0056-plugin-group-contribution.md)。插件 **不得** `ctx.events.on("agent.*")` 做控制。
 
 ---
 
@@ -1856,7 +1856,7 @@ LLM 上下文是有限资源。`ContextBudgeter` 先锁不可丢失锚点，剩�
 
 ### 7.4 `RunStore.get` 与 digest
 
-**不**发明第二套 store 类型。在现网 `lca/layer0_infra/observability/journal/engine.py` 的 **`RunStore`** 上增加方法（PR2）：
+**不**发明第二套 store 类型。在现网 `lca/infrastructure/observability/journal/engine.py` 的 **`RunStore`** 上增加方法（PR2）：
 
 ```python
 class RunStore:  # 现网类；seq = 最后一次成功 append 的序号
@@ -2769,7 +2769,7 @@ class CordisControlTool:
 #### 13.3.3 Composer.mount / unmount / inspect 实现
 
 ```python
-# lca/layer4_app/composer.py
+# lca/application/composer.py
 class Composer:
     """群 Composition 唯一组装者。运行时可挂载 / 卸载 plugin。"""
 
@@ -4685,7 +4685,7 @@ class ApprovalResolved(JournalEvent):
 |---|---|---|
 | ADR-0002「新特性只能 Hook」 | **废止控制面**。控制走 Protocol。观察口 Hook 只读。补步名别名 | **PR1** 写入 ADR 正文 supersession 前向引用；PR11 全文改写 |
 | ADR-0002 `_loop` AST≤30 / `HOOK_NAMES` / 禁 import event_bus | 门禁以本文 §5.4 / §23 为准，不要假定旧测试还在 | PR1 新建测试 |
-| ADR-0002 `DegradationPolicy` 在 `layer1_cognitive/brain/degradation.py` | 类已删、注释还在。恢复 Protocol 与实现 | 与 Gate 分工，PR4–PR5 |
+| ADR-0002 `DegradationPolicy` 在 `cognition/brain/degradation.py` | 类已删、注释还在。恢复 Protocol 与实现 | 与 Gate 分工，PR4–PR5 |
 | ADR-0037 Journal-as-Truth | **保持**叙事/OTel 平面。扩展：模型输入也必须可重建。`fold_run_state` 不够 | PR2 |
 | `COGNITIVE_PHASES` / `HookEvent.PRE_*` | 冻结只减；PR10 拆控制用途 | PR1/PR5/PR10 |
 | harness-spine waterfall | 仅手平面工具管道可留；认知 middleware 淘汰 | PR4 删 loop_intervention；PR10 拆其余 |
@@ -5120,7 +5120,7 @@ lca-ops diagnose --trace trace-001 --problem "approval_rejected"
 
 ## 25. 实施路线图（阶段 0–7）
 
-禁止大爆炸。每阶段允许事件变细，不允许同一输入/配置下出现未解释的 Action、世界副作用、权限扩大或终态改变。行为变化必须 feature flag / shadow。Flags 家园：`lca/layer0_infra/cognitive_loop_settings.py` `CognitiveLoopSettings`（pydantic-settings，env 前缀 `LCA_LOOP_`）。**禁止**放 L2：L1 的 Hub / `context_manifest` helper / SafeExecutor 需要读旗，不能 import L2。L4 Composer 也可把旗注入构造参数。
+禁止大爆炸。每阶段允许事件变细，不允许同一输入/配置下出现未解释的 Action、世界副作用、权限扩大或终态改变。行为变化必须 feature flag / shadow。Flags 家园：`lca/infrastructure/cognitive_loop_settings.py` `CognitiveLoopSettings`（pydantic-settings，env 前缀 `LCA_LOOP_`）。**禁止**放 L2：L1 的 Hub / `context_manifest` helper / SafeExecutor 需要读旗，不能 import L2。L4 Composer 也可把旗注入构造参数。
 
 | 字段 | 默认 | 作用 |
 |---|---|---|
@@ -5329,26 +5329,26 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 ### PR2 — Journal 缺口 + ContextManifest dual-write
 
 - **标题：** journal gaps for context reconstruction: ContextManifest dual-write
-- **文件：** `lca/contracts/models/core/perception.py`；`journal.py` / `journal_catalog.py`（**含新类 `JOURNAL_CATALOG_META`**，§19.1 表）；`JournalSchemaMeta.schema_version`；`StateSnapshot.journal_seq`；`lca/layer0_infra/observability/journal/engine.py` 的 **`RunStore.get` / `get_event` / blob**；**唯一发射模块** `lca/layer1_cognitive/brain/context_manifest.py`；Reasoner **只调用该 helper**；`lca/layer0_infra/cognitive_loop_settings.py`；metric `context_manifest_missing_rate`
+- **文件：** `lca/contracts/models/core/perception.py`；`journal.py` / `journal_catalog.py`（**含新类 `JOURNAL_CATALOG_META`**，§19.1 表）；`JournalSchemaMeta.schema_version`；`StateSnapshot.journal_seq`；`lca/infrastructure/observability/journal/engine.py` 的 **`RunStore.get` / `get_event` / blob**；**唯一发射模块** `lca/cognition/brain/context_manifest.py`；Reasoner **只调用该 helper**；`lca/infrastructure/cognitive_loop_settings.py`；metric `context_manifest_missing_rate`
 - **依赖：** PR1
 - **说明：** 按 §7.3 表 dual-write items（含当时 `current_date` 作为 clock item、search_routing 冻结值）。D19：(a) 默认只 refs+digest；(c) `persist_full_prompt` 或 verbose 写 `prompt_ref`。mint 其它事件类但不发射。`RunPaused`/`RunResumed` 可在 `_loop` 边沿发射。`StampedEvent` **不加** actor/causation/payload_ref。
 - **验证：**
   ```
-  uv run ruff check --fix lca/contracts lca/layer0_infra/observability lca/layer1_cognitive/brain
+  uv run ruff check --fix lca/contracts lca/infrastructure/observability lca/cognition/brain
   uv run pytest --no-cov tests/test_journal_core.py tests/test_journal_fact_stream.py tests/test_run_fact_store.py tests/test_observability_boundary.py -q
-  uv run mypy lca/contracts lca/layer1_cognitive/brain
+  uv run mypy lca/contracts lca/cognition/brain
   ```
   契约变更准备提交时升全量 `uv run pytest`。
 
 ### PR3a — PerceiveHub Protocol + Memory adapter + 等价属性测试
 
 - **标题：** PerceiveHub wraps memory.perceive; apply_delta ≡ fold_events
-- **文件：** `cognition.py` / `journal.py` Protocols；`lca/layer1_cognitive/perceive_hub.py`；`CognitiveRuntime.__init__(..., perceive_hub: PerceiveHub)`（**不** import L1 类）；`composer.py` 总是注入 Hub（空 sensors → 只 Memory adapter）；`tests/test_journal_reducer_apply_delta_equivalent_to_fold_events.py`
+- **文件：** `cognition.py` / `journal.py` Protocols；`lca/cognition/perceive_hub.py`；`CognitiveRuntime.__init__(..., perceive_hub: PerceiveHub)`（**不** import L1 类）；`composer.py` 总是注入 Hub（空 sensors → 只 Memory adapter）；`tests/test_journal_reducer_apply_delta_equivalent_to_fold_events.py`
 - **依赖：** PR2
 - **说明：** 无 Clock、不改 Reasoner `now()`。Memory adapter 算法 §5.5。`NullPerceiveHub` 仅测试。不把 `MutatingSensorAdapter` 当快乐路径。Hub 失败策略：Sensor 隔离；Budgeter/record/Memory 失败不 apply。`PerceptionMerged.delta_ref` 必填；属性测试按 §5.2 **子集** 双射（`get(delta_ref)` → Delta → `apply_delta`），不得从 item_refs 猜 history。
 - **验证：**
   ```
-  uv run ruff check --fix lca/contracts/protocols lca/layer1_cognitive lca/layer2_runtime lca/layer4_app
+  uv run ruff check --fix lca/contracts/protocols lca/cognition lca/runtime lca/application
   uv run lint-imports && uv run mypy lca
   uv run pytest --no-cov tests/test_llm_turn.py tests/test_run_*.py tests/test_architecture*.py tests/test_journal_reducer_apply_delta_equivalent_to_fold_events.py -q
   uv run pytest --no-cov -q -k "gate or ModularBrain or PerceiveHub"
@@ -5358,7 +5358,7 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 ### PR3b — Clock + workspace-artifacts 具名工厂；Manifest emitter 迁 Hub
 
 - **标题：** named sensor.clock and sensor.workspace-artifacts; Hub emits ContextManifested
-- **文件：** `lca/layer1_cognitive/sensors/clock.py`；`sensors/workspace_artifacts.py`；`lca/plugins/sensors/clock.py` 与 `workspace_artifacts.py`（`ctx.provide("sensor.clock", factory)`，**不是** list）；Composer 按 §5.5 顺序组装；catalog `ContextManifested.emitter` 改为 Hub 模块；删除 `context_manifest.py` 的 `record()`（或变为纯 builder）
+- **文件：** `lca/cognition/sensors/clock.py`；`sensors/workspace_artifacts.py`；`lca/plugins/sensors/clock.py` 与 `workspace_artifacts.py`（`ctx.provide("sensor.clock", factory)`，**不是** list）；Composer 按 §5.5 顺序组装；catalog `ContextManifested.emitter` 改为 Hub 模块；删除 `context_manifest.py` 的 `record()`（或变为纯 builder）
 - **依赖：** PR3a
 - **说明：** `workspace-artifacts` **必做**（非可选）。Clock `now()` 可注入；抛错 → 非致命 drop。`PerceptionMerged` 唯一 emitter = Hub。
 - **验证：** 同 PR3a 范围 + `-k "ClockSensor or workspace_artifact or ContextManifested"`；`lint-imports`。
@@ -5371,7 +5371,7 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 - **验证：**
   ```
   uv run pytest --no-cov tests/test_llm_turn.py tests/test_run_*.py -q
-  uv run mypy lca/layer1_cognitive/brain
+  uv run mypy lca/cognition/brain
   ```
   准备提交升全量 pytest。
 
@@ -5421,7 +5421,7 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 ### PR8 — `/runs` 走 followup；steer/inject 进进行中的 run；inbox-facts
 
 - **标题：** unify /runs on followup; wire steer/inject into in-flight run; inbox-facts Sensor
-- **文件：** `gateway/runs/execute.py` / ingress（创建 = `followup`）；`gateway/session_routes.py`（steer/inject 接到进行中的生产 run）；harness Inbox dual-write `actor/target/priority` 到 journal；`lca/layer1_cognitive/sensors/inbox.py`（**只** import contracts/journal）；**不**让 L1 import `lca.harness`；importlinter forbidden L1→harness
+- **文件：** `gateway/runs/execute.py` / ingress（创建 = `followup`）；`gateway/session_routes.py`（steer/inject 接到进行中的生产 run）；harness Inbox dual-write `actor/target/priority` 到 journal；`lca/cognition/sensors/inbox.py`（**只** import contracts/journal）；**不**让 L1 import `lca.harness`；importlinter forbidden L1→harness
 - **依赖：** PR3a
 - **说明：** D24，**不再门控**。所有用户输入经 Inbox → journal → `inbox-facts` → Perceive。`CognitiveRunDriver.run(question)` 改为 followup 统一入口（必要的 gateway 契约变更在本 PR）。Sensor 只读 journal。
 - **验证：** `uv run pytest --no-cov tests/harness/test_phase_b_spine.py tests/harness/test_harness_spine_e2e.py tests/test_run_*.py tests/test_gateway*.py -q` + `lint-imports`
@@ -5481,7 +5481,7 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 - 原宪法：`2026-08-19-cognitive-primitive-plugin-design.md`（已归档）
 - Manus v2 评价：internal Manus v2 eval, 2026-08-19, not in tree
 - ADR-0001 五层；ADR-0002 认知闭环（控制面由本文废止）；ADR-0004 Protocol-First；ADR-0005 L4 组合根；ADR-0015 contracts 无行为类；ADR-0030/0034/0035 Team；ADR-0037 Journal-as-Truth；ADR-0045 Decision 形状；ADR-0047 tool wire；ADR-0049 咨询平面；ADR-0051 workspace/terminal gates；ADR-0055 run fact store
-- 现网锚点：`lca/layer2_runtime/runtime_loop.py`、`lca/layer4_app/composer.py`、`lca/contracts/protocols/cognition.py`、`lca/contracts/models/observability/journal_catalog.py`、`lca/harness/middleware/registry.py`、`lca/layer1_cognitive/brain/reasoner.py`、`lca/layer1_cognitive/brain/decision_gates/__init__.py`、`gateway/runs/loop_drivers.py`
+- 现网锚点：`lca/runtime/runtime_loop.py`、`lca/application/composer.py`、`lca/contracts/protocols/cognition.py`、`lca/contracts/models/observability/journal_catalog.py`、`lca/harness/middleware/registry.py`、`lca/cognition/brain/reasoner.py`、`lca/cognition/brain/decision_gates/__init__.py`、`gateway/runs/loop_drivers.py`
 - Anthropic, *Effective context engineering for AI agents*
 - Anthropic, *Patterns and problems in emerging multiagent systems*
 - DeepSeek Harness architecture（I/O seam 保留，pre-step 认知挂钩不保留）

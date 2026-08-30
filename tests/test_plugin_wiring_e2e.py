@@ -14,7 +14,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 LCA = ROOT / "lca"
-L1 = LCA / "layer1_cognitive"
+L1 = LCA / "cognition"
 PLUGINS = LCA / "plugins"
 
 
@@ -110,7 +110,7 @@ class TestLayerBoundary:
             if "from lca.harness import" in src or "import lca.harness" in src:
                 pytest.fail(
                     f"{path.relative_to(ROOT)}: lca.harness import is forbidden "
-                    f"from lca/layer1_cognitive (spec §5.1 / PR8)"
+                    f"from lca/cognition (spec §5.1 / PR8)"
                 )
 
 

@@ -5,7 +5,7 @@
 > schema_version: 1.0.0
 
 ## 1. 职责
-lca/layer1_cognitive/collaboration. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。
+lca/cognition/collaboration. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。
 
 ## 2. 不负责
 执行副作用、阶段编排、组合根、HTTP 路由

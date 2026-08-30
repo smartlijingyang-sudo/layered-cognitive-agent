@@ -4,7 +4,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Tier-4 组合根 (lca/layer4_app/, gateway/)                   │
+│ Tier-4 组合根 (lca/application/, gateway/)                   │
 │   - 通过 ctx.require() 拉 capability,不直接 new            │
 └──────────────────┬──────────────────────────────────────────┘
                    │ ctx.require("run_ledger_factory")

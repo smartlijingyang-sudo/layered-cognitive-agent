@@ -99,12 +99,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C15: C15 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer0_infra/llm/`
+- **Path(s)**: `lca/infrastructure/llm/`
 - **Main commits touching this cluster**: 2 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 2 commits touch `lca/layer0_infra/llm/`; see `git diff bae32d8..main -- lca/layer0_infra/llm/` for the full delta.
-- **Key symbols touched**: `lca/layer0_infra/llm/config.py`, `lca/layer0_infra/llm/openai_client.py`
+- **End-state delta**: 2 commits touch `lca/infrastructure/llm/`; see `git diff bae32d8..main -- lca/infrastructure/llm/` for the full delta.
+- **Key symbols touched**: `lca/infrastructure/llm/config.py`, `lca/infrastructure/llm/openai_client.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -113,12 +113,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C16: C16 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer0_infra/tools/`
+- **Path(s)**: `lca/infrastructure/tools/`
 - **Main commits touching this cluster**: 12 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 12 commits touch `lca/layer0_infra/tools/`; see `git diff bae32d8..main -- lca/layer0_infra/tools/` for the full delta.
-- **Key symbols touched**: `lca/layer0_infra/tools/contract/__init__.py`, `lca/layer0_infra/tools/contract/builtin.py`, `lca/layer0_infra/tools/contract/codegen_ts.py`, `lca/layer0_infra/tools/contract/project.py`, `lca/layer0_infra/tools/contract/render.py`
+- **End-state delta**: 12 commits touch `lca/infrastructure/tools/`; see `git diff bae32d8..main -- lca/infrastructure/tools/` for the full delta.
+- **Key symbols touched**: `lca/infrastructure/tools/contract/__init__.py`, `lca/infrastructure/tools/contract/builtin.py`, `lca/infrastructure/tools/contract/codegen_ts.py`, `lca/infrastructure/tools/contract/project.py`, `lca/infrastructure/tools/contract/render.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -127,12 +127,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C17: C17 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer0_infra/transport/`
+- **Path(s)**: `lca/infrastructure/transport/`
 - **Main commits touching this cluster**: 3 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 3 commits touch `lca/layer0_infra/transport/`; see `git diff bae32d8..main -- lca/layer0_infra/transport/` for the full delta.
-- **Key symbols touched**: `lca/layer0_infra/transport/invocation.py`, `lca/layer0_infra/transport/transport_registry.py`
+- **End-state delta**: 3 commits touch `lca/infrastructure/transport/`; see `git diff bae32d8..main -- lca/infrastructure/transport/` for the full delta.
+- **Key symbols touched**: `lca/infrastructure/transport/invocation.py`, `lca/infrastructure/transport/transport_registry.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -141,12 +141,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C18: C18 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer0_infra/sandbox/`
+- **Path(s)**: `lca/infrastructure/sandbox/`
 - **Main commits touching this cluster**: 2 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 2 commits touch `lca/layer0_infra/sandbox/`; see `git diff bae32d8..main -- lca/layer0_infra/sandbox/` for the full delta.
-- **Key symbols touched**: `lca/layer0_infra/sandbox/prompt.py`, `lca/layer0_infra/sandbox/runtime_mount.py`, `lca/layer0_infra/sandbox/runtime_scope.py`, `lca/layer0_infra/sandbox/surface.py`
+- **End-state delta**: 2 commits touch `lca/infrastructure/sandbox/`; see `git diff bae32d8..main -- lca/infrastructure/sandbox/` for the full delta.
+- **Key symbols touched**: `lca/infrastructure/sandbox/prompt.py`, `lca/infrastructure/sandbox/runtime_mount.py`, `lca/infrastructure/sandbox/runtime_scope.py`, `lca/infrastructure/sandbox/surface.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -155,12 +155,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C19: C19 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer0_infra/observability/`
+- **Path(s)**: `lca/infrastructure/observability/`
 - **Main commits touching this cluster**: 32 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 32 commits touch `lca/layer0_infra/observability/`; see `git diff bae32d8..main -- lca/layer0_infra/observability/` for the full delta.
-- **Key symbols touched**: `lca/layer0_infra/observability/__init__.py`, `lca/layer0_infra/observability/coding_agent_tools/__init__.py`, `lca/layer0_infra/observability/coding_agent_tools/_helpers.py`, `lca/layer0_infra/observability/coding_agent_tools/diff_context.py`, `lca/layer0_infra/observability/coding_agent_tools/failure_explainer.py`
+- **End-state delta**: 32 commits touch `lca/infrastructure/observability/`; see `git diff bae32d8..main -- lca/infrastructure/observability/` for the full delta.
+- **Key symbols touched**: `lca/infrastructure/observability/__init__.py`, `lca/infrastructure/observability/coding_agent_tools/__init__.py`, `lca/infrastructure/observability/coding_agent_tools/_helpers.py`, `lca/infrastructure/observability/coding_agent_tools/diff_context.py`, `lca/infrastructure/observability/coding_agent_tools/failure_explainer.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -183,12 +183,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C20: C20 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer0_infra/dsh/`
+- **Path(s)**: `lca/infrastructure/dsh/`
 - **Main commits touching this cluster**: 1 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 1 commits touch `lca/layer0_infra/dsh/`; see `git diff bae32d8..main -- lca/layer0_infra/dsh/` for the full delta.
-- **Key symbols touched**: `lca/layer0_infra/dsh/__init__.py`, `lca/layer0_infra/dsh/archive.py`, `lca/layer0_infra/dsh/daemon_worker.py`, `lca/layer0_infra/dsh/driver.py`, `lca/layer0_infra/dsh/harvest.py`
+- **End-state delta**: 1 commits touch `lca/infrastructure/dsh/`; see `git diff bae32d8..main -- lca/infrastructure/dsh/` for the full delta.
+- **Key symbols touched**: `lca/infrastructure/dsh/__init__.py`, `lca/infrastructure/dsh/archive.py`, `lca/infrastructure/dsh/daemon_worker.py`, `lca/infrastructure/dsh/driver.py`, `lca/infrastructure/dsh/harvest.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -197,12 +197,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C21: C21 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer0_infra/plane/`
+- **Path(s)**: `lca/infrastructure/plane/`
 - **Main commits touching this cluster**: 1 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 1 commits touch `lca/layer0_infra/plane/`; see `git diff bae32d8..main -- lca/layer0_infra/plane/` for the full delta.
-- **Key symbols touched**: `lca/layer0_infra/plane/machine.py`
+- **End-state delta**: 1 commits touch `lca/infrastructure/plane/`; see `git diff bae32d8..main -- lca/infrastructure/plane/` for the full delta.
+- **Key symbols touched**: `lca/infrastructure/plane/machine.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -211,12 +211,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C22: C22 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer1_cognitive/brain/`
+- **Path(s)**: `lca/cognition/brain/`
 - **Main commits touching this cluster**: 20 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 20 commits touch `lca/layer1_cognitive/brain/`; see `git diff bae32d8..main -- lca/layer1_cognitive/brain/` for the full delta.
-- **Key symbols touched**: `lca/layer1_cognitive/brain/cognitive_pipeline.py`, `lca/layer1_cognitive/brain/decision_gates/__init__.py`, `lca/layer1_cognitive/brain/decision_gates/repeat_tool_call.py`, `lca/layer1_cognitive/brain/decision_gates/tool_loop_breaker.py`, `lca/layer1_cognitive/brain/default_factory.py`
+- **End-state delta**: 20 commits touch `lca/cognition/brain/`; see `git diff bae32d8..main -- lca/cognition/brain/` for the full delta.
+- **Key symbols touched**: `lca/cognition/brain/cognitive_pipeline.py`, `lca/cognition/brain/decision_gates/__init__.py`, `lca/cognition/brain/decision_gates/repeat_tool_call.py`, `lca/cognition/brain/decision_gates/tool_loop_breaker.py`, `lca/cognition/brain/default_factory.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -225,12 +225,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C23: C23 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer1_cognitive/body/`
+- **Path(s)**: `lca/cognition/body/`
 - **Main commits touching this cluster**: 36 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 36 commits touch `lca/layer1_cognitive/body/`; see `git diff bae32d8..main -- lca/layer1_cognitive/body/` for the full delta.
-- **Key symbols touched**: `lca/layer1_cognitive/body/action_catalog.py`, `lca/layer1_cognitive/body/action_handlers.py`, `lca/layer1_cognitive/body/action_registry.py`, `lca/layer1_cognitive/body/delegation_target.py`, `lca/layer1_cognitive/body/pipeline_safe_executor.py`
+- **End-state delta**: 36 commits touch `lca/cognition/body/`; see `git diff bae32d8..main -- lca/cognition/body/` for the full delta.
+- **Key symbols touched**: `lca/cognition/body/action_catalog.py`, `lca/cognition/body/action_handlers.py`, `lca/cognition/body/action_registry.py`, `lca/cognition/body/delegation_target.py`, `lca/cognition/body/pipeline_safe_executor.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -239,12 +239,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C24: C24 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer1_cognitive/perceive_hub.py`, `lca/layer1_cognitive/perceive_sink.py`
+- **Path(s)**: `lca/cognition/perceive_hub.py`, `lca/cognition/perceive_sink.py`
 - **Main commits touching this cluster**: 3 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 3 commits touch `lca/layer1_cognitive/perceive_hub.py`, `lca/layer1_cognitive/perceive_sink.py`; see `git diff bae32d8..main -- lca/layer1_cognitive/perceive_hub.py lca/layer1_cognitive/perceive_sink.py` for the full delta.
-- **Key symbols touched**: `lca/layer1_cognitive/perceive_hub.py`, `lca/layer1_cognitive/perceive_sink.py`
+- **End-state delta**: 3 commits touch `lca/cognition/perceive_hub.py`, `lca/cognition/perceive_sink.py`; see `git diff bae32d8..main -- lca/cognition/perceive_hub.py lca/cognition/perceive_sink.py` for the full delta.
+- **Key symbols touched**: `lca/cognition/perceive_hub.py`, `lca/cognition/perceive_sink.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -253,12 +253,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C25: C25 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer1_cognitive/sensors/`
+- **Path(s)**: `lca/cognition/sensors/`
 - **Main commits touching this cluster**: 2 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 2 commits touch `lca/layer1_cognitive/sensors/`; see `git diff bae32d8..main -- lca/layer1_cognitive/sensors/` for the full delta.
-- **Key symbols touched**: `lca/layer1_cognitive/sensors/journal_backed.py`, `lca/layer1_cognitive/sensors/workspace_instructions.py`
+- **End-state delta**: 2 commits touch `lca/cognition/sensors/`; see `git diff bae32d8..main -- lca/cognition/sensors/` for the full delta.
+- **Key symbols touched**: `lca/cognition/sensors/journal_backed.py`, `lca/cognition/sensors/workspace_instructions.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -267,12 +267,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C26: C26 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer1_cognitive/collaboration/`, `lca/layer1_cognitive/event_bus.py`, `lca/layer1_cognitive/hook_registry.py`
+- **Path(s)**: `lca/cognition/collaboration/`, `lca/cognition/event_bus.py`, `lca/cognition/hook_registry.py`
 - **Main commits touching this cluster**: 5 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 5 commits touch `lca/layer1_cognitive/collaboration/`, `lca/layer1_cognitive/event_bus.py`, `lca/layer1_cognitive/hook_registry.py`; see `git diff bae32d8..main -- lca/layer1_cognitive/collaboration/ lca/layer1_cognitive/event_bus.py lca/layer1_cognitive/hook_registry.py` for the full delta.
-- **Key symbols touched**: `lca/layer1_cognitive/event_bus.py`, `lca/layer1_cognitive/hook_registry.py`
+- **End-state delta**: 5 commits touch `lca/cognition/collaboration/`, `lca/cognition/event_bus.py`, `lca/cognition/hook_registry.py`; see `git diff bae32d8..main -- lca/cognition/collaboration/ lca/cognition/event_bus.py lca/cognition/hook_registry.py` for the full delta.
+- **Key symbols touched**: `lca/cognition/event_bus.py`, `lca/cognition/hook_registry.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -281,12 +281,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C27: C27 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer1_cognitive/memory/`, `lca/layer1_cognitive/member_status/`
+- **Path(s)**: `lca/cognition/memory/`, `lca/cognition/member_status/`
 - **Main commits touching this cluster**: 5 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 5 commits touch `lca/layer1_cognitive/memory/`, `lca/layer1_cognitive/member_status/`; see `git diff bae32d8..main -- lca/layer1_cognitive/memory/ lca/layer1_cognitive/member_status/` for the full delta.
-- **Key symbols touched**: `lca/layer1_cognitive/memory/layered_retrieval_policy.py`, `lca/layer1_cognitive/memory/null_retrieval_policy.py`, `lca/layer1_cognitive/memory/policy.py`, `lca/layer1_cognitive/memory/semantic_compaction.py`, `lca/layer1_cognitive/memory/simple_memory.py`
+- **End-state delta**: 5 commits touch `lca/cognition/memory/`, `lca/cognition/member_status/`; see `git diff bae32d8..main -- lca/cognition/memory/ lca/cognition/member_status/` for the full delta.
+- **Key symbols touched**: `lca/cognition/memory/layered_retrieval_policy.py`, `lca/cognition/memory/null_retrieval_policy.py`, `lca/cognition/memory/policy.py`, `lca/cognition/memory/semantic_compaction.py`, `lca/cognition/memory/simple_memory.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -295,12 +295,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C28: C28 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer2_runtime/`
+- **Path(s)**: `lca/runtime/`
 - **Main commits touching this cluster**: 97 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 97 commits touch `lca/layer2_runtime/`; see `git diff bae32d8..main -- lca/layer2_runtime/` for the full delta.
-- **Key symbols touched**: `lca/layer2_runtime/__init__.py`, `lca/layer2_runtime/agent_runtime/phases.py`, `lca/layer2_runtime/checkpoint_resolution.py`, `lca/layer2_runtime/completion/__init__.py`, `lca/layer2_runtime/completion/artifact_closure.py`
+- **End-state delta**: 97 commits touch `lca/runtime/`; see `git diff bae32d8..main -- lca/runtime/` for the full delta.
+- **Key symbols touched**: `lca/runtime/__init__.py`, `lca/runtime/agent_runtime/phases.py`, `lca/runtime/checkpoint_resolution.py`, `lca/runtime/completion/__init__.py`, `lca/runtime/completion/artifact_closure.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -337,12 +337,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C30: C30 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer3_agent/`
+- **Path(s)**: `lca/agent/`
 - **Main commits touching this cluster**: 6 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 6 commits touch `lca/layer3_agent/`; see `git diff bae32d8..main -- lca/layer3_agent/` for the full delta.
-- **Key symbols touched**: `lca/layer3_agent/cognitive_agent.py`, `lca/layer3_agent/orchestration_strategies/graph/strategy.py`, `lca/layer3_agent/team_handle.py`
+- **End-state delta**: 6 commits touch `lca/agent/`; see `git diff bae32d8..main -- lca/agent/` for the full delta.
+- **Key symbols touched**: `lca/agent/cognitive_agent.py`, `lca/agent/orchestration_strategies/graph/strategy.py`, `lca/agent/team_handle.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review
@@ -351,12 +351,12 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 ### C31: C31 cluster
 
 - **Lane**: B
-- **Path(s)**: `lca/layer4_app/`
+- **Path(s)**: `lca/application/`
 - **Main commits touching this cluster**: 33 (range bae32d8..main)
 - **Branch HEAD**: `c33c4f5` — docs(port): auto-generated main-classification (816 rows)
 - **Main tip**: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool RenderContract tuples (ADR-0102)
-- **End-state delta**: 33 commits touch `lca/layer4_app/`; see `git diff bae32d8..main -- lca/layer4_app/` for the full delta.
-- **Key symbols touched**: `lca/layer4_app/api.py`, `lca/layer4_app/casting.py`, `lca/layer4_app/default_context.py`, `lca/layer4_app/followup_dispatch.py`, `lca/layer4_app/harness_bridge.py`
+- **End-state delta**: 33 commits touch `lca/application/`; see `git diff bae32d8..main -- lca/application/` for the full delta.
+- **Key symbols touched**: `lca/application/api.py`, `lca/application/casting.py`, `lca/application/default_context.py`, `lca/application/followup_dispatch.py`, `lca/application/harness_bridge.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: investigate: confirm lane A criteria do not apply
 - **Test plan**: no test path auto-detected; recommend manual review

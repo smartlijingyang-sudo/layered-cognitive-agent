@@ -30,7 +30,7 @@ class Config(BaseModel):
     layer="L2",
     effects="none",
     description="Contribute structured Agent Loop lifecycle logging without control access.",
-    test_suite="tests/layer2_runtime/test_runtime_lifecycle_plugins.py",
+    test_suite="tests/runtime/test_runtime_lifecycle_plugins.py",
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:

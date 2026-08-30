@@ -2,7 +2,7 @@
 
 > **结论先行：**“一切皆插件”不是把所有代码都拆成小文件，而是把 Agent 中会变化、需要替换、需要组合、需要授权或需要审计的能力，统一表达成“声明式插件 + capability seam + 注册表 + 编译计划 + 受控运行时”。同时，认知阶段闭集、状态唯一写入者、Journal 事实源、CommandEnvelope 执行窄门等宪法约束并不允许被插件绕开。
 
-本文基于仓库当前工作树源码与配置的静态审读，重点解释 `lca/plugins`、`lca/harness/profile`、`lca/layer2_runtime`、`gateway/runs` 之间的关系。按当前 `lca/plugins` 下含 `@plugin` 的 Python 文件扫描，插件模块规模约为 **125 个**；其中源码声明实际使用了 `SEAM`、`PROVIDER`、`PRIMITIVE`、`BRIDGE` 四种类型，分布在 L0–L4 五个层级。[1][2]
+本文基于仓库当前工作树源码与配置的静态审读，重点解释 `lca/plugins`、`lca/harness/profile`、`lca/runtime`、`gateway/runs` 之间的关系。按当前 `lca/plugins` 下含 `@plugin` 的 Python 文件扫描，插件模块规模约为 **125 个**；其中源码声明实际使用了 `SEAM`、`PROVIDER`、`PRIMITIVE`、`BRIDGE` 四种类型，分布在 L0–L4 五个层级。[1][2]
 
 ## 1. 先建立正确心智模型：插件不是“功能函数”，而是 Agent 的可治理能力单元
 
@@ -399,7 +399,7 @@ Resolve 阶段检查 id、module、Config、duplicate provider、missing capabil
 
 第二，CapabilityPlan 已经支持 11 种关系：`provides`、`requires`、`contributes_to`、`reads_fact`、`emits_fact`，以及 `governs`、`executes`、`delegates`、`projects`、`revises`、`evaluates`。不过，标准 profile 的额外关系声明仍可能很少；关系代数的容器已存在，不代表每个插件都已经把所有语义关系标注完整。[21]
 
-第三，按当前源码直读，`DeclarativeRuntimeDriver` 的构造函数声明需要 `effect_handler_registry` 和 `delta_handler_registry`，而 `lca/layer2_runtime/runtime_loop.py` 中两个构造调用没有显式传入这两个参数。如果没有其他未显示的默认注入或分支适配，这会在实际运行声明式 Agent 时形成参数接线风险，建议优先用声明式 runtime 测试覆盖并修正。这是一个运行时接线问题，不改变“插件一切”的总体架构判断。[6][22]
+第三，按当前源码直读，`DeclarativeRuntimeDriver` 的构造函数声明需要 `effect_handler_registry` 和 `delta_handler_registry`，而 `lca/runtime/runtime_loop.py` 中两个构造调用没有显式传入这两个参数。如果没有其他未显示的默认注入或分支适配，这会在实际运行声明式 Agent 时形成参数接线风险，建议优先用声明式 runtime 测试覆盖并修正。这是一个运行时接线问题，不改变“插件一切”的总体架构判断。[6][22]
 
 ## 16. 用一句话总结每一层
 
@@ -448,7 +448,7 @@ Agent
 
 [5][ref-control-slot]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/contracts/atoms/control_slot.py
 
-[6][ref-phase-runtime]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/layer2_runtime/declarative_runtime.py
+[6][ref-phase-runtime]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/declarative_runtime.py
 
 [7][ref-seams]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/seam_definitions/__init__.py
 
@@ -480,4 +480,4 @@ Agent
 
 [21][ref-capability-resolver]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/harness/profile/capability_plan_resolver.py
 
-[22][ref-runtime-loop]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/layer2_runtime/runtime_loop.py
+[22][ref-runtime-loop]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/runtime_loop.py

@@ -58,7 +58,7 @@
 [1]: ../../lca/plugins/composer/runtime_assembly.py "RuntimeFactory 组合边界"
 [2]: ../../lca/harness/declarative/interpreter.py "声明式图遍历内核"
 [3]: ../../lca/contracts/protocols/cognitive_pipeline.py "认知子流程协议"
-[4]: ../../lca/layer1_cognitive/brain/cognitive_pipeline.py "默认认知子流程实现"
+[4]: ../../lca/cognition/brain/cognitive_pipeline.py "默认认知子流程实现"
 [5]: ../../lca/plugins/providers/cognitive_think_pipeline.py "Think provider"
 [6]: ../../lca/plugins/providers/cognitive_reflection_pipeline.py "Reflect provider"
 [7]: ../../tests/test_cognitive_pipeline_plugins.py "替换性测试"

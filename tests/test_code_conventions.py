@@ -71,23 +71,23 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "ADR-0075：声明式阶段图编译器集中校验 profile 选定的节点、边、策略与投稿，"
         "避免由运行时解释器重新引入隐藏流程默认值"
     ),
-    "lca/layer4_app/spawn.py": (
+    "lca/application/spawn.py": (
         "L4 spawn 闭合 AgentSpec/TeamSpec（ADR-0056）；"
         "promote_lead 由 test_refactor_guards 直接 import"
     ),
-    "lca/layer1_cognitive/body/action_handlers.py": (
+    "lca/cognition/body/action_handlers.py": (
         "Body 动作分发单模块（委派/工具/记忆/收口）；ADR-0049 证据平面与 harvest 同文件"
     ),
-    "lca/layer1_cognitive/brain/reasoner.py": (
+    "lca/cognition/brain/reasoner.py": (
         "PromptReasoner 单模块承载模板渲染 + LLM 调用 + 流式增量（ADR-0041）；"
         "ADR-0052 新增 _strip_empty_prompt_fields 用于 solo 裸模型空字段剥离"
     ),
     "lca/contracts/models/observability/journal.py": (
         "Journal 叙事词表单文件（ADR-0037）；ToolInvoked.plugin_state UI 一等字段（ADR-0053）"
     ),
-    "lca/layer0_infra/skills/marketplace.py": ("Skill marketplace 单模块承载发现/加载/注册全链路"),
-    "lca/layer4_app/casting.py": ("Team casting 单模块承载角色映射与团队组装"),
-    "lca/layer0_infra/sandbox/runtime.py": (
+    "lca/infrastructure/skills/marketplace.py": ("Skill marketplace 单模块承载发现/加载/注册全链路"),
+    "lca/application/casting.py": ("Team casting 单模块承载角色映射与团队组装"),
+    "lca/infrastructure/sandbox/runtime.py": (
         "Sandbox Protocol 单模块承载 session/ready/exec 全链路（ADR-0043~0047）"
     ),
     "lca/contracts/capabilities.py": (
@@ -103,10 +103,10 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/harness/declarative/phase_governance.py": (
         "ADR-0075 phase governance 中心化"
     ),
-    "lca/layer0_infra/observability/event_doc.py": (
+    "lca/infrastructure/observability/event_doc.py": (
         "Observability event_doc 词表 — ADR-0065 L1~L9 不变量清单"
     ),
-    "lca/layer0_infra/computer/runtime_exec.py": (
+    "lca/infrastructure/computer/runtime_exec.py": (
         "ComputerRuntime 执行平面单模块：code/shell/background/export + SandboxPolicy 检查"
     ),
     "lca/contracts/atoms/plan_template.py": (
@@ -121,22 +121,22 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/contracts/protocols/command_envelope.py": (
         "PR-7 CommandEnvelope + RunFact + Verdict 5 闸单调聚合数据面"
     ),
-    "lca/layer0_infra/observability/__init__.py": (
+    "lca/infrastructure/observability/__init__.py": (
         "observability 模块统一 re-export（journal / evidence / otel）"
     ),
-    "lca/layer0_infra/observability/event_descriptors_data.py": (
+    "lca/infrastructure/observability/event_descriptors_data.py": (
         "Journal event descriptor 注册表（ADR-0065 PR-7 source inversion 单一源）"
     ),
-    "lca/layer0_infra/observability/facade.py": (
+    "lca/infrastructure/observability/facade.py": (
         "observability 主 facade（record / record_runtime / observe_operation）"
     ),
-    "lca/layer0_infra/observability/journal/journal_io.py": (
+    "lca/infrastructure/observability/journal/journal_io.py": (
         "Journal v2 envelope IO（read / write / disk format；PR-3 + PR-6）"
     ),
-    "lca/layer1_cognitive/body/safe_executor.py": (
+    "lca/cognition/body/safe_executor.py": (
         "SafeExecutor + 5 阶段管线 + ToolStarted / ToolInvoked audit"
     ),
-    "lca/layer2_runtime/runtime_loop.py": (
+    "lca/runtime/runtime_loop.py": (
         "CognitiveRuntime 单模块承载 v3 6 阶段闭环编排 + 协议边界 record()"
         "（perceive→think→act→reflect→remember→stop，ADR-0002 + PR10 落地）"
     ),
@@ -155,50 +155,50 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/harness/declarative/interpreter.py": (
         "ADR-0075 GenericPlanInterpreter 统一 phase/result/delta 解释边界"
     ),
-    "lca/layer2_runtime/declarative_runtime.py": (
+    "lca/runtime/declarative_runtime.py": (
         "ADR-0075 DeclarativeRuntimeDriver 统一 pause/resume/result 出口"
     ),
-    "lca/layer0_infra/observability/journal/engine.py": (
+    "lca/infrastructure/observability/journal/engine.py": (
         "RunStore 单模块承载事件索引 + get/get_event/get_blob/find_terminal"
         "（PR2 / PR6 / PR10 集中落地）"
     ),
-    "lca/layer0_infra/observability/journal/fact_stream_projector.py": (
+    "lca/infrastructure/observability/journal/fact_stream_projector.py": (
         "FactStreamProjector 单模块承载流式事件到 Journal 转换（ADR-0037）"
     ),
-    "lca/layer0_infra/observability/journal/console_projector.py": (
+    "lca/infrastructure/observability/journal/console_projector.py": (
         "ConsoleProjector 单模块承载 console 输出（ADR-0037）"
     ),
-    "lca/layer0_infra/observability/diagnostics.py": (
+    "lca/infrastructure/observability/diagnostics.py": (
         "DiagnosePattern 单模块承载 4 个 v3 §24.5 诊断模式"
         "（model_not_seen / loop_stuck / memory_poisoned / approval_rejected）"
     ),
-    "lca/layer0_infra/ops/cli.py": (
+    "lca/infrastructure/ops/cli.py": (
         "lca-ops CLI 单模块承载 dev/restart/stop/status/heal/provision"
         "/diagnose/dump-profile/inspect-tree 全子命令"
     ),
-    "lca/layer0_infra/ops/commands/tools.py": (
+    "lca/infrastructure/ops/commands/tools.py": (
         "coding-agent tools CLI 封装（ADR-0065 §六 / PR-9）：9 个只读子命令从旧 cli.py 拆出"
     ),
-    "lca/layer0_infra/ops/services/lobehub.py": (
+    "lca/infrastructure/ops/services/lobehub.py": (
         "LobeHub deploy service 单模块承载 dev/prod/restart/logs/upgrade"
     ),
-    "lca/layer0_infra/ops/services/daemon.py": ("Daemon 单模块承载 process 管理 + uptime + health"),
-    "lca/layer0_infra/openai_compat.py": (
+    "lca/infrastructure/ops/services/daemon.py": ("Daemon 单模块承载 process 管理 + uptime + health"),
+    "lca/infrastructure/openai_compat.py": (
         "OpenAI compat 单模块承载 chat / completion / embedding 适配"
     ),
-    "lca/layer0_infra/host_runtime/providers/user.py": (
+    "lca/infrastructure/host_runtime/providers/user.py": (
         "User provider 单模块承载 user runtime 配置 + workspace"
     ),
-    "lca/layer1_cognitive/memory/simple_memory.py": (
+    "lca/cognition/memory/simple_memory.py": (
         "SimpleMemorySystem 单模块承载四层记忆 + propose/commit/compaction 影子（PR7）"
     ),
-    "lca/layer1_cognitive/body/pipeline_safe_executor.py": (
+    "lca/cognition/body/pipeline_safe_executor.py": (
         "PipelineSafeExecutor 单模块承载五阶段管线 + finalize（v3 §9.1/9.2）"
     ),
     "lca/contracts/models/observability/journal_catalog.py": (
         "JOURNAL_EVENT_CLASSES + JournalSchemaMeta 单文件（PR-7 后 EventDescriptor 单一源移到 event_descriptors_data.py）"
     ),
-    "lca/layer4_app/api.py": ("L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"),
+    "lca/application/api.py": ("L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"),
 }
 
 

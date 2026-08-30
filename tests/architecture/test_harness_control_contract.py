@@ -17,7 +17,7 @@ GOVERNANCE_VERDICTS = PHASE_GOVERNANCE
 RETIRED_CONTROL_MODULES = (
     REPO / "lca" / "contracts" / "protocols" / "control_plan.py",
     REPO / "lca" / "harness" / "profile" / "control_plan_resolver.py",
-    REPO / "lca" / "layer2_runtime" / "control_runtime.py",
+    REPO / "lca" / "runtime" / "control_runtime.py",
 )
 
 

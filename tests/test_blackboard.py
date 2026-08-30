@@ -17,7 +17,7 @@ import ast
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BB_PATH = REPO_ROOT / "lca" / "layer1_cognitive" / "collaboration" / "blackboard.py"
+BB_PATH = REPO_ROOT / "lca" / "cognition" / "collaboration" / "blackboard.py"
 
 
 def _entry(content: str = "x", written_by: str = "alice") -> dict:

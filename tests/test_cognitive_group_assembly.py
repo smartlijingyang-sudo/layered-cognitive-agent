@@ -140,10 +140,10 @@ class TestCognitiveGroupPluginWiring:
         from pathlib import Path
 
         root = Path(__file__).resolve().parent.parent
-        perceive_source = (root / "lca/layer1_cognitive/perceive_service.py").read_text(
+        perceive_source = (root / "lca/cognition/perceive_service.py").read_text(
             encoding="utf-8"
         )
-        gate_source = (root / "lca/layer1_cognitive/gate_service.py").read_text(encoding="utf-8")
+        gate_source = (root / "lca/cognition/gate_service.py").read_text(encoding="utf-8")
 
         assert "SequentialPerceiveHub" not in perceive_source
         assert "ChainedDecisionGate" not in gate_source

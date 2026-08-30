@@ -21,7 +21,7 @@ DshTurnDriver → Journal → LobeHub
 |---|---|
 | `deploy/dsh/install-dsh-sdk.sh` | 安装 SDK 到 sandbox-user venv |
 | `deploy/dsh/requirements-dsh.txt` | Python 依赖（pin 到 rc6） |
-| `lca/layer0_infra/dsh/machine_runtime.py` | Gateway 侧：生成 runner、驱动 transport |
+| `lca/infrastructure/dsh/machine_runtime.py` | Gateway 侧：生成 runner、驱动 transport |
 
 ## 安装
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """check_no_double_encoding —— ADR-0065 §四 + PR-3。
 
-扫描 ``lca/layer1_cognitive/body/`` 与 ``lca/layer0_infra/observability/``
+扫描 ``lca/cognition/body/`` 与 ``lca/infrastructure/observability/``
 不允许 ``result_preview`` / ``*_preview`` 是 JSON 字符串(triple-encoded 旧坑)。
 typed 字段不应是字符串化的结构。
 """
@@ -14,8 +14,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SCAN_DIRS = (
-    REPO / "lca" / "layer1_cognitive" / "body",
-    REPO / "lca" / "layer0_infra" / "observability",
+    REPO / "lca" / "cognition" / "body",
+    REPO / "lca" / "infrastructure" / "observability",
 )
 VIOLATION_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\.preview\s*=\s*json\.dumps\("),

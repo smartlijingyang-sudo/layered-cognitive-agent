@@ -1,7 +1,7 @@
 """GateChainComposer Provider plugin — Tier-2 (ADR-0074).
 
 Migrates the hard-coded ``build_workspace_agent_gate()`` logic from
-``lca/layer1_cognitive/brain/decision_gates/__init__.py`` into a pluggable
+``lca/cognition/brain/decision_gates/__init__.py`` into a pluggable
 default provider. Profile can replace via ``ctx.provide("gate_chain_composer", ...)``
 to customize gate ordering/composition.
 """
@@ -24,7 +24,7 @@ class Config(BaseModel):
 class DefaultGateChainComposer(GateChainComposer):
     """Default GateChainComposer implementation (ADR-0074).
 
-    Migrated from ``lca/layer1_cognitive/brain/decision_gates/__init__.py:build_workspace_agent_gate()``.
+    Migrated from ``lca/cognition/brain/decision_gates/__init__.py:build_workspace_agent_gate()``.
     Composes the standard 5-gate decision chain:
 
     1. ``RepeatToolCallGate``: warns on consecutive identical tool calls

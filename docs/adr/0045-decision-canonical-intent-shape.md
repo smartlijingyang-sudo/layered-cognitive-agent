@@ -94,7 +94,7 @@ LLM 原始文本
 
 | 组件 | 职责 |
 |---|---|
-| `lca/layer1_cognitive/brain/decision_shape.py` | 纯函数意图形状归一（可单测、无 I/O） |
+| `lca/cognition/brain/decision_shape.py` | 纯函数意图形状归一（可单测、无 I/O） |
 | `SimpleDecisionParser` | 编排管线；调用 shape → alias → Decision → degrade |
 | `DecisionMade` + `record_decision_made` | 写入规范 `response_text` |
 | `web/.../chat-projector.ts` | 终态提交优先 journal 字段 |

@@ -12,7 +12,7 @@ TeamSpec 是 Team 构造的唯一声明式输入（ADR-0034）：成员 specs + 
 
 组件选择字段支持「注册名字符串 | 实例」双模：字符串经 ComponentRegistry
 解析（可插拔），实例直接采用（显式注入）。常量 *_CHOICE_* 是框架内置
-注册名，与 layer4_app/defaults.py 的注册键同源，禁止在别处裸写。
+注册名，与 application/defaults.py 的注册键同源，禁止在别处裸写。
 """
 
 from __future__ import annotations

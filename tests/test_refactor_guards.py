@@ -9,9 +9,9 @@ from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _ADR_DIR = _PROJECT_ROOT / "docs" / "adr"
-_API_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "api.py"
-_SPAWN_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "spawn.py"
-_DEFAULTS_PATH = _PROJECT_ROOT / "lca" / "layer4_app" / "defaults.py"
+_API_PATH = _PROJECT_ROOT / "lca" / "application" / "api.py"
+_SPAWN_PATH = _PROJECT_ROOT / "lca" / "application" / "spawn.py"
+_DEFAULTS_PATH = _PROJECT_ROOT / "lca" / "application" / "defaults.py"
 _ADR_README = _ADR_DIR / "README.md"
 
 

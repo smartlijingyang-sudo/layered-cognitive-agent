@@ -37,7 +37,7 @@ def build_human_answer_resume_input_adapter() -> ResumeInputAdapter:
     description=(
         "Register the standard human-answer adapter as resume_input_adapters['human_answer']."
     ),
-    test_suite="tests/layer2_runtime/test_resume_input.py",
+    test_suite="tests/runtime/test_resume_input.py",
     kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

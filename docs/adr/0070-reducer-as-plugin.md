@@ -14,7 +14,7 @@ Supersedes: 无（PR10 路线的提前落地，PRD §31 PR10 整并）
 
 ## 背景
 
-`lca/layer2_runtime/runtime_loop.py` 的 `_loop` 方法（line 201–283）有 14 处直接 `state.x = ...`，分散在感知、激活、终止、错误恢复、artifact closure 之间。宪法的 C4 规定 Reducer 唯一写 State，C5 + v3 §5.2 给出 Reducer 的形式契约。`_apply_manifest`（line 346–355）字面 `return state`，是形状合规但实际空转的 reducer；`_apply_activation`（line 331–343）注释自承「this function still touches state in place ... PR10 will convert」。
+`lca/runtime/runtime_loop.py` 的 `_loop` 方法（line 201–283）有 14 处直接 `state.x = ...`，分散在感知、激活、终止、错误恢复、artifact closure 之间。宪法的 C4 规定 Reducer 唯一写 State，C5 + v3 §5.2 给出 Reducer 的形式契约。`_apply_manifest`（line 346–355）字面 `return state`，是形状合规但实际空转的 reducer；`_apply_activation`（line 331–343）注释自承「this function still touches state in place ... PR10 will convert」。
 
 `_emit`（line 142–167）按 PR5 注释「return value is discarded by callers」，但调用者必须通过 `middleware_bag(state)["decision"] = decision`（line 231/237/245）把决策产物塞进 `state.extra["_middleware_bag"]` 才能让 middleware 读到——narrow seam 用 state 偷产物。Phase Middleware Registry 在 `lca/harness/middleware/registry.py` 完整实现，10 个 phase pre-registered，但 `grep "middleware_registry.register"` 0 hit——机制空转。
 

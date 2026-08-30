@@ -41,7 +41,7 @@ class TestDecisionSingleDelegationField(unittest.TestCase):
 
 class TestTypedProcessDispatch(unittest.TestCase):
     def test_no_string_topology_tables_in_strategies(self) -> None:
-        strat_dir = _ROOT / "lca" / "layer3_agent" / "orchestration_strategies"
+        strat_dir = _ROOT / "lca" / "agent" / "orchestration_strategies"
         banned = ("_DISPATCH", "topology: str", "mode: str", "ChoreographyStrategy", "PeerStrategy")
         for path in strat_dir.rglob("*.py"):
             text = path.read_text(encoding="utf-8")
@@ -189,9 +189,9 @@ class TestResidueGone(unittest.TestCase):
         self.assertFalse(hasattr(c, "iter_delegation_specs"))
 
     def test_cognitive_agent_module_name(self) -> None:
-        path = _ROOT / "lca" / "layer3_agent" / "cognitive_agent.py"
+        path = _ROOT / "lca" / "agent" / "cognitive_agent.py"
         self.assertTrue(path.is_file())
-        self.assertFalse((_ROOT / "lca" / "layer3_agent" / "simple_agent.py").exists())
+        self.assertFalse((_ROOT / "lca" / "agent" / "simple_agent.py").exists())
 
     def test_glossary_has_no_transition_alias_dual_names(self) -> None:
         path = _ROOT / "docs" / "glossary.md"
@@ -204,7 +204,7 @@ class TestResidueGone(unittest.TestCase):
         self.assertNotIn("delegate_targets", text)
 
     def test_no_orphan_pyc_modules_without_py(self) -> None:
-        agent_dir = _ROOT / "lca" / "layer3_agent"
+        agent_dir = _ROOT / "lca" / "agent"
         py_stems = {p.stem for p in agent_dir.glob("*.py")}
         py_stems |= {p.stem for p in (agent_dir / "orchestration_strategies").glob("*.py")}
         orphans: list[str] = []

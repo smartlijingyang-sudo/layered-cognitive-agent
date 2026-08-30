@@ -16,7 +16,7 @@ Keeps: [ADR-0002](0002-cognitive-loop.md)、[ADR-0004](0004-protocol-first-plugg
 
 **Think 群三个 trivial 模块：**
 
-- `ModularBrain.think`（`lca/layer1_cognitive/brain/modular_brain.py:43–59`）17 行纯 sequencing wrapper：try_shortcut → skill_router → reasoner → build_decision → decision_gate → agent_gates，每行都是 delegation。
+- `ModularBrain.think`（`lca/cognition/brain/modular_brain.py:43–59`）17 行纯 sequencing wrapper：try_shortcut → skill_router → reasoner → build_decision → decision_gate → agent_gates，每行都是 delegation。
 - `SimpleCritic.critique`（`critic.py:29–51`）23 行 `if observation.success: ... else: ...` 的字符串模板，reflection 语义权重大于实现。
 - `ConcatSynthesizer.synthesize`（`synthesizer.py:21–53`）字符串拼接加分隔符。
 
@@ -35,7 +35,7 @@ Protocol 表面：Brain / Reasoner / Critic / Synthesizer / DecisionGate / Skill
 
 1. `Critic` Protocol 保留签名；新增 `NullCritic` 实现：`critique(state, observation) -> Reflection(verdict=ON_TRACK, lesson=None)`。不调用任何下游逻辑。
 2. `Synthesizer` Protocol 保留签名；新增 `NullSynthesizer`：`synthesize(objective, candidates) -> candidates[0] if candidates else Result.failed(...)`。
-3. `SimpleCritic` 与 `ConcatSynthesizer` 从 `lca/layer1_cognitive/brain/` 移入 `bundles/standard-think/brain.py`（或 `lca/plugins/think/` 下，作为 plugin 实现）。
+3. `SimpleCritic` 与 `ConcatSynthesizer` 从 `lca/cognition/brain/` 移入 `bundles/standard-think/brain.py`（或 `lca/plugins/think/` 下，作为 plugin 实现）。
 4. `ModularBrain.reflect`（`modular_brain.py:61–62`）转为私有方法 `_default_reflect`；`Brain` Protocol 的 `reflect` 方法保留签名（供 custom Critic 注入），但 `ModularBrain` 默认实现调用 `self._default_reflect(state, observation)`（即原 SimpleCritic 逻辑），不暴露 Critic Protocol 给默认路径。
 5. 默认 profile（baseline）装 `NullBrain`（已有 `NullBrain` 占位）+ `NullCritic` + `NullSynthesizer`；`standard-think` bundle 装 `ModularBrain` + `SimpleCritic` + `ConcatSynthesizer`。
 6. Protocol 表面收敛：Brain / Reasoner / Critic / DecisionGate / SkillRouter / Synthesizer 6 个保留（替换接口契约），但 public seam 数量由 spawn 时解析的 factory 数量衡量。

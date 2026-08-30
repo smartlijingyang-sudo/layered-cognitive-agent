@@ -44,19 +44,19 @@ flowchart TD
 项目规定的主依赖方向是单向的：
 
 ```text
-contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_agent
+contracts → infrastructure → cognition → runtime → agent
                                       ↓
-                                layer4_app 组合根
+                                application 组合根
 ```
 
 | 层次 | 目录 | 主要职责 | 不应该承担的职责 |
 |---|---|---|---|
 | 契约层 | `lca/contracts/` | 定义 Protocol、枚举、数据模型、事件和跨层接口 | 不放具体业务行为，不直接依赖上层实现 |
-| 基础设施层 | `lca/layer0_infra/` | LLM、工具、传输、沙箱、文件、观测、插件内核 | 不决定 Agent 的认知策略 |
-| 认知层 | `lca/layer1_cognitive/` | 感知、推理、批评、综合、决策门、身体执行、记忆 | 不越过执行窄门直接修改外部世界 |
-| 运行时层 | `lca/layer2_runtime/` | 运行循环、阶段驱动、停止、恢复、中间件、结果 | 不负责产品入口和 HTTP 细节 |
-| Agent 层 | `lca/layer3_agent/` | 单 Agent、Team、委派和编排策略 | 不反向依赖组合根细节 |
-| 应用组合根 | `lca/layer4_app/` | 根据 Profile 和能力装配完整应用 | 不把所有实现重新硬编码在 Composer 中 |
+| 基础设施层 | `lca/infrastructure/` | LLM、工具、传输、沙箱、文件、观测、插件内核 | 不决定 Agent 的认知策略 |
+| 认知层 | `lca/cognition/` | 感知、推理、批评、综合、决策门、身体执行、记忆 | 不越过执行窄门直接修改外部世界 |
+| 运行时层 | `lca/runtime/` | 运行循环、阶段驱动、停止、恢复、中间件、结果 | 不负责产品入口和 HTTP 细节 |
+| Agent 层 | `lca/agent/` | 单 Agent、Team、委派和编排策略 | 不反向依赖组合根细节 |
+| 应用组合根 | `lca/application/` | 根据 Profile 和能力装配完整应用 | 不把所有实现重新硬编码在 Composer 中 |
 | Harness 层 | `lca/harness/` | Agent Session、Profile、Boot、声明式阶段和运行骨架 | 对外产品 API 不必暴露 Harness 名称 |
 | Gateway 层 | `gateway/` | HTTP/SSE、命令承载、运行请求进入和结果投影 | 不直接选择具体 Brain、Body 或 Loop 实现 |
 
@@ -362,8 +362,8 @@ Body、SafeExecutor、Sandbox 和工具链执行动作，生成 Effect Receipt�
 | 3 | `lca/contracts/` | 跨层稳定语言和数据形状是什么？ |
 | 4 | `profiles/`、`bundles/` | 当前系统由哪些能力组合而成？ |
 | 5 | `lca/plugins/`、Plugin Kernel | 能力如何注册、依赖和卸载？ |
-| 6 | `lca/layer1_cognitive/` | Brain、Body、Memory、Gate 如何分工？ |
-| 7 | `lca/layer2_runtime/`、`lca/harness/declarative/` | 运行如何按阶段图推进、暂停和恢复？ |
+| 6 | `lca/cognition/` | Brain、Body、Memory、Gate 如何分工？ |
+| 7 | `lca/runtime/`、`lca/harness/declarative/` | 运行如何按阶段图推进、暂停和恢复？ |
 | 8 | `gateway/`、`tests/test_run_*.py` | 外部请求如何进入，结果如何投影？ |
 | 9 | `tests/` 与 `scripts/check_*.py` | 架构规则如何被自动验证？ |
 

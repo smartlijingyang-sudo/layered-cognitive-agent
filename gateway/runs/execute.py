@@ -614,7 +614,7 @@ def _record_run_failure(session: RunSession, exc: BaseException | None, hub: Any
     """Emit ``AgentRunStarted`` + ``AgentRunFinished(error=...)`` so the
     failure is visible to the journal (jsonl + SSE + ``lca-ops logs``).
 
-    The reducer (``lca/layer0_infra/observability/journal/reducer.py``,
+    The reducer (``lca/infrastructure/observability/journal/reducer.py``,
     rule-2) derives ``RunStatus.FAILED`` from any root-level finished
     event, keeping ``session.error`` and the snapshot endpoint consistent.
     """

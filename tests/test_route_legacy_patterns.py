@@ -33,9 +33,9 @@ class TestRouteLegacyPatterns:
     def test_resolve_owner_picks_longest_prefix(self) -> None:
         from scripts.route_legacy_patterns import _resolve_owner
 
-        assert _resolve_owner("state_writers", "lca/layer1_cognitive/body/foo.py")[0] == "PR-7"
-        assert _resolve_owner("state_writers", "lca/layer1_cognitive/memory/foo.py")[0] == "PR-3"
-        assert _resolve_owner("state_writers", "lca/layer1_cognitive/brain/foo.py")[0] == "PR-4"
+        assert _resolve_owner("state_writers", "lca/cognition/body/foo.py")[0] == "PR-7"
+        assert _resolve_owner("state_writers", "lca/cognition/memory/foo.py")[0] == "PR-3"
+        assert _resolve_owner("state_writers", "lca/cognition/brain/foo.py")[0] == "PR-4"
         assert _resolve_owner("state_writers", "totally/unknown/file.py")[0] == "PR-99"
 
     def test_collect_violations_with_patched_audits(self) -> None:
@@ -50,11 +50,11 @@ class TestRouteLegacyPatterns:
 
         fake_root = _REPO
         fake_state = [
-            _FakeFinding(path=f"{fake_root}/lca/layer1_cognitive/body/a.py"),
-            _FakeFinding(path=f"{fake_root}/lca/layer1_cognitive/brain/b.py"),
-            _FakeFinding(path=f"{fake_root}/lca/layer2_runtime/c.py"),
+            _FakeFinding(path=f"{fake_root}/lca/cognition/body/a.py"),
+            _FakeFinding(path=f"{fake_root}/lca/cognition/brain/b.py"),
+            _FakeFinding(path=f"{fake_root}/lca/runtime/c.py"),
         ]
-        fake_direct = [_FakeFinding(path=f"{fake_root}/lca/layer1_cognitive/body/d.py")]
+        fake_direct = [_FakeFinding(path=f"{fake_root}/lca/cognition/body/d.py")]
         fake_control = {
             "__retired_control_metadata__": [
                 _FakeFinding(
@@ -63,7 +63,7 @@ class TestRouteLegacyPatterns:
                 )
             ],
         }
-        fake_hook = [_FakeFinding(path=f"{fake_root}/lca/layer2_runtime/e.py")]
+        fake_hook = [_FakeFinding(path=f"{fake_root}/lca/runtime/e.py")]
 
         with (
             mock.patch.object(
@@ -90,7 +90,7 @@ class TestRouteLegacyPatterns:
             Violation(
                 audit_kind="state_writers",
                 v_constraint="V3",
-                path="lca/layer1_cognitive/body/x.py",
+                path="lca/cognition/body/x.py",
                 line=1,
                 col=0,
                 kind="direct_attr_assign",

@@ -484,8 +484,8 @@ git -c commit.gpgsign=false commit -m "feat(openai-stream): encoder plugin + 翻
 ### Task 1.3: agent loop 暴露事件流(给 encoder 用)
 
 **Files:**
-- Modify: `lca/layer2_runtime/runtime.py`(或 `lca/layer4_app/harness_live.py`,按实际所在位置)— 暴露 `run(...) -> AsyncIterator[dict]` 接口,事件字典 = `record()` 已经发的。
-- Test: `tests/layer2_runtime/test_run_event_stream.py`
+- Modify: `lca/runtime/runtime.py`(或 `lca/application/harness_live.py`,按实际所在位置)— 暴露 `run(...) -> AsyncIterator[dict]` 接口,事件字典 = `record()` 已经发的。
+- Test: `tests/runtime/test_run_event_stream.py`
 
 **Interfaces:**
 - `async def run(run_request) -> AsyncIterator[dict]:`  逐项 yield `{"event_type": str, "data": dict, ...}` 与现有 `record()` 通道一致。
@@ -640,7 +640,7 @@ async def _agent_stream(payload):
 - [ ] **Step 4.2.2**: 删 `lca/harness/session/llm_stream_tap.py`
 - [ ] **Step 4.2.3**: 删 `lca/harness/session/scope_recorder.py`
 - [ ] **Step 4.2.4**: 删 `tests/harness/test_session_live_bus.py` / `tests/harness/test_llm_stream_tap.py`
-- [ ] **Step 4.2.5**: 删 `lca/layer1_cognitive/brain/llm_turn/executor.py` 中对 LLMStreamTap 与 LiveBus 的 import/调用
+- [ ] **Step 4.2.5**: 删 `lca/cognition/brain/llm_turn/executor.py` 中对 LLMStreamTap 与 LiveBus 的 import/调用
 - [ ] **Step 4.2.6**: 跑 `uv run ruff check . && uv run lint-imports && uv run mypy lca`
 - [ ] **Step 4.2.7**: 跑全量测试 `uv run pytest -m 'not real_llm'`
 - [ ] **Step 4.2.8**: 提交

@@ -177,27 +177,27 @@ CI 必须将以下规则作为架构门禁：
 
 | # | 硬编码位置 | 问题 | 违反 | 应有 seam |
 |---|---|---|---|---|
-| 1 | `lca/layer1_cognitive/brain/llm_result.py:21` | `build_decision_from_response` 假设 OpenAI function calling 格式，换 LLM provider 必须改核心 | 宪法 C2 脑手分离 | `decision_classifier` |
-| 2 | `lca/layer2_runtime/declarative_runtime.py:160-224` | `RuntimeEffectGateway` 只支持 `body.act` / `memory.update`，CompiledRunPlan 声明新 effect 类型运行时处理不了 | ADR-0068 唯一入口 | `effect_handler` 注册表 |
-| 3 | `lca/layer2_runtime/declarative_runtime.py:227-253` | `ReducerDeltaAdapter` 只映射 5/11 个 Reducer 操作（缺 `skill_route` / `activation` / `error` / `resume` / `artifact_closure` / `paused`），静默丢弃 delta | ADR-0070 Reducer-as-Plugin | `delta_handler` 注册表 |
-| 4 | `lca/layer1_cognitive/body/action_catalog.py:79-93` | `_operation_for` 硬编码 ActionType → Operation 分发，加新 action type 改 3+ 处 | 「插件只换实现」 | `action_handler` |
-| 5 | `lca/layer2_runtime/reducer.py` / `loop_topology.py` / `default_stop_rule.py` | `DefaultReducer` / `ClosedSetTopology` / `DefaultStopRule` 不是 cordis 插件，`lca-ops inspect-tree` 不可见，不能通过 Profile patch 替换 | 「一切皆插件」 | 现有 seam + `@plugin` |
+| 1 | `lca/cognition/brain/llm_result.py:21` | `build_decision_from_response` 假设 OpenAI function calling 格式，换 LLM provider 必须改核心 | 宪法 C2 脑手分离 | `decision_classifier` |
+| 2 | `lca/runtime/declarative_runtime.py:160-224` | `RuntimeEffectGateway` 只支持 `body.act` / `memory.update`，CompiledRunPlan 声明新 effect 类型运行时处理不了 | ADR-0068 唯一入口 | `effect_handler` 注册表 |
+| 3 | `lca/runtime/declarative_runtime.py:227-253` | `ReducerDeltaAdapter` 只映射 5/11 个 Reducer 操作（缺 `skill_route` / `activation` / `error` / `resume` / `artifact_closure` / `paused`），静默丢弃 delta | ADR-0070 Reducer-as-Plugin | `delta_handler` 注册表 |
+| 4 | `lca/cognition/body/action_catalog.py:79-93` | `_operation_for` 硬编码 ActionType → Operation 分发，加新 action type 改 3+ 处 | 「插件只换实现」 | `action_handler` |
+| 5 | `lca/runtime/reducer.py` / `loop_topology.py` / `default_stop_rule.py` | `DefaultReducer` / `ClosedSetTopology` / `DefaultStopRule` 不是 cordis 插件，`lca-ops inspect-tree` 不可见，不能通过 Profile patch 替换 | 「一切皆插件」 | 现有 seam + `@plugin` |
 
 #### 🟡 P1 — 应该插件化（工程一致性）
 
 | # | 硬编码位置 | 问题 | 应有 seam |
 |---|---|---|---|
-| 6 | `lca/layer2_runtime/completion/artifact_closure.py` | `synthesize_artifact_closure()` 自由函数直接 import，无法自定义循环退出行为 | `artifact_closure` |
-| 7 | `lca/layer1_cognitive/brain/decision_gates/__init__.py:29-52` | `build_workspace_agent_gate()` 固定 5 gate 顺序，gate 是插件但链组合不是 | `gate_chain_composer` |
-| 8 | `lca/layer1_cognitive/brain/default_factory.py:43-54` | `SimpleBrainFactory` 用 Python `or` 默认值而非 seam 查找 | `ctx.inject_or_null` |
+| 6 | `lca/runtime/completion/artifact_closure.py` | `synthesize_artifact_closure()` 自由函数直接 import，无法自定义循环退出行为 | `artifact_closure` |
+| 7 | `lca/cognition/brain/decision_gates/__init__.py:29-52` | `build_workspace_agent_gate()` 固定 5 gate 顺序，gate 是插件但链组合不是 | `gate_chain_composer` |
+| 8 | `lca/cognition/brain/default_factory.py:43-54` | `SimpleBrainFactory` 用 Python `or` 默认值而非 seam 查找 | `ctx.inject_or_null` |
 
 #### 🟢 P2 — 类型安全（工程卫生）
 
 | # | 硬编码位置 | 问题 |
 |---|---|---|
-| 9 | `lca/layer2_runtime/declarative_runtime.py:89-97` | `RuntimePhaseCapabilities` 5 个字段全 `Any`，应使用 Brain / Body / MemorySystem / PerceiveHub / StopRule Protocol |
-| 10 | `lca/layer2_runtime/declarative_runtime.py:227-253` | `ReducerDeltaAdapter` 参数全 `Any`，应使用 Reducer / AgentState / RunDelta Protocol |
-| 11 | `lca/layer2_runtime/declarative_runtime.py:256-266` | `DeclarativeRuntimeDriver` 参数全 `Any`，应使用 Protocol 类型 |
+| 9 | `lca/runtime/declarative_runtime.py:89-97` | `RuntimePhaseCapabilities` 5 个字段全 `Any`，应使用 Brain / Body / MemorySystem / PerceiveHub / StopRule Protocol |
+| 10 | `lca/runtime/declarative_runtime.py:227-253` | `ReducerDeltaAdapter` 参数全 `Any`，应使用 Reducer / AgentState / RunDelta Protocol |
+| 11 | `lca/runtime/declarative_runtime.py:256-266` | `DeclarativeRuntimeDriver` 参数全 `Any`，应使用 Protocol 类型 |
 
 #### 实施顺序
 
@@ -236,8 +236,8 @@ CI 必须将以下规则作为架构门禁：
 
 ## 参考
 
-[1]: ../../lca/layer2_runtime/runtime_loop.py "当前生产认知循环"
-[2]: ../../lca/layer2_runtime/control_policies.py "当前控制策略执行器"
+[1]: ../../lca/runtime/runtime_loop.py "当前生产认知循环"
+[2]: ../../lca/runtime/control_policies.py "当前控制策略执行器"
 [3]: ../../lca/plugins/composer/plan_composers.py "当前生产对象图装配"
 [4]: 0068-compiled-plugin-kernel-and-unified-run-plan.md "编译式插件内核与统一运行计划"
 [5]: 0069-agent-primitive-system-and-declarative-grammar.md "Agent 原语体系与声明组合语法"

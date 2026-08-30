@@ -25,6 +25,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 
 if command -v uv >/dev/null 2>&1; then
-  exec uv run python3 -m lca.layer0_infra.ops.cli "$@"
+  exec uv run python3 -m lca.infrastructure.ops.cli "$@"
 fi
-exec python3 -m lca.layer0_infra.ops.cli "$@"
+exec python3 -m lca.infrastructure.ops.cli "$@"

@@ -266,6 +266,6 @@ Inspect：profile / graph / why / explain-control / run evidence
 [2]: ../../lca/harness/plugin_api.py "当前 PluginDefinition、PluginContext 与 Manifest 审计实现"
 [3]: 0061-plugin-manifest-resolve-boot.md "ADR-0061：声明式插件 Manifest —— Resolve/Boot 与依赖图"
 [4]: 0056-plugin-group-contribution.md "ADR-0056：群服务投稿 —— 签名即依赖，配置即装箱单"
-[5]: ../../lca/layer4_app/spawn.py "当前 L4 spawn 组合根"
+[5]: ../../lca/application/spawn.py "当前 L4 spawn 组合根"
 [6]: ../design/2026-08-19-cognitive-primitive-constitution-v3.md "认知原语插件宪法 v3.0"
 [7]: 0065-recoverable-evidence-ledger.md "ADR-0065：可恢复的证据保真运行账本"

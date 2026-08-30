@@ -16,7 +16,7 @@
 
 | 现状项 | 位置 | 影响 |
 |---|---|---|
-| v2 envelope 部分已落地 | `lca/layer0_infra/observability/journal/journal_io.py`（`V2_SCHEMA = "lca.journal/2"`、`stamped_to_record`、`record_normalize`、`record_to_stamped`） | MVA-1 工作量缩减为：包一层 Pydantic 模型 + 增加 `schema_version` 字段 |
+| v2 envelope 部分已落地 | `lca/infrastructure/observability/journal/journal_io.py`（`V2_SCHEMA = "lca.journal/2"`、`stamped_to_record`、`record_normalize`、`record_to_stamped`） | MVA-1 工作量缩减为：包一层 Pydantic 模型 + 增加 `schema_version` 字段 |
 | `StampedEvent.event_id` 字段已存在，默认 `""` | `lca/contracts/models/observability/journal.py:133` | MVA-2 工作量：仅 `RunStore.append` 闭环填值；`StampedEvent` 不改 dataclass |
 | `journal_backends` seam 已存在 | `lca/plugins/seam_definitions/observability/journal.py` | MVA-1 新建 `journal_schemas` 是**平行 seam**（不同 capability），不替换 `journal_backends` |
 | `event_id` 注释说"ULID"，ADR 96 §6.3 说 `sha256(run_id, seq, type)` | `lca/contracts/models/observability/journal.py:804` vs ADR 96 §6.3 | **决策点**：MVA-2 启动时确认用 ULID（与现有注释一致）还是 sha256（与 ADR 一致）。**默认走 ULID**，理由：(1) 与既有 StampedEvent 注释一致；(2) ULID 自带时间排序，更适合事件流；(3) sha256 派生在事件未写入前无法预计算。详见 MVA-2 Task 1 |
@@ -314,7 +314,7 @@ git commit -m "feat(adr-0096-mva-1): EnvelopeV2 Pydantic model + v1→v2 migrati
 **Files:**
 - Create: `lca/plugins/providers/journal_schema/__init__.py`
 - Create: `lca/plugins/providers/journal_schema/v2.py`
-- Modify: `lca/layer0_infra/observability/journal/journal_io.py`（`stamped_to_record` / `record_normalize` 调用 EnvelopeV2 校验）
+- Modify: `lca/infrastructure/observability/journal/journal_io.py`（`stamped_to_record` / `record_normalize` 调用 EnvelopeV2 校验）
 - Test: `tests/test_journal_schema_provider.py`
 
 **Interfaces:**
@@ -410,7 +410,7 @@ Expected: PASS
 
 - [ ] **Step 5：改造 journal_io.py 让 stamped_to_record 走 EnvelopeV2Schema**
 
-修改 `lca/layer0_infra/observability/journal/journal_io.py:stamped_to_record`：
+修改 `lca/infrastructure/observability/journal/journal_io.py:stamped_to_record`：
 
 ```python
 # 在文件顶部加
@@ -432,7 +432,7 @@ Expected: PASS（不允许回归既有 v2 行为）
 - [ ] **Step 7：Commit**
 
 ```bash
-git add lca/plugins/providers/journal_schema/ lca/layer0_infra/observability/journal/journal_io.py tests/test_journal_schema_provider.py
+git add lca/plugins/providers/journal_schema/ lca/infrastructure/observability/journal/journal_io.py tests/test_journal_schema_provider.py
 git commit -m "feat(adr-0096-mva-1): schema-v2.0.0 provider + journal_io integration"
 ```
 
@@ -446,7 +446,7 @@ git commit -m "feat(adr-0096-mva-1): schema-v2.0.0 provider + journal_io integra
 - Modify: `.github/workflows/ci.yml`（如存在 CI 工作流）
 
 **Interfaces:**
-- 扫描 `lca/layer0_infra/observability/` 所有 .py 文件
+- 扫描 `lca/infrastructure/observability/` 所有 .py 文件
 - 拦截：(a) `JournalRecord.data` 字段写入；(b) envelope dict 缺 `schema_version`；(c) envelope dict 含 `data.data` 嵌套
 
 - [ ] **Step 1：写失败测试**
@@ -460,7 +460,7 @@ import ast
 import sys
 from pathlib import Path
 
-ROOT = Path("lca/layer0_infra/observability")
+ROOT = Path("lca/infrastructure/observability")
 
 
 def find_data_field_writes(tree: ast.Module) -> list[tuple[str, int]]:
@@ -507,7 +507,7 @@ Expected: 暴露多个现有 `.data =` 写入（journal_io.py 等）。先记录
 ```python
 # 在脚本顶部加
 ALLOWLIST = {
-    "lca/layer0_infra/observability/journal/journal_io.py",  # MVA-1 Task 3 完成
+    "lca/infrastructure/observability/journal/journal_io.py",  # MVA-1 Task 3 完成
 }
 def main() -> int:
     bad = []
@@ -834,9 +834,9 @@ git commit -m "feat(adr-0096-mva-2): identity-stable-ulid provider"
 ### Task 4：RunStore.append 闭环填 event_id
 
 **Files:**
-- Modify: `lca/layer0_infra/observability/journal/engine.py:RunStore.append`（调用 identity provider）
-- Modify: `lca/layer0_infra/observability/journal/engine.py:RunStore.seal`（同步填 terminal event_id）
-- Modify: `lca/layer0_infra/observability/journal/journal_io.py:_derive_event_id`（删除 fallback 分支）
+- Modify: `lca/infrastructure/observability/journal/engine.py:RunStore.append`（调用 identity provider）
+- Modify: `lca/infrastructure/observability/journal/engine.py:RunStore.seal`（同步填 terminal event_id）
+- Modify: `lca/infrastructure/observability/journal/journal_io.py:_derive_event_id`（删除 fallback 分支）
 - Test: `tests/test_event_identity_integration.py`
 
 - [ ] **Step 1：写失败测试**
@@ -868,7 +868,7 @@ Expected: FAILED（event_id 为空字符串）
 
 - [ ] **Step 3：改造 RunStore.append**
 
-修改 `lca/layer0_infra/observability/journal/engine.py:RunStore.append`：
+修改 `lca/infrastructure/observability/journal/engine.py:RunStore.append`：
 
 ```python
 # 在 __init__ 末尾加:
@@ -893,7 +893,7 @@ stamped = StampedEvent(seq=run_seq, ts=ts, scope=scope, event=event, event_id=ev
 - [ ] **Step 5：删除 journal_io.py _derive_event_id fallback**
 
 ```python
-# lca/layer0_infra/observability/journal/journal_io.py
+# lca/infrastructure/observability/journal/journal_io.py
 # 删除 _derive_event_id 整个函数;record_normalize 不再做 event_id 重派生
 # 改为: 直接使用 record.event_id (RunStore.append 已填)
 ```
@@ -916,7 +916,7 @@ Expected: PASS
 - [ ] **Step 9：Commit**
 
 ```bash
-git add lca/layer0_infra/observability/journal/engine.py lca/layer0_infra/observability/journal/journal_io.py tests/test_event_identity_integration.py
+git add lca/infrastructure/observability/journal/engine.py lca/infrastructure/observability/journal/journal_io.py tests/test_event_identity_integration.py
 git commit -m "feat(adr-0096-mva-2): RunStore.append closes event_id loop"
 ```
 
@@ -954,7 +954,7 @@ git commit -m "refactor(adr-0096-mva-2): RunManifest.terminal_event_seq replaces
 ```bash
 uv run pytest tests/test_event_identity_seam.py tests/test_event_identity_stable_ulid.py tests/test_event_identity_integration.py tests/test_run_manifest_terminal_seq.py tests/test_journal_v2_disk_format.py tests/test_journal_v2_envelope.py tests/test_journal_core.py -q
 uv run python scripts/check_protocol_schema_version.py
-uv run ruff check --fix lca/layer0_infra/observability/journal/ lca/plugins/seam_definitions/observability/event_identity.py lca/plugins/providers/event_identity/
+uv run ruff check --fix lca/infrastructure/observability/journal/ lca/plugins/seam_definitions/observability/event_identity.py lca/plugins/providers/event_identity/
 ```
 
 对应 ADR-0096 §13.4 验收条目：**V4, V5, V6** 通过。

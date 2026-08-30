@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """check_command_envelope_required —— ADR-0068 §五 + ADR-0074 PR-7 V4 hard constraint。
 
-扫描 ``lca/layer1_cognitive/body/pipeline_safe_executor.py`` + 其他 body /
+扫描 ``lca/cognition/body/pipeline_safe_executor.py`` + 其他 body /
 plugin body 文件,确保所有 ``execute()`` 调用栈必含 ``mint_envelope()`` 引用
 (architecture test gate)。
 
 acceptance §3.4 V4:
 
-> AST 扫描 ``lca/layer1_cognitive/body/`` + ``lca/plugins/body/`` 所有
+> AST 扫描 ``lca/cognition/body/`` + ``lca/plugins/body/`` 所有
 > ``pipeline_safe_executor.execute`` 调用栈必含 ``command_envelope.mint``
 > 引用。
 > Body.execute 任意一次调用 stack trace 含 ``command_envelope.mint``。
@@ -24,7 +24,7 @@ PR-7 阶段：
 设计说明：
 
 - 静态 AST 扫描（不执行 runtime；零副作用）
-- 仅扫描 ``lca/layer1_cognitive/body/`` + ``lca/plugins/body/``（body layer）
+- 仅扫描 ``lca/cognition/body/`` + ``lca/plugins/body/``（body layer）
 - 接受 ``mint_envelope(...)`` / ``command_envelope.mint(...)`` / ``command_envelope.mint_envelope(...)`` 3 种引用形式
 """
 
@@ -37,7 +37,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 
 SCAN_PATHS: tuple[Path, ...] = (
-    REPO / "lca" / "layer1_cognitive" / "body",
+    REPO / "lca" / "cognition" / "body",
     REPO / "lca" / "plugins" / "body",
 )
 

@@ -17,28 +17,28 @@ def test_architecture_01_contracts_root() -> None:
 
 
 def test_architecture_02_infra_layer() -> None:
-    """明确 layer0_infra 的基础设施归属。"""
-    _require_path("lca", "layer0_infra")
+    """明确 infrastructure 的基础设施归属。"""
+    _require_path("lca", "infrastructure")
 
 
 def test_architecture_03_cognitive_layer() -> None:
-    """明确 layer1_cognitive 的认知层归属。"""
-    _require_path("lca", "layer1_cognitive")
+    """明确 cognition 的认知层归属。"""
+    _require_path("lca", "cognition")
 
 
 def test_architecture_04_runtime_layer() -> None:
-    """明确 layer2_runtime 的运行层归属。"""
-    _require_path("lca", "layer2_runtime")
+    """明确 runtime 的运行层归属。"""
+    _require_path("lca", "runtime")
 
 
 def test_architecture_05_agent_layer() -> None:
-    """明确 layer3_agent 的 Agent 层归属。"""
-    _require_path("lca", "layer3_agent")
+    """明确 agent 的 Agent 层归属。"""
+    _require_path("lca", "agent")
 
 
 def test_architecture_06_composition_root() -> None:
-    """明确 layer4_app 作为组合根。"""
-    _require_path("lca", "layer4_app")
+    """明确 application 作为组合根。"""
+    _require_path("lca", "application")
 
 
 def test_architecture_07_harness_layer() -> None:
@@ -68,87 +68,87 @@ def test_architecture_11_contracts_models() -> None:
 
 def test_architecture_12_infra_llm() -> None:
     """守护 LLM adapter 位于基础设施层。"""
-    _require_path("lca", "layer0_infra", "llm_adapter")
+    _require_path("lca", "infrastructure", "llm_adapter")
 
 
 def test_architecture_13_infra_observability() -> None:
     """守护观测实现位于基础设施层。"""
-    _require_path("lca", "layer0_infra", "observability")
+    _require_path("lca", "infrastructure", "observability")
 
 
 def test_architecture_14_infra_transport() -> None:
     """守护 transport seam 位于基础设施层。"""
-    _require_path("lca", "layer0_infra", "transport")
+    _require_path("lca", "infrastructure", "transport")
 
 
 def test_architecture_15_infra_state_store() -> None:
     """守护 state_store seam 位于基础设施层。"""
-    _require_path("lca", "layer0_infra", "state_store")
+    _require_path("lca", "infrastructure", "state_store")
 
 
 def test_architecture_16_infra_sandbox() -> None:
     """守护 sandbox seam 位于基础设施层。"""
-    _require_path("lca", "layer0_infra", "sandbox")
+    _require_path("lca", "infrastructure", "sandbox")
 
 
 def test_architecture_17_infra_file_store() -> None:
     """守护 file_store seam 位于基础设施层。"""
-    _require_path("lca", "layer0_infra", "file_store.py")
+    _require_path("lca", "infrastructure", "file_store.py")
 
 
 def test_architecture_18_infra_skills() -> None:
     """守护 skills provider 位于基础设施层。"""
-    _require_path("lca", "layer0_infra", "skills")
+    _require_path("lca", "infrastructure", "skills")
 
 
 def test_architecture_19_cognitive_brain() -> None:
     """守护 Brain 模块作为认知平面入口。"""
-    _require_path("lca", "layer1_cognitive", "brain")
+    _require_path("lca", "cognition", "brain")
 
 
 def test_architecture_20_cognitive_body() -> None:
     """守护 Body 模块作为世界平面入口。"""
-    _require_path("lca", "layer1_cognitive", "body")
+    _require_path("lca", "cognition", "body")
 
 
 def test_architecture_21_cognitive_memory() -> None:
     """守护 Memory 模块的认知层位置。"""
-    _require_path("lca", "layer1_cognitive", "memory")
+    _require_path("lca", "cognition", "memory")
 
 
 def test_architecture_22_cognitive_perception() -> None:
     """守护 perceive 相关模块的局部性。"""
-    _require_path("lca", "layer1_cognitive", "sensors")
+    _require_path("lca", "cognition", "sensors")
 
 
 def test_architecture_23_runtime_reducer() -> None:
     """守护 reducer 作为状态唯一写入相关模块。"""
-    _require_path("lca", "layer2_runtime", "reducer.py")
+    _require_path("lca", "runtime", "reducer.py")
 
 
 def test_architecture_24_runtime_declarative() -> None:
     """守护声明式运行时目录。"""
-    _require_path("lca", "layer2_runtime", "declarative_runtime.py")
+    _require_path("lca", "runtime", "declarative_runtime.py")
 
 
 def test_architecture_25_runtime_recovery() -> None:
     """守护恢复策略位于运行层。"""
-    _require_path("lca", "layer2_runtime", "checkpoint_resolution.py")
+    _require_path("lca", "runtime", "checkpoint_resolution.py")
 
 
 def test_architecture_26_agent_team() -> None:
     """守护 Team 协作模块的层次归属。"""
-    _require_path("lca", "layer3_agent", "orchestration_strategies")
+    _require_path("lca", "agent", "orchestration_strategies")
 
 
 def test_architecture_27_agent_delegation() -> None:
     """守护 delegation 模块的层次归属。"""
-    _require_path("lca", "layer3_agent", "orchestration_strategies")
+    _require_path("lca", "agent", "orchestration_strategies")
 
 
 def test_architecture_28_app_spawn() -> None:
     """守护 spawn 作为组合根装配入口。"""
-    _require_path("lca", "layer4_app", "spawn.py")
+    _require_path("lca", "application", "spawn.py")
 
 
 def test_architecture_29_app_runtime_factory() -> None:

@@ -34,7 +34,7 @@ from lca.plugins.providers.gate_chain_composer import DefaultGateChainComposer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEALER_PATH = (
-    REPO_ROOT / "lca" / "layer1_cognitive" / "brain" / "decision_gates" / "office_works_sealer.py"
+    REPO_ROOT / "lca" / "cognition" / "brain" / "decision_gates" / "office_works_sealer.py"
 )
 
 

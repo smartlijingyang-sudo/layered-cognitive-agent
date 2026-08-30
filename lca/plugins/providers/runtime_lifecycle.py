@@ -42,7 +42,7 @@ class Config(BaseModel):
     layer="L2",
     effects="none",
     description="Freeze passive lifecycle subscribers into the Agent Loop event publisher.",
-    test_suite="tests/layer2_runtime/test_runtime_lifecycle_plugins.py",
+    test_suite="tests/runtime/test_runtime_lifecycle_plugins.py",
     kind=PluginKind.COMPOSITE,
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:

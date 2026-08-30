@@ -3,7 +3,7 @@
 The root package exposes value types from ``contracts``.  Its optional
 ``Agent`` / ``Team`` facade is resolved only for callers that explicitly ask
 for those composition-root symbols; importing a lower-layer submodule must
-not create a static dependency on ``layer4_app``.
+not create a static dependency on ``application``.
 """
 
 from __future__ import annotations

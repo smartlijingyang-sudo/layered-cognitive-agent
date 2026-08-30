@@ -40,7 +40,7 @@ REPO = Path(__file__).resolve().parents[2]
 # ADR-0076 §二 lists five substitution axes; each has one (or two) files
 # that MUST NOT contain the corresponding forbidden pattern.
 
-INTERPRETER_PATH = REPO / "lca" / "layer2_runtime" / "declarative_runtime.py"
+INTERPRETER_PATH = REPO / "lca" / "runtime" / "declarative_runtime.py"
 INTERPRETER_FALLBACK = REPO / "lca" / "harness" / "declarative" / "interpreter.py"
 COMPOSER_DIRECTORY = REPO / "lca" / "plugins" / "composer"
 COMPOSER_PATHS = (
@@ -51,7 +51,7 @@ COMPOSER_PATHS = (
 )
 TEAM_TRANSPORT_PATH = COMPOSER_DIRECTORY / "team_transport.py"
 GRAPH_STRATEGY_PATH = (
-    REPO / "lca" / "layer3_agent" / "orchestration_strategies" / "graph" / "strategy.py"
+    REPO / "lca" / "agent" / "orchestration_strategies" / "graph" / "strategy.py"
 )
 GATEWAY_MODE_PATH = REPO / "gateway" / "modes.py"
 GATEWAY_LOOP_PATH = REPO / "gateway" / "runs" / "loop_drivers.py"

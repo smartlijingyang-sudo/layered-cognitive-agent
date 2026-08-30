@@ -28,11 +28,11 @@ think
   → stop
 ```
 
-声明式运行路径由 [`CognitiveRuntime`](../../lca/layer2_runtime/runtime_loop.py) 绑定 `CompiledRunPlan`、phase executors、effect handler registry 和 delta handler registry，然后交给 [`DeclarativeRuntimeDriver`](../../lca/layer2_runtime/declarative_runtime.py)。通用解释器位于 [`GenericPlanInterpreter`](../../lca/harness/declarative/interpreter.py)。
+声明式运行路径由 [`CognitiveRuntime`](../../lca/runtime/runtime_loop.py) 绑定 `CompiledRunPlan`、phase executors、effect handler registry 和 delta handler registry，然后交给 [`DeclarativeRuntimeDriver`](../../lca/runtime/declarative_runtime.py)。通用解释器位于 [`GenericPlanInterpreter`](../../lca/harness/declarative/interpreter.py)。
 
 ## 3. SafeExecutor 的错误分型
 
-[`SimpleSafeExecutor`](../../lca/layer1_cognitive/body/safe_executor.py) 的执行顺序是权限检查、参数校验、`ToolStarted`、缓存检查、局部重试、`ToolInvoked`。默认 [`RetryPolicy`](../../lca/contracts/models/team/role_team.py) 允许最多三次重试，并使用指数退避。
+[`SimpleSafeExecutor`](../../lca/cognition/body/safe_executor.py) 的执行顺序是权限检查、参数校验、`ToolStarted`、缓存检查、局部重试、`ToolInvoked`。默认 [`RetryPolicy`](../../lca/contracts/models/team/role_team.py) 允许最多三次重试，并使用指数退避。
 
 | 错误类型 | `failure_kind` | SafeExecutor 行为 | Agent 是否重新思考 |
 |---|---|---|---|
@@ -57,7 +57,7 @@ for attempt in range(retry_policy.max_retries + 1):
 
 ## 4. Journal 记录边界
 
-工具事件由 [`tool_journal_emit.py`](../../lca/layer1_cognitive/body/tool_journal_emit.py) 统一发射。一次完整的工具动作至少有以下事实：
+工具事件由 [`tool_journal_emit.py`](../../lca/cognition/body/tool_journal_emit.py) 统一发射。一次完整的工具动作至少有以下事实：
 
 | 事件 | 时机 | 关键字段 |
 |---|---|---|
@@ -67,13 +67,13 @@ for attempt in range(retry_policy.max_retries + 1):
 
 `ToolInvoked.attempt` 表示同一次 SafeExecutor 调用最终使用的尝试次数；`ok=false` 和 `error` 表示最终失败。工具事件模型见 [`journal.py`](../../lca/contracts/models/observability/journal.py)。
 
-声明式解释器还会通过 [`RuntimeJournalCommitter`](../../lca/layer2_runtime/declarative_runtime.py) 记录 `phase.result` 和 `effect.receipt`，并携带 `plan_ref`、`node_ref` 和 operation。工具 Journal 事实回答“工具发生了什么”，phase 事实回答“执行图走到了哪里”。两者不能互相替代。
+声明式解释器还会通过 [`RuntimeJournalCommitter`](../../lca/runtime/declarative_runtime.py) 记录 `phase.result` 和 `effect.receipt`，并携带 `plan_ref`、`node_ref` 和 operation。工具 Journal 事实回答“工具发生了什么”，phase 事实回答“执行图走到了哪里”。两者不能互相替代。
 
 ## 5. 失败如何进入 Reflect
 
 `ACT` 阶段的 [`StandardPhaseExecutor`](../../lca/plugins/phase_executors/common.py) 只创建 `CommandEnvelope`。[`BodyActEffectHandler`](../../lca/plugins/providers/effect_handlers.py) 调用 Body，返回的 Observation 被解释器放入 `artifact_map["observation"]` 和 `artifact_map["act"]`，然后沿 `act.main → reflect.main` 继续。
 
-如果使用 [`SimpleCritic`](../../lca/layer1_cognitive/brain/critic.py)，它会根据 `failure_kind` 生成可解释的 Reflection：
+如果使用 [`SimpleCritic`](../../lca/cognition/brain/critic.py)，它会根据 `failure_kind` 生成可解释的 Reflection：
 
 | 类型 | 反思提示 |
 |---|---|
@@ -106,7 +106,7 @@ act 失败
   → 下一轮 perceive / think
 ```
 
-[`TurnDeltaHandler`](../../lca/plugins/providers/delta_handlers.py) 将 `decision`、`observation` 和 `reflection` 组成 Turn，并调用 `Reducer.apply_turn`。下一次 Think 由 [`build_tool_history`](../../lca/layer1_cognitive/brain/tool_conversation.py) 将失败结果恢复成模型原生消息：
+[`TurnDeltaHandler`](../../lca/plugins/providers/delta_handlers.py) 将 `decision`、`observation` 和 `reflection` 组成 Turn，并调用 `Reducer.apply_turn`。下一次 Think 由 [`build_tool_history`](../../lca/cognition/brain/tool_conversation.py) 将失败结果恢复成模型原生消息：
 
 ```text
 assistant.tool_calls: file_write(...)
@@ -147,7 +147,7 @@ effectful 操作使用幂等键：
 plan_ref + node_ref + decision_id
 ```
 
-[`RuntimeIdempotencyStore`](../../lca/layer2_runtime/declarative_runtime.py) 的状态语义如下：
+[`RuntimeIdempotencyStore`](../../lca/runtime/declarative_runtime.py) 的状态语义如下：
 
 | claim 状态 | 语义 | 处理 |
 |---|---|---|
@@ -187,9 +187,9 @@ effect_uncertain
 
 ## 参考
 
-- [`runtime_loop.py`](../../lca/layer2_runtime/runtime_loop.py)
-- [`declarative_runtime.py`](../../lca/layer2_runtime/declarative_runtime.py)
+- [`runtime_loop.py`](../../lca/runtime/runtime_loop.py)
+- [`declarative_runtime.py`](../../lca/runtime/declarative_runtime.py)
 - [`interpreter.py`](../../lca/harness/declarative/interpreter.py)
-- [`safe_executor.py`](../../lca/layer1_cognitive/body/safe_executor.py)
-- [`tool_journal_emit.py`](../../lca/layer1_cognitive/body/tool_journal_emit.py)
+- [`safe_executor.py`](../../lca/cognition/body/safe_executor.py)
+- [`tool_journal_emit.py`](../../lca/cognition/body/tool_journal_emit.py)
 - [`declarative-phase-graph.yaml`](../../bundles/declarative-phase-graph.yaml)

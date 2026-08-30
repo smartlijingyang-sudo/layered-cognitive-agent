@@ -72,7 +72,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Agent Layer (layer1_cognitive, layer2_runtime, layer3)     │
+│  Agent Layer (cognition, runtime, layer3)     │
 │  - Tools: list_files, read_file, run_command, ...           │
 │  - Prompt: context 注入（label, workspace, backend, caps）   │
 │  - Skills: 参数化路径（不硬编码）                             │
@@ -460,7 +460,7 @@ class HostContext:
 #### HostContext
 
 ```python
-# lca/layer0_infra/execution/host_context.py
+# lca/infrastructure/execution/host_context.py
 
 
 class HostContext:
@@ -593,7 +593,7 @@ class HostContext:
 #### OnlyboxesContext
 
 ```python
-# lca/layer0_infra/execution/onlyboxes_context.py
+# lca/infrastructure/execution/onlyboxes_context.py
 
 
 class OnlyboxesContext:
@@ -690,7 +690,7 @@ class OnlyboxesContext:
 #### SSHContext
 
 ```python
-# lca/layer0_infra/execution/ssh_context.py
+# lca/infrastructure/execution/ssh_context.py
 
 import asyncio
 import subprocess
@@ -1221,7 +1221,7 @@ npx @lca/host connect --gateway ws://127.0.0.1:8765 --token lca-local-host
 ### 3.5 Factory
 
 ```python
-# lca/layer0_infra/execution/factory.py
+# lca/infrastructure/execution/factory.py
 
 import os
 from typing import Optional
@@ -1393,7 +1393,7 @@ def set_gateway_services(registry, hub):
 ### 3.6 配置
 
 ```python
-# lca/layer0_infra/execution/config.py
+# lca/infrastructure/execution/config.py
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -1541,7 +1541,7 @@ officecli create {outputs_dir}/report.pptx --json
 根据当前 `ExecutionContext` 替换占位符：
 
 ```python
-# lca/layer0_infra/skills/skill_renderer.py
+# lca/infrastructure/skills/skill_renderer.py
 
 
 def render_skill_content(content: str, context: ExecutionContext) -> str:
@@ -1673,7 +1673,7 @@ async def generate_download_url(context: ExecutionContext, workspace_path: str) 
 **解决**：在 ExecutionContext 出口**强制执行**截断，Agent 需要更多细节时显式请求「下一段 / 指定行 / grep」。
 
 ```python
-# lca/layer0_infra/execution/viewport.py
+# lca/infrastructure/execution/viewport.py
 
 from dataclasses import dataclass
 
@@ -1743,7 +1743,7 @@ class ViewportPolicy:
 
 | 现有模块 | 关系 |
 |---------|------|
-| `lca/layer0_infra/text/truncate.py` | 底层截断工具，ViewportPolicy 内部使用 |
+| `lca/infrastructure/text/truncate.py` | 底层截断工具，ViewportPolicy 内部使用 |
 | `OpResult.truncated` | 截断信号字段（§3.2 已定义） |
 | `OpResult.original_size` | 原始大小，供 Agent 判断是否需要二次查询 |
 
@@ -1779,7 +1779,7 @@ Agent: execute("grep_content", {"pattern": "def.*important", "path": "huge.py"})
 **HostContext 的 Job 实现思路**：
 
 ```python
-# lca/layer0_infra/execution/host_context.py (Phase 4)
+# lca/infrastructure/execution/host_context.py (Phase 4)
 
 
 class HostJobHandle:
@@ -1862,7 +1862,7 @@ class HostContext:
 **Runtime 集成**：
 
 ```python
-# lca/layer2_runtime/runtime_loop.py (Phase 4)
+# lca/runtime/runtime_loop.py (Phase 4)
 
 
 async def _handle_long_task(self, state, action):
@@ -1921,7 +1921,7 @@ Agent 启动 Job → 返回 job_id → 继续思考
 │ - 任务级策略：是否允许出网、是否允许破坏性操作              │
 │ - 配额控制：最大步骤数、最大 token、最大执行时间            │
 │ - 审批流：高危操作进入 pending_approval                    │
-│ - 实现：lca/layer2_runtime/outcome_policies/              │
+│ - 实现：lca/runtime/outcome_policies/              │
 ├─────────────────────────────────────────────────────────┤
 │ Layer 2: Adapter 硬隔离（ExecutionContext 层）             │
 │ - Host: per-user 隔离空间（/home/lca-{user}）             │
@@ -1962,17 +1962,17 @@ Agent 启动 Job → 返回 job_id → 继续思考
 | `host/local_shell/file/*.py` | 所有 handler 去掉 `mount` 参数 |
 | `host/local_shell/shell/runner.py` | 去掉 `mount` 参数 |
 | `host/exec.py` | 去掉 `mount` 参数 |
-| `lca/layer0_infra/sandbox/surface.py` | **替换**为 ExecutionContext（保留文件但内容迁移） |
-| `lca/layer0_infra/sandbox/host_settings.py` | 合并进 `ExecutionConfig` |
-| `lca/layer0_infra/computer/constants.py::COMPUTER_WORKSPACE_ROOT` | **删除**硬编码，从 context 取 |
-| `lca/layer0_infra/sandbox/bootstrap.py` | 从 `context.workspace` 构建路径 |
-| `lca/layer0_infra/sandbox/runtime_mount.py` | 从 `context.workspace` 构建路径 |
-| `lca/layer0_infra/sandbox/output_collect.py` | 从 `context.outputs_dir` 构建路径 |
-| `lca/layer0_infra/sandbox/inspect_prelude.py` | 从 `context.workspace` 构建路径 |
-| `lca/layer0_infra/sandbox/error_parse.py` | 从 `context.workspace` 构建错误提示 |
-| `lca/layer0_infra/sandbox/prompt.py` | 用 `context.prompt_context()` 替换硬编码 |
-| `lca/layer0_infra/computer/runtime.py::_normalize_path` | 从 `context.workspace` 解析 |
-| `lca/layer0_infra/computer/guest/preamble.py::ROOT` | 从 `context.workspace` 注入 |
+| `lca/infrastructure/sandbox/surface.py` | **替换**为 ExecutionContext（保留文件但内容迁移） |
+| `lca/infrastructure/sandbox/host_settings.py` | 合并进 `ExecutionConfig` |
+| `lca/infrastructure/computer/constants.py::COMPUTER_WORKSPACE_ROOT` | **删除**硬编码，从 context 取 |
+| `lca/infrastructure/sandbox/bootstrap.py` | 从 `context.workspace` 构建路径 |
+| `lca/infrastructure/sandbox/runtime_mount.py` | 从 `context.workspace` 构建路径 |
+| `lca/infrastructure/sandbox/output_collect.py` | 从 `context.outputs_dir` 构建路径 |
+| `lca/infrastructure/sandbox/inspect_prelude.py` | 从 `context.workspace` 构建路径 |
+| `lca/infrastructure/sandbox/error_parse.py` | 从 `context.workspace` 构建错误提示 |
+| `lca/infrastructure/sandbox/prompt.py` | 用 `context.prompt_context()` 替换硬编码 |
+| `lca/infrastructure/computer/runtime.py::_normalize_path` | 从 `context.workspace` 解析 |
+| `lca/infrastructure/computer/guest/preamble.py::ROOT` | 从 `context.workspace` 注入 |
 | `skills/officecli/SKILL.md` | `/mnt/data` → `{workspace}` / `{outputs_dir}` |
 | `lca/contracts/models/core/sandbox.py::SANDBOX_MOUNT_ROOT` | 保留作为 Onlyboxes 内部常量，不再作为全局注入 |
 
@@ -1988,8 +1988,8 @@ Agent 启动 Job → 返回 job_id → 继续思考
 | `host/local_shell/dispatch.py` | 操作路由表，简化后保留 |
 | `gateway/host_sandbox.py` | Host → Sandbox 适配层，被 HostContext 内部使用 |
 | `gateway/presence/` | Presence 注册/路由 |
-| `lca/layer0_infra/sandbox/onlyboxes_adapter.py` | Onlyboxes Sandbox 实现，被 OnlyboxesContext 内部使用 |
-| `lca/layer0_infra/sandbox/factory.py` | 改为解析 ExecutionContext（或废弃，由新 factory 替代） |
+| `lca/infrastructure/sandbox/onlyboxes_adapter.py` | Onlyboxes Sandbox 实现，被 OnlyboxesContext 内部使用 |
+| `lca/infrastructure/sandbox/factory.py` | 改为解析 ExecutionContext（或废弃，由新 factory 替代） |
 
 ---
 
@@ -1998,17 +1998,17 @@ Agent 启动 Job → 返回 job_id → 继续思考
 | 模块 | 说明 | Phase |
 |---|---|---|
 | `lca/contracts/protocols/execution.py` | `ExecutionContext` Protocol + `BackendKind` + `OpResult` + `ExecutionCapability` + `EnvState` + `AsyncJobProvider` + `JobHandle` + `LogChunk` | 1 |
-| `lca/layer0_infra/execution/__init__.py` | 包入口 | 1 |
-| `lca/layer0_infra/execution/host_context.py` | Host 实现（含 capabilities、env_state 回传） | 1 |
-| `lca/layer0_infra/execution/onlyboxes_context.py` | Onlyboxes 实现（含 capabilities） | 1 |
-| `lca/layer0_infra/execution/ssh_context.py` | SSH 实现（含 capabilities） | 3 |
-| `lca/layer0_infra/execution/windows_context.py` | Windows 实现（含 capabilities） | 3 |
-| `lca/layer0_infra/execution/factory.py` | Context factory | 1 |
-| `lca/layer0_infra/execution/config.py` | 统一配置（pydantic model） | 1 |
-| `lca/layer0_infra/execution/viewport.py` | `ViewportPolicy` — 统一截断策略 | 2 |
-| `lca/layer0_infra/execution/job.py` | `JobHandle` 基类 + 日志流基础设施 | 4 |
-| `lca/layer0_infra/execution/host_job.py` | Host Job 实现（后台进程 + 日志文件） | 4 |
-| `lca/layer0_infra/skills/skill_renderer.py` | Skill 占位符替换 | 2 |
+| `lca/infrastructure/execution/__init__.py` | 包入口 | 1 |
+| `lca/infrastructure/execution/host_context.py` | Host 实现（含 capabilities、env_state 回传） | 1 |
+| `lca/infrastructure/execution/onlyboxes_context.py` | Onlyboxes 实现（含 capabilities） | 1 |
+| `lca/infrastructure/execution/ssh_context.py` | SSH 实现（含 capabilities） | 3 |
+| `lca/infrastructure/execution/windows_context.py` | Windows 实现（含 capabilities） | 3 |
+| `lca/infrastructure/execution/factory.py` | Context factory | 1 |
+| `lca/infrastructure/execution/config.py` | 统一配置（pydantic model） | 1 |
+| `lca/infrastructure/execution/viewport.py` | `ViewportPolicy` — 统一截断策略 | 2 |
+| `lca/infrastructure/execution/job.py` | `JobHandle` 基类 + 日志流基础设施 | 4 |
+| `lca/infrastructure/execution/host_job.py` | Host Job 实现（后台进程 + 日志文件） | 4 |
+| `lca/infrastructure/skills/skill_renderer.py` | Skill 占位符替换 | 2 |
 | `gateway/runs/file_download.py` | 文件下载代理 | 3 |
 | `gateway/runs/context_api.py` | `/lca-api/context` endpoint | 3 |
 | `packages/host-sidecar/` | `@lca/host` npm 包 — 一键安装 sidecar | 3 |
@@ -2239,7 +2239,7 @@ const response = await fetch('/runs', {
 
 1. **Observation 需要 observation_id**: `ListFilesTool.execute()` 示例中创建 `Observation` 时需要生成 `observation_id`（如 `new_id("obs")`），这是 `Observation` dataclass 的必需字段。
 
-2. **Factory 层级隔离**: `layer0_infra/execution/factory.py` **不得**在模块顶层 import gateway 类型。所有 gateway 引用必须通过 `set_gateway_services()` 注入点传入，保持 L0 → gateway 的单向依赖清洁。
+2. **Factory 层级隔离**: `infrastructure/execution/factory.py` **不得**在模块顶层 import gateway 类型。所有 gateway 引用必须通过 `set_gateway_services()` 注入点传入，保持 L0 → gateway 的单向依赖清洁。
 
 3. **OnlyboxesContext.execute()**: 参考现有 `OnlyboxesSandboxAdapter` 的 `run()`、`run_terminal()`、`write_files()` 方法构建 op dispatch。File ops 走 guest Python scripts（与现有 ComputerRuntime 一致）。
 
@@ -2253,7 +2253,7 @@ const response = await fetch('/runs', {
 
 7. **Capability 声明必须准确**: 每种 backend 的 `capabilities` 不能「全部声明」或「全部为空」。Host 最完整（含 JOB/STREAMING），SSH 最精简（仅 SHELL/FILESYSTEM）。Router 依赖此做能力路由，虚假声明会导致运行时错误。
 
-8. **ViewportPolicy 不替代 truncate.py**: `ViewportPolicy` 是抽象层的强制截断策略，`lca/layer0_infra/text/truncate.py` 是底层截断工具。ViewportPolicy 内部调用 truncate.py，但对外提供统一的策略接口。
+8. **ViewportPolicy 不替代 truncate.py**: `ViewportPolicy` 是抽象层的强制截断策略，`lca/infrastructure/text/truncate.py` 是底层截断工具。ViewportPolicy 内部调用 truncate.py，但对外提供统一的策略接口。
 
 9. **env_state 回传的代价**: 每次 shell op 都查询 cwd/user 有额外开销（多一次 RPC）。Phase 1 实现时可以考虑：Host 通过一次 `pwd && whoami && echo $SHELL` 命令完成；Onlyboxes 通过 guest preamble 脚本获取。如果性能成为瓶颈，可改为「每 N 次操作回传一次」或「仅在 cwd 可能变化时回传」。
 

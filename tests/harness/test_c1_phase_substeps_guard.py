@@ -19,7 +19,7 @@ ADR-0068 §三运行时序图定义 7 子步骤（run-loop phases）：
 think.* 在 think phase 等）；不允许把 C1 子步骤抽离成独立 state field
 （如 ``_gate_chain`` / ``_pre_phase_method`` / ``_sub_phase_state``）。
 
-PR-4 实施：本测试扫描 ``lca/layer1_cognitive/brain/`` + ``lca/layer2_runtime/``，
+PR-4 实施：本测试扫描 ``lca/cognition/brain/`` + ``lca/runtime/``，
 验证：
 
 1. ``ModularBrain`` 不含 ``_gate_chain`` / ``_gates`` / ``_chain`` 字段
@@ -35,10 +35,10 @@ import ast
 from pathlib import Path
 
 LCA_ROOT = Path("lca")
-BRAIN_DIR = LCA_ROOT / "layer1_cognitive" / "brain"
-RUNTIME_FILE = LCA_ROOT / "layer2_runtime" / "runtime_loop.py"
+BRAIN_DIR = LCA_ROOT / "cognition" / "brain"
+RUNTIME_FILE = LCA_ROOT / "runtime" / "runtime_loop.py"
 REDUCER_PROTOCOL = LCA_ROOT / "contracts" / "protocols" / "reducer.py"
-REDUCER_DEFAULT = LCA_ROOT / "layer2_runtime" / "reducer.py"
+REDUCER_DEFAULT = LCA_ROOT / "runtime" / "reducer.py"
 
 
 class TestCV4NoGateChainField:

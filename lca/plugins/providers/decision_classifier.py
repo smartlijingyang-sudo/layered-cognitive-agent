@@ -23,7 +23,7 @@ class Config(BaseModel):
 class DefaultDecisionClassifier(DecisionClassifier):
     """Default DecisionClassifier implementation.
 
-    Migrated from lca/layer1_cognitive/brain/llm_result.py:build_decision_from_response().
+    Migrated from lca/cognition/brain/llm_result.py:build_decision_from_response().
     Maps native function-calling output to LCA Decision (LobeHub tool wire parity).
     """
 

@@ -15,8 +15,8 @@ class MiddlewareRegistration:
     constructor signature used at 4 production callers (F1 fix):
     - lca/plugins/budget_policy/__init__.py:55
     - lca/plugins/loop_intervention_policy/__init__.py:55
-    - lca/layer2_runtime/hook_middleware.py:57
-    - lca/layer2_runtime/loop_intervention_mw.py:47
+    - lca/runtime/hook_middleware.py:57
+    - lca/runtime/loop_intervention_mw.py:47
 
     These callers pass seam_key/priority/plugin_id only — the actual callback
     is registered separately via `InMemoryMiddlewareRegistry.register()`.

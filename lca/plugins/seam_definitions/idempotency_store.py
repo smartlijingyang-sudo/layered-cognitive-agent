@@ -22,7 +22,7 @@ class Config(BaseModel):
     layer="L2",
     effects="filesystem",
     description="Provide the durable effect claim and receipt store for declarative runtime execution.",
-    test_suite="tests/layer2_runtime/test_idempotency_store.py",
+    test_suite="tests/runtime/test_idempotency_store.py",
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

@@ -196,7 +196,7 @@ git commit -m "feat(migration): add migrate_layer_rename.py with dry-run + execu
 ## Task 3: 原子切换 lca.infrastructure → lca.infrastructure
 
 **Files:**
-- Rename: `lca/layer0_infra/` → `lca/infrastructure/`
+- Rename: `lca/infrastructure/` → `lca/infrastructure/`
 - Modify: 所有引用 `lca.infrastructure` 的 import
 
 - [ ] **Step 1: 创建分支 `rename/layer0-infrastructure`**
@@ -209,8 +209,8 @@ git checkout -b rename/layer0-infrastructure
 - [ ] **Step 2: git mv + 全局替换**
 
 ```bash
-git mv lca/layer0_infra lca/infrastructure
-grep -rl "lca\.layer0_infra" lca/ gateway/ tests/ | xargs sed -i 's/lca\.layer0_infra/lca.infrastructure/g'
+git mv lca/infrastructure lca/infrastructure
+grep -rl "lca\.infrastructure" lca/ gateway/ tests/ | xargs sed -i 's/lca\.infrastructure/lca.infrastructure/g'
 ```
 
 - [ ] **Step 3: 更新 import-linter contracts layers**
@@ -230,7 +230,7 @@ uv run ruff check --fix . && uv run ruff format . && uv run lint-imports && uv r
 - [ ] **Step 6: 验证本映射无残留**
 
 ```bash
-grep -rn "lca\.layer0_infra" lca/ gateway/ tests/ profiles/ deploy/ docs/
+grep -rn "lca\.infrastructure" lca/ gateway/ tests/ profiles/ deploy/ docs/
 # Expected: 空
 ```
 
@@ -256,7 +256,7 @@ gh pr create --title "refactor!: rename lca.infrastructure to lca.infrastructure
 ## Task 4: 原子切换 lca.cognition → lca.cognition
 
 **Files:**
-- Rename: `lca/layer1_cognitive/` → `lca/cognition/`
+- Rename: `lca/cognition/` → `lca/cognition/`
 - Modify: 所有引用 `lca.cognition` 的 import
 
 - [ ] **Step 1: 创建分支 `rename/layer1-cognition`**
@@ -269,8 +269,8 @@ git checkout -b rename/layer1-cognition
 - [ ] **Step 2: git mv + 全局替换**
 
 ```bash
-git mv lca/layer1_cognitive lca/cognition
-grep -rl "lca\.layer1_cognitive" lca/ gateway/ tests/ | xargs sed -i 's/lca\.layer1_cognitive/lca.cognition/g'
+git mv lca/cognition lca/cognition
+grep -rl "lca\.cognition" lca/ gateway/ tests/ | xargs sed -i 's/lca\.cognition/lca.cognition/g'
 ```
 
 - [ ] **Step 3: 更新 import-linter contracts layers**
@@ -290,7 +290,7 @@ uv run ruff check --fix . && uv run ruff format . && uv run lint-imports && uv r
 - [ ] **Step 6: 验证本映射无残留**
 
 ```bash
-grep -rn "lca\.layer1_cognitive" lca/ gateway/ tests/ profiles/ deploy/ docs/
+grep -rn "lca\.cognition" lca/ gateway/ tests/ profiles/ deploy/ docs/
 # Expected: 空
 ```
 
@@ -316,7 +316,7 @@ gh pr create --title "refactor!: rename lca.cognition to lca.cognition" --body "
 ## Task 5: 原子切换 lca.runtime → lca.runtime
 
 **Files:**
-- Rename: `lca/layer2_runtime/` → `lca/runtime/`
+- Rename: `lca/runtime/` → `lca/runtime/`
 - Modify: 所有引用 `lca.runtime` 的 import
 
 - [ ] **Step 1: 创建分支 `rename/layer2-runtime`**
@@ -329,8 +329,8 @@ git checkout -b rename/layer2-runtime
 - [ ] **Step 2: git mv + 全局替换**
 
 ```bash
-git mv lca/layer2_runtime lca/runtime
-grep -rl "lca\.layer2_runtime" lca/ gateway/ tests/ | xargs sed -i 's/lca\.layer2_runtime/lca.runtime/g'
+git mv lca/runtime lca/runtime
+grep -rl "lca\.runtime" lca/ gateway/ tests/ | xargs sed -i 's/lca\.runtime/lca.runtime/g'
 ```
 
 - [ ] **Step 3: 更新 import-linter contracts layers**
@@ -350,7 +350,7 @@ uv run ruff check --fix . && uv run ruff format . && uv run lint-imports && uv r
 - [ ] **Step 6: 验证本映射无残留**
 
 ```bash
-grep -rn "lca\.layer2_runtime" lca/ gateway/ tests/ profiles/ deploy/ docs/
+grep -rn "lca\.runtime" lca/ gateway/ tests/ profiles/ deploy/ docs/
 # Expected: 空
 ```
 
@@ -376,7 +376,7 @@ gh pr create --title "refactor!: rename lca.runtime to lca.runtime" --body "ADR-
 ## Task 6: 原子切换 lca.agent → lca.agent
 
 **Files:**
-- Rename: `lca/layer3_agent/` → `lca/agent/`
+- Rename: `lca/agent/` → `lca/agent/`
 - Modify: 所有引用 `lca.agent` 的 import
 
 - [ ] **Step 1: 创建分支 `rename/layer3-agent`**
@@ -389,8 +389,8 @@ git checkout -b rename/layer3-agent
 - [ ] **Step 2: git mv + 全局替换**
 
 ```bash
-git mv lca/layer3_agent lca/agent
-grep -rl "lca\.layer3_agent" lca/ gateway/ tests/ | xargs sed -i 's/lca\.layer3_agent/lca.agent/g'
+git mv lca/agent lca/agent
+grep -rl "lca\.agent" lca/ gateway/ tests/ | xargs sed -i 's/lca\.agent/lca.agent/g'
 ```
 
 - [ ] **Step 3: 更新 import-linter contracts layers**
@@ -410,7 +410,7 @@ uv run ruff check --fix . && uv run ruff format . && uv run lint-imports && uv r
 - [ ] **Step 6: 验证本映射无残留**
 
 ```bash
-grep -rn "lca\.layer3_agent" lca/ gateway/ tests/ profiles/ deploy/ docs/
+grep -rn "lca\.agent" lca/ gateway/ tests/ profiles/ deploy/ docs/
 # Expected: 空
 ```
 
@@ -436,7 +436,7 @@ gh pr create --title "refactor!: rename lca.agent to lca.agent" --body "ADR-0104
 ## Task 7: 原子切换 lca.application → lca.application
 
 **Files:**
-- Rename: `lca/layer4_app/` → `lca/application/`
+- Rename: `lca/application/` → `lca/application/`
 - Modify: 所有引用 `lca.application` 的 import
 
 - [ ] **Step 1: 创建分支 `rename/layer4-application`**
@@ -449,8 +449,8 @@ git checkout -b rename/layer4-application
 - [ ] **Step 2: git mv + 全局替换**
 
 ```bash
-git mv lca/layer4_app lca/application
-grep -rl "lca\.layer4_app" lca/ gateway/ tests/ | xargs sed -i 's/lca\.layer4_app/lca.application/g'
+git mv lca/application lca/application
+grep -rl "lca\.application" lca/ gateway/ tests/ | xargs sed -i 's/lca\.application/lca.application/g'
 ```
 
 - [ ] **Step 3: 更新 import-linter contracts layers**
@@ -470,7 +470,7 @@ uv run ruff check --fix . && uv run ruff format . && uv run lint-imports && uv r
 - [ ] **Step 6: 验证本映射无残留**
 
 ```bash
-grep -rn "lca\.layer4_app" lca/ gateway/ tests/ profiles/ deploy/ docs/
+grep -rn "lca\.application" lca/ gateway/ tests/ profiles/ deploy/ docs/
 # Expected: 空
 ```
 
@@ -531,7 +531,7 @@ uv run python scripts/check_package_contracts.py
 - [ ] **Step 1: 扫文档中的旧名引用**
 
 ```bash
-grep -rn "layer0_infra\|layer1_cognitive\|layer2_runtime\|layer3_agent\|layer4_app" docs/
+grep -rn "infrastructure\|cognition\|runtime\|agent\|application" docs/
 ```
 
 - [ ] **Step 2: 逐文件替换为新名**
@@ -539,7 +539,7 @@ grep -rn "layer0_infra\|layer1_cognitive\|layer2_runtime\|layer3_agent\|layer4_a
 - [ ] **Step 3: 验证文档无残留**
 
 ```bash
-grep -rn "layer0_infra\|layer1_cognitive\|layer2_runtime\|layer3_agent\|layer4_app" docs/
+grep -rn "infrastructure\|cognition\|runtime\|agent\|application" docs/
 # Expected: 空
 ```
 
@@ -560,7 +560,7 @@ git commit -m "docs: replace layer0/1/2/3/4 with semantic names per ADR-0104"
 - [ ] **Step 1: 扫 profiles 中的旧名**
 
 ```bash
-grep -rn "layer0_infra\|layer1_cognitive\|layer2_runtime\|layer3_agent\|layer4_app" profiles/
+grep -rn "infrastructure\|cognition\|runtime\|agent\|application" profiles/
 ```
 
 - [ ] **Step 2: 替换为新名**
@@ -568,7 +568,7 @@ grep -rn "layer0_infra\|layer1_cognitive\|layer2_runtime\|layer3_agent\|layer4_a
 - [ ] **Step 3: 验证 profiles 无残留**
 
 ```bash
-grep -rn "layer0_infra\|layer1_cognitive\|layer2_runtime\|layer3_agent\|layer4_app" profiles/
+grep -rn "infrastructure\|cognition\|runtime\|agent\|application" profiles/
 # Expected: 空
 ```
 
@@ -590,7 +590,7 @@ git commit -m "refactor(profiles): update to semantic layer names per ADR-0104"
 - [ ] **Step 1: 扫 LobeHub 相关文件**
 
 ```bash
-grep -rn "layer0_infra\|layer1_cognitive\|layer2_runtime\|layer3_agent\|layer4_app" deploy/
+grep -rn "infrastructure\|cognition\|runtime\|agent\|application" deploy/
 ```
 
 - [ ] **Step 2: 替换为新名**
@@ -598,7 +598,7 @@ grep -rn "layer0_infra\|layer1_cognitive\|layer2_runtime\|layer3_agent\|layer4_a
 - [ ] **Step 3: 验证无残留**
 
 ```bash
-grep -rn "layer0_infra\|layer1_cognitive\|layer2_runtime\|layer3_agent\|layer4_app" deploy/
+grep -rn "infrastructure\|cognition\|runtime\|agent\|application" deploy/
 # Expected: 空
 ```
 

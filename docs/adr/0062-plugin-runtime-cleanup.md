@@ -19,7 +19,7 @@ ADR-0061 已确立：Manifest `requires`/`provides` 是当前唯一强制的依�
 | **Manifest 双字段** | 59 个装饰插件中 53 个仍用 legacy `name` / `inject` / `side_effects` / `policy_class`；只有 6 个用 canonical `id` / `kind` / `effects`（静态 AST 审计）。`lca/plugins/_cordis_adapter.py` 是迁移期 shim，仅承担字段重命名。 |
 | **Capability 双解析路径** | `lca/contracts/mechanisms/capability.py:91` 的 `require_capability` 在 plain key 失败后回退到 `seam:<key>` / `SeamRegistry` 路径；`lca/plugins/seam_definitions/` 13 个 alias bundle plugin 在 boot 时写 13 个 `SeamRegistry` 到 ctx。 |
 | **Boot 双实现** | `lca/harness/profile/boot.py` 有 `started: list[...]`、`_call_setup()`、`_dispose_started()` 三件套；vendored cordis 已有 `ctx.registry.plugin()` + `Fiber.await_()`，但 LCA 没走它。失败时手工 dispose 路径吞掉清理异常（`lca/harness/profile/boot.py:220-240`）。 |
-| **L4 双路径** | `lca/layer4_app/spawn.py` 同时有 plugin tree path 与 `register_builtin_sensors()` / `build_default_registries()` / `_is_plugin_tree()` / `_resolve_named_factory(scope, key, ConcreteClass)` / `register_defaults()` 等 fallback。`lca/layer4_app/defaults.py` 把协作策略工厂（lead / pipeline / debate 等）以静态 `Registries` 形式固定在 L4。 |
+| **L4 双路径** | `lca/application/spawn.py` 同时有 plugin tree path 与 `register_builtin_sensors()` / `build_default_registries()` / `_is_plugin_tree()` / `_resolve_named_factory(scope, key, ConcreteClass)` / `register_defaults()` 等 fallback。`lca/application/defaults.py` 把协作策略工厂（lead / pipeline / debate 等）以静态 `Registries` 形式固定在 L4。 |
 | **运行时反向 import** | `lca/plugins/loop_cognitive.py:93` `from gateway.runs.loop_drivers import CognitiveRunDriver` —— LCA 插件反向依赖 Gateway。同一文件 `provides=["agent_loop", "run_loop_driver_registry[cognitive]"]` 担任两个职责（PRD-5 关注点）。 |
 
 每多一个并行事实源就多一条"读哪边才对"的歧义。`vulture` 80% 阈值扫到 `spawn.py` 内多个 dead branch；`import-linter` 没卡住 L1→gateway 是因为 L1 的 `loop_cognitive` 是从 `lca.plugins.loop_cognitive` 命名的，不在 lint 范围内。
@@ -117,7 +117,7 @@ Provider 用 `registry.register(BODIES, "simple", factory)` 注册；`spawn_*` �
 
 ### 5. `spawn_*` 只接受 booted scope
 
-`lca/layer4_app/spawn.py` 收敛为：
+`lca/application/spawn.py` 收敛为：
 
 ```python
 async def spawn_agent(spec: AgentSpec, *, scope: Context) -> CognitiveAgent:
@@ -144,13 +144,13 @@ async def spawn_agent(spec: AgentSpec, *, scope: Context) -> CognitiveAgent:
 - `lca/plugins/drivers/cognitive.py` —— 注册 `DRIVERS["cognitive"] = CognitiveRunDriver`
 - `lca/plugins/registry/run_loop_driver_registry.py` —— 提供 `RUN_DRIVERS` capability 与 registry
 
-`CognitiveRunDriver` 实现位于 `lca/layer2_runtime/drivers/cognitive_run_driver.py`（不引 gateway）。Gateway 仅消费 `RUN_DRIVERS["cognitive"]`，不反向被 LCA 插件 import。
+`CognitiveRunDriver` 实现位于 `lca/runtime/drivers/cognitive_run_driver.py`（不引 gateway）。Gateway 仅消费 `RUN_DRIVERS["cognitive"]`，不反向被 LCA 插件 import。
 
 删除 `provides=["agent_loop", "run_loop_driver_registry[cognitive]"]` 双职责。
 
 ### 7. L4 协作策略工厂迁为 plugin
 
-`lca/layer4_app/defaults.py` 整体删除。`_lead_strategy` / `_pipeline_strategy` / `_fan_out_strategy` / `_peer_relay_strategy` / `_peer_swarm_strategy` / `_debate_strategy` / `_graph_strategy` / `_register_defaults` 改为：
+`lca/application/defaults.py` 整体删除。`_lead_strategy` / `_pipeline_strategy` / `_fan_out_strategy` / `_peer_relay_strategy` / `_peer_swarm_strategy` / `_debate_strategy` / `_graph_strategy` / `_register_defaults` 改为：
 
 - `lca/plugins/strategies/lead.py` —— `register(STRATEGIES, STRATEGY_KEY_LEAD, _lead_strategy)`
 - `lca/plugins/strategies/pipeline.py`
@@ -174,8 +174,8 @@ async def spawn_agent(spec: AgentSpec, *, scope: Context) -> CognitiveAgent:
 | `lca/plugins/seam_definitions/` | `BODIES`/`BRAINS`/... capability registry seam | `bundles/base.yaml` 入口移除 |
 | `lca/contracts/mechanisms/seam_registry.py` | capability `register` / `create` | 无 import |
 | `lca/contracts/mechanisms/capability.py` 的 `Path 2` | 单一路径 | 无运行时分支 |
-| `lca/layer4_app/defaults.py` | strategy plugin + component registry plugin | 测试 fixture 改用 minimal profile |
-| `lca/layer4_app/spawn.py` 的 `_is_plugin_tree` / `_resolve_named_factory` / `build_default_registries()` 调用 | 仅 booted scope | spawn 重写完 |
+| `lca/application/defaults.py` | strategy plugin + component registry plugin | 测试 fixture 改用 minimal profile |
+| `lca/application/spawn.py` 的 `_is_plugin_tree` / `_resolve_named_factory` / `build_default_registries()` 调用 | 仅 booted scope | spawn 重写完 |
 | `lca/plugins/loop_cognitive.py` 的 Gateway import + 双职责 | `lca/plugins/drivers/cognitive.py` | driver plugin 路径绿 |
 | `lca/harness/profile/boot.py` 的 `_call_setup` / `started` / `_dispose_started` | cordis Fiber | boot 重写完 |
 | `plugin_api.py` 的 legacy kwarg (`name` / `inject` / `side_effects` / `policy_class`) | 一次性删除 | 全部 53 个插件迁移完成 |
@@ -193,7 +193,7 @@ async def spawn_agent(spec: AgentSpec, *, scope: Context) -> CognitiveAgent:
 | **PR-2** Boot 走 Cordis Fiber | `resolve.py` 拆分纯编译器；`boot.py` 重写走 `ctx.registry.plugin()`；删 `_call_setup` / `_dispose_started` | 缺能力、循环、Config 错误均在 Resolve 失败；setup 失败逆序 dispose；`ExceptionGroup` 聚合 |
 | **PR-3** Seams & registries 收敛 | 引入 `BODIES` / `BRAINS` / `DRIVERS` / `STOP_RULES` / `HOOKS` / `STRATEGIES` registry seam；删 `seam_definitions` / `SeamRegistry` / `Path 2` 解析 | "每个 capability 恰一个 owner"；重复 registry entry 失败；Sensor/Gate 排序稳定 |
 | **PR-4** L4 严格闭合 | `spawn.py` 收紧到只消费 booted capability；`defaults.py` 整体删除；strategy 工厂迁 plugin；测试改用 fixture 或 minimal profile | `spawn.py` AST 不引 concrete service；integration test 走 minimal profile |
-| **PR-5** Driver 边界 | `loop_cognitive.py` 拆为 `drivers/cognitive.py`；`CognitiveRunDriver` 移至 `lca/layer2_runtime/`；Gateway 仅消费 `RUN_DRIVERS` capability | `lca/plugins` 不 import `gateway`；`/runs` 在 driver 启用时工作 |
+| **PR-5** Driver 边界 | `loop_cognitive.py` 拆为 `drivers/cognitive.py`；`CognitiveRunDriver` 移至 `lca/runtime/`；Gateway 仅消费 `RUN_DRIVERS` capability | `lca/plugins` 不 import `gateway`；`/runs` 在 driver 启用时工作 |
 
 ## 关键验收矩阵
 

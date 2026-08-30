@@ -44,23 +44,23 @@ sys.path.insert(0, str(_REPO))
 _OWNER_TABLE: dict[str, list[tuple[str, str, str]]] = {
     "state_writers": [
         # (path-prefix, owner-PR, rationale)
-        ("lca/layer1_cognitive/body/", "PR-7", "CommandEnvelope 收口 + Body.execute 5 闸"),
-        ("lca/layer1_cognitive/memory/", "PR-3", "MemoryPolicy / CapabilityPlan 中读写"),
-        ("lca/layer1_cognitive/brain/", "PR-4", "ModularBrain / Reasoner 写入"),
-        ("lca/layer1_cognitive/skill_router/", "PR-4", "SkillRouter 决策写"),
-        ("lca/layer1_cognitive/sensors/", "PR-3", "PerceiveHub / Sensor 收敛"),
-        ("lca/layer2_runtime/", "PR-4", "runtime_loop；停止决策由 State 群 StopPolicy 提供"),
-        ("lca/layer3_agent/", "PR-4", "Team / DecisionGate"),
+        ("lca/cognition/body/", "PR-7", "CommandEnvelope 收口 + Body.execute 5 闸"),
+        ("lca/cognition/memory/", "PR-3", "MemoryPolicy / CapabilityPlan 中读写"),
+        ("lca/cognition/brain/", "PR-4", "ModularBrain / Reasoner 写入"),
+        ("lca/cognition/skill_router/", "PR-4", "SkillRouter 决策写"),
+        ("lca/cognition/sensors/", "PR-3", "PerceiveHub / Sensor 收敛"),
+        ("lca/runtime/", "PR-4", "runtime_loop；停止决策由 State 群 StopPolicy 提供"),
+        ("lca/agent/", "PR-4", "Team / DecisionGate"),
     ],
     "direct_commands": [
-        ("lca/layer1_cognitive/body/", "PR-7", "Body.execute 必经 envelope"),
+        ("lca/cognition/body/", "PR-7", "Body.execute 必经 envelope"),
         ("lca/plugins/body/", "PR-7", "plugin Body 必须经 SafeExecutor"),
     ],
     "hook_attach": [
-        ("lca/layer1_cognitive/", "PR-7", "EventBus / HookMiddleware 收口"),
-        ("lca/layer2_runtime/", "PR-7", "runtime_loop 走 envelope"),
-        ("lca/layer3_agent/", "PR-7", "Agent / Team 走 envelope"),
-        ("lca/layer4_app/", "PR-7", "spawn -> bind_plan 收口"),
+        ("lca/cognition/", "PR-7", "EventBus / HookMiddleware 收口"),
+        ("lca/runtime/", "PR-7", "runtime_loop 走 envelope"),
+        ("lca/agent/", "PR-7", "Agent / Team 走 envelope"),
+        ("lca/application/", "PR-7", "spawn -> bind_plan 收口"),
     ],
     "control_surface": [
         ("lca/plugins/", "PR-2", "PluginSpec.contributes 声明式控制面"),
@@ -112,13 +112,13 @@ def collect_violations() -> list[Violation]:
     )
 
     body_roots = [
-        _REPO / "lca" / "layer1_cognitive" / "body",
+        _REPO / "lca" / "cognition" / "body",
         _REPO / "lca" / "plugins" / "body",
     ]
     layer_roots = [
-        _REPO / "lca" / "layer1_cognitive",
-        _REPO / "lca" / "layer2_runtime",
-        _REPO / "lca" / "layer3_agent",
+        _REPO / "lca" / "cognition",
+        _REPO / "lca" / "runtime",
+        _REPO / "lca" / "agent",
     ]
     profile_roots = [_REPO / "lca" / "plugins", _REPO / "bundles", _REPO / "profiles"]
 
@@ -185,7 +185,7 @@ def collect_violations() -> list[Violation]:
         )
 
     # V5 hook-attach
-    findings = audit_hook_attach.scan_hook_attach([*layer_roots, _REPO / "lca" / "layer4_app"])
+    findings = audit_hook_attach.scan_hook_attach([*layer_roots, _REPO / "lca" / "application"])
     for f in findings:
         rel = str(Path(f.path).relative_to(_REPO)) if Path(f.path).is_absolute() else f.path
         owner_pr, rationale = _resolve_owner("hook_attach", rel)

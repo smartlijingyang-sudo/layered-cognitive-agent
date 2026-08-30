@@ -79,10 +79,10 @@ flowchart LR
 |---|---|---|---|---|
 | `ImprovementEpisode`、`ImprovementCandidate`、`PromotionDecision` | `lca/contracts/models/rsi/` | typed contracts，带 `trace_id`、`plan_ref`、证据、预算、版本血缘 | `AgentState`、Journal、evidence contracts | 不把原始对话或用户事实混入全局策略。 |
 | `EpisodeHarvester` | `lca/harness/observability/` 或独立 `lca/harness/learning/` | terminal run / receipts → 去敏 episode | facts、Journal、trace/evidence reader | 不在任务运行中回写 candidate。 |
-| `FailureAttributor` 与 `CandidateSynthesizer` | `lca/layer1_cognitive/learning/` | 多 episode → 失败分类、策略卡、技能草案 | `Reflection`、MemoryPolicy、SkillPackageInstaller | 不根据一次成功/失败提升全局规则。 |
+| `FailureAttributor` 与 `CandidateSynthesizer` | `lca/cognition/learning/` | 多 episode → 失败分类、策略卡、技能草案 | `Reflection`、MemoryPolicy、SkillPackageInstaller | 不根据一次成功/失败提升全局规则。 |
 | `EvaluationRunner`、`RegressionSuite` | `lca/harness/evaluation/` | baseline vs candidate → 多指标报告 | `EvalCase`、`EvalComparison`、sandbox、evidence store | 不使用候选生成轨迹作为唯一测试集。 |
-| `CapabilityRegistry`、`PromotionGate` | `lca/layer0_infra/learning/` + seam/provider | candidate version → canary/approved/revoked | compiled plan、Profile resolve、effect/idempotency | 不允许候选自行升级 grant、budget、approval policy。 |
-| `LearningControlPlane`（后期） | 与 `layer2_runtime` **正交**的 host service | 批处理/事件 → 离线 learning work item | future Trigger/Queue/Lease | 不伪装成新的 Brain、Skill 或运行阶段。 |
+| `CapabilityRegistry`、`PromotionGate` | `lca/infrastructure/learning/` + seam/provider | candidate version → canary/approved/revoked | compiled plan、Profile resolve、effect/idempotency | 不允许候选自行升级 grant、budget、approval policy。 |
+| `LearningControlPlane`（后期） | 与 `runtime` **正交**的 host service | 批处理/事件 → 离线 learning work item | future Trigger/Queue/Lease | 不伪装成新的 Brain、Skill 或运行阶段。 |
 
 ## 分阶段实施路线
 
@@ -154,23 +154,23 @@ Self-distill/finetune 是最晚期能力。只有在 episode 质量、数据治�
 
 ## 参考
 
-[1] [CognitiveRuntime（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/layer2_runtime/runtime_loop.py)
+[1] [CognitiveRuntime（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/runtime/runtime_loop.py)
 
-[2] [DeclarativeRuntimeBindings（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/layer2_runtime/runtime_bindings.py)
+[2] [DeclarativeRuntimeBindings（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/runtime/runtime_bindings.py)
 
 [3] [AgentState（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/contracts/models/core/state.py)
 
 [4] [Decision / Observation / Reflection（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/contracts/models/core/decision.py)
 
-[5] [SimpleCritic（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/layer1_cognitive/brain/critic.py)
+[5] [SimpleCritic（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/cognition/brain/critic.py)
 
-[6] [SimpleMemorySystem（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/layer1_cognitive/memory/simple_memory.py)
+[6] [SimpleMemorySystem（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/cognition/memory/simple_memory.py)
 
 [7] [基础运行 bundle（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/bundles/base.yaml)
 
 [8] [Skills provider（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/plugins/providers/skills.py)
 
-[9] [Skill store factory（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/layer0_infra/skills/factory.py)
+[9] [Skill store factory（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/infrastructure/skills/factory.py)
 
 [10] [Self-improving scenario bundle（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/bundles/scenario-self-improving.yaml)
 

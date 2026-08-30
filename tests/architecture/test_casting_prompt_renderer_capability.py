@@ -88,5 +88,5 @@ def test_default_team_caster_declares_renderer_dependency() -> None:
 def test_caster_has_no_direct_builtin_prompt_dependency() -> None:
     """Only the renderer plugin may select the built-in casting prompt resource."""
 
-    source = (REPO / "lca/layer4_app/casting.py").read_text(encoding="utf-8")
+    source = (REPO / "lca/application/casting.py").read_text(encoding="utf-8")
     assert "load_builtin_prompt" not in source

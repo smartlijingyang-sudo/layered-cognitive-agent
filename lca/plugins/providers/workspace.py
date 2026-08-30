@@ -1,6 +1,6 @@
 """Workspace Provider plugin — Tier-2 (placeholder).
 
-Full WorkspaceService does not yet exist in lca/layer0_infra/workspace/.
+Full WorkspaceService does not yet exist in lca/infrastructure/workspace/.
 This Tier-2 stub is a safe default that registers a no-op workspace.
 """
 

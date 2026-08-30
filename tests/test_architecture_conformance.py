@@ -17,7 +17,7 @@ Frozen invariants (per spec §4–§5, §23) that MUST hold at every PR boundary
    facts read them from a ``ContextManifest`` artifact item, never via a live
    workspace read.
 
-5. **L1 ↛ HARNESS**: No file under ``lca/layer1_cognitive/`` imports
+5. **L1 ↛ HARNESS**: No file under ``lca/cognition/`` imports
    ``lca.harness``.
 
 Re-run this file at every PR boundary. Any single failing assertion is a
@@ -36,10 +36,10 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 LCA = ROOT / "lca"
 HARNESS = LCA / "harness"
-L1 = LCA / "layer1_cognitive"
-L2 = LCA / "layer2_runtime"
-L3 = LCA / "layer3_agent"
-L4 = LCA / "layer4_app"
+L1 = LCA / "cognition"
+L2 = LCA / "runtime"
+L3 = LCA / "agent"
+L4 = LCA / "application"
 PLUGINS = LCA / "plugins"
 GATEWAY = ROOT / "gateway"
 
@@ -184,7 +184,7 @@ class TestControlSurfacePurity:
 
 
 class TestLayerBoundary:
-    """No file under ``lca/layer1_cognitive/`` may import ``lca.harness``."""
+    """No file under ``lca/cognition/`` may import ``lca.harness``."""
 
     def test_l1_does_not_import_harness(self) -> None:
         offenders: list[str] = []
@@ -195,7 +195,7 @@ class TestLayerBoundary:
             for match in re.finditer(r"^import\s+lca\.harness\b", src, re.MULTILINE):
                 offenders.append(f"{path}: {match.group(0)}")
         assert not offenders, (
-            "lca/layer1_cognitive must not import lca.harness "
+            "lca/cognition must not import lca.harness "
             f"(cognitive-primitive v3 §5.1 / PR8 forbidden): {offenders}"
         )
 

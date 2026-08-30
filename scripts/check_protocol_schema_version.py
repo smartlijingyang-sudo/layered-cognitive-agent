@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CI gate: 拦截 envelope 字段名漂移(ADR-0096 §I2 + §6 实施序列 PR-0 gate)。
 
-扫描 ``lca/layer0_infra/observability/`` 下所有 ``.py`` 文件,拦截:
+扫描 ``lca/infrastructure/observability/`` 下所有 ``.py`` 文件,拦截:
 
 - ``.data = ...`` 属性写入
 - ``dataclasses.replace(..., data=...)``(含 ``from dataclasses import replace``)
@@ -17,13 +17,13 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-ROOT = REPO / "lca" / "layer0_infra" / "observability"
+ROOT = REPO / "lca" / "infrastructure" / "observability"
 
 # journal_io.py still writes JournalRecord.data via dataclasses.replace after
 # Task 3's EnvelopeV2 overlay (disk jsonl still uses ADR-0065 `data`).
 # TODO(adr-0096): remove once write-path payload rename (data → payload) lands.
 ALLOWLIST = {
-    "lca/layer0_infra/observability/journal/journal_io.py",  # MVA-1 Task 3 overlay
+    "lca/infrastructure/observability/journal/journal_io.py",  # MVA-1 Task 3 overlay
 }
 
 

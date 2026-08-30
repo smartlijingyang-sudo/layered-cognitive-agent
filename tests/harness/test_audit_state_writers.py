@@ -17,7 +17,7 @@ from lca.harness.diagnostics.audit_state_writers import (
 @pytest.fixture
 def layer_dir(tmp_path: Path) -> Path:
     """Create a fake layer directory for testing."""
-    layer = tmp_path / "lca" / "layer1_cognitive"
+    layer = tmp_path / "lca" / "cognition"
     layer.mkdir(parents=True)
     return layer
 
@@ -134,7 +134,7 @@ def read_only(state: AgentState):
         assert scan_state_writers([layer_dir]) == []
 
     def test_allowlisted_reducer_file_clean(self, tmp_path: Path) -> None:
-        reducer_dir = tmp_path / "lca" / "layer2_runtime"
+        reducer_dir = tmp_path / "lca" / "runtime"
         reducer_dir.mkdir(parents=True)
         reducer_file = reducer_dir / "reducer.py"
         reducer_file.write_text(
@@ -181,7 +181,7 @@ class TestFormatReport:
     def test_format_report_text_mode(self) -> None:
         findings = [
             Finding(
-                path="lca/layer1_cognitive/mod.py",
+                path="lca/cognition/mod.py",
                 line=10,
                 col=4,
                 kind="direct_attr_assign",
@@ -190,21 +190,21 @@ class TestFormatReport:
         ]
         report = format_report(findings, json_mode=False)
         assert "Found 1 state mutation(s)" in report
-        assert "lca/layer1_cognitive/mod.py:10:4" in report
+        assert "lca/cognition/mod.py:10:4" in report
         assert "direct_attr_assign" in report
         assert report.endswith("\n")
 
     def test_format_report_json(self) -> None:
         findings = [
             Finding(
-                path="lca/layer1_cognitive/mod.py",
+                path="lca/cognition/mod.py",
                 line=10,
                 col=4,
                 kind="direct_attr_assign",
                 message="state.x = ... at line 10",
             ),
             Finding(
-                path="lca/layer2_runtime/other.py",
+                path="lca/runtime/other.py",
                 line=20,
                 col=8,
                 kind="subscript_assign",
@@ -219,7 +219,7 @@ class TestFormatReport:
         expected_keys = {"path", "line", "col", "kind", "message"}
         for entry in data:
             assert set(entry.keys()) == expected_keys
-        assert data[0]["path"] == "lca/layer1_cognitive/mod.py"
+        assert data[0]["path"] == "lca/cognition/mod.py"
         assert data[0]["line"] == 10
         assert data[0]["kind"] == "direct_attr_assign"
         assert data[1]["kind"] == "subscript_assign"

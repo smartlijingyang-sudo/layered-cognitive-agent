@@ -14,7 +14,7 @@ Accepted
   reasoner.py / 认知回路（零生产调用方，另立 ADR）」。本 ADR 就是那篇
   续篇。
 
-- `lca/layer1_cognitive/brain/reasoner.py::_complete_candidates` 当前对每个
+- `lca/cognition/brain/reasoner.py::_complete_candidates` 当前对每个
   候选调用 `await llm.complete(prompt, tools=tools)`；`PromptReasoner
   .generate_thoughts(state, n=1)` 是 think() 阶段（`CognitiveRuntime
   .think`）唯一调用点，且生产代码从未以 n>1 调用——think() 直接

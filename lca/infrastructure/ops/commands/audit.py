@@ -42,9 +42,9 @@ def register(app: typer.Typer) -> None:
         )
 
         roots = audit_roots(
-            "lca/layer1_cognitive",
-            "lca/layer2_runtime",
-            "lca/layer3_agent",
+            "lca/cognition",
+            "lca/runtime",
+            "lca/agent",
         )
         findings = scan_state_writers(roots)
         report = format_report(findings, json_mode=json_mode)
@@ -61,7 +61,7 @@ def register(app: typer.Typer) -> None:
             scan_direct_commands,
         )
 
-        roots = audit_roots("lca/layer1_cognitive/body", "lca/plugins/body")
+        roots = audit_roots("lca/cognition/body", "lca/plugins/body")
         findings = scan_direct_commands(roots)
         report = format_report(findings, json_mode=json_mode)
         sys.stdout.write(report)
@@ -78,10 +78,10 @@ def register(app: typer.Typer) -> None:
         )
 
         roots = audit_roots(
-            "lca/layer1_cognitive",
-            "lca/layer2_runtime",
-            "lca/layer3_agent",
-            "lca/layer4_app",
+            "lca/cognition",
+            "lca/runtime",
+            "lca/agent",
+            "lca/application",
         )
         findings = scan_hook_attach(roots)
         report = format_report(findings, json_mode=json_mode)

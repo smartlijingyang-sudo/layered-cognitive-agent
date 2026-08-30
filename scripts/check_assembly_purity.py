@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pre-commit hook: 装配期只读不算（契约 2）—— spawn.py 不允许 if/else 字符串比较分支。
 
-检测 layer4_app/spawn.py 中是否出现字符串比较分支（如 `if x == "supervisor"`），
+检测 application/spawn.py 中是否出现字符串比较分支（如 `if x == "supervisor"`），
 这类分支违反"装配期只读不算"原则：spawn 只应取值 -> 传参 -> 组装，
 业务判断逻辑应放在策略层或运行时。
 """
@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
-_ASSEMBLY = _ROOT / "lca" / "layer4_app" / "spawn.py"
+_ASSEMBLY = _ROOT / "lca" / "application" / "spawn.py"
 
 
 def _check_file(filepath):

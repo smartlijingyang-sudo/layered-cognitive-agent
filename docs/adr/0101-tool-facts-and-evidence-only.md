@@ -85,7 +85,7 @@ listFiles 传了 `{"directoryPath": "/home/lichao/layered-cognitive-agent"}`。*
 
 ### 4.1 journal_io：view-only 概念整个消失
 
-**文件**：`lca/layer0_infra/observability/journal/journal_io.py`
+**文件**：`lca/infrastructure/observability/journal/journal_io.py`
 
 - ❌ 删 `_is_view_only_field()`
 - ❌ 删 `_strip_view_only_data()`
@@ -96,7 +96,7 @@ listFiles 传了 `{"directoryPath": "/home/lichao/layered-cognitive-agent"}`。*
 
 ### 4.2 sse_frames：SSE 不再脱敏
 
-**文件**：`lca/layer0_infra/observability/journal/sse_frames.py`
+**文件**：`lca/infrastructure/observability/journal/sse_frames.py`
 
 - ❌ 删 `_LIVE_REDACT_KEYS` 常量
 - ❌ 删 `stamped_to_sse_frame` 的 `redact` 参数及对应分支
@@ -151,7 +151,7 @@ class ToolInvoked(JournalEvent):
 
 ### 4.4 tool_journal_emit：单一职责
 
-**文件**：`lca/layer1_cognitive/body/tool_journal_emit.py`
+**文件**：`lca/cognition/body/tool_journal_emit.py`
 
 - ❌ 删 `_typed_started_state()`（6-key 白名单提取函数）
 - ❌ 删 `prepare_state_evidence` 内的 `should_inline` 分支（统一走 evidence 路径，见 §5.3）
@@ -168,8 +168,8 @@ class ToolInvoked(JournalEvent):
 
 ### 4.5 整文件删除
 
-- ❌ 删 `lca/layer1_cognitive/body/tool_ui_state.py`（整文件）
-- ❌ 删 `lca/layer1_cognitive/body/tool_ui_builders.py`（整文件）
+- ❌ 删 `lca/cognition/body/tool_ui_state.py`（整文件）
+- ❌ 删 `lca/cognition/body/tool_ui_builders.py`（整文件）
 
 包含的所有机制（每个都是把渲染职责塞进 body 层）：
 
@@ -185,7 +185,7 @@ class ToolInvoked(JournalEvent):
 
 ### 4.6 fact_stream_projector：CLI 调试视图不再读 preview
 
-**文件**：`lca/layer0_infra/observability/journal/fact_stream_projector.py`
+**文件**：`lca/infrastructure/observability/journal/fact_stream_projector.py`
 
 - ❌ 删 `_render_tool_started` / `_render_tool_invoked` / `_render_tool_streaming` 中所有 `event.arguments_preview` / `event.result_preview` / `event.plugin_state` 读取
 - ✅ 渲染逻辑只看 `tool_name + invocation_id + ok/error/latency_ms`
@@ -347,7 +347,7 @@ Renderer Registry（前端 deploy/lobehub/patches/runtime/renderers/index.ts）
 - **V2**：ToolStarted.data 中 `arguments` 与 `arguments_ref` 二选一（非空互斥）
   - 命令：`uv run pytest tests/test_tool_event_facts.py::test_arguments_xor_ref -q`
 - **V3**：journal_io 不再有 `_strip_view_only_data` 调用
-  - 命令：`uv run grep -r "_strip_view_only_data\|_is_view_only_field" lca/layer0_infra/observability/journal/` → 空
+  - 命令：`uv run grep -r "_strip_view_only_data\|_is_view_only_field" lca/infrastructure/observability/journal/` → 空
 - **V4**：所有 tool 事件落盘后 `arguments` 或 `arguments_ref` 至少一个非空
   - 命令：`uv run pytest tests/test_tool_event_facts.py::test_arguments_always_set -q`
 
@@ -356,14 +356,14 @@ Renderer Registry（前端 deploy/lobehub/patches/runtime/renderers/index.ts）
 - **V5**：`_LIVE_REDACT_KEYS` 不存在
   - 命令：`uv run grep -r "_LIVE_REDACT_KEYS" lca/` → 空
 - **V6**：`stamped_to_sse_frame` 不再有 `redact` 参数
-  - 命令：`uv run grep -n "def stamped_to_sse_frame" lca/layer0_infra/observability/journal/sse_frames.py` → 单一签名
+  - 命令：`uv run grep -n "def stamped_to_sse_frame" lca/infrastructure/observability/journal/sse_frames.py` → 单一签名
 - **V7**：SSE 帧中的 tool 事件 `data` 包含 `arguments_ref` 或 `arguments`
   - 命令：`uv run pytest tests/test_sse_redact_retired.py::test_tool_event_includes_arguments -q`
 
 ### V-Codebase
 
 - **V8**：`tool_ui_state.py` 与 `tool_ui_builders.py` 文件不存在
-  - 命令：`test ! -f lca/layer1_cognitive/body/tool_ui_state.py && test ! -f lca/layer1_cognitive/body/tool_ui_builders.py`
+  - 命令：`test ! -f lca/cognition/body/tool_ui_state.py && test ! -f lca/cognition/body/tool_ui_builders.py`
 - **V9**：vulture 报告 tool 相关 dead code 为 0
   - 命令：`uv run vulture lca --min-confidence 80`
 - **V10**：`lcaJournal.ts` 改动 ≤ 1 处（仅 `state_ref` 字段名兼容兼容期可保留为 `arguments_ref` 别名）

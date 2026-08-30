@@ -43,7 +43,7 @@ Accepted
 7. **`web/src/components/shared/MarkdownContent.tsx` 不是一个可以整体替换
    的叶子组件**：渲染前必经两道领域相关的预处理——`sanitizeAssistant
    DisplayText`（从 Decision JSON 里剥离用户可见正文，对齐 `lca
-   /layer1_cognitive/brain/decision_parser.py`，与 ADR-0041 的
+   /cognition/brain/decision_parser.py`，与 ADR-0041 的
    answer-delta 归属判定同源）与 `normalizeChatMarkdown`（streaming/final
    两态的 LLM 输出清洗）。任何「迁移 Markdown 渲染」的方案，如果意味着
    删除这个文件整体换成外部库组件，就会连带丢掉这两步与后端契约对齐的
@@ -68,9 +68,9 @@ Accepted
 10. **文件上传/生成文件在后端完全不存在，不只是前端缺失**：
     `gateway/app.py` 现有路由为 `/runs`、`/runs/{id}/cancel`、
     `/runs/{id}/events`、`/health`、`/conversations*`，没有任何文件相关
-    端点；`lca/layer0_infra/tools/` 只有 `calculator_tool.py`/
+    端点；`lca/infrastructure/tools/` 只有 `calculator_tool.py`/
     `weather_tool.py`，没有文件生成类工具。唯一已经存在、结构上贴近
-    「文件产物」的现成通道是 `lca/layer0_infra/transport/a2a_transport
+    「文件产物」的现成通道是 `lca/infrastructure/transport/a2a_transport
     .py`——它已经在解析 A2A 协议的 `artifacts[].parts[]`，但当前实现只取
     `part.kind == "text"`，file/data 类型的 part 会被直接丢弃。
 

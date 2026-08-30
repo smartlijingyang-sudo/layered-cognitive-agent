@@ -9,7 +9,7 @@
 
 ## 0. 背景
 
-LCA 现有架构基础较强：五层单向分层（`contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_agent` + `layer4_app` 组合根）、`import-linter` 5 条 contracts、73 个 ADR、`docs/specs/naming-conventions.md` 命名规范、约 30 个 `check_*.py` 守门脚本、`docs/specs/documentation-map.md` 文档地图、AGENTS.md coding agent 指南。
+LCA 现有架构基础较强：五层单向分层（`contracts → infrastructure → cognition → runtime → agent` + `application` 组合根）、`import-linter` 5 条 contracts、73 个 ADR、`docs/specs/naming-conventions.md` 命名规范、约 30 个 `check_*.py` 守门脚本、`docs/specs/documentation-map.md` 文档地图、AGENTS.md coding agent 指南。
 
 但当前状态在三个具体方面没有强约束，导致新贡献者上手成本依然偏高：
 
@@ -440,7 +440,7 @@ filename_whitelist = ["llm_resolver.py"]  # 例：保留历史命名
 ```text
 # 已有违规文件名清单，新代码不可重复
 # 格式：<relative_path>  # <reason + introduced_in>
-lca/layer0_infra/observability/trace_tool.py  # 历史命名，Phase 3 不强制改
+lca/infrastructure/observability/trace_tool.py  # 历史命名，Phase 3 不强制改
 ```
 
 每个季度清理：把稳定的（即 N 季度无 PR 涉及）从 `legacy_blacklist.txt` 移除并实际改名。

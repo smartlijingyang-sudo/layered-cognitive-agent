@@ -31,7 +31,7 @@ DeepSeek Harness 基于 Cordis，核心理念是「**一切皆插件**」：mode
 
 工程上包含：完整 turn/step 生命周期、guarded tool pipeline、append-only session log、多 provider LLM seam、subagent 多后端、compaction、permission preset、skill/workflow/plan、Landlock/E2B 沙箱等。
 
-**Python 接入**：`deepseek-harness-sdk` 经 JSON-RPC stdio 驱动 DSH 子进程；LCA 已在 `lca/layer0_infra/dsh/` 落地 `DshTurnDriver`（notify → `{run_id}.dsh.jsonl` + Journal 投影）。
+**Python 接入**：`deepseek-harness-sdk` 经 JSON-RPC stdio 驱动 DSH 子进程；LCA 已在 `lca/infrastructure/dsh/` 落地 `DshTurnDriver`（notify → `{run_id}.dsh.jsonl` + Journal 投影）。
 
 ---
 
@@ -338,6 +338,6 @@ LCA 已实现：
 
 | 模块 | 路径 |
 |---|---|
-| DSH driver | `lca/layer0_infra/dsh/driver.py` |
+| DSH driver | `lca/infrastructure/dsh/driver.py` |
 | 对比跑道 spec | 已归档 |
 | LobeHub 集成 | `docs/specs/lobehub-integration.md` |

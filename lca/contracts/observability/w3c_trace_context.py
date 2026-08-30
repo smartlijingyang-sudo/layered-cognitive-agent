@@ -16,7 +16,7 @@ W3C `traceparent` (RFC) + `tracestate` 解析与校验契约。**入站上下文
 隐私:`tracestate` 中含 `tenant_id=` / `user_id=` / `email=` / `password=` 等
 明确拒绝;含 `o=`(tenant)走 policy。
 
-实现位置:``lca/layer0_infra/observability/w3c_validator.py:DefaultW3CValidator``。
+实现位置:``lca/infrastructure/observability/w3c_validator.py:DefaultW3CValidator``。
 """
 
 from __future__ import annotations

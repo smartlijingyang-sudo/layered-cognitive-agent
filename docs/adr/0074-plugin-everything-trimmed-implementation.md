@@ -202,7 +202,7 @@ ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `smartlijingyang-sudo`）
 | 项 | 内容 |
 |---|---|
 | 目标 | 已有 gate 链改为向 ControlPlan 的 Control Slot 投稿（PR-3 后 ControlPlan 已编译，可静态表达） |
-| 修改 | `lca/layer1_cognitive/brain/modular_brain.py`（去内嵌 gate 引用，调用 `think.guard` registry）、`lca/layer2_runtime/stop_rule.py`（改为向 `stop.decide` 投稿） |
+| 修改 | `lca/cognition/brain/modular_brain.py`（去内嵌 gate 引用，调用 `think.guard` registry）、`lca/runtime/stop_rule.py`（改为向 `stop.decide` 投稿） |
 | 验证 | e2e agent run 决策 / stop 行为字节级一致 |
 | 删除 | `ModularBrain._gate_chain` 字段；`repeat_tool_call` 特殊路径 |
 
@@ -211,9 +211,9 @@ ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `smartlijingyang-sudo`）
 | 项 | 内容 |
 |---|---|
 | 目标 | `spawn_agent` 不再自己造对象图，只绑定 plan + 上下文 |
-| 修改 | `lca/layer4_app/spawn.py` 拆为 `bind_plan(ctx, plan)` + `_legacy_spawn_objects()`（deprecated）；`RuntimeDeps` 用 `compiled_plan` 替换散落的 factory 字段；L4 不再 import 具体插件 ID |
+| 修改 | `lca/application/spawn.py` 拆为 `bind_plan(ctx, plan)` + `_legacy_spawn_objects()`（deprecated）；`RuntimeDeps` 用 `compiled_plan` 替换散落的 factory 字段；L4 不再 import 具体插件 ID |
 | 前置依赖 | ADR-0071（Composer-per-Cluster）先落地，提供 4 个 sub-composer plugin；BrainFactory 入参改为 keyword-only 或 `BrainInputs` dataclass（避免 sub-composer 接口漂移） |
-| 验证 | `grep "control.authorize\|simple_body\|default_factory" lca/layer4_app/` 为 0 hit；e2e 跑通 1 个标准 agent（golden profile） |
+| 验证 | `grep "control.authorize\|simple_body\|default_factory" lca/application/` 为 0 hit；e2e 跑通 1 个标准 agent（golden profile） |
 | 删除 | `spawn.py` 中所有 `default_factory.*` 字符串引用 |
 
 ### PR-6 plan_ref × Journal 绑定
@@ -231,8 +231,8 @@ ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `smartlijingyang-sudo`）
 | 项 | 内容 |
 |---|---|
 | 目标 | 外部世界 effect 必经 `command.plan → authorize → budget → constrain → execute` 5 道闸 |
-| 新增 | `lca/contracts/protocols/command.py`（CommandEnvelope frozen dataclass）、`lca/contracts/protocols/run_fact.py`（RunFact / RunDelta / Verdict / Decision union）、`lca/layer1_cognitive/body/command_envelope.py`（mint_envelope 工厂） |
-| 修改 | `lca/layer1_cognitive/body/pipeline_safe_executor.py` —— 每次执行先 mint CommandEnvelope；删除 Body 内部临时 envelope mint |
+| 新增 | `lca/contracts/protocols/command.py`（CommandEnvelope frozen dataclass）、`lca/contracts/protocols/run_fact.py`（RunFact / RunDelta / Verdict / Decision union）、`lca/cognition/body/command_envelope.py`（mint_envelope 工厂） |
+| 修改 | `lca/cognition/body/pipeline_safe_executor.py` —— 每次执行先 mint CommandEnvelope；删除 Body 内部临时 envelope mint |
 | 前置依赖 | ADR-0073（Session Path Convergence）提供 SessionService Protocol 统一面 |
 | 验证 | 任何 Body.execute 在 stack trace 看到 `command_envelope.mint`；architecture test 拒绝无 envelope 的 tool call |
 | 删除 | 直接调用 sandbox 的 bypass |
@@ -242,7 +242,7 @@ ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `smartlijingyang-sudo`）
 | 项 | 内容 |
 |---|---|
 | 目标 | 8 状态压成 4 状态：`DRAFT / VERIFIED / ACTIVE / RETIRED` |
-| 新增 | `lca/contracts/atoms/artifact_state.py`（4 项枚举）、`lca/contracts/protocols/artifact.py`（CapabilityArtifact 含 logical_id / revision_digest / state / scope / grants）、`lca/layer4_app/composition/artifact_controller.py`（状态迁移 API） |
+| 新增 | `lca/contracts/atoms/artifact_state.py`（4 项枚举）、`lca/contracts/protocols/artifact.py`（CapabilityArtifact 含 logical_id / revision_digest / state / scope / grants）、`lca/application/composition/artifact_controller.py`（状态迁移 API） |
 | 修改 | `lca/plugins/tools/cordis_control/` —— mount/unmount 改为 ArtifactController 调用 |
 | 验证 | 状态机 property test：合法迁移 / 非法迁移覆盖；lab HMR 与 production promotion 用同一状态机、不同路径 |
 | 删除 | STAGED / QUIESCING / PARSED / DECLARED 状态；旧 8 状态机代码路径 |

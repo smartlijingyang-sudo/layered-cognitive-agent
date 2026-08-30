@@ -1,8 +1,8 @@
 """Audit direct ``AgentState`` mutations outside the reducer.
 
 Constitution v3 §C4 mandates that the reducer is the sole writer of
-``AgentState``. This module scans ``lca/layer1_cognitive/``,
-``lca/layer2_runtime/`` and ``lca/layer3_agent/`` with stdlib ``ast``
+``AgentState``. This module scans ``lca/cognition/``,
+``lca/runtime/`` and ``lca/agent/`` with stdlib ``ast``
 (never importing the scanned modules) and reports every direct write that
 bypasses the reducer.
 
@@ -42,8 +42,8 @@ class Finding:
 
 _REDUCER_FILE_ALLOWLIST: frozenset[str] = frozenset(
     {
-        "lca/layer2_runtime/reducer.py",
-        "lca/layer1_cognitive/brain/modular_brain.py",
+        "lca/runtime/reducer.py",
+        "lca/cognition/brain/modular_brain.py",
     }
 )
 

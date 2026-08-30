@@ -24,7 +24,7 @@ class TestEnvelopeGateOrder:
         from lca.harness.diagnostics.audit_direct_commands import scan_direct_commands
 
         # Scan body/ directory for direct execute calls
-        body_dir = Path("lca/layer1_cognitive/body")
+        body_dir = Path("lca/cognition/body")
         if not body_dir.exists():
             pytest.skip("body/ directory not found")
 

@@ -115,7 +115,7 @@ class TestResourcePlane(unittest.TestCase):
     def test_no_private_30_constant_in_action_handlers(self) -> None:
         from pathlib import Path
 
-        src = Path("lca/layer1_cognitive/body/action_handlers.py").read_text(encoding="utf-8")
+        src = Path("lca/cognition/body/action_handlers.py").read_text(encoding="utf-8")
         self.assertNotIn("_DEFAULT_DELEGATE_TIMEOUT_S", src)
         self.assertNotIn("= 30.0", src)
 

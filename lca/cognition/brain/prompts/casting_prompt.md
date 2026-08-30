@@ -1,5 +1,5 @@
 <!--
-自动组队提示词（ADR-0042），由 lca/layer4_app/casting.py::LLMTeamCaster 渲染。
+自动组队提示词（ADR-0042），由 lca/application/casting.py::LLMTeamCaster 渲染。
 占位符 {role_catalog} / {objective} 用精确替换渲染——模板内含 JSON 花括号，
 禁止改用 str.format / f-string 渲染。
 -->

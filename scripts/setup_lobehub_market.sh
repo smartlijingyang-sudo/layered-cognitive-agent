@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Register this host as a LobeHub Market M2M client so LCA search_skill can auth.
-# Credentials: ~/.lobehub-market/credentials.json (auto-read by lca.layer0_infra.skills.market_auth)
+# Credentials: ~/.lobehub-market/credentials.json (auto-read by lca.infrastructure.skills.market_auth)
 set -euo pipefail
 
 NAME="${LCA_MARKET_CLIENT_NAME:-LCA-Agent}"

@@ -199,9 +199,9 @@ BodyComposer 必须消费 `action_handler_registry`，不能在 helper 内部自
 
 [7][ref-declarative-bundle]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/bundles/declarative-phase-graph.yaml> — phase executor、phase edge 与 control contribution 默认 entries。
 
-[8][ref-declarative-runtime]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/layer2_runtime/declarative_runtime.py> — effect/delta registry 为声明式 driver 的必需依赖。
+[8][ref-declarative-runtime]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/declarative_runtime.py> — effect/delta registry 为声明式 driver 的必需依赖。
 
-[9][ref-runtime-loop]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/layer2_runtime/runtime_loop.py> — `CognitiveRuntime` 直接构造声明式 driver 且未传入两个 registry。
+[9][ref-runtime-loop]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/runtime_loop.py> — `CognitiveRuntime` 直接构造声明式 driver 且未传入两个 registry。
 
 [10][ref-effect-handlers]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/providers/effect_handlers.py> — 默认 effect handlers。
 
@@ -211,7 +211,7 @@ BodyComposer 必须消费 `action_handler_registry`，不能在 helper 内部自
 
 [13][ref-composers]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/composer/plan_composers.py> — BodyComposer、PerceiveComposer、TeamComposer。
 
-[14][ref-action-catalog]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/layer1_cognitive/body/action_catalog.py> — builtin action 表与默认 registry builder。
+[14][ref-action-catalog]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/cognition/body/action_catalog.py> — builtin action 表与默认 registry builder。
 
 [15][ref-control-standard]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/control_contributions/standard.py> — 11 个 control capability 的聚合 provider。
 
@@ -225,4 +225,4 @@ BodyComposer 必须消费 `action_handler_registry`，不能在 helper 内部自
 
 [20][ref-plugin-shape-test]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/tests/test_plugin_alignment.py> — 插件目录声明形状与覆盖率门禁。
 
-[21][ref-loop-topology]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/layer2_runtime/loop_topology.py> — 六阶段闭集拓扑实现。
+[21][ref-loop-topology]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/loop_topology.py> — 六阶段闭集拓扑实现。

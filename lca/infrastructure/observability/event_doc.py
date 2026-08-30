@@ -297,7 +297,7 @@ def _doc_sandbox_delta() -> EventDoc:
     return EventDoc(
         summary="沙箱执行的原始增量输出(stdout/stderr 各成流)",
         why="前端实时显示工具运行日志;落盘由 projector 合并",
-        arch="L0 sandbox;lca/layer0_infra/sandbox/streaming.py",
+        arch="L0 sandbox;lca/infrastructure/sandbox/streaming.py",
         layer="L0",
     )
 
@@ -417,7 +417,7 @@ def _doc_team_message() -> EventDoc:
     return EventDoc(
         summary="Team 消息发布 —— 一个 team 一个 topic;thread_id 区分委派子线",
         why="异步协作的横向通信,其他成员可订阅",
-        arch="L3 team_handle;lca/layer1_cognitive/collaboration/blackboard.py",
+        arch="L3 team_handle;lca/cognition/collaboration/blackboard.py",
         layer="L3",
     )
 
@@ -447,7 +447,7 @@ def _doc_memory_committed() -> EventDoc:
     return EventDoc(
         summary="记忆提交到持久层(scratchpad / long-term / vector store)",
         why="审计记忆写入;C5 capability grant 衰减在此强制",
-        arch="L1 memory.simple_memory;lca/layer1_cognitive/memory.py",
+        arch="L1 memory.simple_memory;lca/cognition/memory.py",
         layer="L1",
     )
 

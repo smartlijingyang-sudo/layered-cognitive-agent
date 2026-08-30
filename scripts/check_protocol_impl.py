@@ -190,7 +190,7 @@ def _collect_classes() -> list[ClassInfo]:
 _ALLOWLIST: set[tuple[str, str]] = {
     # ObservabilityHub 显式继承了 ObservabilityBackend，不会被检出。
     # 以下是有意的结构化匹配，无需显式继承：
-    # DeclarativeRuntimeDriver（lca/layer2_runtime/declarative_runtime.py）：
+    # DeclarativeRuntimeDriver（lca/runtime/declarative_runtime.py）：
     #   脚本按方法名同构匹配到 Runtime Protocol，但 run(state: Any) /
     #   resume(checkpoint: DeclarativeCheckpoint) 与 Runtime.run(task, ctx, *,
     #   max_steps, max_wall_clock_seconds, agent_role) / resume(snapshot, input,

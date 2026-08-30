@@ -26,7 +26,7 @@ class Config(BaseModel):
     layer="L4",
     effects="none",
     description="Plan-bound AgentGraph and TeamGraph composers with narrow interfaces.",
-    test_suite="tests/layer4_app/test_spawn_bind_plan.py",
+    test_suite="tests/application/test_spawn_bind_plan.py",
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
