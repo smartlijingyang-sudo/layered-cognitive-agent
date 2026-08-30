@@ -15,7 +15,7 @@ from lca.contracts.models.core.sandbox import (
 )
 from lca.layer0_infra.attachment.layout import AttachmentLayout, sanitize_attachment_name
 from lca.layer0_infra.attachment.settings import get_attachment_policy
-from lca.layer0_infra.file_store import FileStore
+from lca.layer0_infra.file_store import FileStore, LocalFileStore
 from lca.layer0_infra.sandbox.paths import ONLYBOXES
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.run_finalizer import get_current_run_id
@@ -155,7 +155,7 @@ def render_dsh_workspace_context(
     return f"<uploaded_files>\n{policy.machine_policy_text()}\n\n{file_list}\n</uploaded_files>"
 
 
-def format_skill_attachment_block() -> str:
+def format_skill_attachment_block(store: FileStore | None = None) -> str:
     """Same staged paths as system role — injected on ``activate_skill``."""
     ids = get_current_run_attachment_ids()
     if not ids:
@@ -175,7 +175,7 @@ def format_skill_attachment_block() -> str:
     if machine is None:
         machine = resolve_machine()
 
-    store = LocalFileStore()
+    store = store if store is not None else LocalFileStore()
     policy = get_attachment_policy()
 
     if machine is not None and (machine.root or "").strip():
