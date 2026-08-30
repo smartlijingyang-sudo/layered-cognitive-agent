@@ -313,7 +313,11 @@ def create_app(
     application.state.devices = _devices
     application.state.device_hub = _device_hub
     application.state.device_settings = _device_settings
+    if run_port is None:
+        from gateway.runs.legacy_adapter import RegistryRunAdapter
+        run_port = RegistryRunAdapter(_registry)
     application.state.run_port = run_port
+    application.state.run_registry = _registry
     application.state.bootstrap_factory = bootstrap_factory
     application.state.bootstrap_config = bootstrap_config
 
