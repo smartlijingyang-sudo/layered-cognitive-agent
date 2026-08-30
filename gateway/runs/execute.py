@@ -845,5 +845,14 @@ def schedule_run(
 # private (underscore-prefixed) function with no wire-shape impact, add
 # it as a no-op shim so test imports resolve.
 def _record_terminal_materialization(session: RunSession) -> None:
-    """No-op on the soft-locked execute.py; main has its own implementation."""
-    return None
+    """Compatibility wrapper for terminal-manifest callers.
+
+    Delegates to ``gateway.runs.terminal_materialization.record_terminal_materialization``
+    (main's full impl). Kept as a private wrapper on the soft-locked
+    ``gateway/runs/execute.py`` so test fixtures that call
+    ``from gateway.runs.execute import _record_terminal_materialization``
+    keep loading while the actual logic lives in the soft-lock-allowed
+    ``execute.py`` boundary.
+    """
+    from gateway.runs.terminal_materialization import record_terminal_materialization
+    record_terminal_materialization(session)
