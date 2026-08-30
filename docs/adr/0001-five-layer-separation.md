@@ -1,6 +1,9 @@
 # ADR-0001: 五层单向依赖分层
 
 ## 状态
+**Superseded by [ADR-0104](0104-semantic-layer-rename.md)** — 层名从 `layer0/1/2/3/4` 改为语义化名称（`infrastructure`/`cognition`/`runtime`/`agent`/`application`）。本 ADR 保留作为历史档案；新增代码与文档请以 ADR-0104 为准。
+
+## 原始状态
 Accepted
 
 ## 背景

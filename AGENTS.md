@@ -15,11 +15,11 @@ LCA（Layered Cognitive Agent）是基于 vendored Cordis 的 Python 插件化�
 ```text
 docs/                         规范、设计、ADR、计划和专题说明
 lca/contracts/                Protocol、枚举、ID、模型、事件和跨层契约
-lca/layer0_infra/             LLM、工具、传输、沙箱、文件、观测、插件内核
-lca/layer1_cognitive/         感知、Brain、Reasoner、Critic、Gate、Body、Memory
-lca/layer2_runtime/           Runtime、停止、恢复、阶段执行、中间件
-lca/layer3_agent/             Agent、Team、委派和编排
-lca/layer4_app/               组合根、spawn、runtime factory、team wiring
+lca/infrastructure/             LLM、工具、传输、沙箱、文件、观测、插件内核
+lca/cognition/         感知、Brain、Reasoner、Critic、Gate、Body、Memory
+lca/runtime/           Runtime、停止、恢复、阶段执行、中间件
+lca/agent/             Agent、Team、委派和编排
+lca/application/               组合根、spawn、runtime factory、team wiring
 lca/harness/                  Profile、Boot、Session、Plugin API、声明式执行
 lca/plugins/                  Seam、Provider、Loop Driver、Strategy、Tool Plugin
 gateway/                      FastAPI、SSE、命令入口、运行执行和 projection
@@ -36,10 +36,10 @@ vendor/                       Cordis、Cosmokit、Schemastery
 | Plugin Manifest | `lca/harness/plugin_api.py` |
 | Loop Driver | `gateway/runs/loop_drivers.py` |
 | 声明式阶段图 | `lca/contracts/protocols/declarative_*.py`、`lca/harness/declarative/` |
-| Brain / Prompt | `lca/layer1_cognitive/brain/` |
-| Body / SafeExecutor | `lca/layer1_cognitive/body/` |
-| Journal / Projection | `lca/contracts/models/observability/`、`lca/layer0_infra/observability/` |
-| Agent / Team | `lca/layer4_app/spawn.py`、`lca/layer3_agent/` |
+| Brain / Prompt | `lca/cognition/brain/` |
+| Body / SafeExecutor | `lca/cognition/body/` |
+| Journal / Projection | `lca/contracts/models/observability/`、`lca/infrastructure/observability/` |
+| Agent / Team | `lca/application/spawn.py`、`lca/agent/` |
 | 平台操作 | `./scripts/lca-ops` |
 
 ## 3. 架构不变量
@@ -47,10 +47,10 @@ vendor/                       Cordis、Cosmokit、Schemastery
 ### 五层单向依赖
 
 ```text
-contracts → layer0_infra → layer1_cognitive → layer2_runtime → layer3_agent
+contracts → infrastructure → cognition → runtime → agent
 ```
 
-`layer4_app` 是组合根，负责装配具体实现；下层不得反向 import 它。Gateway 是 Carrier，只负责 HTTP/SSE、typed command 和 projection，不直接绑定具体 Brain、Body 或 Loop。分层由 `lint-imports` 和 `pyproject.toml` 契约检查。
+`application` 是组合根，负责装配具体实现；下层不得反向 import 它。Gateway 是 Carrier，只负责 HTTP/SSE、typed command 和 projection，不直接绑定具体 Brain、Body 或 Loop。分层由 `lint-imports` 和 `pyproject.toml` 契约检查。
 
 ### 认知闭集与双平面
 
@@ -143,6 +143,6 @@ uv run vulture lca --min-confidence 80
 
 使用 Conventional Commits：`<type>(<scope>): <subject>`，正文说明做了什么和为什么；常用类型为 `feat`、`fix`、`docs`、`refactor`、`test`、`chore`、`perf`。一个提交只包含一个主题；不要使用 `--no-verify`，不要提交密钥、运行产物或环境文件；远程更新优先 `git pull --rebase`。
 
-禁止反向依赖 `layer4_app`、无 ADR 扩大闭集、绕过 Reducer 改 State、绕过 Body 执行副作用、Gateway 绑定具体认知实现、插件自行读取凭证、通过新事件词表或新 schema 绕过现有机制。不要直接改生成的 `lobehub-ui/` 或 vendor；LobeHub 改 `deploy/lobehub/patches/` 后重新应用，vendor 改动必须有明确升级或修复理由。
+禁止反向依赖 `application`、无 ADR 扩大闭集、绕过 Reducer 改 State、绕过 Body 执行副作用、Gateway 绑定具体认知实现、插件自行读取凭证、通过新事件词表或新 schema 绕过现有机制。不要直接改生成的 `lobehub-ui/` 或 vendor；LobeHub 改 `deploy/lobehub/patches/` 后重新应用，vendor 改动必须有明确升级或修复理由。
 
 根级 AGENTS.md 只保留 coding agent 高频需要的上下文、判断规则、强制约束、命令和验证矩阵；详细解释放专题文档，架构原因放 ADR，实施状态放计划或报告。
