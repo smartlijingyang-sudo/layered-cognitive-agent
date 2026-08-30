@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, cast
 from pydantic import BaseModel
 
 from gateway.runs.lifecycle.runnable_assembly import RunnableBuildRequest
+from lca.application.api import Agent
 from lca.contracts.capabilities import (
     CORDIS_CONTROL_TOOL_FACTORY,
     CORDIS_CREATOR_ROLE,
@@ -20,8 +21,7 @@ from lca.contracts.protocols.runtime.infra import Tool
 from lca.contracts.protocols.session.run_mode import ModeAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability import BoundObservability
-from lca.application.api import Agent
-from lca.plugins.seam_definitions.run_mode_registry import RunModeRegistry
+from lca.plugins.seams.state.run_mode_registry import RunModeRegistry
 from lca.plugins.tools.cordis_control import CordisControlToolFactoryProtocol
 
 if TYPE_CHECKING:

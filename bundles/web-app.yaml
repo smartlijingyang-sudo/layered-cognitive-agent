@@ -106,7 +106,7 @@ entries:
   # Tier-2 provider supplies DefaultActionHandlerRegistry with 4 built-in handlers.
   - id: lca-action-handler-registry-seam
     name: lca_seam_action_handler_registry
-    $module: lca.plugins.seam_definitions.action_handler
+    $module: lca.plugins.seams.act.action_handler
     config: {}
 
   - id: lca-action-handler-provider
@@ -154,7 +154,7 @@ entries:
 
   - id: lca-reasoner-template-catalog-builtin
     name: lca_reasoner_template_catalog_builtin
-    $module: lca.plugins.seam_definitions.reasoner_template_catalog
+    $module: lca.plugins.seams.think.reasoner_template_catalog
     config:
       template_names: [react_prompt, hierarchical_prompt, routing_prompt]
 
@@ -172,7 +172,7 @@ entries:
   # ── Journal store (named factory; spawn instantiates per-run) ──
   - id: lca-journal-store
     name: lca_journal_store
-    $module: lca.plugins.seam_definitions.journal_store
+    $module: lca.plugins.seams.journal.journal_store
     config: {}
 
   # ── Run-loop driver registry (Tier-3) ─────────────
@@ -247,7 +247,7 @@ entries:
   # Tier-2 contributors register one component each for independent substitution.
   - id: lca-component-registry-seam
     name: lca_component_registry_seam
-    $module: lca.plugins.seam_definitions.component_registry
+    $module: lca.plugins.seams.state.component_registry
     config: {}
 
   - id: lca-component-state-store-contributor

@@ -51,7 +51,7 @@ def test_normal_files_not_blacklisted():
 def test_whitelist_init_py():
     assert is_whitelisted("lca/contracts/__init__.py")
     assert is_whitelisted("lca/harness/agent/__init__.py")
-    assert is_whitelisted("lca/plugins/seam_definitions/__init__.py")
+    assert is_whitelisted("lca/plugins/seams/__init__.py")
     assert is_whitelisted("gateway/plugins/__init__.py")
 
 

@@ -18,7 +18,7 @@ from lca.contracts.models.core.llm import LLMResponse
 from lca.agent.role_library import FileRoleLibrary
 from lca.application.api import Agent, Team
 from lca.application.casting import LLMTeamCaster
-from lca.plugins.seam_definitions.team_casting_prompt_renderer import BuiltinCastingPromptRenderer
+from lca.plugins.seams.collaboration.team_casting_prompt_renderer import BuiltinCastingPromptRenderer
 from tests.harness.collector import InMemoryObservability
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 

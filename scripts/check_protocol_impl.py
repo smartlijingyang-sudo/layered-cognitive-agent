@@ -199,7 +199,7 @@ _ALLOWLIST: set[tuple[str, str]] = {
     #   DeclarativeRuntimeDriver 不应继承 Runtime Protocol，避免误导读者以为
     #   该 driver 可作 task 入口使用。
     ("DeclarativeRuntimeDriver", "Runtime"),
-    # RunModeRegistry（lca/plugins/seam_definitions/run_mode_registry.py）：
+    # RunModeRegistry（lca/plugins/seams.state.run_mode_registry）：
     #   脚本按方法名同构匹配到 ActionHandlerRegistry，但 register(adapter:
     #   ModeAdapter) / resolve(model: str) / registered() -> tuple[RegisteredMode, ...]
     #   与 ActionHandlerRegistry.register(action_type, handler) /

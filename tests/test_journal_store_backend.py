@@ -100,7 +100,7 @@ def test_run_store_accepts_explicit_backend() -> None:
 
 def test_seam_provides_journal_store() -> None:
     """seam plugin 模块可导入。"""
-    from lca.plugins.seam_definitions import journal_store_factories as mod
+    from lca.plugins.seams.journal import journal_store_factories as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

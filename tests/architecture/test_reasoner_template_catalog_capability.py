@@ -6,7 +6,7 @@ from pathlib import Path
 
 from lca.contracts.capabilities import REASONER_TEMPLATE_CATALOG
 from lca.harness.profile.resolve import resolve_profile
-from lca.plugins.seam_definitions.reasoner_template_catalog import (
+from lca.plugins.seams.think.reasoner_template_catalog import (
     BuiltinReasonerTemplateCatalog,
     Config,
 )

@@ -18,7 +18,7 @@ entries:
   # Skills (Tier-1)
   - id: lca-skills-service
     name: lca_skills_service
-    $module: lca.plugins.seam_definitions.skills
+    $module: lca.plugins.seams.memory.skills
     config: {}
 
   # Perceive / Gate groups (ADR-0056) — idempotent if web-app already loaded them

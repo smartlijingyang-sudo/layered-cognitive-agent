@@ -183,7 +183,7 @@ def test_architecture_34_plugin_providers() -> None:
 
 def test_architecture_35_plugin_seams() -> None:
     """守护 seams 作为替换接口目录。"""
-    _require_path("lca", "plugins", "seam_definitions")
+    _require_path("lca", "plugins", "seams")
 
 
 def test_architecture_36_plugin_strategies() -> None:

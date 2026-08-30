@@ -5,7 +5,7 @@ entries:
   # Mount governance is selected independently from the Composer factory.
   - id: lca-composition-invariant-default
     name: lca_composition_invariant_default
-    $module: lca.plugins.seam_definitions.composition_invariant
+    $module: lca.plugins.seams.journal.composition_invariant
     config: {}
 
   # CordisComposer provider (Tier-2) — 把 CordisComposer 工厂挂到

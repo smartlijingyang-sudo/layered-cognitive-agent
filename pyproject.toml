@@ -1967,8 +1967,8 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.plugins.seam_definitions"]
-responsibility = "lca.plugins.seam_definitions: Seam 定义。本 README 由脚手架生成，待包负责人补充具体细节。"
+[tool.lca.package_contracts."lca.plugins.seams"]
+responsibility = "lca.plugins.seams: Tier-1 seam definitions (cordis @plugin modules), grouped by cognitive plane."
 not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
 allowed_dependencies = [
     "lca.contracts",
@@ -1981,7 +1981,7 @@ side_effects = [
     "log:emit",
 ]
 public_api = [
-    "lca.plugins.seam_definitions",
+    "lca.plugins.seams",
 ]
 schema_version = "1.0.0"
 

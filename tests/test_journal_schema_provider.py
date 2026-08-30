@@ -18,11 +18,11 @@ def test_v2_provider_registered_on_seam() -> None:
     """Seam setup registers EnvelopeV2Schema at version v2.0.0."""
     import asyncio
 
-    from lca.plugins.seam_definitions.observability.journal_schema import (
+    from lca.plugins.seams.observability.journal_schema import (
         Config,
         JournalSchemaRegistry,
     )
-    from lca.plugins.seam_definitions.observability.journal_schema import (
+    from lca.plugins.seams.observability.journal_schema import (
         setup as seam_setup,
     )
 

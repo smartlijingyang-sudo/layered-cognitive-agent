@@ -12,11 +12,11 @@ from pydantic import BaseModel
 
 from lca.contracts.capabilities import TEAM_COMMUNICATION
 from lca.contracts.protocols.collaboration.agent import AgentUnit
-from lca.contracts.protocols.journal.spec import TeamSpec
 from lca.contracts.protocols.collaboration.team_seam import (
     TeamCommunication,
     TeamCommunicationAssemblerProtocol,
 )
+from lca.contracts.protocols.journal.spec import TeamSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

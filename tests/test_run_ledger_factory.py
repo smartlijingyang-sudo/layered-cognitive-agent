@@ -6,7 +6,7 @@ from pathlib import Path
 from lca.contracts.observability.ledger import RunLedgerFactory
 from lca.contracts.observability.run_journal import RunJournalFactory
 from lca.harness.profile.boot import boot_profile
-from lca.plugins.seam_definitions.observability.run_ledger import (
+from lca.plugins.seams.observability.run_ledger import (
     FilesystemRunLedgerFactory,
 )
 

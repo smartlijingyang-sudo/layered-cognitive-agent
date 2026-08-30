@@ -28,7 +28,7 @@ from lca.application.casting import (
     parse_casting_output,
     repair_invalid_role_ids,
 )
-from lca.plugins.seam_definitions.team_casting_prompt_renderer import BuiltinCastingPromptRenderer
+from lca.plugins.seams.collaboration.team_casting_prompt_renderer import BuiltinCastingPromptRenderer
 from tests.harness.collector import InMemoryObservability
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 

@@ -244,9 +244,10 @@ async def _build_team(
     if caster is not None:
         resolved_caster = caster
     else:
-        from lca.plugins.seam_definitions.team_casting_prompt_renderer import (
+        from lca.plugins.seams.collaboration.team_casting_prompt_renderer import (
             BuiltinCastingPromptRenderer,
         )
+
         resolved_caster = LLMTeamCaster(prompt_renderer=BuiltinCastingPromptRenderer())
     record_scope = RunScope(trace_id=cast("TraceId", trace_id), run_id=cast("RunId", run_id))
     with bind_backends(observability), run_scope(record_scope):

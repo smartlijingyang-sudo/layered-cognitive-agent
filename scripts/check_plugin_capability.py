@@ -20,7 +20,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 CAPABILITIES_FILE = REPO / "lca" / "contracts" / "capabilities.py"
 PLUGINS_DIR = REPO / "lca" / "plugins"
-SEAM_DIR = PLUGINS_DIR / "seam_definitions"
+SEAM_DIR = PLUGINS_DIR / "seams"
 CONTRACTS_DIR = REPO / "lca" / "contracts"
 
 

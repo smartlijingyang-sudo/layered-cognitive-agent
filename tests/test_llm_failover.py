@@ -13,7 +13,7 @@ from lca.infrastructure.llm_adapter.failover import (
     LLMRetryPolicy,
     RetryingLLMAdapter,
 )
-from lca.plugins.seam_definitions.llm_resolver import (
+from lca.plugins.seams.think.llm_resolver import (
     Config,
     FallbackConfig,
     RetryConfig,

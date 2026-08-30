@@ -58,7 +58,7 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
         {
             "layers": {"L0", "L1", "L2", "L3"},
             "module_patterns": [
-                r"^lca/plugins/seam_definitions/observability/",
+                r"^lca/plugins/seams/observability/",
                 r"^lca/plugins/providers/attribute_policy",
                 r"^lca/plugins/providers/cli_debug",
                 r"^lca/plugins/providers/event_descriptor",
@@ -143,13 +143,13 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
             "kind": None,
         },
     ),
-    # Infrastructure: everything else in seam_definitions, providers, compose, registries, bundles
+    # Infrastructure: everything else in seams, providers, compose, registries, bundles
     (
         "infrastructure",
         {
             "layers": {"L0", "L1", "L2", "L3", "L4"},
             "module_patterns": [
-                r"^lca/plugins/seam_definitions/",
+                r"^lca/plugins/seams/",
                 r"^lca/plugins/providers/",
                 r"^lca/plugins/compose/",
                 r"^lca/plugins/registries/",

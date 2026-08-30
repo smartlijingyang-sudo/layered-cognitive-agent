@@ -46,11 +46,11 @@ class RuntimeClosureRequirement:
 _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     RuntimeClosureRequirement(
         "idempotency_store",
-        "lca.plugins.seam_definitions.idempotency_store",
+        "lca.plugins.seams.journal.idempotency_store",
     ),
     RuntimeClosureRequirement(
         "effect_handler_registry",
-        "lca.plugins.seam_definitions.effect_handler",
+        "lca.plugins.seams.act.effect_handler",
     ),
     RuntimeClosureRequirement(
         "effect_gateway_factory",
@@ -66,7 +66,7 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     ),
     RuntimeClosureRequirement(
         "delta_handler_registry",
-        "lca.plugins.seam_definitions.delta_handler",
+        "lca.plugins.seams.act.delta_handler",
     ),
     RuntimeClosureRequirement(
         "delta_reducer_factory",
@@ -86,7 +86,7 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     ),
     RuntimeClosureRequirement(
         "evidence_store",
-        "lca.plugins.seam_definitions.observability.evidence_store",
+        "lca.plugins.seams.observability.evidence_store",
     ),
     RuntimeClosureRequirement(
         "stop_policy",

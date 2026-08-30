@@ -3,5 +3,5 @@
 Each Tier-1 Definition seam (tools / sandbox / memory / …) has a provider
 plugin here that registers implementations. LLM is an exception: credentials
 and the chat adapter are owned solely by
-``lca.plugins.seam_definitions.llm_resolver``.
+``lca.plugins.seams.think.llm_resolver``.
 """
