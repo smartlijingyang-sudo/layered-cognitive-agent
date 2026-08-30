@@ -331,9 +331,9 @@ Main tip: `0dc34a1` — feat(tools): flatten tool observation payload + per-tool
 - **Key symbols touched**: `lca/contracts/models/core/budget.py`, `lca/contracts/models/core/lifecycle.py`, `lca/contracts/models/core/memory.py`, `lca/contracts/models/core/perceive_state.py`, `lca/contracts/models/core/perception.py`
 - **Lock impact**: none — fully unlocked
 - **Default recommendation**: port as-is
-- **Test plan**: no test path auto-detected; recommend manual review
+- **Test plan**: `tests/test_contracts_purity.py`, `tests/test_journal_core.py`, `tests/test_journal_fact_stream.py`, `tests/test_journal_content_policy.py`, `tests/test_contracts.py`, `tests/test_plugin_alignment.py`, `tests/test_run_identity.py`
 - **DAG deps**: (none)
-- **Mark**: [ ] port
+- **Mark**: [x] port (commit `1caea4c1` + post-port scaffold/restore `ecfc5031`; 6 downstream test failures deferred to C44/C47 — ToolCallStreaming/ToolInvoked fixtures use pre-C3 `arguments_preview` keyword vs new `arguments_ref`)
 ### C30: C30 cluster
 
 - **Lane**: B
