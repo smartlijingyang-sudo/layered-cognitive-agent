@@ -19,12 +19,14 @@ class TaskStatus(str, Enum):
     PAUSED = "paused"
     INPUT_REQUIRED = "input-required"
     COMPLETED = "completed"
+    PARTIAL = "partial"
     FAILED = "failed"
     CANCELED = "canceled"
 
 
 _STATUS_MAP: dict[str, TaskStatus] = {
     "completed": TaskStatus.COMPLETED,
+    "partial": TaskStatus.PARTIAL,
     "failed": TaskStatus.FAILED,
     "working": TaskStatus.WORKING,
     "running": TaskStatus.WORKING,

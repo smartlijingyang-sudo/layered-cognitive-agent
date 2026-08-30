@@ -1,6 +1,7 @@
-"""StopReason / StopDecision / StopOutcome —— 认知循环停止判定数据契约。
+"""StopReason / StopDecision —— 停止阶段使用的数据契约。
 
-``StopRule`` 是能力接口，见 ``lca.contracts.protocols.runtime.StopRule``。
+``StopPolicy`` 是 State 群内的策略接口，见
+``lca.contracts.protocols.runtime.StopPolicy``。
 """
 
 from __future__ import annotations
@@ -26,18 +27,5 @@ class StopDecision:
 
     should_stop: bool = False
     reason: StopReason = StopReason.CONTINUE
-    final_output: str | None = None
-    status: TaskStatus | None = None
-
-
-@dataclass(frozen=True)
-class StopOutcome:
-    """单步结果判定（StopOutcomePolicy）的返回类型。
-
-    仅 StopOutcomePolicy 实现与 StopRule 内部使用；循环边界对外统一用
-    StopDecision（见 lca.contracts.protocols.runtime.StopRule）。
-    """
-
-    should_stop: bool = False
     final_output: str | None = None
     status: TaskStatus | None = None

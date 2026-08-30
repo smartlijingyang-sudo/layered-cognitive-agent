@@ -65,7 +65,7 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
         }
     ),
     "PerceiveState": frozenset({"from_agent_state", "commit"}),
-    "ContextManifest": frozenset({"by_kind", "has_kind"}),
+    "ContextManifest": frozenset({"by_class", "by_kind", "has_kind"}),
     "WorkflowProgress": frozenset({"done"}),
     # C2 port — main 的 composition.py / content_addressable.py 引入的行为
     # dataclass 方法（MountResult.ok / UnmountResult.ok / InspectResult.mounted_count /
@@ -75,6 +75,13 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
     "UnmountResult": frozenset({"ok"}),
     "InspectResult": frozenset({"mounted_count"}),
     "InMemoryContentAddressableStore": frozenset({"put", "get", "contains", "sweep_orphan"}),
+    # C3 port — main 的 perception.py 增 ContextClass(StrEnum) 与 ContextManifest.by_class()；
+    # terminal_outcome.py 增 TerminalOutcome.output_ref_kind()；journal.py 增
+    # Causation / DescriptorRef / JournalRecord 的 to_dict/from_dict 序列化方法。
+    "TerminalOutcome": frozenset({"output_ref_kind"}),
+    "Causation": frozenset({"to_dict", "from_dict"}),
+    "DescriptorRef": frozenset({"to_dict", "from_dict"}),
+    "JournalRecord": frozenset({"to_dict", "from_dict"}),
 }
 
 # 已存在的非 dataclass / 非 Protocol / 非异常 / 非枚举类——
@@ -107,7 +114,7 @@ _STD_EXCEPTION_BASES = frozenset(
 )
 
 # 枚举基类——用于识别 Enum 类（跳过检查）
-_ENUM_BASES = frozenset({"Enum", "IntEnum", "str"})
+_ENUM_BASES = frozenset({"Enum", "IntEnum", "StrEnum", "str"})
 
 
 def _get_base_names(node: ast.ClassDef) -> list[str]:

@@ -23,6 +23,7 @@ New kinds must be added here and to the EmitAllowlist in tests.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Literal
 
 # Closed allowlist of ContextItem kinds.  Additions must be intentional.
@@ -37,6 +38,12 @@ ItemKind = Literal[
     "memory",
     "subtasks",
 ]
+
+
+class ContextClass(StrEnum):
+    DATA = "data"
+    INSTRUCTION = "instruction"
+    SYSTEM = "system"
 
 
 @dataclass(frozen=True)
@@ -57,6 +64,7 @@ class ContextItem:
     provenance: str
     ref: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
+    content_class: ContextClass = ContextClass.DATA
 
 
 @dataclass(frozen=True)
@@ -72,6 +80,9 @@ class ContextManifest:
     digest: str = ""
     schema_version: str = "1.0"
     extra: dict[str, Any] = field(default_factory=dict)
+
+    def by_class(self, content_class: ContextClass) -> list[ContextItem]:
+        return [item for item in self.items if item.content_class == content_class]
 
     def by_kind(self, kind: ItemKind) -> list[ContextItem]:
         return [item for item in self.items if item.kind == kind]

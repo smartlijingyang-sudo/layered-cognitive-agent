@@ -57,6 +57,12 @@ class BudgetLimits:
     max_steps: int
     max_wall_clock_seconds: int
 
+    def __post_init__(self) -> None:
+        if self.max_steps <= 0:
+            raise ValueError("max_steps must be positive")
+        if self.max_wall_clock_seconds <= 0:
+            raise ValueError("max_wall_clock_seconds must be positive")
+
 
 @dataclass(frozen=True)
 class DelegationBudget:

@@ -53,9 +53,7 @@ class PerceiveState:
         if not isinstance(bucket, list):
             bucket = []
         # Normalize bucket to a list of GateDecided.
-        normalized: list[GateDecided] = [
-            item for item in bucket if isinstance(item, GateDecided)
-        ]
+        normalized: list[GateDecided] = [item for item in bucket if isinstance(item, GateDecided)]
         return cls(
             current_manifest=manifest if isinstance(manifest, ContextManifest) else None,
             gate_decided=normalized,

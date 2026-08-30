@@ -17,15 +17,21 @@ record 时盖章进 ``StampedEvent.scope``，事件字段只承载领域语义�
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
+from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from importlib import import_module
+from typing import Any, Literal, cast
 
-from lca.contracts.atoms.ids import RunId, TraceId, new_run_id, new_trace_id
+from lca.contracts.atoms.ids import RunId, TraceId
 from lca.contracts.models.observability.event import OperationOutcome, RuntimeKind
+from lca.contracts.observability.evidence import (
+    EvidenceRef,
+)
+from lca.contracts.observability.evidence import (
+    EvidenceRef as _EvidenceRef,  # alias for JournalRecord.evidence compat
+)
 
 # ── 关联骨架 ─────────────────────────────────────────────
 
@@ -39,7 +45,7 @@ class RunScope:
     - ``delegation_id``：生成此 run 的委派 id（无则 None）；
     - ``agent_role``：当前 run 的角色（委派发射点用作 caller_role）。
 
-    品牌化 ID（DSH-inspired）：trace_id/run_id 在类型层面不可互换，
+    品牌化 ID：trace_id/run_id 在类型层面不可互换，
     防止关联骨架 ID 混传。运行时零成本。
     """
 
@@ -52,64 +58,6 @@ class RunScope:
     # Per-step counter inside the agent loop turn; sensors use it to
     # bound re-reads (e.g. only events at step >= N).
     step: int = 0
-
-
-_run_scope: ContextVar[RunScope | None] = ContextVar("lca_run_scope", default=None)
-
-
-def get_current_run_scope() -> RunScope | None:
-    """读取当前 run 关联身份；未设置返回 None（solo 且未入 run 边界）。"""
-    return _run_scope.get()
-
-
-TEAM_CONTAINER_ROLE = "team"
-
-
-def adopt_run_scope(*, role: str) -> tuple[RunScope, bool]:
-    """Claim an allocated root Run, or mint a child / new root.
-
-    Gateway (and tests) may open ``RunScope(run_id=..., agent_role='')`` before
-    ``Agent`` / ``Team``.run. The first actor claims that id. Nested actors
-    (delegation, another speaker) mint a child. Returns ``(scope, is_root)``.
-
-    使用品牌化 ID 工厂（DSH-inspired）：trace_id 和 run_id 在类型层面区分，
-    防止关联骨架 ID 混传。
-    """
-    inherited = get_current_run_scope()
-    if inherited is None:
-        return RunScope(trace_id=new_trace_id(), run_id=new_run_id(), agent_role=role), True
-    claimed = bool(inherited.agent_role)
-    if (
-        inherited.run_id
-        and not inherited.parent_run_id
-        and not inherited.delegation_id
-        and not claimed
-    ):
-        return (
-            RunScope(trace_id=inherited.trace_id, run_id=inherited.run_id, agent_role=role),
-            True,
-        )
-    return (
-        RunScope(
-            trace_id=inherited.trace_id,
-            run_id=new_run_id(),
-            parent_run_id=inherited.run_id or inherited.parent_run_id,
-            delegation_id=inherited.delegation_id,
-            agent_role=role,
-        ),
-        False,
-    )
-
-
-@contextmanager
-def run_scope(scope: RunScope) -> Iterator[None]:
-    """在 run 边界包裹此上下文：asyncio.create_task 拷贝 Context 后，
-    成员任务读到的是发起方的关联身份（与 delegator_scope 同一机制）。"""
-    token = _run_scope.set(scope)
-    try:
-        yield
-    finally:
-        _run_scope.reset(token)
 
 
 # ── 事件基类与盖章记录 ──────────────────────────────────
@@ -148,12 +96,16 @@ class RuntimeObserved(JournalEvent):
 class StampedEvent:
     """引擎盖章后的日志记录：序号 + 时间戳 + 关联骨架 + 事件本体。
 
-    Spec §24.5 / Phase J: every stamped event carries:
+    Spec §24.5 / Phase J + ADR-0074 PR-6: every stamped event carries:
 
     - ``seq``  — sequential log index (ADR-0055 N2)
     - ``ts``   — monotonic timestamp
     - ``scope`` — correlation skeleton (trace_id / parent_trace_id / run_id /
       delegation_id / agent_role / step)
+    - ``plan_ref`` — CompiledRunPlan canonical hash (PR-6 V5); auto-stamped
+      from ``lca_run_plan_ref`` ContextVar at append time. Empty string
+      ``""`` for legacy code paths without plan binding (tests, projector
+      previews). V5 acceptance: replay test 守护每条 fact 携带 plan_ref。
     - ``event_type`` — class name of the payload (auto-stamped by ``RunStore.append``)
     - ``data``  — optional dict carrying the raw payload for downstream
       consumers (mirrors ``event.__dict__``; auto-populated when the engine
@@ -161,6 +113,13 @@ class StampedEvent:
     - ``parent_seq`` — immediate causal parent seq (None for root events).
     - ``correlation_ids`` — reserved for future multi-trace joining; never written.
     - ``event`` — the typed payload (frozen dataclass).
+    - ``event_id`` — global unique id (ADR-0065 §三 / L3); computed by engine
+      at append time, propagated to ``JournalRecord.event_id`` in the v2
+      envelope. ``""`` for events constructed outside the ledger (tests,
+      projector previews).
+    - ``parent_event_id`` — global id of the immediate causal parent
+      (ADR-0065 §三 / causation); engine looks up from seq→event_id map at
+      append. ``""`` for root events or pre-flip replays.
     """
 
     seq: int
@@ -171,6 +130,10 @@ class StampedEvent:
     data: dict[str, object] = field(default_factory=dict)
     parent_seq: int | None = None
     correlation_ids: tuple[str, ...] = ()
+    event_id: str = ""
+    parent_event_id: str = ""
+    plan_ref: str = ""
+    """CompiledRunPlan canonical hash (PR-6 V5)；auto-stamped by RunStore."""
 
 
 class DelegationMechanism(str, Enum):
@@ -234,6 +197,18 @@ class CastingFailed(JournalEvent):
     """自动组队选角失败（解析/白名单/重试耗尽）。"""
 
     error: str = ""
+
+
+@dataclass(frozen=True)
+class TaskCreated(JournalEvent):
+    """Durable task creation fact for the session spine."""
+
+    task_id: str = ""
+    session_id: str = ""
+    objective: str = ""
+    profile: str = ""
+    preset: str = ""
+    origin: str = "user"
 
 
 @dataclass(frozen=True)
@@ -424,28 +399,33 @@ class ToolCallStreaming(JournalEvent):
     在 LLM 响应完成前发出，让前端尽早渲染工具卡片占位——消除思考结束到
     工具执行之间的空白期。与 ``ToolStarted``（执行前、参数完整）互补。
     ``tool_call_id`` 即后续 ToolStarted/Invoked 的 ``invocation_id``（同一张卡）。
+
+    ADR-0101 PR-2:tool 事件回归事实账本。流式累积由调用方在 ToolCall
+    周期内多次 emit 同一 ``arguments_ref`` 完成;tool 渲染面通过 ref
+    走 EvidenceStore 平面。
     """
 
     tool_name: str = ""
     tool_call_id: str = ""
-    arguments_preview: str = ""
-    plugin_state: dict[str, Any] = field(default_factory=dict)
+    arguments_ref: EvidenceRef | None = None
 
 
 @dataclass(frozen=True)
 class ToolStarted(JournalEvent):
     """工具调用开始（执行前；与 ToolInvoked 经 invocation_id 关联）。
 
-    ``arguments_preview`` 是截断字符串（OTel/console）；``plugin_state`` 是 UI
-    一等字段（完整 code/command 等，dict 不受 AttributePolicy 2k 截断）。
+    ADR-0101 PR-2:tool 事件回归事实账本。``arguments`` 与
+    ``arguments_ref`` 二选一(非空互斥);v1 强制走 evidence 平面,
+    inline ``arguments`` 保留为 ``{}``,由后续 EvidencePolicy 决策
+    何时启用。
 
     ``idempotency_key`` (PR6) 由 ExecutionEnvelope 注入；为空表示工具未声明幂等。
     """
 
     tool_name: str = ""
-    arguments_preview: str = ""
     invocation_id: str = ""
-    plugin_state: dict[str, Any] = field(default_factory=dict)
+    arguments: Mapping[str, object] = field(default_factory=dict)
+    arguments_ref: EvidenceRef | None = None
     idempotency_key: str = ""
 
 
@@ -453,25 +433,36 @@ class ToolStarted(JournalEvent):
 class ToolInvoked(JournalEvent):
     """工具调用完成。
 
-    ``plugin_state`` / ``files`` 是 UI 与产品通道（journal 不截断）。
-    ``arguments_preview`` / ``result_preview`` 只给 jsonl 与 OTel（2k 有损）。
-    Live SSE 必须抹掉两个 preview，浏览器不得读到。
+    ADR-0101 PR-2:tool 事件回归事实账本。``arguments_ref`` 与
+    ``arguments`` 二选一(沿用 ToolStarted 同一 ref,便于 join),
+    ``output_ref`` 在 ok 时指向结果,失败时为空;``output_truncated``
+    是唯一保留的 view-only 字段(标记 result 截断,UI 元数据)。
 
     ``idempotency_key`` (PR6) 与 ``ToolStarted`` 同步；用于 resume dedupe
     via ``RunStore.find_terminal_tool_invoked``。
     """
 
     tool_name: str = ""
-    arguments_preview: str = ""
-    result_preview: str = ""
+    invocation_id: str = ""
     ok: bool = True
     latency_ms: int = 0
     attempt: int = 1
     error: str = ""
-    invocation_id: str = ""  # optional link to in-flight streaming deltas
-    files: tuple[dict[str, Any], ...] = ()
-    plugin_state: dict[str, Any] = field(default_factory=dict)
     idempotency_key: str = ""
+    files: tuple[dict[str, Any], ...] = ()
+    arguments: Mapping[str, object] = field(default_factory=dict)
+    arguments_ref: EvidenceRef | None = None
+    output_ref: EvidenceRef | None = None
+    # Inline text result (stdout-equivalent). Set when ``output_ref`` is None
+    # — the fact-log can still carry a small inline copy without a round-trip
+    # to the evidence store. ADR-0101 PR-2: inline path stays available;
+    # frontend ``/runs/{id}/live`` consumer reads this field directly.
+    output_text: str | None = None
+    output_truncated: bool = False
+    # Renderer-facing projection (SSE-only).  jsonl never writes this;
+    # stripped by JsonlJournalProjector before disk write.  Empty when the
+    # Tool has no RenderContract.
+    projected_state: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -629,11 +620,24 @@ class MemoryCommitted(JournalEvent):
 
 @dataclass(frozen=True)
 class ContextCompacted(JournalEvent):
-    """PR7: a CompactionPolicy was applied and the manifest was compacted."""
+    """PR7: a CompactionPolicy was applied and the manifest was compacted.
+
+    The event intentionally holds identifiers and size metrics only. Summary
+    content and original evidence remain in their respective governed stores.
+    """
 
     step: int = 0
     original_kinds: tuple[str, ...] = ()
     kept_kinds: tuple[str, ...] = ()
+    mode: str = "selection"
+    applied: bool = False
+    reason: str = ""
+    source_record_count: int = 0
+    summary_record_id: str = ""
+    original_characters: int = 0
+    result_characters: int = 0
+    compression_ratio: float = 0.0
+    coverage_ratio: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -646,7 +650,414 @@ class RunPaused(JournalEvent):
 
 @dataclass(frozen=True)
 class RunResumed(JournalEvent):
-    """PR2: emitted on the ``_loop`` boundary when the run is resumed."""
+    """PR2: emitted at the declarative runtime boundary before a run resumes."""
 
     step: int = 0
     reason: str = ""
+
+
+# ── 创造模式（§13.3 Creator）─────────────────────────────────
+#
+# PluginAuthored / PluginMounted / PluginUnmounted / PresetPublished 是
+# 宪法 §13.3.1 五条硬约束（C3/C4/C5/PR12/§23.2）的可审计事实：每一笔 plugin
+# 的「创作→挂载→卸载→发布」必有一条对应事件，trace_id/run_id/step 自动盖章。
+#
+# Payload 设计原则：
+# - capability_grant 字段一律序列化为 tuple[str, ...] —— 与 CapabilityGrant 原子值
+#   体系保持一致，方便按子集校验。
+# - plugin_meta 字段保存 PluginMeta TypedDict 关键字段的 snapshot 而非引用：
+#   后续即使插件代码改了 meta，历史 journal 仍能如实回放挂载时声明的能力。
+# - rejection 字段统一为具名错误码（CapabilityGrantExceeded / PluginMetaMissing /
+#   InvariantViolation / NameConflict / NotMounted），禁止裸字符串。
+
+
+@dataclass(frozen=True)
+class PluginAuthored(JournalEvent):
+    """创造模式：agent 把一份 plugin 源码写到磁盘。
+
+    Step 5 / §13.3.4 流程的「写文件」动作；ToolInvoked 之外另发一条 Creator
+    专用事件，用于按 actor_role 把"我写了一个插件"与通用工具事件区分开。
+    """
+
+    plugin_name: str = ""
+    path: str = ""
+    language: str = ""
+    size_bytes: int = 0
+    actor_role: str = ""
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class PluginMounted(JournalEvent):
+    """创造模式：plugin 已通过 Composer.mount 挂入 Context（C3 单一事实源）。
+
+    §13.3.1 C5：挂载时调用方 capability_grant 与插件声明 capabilities 子集校验，
+    超集 → CapabilityGrantExceeded 拒绝并落拒绝事件。拒绝路径不发本事件，
+    改发 PluginMountRejected。
+    """
+
+    plugin_name: str = ""
+    plugin_id: str = ""
+    capabilities: tuple[str, ...] = ()
+    capability_grant: tuple[str, ...] = ()
+    meta: dict[str, object] = field(default_factory=dict)
+    actor_role: str = ""
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class PluginMountRejected(JournalEvent):
+    """挂载被拒（C5 / PR12 / §23.2 三道闸任一失败）。
+
+    ``reason_code`` 取值见 ``composition.py::ComposerErrorCode``；
+    本事件是失败事实的唯一来源，PluginMounted 与之互斥。
+    """
+
+    plugin_name: str = ""
+    reason_code: str = ""
+    reason_message: str = ""
+    plugin_meta_present: bool = False
+    capability_grant: tuple[str, ...] = ()
+    requested_capabilities: tuple[str, ...] = ()
+    actor_role: str = ""
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class PluginUnmounted(JournalEvent):
+    """创造模式：plugin 已通过 Composer.unmount 退出 Context。"""
+
+    plugin_name: str = ""
+    plugin_id: str = ""
+    actor_role: str = ""
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class PluginInspected(JournalEvent):
+    """创造模式：CordisControlTool(inspect) 已返回当前能力图 snapshot。
+
+    每条记录带 ``mounted_count`` 与 ``plugins_summary``（name + implements +
+    policy_class + side_effects 派生键），便于 lca-ops trace 子命令按 seq
+    回放「运行时的能力图长什么样」。
+    """
+
+    actor_role: str = ""
+    mounted_count: int = 0
+    plugin_names: tuple[str, ...] = ()
+    plugins_summary: tuple[dict[str, object], ...] = ()
+    step: int = 0
+
+
+@dataclass(frozen=True)
+class PresetPublished(JournalEvent):
+    """创造模式：mount 成功后 PluginAuthoring 把 plugin 落盘到 preset 目录。
+
+    §13.3.4 流程的 Step 6：plugin 源码 + bundle YAML 写入
+    ``$LCA_AGENT_PRESETS_HOME/<preset_id>/``。下一次 boot 加载该 bundle
+    时 plugin 自动挂入 Context，无需任何 cordis_control 调用。
+
+    ``bundle_path`` / ``plugin_path`` 是相对 preset root 的 POSIX 路径，
+    不带环境变量前缀（避免 journal 含敏感信息）。
+    """
+
+    preset_id: str = ""
+    plugin_name: str = ""
+    plugin_id: str = ""
+    preset_root: str = ""
+    bundle_path: str = ""
+    plugin_path: str = ""
+    actor_role: str = ""
+    step: int = 0
+
+
+# ── ADR-0065 §三 / PR-3: JournalRecord v2 envelope ──────────────────
+#
+# 引入 JournalRecord 作为 StampedEvent 的下替代身;不立即删除 StampedEvent。
+# 字段语义变化:
+# - schema 必填 "lca.journal/2"
+# - event_id 全局唯一(ULID),与 seq 不同
+# - occurred_at vs committed_at 显式区分(0065 §三)
+# - causation.parent_event_id / causation.links 替代 parent_seq(0065 §三)
+# - evidence: tuple[EvidenceRef, ...] 引用受治理证据(0065 §四)
+# - 不再有 *_preview 字段;plugin_state 字段(ADR-0101 PR-2 已删除);
+#   output_truncated 保留为 ToolInvoked 唯一 view-only 字段(标记 result
+#   是否被 2k 截断,UI 元数据)
+#
+# 本文件只新增类型 + 工厂方法;StampedEvent 暂不删除,等消费方迁完再走
+# 单独 PR 强制删除路径。
+
+
+def _mapping_value(value: object, *, field_name: str) -> Mapping[str, object]:
+    """Validate one JSON object before it enters the typed Journal envelope."""
+
+    if not isinstance(value, Mapping):
+        raise ValueError(f"JournalRecord.{field_name} must be an object")
+    return {str(key): item for key, item in value.items()}
+
+
+def _mapping_field(payload: Mapping[str, object], field_name: str) -> Mapping[str, object]:
+    value = payload.get(field_name, {})
+    if value is None:
+        return {}
+    return _mapping_value(value, field_name=field_name)
+
+
+def _sequence_field(payload: Mapping[str, object], field_name: str) -> tuple[object, ...]:
+    value = payload.get(field_name, ())
+    if value is None:
+        return ()
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+        raise ValueError(f"JournalRecord.{field_name} must be an array")
+    return tuple(value)
+
+
+def _string_field(payload: Mapping[str, object], field_name: str, *, default: str = "") -> str:
+    value = payload.get(field_name, default)
+    if value is None:
+        return default
+    if not isinstance(value, str):
+        raise ValueError(f"JournalRecord.{field_name} must be a string")
+    return value
+
+
+def _optional_string_field(payload: Mapping[str, object], field_name: str) -> str | None:
+    value = payload.get(field_name)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"JournalRecord.{field_name} must be a string or null")
+    return value
+
+
+def _int_field(payload: Mapping[str, object], field_name: str, *, default: int = 0) -> int:
+    value = payload.get(field_name, default)
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        raise ValueError(f"JournalRecord.{field_name} must be an integer")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError as exc:
+            raise ValueError(f"JournalRecord.{field_name} must be an integer") from exc
+    raise ValueError(f"JournalRecord.{field_name} must be an integer")
+
+
+def _float_field(payload: Mapping[str, object], field_name: str, *, default: float = 0.0) -> float:
+    value = payload.get(field_name, default)
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        raise ValueError(f"JournalRecord.{field_name} must be a number")
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError as exc:
+            raise ValueError(f"JournalRecord.{field_name} must be a number") from exc
+    raise ValueError(f"JournalRecord.{field_name} must be a number")
+
+
+@dataclass(frozen=True, slots=True)
+class Causation:
+    """事件因果关系(ADR-0065 §三)。
+
+    - ``parent_event_id``: 直接因果(替代 StampedEvent.parent_seq)。
+    - ``links``: 非树形关联 —— 重试 / 并行委派 / 外部 trace / 跨 run 证据。
+    """
+
+    parent_event_id: str = ""
+    links: tuple[dict[str, str], ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "parent_event_id": self.parent_event_id,
+            "links": [dict(link) for link in self.links],
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> Causation:
+        links = tuple(
+            {key: _string_field(link, key) for key in link}
+            for item in _sequence_field(payload, "links")
+            for link in (_mapping_value(item, field_name="causation.links[]"),)
+        )
+        return cls(
+            parent_event_id=_string_field(payload, "parent_event_id"),
+            links=links,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DescriptorRef:
+    """事件描述符引用(ADR-0065 §三 / L4)。
+
+    - type: 与 EventDescriptor.type_name 对应;
+    - version: 描述符自身版本号;
+    - payload_schema_version: payload dataclass schema 版本。
+    """
+
+    type: str = ""
+    version: int = 1
+    payload_schema_version: int = 1
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "type": self.type,
+            "version": self.version,
+            "payload_schema_version": self.payload_schema_version,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> DescriptorRef:
+        return cls(
+            type=_string_field(payload, "type"),
+            version=_int_field(payload, "version", default=1),
+            payload_schema_version=_int_field(payload, "payload_schema_version", default=1),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class JournalRecord:
+    """Journal v2 envelope(ADR-0065 §三)。
+
+    字段:
+    - schema: 必填 "lca.journal/2";L4 fail-fast 校验入口。
+    - event_id: 全局唯一(ULID);L3 身份不可重铸的稳定句柄。
+    - run_id / run_seq: 连续唯一;L1/L3 强约束。
+    - occurred_at: 源认定的发生时间(可能落后于 committed_at)。
+    - committed_at: 账本接受该记录的时间(L2 "提交先于观察")。
+    - scope: RunScope —— 与 StampedEvent.scope 等价。
+    - causation: Causation —— 替代 parent_seq;支持跨 run 关联。
+    - descriptor: DescriptorRef —— L4 fail-fast 校验目标。
+    - data: 类型化 payload 规范化序列化;不再是自由 dict 逃逸口。
+    - evidence: 受治理证据引用(L5 / §四);完整载荷走 EvidenceStore。
+    - plan_ref: ADR-0074 PR-6 —— CompiledRunPlan canonical hash (V5 硬约束);
+      auto-stamped from ``lca_run_plan_ref`` ContextVar. 空字符串 ``""`` for
+      legacy code paths without plan binding (tests, projector previews)。
+    """
+
+    schema: Literal["lca.journal/2"] = "lca.journal/2"
+    event_id: str = ""
+    run_id: str = ""
+    run_seq: int = 0
+    occurred_at: float = 0.0
+    committed_at: float = 0.0
+    scope: RunScope = field(default_factory=RunScope)
+    causation: Causation = field(default_factory=Causation)
+    descriptor: DescriptorRef = field(default_factory=DescriptorRef)
+    data: Mapping[str, object] = field(default_factory=dict)
+    evidence: tuple[_EvidenceRef, ...] = ()
+    plan_ref: str = ""
+    """CompiledRunPlan canonical hash (PR-6 V5); empty = no plan binding."""
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema": self.schema,
+            "event_id": self.event_id,
+            "run_id": self.run_id,
+            "run_seq": self.run_seq,
+            "occurred_at": self.occurred_at,
+            "committed_at": self.committed_at,
+            "scope": _scope_to_dict(self.scope),
+            "causation": self.causation.to_dict(),
+            "descriptor": self.descriptor.to_dict(),
+            "data": dict(self.data),
+            "evidence": [ref.to_dict() for ref in self.evidence],
+            "plan_ref": self.plan_ref,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> JournalRecord:
+        from lca.contracts.observability.evidence import EvidenceRef as _EvidenceRef
+
+        scope = _scope_from_dict(_mapping_field(payload, "scope"))
+        causation = Causation.from_dict(_mapping_field(payload, "causation"))
+        descriptor = DescriptorRef.from_dict(_mapping_field(payload, "descriptor"))
+        evidence = tuple(
+            _EvidenceRef.from_dict(_mapping_value(item, field_name="evidence[]"))
+            for item in _sequence_field(payload, "evidence")
+        )
+        return cls(
+            schema="lca.journal/2",
+            event_id=_string_field(payload, "event_id"),
+            run_id=_string_field(payload, "run_id"),
+            run_seq=_int_field(payload, "run_seq"),
+            occurred_at=_float_field(payload, "occurred_at"),
+            committed_at=_float_field(payload, "committed_at"),
+            scope=scope,
+            causation=causation,
+            descriptor=descriptor,
+            data=dict(_mapping_field(payload, "data")),
+            evidence=evidence,
+            plan_ref=_string_field(payload, "plan_ref"),
+        )
+
+
+def _scope_to_dict(scope: RunScope) -> dict[str, object]:
+    """RunScope 不依赖 dataclasses.asdict(因为字段是 brand-typed)。"""
+    return {
+        "trace_id": str(scope.trace_id),
+        "run_id": str(scope.run_id),
+        "parent_run_id": str(scope.parent_run_id) if scope.parent_run_id else None,
+        "parent_trace_id": str(scope.parent_trace_id) if scope.parent_trace_id else None,
+        "delegation_id": scope.delegation_id,
+        "agent_role": scope.agent_role,
+        "step": scope.step,
+    }
+
+
+def _scope_from_dict(payload: Mapping[str, object]) -> RunScope:
+    """Rebuild the branded correlation skeleton from validated JSON fields."""
+
+    parent_run_id = _optional_string_field(payload, "parent_run_id")
+    parent_trace_id = _optional_string_field(payload, "parent_trace_id")
+    return RunScope(
+        trace_id=TraceId(_string_field(payload, "trace_id")),
+        run_id=RunId(_string_field(payload, "run_id")),
+        parent_run_id=RunId(parent_run_id) if parent_run_id is not None else None,
+        parent_trace_id=TraceId(parent_trace_id) if parent_trace_id is not None else None,
+        delegation_id=_optional_string_field(payload, "delegation_id"),
+        agent_role=_string_field(payload, "agent_role"),
+        step=_int_field(payload, "step"),
+    )
+
+
+def run_scope(scope: RunScope) -> AbstractContextManager[None]:
+    """兼容导出：经 observability 包根转发唯一 RunScope 实现。"""
+
+    facade = import_module("lca.layer0_infra.observability")
+    return cast("AbstractContextManager[None]", facade.run_scope(scope))
+
+
+def get_current_run_scope() -> RunScope | None:
+    """兼容导出：读取当前环境的唯一 RunScope。"""
+
+    facade = import_module("lca.layer0_infra.observability")
+    return cast("RunScope | None", facade.get_current_run_scope())
+
+
+def stamped_to_journal_record(
+    stamped: StampedEvent,
+    **kwargs: object,
+) -> JournalRecord:
+    """兼容导出：将 Journal 账本事件投影为 v2 JournalRecord。"""
+
+    facade = import_module("lca.layer0_infra.observability")
+    return cast("JournalRecord", facade.stamped_to_journal_record(stamped, **kwargs))
+
+
+__all__ = [
+    "Causation",
+    "DescriptorRef",
+    "JournalRecord",
+    "get_current_run_scope",
+    "run_scope",
+    "stamped_to_journal_record",
+]

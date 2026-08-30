@@ -63,8 +63,19 @@ class Result:
             output = str(payload)
         else:
             output = None
-        total_steps = int(extra.get("source_total_steps") or 1)
-        trace_id = str(extra.get("source_trace_id") or new_id("trace"))
+        raw_total_steps = extra.get("source_total_steps", 1)
+        if not isinstance(raw_total_steps, int) or isinstance(raw_total_steps, bool):
+            raise ValueError("source_total_steps must be an integer")
+        if raw_total_steps < 0:
+            raise ValueError("source_total_steps must be non-negative")
+        raw_trace_id = extra.get("source_trace_id")
+        if raw_trace_id is None:
+            trace_id = new_id("trace")
+        elif not isinstance(raw_trace_id, str) or not raw_trace_id:
+            raise ValueError("source_trace_id must be a non-empty string")
+        else:
+            trace_id = raw_trace_id
+        total_steps = raw_total_steps
         return cls(
             trace_id=trace_id,
             status=status,

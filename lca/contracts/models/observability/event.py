@@ -86,6 +86,9 @@ class EventDescriptor:
 
     描述符把分类、持久化、可见性、安全治理、领域归属与唯一发射边界放在
     同一注册表中；投影器只能读取描述符，不能自行解释相同的策略。
+
+    ADR-0065 L4 增强：``version`` + ``payload_schema_version`` 共同决定
+    提交边界的兼容性。未登记 / 不匹配 schema 版本 fail-fast。
     """
 
     type_name: str
@@ -103,6 +106,10 @@ class EventDescriptor:
     """领域 payload 类；反序列化和 ``EventDescriptor`` 校验依赖此绑定。"""
     extra: Mapping[str, Any] = field(default_factory=dict)
     """插件可扩展字段（不破坏核心元数据）。"""
+    version: int = 1
+    """描述符自身版本号；每次 type 字段语义变更 +1。"""
+    payload_schema_version: int = 1
+    """领域 payload dataclass 的 schema 版本；``JournalRecord.data`` 序列化形态稳定于此。"""
 
 
 __all__ = [
