@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.infrastructure.ops.config import OnlyboxesConfig
-from lca.infrastructure.ops.service import ServiceStatus
-from lca.infrastructure.ops.services.onlyboxes import OnlyboxesService
+from lca.infrastructure.cli.config import OnlyboxesConfig
+from lca.infrastructure.cli.service import ServiceStatus
+from lca.infrastructure.cli.services.onlyboxes import OnlyboxesService
 
 CONFIGURE = "./deploy/onlyboxes/configure-terminal-runtime.sh"
 BUILD = "./deploy/onlyboxes/build-terminal-image.sh"
@@ -25,7 +25,7 @@ class _FakeProbe:
     configure_calls: int = 0
 
     def observe(self):
-        from lca.infrastructure.ops.services.onlyboxes import OnlyboxesObservation
+        from lca.infrastructure.cli.services.onlyboxes import OnlyboxesObservation
 
         return OnlyboxesObservation(
             image_present=self.image_present,
@@ -110,10 +110,10 @@ def test_heal_runs_configure_when_runtime_is_wrong() -> None:
 
 
 def test_stack_status_includes_onlyboxes() -> None:
-    from lca.infrastructure.ops.steps import STATUS_SERVICES
+    from lca.infrastructure.cli.steps import STATUS_SERVICES
 
     assert "onlyboxes" in STATUS_SERVICES
     assert (
         "onlyboxes"
-        not in __import__("lca.infrastructure.ops.steps", fromlist=["STOP_SERVICES"]).STOP_SERVICES
+        not in __import__("lca.infrastructure.cli.steps", fromlist=["STOP_SERVICES"]).STOP_SERVICES
     )

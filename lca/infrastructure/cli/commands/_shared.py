@@ -12,11 +12,11 @@ from typing import Any
 
 import typer
 
-from lca.infrastructure.ops.config import OpsConfig
-from lca.infrastructure.ops.console import Console, ConsoleConfig
-from lca.infrastructure.ops.pipeline import PipelineContext
-from lca.infrastructure.ops.services import build_registry
-from lca.infrastructure.ops.state import StateStore
+from lca.infrastructure.cli.config import OpsConfig
+from lca.infrastructure.cli.console import Console, ConsoleConfig
+from lca.infrastructure.cli.pipeline import PipelineContext
+from lca.infrastructure.cli.services import build_registry
+from lca.infrastructure.cli.state import StateStore
 
 
 def make_context(

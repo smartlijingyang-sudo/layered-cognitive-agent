@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import pytest
 
-from lca.infrastructure.ops.config import GatewayConfig, LobeHubConfig
-from lca.infrastructure.ops.service import ServiceStatus
-from lca.infrastructure.ops.services.lobehub import LobeHubService
-from lca.infrastructure.ops.state import StateStore
+from lca.infrastructure.cli.config import GatewayConfig, LobeHubConfig
+from lca.infrastructure.cli.service import ServiceStatus
+from lca.infrastructure.cli.services.lobehub import LobeHubService
+from lca.infrastructure.cli.state import StateStore
 
 
 @pytest.fixture
@@ -40,10 +40,10 @@ def test_status_running_when_dev_up_but_stored_pid_stale(lobehub_svc: LobeHubSer
     lobehub_svc._state.write_pid("lobehub", 999_999)
 
     with (
-        patch("lca.infrastructure.ops.services.lobehub.http_ready", return_value=True),
-        patch("lca.infrastructure.ops.services.lobehub.pid_on_port", return_value=42_001),
+        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
+        patch("lca.infrastructure.cli.services.lobehub.pid_on_port", return_value=42_001),
         patch(
-            "lca.infrastructure.ops.services.lobehub.pid_alive", side_effect=lambda pid: pid == 42_001
+            "lca.infrastructure.cli.services.lobehub.pid_alive", side_effect=lambda pid: pid == 42_001
         ),
     ):
         state = lobehub_svc.state()
@@ -58,9 +58,9 @@ def test_status_stopped_when_dev_down_and_pid_stale(lobehub_svc: LobeHubService)
     lobehub_svc._state.write_pid("lobehub", 999_999)
 
     with (
-        patch("lca.infrastructure.ops.services.lobehub.http_ready", return_value=False),
-        patch("lca.infrastructure.ops.services.lobehub.pid_on_port", return_value=None),
-        patch("lca.infrastructure.ops.services.lobehub.pid_alive", return_value=False),
+        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=False),
+        patch("lca.infrastructure.cli.services.lobehub.pid_on_port", return_value=None),
+        patch("lca.infrastructure.cli.services.lobehub.pid_alive", return_value=False),
     ):
         state = lobehub_svc.state()
 
@@ -98,11 +98,11 @@ def test_start_spawns_next_and_spa_not_coupled_dev(lobehub_svc: LobeHubService) 
 
     with (
         patch.object(lobehub_svc, "ensure_ready", return_value=False),
-        patch("lca.infrastructure.ops.services.lobehub.subprocess.Popen", side_effect=_popen),
-        patch("lca.infrastructure.ops.services.lobehub.http_ready", side_effect=_ready),
-        patch("lca.infrastructure.ops.services.lobehub.time.sleep"),
+        patch("lca.infrastructure.cli.services.lobehub.subprocess.Popen", side_effect=_popen),
+        patch("lca.infrastructure.cli.services.lobehub.http_ready", side_effect=_ready),
+        patch("lca.infrastructure.cli.services.lobehub.time.sleep"),
         patch(
-            "lca.infrastructure.ops.services.lobehub.pid_on_port", side_effect=_port_pid(None, None)
+            "lca.infrastructure.cli.services.lobehub.pid_on_port", side_effect=_port_pid(None, None)
         ),
     ):
         state = lobehub_svc.start()
@@ -120,12 +120,12 @@ def test_next_up_spa_down_is_degraded_not_stopped(lobehub_svc: LobeHubService) -
     lobehub_svc._state.write_pid("lobehub", 42_001)
 
     with (
-        patch("lca.infrastructure.ops.services.lobehub.http_ready", return_value=True),
+        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
         patch(
-            "lca.infrastructure.ops.services.lobehub.pid_on_port", side_effect=_port_pid(42_001, None)
+            "lca.infrastructure.cli.services.lobehub.pid_on_port", side_effect=_port_pid(42_001, None)
         ),
         patch(
-            "lca.infrastructure.ops.services.lobehub.pid_alive", side_effect=lambda pid: pid == 42_001
+            "lca.infrastructure.cli.services.lobehub.pid_alive", side_effect=lambda pid: pid == 42_001
         ),
     ):
         state = lobehub_svc.state()
@@ -151,14 +151,14 @@ def test_heal_spa_only_does_not_respawn_next(lobehub_svc: LobeHubService) -> Non
     with (
         patch.object(lobehub_svc, "ensure_ready", return_value=False),
         patch.object(lobehub_svc, "stop") as stop,
-        patch("lca.infrastructure.ops.services.lobehub.subprocess.Popen", side_effect=_popen),
-        patch("lca.infrastructure.ops.services.lobehub.http_ready", return_value=True),
+        patch("lca.infrastructure.cli.services.lobehub.subprocess.Popen", side_effect=_popen),
+        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
         patch(
-            "lca.infrastructure.ops.services.lobehub.pid_on_port",
+            "lca.infrastructure.cli.services.lobehub.pid_on_port",
             side_effect=_port_pid(42_001, None),
         ),
         patch(
-            "lca.infrastructure.ops.services.lobehub.pid_alive",
+            "lca.infrastructure.cli.services.lobehub.pid_alive",
             side_effect=lambda pid: pid in {42_001, 77},
         ),
     ):

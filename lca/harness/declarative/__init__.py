@@ -1,6 +1,5 @@
 """ADR-0075 最小可信内核的声明式编译、组装与执行实现。"""
 
-from lca.harness.declarative.controls.approval import ApprovalState, ApprovalStateMachine, ApprovalTransition
 from lca.harness.declarative.compile.assembler import (
     ExecutableNode,
     ExecutablePlan,
@@ -12,6 +11,12 @@ from lca.harness.declarative.compile.compiler import (
     DeclarativePlanProjection,
     compile_declarative_projection,
 )
+from lca.harness.declarative.controls.approval import (
+    ApprovalState,
+    ApprovalStateMachine,
+    ApprovalTransition,
+)
+from lca.harness.declarative.controls.validation import validate_control_binding_closure
 from lca.harness.declarative.execute.interpreter import (
     GenericPlanInterpreter,
     InMemoryJournalCommitter,
@@ -19,7 +24,6 @@ from lca.harness.declarative.execute.interpreter import (
     PhaseVisit,
     RestrictedPhaseContext,
 )
-from lca.harness.declarative.controls.validation import validate_control_binding_closure
 
 __all__ = [
     "ApprovalState",

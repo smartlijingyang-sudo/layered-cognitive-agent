@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from lca.infrastructure.ops.config import OnlyboxesConfig
-from lca.infrastructure.ops.service import HealthCheck, ServiceState, ServiceStatus
+from lca.infrastructure.cli.config import OnlyboxesConfig
+from lca.infrastructure.cli.service import HealthCheck, ServiceState, ServiceStatus
 
 
 @dataclass(frozen=True, slots=True)

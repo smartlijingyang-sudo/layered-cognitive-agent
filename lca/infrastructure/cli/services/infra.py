@@ -11,8 +11,8 @@ import socket
 import subprocess
 from pathlib import Path
 
-from lca.infrastructure.ops.config import InfraConfig
-from lca.infrastructure.ops.service import HealthCheck, ServiceState, ServiceStatus
+from lca.infrastructure.cli.config import InfraConfig
+from lca.infrastructure.cli.service import HealthCheck, ServiceState, ServiceStatus
 
 
 class InfraService:

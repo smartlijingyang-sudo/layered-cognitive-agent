@@ -13,10 +13,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TypeAlias
 
-from lca.infrastructure.ops.config import OpsConfig
-from lca.infrastructure.ops.console import Console
-from lca.infrastructure.ops.registry import ServiceRegistry
-from lca.infrastructure.ops.state import StateStore
+from lca.infrastructure.cli.config import OpsConfig
+from lca.infrastructure.cli.console import Console
+from lca.infrastructure.cli.registry import ServiceRegistry
+from lca.infrastructure.cli.state import StateStore
 
 
 @dataclass

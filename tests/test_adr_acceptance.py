@@ -12,7 +12,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from lca.infrastructure.ops.cli import app
+from lca.infrastructure.cli.cli import app
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 ACCEPTANCE_CRITERIA = (

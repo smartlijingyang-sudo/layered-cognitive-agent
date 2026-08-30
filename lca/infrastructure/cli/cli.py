@@ -4,7 +4,7 @@ Design: each command group lives in ``commands/`` as a deepening module.
 This file creates the typer app, loads the GUIDE, and registers all
 command groups via their ``register(app)`` entry points.
 
-Backward compatibility: ``from lca.infrastructure.ops.cli import app``
+Backward compatibility: ``from lca.infrastructure.cli.cli import app``
 still works — tests and scripts import ``app`` directly.
 """
 
@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import typer
 
-import lca.infrastructure.ops.steps  # noqa: F401
-from lca.infrastructure.ops.commands import (
+import lca.infrastructure.cli.steps  # noqa: F401
+from lca.infrastructure.cli.commands import (
     audit,
     creator_plan,
     declarative,

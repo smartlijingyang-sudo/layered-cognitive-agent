@@ -38,7 +38,7 @@ from lca.harness.profile.plan_compiler import (
     explain_compile_plan,
 )
 from lca.harness.profile.resolve import ResolvedProfile, resolve_profile
-from lca.infrastructure.ops.commands.declarative import render_declarative_graph
+from lca.infrastructure.cli.commands.declarative import render_declarative_graph
 
 # ── build_input_provenance ──────────────────────────────────────────
 

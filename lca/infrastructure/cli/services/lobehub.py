@@ -13,8 +13,8 @@ import subprocess
 import time
 from pathlib import Path
 
-from lca.infrastructure.ops.config import GatewayConfig, LobeHubConfig
-from lca.infrastructure.ops.service import (
+from lca.infrastructure.cli.config import GatewayConfig, LobeHubConfig
+from lca.infrastructure.cli.service import (
     HealthCheck,
     ServiceState,
     ServiceStatus,
@@ -24,7 +24,7 @@ from lca.infrastructure.ops.service import (
     pid_alive,
     pid_on_port,
 )
-from lca.infrastructure.ops.state import StateStore
+from lca.infrastructure.cli.state import StateStore
 
 
 class LobeHubService:

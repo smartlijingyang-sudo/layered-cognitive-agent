@@ -33,7 +33,7 @@ from lca.infrastructure.observability.journal.jsonl.projector import (
 )
 from lca.infrastructure.observability.journal_backend import MemoryJournal
 from lca.infrastructure.observability.policy import AttributePolicy
-from lca.infrastructure.ops.cli import app
+from lca.infrastructure.cli.cli import app
 
 _RUNNER = typer.testing.CliRunner()
 

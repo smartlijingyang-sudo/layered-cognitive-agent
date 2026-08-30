@@ -6,7 +6,7 @@ Simple dict-based registry, no magic.
 
 from __future__ import annotations
 
-from lca.infrastructure.ops.service import Service, ServiceStatus
+from lca.infrastructure.cli.service import Service, ServiceStatus
 
 
 class ServiceRegistry:

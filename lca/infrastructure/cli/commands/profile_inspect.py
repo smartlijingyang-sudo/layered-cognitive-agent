@@ -9,7 +9,7 @@ from typing import cast
 
 import typer
 
-from lca.infrastructure.ops.commands._shared import render_diagnostic_trace_line
+from lca.infrastructure.cli.commands._shared import render_diagnostic_trace_line
 
 
 def register(app: typer.Typer) -> None:
@@ -118,7 +118,7 @@ def register(app: typer.Typer) -> None:
         ),
     ) -> None:
         """Print the compiled capability / phase / replacement graph as Mermaid."""
-        from lca.infrastructure.ops.commands.declarative import render_declarative_graph
+        from lca.infrastructure.cli.commands.declarative import render_declarative_graph
 
         print(render_declarative_graph(profile))
 

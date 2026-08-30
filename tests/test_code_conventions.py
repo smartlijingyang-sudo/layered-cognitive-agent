@@ -186,17 +186,17 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "DiagnosePattern 单模块承载 4 个 v3 §24.5 诊断模式"
         "（model_not_seen / loop_stuck / memory_poisoned / approval_rejected）"
     ),
-    "lca/infrastructure/ops/cli.py": (
+    "lca.infrastructure.cli/cli.py": (
         "lca-ops CLI 单模块承载 dev/restart/stop/status/heal/provision"
         "/diagnose/dump-profile/inspect-tree 全子命令"
     ),
-    "lca/infrastructure/ops/commands/tools.py": (
+    "lca.infrastructure.cli/commands/tools.py": (
         "coding-agent tools CLI 封装（ADR-0065 §六 / PR-9）：9 个只读子命令从旧 cli.py 拆出"
     ),
-    "lca/infrastructure/ops/services/lobehub.py": (
+    "lca.infrastructure.cli/services/lobehub.py": (
         "LobeHub deploy service 单模块承载 dev/prod/restart/logs/upgrade"
     ),
-    "lca/infrastructure/ops/services/daemon.py": ("Daemon 单模块承载 process 管理 + uptime + health"),
+    "lca.infrastructure.cli/services/daemon.py": ("Daemon 单模块承载 process 管理 + uptime + health"),
     "lca/infrastructure/openai_compat.py": (
         "OpenAI compat 单模块承载 chat / completion / embedding 适配"
     ),

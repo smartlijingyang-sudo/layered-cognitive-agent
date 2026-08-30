@@ -1,6 +1,6 @@
 """Creator four-face protocol (ADR-0074 §三).
 
-``plan`` subcommands live in ``lca.infrastructure.ops.commands.declarative``
+``plan`` subcommands live in ``lca.infrastructure.cli.commands.declarative``
 (``plan_app``), not here. Earlier revisions registered a flat ``plan``
 typer on this module too, but the later ``plan_app`` wins and the
 positional-arg handler was unreachable.

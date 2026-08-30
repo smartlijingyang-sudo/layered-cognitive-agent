@@ -1,13 +1,13 @@
 """Service implementations."""
 
-from lca.infrastructure.ops.config import OpsConfig
-from lca.infrastructure.ops.registry import ServiceRegistry
-from lca.infrastructure.ops.services.daemon import DaemonService
-from lca.infrastructure.ops.services.gateway import GatewayService
-from lca.infrastructure.ops.services.infra import InfraService
-from lca.infrastructure.ops.services.lobehub import LobeHubService
-from lca.infrastructure.ops.services.onlyboxes import OnlyboxesService
-from lca.infrastructure.ops.sudo import Sudo
+from lca.infrastructure.cli.config import OpsConfig
+from lca.infrastructure.cli.registry import ServiceRegistry
+from lca.infrastructure.cli.services.daemon import DaemonService
+from lca.infrastructure.cli.services.gateway import GatewayService
+from lca.infrastructure.cli.services.infra import InfraService
+from lca.infrastructure.cli.services.lobehub import LobeHubService
+from lca.infrastructure.cli.services.onlyboxes import OnlyboxesService
+from lca.infrastructure.cli.sudo import Sudo
 
 __all__ = [
     "DaemonService",

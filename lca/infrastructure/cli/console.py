@@ -17,7 +17,7 @@ from rich.console import Console as RichConsole
 from rich.panel import Panel
 from rich.table import Table
 
-from lca.infrastructure.ops.service import HealthCheck, ServiceState, ServiceStatus
+from lca.infrastructure.cli.service import HealthCheck, ServiceState, ServiceStatus
 
 
 @dataclass

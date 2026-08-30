@@ -6,7 +6,7 @@ from pathlib import Path
 
 import typer
 
-from lca.infrastructure.ops.commands._shared import resolve_diagnose_journal_path
+from lca.infrastructure.cli.commands._shared import resolve_diagnose_journal_path
 
 
 def register(app: typer.Typer) -> None:

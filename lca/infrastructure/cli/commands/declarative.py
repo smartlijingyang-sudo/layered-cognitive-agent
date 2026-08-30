@@ -12,8 +12,8 @@ from lca.harness.declarative.controls.validation import is_validation_valid
 from lca.harness.plan import compiled_run_plan_to_dict
 from lca.harness.profile.plan_compiler import CompileOptions, compile_plan
 from lca.harness.profile.resolve import resolve_profile
-from lca.infrastructure.ops.commands._shared import emit_report
-from lca.infrastructure.ops.commands.declarative_graph import (
+from lca.infrastructure.cli.commands._shared import emit_report
+from lca.infrastructure.cli.commands.declarative_graph import (
     audit_declarative_boundaries,
     explain_declarative_plan,
     render_declarative_graph,

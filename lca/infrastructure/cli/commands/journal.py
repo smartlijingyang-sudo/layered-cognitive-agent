@@ -8,7 +8,7 @@ from pathlib import Path
 import httpx
 import typer
 
-from lca.infrastructure.ops.config import OpsConfig
+from lca.infrastructure.cli.config import OpsConfig
 
 # Error codes returned by the gateway when it explicitly refuses a journal
 # subscription. We surface these verbatim so operators don't chase ghosts.
@@ -196,7 +196,7 @@ def _stream_live(
     from lca.infrastructure.observability.journal.stream.fact_stream import (
         FactStreamProjector,
     )
-    from lca.infrastructure.ops.journal_log import (
+    from lca.infrastructure.cli.journal_log import (
         extract_seq_from_record,
         parse_sse_block,
         sse_record_to_stamped,

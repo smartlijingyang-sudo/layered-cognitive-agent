@@ -8,8 +8,8 @@ Commands are sequences of steps defined in the CLI.
 
 from __future__ import annotations
 
-from lca.infrastructure.ops.pipeline import PipelineContext, register_step
-from lca.infrastructure.ops.service import CliShippingService
+from lca.infrastructure.cli.pipeline import PipelineContext, register_step
+from lca.infrastructure.cli.service import CliShippingService
 
 # ── Infrastructure Steps ──────────────────────────────────────────────
 

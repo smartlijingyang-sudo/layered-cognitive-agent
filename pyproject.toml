@@ -185,12 +185,12 @@ ignore = [
 "lca/contracts/protocols/**/*.py" = ["ARG002"]
 "lca/contracts/mechanisms.py" = ["ARG002"]
 "lca/contracts/action.py" = ["ARG002"]
-"lca/infrastructure/ops/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
-"lca/infrastructure/ops/commands/*.py" = ["B008", "S603"]  # typer defaults + tail logs
-"lca/infrastructure/ops/config.py" = ["S105"]  # sudo_pass_file is a path, not a secret
-"lca/infrastructure/ops/sudo.py" = ["S603"]  # privileged subprocess wrapper
-"lca/infrastructure/ops/service.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for process management
-"lca/infrastructure/ops/services/*.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for service management
+"lca.infrastructure.cli/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
+"lca.infrastructure.cli/commands/*.py" = ["B008", "S603"]  # typer defaults + tail logs
+"lca.infrastructure.cli/config.py" = ["S105"]  # sudo_pass_file is a path, not a secret
+"lca.infrastructure.cli/sudo.py" = ["S603"]  # privileged subprocess wrapper
+"lca.infrastructure.cli/service.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for process management
+"lca.infrastructure.cli/services/*.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for service management
 "deploy/lobehub/engine.py" = ["S603", "S607"]  # git describe on .lobehub-upstream (controlled path)
 
 [tool.ruff.format]
@@ -1299,8 +1299,8 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.infrastructure.ops"]
-responsibility = "lca/infrastructure/ops. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
+[tool.lca.package_contracts."lca.infrastructure.cli"]
+responsibility = "lca.infrastructure.cli. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
     "lca.contracts",
@@ -1323,7 +1323,7 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.infrastructure.ops",
+    "lca.infrastructure.cli",
 ]
 schema_version = "1.0.0"
 
@@ -2297,7 +2297,7 @@ type = "forbidden"
 source_modules = ["lca.contracts.models.observability"]
 forbidden_modules = [
     "lca.infrastructure.llm",
-    "lca.infrastructure.ops",
+    "lca.infrastructure.cli",
 ]
 
 [[tool.importlinter.contracts]]
@@ -2316,7 +2316,7 @@ source_modules = ["lca.contracts.observability"]
 forbidden_modules = [
     "lca.infrastructure.llm",
     "lca.infrastructure.tools",
-    "lca.infrastructure.ops",
+    "lca.infrastructure.cli",
 ]
 
 [[tool.importlinter.contracts]]

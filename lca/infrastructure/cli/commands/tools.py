@@ -13,7 +13,7 @@ from pathlib import Path
 
 import typer
 
-from lca.infrastructure.ops.commands._shared import emit_report, resolve_journal_path
+from lca.infrastructure.cli.commands._shared import emit_report, resolve_journal_path
 
 
 def register(app: typer.Typer) -> None:
@@ -62,7 +62,7 @@ def register(app: typer.Typer) -> None:
             if not selected_profile.exists():
                 print(f"Profile not found: {selected_profile}", file=sys.stderr)
                 raise typer.Exit(2)
-            from lca.infrastructure.ops.commands.declarative import explain_declarative_plan
+            from lca.infrastructure.cli.commands.declarative import explain_declarative_plan
 
             try:
                 report = explain_declarative_plan(selected_profile)

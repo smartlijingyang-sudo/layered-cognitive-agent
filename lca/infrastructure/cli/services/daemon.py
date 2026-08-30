@@ -16,16 +16,16 @@ import subprocess
 import time
 from pathlib import Path
 
-from lca.infrastructure.ops.config import DaemonConfig, GatewayConfig
-from lca.infrastructure.ops.service import (
+from lca.infrastructure.cli.config import DaemonConfig, GatewayConfig
+from lca.infrastructure.cli.service import (
     HealthCheck,
     ServiceState,
     ServiceStatus,
     http_ready,
     pid_alive,
 )
-from lca.infrastructure.ops.state import ChangeReport, StateStore
-from lca.infrastructure.ops.sudo import Sudo
+from lca.infrastructure.cli.state import ChangeReport, StateStore
+from lca.infrastructure.cli.sudo import Sudo
 
 
 class DaemonService:

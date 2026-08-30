@@ -48,7 +48,7 @@ class TestBoundaryGuard(unittest.TestCase):
                 for name in imported:
                     if name.startswith(_OBS_PKG + ".") and not (
                         name.startswith(_OBS_PKG + ".adapters")
-                        or mod.startswith("lca.infrastructure.ops")
+                        or mod.startswith("lca.infrastructure.cli")
                         # Plugins are the legitimate adapter boundary — they MUST import
                         # observability internals (ConsoleJournalProjector, OtelTracer, ...)
                         # to register them as plugin factories. The guard's intent is to

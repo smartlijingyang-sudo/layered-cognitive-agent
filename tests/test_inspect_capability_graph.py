@@ -97,7 +97,7 @@ class TestInspectCapabilityGraph:
         """
         from typer.testing import CliRunner
 
-        from lca.infrastructure.ops.cli import app
+        from lca.infrastructure.cli.cli import app
 
         # Write a minimal YAML profile.
         profile = tmp_path / "mini.yaml"

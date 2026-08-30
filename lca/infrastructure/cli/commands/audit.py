@@ -8,7 +8,7 @@ import sys
 
 import typer
 
-from lca.infrastructure.ops.commands._shared import audit_roots, resolve_repo_root
+from lca.infrastructure.cli.commands._shared import audit_roots, resolve_repo_root
 
 
 def register(app: typer.Typer) -> None:

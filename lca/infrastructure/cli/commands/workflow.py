@@ -6,8 +6,8 @@ from pathlib import Path
 
 import typer
 
-from lca.infrastructure.ops.commands._shared import make_context
-from lca.infrastructure.ops.pipeline import build_pipeline
+from lca.infrastructure.cli.commands._shared import make_context
+from lca.infrastructure.cli.pipeline import build_pipeline
 
 
 def register(app: typer.Typer) -> None:
