@@ -257,6 +257,17 @@ checks = [
     "scripts/check_no_flat_runs.py",
     "scripts/check_protocol_schema_version.py",
     "scripts/check_patch_integrity.py",
+    # Package organization (2026-08-30 cleanup batch):
+    "scripts/check_package_size.py",
+    "scripts/check_package_contracts.py",
+    "scripts/check_package_noun.py",
+    "scripts/check_filename_boundaries.py",
+    "scripts/check_no_utility_modules.py",
+    "scripts/check_no_barrel_glob.py",
+    "scripts/check_package_integrity.py",
+    "scripts/check_readme_filled.py",
+    # Plugin metadata completeness (PR-4 gate):
+    "scripts/check_plugin_metadata.py",
 ]
 
 [tool.lca.package_contracts]
