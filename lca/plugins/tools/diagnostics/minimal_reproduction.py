@@ -8,7 +8,7 @@ from lca.contracts.observability.coding_agent_tools import (
     MinimalReproductionPackage,
     MinimalReproductionTool,
 )
-from lca.infrastructure.observability.coding_agent_tools._helpers import (
+from lca.plugins.tools.diagnostics._helpers import (
     _load_inspector_from_jsonl,
 )
 

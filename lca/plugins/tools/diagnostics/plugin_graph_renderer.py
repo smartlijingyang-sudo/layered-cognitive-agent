@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lca.contracts.observability.coding_agent_tools import PluginGraphRendererTool
-from lca.infrastructure.observability.coding_agent_tools._helpers import (
+from lca.plugins.tools.diagnostics._helpers import (
     _load_inspector_from_jsonl,
 )
 

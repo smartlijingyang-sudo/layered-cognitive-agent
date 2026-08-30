@@ -21,21 +21,21 @@ from lca.contracts.observability.coding_agent_tools import (
     RunDiffTool,
     TraceInspectorTool,
 )
-from lca.infrastructure.observability.coding_agent_tools.diff_context import DiffContext
-from lca.infrastructure.observability.coding_agent_tools.failure_explainer import (
+from lca.plugins.tools.diagnostics.diff_context import DiffContext
+from lca.plugins.tools.diagnostics.failure_explainer import (
     FailureExplainer,
 )
-from lca.infrastructure.observability.coding_agent_tools.minimal_reproduction import (
+from lca.plugins.tools.diagnostics.minimal_reproduction import (
     MinimalReproduction,
 )
-from lca.infrastructure.observability.coding_agent_tools.optimization_finder import (
+from lca.plugins.tools.diagnostics.optimization_finder import (
     OptimizationFinder,
 )
-from lca.infrastructure.observability.coding_agent_tools.plugin_graph_renderer import (
+from lca.plugins.tools.diagnostics.plugin_graph_renderer import (
     PluginGraphRenderer,
 )
-from lca.infrastructure.observability.coding_agent_tools.run_diff import RunDiffToolAdapter
-from lca.infrastructure.observability.coding_agent_tools.trace_inspector_tool import (
+from lca.plugins.tools.diagnostics.run_diff import RunDiffToolAdapter
+from lca.plugins.tools.diagnostics.trace_inspector_tool import (
     TraceInspectorToolAdapter,
 )
 

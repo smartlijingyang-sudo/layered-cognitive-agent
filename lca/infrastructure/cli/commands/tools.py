@@ -30,7 +30,7 @@ def register(app: typer.Typer) -> None:
         depth: int = typer.Option(24, "--depth", help="事件深度"),
     ) -> None:
         """检查一个 run 的 journal 轨迹(只读)。"""
-        from lca.infrastructure.observability.coding_agent_tools.trace_inspector_tool import (
+        from lca.plugins.tools.diagnostics.trace_inspector_tool import (
             TraceInspectorToolAdapter,
         )
 
@@ -109,7 +109,7 @@ def register(app: typer.Typer) -> None:
         if slot is not None:
             print("explain <run_id> does not accept a second positional argument", file=sys.stderr)
             raise typer.Exit(2)
-        from lca.infrastructure.observability.coding_agent_tools.failure_explainer import (
+        from lca.plugins.tools.diagnostics.failure_explainer import (
             FailureExplainer,
         )
 
@@ -125,7 +125,7 @@ def register(app: typer.Typer) -> None:
         limit: int = typer.Option(5, "--limit", "-n"),
     ) -> None:
         """优化候选 —— 按延迟/token/重试排序。"""
-        from lca.infrastructure.observability.coding_agent_tools.optimization_finder import (
+        from lca.plugins.tools.diagnostics.optimization_finder import (
             OptimizationFinder,
         )
 
@@ -141,7 +141,7 @@ def register(app: typer.Typer) -> None:
         jsonl: Path = typer.Option(None, "--jsonl"),
     ) -> None:
         """Mermaid 插件交互图(写到 stdout;供 docs / dashboard 嵌入)。"""
-        from lca.infrastructure.observability.coding_agent_tools.plugin_graph_renderer import (
+        from lca.plugins.tools.diagnostics.plugin_graph_renderer import (
             PluginGraphRenderer,
         )
 
@@ -156,7 +156,7 @@ def register(app: typer.Typer) -> None:
         json_mode: bool = typer.Option(False, "--json"),
     ) -> None:
         """失败因果链 + 必要 evidence refs(供离线复现)。"""
-        from lca.infrastructure.observability.coding_agent_tools.minimal_reproduction import (
+        from lca.plugins.tools.diagnostics.minimal_reproduction import (
             MinimalReproduction,
         )
 
@@ -181,7 +181,7 @@ def register(app: typer.Typer) -> None:
         step: int = typer.Option(0, "--step", help="DiffContext.diff 的 step 参数"),
     ) -> None:
         """同 run 在 step 处的上下文快照(返回 ContextDiff)。"""
-        from lca.infrastructure.observability.coding_agent_tools.diff_context import (
+        from lca.plugins.tools.diagnostics.diff_context import (
             DiffContext,
         )
 
@@ -205,7 +205,7 @@ def register(app: typer.Typer) -> None:
         step: int = typer.Option(0, "--step"),
     ) -> None:
         """两次 run 同 step 的差异(prompt_hash + delta)。"""
-        from lca.infrastructure.observability.coding_agent_tools.run_diff import (
+        from lca.plugins.tools.diagnostics.run_diff import (
             RunDiffToolAdapter,
         )
 

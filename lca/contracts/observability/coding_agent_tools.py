@@ -13,7 +13,7 @@ AST 扫描兜底。
 6. ``DiffContextTool`` — diff(run_id, step)
 7. ``RunDiffTool`` — diff(run_id_a, run_id_b, step)
 
-实现位置:``lca/infrastructure/observability/coding_agent_tools/``(7 个 .py)。
+实现位置:``lca.plugins.tools.diagnostics/``(7 个 .py)。
 Bundle:``lca/plugins/bundles/coding_agent_tools.py`` + ``bundles/coding-agent-tools.yaml``。
 """
 
