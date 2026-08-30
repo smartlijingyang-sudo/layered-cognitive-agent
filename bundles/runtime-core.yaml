@@ -6,10 +6,6 @@ name: runtime-core
 description: |
   Minimal declarative runtime primitives required by profile boot closure.
 entries:
-  - id: lca.registries.factory_seams
-    name: lca_registries_factory_seams
-    $module: lca.plugins.registries.factory_seams
-    config: {}
   - id: state.stop-policy.default
     name: state_stop_policy_default
     $module: lca.plugins.phase_policies.stop_policy

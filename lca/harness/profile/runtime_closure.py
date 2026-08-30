@@ -106,7 +106,7 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
     ),
     RuntimeClosureRequirement(
         "resume_input_adapters",
-        "lca.plugins.registries.factory_seams",
+        "lca.plugins.seams.gate.factory_seams",
     ),
 )
 _RUNTIME_CLOSURE_BY_CAPABILITY: Mapping[str, RuntimeClosureRequirement] = MappingProxyType(

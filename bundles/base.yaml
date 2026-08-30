@@ -20,6 +20,13 @@ entries:
     $module: lca.plugins.seams.gate.decision_classifier
     config: {}
 
+  # Factory registry seams for BODIES / BRAINS / HOOKS / RESUME_INPUT_ADAPTERS /
+  # STRATEGIES. Each is an empty registry that the real providers register into.
+  - id: lca-factory-seams-default
+    name: lca_factory_seams_default
+    $module: lca.plugins.seams.gate.factory_seams
+    config: {}
+
   # Think and Reflect stay distinct cognitive primitives.  A profile can
   # replace either provider without changing the Brain facade or Agent Loop.
   - id: lca-cognitive-think-pipeline-standard

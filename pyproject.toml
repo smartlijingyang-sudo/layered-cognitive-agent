@@ -1913,23 +1913,6 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.plugins.registries"]
-responsibility = "lca.plugins.registries: 注册表插件。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.plugins",
-]
-forbidden_dependencies = [
-    "gateway",
-]
-side_effects = [
-    "log:emit",
-]
-public_api = [
-    "lca.plugins.registries",
-]
-schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.plugins.roles"]
 responsibility = "lca.plugins.roles: 角色插件。本 README 由脚手架生成，待包负责人补充具体细节。"

@@ -86,11 +86,6 @@ entries:
     $module: lca.plugins.gates.must_consult_all
     config: {}
 
-  # ── Registry seams (empty owners; contributors register into them) ──
-  - id: lca.registries.factory_seams
-    name: lca_registries_factory_seams
-    $module: lca.plugins.registries.factory_seams
-    config: {}
 
   # ── Tool batch execution policy ──
   # The segmented-safe default keeps each side-effecting call as an ordered

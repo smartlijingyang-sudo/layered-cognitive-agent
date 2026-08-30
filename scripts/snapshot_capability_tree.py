@@ -135,7 +135,7 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
             "kind": None,
         },
     ),
-    # Infrastructure: everything else in seams, providers, compose, registries, bundles
+    # Infrastructure: everything else in seams, providers, compose, factories, bundles
     (
         "infrastructure",
         {
@@ -144,7 +144,6 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
                 r"^lca/plugins/seams/",
                 r"^lca/plugins/providers/",
                 r"^lca.plugins.factories/",
-                r"^lca/plugins/registries/",
                 r"^lca/plugins/bundles/",
             ],
             "kind": None,

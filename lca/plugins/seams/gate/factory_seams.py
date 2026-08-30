@@ -20,7 +20,7 @@ class Config(BaseModel):
 
 
 @plugin(
-    id="lca.registries.factory_seams",
+    id="lca-factory-seams-default",
     provides=[
         BODIES.key,
         BRAINS.key,
