@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.timeout_recovery import TimeoutAction, TimeoutRecoveryPolicy
+from lca.contracts.harness.gate.timeout_recovery import TimeoutAction, TimeoutRecoveryPolicy
 
 
 def test_timeout_policy_retries_then_resumes_from_checkpoint() -> None:

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from lca.contracts.harness.continuous import (
+from lca.contracts.harness.tasks.continuous import (
     ContinuousControlPlane,
     ContinuousControlPlaneFactory,
     SessionWorkActivator,

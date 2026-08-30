@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from lca.contracts.harness.workflow import (
+from lca.contracts.harness.tasks.workflow import (
     WorkflowMeta,
     WorkflowPhase,
     WorkflowPhaseContext,

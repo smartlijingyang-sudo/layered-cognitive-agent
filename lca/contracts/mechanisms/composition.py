@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
-from lca.contracts.harness.plugin_meta import PluginMeta
+from lca.contracts.harness.composition.plugin_meta import PluginMeta
 
 if TYPE_CHECKING:
     from lca.contracts.models.observability.journal import StampedEvent

@@ -9,8 +9,8 @@ from typing import Any
 
 import structlog
 
-from lca.contracts.harness.middleware import MiddlewareRegistration
-from lca.contracts.harness.plugin import ExtensionPoint
+from lca.contracts.harness.act.middleware import MiddlewareRegistration
+from lca.contracts.harness.composition.plugin import ExtensionPoint
 
 _log = structlog.get_logger("lca.harness.middleware")
 

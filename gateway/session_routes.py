@@ -21,7 +21,7 @@ from gateway.session_payloads import (
     sse_change_payload,
 )
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.harness.command import (
+from lca.contracts.harness.act.command import (
     ApprovalResumeCommand,
     CancelCommand,
     InjectCommand,

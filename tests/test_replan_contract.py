@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.replan import ReplanAction, ReplanRequest
+from lca.contracts.harness.think.replan import ReplanAction, ReplanRequest
 
 
 def test_replan_request_allows_bounded_tool_replacement() -> None:
@@ -44,7 +44,7 @@ def test_replan_request_rejects_unsafe_shape(kwargs: dict[str, object]) -> None:
 
 
 def test_replan_scope_rejects_completed_step_mutation() -> None:
-    from lca.contracts.harness.replan import validate_replan_scope
+    from lca.contracts.harness.think.replan import validate_replan_scope
 
     request = ReplanRequest(
         task_id="task-1",
@@ -60,7 +60,7 @@ def test_replan_scope_rejects_completed_step_mutation() -> None:
 
 
 def test_replan_scope_allows_pending_step_mutation() -> None:
-    from lca.contracts.harness.replan import validate_replan_scope
+    from lca.contracts.harness.think.replan import validate_replan_scope
 
     request = ReplanRequest(
         task_id="task-1",

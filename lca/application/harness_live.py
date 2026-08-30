@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.harness.agent import (
+from lca.contracts.harness.collaboration.agent import (
     ApprovalResumePoint,
     ContextMessage,
     LiveAgentRecovery,
@@ -13,7 +13,7 @@ from lca.contracts.harness.agent import (
     MessageReceipt,
     UserMessage,
 )
-from lca.contracts.harness.events import (
+from lca.contracts.harness.memory.events import (
     ApprovalPersisted,
     ApprovalResolved,
     MessageAccepted,

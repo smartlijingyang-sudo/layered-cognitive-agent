@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from lca.contracts.capabilities import STRATEGIES, TEAM_SEAM
-from lca.contracts.harness.composer import TeamGraph
+from lca.contracts.harness.composition.composer import TeamGraph
 from lca.contracts.mechanisms.capability import require_capability
 from lca.contracts.protocols import TeamAssembly, TeamStage
 from lca.contracts.protocols.journal.spec import LeadSpec, TeamSpec, strategy_key_for_governance

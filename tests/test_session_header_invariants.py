@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.session import SESSION_FORMAT_VERSION, SessionHeader
+from lca.contracts.harness.tasks.session import SESSION_FORMAT_VERSION, SessionHeader
 
 
 def _header(**overrides: object) -> SessionHeader:

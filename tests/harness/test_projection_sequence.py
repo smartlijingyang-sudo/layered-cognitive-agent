@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.tasks.session import SessionEvent
 from lca.harness.projection.registry import InMemoryProjectionRegistry
 
 

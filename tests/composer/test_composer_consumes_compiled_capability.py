@@ -34,7 +34,7 @@ from lca.contracts.capabilities import (
     STRATEGIES,
     TEAM_SEAM,
 )
-from lca.contracts.harness.composer import AgentCompositionRequest
+from lca.contracts.harness.composition.composer import AgentCompositionRequest
 from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.plugins.seam_definitions.team_communication import (
     DefaultTeamCommunicationAssembler,
@@ -479,7 +479,7 @@ def test_default_composers_expose_only_the_graph_operation_they_own() -> None:
     absent prevents callers from restoring ``TypeError``-based routing.
     """
 
-    from lca.contracts.harness.composer import AgentGraphComposer, TeamGraphComposer
+    from lca.contracts.harness.composition.composer import AgentGraphComposer, TeamGraphComposer
     from lca.plugins.composer.agent_assembly import AgentAssemblyPort, PlanBoundAgentAssembler
     from lca.plugins.composer.body_composer import BodyComposer
     from lca.plugins.composer.brain_composer import BrainComposer

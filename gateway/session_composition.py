@@ -20,7 +20,7 @@ from gateway.spine import (
     session_persistence_factory_provider,
     session_projection_registry_factory_provider,
 )
-from lca.contracts.harness.projection import SessionProjectionRegistry
+from lca.contracts.harness.state.projection import SessionProjectionRegistry
 from lca.harness.agent.registry import AgentRegistry
 from lca.harness.command.gateway import CommandGateway
 

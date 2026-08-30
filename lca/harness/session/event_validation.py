@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.tasks.session import SessionEvent
 
 
 def validate_event_stream(events: Iterable[SessionEvent], *, session_id: str) -> None:

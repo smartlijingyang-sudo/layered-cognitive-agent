@@ -23,7 +23,7 @@ from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.protocols.declarative.declarative_plugin import PluginSpec
 
 if TYPE_CHECKING:
-    from lca.contracts.harness.plugin_contract import PluginContract
+    from lca.contracts.harness.composition.plugin_contract import PluginContract
     from lca.contracts.protocols.composition.logic_address import LogicAddress
     from lca.harness.plugin_context import PluginContext
 

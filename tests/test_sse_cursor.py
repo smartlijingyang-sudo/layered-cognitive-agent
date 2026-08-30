@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.sse_cursor import SseCursor
+from lca.contracts.harness.perceive.sse_cursor import SseCursor
 
 
 def test_sse_cursor_advances_monotonically() -> None:

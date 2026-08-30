@@ -13,7 +13,7 @@ from typing import Any
 from gateway.runs.doctor.legacy import diagnose_legacy
 from gateway.runs.doctor.models import DoctorReport, HopVerdict
 from gateway.runs.doctor.session_check import diagnose_session_projection
-from lca.contracts.harness.projection import ProjectionSnapshot
+from lca.contracts.harness.state.projection import ProjectionSnapshot
 
 
 def diagnose(session: Any | None, jsonl_path: Path) -> DoctorReport:

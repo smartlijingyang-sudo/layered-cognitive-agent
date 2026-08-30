@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.tool_governance import (
+from lca.contracts.harness.act.tool_governance import (
     ToolGovernance,
     ToolRisk,
     governance_for,
@@ -43,7 +43,7 @@ def test_tool_governance_rejects_inconsistent_metadata(kwargs: dict[str, object]
 
 
 def test_risk_policy_requires_approval_for_side_effects() -> None:
-    from lca.contracts.harness.tool_governance import requires_approval
+    from lca.contracts.harness.act.tool_governance import requires_approval
 
     assert requires_approval(ToolGovernance()) is False
     assert (
@@ -53,7 +53,7 @@ def test_risk_policy_requires_approval_for_side_effects() -> None:
 
 
 def test_read_only_policy_is_deterministic() -> None:
-    from lca.contracts.harness.tool_governance import is_read_only
+    from lca.contracts.harness.act.tool_governance import is_read_only
 
     assert is_read_only(ToolGovernance()) is True
     assert is_read_only(ToolGovernance(risk=ToolRisk.INTERNAL_WRITE, side_effect=True)) is False

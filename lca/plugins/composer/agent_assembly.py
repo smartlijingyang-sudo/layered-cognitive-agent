@@ -21,7 +21,7 @@ from lca.plugins.composer.runtime_assembly import assemble_runtime_from_graph
 if TYPE_CHECKING:
     from cordis import Context
 
-    from lca.contracts.harness.composer import AgentGraph
+    from lca.contracts.harness.composition.composer import AgentGraph
     from lca.contracts.protocols import DecisionGate
     from lca.contracts.protocols.state.plan import CompiledRunPlan
 

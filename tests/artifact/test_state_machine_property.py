@@ -39,7 +39,7 @@ from lca.contracts.atoms.artifact_state import (
     parse_artifact_state,
 )
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.harness.artifact import (
+from lca.contracts.harness.journal.artifact import (
     ArtifactController,
     CapabilityArtifact,
     InvalidStateTransitionError,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any, Protocol
 
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.tasks.session import SessionEvent
 from lca.harness.session.event_validation import validate_event_stream
 
 

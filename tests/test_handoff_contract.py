@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.handoff import AgentHandoff
+from lca.contracts.harness.collaboration.handoff import AgentHandoff
 
 
 def test_handoff_requires_distinct_owners() -> None:

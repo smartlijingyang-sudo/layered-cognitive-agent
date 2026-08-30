@@ -6,8 +6,8 @@ import asyncio
 from contextlib import suppress
 
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.harness.agent import AgentIdentity, AgentOptions
-from lca.contracts.harness.subagent import (
+from lca.contracts.harness.collaboration.agent import AgentIdentity, AgentOptions
+from lca.contracts.harness.collaboration.subagent import (
     ActivatedSubagent,
     SubagentActivator,
     SubagentRequest,

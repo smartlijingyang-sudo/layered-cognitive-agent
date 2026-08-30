@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from lca.contracts.harness.agent import (
+from lca.contracts.harness.collaboration.agent import (
     ApprovalResumePoint,
     LiveAgentRecovery,
     LiveAgentStatus,
 )
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.tasks.session import SessionEvent
 from lca.harness.session.resume_point import deserialize_resume_point
 
 

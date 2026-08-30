@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.trace_context import AgentTraceContext
+from lca.contracts.harness.act.trace_context import AgentTraceContext
 
 
 def test_trace_context_exports_reproducibility_attributes() -> None:

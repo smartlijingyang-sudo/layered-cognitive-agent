@@ -21,7 +21,7 @@ from lca.plugins.composer.internal.runtime_capabilities import (
 if TYPE_CHECKING:
     from cordis import Context
 
-    from lca.contracts.harness.composer import AgentGraph
+    from lca.contracts.harness.composition.composer import AgentGraph
     from lca.contracts.protocols.state.plan import CompiledRunPlan
     from lca.contracts.protocols.journal.spec import AgentSpec
 

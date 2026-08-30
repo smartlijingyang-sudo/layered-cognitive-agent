@@ -9,13 +9,13 @@ from typing import Any, ClassVar
 
 from lca.contracts.atoms.enums import ContentType
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.harness.events import (
+from lca.contracts.harness.memory.events import (
     ContextInjected,
     SkillCatalogPublished,
     SkillLoaded,
     SkillUserInvoked,
 )
-from lca.contracts.harness.skill import (
+from lca.contracts.harness.memory.skill import (
     LoadedSkill,
     SkillCatalogEntry,
     SkillCatalogSnapshot,

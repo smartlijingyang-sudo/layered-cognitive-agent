@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lca.contracts.harness.subagent_lifecycle import SubagentLifecycle
+from lca.contracts.harness.collaboration.subagent_lifecycle import SubagentLifecycle
 
 
 def test_only_active_subagents_accept_work() -> None:

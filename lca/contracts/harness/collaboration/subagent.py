@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from lca.contracts.harness.agent import AgentHandle, AgentIdentity, AgentOptions
+from lca.contracts.harness.collaboration.agent import AgentHandle, AgentIdentity, AgentOptions
 
 
 @dataclass(frozen=True)

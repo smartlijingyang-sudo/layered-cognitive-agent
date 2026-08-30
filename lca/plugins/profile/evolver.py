@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.capabilities import LEARNING_PROFILE_EVOLVER
-from lca.contracts.harness.eval_comparison import EvalComparison
+from lca.contracts.harness.think.eval_comparison import EvalComparison
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from lca.contracts.harness import AgentGraphContribution, TeamGraph
-from lca.contracts.harness.composer import (
+from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
     merge_agent_graphs,
     team_graph_member_count,

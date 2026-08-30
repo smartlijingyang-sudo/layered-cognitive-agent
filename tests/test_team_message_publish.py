@@ -19,7 +19,7 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.harness.plugin_meta import LAYER_FIELD, NAME_FIELD, PluginMeta
+from lca.contracts.harness.composition.plugin_meta import LAYER_FIELD, NAME_FIELD, PluginMeta
 from lca.contracts.models.core.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState, Budget

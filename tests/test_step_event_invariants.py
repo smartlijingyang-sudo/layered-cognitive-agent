@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.events import StepEnded, StepStarted
+from lca.contracts.harness.memory.events import StepEnded, StepStarted
 
 
 @pytest.mark.parametrize("event_type", [StepStarted, StepEnded])

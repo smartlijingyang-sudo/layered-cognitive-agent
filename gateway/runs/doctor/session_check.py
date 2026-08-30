@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from gateway.runs.doctor.models import DoctorReport, HopVerdict
-from lca.contracts.harness.projection import ProjectionSnapshot
+from lca.contracts.harness.state.projection import ProjectionSnapshot
 
 
 def diagnose_session_projection(

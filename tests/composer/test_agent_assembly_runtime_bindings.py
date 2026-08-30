@@ -29,8 +29,8 @@ from lca.contracts.capabilities import (
     SESSION_PERSISTENCE_FACTORY,
     SESSION_PROJECTION_REGISTRY_FACTORY,
 )
-from lca.contracts.harness.agent import SessionLiveBuilder
-from lca.contracts.harness.projection import SessionProjectionRegistryFactory
+from lca.contracts.harness.collaboration.agent import SessionLiveBuilder
+from lca.contracts.harness.state.projection import SessionProjectionRegistryFactory
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.contracts.protocols.runtime.runtime_composition import (
     CheckpointStateResolverFactory,

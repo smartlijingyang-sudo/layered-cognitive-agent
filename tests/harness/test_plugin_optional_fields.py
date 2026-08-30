@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from lca.contracts.atoms.control_slot import ControlSlot
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.harness.plugin_contract import (
+from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     PluginContract,
     PluginIdentity,

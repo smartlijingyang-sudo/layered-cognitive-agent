@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
-from lca.contracts.harness.projection import ProjectionChange, ProjectionSnapshot
+from lca.contracts.harness.state.projection import ProjectionChange, ProjectionSnapshot
 
 
 class SSEAligner:

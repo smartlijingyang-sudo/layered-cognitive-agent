@@ -12,13 +12,13 @@ from contextlib import suppress
 from typing import Any
 
 from lca.contracts.atoms.artifact_state import ArtifactState
-from lca.contracts.harness.artifact import (
+from lca.contracts.harness.journal.artifact import (
     ArtifactController,
     CapabilityArtifact,
     controller_migrate,
     make_capability_artifact,
 )
-from lca.contracts.harness.plugin_meta import PluginMeta
+from lca.contracts.harness.composition.plugin_meta import PluginMeta
 from lca.contracts.mechanisms.composition import (
     CapabilityGrantExceeded,
     Composer,

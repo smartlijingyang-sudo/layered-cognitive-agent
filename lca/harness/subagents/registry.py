@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.harness.subagent import SubagentSpec
+from lca.contracts.harness.collaboration.subagent import SubagentSpec
 
 
 class SubagentRegistry:

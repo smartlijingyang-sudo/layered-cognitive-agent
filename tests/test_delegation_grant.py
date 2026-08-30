@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.delegation_grant import derive_child_grant
+from lca.contracts.harness.collaboration.delegation_grant import derive_child_grant
 from lca.contracts.protocols.act.command_envelope import CapabilityGrant
 
 

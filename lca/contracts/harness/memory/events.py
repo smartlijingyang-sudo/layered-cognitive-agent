@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.harness.session import session_event
-from lca.contracts.harness.skill import SkillCatalogEntry
+from lca.contracts.harness.memory.skill import SkillCatalogEntry
+from lca.contracts.harness.tasks.session import session_event
 
 
 @session_event("session.created.v1", visibility="audit")

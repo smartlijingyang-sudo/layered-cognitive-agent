@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.atoms.artifact_state import ArtifactState
-from lca.contracts.harness.artifact import CapabilityArtifact
+from lca.contracts.harness.journal.artifact import CapabilityArtifact
 
 
 @dataclass(frozen=True, slots=True)

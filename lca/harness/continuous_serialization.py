@@ -6,7 +6,7 @@ import json
 from dataclasses import asdict
 from datetime import datetime
 
-from lca.contracts.harness.continuous import Trigger, TriggerKind, WorkItem
+from lca.contracts.harness.tasks.continuous import Trigger, TriggerKind, WorkItem
 
 
 def work_item_payload(item: WorkItem) -> str:

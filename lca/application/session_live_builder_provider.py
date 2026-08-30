@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.harness.agent import SessionLiveBuilder
+from lca.contracts.harness.collaboration.agent import SessionLiveBuilder
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.application.harness_bridge import build_live_agent
 

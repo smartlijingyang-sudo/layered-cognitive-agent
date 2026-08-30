@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.harness.command import CommandReceipt
-from lca.contracts.harness.continuous import (
+from lca.contracts.harness.act.command import CommandReceipt
+from lca.contracts.harness.tasks.continuous import (
     Trigger,
     TriggerKind,
     WorkActivationReceipt,

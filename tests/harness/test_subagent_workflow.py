@@ -6,13 +6,13 @@ import asyncio
 
 import pytest
 
-from lca.contracts.harness.agent import AgentIdentity, AgentOptions
-from lca.contracts.harness.subagent import (
+from lca.contracts.harness.collaboration.agent import AgentIdentity, AgentOptions
+from lca.contracts.harness.collaboration.subagent import (
     SubagentCapabilities,
     SubagentRequest,
     SubagentSpec,
 )
-from lca.contracts.harness.workflow import WorkflowMeta, WorkflowPhase
+from lca.contracts.harness.tasks.workflow import WorkflowMeta, WorkflowPhase
 from lca.harness.subagents import SubagentActivationCoordinator, SubagentRegistry
 from lca.harness.workflow import WorkflowEngine, agent, phase
 

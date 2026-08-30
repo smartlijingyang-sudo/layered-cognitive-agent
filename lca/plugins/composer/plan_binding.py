@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from lca.contracts.atoms.enums import ActionScope
-from lca.contracts.harness.composer import (
+from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
     AgentGraphComposer,
     TeamGraphComposer,
@@ -22,7 +22,7 @@ from lca.plugins.composer.capability_resolution import (
 if TYPE_CHECKING:
     from cordis import Context
 
-    from lca.contracts.harness.composer import AgentGraph, TeamGraph
+    from lca.contracts.harness.composition.composer import AgentGraph, TeamGraph
     from lca.contracts.protocols import DecisionGate, SharedMemoryStore
     from lca.contracts.protocols.runtime.infra import AgentTransport
     from lca.contracts.protocols.state.plan import CompiledRunPlan
@@ -116,7 +116,7 @@ def bind_plan(
 ) -> PlanBindingResult:
     """Bind every required Agent composer and validate the capability plan."""
 
-    from lca.contracts.harness.composer import merge_agent_graphs
+    from lca.contracts.harness.composition.composer import merge_agent_graphs
 
     _validate_capability_bindings(plan, scope)
     composer_bindings = _agent_composer_bindings(plan, scope)

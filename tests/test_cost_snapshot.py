@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.cost_snapshot import CostSnapshot
+from lca.contracts.harness.state.cost_snapshot import CostSnapshot
 
 
 def test_cost_snapshot_aggregates_tokens_and_checks_budget() -> None:

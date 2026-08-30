@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 
-from lca.contracts.harness.command import CommandReceipt
+from lca.contracts.harness.act.command import CommandReceipt
 from lca.contracts.protocols.session.session_command_ledger import (
     ApprovalResumeDisposition,
     SessionCommandLedger,

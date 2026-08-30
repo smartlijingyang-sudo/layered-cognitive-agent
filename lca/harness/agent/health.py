@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from lca.contracts.harness.agent import LiveAgentStatus
+from lca.contracts.harness.collaboration.agent import LiveAgentStatus
 
 _STATUS_BUCKETS = {
     LiveAgentStatus.WORKING: "running",

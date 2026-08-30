@@ -6,8 +6,8 @@ from gateway.session_payloads import (
     snapshot_payload,
     sse_change_payload,
 )
-from lca.contracts.harness.command import CommandReceipt
-from lca.contracts.harness.projection import ProjectionChange, ProjectionSnapshot
+from lca.contracts.harness.act.command import CommandReceipt
+from lca.contracts.harness.state.projection import ProjectionChange, ProjectionSnapshot
 
 
 def test_command_receipt_projection_preserves_client_identity() -> None:

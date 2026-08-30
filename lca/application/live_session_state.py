@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from lca.contracts.harness.agent import ApprovalResumePoint, LiveAgentStatus
+from lca.contracts.harness.collaboration.agent import ApprovalResumePoint, LiveAgentStatus
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.harness.session.resume_point import resume_point_from_state_snapshot
 

@@ -35,7 +35,7 @@ from lca.plugins.composer.capability_resolution import (
 if TYPE_CHECKING:
     from cordis import Context
 
-    from lca.contracts.harness.composer import AgentGraph
+    from lca.contracts.harness.composition.composer import AgentGraph
     from lca.contracts.protocols import ArtifactClosure, Reducer
     from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
     from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry

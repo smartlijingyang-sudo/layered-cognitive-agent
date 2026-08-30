@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from lca.contracts.harness.agent import UserMessage
-from lca.contracts.harness.events import InboxSpliced
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.collaboration.agent import UserMessage
+from lca.contracts.harness.memory.events import InboxSpliced
+from lca.contracts.harness.tasks.session import SessionEvent
 from lca.harness.session.inbox_projection import InboxProjector, InboxState, InboxTarget
 from lca.harness.session.store import SessionStore
 

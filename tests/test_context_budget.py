@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.context_budget import ContextBudgeter
+from lca.contracts.harness.state.context_budget import ContextBudgeter
 from lca.contracts.models.core.perception import ContextItem
 
 

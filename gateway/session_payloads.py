@@ -11,8 +11,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from lca.contracts.harness.command import CommandReceipt
-from lca.contracts.harness.projection import ProjectionChange, ProjectionSnapshot
+from lca.contracts.harness.act.command import CommandReceipt
+from lca.contracts.harness.state.projection import ProjectionChange, ProjectionSnapshot
 
 
 def command_receipt_payload(receipt: CommandReceipt) -> dict[str, Any]:

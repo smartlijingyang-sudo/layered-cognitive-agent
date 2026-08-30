@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.cancellation import CancellationRequest, CancellationState
+from lca.contracts.harness.gate.cancellation import CancellationRequest, CancellationState
 
 
 def test_cancellation_request_can_be_applied() -> None:

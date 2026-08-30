@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.harness.session import SessionEvent, SessionHeader
+from lca.contracts.harness.tasks.session import SessionEvent, SessionHeader
 
 
 @runtime_checkable

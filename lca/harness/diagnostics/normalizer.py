@@ -6,8 +6,8 @@ import hashlib
 from dataclasses import asdict, dataclass
 from typing import Any, cast
 
-from lca.contracts.harness.projection import ProjectionSnapshot
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.state.projection import ProjectionSnapshot
+from lca.contracts.harness.tasks.session import SessionEvent
 
 
 def _hash(value: Any) -> str:

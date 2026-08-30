@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.eval_case import EvalCase
+from lca.contracts.harness.think.eval_case import EvalCase
 
 
 def test_eval_case_matches_expected_terminal_result() -> None:

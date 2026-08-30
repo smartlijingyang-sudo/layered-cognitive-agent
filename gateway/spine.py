@@ -24,15 +24,15 @@ from lca.contracts.capabilities import (
     SESSION_PERSISTENCE_FACTORY,
     SESSION_PROJECTION_REGISTRY_FACTORY,
 )
-from lca.contracts.harness.agent import SessionLiveBuilder
-from lca.contracts.harness.projection import (
+from lca.contracts.harness.collaboration.agent import SessionLiveBuilder
+from lca.contracts.harness.state.projection import (
     ProjectionChange,
     ProjectionDefinition,
     ProjectionSnapshot,
     SessionProjectionRegistry,
     SessionProjectionRegistryFactory,
 )
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.tasks.session import SessionEvent
 from lca.contracts.protocols.session.session_command_ledger import SessionCommandLedger
 from lca.contracts.protocols.session.session_persistence import SessionPersistenceFactory
 from lca.harness.agent.registry import AgentRegistry

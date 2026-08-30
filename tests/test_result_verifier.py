@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.result_verifier import VerificationReport, VerificationStatus
+from lca.contracts.harness.gate.result_verifier import VerificationReport, VerificationStatus
 
 
 def test_verified_result_requires_evidence() -> None:
@@ -37,7 +37,7 @@ def test_verification_report_rejects_inconsistent_outcome(kwargs: dict[str, obje
 
 
 def test_verification_projects_to_existing_task_status() -> None:
-    from lca.contracts.harness.result_verifier import task_status_from_verification
+    from lca.contracts.harness.gate.result_verifier import task_status_from_verification
     from lca.contracts.models.core.lifecycle import TaskStatus
 
     assert (
@@ -64,12 +64,12 @@ def test_verification_projects_to_existing_task_status() -> None:
 
 
 def test_artifact_manifest_verification_requires_task_ownership() -> None:
-    from lca.contracts.harness.artifact_manifest import (
+    from lca.contracts.harness.journal.artifact_manifest import (
         ArtifactEntry,
         ArtifactKind,
         ArtifactManifest,
     )
-    from lca.contracts.harness.result_verifier import verify_artifact_manifest
+    from lca.contracts.harness.gate.result_verifier import verify_artifact_manifest
 
     entry = ArtifactEntry(
         "a1", "report.md", ArtifactKind.REPORT, "sha256:x", "text/markdown", "artifact://a1", 1

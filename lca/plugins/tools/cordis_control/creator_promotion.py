@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from lca.contracts.atoms.artifact_state import ArtifactState
 from lca.contracts.atoms.scope import Scope
-from lca.contracts.harness.artifact import (
+from lca.contracts.harness.journal.artifact import (
     artifact_with_scope,
     capability_artifact_to_dict,
     migrate_to_active,

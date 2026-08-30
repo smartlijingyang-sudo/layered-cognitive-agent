@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from lca.contracts.harness.composer import AgentCompositionRequest, AgentGraphContribution
+from lca.contracts.harness.composition.composer import AgentCompositionRequest, AgentGraphContribution
 from lca.plugins.composer.internal.brain import (
     apply_lead_brain,
     instrument_llm,

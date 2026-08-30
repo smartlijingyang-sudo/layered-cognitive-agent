@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
 
-from lca.contracts.harness.command import (
+from lca.contracts.harness.act.command import (
     AgentRegistryFacade,
     ApprovalResumeCommand,
     CancelCommand,
@@ -18,7 +18,7 @@ from lca.contracts.harness.command import (
     SessionCreateCommand,
     SteerCommand,
 )
-from lca.contracts.harness.projection import (
+from lca.contracts.harness.state.projection import (
     ProjectionChange,
     ProjectionRegistry,
     ProjectionSnapshot,

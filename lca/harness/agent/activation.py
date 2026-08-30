@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.atoms.ids import new_id
-from lca.contracts.harness.agent import AgentHandle, LiveAgent, SessionLiveBuilder
-from lca.contracts.harness.events import SessionCreated
-from lca.contracts.harness.projection import SessionProjectionRegistry
-from lca.contracts.harness.session import SESSION_FORMAT_VERSION, SessionHeader
+from lca.contracts.harness.collaboration.agent import AgentHandle, LiveAgent, SessionLiveBuilder
+from lca.contracts.harness.memory.events import SessionCreated
+from lca.contracts.harness.state.projection import SessionProjectionRegistry
+from lca.contracts.harness.tasks.session import SESSION_FORMAT_VERSION, SessionHeader
 from lca.contracts.protocols.session.session_persistence import (
     SessionPersistence,
     SessionPersistenceFactory,
@@ -200,7 +200,7 @@ class _StubSessionLiveBuilder:
 
     def __call__(self, store, inbox, session_id, options, ctx):  # type: ignore[no-untyped-def]
         from lca.contracts.atoms.ids import new_id
-        from lca.contracts.harness.agent import LiveAgent
+        from lca.contracts.harness.collaboration.agent import LiveAgent
         from lca.contracts.models.core.lifecycle import TaskStatus
         from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 

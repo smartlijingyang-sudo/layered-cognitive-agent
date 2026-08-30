@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.contracts.harness.projection import (
+from lca.contracts.harness.state.projection import (
     SessionProjectionRegistry,
     SessionProjectionRegistryFactory,
 )

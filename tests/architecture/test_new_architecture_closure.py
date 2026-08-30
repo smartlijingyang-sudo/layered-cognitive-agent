@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import fields
 from pathlib import Path
 
-from lca.contracts.harness.artifact import CapabilityArtifact
+from lca.contracts.harness.journal.artifact import CapabilityArtifact
 from lca.plugins.tools.cordis_control.tool import ALLOWED_ACTIONS
 
 ROOT = Path(__file__).resolve().parents[2]

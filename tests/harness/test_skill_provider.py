@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.contracts.harness.session import SESSION_FORMAT_VERSION, SessionHeader
+from lca.contracts.harness.tasks.session import SESSION_FORMAT_VERSION, SessionHeader
 from lca.harness.projection.registry import InMemoryProjectionRegistry
 from lca.harness.session.store import SessionStore
 from lca.harness.skills import (

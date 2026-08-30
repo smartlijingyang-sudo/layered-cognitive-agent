@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from lca.contracts.atoms.ids import RunId, TraceId
-from lca.contracts.harness.agent import ApprovalResumePoint
+from lca.contracts.harness.collaboration.agent import ApprovalResumePoint
 from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.protocols.declarative.declarative_execution import PhaseRunCursor
 

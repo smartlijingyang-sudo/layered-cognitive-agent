@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from lca.contracts.harness.continuous import ContinuousControlPlaneFactory
+from lca.contracts.harness.tasks.continuous import ContinuousControlPlaneFactory
 from lca.harness.continuous import SqliteContinuousControlPlaneFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.tasks.session import SessionEvent
 
 # ADR-0098 D4: terminal Statuses 命中后 ActivityProjection.view 增加 terminal=True 标记
 # 仅字典多一字段,旧 client 只读 status/turn/error 不受影响

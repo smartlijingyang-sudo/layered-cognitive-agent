@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.harness.agent import LiveAgent
+from lca.contracts.harness.collaboration.agent import LiveAgent
 
 
 class OwnerAgentHandle:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.evidence import Evidence
+from lca.contracts.harness.perceive.evidence import Evidence
 
 
 def test_evidence_is_auditable() -> None:

@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from lca.contracts.harness.continuous import (
+from lca.contracts.harness.tasks.continuous import (
     WorkActivationReceipt,
     WorkItem,
     WorkLease,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, cast
 
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.tasks.session import SessionEvent
 from lca.contracts.models.core.budget import Budget
 from lca.contracts.models.core.decision import Turn
 from lca.contracts.models.core.lifecycle import TaskStatus

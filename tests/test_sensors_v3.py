@@ -123,7 +123,7 @@ class TestSkillCatalogSensor:
 class TestSkillCatalogPublishedSource:
     def test_skill_catalog_published_source_default_perceive(self) -> None:
         """``SkillCatalogPublished.source`` default MUST be ``"perceive"``."""
-        from lca.contracts.harness.events import SkillCatalogPublished
+        from lca.contracts.harness.memory.events import SkillCatalogPublished
 
         evt = SkillCatalogPublished(entries=(), digest="")
         assert evt.source == "perceive"

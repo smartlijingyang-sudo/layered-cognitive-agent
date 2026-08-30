@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from lca.contracts.capabilities import MEMORY, STATE_STORE
-from lca.contracts.harness.composer import AgentCompositionRequest, AgentGraphContribution
+from lca.contracts.harness.composition.composer import AgentCompositionRequest, AgentGraphContribution
 from lca.contracts.mechanisms.capability import require_capability
 from lca.plugins.composer.internal.perceive import (
     build_perceive_hub,

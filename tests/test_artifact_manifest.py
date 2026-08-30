@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.artifact_manifest import (
+from lca.contracts.harness.journal.artifact_manifest import (
     ArtifactEntry,
     ArtifactKind,
     ArtifactManifest,

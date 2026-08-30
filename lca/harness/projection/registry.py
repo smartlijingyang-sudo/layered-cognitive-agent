@@ -5,13 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from lca.contracts.harness.projection import (
+from lca.contracts.harness.state.projection import (
     ProjectionChange,
     ProjectionDefinition,
     ProjectionSnapshot,
     SessionProjectionRegistry,
 )
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.tasks.session import SessionEvent
 
 
 class InMemoryProjectionRegistry(SessionProjectionRegistry):

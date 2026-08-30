@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.harness.composer import AgentGraphContribution, merge_agent_graphs
+from lca.contracts.harness.composition.composer import AgentGraphContribution, merge_agent_graphs
 from lca.runtime.runtime_bindings import RuntimePhaseCapabilities
 
 

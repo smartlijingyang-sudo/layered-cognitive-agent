@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.effect_receipt import EffectOutcome, EffectReceipt
+from lca.contracts.harness.act.effect_receipt import EffectOutcome, EffectReceipt
 
 
 def test_effect_receipt_carries_idempotent_success() -> None:
@@ -55,7 +55,7 @@ def test_effect_receipt_rejects_inconsistent_state(kwargs: dict[str, object]) ->
 
 
 def test_gateway_receipt_is_normalized() -> None:
-    from lca.contracts.harness.effect_receipt import receipt_from_gateway
+    from lca.contracts.harness.act.effect_receipt import receipt_from_gateway
 
     receipt = receipt_from_gateway(
         {"idempotency_key": "k-1", "output_ref": "artifact://x"},

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lca.contracts.harness.command import (
+from lca.contracts.harness.act.command import (
     ApprovalResumeCommand,
     CancelCommand,
     CommandKind,

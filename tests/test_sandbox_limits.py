@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.sandbox_limits import SandboxResourceLimits
+from lca.contracts.harness.act.sandbox_limits import SandboxResourceLimits
 
 
 def test_sandbox_limits_allow_bounded_output_file() -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.task import StepStatus, TaskStep
+from lca.contracts.harness.tasks.task import StepStatus, TaskStep
 
 
 def test_task_step_tracks_attempt_and_artifact_refs() -> None:

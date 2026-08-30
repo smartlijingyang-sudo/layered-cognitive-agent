@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.contracts.harness.agent import LiveAgentStatus
+from lca.contracts.harness.collaboration.agent import LiveAgentStatus
 from lca.harness.agent.health import live_totals, status_counts
 
 

@@ -11,8 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from lca.contracts.harness.agent import UserMessage
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.collaboration.agent import UserMessage
+from lca.contracts.harness.tasks.session import SessionEvent
 
 InboxTarget = Literal["next_turn", "next_step"]
 

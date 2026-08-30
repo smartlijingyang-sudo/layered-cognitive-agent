@@ -9,7 +9,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.harness.session import (
+from lca.contracts.harness.tasks.session import (
     EventScope,
     SessionEvent,
     SessionHeader,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.compensation import CompensationPlan
+from lca.contracts.harness.gate.compensation import CompensationPlan
 
 
 def test_compensation_plan_requires_distinct_idempotent_operation() -> None:

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.contracts.harness.command import AgentRegistryFacade
-from lca.contracts.harness.continuous import (
+from lca.contracts.harness.act.command import AgentRegistryFacade
+from lca.contracts.harness.tasks.continuous import (
     SessionWorkActivator,
     WorkActivationReceipt,
     WorkItem,

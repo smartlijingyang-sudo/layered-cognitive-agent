@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.harness.capability_gate import CapabilityCheck, HermesCapabilityGate
+from lca.contracts.harness.gate.capability_gate import CapabilityCheck, HermesCapabilityGate
 
 
 def test_capability_gate_passes_when_all_contracts_are_implemented() -> None:

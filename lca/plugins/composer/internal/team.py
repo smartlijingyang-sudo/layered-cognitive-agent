@@ -13,7 +13,7 @@ from lca.contracts.protocols.journal.spec import AgentSpec, LeadSpec, TeamSpec, 
 from lca.infrastructure.observability import BoundObservability, TeamTraceProfile, team_id_for
 
 if TYPE_CHECKING:
-    from lca.contracts.harness.composer import TeamGraph
+    from lca.contracts.harness.composition.composer import TeamGraph
 
 
 def resolve_decision_gate(name: DecisionGateName, *, scope: object) -> DecisionGate | None:

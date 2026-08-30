@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lca.contracts.harness.session import SessionEvent
+from lca.contracts.harness.tasks.session import SessionEvent
 from lca.harness.projection.web import TaskProjection
 
 
