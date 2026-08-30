@@ -130,6 +130,11 @@ class SandboxResult:
     success: bool = True
     generated_files: tuple[SandboxFile, ...] = field(default_factory=tuple)
     error: str = ""
+    # Aliases for ``SandboxExecResult`` — soft-locked runtime_exec.py
+    # accesses error_summary / error_kind which SandboxExecResult exposes.
+    # Backwards-compat defaults make the base class usable too.
+    error_summary: str = ""
+    error_kind: Any = None
 
 
 @dataclass(frozen=True)

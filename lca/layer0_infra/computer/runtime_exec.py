@@ -26,8 +26,8 @@ from lca.layer0_infra.computer.sandbox_computer import normalize_sandbox_path
 from lca.layer0_infra.file_store import FileStore, persist_generated_files
 from lca.layer0_infra.sandbox.factory import get_sandbox_policy
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
-from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
-from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
+
+
 from lca.layer0_infra.workspace.deliverable import (
     is_office_name,
     is_office_publish_intent,
@@ -168,9 +168,9 @@ class ComputerRuntimeExecMixin:
         runtime = await ensure_sandbox_runtime(
             self._sandbox,
             self._store,
-            attachment_ids=get_current_run_attachment_ids(),
+            attachment_ids=_re_get("attachment_ids"),
         )
-        inv = get_current_tool_invocation_id() or "executeCode"
+        inv = _re_get("inv") or "executeCode"
 
         # Artifact collection is embedded in the bootstrap template at the
         # same indentation level as user code — no wrapping needed.
@@ -231,7 +231,7 @@ class ComputerRuntimeExecMixin:
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
     ) -> ComputerOpResult:
         del description
-        inv = get_current_tool_invocation_id() or "runCommand"
+        inv = _re_get("inv") or "runCommand"
         if background:
             registry = get_background_registry()
             command_id = registry.register(command=command)
@@ -249,7 +249,7 @@ class ComputerRuntimeExecMixin:
             runtime = await ensure_sandbox_runtime(
                 self._sandbox,
                 self._store,
-                attachment_ids=get_current_run_attachment_ids(),
+                attachment_ids=_re_get("attachment_ids"),
             )
             await runtime.ensure_ready()
             terminal_result = await runtime.run_terminal(
@@ -279,7 +279,7 @@ class ComputerRuntimeExecMixin:
                     f"exit_code={terminal_result.exit_code}" if terminal_result.exit_code else ""
                 )
                 state["error_summary"] = terminal_result.error_summary or terminal_result.error
-                state["error_kind"] = terminal_result.error_kind.value
+                state["error_kind"] = getattr(terminal_result.error_kind, 'value', None) or 'none'
             generated = terminal_result.generated_files
             if is_office_publish_intent(tool_name="runCommand", command=command):
                 scanned = await runtime.scan_output_files(invocation_id=f"{inv}_office_pub")
@@ -391,3 +391,14 @@ class ComputerRuntimeExecMixin:
             state=state,
             generated_files=(sandbox_file,),
         )
+
+
+def _re_get(kind: str) -> Any:
+    """Lazy import to break circular import (computer ↔ tools)."""
+    if kind == "attachment_ids":
+        from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
+        return get_current_run_attachment_ids()
+    if kind == "inv":
+        from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
+        return get_current_tool_invocation_id()
+    raise ValueError(kind)

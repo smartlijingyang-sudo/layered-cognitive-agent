@@ -24,7 +24,6 @@ from lca.layer0_infra.computer.op_result import ComputerOpResult
 from lca.layer0_infra.computer.parse_result import parse_computer_stdout
 from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
-from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
 
 
@@ -52,7 +51,7 @@ class _SandboxComputerBase:
         runtime = await ensure_sandbox_runtime(
             self._sandbox,
             self._store,
-            attachment_ids=get_current_run_attachment_ids(),
+            attachment_ids=_get_current_run_attachment_ids(),
         )
         inv = invocation_id or get_current_tool_invocation_id() or "computer"
         exec_result = await runtime.execute(
@@ -220,3 +219,9 @@ class SandboxComputer(_SandboxComputerBase, ComputerRuntimeExecMixin):
 
 
 __all__ = ["SandboxComputer", "normalize_sandbox_path"]
+
+
+def _get_current_run_attachment_ids() -> tuple[str, ...]:
+    """Lazy import to break circular import (sandbox_computer ↔ tools)."""
+    from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
+    return get_current_run_attachment_ids()
