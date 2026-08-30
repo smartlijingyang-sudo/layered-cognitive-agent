@@ -79,6 +79,11 @@ _GRANDFATHERED_CLASSES: frozenset[str] = frozenset(
         "PluginMeta",
         "MissingCapabilityError",
         "PluginConfig",
+        # Branch-existing pre-port classes — Generic[T] 适配 cordis Context 的
+        # seam 接缝容器；main 在 PR-0.5 后已 grandfathered，本分支基线就有但未加，
+        # C2 port 前补齐以让 contracts purity gate 全绿。
+        "FactoryRegistry",
+        "NamedRegistry",
     }
 )
 
