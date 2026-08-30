@@ -29,4 +29,5 @@ log:emit,subprocess:spawn,network:openai
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.plugins.tools
+（无显式 __all__；通过模块导入即可）
+

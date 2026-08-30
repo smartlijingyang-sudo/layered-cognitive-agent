@@ -29,4 +29,5 @@ network:http,log:emit
 {{failure_semantics}}
 
 ## 9. 公共入口
-gateway.device_gateway
+`AuthError`, `AuthenticatedUser`, `Device`, `DeviceConnection`, `DeviceGatewaySettings`, `DeviceHub`, `DeviceRegistry`, `verify_token`
+

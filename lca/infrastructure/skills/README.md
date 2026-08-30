@@ -29,4 +29,5 @@ file:read,file:write,network:openai,log:emit,subprocess:spawn
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.infrastructure.skills
+`OFFICECLI_SKILL_ID`, `ActivatedSkill`, `DiskSkillPackageStore`, `HttpSkillImporter`, `activated_skills_scope`, `build_skill_exec_code`, `ensure_bundled_skills`, `get_activated_skills`, `get_newly_activated`, `register_activated`, `resolve_skill_for_exec`, `resolve_skill_importer`, `resolve_skill_store`, `skill_mount_dir`
+

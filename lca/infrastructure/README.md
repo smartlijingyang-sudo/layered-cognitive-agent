@@ -29,4 +29,5 @@ file:read,file:write,network:openai,log:emit,subprocess:spawn
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.infrastructure
+（无显式 __all__；通过模块导入即可）
+

@@ -29,4 +29,5 @@ file:read,file:write,network:openai,log:emit,subprocess:spawn
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.infrastructure.capability
+`CapabilityHub`, `FileStoreService`, `LlmService`, `MemoryService`, `ObservabilityService`, `SandboxService`, `SearchService`, `SkillsService`, `StateStoreService`, `ToolsService`, `TransportService`
+

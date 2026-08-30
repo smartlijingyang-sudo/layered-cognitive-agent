@@ -29,4 +29,5 @@ log:emit
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.harness.observability
+`assemble_observability`, `default_policy`, `make_minimal_bound`
+

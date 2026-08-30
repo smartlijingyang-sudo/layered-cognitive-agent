@@ -29,4 +29,5 @@ log:emit,file:read
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.harness.diagnostics
+`format_plugin_tree`, `inspect_profile_tree`, `render_tree`, `why_capability`, `why_plugin`
+

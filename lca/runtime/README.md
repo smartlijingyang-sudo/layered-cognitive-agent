@@ -29,4 +29,5 @@ log:emit
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.runtime
+`AgentPhase`, `CognitiveRuntime`, `JournalEmitFn`, `make_journal_emitting_hook`
+

@@ -29,4 +29,5 @@ file:read,file:write,network:openai,log:emit,subprocess:spawn
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.infrastructure.plane
+`PlaneBindingError`, `PlaneBindings`, `PlaneKind`, `PlaneRef`, `PlaneRequest`, `current_bindings`, `current_primary`, `join_under`, `make_sandbox_ref`, `outputs_under`, `path_needs_approval`, `plane_bindings_scope`, `raise_if_out_of_scope`, `ref_of`, `resolve_plane_bindings`, `resolve_plane_path`, `sandbox_ref_from`
+

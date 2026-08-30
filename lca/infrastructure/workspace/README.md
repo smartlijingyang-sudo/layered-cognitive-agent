@@ -29,4 +29,5 @@ file:read,file:write,network:openai,log:emit,subprocess:spawn
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.infrastructure.workspace
+`ArtifactLedger`, `RunWorkspace`, `effective_agent_wall_clock`, `get_run_workspace`, `run_workspace_scope`
+

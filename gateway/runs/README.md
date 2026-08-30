@@ -29,4 +29,5 @@ log:emit,file:read,file:write
 {{failure_semantics}}
 
 ## 9. 公共入口
-gateway.runs
+（无显式 __all__；通过模块导入即可）
+

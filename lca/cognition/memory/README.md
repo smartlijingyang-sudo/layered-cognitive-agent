@@ -29,4 +29,5 @@ llm:call,log:emit
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.cognition.memory
+`SimpleMemorySystem`, `TeamSharedMemoryStore`
+

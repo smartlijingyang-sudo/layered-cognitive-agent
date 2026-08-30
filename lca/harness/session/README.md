@@ -29,4 +29,5 @@ log:emit,file:read,file:write
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.harness.session
+`Inbox`, `SessionStore`
+

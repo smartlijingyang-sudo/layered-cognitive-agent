@@ -29,4 +29,5 @@ file:read,file:write,network:openai,log:emit,subprocess:spawn
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.infrastructure.search
+`LOBE_WEB_BROWSING_ID`, `PROVIDER_LLM_NATIVE`, `PROVIDER_TAVILY`, `WEB_BROWSING_API_SEARCH`, `WEB_SEARCH_TOOL`, `any_search_provider_available`, `get_search_settings`, `is_search_intent`, `resolve_llm_search_kwargs`, `search`, `search_routing_hint`, `search_run_scope`, `web_search`
+

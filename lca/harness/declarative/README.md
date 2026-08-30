@@ -29,4 +29,5 @@ log:emit
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.harness.declarative
+`ApprovalState`, `ApprovalStateMachine`, `ApprovalTransition`, `DeclarativePlanProjection`, `ExecutableNode`, `ExecutablePlan`, `GenericPlanInterpreter`, `GraphAssembler`, `InMemoryJournalCommitter`, `InterpretationResult`, `MappingRestrictedScope`, `PhaseVisit`, `RestrictedPhaseContext`, `RestrictedScope`, `compile_declarative_projection`, `validate_control_binding_closure`
+

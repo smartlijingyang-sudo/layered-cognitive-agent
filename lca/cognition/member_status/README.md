@@ -29,4 +29,5 @@ llm:call,log:emit
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.cognition.member_status
+`ConsultNextAction`, `InMemoryMemberStatus`, `RequiredAction`, `classify_synthesis`, `compute_consult_next`, `compute_required_action`, `compute_required_action_from_duty`, `compute_required_action_rich`, `delegation_budget_for_state`, `duty_board`, `duty_consult`, `evidence_coverage_summary`, `record_delegation_return`
+

@@ -29,4 +29,5 @@ log:emit,file:read
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.harness.profile
+`ProfileResolveError`, `ResolvedProfile`, `boot_entries`, `boot_profile`, `boot_resolved_profile`, `dump_resolved`, `install_profile_lifespan`, `load_profile_entries`, `noop_lifespan`, `profile_lifespan`, `resolve_profile`, `starlette_profile_lifespan`
+

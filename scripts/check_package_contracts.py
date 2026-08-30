@@ -8,6 +8,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -117,6 +118,57 @@ def cross_check_l1_l2(packages: list[str]) -> list[Issue]:
     return issues
 
 
+def cross_check_l1_public_api(packages: list[str]) -> list[Issue]:
+    """Verify __init__.py.__all__ matches L1 README 段 9 公共入口."""
+    issues: list[Issue] = []
+    for pkg in packages:
+        init = package_to_path(ROOT, pkg) / "__init__.py"
+        if not init.exists():
+            continue
+        readme = package_to_path(ROOT, pkg) / "README.md"
+        if not readme.exists():
+            continue
+        try:
+            text = init.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        # Parse __all__
+        all_match = re.search(r"^__all__\s*=\s*\[(.*?)\]", text, re.MULTILINE | re.DOTALL)
+        all_symbols: set[str] = set()
+        if all_match:
+            body = re.sub(r"#[^\n]*", "", all_match.group(1))
+            for sym in body.split(","):
+                sym = sym.strip().strip("'\"")
+                if sym and sym != "*":
+                    all_symbols.add(sym)
+        # Parse L1 README 段 9
+        try:
+            readme_text = readme.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        section_match = re.search(
+            r"## 9\.\s*公共入口\s*\n(.*?)(?=\n##|\Z)",
+            readme_text,
+            re.DOTALL,
+        )
+        if not section_match:
+            continue
+        l1_text = section_match.group(1)
+        # Extract identifiers from L1 段 9
+        # Only consider backtick-wrapped identifiers (e.g. `Foo`, `bar`)
+        l1_symbols: set[str] = set()
+        for sym in re.findall(r"`([A-Z][A-Za-z0-9_]+)`", l1_text):
+            l1_symbols.add(sym)
+        for sym in re.findall(r"`([a-z_][A-Za-z0-9_]+)`", l1_text):
+            l1_symbols.add(sym)
+        # Compare
+        for sym in all_symbols - l1_symbols:
+            issues.append(Issue(pkg, "L1↔__all__", f"__all__ contains {sym} not in L1 section 9"))
+        for sym in l1_symbols - all_symbols:
+            issues.append(Issue(pkg, "L1↔__all__", f"L1 section 9 lists {sym} not in __all__"))
+    return issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--package", help="check only this package")
@@ -131,6 +183,7 @@ def main() -> int:
     all_issues.extend(check_l1_readme_exists(args.root, packages))
     all_issues.extend(check_l2_pyproject_section(packages))
     all_issues.extend(cross_check_l1_l2(packages))
+    all_issues.extend(cross_check_l1_public_api(packages))
 
     if not all_issues:
         print(f"OK: {len(packages)} packages checked, no issues")

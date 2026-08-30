@@ -29,4 +29,5 @@ lca.infrastructure,lca.cognition,lca.runtime,lca.agent,lca.application,lca.harne
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.contracts.models.observability
+`get_current_plan_ref`, `plan_ref_scope`, `reset_current_plan_ref`, `set_current_plan_ref`, `stamped_event_has_plan_ref`
+

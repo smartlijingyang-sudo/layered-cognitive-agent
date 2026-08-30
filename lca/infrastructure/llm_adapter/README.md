@@ -29,4 +29,5 @@ file:read,file:write,network:openai,log:emit,subprocess:spawn
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.infrastructure.llm_adapter
+`FailoverLLMAdapter`, `LLMApiStyle`, `LLMFailoverCandidate`, `LLMRetryPolicy`, `LLMSettings`, `MockLLMAdapter`, `OpenAICompatAdapter`, `RetryingLLMAdapter`, `clear_llm_settings_cache`, `get_llm_settings`, `load_dotenv_if_present`, `resolve_llm_adapter`
+

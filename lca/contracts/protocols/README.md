@@ -29,4 +29,5 @@ lca.infrastructure,lca.cognition,lca.runtime,lca.agent,lca.application,lca.harne
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.contracts.protocols
+（无显式 __all__；通过模块导入即可）
+

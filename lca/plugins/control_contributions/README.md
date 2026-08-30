@@ -29,4 +29,5 @@ log:emit
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.plugins.control_contributions
+`ActAuthorizeExecutor`, `ActBudgetExecutor`, `ActConstrainExecutor`, `ActExecuteExecutor`, `ActSafeBoundaryExecutor`, `FocusStopExecutor`, `ObserveCheckpointExecutor`, `ObserveWildcardExecutor`, `PerceiveContextExecutor`, `RememberAdmitExecutor`, `StopDecideExecutor`, `ThinkGuardExecutor`
+

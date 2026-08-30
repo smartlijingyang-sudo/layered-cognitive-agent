@@ -29,4 +29,5 @@ LCA 一级包命名空间；根层
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca
+`Agent`, `AgentSpec`, `Debate`, `FanOut`, `Governance`, `Graph`, `LeadMandate`, `LeadSpec`, `PeerRelay`, `PeerSwarm`, `Pipeline`, `Team`, `TeamLead`, `TeamSpec`
+

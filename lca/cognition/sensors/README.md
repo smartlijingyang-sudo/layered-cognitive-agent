@@ -29,4 +29,5 @@ llm:call,log:emit
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.cognition.sensors
+`INBOX_FACTS_KIND`, `TEAM_INBOX_KIND`, `ClockSensor`, `InboxFactsSensor`, `TeamInboxSensor`, `WorkspaceArtifactsSensor`, `build_clock_sensor`, `build_inbox_facts_sensor`, `build_team_inbox_sensor`, `build_workspace_artifacts_sensor`
+

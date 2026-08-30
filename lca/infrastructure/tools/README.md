@@ -29,4 +29,5 @@ file:read,file:write,network:openai,log:emit,subprocess:spawn
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.infrastructure.tools
+`SANDBOX_EXECUTE_TOOL_NAME`, `SANDBOX_INSPECT_TOOL_NAME`, `SandboxExecuteTool`, `SandboxInspectTool`, `build_default_tools`, `get_current_run_attachment_ids`, `merge_attachment_ids`, `run_attachment_scope`
+

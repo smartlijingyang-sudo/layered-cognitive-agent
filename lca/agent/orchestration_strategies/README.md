@@ -29,4 +29,5 @@ lca.application,lca.harness,lca.plugins,gateway
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.agent.orchestration_strategies
+`DebateStrategy`, `GraphStrategy`, `HandoffStrategy`, `LeadStrategy`, `ParallelStrategy`, `RaceStrategy`, `SequentialStrategy`, `SwarmStrategy`
+

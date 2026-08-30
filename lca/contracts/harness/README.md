@@ -29,4 +29,5 @@ lca.infrastructure,lca.cognition,lca.runtime,lca.agent,lca.application,lca.harne
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.contracts.harness
+`AgentGraph`, `AgentGraphComposer`, `AgentGraphContribution`, `ArchitectureContract`, `ArtifactController`, `AuthorityContract`, `CapabilityArtifact`, `CapabilityContract`, `ContinuousControlPlane`, `ContinuousControlPlaneFactory`, `EvidenceContract`, `InvalidStateTransitionError`, `LifecycleContract`, `OwnershipContract`, `PluginContract`, `PluginIdentity`, `SessionWorkActivator`, `TeamGraph`, `TeamGraphComposer`, `Trigger`, `TriggerKind`, `VerificationContract`, `WorkActivationReceipt`, `WorkItem`, `WorkLease`, `WorkQueue`, `WorkStatus`, `artifact_with_state`, `capability_artifact_to_dict`, `is_plugin_contract_empty`, `is_terminal_state`, `legal_next_states`, `make_capability_artifact`, `merge_agent_graphs`, `migrate_artifact`, `migrate_to_active`, `migrate_to_retired`, `migrate_to_verified`, `plugin_contract_control_slots`, `plugin_contract_functional_group`
+

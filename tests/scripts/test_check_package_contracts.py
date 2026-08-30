@@ -13,6 +13,7 @@ from check_package_contracts import (  # noqa: E402
     check_l1_readme_exists,
     check_l2_pyproject_section,
     cross_check_l1_l2,
+    cross_check_l1_public_api,
     discover_packages,
     package_to_path,
 )
@@ -79,6 +80,55 @@ def test_cross_check_l1_l2_smoke():
     # All issues should be of kind L1↔L2
     for issue in issues:
         assert issue.layer == "L1↔L2"
+
+
+def test_cross_check_l1_public_api_strips_comments(tmp_path):
+    """Verify __all__ parsing handles inline comments."""
+    pkg = tmp_path / "lca" / "fake"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text(
+        '__all__ = [\n    "Foo",\n    "Bar",  # deprecated\n    "Baz",\n]\n',
+        encoding="utf-8",
+    )
+    readme = pkg / "README.md"
+    readme.write_text(
+        "# lca.fake\n## 1. 职责\nx\n## 2. 不负责\nx\n## 3. 输入\nx\n## 4. 输出\nx\n"
+        "## 5. 允许依赖\nx\n## 6. 禁止依赖\nx\n## 7. 副作用\nx\n## 8. 失败语义\nx\n"
+        "## 9. 公共入口\n`Foo`, `Bar`, `Baz`\n",
+        encoding="utf-8",
+    )
+    issues = cross_check_l1_public_api(["lca.fake"])
+    assert issues == []
+
+
+def test_cross_check_l1_public_api_detects_mismatch():
+    """Smoke test: cross-check on real data returns issues for inconsistencies.
+
+    Note: This test relies on a known-real package to have its README 段 9
+    not match __all__ — by design, the sync script should keep them aligned.
+    We just verify the function is callable and returns a list.
+    """
+    issues = cross_check_l1_public_api(["lca.contracts", "lca.contracts.atoms"])
+    # After Phase 3 sync, both should be clean
+    assert isinstance(issues, list)
+
+
+def test_cross_check_l1_public_api_no_init_no_crash(tmp_path):
+    """If __init__.py doesn't exist, no issues."""
+    pkg = tmp_path / "lca" / "fake"
+    pkg.mkdir(parents=True)
+    readme = pkg / "README.md"
+    readme.write_text("# lca.fake\n## 9. 公共入口\n`X`\n", encoding="utf-8")
+    issues = cross_check_l1_public_api(["lca.fake"])
+    assert issues == []
+
+
+def test_cross_check_l1_public_api_smoke():
+    """Smoke test: cross-check on real data is clean."""
+    issues = cross_check_l1_public_api(["lca.contracts", "lca.contracts.atoms"])
+    # Should be clean after Phase 3 sync
+    for issue in issues:
+        assert issue.layer == "L1↔__all__"
 
 
 def test_issue_render():

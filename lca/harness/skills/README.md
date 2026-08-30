@@ -29,4 +29,5 @@ log:emit,file:read
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.harness.skills
+`DiskSkillProvider`, `SkillCatalogService`, `SkillLoadTool`, `SkillSlashActivationPolicy`, `SkillSlashInvocation`, `SkillsProjection`
+

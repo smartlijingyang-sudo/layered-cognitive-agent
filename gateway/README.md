@@ -29,4 +29,5 @@ network:http,log:emit
 {{failure_semantics}}
 
 ## 9. 公共入口
-gateway
+`create_app`
+

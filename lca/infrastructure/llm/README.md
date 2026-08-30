@@ -29,4 +29,5 @@ file:read,file:write,network:openai,log:emit,subprocess:spawn
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.infrastructure.llm
+`CHAT`, `DEFAULT_CHAT_MODEL`, `EMBEDDINGS`, `MODEL_CATALOG`, `STREAMING`, `STRUCTURED_OUTPUT`, `TOOL_CALLING`, `VISION`, `LLMFace`, `LLMProviderSettings`, `LLMUnavailableError`, `ModelDefinition`, `ModelRegistry`, `ResolvedEndpoint`, `configured_chat_model`, `get_async_openai_client`, `get_model_registry`, `llm_credentials`, `llm_openai_credentials`, `load_provider_settings`, `normalize_llm_environ`, `prepare_llm_environ`, `reset_async_openai_client`, `resolve_endpoint`
+

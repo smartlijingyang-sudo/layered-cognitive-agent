@@ -29,4 +29,5 @@ log:emit
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.plugins.graph_nodes
+`AgentGraphNodeExecutor`, `AggregatorGraphNodeExecutor`, `GraphNodeExecutorRegistry`, `TopologyGraphNodeExecutor`
+

@@ -29,4 +29,5 @@ file:read,file:write,network:openai,log:emit,subprocess:spawn
 {{failure_semantics}}
 
 ## 9. 公共入口
-lca.infrastructure.credentials
+`build_sandbox_env_preamble`, `resolve_sandbox_env`
+
