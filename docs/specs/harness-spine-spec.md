@@ -208,7 +208,7 @@ perceive → think → act → reflect → record → checkpoint → stop
 优势：
 - 清晰的 7-phase 闭环
 - Hook registry 在每 phase 前后触发
-- StopRule 完全分离
+- StopPolicy 作为 State 群策略完全分离，并仅由 Stop 阶段消费
 - HIL resume via `state_store.load(snapshot)`
 - Loop intervention（连续相同工具检测）
 
@@ -1340,20 +1340,28 @@ class CognitiveLoopFactory:
     不重写认知算法——只是适配。
     """
     def __init__(self, brain_factory, body_factory, memory_factory,
-                 state_store_factory, stop_rule_factory, hook_registry):
+                 state_store_factory, hook_registry):
         ...
 
     async def create(self, scope, identity, options, *, resume_session=None):
-        # 1. 从 scope 解析 Brain, Body, Memory, StateStore, StopRule
+        # 1. 从 scope 解析 Brain、Body、Memory、StateStore 与 State 群 StopPolicy
         brain = scope.resolve("brain")
         body = scope.resolve("body")
         memory = scope.resolve("memory")
         state_store = scope.resolve("state_store")
-        stop_rule = scope.resolve("stop_rule")
+        stop_policy = scope.resolve("stop_policy")
 
-        # 2. 构造 CognitiveRuntime
+        # 2. 由 Profile 选择的 runtime factory 构造运行时；StopPolicy
+        #    仅位于 Stop 阶段的局部 phase_capabilities。
         hooks = self._build_hooks(scope)
-        runtime = CognitiveRuntime(brain, body, memory, hooks, state_store, stop_rule)
+        runtime = self._runtime_factory.create(
+            brain=brain,
+            body=body,
+            memory=memory,
+            hooks=hooks,
+            state_store=state_store,
+            phase_capabilities={"stop_policy": stop_policy},
+        )
 
         # 3. 包装为 LiveAgent
         live = CognitiveLiveAgent(
@@ -1836,23 +1844,30 @@ entries:
 
 ```python
 # lca/plugins/llm_service/__init__.py
-from lca.contracts.harness.plugin import PluginManifest, PluginKind
+from pydantic import BaseModel
 
-manifest = PluginManifest(
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
+
+
+@plugin(
     id="lca.llm.service",
-    version="1.0.0",
-    api_version="lca-harness/1",
-    kind=PluginKind.SERVICE,
     provides=("llm",),
+    layer="L0",
+    effects="none",
+    test_suite="tests/test_plugin_alignment.py",
+    kind=PluginKind.PROVIDER,
 )
-
-async def apply(ctx, config):
+async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer0_infra.capability.llm import LlmService
     service = LlmService()
     # 注册 default providers
     from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
     service.register("mock", MockLLMAdapter())
-    ctx.mount("llm", service)
+    ctx.provide("llm", service)
 ```
 
 **验收测试**：
@@ -2505,7 +2520,7 @@ class DshJournalProjector:
 见蓝图 Section 8-10，此处不重复。关键是：
 1. Tool Definition/Provider/Pipeline/Renderer 分离
 2. Skill Catalog/Tool/Slash/Projection 统一
-3. SubagentRegistry + capability negotiation + ActivationManager
+3. SubagentRegistry + capability negotiation + SubagentActivationCoordinator
 4. Workflow DAG engine
 
 ---
@@ -2678,7 +2693,7 @@ class SessionStore:
 | 现有认知闭环和 Team 优势是否仍在？ | 在；它们分别是 default loop 和 team provider |
 | DSH 是否仍需 Gateway 特例？ | 不需；它是 loop/subagent provider |
 | Skill 是否能被模型发现 + 用户显式调用 + 重放？ | 能；catalog/activation/result 都是 Session facts |
-| 子代理是否可恢复、可取消、可追溯？ | 能；durable child session + ActivationManager |
+| 子代理是否可恢复、可取消、可追溯？ | 能；durable child session + SubagentActivationCoordinator |
 | Plugin 是否可安全卸载/回滚？ | 能；scope-bound effects + drain |
 | 运维是否能解释一次行为由哪个版本的插件造成？ | 能；event 中有 profile digest + plugin/version |
 

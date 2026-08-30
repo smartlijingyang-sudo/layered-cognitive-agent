@@ -1,0 +1,6 @@
+# Golden profile: standard-team (PR-10 V1 acceptance §7.3)
+# Lead + members (3) — exercises V1 control plane routing through lead.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml

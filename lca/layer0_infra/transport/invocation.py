@@ -34,8 +34,6 @@ from lca.contracts.models.observability.journal import (
     DelegationIssued,
     DelegationMechanism,
     RunScope,
-    get_current_run_scope,
-    run_scope,
 )
 from lca.contracts.models.team.delegation_context import (
     delegation_scope,
@@ -43,7 +41,13 @@ from lca.contracts.models.team.delegation_context import (
     in_member_invoke,
 )
 from lca.contracts.protocols import AgentTransport
-from lca.layer0_infra.observability import record, record_runtime, span
+from lca.layer0_infra.observability import (
+    get_current_run_scope,
+    record,
+    record_runtime,
+    run_scope,
+    span,
+)
 
 
 def _describe_target(agent_card: AgentCard | str) -> str:

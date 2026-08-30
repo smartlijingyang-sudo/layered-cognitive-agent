@@ -75,6 +75,11 @@ class _SandboxComputerBase:
         ok = bool(payload.get("success", True))
         err = str(payload.get("error") or "")
         content = _format_content(payload)
+        # ADR-0102: normalise the on-guest camelCase renderer keys to the
+        # snake_case python keys the RenderContracts declare.
+        from lca.layer0_infra.computer.runtime_exec import _normalize_guest_state
+
+        _normalize_guest_state(payload, tool_name=invocation_id)
         return ComputerOpResult(
             success=ok,
             content=content,

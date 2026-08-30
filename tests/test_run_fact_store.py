@@ -171,9 +171,7 @@ def test_reasoning_events_are_restricted_audience() -> None:
     for name in ("ReasoningDelta", "ReasoningCompleted"):
         descriptor = EVENT_DESCRIPTOR_REGISTRY.get(name)
         assert descriptor is not None
-        assert descriptor.audience is EventAudience.RESTRICTED, (
-            f"{name}.audience 应为 restricted"
-        )
+        assert descriptor.audience is EventAudience.RESTRICTED, f"{name}.audience 应为 restricted"
 
 
 # ── SSE audience 过滤 ────────────────────────────────────

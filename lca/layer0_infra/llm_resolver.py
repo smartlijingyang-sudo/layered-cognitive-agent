@@ -1,6 +1,6 @@
-"""LLM resolver — ``ProductionLLMResolver`` plus re-exports for backward compat.
+"""LLM resolver — ``ProductionLLMResolver`` plus LLM infrastructure exports.
 
-The plugin (``lca.plugins.llm_resolver``) is the only thing that loads
+The plugin (``lca.plugins.seam_definitions.llm_resolver``) is the only thing that loads
 ``.env``, normalizes aliases, and wires the chat adapter. No product
 ``mode`` vocabulary (mock / deepseek / auto).
 """
@@ -67,7 +67,6 @@ class ProductionLLMResolver:
         default_model: str | None = None,
         api_style: str | None = None,
         llm_service: LlmService | None = None,
-        mode: str | None = None,  # ignored; kept for call-site compat during migration
     ) -> None:
         self._api_key = live_credential(api_key)
         self._base_url = live_credential(base_url)
@@ -79,13 +78,8 @@ class ProductionLLMResolver:
     def is_available(self) -> bool:
         return bool(self._api_key)
 
-    def resolve(self, *, mode: str | None = None) -> LLMAdapter:
-        """Return the registered chat adapter, or build one from credentials.
-
-        *mode* is ignored (gateway run modes like ``solo`` must not select a
-        provider). Kept as a keyword for call-site compatibility.
-        """
-        del mode  # run modes are not LLM provider selectors
+    def resolve(self) -> LLMAdapter:
+        """Return the registered chat adapter, or build one from credentials."""
         if self._llm_service is not None:
             names = set(self._llm_service.providers.names())
             if names:

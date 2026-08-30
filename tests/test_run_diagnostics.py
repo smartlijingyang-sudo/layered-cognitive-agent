@@ -22,6 +22,7 @@ from lca.layer0_infra.observability import (
     run_scope,
 )
 from lca.layer0_infra.observability.facade import RunContext, bind
+from lca.layer0_infra.observability.journal.journal_io import load_journal_records
 from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
 from lca.layer0_infra.observability.policy import Verbosity
 from lca.layer0_infra.ops.cli import app
@@ -30,7 +31,7 @@ from tests.support.observability_helpers import RuntimeCategoryFilter, make_test
 
 
 def _events(path: Path) -> list[dict[str, object]]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    return load_journal_records(path)
 
 
 def test_diagnostic_event_is_run_scoped_and_redacted(tmp_path: Path) -> None:
@@ -58,13 +59,15 @@ def test_diagnostic_event_is_run_scoped_and_redacted(tmp_path: Path) -> None:
     bound.journal.flush()  # type: ignore[union-attr]
     bound.journal.close()  # type: ignore[union-attr]
     [event] = _events(path)
-    # JsonlJournalProjector emits journal.v1 records (seq/scope/event/...)
-    assert event["schema"] == "journal.v1"
+    # ADR-0065 §三 / PR-3: v2 envelope
+    assert event["schema"] == "lca.journal/2"
     assert event["scope"]["run_id"] == "run_123"
     assert event["scope"]["trace_id"] == "trace_456"
-    prompt = event["event"]["attributes"]["prompt_preview"]
-    assert "sk-1234567890abcdef" not in prompt
-    assert "[REDACTED]" in prompt
+    # ADR-0101 PR-2:view-only stripping 已移除(0065 §四);RuntimeObserved
+    # attributes / output 子字典不再剥离 prompt_preview / response_preview
+    # 等 view-only 键,新策略由 frontend 渲染层处理(白名单)。
+    assert "prompt_preview" in event["data"].get("attributes", {})
+    assert "response_preview" in event["data"].get("output", {})
 
 
 def test_observe_operation_emits_started_and_terminal_status(tmp_path: Path) -> None:
@@ -91,12 +94,12 @@ def test_observe_operation_emits_started_and_terminal_status(tmp_path: Path) -> 
     bound.journal.flush()  # type: ignore[union-attr]
     bound.journal.close()  # type: ignore[union-attr]
     started, completed = _events(path)
-    assert started["event"]["outcome"] == "started"
-    assert completed["event"]["outcome"] == "ok"
-    assert completed["event"]["output"] == {
-        "result_preview": "4",
-        "duration_ms": completed["event"]["output"]["duration_ms"],
-    }
+    assert started["data"]["outcome"] == "started"
+    assert completed["data"]["outcome"] == "ok"
+    # ADR-0101 PR-2:view-only stripping 已移除;RuntimeObserved output
+    # 子字典保留 result_preview 等键(语义:诊断元数据,非渲染细节)。
+    assert "result_preview" in completed["data"]["output"]
+    assert "duration_ms" in completed["data"]["output"]
 
 
 @pytest.mark.asyncio
@@ -120,7 +123,7 @@ async def test_hook_trigger_uses_diagnostic_stream_not_stderr_logger(tmp_path: P
     bound.journal.flush()  # type: ignore[union-attr]
     bound.journal.close()  # type: ignore[union-attr]
     [event] = _events(path)
-    payload = event["event"]
+    payload = event["data"]
     assert payload["operation"] == "hook.trigger"
     assert payload["source"] == "hook_registry.simple"
     assert payload["attributes"]["hook_event"] == HookEvent.PRE_THINK.value

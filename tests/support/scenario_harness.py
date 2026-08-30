@@ -53,9 +53,15 @@ _CLOSED_SET: frozenset[str] = frozenset(
         # Tier-2 providers (from bundles/base.yaml)
         "lca-llm-provider",
         "lca-memory-provider",
+        "lca-memory-write-policy-simple",
+        "lca-memory-compaction-policy-simple",
+        "lca-retrieval-layered",
+        "lca-retrieval-null",
         "lca-state-store-provider",
         "lca-search-provider",
         "lca-tools-provider",
+        "lca-composer-provider",
+        "lca-composition-invariant-default",
         "lca-transport-provider",
         "lca-skills-provider",
         "lca-file-store-provider",
@@ -63,15 +69,28 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "lca-sandbox-provider",
         "lca-attachment-provider",
         "lca-workspace-provider",
+        # Tier-3 group services (ADR-0056 short names — perceived via perceive/gates group)
+        "perceive",
+        "perceive.hub.sequential",
+        "gates",
+        "gates.chain.sequential",
+        "remember",
+        "act",
+        "tools",
         # Tier-3 behaviors (from bundles/web-app.yaml + scenarios)
         "lca-brain-modular",
         "lca-brain-simple",
         "lca-brain-lats",
         "lca-reasoner-prompt",
+        "lca-reasoner-template-catalog-builtin",
         "lca-synthesizer-concat",
         "lca-synthesizer-evidence-weighted",
         "lca-loop-cognitive",
         "lca-loop-dsh-bridge",
+        # Run-mode adapters are independently replaceable plugin entries.
+        "lca-mode-solo-default",
+        "lca-mode-team-default",
+        "lca-mode-cordis-creator-default",
         "lca-loop-replay",
         "lca-team-lead-board",
         "lca-gate-repeat-tool-call",
@@ -108,14 +127,16 @@ _CLOSED_SET: frozenset[str] = frozenset(
         # Act / runtime
         "body.simple",
         "safe_executor.simple",
-        "stop_rule.default",
+        "state.stop-policy.default",
         "hook_registry.simple",
         "middleware_registry.memory",
         # Memory layers
         "lca-memory-four-layer",
         "lca-memory-tree-cache",
-        # Skills
+        # Candidate-only learning
         "lca-skill-auto-acquire",
+        "lca-learning-review-ticket-store",
+        "lca-learning-review-lifecycle-subscriber",
         # Policy / coordination / synthesizer helpers
         "lca-goal-stack-policy",
         "lca-compaction-policy",
@@ -127,6 +148,9 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "lca-profile-evolver",
         # Body / executor
         "lca-safe-executor",
+        # Creator role policy (Organization plane)
+        "lca-role-cordis-creator",
+        "lca-team-casting-prompt-renderer-builtin",
         # Tools (closed tool set)
         "lca-tool-bash",
         "lca-tool-str-replace-editor",

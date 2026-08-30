@@ -7,6 +7,7 @@ from typing import Any
 
 from cordis import Context
 
+from lca.harness.profile.boot_products import resolved_profile_from_scope
 from lca.harness.profile.resolve import dump_resolved
 
 
@@ -20,34 +21,29 @@ async def inspect_profile_tree(profile_path: Path | str) -> Context:
 
 def format_plugin_tree(ctx: Context, *, profile: str) -> str:
     """Render resolved Manifest rows: id, module, kind, layer, config sources."""
-    resolved = getattr(ctx, "resolved_profile", None) or ctx.__dict__.get("resolved_profile")
+    resolved = resolved_profile_from_scope(ctx)
     lines = [f"Profile: {profile}"]
-    if resolved is not None:
-        dumped = dump_resolved(resolved, redact=True)
-        lines.append(f"manifest_hash: {dumped['manifest_hash']}")
-        lines.append(f"plugins: {len(dumped['plugins'])}  dag_edges: {len(dumped['dag_edges'])}")
-        lines.append("")
-        for row in dumped["plugins"]:
-            status = "disabled" if row["disabled"] else "active"
-            lines.append(
-                f"  {row['id']}  [{status}]  kind={row['kind']} layer={row['layer']}  "
-                f"module={row['module']}"
-            )
-            if row["provides"]:
-                lines.append(f"    provides: {', '.join(row['provides'])}")
-            if row["requires"]:
-                lines.append(f"    requires: {', '.join(row['requires'])}")
-            if row["config_sources"]:
-                src = ", ".join(f"{k}←{v}" for k, v in sorted(row["config_sources"].items())[:4])
-                lines.append(f"    config_from: {src}")
+    if resolved is None:
+        lines.append("no ResolvedProfile on context")
         return "\n".join(lines) + "\n"
 
-    entries = ctx.__dict__.get("entries") or []
-    lines.append(f"Plugin count: {len(entries)}")
-    for entry in entries:
-        eid = getattr(entry, "id", "?")
-        module = (getattr(entry, "extra", None) or {}).get("$module", "")
-        lines.append(f"  {eid}  module={module}")
+    dumped = dump_resolved(resolved, redact=True)
+    lines.append(f"manifest_hash: {dumped['manifest_hash']}")
+    lines.append(f"plugins: {len(dumped['plugins'])}  dag_edges: {len(dumped['dag_edges'])}")
+    lines.append("")
+    for row in dumped["plugins"]:
+        status = "disabled" if row["disabled"] else "active"
+        lines.append(
+            f"  {row['id']}  [{status}]  kind={row['kind']} layer={row['layer']}  "
+            f"module={row['module']}"
+        )
+        if row["provides"]:
+            lines.append(f"    provides: {', '.join(row['provides'])}")
+        if row["requires"]:
+            lines.append(f"    requires: {', '.join(row['requires'])}")
+        if row["config_sources"]:
+            src = ", ".join(f"{k}←{v}" for k, v in sorted(row["config_sources"].items())[:4])
+            lines.append(f"    config_from: {src}")
     return "\n".join(lines) + "\n"
 
 
@@ -64,7 +60,7 @@ def format_capability_graph(
     elif meta is not None:
         payload = dict(meta)
     elif isinstance(ctx_or_meta, Context):
-        resolved = ctx_or_meta.__dict__.get("resolved_profile")
+        resolved = resolved_profile_from_scope(ctx_or_meta)
         if resolved is not None:
             dumped = dump_resolved(resolved, redact=True)
             return {
@@ -83,11 +79,6 @@ def format_capability_graph(
                 ],
                 "edges": [list(e) for e in dumped["dag_edges"]],
             }
-        plugins_meta = _collect_plugin_meta(ctx_or_meta)
-        if not plugins_meta:
-            plugins_meta = _legacy_plugin_entries(ctx_or_meta)
-        if plugins_meta:
-            return _assemble_graph(profile=profile, plugins=plugins_meta)
         payload = {}
     return _normalize_capability_dict(payload)
 
@@ -115,12 +106,18 @@ def format_capability_graph_from_legacy(legacy_obj: Any, *, profile: str = "") -
 
 def why_capability(ctx: Context, capability: str) -> str:
     """Explain who owns a capability and who requires it."""
-    resolved = ctx.__dict__.get("resolved_profile")
+    resolved = resolved_profile_from_scope(ctx)
     if resolved is None:
         return f"capability {capability!r}: no ResolvedProfile on context"
-    owners = [p for p in resolved.plugins if capability in p.definition.provides and not p.disabled]
+    owners = [
+        p
+        for p in resolved.plugins
+        if capability in p.definition.provided_capability_keys and not p.disabled
+    ]
     consumers = [
-        p for p in resolved.plugins if capability in p.definition.requires and not p.disabled
+        p
+        for p in resolved.plugins
+        if capability in p.definition.required_capability_keys and not p.disabled
     ]
     lines = [f"capability: {capability}"]
     if not owners:
@@ -128,8 +125,8 @@ def why_capability(ctx: Context, capability: str) -> str:
     else:
         for owner in owners:
             lines.append(
-                f"owner: {owner.id} ({owner.module}) kind={owner.definition.kind.value} "
-                f"layer={owner.definition.layer}"
+                f"owner: {owner.id} ({owner.module}) kind={owner.definition.spec.kind.value} "
+                f"layer={owner.definition.spec.layer}"
             )
     if consumers:
         lines.append("required by:")
@@ -142,7 +139,7 @@ def why_capability(ctx: Context, capability: str) -> str:
 
 def why_plugin(ctx: Context, plugin_id: str) -> str:
     """Explain why a plugin was started (reverse dependency + source)."""
-    resolved = ctx.__dict__.get("resolved_profile")
+    resolved = resolved_profile_from_scope(ctx)
     if resolved is None:
         return f"plugin {plugin_id!r}: no ResolvedProfile on context"
     target = next((p for p in resolved.plugins if p.id == plugin_id), None)
@@ -153,48 +150,14 @@ def why_plugin(ctx: Context, plugin_id: str) -> str:
         f"plugin: {plugin_id}",
         f"module: {target.module}",
         f"source: {target.source}",
-        f"kind/layer: {target.definition.kind.value}/{target.definition.layer}",
-        f"provides: {list(target.definition.provides)}",
-        f"requires: {list(target.definition.requires)}",
-        f"test_suite: {target.definition.test_suite}",
+        f"kind/layer: {target.definition.spec.kind.value}/{target.definition.spec.layer}",
+        f"provides: {list(target.definition.provided_capability_keys)}",
+        f"requires: {list(target.definition.required_capability_keys)}",
+        f"test_suite: {target.definition.spec.verification.test_suite}",
         f"disabled: {target.disabled}",
         f"enables: {dependents or '(no dependents in DAG)'}",
     ]
     return "\n".join(lines)
-
-
-# ── Internal helpers (legacy graph assembly) ─────────────────────────
-
-
-def _collect_plugin_meta(ctx: Context) -> list[dict[str, Any]]:
-    entries = ctx.__dict__.get("entries") or []
-    out: list[dict[str, Any]] = []
-    for entry in entries:
-        meta = {
-            "name": getattr(entry, "id", ""),
-            "layer": "",
-            "implements": [],
-            "provides": list(getattr(entry, "provides", []) or []),
-            "requires": list(getattr(entry, "inject", []) or []),
-            "side_effects": [],
-            "policy_class": "",
-        }
-        if meta["name"]:
-            out.append(meta)
-    return out
-
-
-def _legacy_plugin_entries(ctx: Context) -> list[dict[str, Any]]:
-    return _collect_plugin_meta(ctx)
-
-
-def _assemble_graph(*, profile: str, plugins: list[dict[str, Any]]) -> dict[str, Any]:
-    return {
-        "profile": profile,
-        "plugins": plugins,
-        "implements": sorted({i for p in plugins for i in (p.get("implements") or []) if i}),
-        "side_effects": sorted({s for p in plugins for s in (p.get("side_effects") or []) if s}),
-    }
 
 
 def _normalize_capability_dict(payload: dict[str, Any]) -> dict[str, Any]:

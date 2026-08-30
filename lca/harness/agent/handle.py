@@ -14,4 +14,4 @@ class OwnerAgentHandle:
         return self._agent
 
     async def dispose(self, reason: str = "owner") -> None:
-        self._agent.cancel(reason)
+        await self._agent.cancel(reason)

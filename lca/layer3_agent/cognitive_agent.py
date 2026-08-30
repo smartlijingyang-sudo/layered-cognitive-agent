@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 
 from lca.contracts.mechanisms import Hook
 from lca.contracts.models.core.budget import DEFAULT_MAX_STEPS
@@ -17,8 +18,9 @@ from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.models.observability.journal import (
     AgentRunFinished,
     AgentRunStarted,
-    adopt_run_scope,
+    RunScope,
 )
+from lca.contracts.models.observability.plan_ref import plan_ref_scope
 from lca.contracts.models.team.partial_buffer import (
     begin_partial_buffer,
     drain_run_partial,
@@ -30,6 +32,7 @@ from lca.contracts.protocols import AgentUnit, Runtime
 from lca.contracts.protocols.capabilities import HasHooks
 from lca.layer0_infra.observability import (
     BoundObservability,
+    adopt_run_scope,
     bind_backends,
     objective_preview,
     record,
@@ -37,6 +40,7 @@ from lca.layer0_infra.observability import (
     set_session,
 )
 from lca.layer0_infra.workspace import effective_agent_wall_clock, get_run_workspace
+from lca.layer2_runtime.runtime_lifecycle import record_run_resumed
 
 _STRATEGY_KEY_SOLO = "solo"
 
@@ -57,17 +61,24 @@ class CognitiveAgent(AgentUnit):
         observability: BoundObservability,
         max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = None,
+        plan_ref: str = "",
     ) -> None:
         self.runtime = runtime
         self.role_profile = role_profile
         self._observability = observability
         self.max_steps = max_steps
         self.max_wall_clock_seconds = max_wall_clock_seconds
+        self._plan_ref = plan_ref
 
     @property
     def observability(self) -> BoundObservability:
         """组合注入的观测 backend（只读暴露，供组合根提升/复用）。"""
         return self._observability
+
+    @property
+    def plan_ref(self) -> str:
+        """Immutable plan associated with this agent, if it was plan-bound."""
+        return self._plan_ref
 
     async def run(
         self,
@@ -79,75 +90,155 @@ class CognitiveAgent(AgentUnit):
         scope, top_level = adopt_run_scope(role=role)
         if ctx and ctx.session_id:
             set_session(ctx.session_id)
+        bound_ctx = self._enrich_run_context(ctx)
+        effective_wall = effective_agent_wall_clock(self.max_wall_clock_seconds)
+
+        async def execute() -> Result:
+            return await self.runtime.run(
+                text,
+                bound_ctx,
+                max_steps=self.max_steps,
+                max_wall_clock_seconds=effective_wall,
+                agent_role=role,
+            )
+
         with bind_backends(self._observability), run_scope(scope):
-            partial_token = begin_partial_buffer()
+            if self._plan_ref:
+                with plan_ref_scope(self._plan_ref):
+                    return await self._run_lifecycle(
+                        objective=text,
+                        ctx=bound_ctx,
+                        role=role,
+                        top_level=top_level,
+                        scope=scope,
+                        execute=execute,
+                    )
+            return await self._run_lifecycle(
+                objective=text,
+                ctx=bound_ctx,
+                role=role,
+                top_level=top_level,
+                scope=scope,
+                execute=execute,
+            )
+
+    async def _run_lifecycle(
+        self,
+        *,
+        objective: str,
+        ctx: RunContext | None,
+        role: str,
+        top_level: bool,
+        scope: RunScope,
+        execute: Callable[[], Awaitable[Result]],
+        resumed_snapshot: StateSnapshot | None = None,
+    ) -> Result:
+        """Record one fresh or resumed runtime invocation inside a RunScope.
+
+        The lifecycle boundary remains kernel-owned rather than hook/plugin
+        controlled: plugins may replace the ``Runtime`` through the profile,
+        but must not omit the durable start/resume/finish facts that make its
+        model-visible work and recovery path auditable.
+        """
+        partial_token = begin_partial_buffer()
+        record(
+            AgentRunStarted(
+                agent_role=role,
+                strategy_key=_STRATEGY_KEY_SOLO if top_level else "",
+                objective=objective,
+                objective_preview=objective_preview(objective),
+                from_role=ctx.from_role if ctx else "",
+            )
+        )
+        if resumed_snapshot is not None:
+            record_run_resumed(resumed_snapshot)
+        finish_status = TaskStatus.CANCELED.value
+        finish_output = ""
+        finish_steps = 0
+        finish_error = ""
+        try:
+            result = await execute()
+            self._stamp_resumable_snapshot(result, scope)
+            finish_status = (
+                result.status.value if isinstance(result.status, TaskStatus) else str(result.status)
+            )
+            finish_output = result.output or ""
+            finish_steps = result.total_steps
+            finish_error = result.error or ""
+            return result
+        except asyncio.CancelledError:
+            finish_status = TaskStatus.CANCELED.value
+            finish_output = drain_run_partial()
+            finish_error = "canceled"
+            raise
+        except Exception as err:
+            finish_status = TaskStatus.FAILED.value
+            finish_output = drain_run_partial()
+            finish_error = f"{type(err).__name__}: {err}"
+            raise
+        finally:
             record(
-                AgentRunStarted(
-                    agent_role=role,
-                    strategy_key=_STRATEGY_KEY_SOLO if top_level else "",
-                    objective=text,
-                    objective_preview=objective_preview(text),
-                    from_role=ctx.from_role if ctx else "",
+                AgentRunFinished(
+                    status=finish_status,
+                    output_text=finish_output,
+                    steps=finish_steps,
+                    error=finish_error,
                 )
             )
-            # 默认 CANCELED：CancelledError 是 BaseException，不会进 except Exception。
-            # finally 保证任何退出路径都发射 Finished，OTel attach 在同 task 配对 detach。
-            finish_status = TaskStatus.CANCELED.value
-            finish_output = ""
-            finish_steps = 0
-            finish_error = ""
-            try:
-                ctx = self._enrich_run_context(ctx)
-                effective_wall = effective_agent_wall_clock(self.max_wall_clock_seconds)
-                result = await self.runtime.run(
-                    text,
-                    ctx,
-                    max_steps=self.max_steps,
-                    max_wall_clock_seconds=effective_wall,
-                    agent_role=role,
-                )
-                finish_status = (
-                    result.status.value
-                    if isinstance(result.status, TaskStatus)
-                    else str(result.status)
-                )
-                finish_output = result.output or ""
-                finish_steps = result.total_steps
-                finish_error = result.error or ""
-                return result
-            except asyncio.CancelledError:
-                # ADR-0049：deadline cancel 时收割 stream partial，不丢弃已生成正文
-                finish_status = TaskStatus.CANCELED.value
-                finish_output = drain_run_partial()
-                finish_error = "canceled"
-                raise
-            except Exception as err:
-                finish_status = TaskStatus.FAILED.value
-                finish_output = drain_run_partial()
-                finish_error = f"{type(err).__name__}: {err}"
-                raise
-            finally:
-                record(
-                    AgentRunFinished(
-                        status=finish_status,
-                        output_text=finish_output,
-                        steps=finish_steps,
-                        error=finish_error,
-                    )
-                )
-                reset_partial_buffer(partial_token)
+            reset_partial_buffer(partial_token)
+
+    @staticmethod
+    def _stamp_resumable_snapshot(result: Result, scope: RunScope) -> None:
+        """Persist the owning RunScope on a pause checkpoint for later resume."""
+        snapshot = result.extra.get("state_snapshot")
+        if isinstance(snapshot, StateSnapshot):
+            snapshot.trace_id = scope.trace_id
+            snapshot.run_id = scope.run_id
 
     async def resume(
         self,
         snapshot: StateSnapshot,
         input: str | AgentMessage | None = None,
     ) -> Result:
+        """Resume through the same observability and lifecycle boundary as ``run``."""
         msg = None
         if isinstance(input, AgentMessage):
             msg = input
         elif isinstance(input, str):
             msg = agent_message_text(input)
-        return await self.runtime.resume(snapshot, input=msg, max_steps=self.max_steps)
+
+        role = self.role_profile.role
+        scope, top_level = adopt_run_scope(
+            role=role,
+            trace_id=snapshot.trace_id or None,
+            parent_run_id=snapshot.run_id or None,
+        )
+
+        async def execute() -> Result:
+            return await self.runtime.resume(snapshot, input=msg, max_steps=self.max_steps)
+
+        objective = f"resume:{snapshot.snapshot_id}"
+        with bind_backends(self._observability), run_scope(scope):
+            if self._plan_ref:
+                with plan_ref_scope(self._plan_ref):
+                    return await self._run_lifecycle(
+                        objective=objective,
+                        ctx=None,
+                        role=role,
+                        top_level=top_level,
+                        scope=scope,
+                        execute=execute,
+                        resumed_snapshot=snapshot,
+                    )
+            return await self._run_lifecycle(
+                objective=objective,
+                ctx=None,
+                role=role,
+                top_level=top_level,
+                scope=scope,
+                execute=execute,
+                resumed_snapshot=snapshot,
+            )
 
     async def cancel(self) -> None:
         return None

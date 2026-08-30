@@ -10,7 +10,10 @@ from lca.contracts.mechanisms import consume
 from lca.contracts.protocols import Sandbox
 from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.sandbox.runtime import RunBoundSandboxRuntime
-from lca.layer0_infra.tools.run_finalizer import get_current_run_id, register_finalizer
+
+# ADR-0101 PR-3 carry-over:延迟导入 ``run_finalizer``,避开 ``tools`` 包预
+# 加载触发的 runtime_scope ↔ computer.sandbox_computer 循环(见
+# runtime_mount.py 注释)。
 
 _log = structlog.get_logger(__name__)
 
@@ -19,6 +22,8 @@ _runtimes: dict[str, RunBoundSandboxRuntime] = {}
 
 def get_sandbox_runtime(run_id: str | None = None) -> RunBoundSandboxRuntime | None:
     """Return the runtime for *run_id* or the ambient run."""
+    from lca.layer0_infra.tools.run_finalizer import get_current_run_id
+
     rid = (run_id or get_current_run_id()).strip()
     if not rid:
         return None
@@ -48,6 +53,8 @@ async def bind_sandbox_runtime(
     async def _destroy() -> None:
         await unbind_sandbox_runtime(run_id)
 
+    from lca.layer0_infra.tools.run_finalizer import register_finalizer
+
     register_finalizer(run_id, _destroy)
     _log.debug("sandbox_runtime_bound", run_id=run_id, attachments=len(cleaned))
     return runtime
@@ -61,6 +68,8 @@ async def ensure_sandbox_runtime(
     attachment_ids: Sequence[str] | None = None,
 ) -> RunBoundSandboxRuntime:
     """Get or create runtime for the active run and ensure environment ready."""
+    from lca.layer0_infra.tools.run_finalizer import get_current_run_id
+
     rid = (run_id or get_current_run_id()).strip()
     if not rid:
         raise RuntimeError("sandbox runtime requires an active run_id scope")

@@ -2,14 +2,16 @@
 
 LobeHub paints the card while arguments are still incomplete. Journal must
 do the same: one ``tool_call_id`` from the first name delta through ToolInvoked.
+
+ADR-0101 PR-3:返回 frame 仅含 ``tool_name`` / ``tool_call_id`` —— ToolCallStreaming
+event 不再带 ``arguments_preview`` / ``plugin_state`` 字段;完整参数通过
+``arguments_ref`` 走 evidence 平面,渲染面在 LobeHub renderer registry 取得。
 """
 
 from __future__ import annotations
 
 import json
 from typing import Any
-
-from lca.layer1_cognitive.body.tool_ui_state import build_started_plugin_state
 
 _EMIT_EVERY_CHARS = 160
 _PARTIAL_STRING_KEYS = (
@@ -46,12 +48,9 @@ def push_tool_call_stream(
     if emitted >= 0 and len(raw) - emitted < _EMIT_EVERY_CHARS:
         return None
     slot["emitted"] = len(raw)
-    args = parse_partial_tool_args(raw)
     return {
         "tool_name": name,
         "tool_call_id": (tool_call_id or key),
-        "arguments_preview": raw[:2000],
-        "plugin_state": build_started_plugin_state(name, args) if args else {},
     }
 
 

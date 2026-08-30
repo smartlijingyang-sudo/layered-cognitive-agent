@@ -18,6 +18,7 @@ from __future__ import annotations
 from lca.contracts.atoms.enums import MemoryLayer
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Observation, Reflection
+from lca.contracts.models.core.memory import MemoryRecord, MemoryTrust
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import (
     ContextCompacted,
@@ -34,6 +35,7 @@ from lca.layer1_cognitive.memory.policy import (
     SimpleCompactionPolicy,
     SimpleMemoryPolicy,
 )
+from lca.layer1_cognitive.memory.semantic_compaction import SemanticCompactionPolicy
 
 
 def _agent_state() -> AgentState:
@@ -90,9 +92,7 @@ class TestSimpleMemoryPolicy:
 
     def test_model_inference_below_threshold_rejected(self) -> None:
         policy = SimpleMemoryPolicy(min_confidence=0.7)
-        rejected = _write(
-            authority=MemoryAuthority.MODEL_INFERENCE, confidence=0.3
-        )
+        rejected = _write(authority=MemoryAuthority.MODEL_INFERENCE, confidence=0.3)
         result = policy.commit((rejected,))
         assert not result.accepted
         assert len(result.rejected) == 1
@@ -103,9 +103,7 @@ class TestSimpleMemoryPolicy:
 
     def test_model_inference_above_threshold_accepted(self) -> None:
         policy = SimpleMemoryPolicy(min_confidence=0.5)
-        accepted = _write(
-            authority=MemoryAuthority.MODEL_INFERENCE, confidence=0.9
-        )
+        accepted = _write(authority=MemoryAuthority.MODEL_INFERENCE, confidence=0.9)
         result = policy.commit((accepted,))
         assert len(result.accepted) == 1
 
@@ -198,6 +196,85 @@ class TestSimpleCompactionPolicy:
         assert kept[0].record_id == "c"
 
 
+class TestSemanticCompactionPolicy:
+    @staticmethod
+    def _records(*, count: int = 5, anchored: bool = False) -> tuple[MemoryRecord, ...]:
+        return tuple(
+            MemoryRecord(
+                record_id=f"r{i}",
+                content=f"historical evidence {i}: " + ("detail " * 90),
+                memory_type=MemoryLayer.EPISODIC,
+                importance=0.5,
+                recency_score=float(i),
+                metadata={"compaction_anchor": True} if anchored and i == 0 else {},
+            )
+            for i in range(count)
+        )
+
+    def test_shadow_keeps_exact_selection_and_records_candidate_provenance(self) -> None:
+        records = self._records()
+        policy = SemanticCompactionPolicy(mode="shadow")
+
+        result = policy.compact(records, budget=2)
+
+        assert tuple(record.record_id for record in result) == ("r3", "r4")
+        report = policy.report(records, budget=2)
+        assert report.applied is False
+        assert report.reason == "shadow_candidate"
+        assert report.source_record_ids == ("r0", "r1", "r2")
+        assert report.summary_record_id is not None
+        assert report.summary_record_id.startswith("context-summary-")
+        assert report.coverage_ratio == 1.0
+
+    def test_enforce_replaces_exactly_the_records_described_by_summary(self) -> None:
+        records = self._records()
+        policy = SemanticCompactionPolicy(mode="enforce", max_summary_characters=320)
+
+        result = policy.compact(records, budget=3)
+
+        assert len(result) == 3
+        summary, *exact_records = result
+        assert summary.metadata["compaction"] is True
+        assert summary.metadata["source_record_ids"] == ("r0", "r1", "r2")
+        assert summary.trust is MemoryTrust.UNTRUSTED_HISTORY
+        assert tuple(record.record_id for record in exact_records) == ("r3", "r4")
+        report = policy.report(records, budget=3)
+        assert report.applied is True
+        assert report.source_record_ids == tuple(summary.metadata["source_record_ids"])
+        assert report.summary_record_id == summary.record_id
+        assert report.result_count == 3
+        assert report.compression_ratio > 0
+
+    def test_enforce_never_removes_anchored_records(self) -> None:
+        records = self._records(anchored=True)
+        policy = SemanticCompactionPolicy(mode="enforce", max_summary_characters=320)
+
+        result = policy.compact(records, budget=2)
+
+        assert result[0].record_id == "r0"
+        assert result[0].metadata["compaction_anchor"] is True
+        assert result[1].metadata["source_record_ids"] == ("r1", "r2", "r3", "r4")
+
+    def test_anchor_overflow_fails_closed_without_dropping_context(self) -> None:
+        records = tuple(
+            MemoryRecord(
+                record_id=f"anchor-{i}",
+                content="protected constraint",
+                memory_type=MemoryLayer.EPISODIC,
+                importance=0.5,
+                metadata={"compaction_anchor": True},
+            )
+            for i in range(3)
+        )
+        policy = SemanticCompactionPolicy(mode="enforce")
+
+        result = policy.compact(records, budget=2)
+
+        assert result == records
+        report = policy.report(records, budget=2)
+        assert report.reason == "anchors_exceed_budget"
+
+
 class TestProtocols:
     def test_memory_policy_is_a_protocol(self) -> None:
         from typing import Protocol
@@ -268,8 +345,12 @@ class TestSimpleMemorySystemCommit:
                 seen.append(
                     ContextCompacted(
                         step=0,
-                        original_kinds=tuple({r.kind.value for r in records if hasattr(r.kind, "value")}),
-                        kept_kinds=tuple({r.kind.value for r in result if hasattr(r.kind, "value")}),
+                        original_kinds=tuple(
+                            {r.kind.value for r in records if hasattr(r.kind, "value")}
+                        ),
+                        kept_kinds=tuple(
+                            {r.kind.value for r in result if hasattr(r.kind, "value")}
+                        ),
                     )
                 )
                 return result
@@ -298,10 +379,50 @@ class TestSimpleMemorySystemCommit:
         assert committed_events
         # Sanity: at least one record_id matches the accepted record.
         assert any(
-            ev.record_id == rec.record_id
-            for ev in committed_events
-            for rec in result.accepted
+            ev.record_id == rec.record_id for ev in committed_events for rec in result.accepted
         )
+
+    async def test_semantic_compaction_event_exposes_metrics_without_summary_content(self) -> None:
+        from lca.contracts.models.observability.journal import RunScope
+        from lca.layer0_infra.observability import bind_backends, run_scope
+        from tests.support.observability_helpers import make_test_bound
+
+        class _AllWorkingRetrieval:
+            def retrieve(self, layers, budget):
+                del budget
+                return list(layers[MemoryLayer.WORKING])
+
+        hub = make_test_bound()
+        system = SimpleMemorySystem(
+            compaction=SemanticCompactionPolicy(mode="enforce", max_summary_characters=320),
+            retrieval=_AllWorkingRetrieval(),
+        )
+        for i in range(21):
+            system._append_record(
+                MemoryLayer.WORKING,
+                MemoryRecord(
+                    record_id=f"r{i}",
+                    content=f"historical tool-free context {i}: " + ("detail " * 90),
+                    memory_type=MemoryLayer.WORKING,
+                    importance=0.5,
+                    recency_score=float(i),
+                ),
+            )
+
+        with bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
+            await system.perceive(_agent_state())
+
+        event = next(
+            stamped.event
+            for stamped in hub.journal.store.events
+            if isinstance(stamped.event, ContextCompacted)
+        )
+        assert event.mode == "enforce"
+        assert event.applied is True
+        assert event.source_record_count == 2
+        assert event.summary_record_id.startswith("context-summary-")
+        assert event.original_characters > event.result_characters
+        assert not hasattr(event, "summary_content")
 
     async def test_context_compacted_event_emitted_on_perceive(self) -> None:
         """Direct test: ContextCompacted is appended on perceive."""

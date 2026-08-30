@@ -1,0 +1,22 @@
+# PlanTemplate: prompt_chain (Sequential Prompt Chain)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: prompt_chain
+name: Sequential Prompt Chain
+description: Chain of prompts: each prompt's output feeds next
+version: 1
+
+relations:
+  - governs
+  - evaluates
+  - contributes_to
+
+control_slots:
+  - think.guard
+  - stop.decide
+
+required_groups:
+  - G5
+  - G6
+
+scope: run

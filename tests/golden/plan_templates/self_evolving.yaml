@@ -1,0 +1,24 @@
+# PlanTemplate: self_evolving (Self-Evolving Agent)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: self_evolving
+name: Self-Evolving Agent
+description: Reflect on past runs; revise templates / prompts / plans
+version: 1
+
+relations:
+  - evaluates
+  - revises
+  - governs
+  - reads_fact
+
+control_slots:
+  - think.guard
+  - stop.decide
+  - remember.admit
+
+required_groups:
+  - G11
+  - G12
+
+scope: agent

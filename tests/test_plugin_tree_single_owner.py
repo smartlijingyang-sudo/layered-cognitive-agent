@@ -8,12 +8,16 @@ import pytest
 
 from gateway.runs.execute import create_run_session, execute_run
 from gateway.runs.session import RunRegistry, RunStatus
+from lca.contracts.atoms.enums import ActionScope
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_entries
+from lca.harness.profile.boot_products import resolved_profile_from_scope
+from lca.harness.profile.resolve import ProfileResolveError
 from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer0_infra.llm_resolver import live_credential
 from lca.layer4_app.api import Agent
-from lca.layer4_app.spawn import build_perceive_hub, spawn_agent
+from lca.layer4_app.spawn import spawn_agent
+from lca.plugins.composer.internal.perceive import build_perceive_hub
 
 DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
@@ -27,7 +31,6 @@ DEAD_DEFAULT_IDS = frozenset(
         "lca-attachment-provider",
         "lca-llm-provider",
         "lca-team-lead-board",
-        "lca-dsh-bridge",
         "lca-blackboard-memory",
         "lca-synthesizer-concat",
         "lca-brain-modular",
@@ -54,7 +57,10 @@ SEAM_OMIT_IDS = (
 
 
 def _entry_ids(ctx: Any) -> set[str]:
-    return {str(getattr(e, "id", "")) for e in getattr(ctx, "entries", [])}
+    resolved = resolved_profile_from_scope(ctx)
+    if resolved is None:
+        return set()
+    return {plugin.id for plugin in resolved.plugins if not plugin.disabled}
 
 
 async def _boot_omitting(omit: str) -> Any:
@@ -135,9 +141,8 @@ async def test_every_default_entry_is_consumed(no_llm_key: None) -> None:
         "brains",
         "bodies",
         "safe_executor.simple",
-        "stop_rules",
+        "stop_policy",
         "hooks",
-        "middleware_registry.memory",
         "journal_store",
         "perceive",
     }
@@ -158,8 +163,9 @@ async def test_omitting_seam_plugin_does_not_bypass(
 ) -> None:
     try:
         ctx = await _boot_omitting(omit_id)
-    except KeyError:
-        # Provider plugins inject the service; omitting the service fails boot.
+    except (KeyError, ProfileResolveError):
+        # Resolve or boot rejects an incomplete provider graph before it can
+        # become a module-level fallback path.
         return
 
     def _boom(*_a: object, **_k: object) -> object:
@@ -167,8 +173,10 @@ async def test_omitting_seam_plugin_does_not_bypass(
 
     monkeypatch.setattr("lca.layer0_infra.sandbox.factory.resolve_sandbox", _boom)
     monkeypatch.setattr("lca.layer0_infra.tools.default_set.resolve_sandbox", _boom)
-    monkeypatch.setattr("lca.layer0_infra.file_store.get_default_file_store", _boom)
-    monkeypatch.setattr("lca.layer0_infra.tools.default_set.get_default_file_store", _boom)
+    import lca.layer0_infra.file_store as file_store_module
+
+    assert not hasattr(file_store_module, "get_default_file_store")
+    assert not hasattr(file_store_module, "set_default_file_store")
     monkeypatch.setattr(
         "lca.layer0_infra.tools.default_set.build_g2a_chat_tools",
         _boom,
@@ -194,15 +202,31 @@ async def test_omitting_seam_plugin_does_not_bypass(
 async def test_omitting_tools_provider_skips_g2a_not_fallback(
     no_llm_key: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """省略 lca-tools-provider 时，g2a 不应被 fallback 调用。
+
+    实现差异：web-standard 现默认加载 scenario-cordis-creator bundle，bash /
+    file_write 通过 setup 直接 register() 进 tools 服务（不依赖 lca-tools-provider）。
+    本测试断言在 lca-tools-provider 缺位时：
+    1. g2a factory 不被调用（mock _boom）；
+    2. tools_from_scope 返回结果里不含任何 *_skill / *_chat 工具
+       （这些只能由 g2a 产出）。
+    """
     ctx = await _boot_omitting("lca-tools-provider")
 
     def _boom(*_a: object, **_k: object) -> object:
         raise AssertionError("build_g2a_chat_tools must not run when tools-provider is omitted")
 
     monkeypatch.setattr("lca.layer0_infra.tools.default_set.build_g2a_chat_tools", _boom)
-    from gateway.runs.loop_drivers import _tools_from_ctx
+    from gateway.runs.runnable_assembly import tools_from_scope
 
-    assert _tools_from_ctx(ctx, None) == ()
+    tools = tools_from_scope(ctx, None)
+    tool_names = [t.name for t in tools]
+    # g2a 出来的工具（search / askUserQuestion / *_skill 系列）一律不应出现
+    assert not any(name.endswith("_skill") for name in tool_names), tool_names
+    assert "search" not in tool_names
+    assert "askUserQuestion" not in tool_names
+    # bash / file_write 是 scenario-cordis-creator bundle 直挂的，缺 lca-tools-provider
+    # 时仍可用（这是设计：creator 工具独立于 g2a chain）
 
 
 @pytest.mark.asyncio
@@ -219,16 +243,16 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
         raise AssertionError("resolve_skill_store must not run when skills-provider is omitted")
 
     monkeypatch.setattr("lca.layer0_infra.skills.factory.resolve_skill_store", _boom)
-    monkeypatch.setattr(
-        "lca.layer4_app.spawn.resolve_skill_store",
-        _boom,
-        raising=False,
-    )
 
     from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
     with pytest.raises(MissingCapabilityError, match="skills"):
-        build_perceive_hub(SimpleMemorySystem(), scope=ctx)
+        build_perceive_hub(
+            SimpleMemorySystem(),
+            store=object(),
+            scope=ctx,
+            action_scope=ActionScope.SOLO,
+        )
 
     registry = RunRegistry()
     session = create_run_session(registry, question="ping", user_text="ping", mode="solo", ctx=ctx)
@@ -390,30 +414,3 @@ async def test_unknown_execution_target_writes_journal_and_session_error(
     journal = session2.jsonl_path.read_text(encoding="utf-8")
     assert "AgentRunFinished" in journal
     assert "no-such-loop" in journal
-
-
-@pytest.mark.asyncio
-async def test_dsh_loop_is_a_real_plugin(no_llm_key: None) -> None:
-    """lca-loop-dsh registers DshRunDriver into the runtime registry.
-
-    Opt-in via ``bundles/loop-dsh.yaml``; web-app.yaml does not ship it
-    by default because DSH is a separate deployment artifact.
-    """
-    from pathlib import Path
-
-    import yaml as _yaml
-
-    from lca.harness.profile.boot import boot_entries, load_profile_entries
-
-    webapp_ids = {e["id"] for e in load_profile_entries(DEFAULT_PROFILE)}
-    assert "lca-loop-cognitive" in webapp_ids
-    assert "lca-loop-dsh" not in webapp_ids
-
-    loop_dsh_entries = _yaml.safe_load(Path("bundles/loop-dsh.yaml").read_text())["entries"]
-    entries = load_profile_entries(DEFAULT_PROFILE) + loop_dsh_entries
-    ctx = await boot_entries(entries)
-    registry = ctx.inject("run_loop_driver_registry")
-    assert registry.contains("cognitive")
-    assert registry.contains("dsh")
-    assert registry.resolve("cognitive") is registry.resolve("cognitive")
-    assert registry.resolve("dsh") is not registry.resolve("cognitive")

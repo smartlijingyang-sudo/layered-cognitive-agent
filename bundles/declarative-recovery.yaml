@@ -1,0 +1,24 @@
+# ADR-0075: Recovery phase graph edges.
+# Extends the default phase graph with reflect→think recovery edge.
+#
+# Recovery flow:
+# 1. Phase fails (e.g., tool call returns error)
+# 2. Reflect phase detects failure and sets result.next_hints.admit_recovery = True
+# 3. Edge reflect.main → think.main is taken (when: result.next_hints.admit_recovery)
+# 4. Think phase retries with adjusted strategy
+# 5. LoopGuard limits to 1 recovery iteration (maxIterations: 1)
+#
+# This ensures bounded recovery: agent gets one retry, then must stop.
+
+entries:
+  # Recovery edge: reflect → think (only when recovery is admitted)
+  - id: phase.edge.reflect_to_think.recovery
+    name: phase_edge_reflect_to_think_recovery
+    $module: lca.plugins.phase_edges.recovery
+    config:
+      source: reflect.main
+      target: think.main
+      when: result.next_hints.admit_recovery
+      loop:
+        maxIterations: 1
+        budget: run.steps

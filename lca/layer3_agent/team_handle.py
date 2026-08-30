@@ -12,15 +12,15 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.message import AgentMessage, agent_message_as_text
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.observability.journal import (
-    TEAM_CONTAINER_ROLE,
     TeamRunFinished,
     TeamRunStarted,
-    adopt_run_scope,
 )
 from lca.contracts.protocols import AgentUnit, TeamStrategy, TeamUnit
 from lca.layer0_infra.observability import (
+    TEAM_CONTAINER_ROLE,
     BoundObservability,
     TeamTraceProfile,
+    adopt_run_scope,
     bind_backends,
     objective_preview,
     plan_steps_joined,

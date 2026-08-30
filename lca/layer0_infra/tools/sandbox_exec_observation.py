@@ -15,8 +15,8 @@ from lca.contracts.models.core.sandbox import (
     SandboxErrorKind,
     SandboxExecResult,
 )
-from lca.contracts.models.observability.journal import get_current_run_scope
 from lca.layer0_infra.file_store import FileStore
+from lca.layer0_infra.observability import get_current_run_scope
 from lca.layer0_infra.tools.sandbox_observation import _stored_part, _truncate_preview
 from lca.layer0_infra.workspace import get_run_workspace
 from lca.layer0_infra.workspace.deliverable import is_office_name

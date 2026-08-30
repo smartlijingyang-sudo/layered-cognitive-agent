@@ -1,9 +1,9 @@
-"""FactStreamProjector —— journal 事实流投影器（DSH「模型所见即日志」终端视图）。
+"""FactStreamProjector —— journal 事实流投影器（模型所见即日志视图）。
 
 每个盖章事件作为一条「事实」渲染：事件类型 + 关键字段 + 时间戳。
 轨迹分析由只读 ``TraceInspector`` 按需派生；洞察事件已并入 RuntimeObserved。
 
-设计原则（对齐 ADR-0037 + DSH session log philosophy）：
+设计原则（对齐 ADR-0037）：
 - 模型可见的即被记录的：每个事件都渲染，不做过滤
 - 容器事件（run start/finish）用 Run Card 包裹
 
@@ -11,11 +11,11 @@
 - ConsoleJournalProjector 是「叙事视图」：聚合后只渲染一行摘要
 - FactStreamProjector 是「事实流视图」：每个事件完整呈现，用于 debug 和审计
 
-结构层次（对齐 DSH Trajectory 的 Turn→Step→Record 层次）：
+结构层次（Turn→Step→Record）：
 - Run Card：Team/Agent run 边界，一步呈现成员/策略/任务
 - Step Group：以 step 编号分组，视觉上缩进嵌套
 - 资源嵌套：LLM call → Tool call 在同一 step 内缩进关联
-- 相对计时：Δms 显示事件间距（对齐 DSH 每记录 duration 列）
+- 相对计时：Δms 显示事件间距
 - Token 累计：running total 在 LLM 完成时更新
 """
 
@@ -108,7 +108,7 @@ _ATTACHMENT_ICONS = {
 class FactStreamProjector(JournalProjector):
     """journal → terminal 事实流。每个事件一条事实。
 
-    结构化层次（对齐 DSH Trajectory）：
+    结构化层次：
     - Run Card：Team/Agent 容器事件渲染为卡片
     - Step Group：step 变化时输出分组头
     - 资源嵌套：LLM + Tool 在 step 内缩进
@@ -132,7 +132,7 @@ class FactStreamProjector(JournalProjector):
         self._last_ts: float | None = None
         self._run_start_ts: float | None = None
         self._current_step: int | None = None
-        # Token 累计（对齐 DSH session cumulative usage）
+        # Token 累计（session cumulative usage）
         self._total_prompt_tokens: int = 0
         self._total_completion_tokens: int = 0
         self._total_llm_calls: int = 0
@@ -203,13 +203,13 @@ class FactStreamProjector(JournalProjector):
         return _format_duration(offset)
 
     def _step_group(self, stamped: StampedEvent, step: int) -> None:
-        """step 变化时输出分组头（对齐 DSH 的 Step grouping）。"""
+        """step 变化时输出分组头。"""
         if step != self._current_step:
             self._current_step = step
             self._emit(f"  ┌─ Step {step} ──────────────────────────────────")
 
     def _token_summary(self) -> str:
-        """累计 token 摘要（对齐 DSH session cumulative usage）。"""
+        """累计 token 摘要。"""
         return (
             f"tokens: {self._total_prompt_tokens + self._total_completion_tokens}"
             f" total "
@@ -395,7 +395,7 @@ class FactStreamProjector(JournalProjector):
             f"{event.original_action_type} → {event.degraded_to}"
         )
 
-    # ── 资源事实：LLM（结构化块，对齐 DSH assistant timing）──
+    # ── 资源事实：LLM（结构化块）──
     def _render_llm_started(self, stamped: StampedEvent, event: LlmCallStarted) -> None:
         self._section(stamped)
         self._step_group(stamped, event.step)
@@ -421,7 +421,7 @@ class FactStreamProjector(JournalProjector):
             f" #{stamped.seq} {self._delta_ms(stamped)} "
             f"{event.model} · {event.latency_ms}ms{tokens}{stream} · {mark}",
         ]
-        # 累计摘要（对齐 DSH session cumulative）
+        # 累计摘要（session cumulative）
         if self._total_llm_calls > 1:
             lines.append(
                 f"  │   cumulative: {self._token_summary()} over {self._total_llm_calls} calls"
@@ -433,38 +433,34 @@ class FactStreamProjector(JournalProjector):
                 lines.append(f"  │   response: {_truncate(event.response_preview, _PREVIEW_MAX)}")
         self._emit("\n".join(lines))
 
-    # ── 资源事实：工具（结构化块，对齐 DSH tool detail）──
+    # ── 资源事实：工具（结构化块）──
+    # ADR-0101 PR-2:tool 事件回归事实账本,参数/输出走 evidence 平面。
+    # projector 是 CLI 调试视图 —— 看完整参数是 UX 关心,不是 debug 关心。
+    # 渲染只显示 tool_name + invocation_id + ok/error/latency_ms;要看
+    # 完整参数/输出用 ref + EvidenceStore 单独查(``lca-ops evidence``)。
     def _render_tool_started(self, stamped: StampedEvent, event: ToolStarted) -> None:
         self._section(stamped)
         self._total_tool_calls += 1
-        lines = [
+        line = (
             f"  │   {_OBSERVATION_ICONS['tool_start']} tool.start"
-            f" #{stamped.seq} {self._delta_ms(stamped)} {event.tool_name}",
-        ]
-        if event.arguments_preview:
-            lines.append(f"  │     args: {_truncate(event.arguments_preview, 100)}")
-        if self._verbose and event.plugin_state:
-            lines.append(f"  │     state: {_truncate(str(event.plugin_state), _PREVIEW_MAX)}")
-        self._emit("\n".join(lines))
+            f" #{stamped.seq} {self._delta_ms(stamped)} {event.tool_name}"
+            f" · inv={event.invocation_id}"
+        )
+        self._emit(line)
 
     def _render_tool_invoked(self, stamped: StampedEvent, event: ToolInvoked) -> None:
         self._section(stamped)
         mark = "ok" if event.ok else "FAIL"
         if not event.ok:
             self._total_tool_errors += 1
-        lines = [
+        line = (
             f"  │   {_OBSERVATION_ICONS['tool_done']} tool.done"
             f" #{stamped.seq} {self._delta_ms(stamped)} "
-            f"{event.tool_name} · {event.latency_ms}ms · {mark}",
-        ]
+            f"{event.tool_name} · {event.latency_ms}ms · {mark}"
+        )
         if event.error:
-            lines.append(f"  │     error: {_truncate(event.error, 100)}")
-        if self._verbose:
-            if event.result_preview:
-                lines.append(f"  │     result: {_truncate(event.result_preview, _PREVIEW_MAX)}")
-            if event.plugin_state:
-                lines.append(f"  │     state: {_truncate(str(event.plugin_state), _PREVIEW_MAX)}")
-        self._emit("\n".join(lines))
+            line += f"\n  │     error: {_truncate(event.error, 100)}"
+        self._emit(line)
 
     def _render_tool_denied(self, stamped: StampedEvent, event: ToolDenied) -> None:
         self._section(stamped)
@@ -481,8 +477,6 @@ class FactStreamProjector(JournalProjector):
             f" #{stamped.seq} {self._delta_ms(stamped)} "
             f"{event.tool_name}"
         )
-        if self._verbose and event.arguments_preview:
-            line += f"\n  │     args: {_truncate(event.arguments_preview, 100)}"
         self._emit(line)
 
     # ── 活动心跳 ───────────────────────────────────────
@@ -597,7 +591,7 @@ def _truncate_str(text: str, max_len: int) -> str:
 
 
 def _format_duration(ms: float) -> str:
-    """格式化毫秒为人类可读的时长标签（对齐 DSH formatDurationMillis）。"""
+    """格式化毫秒为人类可读的时长标签。"""
     if ms < 1:
         return "+0ms"
     if ms < 1000:

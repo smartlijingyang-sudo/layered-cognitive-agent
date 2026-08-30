@@ -79,13 +79,22 @@ def assemble_observability(
     # 3. journal
     journal: JournalBackend | None = None
     journal_registry = _maybe("journal_backends")
+    # ADR-0065 L4: boot 期把 cordis 注入的 EventDescriptorRegistry 透传给
+    # journal factory（也由 providers/event_descriptor bootstrap 灌 49 个内置
+    # descriptor）。RunStore._apply_policy 优先用它，避免模块 fallback。
+    descriptor_registry = _maybe("event_descriptor_registry")
     if isinstance(journal_registry, NamedRegistry):
         backend_name = cfg.journal_backend
         if backend_name:
             factory = journal_registry.get(backend_name)
             if factory is not None:
-                # 工厂签名：(settings, projections=..., policy=...)
-                journal = factory(cfg, projections=tuple(readers), policy=policy)
+                # 工厂签名：(settings, projections=..., policy=..., descriptor_registry=...)
+                journal = factory(
+                    cfg,
+                    projections=tuple(readers),
+                    policy=policy,
+                    descriptor_registry=descriptor_registry,
+                )
 
     # 4. tracer
     tracer: TracerBackend | None = None
@@ -112,6 +121,8 @@ def assemble_observability(
         tracer=tracer,
         policy=policy,
         scorers=tuple(scorers),
+        evidence_store=_maybe("evidence_store"),
+        evidence_policy=_maybe("evidence_policy"),
     )
     provide = getattr(ctx, "provide", None)
     if callable(provide):

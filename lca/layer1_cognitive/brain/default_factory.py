@@ -1,39 +1,76 @@
-"""SimpleBrainFactory —— 默认 Brain 策略的自包含工厂（L1 实现层）。"""
+"""Build a modular Brain from collaborators selected by composition.
+
+``SimpleBrainFactory`` owns only the construction of one ``ModularBrain``. It
+must not choose a Critic, Reasoner, Think pipeline, or Reflect pipeline on
+behalf of the composition root: those choices are declared by the selected
+plugins and injected explicitly.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 from lca.contracts.mechanisms import consume
 from lca.contracts.models.team.role_team import RoleProfile
-from lca.contracts.protocols import Brain, DecisionGate, LLMAdapter, Tool
-from lca.layer1_cognitive.brain.critic import SimpleCritic
-from lca.layer1_cognitive.brain.decision_gates import build_workspace_agent_gate
+from lca.contracts.protocols import (
+    Brain,
+    Critic,
+    DecisionGate,
+    LLMAdapter,
+    Tool,
+)
+from lca.contracts.protocols.cognitive_pipeline import (
+    CognitiveReflectionPipeline,
+    CognitiveThinkPipeline,
+)
+from lca.contracts.protocols.decision_classifier import DecisionClassifier
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
-from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
 
 class SimpleBrainFactory:
-    """默认 Brain 策略工厂。
+    """Construct the default ``ModularBrain`` from an explicit dependency set.
 
-    组装 Reasoner → Critic，不再需要 DecisionParser（原生 function calling）。
-    签名与 ``BrainFactory`` Protocol 严格对齐，不吞额外参数。
+    The composition root selects the gate chain, decision classifier, critic,
+    reasoner, and both cognitive subflow providers. Keeping these selections
+    outside Layer 1 makes a configured Brain reproducible from its plugin graph:
+    changing a primitive requires a changed declaration instead of relying on a
+    hidden Python fallback.
 
-    ``agent_gate_factory`` 由 plugin tree 注入（``GateService.assemble``）；
-    未注入时回落到 Standard 链 ``build_workspace_agent_gate``。
+    This factory deliberately has no ``synthesizer_factory`` argument. A
+    synthesizer is not consumed while constructing ``ModularBrain``; exposing
+    it here would create a misleading seam whose configuration has no runtime
+    effect.
     """
 
     def __init__(
         self,
         *,
-        agent_gate_factory: Callable[[], DecisionGate] | None = None,
-        critic_factory: Callable[[], SimpleCritic] | None = None,
-        reasoner_cls: type[PromptReasoner] | None = None,
+        agent_gate_factory: Callable[[], DecisionGate],
+        classifier: DecisionClassifier,
+        critic_factory: Callable[[], Critic],
+        reasoner_cls: type[PromptReasoner],
+        reasoner_templates: Mapping[str, str],
+        think_pipeline: CognitiveThinkPipeline,
+        reflection_pipeline: CognitiveReflectionPipeline,
     ) -> None:
-        self._agent_gate_factory = agent_gate_factory or build_workspace_agent_gate
-        self._critic_factory = critic_factory or SimpleCritic
-        self._reasoner_cls = reasoner_cls or PromptReasoner
+        self._agent_gate_factory = agent_gate_factory
+        self._classifier = classifier
+        self._critic_factory = critic_factory
+        self._reasoner_cls = reasoner_cls
+        self._reasoner_templates = dict(reasoner_templates)
+        if not isinstance(think_pipeline, CognitiveThinkPipeline):
+            raise TypeError(
+                "think_pipeline must implement CognitiveThinkPipeline, got "
+                f"{type(think_pipeline).__name__}"
+            )
+        if not isinstance(reflection_pipeline, CognitiveReflectionPipeline):
+            raise TypeError(
+                "reflection_pipeline must implement CognitiveReflectionPipeline, got "
+                f"{type(reflection_pipeline).__name__}"
+            )
+        self._think_pipeline = think_pipeline
+        self._reflection_pipeline = reflection_pipeline
 
     def __call__(
         self,
@@ -49,15 +86,14 @@ class SimpleBrainFactory:
             role_profile,
             tools_desc,
             tools=tools,
-            templates={
-                "react_prompt": load_builtin_prompt("react_prompt"),
-                "hierarchical_prompt": load_builtin_prompt("hierarchical_prompt"),
-                "routing_prompt": load_builtin_prompt("routing_prompt"),
-            },
+            templates=self._reasoner_templates,
             available_skills=available_skills,
         )
         return ModularBrain(
             reasoner=reasoner,
             critic=self._critic_factory(),
             agent_gates=self._agent_gate_factory(),
+            classifier=self._classifier,
+            think_pipeline=self._think_pipeline,
+            reflection_pipeline=self._reflection_pipeline,
         )

@@ -6,10 +6,11 @@ from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 from lca.contracts.protocols import Sandbox, Tool
-from lca.layer0_infra.computer.machine import MachineComputer, MachineTransport
+from lca.contracts.protocols.infra import MachineTransport
+from lca.layer0_infra.computer.machine import MachineComputer
 from lca.layer0_infra.computer.ops import ComputerOps
 from lca.layer0_infra.computer.sandbox_computer import SandboxComputer
-from lca.layer0_infra.file_store import FileStore, get_default_file_store
+from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.tools.builder import build_tools_from_manifest
 from lca.layer0_infra.tools.lca_computer.executor import LcaComputerExecutor, LcaSandboxExecutor
 from lca.layer0_infra.tools.lca_computer.manifest import (
@@ -59,7 +60,9 @@ def build_computer_tools(
     file_store: FileStore | None = None,
 ) -> list[Tool]:
     """Build cloud-sandbox computer tools (13 APIs, ``lobe-cloud-sandbox``)."""
-    store = file_store if file_store is not None else get_default_file_store()
+    if file_store is None:
+        raise TypeError("build_computer_tools requires an explicit file_store")
+    store = file_store
     runtime: ComputerOps
     if ops is not None:
         runtime = ops
@@ -82,7 +85,9 @@ def build_computer_tools(
     return build_tools_from_manifest(
         CLOUD_SANDBOX_MANIFEST,
         executor,
-        invoke_fn=cast("Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor),
+        invoke_fn=cast(
+            "Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor
+        ),
         observation_builder=_computer_obs_builder(store),
     )
 
@@ -94,14 +99,18 @@ def build_machine_computer_tools(
     file_store: FileStore | None = None,
 ) -> list[Tool]:
     """Build machine-prefixed tools (11 APIs — no executeCode/exportFile)."""
-    store = file_store if file_store is not None else get_default_file_store()
+    if file_store is None:
+        raise TypeError("build_machine_computer_tools requires an explicit file_store")
+    store = file_store
     computer = MachineComputer(plane, transport, store=store)
     executor = LcaComputerExecutor(computer)
 
     return build_tools_from_manifest(
         MACHINE_MANIFEST,
         executor,
-        invoke_fn=cast("Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor),
+        invoke_fn=cast(
+            "Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor
+        ),
         observation_builder=_computer_obs_builder(store),
         name_prefix="local_",
     )

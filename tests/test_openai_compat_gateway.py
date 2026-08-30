@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from starlette.testclient import TestClient
 
 from gateway.app import create_app
-from gateway.runs.live import LiveTail
+from gateway.runs.legacy_adapter import RegistryRunAdapter
 from gateway.runs.session import RunRegistry, RunSession, RunStatus, run_dedup_key
+from lca.layer0_infra.observability.journal.live_tail import LiveTail
 from lca.layer0_infra.openai_compat import (
     extract_json_schema_format,
     normalize_chat_messages,
@@ -26,14 +27,19 @@ class TestOpenAiCompatGateway(unittest.TestCase):
         response = client.get("/v1/models")
         self.assertEqual(response.status_code, 200)
         ids = [item["id"] for item in response.json()["data"]]
-        self.assertEqual(ids, ["solo", "team", "auto"])
+        # Per PR-9 + PR-10 cordis-creator mode, LCA_UI_MODELS = (solo, team, auto, cordis-creator)
+        self.assertEqual(ids, ["solo", "team", "auto", "cordis-creator"])
 
     def test_chat_completions_housekeeper_passthrough(self) -> None:
         registry = RunRegistry()
-        client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
-        with patch(
-            "gateway.openai_shim.create_simple_completion",
-            return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2}),
+        with (
+            TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
+            patch(
+                "gateway.openai_housekeeping.create_simple_completion",
+                new=AsyncMock(
+                    return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2})
+                ),
+            ),
         ):
             response = client.post(
                 "/v1/chat/completions",
@@ -50,6 +56,37 @@ class TestOpenAiCompatGateway(unittest.TestCase):
         )
         self.assertEqual(registry.status_counts().get("running", 0), 0)
 
+    def test_streamed_mode_id_does_not_start_agent_run(self) -> None:
+        """ADR-0100: stream=true with a catalog id is housekeeping, not POST /runs."""
+        registry = RunRegistry()
+        app = create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())
+        spy = AsyncMock()
+        app.state.run_port.create_and_dispatch = spy
+        with (
+            TestClient(app) as client,
+            patch(
+                "gateway.openai_housekeeping.create_simple_completion",
+                new=AsyncMock(
+                    return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2})
+                ),
+            ),
+        ):
+            response = client.post(
+                "/v1/chat/completions",
+                json={
+                    "model": "solo",
+                    "stream": True,
+                    "messages": [{"role": "user", "content": "hello"}],
+                },
+            )
+        spy.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/event-stream", response.headers.get("content-type", ""))
+        body = response.content.decode("utf-8")
+        self.assertIn("chat.completion.chunk", body)
+        self.assertIn("topic title", body)
+        self.assertEqual(registry.status_counts().get("running", 0), 0)
+
     def test_chat_completions_without_llm_returns_503(self) -> None:
         registry = RunRegistry()
 
@@ -60,7 +97,7 @@ class TestOpenAiCompatGateway(unittest.TestCase):
             def resolve(self, *, mode: str | None = None):
                 raise RuntimeError("unavailable")
 
-        app = create_app(registry)
+        app = create_app(run_port=RegistryRunAdapter(registry))
         if getattr(app.state, "ctx", None) is not None:
             app.state.ctx.provide("llm_resolver", _Unavailable())
         client = TestClient(app)
@@ -72,6 +109,16 @@ class TestOpenAiCompatGateway(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 503)
+
+    def test_unbooted_compat_endpoints_return_503(self) -> None:
+        """Missing lifespan context is an availability error, never a server error."""
+        client = TestClient(create_app(run_port=RegistryRunAdapter(RunRegistry())))
+        for path, payload in (
+            ("/v1/embeddings", {"model": "text-embedding-3-small", "input": "hello"}),
+            ("/v1/responses", {"model": "solo", "input": "hello"}),
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(client.post(path, json=payload).status_code, 503)
 
 
 class TestRunRegistryDedup(unittest.TestCase):
@@ -220,15 +267,21 @@ class TestOpenAiStructuredHelpers(unittest.TestCase):
 
 class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
     def test_embeddings_create_returns_vectors(self) -> None:
-        client = TestClient(create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
-        with patch(
-            "gateway.openai_shim.create_embeddings",
-            return_value={
-                "object": "list",
-                "data": [{"object": "embedding", "index": 0, "embedding": [0.1, 0.2]}],
-                "model": "text-embedding-3-small",
-                "usage": {"prompt_tokens": 2, "total_tokens": 2},
-            },
+        with (
+            TestClient(
+                create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver())
+            ) as client,
+            patch(
+                "gateway.openai_endpoints.create_embeddings",
+                new=AsyncMock(
+                    return_value={
+                        "object": "list",
+                        "data": [{"object": "embedding", "index": 0, "embedding": [0.1, 0.2]}],
+                        "model": "text-embedding-3-small",
+                        "usage": {"prompt_tokens": 2, "total_tokens": 2},
+                    }
+                ),
+            ),
         ):
             response = client.post(
                 "/v1/embeddings",
@@ -242,11 +295,20 @@ class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
 
 class TestOpenAiResponsesEndpoint(unittest.TestCase):
     def test_responses_without_schema_is_housekeeper(self) -> None:
+        """`/v1/responses` must wrap chat output into a Responses envelope.
+
+        LobeHub's `handleResponseAPIMode` parses `object: "response"` and rejects
+        `chat.completion` shapes — so a plain chat completion must be re-emitted
+        as a Responses object (with `output_text` populated) regardless of
+        whether `response_format` was supplied.
+        """
         registry = RunRegistry()
-        client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
-        with patch(
-            "gateway.openai_shim.create_simple_completion",
-            return_value=("ok", {}),
+        with (
+            TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
+            patch(
+                "gateway.openai_housekeeping.create_simple_completion",
+                return_value=("ok", {}),
+            ),
         ):
             response = client.post(
                 "/v1/responses",
@@ -257,16 +319,20 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
                 },
             )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["choices"][0]["message"]["content"], "ok")
+        body = response.json()
+        self.assertEqual(body["object"], "response")
+        self.assertEqual(body["output_text"], "ok")
 
     def test_responses_create_returns_output_text(self) -> None:
         registry = RunRegistry()
-        client = TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver()))
-        with patch(
-            "gateway.openai_shim.create_structured_completion",
-            return_value=(
-                '{"satisfied": true}',
-                {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},
+        with (
+            TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
+            patch(
+                "gateway.openai_endpoints.create_structured_completion",
+                return_value=(
+                    '{"satisfied": true}',
+                    {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},
+                ),
             ),
         ):
             response = client.post(
@@ -288,15 +354,63 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
         self.assertEqual(payload["object"], "response")
         self.assertIn("satisfied", payload["output_text"])
 
+    def test_responses_create_no_response_format_wraps_into_response_envelope(self) -> None:
+        """Title / mini-helper calls must come back as `object: response`.
+
+        Regression: previously `/v1/responses` (no `response_format`) delegated
+        straight to chat completions and returned `object: chat.completion`,
+        which broke LobeHub's `handleResponseAPIMode` parser and silently
+        dropped auto-generated topic titles.
+        """
+        registry = RunRegistry()
+        with (
+            TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
+            patch(
+                "gateway.openai_endpoints.passthrough_responses_completion",
+                new=AsyncMock(
+                    return_value=__import__(
+                        "starlette.responses", fromlist=["JSONResponse"]
+                    ).JSONResponse(
+                        {
+                            "id": "resp_test",
+                            "object": "response",
+                            "status": "completed",
+                            "output_text": "工作区检查",
+                            "output": [
+                                {
+                                    "id": "msg_test",
+                                    "type": "message",
+                                    "role": "assistant",
+                                    "status": "completed",
+                                    "content": [{"type": "output_text", "text": "工作区检查"}],
+                                }
+                            ],
+                        },
+                        headers={"Access-Control-Allow-Origin": "*"},
+                    )
+                ),
+            ),
+        ):
+            response = client.post(
+                "/v1/responses",
+                json={"model": "solo", "input": "summarize this"},
+            )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["object"], "response")
+        self.assertEqual(payload["output_text"], "工作区检查")
+
     def test_responses_missing_schema_without_user_message_returns_400(self) -> None:
-        client = TestClient(create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver()))
-        response = client.post(
-            "/v1/responses",
-            json={
-                "model": "gpt-5.4-mini",
-                "input": [],
-            },
-        )
+        with TestClient(
+            create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver())
+        ) as client:
+            response = client.post(
+                "/v1/responses",
+                json={
+                    "model": "gpt-5.4-mini",
+                    "input": [],
+                },
+            )
         self.assertEqual(response.status_code, 400)
 
 

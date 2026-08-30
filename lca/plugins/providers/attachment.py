@@ -27,5 +27,5 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer0_infra.attachment.service import FileStoreAttachmentIdentity
 
     if "filesystem" in config.providers:
-        provider = FileStoreAttachmentIdentity(ctx.inject("file_store"))
-        ctx.inject("attachment").register("filesystem", provider)
+        provider = FileStoreAttachmentIdentity(ctx.require("file_store"))
+        ctx.require("attachment").register("filesystem", provider)

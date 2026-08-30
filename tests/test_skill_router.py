@@ -13,6 +13,8 @@ from lca.contracts.models.core.llm import LLMResponse
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.skill_router import KeywordSkillRouter, StaticSkillRouter
+from lca.layer2_runtime.reducer import DefaultReducer
+from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 
 
 def _make_state(task: str) -> AgentState:
@@ -68,6 +70,8 @@ class TestSkillRouterIntegration(unittest.IsolatedAsyncioTestCase):
 
         brain = ModularBrain(
             reasoner=reasoner,
+            reducer=DefaultReducer(),
+            classifier=DefaultDecisionClassifier(),
             critic=critic,
             skill_router=router,
         )
@@ -76,6 +80,19 @@ class TestSkillRouterIntegration(unittest.IsolatedAsyncioTestCase):
         await brain.think(state)
 
         self.assertEqual(state.active_template, "custom_prompt")
+
+    async def test_router_requires_explicit_reducer(self) -> None:
+        """SkillRouter writes state, so it cannot use a hidden local Reducer."""
+        reasoner = MagicMock()
+        reasoner.generate_thoughts = AsyncMock(return_value=LLMResponse(text="think"))
+        brain = ModularBrain(
+            reasoner=reasoner,
+            classifier=DefaultDecisionClassifier(),
+            skill_router=StaticSkillRouter("custom_prompt"),
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "requires Reducer"):
+            await brain.think(_make_state("test task"))
 
     async def test_think_without_router_no_template(self) -> None:
         """无 SkillRouter 时，working_memory 不设 active_template。"""
@@ -88,6 +105,8 @@ class TestSkillRouterIntegration(unittest.IsolatedAsyncioTestCase):
 
         brain = ModularBrain(
             reasoner=reasoner,
+            reducer=DefaultReducer(),
+            classifier=DefaultDecisionClassifier(),
             critic=critic,
         )
 
@@ -109,6 +128,8 @@ class TestSkillRouterIntegration(unittest.IsolatedAsyncioTestCase):
 
         brain = ModularBrain(
             reasoner=reasoner,
+            reducer=DefaultReducer(),
+            classifier=DefaultDecisionClassifier(),
             critic=critic,
             skill_router=router,
         )

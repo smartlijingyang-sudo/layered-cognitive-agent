@@ -11,6 +11,7 @@ Therefore TypedContext references ONLY Protocol types already declared in
 `lca/contracts/protocols/`. Concrete service classes (`LlmService`,
 `ToolsService`, `CommandGateway`, etc.) are not imported here.
 """
+
 from __future__ import annotations
 
 from typing import Protocol
@@ -27,7 +28,7 @@ from lca.contracts.protocols.infra import (
 )
 from lca.contracts.protocols.memory import MemorySystem
 from lca.contracts.protocols.observability import ObservabilityBackend
-from lca.contracts.protocols.operational_skills import SkillPackageStore
+from lca.contracts.protocols.operational_skills import SkillPackageInstaller
 from lca.contracts.protocols.runtime import Runtime
 
 
@@ -55,7 +56,7 @@ class TypedContext(Protocol):
     def state_store(self) -> StateStore: ...
 
     @property
-    def skills(self) -> SkillPackageStore: ...
+    def skills(self) -> SkillPackageInstaller: ...
 
     @property
     def observability(self) -> ObservabilityBackend: ...

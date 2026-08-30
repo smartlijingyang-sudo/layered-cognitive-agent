@@ -1,0 +1,22 @@
+# PlanTemplate: orchestrator_workers (Orchestrator + Workers)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: orchestrator_workers
+name: Orchestrator + Workers
+description: Orchestrator dispatches tasks to worker agents
+version: 1
+
+relations:
+  - delegates
+  - executes
+  - governs
+
+control_slots:
+  - act.authorize
+  - act.budget
+
+required_groups:
+  - G6
+  - G8
+
+scope: run

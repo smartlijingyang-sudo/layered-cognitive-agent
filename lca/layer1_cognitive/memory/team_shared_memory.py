@@ -18,12 +18,26 @@ class TeamSharedMemoryStore(SharedMemoryStore):
     持有同一 store 的引用，实现"共享即同一数据源"。
     """
 
-    def __init__(self, shared_layers: list[MemoryLayer]) -> None:
+    def __init__(
+        self,
+        shared_layers: list[MemoryLayer],
+        *,
+        tenant_id: str = "default",
+        session_scope: str = "team",
+    ) -> None:
         invalid = set(shared_layers) - SHAREABLE_LAYERS
         if invalid:
             raise ValueError(f"只有 semantic/procedural 层可以共享，非法层: {invalid}")
+        if not tenant_id.strip() or not session_scope.strip():
+            raise ValueError("memory scope identifiers must not be empty")
+        self._tenant_id = tenant_id
+        self._session_scope = session_scope
         self._shared_layers: list[MemoryLayer] = list(shared_layers)
         self._stores: dict[MemoryLayer, list[MemoryRecord]] = {layer: [] for layer in shared_layers}
+
+    @property
+    def scope(self) -> tuple[str, str]:
+        return self._tenant_id, self._session_scope
 
     @property
     def shared_layers(self) -> list[MemoryLayer]:

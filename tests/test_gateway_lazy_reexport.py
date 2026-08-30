@@ -15,19 +15,16 @@ Python's native submodule mechanism handles ``gateway.app`` (it is the
 ``app.py`` file in the package, accessed as ``gateway.app`` /
 ``from gateway import app``). It does NOT go through `__getattr__`.
 
-`__getattr__` only re-exports two callables (``create_app``,
-``get_registry``) from ``gateway.app``, so consumers can write
-``from gateway import create_app`` without first forcing
-``gateway.app`` to load. This test exercises every documented
-lazy-reexport path so the bug cannot regress without an immediate
-red light.
+`__getattr__` only re-exports ``create_app`` from ``gateway.app``, so
+consumers can use the app factory without first forcing ``gateway.app`` to
+load. This test exercises every documented lazy-reexport path so the bug
+cannot regress without an immediate red light.
 
 Rules under test
 ----------------
 1. ``import gateway`` does NOT eagerly import ``gateway.app``.
-2. ``from gateway import create_app`` / ``get_registry`` resolve via
-   the narrow ``__getattr__`` hook to the callables inside
-   ``gateway.app``.
+2. ``from gateway import create_app`` resolves via the narrow
+   ``__getattr__`` hook to the callable inside ``gateway.app``.
 4. Unknown names raise the standard ``ImportError`` from a failed
    ``from X import Y`` lookup.
 5. ``__getattr__('app')`` is NOT consulted for ``app`` — Python's
@@ -70,13 +67,6 @@ def test_from_gateway_import_create_app_returns_callable():
 
     assert callable(create_app)
     assert create_app is sys.modules["gateway.app"].create_app
-
-
-def test_from_gateway_import_get_registry_returns_callable():
-    from gateway import get_registry
-
-    assert callable(get_registry)
-    assert get_registry is sys.modules["gateway.app"].get_registry
 
 
 def test_from_gateway_import_app_resolves_to_submodule():

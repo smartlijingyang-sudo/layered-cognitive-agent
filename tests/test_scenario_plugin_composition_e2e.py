@@ -82,7 +82,7 @@ class TestMinimalHub:
     @pytest.mark.asyncio
     async def test_empty_hub_emits_manifest(self) -> None:
         store = RunStore()
-        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink(store))
+        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink.for_store(store))
         state = _state()
         manifest = await hub.perceive(state)
         assert manifest.items == ()
@@ -95,7 +95,7 @@ class TestMinimalHub:
     @pytest.mark.asyncio
     async def test_hub_emits_event_with_step(self) -> None:
         store = RunStore()
-        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink(store))
+        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink.for_store(store))
         state = _state()
         state.step = 7
         await hub.perceive(state)
@@ -120,7 +120,7 @@ class TestCompositionOrder:
                 build_workspace_artifacts_sensor(),
             ],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         state = _state()
         manifest = await hub.perceive(state)
@@ -157,7 +157,7 @@ class TestPolicyFactEndToEnd:
     @pytest.mark.asyncio
     async def test_warning_folds_into_next_manifest(self) -> None:
         store = RunStore()
-        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink(store))
+        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink.for_store(store))
         state = _state()
 
         # Step 0: Trigger a RepeatToolCallGate verdict via the chain.
@@ -208,7 +208,7 @@ class TestPolicyFactEndToEnd:
         # the gate's job, not the helper's).
         assert len(_bucket(state)) == 1
         # And the journal path is exercised by the Hub fold.
-        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink(store))
+        hub = SequentialPerceiveHub(sensors=[], memory=None, sink=JournalSink.for_store(store))
         state.step = 1
         manifest = await hub.perceive(state)
         assert manifest.has_kind("policy_fact")
@@ -342,7 +342,7 @@ class TestLargeComposition:
                 TeamInboxSensor(store),
             ],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         # Add a chain pass: emit a warning.
         state = _state()
@@ -369,7 +369,7 @@ class TestLargeComposition:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         await hub.perceive(_state())
         await hub.perceive(_state())

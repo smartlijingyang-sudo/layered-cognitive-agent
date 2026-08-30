@@ -1,6 +1,8 @@
-"""State Store Provider plugin — Tier-2."""
+"""State Store Provider plugin — profile-selected memory or SQLite backends."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -9,8 +11,12 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
+    """Declare the StateStore implementations and active profile default."""
+
     model_config = {"extra": "forbid"}
     providers: list[str] = Field(default_factory=lambda: ["memory"])
+    active_provider: str = "memory"
+    sqlite_database_path: str = ".lca/agent-state.db"
 
 
 @plugin(
@@ -19,12 +25,38 @@ class Config(BaseModel):
     implements=[StateStore],
     layer="L0",
     effects="none",
-    description="Register StateStore providers on the StateStoreService Definition.",
+    description="Register memory or durable SQLite StateStore providers selected by Profile.",
     test_suite="tests/test_plugin_tree_single_owner.py",
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
+    """Register configured StateStore factories and select the active provider."""
 
-    if "memory" in config.providers:
-        ctx.inject("state_store").register("memory", InMemoryStateStore)
+    from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
+    from lca.layer0_infra.state_store.sqlite_store import SqliteStateStore
+
+    supported = {"memory", "sqlite"}
+    requested = set(config.providers)
+    unknown = requested - supported
+    if unknown:
+        raise ValueError(f"unsupported StateStore providers: {sorted(unknown)}")
+    if config.active_provider not in requested:
+        raise ValueError("active_provider must be included in providers")
+
+    service = ctx.require("state_store")
+    if "memory" in requested:
+        service.register(
+            "memory",
+            InMemoryStateStore,
+            activate=config.active_provider == "memory",
+        )
+    if "sqlite" in requested:
+        database_path = Path(config.sqlite_database_path)
+        service.register(
+            "sqlite",
+            lambda: SqliteStateStore(database_path),
+            activate=config.active_provider == "sqlite",
+        )
+
+
+__all__ = ["Config", "setup"]

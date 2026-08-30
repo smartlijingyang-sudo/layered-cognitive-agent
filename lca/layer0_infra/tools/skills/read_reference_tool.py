@@ -12,10 +12,30 @@ from lca.contracts.models.core.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.operational_skills import SkillNotFoundError, SkillPackageStore
+from lca.layer0_infra.tools.contract.render import RenderContract, contract
+from lca.layer0_infra.tools.contract.schema import COMMON
 
 READ_SKILL_REFERENCE_TOOL = "read_skill_reference"
 
 
+@contract(
+    RenderContract(
+        tool_name="read_skill_reference",
+        identifier="lobe-skills",
+        api_name="readReference",
+        args=(
+            COMMON["skill_id"],
+            COMMON["path"],
+        ),
+        state=(
+            COMMON["path"],
+            COMMON["content"],
+            COMMON["size"].optional(),
+            COMMON["file_type"].optional(),
+            COMMON["encoding"].optional(),
+        ),
+    )
+)
 class SkillReadReferenceTool(Tool):
     name = READ_SKILL_REFERENCE_TOOL
     description = (

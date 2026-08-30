@@ -7,7 +7,7 @@ from collections.abc import Sequence
 
 from lca.contracts.models.core.attachment import AttachmentRecord
 from lca.contracts.protocols.infra import AttachmentIdentity
-from lca.layer0_infra.attachment.files_info import FilesInfoDocument
+from lca.layer0_infra.attachment.files_info import AttachmentManifest
 from lca.layer0_infra.attachment.layout import AttachmentLayout
 from lca.layer0_infra.attachment.settings import AttachmentPolicyDocument, get_attachment_policy
 from lca.layer0_infra.file_store import FileStore
@@ -61,7 +61,9 @@ class FileStoreAttachmentIdentity(AttachmentIdentity):
 
     def compose_question(self, user_text: str, attachment_ids: Sequence[str]) -> str:
         text = user_text.strip()
-        document = FilesInfoDocument.from_records(self.resolve(attachment_ids), policy=self._policy)
+        document = AttachmentManifest.from_records(
+            self.resolve(attachment_ids), policy=self._policy
+        )
         block = document.render()
         if not block:
             return text

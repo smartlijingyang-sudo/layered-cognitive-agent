@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from cordis import Context
 
 from lca.contracts.atoms.enums import ActionType, LLMStreamEventType, ReflectionVerdict
 from lca.contracts.atoms.ids import new_id
@@ -15,20 +16,33 @@ from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManif
 from lca.contracts.models.team.team_coordination import Debate
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.action import ActionRegistryProtocol
+from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.declarative_phase_graph import PhaseInput, PhaseResult
+from lca.harness.profile.plan_compiler import compile_plan
+from lca.harness.profile.resolve import resolve_profile
 from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
+from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
+from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
+from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 from lca.layer1_cognitive.brain.skill_router import StaticSkillRouter
-from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
-from lca.layer2_runtime.default_stop_rule import DefaultStopRule
-from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+from lca.layer1_cognitive.hook_registry import CordisHookRegistry
+from lca.layer2_runtime.reducer import DefaultReducer
 from lca.layer4_app.api import Agent, Team, ensure_default_ctx
-from lca.layer4_app.runtime_factory import NullPerceiveHub
+from lca.plugins.composer.runtime_factory import (
+    NullPerceiveHub,
+    RuntimeDeps,
+    build_fixture_cognitive_runtime,
+)
+from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
+from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.state.stop_policy import DefaultStopPolicy
+from tests.phase_executors import standard_phase_executors
 
 
 def _state() -> AgentState:
@@ -48,7 +62,12 @@ class TestLifecycleTwins:
 
 class TestDegradationFirstClass:
     async def test_unregistered_raises_typed_error(self) -> None:
-        body = SimpleBody(action_registry=ActionRegistry())
+        body = SimpleBody(
+            SimpleToolRegistry(),
+            SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[])),
+            TransportRegistry(),
+            ActionRegistry(),
+        )
         decision = Decision(
             decision_id="d",
             action_type="invented",
@@ -64,6 +83,23 @@ class TestDegradationFirstClass:
 class TestCheckpointResume:
     async def test_checkpoint_persists_via_state_store(self) -> None:
         store = InMemoryStateStore()
+        plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
+        phase_executors: dict[str, object] = dict(standard_phase_executors())
+
+        class _AllowContribution:
+            async def execute(self, _context: object, _input: PhaseInput) -> PhaseResult:
+                return PhaseResult(
+                    result_kind="control",
+                    payload=ControlVerdict(
+                        plugin_id="test.allow-contribution",
+                        kind=ControlVerdictKind.ALLOW,
+                    ),
+                )
+
+        allow = _AllowContribution()
+        for binding in plan.phase_bindings:
+            for contribution in binding.contributions:
+                phase_executors[contribution.executor] = allow
 
         class _Mem:
             async def perceive(self, s: AgentState) -> AgentState:
@@ -94,14 +130,30 @@ class TestCheckpointResume:
             def bind_channel(self, t: object) -> None:
                 return None
 
-        rt = CognitiveRuntime(
-            brain=_Brain(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
-            body=_Body(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
-            memory=_Mem(),  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
-            hooks=SimpleHookRegistry(),
-            state_store=store,
-            perceive_hub=NullPerceiveHub(),
-            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+        brain = _Brain()
+        body = _Body()
+        memory = _Mem()
+        perceive_hub = NullPerceiveHub()
+        stop_policy = DefaultStopPolicy(DefaultArtifactClosure())
+        rt = build_fixture_cognitive_runtime(
+            RuntimeDeps(
+                brain=brain,  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
+                body=body,  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
+                memory=memory,  # type: ignore[arg-type]  # 测试用内部类满足 Protocol 结构
+                hooks=CordisHookRegistry(Context()),
+                state_store=store,
+                perceive_hub=perceive_hub,
+                stop_policy=stop_policy,
+                phase_capabilities={
+                    "brain": brain,
+                    "body": body,
+                    "memory": memory,
+                    "perceive_hub": perceive_hub,
+                    "stop_policy": stop_policy,
+                },
+                compiled_plan=plan,
+                phase_executors=phase_executors,
+            )
         )
         result = await rt.run("checkpoint me", max_steps=3)
         assert result.status == TaskStatus.COMPLETED
@@ -144,6 +196,8 @@ class TestSkillRouterTemplate:
                     "react_prompt": load_builtin_prompt("react_prompt"),
                 },
             ),
+            reducer=DefaultReducer(),
+            classifier=DefaultDecisionClassifier(),
             critic=SimpleCritic(),
             skill_router=StaticSkillRouter("custom_research"),
         )

@@ -1,166 +1,133 @@
 # Run Live
 
-一次用户消息 = 一次 Run。一次 Run 有一本 Journal。Journal 有两个读者：jsonl、LiveTail。
+一次用户消息 = 一次 Run。一次 Run 有一本 Journal。Journal 的读者是 jsonl（及可选 OTel），**不是**浏览器。
 
-浏览器订同一本 `/live`。SSE `event:` = Python 类名 = jsonl `event_type`。前端 `runLcaJournal` 把 Journal 译成 LobeHub 原生 Thinking 和工具卡。**LCA 拥有 agent loop**；浏览器不跑 `GeneralChatAgent`，也不 invoke 工具。
+聊天分两面：**命令** `POST /runs` 开工，**观察** `GET /runs/{id}/live` 画四个 UI 事件。**LCA 拥有 agent loop**；LobeHub 只渲染，不 invoke 工具，不把这次请求当成一次模型补全。
 
-这是聊天投影的现行说明。原则来自 ADR-0037 Journal-as-Truth。集成与启动见 [lobehub-integration.md](lobehub-integration.md)；补丁清单见 [CUSTOMIZATIONS.md](../../deploy/lobehub/CUSTOMIZATIONS.md)。
+协议决策：[ADR-0100](../adr/0100-chat-command-is-agent-run.md)。持久化：[ADR-0037](../adr/0037-journal-as-truth.md)。集成：[lobehub-integration.md](lobehub-integration.md)；补丁：[CUSTOMIZATIONS.md](../../deploy/lobehub/CUSTOMIZATIONS.md)。
+
+不恢复 ADR-0098 三通道载荷。不把 Agent 伪装成 `POST /v1/chat/completions`（ADR-0099 聊天 wire 已退役）。`/live` 这条路径收回，只承载画布事件。
 
 ## 链路
 
 ```
 用户回车
-  └─ executeClientAgent(solo | team | auto)
-       └─ runLcaJournal                         deploy/lobehub/patches/runtime/lca_run_driver.py
-            │  POST /lca-api/runs               Next rewrite → POST /runs
-            │  GET  /lca-api/runs/{id}/live     Last-Event-ID
+  └─ runLcaJournal + finishLcaChat (注入自 lca_run_driver 补丁)
+       ├─ POST /runs                 202 {run_id, live_url}
+       └─ GET  /runs/{id}/live       四事件
             ▼
-Starlette :8765                                 gateway/app.py 只注册路由
-  POST /runs     ingress → RunSession → schedule_run
-  GET  /live     LiveTail → stamped_to_sse_frame
-            │
-            ▼
-ObservabilityHub                                只经 create_observability() 装配
-  JsonlJournalProjector   traces/runs/{id}.jsonl
-  LiveTail                环形缓冲 + 套接字
-  OtelProjector           有 Langfuse 凭据才挂
-            │
+Starlette :8765
+  POST /runs                         create_and_dispatch
+  GET  /runs/{id}/live               UI 编码器
+  POST /runs/{id}/cancel|answer
+  GET  /runs/{id} / doctor / profile
+  POST /v1/chat/completions          管家直转；不开 Agent
             ▼
 Agent / Team
-  TelemetryLLMAdapter.stream
-    record(LlmCallStarted | ReasoningDelta | StepTextDelta)
-  SafeExecutor
-    record(ToolStarted{plugin_state} | SandboxOutputDelta | ToolInvoked | ToolDenied)
-  收尾
-    record(AgentRunFinished | TeamRunFinished)
-            │
-            ▼
-runLcaJournal                          deploy/lobehub/patches/runtime/LcaRunDriver.ts
-  parseSseBlock / readSse     订流
-  projectJournalFrame         Journal → 投影值
-  openTurn / tool 子消息      一次 LlmCallStarted = 一条 assistant；同说话人 parent = 上一张 tool；原生 conversation-flow 收组
-finishLcaChat                          patches/runtime/lcaFinishChat.ts
-  停转圈 / 队列 / 话题状态 / 通知
-  *Finished 不是 EOF；tail close 才 sealRow
+  record(...) → jsonl
+  UI 编码器 → reasoning | text | tool | done
 ```
-
-两条 HTTP 面不相交。意图定面，不是模型名定面。
 
 | 面 | 路径 | 谁用 |
 |---|---|---|
-| Run | `POST /runs` + `GET /runs/{id}/live` | 某个 **AgentRef** 干活。附件是 `messages[].files` |
-| Shim | `/v1/chat/completions` `/v1/embeddings` `/v1/responses` | 标题、话题、embeddings。直连上游补全，**不是 agent**，无记忆 |
+| 命令 | `POST /runs` → 202 | 一次回车 = 一次 Run。mode = `solo` / `team` / `auto` / `cordis-creator` |
+| 观察 | `GET /runs/{id}/live` | 画布。四种事件 |
+| 管家 | `/v1/chat/completions`、`/v1/embeddings`、`/v1/responses` | 标题、embeddings。直连上游，**不开** loop |
+| 状态 | `GET /runs/{id}`、cancel / answer / profile / doctor | 生命周期、HIL、诊断 |
 
-`POST /runs` 必带 `agent: { id, name }`。`id` 是隔离键（journal / sandbox / inflight / Langfuse session）；两个 LobeHub `agentId` 说同一句话也是两本 Run。缺省 `{ id: "solo", name: "助手" }`。
-
-`/v1` 通的是管家函数，不要在 shim 里再包一层假 agent。LobeHub 里真正的对话体（含小助手）走 `executeClientAgent`，带上自己的 `agentId`。
-
-Hub 收尾分两拍：`release()` 先关 LiveTail / jsonl（SSE 结束）；`dispose()` 在线程里关 Langfuse，超时放弃。聊天面不等导出器。
+`agent: { id, name }` 是隔离键。缺省 `{ id: "solo", name: "助手" }`。
 
 ## HTTP
 
 | 方法 | 路径 | 作用 |
 |---|---|---|
-| `POST` | `/runs` | 开工。body `{ messages, model, agent }`。202 `{ run_id, trace_id, agent, live_url }` |
-| `GET` | `/runs/{id}/live` | Journal SSE。认 `Last-Event-ID` |
+| `POST` | `/runs` | 开工。`202 {run_id,trace_id,agent,live_url}` |
+| `GET` | `/runs/{id}/live` | 画布 SSE。`?after=N` 跳过已画序号，默认 0 |
 | `GET` | `/runs/{id}` | 快照：status / error / mode |
-| `GET` | `/runs/{id}/doctor` | `doctor.v1`：H1 开工、H2 记账、H3 转播。H4/H5 在浏览器 |
-| `POST` | `/runs/{id}/cancel` | 取消。abort fetch 时必须打 |
-| `POST` | `/runs/{id}/answer` | HIL 续跑。LiveTail 在 `waiting_input` 时不关 |
+| `GET` | `/runs/{id}/doctor` | 诊断 |
+| `POST` | `/runs/{id}/cancel` | 取消。abort 时必须打 |
+| `POST` | `/runs/{id}/answer` | HIL 续跑，然后再次 GET live |
+| `GET` | `/runs/{id}/profile` | boot 期 snapshot |
 | `GET` | `/files/{id}` | 产物 |
+| `POST` | `/v1/chat/completions` | **仅管家**。真实上游模型 |
 
 Next rewrite：`/lca-api/runs`、`/lca-api/runs/:path*`、`/runs/:path*`、`/files/:path*` → gateway。
 
 ## SSE
 
 ```
-id: {seq}
-event: {Journal 类名}
-data: { stamped_to_record(stamped) + domain }
+GET /runs/{id}/live?after=0
+Accept: text/event-stream
 
-: keepalive          ← 空闲 15s，注释帧，无 id
+→ 200
+Content-Type: text/event-stream
+
+event: reasoning
+data: {"text":"..."}
+
+event: text
+data: {"text":"..."}
+
+event: tool
+data: {"name":"bash","phase":"started","detail":"ls"}
+
+event: done
+data: {"status":"completed"}
+
+: keepalive
 ```
 
-`data` 与 jsonl 同行：`schema` / `seq` / `ts` / `scope` / `event_type` / `event`。前端从 `event` 取字段。
+`phase` ∈ `started` / `done` / `denied`。`done.status` ∈ `completed` / `failed` / `canceled` / `awaiting_human`。
 
-`LiveGap` 是 LiveTail 唯一允许发明的名字：环形缓冲淘汰了订阅者要的 seq。不是 Journal 事件，不进 jsonl。前端打日志，不中断。
+服务端可见文本回退：answer 通道为空时用 `DecisionMade.response_text` 或 `AgentRunFinished.output_text`。客户端读到 `done` 即结束，不重试。
 
-## 前端映射
+禁止：OpenAI chunk、`[DONE]`、`delta.tool_calls`、`projection.*`、`content_ref`、决策 JSON、Journal 类型名。
 
-入口：`executeClientAgent` 对 `solo` / `team` / `auto` 进 `runLcaJournal`，收尾走 `finishLcaChat`（LobeHub 壳，不是 AgentRuntime）。一次 POST，订一本 `/live`。投影成 **原生消息图**：**一次 `LlmCallStarted` = 一条 `assistant`**；每个工具一条 `role=tool` 子消息（`result_msg_id` + `toolCalling` operation）。同说话人下一条 assistant 的 parent = 上一张 tool（tool-anchored）。换说话人时新开一条链（parent = 用户消息）。`conversation-flow` 自己收成 `assistantGroup`；`ProcessFold` 步数 = 组里 assistant 条数。`StreamingHandler` 只服务当前这一轮；`optimisticUpdateMessageContent` 落库；`sealRow` 发现库里仍是 `...` 就再写一次。未完成的 streaming 工具卡在换轮时 seal，避免组头 operation 卡住「共运行 N 步」。工具卡仍带 `pluginState.files`；最终一轮再写 `imageList` / `fileList`，下载块出现在折外面。未知 `event` 忽略。
+不要帧级 `Last-Event-ID` 自动续传。`after` 只用于「第二次订阅从哪接着画」（HIL）。
 
-| SSE `event` | 行为 |
-|---|---|
-| `LlmCallStarted` | 封上一轮 Handler，**新开**一条 assistant。同说话人 parent = `lastResultMsgId`（否则上一轮 assistant）；换说话人 parent = 用户消息。第一条可复用占位行 |
-| `ReasoningDelta` | `{ type: 'reasoning', text }` |
-| `ReasoningCompleted` | 收起 Thinking；`duration_ms` 写入该块 `reasoning.duration` |
-| `StepTextDelta` 且 `channel=answer` | `{ type: 'text', text }`。相对路径图按 ledger/收获文件改写成 `/files/...`。`decision` 丢弃 |
-| `ToolCallStreaming` | 与 `ToolStarted` 同一张卡（`tool_call_id` = 后续 `invocation_id`）。无卡则建；有卡则更新 `arguments` / `plugin_state`（代码边生成边出现） |
-| `ToolStarted` | 同上 id：补全 `plugin_state`（完整 code/command）。新建 `role=tool` 子消息（若还没有） |
-| `SandboxOutputDelta` | 补 tool 行 `pluginState.output/stderr` 与当前卡 `result.state`；有输出后切到 Render，stdout 增量可见 |
-| `ToolInvoked` | `plugin_state` + `files` 为卡片 SSOT。Live SSE **抹掉** `result_preview` / `arguments_preview`（只留 jsonl/OTel） |
-| `ToolDenied` | 写 `result.error`；`failOperation`；不进答案正文 |
-| `AgentRunFinished` / `TeamRunFinished` | 写 error（若有）。**不关流**；`handleFinish` 发生在 tail close |
-| `LiveGap` | `console.warn`；不中断 |
-| 其它 | 忽略（Casting / Delegation / RunInsight 属于 jsonl / Langfuse） |
+## 前端
 
-工具坐标 SSOT：`gateway/runs/wire.py` 的 `WIRE`。补丁生成进 Driver；`tests/test_run_wire.py` 锁两边相等。`import_skill` 的 `plugin_state.identifier` 有值时 apiName 改为 `importFromMarket`。
+`runLcaJournal`：`POST /lca-api/runs` → `GET live_url` → 写气泡。不 `call_tool`。`awaiting_human` 后 `POST .../answer`，再 GET `?after=<已画>`。配合 `finishLcaChat` 停转圈。
 
-`plugin_state` 在 `SafeExecutor` 出厂（`tool_ui_state`）。Gateway 不改写。
-`result_preview` / `arguments_preview` 只进 jsonl 与 OTel；`stamped_to_sse_frame` 抹掉后再上 Live。浏览器和 prompt 读不到。
+**体积说明**：协议面（HTTP + 4 个 SSE 事件）保持极小。LobeHub 侧实现面已外溢到 `src/store/chat/agents/transports/` 下的 8 个 TS 文件（`LcaRunDriver.ts` 主文件 + 投影/工件/收尾工具），目前约 1400 LOC。约束的不是绝对行数，而是"协议事件集不增不减 + LobeHub transports 目录之外不出现 LCA 业务代码"。见 ADR-0100 §D3 注。
 
-## 后端文件
+选择器只暴露 mode：`solo` / `team` / `auto` / `cordis-creator`。
 
-```
-gateway/
-  app.py                   组合根：路由 + 注入
-  cors.py                  CORS
-  modes.py                 solo / team / auto
-  assemble.py              build_solo_agent / build_runnable_team
-  openai_shim.py           标题 / embeddings / responses
-  files.py                 GET /files/{id}
-  runs/
-    api.py                 create / live / get / cancel / answer / doctor HTTP
-    session.py             RunSession + RunRegistry
-    execute.py             装配、跑、唯一 finalize
-    ingress.py             messages[] → RunInput
-    ingest.py              附件
-    live.py                LiveTail(JournalProjector)
-    doctor.py              diagnose()
-    wire.py                工具名 → (identifier, apiName)
+## 持久化
 
-deploy/lobehub/patches/runtime/
-  LcaRunDriver.ts          投影：SSE → 原生 assistant/tool 图
-  lcaJournal.ts            解析 SSE / Journal → 投影值
-  lcaArtifacts.ts          文件规范化 + markdown href 改写
-  lcaFinishChat.ts         LobeHub 壳：转圈 / 队列 / 通知
-  lcaChatRow.ts            占位符对账
-  lca_run_driver.py        拷贝 TS、生成 lcaWire.ts、挂钩
-```
-
-`layer0` 的 `stamped_to_sse_frame` 是线上编码。Gateway 的读者是 LiveTail，不另挂 `SSEJournalProjector`。
+`record()` 写 `traces/runs/{id}.jsonl`，与 SSE 解耦。doctor / CLI 读 jsonl。Casting / Delegation 不上聊天流。
 
 ## 状态
 
 | 场景 | 行为 |
 |---|---|
-| 用户停止 | abort fetch **并且** `POST /runs/{id}/cancel` |
-| 断线 | 用最后一帧 `id` 重开 `/live` |
-| `waiting_input` | LiveTail 不关；Driver 在当前消息 metadata 标 `waiting_input`；`POST /runs/{id}/answer` 后续跑。Driver 不代填答案 |
-| 产物闭包 | `finalize` 可在 `*Finished` **之后**再记一帧 `StepTextDelta(channel=answer)`。前端读到 tail close，不把 Finished 当套接字结束 |
-| 终态会话 | Registry 按 TTL（1h）和上限（128）淘汰内存里的终态 Run；jsonl 仍在，doctor 可读 |
+| 用户停止 | abort live **并且** `POST /runs/{id}/cancel` |
+| 断线 | 不续帧；已写入消息库的内容保留 |
+| `awaiting_human` | 关 live；answer 后再 GET 一次 |
+| 终态 | Registry TTL 淘汰内存 Run；jsonl 仍在 |
 
 ## 排障
 
 ```
-curl -s localhost:8765/runs/$ID/doctor | jq '{broken_hop,summary,factory}'
-jq -c '{seq,event_type}' traces/runs/$ID.jsonl
-curl -N -H "Last-Event-ID: 0" localhost:8765/runs/$ID/live | head
+RUN=$(curl -s -H "Authorization: Bearer lca-local" \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"solo","messages":[{"role":"user","content":"hello"}]}' \
+  localhost:8765/runs | jq -r .run_id)
+
+curl -N -H "Authorization: Bearer lca-local" \
+  localhost:8765/runs/$RUN/live
 ```
 
 | 现象 | 先查 |
 |---|---|
-| jsonl 没有事件 | SafeExecutor / LLM adapter 的 `record()` |
-| jsonl 有、/live 没有 | LiveTail、`Last-Event-ID`、doctor H3 |
-| live 有、卡片没有 | Driver 映射表 / `WIRE` / `transformToolCalls` |
-| 卡片字段不对 | `plugin_state` 出厂（layer1 `tool_ui_state`），不是 gateway |
+| 浏览器打 `/webapi/chat/openai` 当聊天 | `lca_run_driver` 补丁没接上 |
+| jsonl 没有事件 | `record()` |
+| jsonl 有、live 没有 | UI 编码器；路由是否重新挂上 `/live` |
+| `ModelEmptyCompletion` | 仍在走 LobeHub AgentRuntime |
+| 工具被前端重跑 | 驱动是否 `call_tool` |
+
+## 关联
+
+- [ADR-0100](../adr/0100-chat-command-is-agent-run.md) — 现行命令 / 观察面
+- [ADR-0099](../adr/0099-runs-live-openai-stream.md) — 已退役的 OpenAI 伪装；三通道否决仍有效
+- [lobehub-integration.md](lobehub-integration.md)

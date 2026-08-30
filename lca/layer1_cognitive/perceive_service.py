@@ -1,14 +1,17 @@
-"""Perceive group service — sensors add themselves; assemble() builds the Hub."""
-
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypeAlias
 
 from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
-from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
+from lca.contracts.protocols.cognition import PerceiveHubAssembler
+from lca.layer1_cognitive.group_assembly import (
+    AssemblyStrategy,
+    OrderedContributionCatalog,
+    SingleAssemblyStrategy,
+)
 
 Needs = Literal["none", "store", "skills"]
 
@@ -22,13 +25,28 @@ class SensorEntry:
     needs: Needs = "none"
 
 
+PerceiveAssemblerEntry: TypeAlias = AssemblyStrategy[PerceiveHubAssembler]
+
+
 class PerceiveService:
-    """Live registry of Sensor contributions (ADR-0056)."""
+    """Live Perceive-group registry with plugin-selected Hub assembly.
+
+    Sensor plugins contribute ordered facts here. A separate, single
+    PerceiveHubAssembler contribution selects how those facts become a Hub.
+    The shared group-assembly primitives own collision detection and strategy
+    selection, while this service retains Perceive-specific filtering and
+    dependency-aware Sensor construction.
+    """
 
     key = "perceive"
 
     def __init__(self) -> None:
-        self._entries: dict[str, SensorEntry] = {}
+        self._sensors = OrderedContributionCatalog[SensorEntry](
+            group="perceive", contribution_kind="sensor"
+        )
+        self._assembly = SingleAssemblyStrategy[PerceiveHubAssembler](
+            group="perceive", role="assembler"
+        )
 
     def add(
         self,
@@ -39,17 +57,41 @@ class PerceiveService:
         team_only: bool = False,
         needs: Needs = "none",
     ) -> None:
-        self._entries[id] = SensorEntry(
+        """Register one profile-selected Sensor contribution.
+
+        Contribution identities are fail-closed: two plugins cannot silently
+        overwrite one another just because profile loading order changed.
+        """
+
+        entry = SensorEntry(
             id=id,
             order=order,
             factory=factory,
             team_only=team_only,
             needs=needs,
         )
+        self._sensors.register(id=id, order=order, value=entry)
+
+    def set_assembler(self, assembler: PerceiveHubAssembler, *, id: str) -> None:
+        """Select the only Hub-assembly strategy for this group scope."""
+
+        if not isinstance(assembler, PerceiveHubAssembler):
+            raise TypeError(
+                "perceive assembler must implement PerceiveHubAssembler, "
+                f"got {type(assembler).__name__}"
+            )
+        self._assembly.select(assembler, id=id)
+
+    @property
+    def assembler_id(self) -> str | None:
+        """Return the profile-selected Hub strategy id for diagnostics."""
+
+        return self._assembly.id
 
     def members(self, *, team: bool = False) -> tuple[SensorEntry, ...]:
-        items = [entry for entry in self._entries.values() if not entry.team_only or team]
-        return tuple(sorted(items, key=lambda entry: (entry.order, entry.id)))
+        return tuple(
+            entry.value for entry in self._sensors.ordered() if not entry.value.team_only or team
+        )
 
     def assemble(
         self,
@@ -59,6 +101,8 @@ class PerceiveService:
         skill_store: object | None = None,
         team: bool = False,
     ) -> PerceiveHub:
+        """Build the Hub through the Profile's registered assembly strategy."""
+
         sensors: list[Sensor] = []
         for entry in self.members(team=team):
             try:
@@ -72,33 +116,11 @@ class PerceiveService:
                 raise
             except Exception:  # noqa: S112 — broken factory must not abort Hub
                 continue
-        return SequentialPerceiveHub(sensors=sensors, memory=memory)
+
+        assembler = self._assembly.require(
+            message="perceive group has no Hub assembler; enable one profile contribution"
+        )
+        return assembler.assemble(sensors=tuple(sensors), memory=memory)
 
 
-def register_builtin_sensors(service: PerceiveService) -> None:
-    """Standard sensors for callers that have no booted plugin tree."""
-    from lca.layer1_cognitive.sensors.clock import build_clock_sensor
-    from lca.layer1_cognitive.sensors.journal_backed import (
-        build_inbox_facts_sensor,
-        build_team_inbox_sensor,
-    )
-    from lca.layer1_cognitive.sensors.skill_catalog import build_skill_catalog_sensor
-    from lca.layer1_cognitive.sensors.workspace_artifacts import (
-        build_workspace_artifacts_sensor,
-    )
-    from lca.layer1_cognitive.sensors.workspace_instructions import (
-        build_workspace_instructions_sensor,
-    )
-
-    service.add(build_clock_sensor, id="clock", order=10)
-    service.add(build_workspace_artifacts_sensor, id="workspace-artifacts", order=20)
-    service.add(build_inbox_facts_sensor, id="inbox-facts", order=30, needs="store")
-    service.add(
-        build_team_inbox_sensor,
-        id="team-inbox",
-        order=40,
-        team_only=True,
-        needs="store",
-    )
-    service.add(build_workspace_instructions_sensor, id="workspace-instructions", order=50)
-    service.add(build_skill_catalog_sensor, id="skill-catalog", order=60, needs="skills")
+__all__ = ["Needs", "PerceiveAssemblerEntry", "PerceiveService", "SensorEntry"]

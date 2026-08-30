@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 # 真实 LLM 端到端 Demo 测试 —— 单 Agent + 四种团队策略全链路验证。
-import json
 import logging
 import os
 import unittest
@@ -374,15 +373,13 @@ class TestObservabilityOutput(unittest.IsolatedAsyncioTestCase):
         trace_path = anyio.Path("traces/lca_journal.jsonl")
         if await trace_path.exists():
             content = await trace_path.read_text(encoding="utf-8")
-            lines = content.strip().split("\n")
-            logger.info("Trace file has %d lines", len(lines))
-            self.assertGreater(len(lines), 0, "Trace file should have content")
-            # 验证每行都是有效 JSON
-            for line in lines[:5]:  # 只检查前5行
-                try:
-                    json.loads(line)
-                except json.JSONDecodeError:
-                    self.fail(f"Invalid JSON in trace file: {line[:100]}")
+            from lca.layer0_infra.observability.journal.journal_io import (
+                iter_journal_records,
+            )
+
+            records = list(iter_journal_records(content, source=str(trace_path)))
+            logger.info("Trace file has %d records", len(records))
+            self.assertGreater(len(records), 0, "Trace file should have content")
 
 
 if __name__ == "__main__":

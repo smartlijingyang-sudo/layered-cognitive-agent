@@ -173,6 +173,10 @@ def delegation_completed_attrs(event: DelegationCompleted) -> dict[str, Any]:
 
 
 def tool_invoked_attrs(event: ToolInvoked) -> dict[str, Any]:
+    """ADR-0101 PR-2:tool arguments / output 经 evidence 平面,OTel
+    attr 仅记录事实字段(ok/error/latency_ms/attempt)。完整数据
+    通过 ``arguments_ref`` / ``output_ref`` 走 EvidenceStore 单独读。
+    """
     return drop_empty(
         {
             ATTR_TOOL_NAME: event.tool_name,
@@ -180,10 +184,7 @@ def tool_invoked_attrs(event: ToolInvoked) -> dict[str, Any]:
             ATTR_LATENCY_MS: event.latency_ms,
             ATTR_ATTEMPT: event.attempt,
             ATTR_ERROR: event.error,
-            ATTR_RESULT_OUTPUT: event.result_preview,
             LANGFUSE_OBSERVATION_TYPE: OBSERVATION_TYPE_TOOL,
-            LANGFUSE_OBSERVATION_INPUT: event.arguments_preview,
-            LANGFUSE_OBSERVATION_OUTPUT: event.result_preview,
         }
     )
 

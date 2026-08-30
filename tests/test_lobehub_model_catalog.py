@@ -12,8 +12,9 @@ _CUSTOMIZATIONS = Path("deploy/lobehub/CUSTOMIZATIONS.md").read_text(encoding="u
 _ENV = Path("deploy/lobehub/.env.lca").read_text(encoding="utf-8")
 
 
-def test_ui_catalog_is_solo_team_auto() -> None:
-    assert LCA_UI_MODELS == ("solo", "team", "auto")
+def test_ui_catalog_is_solo_team_auto_cordis_creator() -> None:
+    """LCA 单 port 把 creator 也作为 LobeHub 模型选项（单 port 选 model 切角色）。"""
+    assert LCA_UI_MODELS == ("solo", "team", "auto", "cordis-creator")
     for model in LCA_UI_MODELS:
         assert f"id: '{model}'" in _CATALOG
     assert "resolveLcaChatModel" in _CATALOG

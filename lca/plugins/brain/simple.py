@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.capabilities import BRAINS
 from lca.contracts.protocols import BrainFactory
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.brain._standard_factory import (
+    STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS,
+    build_standard_cognitive_brain_factory,
+)
 
 
 class Config(BaseModel):
@@ -16,22 +21,16 @@ class Config(BaseModel):
 @plugin(
     id="lca-brain-simple",
     provides=[],
-    requires=[BRAINS.key, "gates", "critic.simple", "reasoner.prompt"],
+    requires=STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS,
     implements=[BrainFactory],
     layer="L1",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    description="Register SimpleBrainFactory as brains['default'].",
+    functional_group=FunctionalGroup.G5_COGNITION,
+    description="Register the standard cognitive Brain factory as brains['default'].",
     test_suite="tests/test_plugin_alignment.py",
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
-    from lca.layer1_cognitive.brain.default_factory import SimpleBrainFactory
-
-    gates = ctx.require("gates") if hasattr(ctx, "require") else ctx.inject("gates")
-    factory = SimpleBrainFactory(
-        agent_gate_factory=gates.assemble,
-        critic_factory=ctx.inject("critic.simple"),
-        reasoner_cls=ctx.inject("reasoner.prompt"),
-    )
+    factory = build_standard_cognitive_brain_factory(ctx)
     ctx.register(BRAINS.key, "default", factory)

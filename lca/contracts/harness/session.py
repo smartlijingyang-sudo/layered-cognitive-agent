@@ -28,6 +28,17 @@ class SessionHeader:
     agent_preset: str | None = None
     profile_digest: str | None = None
 
+    def __post_init__(self) -> None:
+        """Reject malformed immutable headers before they enter the journal."""
+        if self.version != SESSION_FORMAT_VERSION:
+            raise ValueError(f"unsupported session format version: {self.version}")
+        if not self.id.strip():
+            raise ValueError("session header id must not be empty")
+        if self.created_at < 0:
+            raise ValueError("session header created_at must be non-negative")
+        if self.delegation_depth is not None and self.delegation_depth < 0:
+            raise ValueError("delegation_depth must be non-negative")
+
 
 @dataclass(frozen=True)
 class EventScope:

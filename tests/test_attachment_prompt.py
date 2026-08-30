@@ -11,12 +11,11 @@ from lca.layer0_infra.attachment import (
     FileStoreAttachmentIdentity,
     format_machine_uploaded_files_prompt,
     format_sandbox_uploaded_files_prompt,
-    render_dsh_workspace_context,
     reset_attachment_settings_for_tests,
     sandbox_attachment_path,
 )
 from lca.layer0_infra.attachment.layout import AttachmentLayout
-from lca.layer0_infra.file_store import LocalFileStore, set_default_file_store
+from lca.layer0_infra.file_store import LocalFileStore
 from lca.layer0_infra.plane.resolve import PlaneBindings
 from lca.layer0_infra.plane.scope import plane_bindings_scope
 from lca.layer0_infra.sandbox.surface import skill_preamble
@@ -58,8 +57,6 @@ class TestAttachmentPrompt(unittest.TestCase):
         self.assertIn("pre-loaded and ready to use", prompt)
 
     def test_skill_preamble_injects_staged_paths_when_scoped(self) -> None:
-        set_default_file_store(self.store)
-        self.addCleanup(lambda: set_default_file_store(None))
         meta = self.store.put(
             data=b"pptx", name="deck.pptx", mime_type="application/vnd.ms-powerpoint"
         )
@@ -75,23 +72,9 @@ class TestAttachmentPrompt(unittest.TestCase):
             run_id_scope("run_skill"),
             run_attachment_scope([meta.attachment_id]),
         ):
-            preamble = skill_preamble()
+            preamble = skill_preamble(self.store)
         self.assertIn("/home/sandbox-user/.lca/inbox/run_skill/deck.pptx", preamble)
         self.assertIn("exact paths", preamble)
-
-    def test_dsh_workspace_context_wraps_uploaded_files(self) -> None:
-        meta = self.store.put(
-            data=b"pptx", name="deck.pptx", mime_type="application/vnd.ms-powerpoint"
-        )
-        ctx = render_dsh_workspace_context(
-            "/home/sandbox-user",
-            "run_dsh",
-            (meta.attachment_id,),
-            self.store,
-        )
-        self.assertIn("<uploaded_files>", ctx)
-        self.assertIn("/home/sandbox-user/.lca/inbox/run_dsh/deck.pptx", ctx)
-        self.assertIn("files_info", ctx)
 
 
 if __name__ == "__main__":

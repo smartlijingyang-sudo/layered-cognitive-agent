@@ -10,7 +10,14 @@ import zipfile
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from lca.contracts.protocols.operational_skills import SkillImportError, SkillNotFoundError
+from lca.contracts.protocols.operational_skills import (
+    SkillImportError,
+    SkillNotFoundError,
+    SkillPackage,
+    SkillSearchResult,
+)
+from lca.layer0_infra.capability.skills import SkillsService
+from lca.layer0_infra.file_store import LocalFileStore
 from lca.layer0_infra.skills.activation_scope import (
     activated_skills_scope,
     register_activated,
@@ -40,6 +47,28 @@ def _make_zip(files: dict[str, str]) -> bytes:
         for name, text in files.items():
             zf.writestr(name, text)
     return buf.getvalue()
+
+
+class _StubSkillImporter:
+    """测试替身：只实现工具消费的 SkillImporter 接缝。"""
+
+    def __init__(self, package: SkillPackage) -> None:
+        self._package = package
+
+    async def search_market(
+        self,
+        query: str,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> SkillSearchResult:
+        return SkillSearchResult(items=(), total=0, page=page, page_size=page_size)
+
+    async def import_from_market(self, identifier: str) -> SkillPackage:
+        return self._package
+
+    async def import_from_url(self, url: str, *, kind: str = "auto") -> SkillPackage:
+        return self._package
 
 
 class TestZipSecurity(unittest.TestCase):
@@ -84,6 +113,29 @@ class TestDiskSkillPackageStore(unittest.TestCase):
     def test_get_missing_raises(self) -> None:
         with self.assertRaises(SkillNotFoundError):
             self.store.get("missing")
+
+
+class TestSkillsCapability(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self._store = DiskSkillPackageStore(SkillSettings(cache_dir=Path(self._tmp.name)))
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_current_exposes_installer_seam(self) -> None:
+        service = SkillsService()
+        service.register("disk", self._store, activate=True)
+
+        package = service.current().install_package(
+            skill_id="capability-demo",
+            skill_md_text="---\nname: capability demo\ndescription: seam\n---\nbody",
+            resource_files={},
+            source_url="file://capability-demo",
+        )
+
+        self.assertEqual(package.skill_id, "capability-demo")
+        self.assertEqual(service.current().get("capability-demo"), package)
 
 
 class TestActivationScope(unittest.IsolatedAsyncioTestCase):
@@ -132,12 +184,14 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(act_obs.payload["text"].endswith("Do work"))
         self.assertIn("outputs/", act_obs.payload["text"])
         self.assertNotIn("/mnt/data", act_obs.payload["text"])
-        state = act_obs.payload["state"]
-        self.assertEqual(state["name"], "demo")
-        self.assertEqual(state["title"], "demo")
-        self.assertEqual(state["description"], "d")
-        self.assertEqual(state["resources"], ["tips.md"])
-        self.assertTrue(state["hasResources"])
+        # ADR-0102: payload is flattened — wire-shape fields live at the top,
+        # not under a legacy ``"state"`` sub-dict.  Use snake_case python keys.
+        self.assertNotIn("state", act_obs.payload)
+        self.assertEqual(act_obs.payload["name"], "demo")
+        self.assertEqual(act_obs.payload["title"], "demo")
+        self.assertEqual(act_obs.payload["description"], "d")
+        self.assertEqual(act_obs.payload["resources"], ["tips.md"])
+        self.assertTrue(act_obs.payload["has_resources"])
         self.assertNotIn("可用资源", act_obs.payload["text"])
 
         read_tool = SkillReadReferenceTool(self.store)
@@ -152,7 +206,7 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
             resource_files={},
             source_url="u",
         )
-        tool = SkillSearchTool(self.importer)
+        tool = SkillSearchTool(self.importer, self.store)
         with patch.object(
             self.importer._market,
             "search",
@@ -161,6 +215,25 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
             obs = await tool.execute({"query": "pdf"})
         self.assertTrue(obs.success)
         self.assertIn("pdf-helper", obs.payload["text"])
+
+    async def test_tools_consume_importer_protocol_without_http_store_attribute(self) -> None:
+        package = self.store.install_package(
+            skill_id="protocol-demo",
+            skill_md_text="---\nname: protocol demo\ndescription: seam\n---\nbody",
+            resource_files={},
+            source_url="u",
+        )
+        importer = _StubSkillImporter(package)
+
+        search = SkillSearchTool(importer, self.store)
+        search_obs = await search.execute({"query": "missing"})
+        self.assertTrue(search_obs.success)
+        self.assertIn("protocol-demo", search_obs.payload["text"])
+
+        import_tool = SkillImportTool(importer)
+        import_obs = await import_tool.execute({"identifier": "protocol-demo"})
+        self.assertTrue(import_obs.success)
+        self.assertEqual(import_obs.payload["skill_id"], "protocol-demo")
 
 
 class TestMarketAuth(unittest.IsolatedAsyncioTestCase):
@@ -234,9 +307,14 @@ class TestMarketAuth(unittest.IsolatedAsyncioTestCase):
 
 
 class TestDefaultTools(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.file_store = LocalFileStore(Path(self._tmp.name))
+        self.addCleanup(self._tmp.cleanup)
+
     def test_build_default_tools_includes_skill_tools(self) -> None:
         with patch("lca.layer0_infra.tools.default_set.resolve_sandbox", return_value=None):
-            names = {t.name for t in build_default_tools()}
+            names = {t.name for t in build_default_tools(self.file_store)}
         self.assertIn("writeFile", names)
         self.assertIn("search_skill", names)
         self.assertIn("import_skill", names)
@@ -250,7 +328,7 @@ class TestDefaultTools(unittest.TestCase):
     def test_build_default_tools_includes_run_skill_script_when_sandbox(self) -> None:
         with patch("lca.layer0_infra.tools.default_set.resolve_sandbox") as mock_sbx:
             mock_sbx.return_value = object()
-            names = {t.name for t in build_default_tools()}
+            names = {t.name for t in build_default_tools(self.file_store)}
         self.assertIn("run_skill_script", names)
         self.assertIn("listFiles", names)
         self.assertIn("runCommand", names)

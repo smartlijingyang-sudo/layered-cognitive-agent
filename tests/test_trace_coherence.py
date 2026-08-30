@@ -37,6 +37,10 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         from lca import Agent
         from lca.contracts.models.team.team_coordination import Pipeline
+        from lca.layer4_app.api import ensure_default_ctx
+
+        # Boot default plugin context for tests that need Agent construction
+        scope = await ensure_default_ctx()
 
         llm = ScriptedLLMAdapter(
             {
@@ -46,8 +50,8 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
             default_respond=True,
         )
         members = [
-            Agent(role="研究员", goal="研究", backstory="", tools=[], llm=llm),
-            Agent(role="撰稿人", goal="撰稿", backstory="", tools=[], llm=llm),
+            Agent(role="研究员", goal="研究", backstory="", tools=[], llm=llm, scope=scope),
+            Agent(role="撰稿人", goal="撰稿", backstory="", tools=[], llm=llm, scope=scope),
         ]
         self.outcome = await run_team_scripted(
             members=members, coordination=Pipeline(), objective="写一份摘要"

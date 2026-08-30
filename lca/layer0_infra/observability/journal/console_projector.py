@@ -56,7 +56,7 @@ class _TraceState:
         self.runs: dict[str, dict[str, Any]] = {}
         self.events: list[StampedEvent] = []
         self.last_section: str | None = None
-        # DSH-inspired 增量投影索引：委派事件的快速查找表（O(1) 替代 O(n) 线性扫描）
+        # 增量投影索引：委派事件的快速查找表（O(1) 替代 O(n) 线性扫描）
         self.delegation_issued: dict[str, StampedEvent] = {}
 
 
@@ -209,7 +209,7 @@ class ConsoleJournalProjector(JournalProjector):
 
     # ── 叙事行渲染方法 ────────────────────────────────
     def _render_delegation_issued(self, stamped: StampedEvent, event: DelegationIssued) -> str:
-        # DSH-inspired 增量投影：将委派事件加入索引，后续查找 O(1)
+        # 增量投影：将委派事件加入索引，后续查找 O(1)
         state = self._state_of(stamped)
         state.delegation_issued[event.delegation_id] = stamped
         return f"⇢ {event.callee_role}: {event.subtask_preview}"
@@ -283,7 +283,7 @@ class ConsoleJournalProjector(JournalProjector):
         run["tool_calls"] = run.get("tool_calls", 0) + 1
 
     def _delegation_duration(self, stamped: StampedEvent, delegation_id: str) -> float | None:
-        # DSH-inspired 增量投影：使用索引查找，O(1) 替代 O(n) 线性扫描
+        # 增量投影：使用索引查找，O(1) 替代 O(n) 线性扫描
         state = self._state_of(stamped)
         issued_stamped = state.delegation_issued.get(delegation_id)
         if issued_stamped is not None:
@@ -291,7 +291,7 @@ class ConsoleJournalProjector(JournalProjector):
         return None
 
     def _delegation_callee(self, stamped: StampedEvent, delegation_id: str) -> str:
-        # DSH-inspired 增量投影：使用索引查找，O(1) 替代 O(n) 线性扫描
+        # 增量投影：使用索引查找，O(1) 替代 O(n) 线性扫描
         state = self._state_of(stamped)
         issued_stamped = state.delegation_issued.get(delegation_id)
         if issued_stamped is not None:

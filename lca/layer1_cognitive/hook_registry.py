@@ -5,14 +5,13 @@
 相位 span 在 trigger 边界统一发射（观察者模式），属性从 hook kwargs 提取后
 经 ambient 策略脱敏/截断（写入期强制）。
 
-设计：DSH 把生命周期钩子作为 cordis events 暴露（``agent/pre-step`` 、
+设计：把生命周期钩子作为 cordis events 暴露（``agent/pre-step`` 、
 ``tools/pre-execute`` 等都是 ``ctx.on`` 的 listener）。LCA 把 ``HookEvent``
 枚举映射成 ``hook/<event>`` 命名空间，单一 dispatch 后端——cordis events。
 """
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Callable
 from typing import Any
 
@@ -37,7 +36,7 @@ def _span_name_for_hook(event_name: str) -> str:
 
 
 def _extract_span_attributes(event_name: str, kwargs: dict[str, Any]) -> dict[str, Any]:
-    """从 hook kwargs 提取属性（原值；脱敏/截断由属性策略在写入期强制）。"""
+    """Extract attributes from a hook payload without bypassing policy enforcement."""
     attrs: dict[str, Any] = {"event": event_name}
 
     state = kwargs.get("state")
@@ -104,7 +103,7 @@ class CordisHookRegistry(HookRegistry):
     async def trigger(self, event_name: str, state: AgentState, **kwargs: Any) -> Any:
         # Ambient actor: nested llm/tool/memory span auto-tags, runtime body zero telemetry.
         set_actor(state.agent_role, state.step)
-        attrs = _extract_span_attributes(event_name, kwargs)
+        attrs = _extract_span_attributes(event_name, {"state": state, **kwargs})
         attrs[ATTR_STEP] = state.step
         # cordis events.serial / parallel / waterfall only accept positional
         # payloads; we fold state + kwargs into a single envelope so the
@@ -167,64 +166,13 @@ async def default_logging_hook(envelope: Any) -> None:
         hook_extra=safe_extra,
     )
 
+
 def cordis_hook_registry(ctx: Any) -> CordisHookRegistry:
     """Return a :class:`CordisHookRegistry` wrapping *ctx*."""
     return CordisHookRegistry(ctx)
 
 
-# ── Back-compat shim ─────────────────────────────────────────────
-#
-# Test files / legacy callers that imported ``SimpleHookRegistry``
-# pre-cordis-migration still resolve through this alias. The class is
-# functionally identical to ``CordisHookRegistry``; the alias exists only
-# so existing imports keep working without churn.
-
-
-class SimpleHookRegistry(CordisHookRegistry):
-    """Back-compat alias for :class:`CordisHookRegistry`."""
-
-    def __init__(self, ctx: Any | None = None) -> None:
-        if ctx is None:
-            # Standalone mode — handlers live on instance attributes (no
-            # private dict dispatch table — that's reserved for cordis
-            # events). Use the same name-shape as cordis (a list of Hook
-            # records keyed by event) so the legacy registry stays a
-            # direct projection of the cordis event model.
-            from collections import defaultdict
-
-            self._legacy_hooks: Any = defaultdict(list)
-            self._legacy_signatures: dict[Callable, str] = {}
-
-            def _register(name: str, hook: Callable) -> None:
-                self._legacy_hooks[name].append(hook)
-                # Inspect once: detect legacy (event_name, state, **kw)
-                # vs cordis envelope (envelope) signatures.
-                try:
-                    params = list(inspect.signature(hook).parameters)
-                except (TypeError, ValueError):
-                    params = []
-                self._legacy_signatures[hook] = (
-                    "legacy" if len(params) >= 2 else "envelope"
-                )
-
-            async def _trigger(name: str, state: Any, **kwargs: Any) -> Any:
-                envelope = {"event_name": name, "state": state, **kwargs}
-                for hook in list(self._legacy_hooks.get(name, [])):
-                    sig = self._legacy_signatures.get(hook, "envelope")
-                    if sig == "legacy":
-                        await hook(name, state, **kwargs)
-                    else:
-                        await hook(envelope)
-                return None
-
-            self.register = _register  # type: ignore[method-assign,assignment]
-            self.trigger = _trigger  # type: ignore[method-assign,assignment]
-        else:
-            super().__init__(ctx)
-
-
 __all__ = [
     "CordisHookRegistry",
-    "SimpleHookRegistry",
     "cordis_hook_registry",
 ]

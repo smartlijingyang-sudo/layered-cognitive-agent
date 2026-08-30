@@ -32,6 +32,8 @@ _NAME_EXEMPT: dict[str, str] = {
     "UseToolOperation": "Action 策略实现（contracts.protocols.action.Action）",
     "DelegateOperation": "Action 策略实现（contracts.protocols.action.Action）",
     "HandoffOperation": "Action 策略实现（contracts.protocols.action.Action）",
+    # Observability 命名：SpanContextInfo 是 OTel SDK 兼容的 dataclass（非 Info/Helper 类）
+    "SpanContextInfo": "OTel span context 信息封装（兼容 OTel SDK 命名约定）",
 }
 
 _SCAN_PACKAGES = [
@@ -59,11 +61,15 @@ _MAX_FILE_LINES = 250
 
 # 已登记豁免（引用 ADR 或说明原因）
 _LINE_COUNT_EXEMPT: dict[str, str] = {
-    "lca/harness/plugin_api.py": (
-        "ADR-0061 Manifest API：PluginDefinition / @plugin / AuditedPluginContext 同文件"
-    ),
     "lca/harness/profile/resolve.py": (
         "ADR-0061 resolve 阶段：深合并、from_env、DAG、校验集中于单一入口"
+    ),
+    "lca/harness/profile/source.py": (
+        "Profile 输入适配器集中 YAML 来源、补丁来源与语义化配置解析，避免解析规则跨模块泄漏"
+    ),
+    "lca/harness/declarative/phase_graph_compiler.py": (
+        "ADR-0075：声明式阶段图编译器集中校验 profile 选定的节点、边、策略与投稿，"
+        "避免由运行时解释器重新引入隐藏流程默认值"
     ),
     "lca/layer4_app/spawn.py": (
         "L4 spawn 闭合 AgentSpec/TeamSpec（ADR-0056）；"
@@ -87,9 +93,54 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/layer0_infra/computer/runtime_exec.py": (
         "ComputerRuntime 执行平面单模块：code/shell/background/export + SandboxPolicy 检查"
     ),
+    "lca/contracts/atoms/plan_template.py": (
+        "PR-12 12 PlanTemplate 标准集数据面 + module-level accessors"
+    ),
+    "lca/contracts/harness/artifact.py": (
+        "PR-8 4 状态机 + CapabilityArtifact + ArtifactController + 8→4 legacy migration"
+    ),
+    "lca/contracts/protocols/__init__.py": (
+        "contracts/protocols re-export hub（所有 contracts 子模块类型统一导出）"
+    ),
+    "lca/contracts/protocols/command_envelope.py": (
+        "PR-7 CommandEnvelope + RunFact + Verdict 5 闸单调聚合数据面"
+    ),
+    "lca/layer0_infra/observability/__init__.py": (
+        "observability 模块统一 re-export（journal / evidence / otel）"
+    ),
+    "lca/layer0_infra/observability/event_descriptors_data.py": (
+        "Journal event descriptor 注册表（ADR-0065 PR-7 source inversion 单一源）"
+    ),
+    "lca/layer0_infra/observability/facade.py": (
+        "observability 主 facade（record / record_runtime / observe_operation）"
+    ),
+    "lca/layer0_infra/observability/journal/journal_io.py": (
+        "Journal v2 envelope IO（read / write / disk format；PR-3 + PR-6）"
+    ),
+    "lca/layer1_cognitive/body/safe_executor.py": (
+        "SafeExecutor + 5 阶段管线 + ToolStarted / ToolInvoked audit"
+    ),
     "lca/layer2_runtime/runtime_loop.py": (
         "CognitiveRuntime 单模块承载 v3 6 阶段闭环编排 + 协议边界 record()"
         "（perceive→think→act→reflect→remember→stop，ADR-0002 + PR10 落地）"
+    ),
+    "lca/contracts/protocols/capability_plan.py": (
+        "ADR-0068 CapabilityPlan 数据投影与 11 关系代数集中于 contracts 数据面"
+    ),
+    "lca/contracts/protocols/declarative_phase_graph.py": (
+        "ADR-0075 声明式 phase graph、validator 与 authority 单一数据契约"
+    ),
+    "lca/contracts/protocols/plan.py": (
+        "ADR-0075 CompiledRunPlan 统一 capability、scope 与声明式控制投影数据面"
+    ),
+    "lca/harness/declarative/compiler.py": (
+        "ADR-0075 PlanCompiler 单一编译入口与原生声明式控制投影"
+    ),
+    "lca/harness/declarative/interpreter.py": (
+        "ADR-0075 GenericPlanInterpreter 统一 phase/result/delta 解释边界"
+    ),
+    "lca/layer2_runtime/declarative_runtime.py": (
+        "ADR-0075 DeclarativeRuntimeDriver 统一 pause/resume/result 出口"
     ),
     "lca/layer0_infra/observability/journal/engine.py": (
         "RunStore 单模块承载事件索引 + get/get_event/get_blob/find_terminal"
@@ -109,15 +160,13 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "lca-ops CLI 单模块承载 dev/restart/stop/status/heal/provision"
         "/diagnose/dump-profile/inspect-tree 全子命令"
     ),
+    "lca/layer0_infra/ops/commands/tools.py": (
+        "coding-agent tools CLI 封装（ADR-0065 §六 / PR-9）：9 个只读子命令从旧 cli.py 拆出"
+    ),
     "lca/layer0_infra/ops/services/lobehub.py": (
         "LobeHub deploy service 单模块承载 dev/prod/restart/logs/upgrade"
     ),
-    "lca/layer0_infra/ops/services/daemon.py": (
-        "Daemon 单模块承载 process 管理 + uptime + health"
-    ),
-    "lca/layer0_infra/ops/upstream_mirror.py": (
-        "Upstream mirror 单模块承载 fork / mirror / patch 应用"
-    ),
+    "lca/layer0_infra/ops/services/daemon.py": ("Daemon 单模块承载 process 管理 + uptime + health"),
     "lca/layer0_infra/openai_compat.py": (
         "OpenAI compat 单模块承载 chat / completion / embedding 适配"
     ),
@@ -133,12 +182,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/contracts/models/observability/journal_catalog.py": (
         "JOURNAL_EVENT_CLASSES + JournalSchemaMeta 单文件（PR-7 后 EventDescriptor 单一源移到 event_descriptors_data.py）"
     ),
-    "lca/layer4_app/api.py": (
-        "L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"
-    ),
-    "lca/packages/client/runtime/src/client/index.py": (
-        "Upstream TypeScript port stub（lobehub-ui 同名；不计入 LCA 行数硬限）"
-    ),
+    "lca/layer4_app/api.py": ("L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"),
 }
 
 
@@ -187,6 +231,7 @@ _REVERSE_SCAN_PACKAGES = (
     "lca.layer2_runtime",
     "lca.layer3_agent",
     "lca.layer4_app",
+    "lca.plugins.state",
 )
 _CAMEL_CASE_TERM = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 _DEPRECATED_SECTION_MARKERS = ("已废弃主名", "禁止复活")

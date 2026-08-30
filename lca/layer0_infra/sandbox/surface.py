@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
-from lca.layer0_infra.plane.machine import resolve_machine
+from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.plane.resolve import (
     make_sandbox_ref,
     resolve_plane_bindings,
@@ -19,7 +19,7 @@ def current_primary_ref() -> PlaneRef | None:
         return primary
     sandbox = resolve_sandbox()
     sandbox_ref = sandbox_ref_from(sandbox) if sandbox is not None else None
-    return resolve_plane_bindings(resolve_machine(), sandbox_ref).primary
+    return resolve_plane_bindings(None, sandbox_ref).primary
 
 
 def environment_note() -> str:
@@ -29,12 +29,12 @@ def environment_note() -> str:
     return plane_system_role(make_sandbox_ref())
 
 
-def skill_preamble() -> str:
+def skill_preamble(store: FileStore | None = None) -> str:
     """Deliverable hint plus staged attachment paths (same SSOT as system role)."""
     from lca.layer0_infra.attachment.prompt import format_skill_attachment_block
 
     lines = ["当前工作目录是工作根。交付物写相对路径 outputs/。"]
-    attachment_block = format_skill_attachment_block()
+    attachment_block = format_skill_attachment_block(store)
     if attachment_block:
         lines.append(attachment_block)
     return "\n".join(lines) + "\n"

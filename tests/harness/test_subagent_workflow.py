@@ -13,7 +13,7 @@ from lca.contracts.harness.subagent import (
     SubagentSpec,
 )
 from lca.contracts.harness.workflow import WorkflowMeta, WorkflowPhase
-from lca.harness.subagents import ActivationManager, SubagentRegistry
+from lca.harness.subagents import SubagentActivationCoordinator, SubagentRegistry
 from lca.harness.workflow import WorkflowEngine, agent, phase
 
 
@@ -34,7 +34,8 @@ class _Agent:
     async def inject(self, message: object) -> object:
         raise NotImplementedError
 
-    def cancel(self, reason: str = "user", *, keep_inbox: bool = True) -> None:
+    async def cancel(self, reason: str = "user", *, keep_inbox: bool = True) -> None:
+        del keep_inbox
         self.cancel_reason = reason
 
     async def when_idle(self) -> None:
@@ -51,7 +52,9 @@ class _Handle:
 
 
 @pytest.fixture
-def activation() -> tuple[ActivationManager, list[tuple[AgentIdentity, AgentOptions, _Handle]]]:
+def activation() -> tuple[
+    SubagentActivationCoordinator, list[tuple[AgentIdentity, AgentOptions, _Handle]]
+]:
     registry = SubagentRegistry()
     registry.register(
         SubagentSpec(
@@ -71,11 +74,13 @@ def activation() -> tuple[ActivationManager, list[tuple[AgentIdentity, AgentOpti
         created.append((identity, options, handle))
         return handle
 
-    return ActivationManager(registry, create), created
+    return SubagentActivationCoordinator(registry, create), created
 
 
 async def test_subagent_negotiates_capabilities_lineage_and_tools(
-    activation: tuple[ActivationManager, list[tuple[AgentIdentity, AgentOptions, _Handle]]],
+    activation: tuple[
+        SubagentActivationCoordinator, list[tuple[AgentIdentity, AgentOptions, _Handle]]
+    ],
 ) -> None:
     manager, created = activation
     child = await manager.activate(
@@ -98,7 +103,9 @@ async def test_subagent_negotiates_capabilities_lineage_and_tools(
 
 
 async def test_subagent_provider_allowlist_is_never_unrestricted(
-    activation: tuple[ActivationManager, list[tuple[AgentIdentity, AgentOptions, _Handle]]],
+    activation: tuple[
+        SubagentActivationCoordinator, list[tuple[AgentIdentity, AgentOptions, _Handle]]
+    ],
 ) -> None:
     manager, created = activation
 
@@ -119,7 +126,9 @@ async def test_subagent_provider_allowlist_is_never_unrestricted(
     ],
 )
 async def test_subagent_rejects_unnegotiated_access(
-    activation: tuple[ActivationManager, list[tuple[AgentIdentity, AgentOptions, _Handle]]],
+    activation: tuple[
+        SubagentActivationCoordinator, list[tuple[AgentIdentity, AgentOptions, _Handle]]
+    ],
     subagent_request: SubagentRequest,
 ) -> None:
     manager, _ = activation
@@ -128,7 +137,9 @@ async def test_subagent_rejects_unnegotiated_access(
 
 
 async def test_child_cancellation_and_parent_drain(
-    activation: tuple[ActivationManager, list[tuple[AgentIdentity, AgentOptions, _Handle]]],
+    activation: tuple[
+        SubagentActivationCoordinator, list[tuple[AgentIdentity, AgentOptions, _Handle]]
+    ],
 ) -> None:
     manager, created = activation
     first = await manager.activate(SubagentRequest("researcher", AgentIdentity("parent")))

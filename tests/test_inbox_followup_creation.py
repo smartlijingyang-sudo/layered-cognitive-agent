@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import cast
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -45,6 +46,7 @@ class TestInboxFollowupCreation:
     def test_run_creation_emits_inbox_followup(self, tmp_path: Path) -> None:
         """``CognitiveRunDriver.execute`` MUST emit InboxFollowupCreated."""
         from gateway.runs.loop_drivers import CognitiveRunDriver
+        from gateway.runs.runnable_assembly import CognitiveRunnableAssembler
         from gateway.runs.session import RunSession
         from lca.contracts.models.observability.journal import InboxFollowupCreated, RunScope
         from lca.layer0_infra.observability import bind_backends, run_scope
@@ -61,7 +63,8 @@ class TestInboxFollowupCreation:
             user_text="hello world",
             mode="solo",
         )
-        driver = CognitiveRunDriver()
+        # LLM 解析会先失败；装配器仅用于保持依赖显式。
+        driver = CognitiveRunDriver(cast("CognitiveRunnableAssembler", object()))
         with (
             bind_backends(hub),
             run_scope(RunScope(trace_id=session.trace_id, run_id=session.run_id)),
@@ -85,6 +88,7 @@ class TestInboxFollowupCreation:
     def test_inbox_followup_carries_question(self, tmp_path: Path) -> None:
         """The first ``InboxFollowupCreated`` MUST carry the question."""
         from gateway.runs.loop_drivers import CognitiveRunDriver
+        from gateway.runs.runnable_assembly import CognitiveRunnableAssembler
         from gateway.runs.session import RunSession
         from lca.contracts.models.observability.journal import InboxFollowupCreated, RunScope
         from lca.layer0_infra.observability import bind_backends, run_scope
@@ -102,7 +106,8 @@ class TestInboxFollowupCreation:
             user_text=question,
             mode="solo",
         )
-        driver = CognitiveRunDriver()
+        # LLM 解析会先失败；装配器仅用于保持依赖显式。
+        driver = CognitiveRunDriver(cast("CognitiveRunnableAssembler", object()))
         with (
             bind_backends(hub),
             run_scope(RunScope(trace_id=session.trace_id, run_id=session.run_id)),

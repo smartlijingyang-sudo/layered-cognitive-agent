@@ -15,7 +15,12 @@ class SimpleToolRegistry(NamedRegistry[Tool], ToolRegistry):
         NamedRegistry.__init__(self)
 
     def register(self, tool: Tool) -> None:  # type: ignore[override]  # ToolRegistry 按 Tool 注册，NamedRegistry 按 (name, impl)
-        self._entries[tool.name] = tool
+        name = tool.name.strip()
+        if not name:
+            raise ValueError("tool name must not be empty")
+        if name != tool.name:
+            raise ValueError("tool name must not have leading or trailing whitespace")
+        self._entries[name] = tool
 
     def get(self, name: str) -> Tool | None:
         return self._entries.get(name)

@@ -1,0 +1,17 @@
+# Candidate-only self-improving profile.
+#
+# This profile is intentionally separate from web-standard. It can resolve and
+# compile the learning plugins, but no plugin in this bundle may auto-apply a
+# profile, change capability grants, or write an installed skill package.
+name: self-improving-minimal
+description: |
+  Minimal, non-default learning-plane profile for evidence-gated skill and
+  profile candidates. Promotion remains external and explicitly approved.
+bundles:
+  # The resolver still performs a provides→requires topological sort. Listing
+  # this scenario first guarantees its passive terminal-review contribution is
+  # registered before base freezes the lifecycle publisher snapshot.
+  - scenario-self-improving
+  - base
+  - web-app
+  - declarative-phase-graph

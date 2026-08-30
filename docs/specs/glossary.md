@@ -25,7 +25,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **PeerRelay** | 协调机制（进阶）：成员间交接，首成即返（策略键 `peer_relay` → HandoffStrategy） |
 | **PeerSwarm** | 协调机制（进阶）：轮询累积直至轮数上限（策略键 `peer_swarm` → SwarmStrategy） |
 | **Debate** | 协调机制（进阶）：多轮辩论收敛（策略键 `debate` → DebateStrategy） |
-| **Graph** | 协调机制（进阶）：按 ExecutionGraph 拓扑执行（策略键 `graph` → GraphStrategy） |
+| **Graph** | 协调机制（进阶）：按 ExecutionGraph 拓扑执行（策略键 `graph` → GraphStrategy）；拓扑遍历保持内核闭集，具体节点行为由 `GraphNodeExecutor` 原语注册表选择。 |
 | **spawn_agent** / **spawn_team** | L4 组合根函数：从 AgentSpec / TeamSpec 封闭组装 Agent / Team 对象图（ADR-0056）；无 Composer 类 |
 | **multi-delegate** | 一步并行委派多个角色（`Decision.delegations` 多条 + DelegateOperation gather） |
 | **Result** | 运行最终结果：status / output / budget / error |
@@ -45,6 +45,7 @@ PeerRelay / PeerSwarm / Debate / Graph 为进阶机制。
 | **TeamAssembly** | 策略工厂 resolve 期的只读装配视图（governance / stage / lead）；仅存在于组合期的布线类型（ADR-0034） |
 | **TeamStage** | 协调型策略的行动舞台：成员 + MemberInvoker；布线类型，非运行期领域概念（ADR-0034） |
 | **MemberInvoker** / **TransportMemberInvoker** | 策略调用成员的唯一通道协议 / 绑定 transport 的默认实现（组合期闭合，运行期零防御校验）（ADR-0034） |
+| **GraphNodeExecutor** | Graph 策略内单一节点类型的可替换行为原语；GraphStrategy 仅负责 DAG 拓扑、边语义与就绪队列，经 `graph_node_executors` registry 解析 Agent、Aggregator 与拓扑节点实现。 |
 | **TeamTraceProfile** | 团队级静态 span 档案（team_id / strategy_key / mandate / 角色名）；组合期派生，遥测与行为分离（ADR-0034） |
 | **TeamUnit** | 团队入口协议 |
 | **AgentUnit** | 单体入口协议 |
@@ -81,18 +82,16 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **Decision** | 一步行动决策；委派目标仅存于 `delegations` |
 | **Observation** | 行动结果 |
 | **Reflection** | 自省判定 |
-| **StopRule** / **StopDecision** / **StopReason** | 是否结束循环 |
-| **DefaultStopRule** | 默认终止裁判（``default_stop_rule.py``）；内部可组合 StopOutcomePolicy |
-| **StopOutcome** / **StopOutcomePolicy** / **DefaultStopOutcomePolicy** | 单步结果判定（DefaultStopRule 内部使用） |
+| **StopPolicy** / **StopDecision** / **StopReason** | Stop 阶段的 State 群策略：判断是否结束循环；不属于 AgentGraph 顶层能力。 |
+| **DefaultStopPolicy** | 默认终止策略（``plugins/state/stop_policy.py``）；在一个深模块内收敛完成与预算耗尽判定。 |
 | **Brain** / **Body** / **MemorySystem** | 想 / 做 / 记 |
 | **ModularBrain** | 默认 Brain（reasoner / critic 可替换）；原生 function calling 直接产出 Decision，无需 DecisionParser |
 | **Turn** | 单步记录：decision + act result + reflection |
 | **Budget** | token / cost / steps / wall_clock 预算 |
 | **Hook** / **HookRegistry** / **EventBus** | 生命周期钩子与事件总线（业务事实经遥测桥进入 trace 管道） |
 | **Telemetry** | 业务层唯一发射门面契约：span / event / score，不耦合任何后端 |
-| **ObservabilityHub** | 可观测性组合根：装配一个运行事件账本、只读投影插件与 OTel 外部导出；不维护第二条诊断流 |
 | **SpanName** / **EventName** | 封闭遥测词表（span 名 / 业务事件名），配 **VocabDef** 目录登记唯一发射点 |
-| **SpanView** / **SpanContext** | OTel span 的本地投影视图 / 当前关联上下文（trace/span id） |
+| **SpanView** | OTel span 的本地投影视图 |
 | **AttributePolicy** / **Verbosity** | 属性策略（脱敏/截断，写入期强制）与信息量档位（minimal/standard/verbose） |
 | **JournalEvent** / **RuntimeObserved** / **RunScope** / **StampedEvent** | 领域事实事件 / 插件、Hook、工具、LLM、记忆与传输的运行解释事件 / 关联骨架 / 盖章记录 |
 | **EventDescriptor** / **EventPlane** / **EventProjection** | 事件的唯一治理描述（受众、敏感性、保留、发射边界）/ 事实、结构、解释三平面 / 已提交事件的只读投影协议 |
@@ -100,7 +99,6 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **JournalProjector** / **ProjectionRegistry** | 兼容投影契约 / 按装配顺序分发已提交事件并隔离投影故障的注册表 |
 | **TraceInspector** / **TraceReport** | 面向 Coding Agent 的只读账本检查器 / 可序列化的因果链、失败、瓶颈、复现与插件交互图报告 |
 | **OtelProjector** / **ConsoleJournalProjector** / **JsonlJournalProjector** | journal → OTel span（显式定父）/ console 场景卡·叙事·Run Card·序列图 / jsonl 落盘投影器 |
-| **LangfuseBridge** / **ExporterUnavailableError** | Langfuse 后端桥接（OTel 原生 SDK 挂接）/ 导出器不可用异常 |
 | **LLMResponse** / **TokenUsage** | LLM 结构化返回（文本 + 模型 + token 用量），成本链路单一事实源 |
 | **StateStore** / **StateSnapshot** | 状态持久化与快照 |
 
@@ -155,8 +153,6 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **PromptReasoner** | Reasoner 默认实现（team-shape agnostic，solo/member/lead 统一） |
 | **SimpleCritic** | Critic 默认实现 |
 | **Intent Shape / normalize_intent_shape** | 决策意图形状归一（伪工具→行动、response_text 提升；ADR-0045 Canonical Model） |
-| **SimpleEventBus** | EventBus 默认实现 |
-| **SimpleHookRegistry** | HookRegistry 默认实现 |
 | **SimpleSafeExecutor** | SafeExecutor 默认实现 |
 | **SimpleToolRegistry** | ToolRegistry 默认实现 |
 | **InMemoryStateStore** | StateStore 内存实现 |
@@ -166,7 +162,6 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **ChangeReport** | 升级 / patch 应用的结果报告（lobehub stack 部署侧） |
 | **ClockSensor** | PerceiveHub 命名工厂 `sensor.clock`：从 journal 上下文读时间戳，避免第三条时钟 |
 | **ComputerOps** | ComputerRuntime 协议（命令 + 输出 + 异步等待） |
-| **Console** / **ConsoleConfig** | 控制台输出 + 配置（ANSI / 日志级别） |
 | **DaemonConfig** / **DaemonService** | lca-ops daemon 进程管理（uptime / health / start-stop） |
 | **WorkspaceArtifactsSensor** | PerceiveHub 命名工厂 `sensor.workspace-artifacts`：从 ArtifactLedger 读当前 run 产物 |
 | **InboxFactsSensor** | PerceiveHub 命名工厂 `sensor.inbox-facts`：从 journal `InboxFollowupCreated` 读用户输入 |
@@ -181,12 +176,10 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **SimpleMemoryPolicy** / **SimpleCompactionPolicy** | MemoryPolicy / CompactionPolicy 默认实现 |
 | **DiagnosePattern** / **diagnose_loop_stuck** / **diagnose_model_not_seen** / **diagnose_memory_poisoned** / **diagnose_approval_rejected** | v3 §24.5 诊断模式（CLI `lca-ops diagnose`） |
 | **DiagnosisReport** | 诊断模式输出报告（根因 + 修复建议 + 证据链） |
-| **DshConfig** / **DshNotification** / **DshProbe** / **DshService** | DeepSeek Harness 适配（DSH 桥接层；v2 遗产，逐步退役） |
-| **FilesInfoDocument** | 文件元数据文档（路径 + mime + 大小 + 校验和） |
+| **AttachmentManifest** | 文件元数据文档（路径 + mime + 大小 + 校验和） |
 | **Finding** | 检索 / 诊断发现的原子单元（source + claim + confidence） |
 | **HealthCheck** / **HostEnvironment** / **InfraConfig** / **InfraService** | 基础设施探活 + 主机环境 + 配置（lca-ops heal 子命令） |
 | **LLMFace** / **ProductionLLMResolver** | LLM 适配门面 + 解析器（多 backend / 多 mode 路由） |
-| **LocalMirror** / **MirrorDiff** | upstream fork 本地镜像 + 与 upstream 的差异报告 |
 | **MachineComputer** | ComputerRuntime 协议的具体机器实例（local subprocess / docker / e2b） |
 | **ModelDefinition** | LLM 模式定义（model id + adapter + 价格 + 限额） |
 | **NullSink** | ManifestSink no-op 实现（测试用） |
@@ -194,10 +187,9 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **PathConfig** / **PathProvider** / **PlaneRequest** / **ResolvedEndpoint** / **WorkspaceProvider** | 路径配置 + provider + 平面请求 + endpoint 解析 + workspace provider |
 | **ProgressLoopDetector** | 同名工具调用循环检测（DecisionGate 组件） |
 | **Provider** / **ProviderDispatch** | LLM / Tools / Search provider 协议 + 分发 |
-| **ScorerFn** / **SearchHit** / **SearchService** | 评分函数签名 + 检索命中 + 检索服务 |
+| **SearchHit** / **SearchService** | 检索命中 + 检索服务 |
 | **Service** / **SkillsService** / **ToolsConfig** / **ToolsProvider** / **ToolsService** / **UserConfig** / **UserProvider** / **VenvConfig** / **VenvProvider** | 平台 service 协议与实现（L4 门面下的服务注册） |
 | **Sudo** | 提权操作适配（仅安全操作走；v3 spec 显式约束） |
-| **UpstreamTree** | upstream 仓库目录树（patch 应用源） |
 | **Verbosity** | 日志信息量档位（minimal / standard / verbose） |
 
 ## L-Casting（自动组队，ADR-0042）
@@ -213,5 +205,40 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **LLMTeamCaster** | 默认 TeamCaster：一次结构化 LLM 调用 + 白名单校验 + 一次纠正重试，失败抛 CastingError |
 | **CastingError** | 自动组队判定失败：解析 / 白名单校验 / 纠正重试全部失败 |
 | **RoleNotFoundError** | role_id 不存在于角色库 |
+
+| **FailureExplainer** (PR-3 + PR-4) | 失败诊断与解释器（lca-ops diagnose 子命令） |
+| **HostEnvironment** (PR-12) | 主机环境封装（lca-ops heal 子命令）：uptime + health + start-stop |
+| **Lease** (v3 §11 / PR-9b) | Blackboard 共享工件的租约协议（团队协作隔离） |
+| **MinimalReproduction** | 最小可复现 bug case 模板（tests/ 辅助） |
+| **OptimizationFinder** | Profile 优化发现器（lca-ops optimize 子命令；找重复 plugin / 冲突 capability） |
+| **PlaneRequest** | lca.ops 平面请求（路径配置 + endpoint 解析） |
+| **PresetAuthoring** | Creator preset 写入层（PR-12 V7 publish） |
+| **PresetLayout** | Creator preset 目录布局（PR-12 V7 publish） |
+| **ProductionLLMResolver** | 生产环境 LLM 解析器（多 backend 路由 + 限额 + 价格） |
+
+## 已废弃主名（PR-12 整理）
+
+> 这些术语曾在 codebase 中存在，现已删除 / 改名 / 退役。禁止复活
+> 为现役主名；新代码请使用替代术语（见上方现役区）。如果旧代码仍
+> 引用这些名字，请先迁移再删除本表条目。
+
+| 已废弃术语 | 替代 / 状态 |
+|---|---|
+| **BindOptions** | 计划绑定兼容选项；已退役 — 替代：严格的 `bind_plan(request, plan, scope)` |
+| **Console** / **ConsoleConfig** | 旧 observability 控制台 facade；已退役 — 替代：layer0 observability facade + projector |
+| **DshConfig** | DeepSeek Harness 适配器；v2 遗产，已退役 — 替代：lca-ops daemon / native config |
+| **DshNotification** | DSH 桥接；v2 遗产，已退役 — 替代：lca layer0_infra observability |
+| **DshProbe** | DSH 桥接；v2 遗产，已退役 — 替代：lca-ops doctor |
+| **DshService** | DSH 桥接；v2 遗产，已退役 — 替代：lca-ops daemon |
+| **ExporterUnavailableError** | observability exporter fallback；已退役 — 替代：None fallback in facade |
+| **LangfuseBridge** | Langfuse 旧版桥接；已退役 — 替代：Layer0 observability 直接 |
+| **LocalMirror** | upstream fork 旧版镜像；已退役 — 替代：Layer0 upstream scan |
+| **MirrorDiff** | upstream 旧版差异报告；已退役 — 替代：Layer0 upstream scan |
+| **ObservabilityHub** | 旧 observability facade 类；改名 — 替代：lca.layer0_infra.observability.facade |
+| **ScorerFn** | 旧版评分函数；已退役 — 替代：observability eval pipeline |
+| **SimpleEventBus** | 本地事件分发兼容实现；已退役 — 替代：由 booted Cordis Context 持有的 `CordisEventBus` |
+| **SimpleHookRegistry** | 本地钩子分发兼容实现；已退役 — 替代：由 booted Cordis Context 持有的 `CordisHookRegistry` |
+| **SpanContext** | 旧 span context 类；改名 — 替代：lca.contracts.atoms.semantic_keys.SpanContext |
+| **UpstreamTree** | upstream 仓库目录树；已退役 — 替代：Layer0 upstream patch scan |
 
 

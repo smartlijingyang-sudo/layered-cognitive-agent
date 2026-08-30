@@ -8,9 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.harness.session import EventScope, SessionEvent, SessionHeader
+from lca.contracts.protocols.session_persistence import (
+    SessionPersistence,
+    SessionPersistenceFactory,
+)
 
 
-class JsonlSessionPersistence:
+class JsonlSessionPersistence(SessionPersistence):
     """Append-only JSONL: first line is the header, rest are events."""
 
     def __init__(self, path: Path) -> None:
@@ -30,6 +34,9 @@ class JsonlSessionPersistence:
         payload["kind"] = "event"
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+    def local_path(self) -> Path:
+        return self.path
 
     def load(self) -> tuple[SessionHeader | None, list[SessionEvent]]:
         if not self.path.exists():
@@ -60,3 +67,16 @@ class JsonlSessionPersistence:
                     )
                 )
         return header, events
+
+
+class JsonlSessionPersistenceFactory(SessionPersistenceFactory):
+    """Create JSONL-backed Session persistence below the configured session root."""
+
+    def create(self, *, session_id: str, sessions_dir: Path) -> SessionPersistence:
+        return JsonlSessionPersistence(sessions_dir / f"{session_id}.jsonl")
+
+
+__all__ = [
+    "JsonlSessionPersistence",
+    "JsonlSessionPersistenceFactory",
+]

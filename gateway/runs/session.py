@@ -1,10 +1,14 @@
-"""Run session aggregate + the one process-wide run index."""
+"""Legacy run-session aggregate and its compatibility registry facade.
+
+``RunSession`` remains the carrier-facing aggregate for one live run.  The
+registry intentionally delegates its three independent lifecycles: ephemeral
+run lookup to ``RunSessionIndex``, durable paths to ``RunLocator``, and the
+process-wide live journal to ``ProcessJournalBinding``.
+"""
 
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
@@ -12,33 +16,27 @@ from pathlib import Path
 from typing import Any
 
 from gateway.runs.identity import AgentRef, default_agent_ref
-from gateway.runs.live import LiveTail
-from gateway.runs.process_journal import ProcessJournal
+from gateway.runs.journal_projection_binding import ProcessJournalBinding
+from gateway.runs.session_health import RunHealthProjection
+from gateway.runs.session_index import (
+    DEFAULT_MAX_TERMINAL,
+    DEFAULT_TERMINAL_TTL_S,
+    RunSessionIndex,
+    run_dedup_key,
+)
+from gateway.runs.session_projection import summary_for_session
 from lca.contracts.models.core.conversation import ConversationTurn
 from lca.contracts.models.core.plane import PlaneBindings
+from lca.contracts.observability.run_journal import (
+    LiveRunProjection,
+    ProcessJournalProjection,
+    RunJournalFactory,
+)
+from lca.contracts.observability.run_locator import RunLocator
+from lca.contracts.protocols import JournalProjector
 from lca.layer0_infra.observability import BoundObservability
 
-_RUNS_DIR = Path("traces/runs")
-_DEFAULT_MAX_TERMINAL = 128
-_DEFAULT_TERMINAL_TTL_S = 3600.0
-
-
-def run_dedup_key(
-    *,
-    user_text: str,
-    mode: str,
-    attachment_ids: Sequence[str] = (),
-    agent_id: str = "",
-) -> str:
-    """Fingerprint for coalescing concurrent duplicate LobeHub requests.
-
-    ``agent_id`` is part of the key: two principals never share an inflight Run.
-    """
-    normalized = " ".join(user_text.strip().split())
-    attachments = ",".join(sorted(str(i).strip() for i in attachment_ids if str(i).strip()))
-    principal = agent_id.strip() or "solo"
-    payload = f"{mode}\0{principal}\0{normalized}\0{attachments}".encode()
-    return hashlib.sha256(payload).hexdigest()[:24]
+_RUNS_ROOT = Path("traces")  # ADR-0065 §七: locator root, runs/ 是其子目录
 
 
 class RunStatus(str, Enum):
@@ -53,8 +51,6 @@ class RunStatus(str, Enum):
         return _LOBEHUB_STATUS_MAP[self]
 
 
-_TERMINAL = frozenset({RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELED})
-
 _LOBEHUB_STATUS_MAP: dict[RunStatus, str] = {
     RunStatus.PENDING: "running",
     RunStatus.RUNNING: "running",
@@ -67,12 +63,12 @@ _LOBEHUB_STATUS_MAP: dict[RunStatus, str] = {
 
 @dataclass
 class RunSession:
-    """One Run: hub, tail, status, and the task that drives them."""
+    """Carrier-facing mutable state for one legacy run."""
 
     run_id: str
     trace_id: str
     jsonl_path: Path
-    tail: LiveTail
+    tail: LiveRunProjection
     question: str
     user_text: str
     mode: str
@@ -93,63 +89,55 @@ class RunSession:
     plane: str = ""
     extra_plane: str = ""
     execution_target: str = ""
+    started_at: float = 0.0
+    locator: RunLocator | None = None  # ADR-0065 PR-11: run 级 locator 引用
 
 
 class RunRegistry:
-    """The only Run index. No parallel module-level session tables."""
+    """Compatibility facade over run index, durable locator, and process journal.
+
+    The public API stays stable for the legacy gateway while each collaborator
+    has a single lifecycle.  No parallel module-level session tables exist.
+    """
 
     def __init__(
         self,
-        runs_dir: Path | None = None,
         *,
-        max_terminal: int = _DEFAULT_MAX_TERMINAL,
-        terminal_ttl_s: float = _DEFAULT_TERMINAL_TTL_S,
+        locator: RunLocator | None = None,
+        max_terminal: int = DEFAULT_MAX_TERMINAL,
+        terminal_ttl_s: float = DEFAULT_TERMINAL_TTL_S,
     ) -> None:
-        self._runs: dict[str, RunSession] = {}
-        self._inflight_by_key: dict[str, str] = {}
-        self._runs_dir = runs_dir if runs_dir is not None else _RUNS_DIR
-        self._runs_dir.mkdir(parents=True, exist_ok=True)
-        self._max_terminal = max_terminal
-        self._terminal_ttl_s = terminal_ttl_s
-        self.journal = ProcessJournal()
+        if locator is None:
+            from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+
+            locator = FilesystemRunLocator(root=_RUNS_ROOT)
+        self._locator: RunLocator = locator
+        self._locator.storage_root.mkdir(parents=True, exist_ok=True)
+        (self._locator.storage_root / "runs").mkdir(parents=True, exist_ok=True)
+        self._index = RunSessionIndex(
+            max_terminal=max_terminal,
+            terminal_ttl_s=terminal_ttl_s,
+        )
+        self._process_journal = ProcessJournalBinding()
+        self._health = RunHealthProjection(
+            index=self._index,
+            process_journal=self._process_journal,
+        )
 
     def latest_bindings(self) -> PlaneBindings | None:
-        for session in reversed(list(self._runs.values())):
-            if session.bindings is not None:
-                return session.bindings
-        return None
+        """Return the newest bound plane configuration from the local run cache."""
+
+        return self._index.latest_bindings()
 
     def prune(self, now: float | None = None) -> int:
-        """Drop terminal sessions past TTL or over the cap. Running/HIL stay."""
-        clock = time.time() if now is None else now
-        terminal = [session for session in self._runs.values() if session.status in _TERMINAL]
-        drop: list[str] = []
-        for session in terminal:
-            closed = session.closed_at if session.closed_at is not None else clock
-            if clock - closed >= self._terminal_ttl_s:
-                drop.append(session.run_id)
-        kept = [session for session in terminal if session.run_id not in drop]
-        kept.sort(key=lambda session: session.closed_at if session.closed_at is not None else 0.0)
-        overflow = len(kept) - self._max_terminal
-        if overflow > 0:
-            drop.extend(session.run_id for session in kept[:overflow])
-        for run_id in drop:
-            doomed = self._runs.get(run_id)
-            if doomed is None:
-                continue
-            del self._runs[run_id]
-            self.clear_inflight(doomed)
-        return len(drop)
+        """Evict retained terminal session handles using the index retention policy."""
+
+        return self._index.prune(now=now)
 
     def put(self, session: RunSession) -> None:
-        self._runs[session.run_id] = session
-        key = run_dedup_key(
-            user_text=session.user_text,
-            mode=session.mode,
-            attachment_ids=session.attachment_ids,
-            agent_id=session.agent.agent_id,
-        )
-        self._inflight_by_key[key] = session.run_id
+        """Register a new session in the process-local index."""
+
+        self._index.put(session)
 
     def find_inflight_run(
         self,
@@ -159,85 +147,101 @@ class RunRegistry:
         attachment_ids: Sequence[str] = (),
         agent_id: str = "",
     ) -> RunSession | None:
-        key = run_dedup_key(
+        """Return a coalescible in-flight session, if one exists."""
+
+        return self._index.find_inflight_run(
             user_text=user_text,
             mode=mode,
             attachment_ids=attachment_ids,
             agent_id=agent_id,
         )
-        run_id = self._inflight_by_key.get(key)
-        if run_id is None:
-            return None
-        session = self.get(run_id)
-        if session is None or session.status not in {RunStatus.PENDING, RunStatus.RUNNING}:
-            self._inflight_by_key.pop(key, None)
-            return None
-        return session
 
     def clear_inflight(self, session_or_id: RunSession | str) -> None:
-        if isinstance(session_or_id, str):
-            session = self._runs.get(session_or_id)
-            if session is None:
-                return
-        else:
-            session = session_or_id
-        key = run_dedup_key(
-            user_text=session.user_text,
-            mode=session.mode,
-            attachment_ids=session.attachment_ids,
-            agent_id=session.agent.agent_id,
-        )
-        if self._inflight_by_key.get(key) == session.run_id:
-            self._inflight_by_key.pop(key, None)
+        """Release a session's process-local deduplication lease."""
+
+        self._index.clear_inflight(session_or_id)
 
     def mark_paused(self, session: RunSession) -> None:
-        self.clear_inflight(session)
+        """Mark a session resumable without keeping its request coalesced."""
+
+        self._index.mark_paused(session)
 
     def get(self, run_id: str) -> RunSession | None:
-        return self._runs.get(run_id)
+        """Return the in-process session handle, if retained."""
+
+        return self._index.get(run_id)
 
     def sessions(self) -> tuple[RunSession, ...]:
-        return tuple(self._runs.values())
+        """Return a stable snapshot of retained session handles."""
 
-    def runs_dir(self) -> Path:
-        return self._runs_dir
+        return self._index.sessions()
+
+    def locator(self) -> RunLocator:
+        """Return the sole run-id-to-durable-path resolver."""
+
+        return self._locator
+
+    @property
+    def journal(self) -> ProcessJournalProjection:
+        """Return the explicitly bound process-level real-time projection."""
+
+        return self._process_journal.journal
+
+    def bind_process_journal(self, factory: RunJournalFactory) -> JournalProjector:
+        """Return one per-run binding into the shared process projection."""
+
+        return self._process_journal.bind(factory)
 
     def jsonl_path_for(self, run_id: str) -> Path:
-        return self._runs_dir / f"{run_id}.jsonl"
+        """Resolve a run journal path through the durable locator."""
+
+        return self._locator.journal_path(run_id)
+
+    def manifest_path_for(self, run_id: str) -> Path:
+        """Resolve a run manifest path through the durable locator."""
+
+        return self._locator.manifest_path(run_id)
+
+    def evidence_dir_for(self, run_id: str) -> Path:
+        """Resolve a run evidence directory through the durable locator."""
+
+        return self._locator.evidence_dir(run_id)
+
+    def materialization_dir_for(
+        self,
+        run_id: str,
+        *,
+        generator_id: str,
+        generator_version: str,
+    ) -> Path:
+        """Resolve the versioned output directory through the durable locator."""
+
+        return self._locator.materialization_dir(
+            run_id,
+            generator_id=generator_id,
+            generator_version=generator_version,
+        )
+
+    def update_latest_pointer(self, run_id: str) -> None:
+        """Delegate latest-run materialization to the durable locator."""
+
+        self._locator.update_latest_pointer(run_id)
 
     def summary(self, run_id: str) -> dict[str, Any] | None:
+        """Return the carrier projection for one retained session."""
+
         session = self.get(run_id)
-        if session is None:
-            return None
-        payload: dict[str, Any] = {
-            "run_id": session.run_id,
-            "trace_id": session.trace_id,
-            "status": session.status.value,
-            "session_status": session.status.to_lobehub_session_status(),
-            "mode": session.mode,
-            "agent": {"id": session.agent.agent_id, "name": session.agent.name},
-            "question": session.question,
-            "error": session.error,
-        }
-        if session.approval_request is not None:
-            payload["approval_request"] = session.approval_request
-        return payload
+        return None if session is None else summary_for_session(session)
 
     def status_counts(self) -> dict[str, int]:
-        counts = {"pending": 0, "running": 0, "waiting_input": 0}
-        for session in self._runs.values():
-            if session.status.value in counts:
-                counts[session.status.value] += 1
-        return counts
+        """Return carrier health counts from the in-memory index."""
+
+        return self._health.status_counts()
 
     def live_totals(self) -> dict[str, int]:
-        subscribers = 0
-        evicted = 0
-        for session in self._runs.values():
-            subscribers += session.tail.subscriber_count
-            evicted += session.tail.evicted
-        return {
-            "total_subscribers": subscribers,
-            "total_evicted": evicted,
-            "journal_subscribers": self.journal.tail.subscriber_count,
-        }
+        """Return the carrier health projection from the dedicated owner."""
+
+        return self._health.live_totals()
+
+
+__all__ = ["RunRegistry", "RunSession", "RunStatus", "run_dedup_key"]

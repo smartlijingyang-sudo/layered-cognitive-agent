@@ -1,0 +1,9 @@
+# Golden profile: patch-priority (PR-10 V2 acceptance §7.3)
+# Bundle + Patch priority resolution — exercises V2 plan_hash determinism.
+# Patch is empty list (no-op) to demonstrate PR-1 Config.extra="forbid" constraint.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+
+patch: []

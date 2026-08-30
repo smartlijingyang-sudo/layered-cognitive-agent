@@ -59,12 +59,20 @@ class StepStarted:
     turn: int
     step: int
 
+    def __post_init__(self) -> None:
+        if self.turn < 0 or self.step < 0:
+            raise ValueError("step event coordinates must be non-negative")
+
 
 @session_event("step.ended.v1")
 @dataclass(frozen=True)
 class StepEnded:
     turn: int
     step: int
+
+    def __post_init__(self) -> None:
+        if self.turn < 0 or self.step < 0:
+            raise ValueError("step event coordinates must be non-negative")
 
 
 @session_event("context.injected.v1", visibility="audit")
@@ -149,11 +157,24 @@ class ToolApprovalRequested:
     description: str
 
 
-@session_event("tool.approval_resolved.v1")
+@session_event("approval.persisted.v1", visibility="internal")
 @dataclass(frozen=True)
-class ToolApprovalResolved:
-    call_id: str
-    decision: str
+class ApprovalPersisted:
+    """Durable declarative resume point for one approval-paused session."""
+
+    approval_id: str
+    resume_point: dict[str, object]
+
+
+@session_event("approval.resolved.v1", visibility="internal")
+@dataclass(frozen=True)
+class ApprovalResolved:
+    """One idempotent human decision over a persisted approval request."""
+
+    approval_id: str
+    command_id: str
+    payload: str
+    approved: bool = True
 
 
 @session_event("inbox.spliced.v1")
@@ -162,26 +183,17 @@ class InboxSpliced:
     op: str
     target: str
     message_ids: tuple[str, ...]
+    # Appended messages are included so a pending queue can be rebuilt from the
+    # existing append-only Session stream. Old events omit this optional field.
+    messages: tuple[dict[str, str], ...] = ()
 
 
 @session_event("assistant.responded.v1")
 @dataclass(frozen=True)
 class AssistantResponded:
-    """Assistant text response — surface event for derive_messages().
-
-    Aligned with DSH ``assistant/message`` surface event.
-    """
+    """Assistant text response — surface event for derive_messages()."""
 
     turn: int
     step: int
     content: str
     tool_calls: list[dict[str, Any]] | None = None
-
-
-@session_event("session.checkpoint.v1", visibility="internal")
-@dataclass(frozen=True)
-class SessionCheckpoint:
-    status: str
-    snapshot_ref: str | None = None
-    answer: str | None = None
-    error: str | None = None

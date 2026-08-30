@@ -77,7 +77,7 @@ class TestFullV3Integration:
                 TeamInboxSensor(store),
             ],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         # 3. Run step 1 — no gates have fired yet.
         state = _state()
@@ -159,7 +159,7 @@ class TestFullV3Integration:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         # Two runs of the same state produce the same digest.
         state = _state()

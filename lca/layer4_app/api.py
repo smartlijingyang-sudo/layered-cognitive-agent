@@ -17,7 +17,6 @@ Example::
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -55,109 +54,38 @@ from lca.contracts.protocols.spec import (
     DEFAULT_DELEGATE_MAX_ATTEMPTS,
     MEMORY_CHOICE_SIMPLE,
     OBSERVABILITY_CHOICE_CONSOLE,
-    STATE_STORE_CHOICE_MEMORY,
+    STATE_STORE_CHOICE_PROFILE_DEFAULT,
     AgentSpec,
     Governance,
     LeadSpec,
     TeamSpec,
 )
+from lca.layer4_app.default_context import (
+    ensure_default_ctx,
+    get_or_create_default_ctx,
+    set_default_ctx,
+)
+from lca.layer4_app.default_context import holder as _default_ctx_holder
 from lca.layer4_app.spawn import spawn_agent, spawn_team
+
+__all__ = [
+    "Agent",
+    "Team",
+    "TeamLead",
+    "ensure_default_ctx",
+    "get_or_create_default_ctx",
+    "set_default_ctx",
+]
 
 if TYPE_CHECKING:
     from cordis import Context
 
-    from lca.harness.plugin_api import PluginContext
-
-_DEFAULT_PROFILE = "profiles/web-standard.yaml"
-
-# Module-level cached default context (boot profile lazily on first Agent creation).
-# ADR-0033 forbids ``global`` statements in the facade; the cache lives on a
-# dedicated holder dataclass so each access is a single attribute read.
-from dataclasses import dataclass
-
-
-@dataclass
-class _DefaultCtxHolder:
-    """Lazy-init holder for the process-default cordis Context.
-
-    Replaces the previous ``global _cached_default_ctx`` pattern so that
-    the facade honours ADR-0033 (no process-level composer singletons in
-    module scope).  ``ensure_default_ctx`` continues to be the single
-    legal boot path.
-    """
-
-    ctx: PluginContext | None = None
-    lock: asyncio.Lock | None = None
-
-
-_default_ctx_holder = _DefaultCtxHolder()
-
 
 def __getattr__(name: str) -> object:
-    """Module-level ``__getattr__`` for backwards-compat with tests.
-
-    The ADR-0033 refactor moved the lazy-init cache onto a dataclass
-    holder to drop the ``global`` statement; tests still access the
-    historical ``_cached_default_ctx`` name.  Forward reads to the holder.
-    """
+    """Preserve the historical cache alias while lifecycle ownership lives elsewhere."""
     if name == "_cached_default_ctx":
         return _default_ctx_holder.ctx
     raise AttributeError(name)
-
-
-def _default_ctx_lock() -> asyncio.Lock:
-    if _default_ctx_holder.lock is None:
-        _default_ctx_holder.lock = asyncio.Lock()
-    return _default_ctx_holder.lock
-
-
-def set_default_ctx(ctx: Context) -> None:
-    """Bind an already-booted cordis Context as the process default."""
-    _default_ctx_holder.ctx = ctx
-
-
-async def ensure_default_ctx() -> Context:
-    """Return the cached default ctx, awaiting boot on the current loop if needed.
-
-    This is the only legal way to lazy-boot inside a running event loop.
-    ``loop.run_until_complete`` on that loop raises RuntimeError.
-    """
-    if _default_ctx_holder.ctx is not None:
-        return _default_ctx_holder.ctx
-    async with _default_ctx_lock():
-        if _default_ctx_holder.ctx is not None:
-            return _default_ctx_holder.ctx
-        from lca.harness.profile.boot import boot_profile
-
-        _default_ctx_holder.ctx = await boot_profile(_DEFAULT_PROFILE)
-        return _default_ctx_holder.ctx
-
-
-def get_or_create_default_ctx() -> Context:
-    """Return a cached cordis Context booted from the default web-standard profile.
-
-    Used as fallback when an Agent is constructed without an explicit scope.
-    Boot is expensive (~100ms + plugin instantiation); cache once.
-
-    - If cache is warm: return it.
-    - If no running loop: ``asyncio.run(boot_profile(...))``.
-    - If a loop is already running: refuse. Callers on that loop must
-      ``await ensure_default_ctx()`` or pass ``scope=``.
-    """
-    if _default_ctx_holder.ctx is not None:
-        return _default_ctx_holder.ctx
-
-    from lca.harness.profile.boot import boot_profile
-
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        _default_ctx_holder.ctx = asyncio.run(boot_profile(_DEFAULT_PROFILE))
-        return _default_ctx_holder.ctx
-    raise RuntimeError(
-        "default plugin context is not booted; await ensure_default_ctx() "
-        "or pass scope= from the already-booted cordis Context"
-    )
 
 
 class Agent(AgentUnit):
@@ -175,7 +103,7 @@ class Agent(AgentUnit):
         max_wall_clock_seconds: int | None = DEFAULT_MAX_WALL_CLOCK_SECONDS,
         memory: str | MemorySystem = MEMORY_CHOICE_SIMPLE,
         observability: str | ObservabilityBackend = OBSERVABILITY_CHOICE_CONSOLE,
-        state_store: str | StateStore = STATE_STORE_CHOICE_MEMORY,
+        state_store: str | StateStore = STATE_STORE_CHOICE_PROFILE_DEFAULT,
         brain: str | Brain = BRAIN_CHOICE_DEFAULT,
         scope: Context | None = None,
     ) -> None:

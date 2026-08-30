@@ -18,7 +18,7 @@ from lca.layer0_infra.attachment.normalizer import normalize_for_injection
 from lca.layer0_infra.attachment.settings import AttachmentPolicyDocument, get_attachment_policy
 
 
-class FilesInfoFile(BaseModel):
+class AttachmentFileMetadata(BaseModel):
     """One <file> node. Field names match LobeHub wire attributes."""
 
     model_config = ConfigDict(frozen=True)
@@ -31,7 +31,7 @@ class FilesInfoFile(BaseModel):
     content: str = ""
 
     @classmethod
-    def from_record(cls, record: AttachmentRecord) -> FilesInfoFile:
+    def from_record(cls, record: AttachmentRecord) -> AttachmentFileMetadata:
         return cls(
             id=record.attachment_id,
             name=record.name,
@@ -55,13 +55,13 @@ class FilesInfoFile(BaseModel):
         return f"<file {attrs}></file>"
 
 
-class FilesInfoDocument(BaseModel):
+class AttachmentManifest(BaseModel):
     """The SYSTEM CONTEXT block injected into the current user turn."""
 
     model_config = ConfigDict(frozen=True)
 
     instruction: str
-    files: tuple[FilesInfoFile, ...]
+    files: tuple[AttachmentFileMetadata, ...]
     open_marker: str
     close_marker: str
 
@@ -71,11 +71,11 @@ class FilesInfoDocument(BaseModel):
         records: Sequence[AttachmentRecord],
         *,
         policy: AttachmentPolicyDocument | None = None,
-    ) -> FilesInfoDocument:
+    ) -> AttachmentManifest:
         doc_policy = policy if policy is not None else get_attachment_policy()
         return cls(
             instruction=doc_policy.files_instruction.strip(),
-            files=tuple(FilesInfoFile.from_record(record) for record in records),
+            files=tuple(AttachmentFileMetadata.from_record(record) for record in records),
             open_marker=doc_policy.system_context_open,
             close_marker=doc_policy.system_context_close,
         )

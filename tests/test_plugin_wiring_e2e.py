@@ -38,9 +38,8 @@ _GATE_PLUGINS: tuple[str, ...] = (
 _ACT_RUNTIME_PLUGINS: tuple[str, ...] = (
     "lca.plugins.body.simple",
     "lca.plugins.body.safe_executor",
-    "lca.plugins.runtime.stop_rule",
+    "lca.plugins.state.stop_policy",
     "lca.plugins.runtime.hook_registry",
-    "lca.plugins.runtime.middleware",
 )
 _EXPECTED_SENSOR_ORDER: tuple[str, ...] = (
     "clock",
@@ -125,6 +124,34 @@ class TestHubConstruction:
         from lca.layer1_cognitive.perceive_sink import JournalSink, default_sink
 
         assert isinstance(default_sink(), JournalSink)
+
+    def test_journal_sink_consumes_write_only_backend(self) -> None:
+        from lca.contracts.models.core.perception import ContextManifest
+        from lca.contracts.models.observability.journal import ContextManifested
+        from lca.contracts.observability.ports import JournalBackend
+        from lca.layer1_cognitive.perceive_sink import JournalSink
+
+        class WriteOnlyJournal:
+            def __init__(self) -> None:
+                self.events: list[ContextManifested] = []
+
+            def write(self, event: ContextManifested) -> None:
+                self.events.append(event)
+                return None
+
+            def flush(self) -> None:
+                return None
+
+            def close(self) -> None:
+                return None
+
+        journal = WriteOnlyJournal()
+        assert isinstance(journal, JournalBackend)
+        event = ContextManifested(step=3)
+        emitted = JournalSink(journal).emit(event, ContextManifest(items=()))
+
+        assert emitted is event
+        assert journal.events == [event]
 
     def test_hub_constructor_signature(self) -> None:
         import inspect

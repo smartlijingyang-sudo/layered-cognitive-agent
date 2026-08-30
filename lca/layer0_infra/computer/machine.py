@@ -3,36 +3,14 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Protocol
+from typing import Any
 
 from lca.contracts.models.core.plane import PlaneRef
+from lca.contracts.protocols.infra import MachineTransport
 from lca.layer0_infra.computer.machine_exec import MachineExecMixin
 from lca.layer0_infra.computer.op_result import ComputerOpResult
-from lca.layer0_infra.file_store import FileStore, get_default_file_store
+from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.plane.scope import raise_if_out_of_scope
-
-
-class MachineTransport(Protocol):
-    """Machine plane 传输——系统通道。
-
-    ``write_files`` 的所有调用方都是受信的基础设施操作（附件暂存），
-    等价于 ``Sandbox.write_files()``——Protocol 本身就是信任边界。
-    用户写入走 ``MachineComputer.write_file()`` tool call（CLI ``writeFile``
-    单数），有独立的 ``assertWritable`` 策略。
-    """
-
-    async def computer_op(
-        self, op: str, args: dict[str, Any], *, timeout_s: int = 60
-    ) -> dict[str, Any]: ...
-
-    async def write_files(
-        self,
-        files: dict[str, bytes | str],
-        *,
-        base_dir: str = "",
-        session_id: str = "",
-        timeout_s: int = 60,
-    ) -> Any: ...
 
 
 class MachineComputer(MachineExecMixin):
@@ -42,11 +20,11 @@ class MachineComputer(MachineExecMixin):
         self,
         plane: PlaneRef,
         transport: MachineTransport,
-        store: FileStore | None = None,
+        store: FileStore,
     ) -> None:
         self.plane = plane
         self._transport = transport
-        self._store = store if store is not None else get_default_file_store()
+        self._store = store
         self._output_fingerprints: dict[str, str] = {}
 
     async def list_files(self, *, directory_path: str) -> ComputerOpResult:
@@ -237,6 +215,11 @@ class MachineComputer(MachineExecMixin):
         if not isinstance(content, str):
             content = _format(body) if ok or body.get("content") else err
         body.setdefault("plane", _plane_state(self.plane))
+        # ADR-0102: normalise the on-guest camelCase renderer keys to the
+        # snake_case python keys the RenderContracts declare.
+        from lca.layer0_infra.computer.runtime_exec import _normalize_guest_state
+
+        _normalize_guest_state(body, tool_name=op)
         return ComputerOpResult(success=ok, content=content, state=body, error=err)
 
 

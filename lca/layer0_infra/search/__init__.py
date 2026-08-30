@@ -29,4 +29,5 @@ __all__ = [
     "search",
     "search_routing_hint",
     "search_run_scope",
+    "web_search",
 ]

@@ -1,0 +1,31 @@
+# profiles/cordis-creator.yaml — Creator §13.3.4 完整 profile。
+#
+# 默认组合：base + web-app + scenario-cordis-creator；LLM 走 qwen3.7-plus。
+# 与 scenario YAML 共享同一组 bundle；patch 覆盖角色与 capability grant 子集，
+# 保证 ``boot_profile("cordis-creator")`` 单行可启。
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
+
+patch:
+  - id: lca-llm-resolver
+    config:
+      default_model: qwen3.7-plus
+      load_dotenv: true
+
+profile:
+  id: cordis-creator
+  description: "Creator §13.3 —— self-plugin-authoring + preset reuse"
+  trust: system
+  role: cordis-creator
+  capability_grant:
+    - cordis_control.inspect
+    - cordis_control.author
+    - cordis_control.validate
+    - cordis_control.promote
+    - tool_fs.read
+    - tool_fs.write
+    - tool_bash
+    - file_write

@@ -35,9 +35,7 @@ class TestStampedEventFields:
     """
 
     def test_stamped_event_does_not_have_turn_field(self) -> None:
-        assert not _has_field(StampedEvent, "turn"), (
-            "StampedEvent.turn 字段已删除；不要再加回来"
-        )
+        assert not _has_field(StampedEvent, "turn"), "StampedEvent.turn 字段已删除；不要再加回来"
 
     def test_stamped_event_has_event_type_field(self) -> None:
         assert _has_field(StampedEvent, "event_type"), (
@@ -107,9 +105,7 @@ class TestRunStoreAppendStampsEventType:
     def test_run_store_default_correlation_ids_empty(self) -> None:
         store = RunStore()
         stamped = store.append(
-            InboxFollowupCreated(
-                inbox_id="abc", actor="user", target="t", priority="p"
-            )
+            InboxFollowupCreated(inbox_id="abc", actor="user", target="t", priority="p")
         )
         assert stamped.correlation_ids == ()
 
@@ -117,9 +113,7 @@ class TestRunStoreAppendStampsEventType:
         """turn 字段已删除（永远 0，从未消费）。"""
         store = RunStore()
         stamped = store.append(
-            InboxFollowupCreated(
-                inbox_id="abc", actor="user", target="t", priority="p"
-            )
+            InboxFollowupCreated(inbox_id="abc", actor="user", target="t", priority="p")
         )
         assert not hasattr(stamped, "turn") or "turn" not in stamped.__dataclass_fields__
 
@@ -132,9 +126,7 @@ class TestStampedEventBackwardsCompatible:
             seq=1,
             ts=0.0,
             scope=RunScope(),
-            event=InboxFollowupCreated(
-                inbox_id="x", actor="user", target="t", priority="p"
-            ),
+            event=InboxFollowupCreated(inbox_id="x", actor="user", target="t", priority="p"),
         )
         assert stamped.event_type == ""
         assert stamped.data == {}

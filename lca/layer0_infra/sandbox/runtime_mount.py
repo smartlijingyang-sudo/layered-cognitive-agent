@@ -17,7 +17,12 @@ from lca.contracts.models.core.sandbox import (
 from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.sandbox.exec_result import sandbox_exec_result_from
 from lca.layer0_infra.sandbox.paths import ONLYBOXES
-from lca.layer0_infra.tools.run_attachment_scope import merge_attachment_ids
+
+# ADR-0101 PR-3 carry-over:tools 包的 __init__.py 会拉起 computer.sandbox_computer
+# 链,提前导入 ``tools.run_attachment_scope`` 会触发 ``runtime_scope`` ↔
+# ``tools/computer`` 循环。``merge_attachment_ids`` 仅在 mount 入口用到,
+# 改成函数内延迟导入,避开加载期路径。
+
 
 MOUNT_VERIFY_SCRIPT = """
 import json as _j
@@ -42,6 +47,11 @@ ExecuteFn = Callable[..., Awaitable[SandboxResult]]
 
 
 def load_mount_files(store: FileStore, explicit_ids: list[str] | None = None) -> dict[str, bytes]:
+    # Lazy import to avoid circular import via ``tools`` package
+    # (see module-level note).  All call sites are post-tool-invocation
+    # so the package is fully loaded by then.
+    from lca.layer0_infra.tools.run_attachment_scope import merge_attachment_ids
+
     ids = merge_attachment_ids(explicit_ids)
     files: dict[str, bytes] = {}
     for aid in ids:
@@ -54,6 +64,8 @@ def load_mount_files(store: FileStore, explicit_ids: list[str] | None = None) ->
 
 
 def build_mount_manifest(store: FileStore, mount_files: dict[str, bytes]) -> MountManifest:
+    from lca.layer0_infra.tools.run_attachment_scope import merge_attachment_ids
+
     ids = merge_attachment_ids(None)
     id_by_name: dict[str, str] = {}
     for aid in ids:

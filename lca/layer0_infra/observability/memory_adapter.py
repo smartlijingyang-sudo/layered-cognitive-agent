@@ -29,9 +29,13 @@ class TelemetryMemoryAdapter(MemorySystem):
     async def perceive(self, state: AgentState) -> AgentState:
         with span(SpanName.MEMORY_READ, **{ATTR_MEMORY_LAYER: _MEMORY_LAYER_PERCEIVE}) as handle:
             result = await self._inner.perceive(state)
-            hit = bool(getattr(result, "retrieved_context", None))
+            hit = bool(result.retrieved_context)
             handle.attributes[ATTR_HIT] = hit
-            record_memory_operation("memory.perceive", self._inner, output={"hit": hit})
+            record_memory_operation(
+                "memory.perceive",
+                self._inner,
+                output={"hit": hit, "record_count": len(result.retrieved_context)},
+            )
             return result
 
     async def update(

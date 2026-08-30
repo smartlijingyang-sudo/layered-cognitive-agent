@@ -10,7 +10,9 @@ from lca.layer0_infra.attachment.prompt import (
     select_attachment_init_files,
 )
 from lca.layer0_infra.file_store import FileStore
-from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
+
+# ADR-0101 PR-3 carry-over:延迟导入以避开 ``tools`` 包预加载导致的循环
+# (见 runtime_mount.py 注释)。
 
 # Backward-compatible aliases — paths resolve through attachment.prompt SSOT.
 sandbox_uploaded_file_path = sandbox_attachment_path
@@ -42,7 +44,7 @@ def render_cloud_sandbox_system_role(
     ids = (
         tuple(str(i).strip() for i in attachment_ids if str(i).strip())
         if attachment_ids is not None
-        else get_current_run_attachment_ids()
+        else _current_attachment_ids()
     )
     uploaded = ""
     if store is not None and ids:
@@ -64,3 +66,10 @@ def render_cloud_sandbox_system_role(
     if "{{sandbox_environment_note}}" in rendered:
         rendered = rendered.replace("{{sandbox_environment_note}}", environment_note())
     return rendered.strip()
+
+
+def _current_attachment_ids() -> tuple[str, ...]:
+    """延迟导入 helper,见模块顶部注释。"""
+    from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
+
+    return get_current_run_attachment_ids()

@@ -18,13 +18,23 @@ from gateway.app import create_app
 @pytest.fixture()
 def client():
     app = create_app()
-    return TestClient(app)
+    with TestClient(app) as client:
+        yield client
+
+
+def _require_profile_llm(client: TestClient) -> None:
+    """Keep real gateway E2E on the declared production LLM seam only."""
+
+    resolver = client.app.state.ctx.inject("llm_resolver")
+    if not callable(getattr(resolver, "resolve", None)) or not resolver.is_available():
+        pytest.skip("No production LLM credentials available")
 
 
 class TestHarnessSpineE2E:
     """The /v1/sessions path exercises the harness plugin system end-to-end."""
 
     def test_create_session_returns_accepted(self, client: TestClient):
+        _require_profile_llm(client)
         receipt = client.post(
             "/v1/sessions",
             json={"profile": "web-standard"},
@@ -36,9 +46,10 @@ class TestHarnessSpineE2E:
 
     def test_send_message_and_snapshot_populated(self, client: TestClient):
         """Full harness chain: create → send → agent runs → snapshot reflects result."""
+        _require_profile_llm(client)
         create = client.post(
             "/v1/sessions",
-            json={"profile": "web-standard", "options": {"max_steps": 3}},
+            json={"profile": "web-standard", "agent_options": {"max_steps": 3}},
         )
         assert create.status_code == 201
         session_id = create.json()["session_id"]
@@ -80,18 +91,16 @@ class TestHarnessSpineE2E:
             "Agent should have produced an assistant message"
         )
 
-    def test_harness_bridge_resolves_real_llm(self):
+    def test_harness_bridge_resolves_real_llm(self, client: TestClient):
         """build_live_agent() must not use MockLLMAdapter when credentials exist."""
         import time
 
         from lca.contracts.harness.session import SESSION_FORMAT_VERSION, SessionHeader
         from lca.harness.session.inbox import Inbox
         from lca.harness.session.store import SessionStore
-        from lca.layer0_infra.llm_resolver import ProductionLLMResolver
         from lca.layer4_app.harness_bridge import build_live_agent
 
-        if not ProductionLLMResolver().is_available():
-            pytest.skip("No LLM credentials available")
+        _require_profile_llm(client)
 
         header = SessionHeader(
             version=SESSION_FORMAT_VERSION,
@@ -106,7 +115,7 @@ class TestHarnessSpineE2E:
             inbox=inbox,
             identity_id="test-bridge-llm",
             options=None,
-            plugin_scope=None,
+            cordis_ctx=client.app.state.ctx,
         )
 
         # The agent's LLM should NOT be MockLLMAdapter

@@ -1,0 +1,6 @@
+# Golden profile: 11-relations-coverage (PR-10 V11 acceptance §7.3)
+# All 11 Relation enum entries exercised.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml

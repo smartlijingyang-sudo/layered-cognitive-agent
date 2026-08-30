@@ -1,0 +1,6 @@
+[
+  {"kind":"open-turn","speaker":"Alice"},
+  {"kind":"text","text":"你好"},
+  {"kind":"reasoning","text":"think"},
+  {"kind":"run-finished"}
+]

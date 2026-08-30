@@ -13,11 +13,7 @@ from typing import Any
 
 import structlog
 
-from lca.layer0_infra.file_store import (
-    FileStore,
-    get_default_file_store,
-    persist_generated_files,
-)
+from lca.layer0_infra.file_store import FileStore, persist_generated_files
 from lca.layer0_infra.sandbox.paths import ONLYBOXES
 from lca.layer0_infra.sandbox.runtime_scope import get_sandbox_runtime
 from lca.layer0_infra.workspace.deliverable import is_office_name
@@ -28,13 +24,12 @@ _log = structlog.get_logger(__name__)
 _OUTLINE_EMPTY_KEYS = ("slides", "slideCount", "paragraphs", "sheets")
 
 
-async def seal_office_works() -> list[dict[str, Any]]:
+async def seal_office_works(store: FileStore | None = None) -> list[dict[str, Any]]:
     """Flush residents, persist finished Office files + HTML previews, update ledger."""
     runtime = get_sandbox_runtime()
     workspace = get_run_workspace()
-    if runtime is None or workspace is None:
+    if runtime is None or workspace is None or store is None:
         return []
-    store = get_default_file_store()
     try:
         parts = await publish_office_works(runtime, store)
     except Exception:

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from lca.contracts.observability.ports import AttributePolicyBackend, TracerBackend
 from lca.layer0_infra.observability.handles import NullSpanHandle, SpanHandle
+from lca.layer0_infra.observability.policy import otel_safe_attributes
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
@@ -39,7 +40,7 @@ class OtelTracer(TracerBackend):
             return
         # 走 policy 准备属性；无 policy 时原样透传
         prepared = self._policy.prepare(attrs) if self._policy is not None else dict(attrs)
-        otel_span = self._tracer.start_span(name, attributes=prepared)
+        otel_span = self._tracer.start_span(name, attributes=otel_safe_attributes(prepared))
         handle = SpanHandle(self._policy, otel_span, dict(attrs), attach=True)
         with handle as h:
             yield h

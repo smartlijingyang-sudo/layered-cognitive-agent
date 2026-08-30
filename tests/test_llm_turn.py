@@ -11,11 +11,8 @@ from lca.contracts.models.core.decision import Decision, Observation, ToolCall, 
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, NativeToolCall
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.layer0_infra.search.constants import WEB_SEARCH_TOOL
-from lca.layer1_cognitive.brain.llm_result import (
-    build_decision_from_response,
-    has_resolved_tool_calls,
-)
 from lca.layer1_cognitive.brain.llm_turn import execute_llm_turn
+from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 
 
 def _state_after_web_search() -> AgentState:
@@ -99,18 +96,18 @@ class TestLlmTurn(unittest.IsolatedAsyncioTestCase):
 
     async def test_text_only_builds_respond_decision(self) -> None:
         response = LLMResponse(text="hello")
-        decision = build_decision_from_response(response)
+        decision = DefaultDecisionClassifier().classify(response)
         self.assertEqual(decision.action_type, "respond")
-        self.assertFalse(has_resolved_tool_calls(response))
+        self.assertFalse(response.tool_calls)
 
     async def test_tool_calls_builds_use_tool(self) -> None:
         response = LLMResponse(
             text="",
             tool_calls=[NativeToolCall(call_id="c1", name="web_search", arguments={"query": "x"})],
         )
-        decision = build_decision_from_response(response)
+        decision = DefaultDecisionClassifier().classify(response)
         self.assertEqual(decision.action_type, "use_tool")
-        self.assertTrue(has_resolved_tool_calls(response))
+        self.assertTrue(response.tool_calls)
 
     async def test_post_search_uses_stream(self) -> None:
         calls: list[str] = []

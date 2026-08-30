@@ -6,7 +6,7 @@ import unittest
 
 from lca.contracts.models.core.llm import LLMResponse
 from lca.layer1_cognitive.brain.leaked_tool_call import recover_leaked_tool_calls
-from lca.layer1_cognitive.brain.llm_result import build_decision_from_response
+from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 
 
 class TestRecoverLeakedToolCall(unittest.TestCase):
@@ -28,9 +28,9 @@ class TestRecoverLeakedToolCall(unittest.TestCase):
         self.assertEqual(leftover, "PDF 已成功生成。")
         self.assertEqual(calls, [])
 
-    def test_llm_result_uses_recovered_call(self) -> None:
+    def test_decision_classifier_uses_recovered_call(self) -> None:
         text = '[Tool call: run_command]\n{"command":"officecli --version"}'
-        decision = build_decision_from_response(LLMResponse(text=text))
+        decision = DefaultDecisionClassifier().classify(LLMResponse(text=text))
         self.assertEqual(decision.action_type, "use_tool")
         self.assertEqual(decision.tool_calls[0].tool_name, "run_command")
         self.assertEqual(decision.tool_calls[0].arguments["command"], "officecli --version")

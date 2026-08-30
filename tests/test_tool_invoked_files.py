@@ -1,8 +1,12 @@
-"""ToolInvoked.files is the durable product channel (not result_preview JSON)."""
+"""ToolInvoked.files is the durable product channel.
+
+ADR-0101 PR-2:tool 事件 dataclass 不再带 ``result_preview`` /
+``plugin_state`` / ``_tool_output_preview``;输出走 ``output_ref``
+evidence 平面,文件元数据走 ``files`` typed 字段(永不截断)。
+"""
 
 from __future__ import annotations
 
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,17 +16,13 @@ from lca.contracts.models.observability.journal import (
     RunScope,
     StampedEvent,
     ToolInvoked,
-    run_scope,
 )
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.layer0_infra.file_store import LocalFileStore
 from lca.layer0_infra.observability import bind_backends, run_scope
 from lca.layer0_infra.tools.write_file import build_tools as build_write_file_tools
-from lca.layer1_cognitive.body.safe_executor import (
-    SimpleSafeExecutor,
-    _tool_output_preview,
-)
-from lca.layer1_cognitive.body.tool_result_preview import tool_files, tool_plugin_state
+from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
+from lca.layer1_cognitive.body.tool_result_preview import tool_files
 from tests.support.observability_helpers import make_test_bound
 
 
@@ -75,7 +75,9 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("previewHtml", files[0])
         self.assertEqual(files[0]["name"], "a.html")
 
-    def test_result_preview_stays_compact_with_large_streams(self) -> None:
+    def test_tool_files_handles_large_streams(self) -> None:
+        """files 是 typed 字段,AttributePolicy 不截断;大流可携带在
+        output_ref 平面。"""
         obs = Observation(
             observation_id="obs_1",
             success=True,
@@ -103,12 +105,14 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
                 ]
             },
         )
-        preview = _tool_output_preview(obs)
-        self.assertLess(len(preview), 2000)
-        parsed = json.loads(preview)
-        self.assertEqual(parsed["files"][0]["name"], "chart.png")
+        files = tool_files(obs)
+        # files 字段是 metadata-only,不携带 body
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]["name"], "chart.png")
 
     async def test_write_file_emits_structured_files_on_tool_invoked(self) -> None:
+        """ADR-0101 PR-2:writeFile 工具 emit ToolInvoked with ``files`` typed
+        field;输出数据走 ``output_ref``(evidence 平面),不落 disk 在 ``data``。"""
         collector = _Collector()
         hub = make_test_bound(projections=[collector])
         tool = build_write_file_tools(store=self.store)[0]
@@ -134,12 +138,9 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(len(inv.files), 1)
         self.assertEqual(inv.files[0]["name"], "report.md")
         self.assertTrue(inv.files[0].get("previewable"))
-        parsed = json.loads(inv.result_preview)
-        self.assertEqual(parsed["name"], "report.md")
-        self.assertNotIn("previewHtml", parsed)
 
     async def test_journal_does_not_truncate_files_field(self) -> None:
-        """files is non-string → AttributePolicy leaves it intact through record()."""
+        """files 是 typed 字段 → AttributePolicy 保留完整 tuple。"""
         collector = _Collector()
         hub = make_test_bound(projections=[collector])
         many = tuple(
@@ -158,7 +159,6 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
             record(
                 ToolInvoked(
                     tool_name="sandbox_execute",
-                    result_preview='{"stdout": "' + ("x" * 3000),
                     ok=True,
                     files=many,
                 )
@@ -167,61 +167,6 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(invoked), 1)
         self.assertEqual(len(invoked[0].files), 8)
         self.assertEqual(invoked[0].files[7]["name"], "chart_7.png")
-        # preview still truncated as a string
-        self.assertLessEqual(len(invoked[0].result_preview), 2010)
-
-    def test_tool_plugin_state_extracts_structured_state(self) -> None:
-        obs = Observation(
-            observation_id="obs_1",
-            success=True,
-            payload={
-                "text": "summary for llm",
-                "state": {
-                    "query": "today news",
-                    "resultNumbers": 2,
-                    "results": [
-                        {"title": "A", "url": "https://a.example", "content": "x" * 500},
-                        {"title": "B", "url": "https://b.example", "content": "y" * 500},
-                    ],
-                    "success": True,
-                },
-            },
-        )
-        state = tool_plugin_state(obs)
-        self.assertEqual(state["resultNumbers"], 2)
-        self.assertEqual(len(state["results"]), 2)
-        preview = _tool_output_preview(obs)
-        self.assertLess(len(preview), 2000)
-        parsed = json.loads(preview)
-        self.assertNotIn("state", parsed)
-
-    async def test_journal_preserves_plugin_state_through_policy(self) -> None:
-        collector = _Collector()
-        hub = make_test_bound(projections=[collector])
-        plugin_state = {
-            "query": "news",
-            "resultNumbers": 3,
-            "results": [
-                {"title": f"Hit {i}", "url": f"https://ex/{i}", "content": "z" * 400}
-                for i in range(3)
-            ],
-            "success": True,
-        }
-        with bind_backends(hub), run_scope(RunScope(trace_id="t", run_id="r")):
-            from lca.layer0_infra.observability import record
-
-            record(
-                ToolInvoked(
-                    tool_name="web_search",
-                    result_preview='{"text": "' + ("t" * 3000) + '"}',
-                    ok=True,
-                    plugin_state=plugin_state,
-                )
-            )
-        invoked = [s.event for s in collector.received if isinstance(s.event, ToolInvoked)]
-        self.assertEqual(len(invoked), 1)
-        self.assertEqual(len(invoked[0].plugin_state["results"]), 3)
-        self.assertEqual(invoked[0].plugin_state["results"][2]["url"], "https://ex/2")
 
 
 if __name__ == "__main__":

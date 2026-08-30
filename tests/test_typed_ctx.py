@@ -1,4 +1,5 @@
 """TypedContext Protocol — typed property accessor for cordis Context."""
+
 from __future__ import annotations
 
 from lca.contracts.typed_ctx import TypedContext

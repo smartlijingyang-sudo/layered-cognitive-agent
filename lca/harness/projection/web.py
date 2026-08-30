@@ -6,6 +6,10 @@ from typing import Any
 
 from lca.contracts.harness.session import SessionEvent
 
+# ADR-0098 D4: terminal Statuses 命中后 ActivityProjection.view 增加 terminal=True 标记
+# 仅字典多一字段,旧 client 只读 status/turn/error 不受影响
+_TERMINAL_STATUSES: frozenset[str] = frozenset({"completed", "failed", "canceled", "waiting_input"})
+
 
 class ConversationProjection:
     key = "conversation"
@@ -32,6 +36,49 @@ class ConversationProjection:
             "messages": list(state["messages"]),
             "last_assistant_message": state["last_assistant_message"],
         }
+
+
+class TaskProjection:
+    """Whole-value task view derived from the session event stream."""
+
+    key = "task"
+    version = 1
+
+    def init(self) -> dict[str, Any]:
+        return {
+            "task_id": None,
+            "session_id": None,
+            "objective": None,
+            "profile": None,
+            "status": "created",
+            "last_seq": -1,
+        }
+
+    def apply(self, state: dict[str, Any], event: SessionEvent) -> dict[str, Any]:
+        if event.seq <= state.get("last_seq", -1):
+            return state
+        if event.type in {"TaskCreated", "task.created.v1"}:
+            state.update(
+                {
+                    "task_id": event.data.get("task_id"),
+                    "session_id": event.session_id,
+                    "objective": event.data.get("objective"),
+                    "profile": event.data.get("profile"),
+                    "status": "created",
+                }
+            )
+        elif event.type in {"turn.started.v1", "task.started.v1"}:
+            if state.get("status") not in {"completed", "succeeded", "failed", "canceled"}:
+                state["status"] = "working"
+        elif event.type in {"turn.ended.v1", "task.completed.v1"}:
+            state["status"] = event.data.get("status", "completed")
+        elif event.type in {"run.failed.v1", "task.failed.v1"}:
+            state["status"] = "failed"
+        state["last_seq"] = event.seq
+        return state
+
+    def view(self, state: dict[str, Any]) -> dict[str, Any]:
+        return dict(state)
 
 
 class ActivityProjection:
@@ -64,6 +111,9 @@ class ActivityProjection:
             state["error"] = event.data.get("error")
         elif event.type == "command.rejected.v1":
             state["error"] = event.data.get("reason")
+        # ADR-0098 D4: 终止状态命中时打 terminal=True 标记
+        if state.get("status") in _TERMINAL_STATUSES:
+            state["terminal"] = True
         return state
 
     def view(self, state: dict[str, Any]) -> dict[str, Any]:

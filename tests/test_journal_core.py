@@ -19,15 +19,15 @@ from lca.contracts.models.observability.journal import (
     RunScope,
     StampedEvent,
     TeamRunStarted,
-    get_current_run_scope,
-    run_scope,
 )
 from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
 from lca.layer0_infra.observability import (
     RunStore,
     UnregisteredJournalEventError,
     bind_backends,
+    get_current_run_scope,
     record,
+    run_scope,
 )
 from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
 from tests.support.observability_helpers import make_test_bound

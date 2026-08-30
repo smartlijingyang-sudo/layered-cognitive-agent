@@ -10,15 +10,11 @@ scorers 不挂在这里 —— 走独立 ``score()`` 路径，由 facade 解析�
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from lca.contracts.models.observability.journal import JournalEvent, StampedEvent
-from lca.contracts.observability.ports import JournalBackend
+from lca.contracts.observability.event_descriptor_registry import EventDescriptorRegistry
+from lca.contracts.observability.ports import AttributePolicyBackend, JournalBackend
 from lca.layer0_infra.observability.journal.engine import RunStore
-
-if TYPE_CHECKING:
-    from lca.contracts.observability.ports import AttributePolicyBackend
-    from lca.contracts.protocols import JournalProjector
+from lca.layer0_infra.observability.projection_registry import EventProjection
 
 
 class MemoryJournal(JournalBackend):
@@ -28,16 +24,21 @@ class MemoryJournal(JournalBackend):
         self,
         *,
         policy: AttributePolicyBackend | None = None,
-        projections: tuple[JournalProjector, ...] = (),
+        projections: tuple[EventProjection, ...] = (),
+        descriptor_registry: EventDescriptorRegistry | None = None,
     ) -> None:
-        self._store = RunStore(policy=policy, projections=projections)
+        self._store = RunStore(
+            policy=policy,
+            projections=projections,
+            descriptor_registry=descriptor_registry,
+        )
 
     @property
     def store(self) -> RunStore:
-        """暴露 RunStore 给需要直接 append 的低层代码（如 DSH sink）。"""
+        """暴露 RunStore 给需要直接 append 的低层代码。"""
         return self._store
 
-    def with_projection(self, projection: JournalProjector) -> MemoryJournal:
+    def with_projection(self, projection: EventProjection) -> MemoryJournal:
         """返回追加 ``projection`` 后的新 MemoryJournal（原实例不变）。"""
         return MemoryJournal(
             policy=self._store.policy,

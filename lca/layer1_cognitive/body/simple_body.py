@@ -1,41 +1,34 @@
-"""SimpleBody —— 通过 ActionRegistry 分发行动。"""
+"""SimpleBody —— 通过显式 ``ActionRegistry`` 分发已获授权的行动。"""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any
 
-from lca.contracts.atoms.enums import ActionScope, ActionType
+from lca.contracts.atoms.enums import ActionType
 from lca.contracts.atoms.semantic_keys import OBS_DEGRADED_FROM
 from lca.contracts.models.core.decision import Decision, Observation
-from lca.contracts.models.core.execution import ExecutionEnvelope
 from lca.contracts.models.core.result import UnregisteredActionError
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols import (
-    AgentTransport,
-    Body,
-    SafeExecutor,
-    ToolRegistry,
-    TransportRegistryProtocol,
-)
+from lca.contracts.protocols import Body, SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.contracts.protocols.action import ActionRegistryProtocol
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
-from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
+from lca.layer0_infra.component_registry import RegistryKeyError
 from lca.layer1_cognitive.body.action_handlers import record_decision_made
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
 
 
 class SimpleBody(Body):
-    """Default ``Body`` implementation — dispatches actions via ``ActionRegistry``.
+    """Default ``Body`` implementation that dispatches a compiled action registry.
 
-    Resolves the ``action_type`` from a ``Decision`` through the
-    action registry and delegates execution to the registered
-    ``Action``.  Supports flexible construction: callers may inject
-    a pre-built ``ActionRegistry``, or provide ``ToolRegistry`` +
-    ``SafeExecutor`` and let the body build the registry automatically.
+    ``BodyComposer`` is the composition seam that derives the registry from a
+    compiled ``ActionAuthorityPlan``.  This class deliberately consumes that
+    completed registry only: it must not infer a scope, create default actions,
+    or turn dependencies into executable authority.  Tests use the same
+    explicit construction rule through ``tests.support.action_authority``.
 
     契约不变量（v3 §5.3 / §9.1 / PR6 / PR10）：
-    - ``act`` 必须收到 envelope；envelope 缺失 → ``UnregisteredActionError``。
+    - ``act`` 只分发已经由计划授权并注册的 ``action_type``。
+    - ``CommandEnvelope`` 是声明式执行链唯一的效果授权入口；Body 不再补造
+      旧的 ``ExecutionEnvelope``。
     - 协议边界派生事件：``ActionDegraded`` 在 ``act`` 末尾直接 ``record()``，
       不再走 hook 派生（v3 §4.4）。
     - ``finalize`` 是 Body finalize 钩子，OfficeWorksSealer 等手平面副作用
@@ -44,79 +37,52 @@ class SimpleBody(Body):
 
     def __init__(
         self,
-        tool_registry: ToolRegistry | None = None,
-        safe_executor: SafeExecutor | None = None,
-        transport_registry: TransportRegistryProtocol | None = None,
-        transport: AgentTransport | None = None,
-        action_registry: ActionRegistryProtocol | None = None,
+        tool_registry: ToolRegistry,
+        safe_executor: SafeExecutor,
+        transport_registry: TransportRegistryProtocol,
+        action_registry: ActionRegistryProtocol,
         *,
-        action_scope: ActionScope = ActionScope.SOLO,
         seal_office_works_fn: Callable[..., Any] | None = None,
     ) -> None:
-        if transport_registry is not None:
-            self.transport_registry = transport_registry
-        elif transport is not None:
-            registry = TransportRegistry()
-            registry.register(transport)
-            self.transport_registry = registry
-        else:
-            self.transport_registry = TransportRegistry()
+        """Create a Body from dependencies already closed by a composition seam.
 
-        if action_registry is not None:
-            self.action_registry = action_registry
-        elif tool_registry is not None and safe_executor is not None:
-            self.action_registry = build_default_action_registry(
-                tool_registry,
-                safe_executor,
-                self.transport_registry,
-                scope=action_scope,
-            )
-        else:
-            self.action_registry = ActionRegistry()
+        ``action_registry`` is intentionally required.  Having tools, a safe
+        executor, or a transport does not itself authorize an action; only the
+        compiled plan may grant that authority by constructing the registry.
+        """
 
+        self.transport_registry = transport_registry
+        self.action_registry = action_registry
         self.tool_registry = tool_registry
         self.safe_executor = safe_executor
         # v3 §9.2: OfficeWorksSealer 副作用点迁到 Body.finalize；
-        # 默认调用 layer0 的 seal_office_works，测试可注入替代。
+        # 测试可以注入替代实现。
         self._seal_office_works_fn = seal_office_works_fn
 
-    async def act(
-        self,
-        decision: Decision,
-        state: AgentState,
-        envelope: ExecutionEnvelope | None = None,
-    ) -> Observation:
-        """执行决策：分发到对应 ActionRegistry handler（v3 §9.1 / PR6）。
+    async def act(self, decision: Decision, state: AgentState) -> Observation:
+        """Execute a decision through its already-authorized action handler.
 
-        The protocol signature is ``(decision, state)``; the
-        ``envelope`` kwarg is reserved for PR6 callers that mint an
-        envelope upstream.  When omitted we mint a minimal envelope
-        from the first tool call so the body-side contract stays
-        closed.
+        Degradation emission (v3 §4.4 + §10) lives in
+        :func:`lca.layer2_runtime.event_emission._derive_action_degraded`,
+        which subscribes to ``HookEvent.POST_ACT`` and reads
+        ``observation.degraded_from`` that we surface here via
+        :meth:`_propagate_degradation`. Body never emits ``ActionDegraded``
+        directly.
         """
-        from lca.contracts.models.core.execution import envelope_from_decision
 
-        if envelope is None:
-            tool_calls = list(getattr(decision, "tool_calls", []) or [])
-            tool_name = tool_calls[0].tool_name if tool_calls else "unknown"
-            arguments = tool_calls[0].arguments if tool_calls else {}
-            envelope = envelope_from_decision(tool_name, arguments)
-        handler = self.action_registry.get(decision.action_type)
-        if handler is None:
-            raise UnregisteredActionError(decision.action_type)
+        try:
+            handler = self.action_registry.resolve(decision.action_type)
+        except (KeyError, RegistryKeyError) as exc:
+            raise UnregisteredActionError(decision.action_type) from exc
         record_decision_made(decision, state)
         observation = await handler.execute(decision, state)
-        observation = self._propagate_degradation(decision, observation)
-        self._maybe_record_action_degraded(decision, observation, state)
-        return observation
+        return self._propagate_degradation(decision, observation)
 
-    async def finalize(
-        self, observation: Observation, state: AgentState
-    ) -> None:
+    async def finalize(self, observation: Observation, state: AgentState) -> None:
         """手平面 finalize（v3 §9.2：OfficeWorksSealer 迁移点）。
 
         当前 turn 即将关闭（RESPOND / STOP / ASK_HUMAN）或到达预算上限时
-        触发；调用方在 _loop 内调用。
+        触发；调用方在声明式 stop phase 中调用。
         """
         from lca.contracts.models.core.budget import TERMINAL_RESERVE_STEPS
 
@@ -132,23 +98,15 @@ class SimpleBody(Body):
         if should_seal and self._seal_office_works_fn is not None:
             await self._seal_office_works_fn()
 
-    def _maybe_record_action_degraded(
-        self, decision: Decision, observation: Observation, state: AgentState
-    ) -> None:
-        """协议边界派生事件（v3 §4.4 + §10）。
-
-        Decision.degraded_from 不为空 + Observation.success=True → 由
-        ``lca.layer2_runtime.event_emission`` 派生 ``ActionDegraded``；
-        我们只保留溯源传播（``_propagate_degradation``），不再在 body
-        里直接 emit（边界守卫：单一发射点是 event_emission）。
-        """
-        # Emit path lives in event_emission; body is responsible for
-        # surfacing the degradation marker on Observation only.
-        return
-
     @staticmethod
     def _propagate_degradation(decision: Decision, observation: Observation) -> Observation:
-        """把决策的降级溯源传播到 Observation，供 hook 与终止策略观测。"""
+        """Surface the degradation marker on ``Observation`` for downstream emission.
+
+        The actual ``ActionDegraded`` journal event is emitted by
+        :func:`lca.layer2_runtime.event_emission._derive_action_degraded`
+        via the ``POST_ACT`` hook (v3 §4.4 + §10). Body is responsible only
+        for carrying the marker on the observation; it does not emit.
+        """
         if decision.degraded_from is None:
             return observation
         observation.degraded_from = decision.degraded_from

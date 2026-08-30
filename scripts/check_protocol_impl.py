@@ -63,6 +63,7 @@ class ProtocolInfo:
     name: str
     methods: frozenset[str]
     attrs: frozenset[str]
+    bases: frozenset[str]
     source_file: str
 
 
@@ -130,6 +131,11 @@ def _collect_protocols() -> list[ProtocolInfo]:
                         name=node.name,
                         methods=frozenset(methods),
                         attrs=frozenset(attrs),
+                        bases=frozenset(
+                            base
+                            for base in (_base_name(base_node) for base_node in node.bases)
+                            if base and base not in {"Protocol", "runtime_checkable"}
+                        ),
                         source_file=str(py.relative_to(_ROOT)),
                     )
                 )
@@ -184,6 +190,23 @@ def _collect_classes() -> list[ClassInfo]:
 _ALLOWLIST: set[tuple[str, str]] = {
     # ObservabilityHub 显式继承了 ObservabilityBackend，不会被检出。
     # 以下是有意的结构化匹配，无需显式继承：
+    # DeclarativeRuntimeDriver（lca/layer2_runtime/declarative_runtime.py）：
+    #   脚本按方法名同构匹配到 Runtime Protocol，但 run(state: Any) /
+    #   resume(checkpoint: DeclarativeCheckpoint) 与 Runtime.run(task, ctx, *,
+    #   max_steps, max_wall_clock_seconds, agent_role) / resume(snapshot, input,
+    #   max_steps) 签名不一致；前者是 PhaseGraph 解释器，后者是认知循环入口，
+    #   概念正交（ADR-0076 §一 Constitution / Execution 分面）。架构上
+    #   DeclarativeRuntimeDriver 不应继承 Runtime Protocol，避免误导读者以为
+    #   该 driver 可作 task 入口使用。
+    ("DeclarativeRuntimeDriver", "Runtime"),
+    # RunModeRegistry（lca/plugins/seam_definitions/run_mode_registry.py）：
+    #   脚本按方法名同构匹配到 ActionHandlerRegistry，但 register(adapter:
+    #   ModeAdapter) / resolve(model: str) / registered() -> tuple[RegisteredMode, ...]
+    #   与 ActionHandlerRegistry.register(action_type, handler) /
+    #   resolve(action_type) / registered() -> tuple[str, ...] 参数语义完全不同。
+    #   RunModeRegistry 没有对应 Protocol（plugin manifest 仅以字符串
+    #   implements=["RunModeRegistry"] 声明），属 ADR-0076 §六 独立 seam。
+    ("RunModeRegistry", "ActionHandlerRegistry"),
 }
 
 # 跳过名称含这些关键词的类（通常是 mock / stub / 测试辅助）
@@ -193,10 +216,35 @@ _SKIP_CLASS_PATTERNS = re.compile(
 )
 
 
-def _is_implicit_impl(cls: ClassInfo, proto: ProtocolInfo) -> bool:
+def _inherits_protocol(
+    base_names: list[str] | frozenset[str],
+    protocol_name: str,
+    protocols_by_name: dict[str, ProtocolInfo],
+) -> bool:
+    """Return whether a class base explicitly reaches a Protocol through inheritance."""
+    pending = list(base_names)
+    visited: set[str] = set()
+    while pending:
+        base = pending.pop()
+        if base == protocol_name:
+            return True
+        if base in visited:
+            continue
+        visited.add(base)
+        parent_protocol = protocols_by_name.get(base)
+        if parent_protocol is not None:
+            pending.extend(parent_protocol.bases)
+    return False
+
+
+def _is_implicit_impl(
+    cls: ClassInfo,
+    proto: ProtocolInfo,
+    protocols_by_name: dict[str, ProtocolInfo],
+) -> bool:
     """判断 cls 是否隐式实现了 proto（方法集全部覆盖但未继承）。"""
-    # 已经显式继承
-    if proto.name in cls.bases:
+    # 已经直接或经由子 Protocol 显式继承。
+    if _inherits_protocol(cls.bases, proto.name, protocols_by_name):
         return False
     # Protocol 方法非空且 cls 全部实现
     if not proto.methods:
@@ -226,7 +274,7 @@ def _is_implicit_impl(cls: ClassInfo, proto: ProtocolInfo) -> bool:
 def _extract_stem(protocol_name: str) -> str:
     """从 Protocol 名称提取核心词干。
 
-    ``DshRuntime`` → ``DshRuntime``, ``TeamStrategy`` → ``Team``,
+    ``TeamStrategy`` → ``Team``,
     ``ActionRegistryProtocol`` → ``ActionRegistry``.
     """
     stem = protocol_name.removesuffix("Protocol")
@@ -246,10 +294,11 @@ def main() -> int:
         print("⚠️  未找到任何 Protocol 定义", file=sys.stderr)
         return 2
 
+    protocols_by_name = {proto.name: proto for proto in protos}
     findings: list[tuple[ClassInfo, ProtocolInfo]] = []
     for cls in classes:
         for proto in protos:
-            if _is_implicit_impl(cls, proto):
+            if _is_implicit_impl(cls, proto, protocols_by_name):
                 findings.append((cls, proto))
 
     # 去重：同一 class 匹配多个 Protocol 时全部保留（可能实现多个接口）

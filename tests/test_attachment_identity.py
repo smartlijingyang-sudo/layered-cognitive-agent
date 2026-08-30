@@ -13,7 +13,7 @@ from lca.layer0_infra.attachment import (
     get_attachment_policy,
     reset_attachment_settings_for_tests,
 )
-from lca.layer0_infra.attachment.files_info import FilesInfoDocument
+from lca.layer0_infra.attachment.files_info import AttachmentManifest
 from lca.layer0_infra.attachment.layout import AttachmentLayout
 from lca.layer0_infra.attachment.settings import AttachmentPolicyDocument
 from lca.layer0_infra.file_store import LocalFileStore
@@ -34,7 +34,11 @@ class TestAttachmentPolicy(unittest.TestCase):
         self.assertTrue(policy.allows_inline("text/csv", "report.csv"))
         self.assertTrue(policy.allows_inline("application/json", "a.json"))
         self.assertTrue(policy.allows_inline("text/plain", "notes.md"))
-        self.assertFalse(policy.allows_inline("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "x.docx"))
+        self.assertFalse(
+            policy.allows_inline(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "x.docx"
+            )
+        )
         self.assertFalse(policy.allows_inline("image/png", "chart.png"))
 
 
@@ -54,9 +58,9 @@ class TestAttachmentLayout(unittest.TestCase):
         self.assertEqual(path, "/home/sandbox-user/.lca/inbox/run_42/report.md")
 
 
-class TestFilesInfoDocument(unittest.TestCase):
+class TestAttachmentManifest(unittest.TestCase):
     def test_empty_records_render_empty_string(self) -> None:
-        doc = FilesInfoDocument.from_records([])
+        doc = AttachmentManifest.from_records([])
         self.assertEqual(doc.render(), "")
 
     def test_document_emits_lobehub_files_info_block(self) -> None:
@@ -70,7 +74,7 @@ class TestFilesInfoDocument(unittest.TestCase):
                 content="# title",
             )
         ]
-        rendered = FilesInfoDocument.from_records(records).render()
+        rendered = AttachmentManifest.from_records(records).render()
         self.assertIn("<!-- SYSTEM CONTEXT (NOT PART OF USER QUERY) -->", rendered)
         self.assertIn("<files_info>", rendered)
         self.assertIn("here are user upload files", rendered)

@@ -1,9 +1,15 @@
 """LCA Framework — Layered Cognitive Agent.
 
-Public API::
-
-    from lca import Agent, Team, TeamLead, LeadMandate, Pipeline, FanOut, ...
+The root package exposes value types from ``contracts``.  Its optional
+``Agent`` / ``Team`` facade is resolved only for callers that explicitly ask
+for those composition-root symbols; importing a lower-layer submodule must
+not create a static dependency on ``layer4_app``.
 """
+
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
 
 from lca.contracts.models.team.team_coordination import (
     Debate,
@@ -33,16 +39,21 @@ __all__ = [
     "TeamSpec",
 ]
 
-_LAZY_LAYER4 = frozenset({"Agent", "Team", "TeamLead"})
+_LAZY_COMPOSITION_SYMBOLS = frozenset({"Agent", "Team", "TeamLead"})
 
 
-def __getattr__(name: str) -> object:
-    """Defer layer4 imports so ``lca.layer0_infra.*`` works in slim runtimes (DSH daemon)."""
-    if name not in _LAZY_LAYER4:
+def __getattr__(name: str) -> Any:
+    """Resolve composition-root symbols only for explicit public-facade access.
+
+    The import target intentionally remains behind this adapter.  Layered code
+    imports concrete submodules directly, while external callers can retain the
+    concise ``from lca import Agent`` form without making package initialisation
+    a reverse dependency edge.
+    """
+
+    if name not in _LAZY_COMPOSITION_SYMBOLS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from lca.layer4_app.api import Agent, Team, TeamLead
-
-    mapping = {"Agent": Agent, "Team": Team, "TeamLead": TeamLead}
-    value = mapping[name]
+    api = import_module("lca.layer4_app.api")
+    value = getattr(api, name)
     globals()[name] = value
     return value

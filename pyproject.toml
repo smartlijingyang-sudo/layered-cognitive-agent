@@ -20,12 +20,21 @@ dependencies = [
     "taiyi-cordis",
     "taiyi-cosmokit",
     "taiyi-schemastery",
+    "ulid-py>=1.0.0",
 ]
 
 [tool.uv.sources]
 taiyi-cordis      = { path = "vendor/cordis" }
 taiyi-cosmokit    = { path = "vendor/cosmokit" }
 taiyi-schemastery = { path = "vendor/schemastery" }
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["lca*", "gateway*"]
+exclude = ["tests*", "skills*", "roles*", "profiles*", "bundles*", "history*", "packages*", "deploy*", "vendor*"]
 
 [tool.importlinter]
 root_package = "lca"
@@ -140,6 +149,9 @@ web = [
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+# SKILL.md files embed Python code blocks; ruff 0.16+ misinterprets the file as
+# Python when the embedded block parses cleanly. Treat all .md as out of scope.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = [
@@ -170,23 +182,16 @@ ignore = [
 "tests/*" = ["S101"]
 "gateway/*" = ["TC002"]
 "scripts/*" = ["S101"]
-"scripts/check_locked_surface.py" = ["S603", "S607"]  # literal argv, git + ad-hoc CLI
-"scripts/port_classify.py" = ["S603", "S607"]  # git subprocess for commit enumeration
-"scripts/port_endstate.py" = ["S603", "S607"]  # git subprocess for end-state diff
-"scripts/port_apply.py" = ["S603", "S607"]  # git subprocess for patch generation + apply
-"tests/test_check_locked_surface.py" = ["S603", "S607"]  # CLI smoke fixtures
-"tests/test_port_classify.py" = ["S603", "S607"]
-"tests/test_port_endstate.py" = ["S603", "S607"]
-"tests/test_port_apply.py" = ["S603", "S607"]
 "lca/contracts/protocols/**/*.py" = ["ARG002"]
 "lca/contracts/mechanisms.py" = ["ARG002"]
 "lca/contracts/action.py" = ["ARG002"]
 "lca/layer0_infra/ops/cli.py" = ["B008", "S603"]  # typer defaults + tail logs
+"lca/layer0_infra/ops/commands/*.py" = ["B008", "S603"]  # typer defaults + tail logs
 "lca/layer0_infra/ops/config.py" = ["S105"]  # sudo_pass_file is a path, not a secret
 "lca/layer0_infra/ops/sudo.py" = ["S603"]  # privileged subprocess wrapper
 "lca/layer0_infra/ops/service.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for process management
 "lca/layer0_infra/ops/services/*.py" = ["S603", "S607", "S110", "SIM105"]  # subprocess for service management
-"lca/layer0_infra/dsh_core/session/*.py" = ["N815", "N802", "N803", "N806", "UP007"]  # 1:1 TS port
+"deploy/lobehub/engine.py" = ["S603", "S607"]  # git describe on .lobehub-upstream (controlled path)
 
 [tool.ruff.format]
 quote-style = "double"
@@ -198,10 +203,7 @@ warn_redundant_casts = true
 warn_return_any = true
 disallow_untyped_defs = true
 check_untyped_defs = true
-# lca/packages/* 是上游 deepseek-harness 的源码镜像，目录名带连字符（非合法 Python 包），
-# mypy 会静默跳过扫描整个 lca/ 并返回 0，导致类型检查实际失效。这里显式排除。
 exclude = [
-    "^lca/packages/.*",
     "^lca/contracts/protocols/.*",
     "^lca/layer0_infra/llm_adapter/openai_compat/.*",
 ]
@@ -242,3 +244,17 @@ exclude = [
     "lca/layer0_infra/llm_adapter/openai_compat/",
 ]
 ignore_names = ["n", "predicted_state", "version", "agent_card", "context_refs", "subtask"]
+
+[tool.lca.lint-checks]
+# Architecture / contract gates. Executed via pre-commit and standalone
+# ``uv run python <script>``. CI runs this list's newest ADR-0096 gate.
+checks = [
+    "scripts/check_protocol_impl.py",
+    "scripts/check_plugin_typing.py",
+    "scripts/check_no_any.py",
+    "scripts/check_no_bare_strings.py",
+    "scripts/check_assembly_purity.py",
+    "scripts/check_no_flat_runs.py",
+    "scripts/check_protocol_schema_version.py",
+    "scripts/check_patch_integrity.py",
+]

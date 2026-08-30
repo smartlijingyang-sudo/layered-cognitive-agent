@@ -13,6 +13,7 @@ from gateway.runs.execute import create_run_session, schedule_run
 from gateway.runs.session import RunRegistry, RunStatus
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
+from tests.support.gateway_scripted import ScriptedLLMResolver
 
 
 @pytest.fixture(autouse=True)
@@ -56,20 +57,29 @@ class _LazyHubAgent:
 
 @pytest.mark.asyncio
 async def test_execute_run_cancel_no_otel_detach_noise(caplog: pytest.LogCaptureFixture) -> None:
+    from lca.harness.profile.lifespan import profile_lifespan
+
     registry = RunRegistry()
-    session = create_run_session(registry, question="hang", user_text="hang", mode="solo")
-
-    with patch("gateway.runs.loop_drivers.build_solo_agent", return_value=_LazyHubAgent(session)):
-        task = schedule_run(registry, session)
-        await asyncio.sleep(0)
-        task.cancel()
-        with (
-            caplog.at_level(logging.ERROR, logger="opentelemetry.context"),
-            pytest.raises(asyncio.CancelledError),
+    async with profile_lifespan("profiles/web-standard.yaml") as state:
+        ctx = state["ctx"]
+        ctx.provide("llm_resolver", ScriptedLLMResolver())
+        session = create_run_session(
+            registry, question="hang", user_text="hang", mode="solo", ctx=ctx
+        )
+        with patch(
+            "gateway.plugins.default_modes.build_solo_agent",
+            return_value=_LazyHubAgent(session),
         ):
-            await task
+            task = schedule_run(registry, session, ctx=ctx)
+            await asyncio.sleep(0)
+            task.cancel()
+            with (
+                caplog.at_level(logging.ERROR, logger="opentelemetry.context"),
+                pytest.raises(asyncio.CancelledError),
+            ):
+                await task
 
-    # Hub was cleaned up by _finalize_run; check via the journal recorded before close
-    # Since _active_hubs is cleaned up, we verify via session state
-    assert session.status == RunStatus.CANCELED
-    assert not any("Failed to detach context" in r.message for r in caplog.records)
+        # Hub was cleaned up by _finalize_run; check via the journal recorded before close
+        # Since _active_hubs is cleaned up, we verify via session state
+        assert session.status == RunStatus.CANCELED
+        assert not any("Failed to detach context" in r.message for r in caplog.records)

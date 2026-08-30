@@ -23,7 +23,7 @@ from lca.layer0_infra.computer.guest import (
 from lca.layer0_infra.computer.office_plane import normalize_officecli_command
 from lca.layer0_infra.computer.op_result import ComputerOpResult, TerminalCapableSandbox
 from lca.layer0_infra.computer.sandbox_computer import normalize_sandbox_path
-from lca.layer0_infra.file_store import FileStore, get_default_file_store, persist_generated_files
+from lca.layer0_infra.file_store import FileStore, persist_generated_files
 from lca.layer0_infra.sandbox.factory import get_sandbox_policy
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
@@ -33,6 +33,59 @@ from lca.layer0_infra.workspace.deliverable import (
     is_office_publish_intent,
     visible_generated_files,
 )
+
+# ── Guest → wire-shape normaliser ───────────────────────────────────
+# ADR-0102: the on-guest SHELL/FILE scripts emit camelCase renderer
+# keys (the legacy LobeHub wire shape).  The RenderContracts in
+# ``lca.layer0_infra.tools.contract.sandbox_contracts`` declare snake_case
+# python keys.  This helper bridges the two at the seam so downstream
+# ``build_computer_observation`` does not need a second rename pass.
+_GUEST_KEY_RENAMES: dict[str, str] = {
+    "executionEnv": "execution_env",
+    "exitCode": "exit_code",
+    "errorKind": "error_kind",
+    "errorSummary": "error_summary",
+    "isBackground": "is_background",
+    "totalCount": "total_count",
+    "totalMatches": "total_matches",
+    "successCount": "success_count",
+    "directoryPath": "directory_path",
+    "totalCharCount": "total_char_count",
+    "totalLines": "total_lines",
+    "charCount": "char_count",
+    "startLine": "start_line",
+    "endLine": "end_line",
+    "fileType": "file_type",
+    "mimeType": "mime_type",
+    "bytesWritten": "bytes_written",
+    "linesAdded": "lines_added",
+    "linesDeleted": "lines_deleted",
+    "filePattern": "file_pattern",
+    "modifiedAfter": "modified_after",
+    "modifiedBefore": "modified_before",
+    "commandId": "command_id",
+    "createDirectories": "create_directories",
+    "replaceAll": "replace_all",
+}
+
+
+def _normalize_guest_state(state: dict[str, Any], *, tool_name: str = "") -> dict[str, Any]:
+    """Rename legacy camelCase guest keys to snake_case python keys.
+
+    ADR-0102: ``RenderContract.python_key`` is the SSOT.  The on-guest
+    scripts still emit camelCase (they predate ADR-0102).  Normalise in
+    place so downstream contracts can find what they expect.
+    """
+    if not isinstance(state, dict):
+        return state
+    for camel, snake in _GUEST_KEY_RENAMES.items():
+        if camel in state and snake not in state:
+            state[snake] = state.pop(camel)
+    # ``output`` is a stdout/stderr alias the guest uses; drop it so the
+    # contract's ``stdout`` field is the single source of truth.
+    if "stdout" in state and "output" in state:
+        state.pop("output", None)
+    return state
 
 _log = structlog.get_logger(__name__)
 
@@ -127,22 +180,30 @@ class ComputerRuntimeExecMixin:
             invocation_id=inv,
         )
         ok = exec_result.success
+        # ADR-0102: state is the Tool's wire-shape view.  Emit snake_case
+        # python keys matching the ``executeCode`` RenderContract (python_key
+        # 'stdout' / 'stderr' / 'exit_code' / 'execution_env' /
+        # 'error_summary' / 'error_kind').  Code stays in args; renderer
+        # reads ``pluginState.stdout`` for output.
         state: dict[str, Any] = {
             "success": ok,
             "language": lang,
-            "output": exec_result.stdout,
+            "stdout": exec_result.stdout,
             "stderr": exec_result.stderr,
-            "exitCode": exec_result.exit_code,
+            "exit_code": exec_result.exit_code,
+            "execution_env": "sandbox",
             "code": code,  # source code always visible in tool card
         }
         if not ok:
             state["error"] = exec_result.error_summary or exec_result.error
+            state["error_summary"] = exec_result.error_summary or exec_result.error
+            state["error_kind"] = exec_result.error_kind.value
 
         # Auto-store generated files so they have download URLs immediately.
         # This eliminates the need for a separate export_file call — files
         # produced in the sandbox are always accessible to the frontend.
         file_parts = _store_generated_file_parts(
-            get_default_file_store(),
+            self._store,
             visible_generated_files(exec_result.generated_files, tool_name="executeCode"),
         )
         if file_parts:
@@ -197,20 +258,27 @@ class ComputerRuntimeExecMixin:
             )
             json_ok = cli_json_success(terminal_result.stdout)
             ok = terminal_result.success if json_ok is None else json_ok
+            # ADR-0102: state is the Tool's wire-shape view.  Snake_case
+            # python keys matching the ``runCommand`` RenderContract.  The
+            # legacy ``output`` alias is dropped — renderer reads
+            # ``pluginState.stdout`` directly.  ``error_summary`` /
+            # ``error_kind`` surface ``SandboxExecResult`` annotations on
+            # failure (renderer uses them for the failure card).
             state: dict[str, Any] = {
                 "success": ok,
                 "command": command,
-                "executionEnv": "sandbox",
+                "execution_env": "sandbox",
                 "stdout": terminal_result.stdout,
                 "stderr": terminal_result.stderr,
-                "output": terminal_result.stdout or terminal_result.stderr,
-                "exitCode": terminal_result.exit_code,
-                "isBackground": False,
+                "exit_code": terminal_result.exit_code,
+                "is_background": False,
             }
             if not ok:
                 state["error"] = terminal_result.error or (
                     f"exit_code={terminal_result.exit_code}" if terminal_result.exit_code else ""
                 )
+                state["error_summary"] = terminal_result.error_summary or terminal_result.error
+                state["error_kind"] = terminal_result.error_kind.value
             generated = terminal_result.generated_files
             if is_office_publish_intent(tool_name="runCommand", command=command):
                 scanned = await runtime.scan_output_files(invocation_id=f"{inv}_office_pub")
@@ -218,7 +286,7 @@ class ComputerRuntimeExecMixin:
                     item for item in scanned if is_office_name(item.name)
                 )
             file_parts = _store_generated_file_parts(
-                get_default_file_store(),
+                self._store,
                 visible_generated_files(generated, tool_name="runCommand", command=command),
             )
             if file_parts:
@@ -237,14 +305,18 @@ class ComputerRuntimeExecMixin:
             timeout_s=timeout_s,
             invocation_id=inv,
         )
+        # ADR-0102: snake_case python keys on the guest path too.  The guest
+        # SHELL_SCRIPT still emits legacy camelCase; normalise here so
+        # ``runCommand`` produces a uniform shape regardless of dispatch.
+        _normalize_guest_state(guest.state, tool_name="runCommand")
         guest.state.setdefault("command", command)
-        guest.state.setdefault("executionEnv", "sandbox")
-        guest.state.setdefault("isBackground", False)
+        guest.state.setdefault("execution_env", "sandbox")
+        guest.state.setdefault("is_background", False)
         # Guest shell path uses execute() + artifact scanner; surface files.
         if guest.exec_result is not None and guest.exec_result.generated_files:
             generated = guest.exec_result.generated_files
             file_parts = _store_generated_file_parts(
-                get_default_file_store(),
+                self._store,
                 visible_generated_files(generated, tool_name="runCommand", command=command),
             )
             if file_parts:
@@ -262,11 +334,20 @@ class ComputerRuntimeExecMixin:
     async def get_command_output(
         self: _GuestOpHost, *, command_id: str, timeout_s: int = 60
     ) -> ComputerOpResult:
-        return await self._guest_op(build_background_poll_script(command_id=command_id))
+        guest = await self._guest_op(build_background_poll_script(command_id=command_id))
+        _normalize_guest_state(guest.state, tool_name="getCommandOutput")
+        # ``partial`` flag tells the renderer the background command is
+        # still streaming.  Renderer card shows "still running".
+        guest.state.setdefault("partial", bool(guest.state.get("running", False)))
+        guest.state.setdefault("command_id", command_id)
+        return guest
 
     async def kill_command(self: _GuestOpHost, *, command_id: str) -> ComputerOpResult:
         result = await self._guest_op(build_background_kill_script(command_id=command_id))
+        _normalize_guest_state(result.state, tool_name="killCommand")
+        result.state.setdefault("command_id", command_id)
         if result.success:
+            result.state.setdefault("killed", True)
             get_background_registry().mark_stopped(command_id)
         return result
 
@@ -276,6 +357,7 @@ class ComputerRuntimeExecMixin:
         _check_writable(path, get_sandbox_policy())
         normalized = normalize_sandbox_path(path, self.plane.root)
         read = await self._guest_op(build_read_bytes_script(path=normalized))
+        _normalize_guest_state(read.state, tool_name="exportFile")
         if not read.success:
             return read
         b64_raw = read.state.get("b64")
@@ -289,14 +371,16 @@ class ComputerRuntimeExecMixin:
             )
         data = base64.b64decode(b64_raw)
         filename = str(read.state.get("filename") or normalized.rsplit("/", 1)[-1] or "export.bin")
-        mime_type = str(read.state.get("mimeType") or "application/octet-stream")
+        mime_type = str(read.state.get("mime_type") or "application/octet-stream")
         stored = self._store.put(data=data, name=filename, mime_type=mime_type)
+        # ADR-0102: snake_case python keys matching the ``exportFile``
+        # RenderContract (filename / path / mime_type / size / download_url).
         state = {
             "success": True,
             "path": normalized,
             "filename": stored.name,
-            "downloadUrl": stored.url,
-            "mimeType": mime_type,
+            "download_url": stored.url,
+            "mime_type": mime_type,
             "size": stored.size_bytes,
         }
         sandbox_file = SandboxFile(name=filename, mime_type=mime_type, data=data)

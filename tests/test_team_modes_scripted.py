@@ -43,6 +43,7 @@ async def _boot_default_ctx_for_module() -> None:
     """Team/Agent construction needs a warm default plugin ctx (ADR-0062 PR-4)."""
     await ensure_default_ctx()
 
+
 # team 模式（board 治理探针）的期望
 MODE_EXPECT: dict[str, dict] = {
     "team": {

@@ -6,7 +6,7 @@ import asyncio
 import unittest
 from unittest.mock import MagicMock
 
-from lca.contracts.atoms.enums import ActionScope, RoleStatus
+from lca.contracts.atoms.enums import RoleStatus
 from lca.contracts.atoms.semantic_keys import (
     COMPLETION_PARTIAL,
     FAILURE_KIND,
@@ -36,7 +36,6 @@ from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_handlers import resolve_spec_timeout_s
-from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsultAllMembers
 from lca.layer1_cognitive.member_status import (
@@ -46,6 +45,7 @@ from lca.layer1_cognitive.member_status import (
     record_delegation_return,
 )
 from lca.layer1_cognitive.member_status.tracking import duty_consult
+from tests.support.action_authority import build_test_body
 
 
 def _noop_executor() -> MagicMock:
@@ -267,11 +267,10 @@ class TestTransportHarvest(unittest.IsolatedAsyncioTestCase):
                 )
 
         transport.register_agent("a", cooperative)
-        body = SimpleBody(
+        body = build_test_body(
             SimpleToolRegistry(),
             _noop_executor(),
-            transport_registry=_registry(transport),
-            action_scope=ActionScope.LEAD,
+            transport=_registry(transport),
         )
         state = _duty_state(roles=("a",), max_attempts=1)
         decision = Decision(

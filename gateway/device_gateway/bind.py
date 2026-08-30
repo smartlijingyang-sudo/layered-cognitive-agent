@@ -1,4 +1,4 @@
-"""DeviceRegistry → machine PlaneRef + transport."""
+"""Application-scoped device-to-machine resolution."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from gateway.device_gateway.models import Device
 from gateway.device_gateway.registry import DeviceRegistry
 from gateway.device_gateway.transport import DeviceTransport
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
+from lca.contracts.protocols.infra import MachineResolver, MachineTransport
 from lca.layer0_infra.plane.paths import outputs_under
 from lca.layer0_infra.sandbox.host_settings import load_host_settings
 
@@ -27,30 +28,21 @@ def plane_ref_for_device(device: Device) -> PlaneRef:
     )
 
 
-_hub: DeviceHub | None = None
+class DeviceMachineResolver(MachineResolver):
+    """Resolve machines from the DeviceRegistry owned by one Gateway app."""
 
+    def __init__(self, registry: DeviceRegistry, hub: DeviceHub) -> None:
+        self._registry = registry
+        self._hub = hub
 
-def device_hub() -> DeviceHub | None:
-    """Bound device hub (gateway process). Used by DSH streaming runtime."""
-    return _hub
-
-
-def bind_devices(registry: DeviceRegistry, hub: DeviceHub) -> None:
-    global _hub
-    _hub = hub
-    from lca.layer0_infra.plane.machine import (
-        set_machine_resolver,
-        set_machine_transport_resolver,
-    )
-
-    def _resolve(device_id: str | None) -> PlaneRef | None:
-        device = registry.select_online(device_id)
+    def resolve_machine(self, device_id: str | None = None) -> PlaneRef | None:
+        device = self._registry.select_online(device_id)
         if device is None:
             return None
         return plane_ref_for_device(device)
 
-    def _transport(device_id: str) -> DeviceTransport | None:
-        return DeviceTransport.for_device(registry, hub, device_id)
+    def resolve_transport(self, device_id: str) -> MachineTransport | None:
+        return DeviceTransport.for_device(self._registry, self._hub, device_id)
 
-    set_machine_resolver(_resolve)
-    set_machine_transport_resolver(_transport)
+
+__all__ = ["DeviceMachineResolver", "plane_ref_for_device"]

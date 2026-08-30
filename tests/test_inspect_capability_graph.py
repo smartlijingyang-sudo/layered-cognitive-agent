@@ -88,9 +88,7 @@ class TestInspectCapabilityGraph:
         assert graph.get("layer") == "service"
         assert graph.get("seam_key") == "agent.before_think"
 
-    def test_inspect_tree_loads_webstandard_yaml_without_crash(
-        self, tmp_path: Path
-    ) -> None:
+    def test_inspect_tree_loads_webstandard_yaml_without_crash(self, tmp_path: Path) -> None:
         """``inspect_tree`` MUST NOT crash on a minimal profile YAML.
 
         The previous CLI version referenced an undefined ``tree`` symbol

@@ -10,6 +10,11 @@ entries:
     $module: lca.plugins.perceive.service
     config: {}
 
+  - id: perceive.hub.sequential
+    name: perceive_hub_sequential
+    $module: lca.plugins.perceive.sequential_hub
+    config: {}
+
   - id: sensor.clock
     name: sensor_clock
     $module: lca.plugins.sensors.clock
@@ -44,6 +49,11 @@ entries:
   - id: gates
     name: gates
     $module: lca.plugins.gates.service
+    config: {}
+
+  - id: gates.chain.sequential
+    name: gates_chain_sequential
+    $module: lca.plugins.gates.chained
     config: {}
 
   - id: gate.repeat-tool-call
@@ -82,6 +92,28 @@ entries:
     $module: lca.plugins.registries.factory_seams
     config: {}
 
+  # ── Tool batch execution policy ──
+  # The segmented-safe default keeps each side-effecting call as an ordered
+  # barrier while allowing adjacent idempotent/read-only calls to overlap.
+  - id: lca-tool-batch-execution-policy
+    name: lca_tool_batch_execution_policy
+    $module: lca.plugins.providers.tool_batch_execution_policy
+    config:
+      mode: segmented_safe
+
+  # ── ADR-0074: Action handler registry + provider ──
+  # Tier-1 seam declares the action_handler_registry capability;
+  # Tier-2 provider supplies DefaultActionHandlerRegistry with 4 built-in handlers.
+  - id: lca-action-handler-registry-seam
+    name: lca_seam_action_handler_registry
+    $module: lca.plugins.seam_definitions.action_handler
+    config: {}
+
+  - id: lca-action-handler-provider
+    name: lca_action_handler_provider
+    $module: lca.plugins.providers.action_handlers
+    config: {}
+
   # ── Act / world plane ──
   - id: body.simple
     name: body_simple
@@ -93,10 +125,10 @@ entries:
     $module: lca.plugins.body.safe_executor
     config: {}
 
-  # ── Runtime primitives ──
-  - id: stop_rule.default
-    name: stop_rule_default
-    $module: lca.plugins.runtime.stop_rule
+  # ── State-cluster stop policy ──
+  - id: state.stop-policy.default
+    name: state_stop_policy_default
+    $module: lca.plugins.state.stop_policy
     config: {}
 
   - id: hook_registry.simple
@@ -104,16 +136,27 @@ entries:
     $module: lca.plugins.runtime.hook_registry
     config: {}
 
-  - id: middleware_registry.memory
-    name: middleware_registry_memory
-    $module: lca.plugins.runtime.middleware
+  - id: resume_input.human_answer
+    name: resume_input_human_answer
+    $module: lca.plugins.runtime.resume_input
     config: {}
 
   # ── Think internals (named factories consumed by brain factory) ──
+  - id: lca-brain-prompt-catalog-default
+    name: lca_brain_prompt_catalog_default
+    $module: lca.plugins.composer.prompt_catalog
+    config: {}
+
   - id: lca-reasoner-prompt
     name: lca_reasoner_prompt
     $module: lca.plugins.reasoner.prompt
     config: {}
+
+  - id: lca-reasoner-template-catalog-builtin
+    name: lca_reasoner_template_catalog_builtin
+    $module: lca.plugins.seam_definitions.reasoner_template_catalog
+    config:
+      template_names: [react_prompt, hierarchical_prompt, routing_prompt]
 
   - id: lca-critic-simple
     name: lca_critic_simple
@@ -129,7 +172,7 @@ entries:
   # ── Journal store (named factory; spawn instantiates per-run) ──
   - id: lca-journal-store
     name: lca_journal_store
-    $module: lca.plugins.journal_store
+    $module: lca.plugins.seam_definitions.journal_store
     config: {}
 
   # ── Run-loop driver registry (Tier-3) ─────────────
@@ -138,7 +181,7 @@ entries:
   # ``execution_target``.
   - id: lca-run-loop-driver-registry
     name: lca_run_loop_driver_registry
-    $module: lca.plugins.run_loop_driver_registry
+    $module: lca.plugins.loop_drivers.registry
     config:
       default: cognitive
 
@@ -148,30 +191,78 @@ entries:
   # are loaded; nothing in gateway hard-codes drivers.
   - id: lca-loop-cognitive
     name: lca_loop_cognitive
-    $module: lca.plugins.loop_cognitive
+    $module: gateway.plugins.cognitive_loop
     config:
       target: cognitive
-  # lca-loop-dsh is NOT loaded here: deployments that ship DSH opt in via
-  # bundles/loop-dsh.yaml in their profile. Avoids registering a driver
-  # whose runtime (DSH daemon) may not be deployed.
+  # Cognitive is the default loop driver; the bundle decides whether to load
+  # alternative loops alongside it.
 
-  # ── Compose-time named factories (DSH-style) ──────────
+  # This bridge is deliberately co-located with the selected ``agent_loop``.
+  # The base infrastructure bundle remains useful for tooling/observability-only
+  # profiles, which must not accidentally promise a Session Spine they cannot run.
+  - id: lca-session-live-builder-provider
+    name: lca_providers_session_live_builder
+    $module: lca.layer4_app.session_live_builder_provider
+    config: {}
+
+  # ── Plan-driven composers (one entry per capability plane) ─────────
+  # Each composer is independently replaceable through a profile patch. The
+  # default profile composes all four, while a specialized profile can replace
+  # one entry without taking ownership of neighboring graph contributions.
+  - id: lca-plan-brain-composer
+    name: lca_plan_brain_composer
+    $module: lca.plugins.composer.brain_provider
+    config: {}
+
+  - id: lca-plan-body-composer
+    name: lca_plan_body_composer
+    $module: lca.plugins.composer.body_provider
+    config: {}
+
+  - id: lca-plan-perceive-composer
+    name: lca_plan_perceive_composer
+    $module: lca.plugins.composer.perceive_provider
+    config: {}
+
+  - id: lca-plan-team-composer
+    name: lca_plan_team_composer
+    $module: lca.plugins.composer.team_provider
+    config: {}
+
+  # ── Compose-time named factories ──────────
   # Provide fresh capability service instances at compose time
   # so the composition root never instantiates concrete classes inline.
   - id: tools.compose_service
     name: tools_compose_service
-    $module: lca.plugins.tools_compose_service
+    $module: lca.plugins.compose.tools
     config: {}
 
   - id: transport.compose_service
     name: transport_compose_service
-    $module: lca.plugins.transport_compose_service
+    $module: lca.plugins.compose.transport
     config: {}
 
-  # ── Component discovery registry (ADR-0062 §7) ──
-  - id: lca.registries.component_registry
-    name: lca_registries_component_registry
-    $module: lca.plugins.registries.component_registry
+  # ── Component discovery registry (ADR-0062 §7 / ADR-0074 Phase 3) ──
+  # Tier-1 seam provides empty ComponentRegistry;
+  # Tier-2 contributors register one component each for independent substitution.
+  - id: lca-component-registry-seam
+    name: lca_component_registry_seam
+    $module: lca.plugins.seam_definitions.component_registry
+    config: {}
+
+  - id: lca-component-state-store-contributor
+    name: lca_component_state_store_contributor
+    $module: lca.plugins.providers.component_state_store
+    config: {}
+
+  - id: lca-component-memory-contributor
+    name: lca_component_memory_contributor
+    $module: lca.plugins.providers.component_memory
+    config: {}
+
+  - id: lca-component-budget-policy-contributor
+    name: lca_component_budget_policy_contributor
+    $module: lca.plugins.providers.component_budget_policy
     config: {}
 
   # ── Team strategy factories (ADR-0062 §7 / PR-4) ──
@@ -203,6 +294,29 @@ entries:
   - id: strategy.debate
     name: strategy_debate
     $module: lca.plugins.strategies.debate
+    config: {}
+
+  # ── Graph collaboration node primitives ──────────────────
+  # Traversal remains a closed DAG kernel; each concrete NodeType behavior is
+  # resolved through this Profile-selected registry before GraphStrategy runs.
+  - id: lca.graph-node-executor-registry
+    name: lca_graph_node_executor_registry
+    $module: lca.plugins.graph_nodes.registry
+    config: {}
+
+  - id: graph-node.agent.default
+    name: graph_node_agent_default
+    $module: lca.plugins.graph_nodes.agent
+    config: {}
+
+  - id: graph-node.aggregator.default
+    name: graph_node_aggregator_default
+    $module: lca.plugins.graph_nodes.aggregator
+    config: {}
+
+  - id: graph-node.topology.default
+    name: graph_node_topology_default
+    $module: lca.plugins.graph_nodes.topology
     config: {}
 
   - id: strategy.graph

@@ -242,13 +242,7 @@ from lca.contracts.protocols.run_mode import (
     RegisteredMode,
     RunModeRegistryProtocol,
 )
-from lca.contracts.models.core.stop import StopDecision, StopOutcome
-from lca.contracts.protocols.runtime import (
-    Runtime,
-    StopOutcomePolicy,
-    StopPolicy,
-    StopRule,
-)
+from lca.contracts.protocols.runtime import Runtime, StopPolicy
 from lca.contracts.protocols.runtime_composition import (
     CheckpointStateResolver,
     CheckpointStateResolverFactory,

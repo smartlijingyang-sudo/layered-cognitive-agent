@@ -11,7 +11,7 @@ from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDAT
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.tool import ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
-from lca.layer0_infra.file_store import FileStore, get_default_file_store
+from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.tools.builder import build_tools_from_manifest
 
 IDENTIFIER = "write-file"
@@ -51,8 +51,8 @@ MANIFEST = ToolManifest(
 
 
 class WriteFileExecutor:
-    def __init__(self, store: FileStore | None = None) -> None:
-        self._store = store if store is not None else get_default_file_store()
+    def __init__(self, store: FileStore) -> None:
+        self._store = store
 
     def validate(self, api_name: str, args: dict[str, Any]) -> str | None:
         return _validate(args)
@@ -125,5 +125,5 @@ def _validate(args: dict[str, Any]) -> str | None:
     return None
 
 
-def build_tools(store: FileStore | None = None) -> list[Tool]:
+def build_tools(store: FileStore) -> list[Tool]:
     return build_tools_from_manifest(MANIFEST, WriteFileExecutor(store))

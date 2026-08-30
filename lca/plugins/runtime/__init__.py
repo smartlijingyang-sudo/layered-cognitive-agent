@@ -1,1 +1,4 @@
-"""Named runtime primitive factory plugins (StopRule / hooks / middleware)."""
+"""Runtime support plugins for hooks, middleware, and resume input.
+
+The State-cluster StopPolicy Provider lives in ``lca.plugins.state``.
+"""

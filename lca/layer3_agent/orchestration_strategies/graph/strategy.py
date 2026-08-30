@@ -22,12 +22,12 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from lca.contracts.models.core.budget import create_budget
-from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
-from lca.contracts.models.core.state import AgentState, Budget
-from lca.contracts.models.team.graph import EdgeType, ExecutionGraph, GraphNode, NodeType
+from lca.contracts.models.core.state import AgentState
+from lca.contracts.models.team.graph import EdgeType, ExecutionGraph, GraphNode
 from lca.contracts.protocols import (
-    AgentUnit,
+    GraphNodeExecutionContext,
+    GraphNodeExecutorRegistryProtocol,
     StateStore,
     Synthesizer,
     TeamStage,
@@ -41,8 +41,6 @@ from lca.layer3_agent.orchestration_strategies.graph.topology import (
     compute_in_degree,
     resolve_successor,
 )
-
-_AGGREGATOR_TRACE_PREFIX = "graph-agg"
 
 
 @dataclass
@@ -74,11 +72,13 @@ class GraphStrategy(TeamStrategy):
         self,
         stage: TeamStage,
         execution_graph: ExecutionGraph,
+        node_executors: GraphNodeExecutorRegistryProtocol,
         state_store: StateStore | None = None,
         synthesizer: Synthesizer | None = None,
     ) -> None:
         self._stage = stage
         self._graph = execution_graph
+        self._node_executors = node_executors
         self._state_store = state_store
         self._synthesizer = synthesizer
 
@@ -87,7 +87,6 @@ class GraphStrategy(TeamStrategy):
         graph.validate()
         if graph.allow_cycle:
             raise ValueError("GraphStrategy 仅支持严格 DAG（allow_cycle=False)。")
-        member_map = {m.role_profile.role: m for m in self._stage.members}
         state = AgentState(trace_id=objective[:16], task=objective, budget=create_budget())
         in_degree = compute_in_degree(graph)
 
@@ -104,11 +103,9 @@ class GraphStrategy(TeamStrategy):
             if nid in es.executed or nid in es.skipped:
                 continue
             node = graph.nodes[nid]
-            if node.type == NodeType.AGGREGATOR:
-                es.aggregator_ids.add(nid)
-            await self._execute_node(node, graph, member_map, objective, state, es)
+            await self._execute_node(node, graph, objective, state, es)
             es.executed.add(nid)
-            await self._process_outgoing(nid, graph, state, es, member_map, objective)
+            await self._process_outgoing(nid, graph, state, es, objective)
 
         return await finalize_graph_result(
             objective, graph, es.results, es.aggregator_ids, self._synthesizer
@@ -120,7 +117,6 @@ class GraphStrategy(TeamStrategy):
         graph: ExecutionGraph,
         state: AgentState,
         es: GraphExecutionState,
-        member_map: dict[str, AgentUnit],
         objective: str,
     ) -> None:
         """处理节点出边：分类 → 条件求值 → 并行执行子树 → resolve 后继。
@@ -157,7 +153,7 @@ class GraphStrategy(TeamStrategy):
                 fixed.append(edge.target)
 
         if parallel:
-            await self._execute_parallel_branches(parallel, graph, state, es, member_map, objective)
+            await self._execute_parallel_branches(parallel, graph, state, es, objective)
         for target in fixed:
             resolve_successor(
                 graph,
@@ -176,7 +172,6 @@ class GraphStrategy(TeamStrategy):
         graph: ExecutionGraph,
         state: AgentState,
         es: GraphExecutionState,
-        member_map: dict[str, AgentUnit],
         objective: str,
     ) -> None:
         """并发执行并行分支，每个分支递归处理完整子树。"""
@@ -185,11 +180,9 @@ class GraphStrategy(TeamStrategy):
             if target_nid in es.executed or target_nid in es.skipped:
                 return
             node = graph.nodes[target_nid]
-            if node.type == NodeType.AGGREGATOR:
-                es.aggregator_ids.add(target_nid)
-            await self._execute_node(node, graph, member_map, objective, state, es)
+            await self._execute_node(node, graph, objective, state, es)
             es.executed.add(target_nid)
-            await self._process_outgoing(target_nid, graph, state, es, member_map, objective)
+            await self._process_outgoing(target_nid, graph, state, es, objective)
 
         await asyncio.gather(*[_run_branch(t) for t in targets], return_exceptions=True)
 
@@ -197,54 +190,25 @@ class GraphStrategy(TeamStrategy):
         self,
         node: GraphNode,
         graph: ExecutionGraph,
-        member_map: dict[str, AgentUnit],
         objective: str,
         state: AgentState,
         es: GraphExecutionState,
     ) -> None:
-        if node.type == NodeType.AGENT:
-            role = node.config.get("role", "")
-            member = member_map.get(role)
-            if member:
-                task = self._build_task_for_node(node, graph, objective, es)
-                es.results[node.id] = await self._stage.invoker.invoke(member, task)
-                if self._state_store:
-                    await self._state_store.save(state)
-            else:
-                es.results[node.id] = Result.failed(
-                    f"Graph node {node.id!r}: role {role!r} not found in team"
-                )
-        elif node.type == NodeType.AGGREGATOR:
-            preds = [e.source for e in graph.incoming(node.id)]
-            parts = [
-                str(es.results[p].output) for p in preds if p in es.results and es.results[p].output
-            ]
-            total_steps = sum(es.results[p].total_steps for p in preds if p in es.results)
-            es.results[node.id] = Result(
-                trace_id=_AGGREGATOR_TRACE_PREFIX,
-                status=TaskStatus.COMPLETED,
-                final_state_ref="",
-                total_steps=total_steps or 1,
-                budget_used=Budget(used_steps=total_steps or 1),
-                output="\n".join(parts),
-            )
+        """Delegate one node's behavior to its profile-selected primitive."""
 
-    @staticmethod
-    def _build_task_for_node(
-        node: GraphNode,
-        graph: ExecutionGraph,
-        objective: str,
-        es: GraphExecutionState,
-    ) -> str:
-        """构建节点任务：有前驱输出时拼接为上下文，否则使用原始 objective。"""
-        preds = [
-            e.source
-            for e in graph.incoming(node.id)
-            if e.source in es.results and es.results[e.source].output
-        ]
-        if not preds:
-            return objective
-        if len(preds) == 1:
-            return f"{objective}\n\nContext from previous step:\n{es.results[preds[0]].output}"
-        parts = [str(es.results[p].output) for p in preds]
-        return f"{objective}\n\nContext from previous steps:\n" + "\n---\n".join(parts)
+        executor = self._node_executors.resolve(node.type)
+        if executor.is_aggregator:
+            es.aggregator_ids.add(node.id)
+        result = await executor.execute(
+            GraphNodeExecutionContext(
+                node=node,
+                graph=graph,
+                objective=objective,
+                state=state,
+                stage=self._stage,
+                predecessor_results=es.results,
+                state_store=self._state_store,
+            )
+        )
+        if result is not None:
+            es.results[node.id] = result

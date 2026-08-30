@@ -198,7 +198,7 @@ def daemon_stop(ctx: PipelineContext) -> None:
 
 # ── Composite Steps ───────────────────────────────────────────────────
 
-STATUS_SERVICES = ("infra", "gateway", "lobehub", "daemon", "onlyboxes", "dsh")
+STATUS_SERVICES = ("infra", "gateway", "lobehub", "daemon", "onlyboxes")
 STOP_SERVICES = ("daemon", "lobehub", "gateway", "infra")
 
 

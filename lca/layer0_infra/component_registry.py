@@ -54,6 +54,16 @@ class NamedRegistry(NamedRegistryProtocol, Generic[_T]):
         self._entries: dict[str, _T] = {}
 
     def register(self, name: str, impl: _T) -> None:
+        """Register one named implementation without replacing an owner.
+
+        A ComponentRegistry is a discovery seam: choosing a replacement is a
+        profile-level decision, not an import-order side effect.  Rejecting a
+        duplicate here preserves the first provider for diagnosis and makes
+        an accidental second contributor fail at the interface where the
+        conflict occurs.
+        """
+        if name in self._entries:
+            raise KeyError(f"{self._REGISTRY_KIND}: entry {name!r} already registered")
         self._entries[name] = impl
 
     def get(self, name: str) -> _T | None:
@@ -91,31 +101,45 @@ class ComponentRegistry:
     def __init__(self) -> None:
         self._registries: dict[str, NamedRegistry[Any]] = {}
 
+    @staticmethod
+    def _category_key(category: str) -> str:
+        """Return the stable string key for a string-like category enum."""
+        value = getattr(category, "value", category)
+        return str(value)
+
     def _named(self, category: str) -> NamedRegistry[Any]:
-        registry = self._registries.get(category)
+        key = self._category_key(category)
+        registry = self._registries.get(key)
         if registry is None:
-            registry = NamedRegistry[Any](kind=category)
-            self._registries[category] = registry
+            registry = NamedRegistry[Any](kind=key)
+            self._registries[key] = registry
         return registry
 
     def register(self, category: str, name: str, impl: Any) -> None:
+        """Register one category-local implementation.
+
+        Names are unique within a category but may be reused across categories.
+        This preserves explicit replacement through profile selection while
+        preventing silent provider-order overrides inside one seam.
+        """
         self._named(category).register(name, impl)
 
     def get(self, category: str, name: str) -> Any | None:
         """软查询：找不到返回 None。"""
-        registry = self._registries.get(category)
+        registry = self._registries.get(self._category_key(category))
         return registry.get(name) if registry is not None else None
 
     def require(self, category: str, name: str) -> Any:
         """硬查询：找不到 raise RegistryKeyError（种类名为 category）。"""
-        registry = self._registries.get(category)
+        key = self._category_key(category)
+        registry = self._registries.get(key)
         impl = registry.get(name) if registry is not None else None
         if impl is None:
-            raise RegistryKeyError(name, category, self.list(category))
+            raise RegistryKeyError(name, key, self.list(key))
         return impl
 
     def list(self, category: str) -> _StrList:
-        registry = self._registries.get(category)
+        registry = self._registries.get(self._category_key(category))
         return registry.list() if registry is not None else []
 
     def list_categories(self) -> _StrList:

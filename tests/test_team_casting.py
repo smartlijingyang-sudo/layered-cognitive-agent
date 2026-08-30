@@ -28,6 +28,7 @@ from lca.layer4_app.casting import (
     parse_casting_output,
     repair_invalid_role_ids,
 )
+from lca.plugins.seam_definitions.team_casting_prompt_renderer import BuiltinCastingPromptRenderer
 from tests.harness.collector import InMemoryObservability
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
@@ -78,6 +79,12 @@ def _plan_json(
     return json.dumps(payload, ensure_ascii=False)
 
 
+def _caster() -> LLMTeamCaster:
+    """Build the standard caster with its explicit prompt-content dependency."""
+
+    return LLMTeamCaster(BuiltinCastingPromptRenderer())
+
+
 def _caster_llm(*responses: str) -> ScriptedLLMAdapter:
     from lca.contracts.models.core.llm import LLMResponse
 
@@ -92,7 +99,7 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
         llm = _caster_llm(
             _plan_json("board", ["strategy/lead", "product/pm"], lead_role_id="strategy/lead")
         )
-        plan = await LLMTeamCaster().cast("评估新方案", _FixedLibrary(), llm)
+        plan = await _caster().cast("评估新方案", _FixedLibrary(), llm)
         self.assertEqual(plan.governance_kind, "board")
         self.assertEqual(plan.lead_role_id, "strategy/lead")
         self.assertEqual([s.role_id for s in plan.selected], ["strategy/lead", "product/pm"])
@@ -104,7 +111,7 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
         llm = _caster_llm(
             _plan_json("pipeline", ["user-researcher", "product/product-manager"]),
         )
-        plan = await LLMTeamCaster().cast("做用户研究", library, llm)
+        plan = await _caster().cast("做用户研究", library, llm)
         self.assertEqual(
             [s.role_id for s in plan.selected],
             ["design/design-ux-researcher", "product/product-manager"],
@@ -116,7 +123,7 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
             _plan_json("pipeline", ["ghost/role", "product/pm"]),
             _plan_json("pipeline", ["marketing/content", "product/pm"]),
         )
-        plan = await LLMTeamCaster().cast("写发布稿", _FixedLibrary(), llm)
+        plan = await _caster().cast("写发布稿", _FixedLibrary(), llm)
         self.assertEqual([s.role_id for s in plan.selected], ["marketing/content", "product/pm"])
         self.assertEqual(len(llm.calls), 2)
 
@@ -126,7 +133,7 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
             _plan_json("pipeline", ["zzz/qqqqwwwweeee-xxxxyyyy", "zzz/another-nope-role"]),
         )
         with self.assertRaises(CastingError):
-            await LLMTeamCaster().cast("写发布稿", _FixedLibrary(), llm)
+            await _caster().cast("写发布稿", _FixedLibrary(), llm)
 
     async def test_cast_rejects_unknown_governance_kind(self) -> None:
         llm = _caster_llm(
@@ -134,7 +141,7 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
             _plan_json("hive_mind", ["product/pm", "strategy/lead"]),
         )
         with self.assertRaises(CastingError):
-            await LLMTeamCaster().cast("做方案", _FixedLibrary(), llm)
+            await _caster().cast("做方案", _FixedLibrary(), llm)
 
     async def test_cast_rejects_lead_kind_without_lead(self) -> None:
         llm = _caster_llm(
@@ -142,7 +149,7 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
             _plan_json("board", ["strategy/lead", "product/pm"]),
         )
         with self.assertRaises(CastingError):
-            await LLMTeamCaster().cast("做决策", _FixedLibrary(), llm)
+            await _caster().cast("做决策", _FixedLibrary(), llm)
 
     async def test_cast_rejects_coordination_with_lead(self) -> None:
         llm = _caster_llm(
@@ -150,7 +157,7 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
             _plan_json("pipeline", ["product/pm", "strategy/lead"], lead_role_id="strategy/lead"),
         )
         with self.assertRaises(CastingError):
-            await LLMTeamCaster().cast("接力任务", _FixedLibrary(), llm)
+            await _caster().cast("接力任务", _FixedLibrary(), llm)
 
     async def test_cast_rejects_single_role(self) -> None:
         llm = _caster_llm(
@@ -158,12 +165,12 @@ class TestLLMTeamCaster(unittest.IsolatedAsyncioTestCase):
             _plan_json("pipeline", ["product/pm"]),
         )
         with self.assertRaises(CastingError):
-            await LLMTeamCaster().cast("一个就够", _FixedLibrary(), llm)
+            await _caster().cast("一个就够", _FixedLibrary(), llm)
 
     async def test_cast_rejects_invalid_json(self) -> None:
         llm = _caster_llm("完全不是 JSON", "还是不是 JSON")
         with self.assertRaises(CastingError):
-            await LLMTeamCaster().cast("随便", _FixedLibrary(), llm)
+            await _caster().cast("随便", _FixedLibrary(), llm)
 
 
 class TestCastingRoleRepair(unittest.TestCase):
@@ -199,7 +206,11 @@ class TestBuildFromCastingPlan(unittest.TestCase):
             rationale="x",
         )
         team = build_from_casting_plan(
-            plan, _FixedLibrary(), ScriptedLLMAdapter(), observability=InMemoryObservability()
+            plan,
+            _FixedLibrary(),
+            ScriptedLLMAdapter(),
+            observability=InMemoryObservability(),
+            tools=(),
         )
         self.assertIsInstance(team, Team)
         governance = team.spec.governance
@@ -219,7 +230,11 @@ class TestBuildFromCastingPlan(unittest.TestCase):
             governance_kind="pipeline",
         )
         team = build_from_casting_plan(
-            plan, _FixedLibrary(), ScriptedLLMAdapter(), observability=InMemoryObservability()
+            plan,
+            _FixedLibrary(),
+            ScriptedLLMAdapter(),
+            observability=InMemoryObservability(),
+            tools=(),
         )
         self.assertIsInstance(team.spec.governance, Pipeline)
         self.assertEqual([m.profile.role for m in team.spec.members], ["产品经理", "内容专家"])

@@ -8,7 +8,7 @@ The Ralph Loop pattern is a patch-then-test cycle:
   → Act (test-run, patch-write, shell-exec)
   → Reflect ("测试通过了吗？patch 合理吗？")
   → Remember (episodic + semantic)
-  → Stop (StopRule)
+  → Stop (StopPolicy)
 
 The spec asserts that Ralph Loop is "完全覆盖，零新增原语" — every
 primitive is composed from the existing v3 vocabulary.  This test
@@ -21,7 +21,7 @@ The test deliberately drives the real primitive set:
 - ``InboxFactsSensor`` + ``WorkspaceArtifactsSensor`` + ``ClockSensor``
 - ``GateDecided`` → ``PolicyFact`` fold
 - ``ContextManifested`` emit
-- StopRule triggers budget exhaustion
+- StopPolicy triggers budget exhaustion
 
 The LLM is a ``ScriptedLLMAdapter`` that returns a deterministic
 sequence: test → patch → test → patch → respond.  No real LLM is
@@ -88,7 +88,7 @@ class TestRalphLoop:
                 InboxFactsSensor(store),
             ],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         state = AgentState(
             trace_id=new_id("trace"),
@@ -172,7 +172,7 @@ class TestRalphLoop:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         state = AgentState(
             trace_id=new_id("trace"),
@@ -258,7 +258,7 @@ class TestComplexScenarios:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         state = AgentState(
             trace_id=new_id("trace"),

@@ -15,10 +15,12 @@ from lca.contracts.protocols.operational_skills import (
     SkillNotFoundError,
     SkillPackageStore,
 )
-from lca.layer0_infra.file_store import FileStore, LocalFileStore, get_default_file_store
+from lca.layer0_infra.file_store import FileStore, LocalFileStore
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
 from lca.layer0_infra.skills.activation_scope import resolve_skill_for_exec
 from lca.layer0_infra.skills.exec_bootstrap import build_skill_exec_code
+from lca.layer0_infra.tools.contract.render import RenderContract, contract
+from lca.layer0_infra.tools.contract.schema import COMMON
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.sandbox_exec_observation import build_exec_observation
 from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invocation_id
@@ -26,6 +28,30 @@ from lca.layer0_infra.tools.tool_invocation_scope import get_current_tool_invoca
 RUN_SKILL_SCRIPT_TOOL = "run_skill_script"
 
 
+@contract(
+    RenderContract(
+        tool_name="run_skill_script",
+        identifier="lobe-skills",
+        api_name="execScript",
+        args=(
+            COMMON["command"],
+            COMMON["skill_id"],
+            COMMON["description"],
+            COMMON["timeout_s"],
+        ),
+        state=(
+            COMMON["execution_env"],
+            COMMON["files"],
+            COMMON["stdout"],
+            COMMON["stderr"],
+            COMMON["exit_code"],
+            COMMON["error_summary"],
+            COMMON["error_kind"],
+            COMMON["skill_id"],
+            COMMON["command"],
+        ),
+    )
+)
 class SkillExecTool(Tool):
     name = RUN_SKILL_SCRIPT_TOOL
     description = (
@@ -53,13 +79,11 @@ class SkillExecTool(Tool):
         *,
         sandbox: Sandbox,
         store: SkillPackageStore,
-        file_store: FileStore | LocalFileStore | None = None,
+        file_store: FileStore | LocalFileStore,
     ) -> None:
         self._sandbox = sandbox
         self._store = store
-        self._file_store: FileStore = (
-            file_store if file_store is not None else get_default_file_store()
-        )
+        self._file_store = file_store
 
     def validate(self, args: dict[str, Any]) -> str | None:
         command = args.get("command")

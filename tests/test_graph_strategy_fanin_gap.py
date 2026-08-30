@@ -15,7 +15,8 @@ from lca.contracts.protocols import LLMAdapter, TeamStage
 from lca.layer3_agent.member_invoke import TransportMemberInvoker
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
 from lca.layer4_app.api import Agent
-from lca.layer4_app.team_wiring import build_team_transport
+from lca.plugins.composer.team_transport import build_team_transport
+from tests.support.graph_node_executors import build_default_graph_node_executor_registry
 
 
 class _LLM(LLMAdapter):
@@ -71,7 +72,11 @@ class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):
         g.add_edge(GraphEdge(source="risk", target="exit"))
         transport = build_team_transport(members)
         stage = TeamStage(members=tuple(members), invoker=TransportMemberInvoker(transport))
-        result = await GraphStrategy(stage, execution_graph=g).run("launch")
+        result = await GraphStrategy(
+            stage,
+            execution_graph=g,
+            node_executors=build_default_graph_node_executor_registry(),
+        ).run("launch")
         self.assertEqual(result.status, TaskStatus.COMPLETED)
         out = result.output or ""
         self.assertIn("PRICE_RECOMMENDATION", out)

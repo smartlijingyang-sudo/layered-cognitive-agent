@@ -21,7 +21,7 @@ from lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector import 
 from lca.layer1_cognitive.brain.decision_gates.office_works_sealer import OfficeWorksSealer
 from lca.layer1_cognitive.brain.decision_gates.terminal_respond import TerminalRespondGate
 from lca.layer1_cognitive.brain.decision_gates.tool_loop_breaker import ToolLoopBreakerGate
-from lca.layer2_runtime.completion.artifact_closure import synthesize_artifact_closure
+from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
 
 
 class TestSafeBoundary:
@@ -205,6 +205,96 @@ class TestToolLoopBreakerGate:
         assert err in (out.response_text or "")
         assert "任务已完成" not in (out.response_text or "")
 
+    async def test_blocks_identical_successful_calls_without_progress(self) -> None:
+        gate = ToolLoopBreakerGate()
+        state = AgentState(trace_id="t", task="x", budget=Budget(max_steps=10), step=3)
+        for number in range(TOOL_LOOP_BREAK_THRESHOLD):
+            state.history.append(
+                Turn(
+                    decision=Decision(
+                        decision_id=f"d{number}",
+                        action_type="use_tool",
+                        rationale="poll",
+                        confidence=0.9,
+                        tool_calls=[
+                            ToolCall(
+                                call_id=f"c{number}",
+                                tool_name="tool_search",
+                                arguments={"query": "same query"},
+                            )
+                        ],
+                    ),
+                    observation=Observation(
+                        observation_id=f"o{number}",
+                        success=True,
+                        payload={"results": []},
+                    ),
+                )
+            )
+
+        out = await gate.enforce(
+            state,
+            Decision(
+                decision_id="next",
+                action_type="use_tool",
+                rationale="poll again",
+                confidence=0.9,
+                tool_calls=[
+                    ToolCall(
+                        call_id="next-call",
+                        tool_name="tool_search",
+                        arguments={"query": "same query"},
+                    )
+                ],
+            ),
+        )
+
+        assert out.action_type == "respond"
+        assert "相同参数连续返回相同结果" in (out.response_text or "")
+
+    async def test_allows_equivalent_calls_when_observations_show_progress(self) -> None:
+        gate = ToolLoopBreakerGate()
+        state = AgentState(trace_id="t", task="x", budget=Budget(max_steps=10), step=3)
+        for number in range(TOOL_LOOP_BREAK_THRESHOLD):
+            state.history.append(
+                Turn(
+                    decision=Decision(
+                        decision_id=f"d{number}",
+                        action_type="use_tool",
+                        rationale="poll",
+                        confidence=0.9,
+                        tool_calls=[
+                            ToolCall(
+                                call_id=f"c{number}",
+                                tool_name="job_status",
+                                arguments={"job_id": "job-1"},
+                            )
+                        ],
+                    ),
+                    observation=Observation(
+                        observation_id=f"o{number}",
+                        success=True,
+                        payload={"status": ["queued", "running", "complete"][number]},
+                    ),
+                )
+            )
+
+        decision = Decision(
+            decision_id="next",
+            action_type="use_tool",
+            rationale="read final status",
+            confidence=0.9,
+            tool_calls=[
+                ToolCall(
+                    call_id="next-call",
+                    tool_name="job_status",
+                    arguments={"job_id": "job-1"},
+                )
+            ],
+        )
+
+        assert await gate.enforce(state, decision) is decision
+
 
 class TestArtifactClosure:
     def test_synthesize_from_workspace(self) -> None:
@@ -214,7 +304,7 @@ class TestArtifactClosure:
             workspace = get_run_workspace()
             assert workspace is not None
             workspace.artifacts.record_file(name="a.pdf", mime_type="application/pdf")
-            text = synthesize_artifact_closure()
+            text = DefaultArtifactClosure().synthesize()
             assert text is not None
             assert "a.pdf" in text
 

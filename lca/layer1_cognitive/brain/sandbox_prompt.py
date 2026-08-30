@@ -12,7 +12,7 @@ from collections.abc import Sequence
 
 from lca.contracts.models.core.plane import PlaneKind
 from lca.contracts.protocols import Tool
-from lca.layer0_infra.file_store import FileStore, get_default_file_store
+from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.sandbox.prompt import render_cloud_sandbox_system_role
 from lca.layer0_infra.sandbox.surface import plane_system_role
 from lca.layer0_infra.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM_ID
@@ -24,13 +24,12 @@ _CLOUD_SANDBOX_TOOL_NAME = _CLOUD_SANDBOX_ID
 _LOCAL_SYSTEM_TOOL_NAME = _LOCAL_SYSTEM_ID
 
 
-def build_cloud_sandbox_prompt(tools: Sequence[Tool]) -> str:
+def build_cloud_sandbox_prompt(tools: Sequence[Tool], store: FileStore | None = None) -> str:
     """Computer-environment ``<tool>`` blocks. One per registered face."""
     names = {t.name for t in tools}
     blocks: list[str] = []
     cloud_values = {api.value for api in CLOUD_SANDBOX_APIS}
-    if any(name in cloud_values for name in names):
-        store: FileStore = get_default_file_store()
+    if any(name in cloud_values for name in names) and store is not None:
         template = load_builtin_prompt("cloud_sandbox_system_role")
         rendered = render_cloud_sandbox_system_role(template, store=store)
         blocks.append(_tool_block(_CLOUD_SANDBOX_TOOL_NAME, rendered))
@@ -43,14 +42,11 @@ def build_cloud_sandbox_prompt(tools: Sequence[Tool]) -> str:
 
 
 def _machine_role() -> str:
-    from lca.layer0_infra.plane.machine import resolve_machine
     from lca.layer0_infra.plane.resolve import ref_of
     from lca.layer0_infra.plane.scope import current_bindings
 
     bound = current_bindings()
     machine = ref_of(bound, PlaneKind.MACHINE) if bound is not None else None
-    if machine is None:
-        machine = resolve_machine()
     if machine is None:
         return (
             "You are operating on the user's machine. "

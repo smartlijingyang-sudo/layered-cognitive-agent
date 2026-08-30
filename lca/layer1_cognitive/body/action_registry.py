@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from lca.contracts.protocols.action import Action, ActionRegistryProtocol
-from lca.layer0_infra.component_registry import NamedRegistry
+from lca.layer0_infra.component_registry import NamedRegistry, RegistryKeyError
 
 
 class ActionRegistry(NamedRegistry[Action], ActionRegistryProtocol):
@@ -24,14 +24,28 @@ class ActionRegistry(NamedRegistry[Action], ActionRegistryProtocol):
 
     def register(self, action_type: str, handler: Action) -> None:
         """注册一个 Action 到指定 action_type。"""
+        if not action_type.strip():
+            raise ValueError("action_type must be non-empty")
         self._entries[action_type] = handler
         self._aliases[action_type] = action_type
 
     def get(self, action_type: str) -> Action | None:
         return self._entries.get(action_type)
 
+    def resolve(self, action_type: str) -> Action:
+        """Resolve aliases at the registry seam and fail with a stable error."""
+        canonical = self.normalize_alias(action_type)
+        handler = self.get(canonical)
+        if handler is None:
+            raise RegistryKeyError(action_type, self._REGISTRY_KIND, self.allowed_action_types())
+        return handler
+
     def register_alias(self, alias: str, canonical: str) -> None:
         """注册别名映射：alias → canonical action_type。"""
+        if not alias.strip() or not canonical.strip():
+            raise ValueError("alias and canonical must be non-empty")
+        if not self.is_registered(canonical):
+            raise RegistryKeyError(canonical, self._REGISTRY_KIND, self.allowed_action_types())
         self._aliases[alias] = canonical
 
     def allowed_action_types(self) -> list[str]:

@@ -25,8 +25,12 @@ class TransportRegistry(NamedRegistry[AgentTransport], TransportRegistryProtocol
 
     # 收窄参数：接受 AgentTransport 而非基类的 (name, impl) 对
     def register(self, transport: AgentTransport) -> None:  # type: ignore[override]
-        """注册一个 AgentTransport，key 取自 transport.protocol_name。"""
-        self._entries[transport.protocol_name] = transport
+        """注册一个 AgentTransport，key 取自 transport.protocol_name。
+
+        协议名的所有权由基础发现型注册表统一保护：同一协议的替换
+        必须在 Profile 的选择接缝完成，不能依赖 provider 的注册顺序。
+        """
+        super().register(transport.protocol_name, transport)
 
     def register_as(self, protocol_name: str, transport: AgentTransport) -> None:
         """显式指定 key 注册，校验 key 与 transport.protocol_name 一致。"""
@@ -35,7 +39,7 @@ class TransportRegistry(NamedRegistry[AgentTransport], TransportRegistryProtocol
                 f"protocol_name 不匹配: 注册 key={protocol_name!r}, "
                 f"但 transport 自报 protocol_name={transport.protocol_name!r}"
             )
-        self._entries[protocol_name] = transport
+        super().register(protocol_name, transport)
 
     def resolve(self, protocol: str) -> AgentTransport:
         """按 protocol 名解析传输实现，找不到抛 TransportNotFoundError。"""

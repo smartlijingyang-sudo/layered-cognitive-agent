@@ -1,4 +1,4 @@
-"""Pipeline-based SafeExecutor — DSH-inspired 五阶段管线集成。
+"""Pipeline-based SafeExecutor — 五阶段管线集成。
 
 将 SafeExecutor 的执行流程重构为五阶段管线：
 1. pre-execute: 权限检查、参数校验
@@ -7,7 +7,7 @@
 4. post-execute: 结果处理、缓存更新
 5. finalize: 纯函数变换（如日志脱敏）
 
-这个实现展示了如何将 DSH 的 Tool Pipeline 模式集成到 LCA 的架构中，
+这个实现展示了如何将 Tool Pipeline 模式集成到 LCA 的架构中，
 同时保持原有的功能（权限、校验、重试、缓存、Journal 记录）。
 
 关键设计决策：
@@ -23,6 +23,7 @@ import asyncio
 import json
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from typing import Any, cast
 
 import structlog
@@ -46,11 +47,6 @@ from lca.contracts.protocols.tool_pipeline import (
 )
 from lca.layer0_infra.tool_pipeline import DefaultToolExecutionPipeline
 from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
-from lca.layer1_cognitive.body.tool_result_preview import (
-    build_started_plugin_state,
-    compact_args_preview,
-    compact_payload_for_preview,
-)
 
 _log = structlog.get_logger("lca.safe_executor")
 
@@ -69,17 +65,6 @@ _DETERMINISTIC_EXCEPTIONS: tuple[type[BaseException], ...] = (
     OverflowError,
     ZeroDivisionError,
 )
-
-
-def _tool_output_preview(obs: Observation) -> str:
-    """工具结果预览（成功取紧凑 payload，失败取错误）。"""
-    if obs.success:
-        return json.dumps(
-            compact_payload_for_preview(obs.payload),
-            ensure_ascii=False,
-            default=str,
-        )
-    return obs.error or ""
 
 
 def _elapsed_ms(started: float) -> int:
@@ -128,7 +113,9 @@ class PipelineSafeExecutor(SafeExecutor):
         pipeline.add_pre_execute(self._pre_execute_check(tool))
         return pipeline
 
-    def _pre_execute_check(self, tool: Tool) -> Callable[[ToolExecutionContext], Awaitable[ToolPreDecision]]:
+    def _pre_execute_check(
+        self, tool: Tool
+    ) -> Callable[[ToolExecutionContext], Awaitable[ToolPreDecision]]:
         async def check(ctx: ToolExecutionContext) -> ToolPreDecision:
             return self._check_permission_and_args(tool, ctx.args)
 
@@ -169,8 +156,6 @@ class PipelineSafeExecutor(SafeExecutor):
         duplicating the emit here would violate the single-emission
         boundary guard.
         """
-        args_preview = compact_args_preview(args)
-        started_state = build_started_plugin_state(tool.name, args)
 
         with tool_invocation_scope(invocation_id):
             # 缓存检查
@@ -181,7 +166,6 @@ class PipelineSafeExecutor(SafeExecutor):
                 self._record_invoked(
                     tool,
                     args,
-                    args_preview,
                     cached,
                     latency_ms=0,
                     attempt=0,
@@ -209,7 +193,6 @@ class PipelineSafeExecutor(SafeExecutor):
                     self._record_invoked(
                         tool,
                         args,
-                        args_preview,
                         obs,
                         latency_ms=_elapsed_ms(started),
                         attempt=attempts_used,
@@ -224,7 +207,6 @@ class PipelineSafeExecutor(SafeExecutor):
                     self._record_invoked(
                         tool,
                         args,
-                        args_preview,
                         obs,
                         latency_ms=_elapsed_ms(started),
                         attempt=attempts_used,
@@ -243,7 +225,6 @@ class PipelineSafeExecutor(SafeExecutor):
                 self._record_invoked(
                     tool,
                     args,
-                    args_preview,
                     last_obs,
                     latency_ms=_elapsed_ms(started),
                     attempt=attempts_used,
@@ -264,12 +245,79 @@ class PipelineSafeExecutor(SafeExecutor):
         cache_config: CacheConfig,
         invocation_id: str = "",
     ) -> Observation:
-        """执行工具调用（通过管线）。"""
+        """执行工具调用（通过管线）。
+
+        PR-7 V4 hard constraint：mint_envelope() 在 stack trace
+        (architecture test 守护，scripts/check_command_envelope_required.py)。
+        RuntimeKernel owns the five compiled control gates before this Body
+        boundary.  This executor only records its local defensive checks and
+        must not present them as compiled ``act.*`` policy verdicts.
+        """
         invocation_id = invocation_id.strip() or new_id("inv")
 
+        from lca.contracts.models.observability.plan_ref import get_current_plan_ref
+        from lca.contracts.protocols.command_envelope import (
+            BudgetReservation,
+            CapabilityGrant,
+            command_envelope_to_dict,
+            mint_envelope,
+        )
+        from lca.layer0_infra.observability import get_current_run_scope
+
+        current_scope = get_current_run_scope()
+        scope_ref = (
+            str(current_scope.run_id) if current_scope and current_scope.run_id else "default"
+        )
+        plan_ref = get_current_plan_ref()
+        if not plan_ref:
+            raise ToolExecutionError("tool execution requires an active compiled plan_ref")
+        envelope = mint_envelope(
+            plan_ref=plan_ref,
+            scope_ref=scope_ref,
+            decision={"decision_id": invocation_id, "action_type": "use_tool"},
+            provider=_LegacyToolProvider.provider_id,
+            grant=CapabilityGrant(capability=tool.name, scope="turn", effect_class="tools"),
+            budget_reservation=BudgetReservation(tool_calls=1),
+            idempotency_key=f"{invocation_id}:{tool.name}",
+            metadata={"tool_name": tool.name},
+        )
+
+        # These are local compatibility safeguards.  They remain distinct from
+        # RuntimeKernel control-plan facts, which use the canonical ``act.*``
+        # vocabulary and are the only evidence accepted by envelope_is_authorized.
+        authorization = self._check_permission_and_args(tool, args)
+        if authorization.kind != "allow":
+            raise ToolExecutionError(authorization.reason or "authorization denied")
+        verdict_refs = ["executor.permission:allow"]
+
+        reservation = envelope.budget_reservation
+        if (
+            min(
+                reservation.tokens,
+                reservation.cost_cents,
+                reservation.wall_clock_ms,
+                reservation.tool_calls,
+            )
+            < 0
+        ):
+            raise ToolExecutionError("budget reservation must not be negative")
+        verdict_refs.append("executor.reservation:valid")
+
+        if envelope.grant.capability != tool.name or envelope.grant.effect_class != "tools":
+            raise ToolExecutionError(
+                "command envelope capability constraint rejected tool execution"
+            )
+        verdict_refs.append("executor.grant:valid")
+
+        if not envelope.plan_ref or not envelope.scope_ref:
+            raise ToolExecutionError("command envelope failed safe-boundary validation")
+
+        verdict_refs.append("executor.plan-boundary:valid")
         result = await self._pipeline_for(tool, retry_policy, cache_config).execute(
             tool.name, args, invocation_id=invocation_id
         )
+        verdict_refs.append("executor.pipeline:completed")
+        envelope = replace(envelope, policy_verdict_refs=tuple(verdict_refs))
 
         # 如果管线返回 deny，抛出异常
         if (
@@ -280,17 +328,24 @@ class PipelineSafeExecutor(SafeExecutor):
             raise ToolExecutionError(result.error)
 
         # 返回 Observation
+        envelope_evidence = command_envelope_to_dict(envelope)
         if result.ok and result.output:
-            return cast("Observation", result.output)
-        else:
-            # 构造失败的 Observation
-            return Observation(
-                observation_id=new_id("obs"),
-                success=False,
-                payload=None,
-                error=result.error or "Unknown error",
-                extra={FAILURE_KIND: FAILURE_KIND_EXECUTION},
-            )
+            observation = cast("Observation", result.output)
+            observation.extra["command_envelope"] = envelope_evidence
+            observation.extra["policy_verdict_refs"] = list(envelope.policy_verdict_refs)
+            return observation
+
+        return Observation(
+            observation_id=new_id("obs"),
+            success=False,
+            payload=None,
+            error=result.error or "Unknown error",
+            extra={
+                FAILURE_KIND: FAILURE_KIND_EXECUTION,
+                "command_envelope": envelope_evidence,
+                "policy_verdict_refs": list(envelope.policy_verdict_refs),
+            },
+        )
 
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:
         """单次执行（不含重试）。"""
@@ -341,12 +396,12 @@ class PipelineSafeExecutor(SafeExecutor):
     def _record_invoked(
         tool: Tool,
         args: dict[str, Any],
-        args_preview: str,
         obs: Observation,
         *,
         latency_ms: int,
         attempt: int,
         invocation_id: str,
+        arguments_ref: Any = None,
     ) -> None:
         """Journal: ToolInvoked。
 
@@ -359,11 +414,11 @@ class PipelineSafeExecutor(SafeExecutor):
         emit_tool_invoked(
             tool,
             args,
-            args_preview,
             obs,
             latency_ms=latency_ms,
             attempt=attempt,
             invocation_id=invocation_id,
+            arguments_ref=arguments_ref,
         )
 
 

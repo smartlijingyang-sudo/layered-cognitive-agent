@@ -23,6 +23,7 @@ def _g2a_factory(run: object | None = None) -> list:
         sandbox=bind.get("sandbox"),
         search=bind.get("search"),
         skill_store=bind.get("skill_store"),
+        machine_resolver=bind.get("machine_resolver"),
         fallback=False,
     )
 
@@ -39,4 +40,4 @@ def _g2a_factory(run: object | None = None) -> list:
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     if "g2a" in config.factories:
-        ctx.inject("tools").register_factory("g2a", _g2a_factory)
+        ctx.require("tools").register_factory("g2a", _g2a_factory)

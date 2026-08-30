@@ -6,6 +6,7 @@ import asyncio
 import time
 from collections.abc import Callable
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 from lca.contracts.harness.session import (
@@ -14,7 +15,8 @@ from lca.contracts.harness.session import (
     SessionHeader,
     event_type_of,
 )
-from lca.harness.session.persistence import JsonlSessionPersistence
+from lca.contracts.protocols.session_persistence import SessionPersistence
+from lca.harness.session.event_validation import validate_event_stream
 
 EventListener = Callable[[SessionEvent], None]
 
@@ -30,12 +32,13 @@ class SessionStore:
         self,
         header: SessionHeader,
         *,
-        persistence: JsonlSessionPersistence | None = None,
+        persistence: SessionPersistence | None = None,
         events: list[SessionEvent] | None = None,
     ) -> None:
         self._header = header
         self._persistence = persistence
         self._events: list[SessionEvent] = list(events or [])
+        validate_event_stream(self._events, session_id=header.id)
         self._seq = self._events[-1].seq if self._events else -1
         self._seq_lock = asyncio.Lock()
         self._listeners: list[EventListener] = []
@@ -52,6 +55,18 @@ class SessionStore:
 
     def subscribe(self, listener: EventListener) -> None:
         self._listeners.append(listener)
+
+    def persistence_path(self) -> Path | None:
+        """JSONL 落盘路径(测试与外部工具读取)。"""
+        if self._persistence is None:
+            return None
+        candidate = getattr(self._persistence, "path", None) or getattr(
+            self._persistence, "local_path", None
+        )
+        if candidate is None:
+            return None
+        result = candidate() if callable(candidate) else candidate
+        return Path(result) if not isinstance(result, Path) else result
 
     async def append(
         self,
@@ -90,8 +105,8 @@ class SessionStore:
         return tuple(self._events)
 
     @classmethod
-    def load(cls, persistence: JsonlSessionPersistence) -> SessionStore:
+    def load(cls, persistence: SessionPersistence) -> SessionStore:
         header, events = persistence.load()
         if header is None:
-            raise FileNotFoundError(f"no session header in {persistence.path}")
+            raise FileNotFoundError("no session header in configured persistence backend")
         return cls(header, persistence=persistence, events=events)

@@ -182,10 +182,7 @@ def diagnose_loop_stuck(
 
     recent = tool_events[-window:]
     tool_names = [cast("ToolInvoked", e.event).tool_name for e in recent]
-    repeats = sum(
-        1 for i in range(1, len(tool_names))
-        if tool_names[i] == tool_names[i - 1]
-    )
+    repeats = sum(1 for i in range(1, len(tool_names)) if tool_names[i] == tool_names[i - 1])
     if repeats >= window - 1:
         warnings = [e for e in gate_events if cast("GateDecided", e.event).verdict == "warn"]
         if not warnings:

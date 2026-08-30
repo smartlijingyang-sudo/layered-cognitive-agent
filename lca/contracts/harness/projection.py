@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
+
+from lca.contracts.harness.session import SessionEvent
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,21 @@ class ProjectionRegistry(Protocol):
 
     def snapshot(self, session_id: str) -> ProjectionSnapshot: ...
 
-    def subscribe_changes(
-        self, listener: Callable[[ProjectionChange], None]
-    ) -> Any: ...
+    def subscribe_changes(self, listener: Callable[[ProjectionChange], None]) -> Any: ...
+
+
+class SessionProjectionRegistry(ProjectionRegistry, Protocol):
+    """Projection registry with the lifecycle operations required by Session Spine."""
+
+    def bind_session(self, session_id: str) -> None: ...
+
+    def on_event(self, event: SessionEvent) -> None: ...
+
+    def replay(self, session_id: str, events: list[SessionEvent]) -> None: ...
+
+
+@runtime_checkable
+class SessionProjectionRegistryFactory(Protocol):
+    """Create the selected projection registry and its declared default views."""
+
+    def create(self) -> SessionProjectionRegistry: ...

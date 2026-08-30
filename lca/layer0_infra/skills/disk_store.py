@@ -1,4 +1,4 @@
-"""Disk-backed SkillPackageStore — content-addressed install tree."""
+"""Disk-backed SkillPackageInstaller — content-addressed install tree."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from lca.contracts.protocols.operational_skills import (
     SkillIndexEntry,
     SkillNotFoundError,
     SkillPackage,
+    SkillPackageInstaller,
     SkillPackageStore,
 )
 from lca.layer0_infra.skills.frontmatter import skill_title, split_frontmatter
@@ -36,12 +37,12 @@ def content_hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-class DiskSkillPackageStore(SkillPackageStore):
-    """Persist skill packages under ``settings.cache_dir/<skill_id>/``."""
+class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
+    """实现完整安装接缝，并持久化技能包到 ``settings.cache_dir/<skill_id>/``。"""
 
     def __init__(self, settings: SkillSettings | None = None) -> None:
         self._settings = settings if settings is not None else get_skill_settings()
-        self._root = self._settings.cache_dir.expanduser()
+        self._root: Path = self._settings.cache_dir.expanduser()
         self._root.mkdir(parents=True, exist_ok=True)
 
     @property

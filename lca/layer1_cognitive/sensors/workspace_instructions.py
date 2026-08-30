@@ -25,9 +25,7 @@ class WorkspaceInstructionsSensor(Sensor):
         *,
         path: Path | str | None = None,
     ) -> None:
-        self._path = (
-            Path(path) if path is not None else DEFAULT_AGENTS_MD_PATH
-        )
+        self._path = Path(path) if path is not None else DEFAULT_AGENTS_MD_PATH
 
     async def read(self, state: AgentState) -> list[ContextItem]:
         del state

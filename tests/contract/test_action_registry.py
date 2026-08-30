@@ -8,15 +8,14 @@ from __future__ import annotations
 
 import pytest
 
-from lca.contracts.atoms.enums import ActionScope
 from lca.contracts.models.team.role_team import ToolPermissionManifest
 from lca.layer0_infra.component_registry import RegistryKeyError
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
-from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
+from tests.support.action_authority import build_test_action_registry
 
 
 def _build_registry() -> ActionRegistry:
@@ -24,7 +23,11 @@ def _build_registry() -> ActionRegistry:
     safe_exec = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
     transport_reg = TransportRegistry()
     transport_reg.register(InternalTransport())
-    return build_default_action_registry(tool_reg, safe_exec, transport_reg, scope=ActionScope.LEAD)
+    return build_test_action_registry(
+        tools=tool_reg,
+        safe_executor=safe_exec,
+        transport=transport_reg,
+    )
 
 
 class TestActionRegistryCompleteness:

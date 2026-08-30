@@ -5,11 +5,12 @@ from __future__ import annotations
 import unittest
 
 from gateway.runs.identity import default_agent_ref, parse_agent_ref
-from gateway.runs.live import LiveTail
 from gateway.runs.session import RunRegistry, RunSession, RunStatus, run_dedup_key
-from lca.contracts.models.observability.journal import (
+from lca.contracts.atoms.ids import RunId, TraceId
+from lca.contracts.models.observability.journal import RunScope
+from lca.layer0_infra.observability.journal.live_tail import LiveTail
+from lca.layer0_infra.observability.run_context import (
     TEAM_CONTAINER_ROLE,
-    RunScope,
     adopt_run_scope,
     run_scope,
 )
@@ -68,7 +69,7 @@ class TestDefaultAgentRef(unittest.TestCase):
 
 class TestAdoptRunScope(unittest.TestCase):
     def test_claims_allocated_root(self) -> None:
-        allocated = RunScope(trace_id="trace_http", run_id="run_http")
+        allocated = RunScope(trace_id=TraceId("trace_http"), run_id=RunId("run_http"))
         with run_scope(allocated):
             scope, is_root = adopt_run_scope(role="助手")
         self.assertTrue(is_root)
@@ -77,7 +78,11 @@ class TestAdoptRunScope(unittest.TestCase):
         self.assertEqual(scope.agent_role, "助手")
 
     def test_nested_actor_mints_child(self) -> None:
-        claimed = RunScope(trace_id="t", run_id="run_http", agent_role=TEAM_CONTAINER_ROLE)
+        claimed = RunScope(
+            trace_id=TraceId("t"),
+            run_id=RunId("run_http"),
+            agent_role=TEAM_CONTAINER_ROLE,
+        )
         with run_scope(claimed):
             scope, is_root = adopt_run_scope(role="研究员")
         self.assertFalse(is_root)
@@ -91,3 +96,15 @@ class TestAdoptRunScope(unittest.TestCase):
         self.assertTrue(scope.run_id)
         self.assertEqual(scope.agent_role, "助手")
         self.assertIsNone(scope.parent_run_id)
+
+    def test_resume_scope_reuses_trace_and_links_source_run(self) -> None:
+        scope, is_root = adopt_run_scope(
+            role="助手",
+            trace_id=TraceId("trace-paused"),
+            parent_run_id=RunId("run-paused"),
+        )
+
+        self.assertFalse(is_root)
+        self.assertEqual(scope.trace_id, "trace-paused")
+        self.assertNotEqual(scope.run_id, "run-paused")
+        self.assertEqual(scope.parent_run_id, "run-paused")

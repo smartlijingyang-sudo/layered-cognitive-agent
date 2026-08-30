@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""CI 15.4：校验 CognitiveRuntime._loop 调用顺序符合 ADR-0002。
+"""CI 15.4: verify the declarative C1 phase order.
 
-期望序列（相对顺序，按源码行号）：
-  perceive_and_retrieve | perceive
-  → think
-  → act
-  → reflect
-  → update_multi_level | update
-  → stop_rule.decide  (StopRule; may also call outcome resolve internally)
+The legacy ``CognitiveRuntime._loop`` is intentionally absent.  The order is
+validated at the declarative boundary: the canonical phase enum order and the
+phase-graph compiler's ``for phase in SemanticPhase`` projection.
 """
 
 from __future__ import annotations
@@ -17,70 +13,74 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LOOP_FILE = ROOT / "lca" / "layer2_runtime" / "runtime_loop.py"
-
-EXPECTED_STEPS: list[tuple[str, frozenset[str]]] = [
-    ("perceive", frozenset({"perceive_and_retrieve", "perceive"})),
-    ("think", frozenset({"think"})),
-    ("act", frozenset({"act"})),
-    ("reflect", frozenset({"reflect"})),
-    ("update", frozenset({"update_multi_level", "update"})),
-    ("stop", frozenset({"decide", "resolve"})),
-]
-
-
-def _attr_name(func: ast.AST) -> str | None:
-    if isinstance(func, ast.Attribute):
-        return func.attr
-    if isinstance(func, ast.Name):
-        return func.id
-    return None
+RUNTIME_FILE = ROOT / "lca" / "layer2_runtime" / "runtime_loop.py"
+SEMANTIC_PHASE_CONTRACT_FILE = ROOT / "lca" / "contracts" / "protocols" / "declarative_common.py"
+PHASE_GRAPH_COMPILER_FILE = ROOT / "lca" / "harness" / "declarative" / "phase_graph_compiler.py"
+EXPECTED_PHASES = (
+    "perceive",
+    "think",
+    "act",
+    "reflect",
+    "remember",
+    "stop",
+)
 
 
-def _collect_calls_in_order(func: ast.AsyncFunctionDef | ast.FunctionDef) -> list[tuple[int, str]]:
-    """按源码行号收集函数体内的调用名。"""
-    found: list[tuple[int, str]] = []
-    for node in ast.walk(func):
-        if not isinstance(node, ast.Call):
+def _semantic_phase_order(path: Path) -> tuple[str, ...]:
+    """Read the canonical enum order from the typed contract."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef) or node.name != "SemanticPhase":
             continue
-        name = _attr_name(node.func)
-        if name is None:
-            continue
-        found.append((node.lineno, name))
-    found.sort(key=lambda x: x[0])
-    return found
+        values: list[str] = []
+        for member in node.body:
+            if not isinstance(member, ast.Assign):
+                continue
+            if len(member.targets) != 1 or not isinstance(member.targets[0], ast.Name):
+                continue
+            value = member.value
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                values.append(value.value)
+        return tuple(values)
+    raise ValueError("SemanticPhase enum not found")
+
+
+def _has_legacy_loop(path: Path) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return any(
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "_loop"
+        for node in ast.walk(tree)
+    )
+
+
+def _has_phase_iteration(path: Path) -> bool:
+    """Accept explicit loops and equivalent comprehension projections over the enum."""
+
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return any(
+        isinstance(node, (ast.For, ast.comprehension))
+        and isinstance(node.iter, ast.Name)
+        and node.iter.id == "SemanticPhase"
+        for node in ast.walk(tree)
+    )
 
 
 def main() -> int:
-    source = LOOP_FILE.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=str(LOOP_FILE))
-    loop_func: ast.AsyncFunctionDef | ast.FunctionDef | None = None
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "_loop":
-            loop_func = node
-            break
-    if loop_func is None:
-        print("FAIL: 未找到 CognitiveRuntime._loop")
+    if _has_legacy_loop(RUNTIME_FILE):
+        print("FAIL: legacy CognitiveRuntime._loop is still present")
         return 1
-
-    ordered = _collect_calls_in_order(loop_func)
-    calls = [name for _, name in ordered]
-    cursor = 0
-    matched: list[str] = []
-    for step_name, aliases in EXPECTED_STEPS:
-        found_at = None
-        for i in range(cursor, len(calls)):
-            if calls[i] in aliases:
-                found_at = i
-                break
-        if found_at is None:
-            print(f"FAIL: _loop 中未找到步骤 {step_name}（期望调用 {sorted(aliases)}）")
-            print(f"  实际调用序列: {calls}")
-            return 1
-        matched.append(step_name)
-        cursor = found_at + 1
-
-    print(f"OK: cognitive loop order = {' → '.join(matched)}")
+    try:
+        phases = _semantic_phase_order(SEMANTIC_PHASE_CONTRACT_FILE)
+    except (OSError, SyntaxError, ValueError) as exc:
+        print(f"FAIL: {exc}")
+        return 1
+    if phases != EXPECTED_PHASES:
+        print(f"FAIL: declarative phase order = {phases}")
+        return 1
+    if not _has_phase_iteration(PHASE_GRAPH_COMPILER_FILE):
+        print("FAIL: phase-graph compiler does not iterate the canonical SemanticPhase order")
+        return 1
+    print(f"OK: declarative cognitive loop order = {' → '.join(phases)}")
     return 0
 
 

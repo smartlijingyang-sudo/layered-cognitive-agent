@@ -29,7 +29,7 @@ from lca.contracts.models.core.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
-from lca.contracts.protocols.cognition import SensorDisabled
+from lca.contracts.protocols.cognition import SensorDisabledError
 from lca.layer0_infra.observability import record_runtime
 from lca.layer1_cognitive.brain.context_manifest import (
     build_manifest_from_items,
@@ -86,7 +86,7 @@ class SequentialPerceiveHub(PerceiveHub):
         for sensor in self._sensors:
             try:
                 items.extend(await sensor.read(state))
-            except SensorDisabled:
+            except SensorDisabledError:
                 continue
             except Exception as exc:
                 _log.warning(
@@ -104,11 +104,11 @@ class SequentialPerceiveHub(PerceiveHub):
                 )
                 continue
 
-        # 2. Memory adapter (per spec §5.5): records, not raw state.
+        # 2. Memory adapter (per spec §5.5): consume its returned state value.
         if self._memory is not None:
             try:
-                await self._memory.perceive(state)
-                items.extend(_memory_items(state))
+                memory_state = await self._memory.perceive(state)
+                items.extend(_memory_items(memory_state))
             except Exception as exc:
                 _log.warning("memory_perceive_failed", error=str(exc))
                 record_runtime(
@@ -129,7 +129,7 @@ class SequentialPerceiveHub(PerceiveHub):
 
 
 def _memory_items(state: AgentState) -> list[ContextItem]:
-    """Fold state.retrieved_context into a single ``memory`` item."""
+    """Fold the memory protocol's returned retrieval context into one item."""
     if not state.retrieved_context:
         return []
     return [

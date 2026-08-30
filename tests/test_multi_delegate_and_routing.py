@@ -6,7 +6,7 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.contracts.atoms.enums import ActionScope, DecisionGateName, RoleStatus
+from lca.contracts.atoms.enums import DecisionGateName, RoleStatus
 from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
@@ -16,7 +16,6 @@ from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
 from lca.layer0_infra.transport.agent_transport import InternalTransport
 from lca.layer0_infra.transport.transport_registry import TransportRegistry
-from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsultAllMembers
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus
@@ -24,6 +23,7 @@ from lca.layer3_agent.orchestration_strategies import (
     LeadStrategy,
     SwarmStrategy,
 )
+from tests.support.action_authority import build_test_body
 from tests.support.team_stage import stage_with_invoker
 
 
@@ -54,11 +54,10 @@ class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):
 
         transport.register_agent("ra", _ha)
         transport.register_agent("rb", _hb)
-        body = SimpleBody(
+        body = build_test_body(
             SimpleToolRegistry(),
             _noop_executor(),
-            transport_registry=_make_registry(transport),
-            action_scope=ActionScope.LEAD,
+            transport=_make_registry(transport),
         )
         decision = Decision(
             decision_id="d1",

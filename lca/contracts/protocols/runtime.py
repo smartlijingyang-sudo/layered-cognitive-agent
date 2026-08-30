@@ -49,13 +49,3 @@ class StopPolicy(Protocol):
         observation: Observation | None,
         reflection: Reflection | None,
     ) -> StopDecision: ...
-
-
-# Backwards-compat aliases — C4 renamed both ``StopRule`` and ``StopOutcomePolicy``
-# into the single ``StopPolicy`` (returns StopDecision). Downstream code on this
-# branch (lca.contracts.__init__ re-exports) still references the old names.
-# Restore as thin aliases so the tree imports until the protocol layer is
-# fully migrated. Mirrors commit 945cc3ba (DECISION_GATE) / ecfc5031
-# (StopOutcome) precedent.
-StopRule = StopPolicy
-StopOutcomePolicy = StopPolicy

@@ -54,9 +54,11 @@ ScorerFn = Callable[[str, float, dict[str, Any]], None]
 
 @runtime_checkable
 class AttributePolicyBackend(Protocol):
-    """写入期属性策略：脱敏/截断/verbosity 的强制点。"""
+    """写入期属性策略：脱敏/截断/内容大小约束的强制点。"""
 
     def prepare(self, attributes: dict[str, Any]) -> dict[str, Any]: ...
+
+    def prepare_content(self, key: str, text: str) -> tuple[str | None, bool]: ...
 
 
 # 抑制 unused-import 警告（runtime_checkable 让 Protocol 运行时可被 isinstance 检查）

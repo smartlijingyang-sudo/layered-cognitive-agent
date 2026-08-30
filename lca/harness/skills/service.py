@@ -112,10 +112,27 @@ class SkillCatalogService:
     ) -> LoadedSkill:
         return await self._load(name, session_id, events, invocation="user")
 
+    async def activate_for_user(
+        self, name: str, session_id: str, raw_text: str, events: SkillEventSink
+    ) -> LoadedSkill:
+        """Resolve, audit, and load a user activation through one provider seam."""
+        loaded = await self._provider.load(name, session_id)
+        await events.append(
+            SkillUserInvoked(skill_id=loaded.entry.skill_id, raw_text=raw_text), actor="user"
+        )
+        await self._record_loaded(loaded, events, invocation="user")
+        return loaded
+
     async def _load(
         self, name: str, session_id: str, events: SkillEventSink, *, invocation: str
     ) -> LoadedSkill:
         loaded = await self._provider.load(name, session_id)
+        await self._record_loaded(loaded, events, invocation=invocation)
+        return loaded
+
+    async def _record_loaded(
+        self, loaded: LoadedSkill, events: SkillEventSink, *, invocation: str
+    ) -> None:
         await events.append(
             SkillLoaded(
                 skill_id=loaded.entry.skill_id,
@@ -124,7 +141,6 @@ class SkillCatalogService:
             ),
             actor="agent" if invocation == "model" else "user",
         )
-        return loaded
 
 
 class SkillLoadTool(Tool):
@@ -188,13 +204,9 @@ class SkillSlashActivationPolicy:
             return None
         name, remaining_text = parsed
         try:
-            resolved = await self._catalog.resolve(name, session_id)
+            loaded = await self._catalog.activate_for_user(name, session_id, raw_text, events)
         except SkillNotFoundError:
             return None
-        await events.append(
-            SkillUserInvoked(skill_id=resolved.entry.skill_id, raw_text=raw_text), actor="user"
-        )
-        loaded = await self._catalog.load_for_user(resolved.entry.skill_id, session_id, events)
         await events.append(
             ContextInjected(
                 source=f"skill:{loaded.entry.skill_id}",

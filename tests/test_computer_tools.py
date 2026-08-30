@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from gateway.runs.wire import WIRE, resolve
 from lca.layer0_infra.computer.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
 from lca.layer0_infra.computer.parse_result import parse_computer_stdout
+from lca.layer0_infra.file_store import LocalFileStore
 from lca.layer0_infra.tools.default_set import build_default_tools
 from lca.layer0_infra.tools.lca_computer import (
     build_computer_tools,
@@ -67,16 +70,30 @@ class TestCloudSandboxWire(unittest.TestCase):
             outputs_dir="/tmp/root/outputs",  # noqa: S108
         )
         transport = MagicMock()
-        names = {t.name for t in build_machine_computer_tools(plane=plane, transport=transport)}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = LocalFileStore(Path(tmpdir))
+            names = {
+                t.name
+                for t in build_machine_computer_tools(
+                    plane=plane,
+                    transport=transport,
+                    file_store=store,
+                )
+            }
         for api in SANDBOX_ONLY_APIS:
             self.assertNotIn(f"local_{api.value}", names)
         self.assertEqual(len(names), len(MACHINE_APIS))
 
 
 class TestDefaultToolsComputer(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.store = LocalFileStore(Path(self._tmp.name))
+        self.addCleanup(self._tmp.cleanup)
+
     def test_includes_computer_tools_when_sandbox(self) -> None:
         sandbox = InlineSandbox()
-        names = {t.name for t in build_computer_tools(sandbox=sandbox)}
+        names = {t.name for t in build_computer_tools(sandbox=sandbox, file_store=self.store)}
         self.assertIn(EXECUTE_CODE, names)
         self.assertIn(RUN_COMMAND, names)
         self.assertIn(LIST_FILES, names)
@@ -86,7 +103,7 @@ class TestDefaultToolsComputer(unittest.TestCase):
 
         with patch("lca.layer0_infra.tools.default_set.resolve_sandbox") as mock:
             mock.return_value = InlineSandbox()
-            names = {t.name for t in build_default_tools()}
+            names = {t.name for t in build_default_tools(self.store)}
         self.assertIn("listFiles", names)
         self.assertIn("run_skill_script", names)
         self.assertIn("writeFile", names)
@@ -104,13 +121,14 @@ class TestDefaultToolsComputer(unittest.TestCase):
             root="/tmp/root",  # noqa: S108
             outputs_dir="/tmp/root/outputs",  # noqa: S108
         )
-        with (
-            patch(
-                "lca.layer0_infra.tools.default_set.resolve_sandbox", return_value=InlineSandbox()
-            ),
-            patch("lca.layer0_infra.tools.default_set.resolve_machine", return_value=machine),
+        from unittest.mock import MagicMock
+
+        resolver = MagicMock()
+        resolver.resolve_machine.return_value = machine
+        with patch(
+            "lca.layer0_infra.tools.default_set.resolve_sandbox", return_value=InlineSandbox()
         ):
-            names = {t.name for t in build_default_tools()}
+            names = {t.name for t in build_default_tools(self.store, machine_resolver=resolver)}
         self.assertIn("listFiles", names)
         self.assertNotIn("local_listFiles", names)
 
@@ -151,9 +169,11 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         self.assertIn("url", files[0])
         self.assertIn("attachmentId", files[0])
         self.assertTrue(files[0].get("previewable"))
-        state = (obs.payload or {}).get("state", {})
-        self.assertEqual(state.get("output"), "output text")
-        self.assertEqual(state.get("files"), files)
+        # ADR-0102: payload is flattened — fields live at the top, not under
+        # a legacy ``"state"`` sub-dict.
+        self.assertEqual(obs.payload.get("output"), "output text")
+        self.assertEqual(obs.payload.get("files"), files)
+        self.assertNotIn("state", obs.payload)
 
     def test_observation_reuses_runtime_file_parts_without_second_put(self) -> None:
         import os
@@ -224,31 +244,6 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         self.assertFalse(obs.success)
         self.assertEqual(len(arts), 0)
         self.assertFalse((obs.extra or {}).get("files"))
-
-    def test_plugin_state_from_nested_state(self) -> None:
-        import os
-        import tempfile
-        from pathlib import Path
-
-        from lca.layer0_infra.computer.runtime import ComputerOpResult
-        from lca.layer0_infra.file_store import LocalFileStore
-        from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
-        from lca.layer1_cognitive.body.tool_result_preview import tool_plugin_state
-
-        result = ComputerOpResult(
-            success=True,
-            content="42",
-            state={"output": "42", "code": "print(42)", "language": "python", "success": True},
-            generated_files=(),
-        )
-        with tempfile.TemporaryDirectory() as tmpdir:
-            store = LocalFileStore(root=Path(os.path.join(tmpdir, "files")))
-            obs = build_computer_observation(
-                result, tool_name="execute_code", start=0.0, store=store
-            )
-        plugin = tool_plugin_state(obs)
-        self.assertEqual(plugin.get("code"), "print(42)")
-        self.assertEqual(plugin.get("output"), "42")
 
     def test_no_files_when_empty(self) -> None:
         import os

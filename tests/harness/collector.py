@@ -12,7 +12,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lca.layer0_infra.observability import AttributePolicy, BoundObservability, SpanView
+from lca.layer0_infra.observability import AttributePolicy, BoundObservability, RunStore, SpanView
 from lca.layer0_infra.observability.tracer_backend import OtelTracer
 from lca.layer0_infra.observability.view import view_of
 from tests.support.observability_helpers import make_test_bound
@@ -85,6 +85,16 @@ class InMemoryObservability(BoundObservability):
 
     def clear(self) -> None:
         self._memory_exporter.clear()
+
+    @property
+    def store(self) -> RunStore:
+        """Backward compat (§11 pre-existing tests): expose RunStore via .store.
+
+        The _RunStoreBackend has its own .store property that returns
+        the underlying RunStore, which has an .events property. We chain:
+        collector.store → journal.store → RunStore.events.
+        """
+        return self.journal.store
 
 
 class LiveCollector(InMemoryObservability):

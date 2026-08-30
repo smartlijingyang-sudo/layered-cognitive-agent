@@ -9,8 +9,8 @@ Why a small `__getattr__` remains
 Python's `from X import Y` does **not** automatically look inside
 submodules. To keep the lazy-export ergonomics (``from gateway import
 create_app`` works without first forcing `gateway.app` to load), we
-re-export two callables from ``gateway.app``. The hook is intentionally
-narrow and only forwards by name — it must not re-import through
+re-export the ``create_app`` callable from ``gateway.app``. The hook is
+intentionally narrow and only forwards by name — it must not re-import through
 ``gateway`` itself, or we recurse forever (the pre-PR-0 bug).
 
 PR-0 history
@@ -30,9 +30,9 @@ import importlib
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from gateway.app import create_app, get_registry
+    from gateway.app import create_app
 
-__all__ = ["create_app", "get_registry"]
+__all__ = ["create_app"]
 
 
 def __getattr__(name: str) -> Any:

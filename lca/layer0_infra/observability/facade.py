@@ -2,7 +2,7 @@
 
 业务层只看到 4 个动词（record / span / annotate / score）和 1 个 scope 上下文
 （RunContext + bind + set_actor + set_session）。Backend 实例由 ``BoundObservability``
-持有（journal / tracer / policy / scorers 4 个字段，纯引用，不聚合逻辑）。
+持有遥测引用（journal / tracer / policy / scorers）以及兼容的证据字段；证据消费者通过 EvidenceBinding 接缝读取。
 
 任何 backend 的实现细节都在 plugin 里；facade 只做"拿 ContextVar → 转发"。
 新增 backend = 新增 plugin；换 backend = 改 settings；不改 facade。
@@ -40,6 +40,10 @@ from lca.contracts.models.observability.journal import (
     JournalEvent,
     RuntimeObserved,
     StampedEvent,
+)
+from lca.contracts.observability.evidence import (
+    EvidencePolicy,
+    EvidenceStore,
 )
 from lca.contracts.observability.ports import (
     AttributePolicyBackend,
@@ -95,15 +99,31 @@ def set_session(session_id: str | None) -> None:
     _run_context.set(replace(current, session_id=session_id or None))
 
 
-# ── BoundObservability：当前 run 激活的 backend 引用集 ─────────────
-# 纯引用 dataclass，4 字段，不持有逻辑；assemble_observability 在 boot 期构造，
-# bind() 装入 ContextVar。后端实现见各 plugin：journal_* / tracer_* / fact_scorer_*
+# ── 当前 run 激活的 backend 引用集 ───────────────────────────────
+# 遥测（journal/tracer/policy/scorers）与证据（store/policy）拥有不同的
+# 生命周期和替换理由。EvidenceBinding 把证据的成对依赖收口成一个接缝，
+# 避免消费者自行判断两个字段是否匹配；BoundObservability 仍保留旧字段
+# 作为兼容输入，新的消费者应通过 evidence_binding() 读取。
+@dataclass(frozen=True, slots=True)
+class EvidenceBinding:
+    """当前 run 的证据存储与治理策略。"""
+
+    store: EvidenceStore | None = None
+    policy: EvidencePolicy | None = None
+
+
 @dataclass(frozen=True)
 class BoundObservability:
     journal: JournalBackend | None = None
     tracer: TracerBackend | None = None
     policy: AttributePolicyBackend | None = None
     scorers: tuple[ScorerFn, ...] = ()
+    evidence_store: EvidenceStore | None = None
+    evidence_policy: EvidencePolicy | None = None
+
+    def evidence_binding(self) -> EvidenceBinding:
+        """Return the evidence seam as one coherent dependency pair."""
+        return EvidenceBinding(store=self.evidence_store, policy=self.evidence_policy)
 
     def with_journal_projection(self, projection: Any) -> BoundObservability:
         """返回追加 run-scoped journal projection 后的新 BoundObservability。
@@ -425,6 +445,7 @@ _log = structlog.get_logger("lca.observability")
 
 __all__ = [
     "BoundObservability",
+    "EvidenceBinding",
     "OperationRecorder",
     "RunContext",
     "SpanContextInfo",

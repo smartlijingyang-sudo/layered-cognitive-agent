@@ -1,7 +1,8 @@
-"""Profile resolve phase — Manifest validation, deep merge, DAG (ADR-0061).
+"""将已规范化的 Profile 输入解析为不可变运行时声明。
 
-Pure: no business objects, no network, no silent fallback. Output is an
-immutable :class:`ResolvedProfile` consumed by ``boot_resolved_profile``.
+``resolve_profile`` 只承担插件 Manifest 导入、配置模型校验、依赖图验证与不可变
+``ResolvedProfile`` 构造。YAML、Bundle、Patch、环境引用和 fallback policy 的输入适配
+统一由 ``profile.source`` 处理，避免语义解析器泄漏外部文件格式细节。
 """
 
 from __future__ import annotations
@@ -9,29 +10,26 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
-import os
 from collections import defaultdict, deque
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, cast
 
-import yaml
 from pydantic import BaseModel, SecretStr
 
 from lca.harness.plugin_api import PluginDefinition, PluginSetupFn, definition_from_plugin
+from lca.harness.plugin_spec_projection import native_spec_from_declaration
+from lca.harness.profile.errors import ProfileResolveError
+from lca.harness.profile.source import (
+    ProfileSource,
+    load_profile_source,
+    programmatic_profile_source,
+)
 
 _LAYER_RANK = {"L0": 0, "L1": 1, "L2": 2, "L3": 3, "L4": 4}
 _REDACTED = "***"
-
-
-class ProfileResolveError(ValueError):
-    """Structural / config / dependency failure before any setup() runs."""
-
-
-@dataclass(frozen=True, slots=True)
-class FieldSource:
-    path: str  # e.g. bundles/base.yaml or profiles/web-standard.yaml#patch
-    value: Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,50 +37,85 @@ class ResolvedPlugin:
     id: str
     module: str
     definition: PluginDefinition
-    config: Any  # validated Pydantic model or empty dict
+    config: Any
     config_sources: dict[str, str]
     disabled: bool
-    source: str  # bundle path that introduced the entry
-    index: int  # stable profile order among peers
+    source: str
+    index: int
 
 
 @dataclass(frozen=True, slots=True)
 class ResolvedProfile:
     profile_path: str
     bundles: tuple[str, ...]
-    plugins: tuple[ResolvedPlugin, ...]  # topological order
-    dag_edges: tuple[tuple[str, str], ...]  # (provider_id, consumer_id)
+    plugins: tuple[ResolvedPlugin, ...]
+    dag_edges: tuple[tuple[str, str], ...]
     manifest_hash: str
-    env_refs: tuple[tuple[str, str, bool], ...]  # (plugin_id, field, required)
+    env_refs: tuple[tuple[str, str, bool], ...]
+    fallback_policy: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
 
 
 def resolve_profile(
     profile_path: Path | str,
     *,
-    env: MappingLike | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> ResolvedProfile:
-    """Load profile → deep-merge → import Manifests → validate DAG → freeze."""
-    path = Path(profile_path)
-    raw = yaml.safe_load(path.read_text()) or {}
-    if not isinstance(raw, dict):
-        raise ProfileResolveError(f"profile {path} must be a mapping")
+    """解析文件 Profile 为不变量已验证、拓扑稳定的不可变声明。"""
 
-    bundles_raw = raw.get("bundles") or []
-    if not isinstance(bundles_raw, list):
-        raise ProfileResolveError("bundles must be a list")
+    return _resolve_source(load_profile_source(profile_path, env=env))
 
-    entries, sources = _expand_bundles(path, bundles_raw)
-    patches = raw.get("patch") or []
-    if not isinstance(patches, list):
-        raise ProfileResolveError("patch must be a list")
-    entries = _apply_patches(entries, sources, patches, profile_path=str(path))
 
-    env_map = dict(os.environ if env is None else env)
+def resolve_entries(entries: Sequence[Mapping[str, Any]]) -> ResolvedProfile:
+    """解析程序化 entries，复用生产 Profile 的唯一领域语义。
+
+    此兼容入口仅接受已由 ``programmatic_profile_source`` 适配的内存声明；Manifest
+    身份、配置模型、单一 provider、层级和 DAG 的判断全部委托给同一 Resolve
+    模块。调用方因此不需要理解另一套测试专用错误、排序或配置规则。
+    """
+
+    return _resolve_source(programmatic_profile_source(entries))
+
+
+def _resolve_source(source: ProfileSource) -> ResolvedProfile:
+    """将一种输入事实解析为唯一的不可变 Profile 声明。"""
+
+    resolved_plugins, env_refs = _resolve_plugins(source)
+    enabled = [plugin for plugin in resolved_plugins if not plugin.disabled]
+    _validate_capability_owners(enabled)
+    _validate_layer_edges(enabled)
+    order, edges = _topo_sort(enabled)
+    disabled_plugins = sorted(
+        (plugin for plugin in resolved_plugins if plugin.disabled), key=lambda plugin: plugin.index
+    )
+    ordered = tuple(order) + tuple(disabled_plugins)
+    digest = hashlib.sha256(
+        json.dumps(_canonical_payload(ordered), sort_keys=True, default=str).encode()
+    ).hexdigest()[:16]
+    return ResolvedProfile(
+        profile_path=str(source.profile_path),
+        bundles=source.bundles,
+        plugins=ordered,
+        dag_edges=tuple(edges),
+        manifest_hash=digest,
+        env_refs=tuple(env_refs),
+        fallback_policy=source.fallback_policy,
+    )
+
+
+def _resolve_plugins(
+    source: ProfileSource,
+) -> tuple[list[ResolvedPlugin], list[tuple[str, str, bool]]]:
+    """把输入 adapter 产出的 entries 转换为已校验的插件声明。
+
+    输入 adapter 已完成文件读取、Patch 和环境引用；此函数只处理 Manifest、Pydantic
+    配置与插件来源。删除它会把插件导入和配置语义重新散落到 YAML 处理路径，因此它
+    构成 Profile 领域的深模块。
+    """
     resolved_plugins: list[ResolvedPlugin] = []
     seen_ids: set[str] = set()
     env_refs: list[tuple[str, str, bool]] = []
 
-    for index, entry in enumerate(entries):
+    for index, entry in enumerate(source.entries):
         plugin_id = str(entry.get("id") or "")
         if not plugin_id:
             raise ProfileResolveError(f"entry at index {index} missing id")
@@ -95,47 +128,45 @@ def resolve_profile(
             raise ProfileResolveError(
                 f"bundle entry {plugin_id!r} has no $module; bare-name resolution was removed"
             )
-
-        disabled = bool(entry.get("disabled"))
-        source = sources.get(plugin_id, str(path))
-        if disabled:
-            # Still import to keep dump/inspect accurate? Skip import for disabled
-            # unless something requires it — resolve will fail consumers later.
+        module_name = str(module_path)
+        plugin_source = source.sources.get(plugin_id, str(source.profile_path))
+        if bool(entry.get("disabled")):
             resolved_plugins.append(
                 ResolvedPlugin(
                     id=plugin_id,
-                    module=str(module_path),
-                    definition=_disabled_stub(plugin_id, str(module_path)),
+                    module=module_name,
+                    definition=_disabled_stub(plugin_id, module_name),
                     config={},
                     config_sources={},
                     disabled=True,
-                    source=source,
+                    source=plugin_source,
                     index=index,
                 )
             )
             continue
 
-        module = importlib.import_module(str(module_path))
+        module = importlib.import_module(module_name)
         setup_obj = getattr(module, "setup", None)
         if setup_obj is None:
             raise ProfileResolveError(f"module {module_path} has no setup")
-        definition = definition_from_plugin(setup_obj, module=str(module_path))
-        if definition.id != plugin_id:
+        definition = definition_from_plugin(setup_obj, module=module_name)
+        if definition.spec.id != plugin_id:
             raise ProfileResolveError(
-                f"profile id {plugin_id!r} != module Manifest id {definition.id!r} ({module_path})"
+                f"profile id {plugin_id!r} != native PluginSpec id {definition.spec.id!r} "
+                f"({module_path})"
             )
 
-        raw_config = entry.get("config") or {}
-        if not isinstance(raw_config, dict):
+        expanded = entry.get("config") or {}
+        if not isinstance(expanded, dict):
             raise ProfileResolveError(f"{plugin_id}: config must be a mapping")
-        expanded, refs = _expand_env_refs(raw_config, env_map, plugin_id=plugin_id)
-        env_refs.extend(refs)
-        config_sources = {key: f"{source}#config.{key}" for key in expanded}
-        # Overlay patch provenance when present.
-        for key in expanded:
-            patch_src = entry.get("_config_sources", {}).get(key)
-            if patch_src:
-                config_sources[key] = patch_src
+        env_refs.extend(entry.get("_env_refs", ()))
+        config_sources = {key: f"{plugin_source}#config.{key}" for key in expanded}
+        patch_sources = entry.get("_config_sources", {})
+        if isinstance(patch_sources, Mapping):
+            for key in expanded:
+                patch_source = patch_sources.get(key)
+                if patch_source:
+                    config_sources[key] = str(patch_source)
 
         config_obj: Any = expanded
         config_cls = (
@@ -144,20 +175,7 @@ def resolve_profile(
             or getattr(module, "Config", None)
         )
         if config_cls is not None and definition.Config is None:
-            definition = PluginDefinition(
-                id=definition.id,
-                Config=config_cls,
-                provides=definition.provides,
-                requires=definition.requires,
-                implements=definition.implements,
-                layer=definition.layer,
-                kind=definition.kind,
-                effects=definition.effects,
-                test_suite=definition.test_suite,
-                description=definition.description,
-                setup=definition.setup,
-                module=definition.module,
-            )
+            definition = definition.with_config(config_cls)
         if config_cls is not None:
             try:
                 config_obj = config_cls.model_validate(expanded)
@@ -167,40 +185,16 @@ def resolve_profile(
         resolved_plugins.append(
             ResolvedPlugin(
                 id=plugin_id,
-                module=str(module_path),
+                module=module_name,
                 definition=definition,
                 config=config_obj,
                 config_sources=config_sources,
                 disabled=False,
-                source=source,
+                source=plugin_source,
                 index=index,
             )
         )
-
-    enabled = [p for p in resolved_plugins if not p.disabled]
-    _validate_capability_owners(enabled)
-    _validate_layer_edges(enabled)
-    order, edges = _topo_sort(enabled)
-    # Append disabled at end (stable by index) so dump still lists them.
-    disabled_plugins = sorted((p for p in resolved_plugins if p.disabled), key=lambda p: p.index)
-    ordered = tuple(order) + tuple(disabled_plugins)
-    payload = _canonical_payload(ordered)
-    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[
-        :16
-    ]
-
-    return ResolvedProfile(
-        profile_path=str(path),
-        bundles=tuple(str(b) for b in bundles_raw),
-        plugins=ordered,
-        dag_edges=tuple(edges),
-        manifest_hash=digest,
-        env_refs=tuple(env_refs),
-    )
-
-
-# Typing alias without importing Mapping everywhere for env override.
-MappingLike = Any
+    return resolved_plugins, env_refs
 
 
 def dump_resolved(
@@ -208,7 +202,7 @@ def dump_resolved(
     *,
     redact: bool = True,
 ) -> dict[str, Any]:
-    """Redacted canonical dump of a ResolvedProfile (no secret plaintext)."""
+    """返回 ``ResolvedProfile`` 的脱敏、规范化诊断视图。"""
     plugins = []
     for item in resolved.plugins:
         config = _config_as_dict(item.config)
@@ -219,244 +213,103 @@ def dump_resolved(
                 "id": item.id,
                 "module": item.module,
                 "disabled": item.disabled,
-                "kind": item.definition.kind.value,
-                "layer": item.definition.layer,
-                "provides": list(item.definition.provides),
-                "requires": list(item.definition.requires),
+                "kind": item.definition.spec.kind.value,
+                "layer": item.definition.spec.layer,
+                "provides": list(item.definition.provided_capability_keys),
+                "requires": list(item.definition.required_capability_keys),
                 "config": config,
                 "config_sources": dict(item.config_sources),
                 "source": item.source,
-                "test_suite": item.definition.test_suite,
+                "test_suite": item.definition.spec.verification.test_suite,
             }
         )
     return {
         "profile": resolved.profile_path,
         "bundles": list(resolved.bundles),
         "manifest_hash": resolved.manifest_hash,
-        "dag_edges": [list(e) for e in resolved.dag_edges],
+        "dag_edges": [list(edge) for edge in resolved.dag_edges],
         "plugins": plugins,
     }
-
-
-# ── Internals ───────────────────────────────────────────────────────
 
 
 def _disabled_stub(plugin_id: str, module: str) -> PluginDefinition:
     from lca.harness.plugin_api import EffectClass, PluginKind
 
     return PluginDefinition(
-        id=plugin_id,
         Config=None,
-        provides=(),
-        requires=(),
-        implements=(),
-        layer="L0",
-        kind=PluginKind.PRIMITIVE,
-        effects=frozenset({EffectClass.NONE}),
-        test_suite="",
+        setup=cast("PluginSetupFn", lambda *_args, **_kwargs: None),
+        spec=native_spec_from_declaration(
+            plugin_id=plugin_id,
+            config_cls=None,
+            provides=(),
+            requires=(),
+            implements=(),
+            layer="L0",
+            kind=PluginKind.PRIMITIVE,
+            effects=frozenset({EffectClass.NONE}),
+            test_suite="",
+            functional_group=None,
+            module=module,
+        ),
         description="disabled",
-        setup=cast("PluginSetupFn", lambda *_a, **_k: None),
-        module=module,
     )
-
-
-def _expand_bundles(
-    profile_path: Path, bundles: list[Any]
-) -> tuple[list[dict[str, Any]], dict[str, str]]:
-    all_entries: list[dict[str, Any]] = []
-    sources: dict[str, str] = {}
-    for bundle_path in bundles:
-        bundle_full = Path(bundle_path)
-        if not bundle_full.is_absolute():
-            candidate = profile_path.parent / bundle_path
-            bundle_full = candidate if candidate.exists() else Path.cwd() / bundle_path
-        if not bundle_full.exists():
-            raise ProfileResolveError(f"bundle not found: {bundle_path}")
-        bundle_data = yaml.safe_load(bundle_full.read_text()) or {}
-        for entry in bundle_data.get("entries") or []:
-            if not isinstance(entry, dict) or "id" not in entry:
-                raise ProfileResolveError(f"invalid entry in {bundle_full}")
-            # Drop YAML inject — Manifest requires is the fact source (ADR-0061).
-            cleaned = {k: v for k, v in entry.items() if k != "inject"}
-            cleaned = dict(cleaned)
-            cleaned.setdefault("config", {})
-            if not isinstance(cleaned["config"], dict):
-                raise ProfileResolveError(
-                    f"{cleaned['id']}: config must be a mapping ({bundle_full})"
-                )
-            # Deep-copy so patch merge cannot mutate YAML-derived shared state.
-            cleaned["config"] = _deep_copy_mapping(cleaned["config"])
-            eid = str(cleaned["id"])
-            if eid in sources:
-                raise ProfileResolveError(
-                    f"duplicate plugin id {eid!r} across bundles ({sources[eid]} and {bundle_full})"
-                )
-            sources[eid] = str(bundle_full)
-            all_entries.append(cleaned)
-    return all_entries, sources
-
-
-def _apply_patches(
-    entries: list[dict[str, Any]],
-    sources: dict[str, str],
-    patches: list[Any],
-    *,
-    profile_path: str,
-) -> list[dict[str, Any]]:
-    by_id = {str(e["id"]): e for e in entries}
-    for patch in patches:
-        if not isinstance(patch, dict) or "id" not in patch:
-            raise ProfileResolveError("each patch entry requires id")
-        pid = str(patch["id"])
-        target = by_id.get(pid)
-        if target is None:
-            raise ProfileResolveError(f"patch id {pid!r} does not match any bundled plugin")
-        # Structural metadata cannot be overridden by profile patch.
-        for forbidden in ("provides", "requires", "layer", "kind", "$module", "name"):
-            if forbidden in patch and forbidden != "id":
-                raise ProfileResolveError(
-                    f"patch must not override structural field {forbidden!r} on {pid}"
-                )
-        if "$module" in patch:
-            raise ProfileResolveError(f"patch must not replace $module on {pid}")
-        if "disabled" in patch:
-            target["disabled"] = bool(patch["disabled"])
-        patch_config = patch.get("config")
-        if patch_config is not None:
-            if not isinstance(patch_config, dict):
-                raise ProfileResolveError(f"patch config for {pid} must be a mapping")
-            target["config"] = _deep_merge(target.get("config") or {}, patch_config)
-            provenance = target.setdefault("_config_sources", {})
-            for key in _flatten_keys(patch_config):
-                provenance[key.split(".", 1)[0]] = f"{profile_path}#patch.{pid}.{key}"
-        sources[pid] = f"{sources.get(pid, '')}+patch"
-    return entries
-
-
-def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
-    out: dict[str, Any] = {k: _deep_copy_mapping(v) for k, v in base.items()}
-    for key, value in overlay.items():
-        if key in out and isinstance(out[key], dict) and isinstance(value, dict):
-            out[key] = _deep_merge(out[key], value)
-        else:
-            out[key] = _deep_copy_mapping(value) if isinstance(value, dict) else value
-    return out
-
-
-def _deep_copy_mapping(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {k: _deep_copy_mapping(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_deep_copy_mapping(v) for v in value]
-    return value
-
-
-def _flatten_keys(mapping: dict[str, Any], prefix: str = "") -> list[str]:
-    keys: list[str] = []
-    for key, value in mapping.items():
-        path = f"{prefix}.{key}" if prefix else str(key)
-        if isinstance(value, dict) and "from_env" not in value and "literal" not in value:
-            keys.extend(_flatten_keys(value, path))
-        else:
-            keys.append(path)
-    return keys
-
-
-def _expand_env_refs(
-    config: dict[str, Any],
-    env: dict[str, str],
-    *,
-    plugin_id: str,
-) -> tuple[dict[str, Any], list[tuple[str, str, bool]]]:
-    refs: list[tuple[str, str, bool]] = []
-
-    def walk(node: Any, field_path: str) -> Any:
-        if isinstance(node, dict):
-            if "from_env" in node:
-                env_name = str(node["from_env"])
-                required = bool(node.get("required", False))
-                refs.append((plugin_id, field_path, required))
-                raw = env.get(env_name)
-                if raw is None or raw == "":
-                    if required:
-                        raise ProfileResolveError(
-                            f"{plugin_id}.{field_path}: required env {env_name!r} missing"
-                        )
-                    return None
-                # Secret-shaped: wrap as SecretStr when field looks sensitive.
-                if any(s in field_path.lower() for s in ("key", "secret", "token", "password")):
-                    return SecretStr(raw)
-                return raw
-            if set(node.keys()) <= {"literal"} and "literal" in node:
-                return node["literal"]
-            return {k: walk(v, f"{field_path}.{k}" if field_path else k) for k, v in node.items()}
-        if isinstance(node, list):
-            return [walk(v, field_path) for v in node]
-        return node
-
-    return walk(config, ""), refs
 
 
 def _validate_capability_owners(plugins: list[ResolvedPlugin]) -> None:
     owners: dict[str, list[str]] = defaultdict(list)
     provided: set[str] = set()
     for plugin in plugins:
-        for key in plugin.definition.provides:
+        for key in plugin.definition.provided_capability_keys:
             owners[key].append(plugin.id)
             provided.add(key)
 
     for key, ids in owners.items():
-        # registry cardinality allows one seam owner; multiple providers register into it
-        # and do not re-provide the same singleton key. Duplicate provide of same key = error
-        # unless all but one are clearly factory/register-only — we treat any duplicate
-        # provide as error (providers should require the seam, not provide it).
         if len(ids) > 1:
             raise ProfileResolveError(f"duplicate providers for capability {key!r}: {ids}")
 
     for plugin in plugins:
-        missing = [k for k in plugin.definition.requires if k not in provided]
+        missing = [key for key in plugin.definition.required_capability_keys if key not in provided]
         if missing:
             raise ProfileResolveError(
                 f"Missing capability: {missing[0]}\n"
                 f"required by: {plugin.id}\n"
                 f"configured at: {plugin.source}\n"
                 f"resolution: enable a plugin that provides {missing[0]!r} "
-                f"or remove the dependent target"
+                "or remove the dependent target"
             )
 
 
 def _validate_layer_edges(plugins: list[ResolvedPlugin]) -> None:
     by_provide: dict[str, ResolvedPlugin] = {}
     for plugin in plugins:
-        for key in plugin.definition.provides:
+        for key in plugin.definition.provided_capability_keys:
             by_provide[key] = plugin
     for consumer in plugins:
-        c_rank = _LAYER_RANK.get(consumer.definition.layer, 0)
-        for key in consumer.definition.requires:
+        consumer_rank = _LAYER_RANK.get(consumer.definition.spec.layer, 0)
+        for key in consumer.definition.required_capability_keys:
             provider = by_provide.get(key)
             if provider is None:
                 continue
-            p_rank = _LAYER_RANK.get(provider.definition.layer, 0)
-            # Dependency direction: lower/equal layer may provide to higher;
-            # a lower layer must not require a higher-layer capability.
-            if c_rank < p_rank:
+            provider_rank = _LAYER_RANK.get(provider.definition.spec.layer, 0)
+            if consumer_rank < provider_rank:
                 raise ProfileResolveError(
-                    f"layer violation: {consumer.id} ({consumer.definition.layer}) "
-                    f"requires {key} from {provider.id} ({provider.definition.layer})"
+                    f"layer violation: {consumer.id} ({consumer.definition.spec.layer}) "
+                    f"requires {key} from {provider.id} ({provider.definition.spec.layer})"
                 )
 
 
 def _topo_sort(
     plugins: list[ResolvedPlugin],
 ) -> tuple[list[ResolvedPlugin], list[tuple[str, str]]]:
-    by_id = {p.id: p for p in plugins}
-    provide_owner = {key: p.id for p in plugins for key in p.definition.provides}
-    # Edge: provider → consumer (provider must boot first).
+    by_id = {plugin.id: plugin for plugin in plugins}
+    provide_owner = {
+        key: plugin.id for plugin in plugins for key in plugin.definition.provided_capability_keys
+    }
     dependents: dict[str, set[str]] = defaultdict(set)
     reverse: dict[str, set[str]] = defaultdict(set)
     edges: list[tuple[str, str]] = []
     for consumer in plugins:
-        for key in consumer.definition.requires:
+        for key in consumer.definition.required_capability_keys:
             owner = provide_owner.get(key)
             if owner is None or owner == consumer.id:
                 continue
@@ -464,37 +317,34 @@ def _topo_sort(
             reverse[consumer.id].add(owner)
             edges.append((owner, consumer.id))
 
-    indegree = {p.id: len(reverse[p.id]) for p in plugins}
-    # Kahn with stable tie-break by original index.
+    indegree = {plugin.id: len(reverse[plugin.id]) for plugin in plugins}
     ready = deque(
         sorted(
-            (p.id for p in plugins if indegree[p.id] == 0),
-            key=lambda i: by_id[i].index,
+            (plugin.id for plugin in plugins if indegree[plugin.id] == 0),
+            key=lambda item: by_id[item].index,
         )
     )
     ordered: list[ResolvedPlugin] = []
     while ready:
-        nid = ready.popleft()
-        ordered.append(by_id[nid])
-        for child in sorted(dependents[nid], key=lambda i: by_id[i].index):
+        plugin_id = ready.popleft()
+        ordered.append(by_id[plugin_id])
+        for child in sorted(dependents[plugin_id], key=lambda item: by_id[item].index):
             indegree[child] -= 1
             if indegree[child] == 0:
                 ready.append(child)
-        # Keep ready queue ordered by index.
         if len(ready) > 1:
-            ready = deque(sorted(ready, key=lambda i: by_id[i].index))
+            ready = deque(sorted(ready, key=lambda item: by_id[item].index))
 
     if len(ordered) != len(plugins):
-        leftover = [p.id for p in plugins if p not in ordered]
+        leftover = [plugin.id for plugin in plugins if plugin not in ordered]
         raise ProfileResolveError(f"cyclic plugin dependency involving: {leftover}")
-    # Deduplicate edges while preserving order.
     seen: set[tuple[str, str]] = set()
-    uniq_edges: list[tuple[str, str]] = []
+    unique_edges: list[tuple[str, str]] = []
     for edge in edges:
         if edge not in seen:
             seen.add(edge)
-            uniq_edges.append(edge)
-    return ordered, uniq_edges
+            unique_edges.append(edge)
+    return ordered, unique_edges
 
 
 def _config_as_dict(config: Any) -> dict[str, Any]:
@@ -514,7 +364,7 @@ def _redact_secrets(config: dict[str, Any]) -> dict[str, Any]:
         elif isinstance(value, dict):
             out[key] = _redact_secrets(value)
         elif isinstance(value, str) and any(
-            s in key.lower() for s in ("key", "secret", "token", "password")
+            token in key.lower() for token in ("key", "secret", "token", "password")
         ):
             out[key] = _REDACTED if value else value
         else:
@@ -525,17 +375,25 @@ def _redact_secrets(config: dict[str, Any]) -> dict[str, Any]:
 def _canonical_payload(
     plugins: tuple[ResolvedPlugin, ...] | list[ResolvedPlugin],
 ) -> list[dict[str, Any]]:
-    rows = []
-    for item in plugins:
-        rows.append(
-            {
-                "id": item.id,
-                "module": item.module,
-                "disabled": item.disabled,
-                "provides": list(item.definition.provides),
-                "requires": list(item.definition.requires),
-                "layer": item.definition.layer,
-                "kind": item.definition.kind.value,
-            }
-        )
-    return rows
+    return [
+        {
+            "id": item.id,
+            "module": item.module,
+            "disabled": item.disabled,
+            "provides": list(item.definition.provided_capability_keys),
+            "requires": list(item.definition.required_capability_keys),
+            "layer": item.definition.spec.layer,
+            "kind": item.definition.spec.kind.value,
+        }
+        for item in plugins
+    ]
+
+
+__all__ = [
+    "ProfileResolveError",
+    "ResolvedPlugin",
+    "ResolvedProfile",
+    "dump_resolved",
+    "resolve_entries",
+    "resolve_profile",
+]

@@ -74,8 +74,7 @@ class _JournalSensor(Sensor):
                 yield stamped
 
     @abstractmethod
-    def _project(self, event: StampedEvent) -> dict[str, Any]:
-        ...
+    def _project(self, event: StampedEvent) -> dict[str, Any]: ...
 
 
 class InboxFactsSensor(_JournalSensor):
@@ -86,7 +85,8 @@ class InboxFactsSensor(_JournalSensor):
     provenance = "inbox_facts_sensor"
 
     def _project(self, event: StampedEvent) -> dict[str, Any]:
-        assert isinstance(event.event, InboxFollowupCreated)
+        if not isinstance(event.event, InboxFollowupCreated):
+            raise TypeError("unexpected journal event for InboxFactsSensor")
         return {
             "inbox_id": event.event.inbox_id,
             "actor": event.event.actor,
@@ -110,7 +110,8 @@ class TeamInboxSensor(_JournalSensor):
     provenance = "team_inbox_sensor"
 
     def _project(self, event: StampedEvent) -> dict[str, Any]:
-        assert isinstance(event.event, TeamMessagePublished)
+        if not isinstance(event.event, TeamMessagePublished):
+            raise TypeError("unexpected journal event for TeamInboxSensor")
         return {
             "team_id": event.event.team_id,
             "thread_id": event.event.thread_id,

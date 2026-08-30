@@ -1,4 +1,4 @@
-"""五阶段工具执行管线实现（DSH-inspired）。
+"""五阶段工具执行管线实现。
 
 管线阶段：
     pre-execute → monotonic guards → execute → post-execute → finalize
@@ -9,8 +9,6 @@
 - post-execute：可 accept / block 结果。
 - finalize：纯函数，异常隔离（只记日志不传播）。
 - 信号融合：cancel_scope 保证调用方取消传播不被切断。
-
-设计来源：DSH ``packages/core/tools`` ToolRuntime 五阶段管线。
 """
 
 from __future__ import annotations

@@ -1,4 +1,5 @@
 """SessionEventType enum contract tests."""
+
 from lca.contracts.observability.session_events import SessionEventType
 
 

@@ -79,6 +79,36 @@ def test_model_tool_and_user_slash_share_provider_and_write_auditable_facts(tmp_
     ]
 
 
+def test_user_slash_activation_loads_once_through_catalog_seam(tmp_path) -> None:
+    class CountingProvider(DiskSkillProvider):
+        def __init__(self, store) -> None:
+            super().__init__(store)
+            self.load_count = 0
+
+        async def load(self, name: str, session_id: str):
+            self.load_count += 1
+            return await super().load(name, session_id)
+
+    provider = CountingProvider(_store(tmp_path))
+    catalog = SkillCatalogService(provider)
+    session = _session()
+
+    async def scenario() -> None:
+        invocation = await SkillSlashActivationPolicy(catalog).pre_step(
+            "ses-skills", "/reports summarize Q2", session
+        )
+        assert invocation is not None
+        assert invocation.skill.entry.skill_id == "reports"
+
+    asyncio.run(scenario())
+    assert provider.load_count == 1
+    assert [event.type for event in session.events()] == [
+        "skill.user_invoked.v1",
+        "skill.loaded.v1",
+        "context.injected.v1",
+    ]
+
+
 def test_skills_projection_replays_durable_facts_without_disk_access(tmp_path) -> None:
     catalog = SkillCatalogService(DiskSkillProvider(_store(tmp_path)))
     session = _session()

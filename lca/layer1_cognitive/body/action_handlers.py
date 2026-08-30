@@ -11,7 +11,6 @@ DELEGATE/HANDOFF 成员调用统一走 ``send_and_wait``（与 strategy 同端�
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 from lca.contracts.atoms.enums import MemoryRecordKind
 from lca.contracts.atoms.ids import new_id, remaining_seconds
@@ -27,33 +26,32 @@ from lca.contracts.atoms.semantic_keys import (
     OBS_RESULT_KIND,
     OBS_TASK_ID,
     OBS_TASK_IDS,
-    OBS_TOOL_RESULTS,
 )
 from lca.contracts.models.core.budget import (
     DEFAULT_DELEGATION_TIMEOUT_S,
     resolve_delegation_timeout_s,
 )
-from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation, ToolCall
-from lca.contracts.models.core.lifecycle import AgentCard
+from lca.contracts.models.core.decision import Decision, DelegationSpec, Observation
 from lca.contracts.models.core.result import ToolExecutionError
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import DecisionMade, SynthesisCompleted
 from lca.contracts.models.team.consultation import SynthesisMethod, usable_outcomes
 from lca.contracts.models.team.delegation_context import delegator_scope
-from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy
 from lca.contracts.protocols import (
-    AgentTransport,
     SafeExecutor,
     ToolRegistry,
     TransportRegistryProtocol,
 )
 from lca.contracts.protocols.action import Action
+from lca.contracts.protocols.command_envelope import command_envelope_to_dict
+from lca.contracts.protocols.tool_batch_execution import ToolBatchExecutionPolicy
 from lca.layer0_infra.observability import record
-from lca.layer0_infra.transport.invocation import handoff_task_traced, send_and_wait
 from lca.layer1_cognitive.body.delegation_cache import (
     cached_delegation_observation,
     tag_delegation_extra,
 )
+from lca.layer1_cognitive.body.delegation_target import resolve_delegation_target
+from lca.layer1_cognitive.body.tool_batch_executor import ToolBatchExecutor
 from lca.layer1_cognitive.body.tool_wire_gate import tool_wire_block_observation
 from lca.layer1_cognitive.member_status.consult_policy import (
     classify_synthesis,
@@ -65,6 +63,7 @@ from lca.layer1_cognitive.member_status.tracking import (
     duty_consult,
     record_delegation_return,
 )
+from lca.layer1_cognitive.transport_envelope import delegate_via_envelope, handoff_via_envelope
 
 _ERR_DEADLINE_EXPIRED = "delegate 超时(deadline 已过期)"
 _ERR_TIMEOUT = "delegate 超时"
@@ -160,6 +159,22 @@ class RespondOperation(Action):
         )
 
 
+class TerminalOperation(Action):
+    """Complete a terminal decision without creating a world effect."""
+
+    async def execute(self, decision: Decision, _state: AgentState) -> Observation:
+        return Observation(
+            observation_id=new_id("obs"),
+            success=True,
+            payload=decision.response_text,
+            extra={OBS_RESULT_KIND: MemoryRecordKind.RESPONSE},
+        )
+
+
+class AskHumanOperation(TerminalOperation):
+    """Expose an explicit human-input observation for the terminal action."""
+
+
 class UseToolOperation(Action):
     """处理 use_tool 动作：wire 闸门 → 查找工具 → 权限校验 → 执行。
 
@@ -167,9 +182,18 @@ class UseToolOperation(Action):
     返回 ``Observation(success=False)`` 回灌 loop（不抛、不 respond 收口）。
     """
 
-    def __init__(self, tool_registry: ToolRegistry, safe_executor: SafeExecutor) -> None:
-        self._tool_registry = tool_registry
-        self._safe_executor = safe_executor
+    def __init__(
+        self,
+        tool_registry: ToolRegistry,
+        safe_executor: SafeExecutor,
+        *,
+        batch_execution_policy: ToolBatchExecutionPolicy,
+    ) -> None:
+        self._batch_executor = ToolBatchExecutor(
+            tool_registry,
+            safe_executor,
+            policy=batch_execution_policy,
+        )
 
     async def execute(self, decision: Decision, state: AgentState) -> Observation:
         if not decision.tool_calls:
@@ -178,76 +202,7 @@ class UseToolOperation(Action):
         if wire_block is not None:
             return wire_block
 
-        # Resolve all tools up front — fail fast before launching any execution.
-        resolved = []
-        for tc in decision.tool_calls:
-            tool = self._tool_registry.get(tc.tool_name)
-            if tool is None:
-                raise ToolExecutionError(f"未注册工具: {tc.tool_name}")
-            resolved.append((tc, tool))
-
-        if len(resolved) == 1:
-            tc, tool = resolved[0]
-            observation = await self._safe_executor.execute(
-                tool,
-                tc.arguments,
-                RetryPolicy(),
-                CacheConfig(),
-                invocation_id=tc.call_id or "",
-            )
-            extra = dict(observation.extra or {})
-            extra.setdefault(OBS_RESULT_KIND, MemoryRecordKind.TOOL_RESULT)
-            observation.extra = extra
-            return observation
-
-        # Parallel execution — asyncio.gather is the Python equivalent of
-        # LobeHub's Promise.all for concurrent tool calls.
-        observations = await asyncio.gather(
-            *[
-                self._safe_executor.execute(
-                    tool,
-                    tc.arguments,
-                    RetryPolicy(),
-                    CacheConfig(),
-                    invocation_id=tc.call_id or "",
-                )
-                for tc, tool in resolved
-            ]
-        )
-        return _combine_tool_observations(observations, decision.tool_calls)
-
-
-def _combine_tool_observations(
-    observations: tuple[Observation, ...] | list[Observation],
-    tool_calls: list[ToolCall],
-) -> Observation:
-    """Package parallel tool results into a single Observation.
-
-    Individual observations are preserved in ``extra[OBS_TOOL_RESULTS]``
-    so ``build_tool_history`` can emit one assistant+tool message pair
-    per tool call — matching OpenAI / LobeHub native wire format.
-    """
-    observations = list(observations)
-    all_ok = all(obs.success for obs in observations)
-    errors = [e for e in (obs.error for obs in observations if not obs.success) if e]
-    extra: dict[str, Any] = {
-        OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
-        OBS_TOOL_RESULTS: [
-            {"call_id": tc.call_id, "tool_name": tc.tool_name, "observation": obs}
-            for tc, obs in zip(tool_calls, observations, strict=True)
-        ],
-    }
-    payload = {
-        "tool_count": len(observations),
-        "all_success": all_ok,
-    }
-    return Observation(
-        observation_id=new_id("obs"),
-        success=all_ok,
-        payload=payload,
-        error="; ".join(errors) if errors else "",
-        extra=extra,
-    )
+        return await self._batch_executor.execute(decision.tool_calls)
 
 
 class DelegateOperation(Action):
@@ -261,31 +216,34 @@ class DelegateOperation(Action):
         if not specs:
             raise ToolExecutionError(f"{decision.action_type} 动作缺少 delegations 规格")
         if len(specs) == 1:
-            return await self._execute_one(specs[0], state)
-        return await self._execute_many(specs, state)
+            observation = await self._resolve_observation(specs[0], state)
+            return tag_delegation_extra(observation, specs[0])
+        observations = await asyncio.gather(
+            *[self._resolve_observation(spec, state) for spec in specs]
+        )
+        return self._aggregate_observations(specs, list(observations))
 
-    async def _execute_one(self, spec: DelegationSpec, state: AgentState) -> Observation:
+    async def _resolve_observation(
+        self, spec: DelegationSpec, state: AgentState
+    ) -> Observation:
+        """Cache → invoke → record seam shared by single and multi paths.
+
+        Single-target delegation reuses this directly; multi-target fans the
+        same call out via ``asyncio.gather`` and aggregates the observations
+        in :meth:`_aggregate_observations`. Keeping cache bookkeeping and
+        invoke semantics in one place prevents the two paths from drifting.
+        """
         cached = cached_delegation_observation(spec, state)
         if cached is not None:
             return cached
         observation = await self._invoke(spec, state)
         self._record_return(spec, observation, state)
-        return tag_delegation_extra(observation, spec)
+        return observation
 
-    async def _execute_many(self, specs: list[DelegationSpec], state: AgentState) -> Observation:
-        returns: dict[int, Observation] = {}
-        pending: list[tuple[int, DelegationSpec]] = []
-        for index, spec in enumerate(specs):
-            cached = cached_delegation_observation(spec, state)
-            if cached is not None:
-                returns[index] = cached
-            else:
-                pending.append((index, spec))
-        fresh = await asyncio.gather(*[self._invoke(spec, state) for _, spec in pending])
-        for (index, spec), observation in zip(pending, fresh, strict=True):
-            self._record_return(spec, observation, state)
-            returns[index] = observation
-        observations = [returns[index] for index in range(len(specs))]
+    def _aggregate_observations(
+        self, specs: list[DelegationSpec], observations: list[Observation]
+    ) -> Observation:
+        """Fold N per-spec observations into one multi-delegate Observation."""
 
         member_payload: dict[str, object] = {}
         member_subtasks: dict[str, object] = {}
@@ -320,35 +278,27 @@ class DelegateOperation(Action):
         record_delegation_return(state, spec, observation)
 
     async def _invoke(self, spec: DelegationSpec, state: AgentState) -> Observation:
-        transport, agent_card = self._resolve_target(spec, state)
+        transport, agent_card = resolve_delegation_target(spec, self._transport_registry)
         timeout_s = resolve_spec_timeout_s(spec, state)
         if timeout_s <= 0:
             return _timeout_observation(_ERR_DEADLINE_EXPIRED)
         try:
             with delegator_scope(state.agent_role):
-                observation = await send_and_wait(
+                observation, envelope = await delegate_via_envelope(
                     transport,
                     agent_card,
                     spec.subtask,
                     spec.context_refs,
                     timeout_s=timeout_s,
+                    decision_ref=spec.target_agent_id or spec.target_role or "delegate",
+                    protocol=spec.protocol,
                 )
+                observation.extra = dict(observation.extra or {})
+                observation.extra["command_envelope"] = command_envelope_to_dict(envelope)
         except TimeoutError:
             return _timeout_observation(_ERR_TIMEOUT)
         # transport 已 harvest 时直接透传（含 partial payload）
         return observation
-
-    def _resolve_target(
-        self, spec: DelegationSpec, state: AgentState
-    ) -> tuple[AgentTransport, AgentCard | str]:
-        del state
-        transport = self._transport_registry.resolve(spec.protocol)
-        agent_card: AgentCard | str | None = (
-            spec.target_agent_card or spec.target_agent_id or spec.target_role
-        )
-        if agent_card is None:
-            raise ToolExecutionError("delegate 动作缺少目标（agent_card / agent_id / role 均为空）")
-        return transport, agent_card
 
 
 class HandoffOperation(Action):
@@ -362,17 +312,23 @@ class HandoffOperation(Action):
         if not specs:
             raise ToolExecutionError("handoff 动作缺少 delegations 规格")
         spec = specs[0]
-        transport = self._transport_registry.resolve(spec.protocol)
-        agent_card = spec.target_agent_card or spec.target_agent_id or spec.target_role
-        if agent_card is None:
-            raise ToolExecutionError("handoff 动作缺少目标（agent_card / agent_id / role 均为空）")
+        transport, agent_card = resolve_delegation_target(spec, self._transport_registry)
         with delegator_scope(state.agent_role):
-            task_id = await handoff_task_traced(
-                transport, agent_card, spec.subtask, spec.context_refs
+            task_id, envelope = await handoff_via_envelope(
+                transport,
+                agent_card,
+                spec.subtask,
+                spec.context_refs,
+                decision_ref=spec.target_agent_id or spec.target_role or "handoff",
+                protocol=spec.protocol,
             )
         return Observation(
             observation_id=new_id("obs"),
             success=True,
             payload=f"handoff to {spec.target_role or spec.target_agent_id}",
-            extra={OBS_TASK_ID: task_id, OBS_HANDOFF: True},
+            extra={
+                OBS_TASK_ID: task_id,
+                OBS_HANDOFF: True,
+                "command_envelope": command_envelope_to_dict(envelope),
+            },
         )

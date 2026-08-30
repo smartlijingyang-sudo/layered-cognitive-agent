@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator, Callable
 
 from lca.contracts.harness.command import (
     AgentRegistryFacade,
-    AnswerCommand,
+    ApprovalResumeCommand,
     CancelCommand,
     CommandReceipt,
     InjectCommand,
@@ -50,6 +50,7 @@ class CommandGateway:
             profile=cmd.profile,
             preset=cmd.preset,
             options=cmd.agent_options,
+            session_id=cmd.session_id,
         )
 
     async def handle_send_message(self, cmd: MessageSendCommand) -> CommandReceipt:
@@ -66,10 +67,12 @@ class CommandGateway:
             keep_inbox=cmd.keep_inbox,
         )
 
-    async def handle_answer(self, cmd: AnswerCommand) -> CommandReceipt:
-        return await self._agent_registry.answer(
+    async def handle_resume_approval(self, cmd: ApprovalResumeCommand) -> CommandReceipt:
+        return await self._agent_registry.resume_approval(
             session_id=cmd.session_id,
-            answer=cmd.answer,
+            approval_id=cmd.approval_id,
+            payload=cmd.payload,
+            idempotency_key=cmd.idempotency_key,
         )
 
     async def handle_steer(self, cmd: SteerCommand) -> CommandReceipt:
@@ -88,7 +91,10 @@ class CommandGateway:
     async def get_snapshot(self, session_id: str, as_of_seq: int = -1) -> ProjectionSnapshot:
         snapshot = self._projection_registry.snapshot(session_id)
         if as_of_seq >= 0 and snapshot.as_of_seq > as_of_seq:
-            return snapshot
+            raise ValueError(
+                f"projection registry cannot serve historical snapshot at seq {as_of_seq}; "
+                f"current seq is {snapshot.as_of_seq}"
+            )
         return snapshot
 
     async def subscribe_changes(

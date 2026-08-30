@@ -21,7 +21,9 @@ def _resolve_events(events: Sequence[StampedEvent] | None) -> Sequence[StampedEv
 
 class _InspectTraceTool:
     name = "inspect-trace"
-    description = "返回 trace 的因果链 / 瓶颈 / 插件交互图。focus 支持 all/error/latency/tool/plugin。"
+    description = (
+        "返回 trace 的因果链 / 瓶颈 / 插件交互图。focus 支持 all/error/latency/tool/plugin。"
+    )
 
     def invoke(
         self,
@@ -34,9 +36,7 @@ class _InspectTraceTool:
         **kwargs: Any,
     ) -> dict[str, Any]:
         inspector = TraceInspector(_resolve_events(events))
-        report = inspector.inspect_trace(
-            trace_id=trace_id, run_id=run_id, focus=focus, depth=depth
-        )
+        report = inspector.inspect_trace(trace_id=trace_id, run_id=run_id, focus=focus, depth=depth)
         return asdict(report)
 
 
@@ -89,9 +89,7 @@ class _ExportMinimalReproductionTool:
     ) -> dict[str, Any]:
         inspector = TraceInspector(_resolve_events(events))
         return {
-            "events": list(
-                inspector.export_minimal_reproduction(trace_id=trace_id, run_id=run_id)
-            )
+            "events": list(inspector.export_minimal_reproduction(trace_id=trace_id, run_id=run_id))
         }
 
 

@@ -10,10 +10,16 @@ from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.operational_skills import SkillImportError, SkillSearchResult
+from lca.contracts.protocols.operational_skills import (
+    SkillImporter,
+    SkillImportError,
+    SkillPackageStore,
+    SkillSearchResult,
+)
 from lca.layer0_infra.search.service import any_search_provider_available
 from lca.layer0_infra.search.skill_policy import filter_skill_search_result
-from lca.layer0_infra.skills.http_importer import HttpSkillImporter
+from lca.layer0_infra.tools.contract.render import RenderContract, contract
+from lca.layer0_infra.tools.contract.schema import COMMON
 from lca.layer0_infra.tools.skills._format import format_skill_index_rows
 
 SEARCH_SKILL_TOOL = "search_skill"
@@ -22,6 +28,18 @@ _DEGRADED_PREFIX = "（已放宽搜索条件）"
 _SANDBOX_FALLBACK = "无匹配 skill。建议用 execute_code 直接编码实现，或尝试更简短的关键词重新搜索。"
 
 
+@contract(
+    RenderContract(
+        tool_name="search_skill",
+        identifier="lobe-skill-store",
+        api_name="searchSkill",
+        args=(COMMON["query"],),
+        state=(
+            COMMON["content"],
+            COMMON["total"],
+        ),
+    )
+)
 class SkillSearchTool(Tool):
     name = SEARCH_SKILL_TOOL
     description = (
@@ -42,8 +60,9 @@ class SkillSearchTool(Tool):
     is_idempotent = True
     default_timeout_s = DEFAULT_TOOL_TIMEOUT_S
 
-    def __init__(self, importer: HttpSkillImporter) -> None:
+    def __init__(self, importer: SkillImporter, store: SkillPackageStore) -> None:
         self._importer = importer
+        self._store = store
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
@@ -84,7 +103,7 @@ class SkillSearchTool(Tool):
                     return degraded
 
         # Level 3: list local installed skills
-        local = self._importer.store.list_installed()
+        local = self._store.list_installed()
         if local:
             local_result = SkillSearchResult(
                 items=local,

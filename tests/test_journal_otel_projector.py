@@ -134,8 +134,8 @@ def _board_run(projector: OtelProjector) -> None:
         biz_scope,
         ToolInvoked(
             tool_name="calculator",
-            arguments_preview="2400000 * 0.2",
-            result_preview="480000",
+            invocation_id="calc-1",
+            ok=True,
             latency_ms=1,
         ),
     )

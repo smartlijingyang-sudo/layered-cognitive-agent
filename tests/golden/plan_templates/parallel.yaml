@@ -1,0 +1,22 @@
+# PlanTemplate: parallel (Parallel Fan-out + Join)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: parallel
+name: Parallel Fan-out + Join
+description: Execute multiple branches in parallel; join results
+version: 1
+
+relations:
+  - executes
+  - delegates
+  - projects
+
+control_slots:
+  - act.execute
+  - act.safe-boundary
+
+required_groups:
+  - G7
+  - G8
+
+scope: run

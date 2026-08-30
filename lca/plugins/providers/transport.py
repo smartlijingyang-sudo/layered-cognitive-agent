@@ -28,7 +28,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer0_infra.transport.agent_transport import InternalTransport
     from lca.layer0_infra.transport.mcp_transport import MCPTransport
 
-    service = ctx.inject("transport")
+    service = ctx.require("transport")
     if "internal" in config.providers:
         service.register(InternalTransport())
     if "a2a" in config.providers:

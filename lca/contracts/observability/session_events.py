@@ -1,8 +1,8 @@
 """Session event type enum — the single taxonomy of session mutations.
 
 "session everything" 原则: any state mutation corresponds to a SessionEventType.
-DSH core/session/known_event_types.ts 1:1 aligned + LCA extensions.
 """
+
 from __future__ import annotations
 
 from enum import Enum

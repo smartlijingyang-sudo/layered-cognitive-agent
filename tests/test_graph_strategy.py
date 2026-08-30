@@ -20,7 +20,18 @@ from lca.contracts.models.team.graph import (
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import TeamAssembly
 from lca.layer3_agent.orchestration_strategies import GraphStrategy
+from tests.support.graph_node_executors import build_default_graph_node_executor_registry
 from tests.support.team_stage import stage_with_invoker
+
+
+def _graph_strategy(stage, graph: ExecutionGraph) -> GraphStrategy:
+    """Close GraphStrategy with the explicit default node primitive set."""
+
+    return GraphStrategy(
+        stage,
+        execution_graph=graph,
+        node_executors=build_default_graph_node_executor_registry(),
+    )
 
 
 def _make_role_profile(role: str) -> RoleProfile:
@@ -185,7 +196,7 @@ class TestGraphStrategyLinearExecution(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="analyst", target="writer"))
         graph.add_edge(GraphEdge(source="writer", target="exit"))
 
-        strategy = GraphStrategy(stage_with_invoker([agent_a, agent_w]), execution_graph=graph)
+        strategy = _graph_strategy(stage_with_invoker([agent_a, agent_w]), graph)
 
         result = await strategy.run("write a report")
 
@@ -222,7 +233,7 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="analyst", target="exit"))
         graph.add_edge(GraphEdge(source="reviewer", target="exit"))
 
-        strategy = GraphStrategy(stage_with_invoker([agent_a, agent_b]), execution_graph=graph)
+        strategy = _graph_strategy(stage_with_invoker([agent_a, agent_b]), graph)
 
         result = await strategy.run("task")
 
@@ -252,7 +263,7 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="analyst", target="exit"))
         graph.add_edge(GraphEdge(source="skip_me", target="exit"))
 
-        strategy = GraphStrategy(stage_with_invoker([agent_a, agent_s]), execution_graph=graph)
+        strategy = _graph_strategy(stage_with_invoker([agent_a, agent_s]), graph)
 
         result = await strategy.run("task")
 
@@ -279,7 +290,7 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="b", target="exit"))
         graph.add_edge(GraphEdge(source="c", target="exit"))
 
-        strategy = GraphStrategy(stage_with_invoker([agent_b, agent_c]), execution_graph=graph)
+        strategy = _graph_strategy(stage_with_invoker([agent_b, agent_c]), graph)
 
         result = await strategy.run("task")
 
@@ -315,7 +326,7 @@ class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="b", target="exit"))
         graph.add_edge(GraphEdge(source="c", target="exit"))
 
-        strategy = GraphStrategy(stage_with_invoker([agent_b, agent_c]), execution_graph=graph)
+        strategy = _graph_strategy(stage_with_invoker([agent_b, agent_c]), graph)
 
         start = asyncio.get_event_loop().time()
         await strategy.run("task")

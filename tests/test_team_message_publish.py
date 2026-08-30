@@ -28,7 +28,7 @@ from lca.contracts.models.observability.journal import (
     TeamMessagePublished,
 )
 from lca.contracts.protocols import Sensor
-from lca.contracts.protocols.cognition import SensorDisabled
+from lca.contracts.protocols.cognition import SensorDisabledError
 from lca.layer0_infra.observability.journal.engine import RunStore
 from lca.layer1_cognitive.brain.context_manifest import digest_manifest
 from lca.layer1_cognitive.brain.decision_gates import (
@@ -100,9 +100,9 @@ class TestSensorsPrimitive:
 
         class _Disabled(Sensor):
             async def read(self, state):
-                raise SensorDisabled("skip")
+                raise SensorDisabledError("skip")
 
-        with pytest.raises(SensorDisabled):
+        with pytest.raises(SensorDisabledError):
             await _Disabled().read(_state())
         # The Hub path catches the exception and produces an empty
         # contribution.
@@ -190,7 +190,7 @@ class TestHubPrimitive:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         manifest = await hub.perceive(_state())
         digest = digest_manifest(manifest)
@@ -205,7 +205,7 @@ class TestHubPrimitive:
         hub = SequentialPerceiveHub(
             sensors=[],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         state = _state()
         # Pre-seed the bucket.
@@ -265,7 +265,7 @@ class TestCompositionLarge:
                 TeamInboxSensor(store),
             ],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         state = _state()
         # Pre-seed a gate so the policy_fact fold is exercised.
@@ -288,7 +288,7 @@ class TestCompositionLarge:
         hub = SequentialPerceiveHub(
             sensors=[build_clock_sensor()],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         state = _state()
         m1 = await hub.perceive(state)
@@ -349,7 +349,7 @@ class TestTeamMessageE2E:
         hub = SequentialPerceiveHub(
             sensors=[TeamInboxSensor(store)],
             memory=None,
-            sink=JournalSink(store),
+            sink=JournalSink.for_store(store),
         )
         manifest = await hub.perceive(_state())
         assert manifest.has_kind("team_inbox")

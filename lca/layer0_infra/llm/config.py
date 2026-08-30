@@ -21,7 +21,7 @@ class LLMFace(str, Enum):
     """Which wire a caller needs.
 
     ``AGENT`` may be Anthropic Messages. ``OPENAI_COMPAT`` is chat/completions
-    (housekeeper, embeddings, DSH).
+    (housekeeper, embeddings).
     """
 
     AGENT = "agent"

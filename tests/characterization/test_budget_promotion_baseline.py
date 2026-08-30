@@ -35,6 +35,7 @@ def _make_agent(
         tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
     )
     from lca.harness.observability import make_minimal_bound
+
     return CognitiveAgent(
         runtime,
         rp,

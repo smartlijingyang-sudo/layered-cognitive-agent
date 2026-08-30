@@ -27,9 +27,7 @@ class TestCordisCreatorScenario:
 
     def test_scenario_references_cordis_creator_bundle(self) -> None:
         scenario = load_scenario_yaml("cordis-creator")
-        assert_scenario_references_bundles(
-            scenario, "bundles/scenario-cordis-creator.yaml"
-        )
+        assert_scenario_references_bundles(scenario, "bundles/scenario-cordis-creator.yaml")
 
     def test_cordis_creator_bundle_loads(self) -> None:
         ids = assert_bundle_parses("scenario-cordis-creator")

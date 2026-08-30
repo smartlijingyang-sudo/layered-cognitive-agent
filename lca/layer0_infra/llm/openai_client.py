@@ -5,11 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lca.layer0_infra.llm.config import LLMFace, resolve_endpoint
-
-
-class LLMUnavailableError(RuntimeError):
-    """LLM 凭证或兼容口缺失。"""
-
+from lca.layer0_infra.llm_errors import LLMUnavailableError
 
 _cached_async_client: Any = None
 _cached_client_key: tuple[str | None, str | None] | None = None

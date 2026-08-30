@@ -80,7 +80,9 @@ class TestBoundaryGuard(unittest.TestCase):
                 if any(n.startswith("opentelemetry") for n in names):
                     # Plugins are the legitimate OTel adapter boundary; same exception
                     # rationale as the submodule import guard above.
-                    if mod.startswith("lca.plugins.") or mod.startswith("lca.harness.observability"):
+                    if mod.startswith("lca.plugins.") or mod.startswith(
+                        "lca.harness.observability"
+                    ):
                         continue
                     violations.append(mod)
                     break

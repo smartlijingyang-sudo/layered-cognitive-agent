@@ -50,6 +50,12 @@ from lca.contracts.models.observability.journal import (
     JournalEvent,
     LlmCallCompleted,
     LlmCallStarted,
+    PluginAuthored,
+    PluginInspected,
+    PluginMounted,
+    PluginMountRejected,
+    PluginUnmounted,
+    PresetPublished,
     ReasoningCompleted,
     ReasoningDelta,
     RunActivity,
@@ -65,8 +71,6 @@ from lca.contracts.models.observability.journal import (
     ToolDenied,
     ToolInvoked,
     ToolStarted,
-    get_current_run_scope,
-    run_scope,
 )
 from lca.contracts.models.observability.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
@@ -79,6 +83,10 @@ from lca.layer0_infra.observability.event_catalog import (
     descriptor_for,
     may_export_externally,
 )
+from lca.layer0_infra.observability.event_descriptor_env import (
+    bind_descriptors,
+    current_descriptors,
+)
 from lca.layer0_infra.observability.event_descriptor_registry import (
     DuplicateEventDescriptorError,
     InMemoryEventDescriptorRegistry,
@@ -87,6 +95,7 @@ from lca.layer0_infra.observability.event_descriptor_registry import (
 from lca.layer0_infra.observability.event_descriptors_data import build_default_registry
 from lca.layer0_infra.observability.facade import (
     BoundObservability,
+    EvidenceBinding,
     OperationRecorder,
     RunContext,
     SpanContextInfo,
@@ -123,6 +132,7 @@ from lca.layer0_infra.observability.journal import (
 )
 from lca.layer0_infra.observability.journal.backends import InMemoryJournalStore
 from lca.layer0_infra.observability.journal.journal_io import read_journal, stamped_to_record
+from lca.layer0_infra.observability.journal.serialization import stamped_to_journal_record
 from lca.layer0_infra.observability.langfuse_conventions import (
     FRAMEWORK_TAG,
     LANGFUSE_ENVIRONMENT,
@@ -141,6 +151,12 @@ from lca.layer0_infra.observability.langfuse_conventions import (
 from lca.layer0_infra.observability.narrative import plan_steps_joined
 from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
 from lca.layer0_infra.observability.projection_registry import EventProjection, ProjectionRegistry
+from lca.layer0_infra.observability.run_context import (
+    TEAM_CONTAINER_ROLE,
+    adopt_run_scope,
+    get_current_run_scope,
+    run_scope,
+)
 from lca.layer0_infra.observability.settings import ObservabilitySettings
 from lca.layer0_infra.observability.team_profile import (
     TeamTraceProfile,
@@ -173,6 +189,7 @@ __all__ = [
     "OBSERVATION_TYPE_AGENT",
     "OBSERVATION_TYPE_GENERATION",
     "OBSERVATION_TYPE_TOOL",
+    "TEAM_CONTAINER_ROLE",
     "ActionDegraded",
     "AgentRunFinished",
     "AgentRunStarted",
@@ -211,6 +228,12 @@ __all__ = [
     "OperationRecorder",
     "OtelProjector",
     "OtelTracer",
+    "PluginAuthored",
+    "PluginInspected",
+    "PluginMountRejected",
+    "PluginMounted",
+    "PluginUnmounted",
+    "PresetPublished",
     "ProjectionRegistry",
     "ReasoningCompleted",
     "ReasoningDelta",
@@ -242,13 +265,16 @@ __all__ = [
     "UnknownEventDescriptorError",
     "UnregisteredJournalEventError",
     "Verbosity",
+    "adopt_run_scope",
     "annotate",
     "bind",
     "bind_backends",
+    "bind_descriptors",
     "build_default_genai_registry",
     "build_default_registry",
     "current_bound",
     "current_context",
+    "current_descriptors",
     "descriptor_for",
     "detached_span",
     "fold_run_state",
@@ -272,6 +298,7 @@ __all__ = [
     "set_actor",
     "set_session",
     "span",
+    "stamped_to_journal_record",
     "stamped_to_record",
     "team_id_for",
     "traced",

@@ -18,6 +18,8 @@ from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.trace import StatusCode
 
+from lca.layer0_infra.observability.policy import otel_safe_attributes
+
 if TYPE_CHECKING:
     from opentelemetry.context import Context, Token
 
@@ -107,9 +109,13 @@ class SpanHandle:
             self.attributes.setdefault("error_message", str(exc)[:_ERROR_MESSAGE_MAX])
             self._otel.record_exception(exc)
             self._otel.set_status(StatusCode.ERROR)
-        prepared = self._policy.prepare(self.attributes) if self._policy is not None else dict(self.attributes)
+        prepared = (
+            self._policy.prepare(self.attributes)
+            if self._policy is not None
+            else dict(self.attributes)
+        )
         # 单次 set_attributes 比循环 set_attribute 省 N-1 次 OTel SDK 调用（评估文档 §89）
-        self._otel.set_attributes(prepared)
+        self._otel.set_attributes(otel_safe_attributes(prepared))
         self._otel.end()
         if self._ctx_token is not None:
             # Token 仅在创建它的 Context 有效；跨 task 退出时静默跳过

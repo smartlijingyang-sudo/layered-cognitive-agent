@@ -23,8 +23,8 @@ def _imports(rel: str) -> list[str]:
     return names
 
 
-def test_live_has_no_starlette() -> None:
-    assert "starlette" not in _source("runs/live.py")
+def test_live_facade_is_absent() -> None:
+    assert not (_ROOT / "runs" / "live.py").exists()
 
 
 def test_doctor_has_no_starlette() -> None:
@@ -49,13 +49,9 @@ def test_ingress_does_not_import_live_or_execute() -> None:
     assert "gateway.runs.execute" not in text
 
 
-def test_live_does_not_import_wire_or_ingest() -> None:
-    text = _source("runs/live.py")
-    assert "gateway.runs.wire" not in text
-    assert "gateway.runs.ingest" not in text
-    assert "gateway.assemble" not in text
+def test_process_journal_facade_is_absent() -> None:
+    assert not (_ROOT / "runs" / "process_journal.py").exists()
 
 
-def test_api_does_not_import_app() -> None:
-    text = _source("runs/api.py")
-    assert "gateway.app" not in text
+def test_run_handler_facade_is_absent() -> None:
+    assert not (_ROOT / "runs" / "api.py").exists()

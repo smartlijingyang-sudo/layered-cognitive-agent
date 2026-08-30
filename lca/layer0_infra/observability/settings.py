@@ -39,6 +39,10 @@ class ObservabilitySettings(BaseSettings):
     jsonl_path: str = _DEFAULT_JSONL_PATH
     diagnostics_enabled: bool = True
     redact_enabled: bool = True
+    evidence_root: str = Field(
+        default="traces/evidence",
+        description="EvidenceStore fs 后端根目录(ADR-0065 PR-2 / L5)。",
+    )
 
     environment: str = Field(
         default="development",

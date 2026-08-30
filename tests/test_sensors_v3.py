@@ -31,9 +31,7 @@ def _state() -> AgentState:
 
 
 class TestWorkspaceInstructionsSensor:
-    async def test_workspace_instructions_sensor_reads_agents_md(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_workspace_instructions_sensor_reads_agents_md(self, tmp_path: Path) -> None:
         """The sensor MUST read AGENTS.md and emit its content as payload."""
         agents_md = tmp_path / "AGENTS.md"
         agents_md.write_text("Hello from AGENTS.md\n", encoding="utf-8")

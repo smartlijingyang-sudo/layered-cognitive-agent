@@ -11,6 +11,26 @@ entries:
       min_confidence: 0.7
       min_evidence: 3
 
+  # Durable ticket persistence is distinct from lifecycle subscription. It owns
+  # only references, idempotency and leases; it cannot read evidence or promote skills.
+  - id: lca-learning-review-ticket-store
+    name: lca_learning_review_ticket_store
+    $module: lca.plugins.learning.review_ticket_store
+    config:
+      database_path: .lca/learning-review.db
+
+  # Hermes-style post-turn review bridge. It receives only terminal lifecycle
+  # references, then exposes candidate-only assessment APIs to an external worker.
+  - id: lca-learning-review-lifecycle-subscriber
+    name: lca_learning_review_lifecycle_subscriber
+    $module: lca.plugins.learning.review_lifecycle
+    config:
+      enabled: true
+      statuses: [completed, failed, partial]
+      max_pending: 64
+      lease_seconds: 300
+      priority: 50
+
   # Failure analysis — records failed traces + emits retrospective insights.
   - id: lca-failure-analyzer
     name: lca_failure_analyzer
@@ -36,9 +56,9 @@ entries:
     name: lca_tool_cordis_control
     $module: lca.plugins.tools.cordis_control
     config:
-      allowed_actions:
-        - mount
-        - unmount
+      caller_grant:
+        - cordis_control.mount
+        - cordis_control.unmount
 
   - id: lca-tool-profile-diff
     name: lca_tool_profile_diff

@@ -32,7 +32,7 @@ class TestSpawnNoConcreteServices(unittest.TestCase):
             "ToolsService",
             "TransportService",
             "SimpleSafeExecutor",
-            "DefaultStopRule",
+            "DefaultStopPolicy",
             "MustConsultAllMembers",
         }
         imported: set[str] = set()
@@ -98,7 +98,7 @@ class TestLeadWallClockPropagation(unittest.TestCase):
     def test_lead_wall_clock_preserved(self) -> None:
         from unittest.mock import MagicMock
 
-        from lca.layer0_infra.observability import create_observability
+        from lca.harness.observability.assemble import make_minimal_bound
         from lca.layer3_agent.cognitive_agent import CognitiveAgent
         from lca.layer4_app.policies import LeadBudgetPolicy
         from lca.layer4_app.spawn import promote_lead
@@ -109,7 +109,7 @@ class TestLeadWallClockPropagation(unittest.TestCase):
         lead = CognitiveAgent(
             runtime,
             role_profile,
-            create_observability("memory"),
+            make_minimal_bound(),
             max_steps=10,
             max_wall_clock_seconds=900,
         )

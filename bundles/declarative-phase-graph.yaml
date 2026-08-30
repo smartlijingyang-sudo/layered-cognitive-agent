@@ -1,0 +1,207 @@
+# ADR-0075: 默认认知阶段只通过显式 PhaseExecutor capability 选择。
+entries:
+  - id: phase.perceive.standard
+    name: phase_perceive_standard
+    $module: lca.plugins.phase_executors.perceive
+    config: {}
+
+  - id: phase.think.standard
+    name: phase_think_standard
+    $module: lca.plugins.phase_executors.think
+    config: {}
+
+  - id: phase.act.standard
+    name: phase_act_standard
+    $module: lca.plugins.phase_executors.act
+    config: {}
+
+  - id: phase.reflect.standard
+    name: phase_reflect_standard
+    $module: lca.plugins.phase_executors.reflect
+    config: {}
+
+  - id: phase.remember.standard
+    name: phase_remember_standard
+    $module: lca.plugins.phase_executors.remember
+    config: {}
+
+  - id: phase.stop.standard
+    name: phase_stop_standard
+    $module: lca.plugins.phase_executors.stop
+    config: {}
+
+  # 节点身份、入口、终止标记和访问上限同样由 Profile/Bundle 声明；编译器
+  # 只验证并投影，绝不注入 *.main、perceive 入口、stop 终止或固定访问上限。
+  - id: phase.topology.standard
+    name: phase_topology_standard
+    $module: lca.plugins.phase_topology.standard
+    config:
+      nodes:
+        - id: perceive.main
+          phase: perceive
+          binding: phase.perceive.standard
+          max_visits: 8
+          entry: true
+        - id: think.main
+          phase: think
+          binding: phase.think.standard
+          max_visits: 8
+        - id: act.main
+          phase: act
+          binding: phase.act.standard
+          max_visits: 8
+        - id: reflect.main
+          phase: reflect
+          binding: phase.reflect.standard
+          max_visits: 8
+        - id: remember.main
+          phase: remember
+          binding: phase.remember.standard
+          max_visits: 8
+        - id: stop.main
+          phase: stop
+          binding: phase.stop.standard
+          max_visits: 8
+          terminal: true
+
+  # 生产默认值：非副作用阶段可处理瞬时故障；动作阶段依赖 Effect Gateway 的
+  # 幂等语义，超时后不重放。所有常规阶段耗尽后均由图显式收敛至 stop。
+  - id: phase.execution_policy.resilient
+    name: phase_execution_policy_resilient
+    $module: lca.plugins.phase_policies.resilient
+    config:
+      policies:
+        perceive:
+          max_attempts: 2
+          timeout_seconds: 20
+          retry_on: [timeout, transient]
+          initial_backoff_seconds: 0.25
+          on_exhausted: route_to_stop
+        think:
+          max_attempts: 2
+          timeout_seconds: 90
+          retry_on: [timeout, transient]
+          initial_backoff_seconds: 0.5
+          on_exhausted: route_to_stop
+        act:
+          max_attempts: 1
+          timeout_seconds: 90
+          on_exhausted: route_to_stop
+        reflect:
+          max_attempts: 2
+          timeout_seconds: 30
+          retry_on: [timeout, transient]
+          initial_backoff_seconds: 0.25
+          on_exhausted: route_to_stop
+        remember:
+          max_attempts: 1
+          timeout_seconds: 30
+          on_exhausted: route_to_stop
+
+  # ADR-0075: 图的所有阶段连边由 Profile/Bundle 声明，编译器只验证并解释。
+  - id: phase.edge.standard
+    name: phase_edge_standard
+    $module: lca.plugins.phase_edges.standard
+    config:
+      approval_resume_node: think.main
+      edges:
+        - source: perceive.main
+          target: stop.main
+          when: result.result_kind == "phase_error"
+        - source: perceive.main
+          target: think.main
+          when: true
+        - source: think.main
+          target: stop.main
+          when: result.result_kind == "phase_error"
+        - source: think.main
+          target: act.main
+          when: true
+        - source: act.main
+          target: stop.main
+          when: result.result_kind == "phase_error"
+        - source: act.main
+          target: reflect.main
+          when: true
+        - source: reflect.main
+          target: stop.main
+          when: result.result_kind == "phase_error"
+        - source: reflect.main
+          target: remember.main
+          when: true
+        - source: remember.main
+          target: stop.main
+          when: result.result_kind == "phase_error"
+        - source: remember.main
+          target: stop.main
+          when: true
+        - source: stop.main
+          target: perceive.main
+          when: not result.payload.should_stop
+          loop:
+            max_iterations: 8
+            budget: run.steps
+            terminal_predicate: result.payload.should_stop
+
+  # ADR-0074: 所有控制贡献均由独立插件提供，支持按槽替换（Phase 3b）。
+  - id: control.perceive.context
+    name: control_perceive_context
+    $module: lca.plugins.control_contributions.perceive_context
+    config: {}
+
+  - id: control.think.guard
+    name: control_think_guard
+    $module: lca.plugins.control_contributions.think_guard
+    config: {}
+
+  - id: control.act.authorize
+    name: control_act_authorize
+    $module: lca.plugins.control_contributions.act_authorize
+    config: {}
+
+  - id: control.act.budget
+    name: control_act_budget
+    $module: lca.plugins.control_contributions.act_budget
+    config: {}
+
+  - id: control.act.constrain
+    name: control_act_constrain
+    $module: lca.plugins.control_contributions.act_constrain
+    config: {}
+
+  - id: control.act.execute
+    name: control_act_execute
+    $module: lca.plugins.control_contributions.act_execute
+    config: {}
+
+  - id: control.act.safe-boundary
+    name: control_act_safe_boundary
+    $module: lca.plugins.control_contributions.act_safe_boundary
+    config: {}
+
+  - id: control.remember.admit
+    name: control_remember_admit
+    $module: lca.plugins.control_contributions.remember_admit
+    config: {}
+
+  - id: control.stop.decide
+    name: control_stop_decide
+    $module: lca.plugins.control_contributions.stop_decide
+    config: {}
+
+  # 防止跨工具或无工具路径在同一失败意图上做浅层反复认知；只在 STOP 治理槽收口。
+  - id: control.stop.focus
+    name: control_stop_focus
+    $module: lca.plugins.control_contributions.stop_focus
+    config:
+      max_consecutive_stagnant_turns: 3
+
+  - id: control.observe.checkpoint
+    name: control_observe_checkpoint
+    $module: lca.plugins.control_contributions.observe_checkpoint
+    config: {}
+
+  - id: control.observe.wildcard
+    name: control_observe_wildcard
+    $module: lca.plugins.control_contributions.observe_wildcard
+    config: {}

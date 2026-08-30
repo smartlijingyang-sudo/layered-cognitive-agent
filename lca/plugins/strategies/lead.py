@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.capabilities import STRATEGIES
 from lca.contracts.models.team.team_coordination import STRATEGY_KEY_LEAD, LeadMandate
 from lca.contracts.protocols import TeamAssembly
@@ -48,6 +49,7 @@ class Config(BaseModel):
     layer="L3",
     kind=PluginKind.PRIMITIVE,
     effects="none",
+    functional_group=FunctionalGroup.G8_COLLAB,
     description="Register lead TeamStrategy factory.",
     test_suite="tests/test_orchestration_coverage.py",
 )

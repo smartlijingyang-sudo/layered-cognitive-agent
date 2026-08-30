@@ -76,6 +76,10 @@ class _SidecarTransport:
         return {"success": True}
 
 
+def _store(tmp_path: Path) -> LocalFileStore:
+    return LocalFileStore(tmp_path / "files")
+
+
 def _plane() -> PlaneRef:
     return PlaneRef(
         id="dev-1",
@@ -88,31 +92,31 @@ def _plane() -> PlaneRef:
 
 
 @pytest.mark.asyncio
-async def test_relative_path_joins_root() -> None:
+async def test_relative_path_joins_root(tmp_path: Path) -> None:
     transport = _FakeTransport()
-    computer = MachineComputer(_plane(), transport)
+    computer = MachineComputer(_plane(), transport, store=_store(tmp_path))
     await computer.read_file(path="notes.txt")
     assert transport.calls[0][1]["path"] == "/home/lca-sandbox/notes.txt"
 
 
 @pytest.mark.asyncio
-async def test_out_of_root_raises_hitl() -> None:
-    computer = MachineComputer(_plane(), _FakeTransport())
+async def test_out_of_root_raises_hitl(tmp_path: Path) -> None:
+    computer = MachineComputer(_plane(), _FakeTransport(), store=_store(tmp_path))
     with pytest.raises(ApprovalPendingError):
         await computer.read_file(path="/mnt/data/x")
 
 
 @pytest.mark.asyncio
-async def test_execute_code_available_on_machine() -> None:
+async def test_execute_code_available_on_machine(tmp_path: Path) -> None:
     """MachineComputer now supports execute_code (temp file + interpreter)."""
-    computer = MachineComputer(_plane(), _FakeTransport())
+    computer = MachineComputer(_plane(), _FakeTransport(), store=_store(tmp_path))
     assert hasattr(computer, "execute_code")
 
 
 @pytest.mark.asyncio
-async def test_run_command_sends_timeout_s_and_timeout() -> None:
+async def test_run_command_sends_timeout_s_and_timeout(tmp_path: Path) -> None:
     transport = _FakeTransport()
-    computer = MachineComputer(_plane(), transport)
+    computer = MachineComputer(_plane(), transport, store=_store(tmp_path))
     await computer.run_command(command="false", timeout_s=15)
     op, args = transport.calls[0]
     assert op == "runCommand"
@@ -144,10 +148,10 @@ async def test_run_command_publishes_pdf_as_canonical_file_part(tmp_path: Path) 
 
 
 @pytest.mark.asyncio
-async def test_execute_code_uses_system_write_not_denied_lca_path() -> None:
+async def test_execute_code_uses_system_write_not_denied_lca_path(tmp_path: Path) -> None:
     """Temp scripts are infrastructure: write_files (system), not writeFile (.lca denied)."""
     transport = _SidecarTransport({})
-    computer = MachineComputer(_plane(), transport)
+    computer = MachineComputer(_plane(), transport, store=_store(tmp_path))
     result = await computer.execute_code(code="print(1)")
     assert result.success
     assert transport.writes, "execute_code must use MachineTransport.write_files"

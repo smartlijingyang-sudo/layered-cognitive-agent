@@ -46,9 +46,7 @@ def _is_plugin_decorated(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     return False
 
 
-def _missing_param_annotation(
-    args: ast.arguments, *, require_config: bool
-) -> list[str]:
+def _missing_param_annotation(args: ast.arguments, *, require_config: bool) -> list[str]:
     """返回缺标注的参数名列表（按形参顺序）。"""
     missing: list[str] = []
     pos_args = list(args.posonlyargs) + list(args.args)
@@ -96,27 +94,21 @@ def _check_file(path: Path) -> list[str]:
             # 返回类型：Coroutine[Any, Any, None]，目前允许 -> None / -> Awaitable[None]
             # _wrap 已经要求返回 None（PluginSetupFn 定义），所以缺返回标注也算违规。
             if _missing_return_annotation(node):
-                violations.append(
-                    f"{rel}:{node.lineno}: @plugin setup() 缺返回类型标注 (-> None)"
-                )
+                violations.append(f"{rel}:{node.lineno}: @plugin setup() 缺返回类型标注 (-> None)")
 
         # ── 规则 2：模块级 / 类外的 build_ 工厂函数 ────────────────────
         # build_ 函数名约定：注册到 ctx.register / ctx.provide 的工厂。
         # 必须有完整签名，否则调用方只能拿到 Callable[..., Any]。
         elif node.name.startswith("build_") and _is_module_level(tree, node):
             for arg in (
-                list(node.args.posonlyargs)
-                + list(node.args.args)
-                + list(node.args.kwonlyargs)
+                list(node.args.posonlyargs) + list(node.args.args) + list(node.args.kwonlyargs)
             ):
                 if arg.annotation is None and arg.arg != "self":
                     violations.append(
                         f"{rel}:{node.lineno}: build_ 工厂参数 '{arg.arg}' 缺类型标注"
                     )
             if _missing_return_annotation(node):
-                violations.append(
-                    f"{rel}:{node.lineno}: build_ 工厂 '{node.name}' 缺返回类型标注"
-                )
+                violations.append(f"{rel}:{node.lineno}: build_ 工厂 '{node.name}' 缺返回类型标注")
 
     return violations
 

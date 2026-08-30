@@ -1,0 +1,35 @@
+# PlanTemplate: rag (Retrieval-Augmented Generation)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+# Each corresponds to tests/golden/plan_templates/<name>.yaml.
+#
+# V12 acceptance: lca-ops plan list-templates outputs 12 template.
+# Each PlanTemplate specifies:
+# - relations used (subset of 11 ADR-0069 relations)
+# - control_slots used (subset of 11 ADR-0066 slots)
+# - required_groups (subset of 13 ADR-0069 functional groups)
+# - scope (default Scope)
+
+template_id: rag
+name: Retrieval-Augmented Generation
+description: RAG - retrieve relevant context, augment prompt, generate
+version: 1
+
+# relations used (subset of 11)
+relations:
+  - reads_fact
+  - contributes_to
+  - emits_fact
+
+# control_slots used (subset of 11)
+control_slots:
+  - perceive.context
+  - think.guard
+
+# required_groups (subset of 13)
+required_groups:
+  - G4  # Perception & Grounding
+  - G5  # Cognition, Models & Planning
+  - G6  # Decision, Command & Control
+
+# scope
+scope: run

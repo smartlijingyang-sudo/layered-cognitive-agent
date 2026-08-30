@@ -20,7 +20,7 @@ from lca.contracts.models.core.perception import ContextItem
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import ContextManifested
 from lca.contracts.protocols import PerceiveHub, Sensor
-from lca.contracts.protocols.cognition import SensorDisabled
+from lca.contracts.protocols.cognition import SensorDisabledError
 from lca.layer0_infra.observability.journal.engine import RunStore
 from lca.layer1_cognitive.brain.decision_gates import record_gate_decided
 from lca.layer1_cognitive.perceive_hub import SequentialPerceiveHub
@@ -53,7 +53,7 @@ class _FailingSensor(Sensor):
 
 class _DisabledSensor(Sensor):
     async def read(self, state: AgentState) -> list[ContextItem]:
-        raise SensorDisabled("skip me")
+        raise SensorDisabledError("skip me")
 
 
 @pytest.mark.asyncio
@@ -63,7 +63,7 @@ async def test_perceive_emits_manifest_with_sensor_items() -> None:
     hub: PerceiveHub = SequentialPerceiveHub(
         sensors=[_ClockSensor()],
         memory=None,
-        sink=JournalSink(store),
+        sink=JournalSink.for_store(store),
     )
     manifest = await hub.perceive(state)
     assert manifest.has_kind("clock")

@@ -17,14 +17,14 @@ record 时盖章进 ``StampedEvent.scope``，事件字段只承载领域语义�
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
-from contextlib import AbstractContextManager, contextmanager
-from contextvars import ContextVar
+from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Literal
+from importlib import import_module
+from typing import Any, Literal, cast
 
-from lca.contracts.atoms.ids import RunId, TraceId, new_run_id, new_trace_id
+from lca.contracts.atoms.ids import RunId, TraceId
 from lca.contracts.models.observability.event import OperationOutcome, RuntimeKind
 from lca.contracts.observability.evidence import (
     EvidenceRef,
@@ -1029,94 +1029,18 @@ def _scope_from_dict(payload: Mapping[str, object]) -> RunScope:
     )
 
 
-# Run-scope ambient state (ContextVar) — pre-C3 was defined here in journal.py.
-# Main moved these to lca/layer0_infra/observability/run_context.py per
-# ADR-0015 (contracts/ holds pure data, not ambient state). This branch keeps
-# the pre-C3 inline pattern until C19 lands the migration; downstream code
-# (lca/layer3_agent/{cognitive_agent,team_handle}, tests/test_run_identity)
-# still imports these names from journal.py. Removing the facade shim also
-# avoids the journal ↔ layer0 import cycle (see follow-up commit note).
-_run_scope: ContextVar[RunScope | None] = ContextVar("lca_run_scope", default=None)
+def run_scope(scope: RunScope) -> AbstractContextManager[None]:
+    """兼容导出：经 observability 包根转发唯一 RunScope 实现。"""
 
-TEAM_CONTAINER_ROLE = "team"
+    facade = import_module("lca.layer0_infra.observability")
+    return cast("AbstractContextManager[None]", facade.run_scope(scope))
 
 
 def get_current_run_scope() -> RunScope | None:
-    """读取当前 run 关联身份；未设置返回 None（solo 且未入 run 边界）。"""
-    return _run_scope.get()
+    """兼容导出：读取当前环境的唯一 RunScope。"""
 
-
-def adopt_run_scope(*, role: str) -> tuple[RunScope, bool]:
-    """Claim an allocated root Run, or mint a child / new root.
-
-    Gateway (and tests) may open ``RunScope(run_id=..., agent_role='')`` before
-    ``Agent`` / ``Team``.run. The first actor claims that id. Nested actors
-    (delegation, another speaker) mint a child. Returns ``(scope, is_root)``.
-    """
-    inherited = get_current_run_scope()
-    if inherited is None:
-        return RunScope(trace_id=new_trace_id(), run_id=new_run_id(), agent_role=role), True
-    claimed = bool(inherited.agent_role)
-    if (
-        inherited.run_id
-        and not inherited.parent_run_id
-        and not inherited.delegation_id
-        and not claimed
-    ):
-        return (
-            RunScope(trace_id=inherited.trace_id, run_id=inherited.run_id, agent_role=role),
-            True,
-        )
-    return (
-        RunScope(
-            trace_id=inherited.trace_id,
-            run_id=new_run_id(),
-            parent_run_id=inherited.run_id or inherited.parent_run_id,
-            delegation_id=inherited.delegation_id,
-            agent_role=role,
-        ),
-        False,
-    )
-
-
-@contextmanager
-def run_scope(scope: RunScope) -> Iterator[None]:
-    """包裹 run 边界：asyncio.create_task 拷贝 Context 后，成员任务读到的
-    是发起方的关联身份（与 delegator_scope 同一机制）。"""
-    token = _run_scope.set(scope)
-    try:
-        yield
-    finally:
-        _run_scope.reset(token)
-
-
-# ── v2 序列化兼容（stamped → JournalRecord）──
-# 真实实现在 lca/layer0_infra/observability/journal/serialization.py；
-# journal.py 在 contracts 层仅留这个 shim 以让旧 caller 继续可用。
-# 注：原 main 版用 import_module facade 调 facade.stamped_to_journal_record；
-# 我们让本分支依然能跑（避免 layer0/journal/serialization 的间接依赖），
-# 直接重新实现等价逻辑，避免循环导入和C19 提前迁移。
-@dataclass(frozen=True, slots=True)
-class _StampedRecordAdapter:
-    """thin shim — wraps a StampedEvent into a JournalRecord dict-like envelope."""
-
-    stamped: StampedEvent
-
-    def to_record(self) -> "JournalRecord":
-        return JournalRecord.from_stamped(self.stamped, **self.stamped_to_kwargs())
-
-    def stamped_to_kwargs(self) -> dict[str, Any]:
-        s = self.stamped
-        return {
-            "event": s.event,
-            "scope": s.scope,
-            "seq": s.seq,
-            "occurred_at": s.occurred_at,
-            "actor_run_id": s.actor_run_id,
-            "causation": getattr(s, "causation", None),
-            "redaction": getattr(s, "redaction", None),
-            "preview": getattr(s, "preview", None),
-        }
+    facade = import_module("lca.layer0_infra.observability")
+    return cast("RunScope | None", facade.get_current_run_scope())
 
 
 def stamped_to_journal_record(
@@ -1124,22 +1048,15 @@ def stamped_to_journal_record(
     **kwargs: object,
 ) -> JournalRecord:
     """兼容导出：将 Journal 账本事件投影为 v2 JournalRecord。"""
-    adapter = _StampedRecordAdapter(stamped)
-    record = adapter.to_record()
-    if kwargs:
-        # Best-effort: apply any overrides the caller asked for.
-        for k, v in kwargs.items():
-            if hasattr(record, k):
-                object.__setattr__(record, k, v)  # frozen-safe via slots path
-    return record
+
+    facade = import_module("lca.layer0_infra.observability")
+    return cast("JournalRecord", facade.stamped_to_journal_record(stamped, **kwargs))
 
 
 __all__ = [
     "Causation",
     "DescriptorRef",
     "JournalRecord",
-    "TEAM_CONTAINER_ROLE",
-    "adopt_run_scope",
     "get_current_run_scope",
     "run_scope",
     "stamped_to_journal_record",

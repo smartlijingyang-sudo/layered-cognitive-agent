@@ -34,13 +34,6 @@ class _StubStore:
 
 
 @dataclass
-class _StubObsHub:
-    """Stub BoundObservability exposing a RunStore."""
-
-    store: _StubStore = field(default_factory=_StubStore)
-
-
-@dataclass
 class _RecordingHub:
     """Capture the sensors handed to SequentialPerceiveHub."""
 
@@ -49,9 +42,9 @@ class _RecordingHub:
 
 
 def _install_perceive_hub_recorder(recorded):
-    """Install a SequentialPerceiveHub shim where PerceiveService looks it up."""
+    """Install a SequentialPerceiveHub shim at the selected strategy boundary."""
 
-    import lca.layer1_cognitive.perceive_service as service_module
+    import lca.plugins.perceive.sequential_hub as service_module
 
     class _RecordingPerceiveHub:
         def __init__(self, sensors, memory):
@@ -83,7 +76,7 @@ class TestPerceiveServiceWiring:
         try:
             build_perceive_hub(
                 _StubMemory(),  # type: ignore[arg-type]
-                hub=_StubObsHub(),
+                store=_StubStore(),
                 scope=booted_scope,
                 action_scope=ActionScope.SOLO,
             )
@@ -100,6 +93,30 @@ class TestPerceiveServiceWiring:
         )
 
     @pytest.mark.asyncio
+    async def test_explicit_store_is_used_by_journal_sensors(self, booted_scope) -> None:
+        """The composition seam must pass the chosen store directly to sensors."""
+        from lca.contracts.atoms.enums import ActionScope
+        from lca.layer4_app.spawn import build_perceive_hub
+
+        store = _StubStore()
+        recorded = _RecordingHub()
+        original, hub_module = _install_perceive_hub_recorder(recorded)
+        try:
+            build_perceive_hub(
+                _StubMemory(),  # type: ignore[arg-type]
+                store=store,
+                scope=booted_scope,
+                action_scope=ActionScope.SOLO,
+            )
+        finally:
+            hub_module.SequentialPerceiveHub = original  # type: ignore[assignment]
+
+        inbox_sensor = next(
+            sensor for sensor in recorded.sensors if type(sensor).__name__ == "InboxFactsSensor"
+        )
+        assert inbox_sensor._store is store
+
+    @pytest.mark.asyncio
     async def test_team_inbox_in_team_mode(self, booted_scope) -> None:
         """TeamInboxSensor MUST be present in team assemble."""
         from lca.contracts.atoms.enums import ActionScope
@@ -110,7 +127,7 @@ class TestPerceiveServiceWiring:
         try:
             build_perceive_hub(
                 _StubMemory(),  # type: ignore[arg-type]
-                hub=_StubObsHub(),
+                store=_StubStore(),
                 scope=booted_scope,
                 action_scope=ActionScope.MEMBER,
             )
@@ -134,7 +151,7 @@ class TestPerceiveServiceWiring:
         try:
             build_perceive_hub(
                 _StubMemory(),  # type: ignore[arg-type]
-                hub=_StubObsHub(),
+                store=_StubStore(),
                 scope=booted_scope,
                 action_scope=ActionScope.SOLO,
             )

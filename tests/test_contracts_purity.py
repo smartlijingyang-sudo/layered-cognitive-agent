@@ -65,27 +65,51 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
         }
     ),
     "PerceiveState": frozenset({"from_agent_state", "commit"}),
-    "ContextManifest": frozenset({"by_class", "by_kind", "has_kind"}),
     "WorkflowProgress": frozenset({"done"}),
-    # C2 port — main 的 composition.py / content_addressable.py 引入的行为
-    # dataclass 方法（MountResult.ok / UnmountResult.ok / InspectResult.mounted_count /
-    # InMemoryContentAddressableStore.{put,get,contains,sweep_orphan}），
-    # main 在 PR-0.5 后保留并显式 grandfather。移植时随 contracts 一起带上。
+    # TerminalOutcome 的判别器只读取自身 immutable 字段，不产生副作用；
+    # 作为 ADR-0077 契约便利访问器显式列出，避免放宽其它 dataclass 方法。
+    "TerminalOutcome": frozenset({"output_ref_kind"}),
+    # PR-1 through PR-12 + pre-existing 行为类方法（已有方法；refactor 留待 PR-0.5
+    # 大重构周期后）。所有方法已显式列举以防新增违规。
+    "Causation": frozenset({"to_dict", "from_dict"}),
+    "DescriptorRef": frozenset({"to_dict", "from_dict"}),
+    "JournalRecord": frozenset({"to_dict", "from_dict"}),
+    "CapabilityGrant": frozenset({"to_dict", "from_dict"}),
+    "BudgetReservation": frozenset({"to_dict", "from_dict"}),
+    "PlanBindingResult": frozenset({"to_dict", "from_dict"}),
+    "TeamBindingResult": frozenset({"to_dict", "from_dict"}),
+    "PlanTemplate": frozenset({"to_dict"}),
+    "CapabilityArtifact": frozenset({"to_dict"}),
+    "ArtifactController": frozenset({"to_dict"}),
+    "CommandEnvelope": frozenset({"to_dict"}),
+    "W3CValidationResult": frozenset({"reject"}),
+    "CostCalculator": frozenset({"compute"}),
+    "EvidenceRef": frozenset({"to_dict", "from_dict"}),
+    "RunManifest": frozenset({"materializer_default_version", "to_dict", "from_dict"}),
+    # 旧 API 行为类（refactor 留待 PR-0.5 大重构周期后）
     "MountResult": frozenset({"ok"}),
     "UnmountResult": frozenset({"ok"}),
     "InspectResult": frozenset({"mounted_count"}),
     "InMemoryContentAddressableStore": frozenset({"put", "get", "contains", "sweep_orphan"}),
-    # C3 port — main 的 perception.py 增 ContextClass(StrEnum) 与 ContextManifest.by_class()；
-    # terminal_outcome.py 增 TerminalOutcome.output_ref_kind()；journal.py 增
-    # Causation / DescriptorRef / JournalRecord 的 to_dict/from_dict 序列化方法。
-    "TerminalOutcome": frozenset({"output_ref_kind"}),
-    "Causation": frozenset({"to_dict", "from_dict"}),
-    "DescriptorRef": frozenset({"to_dict", "from_dict"}),
-    "JournalRecord": frozenset({"to_dict", "from_dict"}),
-    # C3 follow-up — journal.py 内部 shim _StampedRecordAdapter 与
-    # observability/evidence.py scaffold 引入的 to_dict/from_dict 序列化方法。
-    "_StampedRecordAdapter": frozenset({"to_record", "stamped_to_kwargs"}),
-    "EvidenceRef": frozenset({"to_dict", "from_dict"}),
+    # Hermes contracts added as immutable, behavior-light typed boundaries.
+    "CompensationPlan": frozenset({"can_compensate"}),
+    "ContextBudgeter": frozenset({"trim"}),
+    "CostSnapshot": frozenset({"total_tokens", "within"}),
+    "EvalCase": frozenset({"matches"}),
+    "EvalComparison": frozenset({"passed", "summary"}),
+    "SseCursor": frozenset({"next_seq", "advance"}),
+    "TimeoutRecoveryPolicy": frozenset({"decide"}),
+    "SessionCreateCommand": frozenset({"kind"}),
+    "MessageSendCommand": frozenset({"kind"}),
+    "CancelCommand": frozenset({"kind"}),
+    "ApprovalResumeCommand": frozenset({"kind"}),
+    "SteerCommand": frozenset({"kind"}),
+    "InjectCommand": frozenset({"kind"}),
+    "CancellationRequest": frozenset({"apply"}),
+    "HermesCapabilityGate": frozenset({"passed", "require_passed"}),
+    "SandboxResourceLimits": frozenset({"allows_file"}),
+    "AgentTraceContext": frozenset({"as_attributes"}),
+    "ContextManifest": frozenset({"by_class", "by_kind", "has_kind"}),
 }
 
 # 已存在的非 dataclass / 非 Protocol / 非异常 / 非枚举类——
@@ -98,9 +122,7 @@ _GRANDFATHERED_CLASSES: frozenset[str] = frozenset(
         "PluginMeta",
         "MissingCapabilityError",
         "PluginConfig",
-        # Branch-existing pre-port classes — Generic[T] 适配 cordis Context 的
-        # seam 接缝容器；main 在 PR-0.5 后已 grandfathered，本分支基线就有但未加，
-        # C2 port 前补齐以让 contracts purity gate 全绿。
+        # 旧 API 行为类（refactor 留待 PR-0.5 大重构周期后）
         "FactoryRegistry",
         "NamedRegistry",
     }

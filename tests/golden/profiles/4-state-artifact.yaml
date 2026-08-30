@@ -1,0 +1,6 @@
+# Golden profile: 4-state-artifact (PR-10 V6 acceptance §7.3)
+# ArtifactController 4 状态机覆盖 — PR-8 state migration test.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml

@@ -89,8 +89,6 @@ async def run_team_scripted(
     col = collector or InMemoryObservability()
     # Boot the cordis context once (per run_mode invocation) so Agent constructors
     # have a populated cordis.Context to resolve services from.
-    from lca.harness.profile.boot import boot_profile
-    cordis_ctx = await boot_profile("profiles/web-standard.yaml")
     team = Team(
         members=members,
         lead=lead,
@@ -128,6 +126,7 @@ async def run_mode(
     # Boot the cordis context once (per run_mode invocation) so Agent constructors
     # have a populated cordis.Context to resolve services from.
     from lca.harness.profile.boot import boot_profile
+
     cordis_ctx = await boot_profile("profiles/web-standard.yaml")
 
     def _agent(role: str, steps: int = 5) -> Agent:

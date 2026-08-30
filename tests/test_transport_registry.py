@@ -97,16 +97,28 @@ class TestUnimplementedTransport(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("tracked in", str(ctx.exception))
 
 
-class TestRegistryOverwrite(unittest.TestCase):
-    """后注册的 transport 覆盖先注册的（同 protocol_name）。"""
+class TestRegistryOwnership(unittest.TestCase):
+    """同一协议只能有一个发现型所有者。"""
 
-    def test_later_register_overwrites(self) -> None:
+    def test_later_register_rejects_duplicate_protocol_owner(self) -> None:
         registry = TransportRegistry()
-        t1 = InternalTransport()
-        t2 = InternalTransport()
-        registry.register(t1)
-        registry.register(t2)
-        self.assertIs(registry.resolve("internal"), t2)
+        first = InternalTransport()
+        registry.register(first)
+
+        with self.assertRaises(KeyError):
+            registry.register(InternalTransport())
+
+        self.assertIs(registry.resolve("internal"), first)
+
+    def test_register_as_rejects_duplicate_protocol_owner(self) -> None:
+        registry = TransportRegistry()
+        first = InternalTransport()
+        registry.register_as("internal", first)
+
+        with self.assertRaises(KeyError):
+            registry.register_as("internal", InternalTransport())
+
+        self.assertIs(registry.resolve("internal"), first)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 """SafeExecutor — permission → validate → ToolStarted → cache → retry → execute → ToolInvoked.
 
-Journal dual-track (ADR-0037 + UI SSOT):
-- ``arguments_preview`` / ``result_preview``: lossy strings (console/OTel)
-- ``plugin_state`` / ``files``: full structured UI truth (not AttributePolicy-truncated)
+ADR-0101 PR-2:tool 事件回归事实账本。``arguments`` / ``output`` 经
+``EvidenceStore.prepare()`` 落到 evidence/<sha256>.json;``files`` 仍
+作为 typed 字段(metadata-only,不截断)。
 """
 
 from __future__ import annotations
@@ -23,19 +23,16 @@ from lca.contracts.atoms.semantic_keys import (
 )
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ApprovalPendingError, ToolExecutionError
+from lca.contracts.models.observability.journal import ApprovalRequested
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
+from lca.contracts.observability.evidence import EvidenceRef
 from lca.contracts.protocols import SafeExecutor, Tool
+from lca.layer0_infra.observability import record
 from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
-from lca.layer1_cognitive.body.tool_result_preview import (
-    build_started_plugin_state,
-    compact_args_preview,
-    compact_payload_for_preview,
-)
 
 _log = structlog.get_logger("lca.safe_executor")
 
 _PERF_COUNTER_SCALE = 1000
-
 # Deterministic exceptions — retrying with the same args will never succeed.
 _DETERMINISTIC_EXCEPTIONS: tuple[type[BaseException], ...] = (
     ValueError,
@@ -51,17 +48,6 @@ _DETERMINISTIC_EXCEPTIONS: tuple[type[BaseException], ...] = (
 )
 
 
-def _tool_output_preview(obs: Observation) -> str:
-    """工具结果预览（成功取紧凑 payload，失败取错误）。"""
-    if obs.success:
-        return json.dumps(
-            compact_payload_for_preview(obs.payload),
-            ensure_ascii=False,
-            default=str,
-        )
-    return obs.error or ""
-
-
 def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
 
@@ -73,12 +59,43 @@ from lca.layer1_cognitive.body.tool_journal_emit import (  # noqa: E402
 )
 
 
+def _emit_approval_requested(tool: Tool, invocation_id: str) -> None:
+    """Record a human-input request without opening a tool invocation."""
+    record(
+        ApprovalRequested(
+            envelope_id=invocation_id,
+            tool_name=tool.name,
+            capability_grant=tool.name,
+            risk_level="human-input",
+        )
+    )
+
+
+def _resolve_evidence_pair() -> tuple[Any, Any]:
+    """Return (evidence_store, evidence_policy) from current bound observability。
+
+    注入 safe_executor 在 boot 时已通过 seam plugin 拿到 capability;如果没有
+    配 seam(测试场景),这里返回 (None, None) → emitter 走 no-ref 路径。
+    """
+    from lca.layer0_infra.observability import current_bound
+
+    bound = current_bound()
+    if bound is None:
+        return None, None
+    evidence = bound.evidence_binding()
+    return evidence.store, evidence.policy
+
+
 class SimpleSafeExecutor(SafeExecutor):
     """Permission → validate → ToolStarted → cache → retry → sandbox execute → ToolInvoked."""
 
     def __init__(self, permission_manifest: ToolPermissionManifest):
         self.permission_manifest = permission_manifest
         self._cache: dict[str, Observation] = {}
+        # ADR-0101 PR-2:stash arguments_ref from emit_tool_started so
+        # emit_tool_invoked carries the same ref (便于 ToolStarted↔ToolInvoked join)。
+        # keyed by invocation_id (单 run 单线程,dict 即可)。
+        self._started_refs: dict[str, EvidenceRef | None] = {}
 
     async def execute(
         self,
@@ -106,9 +123,21 @@ class SimpleSafeExecutor(SafeExecutor):
             )
 
         invocation_id = invocation_id.strip() or new_id("inv")
-        args_preview = compact_args_preview(args)
-        started_state = build_started_plugin_state(tool.name, args)
-        emit_tool_started(tool, args_preview, invocation_id, started_state)
+        evidence_store, evidence_policy = _resolve_evidence_pair()
+        if tool.name == "askUserQuestion":
+            # HIL requests pause before any external effect starts. Keep the
+            # journal in the approval lifecycle; a ToolStarted event would
+            # require a ToolInvoked/ToolDenied terminal fact even though the
+            # question has not been executed yet.
+            _emit_approval_requested(tool, invocation_id)
+        else:
+            self._started_refs[invocation_id] = emit_tool_started(
+                tool,
+                args,
+                invocation_id,
+                evidence_store=evidence_store,
+                evidence_policy=evidence_policy,
+            )
 
         with tool_invocation_scope(invocation_id):
             return await self._execute_with_retry(
@@ -117,7 +146,6 @@ class SimpleSafeExecutor(SafeExecutor):
                 retry_policy=retry_policy,
                 cache_config=cache_config,
                 invocation_id=invocation_id,
-                args_preview=args_preview,
             )
 
     async def _execute_with_retry(
@@ -128,7 +156,6 @@ class SimpleSafeExecutor(SafeExecutor):
         retry_policy: RetryPolicy,
         cache_config: CacheConfig,
         invocation_id: str,
-        args_preview: str,
     ) -> Observation:
         cache_key = f"{tool.name}:{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
         if cache_config.enabled and cache_key in self._cache:
@@ -137,11 +164,11 @@ class SimpleSafeExecutor(SafeExecutor):
             self._record_invoked(
                 tool,
                 args,
-                args_preview,
                 cached,
                 latency_ms=0,
                 attempt=0,
                 invocation_id=invocation_id,
+                arguments_ref=self._started_refs.get(invocation_id),
             )
             return cached
 
@@ -159,11 +186,11 @@ class SimpleSafeExecutor(SafeExecutor):
                 self._record_invoked(
                     tool,
                     args,
-                    args_preview,
                     obs,
                     latency_ms=_elapsed_ms(started),
                     attempt=attempts_used,
                     invocation_id=invocation_id,
+                    arguments_ref=self._started_refs.get(invocation_id),
                 )
                 return obs
             failure_kind = obs.extra.get(FAILURE_KIND)
@@ -175,11 +202,11 @@ class SimpleSafeExecutor(SafeExecutor):
                 self._record_invoked(
                     tool,
                     args,
-                    args_preview,
                     obs,
                     latency_ms=_elapsed_ms(started),
                     attempt=attempts_used,
                     invocation_id=invocation_id,
+                    arguments_ref=self._started_refs.get(invocation_id),
                 )
                 return obs
             last_obs = obs
@@ -192,11 +219,11 @@ class SimpleSafeExecutor(SafeExecutor):
             self._record_invoked(
                 tool,
                 args,
-                args_preview,
                 last_obs,
                 latency_ms=_elapsed_ms(started),
                 attempt=attempts_used,
                 invocation_id=invocation_id,
+                arguments_ref=self._started_refs.get(invocation_id),
             )
         detail = f"，最后错误: {last_error}" if last_error else ""
         raise ToolExecutionError(
@@ -207,24 +234,27 @@ class SimpleSafeExecutor(SafeExecutor):
     def _record_invoked(
         tool: Tool,
         args: dict[str, Any],
-        args_preview: str,
         obs: Observation,
         *,
         latency_ms: int,
         attempt: int,
         invocation_id: str,
+        arguments_ref: EvidenceRef | None = None,
     ) -> None:
         # Prefer sandbox/tool-provided id; fall back to SafeExecutor-assigned id.
         # ToolInvoked emission is delegated to tool_journal_emit so the
         # boundary guard sees a single canonical site (this module).
+        evidence_store, evidence_policy = _resolve_evidence_pair()
         emit_tool_invoked(
             tool,
             args,
-            args_preview,
             obs,
             latency_ms=latency_ms,
             attempt=attempt,
             invocation_id=invocation_id,
+            arguments_ref=arguments_ref,
+            evidence_store=evidence_store,
+            evidence_policy=evidence_policy,
         )
 
     async def _execute_once(self, tool: Tool, args: dict[str, Any], attempt: int) -> Observation:

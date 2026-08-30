@@ -86,7 +86,7 @@ class TestSearchSkillToolFiltering(unittest.IsolatedAsyncioTestCase):
         self._tmp.cleanup()
 
     async def test_search_skill_hides_tavily_when_api_configured(self) -> None:
-        tool = SkillSearchTool(self.importer)
+        tool = SkillSearchTool(self.importer, self.store)
         market_result = SkillSearchResult(
             items=(
                 SkillIndexEntry(

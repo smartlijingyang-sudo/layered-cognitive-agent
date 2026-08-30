@@ -1,20 +1,19 @@
-"""Plugin alignment to DSH spec — coverage, interaction uniqueness, seam runtime, inline instantiation.
+"""Plugin alignment — coverage, interaction uniqueness, seam runtime, inline instantiation.
 
 These four assertions cover the criteria from the alignment plan:
 
 * (a) Declaration shape scan — every ``lca/plugins/**/*.py`` ``@plugin`` module
-  declares ``name + inject + implements`` (``implements`` is the DSH
-  ``extends Service`` analogue).  Coverage = 100% minus an allowlist of
+  declares ``name + inject + implements`` ().  Coverage = 100% minus an allowlist of
   at most 10 shim modules (each allowlist entry has a one-line comment
   explaining why it cannot adopt the canonical shape).
 
-* (b) Interaction path uniqueness — the EventBus / HookRegistry story has
-  exactly one dispatch backend (cordis events).  Legacy SimpleEventBus /
-  SimpleHookRegistry names must exist only as typed façades (the cordis
-  wrapper); private dict-based dispatch implementations are forbidden.
+* (b) Interaction path uniqueness — EventBus and HookRegistry share exactly
+  one dispatch backend (cordis events); parallel local listener tables are
+  forbidden.
 
-* (c) Registry seams — BODIES / BRAINS / STOP_RULES / HOOKS / STRATEGIES
-  are ``FactoryRegistry`` instances on the booted Context (ADR-0062 §3).
+* (c) Registry seams — BODIES / BRAINS / HOOKS / STRATEGIES are
+  ``FactoryRegistry`` instances, while the State-cluster StopPolicy is a
+  directly injected Provider on the booted Context.
   A bundle that omits the memory Tier-1 service fails to boot with a
   message that names the missing capability key. No ``seam:`` Path-2.
 
@@ -43,6 +42,10 @@ _PLUGINS_DIR = _ROOT / "lca" / "plugins"
 # <= 10.
 ALLOWLIST: tuple[tuple[str, str], ...] = (
     ("__init__.py", "plugin package marker"),
+    ("composer/agent_assembly.py", "implementation helper owned by lca-plan-sub-composers"),
+    ("composer/plan_binding.py", "implementation helper owned by lca-plan-sub-composers"),
+    ("composer/runtime_factory.py", "implementation helper owned by lca-plan-sub-composers"),
+    ("composer/team_transport.py", "implementation helper owned by lca-plan-sub-composers"),
     # ToolsComposeService / TransportComposeService declare the
     # shape; keep them in coverage.
 )
@@ -56,9 +59,12 @@ DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
 
 def _all_plugin_modules() -> list[Path]:
+    """Return modules that declare the canonical ``@plugin`` entry point."""
     out: list[Path] = []
     for py in sorted(_PLUGINS_DIR.rglob("*.py")):
         if py.name == "__init__.py":
+            continue
+        if _read_plugin_meta(py) is None:
             continue
         out.append(py)
     return out
@@ -142,10 +148,8 @@ def test_tier1_plugin_shape() -> None:
 def test_eventbus_and_hookregistry_single_backend() -> None:
     """The only event/hook dispatch backend is cordis events.
 
-    ``SimpleEventBus`` / ``SimpleHookRegistry`` aliases may exist as
-    typed façades over cordis or as self-contained shims for unit tests
-    that don't boot a profile — but no private dict-based dispatch
-    implementation may live outside the two facade modules.
+    EventBus and HookRegistry dispatch must always route through Cordis
+    rather than a parallel local listener table.
     """
     layers = [
         _ROOT / "lca" / "layer1_cognitive" / "event_bus.py",
@@ -176,7 +180,6 @@ def test_eventbus_and_hookregistry_single_backend() -> None:
 _REGISTRY_SEAMS: tuple[str, ...] = (
     "bodies",
     "brains",
-    "stop_rules",
     "hooks",
     "team_strategies",
 )
@@ -196,7 +199,7 @@ def test_factory_registry_seams() -> None:
         )
     assert "simple" in ctx.inject("bodies")
     assert "default" in ctx.inject("brains")
-    assert "default" in ctx.inject("stop_rules")
+    assert ctx.inject("stop_policy") is not None
     assert "simple" in ctx.inject("hooks")
     assert "lead" in ctx.inject("team_strategies")
     assert "pipeline" in ctx.inject("team_strategies")
@@ -232,7 +235,6 @@ def test_boot_fails_when_seam_provider_missing() -> None:
     import tempfile
     from pathlib import Path
 
-    from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
     from lca.harness.profile.resolve import ProfileResolveError, resolve_profile
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -248,13 +250,14 @@ def test_boot_fails_when_seam_provider_missing() -> None:
         with pytest.raises(ProfileResolveError, match="memory"):
             resolve_profile(profile)
 
-    # Programmatic entries path: drop provider + consumers of memory, boot,
-    # then require_capability must still fail.
+    # Programmatic entries retain their fixture role: after the Manifest graph
+    # resolves, an omitted runtime provider remains observable as a missing
+    # capability instead of being replaced by a module-level fallback.
+    from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
+
     entries = load_profile_entries(DEFAULT_PROFILE)
     dropped = {"lca-memory-service", "lca-memory-provider"}
     pruned = [entry for entry in entries if entry["id"] not in dropped]
-    # Also drop anything that still lists memory in $module providers chain
-    # by attempting boot and asserting require fails.
     ctx = asyncio.run(boot_entries(pruned))
     with pytest.raises(MissingCapabilityError, match="memory"):
         require_capability(ctx, "memory")
@@ -289,15 +292,9 @@ def test_compose_root_no_inline_instantiation() -> None:
         "LlmService",
         "SandboxService",
     ]
-    # Inline instantiations the composition root legitimately performs as
-    # last-resort fallbacks when no plugin tree is booted (unit tests that
-    # compose without booting a profile). SimpleHookRegistry is a typed
-    # façade over CordisHookRegistry — it's the cordis events shim, not
-    # a capability service, so it doesn't go on the forbidden list.
-    inline_allowlist = (
-        ("InMemoryMiddlewareRegistry", "no-op fallback when plugin tree is absent"),
-        ("SimpleHookRegistry", "cordis events shim — typed façade over CordisHookRegistry"),
-    )
+    # All hook registries now come from the booted plugin tree; Layer-4 has
+    # no standalone hook-registry fallback to exempt from this guard.
+    inline_allowlist: tuple[tuple[str, str], ...] = ()
     offenders: list[str] = []
     for cls in forbidden_classes:
         pat = re.compile(rf"\b{cls}\(\)")

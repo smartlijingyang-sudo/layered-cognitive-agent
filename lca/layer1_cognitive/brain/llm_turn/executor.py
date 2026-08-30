@@ -98,8 +98,6 @@ async def _stream_turn(
             chunk = event.text or ""
             accumulated += chunk
             append_run_partial(chunk)
-        elif event.type == LLMStreamEventType.REASONING_TEXT_DELTA:
-            pass
         elif event.type == LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA:
             frame = push_tool_call_stream(
                 tool_slots,
@@ -108,12 +106,13 @@ async def _stream_turn(
                 arguments_delta=event.arguments_delta or "",
             )
             if frame is not None:
+                # ADR-0101 PR-2:ToolCallStreaming 不再有 arguments_preview /
+                # plugin_state 字段(0065 §四 L1);arguments 走 evidence 平面
+                # (ToolCall 周期内多次 emit 同一 arguments_ref 即可)。
                 record(
                     ToolCallStreaming(
                         tool_name=str(frame["tool_name"]),
                         tool_call_id=str(frame["tool_call_id"]),
-                        arguments_preview=str(frame["arguments_preview"]),
-                        plugin_state=dict(frame["plugin_state"]),
                     )
                 )
         elif event.type == LLMStreamEventType.COMPLETED and event.response is not None:

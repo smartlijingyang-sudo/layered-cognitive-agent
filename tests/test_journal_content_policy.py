@@ -42,8 +42,8 @@ class JournalContentPolicyTests(unittest.TestCase):
         assert "[REDACTED]" in out
 
     def test_redact_restricted_redacts_secrets(self) -> None:
-        secret = "Bearer sk-1234567890abcdefghij"
-        out = redact_restricted(secret)
+        credential = "Bearer sk-1234567890abcdefghij"
+        out = redact_restricted(credential)
         assert "sk-1234567890abcdefghij" not in out
         assert "[REDACTED]" in out
 

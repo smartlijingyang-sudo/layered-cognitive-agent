@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from deploy.lobehub.patches.ui.execution_target import _patch_switcher
 
 _SWITCHER = Path("lobehub-ui/src/features/ChatInput/ControlBar/HeteroDeviceSwitcher.tsx")
@@ -11,6 +13,8 @@ _CUSTOMIZATIONS = Path("deploy/lobehub/CUSTOMIZATIONS.md")
 
 
 def test_patch_drops_none_and_download_desktop() -> None:
+    if not _SWITCHER.is_file():
+        pytest.skip("lobehub-ui is an optional synced worktree and is not present")
     patched = _patch_switcher(_SWITCHER.read_text(encoding="utf-8"))
     assert "LCA: sidecar is use-computer" in patched
     assert "handleSelect('none')" not in patched

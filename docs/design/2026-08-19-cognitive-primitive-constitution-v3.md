@@ -11,7 +11,7 @@
 | 废止（作为评价，不在树内） | internal Manus v2 eval, 2026-08-19, not in tree |
 | 必须修订的 ADR | ADR-0002（废止「新特性只能 Hook」；PR1 写入 supersession 前向引用，全文补丁在 PR11） |
 | 必须遵守的 ADR | ADR-0001 五层单向、ADR-0004 Protocol-First、ADR-0005 L4 组合根、ADR-0015 contracts 无行为类、ADR-0030/0034/0035 Team、ADR-0037 Journal-as-Truth |
-| 装配仍有效 | [`2026-08-16-plugin-tree-runtime-design.md`](./2026-08-16-plugin-tree-runtime-design.md)、[`2026-08-19-cordis-migration-design.md`](./2026-08-19-cordis-migration-design.md)（运行时是 cordis；本文约束 *挂什么*，不换内核） |
+| 装配仍有效 | plugin-tree-runtime-design（已归档）、cordis-migration-design（已归档）——运行时是 cordis；本文约束 *挂什么*，不换内核 |
 
 **一句话：** Agent 的认知永远是封闭六步循环；世界副作用永远经 Body 内的执行窄门；模型可见事实永远可由 Journal 重建；跨 Agent 协作永远经有权限的消息与共享资源进入 Perceive。插件只换实现，不在循环上开洞。
 
@@ -4425,7 +4425,7 @@ class ContextBudgeter(Protocol):  # 家园：memory.py
 | `Body.act` | `(decision, state) -> Observation` | 同签名；禁止赋值 AgentState 字段 | 暂停仍抛 `ApprovalPendingError` |
 | `StopRule.decide` | 可写 `state.final_output` | 纯函数 → `StopDecision` | Runtime `apply_stop`（PR5） |
 | `CognitiveRuntime.__init__` | 无 hub | `perceive_hub: PerceiveHub`（必填生产路径） | 测试 `NullPerceiveHub`；L2 只依赖 Protocol |
-| `build_cognitive_runtime(...)` | 不存在 | `lca/layer4_app/runtime_factory.py` | PR5。**不**放 `loop_cognitive.py` |
+| `build_cognitive_runtime(...)` | 不存在 | `lca/plugins/composer/runtime_factory.py` | PR5。**不**放 `loop_cognitive.py` |
 | `DegradationPolicy` | glossary 已删除 | 恢复：词表外 parse + `degraded_from` | 与 Gate 词表内 rewrite 分工（§6.2） |
 
 `SupportsShortcut.try_shortcut` 保留。不新增 `evaluate`。不新增 `chat` ActionType。
@@ -4691,7 +4691,7 @@ class ApprovalResolved(JournalEvent):
 | harness-spine waterfall | 仅手平面工具管道可留；认知 middleware 淘汰 | PR4 删 loop_intervention；PR10 拆其余 |
 | `loop_intervention` 三路径 + Composer `install_loop_intervention` | **删除**。成功仍重复 → RepeatToolCallGate + PolicyFact | PR4 |
 | `lca-guard-step-budget` | 删除死插件；预算以 StopRule 为准 | PR4（删插件）/ 原「迁 StopRule」已无必要若 DefaultStopRule 已覆盖 |
-| `loop_cognitive.py` | **保持** LiveAgent `NotImplementedError`；`build_cognitive_runtime` 在 `layer4_app/runtime_factory.py` | PR5 |
+| `loop_cognitive.py` | **保持** LiveAgent `NotImplementedError`；`build_cognitive_runtime` 在 `plugins/composer/runtime_factory.py` | PR5 |
 | Inbox 未进 `_loop` | `/runs` 走 `followup`；steer/inject 进进行中的 run；`inbox-facts` 只读 journal | PR8（D24，不再门控） |
 | 三套事件词表 | Journal 唯一；SessionEventType 冻结；harness dual-write | PR2 起 |
 | workspace-reading Gates | artifacts Sensor **必做**；Sealer→Body；Terminal/Injector 只读 Manifest | PR3b + PR6 |
@@ -5391,7 +5391,7 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 ### PR5 — 忽略 `_emit` 返回；`apply_activation`；L4 `build_cognitive_runtime`
 
 - **标题：** ignore _emit return; apply_activation; runtime_factory
-- **文件：** `runtime_loop.py`；`lca/layer4_app/runtime_factory.py`（**不是** `loop_cognitive.py`）；`composer.py`；`default_stop_rule.py` 改为纯函数；`tests/test_architecture_conformance.py`；**必须改写** `tests/harness/test_runtime_middleware_integration.py`（返回值替换将静默 no-op）
+- **文件：** `runtime_loop.py`；`lca/plugins/composer/runtime_factory.py`（**不是** `loop_cognitive.py`）；`composer.py`；`default_stop_rule.py` 改为纯函数；`tests/test_architecture_conformance.py`；**必须改写** `tests/harness/test_runtime_middleware_integration.py`（返回值替换将静默 no-op）
 - **依赖：** PR4
 - **说明：** `_sync_activated_skills` → `reducer.apply_activation`。`loop_cognitive` 仍 NotImplemented LiveAgent。
 - **验证：**
@@ -5481,7 +5481,6 @@ v3「架构迁移完成」时 A1–A7 同时成立。早期 PR 只验收其切�
 - 原宪法：`2026-08-19-cognitive-primitive-plugin-design.md`（已归档）
 - Manus v2 评价：internal Manus v2 eval, 2026-08-19, not in tree
 - ADR-0001 五层；ADR-0002 认知闭环（控制面由本文废止）；ADR-0004 Protocol-First；ADR-0005 L4 组合根；ADR-0015 contracts 无行为类；ADR-0030/0034/0035 Team；ADR-0037 Journal-as-Truth；ADR-0045 Decision 形状；ADR-0047 tool wire；ADR-0049 咨询平面；ADR-0051 workspace/terminal gates；ADR-0055 run fact store
-- 装配：`docs/design/2026-08-16-plugin-tree-runtime-design.md`、`2026-08-19-cordis-migration-design.md`
 - 现网锚点：`lca/layer2_runtime/runtime_loop.py`、`lca/layer4_app/composer.py`、`lca/contracts/protocols/cognition.py`、`lca/contracts/models/observability/journal_catalog.py`、`lca/harness/middleware/registry.py`、`lca/layer1_cognitive/brain/reasoner.py`、`lca/layer1_cognitive/brain/decision_gates/__init__.py`、`gateway/runs/loop_drivers.py`
 - Anthropic, *Effective context engineering for AI agents*
 - Anthropic, *Patterns and problems in emerging multiagent systems*

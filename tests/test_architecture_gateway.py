@@ -37,9 +37,7 @@ def _check_file(relative_path: str) -> None:
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
             for forbidden in FORBIDDEN_MODULES:
-                assert forbidden not in module, (
-                    f"{relative_path} must not import from {module}"
-                )
+                assert forbidden not in module, f"{relative_path} must not import from {module}"
 
 
 def test_gateway_no_concrete_import() -> None:

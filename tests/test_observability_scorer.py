@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 def test_seam_provides_registry() -> None:
-    from lca.plugins import seam_fact_scorer as mod
+    from lca.plugins.seam_definitions.observability import fact_scorer as mod
 
     assert hasattr(mod, "setup")
     meta = getattr(mod.setup, "meta", {})

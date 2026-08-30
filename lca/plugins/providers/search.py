@@ -25,4 +25,4 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer0_infra.search.providers.tavily import search_tavily
 
     if "tavily" in config.providers:
-        ctx.inject("search").register("tavily", search_tavily)
+        ctx.require("search").register("tavily", search_tavily)

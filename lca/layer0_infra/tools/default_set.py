@@ -8,11 +8,10 @@ from __future__ import annotations
 
 from lca.contracts.models.core.plane import PlaneBindings, PlaneKind, PlaneRef
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.infra import Sandbox
-from lca.contracts.protocols.operational_skills import SkillPackageStore
+from lca.contracts.protocols.infra import MachineResolver, Sandbox
+from lca.contracts.protocols.operational_skills import SkillPackageInstaller
 from lca.layer0_infra.capability.search import SearchService
-from lca.layer0_infra.file_store import FileStore, get_default_file_store
-from lca.layer0_infra.plane.machine import resolve_machine, resolve_machine_transport
+from lca.layer0_infra.file_store import FileStore
 from lca.layer0_infra.plane.resolve import ref_of, resolve_plane_bindings, sandbox_ref_from
 from lca.layer0_infra.sandbox.factory import resolve_sandbox
 from lca.layer0_infra.tools import ask_user as ask_user_module
@@ -30,7 +29,8 @@ def build_g2a_chat_tools(
     *,
     sandbox: Sandbox | None = None,
     search: SearchService | None = None,
-    skill_store: SkillPackageStore | None = None,
+    skill_store: SkillPackageInstaller | None = None,
+    machine_resolver: MachineResolver | None = None,
     fallback: bool = True,
 ) -> list[Tool]:
     """Tools for LobeHub G2A chat — GeneralChatAgent parity."""
@@ -42,6 +42,7 @@ def build_g2a_chat_tools(
             sandbox=sandbox,
             search=search,
             skill_store=skill_store,
+            machine_resolver=machine_resolver,
             fallback=fallback,
         )
         if t.name != SEARCH_SKILL_TOOL
@@ -54,20 +55,20 @@ def build_default_tools(
     *,
     sandbox: Sandbox | None = None,
     search: SearchService | None = None,
-    skill_store: SkillPackageStore | None = None,
+    skill_store: SkillPackageInstaller | None = None,
+    machine_resolver: MachineResolver | None = None,
     fallback: bool = True,
 ) -> list[Tool]:
     """Tools available to gateway / auto-casting agents.
 
-    *fallback=False* (plugin-tree path): never call module-level
-    ``get_default_file_store`` / ``resolve_sandbox``. Missing seams
-    skip the corresponding tools instead of growing a second owner.
+    Missing explicit FileStore seams skip corresponding file tools instead
+    of constructing an ambient storage owner.
     """
-    file_store = store if store is not None else (get_default_file_store() if fallback else None)
+    file_store = store
     if bindings is not None:
         bound = bindings
     elif fallback:
-        bound = _ambient_bindings()
+        bound = _ambient_bindings(machine_resolver)
     else:
         bound = PlaneBindings(primary=None)
 
@@ -80,9 +81,9 @@ def build_default_tools(
 
     if file_store is not None:
         if bound.primary is not None:
-            computer.extend(_tools_for_ref(bound.primary, file_store, sandbox))
+            computer.extend(_tools_for_ref(bound.primary, file_store, sandbox, machine_resolver))
         if bound.secondary is not None:
-            computer.extend(_tools_for_ref(bound.secondary, file_store, sandbox))
+            computer.extend(_tools_for_ref(bound.secondary, file_store, sandbox, machine_resolver))
 
     if computer:
         skill_sandbox = (
@@ -110,16 +111,18 @@ def build_default_tools(
     ]
 
 
-def _ambient_bindings() -> PlaneBindings:
+def _ambient_bindings(machine_resolver: MachineResolver | None) -> PlaneBindings:
     sandbox = resolve_sandbox()
     sandbox_ref = sandbox_ref_from(sandbox) if sandbox is not None else None
-    return resolve_plane_bindings(resolve_machine(), sandbox_ref)
+    machine = machine_resolver.resolve_machine() if machine_resolver is not None else None
+    return resolve_plane_bindings(machine, sandbox_ref)
 
 
 def _tools_for_ref(
     plane: PlaneRef,
     file_store: FileStore,
     sandbox: Sandbox | None,
+    machine_resolver: MachineResolver | None,
 ) -> list[Tool]:
     if plane.kind is PlaneKind.SANDBOX:
         if sandbox is None:
@@ -127,7 +130,9 @@ def _tools_for_ref(
         return lca_computer.build_computer_tools(
             sandbox=sandbox, plane=plane, file_store=file_store
         )
-    transport = resolve_machine_transport(plane.id)
+    transport = (
+        machine_resolver.resolve_transport(plane.id) if machine_resolver is not None else None
+    )
     if transport is None:
         return []
     return lca_computer.build_machine_computer_tools(

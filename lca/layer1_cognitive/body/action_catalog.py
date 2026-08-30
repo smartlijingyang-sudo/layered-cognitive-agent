@@ -5,16 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from lca.contracts.atoms.enums import ActionScope, ActionType
-from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistryProtocol
-from lca.contracts.protocols.action import Action
-from lca.layer1_cognitive.body.action_handlers import (
-    DelegateOperation,
-    HandoffOperation,
-    RespondOperation,
-    UseToolOperation,
-)
-from lca.layer1_cognitive.body.action_registry import ActionRegistry
+from lca.contracts.atoms.enums import ActionType
 
 
 @dataclass(frozen=True)
@@ -67,62 +58,14 @@ def format_allowed_actions_desc(
     allowed_names: Sequence[str],
     specs: Sequence[ActionSpec] = BUILTIN_ACTION_SPECS,
 ) -> str:
-    by_name = {s.name: s for s in specs}
+    """Format the action names already permitted by compiled authority."""
+    by_name = {spec.name: spec for spec in specs}
     lines: list[str] = []
-    for i, name in enumerate(allowed_names):
+    for index, name in enumerate(allowed_names):
         spec = by_name.get(name)
-        desc = spec.description if spec is not None else f"{name} — (自定义)"
-        lines.append(f"{i + 1}. {desc}")
+        description = spec.description if spec is not None else f"{name} — (自定义)"
+        lines.append(f"{index + 1}. {description}")
     return "\n".join(lines)
 
 
-def _operation_for(
-    name: str,
-    tool_registry: ToolRegistry,
-    safe_executor: SafeExecutor,
-    transport_registry: TransportRegistryProtocol,
-) -> Action | None:
-    if name == ActionType.RESPOND:
-        return RespondOperation()
-    if name == ActionType.USE_TOOL:
-        return UseToolOperation(tool_registry, safe_executor)
-    if name == ActionType.DELEGATE:
-        return DelegateOperation(transport_registry)
-    if name == ActionType.HANDOFF:
-        return HandoffOperation(transport_registry)
-    return None
-
-
-_SCOPE_ACTIONS: dict[ActionScope, frozenset[str]] = {
-    ActionScope.SOLO: frozenset({ActionType.RESPOND, ActionType.USE_TOOL}),
-    ActionScope.MEMBER: frozenset({ActionType.RESPOND, ActionType.USE_TOOL}),
-    ActionScope.LEAD: frozenset(
-        {
-            ActionType.RESPOND,
-            ActionType.USE_TOOL,
-            ActionType.DELEGATE,
-            ActionType.HANDOFF,
-        }
-    ),
-}
-
-
-def build_default_action_registry(
-    tool_registry: ToolRegistry,
-    safe_executor: SafeExecutor,
-    transport_registry: TransportRegistryProtocol,
-    *,
-    scope: ActionScope = ActionScope.SOLO,
-) -> ActionRegistry:
-    allowed = _SCOPE_ACTIONS[scope]
-    registry = ActionRegistry()
-    for spec in BUILTIN_ACTION_SPECS:
-        if not spec.executable or spec.name not in allowed:
-            continue
-        op = _operation_for(spec.name, tool_registry, safe_executor, transport_registry)
-        if op is None:
-            continue
-        registry.register(spec.name, op)
-        for alias in spec.aliases:
-            registry.register_alias(alias, spec.name)
-    return registry
+__all__ = ["BUILTIN_ACTION_SPECS", "ActionSpec", "format_allowed_actions_desc"]

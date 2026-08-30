@@ -12,6 +12,7 @@ from lca.contracts.protocols.operational_skills import (
     SkillImportError,
     SkillIndexEntry,
     SkillPackage,
+    SkillPackageInstaller,
     SkillSearchResult,
 )
 from lca.layer0_infra.skills.disk_store import DiskSkillPackageStore, sanitize_skill_id
@@ -32,11 +33,11 @@ from lca.layer0_infra.skills.zip_security import (
 
 
 class HttpSkillImporter(SkillImporter):
-    """Fetch skill packages from network and persist via DiskSkillPackageStore."""
+    """Fetch skill packages from network and persist through the installer seam."""
 
     def __init__(
         self,
-        store: DiskSkillPackageStore | None = None,
+        store: SkillPackageInstaller | None = None,
         market: LobeHubMarketClient | None = None,
         settings: SkillSettings | None = None,
     ) -> None:
@@ -45,7 +46,7 @@ class HttpSkillImporter(SkillImporter):
         self._market = market if market is not None else LobeHubMarketClient(self._settings)
 
     @property
-    def store(self) -> DiskSkillPackageStore:
+    def store(self) -> SkillPackageInstaller:
         return self._store
 
     async def search_market(

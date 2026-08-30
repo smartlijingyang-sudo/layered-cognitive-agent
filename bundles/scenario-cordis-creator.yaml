@@ -2,16 +2,49 @@
 # Per spec §13.3: standard + Composer.mount/unmount + cordis_control tool.
 
 entries:
-  # Cordis control tool (Tier-3) — mount/unmount/inspect/publish
+  # Mount governance is selected independently from the Composer factory.
+  - id: lca-composition-invariant-default
+    name: lca_composition_invariant_default
+    $module: lca.plugins.seam_definitions.composition_invariant
+    config: {}
+
+  # CordisComposer provider (Tier-2) — 把 CordisComposer 工厂挂到
+  # ``composition.compose_factory`` 命名 seam，供 cordis_control 工具运行时
+  # 拿到 composer 实例。single-port 模式下 web-standard 绑此 bundle 即可。
+  - id: lca-composer-provider
+    name: lca_composer_provider
+    $module: lca.plugins.providers.composition_provider
+    config: {}
+
+  # Creator persona is a profile capability rather than an adapter-local
+  # builder. Custom Creator personas replace only this entry.
+  - id: lca-role-cordis-creator
+    name: lca_role_cordis_creator
+    $module: lca.plugins.roles.cordis_creator
+    config: {}
+
+  # The Composer-bound control tool is created by a profile-owned factory. Its
+  # caller grant is declared here, never embedded in a Gateway mode adapter.
   - id: lca-tool-cordis-control
     name: lca_tool_cordis_control
     $module: lca.plugins.tools.cordis_control
     config:
-      allowed_actions:
-        - inspect
-        - mount
-        - unmount
-        - publish
+      caller_grant:
+        - cordis_control.inspect
+        - cordis_control.author
+        - cordis_control.validate
+        - cordis_control.promote
+        - tool_fs.read
+        - tool_fs.write
+        - tool_bash
+        - file_write
+
+  # Register this mode independently from Solo and Team adapters. Profiles can
+  # replace or remove it without editing the base Gateway mode configuration.
+  - id: lca-mode-cordis-creator-default
+    name: lca_mode_cordis_creator_default
+    $module: gateway.plugins.cordis_creator_mode
+    config: {}
 
   # File + bash — creator needs to author bundles on disk.
   - id: lca-tool-bash

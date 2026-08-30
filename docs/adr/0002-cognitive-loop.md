@@ -89,8 +89,8 @@ v3 落地（PR1–PR12）：
 
 ### v3 架构命令（PR1–PR12 落地）
 
-1. **PR1** — 冻结 hook 控制面，删死插件（loop_intervention / step_budget），
-   ADR supersession 前向引用（本 ADR）。
+1. **PR1** — 冻结 hook 控制面，删死插件（loop_intervention / step_budget）及
+   空 `lca.plugins.guards` 兼容包，ADR supersession 前向引用（本 ADR）。
 2. **PR2** — Journal 缺口 + ContextManifest dual-write。
 3. **PR3a/b/c** — PerceiveHub 协议 + 具名工厂 + Reasoner 切断私有路径。
 4. **PR4** — RepeatToolCallGate 替代 loop_intervention；PolicyFact 替代 WM。

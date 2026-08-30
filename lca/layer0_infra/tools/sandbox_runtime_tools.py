@@ -11,7 +11,7 @@ from lca.contracts.models.core.sandbox import (
     SANDBOX_PREINSTALLED_PYTHON_PACKAGES,
 )
 from lca.contracts.protocols import Sandbox, Tool
-from lca.layer0_infra.file_store import FileStore, LocalFileStore, get_default_file_store
+from lca.layer0_infra.file_store import FileStore, LocalFileStore
 from lca.layer0_infra.sandbox.runtime_scope import ensure_sandbox_runtime
 from lca.layer0_infra.tools.run_attachment_scope import get_current_run_attachment_ids
 from lca.layer0_infra.tools.sandbox_exec_observation import (
@@ -50,10 +50,10 @@ class SandboxInspectTool(Tool):
     def __init__(
         self,
         sandbox: Sandbox,
-        store: FileStore | LocalFileStore | None = None,
+        store: FileStore | LocalFileStore,
     ) -> None:
         self._sandbox = sandbox
-        self._store: FileStore = store if store is not None else get_default_file_store()
+        self._store = store
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
@@ -102,10 +102,10 @@ class SandboxExecuteTool(Tool):
     def __init__(
         self,
         sandbox: Sandbox,
-        store: FileStore | LocalFileStore | None = None,
+        store: FileStore | LocalFileStore,
     ) -> None:
         self._sandbox = sandbox
-        self._store: FileStore = store if store is not None else get_default_file_store()
+        self._store = store
 
     def validate(self, args: dict[str, Any]) -> str | None:
         code = args.get("code")

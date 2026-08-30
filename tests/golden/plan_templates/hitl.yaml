@@ -1,0 +1,22 @@
+# PlanTemplate: hitl (Human-in-the-Loop)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: hitl
+name: Human-in-the-Loop
+description: Pause for human approval at key decision points
+version: 1
+
+relations:
+  - evaluates
+  - governs
+  - reads_fact
+
+control_slots:
+  - act.authorize
+  - think.guard
+
+required_groups:
+  - G5
+  - G6
+
+scope: turn

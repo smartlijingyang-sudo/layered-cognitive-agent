@@ -1,6 +1,15 @@
 # test-minimal — L4 spawn / strategy tests without LLM env patch.
 # Same plugin surface as web-standard (base + web-app); secrets optional.
-
+#
+# ADR-0076 W1：test / null profile 必须显式声明 fallback_policy，避免
+# 类构造函数默认值隐式触发运行时 fallback；本 profile 标记自身为 test
+# profile，对全部 closure 必需 capability 接受 test_default 策略。
 bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
+
+fallback_policy:
+  effect_handler_registry: test_default
+  delta_handler_registry: test_default
+  evidence_store: test_default
+  reducer: test_default

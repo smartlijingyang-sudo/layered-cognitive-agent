@@ -1,0 +1,29 @@
+# web-standard-continuous — durable sessions plus worker-driven activation.
+#
+# This profile keeps the standard governed cognitive graph while selecting an
+# on-disk StateStore and installing the separate continuous control plane.
+# A deployment still supplies one SessionWorkActivator and runs worker loops;
+# the control plane deliberately never bypasses the Session command boundary.
+name: web-standard-continuous
+description: |
+  Production-oriented Web profile for resumable agents. It selects SQLite
+  AgentState persistence and durable trigger/work leasing while retaining the
+  standard approval, budget, Journal and effect-receipt governance path.
+bundles:
+  - bundles/base.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
+  - bundles/declarative-phase-graph.yaml
+  - bundles/continuous-control-plane.yaml
+
+patch:
+  - id: lca-llm-resolver
+    config:
+      default_model: qwen3.7-plus
+      load_dotenv: true
+
+  - id: lca-state-store-provider
+    config:
+      providers: [memory, sqlite]
+      active_provider: sqlite
+      sqlite_database_path: .lca/agent-state.db

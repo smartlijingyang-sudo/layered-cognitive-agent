@@ -9,11 +9,12 @@ from lca.contracts.harness.projection import (
     ProjectionChange,
     ProjectionDefinition,
     ProjectionSnapshot,
+    SessionProjectionRegistry,
 )
 from lca.contracts.harness.session import SessionEvent
 
 
-class InMemoryProjectionRegistry:
+class InMemoryProjectionRegistry(SessionProjectionRegistry):
     """Per-session fold of registered projections."""
 
     def __init__(self) -> None:
@@ -35,6 +36,11 @@ class InMemoryProjectionRegistry:
         session_id = event.session_id
         if session_id not in self._states:
             self.bind_session(session_id)
+        current_seq = self._seq[session_id]
+        if event.seq <= current_seq:
+            raise ValueError(
+                f"projection event sequence must increase: {event.seq} <= {current_seq}"
+            )
         self._seq[session_id] = event.seq
         for key, definition in self._definitions.items():
             before = self._states[session_id][key]

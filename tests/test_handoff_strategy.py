@@ -4,14 +4,22 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from lca.contracts.atoms.enums import ActionScope
 from lca.contracts.models.core.decision import Decision, DelegationSpec
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.models.core.state import Budget
-from lca.layer1_cognitive.body.simple_body import SimpleBody
+from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.declarative_phase_graph import PhaseInput, PhaseResult
+from lca.harness.profile.plan_compiler import compile_plan
+from lca.harness.profile.resolve import resolve_profile
 from lca.layer3_agent.orchestration_strategies import HandoffStrategy
-from lca.layer4_app.runtime_factory import NullPerceiveHub
+from lca.plugins.composer.runtime_factory import (
+    NullPerceiveHub,
+    RuntimeDeps,
+    build_fixture_cognitive_runtime,
+)
+from tests.phase_executors import standard_phase_executors
+from tests.support.action_authority import build_test_action_registry, build_test_body
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
@@ -104,7 +112,6 @@ class TestHandoffActionType(unittest.TestCase):
         from lca.contracts.models.team.role_team import ToolPermissionManifest
         from lca.layer0_infra.transport.agent_transport import InternalTransport
         from lca.layer0_infra.transport.transport_registry import TransportRegistry
-        from lca.layer1_cognitive.body.action_catalog import build_default_action_registry
         from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
         from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 
@@ -112,8 +119,10 @@ class TestHandoffActionType(unittest.TestCase):
         safe_exec = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
         transport_reg = TransportRegistry()
         transport_reg.register(InternalTransport())
-        registry = build_default_action_registry(
-            tool_reg, safe_exec, transport_reg, scope=ActionScope.LEAD
+        registry = build_test_action_registry(
+            tools=tool_reg,
+            safe_executor=safe_exec,
+            transport=transport_reg,
         )
         self.assertIn("handoff", registry.allowed_action_types())
 
@@ -136,11 +145,10 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
         mock_transport.send_task = AsyncMock(side_effect=_send_task)
         transport_registry.resolve = MagicMock(return_value=mock_transport)
 
-        body = SimpleBody(
+        body = build_test_body(
             tool_registry,
             safe_executor,
-            transport_registry=transport_registry,
-            action_scope=ActionScope.LEAD,
+            transport=transport_registry,
         )
 
         decision = Decision(
@@ -162,7 +170,7 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
         """handoff 缺少 delegate_to 应报错。"""
         tool_registry = MagicMock()
         safe_executor = MagicMock()
-        body = SimpleBody(tool_registry, safe_executor, action_scope=ActionScope.LEAD)
+        body = build_test_body(tool_registry, safe_executor)
 
         decision = Decision(
             decision_id="d1",
@@ -178,22 +186,36 @@ class TestHandoffBodyAction(unittest.IsolatedAsyncioTestCase):
             await body.act(decision, state)
 
 
+class _AllowContribution:
+    async def execute(self, _context: object, _input: PhaseInput) -> PhaseResult:
+        return PhaseResult(
+            result_kind="control",
+            payload=ControlVerdict(
+                plugin_id="test.allow-contribution",
+                kind=ControlVerdictKind.ALLOW,
+            ),
+        )
+
+
 class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
     """CognitiveRuntime 在 handoff 时应停止循环。"""
 
     async def test_runtime_stops_on_handoff(self) -> None:
-        """handoff action 应触发 StopRule 返回 should_stop=True。"""
-        from lca.layer2_runtime.default_stop_rule import DefaultStopRule
-        from lca.layer2_runtime.outcome_policies.default_outcome_policy import (
-            DefaultStopOutcomePolicy,
-        )
-        from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+        """handoff action 应触发 StopPolicy 返回 should_stop=True。"""
+        from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
+        from lca.plugins.state.stop_policy import DefaultStopPolicy
 
         brain = MagicMock()
         body = MagicMock()
         memory = MagicMock()
         hooks = MagicMock()
         state_store = MagicMock()
+        plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
+        phase_executors: dict[str, object] = dict(standard_phase_executors())
+        allow = _AllowContribution()
+        for binding in plan.phase_bindings:
+            for contribution in binding.contributions:
+                phase_executors[contribution.executor] = allow
 
         hooks.trigger = AsyncMock()
         memory.perceive = AsyncMock(side_effect=lambda s: s)
@@ -216,15 +238,28 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
         body.act = AsyncMock(return_value=observation)
 
         state_store.save = AsyncMock(return_value="ref")
+        stop_policy = DefaultStopPolicy(DefaultArtifactClosure())
+        perceive_hub = NullPerceiveHub()
 
-        runtime = CognitiveRuntime(
-            brain,
-            body,
-            memory,
-            hooks,
-            state_store,
-            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
-            perceive_hub=NullPerceiveHub(),
+        runtime = build_fixture_cognitive_runtime(
+            RuntimeDeps(
+                brain=brain,
+                body=body,
+                memory=memory,
+                hooks=hooks,
+                state_store=state_store,
+                stop_policy=stop_policy,
+                perceive_hub=perceive_hub,
+                phase_capabilities={
+                    "brain": brain,
+                    "body": body,
+                    "memory": memory,
+                    "perceive_hub": perceive_hub,
+                    "stop_policy": stop_policy,
+                },
+                compiled_plan=plan,
+                phase_executors=phase_executors,
+            )
         )
         result = await runtime.run("test task", max_steps=10)
 

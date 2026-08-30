@@ -29,4 +29,4 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     if "local" in config.providers:
         resolved = resolve_sandbox()
         if resolved is not None:
-            ctx.inject("sandbox").register("local", resolved, activate=True)
+            ctx.require("sandbox").register("local", resolved, activate=True)

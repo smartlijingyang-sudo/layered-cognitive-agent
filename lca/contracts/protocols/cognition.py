@@ -38,14 +38,6 @@ class SensorDisabledError(RuntimeError):
     """Raised by a Sensor to signal "skip me this turn" (per spec §5.5)."""
 
 
-# Backwards-compat alias — C4 renamed ``SensorDisabled`` → ``SensorDisabledError``
-# for clarity. Downstream code on this branch (lca/layer1_cognitive/perceive_hub,
-# tests/test_journal_reducer_apply_delta_equivalent_to_fold_events,
-# tests/test_team_message_publish) still imports the old name. Restore as thin
-# alias so callers keep working. Mirrors C1/C3 alias precedent.
-SensorDisabled = SensorDisabledError
-
-
 @runtime_checkable
 class PerceiveHub(Protocol):
     """Combine ``Memory.perceive`` with a list of Sensors into a ContextManifest.

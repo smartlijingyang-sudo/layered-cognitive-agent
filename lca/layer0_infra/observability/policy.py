@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+import json
 import re
 from enum import Enum
 from typing import Any
@@ -24,6 +26,7 @@ _PREVIEW_KEYS = frozenset(
 _SECRET_PATTERN: re.Pattern[str] = re.compile(
     r"(sk-|pk-|api[_-]?key[_-]?|token[_-]?)[\w-]{8,}", re.IGNORECASE
 )
+_SECRET_KEYS = frozenset({"authorization", "cookie", "set-cookie", "proxy-authorization"})
 
 _PREVIEW_LEN_MINIMAL = 0
 _PREVIEW_LEN_STANDARD = 600
@@ -74,11 +77,38 @@ def redact_restricted(text: str) -> str:
     return sanitize(stripped[:_RESTRICTED_PREVIEW_MAX]) + _SUFFIX + " " + _REDACTED
 
 
+def json_default(value: object) -> object:
+    """``json.dumps(..., default=)``：dataclass / Enum 走结构，其余转字符串。"""
+    if isinstance(value, Enum):
+        return value.value
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return dataclasses.asdict(value)
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat):
+        converted = isoformat()
+        if isinstance(converted, str):
+            return converted
+    return str(value)
+
+
 def safe_repr(value: Any) -> Any:
-    """结构化安全表示：原语透传，复杂对象 fallback ``repr()``。"""
+    """结构化安全表示：原语透传，复杂对象走 JSON 可序列化结构。"""
     if isinstance(value, (str, int, float, bool, type(None))):
         return value
-    return repr(value)
+    return json.loads(json.dumps(value, ensure_ascii=False, default=json_default))
+
+
+def otel_safe_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
+    """OTel 只接受原语；嵌套值用 stdlib ``json.dumps`` 压成字符串。"""
+    out: dict[str, Any] = {}
+    for key, value in attributes.items():
+        if isinstance(value, (bool, int, float, str)):
+            out[key] = value
+        elif value is None:
+            continue
+        else:
+            out[key] = json.dumps(value, ensure_ascii=False, default=json_default)
+    return out
 
 
 class AttributePolicy:
@@ -117,12 +147,24 @@ class AttributePolicy:
             return self._prepare_str(key, value)
         if isinstance(value, (int, float, bool)):
             return value
+        if isinstance(value, dict):
+            return {str(k): self._prepare_value(str(k), v) for k, v in value.items()}
         if isinstance(value, (list, tuple)):
-            return [safe_repr(v) for v in value]
-        return safe_repr(value)
+            return [self._prepare_value(key, v) for v in value]
+        try:
+            loaded = json.loads(json.dumps(value, ensure_ascii=False, default=json_default))
+        except (TypeError, ValueError):
+            return self._prepare_str(key, str(value))
+        if isinstance(loaded, (dict, list)):
+            return self._prepare_value(key, loaded)
+        if isinstance(loaded, str):
+            return self._prepare_str(key, loaded)
+        return loaded
 
     def _prepare_str(self, key: str, text: str, *, journal_kind: str | None = None) -> str | None:
         text = text.replace("\r\n", "\n")
+        if self._redact and key.lower() in _SECRET_KEYS:
+            return _REDACTED
         if self._redact:
             text = sanitize(text)
         if journal_kind == _JOURNAL_KIND_CONTENT:

@@ -1,0 +1,51 @@
+"""Runtime-lifecycle subscriber registry seam.
+
+The seam creates an empty neutral registry only. Provider plugins independently
+contribute passive subscribers at profile boot, while a single composite provider
+freezes the registry into the runtime binding before any Agent Loop executes.
+"""
+
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+from lca.contracts.capabilities import RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY
+from lca.contracts.protocols.runtime_lifecycle import RuntimeLifecycleSubscriberRegistry
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.layer2_runtime.runtime_event_publisher import InMemoryRuntimeLifecycleSubscriberRegistry
+
+
+class Config(BaseModel):
+    """The neutral registry has no configurable behavior."""
+
+    model_config = {"extra": "forbid"}
+
+
+@plugin(
+    id="lca-runtime-lifecycle-subscriber-registry-seam",
+    Config=Config,
+    provides=[RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY.key],
+    requires=[],
+    implements=[RuntimeLifecycleSubscriberRegistry],
+    layer="L2",
+    effects="none",
+    description="Provide the neutral registry for passive Agent Loop lifecycle subscribers.",
+    test_suite="tests/layer2_runtime/test_runtime_lifecycle_plugins.py",
+    kind=PluginKind.SEAM,
+)
+async def setup(ctx: PluginContext, config: BaseModel) -> None:
+    """Mount an empty registry; contributor providers register all behavior."""
+
+    del config
+    ctx.provide(
+        RUNTIME_LIFECYCLE_SUBSCRIBER_REGISTRY.key,
+        InMemoryRuntimeLifecycleSubscriberRegistry(),
+    )
+
+
+__all__ = [
+    "Config",
+    "InMemoryRuntimeLifecycleSubscriberRegistry",
+    "RuntimeLifecycleSubscriberRegistry",
+    "setup",
+]

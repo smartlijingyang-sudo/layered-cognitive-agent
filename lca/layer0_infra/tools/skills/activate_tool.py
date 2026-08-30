@@ -19,6 +19,8 @@ from lca.contracts.protocols.operational_skills import (
 from lca.layer0_infra.search.service import any_search_provider_available
 from lca.layer0_infra.search.skill_policy import is_redundant_cli_search_skill
 from lca.layer0_infra.skills.activation_scope import register_activated
+from lca.layer0_infra.tools.contract.render import RenderContract, contract
+from lca.layer0_infra.tools.contract.schema import COMMON
 
 ACTIVATE_SKILL_TOOL = "activate_skill"
 
@@ -28,6 +30,22 @@ _REDIRECT_WEB_SEARCH_MESSAGE = (
 )
 
 
+@contract(
+    RenderContract(
+        tool_name="activate_skill",
+        identifier="lobe-skills",
+        api_name="activateSkill",
+        args=(COMMON["skill_id"].rename("name"),),
+        state=(
+            COMMON["name"],
+            COMMON["title"],
+            COMMON["description"],
+            COMMON["has_resources"],
+            COMMON["content"],
+        ),
+        content_field="content",
+    )
+)
 class SkillActivateTool(Tool):
     name = ACTIVATE_SKILL_TOOL
     description = (
@@ -82,9 +100,16 @@ class SkillActivateTool(Tool):
 
         body = skill_preamble() + package.content
         summary = (package.summary or "").strip()
+        # ADR-0102: payload is the Tool's wire-shape view, flattened so the
+        # RenderContract reader (``project_tool_state``) can pick fields
+        # directly from the top level.  Use snake_case python keys the
+        # ``activate_skill`` contract expects (``has_resources``).
+        # ``text`` stays at the top because the contract's content_field
+        # is ``"content"`` and we want ``text`` available for the inline
+        # fallback / extra consumers.
         state = {
             "success": True,
-            "hasResources": bool(package.resource_paths),
+            "has_resources": bool(package.resource_paths),
             "source": "agent",
             "id": package.skill_id,
             "name": package.name,
@@ -100,7 +125,7 @@ class SkillActivateTool(Tool):
         return Observation(
             observation_id=new_id("obs"),
             success=True,
-            payload={"text": body, "skill_id": package.skill_id, "state": state},
+            payload={"text": body, "skill_id": package.skill_id, **state},
             content_type=ContentType.TEXT,
             latency_ms=latency_ms,
         )

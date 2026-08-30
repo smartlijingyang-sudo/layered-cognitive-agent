@@ -26,8 +26,12 @@ from lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector import 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INJECTOR_PATH = (
-    REPO_ROOT / "lca" / "layer1_cognitive" / "brain" / "decision_gates" /
-    "artifact_respond_injector.py"
+    REPO_ROOT
+    / "lca"
+    / "layer1_cognitive"
+    / "brain"
+    / "decision_gates"
+    / "artifact_respond_injector.py"
 )
 
 
@@ -136,25 +140,12 @@ class TestArtifactRespondInjectorManifest:
         for node in ast.walk(tree):
             if isinstance(node, ast.Call):
                 func = node.func
-                if (
-                    isinstance(func, ast.Name)
-                    and func.id == "get_run_workspace"
-                ):
-                    offenders.append(
-                        f"{INJECTOR_PATH.relative_to(REPO_ROOT)}:"
-                        f"{node.lineno}"
-                    )
-                if (
-                    isinstance(func, ast.Attribute)
-                    and func.attr == "get_run_workspace"
-                ):
-                    offenders.append(
-                        f"{INJECTOR_PATH.relative_to(REPO_ROOT)}:"
-                        f"{node.lineno}"
-                    )
+                if isinstance(func, ast.Name) and func.id == "get_run_workspace":
+                    offenders.append(f"{INJECTOR_PATH.relative_to(REPO_ROOT)}:{node.lineno}")
+                if isinstance(func, ast.Attribute) and func.attr == "get_run_workspace":
+                    offenders.append(f"{INJECTOR_PATH.relative_to(REPO_ROOT)}:{node.lineno}")
         assert not offenders, (
-            "ArtifactRespondInjector must NOT call get_run_workspace(); "
-            f"offenders: {offenders}"
+            f"ArtifactRespondInjector must NOT call get_run_workspace(); offenders: {offenders}"
         )
 
 

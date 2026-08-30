@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from gateway.device_gateway.auth import AuthError, verify_token
+from gateway.device_gateway.bind import DeviceMachineResolver
+from gateway.device_gateway.hub import DeviceHub
 from gateway.device_gateway.models import DeviceConnection
 from gateway.device_gateway.registry import DeviceRegistry
 from gateway.device_gateway.settings import DeviceGatewaySettings
@@ -55,6 +57,35 @@ def test_channel_attach_detach(tmp_path: Path) -> None:
     registry.detach_channel("d1", "c1")
     assert registry.select_online("d1") is None
     assert registry.get("d1") is not None
+
+
+def test_device_machine_resolver_is_bound_to_explicit_registry_and_hub(tmp_path: Path) -> None:
+    registry = DeviceRegistry(str(tmp_path / "devices.db"))
+    registry.register_device(
+        device_id="d1",
+        hostname="box",
+        platform="linux",
+        home="/home/u",
+        workspace="/workspace",
+        user_id="u1",
+    )
+    registry.attach_channel(
+        "d1",
+        DeviceConnection(
+            connection_id="c1",
+            channel="cli",
+            connected_at=datetime.now(UTC),
+            websocket=object(),
+        ),
+    )
+    resolver = DeviceMachineResolver(registry, DeviceHub(registry))
+
+    machine = resolver.resolve_machine("d1")
+
+    assert machine is not None
+    assert machine.id == "d1"
+    assert machine.root == "/workspace"
+    assert resolver.resolve_transport("d1") is not None
 
 
 def test_workspace_pool(tmp_path: Path) -> None:

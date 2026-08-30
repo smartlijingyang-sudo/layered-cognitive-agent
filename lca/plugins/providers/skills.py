@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from lca.contracts.protocols.operational_skills import SkillPackageStore
+from lca.contracts.protocols.operational_skills import SkillPackageInstaller
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -16,10 +16,10 @@ class Config(BaseModel):
 @plugin(
     id="lca-skills-provider",
     requires=["skills"],
-    implements=[SkillPackageStore],
+    implements=[SkillPackageInstaller],
     layer="L0",
     effects="none",
-    description="Register SkillPackageStore providers on the SkillsService Definition.",
+    description="Register SkillPackageInstaller providers on the SkillsService Definition.",
     test_suite="tests/test_plugin_tree_single_owner.py",
     kind=PluginKind.PROVIDER,
 )
@@ -27,4 +27,4 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.layer0_infra.skills.factory import resolve_skill_store
 
     if "disk" in config.providers:
-        ctx.inject("skills").register("disk", resolve_skill_store())
+        ctx.require("skills").register("disk", resolve_skill_store())

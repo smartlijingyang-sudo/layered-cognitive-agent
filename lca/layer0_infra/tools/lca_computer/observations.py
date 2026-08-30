@@ -28,17 +28,19 @@ def build_computer_observation(
     start: float,
     store: FileStore,
 ) -> Observation:
-    """Build an Observation from a ComputerOpResult, storing generated files."""
+    """Build an Observation from a ComputerOpResult, storing generated files.
+
+    ADR-0102: payload is the Tool's wire-shape view, flattened so the
+    RenderContract reader (``project_tool_state``) can pick fields directly
+    from the top level.  The legacy ``"state"`` sub-dict is no longer
+    emitted — its keys are merged at the top.  The runtime
+    (``runtime_exec._normalize_guest_state``) has already converted
+    camelCase to snake_case; we don't rename here.
+    """
     latency_ms = int((time.monotonic() - start) * 1000)
     plugin_state = dict(result.state)
-    payload: dict[str, Any] = {
-        "state": plugin_state,
-        "content": result.content,
-        "summary": _truncate(result.content),
-    }
     if result.exec_result is not None:
-        payload["exit_code"] = result.exec_result.exit_code
-        plugin_state.setdefault("exitCode", result.exec_result.exit_code)
+        plugin_state.setdefault("exit_code", result.exec_result.exit_code)
 
     command = str(plugin_state.get("command") or "")
     stdout = str(plugin_state.get("stdout") or result.content or "")
@@ -48,14 +50,21 @@ def build_computer_observation(
         tool_name=tool_name,
         command=command,
     )
-    plugin_state["files"] = file_parts
+    if file_parts:
+        plugin_state["files"] = file_parts
+    else:
+        plugin_state.pop("files", None)
+
+    payload: dict[str, Any] = {
+        **plugin_state,
+        "content": result.content,
+        "summary": _truncate(result.content),
+    }
 
     extra: dict[str, Any] = {}
     if file_parts:
         extra["files"] = file_parts
         _record_harvest(file_parts, result=result, tool_name=tool_name)
-    else:
-        plugin_state.pop("files", None)
 
     if not result.success:
         extra[FAILURE_KIND] = FAILURE_KIND_EXECUTION

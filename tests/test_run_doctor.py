@@ -6,9 +6,9 @@ import json
 from pathlib import Path
 
 from gateway.runs.doctor import diagnose
-from gateway.runs.live import LiveTail
 from gateway.runs.session import RunSession, RunStatus
 from lca.layer0_infra.observability.journal.journal_io import JOURNAL_SCHEMA_VERSION
+from lca.layer0_infra.observability.journal.live_tail import LiveTail
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
@@ -60,7 +60,16 @@ def test_doctor_flags_h3_when_tail_closes_while_running(tmp_path: Path) -> None:
     assert report.hops["H3"].ok is False
 
 
-def test_doctor_flags_factory_when_tool_started_without_state(tmp_path: Path) -> None:
+def test_doctor_factory_unverifiable_from_jsonl(tmp_path: Path) -> None:
+    """ADR-0102: the renderer-facing projection lives on ToolInvoked.
+
+    ``projected_state`` is SSE-only — jsonl never carries it (stripped by
+    ``JsonlJournalProjector._strip_sse_only_fields`` before disk write).
+    Therefore the doctor cannot fact-check the projection from jsonl; the
+    factory field is always ok=True / missing list empty when scanning the
+    journal.  Wire-level validation lives in the SSE encoder / contract
+    registry, not here.
+    """
     path = tmp_path / "run_x.jsonl"
     _write_jsonl(
         path,
@@ -78,8 +87,8 @@ def test_doctor_flags_factory_when_tool_started_without_state(tmp_path: Path) ->
     tail = LiveTail()
     session = _session(status=RunStatus.COMPLETED, tail=tail, jsonl_path=path)
     report = diagnose(session, path)
-    assert report.factory["ok"] is False
-    assert "web_search" in report.factory["tools_missing_plugin_state"]
+    assert report.factory["ok"] is True
+    assert list(report.factory["tools_missing_plugin_state"]) == []
     assert report.broken_hop is None
 
 
@@ -93,6 +102,39 @@ def test_doctor_broken_hop_is_first_false(tmp_path: Path) -> None:
     assert report.hops["H2"].ok is False
     assert report.hops["H3"].ok is False
     assert report.broken_hop == "H2"
+
+
+def test_doctor_reads_v2_envelope_fields(tmp_path: Path) -> None:
+    path = tmp_path / "run_x.jsonl"
+    _write_jsonl(
+        path,
+        [
+            {
+                "schema": JOURNAL_SCHEMA_VERSION,
+                "event_id": "evt-finished",
+                "run_id": "run_x",
+                "run_seq": 4,
+                "occurred_at": 4.0,
+                "committed_at": 4.0,
+                "scope": {"trace_id": "t", "run_id": "run_x", "agent_role": "助手", "step": 0},
+                "causation": {"parent_event_id": "", "links": []},
+                "descriptor": {
+                    "type": "AgentRunFinished",
+                    "version": 1,
+                    "payload_schema_version": 1,
+                },
+                "data": {"status": "completed", "output_text": "done", "error": ""},
+                "evidence": [],
+            }
+        ],
+    )
+    session = _session(status=RunStatus.COMPLETED, tail=LiveTail(), jsonl_path=path)
+
+    report = diagnose(session, path)
+
+    assert report.hops["H2"].ok is True
+    assert report.hops["H2"].extra["last_seq"] == 4
+    assert report.hops["H2"].extra["counts"] == {"AgentRunFinished": 1}
 
 
 def test_doctor_works_from_jsonl_without_session(tmp_path: Path) -> None:

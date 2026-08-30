@@ -1,0 +1,31 @@
+# Runtime core bundle — mandatory declarative runtime primitives.
+#
+# This bundle keeps the State-cluster stop policy available to minimal profiles
+# that enable observability or tooling without the full web application bundle.
+name: runtime-core
+description: |
+  Minimal declarative runtime primitives required by profile boot closure.
+entries:
+  - id: lca.registries.factory_seams
+    name: lca_registries_factory_seams
+    $module: lca.plugins.registries.factory_seams
+    config: {}
+  - id: state.stop-policy.default
+    name: state_stop_policy_default
+    $module: lca.plugins.state.stop_policy
+    config: {}
+
+  # Minimal production profiles still need an explicitly selected loop owner.
+  # The registry and driver are independent plugin entries, so specialized
+  # profiles can replace the driver without changing runtime-core consumers.
+  - id: lca-run-loop-driver-registry
+    name: lca_run_loop_driver_registry
+    $module: lca.plugins.loop_drivers.registry
+    config:
+      default: cognitive
+
+  - id: lca-loop-cognitive
+    name: lca_loop_cognitive
+    $module: gateway.plugins.cognitive_loop
+    config:
+      target: cognitive

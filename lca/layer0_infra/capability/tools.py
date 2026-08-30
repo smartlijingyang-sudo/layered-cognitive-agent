@@ -1,8 +1,8 @@
 """tools seam Definition — owns ctx.tools.
 
-Mirrors DSH ``core/tools``: a registry of tool factories. Each factory
-``bind(s)``s a run's bindings (plane / file_store / sandbox / workspace) into
-a concrete ``Tool`` — the DSH ``ToolFactory.bind`` pattern. Consumers
+Registry of tool factories. Each factory ``bind(s)``s a run's bindings
+(plane / file_store / sandbox / workspace) into a concrete ``Tool``.
+Consumers
 (loop / body) receive the forked per-run registry, never a process-global
 tool table.
 
@@ -21,7 +21,7 @@ T = TypeVar("T", bound=Tool)
 
 
 class ToolFactory(Generic[T]):
-    """A tool factory bound to run bindings (DSH ``ToolFactory.bind``)."""
+    """A tool factory bound to run bindings."""
 
     name: str
     description: str
@@ -37,7 +37,7 @@ _Factory = Callable[[Any], Tool | list[Tool] | None]
 class ToolsService(ToolRegistry):
     """Service Definition：工具工厂注册表 + 每 Run 实例化。
 
-    与 DSH 对齐：``register_factory`` 是唯一的 provider 挂载点；
+    ``register_factory`` 是唯一的 provider 挂载点；
     ``fork_for_run`` 对每个工厂 bind 出一份只含本 run 实例的注册表。
     禁止在 bind 之外调用 resolve_machine() / resolve_sandbox()。
     """

@@ -7,6 +7,8 @@ import os
 import sys
 import unittest
 
+from cordis import Context
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.protocols import (
@@ -34,6 +36,8 @@ from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
 from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
 from lca.layer0_infra.tools.weather import build_tools as build_weather_tools
 from lca.layer0_infra.transport.agent_transport import InternalTransport
+from lca.layer0_infra.transport.transport_registry import TransportRegistry
+from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
@@ -42,18 +46,23 @@ from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
-from lca.layer1_cognitive.event_bus import SimpleEventBus
-from lca.layer1_cognitive.hook_registry import SimpleHookRegistry
+from lca.layer1_cognitive.event_bus import CordisEventBus
+from lca.layer1_cognitive.hook_registry import CordisHookRegistry
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 
 # L2
-from lca.layer2_runtime.default_stop_rule import DefaultStopRule
-from lca.layer2_runtime.outcome_policies.default_outcome_policy import DefaultStopOutcomePolicy
-from lca.layer2_runtime.runtime_loop import CognitiveRuntime
+from lca.layer2_runtime.reducer import DefaultReducer
 
 # L3
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
-from lca.layer4_app.runtime_factory import NullPerceiveHub
+from lca.plugins.composer.runtime_factory import (
+    NullPerceiveHub,
+    RuntimeDeps,
+    build_fixture_cognitive_runtime,
+)
+from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
+from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
+from lca.plugins.state.stop_policy import DefaultStopPolicy
 from tests.support.unimplemented_transport import UnimplementedTransport
 
 
@@ -97,7 +106,7 @@ class TestL0ProtocolCompliance(unittest.TestCase):
 
     def test_default_registry_resolves_all_delegation_protocols(self):
         """DelegationSpec.protocol 的每个取值都能在默认 registry 中 resolve 到非空实现。"""
-        from lca.layer4_app.team_wiring import build_default_transport_registry
+        from lca.plugins.composer.team_transport import build_default_transport_registry
 
         registry = build_default_transport_registry()
         for protocol in ("internal", "a2a", "mcp"):
@@ -126,6 +135,8 @@ class TestL1ProtocolCompliance(unittest.TestCase):
         reasoner = self._build_brain_deps()
         brain = ModularBrain(
             reasoner=reasoner,
+            reducer=DefaultReducer(),
+            classifier=DefaultDecisionClassifier(),
             critic=SimpleCritic(),
         )
         self.assertIsInstance(brain, Brain)
@@ -142,7 +153,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
         from lca.contracts.models.team.role_team import ToolPermissionManifest
 
         executor = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
-        body = SimpleBody(tool_reg, executor)
+        body = SimpleBody(tool_reg, executor, TransportRegistry(), ActionRegistry())
         self.assertIsInstance(body, Body)
 
     def test_simple_tool_registry(self):
@@ -157,11 +168,11 @@ class TestL1ProtocolCompliance(unittest.TestCase):
     def test_simple_memory_system(self):
         self.assertIsInstance(SimpleMemorySystem(), MemorySystem)
 
-    def test_simple_event_bus(self):
-        self.assertIsInstance(SimpleEventBus(), EventBus)
+    def test_cordis_event_bus(self):
+        self.assertIsInstance(CordisEventBus(object()), EventBus)
 
-    def test_simple_hook_registry(self):
-        self.assertIsInstance(SimpleHookRegistry(), HookRegistry)
+    def test_cordis_hook_registry(self):
+        self.assertIsInstance(CordisHookRegistry(Context()), HookRegistry)
 
 
 class TestL2ProtocolCompliance(unittest.TestCase):
@@ -180,20 +191,36 @@ class TestL2ProtocolCompliance(unittest.TestCase):
         reasoner = PromptReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         brain = ModularBrain(
             reasoner=reasoner,
+            reducer=DefaultReducer(),
+            classifier=DefaultDecisionClassifier(),
             critic=SimpleCritic(),
         )
         body = SimpleBody(
             SimpleToolRegistry(),
             SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[])),
+            TransportRegistry(),
+            ActionRegistry(),
         )
-        runtime = CognitiveRuntime(
-            brain,
-            body,
-            SimpleMemorySystem(),
-            SimpleHookRegistry(),
-            InMemoryStateStore(),
-            perceive_hub=NullPerceiveHub(),
-            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+        memory = SimpleMemorySystem()
+        perceive_hub = NullPerceiveHub()
+        stop_policy = DefaultStopPolicy(DefaultArtifactClosure())
+        runtime = build_fixture_cognitive_runtime(
+            RuntimeDeps(
+                brain=brain,
+                body=body,
+                memory=memory,
+                hooks=CordisHookRegistry(Context()),
+                state_store=InMemoryStateStore(),
+                perceive_hub=perceive_hub,
+                phase_capabilities={
+                    "brain": brain,
+                    "body": body,
+                    "memory": memory,
+                    "perceive_hub": perceive_hub,
+                    "stop_policy": stop_policy,
+                },
+                stop_policy=stop_policy,
+            )
         )
         self.assertIsInstance(runtime, Runtime)
 
@@ -214,20 +241,36 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         reasoner = PromptReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
         brain = ModularBrain(
             reasoner=reasoner,
+            reducer=DefaultReducer(),
+            classifier=DefaultDecisionClassifier(),
             critic=SimpleCritic(),
         )
         body = SimpleBody(
             SimpleToolRegistry(),
             SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[])),
+            TransportRegistry(),
+            ActionRegistry(),
         )
-        runtime = CognitiveRuntime(
-            brain,
-            body,
-            SimpleMemorySystem(),
-            SimpleHookRegistry(),
-            InMemoryStateStore(),
-            perceive_hub=NullPerceiveHub(),
-            stop_rule=DefaultStopRule(outcome_policy=DefaultStopOutcomePolicy()),
+        memory = SimpleMemorySystem()
+        perceive_hub = NullPerceiveHub()
+        stop_policy = DefaultStopPolicy(DefaultArtifactClosure())
+        runtime = build_fixture_cognitive_runtime(
+            RuntimeDeps(
+                brain=brain,
+                body=body,
+                memory=memory,
+                hooks=CordisHookRegistry(Context()),
+                state_store=InMemoryStateStore(),
+                perceive_hub=perceive_hub,
+                phase_capabilities={
+                    "brain": brain,
+                    "body": body,
+                    "memory": memory,
+                    "perceive_hub": perceive_hub,
+                    "stop_policy": stop_policy,
+                },
+                stop_policy=stop_policy,
+            )
         )
         return CognitiveAgent(runtime, rp, make_minimal_bound()), rp, runtime
 

@@ -43,16 +43,13 @@ def _write_journal(path: Path, *events) -> Path:
     """Serialize a sequence of journal events to a jsonl file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
-        seq = 0
-        for event in events:
-            seq += 1
+        for seq, event in enumerate(events, start=1):
             from lca.contracts.models.observability.journal import (
                 RunScope,
                 StampedEvent,
             )
-            stamped = StampedEvent(
-                seq=seq, ts=float(seq), scope=RunScope(), event=event
-            )
+
+            stamped = StampedEvent(seq=seq, ts=float(seq), scope=RunScope(), event=event)
             f.write(json.dumps(stamped_to_record(stamped), ensure_ascii=False))
             f.write("\n")
     return path
@@ -95,9 +92,7 @@ class TestDiagnoseCommandExists:
         _write_journal(
             journal,
             InboxFollowupCreated(inbox_id="x", actor="user", target="t", priority="p"),
-            ApprovalResolved(
-                envelope_id="env-1", approved=False, resolver="user"
-            ),
+            ApprovalResolved(envelope_id="env-1", approved=False, resolver="user"),
             MemoryCommitted(layer="procedural"),
         )
 
@@ -107,9 +102,7 @@ class TestDiagnoseCommandExists:
             ("memory-poisoned", "memory_poisoned"),
             ("approval-rejected", "approval_rejected"),
         ):
-            result = runner.invoke(
-                app, ["diagnose", pattern, "--journal", str(journal)]
-            )
+            result = runner.invoke(app, ["diagnose", pattern, "--journal", str(journal)])
             assert expect_token in result.stdout, (
                 f"pattern {pattern}: expected token {expect_token!r} "
                 f"in stdout, got {result.stdout[:300]}"
@@ -151,9 +144,7 @@ class TestDiagnoseAliasExecution:
         assert "diagnose-approval-rejected" in names
 
     def test_diagnose_approval_rejected_runs(self, journal: Path) -> None:
-        result = runner.invoke(
-            app, ["diagnose-approval-rejected", "--journal", str(journal)]
-        )
+        result = runner.invoke(app, ["diagnose-approval-rejected", "--journal", str(journal)])
         # Should produce output mentioning the pattern.
         assert "approval_rejected" in result.stdout
 
@@ -162,9 +153,7 @@ class TestDiagnoseUnknownPattern:
     def test_unknown_pattern_exits_nonzero(self, tmp_path: Path) -> None:
         journal = tmp_path / "run.journal"
         journal.write_text("")
-        result = runner.invoke(
-            app, ["diagnose", "no-such-pattern", "--journal", str(journal)]
-        )
+        result = runner.invoke(app, ["diagnose", "no-such-pattern", "--journal", str(journal)])
         assert result.exit_code != 0
         assert "Unknown pattern" in result.stdout
 

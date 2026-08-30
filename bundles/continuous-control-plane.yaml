@@ -1,0 +1,11 @@
+# Durable continuous control plane — intentionally separate from the six-phase Agent Loop.
+# A deployment selects this bundle when it needs trigger ingestion and worker-driven
+# Session activation. The worker process supplies the SessionWorkActivator adapter.
+entries:
+  - id: lca-continuous-control-plane-factory
+    name: lca_continuous_control_plane_factory
+    $module: lca.plugins.providers.continuous_control_plane
+    config:
+      database_path: .lca/continuous-work.db
+      lease_seconds: 60
+      retry_delay_seconds: 5

@@ -31,6 +31,8 @@ from lca.layer1_cognitive.member_status import (
     record_delegation_return,
 )
 from lca.layer1_cognitive.member_status.tracking import _next_role_status
+from lca.layer2_runtime.reducer import DefaultReducer
+from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 
 # ── helpers ──
 
@@ -375,6 +377,8 @@ class TestModularBrainTryShortcutShortCircuit:
         )
         brain = ModularBrain(
             reasoner=reasoner,
+            reducer=DefaultReducer(),
+            classifier=DefaultDecisionClassifier(),
             critic=SimpleCritic(),
             decision_gate=MustConsultAllMembers(),
         )

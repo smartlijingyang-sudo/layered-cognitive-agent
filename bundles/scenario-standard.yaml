@@ -18,7 +18,7 @@ entries:
   # Skills (Tier-1)
   - id: lca-skills-service
     name: lca_skills_service
-    $module: lca.plugins.skills_service
+    $module: lca.plugins.seam_definitions.skills
     config: {}
 
   # Perceive / Gate groups (ADR-0056) — idempotent if web-app already loaded them
@@ -27,9 +27,19 @@ entries:
     $module: lca.plugins.perceive.service
     config: {}
 
+  - id: perceive.hub.sequential
+    name: perceive_hub_sequential
+    $module: lca.plugins.perceive.sequential_hub
+    config: {}
+
   - id: gates
     name: gates
     $module: lca.plugins.gates.service
+    config: {}
+
+  - id: gates.chain.sequential
+    name: gates_chain_sequential
+    $module: lca.plugins.gates.chained
     config: {}
 
   # Sensors (Tier-3)

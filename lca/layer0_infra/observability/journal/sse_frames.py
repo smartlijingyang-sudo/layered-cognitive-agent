@@ -1,11 +1,12 @@
 """journal → SSE 帧序列化 —— 零翻译传输契约（ADR-0055 §十三 + ADR-0063 PR-7）。
 
 ``StampedEvent`` 经 ``stamped_to_record`` 落盘同构序列化，再包装为
-标准 SSE 帧（``id`` = seq，``event`` = 事件类名，``data`` = JSON）。
+标准 SSE 帧（``id`` = run_seq，``event`` = 事件类名，``data`` = JSON）。
 ``domain`` 字段从 ``EventDescriptorRegistry`` 查表附加，供前端着色分组。
 
-audience 分类驱动 SSE 过滤：``audience=restricted`` 的事件（如 ReasoningDelta）
-默认不进 SSE live 帧；``audience=end_user`` 的事件才推送。
+ADR-0065 §四 + ADR-0101: live SSE frame 的 data 是 v2 envelope(同 disk),
+``*_preview`` 字段已经在 ``stamped_to_record`` 阶段被剥离;SSE 是观察通道,
+不再做任何脱敏或隐藏——journal fact 即事实。
 """
 
 from __future__ import annotations
@@ -17,9 +18,6 @@ from lca.contracts.models.observability.journal import StampedEvent
 from lca.layer0_infra.observability.event_catalog import descriptor_for
 from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
 
-# Lossy journal strings — jsonl/OTel only. Live UI uses plugin_state / files.
-_LIVE_REDACT_KEYS = frozenset({"result_preview", "arguments_preview"})
-
 SSE_SENTINEL: None = None
 """队列/订阅关闭哨兵（与 ``LiveTail.close`` 对齐）。"""
 
@@ -30,20 +28,15 @@ def is_sse_visible(event_type: str) -> bool:
     return descriptor.audience is not EventAudience.RESTRICTED
 
 
-def stamped_to_sse_frame(stamped: StampedEvent, *, redact: bool = True) -> str:
+def stamped_to_sse_frame(stamped: StampedEvent) -> str:
     """StampedEvent → SSE 文本帧（含 trailing blank line）。
 
-    ``redact=True``（LobeHub live）：抹掉 preview 字符串。
-    ``redact=False``（ops journal）：保留预览，给终端 debug。
+    ADR-0101: SSE 是观察通道，journal fact 即事实，不做任何脱敏。
+    data 已是 v2 envelope（无 preview / plugin_state 等 view-only 字段）。
     """
     event_type = type(stamped.event).__name__
     record = stamped_to_record(stamped)
     record["domain"] = descriptor_for(event_type).domain
-    event = record.get("event")
-    if redact and isinstance(event, dict):
-        for key in _LIVE_REDACT_KEYS:
-            if key in event:
-                event[key] = ""
     payload = json.dumps(record, ensure_ascii=False, default=str)
     return f"id: {stamped.seq}\nevent: {event_type}\ndata: {payload}\n\n"
 

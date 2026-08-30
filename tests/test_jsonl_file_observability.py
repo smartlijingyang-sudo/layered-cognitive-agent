@@ -26,6 +26,7 @@ from lca.layer0_infra.observability import (
 )
 from lca.layer0_infra.observability.journal.journal_io import (
     JOURNAL_SCHEMA_VERSION,
+    load_journal_records,
     read_journal,
 )
 from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
@@ -50,7 +51,7 @@ def _run_solo(bound: BoundObservability) -> None:
 
 
 class TestJsonlJournalProjector(unittest.TestCase):
-    """journal 落盘：schema 版本化、一行一事件、replay 可重建。"""
+    """journal 落盘：schema 版本化、indent=2 JSON、replay 可重建。"""
 
     def test_creates_file_including_missing_parents(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -69,14 +70,14 @@ class TestJsonlJournalProjector(unittest.TestCase):
             _run_solo(hub)
             if hub.journal is not None:
                 hub.journal.close()
-            lines = [json.loads(x) for x in output.read_text(encoding="utf-8").splitlines() if x]
-            self.assertGreaterEqual(len(lines), 2)
-            for line in lines:
-                self.assertEqual(line["schema"], JOURNAL_SCHEMA_VERSION)
-                self.assertIn("scope", line)
-                self.assertIn("event_type", line)
-                self.assertIn("event", line)
-            types = {x["event_type"] for x in lines}
+            records = load_journal_records(output)
+            self.assertGreaterEqual(len(records), 2)
+            for record in records:
+                self.assertEqual(record["schema"], JOURNAL_SCHEMA_VERSION)
+                self.assertIn("scope", record)
+                self.assertIn("descriptor", record)
+                self.assertEqual(record["descriptor"]["type"], record["descriptor"]["type"])
+            types = {x["descriptor"]["type"] for x in records}
             self.assertIn("AgentRunStarted", types)
             self.assertIn("AgentRunFinished", types)
 
@@ -85,7 +86,7 @@ class TestJsonlJournalProjector(unittest.TestCase):
             hub, output = _journal_hub(tmpdir)
             _run_solo(hub)
             hub.journal.close() if hub.journal else None
-            first = json.loads(output.read_text(encoding="utf-8").splitlines()[0])
+            first = load_journal_records(output)[0]
             scope = first["scope"]
             self.assertEqual(scope["trace_id"], "t")
             self.assertEqual(scope["run_id"], "r")
@@ -105,6 +106,85 @@ class TestJsonlJournalProjector(unittest.TestCase):
             self.assertEqual(events[0].event.team_id, "team-x")
             self.assertEqual(events[0].scope.run_id, "team-run")
             self.assertIsInstance(events[1].event, TeamRunFinished)
+
+    def test_disk_records_are_pretty_printed_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            hub, output = _journal_hub(tmpdir)
+            _run_solo(hub)
+            if hub.journal is not None:
+                hub.journal.close()
+            text = output.read_text(encoding="utf-8")
+            self.assertIn('\n  "schema":', text)
+            self.assertGreaterEqual(len(load_journal_records(output)), 2)
+
+    def test_nested_runtime_attributes_stay_json_objects(self) -> None:
+        from lca.layer0_infra.observability import record_runtime
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            hub, output = _journal_hub(tmpdir)
+            scope = RunScope(trace_id="t", run_id="r", agent_role="Solo")
+            with bind_backends(hub), run_scope(scope):
+                record_runtime(
+                    "journal",
+                    "phase.fact",
+                    plugin="perceive.main",
+                    attributes={
+                        "payload": {
+                            "node": "perceive.main",
+                            "semantic_phase": "perceive",
+                        }
+                    },
+                )
+            if hub.journal is not None:
+                hub.journal.close()
+            records = load_journal_records(output)
+            self.assertGreaterEqual(len(records), 1)
+            payload = records[0]["data"]["attributes"]["payload"]
+            self.assertEqual(
+                payload,
+                {"node": "perceive.main", "semantic_phase": "perceive"},
+            )
+            text = output.read_text(encoding="utf-8")
+            self.assertIn('\n        "node": "perceive.main"', text)
+
+    def test_read_journal_accepts_compact_jsonl(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "compact.jsonl"
+            compact = {
+                "schema": JOURNAL_SCHEMA_VERSION,
+                "event_id": "01TESTCOMPACTJSONL0000000000",
+                "run_id": "r",
+                "run_seq": 1,
+                "occurred_at": 1.0,
+                "committed_at": 1.0,
+                "scope": {
+                    "trace_id": "t",
+                    "run_id": "r",
+                    "parent_run_id": None,
+                    "parent_trace_id": None,
+                    "delegation_id": None,
+                    "agent_role": "Solo",
+                    "step": 0,
+                },
+                "causation": {"parent_event_id": "", "links": []},
+                "descriptor": {
+                    "type": "AgentRunStarted",
+                    "version": 1,
+                    "payload_schema_version": 1,
+                },
+                "data": {
+                    "agent_role": "Solo",
+                    "strategy_key": "solo",
+                    "objective": "hi",
+                    "from_role": "",
+                },
+                "evidence": [],
+                "plan_ref": "",
+            }
+            path.write_text(json.dumps(compact, ensure_ascii=False) + "\n", encoding="utf-8")
+            events = read_journal(path)
+            self.assertEqual(len(events), 1)
+            self.assertIsInstance(events[0].event, AgentRunStarted)
 
 
 class TestHookSpanAttributes(unittest.TestCase):

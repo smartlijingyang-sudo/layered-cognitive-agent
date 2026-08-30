@@ -8,7 +8,7 @@ AgentRuntime.step loop            CognitiveRuntime._loop
   llm_result phase                  ModularBrain.think
                                     └─ llm_result.build_decision_from_response
   call_tool / call_tools_batch      Body.act (SafeExecutor)
-  finish                            DefaultStopOutcomePolicy (RESPOND → stop)
+  finish                            DefaultStopPolicy (RESPOND → stop)
 
 LobeHub UI → LCA gateway:
   One Run per user send (POST /runs); internal loop may multi-step.

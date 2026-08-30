@@ -27,9 +27,7 @@ class TestSelfImprovingScenario:
 
     def test_scenario_references_self_improving_bundle(self) -> None:
         scenario = load_scenario_yaml("self-improving")
-        assert_scenario_references_bundles(
-            scenario, "bundles/scenario-self-improving.yaml"
-        )
+        assert_scenario_references_bundles(scenario, "bundles/scenario-self-improving.yaml")
 
     def test_self_improving_bundle_loads(self) -> None:
         ids = assert_bundle_parses("scenario-self-improving")

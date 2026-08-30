@@ -56,20 +56,21 @@ def build_team_message_publish_tool() -> object:
     from lca.contracts.protocols.infra import Tool
 
     class _TeamMessagePublishTool(Tool):
-        name = TEAM_MESSAGE_TOOL_NAME
-        description = "Publish a message on the team's topic."
-        parameters = {
-            "type": "object",
-            "properties": {
-                "team_id": {"type": "string"},
-                "thread_id": {"type": "string"},
-                "recipient_role": {"type": "string"},
-                "body": {"type": "string"},
-            },
-            "required": ["team_id", "thread_id", "recipient_role", "body"],
-        }
-        is_idempotent = True
-        default_timeout_s = 5
+        def __init__(self) -> None:
+            self.name = TEAM_MESSAGE_TOOL_NAME
+            self.description = "Publish a message on the team's topic."
+            self.parameters = {
+                "type": "object",
+                "properties": {
+                    "team_id": {"type": "string"},
+                    "thread_id": {"type": "string"},
+                    "recipient_role": {"type": "string"},
+                    "body": {"type": "string"},
+                },
+                "required": ["team_id", "thread_id", "recipient_role", "body"],
+            }
+            self.is_idempotent = True
+            self.default_timeout_s = 5
 
         async def execute(self, args: dict) -> Observation:
             event = publish_team_message(

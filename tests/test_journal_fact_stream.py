@@ -230,11 +230,13 @@ def test_llm_completed_default_hides_previews() -> None:
 
 
 def test_tool_started_shows_arguments() -> None:
-    event = ToolStarted(tool_name="bash", arguments_preview="ls -la", invocation_id="inv1")
+    """ADR-0101 PR-2:tool 事件不再有 arguments_preview 字段;projector
+    只看 tool_name + invocation_id,args 内容由 arguments_ref 走 evidence 平面。"""
+    event = ToolStarted(tool_name="bash", invocation_id="inv1")
     output = _render(event)
     assert "tool.start" in output
     assert "bash" in output
-    assert "ls -la" in output
+    assert "inv1" in output
 
 
 def test_tool_invoked_shows_latency() -> None:
@@ -255,7 +257,9 @@ def test_tool_denied_shows_reason() -> None:
 
 
 def test_tool_streaming() -> None:
-    event = ToolCallStreaming(tool_name="bash", tool_call_id="tc1", arguments_preview="echo hello")
+    """ADR-0101 PR-2:ToolCallStreaming 不再带 arguments_preview;projector
+    只看 tool_name + tool_call_id。"""
+    event = ToolCallStreaming(tool_name="bash", tool_call_id="tc1")
     output = _render(event)
     assert "tool.streaming" in output
     assert "bash" in output
@@ -508,8 +512,8 @@ def test_tool_nesting_indentation() -> None:
     buf = io.StringIO()
     projector = FactStreamProjector(stream=buf)
     projector.on_event(_stamped(1, DecisionMade(step=1, action_type="use_tool", tool_name="bash")))
-    projector.on_event(_stamped(2, ToolStarted(tool_name="bash", arguments_preview="ls")))
-    projector.on_event(_stamped(3, ToolInvoked(tool_name="bash", ok=True, latency_ms=100)))
+    projector.on_event(_stamped(2, ToolStarted(tool_name="bash", invocation_id="i")))
+    projector.on_event(_stamped(3, ToolInvoked(tool_name="bash", invocation_id="i", ok=True, latency_ms=100)))
     output = buf.getvalue()
     lines = output.split("\n")
     # Decision is at "  │" level (2 spaces + │)

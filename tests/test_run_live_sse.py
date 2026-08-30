@@ -6,8 +6,6 @@ import json
 
 import pytest
 
-from gateway.runs.api import encode_live_gap, iter_live_sse
-from gateway.runs.live import LiveGap, LiveTail
 from lca.contracts.atoms.enums import StreamChannel
 from lca.contracts.models.observability.journal import (
     ReasoningDelta,
@@ -18,6 +16,12 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
+from lca.layer0_infra.observability.journal.live_tail import (
+    LiveGap,
+    LiveTail,
+    encode_live_gap,
+    iter_live_sse,
+)
 from lca.layer0_infra.observability.journal.sse_frames import stamped_to_sse_frame
 
 
@@ -55,7 +59,6 @@ async def test_live_event_names_are_journal_class_names() -> None:
         ToolStarted(
             tool_name="execute_code",
             invocation_id="inv1",
-            plugin_state={"code": "print(1)", "language": "python"},
         ),
     )
     tail.on_event(thinking)
@@ -77,45 +80,69 @@ async def test_live_data_matches_stamped_to_record() -> None:
     _, event_name, payload = _parse_frame(frames[0])
     record = stamped_to_record(stamped)
     assert event_name == "ReasoningDelta"
-    assert payload["event_type"] == record["event_type"]
-    assert payload["event"] == record["event"]
-    assert payload["seq"] == 1
+    assert payload["descriptor"]["type"] == record["descriptor"]["type"]
+    assert payload["data"] == record["data"]
+    assert payload["run_seq"] == 1
 
 
 @pytest.mark.asyncio
-async def test_tool_started_plugin_state_is_not_rewritten() -> None:
-    state = {"code": "print(1)", "language": "python", "executionEnv": "sandbox"}
-    tail = LiveTail()
-    tail.on_event(
-        _stamped(1, ToolStarted(tool_name="execute_code", invocation_id="i", plugin_state=state))
-    )
-    tail.close()
-    frames = [frame async for frame in iter_live_sse(tail, after_seq=0, heartbeat_s=30)]
-    _, _, payload = _parse_frame(frames[0])
-    assert payload["event"]["plugin_state"] == state
-
-
-@pytest.mark.asyncio
-async def test_ops_stream_keeps_preview_strings() -> None:
+async def test_tool_started_typed_fields_propagate_to_live_sse() -> None:
+    """ADR-0101 PR-2:tool 事件 dataclass 不再有 typed 6-key / plugin_state
+    字段(0065 §四);SSE 帧 data 仅含事实字段。完整数据经
+    ``arguments_ref`` 走 evidence 平面。"""
     tail = LiveTail()
     tail.on_event(
         _stamped(
             1,
-            ToolInvoked(
-                tool_name="ls",
-                arguments_preview="ls -la",
-                result_preview="ok",
+            ToolStarted(
+                tool_name="execute_code",
                 invocation_id="i",
             ),
         )
     )
     tail.close()
-    frames = [
-        frame async for frame in iter_live_sse(tail, after_seq=0, heartbeat_s=30, redact=False)
-    ]
+    frames = [frame async for frame in iter_live_sse(tail, after_seq=0, heartbeat_s=30)]
     _, _, payload = _parse_frame(frames[0])
-    assert payload["event"]["arguments_preview"] == "ls -la"
-    assert payload["event"]["result_preview"] == "ok"
+    assert payload["data"]["tool_name"] == "execute_code"
+    assert payload["data"]["invocation_id"] == "i"
+    # typed 6-key 不在 SSE
+    for forbidden in ("code", "language", "execution_env", "plugin_state"):
+        assert forbidden not in payload["data"]
+    # V7:arguments / arguments_ref 至少一个
+    assert "arguments" in payload["data"] or "arguments_ref" in payload["data"]
+
+
+@pytest.mark.asyncio
+async def test_ops_stream_keeps_typed_fields_no_preview() -> None:
+    """ADR-0101 PR-2:preview 不在 SSE payload;typed 6-key / output_text /
+    state_ref / plugin_state 同样不在。SSE 帧只携带事实字段。"""
+    tail = LiveTail()
+    tail.on_event(
+        _stamped(
+            1,
+            ToolInvoked(
+                tool_name="executeCode",
+                invocation_id="i",
+                ok=True,
+                latency_ms=100,
+            ),
+        )
+    )
+    tail.close()
+    frames = [frame async for frame in iter_live_sse(tail, after_seq=0, heartbeat_s=30)]
+    _, _, payload = _parse_frame(frames[0])
+    for forbidden in (
+        "arguments_preview",
+        "result_preview",
+        "code",
+        "language",
+        "command",
+        "plugin_state",
+        "state_ref",
+    ):
+        assert forbidden not in payload["data"], f"{forbidden} present in payload"
+    # V7:arguments / arguments_ref 至少一个
+    assert "arguments" in payload["data"] or "arguments_ref" in payload["data"]
 
 
 @pytest.mark.asyncio
@@ -185,7 +212,7 @@ async def test_default_text_channel_filters_decision_deltas() -> None:
     names = [_parse_frame(frame)[1] for frame in frames]
     assert names == ["StepTextDelta"]
     _, _, payload = _parse_frame(frames[0])
-    assert payload["event"]["channel"] == StreamChannel.ANSWER.value
+    assert payload["data"]["channel"] == StreamChannel.ANSWER.value
 
 
 @pytest.mark.asyncio

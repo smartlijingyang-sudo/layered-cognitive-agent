@@ -15,5 +15,6 @@
 | skill_id | 说明 |
 |----------|------|
 | `officecli` | Office 平面知识层（ADR-0054）；binary 在 terminal 镜像 |
+| `improve-codebase-architecture` | 扫描架构深化机会并直接呈现候选项；不直接修改代码 |
 
 **不要**把 Market 下载的 skill 提交到本目录；Market 仍走 `import_skill`。

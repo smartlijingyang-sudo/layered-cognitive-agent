@@ -2,7 +2,9 @@
 
 ## 状态
 
-Proposed
+**Accepted — 2026-08-21（PR-10 整合落地后接受）**
+
+PR-0 / PR-1 / PR-2 / PR-3 等多轮整合落地：Cordis Fiber Boot + L4 严格闭合 + 单一事实源。
 
 Amends: [ADR-0056](0056-plugin-group-contribution.md)、[ADR-0061](0061-plugin-manifest-resolve-boot.md)、[ADR-0004](0004-protocol-first-pluggability.md)、[ADR-0005](0005-composition-root-l4.md)
 
@@ -166,6 +168,9 @@ async def spawn_agent(spec: AgentSpec, *, scope: Context) -> CognitiveAgent:
 | 删除项 | 删除前替代 | 删除条件 |
 |---|---|---|
 | `lca/plugins/_cordis_adapter.py` | `from lca.harness.plugin_api import plugin` | 全部 25 个插件 import 迁移完成 |
+| `lca/contracts/harness/plugin.py` 的过渡 Manifest 类型 | `lca.harness.plugin_api` | 仓库内无旧模块 import |
+| `AgentRegistry` / `build_live_agent` 的 `plugin_scope` 别名 | `cordis_ctx` / `ctx_provider` | 仓库内无旧参数调用 |
+| `plan_ref_of()` 兼容访问器 | `compiled_run_plan_ref()` | 仓库内无旧函数调用 |
 | `lca/plugins/seam_definitions/` | `BODIES`/`BRAINS`/... capability registry seam | `bundles/base.yaml` 入口移除 |
 | `lca/contracts/mechanisms/seam_registry.py` | capability `register` / `create` | 无 import |
 | `lca/contracts/mechanisms/capability.py` 的 `Path 2` | 单一路径 | 无运行时分支 |

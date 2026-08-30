@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from lca.contracts.models.core.plane import PlaneBindings
 from lca.contracts.models.team.team_coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
@@ -36,6 +35,7 @@ from lca.contracts.protocols.casting import (
     LEAD_CASTING_KINDS,
     CastingError,
     CastingPlan,
+    CastingPromptRenderer,
     RoleCard,
     RoleIndexEntry,
     RoleLibrary,
@@ -45,8 +45,6 @@ from lca.contracts.protocols.casting import (
 from lca.contracts.protocols.infra import LLMAdapter, Tool
 from lca.contracts.protocols.observability import ObservabilityBackend
 from lca.contracts.protocols.spec import OBSERVABILITY_CHOICE_CONSOLE
-from lca.layer0_infra.tools.default_set import build_default_tools
-from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 from lca.layer4_app.api import Agent, Team, TeamLead
 from lca.layer4_app.role_suggest import suggest_for_auto_repair, suggest_from_paths
 
@@ -110,15 +108,20 @@ _COORDINATION_FACTORY: dict[str, Callable[[], Coordination]] = {
 
 
 class LLMTeamCaster(TeamCaster):
-    """默认 TeamCaster：一次结构化 LLM 调用 + 白名单校验 + 一次纠正重试。
+    """LLM TeamCaster：结构化调用、白名单校验和受 profile 选择的提示词。
 
     白名单校验（role_id ∈ 角色库、governance.kind ∈ 既有封闭词表）顺带构成
     prompt injection 防线：objective 是用户输入，LLM 输出中任何越界值一律
     拒绝，不存在借选角越权的口子。
     """
 
+    def __init__(self, prompt_renderer: CastingPromptRenderer) -> None:
+        """Bind the prompt content policy explicitly at plugin composition time."""
+
+        self._prompt_renderer = prompt_renderer
+
     async def cast(self, objective: str, library: RoleLibrary, llm: LLMAdapter) -> CastingPlan:
-        prompt = render_casting_prompt(objective, library.index())
+        prompt = render_casting_prompt(objective, library.index(), self._prompt_renderer)
         last_error = "no attempt made"
         for attempt in range(_CASTING_ATTEMPTS):
             response = await llm.complete(prompt)
@@ -135,21 +138,14 @@ class LLMTeamCaster(TeamCaster):
         raise CastingError(f"自动组队失败：{last_error}")
 
 
-def render_casting_prompt(objective: str, index: tuple[RoleIndexEntry, ...]) -> str:
-    """渲染组队提示词：模板占位符用精确替换（模板含 JSON 花括号，禁用 format）。"""
-    by_department: dict[str, list[RoleIndexEntry]] = {}
-    for entry in index:
-        by_department.setdefault(entry.department, []).append(entry)
-    lines: list[str] = []
-    for department in sorted(by_department):
-        lines.append(f"## {department}")
-        for entry in by_department[department]:
-            emoji = f"{entry.emoji} " if entry.emoji else ""
-            lines.append(f"- {entry.role_id} | {emoji}{entry.title} | {entry.summary}")
-    template = load_builtin_prompt(CASTING_PROMPT_NAME)
-    return template.replace(_CATALOG_PLACEHOLDER, "\n".join(lines)).replace(
-        _OBJECTIVE_PLACEHOLDER, objective
-    )
+def render_casting_prompt(
+    objective: str,
+    index: tuple[RoleIndexEntry, ...],
+    renderer: CastingPromptRenderer,
+) -> str:
+    """Render the selected prompt through the profile-bound renderer capability."""
+
+    return renderer.render(objective, index)
 
 
 def _format_casting_correction_hint(error: str, library: RoleLibrary) -> str:
@@ -285,15 +281,19 @@ def build_from_casting_plan(
     llm: LLMAdapter,
     *,
     observability: str | ObservabilityBackend = OBSERVABILITY_CHOICE_CONSOLE,
-    bindings: PlaneBindings | None = None,
     scope: Context | None = None,
-    tools: Sequence[Tool] | None = None,
+    tools: Sequence[Tool],
 ) -> Team:
-    """把 CastingPlan 编译成 Team —— 与手写构造同路径，无专用运行时机制。"""
+    """Compile a validated casting plan using the caller-materialized tools.
+
+    Tool materialization belongs to the profile's ``tools`` capability at the
+    run-assembly boundary. This translator only projects the selected tool set
+    onto each member, so it cannot recreate a concrete default tool provider.
+    """
     cards: dict[str, tuple[RoleCard, str | None]] = {
         chosen.role_id: (library.get(chosen.role_id), chosen.task_hint) for chosen in plan.selected
     }
-    member_tools = tools if tools is not None else build_default_tools(bindings=bindings)
+    member_tools = tuple(tools)
 
     def _member(role_id: str) -> Agent:
         card, task_hint = cards[role_id]

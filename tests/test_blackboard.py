@@ -140,9 +140,7 @@ class TestInMemoryBlackboard:
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    assert "crdt" not in alias.name.lower(), (
-                        f"forbidden CRDT import: {alias.name}"
-                    )
+                    assert "crdt" not in alias.name.lower(), f"forbidden CRDT import: {alias.name}"
             elif isinstance(node, ast.ImportFrom) and node.module:
                 assert "crdt" not in node.module.lower(), (
                     f"forbidden CRDT import from: {node.module}"

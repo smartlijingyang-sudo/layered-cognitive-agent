@@ -72,13 +72,8 @@ def build_sandbox_tools(**kwargs: Any) -> list:
     from lca.layer0_infra.tools.builder import build_tools_from_manifest
 
     store = kwargs.get("file_store")
-    if store is None:
-        from lca.layer0_infra.file_store import get_default_file_store
-
-        store = get_default_file_store()
-
     sandbox = kwargs.get("sandbox")
-    if sandbox is None:
+    if sandbox is None or store is None:
         return []
 
     from lca.layer0_infra.computer.sandbox_computer import SandboxComputer
@@ -92,7 +87,9 @@ def build_sandbox_tools(**kwargs: Any) -> list:
     return build_tools_from_manifest(
         MANIFEST,
         executor,
-        invoke_fn=cast("Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor),
+        invoke_fn=cast(
+            "Callable[[object, str, dict[str, Any]], Awaitable[Any]]", _invoke_via_executor
+        ),
         observation_builder=_sandbox_obs_builder(store),
     )
 

@@ -11,12 +11,30 @@ from lca.contracts.atoms.semantic_keys import FAILURE_KIND, FAILURE_KIND_VALIDAT
 from lca.contracts.models.core.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.operational_skills import SkillImportError
-from lca.layer0_infra.skills.http_importer import HttpSkillImporter
+from lca.contracts.protocols.operational_skills import SkillImporter, SkillImportError
+from lca.layer0_infra.tools.contract.render import RenderContract, contract
+from lca.layer0_infra.tools.contract.schema import COMMON
 
 IMPORT_SKILL_TOOL = "import_skill"
 
 
+@contract(
+    RenderContract(
+        tool_name="import_skill",
+        identifier="lobe-skill-store",
+        api_name="importSkill",
+        args=(
+            COMMON["identifier"].optional(),
+            COMMON["url"].optional(),
+            COMMON["kind"].optional(),
+        ),
+        state=(
+            COMMON["name"],
+            COMMON["content"],
+        ),
+        content_field="content",
+    )
+)
 class SkillImportTool(Tool):
     name = IMPORT_SKILL_TOOL
     description = (
@@ -43,7 +61,7 @@ class SkillImportTool(Tool):
     is_idempotent = False
     default_timeout_s = DEFAULT_TOOL_TIMEOUT_S
 
-    def __init__(self, importer: HttpSkillImporter) -> None:
+    def __init__(self, importer: SkillImporter) -> None:
         self._importer = importer
 
     def validate(self, args: dict[str, Any]) -> str | None:

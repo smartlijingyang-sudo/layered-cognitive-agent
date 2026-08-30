@@ -1,4 +1,13 @@
-"""LCA core contracts — typed models and protocols."""
+"""LCA core contracts — typed models and protocols.
+
+Re-export barrel: every ``from X import Y`` below is a deliberate public
+re-export. ``__all__`` is derived from these imports at module load so the
+contract has a single source of truth.
+"""
+
+from __future__ import annotations
+
+import types
 
 from lca.contracts.mechanisms import (
     ComponentRegistryProtocol,
@@ -20,7 +29,7 @@ from lca.contracts.models.core.decision import (
 )
 from lca.contracts.models.core.lifecycle import AgentCard, TaskStatus, TeamMessage
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, TokenUsage
-from lca.contracts.models.core.memory import MemoryRecord
+from lca.contracts.models.core.memory import MemoryRecord, MemoryRelationKind, MemoryTrust
 from lca.contracts.models.core.result import (
     ApprovalPendingError,
     BudgetExceededError,
@@ -28,11 +37,7 @@ from lca.contracts.models.core.result import (
     ToolExecutionError,
 )
 from lca.contracts.models.core.state import AgentState, Budget, StateSnapshot
-from lca.contracts.models.core.stop import (
-    StopDecision,
-    StopOutcome,
-    StopReason,
-)
+from lca.contracts.models.core.stop import StopDecision, StopReason
 from lca.contracts.models.team.delegation import DelegationResult, find_result
 from lca.contracts.models.team.graph import (
     ExecutionGraph,
@@ -61,7 +66,7 @@ from lca.contracts.models.team.team_coordination import (
 from lca.contracts.protocols import (
     DecisionGate,
     SharedMemoryStore,
-    StopRule,
+    StopPolicy,
     TransportRegistryProtocol,
 )
 from lca.contracts.protocols.action import Action, ActionRegistryProtocol
@@ -71,67 +76,12 @@ from lca.contracts.protocols.spec import (
     strategy_key_for_governance,
 )
 
-__all__ = [
-    "Action",
-    "ActionRegistryProtocol",
-    "AgentCard",
-    "AgentState",
-    "ApprovalDecision",
-    "ApprovalPendingError",
-    "ApprovalRequest",
-    "Budget",
-    "BudgetExceededError",
-    "CacheConfig",
-    "ComponentRegistryProtocol",
-    "ConsultDuty",
-    "Debate",
-    "Decision",
-    "DecisionGate",
-    "DelegationResult",
-    "DelegationSpec",
-    "EventBus",
-    "ExecutionGraph",
-    "FanOut",
-    "Governance",
-    "Graph",
-    "GraphEdge",
-    "GraphNode",
-    "GraphValidationError",
-    "Hook",
-    "HookRegistry",
-    "LLMResponse",
-    "LLMStreamEvent",
-    "LeadMandate",
-    "MemberStatus",
-    "MemoryRecord",
-    "NamedRegistryProtocol",
-    "Observation",
-    "PeerRelay",
-    "PeerSwarm",
-    "Pipeline",
-    "Reflection",
-    "Registries",
-    "Result",
-    "RetryPolicy",
-    "RoleProfile",
-    "RunContext",
-    "SharedMemoryStore",
-    "StateSnapshot",
-    "StopDecision",
-    "StopOutcome",
-    "StopReason",
-    "StopRule",
-    "TaskStatus",
-    "TeamAwareness",
-    "TeamMessage",
-    "TeamSpec",
-    "TokenUsage",
-    "ToolCall",
-    "ToolExecutionError",
-    "ToolPermissionManifest",
-    "TransportRegistryProtocol",
-    "Turn",
-    "create_budget",
-    "find_result",
-    "strategy_key_for_governance",
-]
+# Re-export barrel: every `from X import Y` above is intentional public re-export.
+# ruff: noqa: F401
+__all__ = sorted(
+    name
+    for name, value in globals().items()
+    if not name.startswith("_")
+    and not isinstance(value, types.ModuleType)
+    and name != "annotations"
+)

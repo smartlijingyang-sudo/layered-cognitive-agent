@@ -3,7 +3,6 @@
 from lca.layer0_infra.ops.config import OpsConfig
 from lca.layer0_infra.ops.registry import ServiceRegistry
 from lca.layer0_infra.ops.services.daemon import DaemonService
-from lca.layer0_infra.ops.services.dsh import DshService
 from lca.layer0_infra.ops.services.gateway import GatewayService
 from lca.layer0_infra.ops.services.infra import InfraService
 from lca.layer0_infra.ops.services.lobehub import LobeHubService
@@ -12,7 +11,6 @@ from lca.layer0_infra.ops.sudo import Sudo
 
 __all__ = [
     "DaemonService",
-    "DshService",
     "GatewayService",
     "InfraService",
     "LobeHubService",
@@ -33,5 +31,4 @@ def build_registry(config: OpsConfig) -> ServiceRegistry:
         DaemonService(config.daemon, config.gateway, config.state_dir, config.root, sudo)
     )
     registry.register(OnlyboxesService(config.onlyboxes, config.root))
-    registry.register(DshService(config.dsh, config.root))
     return registry

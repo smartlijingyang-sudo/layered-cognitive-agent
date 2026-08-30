@@ -1,0 +1,26 @@
+# PlanTemplate: team (Multi-Agent Team)
+# PR-12 V12 acceptance §4.6: 12 standard PlanTemplate instances.
+
+template_id: team
+name: Multi-Agent Team
+description: Multiple agents collaborate via shared blackboard / transport
+version: 1
+
+relations:
+  - delegates
+  - projects
+  - executes
+  - emits_fact
+
+control_slots:
+  - act.authorize
+  - act.budget
+  - act.constrain
+  - act.execute
+
+required_groups:
+  - G7
+  - G8
+  - G12
+
+scope: run

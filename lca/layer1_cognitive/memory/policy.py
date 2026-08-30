@@ -3,18 +3,18 @@
 v3 §5.5 splits memory writes into two phases:
 
 1. ``MemoryPolicy.commit(writes) -> MemoryCommitResult`` — authoritatively
-   accepts or rejects each ``MemoryWrite``.  The default
+   accepts or rejects each ``MemoryWrite``. The default
    ``SimpleMemoryPolicy`` rejects ``MODEL_INFERENCE`` writes below a
    configurable confidence threshold and accepts every other authority.
 
 2. ``CompactionPolicy.compact(records, budget) -> tuple`` — trims the
    memory view by ``recency_score`` so the Reasoner sees only what fits
-   the budget.  The default ``SimpleCompactionPolicy`` is a stable
+   the budget. The default ``SimpleCompactionPolicy`` is a stable
    top-``budget`` selection.
 
 Both Protocols are pure-function shapes: implementations must NOT carry
-state outside what the caller threads in.  The runtime injects them
-into ``SimpleMemorySystem`` via constructor; tests can override either.
+state outside what the caller threads in. The runtime injects them into
+``SimpleMemorySystem`` via constructor; tests can override either.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from lca.contracts.models.core.memory import MemoryRecord
 class MemoryAuthority(str, Enum):
     """Origin authority of a memory write (v3 §5.5).
 
-    Drives ``MemoryPolicy`` accept / reject decisions.  Adding new
+    Drives ``MemoryPolicy`` accept / reject decisions. Adding new
     authorities is intentionally a deliberate enum change.
     """
 
@@ -167,7 +167,7 @@ class SimpleMemoryPolicy(MemoryPolicy):
 class SimpleCompactionPolicy(CompactionPolicy):
     """Stable top-``budget`` selection by ``recency_score``.
 
-    Records with no ``recency_score`` are treated as 0.0.  When the input
+    Records with no ``recency_score`` are treated as 0.0. When the input
     fits in ``budget`` the result is the input verbatim (preserving order).
     """
 

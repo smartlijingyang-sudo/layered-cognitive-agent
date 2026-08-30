@@ -12,9 +12,11 @@ from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer1_cognitive.brain.decision_gates import MustConsultAllMembers
 from lca.layer1_cognitive.brain.modular_brain import ModularBrain
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
+from lca.layer2_runtime.reducer import DefaultReducer
 from lca.layer4_app.api import ensure_default_ctx
 from lca.layer4_app.spawn import spawn_agent, spawn_lead, spawn_team
-from lca.layer4_app.team_wiring import build_team_transport
+from lca.plugins.composer.team_transport import build_team_transport
+from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
 from tests.support.agent_specs import make_spec
 
 
@@ -65,12 +67,27 @@ class TestComposeAsLead(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(brain.reasoner, PromptReasoner)
         self.assertIsNone(brain._decision_gate)
 
+    async def test_explicit_team_transport_replaces_inherited_protocol(self) -> None:
+        member = spawn_agent(make_spec("worker", MockLLMAdapter()))
+        team_transport = build_team_transport([member])
+        lead = spawn_lead(
+            make_spec("lead", MockLLMAdapter()),
+            transport=team_transport,
+            mandate=LeadMandate.ROUTING,
+        )
+
+        body = lead.runtime.body  # type: ignore[attr-defined]
+        inner = getattr(body, "_inner", body)
+        self.assertIs(inner.transport_registry.resolve("internal"), team_transport)
+
     async def test_no_bind_or_install_apis(self) -> None:
         body = spawn_agent(make_spec("x", MockLLMAdapter())).runtime.body  # type: ignore[attr-defined]
         inner = getattr(body, "_inner", body)
         self.assertFalse(hasattr(inner, "bind_channel"))
         brain = ModularBrain(
             reasoner=MagicMock(spec=PromptReasoner),
+            reducer=DefaultReducer(),
+            classifier=DefaultDecisionClassifier(),
             critic=MagicMock(),
         )
         self.assertFalse(hasattr(brain, "install_decision_gate"))
