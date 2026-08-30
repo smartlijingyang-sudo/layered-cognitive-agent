@@ -26,6 +26,8 @@ jobs:
         run: uv run python scripts/check_protocol_schema_version.py
       - name: 架构契约（import-linter）
         run: uv run lint-imports
+      - name: 包契约一致性（L1↔L2↔L3↔actual import）
+        run: uv run python scripts/check_package_contracts.py
       - name: mypy
         run: uv run mypy lca
       - name: pytest
