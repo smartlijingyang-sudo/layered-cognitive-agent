@@ -128,7 +128,7 @@ entries:
   # ── State-cluster stop policy ──
   - id: state.stop-policy.default
     name: state_stop_policy_default
-    $module: lca.plugins.state.stop_policy
+    $module: lca.plugins.phase_policies.stop_policy
     config: {}
 
   - id: hook_registry.simple
