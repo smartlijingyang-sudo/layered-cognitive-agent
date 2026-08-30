@@ -12,7 +12,7 @@ from lca.contracts.protocols import SafeExecutor, ToolRegistry, TransportRegistr
 from lca.cognition.body.action_registry import ActionRegistry
 from lca.cognition.body.simple_body import SimpleBody
 from lca.cognition.transport_registry_factory import build_transport_registry
-from lca.plugins.composer.action_authority import build_action_registry_from_authority
+from lca.plugins.composer.act.action_authority import build_action_registry_from_authority
 from lca.plugins.providers.act.action_handlers import DefaultActionHandlerRegistry
 
 DEFAULT_EXECUTABLE_ACTIONS = frozenset(

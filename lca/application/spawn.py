@@ -18,12 +18,12 @@ from lca.contracts.protocols.journal.spec import (
 )
 from lca.infrastructure.observability import BoundObservability
 from lca.agent.team_handle import TeamHandle
-from lca.plugins.composer.agent_assembly import PlanBoundAgentAssembler, promote_lead
-from lca.plugins.composer.internal.perceive import build_perceive_hub
-from lca.plugins.composer.internal.skill_store import active_skill_store
-from lca.plugins.composer.internal.team import resolve_observability, team_trace_profile
-from lca.plugins.composer.plan_binding import bind_team_from_scope
-from lca.plugins.composer.prompt_catalog import ModelPromptCatalog
+from lca.plugins.composer.composition.agent_assembly import PlanBoundAgentAssembler, promote_lead
+from lca.plugins.composer.perceive.perceive import build_perceive_hub
+from lca.plugins.composer.composition.skill_store import active_skill_store
+from lca.plugins.composer.collaboration.team import resolve_observability, team_trace_profile
+from lca.plugins.composer.composition.plan_binding import bind_team_from_scope
+from lca.plugins.composer.composition.prompt_catalog import ModelPromptCatalog
 
 if TYPE_CHECKING:
     from cordis import Context

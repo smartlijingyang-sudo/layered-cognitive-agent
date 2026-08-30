@@ -13,7 +13,7 @@ from lca.contracts.protocols.gate.control_verdict import ControlVerdict, Control
 from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseInput, PhaseResult
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
-from lca.plugins.composer.runtime_factory import RuntimeDeps, build_fixture_cognitive_runtime
+from lca.plugins.composer.runtime.runtime_factory import RuntimeDeps, build_fixture_cognitive_runtime
 from tests.phase_executors import standard_phase_executors
 
 

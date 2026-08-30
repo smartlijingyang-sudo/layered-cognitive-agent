@@ -44,10 +44,10 @@ from lca.plugins.seams.collaboration.team_shared_memory import DefaultTeamShared
 
 REPO = Path(__file__).resolve().parents[2]
 COMPOSER_DIRECTORY = REPO / "lca" / "plugins" / "composer"
-BRAIN_COMPOSER_PATH = COMPOSER_DIRECTORY / "brain_composer.py"
-BODY_COMPOSER_PATH = COMPOSER_DIRECTORY / "body_composer.py"
-PERCEIVE_COMPOSER_PATH = COMPOSER_DIRECTORY / "perceive_composer.py"
-TEAM_COMPOSER_PATH = COMPOSER_DIRECTORY / "team_composer.py"
+BRAIN_COMPOSER_PATH = COMPOSER_DIRECTORY / "think" / "brain_composer.py"
+BODY_COMPOSER_PATH = COMPOSER_DIRECTORY / "act" / "body_composer.py"
+PERCEIVE_COMPOSER_PATH = COMPOSER_DIRECTORY / "perceive" / "perceive_composer.py"
+TEAM_COMPOSER_PATH = COMPOSER_DIRECTORY / "collaboration" / "team_composer.py"
 COMPOSER_PATHS = (
     BRAIN_COMPOSER_PATH,
     BODY_COMPOSER_PATH,
@@ -202,9 +202,9 @@ def test_agent_assembly_rejects_a_plan_without_action_authority(monkeypatch) -> 
     """Production assembly must not translate missing plan authority into no actions."""
     from unittest.mock import MagicMock
 
-    from lca.plugins.composer import plan_binding
-    from lca.plugins.composer.agent_assembly import PlanBoundAgentAssembler
-    from lca.plugins.composer.plan_binding import BindPlanError
+    from lca.plugins.composer.composition import plan_binding
+    from lca.plugins.composer.composition.agent_assembly import PlanBoundAgentAssembler
+    from lca.plugins.composer.composition.plan_binding import BindPlanError
 
     plan = MagicMock()
     plan.action_authority = None
@@ -292,7 +292,7 @@ def test_team_composer_passes_resolved_store_to_one_member_assembly_pass() -> No
 
     from lca.contracts.models.team.team_coordination import Pipeline
     from lca.contracts.protocols.journal.spec import TeamSpec
-    from lca.plugins.composer.team_composer import TeamComposer
+    from lca.plugins.composer.collaboration.team_composer import TeamComposer
     from tests.support.agent_specs import make_spec
 
     class _RecordingAssembler:
@@ -480,11 +480,14 @@ def test_default_composers_expose_only_the_graph_operation_they_own() -> None:
     """
 
     from lca.contracts.harness.composition.composer import AgentGraphComposer, TeamGraphComposer
-    from lca.plugins.composer.agent_assembly import AgentAssemblyPort, PlanBoundAgentAssembler
-    from lca.plugins.composer.body_composer import BodyComposer
-    from lca.plugins.composer.brain_composer import BrainComposer
-    from lca.plugins.composer.perceive_composer import PerceiveComposer
-    from lca.plugins.composer.team_composer import TeamComposer
+    from lca.plugins.composer.act.body_composer import BodyComposer
+    from lca.plugins.composer.collaboration.team_composer import TeamComposer
+    from lca.plugins.composer.composition.agent_assembly import (
+        AgentAssemblyPort,
+        PlanBoundAgentAssembler,
+    )
+    from lca.plugins.composer.perceive.perceive_composer import PerceiveComposer
+    from lca.plugins.composer.think.brain_composer import BrainComposer
 
     for composer in (BrainComposer(), BodyComposer(), PerceiveComposer()):
         assert isinstance(composer, AgentGraphComposer)

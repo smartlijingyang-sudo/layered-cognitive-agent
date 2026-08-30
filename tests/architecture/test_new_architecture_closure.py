@@ -47,7 +47,7 @@ def test_artifact_contract_is_four_state_only() -> None:
 
 
 def test_team_composer_uses_the_agent_assembly_seam() -> None:
-    source = (ROOT / "lca" / "plugins" / "composer" / "team_composer.py").read_text(
+    source = (ROOT / "lca" / "plugins" / "composer" / "collaboration" / "team_composer.py").read_text(
         encoding="utf-8"
     )
     assert "lca.application.spawn" not in source

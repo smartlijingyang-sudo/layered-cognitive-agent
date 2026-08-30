@@ -144,7 +144,7 @@ entries:
   # ── Think internals (named factories consumed by brain factory) ──
   - id: lca-brain-prompt-catalog-default
     name: lca_brain_prompt_catalog_default
-    $module: lca.plugins.composer.prompt_catalog
+    $module: lca.plugins.composer.composition.prompt_catalog
     config: {}
 
   - id: lca-reasoner-prompt
@@ -211,22 +211,22 @@ entries:
   # one entry without taking ownership of neighboring graph contributions.
   - id: lca-plan-brain-composer
     name: lca_plan_brain_composer
-    $module: lca.plugins.composer.brain_provider
+    $module: lca.plugins.composer.think.brain_provider
     config: {}
 
   - id: lca-plan-body-composer
     name: lca_plan_body_composer
-    $module: lca.plugins.composer.body_provider
+    $module: lca.plugins.composer.act.body_provider
     config: {}
 
   - id: lca-plan-perceive-composer
     name: lca_plan_perceive_composer
-    $module: lca.plugins.composer.perceive_provider
+    $module: lca.plugins.composer.perceive.perceive_provider
     config: {}
 
   - id: lca-plan-team-composer
     name: lca_plan_team_composer
-    $module: lca.plugins.composer.team_provider
+    $module: lca.plugins.composer.collaboration.team_provider
     config: {}
 
   # ── Compose-time named factories ──────────

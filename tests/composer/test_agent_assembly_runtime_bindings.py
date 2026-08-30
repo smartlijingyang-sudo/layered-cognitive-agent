@@ -43,19 +43,19 @@ from lca.contracts.protocols.runtime.runtime_composition import (
 from lca.contracts.protocols.session.session_persistence import SessionPersistenceFactory
 from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.harness.profile.boot import boot_profile
-from lca.plugins.composer.internal.runtime_binding import (
+from lca.plugins.composer.runtime.runtime_binding import (
     ProductionRuntimeDeps,
     bind_runtime_graph,
 )
-from lca.plugins.composer.internal.runtime_capabilities import RuntimeCapabilityClosure
+from lca.plugins.composer.runtime.runtime_capabilities import RuntimeCapabilityClosure
 
 REPO = Path(__file__).resolve().parents[2]
-AGENT_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "agent_assembly.py"
-RUNTIME_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "runtime_assembly.py"
+AGENT_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "composition" / "agent_assembly.py"
+RUNTIME_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime_assembly.py"
 RUNTIME_CAPABILITIES_PATH = (
-    REPO / "lca" / "plugins" / "composer" / "internal" / "runtime_capabilities.py"
+    REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime_capabilities.py"
 )
-RUNTIME_BINDING_PATH = REPO / "lca" / "plugins" / "composer" / "internal" / "runtime_binding.py"
+RUNTIME_BINDING_PATH = REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime_binding.py"
 WEB_APP_BUNDLE_PATH = REPO / "bundles" / "web-app.yaml"
 
 
@@ -156,11 +156,11 @@ def test_runtime_binding_adapter_maps_one_complete_graph_to_bindings() -> None:
 
     with (
         patch(
-            "lca.plugins.composer.internal.runtime_capabilities.resolve_phase_executor_bindings",
+            "lca.plugins.composer.runtime.runtime_capabilities.resolve_phase_executor_bindings",
             return_value={"execute": object()},
         ) as resolve_executors,
         patch(
-            "lca.plugins.composer.internal.runtime_capabilities.resolve_resume_input_adapter",
+            "lca.plugins.composer.runtime.runtime_capabilities.resolve_resume_input_adapter",
             return_value=resume_input_adapter,
         ) as resolve_resume_adapter,
     ):

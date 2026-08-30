@@ -17,7 +17,7 @@ from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.infrastructure.llm_resolver import live_credential
 from lca.application.api import Agent
 from lca.application.spawn import spawn_agent
-from lca.plugins.composer.internal.perceive import build_perceive_hub
+from lca.plugins.composer.perceive.perceive import build_perceive_hub
 
 DEFAULT_PROFILE = "profiles/web-standard.yaml"
 

@@ -33,7 +33,7 @@ from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.plugins.composer.runtime_factory import (
+from lca.plugins.composer.runtime.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,
     build_fixture_cognitive_runtime,

@@ -16,8 +16,8 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols.journal.spec import AgentSpec
 from lca.harness.profile.resolve import resolve_profile
-from lca.plugins.composer.internal import brain
-from lca.plugins.composer.prompt_catalog import DefaultBrainPromptCatalogFactory
+from lca.plugins.composer.think import brain
+from lca.plugins.composer.composition.prompt_catalog import DefaultBrainPromptCatalogFactory
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -149,7 +149,7 @@ def test_resolve_brain_consumes_profile_selected_prompt_catalog_factory(
 def test_brain_composer_has_no_direct_prompt_catalog_implementation() -> None:
     """Only the selected primitive may choose the concrete prompt-catalog implementation."""
 
-    source = (REPO / "lca/plugins/composer/internal/brain.py").read_text(encoding="utf-8")
+    source = (REPO / "lca/plugins/composer/think/brain.py").read_text(encoding="utf-8")
 
     assert "ModelPromptCatalog" not in source
     assert BRAIN_PROMPT_CATALOG_FACTORY.key in source

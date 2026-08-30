@@ -15,7 +15,7 @@ from lca.cognition.brain.reasoner import PromptReasoner
 from lca.runtime.reducer import DefaultReducer
 from lca.application.api import ensure_default_ctx
 from lca.application.spawn import spawn_agent, spawn_lead, spawn_team
-from lca.plugins.composer.team_transport import build_team_transport
+from lca.plugins.composer.collaboration.team_transport import build_team_transport
 from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
 from tests.support.agent_specs import make_spec
 

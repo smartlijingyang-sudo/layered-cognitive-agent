@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.mechanisms import MissingCapabilityError
-from lca.plugins.composer.action_authority import build_action_registry_from_authority
+from lca.plugins.composer.act.action_authority import build_action_registry_from_authority
 
 
 class _Handler:

@@ -7,6 +7,10 @@ from pathlib import Path
 
 import pytest
 
+from lca.application.policies import LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy
+from lca.cognition.gate_service import GateService
+from lca.cognition.memory.simple_memory import SimpleMemorySystem
+from lca.cognition.memory.temporal_memory import TemporalMemorySystem
 from lca.contracts.atoms.enums import ComponentKind, DecisionGateName
 from lca.contracts.capabilities import COMPONENT_REGISTRY, GATES, LEAD_BUDGET_POLICY_RESOLVER
 from lca.contracts.protocols import DecisionGate, LeadBudgetPolicyResolver
@@ -18,10 +22,6 @@ from lca.contracts.protocols.journal.spec import (
 from lca.harness.profile.boot import boot_profile
 from lca.infrastructure.component_registry import ComponentRegistry, RegistryKeyError
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
-from lca.cognition.gate_service import GateService
-from lca.cognition.memory.simple_memory import SimpleMemorySystem
-from lca.cognition.memory.temporal_memory import TemporalMemorySystem
-from lca.application.policies import LEAD_BUDGET_POLICY_KEY, LeadBudgetPolicy
 from lca.plugins.providers.state.component_budget_policy import (
     ComponentRegistryLeadBudgetPolicyResolver,
 )
@@ -94,7 +94,7 @@ def test_plan_bound_agent_assembly_consumes_only_lead_policy_resolver() -> None:
     """Lead assembly must not leak registry taxonomy or policy naming details."""
 
     source = (
-        Path(__file__).resolve().parents[2] / "lca" / "plugins" / "composer" / "agent_assembly.py"
+        Path(__file__).resolve().parents[2] / "lca" / "plugins" / "composer" / "composition" / "agent_assembly.py"
     ).read_text(encoding="utf-8")
 
     assert "LEAD_BUDGET_POLICY_RESOLVER.key" in source
@@ -111,7 +111,7 @@ def test_lead_decision_gate_selection_consumes_only_gate_service() -> None:
         / "lca"
         / "plugins"
         / "composer"
-        / "internal"
+        / "collaboration"
         / "team.py"
     ).read_text(encoding="utf-8")
 

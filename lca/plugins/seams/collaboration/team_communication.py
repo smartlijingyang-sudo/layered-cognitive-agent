@@ -39,7 +39,7 @@ class DefaultTeamCommunicationAssembler(TeamCommunicationAssemblerProtocol):
 
         del spec
         from lca.agent.member_invoke import TransportMemberInvoker
-        from lca.plugins.composer.team_transport import build_team_transport
+        from lca.plugins.composer.collaboration.team_transport import build_team_transport
 
         transport = build_team_transport(members)
         return TeamCommunication(

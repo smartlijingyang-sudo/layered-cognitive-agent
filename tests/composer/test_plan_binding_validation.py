@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
-from lca.plugins.composer.plan_binding import BindPlanError, bind_plan
+from lca.plugins.composer.composition.plan_binding import BindPlanError, bind_plan
 
 
 class _CountingComposer:
@@ -117,7 +117,7 @@ def test_binding_results_expose_composer_provenance_as_explicit_fields() -> None
 
     from dataclasses import fields
 
-    from lca.plugins.composer.plan_binding import PlanBindingResult, TeamBindingResult
+    from lca.plugins.composer.composition.plan_binding import PlanBindingResult, TeamBindingResult
 
     assert tuple(field.name for field in fields(PlanBindingResult)) == (
         "graph",

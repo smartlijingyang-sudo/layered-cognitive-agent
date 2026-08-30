@@ -51,7 +51,7 @@ from lca.infrastructure.tools.calculator import build_tools as build_calculator_
 from lca.infrastructure.tools.weather import build_tools as build_weather_tools
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.plugins.composer.runtime_factory import (
+from lca.plugins.composer.runtime.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,
     build_fixture_cognitive_runtime,
@@ -105,7 +105,7 @@ class TestL0ProtocolCompliance(unittest.TestCase):
 
     def test_default_registry_resolves_all_delegation_protocols(self):
         """DelegationSpec.protocol 的每个取值都能在默认 registry 中 resolve 到非空实现。"""
-        from lca.plugins.composer.team_transport import build_default_transport_registry
+        from lca.plugins.composer.collaboration.team_transport import build_default_transport_registry
 
         registry = build_default_transport_registry()
         for protocol in ("internal", "a2a", "mcp"):

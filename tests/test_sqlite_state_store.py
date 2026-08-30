@@ -14,7 +14,7 @@ from lca.harness.profile.source import load_profile_source
 from lca.infrastructure.capability.state_store import StateStoreService
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.infrastructure.state_store.sqlite_store import SqliteStateStore
-from lca.plugins.composer.internal.perceive import resolve_state_store
+from lca.plugins.composer.perceive.perceive import resolve_state_store
 from lca.plugins.providers.state import state_store as state_store_provider
 
 

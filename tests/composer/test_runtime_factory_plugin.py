@@ -8,7 +8,7 @@ import pytest
 
 from lca.contracts.protocols.runtime.runtime_composition import RuntimeFactory
 from lca.harness.profile.resolve import resolve_profile
-from lca.plugins.composer import runtime_assembly
+from lca.plugins.composer.runtime import runtime_assembly
 from lca.plugins.providers.journal.runtime_factory import CognitiveRuntimeFactory
 
 

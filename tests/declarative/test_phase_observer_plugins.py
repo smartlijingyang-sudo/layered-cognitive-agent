@@ -20,7 +20,7 @@ from lca.harness.declarative.phase_observation import (
     PhaseObserverError,
     phase_state_snapshot,
 )
-from lca.plugins.composer.runtime_assembly import _require_runtime
+from lca.plugins.composer.runtime.runtime_assembly import _require_runtime
 from lca.plugins.providers.perceive import phase_observer, phase_observer_tracing
 
 

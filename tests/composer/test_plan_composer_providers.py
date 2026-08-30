@@ -6,10 +6,10 @@ import asyncio
 from pathlib import Path
 
 from lca.harness.profile.boot import boot_profile
-from lca.plugins.composer.body_composer import BodyComposer
-from lca.plugins.composer.brain_composer import BrainComposer
-from lca.plugins.composer.perceive_composer import PerceiveComposer
-from lca.plugins.composer.team_composer import TeamComposer
+from lca.plugins.composer.act.body_composer import BodyComposer
+from lca.plugins.composer.think.brain_composer import BrainComposer
+from lca.plugins.composer.perceive.perceive_composer import PerceiveComposer
+from lca.plugins.composer.collaboration.team_composer import TeamComposer
 
 REPO = Path(__file__).resolve().parents[2]
 WEB_APP_BUNDLE_PATH = REPO / "bundles" / "web-app.yaml"
@@ -22,10 +22,10 @@ def test_web_bundle_registers_one_entry_per_plan_composer() -> None:
 
     assert "lca-plan-sub-composers" not in bundle
     for plugin_id, module in (
-        ("lca-plan-brain-composer", "lca.plugins.composer.brain_provider"),
-        ("lca-plan-body-composer", "lca.plugins.composer.body_provider"),
-        ("lca-plan-perceive-composer", "lca.plugins.composer.perceive_provider"),
-        ("lca-plan-team-composer", "lca.plugins.composer.team_provider"),
+        ("lca-plan-brain-composer", "lca.plugins.composer.think.brain_provider"),
+        ("lca-plan-body-composer", "lca.plugins.composer.act.body_provider"),
+        ("lca-plan-perceive-composer", "lca.plugins.composer.perceive.perceive_provider"),
+        ("lca-plan-team-composer", "lca.plugins.composer.collaboration.team_provider"),
     ):
         assert f"id: {plugin_id}" in bundle
         assert f"$module: {module}" in bundle

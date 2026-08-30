@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
-from lca.plugins.composer.capability_resolution import (
+from lca.plugins.composer.composition.capability_resolution import (
     CapabilityResolutionError,
     ScopeCapabilityResolver,
 )
@@ -169,11 +169,11 @@ def test_runtime_assembly_uses_the_shared_scope_adapter_for_all_plan_reads() -> 
     """运行时闭合与阶段执行器均不得绕开统一的计划能力接缝。"""
 
     runtime_assembly = (
-        Path(__file__).resolve().parents[2] / "lca/plugins/composer/runtime_assembly.py"
+        Path(__file__).resolve().parents[2] / "lca/plugins/composer/runtime/runtime_assembly.py"
     ).read_text(encoding="utf-8")
     runtime_capabilities = (
         Path(__file__).resolve().parents[2]
-        / "lca/plugins/composer/internal/runtime_capabilities.py"
+        / "lca/plugins/composer/runtime/runtime_capabilities.py"
     ).read_text(encoding="utf-8")
 
     assert "resolve_runtime_capabilities" in runtime_assembly

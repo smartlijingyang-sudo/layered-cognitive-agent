@@ -13,7 +13,7 @@ from lca.contracts.harness.composition.composer import (
     merge_agent_graphs,
     team_graph_member_count,
 )
-from lca.plugins.composer.plan_binding import (
+from lca.plugins.composer.composition.plan_binding import (
     BindPlanError,
     PlanBindingResult,
     TeamBindingResult,

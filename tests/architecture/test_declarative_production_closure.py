@@ -20,7 +20,7 @@ def test_production_runtime_and_composer_contain_no_legacy_execution_fallbacks()
     """Verify that production files contain no legacy execution fallbacks."""
     paths = [
         "lca/runtime/runtime_loop.py",
-        "lca/plugins/composer/plan_binding.py",
+        "lca/plugins/composer/composition/plan_binding.py",
         "lca/plugins/loop_drivers/cognitive.py",
         "gateway/runs/execute/loop_drivers.py",
     ]
@@ -42,9 +42,9 @@ def test_production_runtime_and_composer_contain_no_legacy_execution_fallbacks()
 def test_production_assembly_requires_profile_selected_phase_observer() -> None:
     """Phase observation must be an explicit production capability binding."""
 
-    runtime_assembly = Path("lca/plugins/composer/runtime_assembly.py").read_text()
-    runtime_capabilities = Path("lca/plugins/composer/internal/runtime_capabilities.py").read_text()
-    runtime_binding = Path("lca/plugins/composer/internal/runtime_binding.py").read_text()
+    runtime_assembly = Path("lca/plugins/composer/runtime/runtime_assembly.py").read_text()
+    runtime_capabilities = Path("lca/plugins/composer/runtime/runtime_capabilities.py").read_text()
+    runtime_binding = Path("lca/plugins/composer/runtime/runtime_binding.py").read_text()
     transaction = Path("lca/harness/declarative/phase_transaction.py").read_text()
 
     assert "resolve_runtime_capabilities" in runtime_assembly
@@ -59,7 +59,7 @@ def test_production_assembly_requires_profile_selected_phase_observer() -> None:
 
 def test_plan_binding_rejects_v1_fallback_candidates():
     """Verify that plan_binding.py does not contain v1 fallback candidates."""
-    path = Path("lca/plugins/composer/plan_binding.py")
+    path = Path("lca/plugins/composer/composition/plan_binding.py")
     if not path.exists():
         pytest.skip("plan_binding.py not found")
 
@@ -99,7 +99,7 @@ def test_plan_binding_rejects_a_scope_without_the_boot_frozen_plan():
     """Composition must not silently create a second plan from profile data."""
     from lca.contracts.mechanisms.capability import MissingCapabilityError
     from lca.harness.profile.resolve import resolve_profile
-    from lca.plugins.composer.plan_binding import compiled_plan_from_scope
+    from lca.plugins.composer.composition.plan_binding import compiled_plan_from_scope
 
     resolved = resolve_profile("profiles/web-standard.yaml")
 

@@ -15,7 +15,7 @@ from lca.contracts.protocols import LLMAdapter, TeamStage
 from lca.agent.member_invoke import TransportMemberInvoker
 from lca.agent.orchestration_strategies import GraphStrategy
 from lca.application.api import Agent
-from lca.plugins.composer.team_transport import build_team_transport
+from lca.plugins.composer.collaboration.team_transport import build_team_transport
 from tests.support.graph_node_executors import build_default_graph_node_executor_registry
 
 

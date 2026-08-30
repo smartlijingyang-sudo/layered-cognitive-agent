@@ -44,12 +44,12 @@ INTERPRETER_PATH = REPO / "lca" / "runtime" / "declarative_runtime.py"
 INTERPRETER_FALLBACK = REPO / "lca" / "harness" / "declarative" / "interpreter.py"
 COMPOSER_DIRECTORY = REPO / "lca" / "plugins" / "composer"
 COMPOSER_PATHS = (
-    COMPOSER_DIRECTORY / "brain_composer.py",
-    COMPOSER_DIRECTORY / "body_composer.py",
-    COMPOSER_DIRECTORY / "perceive_composer.py",
-    COMPOSER_DIRECTORY / "team_composer.py",
+    COMPOSER_DIRECTORY / "think" / "brain_composer.py",
+    COMPOSER_DIRECTORY / "act" / "body_composer.py",
+    COMPOSER_DIRECTORY / "perceive" / "perceive_composer.py",
+    COMPOSER_DIRECTORY / "collaboration" / "team_composer.py",
 )
-TEAM_TRANSPORT_PATH = COMPOSER_DIRECTORY / "team_transport.py"
+TEAM_TRANSPORT_PATH = COMPOSER_DIRECTORY / "collaboration" / "team_transport.py"
 GRAPH_STRATEGY_PATH = (
     REPO / "lca" / "agent" / "orchestration_strategies" / "graph" / "strategy.py"
 )
