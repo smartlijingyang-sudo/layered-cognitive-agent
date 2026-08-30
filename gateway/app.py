@@ -318,13 +318,24 @@ def create_app(
     application.state.bootstrap_config = bootstrap_config
 
     # ── Harness plugin tree (Phase A) ──
+    # Per ADR-0103 §2: gateway/app.py is adapter layer; allowed to evolve
+    # provided wire-shape contracts (api.py SSE / openai_shim.py REST /
+    # execute.py finalize/closure) are preserved. Main's design moves the
+    # boot from ``create_app`` into the Starlette lifespan so async
+    # primitives stay on one event loop. install_profile_lifespan wires
+    # the boot into Starlette's startup → run → shutdown contract; if no
+    # profile is given, a noop_lifespan is installed so app.router.
+    # lifespan_context(app) still works.
     import os as _os
 
     resolved_profile = profile_path or _os.environ.get("LCA_PROFILE")
     if resolved_profile is None and Path("profiles/web-standard.yaml").exists():
         resolved_profile = "profiles/web-standard.yaml"
-    if resolved_profile is not None:
-        _load_harness_profile(application, resolved_profile)
+    if lifespan is None:
+        from lca.harness.profile.lifespan import install_profile_lifespan
+
+        lifespan = install_profile_lifespan(resolved_profile)
+    application.router.lifespan_context = lifespan
 
     spine_dir = Path("traces/sessions")
     # Main-side spine.py refactored bind_session_spine to take per-call
