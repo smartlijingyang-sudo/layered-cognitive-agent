@@ -92,7 +92,7 @@ def test_runtime_phase_capabilities_accept_custom_contribution_keys() -> None:
 def test_standard_nodes_do_not_route_through_shared_semantic_branching() -> None:
     """Every default node owns its behavior in its selected plugin module."""
 
-    common = Path("lca/plugins/phase_executors/common.py").read_text(encoding="utf-8")
+    common = Path("lca/plugins/phase_graph/common.py").read_text(encoding="utf-8")
     assert "if self.phase" not in common
     assert "StandardPhaseExecutor" not in common
 
@@ -105,5 +105,5 @@ def test_standard_nodes_do_not_route_through_shared_semantic_branching() -> None
         "think.py": "StandardThinkExecutor",
     }
     for filename, executor_name in expected_modules.items():
-        source = (Path("lca/plugins/phase_executors") / filename).read_text(encoding="utf-8")
+        source = (Path("lca/plugins/phase_graph") / filename).read_text(encoding="utf-8")
         assert f"class {executor_name}" in source

@@ -14,7 +14,7 @@ entries:
   # Recovery edge: reflect → think (only when recovery is admitted)
   - id: phase.edge.reflect_to_think.recovery
     name: phase_edge_reflect_to_think_recovery
-    $module: lca.plugins.phase_edges.recovery
+    $module: lca.plugins.phase_graph.recovery
     config:
       source: reflect.main
       target: think.main

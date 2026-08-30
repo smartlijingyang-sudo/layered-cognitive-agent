@@ -203,7 +203,7 @@ class TestStopPolicyControlSurface:
     def test_stop_phase_executor_routes_stop_through_stop_policy(self) -> None:
         from pathlib import Path
 
-        stop_executor = Path("lca/plugins/phase_executors/stop.py").read_text(encoding="utf-8")
+        stop_executor = Path("lca/plugins/phase_graph/stop.py").read_text(encoding="utf-8")
         assert "stop_policy.decide(" in stop_executor, (
             "stop PhaseExecutor must invoke its local StopPolicy.decide(...) with the "
             "think/act/reflect artifacts (stop.decide control surface)."

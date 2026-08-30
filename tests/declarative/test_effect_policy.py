@@ -9,7 +9,7 @@ import pytest
 from lca.contracts.protocols.declarative.declarative_common import DeclarativeValidationError, SemanticPhase
 from lca.contracts.protocols.declarative.declarative_plugin import EffectGovernanceDeclaration
 from lca.harness.declarative.compile.effect_policy import compile_effect_policy
-from lca.plugins.phase_executors.common import standard_phase_spec
+from lca.plugins.phase_graph.common import standard_phase_spec
 
 
 def _spec(

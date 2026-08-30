@@ -2,39 +2,39 @@
 entries:
   - id: phase.perceive.standard
     name: phase_perceive_standard
-    $module: lca.plugins.phase_executors.perceive
+    $module: lca.plugins.phase_graph.perceive
     config: {}
 
   - id: phase.think.standard
     name: phase_think_standard
-    $module: lca.plugins.phase_executors.think
+    $module: lca.plugins.phase_graph.think
     config: {}
 
   - id: phase.act.standard
     name: phase_act_standard
-    $module: lca.plugins.phase_executors.act
+    $module: lca.plugins.phase_graph.act
     config: {}
 
   - id: phase.reflect.standard
     name: phase_reflect_standard
-    $module: lca.plugins.phase_executors.reflect
+    $module: lca.plugins.phase_graph.reflect
     config: {}
 
   - id: phase.remember.standard
     name: phase_remember_standard
-    $module: lca.plugins.phase_executors.remember
+    $module: lca.plugins.phase_graph.remember
     config: {}
 
   - id: phase.stop.standard
     name: phase_stop_standard
-    $module: lca.plugins.phase_executors.stop
+    $module: lca.plugins.phase_graph.stop
     config: {}
 
   # 节点身份、入口、终止标记和访问上限同样由 Profile/Bundle 声明；编译器
   # 只验证并投影，绝不注入 *.main、perceive 入口、stop 终止或固定访问上限。
   - id: phase.topology.standard
     name: phase_topology_standard
-    $module: lca.plugins.phase_topology.standard
+    $module: lca.plugins.phase_graph.standard
     config:
       nodes:
         - id: perceive.main
@@ -68,7 +68,7 @@ entries:
   # 幂等语义，超时后不重放。所有常规阶段耗尽后均由图显式收敛至 stop。
   - id: phase.execution_policy.resilient
     name: phase_execution_policy_resilient
-    $module: lca.plugins.phase_policies.resilient
+    $module: lca.plugins.phase_graph.resilient
     config:
       policies:
         perceive:
@@ -101,7 +101,7 @@ entries:
   # ADR-0075: 图的所有阶段连边由 Profile/Bundle 声明，编译器只验证并解释。
   - id: phase.edge.standard
     name: phase_edge_standard
-    $module: lca.plugins.phase_edges.standard
+    $module: lca.plugins.phase_graph.edges_standard
     config:
       approval_resume_node: think.main
       edges:

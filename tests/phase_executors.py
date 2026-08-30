@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseExecutor
-from lca.plugins.phase_executors.act import create_executor as create_act_executor
-from lca.plugins.phase_executors.perceive import create_executor as create_perceive_executor
-from lca.plugins.phase_executors.reflect import create_executor as create_reflect_executor
-from lca.plugins.phase_executors.remember import create_executor as create_remember_executor
-from lca.plugins.phase_executors.stop import create_executor as create_stop_executor
-from lca.plugins.phase_executors.think import create_executor as create_think_executor
+from lca.plugins.phase_graph.act import create_executor as create_act_executor
+from lca.plugins.phase_graph.perceive import create_executor as create_perceive_executor
+from lca.plugins.phase_graph.reflect import create_executor as create_reflect_executor
+from lca.plugins.phase_graph.remember import create_executor as create_remember_executor
+from lca.plugins.phase_graph.stop import create_executor as create_stop_executor
+from lca.plugins.phase_graph.think import create_executor as create_think_executor
 
 
 def standard_phase_executors() -> Mapping[str, PhaseExecutor]:

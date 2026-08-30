@@ -52,10 +52,10 @@ SPEC = PluginSpec(
     layer="L2",
     functional_group="G5",
     implementation=PluginImplementation(
-        module="lca.plugins.phase_topology.standard",
+        module="lca.plugins.phase_graph.standard",
         setup="setup",
     ),
-    configuration=PluginConfiguration(schema="lca.plugins.phase_topology.standard.Config"),
+    configuration=PluginConfiguration(schema="lca.plugins.phase_graph.standard.Config"),
     provides=(
         CapabilityDeclaration(
             key="phase.topology.standard",

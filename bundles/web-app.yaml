@@ -123,7 +123,7 @@ entries:
   # ── State-cluster stop policy ──
   - id: state.stop-policy.default
     name: state_stop_policy_default
-    $module: lca.plugins.phase_policies.stop_policy
+    $module: lca.plugins.phase_graph.stop_policy
     config: {}
 
   - id: hook_registry.simple
@@ -296,22 +296,22 @@ entries:
   # resolved through this Profile-selected registry before GraphStrategy runs.
   - id: lca.graph-node-executor-registry
     name: lca_graph_node_executor_registry
-    $module: lca.plugins.graph_nodes.registry
+    $module: lca.plugins.phase_graph.registry
     config: {}
 
   - id: graph-node.agent.default
     name: graph_node_agent_default
-    $module: lca.plugins.graph_nodes.agent
+    $module: lca.plugins.phase_graph.agent
     config: {}
 
   - id: graph-node.aggregator.default
     name: graph_node_aggregator_default
-    $module: lca.plugins.graph_nodes.aggregator
+    $module: lca.plugins.phase_graph.aggregator
     config: {}
 
   - id: graph-node.topology.default
     name: graph_node_topology_default
-    $module: lca.plugins.graph_nodes.topology
+    $module: lca.plugins.phase_graph.topology
     config: {}
 
   - id: strategy.graph

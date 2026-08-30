@@ -48,10 +48,10 @@ SPEC = PluginSpec(
     layer="L2",
     functional_group="G5",
     implementation=PluginImplementation(
-        module="lca.plugins.phase_edges.recovery",
+        module="lca.plugins.phase_graph.recovery",
         setup="setup",
     ),
-    configuration=PluginConfiguration(schema="lca.plugins.phase_edges.recovery.RecoveryEdgeConfig"),
+    configuration=PluginConfiguration(schema="lca.plugins.phase_graph.recovery.RecoveryEdgeConfig"),
     provides=(
         CapabilityDeclaration(
             key="phase.edge.recovery",

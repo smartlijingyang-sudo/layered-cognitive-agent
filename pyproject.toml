@@ -1696,8 +1696,8 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.plugins.graph_nodes"]
-responsibility = "lca.plugins.graph_nodes: 图节点插件。本 README 由脚手架生成，待包负责人补充具体细节。"
+[tool.lca.package_contracts."lca.plugins.phase_graph"]
+responsibility = "lca.plugins.phase_graph: 图节点插件。本 README 由脚手架生成，待包负责人补充具体细节。"
 not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
 allowed_dependencies = [
     "lca.contracts",
@@ -1710,7 +1710,7 @@ side_effects = [
     "log:emit",
 ]
 public_api = [
-    "lca.plugins.graph_nodes",
+    "lca.plugins.phase_graph",
 ]
 schema_version = "1.0.0"
 
@@ -1786,77 +1786,9 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.plugins.phase_edges"]
-responsibility = "lca.plugins.phase_edges: 阶段边插件。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.plugins",
-]
-forbidden_dependencies = [
-    "gateway",
-]
-side_effects = [
-    "log:emit",
-]
-public_api = [
-    "lca.plugins.phase_edges",
-]
-schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.plugins.phase_executors"]
-responsibility = "lca.plugins.phase_executors: 阶段执行器插件。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.plugins",
-]
-forbidden_dependencies = [
-    "gateway",
-]
-side_effects = [
-    "log:emit",
-]
-public_api = [
-    "lca.plugins.phase_executors",
-]
-schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.plugins.phase_policies"]
-responsibility = "lca.plugins.phase_policies: 阶段策略插件。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.plugins",
-]
-forbidden_dependencies = [
-    "gateway",
-]
-side_effects = [
-    "log:emit",
-]
-public_api = [
-    "lca.plugins.phase_policies",
-]
-schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.plugins.phase_topology"]
-responsibility = "lca.plugins.phase_topology: 阶段拓扑插件。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
-allowed_dependencies = [
-    "lca.contracts",
-    "lca.plugins",
-]
-forbidden_dependencies = [
-    "gateway",
-]
-side_effects = [
-    "log:emit",
-]
-public_api = [
-    "lca.plugins.phase_topology",
-]
-schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.plugins.profile"]
 responsibility = "lca.plugins.profile: Profile 插件。本 README 由脚手架生成，待包负责人补充具体细节。"

@@ -38,7 +38,7 @@ from lca.plugins.composer.runtime.runtime_factory import (
     RuntimeDeps,
     build_fixture_cognitive_runtime,
 )
-from lca.plugins.phase_policies.stop_policy import DefaultStopPolicy
+from lca.plugins.phase_graph.stop_policy import DefaultStopPolicy
 from lca.plugins.providers.journal.artifact_closure import DefaultArtifactClosure
 from lca.plugins.providers.gate.decision_classifier import DefaultDecisionClassifier
 from lca.runtime.reducer import DefaultReducer

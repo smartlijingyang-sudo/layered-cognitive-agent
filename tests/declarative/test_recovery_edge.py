@@ -17,7 +17,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 from lca.harness.declarative.compile.compiler import compile_declarative_projection
 from lca.harness.declarative.graph.phase_graph_compiler import compile_phase_graph_projection
 from lca.harness.profile.resolve import resolve_profile
-from lca.plugins.phase_edges.recovery import SPEC, RecoveryEdgeConfig
+from lca.plugins.phase_graph.recovery import SPEC, RecoveryEdgeConfig
 
 
 def test_recovery_provider_has_native_spec() -> None:
@@ -70,11 +70,11 @@ def _make_recovery_spec() -> PluginSpec:
         layer="L2",
         functional_group="cognitive-phase",
         implementation=PluginImplementation(
-            module="lca.plugins.phase_edges.recovery",
+            module="lca.plugins.phase_graph.recovery",
             setup="setup",
         ),
         configuration=PluginConfiguration(
-            schema="lca.plugins.phase_edges.recovery.RecoveryEdgeConfig",
+            schema="lca.plugins.phase_graph.recovery.RecoveryEdgeConfig",
             values={
                 "source": "reflect.main",
                 "target": "think.main",
@@ -160,11 +160,11 @@ def test_no_edge_without_phase_edge_capability() -> None:
         layer="L2",
         functional_group="cognitive-phase",
         implementation=PluginImplementation(
-            module="lca.plugins.phase_executors.reflect",
+            module="lca.plugins.phase_graph.reflect",
             setup="setup",
         ),
         configuration=PluginConfiguration(
-            schema="lca.plugins.phase_executors.common.StandardPhaseConfig",
+            schema="lca.plugins.phase_graph.common.StandardPhaseConfig",
             values={},
         ),
         provides=(CapabilityDeclaration(key="phase.reflect.standard", cardinality="one"),),
@@ -213,11 +213,11 @@ def test_recovery_edge_without_loop_guard() -> None:
         layer="L2",
         functional_group="cognitive-phase",
         implementation=PluginImplementation(
-            module="lca.plugins.phase_edges.custom",
+            module="lca.plugins.phase_graph.custom",
             setup="setup",
         ),
         configuration=PluginConfiguration(
-            schema="lca.plugins.phase_edges.custom.CustomEdgeConfig",
+            schema="lca.plugins.phase_graph.custom.CustomEdgeConfig",
             values={
                 "source": "think.main",
                 "target": "perceive.main",

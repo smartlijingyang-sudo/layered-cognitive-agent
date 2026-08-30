@@ -66,7 +66,7 @@ def standard_phase_spec(
             module=module, setup="setup", factory="create_executor"
         ),
         configuration=PluginConfiguration(
-            schema="lca.plugins.phase_executors.common.StandardPhaseConfig"
+            schema="lca.plugins.phase_graph.common.StandardPhaseConfig"
         ),
         provides=(
             CapabilityDeclaration(

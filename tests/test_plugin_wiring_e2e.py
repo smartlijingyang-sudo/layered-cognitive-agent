@@ -38,7 +38,7 @@ _GATE_PLUGINS: tuple[str, ...] = (
 _ACT_RUNTIME_PLUGINS: tuple[str, ...] = (
     "lca.plugins.body.simple",
     "lca.plugins.body.safe_executor",
-    "lca.plugins.phase_policies.stop_policy",
+    "lca.plugins.phase_graph.stop_policy",
     "lca.plugins.runtime.hook_registry",
 )
 _EXPECTED_SENSOR_ORDER: tuple[str, ...] = (

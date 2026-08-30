@@ -261,7 +261,7 @@ _REVERSE_SCAN_PACKAGES = (
     "lca.runtime",
     "lca.agent",
     "lca.application",
-    "lca.plugins.phase_policies",
+    "lca.plugins.phase_graph",
 )
 _CAMEL_CASE_TERM = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 _DEPRECATED_SECTION_MARKERS = ("已废弃主名", "禁止复活")

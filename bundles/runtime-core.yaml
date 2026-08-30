@@ -8,7 +8,7 @@ description: |
 entries:
   - id: state.stop-policy.default
     name: state_stop_policy_default
-    $module: lca.plugins.phase_policies.stop_policy
+    $module: lca.plugins.phase_graph.stop_policy
     config: {}
 
   # Minimal production profiles still need an explicitly selected loop owner.

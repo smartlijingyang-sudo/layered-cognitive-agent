@@ -12,8 +12,8 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
-from lca.plugins.phase_executors.capabilities import StandardPhaseCapabilities
-from lca.plugins.phase_executors.common import (
+from lca.plugins.phase_graph.capabilities import StandardPhaseCapabilities
+from lca.plugins.phase_graph.common import (
     StandardPhaseConfig,
     fallback_phase_result,
     standard_phase_spec,
@@ -22,7 +22,7 @@ from lca.plugins.phase_executors.common import (
 SPEC = standard_phase_spec(
     plugin_id="phase.perceive.standard",
     phase=SemanticPhase.PERCEIVE,
-    module="lca.plugins.phase_executors.perceive",
+    module="lca.plugins.phase_graph.perceive",
 )
 
 

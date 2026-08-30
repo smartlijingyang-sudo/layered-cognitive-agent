@@ -33,8 +33,8 @@ SPEC = PluginSpec(
     kind=PluginSpecKind.PROVIDER,
     layer="L2",
     functional_group="G5",
-    implementation=PluginImplementation(module="lca.plugins.phase_edges.standard", setup="setup"),
-    configuration=PluginConfiguration(schema="lca.plugins.phase_edges.standard.Config"),
+    implementation=PluginImplementation(module="lca.plugins.phase_graph.edges_standard", setup="setup"),
+    configuration=PluginConfiguration(schema="lca.plugins.phase_graph.edges_standard.Config"),
     provides=(
         CapabilityDeclaration(
             key="phase.edge.standard", cardinality="one", protocol="PhaseEdge", scope="profile"

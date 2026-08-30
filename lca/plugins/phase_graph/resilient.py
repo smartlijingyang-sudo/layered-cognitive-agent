@@ -49,11 +49,11 @@ SPEC = PluginSpec(
     layer="L2",
     functional_group="G5",
     implementation=PluginImplementation(
-        module="lca.plugins.phase_policies.resilient",
+        module="lca.plugins.phase_graph.resilient",
         setup="setup",
     ),
     configuration=PluginConfiguration(
-        schema="lca.plugins.phase_policies.resilient.Config",
+        schema="lca.plugins.phase_graph.resilient.Config",
     ),
     provides=(
         CapabilityDeclaration(

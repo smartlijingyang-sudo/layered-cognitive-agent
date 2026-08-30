@@ -79,7 +79,7 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
                 r"^lca/contracts/",
                 r"^lca/runtime/",
                 r"^lca/plugins/runtime/",
-                r"^lca/plugins/phase_executors/",
+                r"^lca/plugins/phase_graph/",
                 r"^lca/plugins/phase_edges/",
                 r"^lca/plugins/phase_policies/",
                 r"^lca/plugins/phase_topology/",
@@ -126,7 +126,7 @@ _PLANE_RULES: list[tuple[str, dict[str, object]]] = [
         {
             "layers": {"L0", "L1", "L2", "L3", "L4"},
             "module_patterns": [
-                r"^lca/plugins/(strategies|roles|loop_drivers|composer|team_lead|modes|graph_nodes)/",
+                r"^lca/plugins/(strategies|roles|loop_drivers|composer|team_lead|modes|phase_graph)/",
                 r"^lca/plugins/run_loop_driver_registry\.py",
                 r"^lca/agent/",
                 r"^lca/application/",
@@ -422,7 +422,7 @@ def _build_capability_tree(profile: str) -> CapabilityTree:
         )
 
     # Phase executors: plugins in phase_executors/ directory
-    phase_executors = [p.id for p in plugins if "phase_executors/" in p.module]
+    phase_executors = [p.id for p in plugins if "phase_graph/" in p.module]
 
     # Effect/Delta handlers: plugins providing these capabilities
     effect_handlers = [

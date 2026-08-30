@@ -16,14 +16,14 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
-from lca.plugins.phase_executors.capabilities import StandardPhaseCapabilities
-from lca.plugins.phase_executors.common import StandardPhaseConfig, standard_phase_spec
-from lca.plugins.phase_executors.failure_stop import phase_failure_stop_result
+from lca.plugins.phase_graph.capabilities import StandardPhaseCapabilities
+from lca.plugins.phase_graph.common import StandardPhaseConfig, standard_phase_spec
+from lca.plugins.phase_graph.failure_stop import phase_failure_stop_result
 
 SPEC = standard_phase_spec(
     plugin_id="phase.stop.standard",
     phase=SemanticPhase.STOP,
-    module="lca.plugins.phase_executors.stop",
+    module="lca.plugins.phase_graph.stop",
 )
 
 
