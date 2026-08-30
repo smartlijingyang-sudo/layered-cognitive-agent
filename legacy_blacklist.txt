@@ -7,3 +7,21 @@
 # See: docs/superpowers/specs/2026-08-30-lca-modularization-design.md §6
 #      docs/superpowers/plans/2026-08-30-lca-phase3-filename-linter.md
 #      docs/specs/naming-conventions.md
+
+# Auto-populated by check_filename_boundaries.py (Phase 3 Task 2)
+scripts/check_protocol_impl.py  # historical filename; tracked for quarterly cleanup
+tests/test_simple_body_delegate.py  # historical filename; tracked for quarterly cleanup
+tests/test_simple_body_no_op_removed.py  # historical filename; tracked for quarterly cleanup
+tests/test_simple_memory_typed_records.py  # historical filename; tracked for quarterly cleanup
+tests/support/unimplemented_transport.py  # historical filename; tracked for quarterly cleanup
+tests/support/observability_helpers.py  # historical filename; tracked for quarterly cleanup
+lca/cognition/memory/simple_memory.py  # historical filename; tracked for quarterly cleanup
+lca/cognition/body/simple_body.py  # historical filename; tracked for quarterly cleanup
+lca/plugins/critic/simple.py  # historical filename; tracked for quarterly cleanup
+lca/plugins/phase_executors/common.py  # historical filename; tracked for quarterly cleanup
+lca/plugins/brain/simple.py  # historical filename; tracked for quarterly cleanup
+lca/plugins/body/simple.py  # historical filename; tracked for quarterly cleanup
+lca/plugins/creator/faces/implementations.py  # historical filename; tracked for quarterly cleanup
+lca/contracts/protocols/declarative_common.py  # historical filename; tracked for quarterly cleanup
+lca/infrastructure/observability/narrative/narrative_utils.py  # historical filename; tracked for quarterly cleanup
+lca/infrastructure/observability/coding_agent_tools/_helpers.py  # historical filename; tracked for quarterly cleanup
