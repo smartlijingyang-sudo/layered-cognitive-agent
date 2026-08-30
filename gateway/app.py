@@ -72,22 +72,10 @@ from gateway.spine import bind_session_spine
 from lca.layer0_infra.file_store import LocalFileStore
 
 
-def _get_default_file_store() -> LocalFileStore:
-    """Soft-locked (ADR-0103 §2) module-level helper.
-
-    Branch's gateway/app.py imported ``get_default_file_store`` from
-    ``lca.layer0_infra.file_store``. Main removed it (single-default-store
-    is owned by the composition root). The plugin tree tests assert
-    ``get_default_file_store`` is absent from ``lca.layer0_infra.file_store``
-    (seam-purity). Define it as a private module helper here so the
-    soft-locked app.py keeps loading without re-introducing the seam
-    bypass the test is protecting against.
-    """
-    return LocalFileStore()
 
 
 _registry = RunRegistry()
-_file_store = _get_default_file_store()
+_file_store = None  # set by bootstrap factory or lifespan
 _device_settings = DeviceGatewaySettings()
 _devices = DeviceRegistry(_device_settings.db_path)
 _device_hub = DeviceHub(_devices)
@@ -97,8 +85,6 @@ def get_registry() -> RunRegistry:
     return _registry
 
 
-def get_file_store() -> LocalFileStore:
-    return _file_store
 
 
 async def _options(_request: Request) -> JSONResponse:
@@ -318,6 +304,7 @@ def create_app(
         run_port = RegistryRunAdapter(_registry)
     application.state.run_port = run_port
     application.state.run_registry = _registry
+    application.state.bootstrap = None  # sentinel — main always sets this
     application.state.bootstrap_factory = bootstrap_factory
     application.state.bootstrap_config = bootstrap_config
     # If a bootstrap_factory is supplied, use it to install an explicit
