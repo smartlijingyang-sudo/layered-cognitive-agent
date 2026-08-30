@@ -15,6 +15,10 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class PerceiveContextExecutor:
@@ -64,6 +68,15 @@ class Config(BaseModel):
             aggregation="deny-on-any-deny",
         )
     ],
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G6_DECISION,
+        control_slot=ControlSlot.PERCEIVE_CONTEXT,
+        scope=Scope.TURN,
+        authority=("context.read",),
+        evidence=("control.perceive.context.checked",),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

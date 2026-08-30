@@ -19,6 +19,10 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 _GATE_CONTRIBUTIONS = {
     "gate.repeat-tool-call": "RepeatToolCallGate",
@@ -121,6 +125,15 @@ class Config(BaseModel):
             aggregation="deny-on-any-deny",
         )
     ],
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G6_DECISION,
+        control_slot=ControlSlot.THINK_GUARD,
+        scope=Scope.TURN,
+        authority=("decision.read",),
+        evidence=("control.think.guard.checked",),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config

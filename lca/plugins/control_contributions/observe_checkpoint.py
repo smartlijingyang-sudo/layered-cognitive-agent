@@ -14,6 +14,10 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.atoms.control_slot import ControlSlot
+from lca.contracts.atoms.functional_group import FunctionalGroup
+from lca.contracts.atoms.scope import Scope
+from lca.contracts.protocols.composition.logic_address import LogicAddress
 
 
 class ObserveCheckpointExecutor:
@@ -66,6 +70,15 @@ class Config(BaseModel):
             order=1,
         )
     ],
+    logic_address=LogicAddress(
+        functional_group=FunctionalGroup.G6_DECISION,
+        control_slot=ControlSlot.OBSERVE_CHECKPOINT,
+        scope=Scope.TURN,
+        authority=("checkpoint.read", "state.read"),
+        evidence=("control.observe.checkpoint.checked",),
+        revision="v1",
+    ),
+    relations=(),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
