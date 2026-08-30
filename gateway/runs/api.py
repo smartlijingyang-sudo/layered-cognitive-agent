@@ -17,7 +17,7 @@ from gateway.runs.doctor import diagnose
 from gateway.runs.execute import create_run_session, llm_status, resume_run, schedule_run
 from gateway.runs.identity import parse_agent_ref
 from gateway.runs.ingress import prepare_run_from_messages
-from gateway.runs.live import LiveGap, LiveTail
+from gateway.runs.live_compat import LiveGap, LiveTail
 from gateway.runs.session import RunRegistry, RunStatus
 from lca.contracts.models.observability.journal import (
     StampedEvent,

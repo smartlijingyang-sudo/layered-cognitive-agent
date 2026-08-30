@@ -17,7 +17,7 @@ from gateway.modes import DEFAULT_MODE
 from gateway.runs.doctor import diagnose
 from gateway.runs.identity import AgentRef, default_agent_ref
 from gateway.runs.intent import resolve_run_intent
-from gateway.runs.live import LiveTail
+from gateway.runs.live_compat import LiveTail
 from gateway.runs.session import RunRegistry, RunSession, RunStatus
 from lca.contracts.atoms.ids import RunId, TraceId, new_id
 from lca.contracts.mechanisms.capability import (
@@ -856,3 +856,48 @@ def _record_terminal_materialization(session: RunSession) -> None:
     """
     from gateway.runs.terminal_materialization import record_terminal_materialization
     record_terminal_materialization(session)
+
+
+# Backwards-compat re-export — main's architecture has the lifecycle
+# coordinator in gateway/runs/lifecycle.py, but tests import it from
+# gateway.runs.execute (a soft-lock-allowed adapter per ADR-0103 §2).
+# Re-export here so the soft-lock surface keeps loading.
+from gateway.runs.lifecycle import RunLifecycleCoordinator  # noqa: E402, F401
+
+
+async def execute_run(
+    registry: RunRegistry,
+    *,
+    run_id: str,
+    question: str,
+    mode: str = DEFAULT_MODE,
+    ctx: Any | None = None,
+    machine_resolver: Any | None = None,
+) -> None:
+    """Soft-lock compat facade — delegates to ``RunLifecycleCoordinator``.
+
+    Per ADR-0103 §2 the soft-locked ``gateway/runs/execute.py`` can evolve
+    in finalize/closure logic; tests on main expect the modern shape
+    where execution is delegated to ``RunLifecycleCoordinator``.
+
+    Uses module-level ``RunLifecycleCoordinator`` import so test mocks
+    (``patch.object(execution_module, "RunLifecycleCoordinator", ...)``)
+    take effect — local ``from ... import`` would create a fresh
+    reference that bypasses the module patch.
+    """
+    await RunLifecycleCoordinator(registry, machine_resolver=machine_resolver).execute(
+        run_id=run_id,
+        question=question,
+        mode=mode,
+        ctx=ctx,
+    )
+
+
+async def resume_run(session: RunSession, registry: RunRegistry, answer: str) -> None:
+    """Soft-lock compat facade — delegates to ``RunLifecycleCoordinator.resume``.
+
+    Per ADR-0103 §2 ``gateway/runs/execute.py`` finalize/closure can evolve;
+    main's resume delegates to ``RunLifecycleCoordinator``. Module-level
+    import so test patches take effect.
+    """
+    await RunLifecycleCoordinator(registry).resume(session, answer=answer)
