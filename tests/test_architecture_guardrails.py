@@ -153,7 +153,7 @@ def test_architecture_28_app_spawn() -> None:
 
 def test_architecture_29_app_runtime_factory() -> None:
     """守护 runtime factory 的组合根位置。"""
-    _require_path("lca", "plugins", "composer", "runtime_factory.py")
+    _require_path("lca", "plugins", "composer", "runtime", "runtime_factory.py")
 
 
 def test_architecture_30_harness_profile() -> None:

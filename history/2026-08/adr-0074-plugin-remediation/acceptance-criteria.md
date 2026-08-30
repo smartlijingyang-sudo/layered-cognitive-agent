@@ -281,7 +281,7 @@ uv run pytest --no-cov tests/artifact/test_state_machine_property.py -v
 通过条件：4 个 subcommand（inspect / author / validate / promote）。
 
 ```sh
-uv run pytest --no-cov tests/creator/test_4_faces.py -v
+uv run pytest --no-cov tests/creator/test_4_personas.py -v
 ```
 
 通过条件：旧动作 `mount` / `unmount` / `stage` / `retire` / `publish` 均被拒绝；唯一动作词表是 inspect / author / validate / promote。

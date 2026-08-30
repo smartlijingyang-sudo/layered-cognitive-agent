@@ -67,6 +67,15 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/harness/profile/source.py": (
         "Profile 输入适配器集中 YAML 来源、补丁来源与语义化配置解析，避免解析规则跨模块泄漏"
     ),
+    "lca/infrastructure/cli/commands/tools.py": (
+        "CLI 工具子命令集中 registration、provider 装载、CLI 渲染、命令装配（Phase C #5 合并 ops 后）"
+    ),
+    "lca/infrastructure/cli/services/daemon.py": (
+        "Daemon lifecycle 服务集中 dispatch + run loop + shutdown coordination（Phase C #5 合并 ops 后）"
+    ),
+    "lca/infrastructure/cli/services/lobehub.py": (
+        "LobeHub streaming adapter 集中 SSE + ChunkBuilder + Encoder 装配（Phase C #5 合并 ops 后）"
+    ),
     "lca/harness/declarative/graph/phase_graph_compiler.py": (
         "ADR-0075：声明式阶段图编译器集中校验 profile 选定的节点、边、策略与投稿，"
         "避免由运行时解释器重新引入隐藏流程默认值"
@@ -445,6 +454,9 @@ class TestGlossaryReverseCoverage(unittest.TestCase):
             "DegradationPolicy",
             "GracefulDegradation",
             "SimpleDecisionParser",
+            "FailureExplainer",
+            "MinimalReproduction",
+            "OptimizationFinder",
         }
 
         class_names = _collect_class_names(_REVERSE_SCAN_PACKAGES)
