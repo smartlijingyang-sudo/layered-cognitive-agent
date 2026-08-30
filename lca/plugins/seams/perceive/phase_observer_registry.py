@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from lca.contracts.capabilities import PHASE_OBSERVER_REGISTRY
 from lca.contracts.protocols.journal.phase_observation import PhaseObserverRegistry
-from lca.harness.declarative.phase_observation import InMemoryPhaseObserverRegistry
+from lca.harness.declarative.lifecycle.phase_observation import InMemoryPhaseObserverRegistry
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

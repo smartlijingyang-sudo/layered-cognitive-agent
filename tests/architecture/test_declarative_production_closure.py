@@ -45,7 +45,7 @@ def test_production_assembly_requires_profile_selected_phase_observer() -> None:
     runtime_assembly = Path("lca/plugins/composer/runtime/runtime_assembly.py").read_text()
     runtime_capabilities = Path("lca/plugins/composer/runtime/runtime_capabilities.py").read_text()
     runtime_binding = Path("lca/plugins/composer/runtime/runtime_binding.py").read_text()
-    transaction = Path("lca/harness/declarative/phase_transaction.py").read_text()
+    transaction = Path("lca/harness/declarative/lifecycle/phase_transaction.py").read_text()
 
     assert "resolve_runtime_capabilities" in runtime_assembly
     assert "bind_runtime_graph(" in runtime_assembly

@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from lca.contracts.protocols.act.command_envelope import CommandEnvelope
-from lca.harness.declarative.dispatch import RegistryEffectGateway
+from lca.harness.declarative.execute.dispatch import RegistryEffectGateway
 from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
 from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 from lca.plugins.providers.act.effect_handlers import (

@@ -41,7 +41,7 @@ REPO = Path(__file__).resolve().parents[2]
 # that MUST NOT contain the corresponding forbidden pattern.
 
 INTERPRETER_PATH = REPO / "lca" / "runtime" / "declarative_runtime.py"
-INTERPRETER_FALLBACK = REPO / "lca" / "harness" / "declarative" / "interpreter.py"
+INTERPRETER_FALLBACK = REPO / "lca" / "harness" / "declarative" / "execute" / "interpreter.py"
 COMPOSER_DIRECTORY = REPO / "lca" / "plugins" / "composer"
 COMPOSER_PATHS = (
     COMPOSER_DIRECTORY / "think" / "brain_composer.py",

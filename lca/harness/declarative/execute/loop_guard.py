@@ -14,7 +14,7 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_execution import PhaseResult
 from lca.contracts.protocols.declarative.declarative_graph import LoopGuard, PhaseEdge
 from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator, LoopGuardVerdict
-from lca.harness.declarative.predicate import evaluate_restricted_predicate
+from lca.harness.declarative.graph.predicate import evaluate_restricted_predicate
 
 
 class DeclarativeLoopGuardEvaluator(LoopGuardEvaluator):

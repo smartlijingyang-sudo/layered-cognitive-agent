@@ -19,14 +19,14 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseResult,
     SemanticPhase,
 )
-from lca.harness.declarative.assembler import ExecutableNode
-from lca.harness.declarative.effect_receipt import adapt_effect_receipt
-from lca.harness.declarative.phase_capabilities import normalize_phase_capabilities
-from lca.harness.declarative.phase_context import RestrictedPhaseContext
-from lca.harness.declarative.phase_execution_policy import execute_with_policy
-from lca.harness.declarative.phase_governance import GovernanceResult, PhaseGovernance
-from lca.harness.declarative.phase_observation import PhaseObserver, phase_state_snapshot
-from lca.harness.declarative.traversal import PhaseTraversal
+from lca.harness.declarative.compile.assembler import ExecutableNode
+from lca.harness.declarative.compile.phase_capabilities import normalize_phase_capabilities
+from lca.harness.declarative.compile.phase_execution_policy import execute_with_policy
+from lca.harness.declarative.compile.phase_governance import GovernanceResult, PhaseGovernance
+from lca.harness.declarative.controls.effect_receipt import adapt_effect_receipt
+from lca.harness.declarative.graph.traversal import PhaseTraversal
+from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
+from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver, phase_state_snapshot
 
 
 @dataclass(frozen=True, slots=True)

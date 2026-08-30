@@ -15,11 +15,11 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.contracts.protocols.journal.phase_observation import PhaseStateSnapshot
-from lca.harness.declarative.assembler import ExecutableNode
-from lca.harness.declarative.phase_capabilities import normalize_phase_capabilities
-from lca.harness.declarative.phase_observation import NullPhaseObserver
-from lca.harness.declarative.phase_transaction import PhaseExecutionTransaction
-from lca.harness.declarative.traversal import PhaseTraversal
+from lca.harness.declarative.compile.assembler import ExecutableNode
+from lca.harness.declarative.compile.phase_capabilities import normalize_phase_capabilities
+from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver
+from lca.harness.declarative.lifecycle.phase_transaction import PhaseExecutionTransaction
+from lca.harness.declarative.graph.traversal import PhaseTraversal
 
 
 @dataclass

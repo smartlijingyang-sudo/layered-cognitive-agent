@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.harness.declarative.phase_observation import NullPhaseObserver
+from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver
 from lca.runtime.declarative_runtime import (
     DeclarativeExecution,
     DeclarativeRuntimeDriver,

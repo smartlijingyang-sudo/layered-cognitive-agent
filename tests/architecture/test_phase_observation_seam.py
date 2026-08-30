@@ -6,7 +6,7 @@ import ast
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-TRANSACTION = REPO / "lca" / "harness" / "declarative" / "phase_transaction.py"
+TRANSACTION = REPO / "lca" / "harness" / "declarative" / "lifecycle" / "phase_transaction.py"
 
 
 def _imported_modules(path: Path) -> set[str]:
@@ -22,6 +22,6 @@ def test_phase_transaction_depends_on_observation_seam_not_tracing_backend() -> 
     """Span selection belongs to the observer adapter, not phase execution."""
     imports = _imported_modules(TRANSACTION)
 
-    assert "lca.harness.declarative.phase_observation" in imports
+    assert "lca.harness.declarative.lifecycle.phase_observation" in imports
     assert "lca.infrastructure.observability" not in imports
     assert "lca.contracts.atoms.telemetry" not in imports

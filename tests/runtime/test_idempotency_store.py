@@ -63,7 +63,7 @@ async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> 
 
     from lca.contracts.protocols.act.command_envelope import CapabilityGrant, CommandEnvelope
     from lca.contracts.protocols.declarative.declarative_phase_graph import EffectPolicyPlan
-    from lca.harness.declarative.dispatch import RegistryEffectGateway
+    from lca.harness.declarative.execute.dispatch import RegistryEffectGateway
     from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
     from lca.plugins.providers.act.effect_handlers import (
         InMemoryEffectHandlerRegistry,

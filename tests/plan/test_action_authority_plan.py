@@ -13,8 +13,8 @@ from dataclasses import replace
 from lca.contracts.atoms.enums import ActionScope, ActionType
 from lca.contracts.atoms.functional_group import FunctionalGroup
 from lca.contracts.protocols.declarative.declarative_phase_graph import ActionAuthorityPlan
-from lca.harness.declarative.action_authority import compile_action_authority
-from lca.harness.declarative.authority import (
+from lca.harness.declarative.compile.action_authority import compile_action_authority
+from lca.harness.declarative.compile.authority import (
     action_authority_for_scope,
     action_is_permitted,
 )

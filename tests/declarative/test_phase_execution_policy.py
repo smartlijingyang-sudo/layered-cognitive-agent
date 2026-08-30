@@ -21,15 +21,15 @@ from lca.contracts.protocols.declarative.declarative_execution import (
 from lca.contracts.protocols.declarative.declarative_fault_tolerance import PhaseExecutionPolicy
 from lca.contracts.protocols.declarative.declarative_phase_graph import SemanticPhase
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
-from lca.harness.declarative.assembler import ExecutableNode
-from lca.harness.declarative.phase_execution_policy import (
+from lca.harness.declarative.compile.assembler import ExecutableNode
+from lca.harness.declarative.compile.phase_execution_policy import (
     PhaseExecutionExhaustedError,
     RunDeadlineExceededError,
 )
-from lca.harness.declarative.phase_observation import NullPhaseObserver
-from lca.harness.declarative.phase_transaction import PhaseExecutionTransaction
-from lca.harness.declarative.traversal import PhaseTraversal
-from lca.harness.declarative.validation import PhaseGraphValidator, validation_errors
+from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver
+from lca.harness.declarative.lifecycle.phase_transaction import PhaseExecutionTransaction
+from lca.harness.declarative.graph.traversal import PhaseTraversal
+from lca.harness.declarative.controls.validation import PhaseGraphValidator, validation_errors
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from tests.phase_executors import standard_phase_executors

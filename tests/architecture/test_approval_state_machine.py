@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.harness.declarative.approval import ApprovalState, ApprovalStateMachine
+from lca.harness.declarative.controls.approval import ApprovalState, ApprovalStateMachine
 
 
 def test_approval_state_machine_replays_wait_and_resolution() -> None:

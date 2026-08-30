@@ -11,7 +11,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 from lca.contracts.protocols.runtime.infra import StateStore
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.contracts.protocols.runtime.runtime_composition import ResultFinalizer
-from lca.harness.declarative.interpreter import InterpretationResult
+from lca.harness.declarative.execute.interpreter import InterpretationResult
 from lca.runtime.result_projection import TerminalResultProjection
 
 

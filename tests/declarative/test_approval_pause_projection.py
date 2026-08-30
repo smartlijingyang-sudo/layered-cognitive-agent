@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 
 from lca.contracts.models.core.result import ApprovalPendingError
 from lca.contracts.protocols.act.command_envelope import RunFact
-from lca.harness.declarative.outcome_projection import RunOutcomeProjector
-from lca.harness.declarative.traversal import PhaseTraversal
+from lca.harness.declarative.execute.outcome_projection import RunOutcomeProjector
+from lca.harness.declarative.graph.traversal import PhaseTraversal
 
 
 @dataclass

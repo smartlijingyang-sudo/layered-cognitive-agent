@@ -1,6 +1,6 @@
 """DeltaHandler 与 DeltaHandlerRegistry Protocol（ADR-0074 + ADR-0070）。
 
-``lca/harness/declarative/dispatch.py`` 中的 ``RegistryDeltaReducer``
+``lca/harness/declarative/execute/dispatch.py`` 中的 ``RegistryDeltaReducer``
 仅从注入的 ``DeltaHandlerRegistry`` 解析操作，并经唯一 ``Reducer`` seam
 折叠状态；它不包含操作分支，也不会静默丢弃未知 delta。
 

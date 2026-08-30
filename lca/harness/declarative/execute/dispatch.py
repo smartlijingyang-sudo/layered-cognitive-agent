@@ -7,15 +7,15 @@ from typing import cast
 
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols.act.command_envelope import CommandEnvelope, RunDelta
+from lca.contracts.protocols.act.effect_handler import EffectCapabilities, EffectHandlerRegistry
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     DeltaReducer,
     EffectGateway,
     EffectPolicyPlan,
 )
-from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
-from lca.contracts.protocols.act.effect_handler import EffectCapabilities, EffectHandlerRegistry
 from lca.contracts.protocols.journal.idempotency import IdempotencyStore
+from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.infrastructure.component_registry import RegistryKeyError
 

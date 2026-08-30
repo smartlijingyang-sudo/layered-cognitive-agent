@@ -35,7 +35,7 @@ from lca.contracts.protocols.runtime.runtime_composition import (
 from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.declarative.phase_observation import PhaseObserver, TracingPhaseObserver
+from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver, TracingPhaseObserver
 
 
 @dataclass(frozen=True, slots=True)

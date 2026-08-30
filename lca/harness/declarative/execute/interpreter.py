@@ -31,20 +31,20 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import (
     RuntimeLifecycleEventType,
     RuntimeLifecyclePublisher,
 )
-from lca.harness.declarative.assembler import ExecutablePlan
-from lca.harness.declarative.loop_guard import DeclarativeLoopGuardEvaluator
-from lca.harness.declarative.outcome_projection import (
+from lca.harness.declarative.compile.assembler import ExecutablePlan
+from lca.harness.declarative.controls.validation import require_valid
+from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
+from lca.harness.declarative.execute.outcome_projection import (
     InterpretationResult,
     PhaseVisit,
     RunOutcomeProjector,
     terminal_result,
 )
-from lca.harness.declarative.phase_context import RestrictedPhaseContext
-from lca.harness.declarative.phase_observation import NullPhaseObserver, PhaseObserver
-from lca.harness.declarative.phase_transaction import PhaseExecutionTransaction
-from lca.harness.declarative.predicate import evaluate_restricted_predicate
-from lca.harness.declarative.traversal import PhaseTraversal
-from lca.harness.declarative.validation import require_valid
+from lca.harness.declarative.graph.predicate import evaluate_restricted_predicate
+from lca.harness.declarative.graph.traversal import PhaseTraversal
+from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
+from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserver, PhaseObserver
+from lca.harness.declarative.lifecycle.phase_transaction import PhaseExecutionTransaction
 from lca.harness.plan import compiled_run_plan_ref
 
 

@@ -14,11 +14,11 @@ from lca.contracts.atoms.scope import Scope
 from lca.contracts.protocols.declarative.declarative_phase_graph import SemanticPhase
 from lca.contracts.protocols.state.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
-from lca.harness.declarative.compiler import (
+from lca.harness.declarative.compile.compiler import (
     DeclarativePlanProjection,
     compile_declarative_projection,
 )
-from lca.harness.declarative.validation import require_valid
+from lca.harness.declarative.controls.validation import require_valid
 from lca.harness.plan import build_input_provenance
 from lca.harness.profile.capability_plan_resolver import (
     CapabilityPlanOptions,

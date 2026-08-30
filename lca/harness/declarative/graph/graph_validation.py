@@ -25,13 +25,13 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ValidationIssue,
     ValidationReport,
 )
-from lca.harness.declarative.graph_algorithms import (
+from lca.harness.declarative.graph.graph_algorithms import (
     has_directed_cycle,
     has_path_between_any,
     reachable,
     strongly_connected_components,
 )
-from lca.harness.declarative.predicate import evaluate_restricted_predicate
+from lca.harness.declarative.graph.predicate import evaluate_restricted_predicate
 
 
 class PhaseGraphValidator:

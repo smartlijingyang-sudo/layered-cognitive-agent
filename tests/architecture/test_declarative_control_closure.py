@@ -16,7 +16,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ValidationIssue,
     ValidationReport,
 )
-from lca.harness.declarative.validation import (
+from lca.harness.declarative.controls.validation import (
     is_validation_valid,
     require_valid,
     validate_control_binding_closure,

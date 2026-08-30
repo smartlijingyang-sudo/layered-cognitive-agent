@@ -14,8 +14,8 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
     VerificationDeclaration,
 )
-from lca.harness.declarative.compiler import compile_declarative_projection
-from lca.harness.declarative.phase_graph_compiler import compile_phase_graph_projection
+from lca.harness.declarative.compile.compiler import compile_declarative_projection
+from lca.harness.declarative.graph.phase_graph_compiler import compile_phase_graph_projection
 from lca.harness.profile.resolve import resolve_profile
 from lca.plugins.phase_edges.recovery import SPEC, RecoveryEdgeConfig
 

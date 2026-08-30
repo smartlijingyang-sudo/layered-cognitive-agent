@@ -11,7 +11,7 @@ from lca.contracts.harness.composition.composer import (
     AgentGraphComposer,
     TeamGraphComposer,
 )
-from lca.harness.declarative.authority import action_authority_for_scope
+from lca.harness.declarative.compile.authority import action_authority_for_scope
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.boot_products import compiled_plan_from_scope
 from lca.plugins.composer.composition.capability_resolution import (

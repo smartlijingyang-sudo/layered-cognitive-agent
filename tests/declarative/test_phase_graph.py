@@ -14,8 +14,8 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
-from lca.harness.declarative.phase_graph_compiler import compile_phase_graph_projection
-from lca.harness.declarative.validation import (
+from lca.harness.declarative.graph.phase_graph_compiler import compile_phase_graph_projection
+from lca.harness.declarative.controls.validation import (
     PhaseGraphValidator,
     is_validation_valid,
     validation_errors,

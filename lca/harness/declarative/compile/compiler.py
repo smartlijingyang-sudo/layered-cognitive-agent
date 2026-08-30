@@ -27,14 +27,14 @@ from lca.contracts.protocols.declarative.declarative_graph import (
     ValidationReport,
 )
 from lca.contracts.protocols.declarative.declarative_plugin import CapabilityDeclaration, PluginSpec
-from lca.harness.declarative.action_authority import compile_action_authority
-from lca.harness.declarative.effect_policy import compile_effect_policy
-from lca.harness.declarative.phase_graph_compiler import compile_phase_graph_projection
-from lca.harness.declarative.validation import (
+from lca.harness.declarative.compile.action_authority import compile_action_authority
+from lca.harness.declarative.compile.effect_policy import compile_effect_policy
+from lca.harness.declarative.controls.validation import (
     PhaseGraphValidator,
     PluginSpecValidator,
     validate_control_binding_closure,
 )
+from lca.harness.declarative.graph.phase_graph_compiler import compile_phase_graph_projection
 from lca.harness.profile.projection import ResolvedProfileProjection
 from lca.harness.profile.resolve import ResolvedProfile
 

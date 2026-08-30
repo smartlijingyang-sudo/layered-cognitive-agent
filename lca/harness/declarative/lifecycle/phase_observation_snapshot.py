@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState
-from lca.contracts.protocols.journal.phase_observation import PhaseBudgetSnapshot, PhaseStateSnapshot
+from lca.contracts.protocols.journal.phase_observation import (
+    PhaseBudgetSnapshot,
+    PhaseStateSnapshot,
+)
 
 
 def phase_state_snapshot(state: object) -> PhaseStateSnapshot:

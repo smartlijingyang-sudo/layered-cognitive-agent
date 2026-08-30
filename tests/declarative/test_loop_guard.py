@@ -6,7 +6,7 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_phase_graph import LoopGuard, PhaseEdge, PhaseResult
 from lca.contracts.protocols.gate.loop_guard import LoopGuardVerdict
 from lca.harness.declarative import GenericPlanInterpreter
-from lca.harness.declarative.loop_guard import DeclarativeLoopGuardEvaluator
+from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
 
 
 def _state(*, budget: Budget | None = None) -> AgentState:

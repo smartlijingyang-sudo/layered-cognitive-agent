@@ -21,7 +21,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseRunCursor,
 )
 from lca.harness.declarative import GenericPlanInterpreter, GraphAssembler, MappingRestrictedScope
-from lca.harness.declarative.phase_governance import classify_control_verdict
+from lca.harness.declarative.compile.phase_governance import classify_control_verdict
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
@@ -232,8 +232,8 @@ def test_outcome_projector_records_failure_without_executing_a_graph() -> None:
     """Terminal failure projection has a direct test surface independent of traversal."""
 
     from lca.harness.declarative import InMemoryJournalCommitter
-    from lca.harness.declarative.outcome_projection import RunOutcomeProjector
-    from lca.harness.declarative.traversal import PhaseTraversal
+    from lca.harness.declarative.execute.outcome_projection import RunOutcomeProjector
+    from lca.harness.declarative.graph.traversal import PhaseTraversal
 
     journal = InMemoryJournalCommitter()
     traversal = PhaseTraversal.start(

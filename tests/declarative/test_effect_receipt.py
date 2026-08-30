@@ -6,7 +6,7 @@ import pytest
 
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.protocols.declarative.declarative_phase_graph import DeclarativeValidationError
-from lca.harness.declarative.effect_receipt import adapt_effect_receipt
+from lca.harness.declarative.controls.effect_receipt import adapt_effect_receipt
 
 
 def test_plain_mapping_remains_the_domain_output() -> None:

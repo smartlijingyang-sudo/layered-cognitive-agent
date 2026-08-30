@@ -42,7 +42,7 @@ from lca.contracts.protocols.runtime.runtime_composition import (
 )
 from lca.contracts.protocols.runtime.runtime_lifecycle import RuntimeLifecyclePublisher
 from lca.harness.declarative import MappingRestrictedScope
-from lca.harness.declarative.phase_observation import PhaseObserver
+from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
 from lca.harness.plan import compiled_run_plan_ref
 from lca.runtime.runtime_event_publisher import NullRuntimeLifecyclePublisher
 

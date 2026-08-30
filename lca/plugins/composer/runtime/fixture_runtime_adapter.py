@@ -28,7 +28,7 @@ from lca.contracts.protocols.runtime.runtime_composition import (
 from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.declarative.loop_guard import DeclarativeLoopGuardEvaluator
+from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
 from lca.plugins.composer.runtime import fixture_runtime_defaults
 from lca.plugins.composer.runtime.fixture_runtime_input import RuntimeDeps
 from lca.plugins.composer.runtime.runtime_deps import ProductionRuntimeDeps

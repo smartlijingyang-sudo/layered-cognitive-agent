@@ -10,10 +10,10 @@ import pytest
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_phase_graph import PhaseInput, PhaseResult, SemanticPhase
 from lca.contracts.protocols.journal.phase_observation import PhaseStateSnapshot
-from lca.harness.declarative.assembler import ExecutableNode
-from lca.harness.declarative.phase_observation import PhaseObserver, phase_state_snapshot
-from lca.harness.declarative.phase_transaction import PhaseExecutionTransaction
-from lca.harness.declarative.traversal import PhaseTraversal
+from lca.harness.declarative.compile.assembler import ExecutableNode
+from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver, phase_state_snapshot
+from lca.harness.declarative.lifecycle.phase_transaction import PhaseExecutionTransaction
+from lca.harness.declarative.graph.traversal import PhaseTraversal
 
 
 class _Journal:

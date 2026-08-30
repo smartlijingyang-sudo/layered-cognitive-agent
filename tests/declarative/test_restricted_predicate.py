@@ -8,7 +8,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     DeclarativeValidationError,
     PhaseResult,
 )
-from lca.harness.declarative.predicate import evaluate_restricted_predicate
+from lca.harness.declarative.graph.predicate import evaluate_restricted_predicate
 
 
 def _result() -> PhaseResult:

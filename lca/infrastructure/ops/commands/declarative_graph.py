@@ -93,8 +93,8 @@ def audit_declarative_boundaries(root: Path) -> dict[str, Any]:
     """Reject implementation-identity dispatch in MTK and GraphAssembler."""
     files = (
         root / "lca/contracts/protocols/declarative_phase_graph.py",
-        root / "lca/harness/declarative/assembler.py",
-        root / "lca/harness/declarative/interpreter.py",
+        root / "lca/harness/declarative/compile/assembler.py",
+        root / "lca/harness/declarative/execute/interpreter.py",
     )
     violations: list[dict[str, Any]] = []
     forbidden = {"simple", "default"}

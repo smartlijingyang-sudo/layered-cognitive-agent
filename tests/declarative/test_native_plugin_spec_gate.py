@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lca.harness.declarative.compiler import compile_declarative_projection
+from lca.harness.declarative.compile.compiler import compile_declarative_projection
 from lca.harness.profile.resolve import resolve_profile
 
 

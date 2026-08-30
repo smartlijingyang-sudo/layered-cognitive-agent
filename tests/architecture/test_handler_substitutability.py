@@ -22,7 +22,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
 )
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.contracts.protocols.act.effect_handler import EffectHandler, EffectHandlerRegistry
-from lca.harness.declarative.dispatch import RegistryEffectGateway
+from lca.harness.declarative.execute.dispatch import RegistryEffectGateway
 from lca.cognition.body.tool_batch_execution import SafeToolBatchExecutionPolicy
 from lca.runtime.declarative_runtime import RuntimePhaseCapabilities
 from lca.runtime.idempotency_fixtures import InMemoryFixtureIdempotencyStore
@@ -249,7 +249,7 @@ def test_runtime_gateway_does_not_construct_handlers_by_name() -> None:
     registry must therefore be assembled by the profile/bundle seam.
     """
 
-    gateway_path = REPO / "lca" / "harness" / "declarative" / "dispatch.py"
+    gateway_path = REPO / "lca" / "harness" / "declarative" / "execute" / "dispatch.py"
     if not gateway_path.exists():
         return
     source = gateway_path.read_text(encoding="utf-8")
@@ -407,7 +407,7 @@ def test_delta_reducer_rejects_invalid_operation_before_registry_lookup(operatio
     """Delta operation names are typed inputs at the reducer seam."""
     from lca.contracts.models.core.state import AgentState, Budget
     from lca.contracts.protocols.act.command_envelope import RunDelta
-    from lca.harness.declarative.dispatch import RegistryDeltaReducer
+    from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer
 
     class _Reducer:
         pass

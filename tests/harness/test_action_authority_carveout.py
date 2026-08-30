@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.harness.declarative.action_authority import compile_action_authority
+from lca.harness.declarative.compile.action_authority import compile_action_authority
 
 
 def test_empty_task_carveout_does_not_create_an_empty_forbidden_action() -> None:

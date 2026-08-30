@@ -33,7 +33,7 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import RuntimeLifecyclePu
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.harness.declarative import GenericPlanInterpreter
-from lca.harness.declarative.dispatch import RegistryDeltaReducer, RegistryEffectGateway
+from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectGateway
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.checkpoint_resolution import DeclarativeCheckpointStateResolver
 from lca.runtime.result_finalizer import RuntimeResultFinalizer

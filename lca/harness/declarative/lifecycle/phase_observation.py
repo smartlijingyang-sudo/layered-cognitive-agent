@@ -21,7 +21,7 @@ from lca.contracts.protocols.journal.phase_observation import (
     PhaseObserverRegistry,
     PhaseStateSnapshot,
 )
-from lca.harness.declarative.phase_observation_snapshot import phase_state_snapshot
+from lca.harness.declarative.lifecycle.phase_observation_snapshot import phase_state_snapshot
 from lca.infrastructure.observability import span
 
 _log = structlog.get_logger("lca.runtime.phase_observer")

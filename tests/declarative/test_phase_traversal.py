@@ -12,7 +12,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseResult,
     SemanticPhase,
 )
-from lca.harness.declarative.traversal import PhaseTraversal
+from lca.harness.declarative.graph.traversal import PhaseTraversal
 
 
 def test_traversal_checkpoints_complete_execution_state() -> None:

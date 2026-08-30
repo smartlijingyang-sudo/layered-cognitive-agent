@@ -10,7 +10,7 @@ from lca.contracts.protocols.journal.phase_observation import (
     PhaseObserverContribution,
     PhaseObserverRegistry,
 )
-from lca.harness.declarative.phase_observation import TracingPhaseObserver
+from lca.harness.declarative.lifecycle.phase_observation import TracingPhaseObserver
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

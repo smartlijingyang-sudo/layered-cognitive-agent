@@ -8,11 +8,11 @@ from pathlib import Path
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 
 REPO = Path(__file__).resolve().parents[2]
-INTERPRETER = REPO / "lca" / "harness" / "declarative" / "interpreter.py"
-PHASE_TRANSACTION = REPO / "lca" / "harness" / "declarative" / "phase_transaction.py"
+INTERPRETER = REPO / "lca" / "harness" / "declarative" / "execute" / "interpreter.py"
+PHASE_TRANSACTION = REPO / "lca" / "harness" / "declarative" / "lifecycle" / "phase_transaction.py"
 # governance_verdicts.py was merged into phase_governance.py; the verdict
 # contract lives in the same module that consumes it.
-PHASE_GOVERNANCE = REPO / "lca" / "harness" / "declarative" / "phase_governance.py"
+PHASE_GOVERNANCE = REPO / "lca" / "harness" / "declarative" / "compile" / "phase_governance.py"
 GOVERNANCE_VERDICTS = PHASE_GOVERNANCE
 RETIRED_CONTROL_MODULES = (
     REPO / "lca" / "contracts" / "protocols" / "control_plan.py",

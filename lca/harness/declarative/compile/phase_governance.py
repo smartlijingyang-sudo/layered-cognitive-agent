@@ -10,7 +10,6 @@ from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.stop import StopDecision, StopReason
 from lca.contracts.protocols.act.command_envelope import RunFact
-from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.contracts.protocols.declarative.declarative_phase_graph import (
     ContributionRole,
     DeclarativeRunOutcome,
@@ -19,9 +18,10 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     PhaseResult,
     SemanticPhase,
 )
-from lca.harness.declarative.assembler import ExecutableNode
-from lca.harness.declarative.phase_context import RestrictedPhaseContext
-from lca.harness.declarative.traversal import PhaseTraversal
+from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.harness.declarative.compile.assembler import ExecutableNode
+from lca.harness.declarative.graph.traversal import PhaseTraversal
+from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
 
 @dataclass(frozen=True, slots=True)

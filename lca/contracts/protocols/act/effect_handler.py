@@ -2,7 +2,7 @@
 
 ADR-0074 + ADR-0068: Dispatch effects through pluggable handlers.
 
-``lca/harness/declarative/dispatch.py`` owns the registry-backed effect gateway:
+``lca/harness/declarative/execute/dispatch.py`` owns the registry-backed effect gateway:
 it enforces plan policy and idempotency, then delegates every concrete operation
 to an ``EffectHandlerRegistry``. New ``CompiledRunPlan`` effect operations are
 therefore introduced by registration rather than runtime changes.

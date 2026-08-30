@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from lca.contracts.protocols.journal.idempotency import IdempotencyStore
     from lca.contracts.protocols.state.plan import CompiledRunPlan
     from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
-    from lca.harness.declarative.phase_observation import PhaseObserver
+    from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
 
 
 class CognitiveRuntime(Runtime):

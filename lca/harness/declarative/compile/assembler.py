@@ -14,7 +14,7 @@ from lca.contracts.protocols.declarative.declarative_phase_graph import (
     SemanticPhase,
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.declarative.validation import require_valid
+from lca.harness.declarative.controls.validation import require_valid
 
 
 @runtime_checkable

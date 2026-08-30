@@ -36,7 +36,7 @@ from lca.contracts.protocols.runtime.runtime_lifecycle import RuntimeLifecyclePu
 from lca.contracts.protocols.session.resume_input import ResumeInputAdapter
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.declarative.phase_observation import PhaseObserver
+from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
 from lca.runtime.phase_capabilities import (
     RuntimePhaseCapabilities,
     project_runtime_phase_capabilities,

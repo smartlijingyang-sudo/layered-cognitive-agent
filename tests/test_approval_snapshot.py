@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.harness.declarative.approval import ApprovalRequestSnapshot
+from lca.harness.declarative.controls.approval import ApprovalRequestSnapshot
 
 
 def test_approval_snapshot_expires_at_boundary() -> None:
