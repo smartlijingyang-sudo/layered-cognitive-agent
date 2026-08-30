@@ -1,33 +1,47 @@
-# lca.contracts.models.observability
+# lca/contracts/models/observability
 
-> 状态：稳定 | 草稿 | 弃用
+> 状态：稳定
 > 所有者：@lca-maintainers
-> schema_version: 1.0.0
+> schema_version: 2.0.0
 
 ## 1. 职责
-lca/contracts/models/observability. 职责见各包 docstring 与 .py 文件注释；本 README 由脚手架生成，等待包负责人补充具体职责描述
+LCA 框架的组成部分。具体职责参见同目录下各子包的 README 与 pyproject.toml 中的 ``[tool.lca.package_contracts]`` 块。
 
 ## 2. 不负责
-实现细节、I/O、配置解析、业务编排
+与下层契约的合规性检查（由 lint-imports 与 check_package_contracts 门禁统一处理）；任何不在本目录 schema_version 范围内的修改都不应提交。
 
 ## 3. 输入
-{{inputs}}
+- 当前包内 `6` 个公开模块 + `89` 个公开符号（class / function）
 
 ## 4. 输出
-{{outputs}}
+- 暴露的公共 API：5 个显式 __all__ 条目； 89 个定义符号中，78 个为公共命名
 
 ## 5. 允许依赖
-lca.contracts
+—
 
 ## 6. 禁止依赖
-lca.infrastructure,lca.cognition,lca.runtime,lca.agent,lca.application,lca.harness,lca.plugins
+—
 
 ## 7. 副作用
-
+log:emit
 
 ## 8. 失败语义
-{{failure_semantics}}
+模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
 
 ## 9. 公共入口
-`get_current_plan_ref`, `plan_ref_scope`, `reset_current_plan_ref`, `set_current_plan_ref`, `stamped_event_has_plan_ref`
+**__init__.py 显式 __all__**:
 
+- `get_current_plan_ref`
+- `plan_ref_scope`
+- `reset_current_plan_ref`
+- `set_current_plan_ref`
+- `stamped_event_has_plan_ref`
+
+**模块清单**:
+
+- `lca/contracts/models/observability/diagnostic.py`
+- `lca/contracts/models/observability/event.py`
+- `lca/contracts/models/observability/journal.py`
+- `lca/contracts/models/observability/journal_catalog.py`
+- `lca/contracts/models/observability/plan_ref.py`
+- `lca/contracts/models/observability/telemetry_catalog.py`

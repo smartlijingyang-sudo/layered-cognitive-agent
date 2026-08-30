@@ -1381,6 +1381,7 @@ side_effects = [
 public_api = [
     "lca.infrastructure.sandbox",
 ]
+filename_whitelist = ["sandbox"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.search"]
@@ -1437,6 +1438,7 @@ side_effects = [
 public_api = [
     "lca.infrastructure.skills",
 ]
+filename_whitelist = ["skill_catalog"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.infrastructure.state_store"]
@@ -1657,6 +1659,7 @@ side_effects = [
 public_api = [
     "lca.plugins.control_contributions",
 ]
+filename_whitelist = ["control"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.plugins.critic"]
@@ -1712,6 +1715,7 @@ side_effects = [
 public_api = [
     "lca.plugins.phase_graph",
 ]
+filename_whitelist = ["common"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.plugins.insight"]
@@ -2051,6 +2055,7 @@ side_effects = [
 public_api = [
     "lca.runtime",
 ]
+filename_whitelist = ["runtime"]
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.runtime.agent_runtime"]

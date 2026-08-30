@@ -1,33 +1,66 @@
-# lca.cognition
+# lca/cognition
 
-> 状态：稳定 | 草稿 | 弃用
+> 状态：稳定
 > 所有者：@lca-maintainers
-> schema_version: 1.0.0
+> schema_version: 2.0.0
 
 ## 1. 职责
-lca/cognition. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。
+LCA 框架的组成部分。具体职责参见同目录下各子包的 README 与 pyproject.toml 中的 ``[tool.lca.package_contracts]`` 块。
 
 ## 2. 不负责
-执行副作用、阶段编排、组合根、HTTP 路由
+与下层契约的合规性检查（由 lint-imports 与 check_package_contracts 门禁统一处理）；任何不在本目录 schema_version 范围内的修改都不应提交。
 
 ## 3. 输入
-{{inputs}}
+- 当前包内 `68` 个公开模块 + `354` 个公开符号（class / function）
 
 ## 4. 输出
-{{outputs}}
+- 暴露的公共 API：无 个显式 __all__ 条目； 354 个定义符号中，231 个为公共命名
 
 ## 5. 允许依赖
-lca.contracts,lca.infrastructure,lca.cognition
+—
 
 ## 6. 禁止依赖
-lca.runtime,lca.agent,lca.application,lca.harness,lca.plugins,gateway
+—
 
 ## 7. 副作用
-llm:call,log:emit
+log:emit
 
 ## 8. 失败语义
-{{failure_semantics}}
+模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
 
 ## 9. 公共入口
 （无显式 __all__；通过模块导入即可）
 
+**模块清单**:
+
+- `lca/cognition/_loader.py`
+- `lca/cognition/action_catalog.py`
+- `lca/cognition/action_handlers.py`
+- `lca/cognition/action_registry.py`
+- `lca/cognition/artifact_respond_injector.py`
+- `lca/cognition/blackboard.py`
+- `lca/cognition/chained.py`
+- `lca/cognition/clock.py`
+- `lca/cognition/cognitive_pipeline.py`
+- `lca/cognition/consult_policy.py`
+- `lca/cognition/context_manifest.py`
+- `lca/cognition/conversation_prompt.py`
+- `lca/cognition/critic.py`
+- `lca/cognition/default_factory.py`
+- `lca/cognition/delegation_cache.py`
+- `lca/cognition/delegation_target.py`
+- `lca/cognition/event_bus.py`
+- `lca/cognition/executor.py`
+- `lca/cognition/gate_service.py`
+- `lca/cognition/group_assembly.py`
+- `lca/cognition/hook_registry.py`
+- `lca/cognition/in_memory.py`
+- `lca/cognition/journal_backed.py`
+- `lca/cognition/layered_retrieval_policy.py`
+- `lca/cognition/leaked_tool_call.py`
+- `lca/cognition/mode.py`
+- `lca/cognition/modular_brain.py`
+- `lca/cognition/must_consult_all.py`
+- `lca/cognition/null_critic.py`
+- `lca/cognition/null_retrieval_policy.py`
+- ... 共 68 个

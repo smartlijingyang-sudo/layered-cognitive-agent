@@ -30,6 +30,8 @@ jobs:
         run: uv run python scripts/check_package_contracts.py
       - name: 文件名边界（filename linter，warning）
         run: uv run python scripts/check_filename_boundaries.py || echo "::warning::filename violations found"
+      - name: Package organization gates (Phase D — advisory)
+        run: uv run python -m lca.infrastructure.cli.cli diagnose-package-organization --verbose || echo "::warning::package-organization gates reported issues"
       - name: mypy
         run: uv run mypy lca
       - name: pytest

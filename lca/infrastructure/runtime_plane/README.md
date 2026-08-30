@@ -1,33 +1,59 @@
-# lca.infrastructure.runtime_plane
+# lca/infrastructure/runtime_plane
 
-> 状态：稳定 | 草稿 | 弃用
+> 状态：稳定
 > 所有者：@lca-maintainers
-> schema_version: 1.0.0
+> schema_version: 2.0.0
 
 ## 1. 职责
-lca.infrastructure.runtime_plane. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。
+LCA 框架的组成部分。具体职责参见同目录下各子包的 README 与 pyproject.toml 中的 ``[tool.lca.package_contracts]`` 块。
 
 ## 2. 不负责
-认知决策、阶段编排、组合根
+与下层契约的合规性检查（由 lint-imports 与 check_package_contracts 门禁统一处理）；任何不在本目录 schema_version 范围内的修改都不应提交。
 
 ## 3. 输入
-{{inputs}}
+- 当前包内 `6` 个公开模块 + `33` 个公开符号（class / function）
 
 ## 4. 输出
-{{outputs}}
+- 暴露的公共 API：17 个显式 __all__ 条目； 33 个定义符号中，23 个为公共命名
 
 ## 5. 允许依赖
-lca.contracts,lca.infrastructure
+—
 
 ## 6. 禁止依赖
-lca.cognition,lca.runtime,lca.agent,lca.application,lca.harness,lca.plugins,gateway
+—
 
 ## 7. 副作用
-file:read,file:write,network:openai,log:emit,subprocess:spawn
+log:emit
 
 ## 8. 失败语义
-{{failure_semantics}}
+模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
 
 ## 9. 公共入口
-`PlaneBindingError`, `PlaneBindings`, `PlaneKind`, `PlaneRef`, `PlaneRequest`, `current_bindings`, `current_primary`, `join_under`, `make_sandbox_ref`, `outputs_under`, `path_needs_approval`, `plane_bindings_scope`, `raise_if_out_of_scope`, `ref_of`, `resolve_plane_bindings`, `resolve_plane_path`, `sandbox_ref_from`
+**__init__.py 显式 __all__**:
 
+- `PlaneBindingError`
+- `PlaneBindings`
+- `PlaneKind`
+- `PlaneRef`
+- `PlaneRequest`
+- `current_bindings`
+- `current_primary`
+- `join_under`
+- `make_sandbox_ref`
+- `outputs_under`
+- `path_needs_approval`
+- `plane_bindings_scope`
+- `raise_if_out_of_scope`
+- `ref_of`
+- `resolve_plane_bindings`
+- `resolve_plane_path`
+- `sandbox_ref_from`
+
+**模块清单**:
+
+- `lca/infrastructure/runtime_plane/execution_target.py`
+- `lca/infrastructure/runtime_plane/machine.py`
+- `lca/infrastructure/runtime_plane/paths.py`
+- `lca/infrastructure/runtime_plane/preinstall_prompt.py`
+- `lca/infrastructure/runtime_plane/resolve.py`
+- `lca/infrastructure/runtime_plane/scope.py`

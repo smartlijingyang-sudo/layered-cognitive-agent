@@ -19,6 +19,7 @@ from lca.infrastructure.cli.commands import (
     declarative,
     diagnostics,
     journal,
+    package_organization,
     profile_inspect,
     services,
     tools,
@@ -162,6 +163,7 @@ journal.register(app)
 tools.register(app)
 profile_inspect.register(app)
 diagnostics.register(app)
+package_organization.register(app)
 audit.register(app)
 creator_plan.register(app)
 declarative.register(app)

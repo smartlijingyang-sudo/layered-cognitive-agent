@@ -1,33 +1,36 @@
-# lca.cognition.collaboration
+# lca/cognition/collaboration
 
-> 状态：稳定 | 草稿 | 弃用
+> 状态：稳定
 > 所有者：@lca-maintainers
-> schema_version: 1.0.0
+> schema_version: 2.0.0
 
 ## 1. 职责
-lca/cognition/collaboration. 认知平面：感知、推理、批评、决策、记忆、协作。具体职责见各包 docstring；本 README 由脚手架生成。
+LCA 框架的组成部分。具体职责参见同目录下各子包的 README 与 pyproject.toml 中的 ``[tool.lca.package_contracts]`` 块。
 
 ## 2. 不负责
-执行副作用、阶段编排、组合根、HTTP 路由
+与下层契约的合规性检查（由 lint-imports 与 check_package_contracts 门禁统一处理）；任何不在本目录 schema_version 范围内的修改都不应提交。
 
 ## 3. 输入
-{{inputs}}
+- 当前包内 `1` 个公开模块 + `11` 个公开符号（class / function）
 
 ## 4. 输出
-{{outputs}}
+- 暴露的公共 API：无 个显式 __all__ 条目； 11 个定义符号中，9 个为公共命名
 
 ## 5. 允许依赖
-lca.contracts,lca.infrastructure,lca.cognition
+—
 
 ## 6. 禁止依赖
-lca.runtime,lca.agent,lca.application,lca.harness,lca.plugins,gateway
+—
 
 ## 7. 副作用
-llm:call,log:emit
+log:emit
 
 ## 8. 失败语义
-{{failure_semantics}}
+模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
 
 ## 9. 公共入口
 （无显式 __all__；通过模块导入即可）
 
+**模块清单**:
+
+- `lca/cognition/collaboration/blackboard.py`

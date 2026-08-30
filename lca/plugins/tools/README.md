@@ -1,33 +1,52 @@
-# lca.plugins.tools
+# lca/plugins/tools
 
-> 状态：稳定 | 草稿 | 弃用
+> 状态：稳定
 > 所有者：@lca-maintainers
-> schema_version: 1.0.0
+> schema_version: 2.0.0
 
 ## 1. 职责
-lca.plugins.tools: Tools 插件。本 README 由脚手架生成，待包负责人补充具体细节。
+LCA 框架的组成部分。具体职责参见同目录下各子包的 README 与 pyproject.toml 中的 ``[tool.lca.package_contracts]`` 块。
 
 ## 2. 不负责
-跨层职责（详见 spec §3.4 闭集纪律）
+与下层契约的合规性检查（由 lint-imports 与 check_package_contracts 门禁统一处理）；任何不在本目录 schema_version 范围内的修改都不应提交。
 
 ## 3. 输入
-{{inputs}}
+- 当前包内 `17` 个公开模块 + `50` 个公开符号（class / function）
 
 ## 4. 输出
-{{outputs}}
+- 暴露的公共 API：无 个显式 __all__ 条目； 50 个定义符号中，39 个为公共命名
 
 ## 5. 允许依赖
-lca.contracts,lca.plugins
+—
 
 ## 6. 禁止依赖
-gateway
+—
 
 ## 7. 副作用
-log:emit,subprocess:spawn,network:openai
+log:emit
 
 ## 8. 失败语义
-{{failure_semantics}}
+模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
 
 ## 9. 公共入口
 （无显式 __all__；通过模块导入即可）
 
+**模块清单**:
+
+- `lca/plugins/tools/_helpers.py`
+- `lca/plugins/tools/bash.py`
+- `lca/plugins/tools/creator_artifacts.py`
+- `lca/plugins/tools/creator_promotion.py`
+- `lca/plugins/tools/creator_runtime.py`
+- `lca/plugins/tools/diff_context.py`
+- `lca/plugins/tools/failure_explainer.py`
+- `lca/plugins/tools/file_write.py`
+- `lca/plugins/tools/loader.py`
+- `lca/plugins/tools/minimal_reproduction.py`
+- `lca/plugins/tools/optimization_finder.py`
+- `lca/plugins/tools/plugin_graph_renderer.py`
+- `lca/plugins/tools/profile_apply.py`
+- `lca/plugins/tools/profile_diff.py`
+- `lca/plugins/tools/run_diff.py`
+- `lca/plugins/tools/tool.py`
+- `lca/plugins/tools/trace_inspector_tool.py`
