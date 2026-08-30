@@ -5,6 +5,17 @@ from __future__ import annotations
 import pytest
 from cordis import Context
 
+from lca.application.api import Agent, Team, ensure_default_ctx
+from lca.cognition.body.action_registry import ActionRegistry
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.simple_body import SimpleBody
+from lca.cognition.body.tool_registry import SimpleToolRegistry
+from lca.cognition.brain.critic import SimpleCritic
+from lca.cognition.brain.modular_brain import ModularBrain
+from lca.cognition.brain.prompts import load_builtin_prompt
+from lca.cognition.brain.reasoner import PromptReasoner
+from lca.cognition.brain.skill_router import StaticSkillRouter
+from lca.cognition.hook_registry import CordisHookRegistry
 from lca.contracts.atoms.enums import ActionType, LLMStreamEventType, ReflectionVerdict
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.decision import Decision, Observation, Reflection
@@ -22,26 +33,15 @@ from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.cognition.body.action_registry import ActionRegistry
-from lca.cognition.body.safe_executor import SimpleSafeExecutor
-from lca.cognition.body.simple_body import SimpleBody
-from lca.cognition.body.tool_registry import SimpleToolRegistry
-from lca.cognition.brain.critic import SimpleCritic
-from lca.cognition.brain.modular_brain import ModularBrain
-from lca.cognition.brain.prompts import load_builtin_prompt
-from lca.cognition.brain.reasoner import PromptReasoner
-from lca.cognition.brain.skill_router import StaticSkillRouter
-from lca.cognition.hook_registry import CordisHookRegistry
-from lca.runtime.reducer import DefaultReducer
-from lca.application.api import Agent, Team, ensure_default_ctx
 from lca.plugins.composer.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,
     build_fixture_cognitive_runtime,
 )
+from lca.plugins.phase_policies.stop_policy import DefaultStopPolicy
 from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
 from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
-from lca.plugins.state.stop_policy import DefaultStopPolicy
+from lca.runtime.reducer import DefaultReducer
 from tests.phase_executors import standard_phase_executors
 
 

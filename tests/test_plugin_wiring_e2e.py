@@ -38,7 +38,7 @@ _GATE_PLUGINS: tuple[str, ...] = (
 _ACT_RUNTIME_PLUGINS: tuple[str, ...] = (
     "lca.plugins.body.simple",
     "lca.plugins.body.safe_executor",
-    "lca.plugins.state.stop_policy",
+    "lca.plugins.phase_policies.stop_policy",
     "lca.plugins.runtime.hook_registry",
 )
 _EXPECTED_SENSOR_ORDER: tuple[str, ...] = (
@@ -126,10 +126,10 @@ class TestHubConstruction:
         assert isinstance(default_sink(), JournalSink)
 
     def test_journal_sink_consumes_write_only_backend(self) -> None:
+        from lca.cognition.perceive_sink import JournalSink
         from lca.contracts.models.core.perception import ContextManifest
         from lca.contracts.models.observability.journal import ContextManifested
         from lca.contracts.observability.ports import JournalBackend
-        from lca.cognition.perceive_sink import JournalSink
 
         class WriteOnlyJournal:
             def __init__(self) -> None:
@@ -183,11 +183,11 @@ class TestSensorBaseClass:
         assert issubclass(TeamInboxSensor, _JournalSensor)
 
     def test_journal_sensor_uses_dict_projection(self) -> None:
+        from lca.cognition.sensors.journal_backed import InboxFactsSensor
         from lca.contracts.atoms.ids import new_id
         from lca.contracts.models.core.state import AgentState, Budget
         from lca.contracts.models.observability.journal import InboxFollowupCreated
         from lca.infrastructure.observability.journal.engine import RunStore
-        from lca.cognition.sensors.journal_backed import InboxFactsSensor
 
         store = RunStore()
         store.append(

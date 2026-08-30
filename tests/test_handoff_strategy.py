@@ -4,6 +4,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
+from lca.agent.orchestration_strategies import HandoffStrategy
 from lca.contracts.models.core.decision import Decision, DelegationSpec
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
@@ -12,7 +13,6 @@ from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdi
 from lca.contracts.protocols.declarative_phase_graph import PhaseInput, PhaseResult
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
-from lca.agent.orchestration_strategies import HandoffStrategy
 from lca.plugins.composer.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,
@@ -109,11 +109,11 @@ class TestHandoffActionType(unittest.TestCase):
 
     def test_handoff_in_action_registry(self) -> None:
         """handoff 应在 ActionRegistry 的已注册集合中。"""
+        from lca.cognition.body.safe_executor import SimpleSafeExecutor
+        from lca.cognition.body.tool_registry import SimpleToolRegistry
         from lca.contracts.models.team.role_team import ToolPermissionManifest
         from lca.infrastructure.transport.agent_transport import InternalTransport
         from lca.infrastructure.transport.transport_registry import TransportRegistry
-        from lca.cognition.body.safe_executor import SimpleSafeExecutor
-        from lca.cognition.body.tool_registry import SimpleToolRegistry
 
         tool_reg = SimpleToolRegistry()
         safe_exec = SimpleSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
@@ -202,8 +202,8 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_stops_on_handoff(self) -> None:
         """handoff action 应触发 StopPolicy 返回 should_stop=True。"""
+        from lca.plugins.phase_policies.stop_policy import DefaultStopPolicy
         from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
-        from lca.plugins.state.stop_policy import DefaultStopPolicy
 
         brain = MagicMock()
         body = MagicMock()

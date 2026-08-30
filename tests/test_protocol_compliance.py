@@ -11,6 +11,20 @@ from cordis import Context
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# L3
+from lca.agent.cognitive_agent import CognitiveAgent
+from lca.cognition.body.action_registry import ActionRegistry
+from lca.cognition.body.safe_executor import SimpleSafeExecutor
+from lca.cognition.body.simple_body import SimpleBody
+from lca.cognition.body.tool_registry import SimpleToolRegistry
+
+# L1
+from lca.cognition.brain.critic import SimpleCritic
+from lca.cognition.brain.modular_brain import ModularBrain
+from lca.cognition.brain.reasoner import PromptReasoner
+from lca.cognition.event_bus import CordisEventBus
+from lca.cognition.hook_registry import CordisHookRegistry
+from lca.cognition.memory.simple_memory import SimpleMemorySystem
 from lca.contracts.protocols import (
     AgentTransport,
     AgentUnit,
@@ -37,32 +51,17 @@ from lca.infrastructure.tools.calculator import build_tools as build_calculator_
 from lca.infrastructure.tools.weather import build_tools as build_weather_tools
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.transport_registry import TransportRegistry
-from lca.cognition.body.action_registry import ActionRegistry
-from lca.cognition.body.safe_executor import SimpleSafeExecutor
-from lca.cognition.body.simple_body import SimpleBody
-from lca.cognition.body.tool_registry import SimpleToolRegistry
-
-# L1
-from lca.cognition.brain.critic import SimpleCritic
-from lca.cognition.brain.modular_brain import ModularBrain
-from lca.cognition.brain.reasoner import PromptReasoner
-from lca.cognition.event_bus import CordisEventBus
-from lca.cognition.hook_registry import CordisHookRegistry
-from lca.cognition.memory.simple_memory import SimpleMemorySystem
-
-# L2
-from lca.runtime.reducer import DefaultReducer
-
-# L3
-from lca.agent.cognitive_agent import CognitiveAgent
 from lca.plugins.composer.runtime_factory import (
     NullPerceiveHub,
     RuntimeDeps,
     build_fixture_cognitive_runtime,
 )
+from lca.plugins.phase_policies.stop_policy import DefaultStopPolicy
 from lca.plugins.providers.artifact_closure import DefaultArtifactClosure
 from lca.plugins.providers.decision_classifier import DefaultDecisionClassifier
-from lca.plugins.state.stop_policy import DefaultStopPolicy
+
+# L2
+from lca.runtime.reducer import DefaultReducer
 from tests.support.unimplemented_transport import UnimplementedTransport
 
 
@@ -286,10 +285,10 @@ class TestL3ProtocolCompliance(unittest.TestCase):
         self.assertIsInstance(sup, AgentUnit)
 
     def test_team_handle_is_team_runtime(self):
+        from lca.application.spawn import spawn_team
         from lca.contracts.models.team.team_coordination import (
             Pipeline,
         )
-        from lca.application.spawn import spawn_team
         from tests.support.agent_specs import make_spec
 
         agent, _rp, _runtime = self._build_agent()
@@ -326,10 +325,10 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
         self.assertEqual(result.status, "completed")
 
     def test_agent_with_custom_brain(self):
+        from lca.application.api import Agent
         from lca.contracts.atoms.ids import new_id
         from lca.contracts.models.core.decision import Decision, Reflection
         from lca.contracts.models.core.state import AgentState
-        from lca.application.api import Agent
 
         class StubBrain(Brain):
             async def think(self, state: AgentState):
