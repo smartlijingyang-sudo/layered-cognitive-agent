@@ -94,13 +94,25 @@ export function projectJournalFrame(frame: JournalFrame): Projected {
       if (payload.channel && payload.channel !== 'answer') return { kind: 'ignore' };
       return { kind: 'text', text: String(payload.text_delta ?? '') };
     case 'ToolCallStreaming':
-    case 'ToolStarted':
+    case 'ToolStarted': {
+      // ADR-0101 PR-2: tool events return to facts. ``arguments`` lives at
+      // payload.arguments (top-level fact), not in plugin_state. Merge it
+      // into the projected state so pickArgs / mergeInvocationArgs in
+      // LcaRunDriver find it; the renderer also reads args from there.
+      const baseState =
+        (payload.plugin_state as Record<string, unknown> | undefined) ?? {};
+      const rawArgs = payload.arguments;
+      const merged =
+        rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs)
+          ? { ...baseState, ...(rawArgs as Record<string, unknown>) }
+          : baseState;
       return {
         idHint: toolCallId(payload, `call_${frame.seq ?? 0}`),
         kind: 'tool-start',
-        state: (payload.plugin_state as Record<string, unknown> | undefined) ?? {},
+        state: merged,
         toolName: String(payload.tool_name ?? ''),
       };
+    }
     case 'SandboxOutputDelta':
       return {
         kind: 'sandbox-delta',
@@ -108,13 +120,34 @@ export function projectJournalFrame(frame: JournalFrame): Projected {
         stream: String(payload.stream ?? 'stdout'),
         text: String(payload.text_delta ?? ''),
       };
-    case 'ToolInvoked':
+    case 'ToolInvoked': {
+      // ADR-0101 PR-2: output_text is the top-level fact for tool output
+      // (no longer nested under plugin_state.output). Renderers read
+      // pluginState.output / .stdout / .content; expose output_text under
+      // all three keys so per-tool renders and the generic toolCardContent
+      // helper both find it. Keep the original plugin_state fields first
+      // so renderer-specific structured data (e.g. skill metadata in
+      // activate_skill) still wins on key collision.
+      const baseState =
+        (payload.plugin_state as Record<string, unknown> | undefined) ?? {};
+      const outText = payload.output_text;
+      const projState =
+        payload.projected_state &&
+        typeof payload.projected_state === 'object' &&
+        !Array.isArray(payload.projected_state)
+          ? (payload.projected_state as Record<string, unknown>)
+          : {};
+      const outputAliases =
+        typeof outText === 'string' && outText.length > 0
+          ? { output: outText, stdout: outText, content: outText }
+          : {};
       return {
         files: payload.files,
         kind: 'tool-invoked',
         payload,
-        state: (payload.plugin_state as Record<string, unknown> | undefined) ?? {},
+        state: { ...baseState, ...outputAliases, ...projState },
       };
+    }
     case 'ToolDenied':
       return {
         kind: 'tool-denied',
