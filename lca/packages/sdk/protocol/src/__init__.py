@@ -1,1 +1,0 @@
-"""Mirrors ``sdk/protocol/src/``."""
