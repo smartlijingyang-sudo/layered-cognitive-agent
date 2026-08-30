@@ -243,7 +243,13 @@ async def _build_team(
 ) -> Team:
     """Team LLM casting — select roles + governance, then build Team."""
     resolved_library = library if library is not None else FileRoleLibrary()
-    resolved_caster = caster if caster is not None else LLMTeamCaster()
+    if caster is not None:
+        resolved_caster = caster
+    else:
+        from lca.plugins.seam_definitions.team_casting_prompt_renderer import (
+            BuiltinCastingPromptRenderer,
+        )
+        resolved_caster = LLMTeamCaster(prompt_renderer=BuiltinCastingPromptRenderer())
     record_scope = RunScope(trace_id=cast("TraceId", trace_id), run_id=cast("RunId", run_id))
     with bind_backends(observability), run_scope(record_scope):
         record(CastingStarted(objective_preview=objective_preview(objective)))
