@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.protocols import AgentTransport, TransportRegistryProtocol
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
+from lca.infrastructure.transport.transport_registry import TransportRegistry
 
 
 def build_transport_registry(transport: AgentTransport | None = None) -> TransportRegistryProtocol:

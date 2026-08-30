@@ -21,7 +21,7 @@ from lca.contracts.models.observability.journal import (
     TeamRunStarted,
 )
 from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     RunStore,
     UnregisteredJournalEventError,
     bind_backends,
@@ -29,7 +29,7 @@ from lca.layer0_infra.observability import (
     record,
     run_scope,
 )
-from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
+from lca.infrastructure.observability.policy import AttributePolicy, Verbosity
 from tests.support.observability_helpers import make_test_bound
 
 

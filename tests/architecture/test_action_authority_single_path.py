@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.models.team.role_team import ToolPermissionManifest
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
+from lca.infrastructure.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body import action_catalog
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor

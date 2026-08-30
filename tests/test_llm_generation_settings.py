@@ -6,7 +6,7 @@ import os
 import unittest
 from unittest import mock
 
-from lca.layer0_infra.llm_adapter.settings import (
+from lca.infrastructure.llm_adapter.settings import (
     DEFAULT_MAX_TOKENS,
     DEFAULT_MAX_TOKENS_WITH_TOOLS,
     DEFAULT_TEMPERATURE,

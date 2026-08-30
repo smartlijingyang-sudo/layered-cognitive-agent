@@ -22,9 +22,9 @@ from gateway.runs.doctor import diagnose
 from gateway.runs.execute import _record_terminal_materialization
 from gateway.runs.identity import parse_agent_ref
 from gateway.runs.session import RunSession, RunStatus
-from lca.layer0_infra.observability.journal.journal_io import JOURNAL_SCHEMA_VERSION
-from lca.layer0_infra.observability.journal.live_tail import LiveTail
-from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+from lca.infrastructure.observability.journal.journal_io import JOURNAL_SCHEMA_VERSION
+from lca.infrastructure.observability.journal.live_tail import LiveTail
+from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:

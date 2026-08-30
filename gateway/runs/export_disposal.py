@@ -6,7 +6,7 @@ import asyncio
 
 import structlog
 
-from lca.layer0_infra.observability import BoundObservability
+from lca.infrastructure.observability import BoundObservability
 
 EXPORT_DISPOSE_TIMEOUT_S = 3.0
 _log = structlog.get_logger(__name__)

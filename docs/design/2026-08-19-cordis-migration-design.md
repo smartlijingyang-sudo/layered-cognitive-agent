@@ -159,7 +159,7 @@ async def setup(ctx, config: Config):
     LlmService 保持 plain class(LLMAdapter)——它不跟 ctx 生命周期绑定，
     所以不继承 cordis.Service。需要 auto-dispose 的资源类才继承。
     """
-    from lca.layer0_infra.capability.llm import LlmService
+    from lca.infrastructure.capability.llm import LlmService
 
     service = LlmService()
     ctx.provide("llm", service)
@@ -265,7 +265,7 @@ async def setup(ctx, config):
 
 | 位置 | 允许 import | 禁止 import |
 |---|---|---|
-| `lca/plugins/foo.py` 模块顶层 | `cordis.*` / `lca.contracts.*` | `lca.layer0_infra.*` / `lca.layer1_cognitive.*` / `lca.layer2_runtime.*` / `lca.layer3_agent.*` / `lca.layer4_app.*` |
+| `lca/plugins/foo.py` 模块顶层 | `cordis.*` / `lca.contracts.*` | `lca.infrastructure.*` / `lca.layer1_cognitive.*` / `lca.layer2_runtime.*` / `lca.layer3_agent.*` / `lca.layer4_app.*` |
 | `@plugin` setup 函数体内部 | 任意（延迟到 load 时） | — |
 | `lca/plugins/guards/*.py` 顶层 | `cordis.*` / `lca.contracts.*` / `lca.layer2_runtime.loop_intervention_mw` / `lca.layer2_runtime.budget_policy` | 同上 + 跨 plugin 互引（避免循环） |
 
@@ -275,7 +275,7 @@ async def setup(ctx, config):
 type = forbidden
 source_modules = lca.plugins
 forbidden_modules =
-    lca.layer0_infra
+    lca.infrastructure
     lca.layer1_cognitive
     lca.layer2_runtime
     lca.layer3_agent
@@ -401,7 +401,7 @@ Services:
 ```python
 # lca/plugins/llm_service.py  — 4 行
 from cordis import plugin
-from lca.layer0_infra.capability.llm import LlmService
+from lca.infrastructure.capability.llm import LlmService
 
 @plugin(name="lca-llm-service")
 async def setup(ctx, config):
@@ -411,7 +411,7 @@ async def setup(ctx, config):
 ```python
 # lca/plugins/system_prompt.py  — 4 行（原 195 行压成 4 行）
 from cordis import plugin
-from lca.layer0_infra.system_prompt.service import SystemPromptService
+from lca.infrastructure.system_prompt.service import SystemPromptService
 
 @plugin(name="lca-system-prompt-service")
 async def setup(ctx, config):
@@ -427,7 +427,7 @@ lca/plugins/
 ├── llm_service.py            # 4 行
 ├── llm_provider.py           # ~30 行（含 Config pydantic 校验）
 ├── tools_service.py
-├── session_service.py        # 4 行 + import lca.layer0_infra.session.service
+├── session_service.py        # 4 行 + import lca.infrastructure.session.service
 ├── system_prompt.py          # 4 行
 ├── transport_service.py
 ├── skills_service.py
@@ -511,7 +511,7 @@ async def setup(ctx, config: Config):
     are available and *which* is active. Profiles swap providers by patching
     the plugin's `config` (or replace the plugin entirely).
     """
-    from lca.layer0_infra.llm_adapter import (
+    from lca.infrastructure.llm_adapter import (
         MockLLMAdapter, RealLLMAdapter, DeepseekAdapter, PiAIAdapter,
     )
 
@@ -816,7 +816,7 @@ lca/layer0_infra/session/
 ```python
 # lca/plugins/session_service.py  — 4 行
 from cordis import plugin
-from lca.layer0_infra.session.service import SessionService
+from lca.infrastructure.session.service import SessionService
 
 @plugin(name="lca-session-service")
 async def setup(ctx, config):
@@ -1185,7 +1185,7 @@ ctx.provide("llm", service)                    # 2-arg (key, value, *, dispose=N
 | Phase | 内容 | 验证 |
 |---|---|---|
 | **P0** | vendor 引入 cordis + cosmokit + schemastery（`uv sync` 跑通 + `pyproject.toml` 加 `[tool.uv.sources]`） | `uv run python -c "from cordis import Context, plugin"` |
-| **P1** | 删 `lca/layer0_infra/plugin/`（含 `_test_plugins/`）+ `lca/harness/kernel/` | `rg -l lca.layer0_infra.plugin` 空 |
+| **P1** | 删 `lca/layer0_infra/plugin/`（含 `_test_plugins/`）+ `lca/harness/kernel/` | `rg -l lca.infrastructure.plugin` 空 |
 | **P2** | 拆 `lca/contracts/{harness/plugin.py, mechanisms/plugin.py, mechanisms/seam.py}` 三处：删 LCA seam 抽象，保留 `consume()` / `PluginConfig` | `rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|ScopeKind\|PluginKind\|ProviderMode\|SeamDeclaration\|SeamRegistry\|seam\b"` 仅命中 docstring；`rg "from lca.contracts.mechanisms.seam import consume"` 仍能 import |
 | **P3** | `lca/harness/middleware/registry.py` 10 点 `COGNITIVE_POINTS` 重写为 cordis event 名 map | `tests/test_middleware.py` |
 | **P4** | `lca/harness/profile/boot.py` 重写为 cordis.Loader 薄包装（保留 `boot_profile(path, *, check_seam_completeness: bool = True)` 签名；now no-op 警告） | `gateway/app.py:138` + `tests/harness/test_phase_a_integration.py:225` 跑通 |
@@ -1266,14 +1266,14 @@ P4 / P6 必跑：
 - `rg "ctx\.llm\." lca/layer4_app/` 找到至少 5 处 typed property 使用（验证精修项 2）
 - `rg "@plugin" lca/plugins/ | wc -l` = 38（精确 plugin 数）
 - `uv run lint-imports` plugin top-level 0 违规（精修项 4）
-- `rg "from lca.layer0_infra\|from lca.layer1_cognitive\|from lca.layer2_runtime\|from lca.layer3_agent\|from lca.layer4_app" lca/plugins/*/` 仅命中 plugin setup 函数体内部（非模块顶层）
+- `rg "from lca.infrastructure\|from lca.layer1_cognitive\|from lca.layer2_runtime\|from lca.layer3_agent\|from lca.layer4_app" lca/plugins/*/` 仅命中 plugin setup 函数体内部（非模块顶层）
 
 **功能验收**：
 
 - `uv run lca-ops status` 跑通，所有 capability 加载成功
 - `uv run pytest --no-cov` 全过（real_llm 跳过）
 - `scripts/run_team_mode.py` 起真 e2e，journal 落一条 agent reply
-- `rg -l lca.layer0_infra.plugin` 空（in-house kernel 完全删除）
+- `rg -l lca.infrastructure.plugin` 空（in-house kernel 完全删除）
 - `rg "PluginManifest\|ExtensionPoint\|CapabilityGrant\|ScopeKind\|PluginKind\|ProviderMode\|SeamDeclaration\|SeamRegistry\|SeamRole"` 仅命中 docstring
 - `rg "ScopedPluginHost\|scope\.resolve\|scope\.fork\|ScopeKind\."` 仅命中 docstring
 - `from lca.contracts.mechanisms.seam import consume` 仍能 import

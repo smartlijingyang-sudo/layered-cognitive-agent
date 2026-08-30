@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 from lca.contracts.models.team.team_coordination import FanOut, PeerRelay, Pipeline
-from lca.layer0_infra.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
-from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
+from lca.infrastructure.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
+from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
 from lca.layer4_app.api import Agent, Team, TeamLead
 
 # 加载 .env（如果存在）
@@ -373,7 +373,7 @@ class TestObservabilityOutput(unittest.IsolatedAsyncioTestCase):
         trace_path = anyio.Path("traces/lca_journal.jsonl")
         if await trace_path.exists():
             content = await trace_path.read_text(encoding="utf-8")
-            from lca.layer0_infra.observability.journal.journal_io import (
+            from lca.infrastructure.observability.journal.journal_io import (
                 iter_journal_records,
             )
 

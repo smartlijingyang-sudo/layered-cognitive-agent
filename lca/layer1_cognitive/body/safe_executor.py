@@ -27,8 +27,8 @@ from lca.contracts.models.observability.journal import ApprovalRequested
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.observability.evidence import EvidenceRef
 from lca.contracts.protocols import SafeExecutor, Tool
-from lca.layer0_infra.observability import record
-from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
+from lca.infrastructure.observability import record
+from lca.infrastructure.tools.tool_invocation_scope import tool_invocation_scope
 
 _log = structlog.get_logger("lca.safe_executor")
 
@@ -77,7 +77,7 @@ def _resolve_evidence_pair() -> tuple[Any, Any]:
     注入 safe_executor 在 boot 时已通过 seam plugin 拿到 capability;如果没有
     配 seam(测试场景),这里返回 (None, None) → emitter 走 no-ref 路径。
     """
-    from lca.layer0_infra.observability import current_bound
+    from lca.infrastructure.observability import current_bound
 
     bound = current_bound()
     if bound is None:

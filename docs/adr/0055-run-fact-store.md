@@ -611,7 +611,7 @@ Prompt、模型输出、工具参数可能包含敏感信息。借鉴 Manus 指�
 
 **验收**：
 - DSH 跨线程零 ContextVar 依赖
-- `import lca.layer0_infra.dsh` 有 deprecation warning 指向新路径
+- `import lca.infrastructure.dsh` 有 deprecation warning 指向新路径
 - lint-imports 通过
 
 ## 架构检验清单

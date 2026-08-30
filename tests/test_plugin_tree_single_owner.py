@@ -13,8 +13,8 @@ from lca.contracts.mechanisms.capability import MissingCapabilityError
 from lca.harness.profile.boot import boot_entries, boot_profile, load_profile_entries
 from lca.harness.profile.boot_products import resolved_profile_from_scope
 from lca.harness.profile.resolve import ProfileResolveError
-from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer0_infra.llm_resolver import live_credential
+from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+from lca.infrastructure.llm_resolver import live_credential
 from lca.layer4_app.api import Agent
 from lca.layer4_app.spawn import spawn_agent
 from lca.plugins.composer.internal.perceive import build_perceive_hub
@@ -79,11 +79,11 @@ def _unwrap_llm(llm: Any) -> Any:
 def no_llm_key(monkeypatch: pytest.MonkeyPatch) -> None:
     """Block dotenv reload and clear credential env so boot has no real key."""
     monkeypatch.setattr(
-        "lca.layer0_infra.llm.config.prepare_llm_environ",
+        "lca.infrastructure.llm.config.prepare_llm_environ",
         lambda: None,
     )
     monkeypatch.setattr(
-        "lca.layer0_infra.llm_adapter.factory.load_dotenv_if_present",
+        "lca.infrastructure.llm_adapter.factory.load_dotenv_if_present",
         lambda path=None: None,
     )
     for key in (
@@ -171,18 +171,18 @@ async def test_omitting_seam_plugin_does_not_bypass(
     def _boom(*_a: object, **_k: object) -> object:
         raise AssertionError(f"module-level factory used after omitting {omit_id}")
 
-    monkeypatch.setattr("lca.layer0_infra.sandbox.factory.resolve_sandbox", _boom)
-    monkeypatch.setattr("lca.layer0_infra.tools.default_set.resolve_sandbox", _boom)
-    import lca.layer0_infra.file_store as file_store_module
+    monkeypatch.setattr("lca.infrastructure.sandbox.factory.resolve_sandbox", _boom)
+    monkeypatch.setattr("lca.infrastructure.tools.default_set.resolve_sandbox", _boom)
+    import lca.infrastructure.file_store as file_store_module
 
     assert not hasattr(file_store_module, "get_default_file_store")
     assert not hasattr(file_store_module, "set_default_file_store")
     monkeypatch.setattr(
-        "lca.layer0_infra.tools.default_set.build_g2a_chat_tools",
+        "lca.infrastructure.tools.default_set.build_g2a_chat_tools",
         _boom,
     )
     monkeypatch.setattr(
-        "lca.layer0_infra.skills.factory.resolve_skill_store",
+        "lca.infrastructure.skills.factory.resolve_skill_store",
         _boom,
     )
 
@@ -216,7 +216,7 @@ async def test_omitting_tools_provider_skips_g2a_not_fallback(
     def _boom(*_a: object, **_k: object) -> object:
         raise AssertionError("build_g2a_chat_tools must not run when tools-provider is omitted")
 
-    monkeypatch.setattr("lca.layer0_infra.tools.default_set.build_g2a_chat_tools", _boom)
+    monkeypatch.setattr("lca.infrastructure.tools.default_set.build_g2a_chat_tools", _boom)
     from gateway.runs.runnable_assembly import tools_from_scope
 
     tools = tools_from_scope(ctx, None)
@@ -242,7 +242,7 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
     def _boom(*_a: object, **_k: object) -> object:
         raise AssertionError("resolve_skill_store must not run when skills-provider is omitted")
 
-    monkeypatch.setattr("lca.layer0_infra.skills.factory.resolve_skill_store", _boom)
+    monkeypatch.setattr("lca.infrastructure.skills.factory.resolve_skill_store", _boom)
 
     from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 

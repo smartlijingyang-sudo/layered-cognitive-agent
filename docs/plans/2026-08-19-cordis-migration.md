@@ -144,7 +144,7 @@ git commit -m "deps: wire vendor/{cordis,cosmokit,schemastery} as path dependenc
 - Create: `lca/contracts/typed_ctx.py`
 - Test: `tests/test_typed_ctx.py`
 
-**Critical constraint** (per importlinter contract 3, pyproject.toml lines 53-65): `lca.contracts` is FORBIDDEN from importing `lca.layer0_infra`, `lca.harness`, `lca.plugins`. TypedContext references ONLY Protocol types already in `lca/contracts/protocols/`.
+**Critical constraint** (per importlinter contract 3, pyproject.toml lines 53-65): `lca.contracts` is FORBIDDEN from importing `lca.infrastructure`, `lca.harness`, `lca.plugins`. TypedContext references ONLY Protocol types already in `lca/contracts/protocols/`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -181,7 +181,7 @@ ReflectService resolves attribute reads through this typing, so:
 - `ctx.inject("llm")` is still valid (untyped fallback)
 
 Constraint: this module is in `lca.contracts/`, which is FORBIDDEN by
-importlinter from importing `lca.layer0_infra` / `lca.harness` / `lca.plugins`.
+importlinter from importing `lca.infrastructure` / `lca.harness` / `lca.plugins`.
 Therefore TypedContext references ONLY Protocol types already declared in
 `lca/contracts/protocols/`. Concrete service classes (`LlmService`,
 `ToolsService`, `CommandGateway`, etc.) are not imported here.
@@ -401,7 +401,7 @@ git commit -m "contracts: SessionEventType enum (session everything taxonomy)"
 - [ ] **Step 1: List current re-exports**
 
 Run: `cat lca/harness/__init__.py`
-Expected: contains imports from `lca.harness.kernel.scope` and `lca.layer0_infra.plugin.kernel`
+Expected: contains imports from `lca.harness.kernel.scope` and `lca.infrastructure.plugin.kernel`
 
 - [ ] **Step 2: Replace with minimal re-exports**
 
@@ -429,7 +429,7 @@ are import directly from their respective submodules.
 
 Re-exports removed (deleted in cordis migration):
 - ScopedPluginHost, current_scope (was lca.harness.kernel.scope)
-- PluginContext, PluginHandle, PluginHost, PluginSpec, PluginState, ServiceRecord, reconcile (was lca.layer0_infra.plugin.kernel)
+- PluginContext, PluginHandle, PluginHost, PluginSpec, PluginState, ServiceRecord, reconcile (was lca.infrastructure.plugin.kernel)
 - manifest_from_entry, manifest_from_spec (was lca.harness.kernel.compat)
 """
 ```
@@ -479,8 +479,8 @@ Expected: ~15-25 hits across 3 files
 # remove these lines:
 #   from lca.harness.kernel.scope import ScopedPluginHost
 #   from lca.contracts.harness.plugin import ScopeKind
-#   from lca.layer0_infra.plugin.kernel._handle import PluginHandle
-#   from lca.layer0_infra.plugin.kernel._spec import PluginSpec
+#   from lca.infrastructure.plugin.kernel._handle import PluginHandle
+#   from lca.infrastructure.plugin.kernel._spec import PluginSpec
 #   from lca.layer4_app.capability_boot import boot_capabilities
 ```
 
@@ -550,7 +550,7 @@ git commit -m "production callers: composer/gateway/api drop ScopedPluginHost (C
 - Modify: `lca/harness/diagnostics/inspect.py`
 - Modify: `lca/harness/profile/boot.py`  ← **moved here from Chunk 2 Task 2.1**
 
-**Critical (B1 fix)**: `lca/harness/profile/boot.py` imports `ProfileLoader` / `BootedTree` / `Loader` from `lca.layer0_infra.plugin.*`. Task 1.15 (Chunk 1) deletes that module. boot.py's rewrite MUST happen in Chunk 1, not Chunk 2. Chunk 2's Task 2.1 is now redundant (delete or mark as `Replaced by Task 1.7`).
+**Critical (B1 fix)**: `lca/harness/profile/boot.py` imports `ProfileLoader` / `BootedTree` / `Loader` from `lca.infrastructure.plugin.*`. Task 1.15 (Chunk 1) deletes that module. boot.py's rewrite MUST happen in Chunk 1, not Chunk 2. Chunk 2's Task 2.1 is now redundant (delete or mark as `Replaced by Task 1.7`).
 
 - [ ] **Step 1: Find plugin/kernel imports**
 
@@ -679,14 +679,14 @@ Expected: 5+ files importing dsh_core
 - [ ] **Step 2: For each importer, replace with upstream cordis equivalent or comment out**
 
 For `lca/layer0_infra/dsh_core/agent_default_model/__init__.py`:
-- Replace import from `lca.layer0_infra.plugin.kernel._context.PluginContext` → `from cordis import Context`
+- Replace import from `lca.infrastructure.plugin.kernel._context.PluginContext` → `from cordis import Context`
 - Drop `AgentDefaultModel` class (was a stub anyway)
 
 For `lca/layer0_infra/dsh_core/agent_tool_presentation/__init__.py`:
 - Drop or comment out — DSH tool presentation is one of the 100+ dsh packages we DON'T port
 
 For `lca/layer0_infra/dsh_core/scope/__init__.py`:
-- Replace `lca.layer0_infra.plugin.kernel._context.PluginContext` → `from cordis import Context`
+- Replace `lca.infrastructure.plugin.kernel._context.PluginContext` → `from cordis import Context`
 
 For `lca/layer0_infra/dsh_core/system_prompt/__init__.py`:
 - Same: replace context import
@@ -723,10 +723,10 @@ Expected: 1-3 hits (around line 617 per spec §8.2)
 
 - [ ] **Step 2: Drop imports; replace with cordis equivalents**
 
-If CLI imports `lca.layer0_infra.plugin.include._profile.ProfileLoader`:
+If CLI imports `lca.infrastructure.plugin.include._profile.ProfileLoader`:
 - Replace with `from cordis.loader import load_yaml`
 
-If CLI imports `lca.layer0_infra.plugin.loader._loader.Loader`:
+If CLI imports `lca.infrastructure.plugin.loader._loader.Loader`:
 - Replace with `from cordis import Loader` (cordis has its own Loader)
 
 - [ ] **Step 3: Verify `lca-ops` CLI still works**
@@ -1347,7 +1347,7 @@ git commit -m "contracts: drop Plugin Protocol; keep PluginConfig Pydantic base"
 
 ### Task 1.20: Verify Chunk 1 acceptance criteria
 
-- [ ] **Step 1: `rg "lca.layer0_infra.plugin" lca/ tests/` — expect empty**
+- [ ] **Step 1: `rg "lca.infrastructure.plugin" lca/ tests/` — expect empty**
 
 Run: `rg "lca\.layer0_infra\.plugin" lca/ tests/ --type py`
 Expected: empty
@@ -1705,7 +1705,7 @@ from cordis import plugin
 
 @plugin(name="lca-llm-service")
 async def setup(ctx, config):
-    from lca.layer0_infra.capability.llm import LlmService
+    from lca.infrastructure.capability.llm import LlmService
     ctx.provide("llm", LlmService())
 ```
 
@@ -1722,7 +1722,7 @@ from lca.contracts.typed_ctx import TypedContext
 @plugin(name="lca-llm-provider", inject=["llm"])
 async def setup(ctx: TypedContext, config):
     """Register default providers. Real provider picks live in Tier-2."""
-    from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+    from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
     ctx.llm.register("mock", MockLLMAdapter())
 ```
 
@@ -1736,7 +1736,7 @@ from cordis import plugin
 
 @plugin(name="lca-tools-service")
 async def setup(ctx, config):
-    from lca.layer0_infra.capability.tools import ToolsService
+    from lca.infrastructure.capability.tools import ToolsService
     ctx.provide("tools", ToolsService())
 ```
 
@@ -1782,7 +1782,7 @@ from cordis import plugin
 
 @plugin(name="lca-<name>", inject=[<key>])
 async def setup(ctx, config):
-    from lca.layer0_infra.<module> import <ServiceClass>
+    from lca.infrastructure.<module> import <ServiceClass>
     ctx.provide("<key>", <ServiceClass>())
 ```
 
@@ -1964,7 +1964,7 @@ git commit -m "chore: chunk 2 verification fixes" --allow-empty
 
 **Goal:** Create 12 Tier-2 provider plugins (each seam: single plugin + factory). Create 13 Tier-3 behavior plugins (Brain, Reasoner, Synthesizer, Loop, Guard, DSH bridge, TeamLead). Move prompt templates to central `prompt_registry`. Total: 38 plugins.
 
-**Risk:** Tier-2 plugins must NOT import `lca.layer0_infra.*` at module top-level (per spec §4.6). Imports inside `setup()` are fine.
+**Risk:** Tier-2 plugins must NOT import `lca.infrastructure.*` at module top-level (per spec §4.6). Imports inside `setup()` are fine.
 
 ---
 
@@ -2007,7 +2007,7 @@ from cordis import Context
 @pytest.mark.asyncio
 async def test_llm_provider_registers_all_when_mode_is_auto():
     from lca.plugins.providers.llm import setup, Config
-    from lca.layer0_infra.capability.llm import LlmService
+    from lca.infrastructure.capability.llm import LlmService
 
     ctx = Context()
     ctx.provide("llm", LlmService())
@@ -2020,7 +2020,7 @@ async def test_llm_provider_registers_all_when_mode_is_auto():
 @pytest.mark.asyncio
 async def test_llm_provider_activates_explicit_mode():
     from lca.plugins.providers.llm import setup, Config
-    from lca.layer0_infra.capability.llm import LlmService
+    from lca.infrastructure.capability.llm import LlmService
 
     ctx = Context()
     ctx.provide("llm", LlmService())
@@ -2053,8 +2053,8 @@ class Config(BaseModel):
 
 @plugin(name="lca-llm-provider", inject=["llm"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-    from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
+    from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+    from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
 
     llm = ctx.inject("llm")
     if "mock" in config.providers:
@@ -2141,7 +2141,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-state-store-provider", inject=["state_store"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
+    from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 
     if "memory" in config.providers:
         ctx.inject("state_store").register("memory", InMemoryStateStore)
@@ -2164,7 +2164,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-search-provider", inject=["search"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.search.providers.tavily import search_tavily
+    from lca.infrastructure.search.providers.tavily import search_tavily
 
     if "tavily" in config.providers:
         ctx.inject("search").register("tavily", search_tavily)
@@ -2187,7 +2187,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-tools-provider", inject=["tools"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.tools.default_set import build_default_tools
+    from lca.infrastructure.tools.default_set import build_default_tools
 
     if "g2a" in config.factories:
         ctx.inject("tools").register_factory("g2a", build_default_tools)
@@ -2210,9 +2210,9 @@ class Config(BaseModel):
 
 @plugin(name="lca-transport-provider", inject=["transport"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.transport.a2a_transport import A2ATransport
-    from lca.layer0_infra.transport.agent_transport import InternalTransport
-    from lca.layer0_infra.transport.mcp_transport import MCPTransport
+    from lca.infrastructure.transport.a2a_transport import A2ATransport
+    from lca.infrastructure.transport.agent_transport import InternalTransport
+    from lca.infrastructure.transport.mcp_transport import MCPTransport
 
     transport = ctx.inject("transport")
     if "internal" in config.providers:
@@ -2240,7 +2240,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-skills-provider", inject=["skills"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.skills.factory import resolve_skill_store
+    from lca.infrastructure.skills.factory import resolve_skill_store
 
     if "disk" in config.providers:
         ctx.inject("skills").register("disk", resolve_skill_store())
@@ -2263,7 +2263,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-file-store-provider", inject=["file_store"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.file_store import get_default_file_store
+    from lca.infrastructure.file_store import get_default_file_store
 
     if "local" in config.providers:
         ctx.inject("file_store").register("local", get_default_file_store())
@@ -2286,7 +2286,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-observability-provider", inject=["observability"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.observability.registry import create_observability
+    from lca.infrastructure.observability.registry import create_observability
 
     if "console" in config.providers:
         ctx.inject("observability").register("console", lambda: create_observability("console"))
@@ -2309,7 +2309,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-sandbox-provider", inject=["sandbox"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.sandbox.factory import resolve_sandbox
+    from lca.infrastructure.sandbox.factory import resolve_sandbox
 
     if "local" in config.providers:
         resolved = resolve_sandbox()
@@ -2334,7 +2334,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-attachment-provider", inject=["attachment", "file_store"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.attachment.service import FileStoreAttachmentIdentity
+    from lca.infrastructure.attachment.service import FileStoreAttachmentIdentity
 
     if "filesystem" in config.providers:
         provider = FileStoreAttachmentIdentity(ctx.inject("file_store"))
@@ -2358,7 +2358,7 @@ class Config(BaseModel):
 
 @plugin(name="lca-workspace-provider", inject=["workspace"])
 async def setup(ctx, config: Config) -> None:
-    from lca.layer0_infra.workspace.service import LocalWorkspace
+    from lca.infrastructure.workspace.service import LocalWorkspace
 
     if "local" in config.providers:
         ctx.inject("workspace").register("local", LocalWorkspace())
@@ -2561,8 +2561,8 @@ from cordis import plugin
 
 @plugin(name="lca-dsh-bridge")
 async def setup(ctx, config) -> None:
-    from lca.layer0_infra.dsh.launch import build_harness_env
-    from lca.layer0_infra.dsh.settings import DshSettings
+    from lca.infrastructure.dsh.launch import build_harness_env
+    from lca.infrastructure.dsh.settings import DshSettings
 
     settings = DshSettings()
 
@@ -3016,7 +3016,7 @@ from cordis import Context
 @pytest.mark.asyncio
 async def test_isolate_agent_scope_creates_child_with_shadow_services():
     from lca.layer4_app.composer import _IsolatedAgentScope
-    from lca.layer0_infra.capability.llm import LlmService
+    from lca.infrastructure.capability.llm import LlmService
 
     parent = Context()
     parent.provide("llm", LlmService())
@@ -3280,7 +3280,7 @@ async def debug_tree(profile_path: str) -> None:
 
 async def debug_run(profile_path: str, run_id: str) -> None:
     """Print session events for a run."""
-    from lca.layer0_infra.session.store import SessionStore
+    from lca.infrastructure.session.store import SessionStore
     store = SessionStore()
     events = await store.events(run_id)
     for e in events:
@@ -3317,7 +3317,7 @@ def register_subcommands(subparsers: argparse._SubParsersAction) -> None:
 
 Add to the CLI dispatcher:
 ```python
-from lca.layer0_infra.ops.debug import register_subcommands
+from lca.infrastructure.ops.debug import register_subcommands
 debug_parser = subparsers.add_parser("debug", ...)
 register_subcommands(subparsers)
 ```

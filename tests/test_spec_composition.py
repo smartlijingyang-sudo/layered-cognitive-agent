@@ -10,7 +10,7 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.team.team_coordination import LeadMandate, Pipeline
 from lca.contracts.protocols import AgentUnit, Brain, TeamUnit
 from lca.contracts.protocols.spec import AgentSpec, LeadSpec
-from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer4_app.api import Agent, Team, TeamLead
 

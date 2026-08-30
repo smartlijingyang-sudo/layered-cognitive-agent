@@ -22,7 +22,7 @@ from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols.runtime import Runtime
 from lca.contracts.protocols.runtime_lifecycle import RuntimeLifecycleEventType
-from lca.layer0_infra.observability import get_current_run_scope, get_span_context
+from lca.infrastructure.observability import get_current_run_scope, get_span_context
 from lca.layer2_runtime.checkpoint_resolution import DeclarativeCheckpoint
 from lca.layer2_runtime.runtime_bindings import DeclarativeRuntimeBindings
 from lca.layer2_runtime.runtime_lifecycle_emitter import (

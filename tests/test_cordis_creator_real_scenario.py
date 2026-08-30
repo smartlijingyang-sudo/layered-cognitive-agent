@@ -50,8 +50,8 @@ from typing import Any
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent, NativeToolCall
 from lca.contracts.protocols import LLMAdapter
-from lca.layer0_infra.observability.facade import BoundObservability, bind_backends
-from lca.layer0_infra.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.facade import BoundObservability, bind_backends
+from lca.infrastructure.observability.journal_backend import MemoryJournal
 from lca.layer4_app.preset_authoring import PresetAuthoring
 from lca.plugins.providers.composition_composer import (
     CordisComposer,
@@ -292,7 +292,7 @@ def _build_creator_toolkit(preset_root: Path):
     """
     from cordis import Context
 
-    from lca.layer0_infra.capability.tools import ToolsService
+    from lca.infrastructure.capability.tools import ToolsService
 
     ctx = Context()
     composer = CordisComposer(ctx, invariant_checker=build_default_invariant_checker())
@@ -351,7 +351,7 @@ def _build_creator_toolkit_with_preset(preset_id: str, preset_root: Path):
     from cordis import Context
 
     from lca.contracts.mechanisms.composition import PluginFactory
-    from lca.layer0_infra.capability.tools import ToolsService
+    from lca.infrastructure.capability.tools import ToolsService
 
     ctx = Context()
     composer = CordisComposer(ctx, invariant_checker=build_default_invariant_checker())

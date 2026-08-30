@@ -53,25 +53,25 @@ class Config(BaseModel):
     kind=PluginKind.BRIDGE,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability.coding_agent_tools.diff_context import (
+    from lca.infrastructure.observability.coding_agent_tools.diff_context import (
         DiffContext,
     )
-    from lca.layer0_infra.observability.coding_agent_tools.failure_explainer import (
+    from lca.infrastructure.observability.coding_agent_tools.failure_explainer import (
         FailureExplainer,
     )
-    from lca.layer0_infra.observability.coding_agent_tools.minimal_reproduction import (
+    from lca.infrastructure.observability.coding_agent_tools.minimal_reproduction import (
         MinimalReproduction,
     )
-    from lca.layer0_infra.observability.coding_agent_tools.optimization_finder import (
+    from lca.infrastructure.observability.coding_agent_tools.optimization_finder import (
         OptimizationFinder,
     )
-    from lca.layer0_infra.observability.coding_agent_tools.plugin_graph_renderer import (
+    from lca.infrastructure.observability.coding_agent_tools.plugin_graph_renderer import (
         PluginGraphRenderer,
     )
-    from lca.layer0_infra.observability.coding_agent_tools.run_diff import (
+    from lca.infrastructure.observability.coding_agent_tools.run_diff import (
         RunDiffToolAdapter,
     )
-    from lca.layer0_infra.observability.coding_agent_tools.trace_inspector_tool import (
+    from lca.infrastructure.observability.coding_agent_tools.trace_inspector_tool import (
         TraceInspectorToolAdapter,
     )
 

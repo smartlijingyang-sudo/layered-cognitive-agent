@@ -70,7 +70,7 @@ from gateway.session_routes import (
     stream_events,
 )
 from gateway.spine import bind_session_spine
-from lca.layer0_infra.file_store import LocalFileStore
+from lca.infrastructure.file_store import LocalFileStore
 
 _registry = RunRegistry()
 _file_store = None  # set by bootstrap factory or lifespan
@@ -381,7 +381,7 @@ def create_app(
                     # can use .current() to retrieve the active provider
                     # (test_gateway_bootstrap::test_gateway_lifespan_reuses_
                     # bootstrap_file_store asserts this).
-                    from lca.layer0_infra.capability.files import FileStoreService
+                    from lca.infrastructure.capability.files import FileStoreService
 
                     file_store_svc = FileStoreService()
                     file_store_svc.register("bootstrap", product.file_store, activate=True)

@@ -71,18 +71,18 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     # ── 运行域：run 容器（ADR-0037 起由 OtelProjector 从 journal 投影）──
     SpanName.RUN_AGENT.value: _span(
         VocabDomain.RUN,
-        "lca.layer0_infra.observability.journal.otel_projector",
+        "lca.infrastructure.observability.journal.otel_projector",
         desc="单 agent 运行根（journal AgentRunStarted/Finished 投影）",
     ),
     SpanName.RUN_TEAM.value: _span(
         VocabDomain.RUN,
-        "lca.layer0_infra.observability.journal.otel_projector",
+        "lca.infrastructure.observability.journal.otel_projector",
         desc="团队运行根（journal TeamRunStarted/Finished 投影）",
     ),
     # ── 团队域：编排层 ──
     SpanName.DELEGATION.value: _span(
         VocabDomain.TEAM,
-        "lca.layer0_infra.observability.journal.otel_projector",
+        "lca.infrastructure.observability.journal.otel_projector",
         required=(ATTR_CALLEE_ROLE,),
         desc="委派往返（journal 投影；包住成员全程，ADR-0037）",
     ),
@@ -125,7 +125,7 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     # ── 资源域：适配器/边界发射 ──
     SpanName.LLM_CHAT.value: _span(
         VocabDomain.RESOURCE,
-        "lca.layer0_infra.observability.adapters",
+        "lca.infrastructure.observability.adapters",
         required=(ATTR_MODEL,),
         desc="LLM 调用（generation）",
     ),
@@ -137,28 +137,28 @@ TELEMETRY_CATALOG: dict[str, VocabDef] = {
     ),
     SpanName.MEMORY_READ.value: _span(
         VocabDomain.RESOURCE,
-        "lca.layer0_infra.observability.memory_adapter",
+        "lca.infrastructure.observability.memory_adapter",
         required=(ATTR_MEMORY_LAYER,),
         desc="记忆读取（知识检索）",
     ),
     SpanName.MEMORY_WRITE.value: _span(
         VocabDomain.RESOURCE,
-        "lca.layer0_infra.observability.memory_adapter",
+        "lca.infrastructure.observability.memory_adapter",
         required=(ATTR_MEMORY_LAYER,),
         desc="记忆写入",
     ),
     SpanName.TRANSPORT_REQUEST.value: _span(
         VocabDomain.RESOURCE,
-        "lca.layer0_infra.transport.invocation",
+        "lca.infrastructure.transport.invocation",
         desc="传输请求",
     ),
     SpanName.TRANSPORT_RESPONSE.value: _span(
         VocabDomain.RESOURCE,
-        "lca.layer0_infra.transport.invocation",
+        "lca.infrastructure.transport.invocation",
         desc="传输响应",
     ),
     SpanName.DELEGATE_CACHE_HIT.value: _event(
-        "lca.layer0_infra.observability.journal.otel_projector",
+        "lca.infrastructure.observability.journal.otel_projector",
         desc="委派幂等短路（journal DelegationCacheHit 投影为 run span event，ADR-0037）",
     ),
     SpanName.ERROR.value: _span(

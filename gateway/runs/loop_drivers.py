@@ -35,7 +35,7 @@ from lca.contracts.protocols.casting import (
     TeamCaster,
 )
 from lca.contracts.protocols.infra import Tool
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     BoundObservability,
     bind_backends,
     objective_preview,

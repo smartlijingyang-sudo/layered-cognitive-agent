@@ -30,13 +30,13 @@ from lca.contracts.protocols import (
     ToolRegistry,
 )
 from lca.harness.observability import make_minimal_bound
-from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
-from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
-from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
-from lca.layer0_infra.tools.weather import build_tools as build_weather_tools
-from lca.layer0_infra.transport.agent_transport import InternalTransport
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
+from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
+from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
+from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
+from lca.infrastructure.tools.weather import build_tools as build_weather_tools
+from lca.infrastructure.transport.agent_transport import InternalTransport
+from lca.infrastructure.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody
@@ -84,7 +84,7 @@ class TestL0ProtocolCompliance(unittest.TestCase):
     def test_bound_observability_satisfies_backend(self):
         """BoundObservability satisfies ObservabilityBackend protocol structurally."""
         from lca.contracts.protocols import ObservabilityBackend
-        from lca.layer0_infra.observability import BoundObservability
+        from lca.infrastructure.observability import BoundObservability
 
         self.assertIsInstance(BoundObservability(), ObservabilityBackend)
 

@@ -14,7 +14,7 @@ import pytest
 
 from lca.contracts.models.observability.journal import AgentRunStarted
 from lca.contracts.observability.ledger import LedgerSeqMismatchError
-from lca.layer0_infra.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine import RunStore
 
 
 def test_concurrent_appends_produce_continuous_unique_seq() -> None:

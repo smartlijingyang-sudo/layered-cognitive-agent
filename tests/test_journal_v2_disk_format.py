@@ -32,21 +32,21 @@ from lca.contracts.models.observability.journal import (
     ToolInvoked,
     ToolStarted,
 )
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     BoundObservability,
     bind_backends,
     record,
     run_scope,
 )
-from lca.layer0_infra.observability.journal.journal_io import (
+from lca.infrastructure.observability.journal.journal_io import (
     load_journal_records,
     read_journal,
 )
-from lca.layer0_infra.observability.journal.jsonl_projector import (
+from lca.infrastructure.observability.journal.jsonl_projector import (
     JsonlJournalProjector,
 )
-from lca.layer0_infra.observability.journal_backend import MemoryJournal
-from lca.layer0_infra.observability.policy import AttributePolicy
+from lca.infrastructure.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.policy import AttributePolicy
 
 # ADR-0097 / MVA-2 Task 4: engine fills event_id via StableUlidIdentity;
 # journal_io prefers stamped.event_id over the MVA-1 hash fallback.

@@ -10,7 +10,7 @@ from lca.contracts.models.observability.journal import (
     MemoryCommitted,
     ToolInvoked,
 )
-from lca.layer0_infra.observability.diagnostics import (
+from lca.infrastructure.observability.diagnostics import (
     DiagnosePattern,
     diagnose,
     diagnose_approval_rejected,
@@ -18,7 +18,7 @@ from lca.layer0_infra.observability.diagnostics import (
     diagnose_memory_poisoned,
     diagnose_model_not_seen,
 )
-from lca.layer0_infra.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine import RunStore
 
 
 def _state(store: RunStore, *events):

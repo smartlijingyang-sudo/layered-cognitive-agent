@@ -124,7 +124,7 @@ async def main() -> int:
         from lca.contracts.protocols.spec import AgentSpec
 
         # Use mock LLM to avoid needing a real key
-        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
         from lca.layer4_app.spawn import spawn_agent
 
         spec = AgentSpec(

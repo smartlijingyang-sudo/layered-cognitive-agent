@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from types import SimpleNamespace
 
-from lca.layer0_infra.llm_adapter.openai_compat._shared import (
+from lca.infrastructure.llm_adapter.openai_compat._shared import (
     ThinkTagStreamSplitter,
     extract_reasoning_text,
 )

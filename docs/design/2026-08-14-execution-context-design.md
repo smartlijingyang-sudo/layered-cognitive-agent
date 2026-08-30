@@ -1226,7 +1226,7 @@ npx @lca/host connect --gateway ws://127.0.0.1:8765 --token lca-local-host
 import os
 from typing import Optional
 
-from lca.layer0_infra.execution.config import ExecutionConfig, load_execution_config
+from lca.infrastructure.execution.config import ExecutionConfig, load_execution_config
 
 
 class ExecutionContextFactory:
@@ -1309,7 +1309,7 @@ class ExecutionContextFactory:
         if sandbox is None:
             return None
 
-        from lca.layer0_infra.sandbox.host_settings import load_host_settings
+        from lca.infrastructure.sandbox.host_settings import load_host_settings
 
         settings = load_host_settings()
         return HostContext(sandbox, settings, lobe_user=lobe_user)
@@ -1340,7 +1340,7 @@ class ExecutionContextFactory:
     def _resolve_onlyboxes(self, lobe_user: str) -> Optional[ExecutionContext]:
         if not self._config.onlyboxes_base_url or not self._config.onlyboxes_token:
             return None
-        from lca.layer0_infra.sandbox.onlyboxes_adapter import OnlyboxesSandboxAdapter
+        from lca.infrastructure.sandbox.onlyboxes_adapter import OnlyboxesSandboxAdapter
 
         sandbox = OnlyboxesSandboxAdapter(
             base_url=self._config.onlyboxes_base_url,

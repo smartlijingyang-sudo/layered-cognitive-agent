@@ -22,7 +22,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.search.providers.tavily import search_tavily
+    from lca.infrastructure.search.providers.tavily import search_tavily
 
     if "tavily" in config.providers:
         ctx.require("search").register("tavily", search_tavily)

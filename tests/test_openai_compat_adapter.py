@@ -11,11 +11,11 @@ from unittest import mock
 
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import TokenUsage
-from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
-from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
-from lca.layer0_infra.llm_adapter.openai_compat._chat_completions import to_openai_chat_tool_spec
-from lca.layer0_infra.llm_adapter.openai_compat._responses import to_openai_responses_tool_spec
-from lca.layer0_infra.llm_adapter.settings import clear_llm_settings_cache
+from lca.infrastructure.llm_adapter.api_style import LLMApiStyle
+from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
+from lca.infrastructure.llm_adapter.openai_compat._chat_completions import to_openai_chat_tool_spec
+from lca.infrastructure.llm_adapter.openai_compat._responses import to_openai_responses_tool_spec
+from lca.infrastructure.llm_adapter.settings import clear_llm_settings_cache
 
 _HAS_OPENAI = importlib.util.find_spec("openai") is not None
 

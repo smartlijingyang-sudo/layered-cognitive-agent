@@ -22,7 +22,7 @@ from lca.contracts.protocols.casting import CastingError, RoleLibrary, TeamCaste
 from lca.contracts.protocols.infra import Tool
 from lca.contracts.protocols.run_mode import ModeAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     BoundObservability,
     bind_backends,
     objective_preview,

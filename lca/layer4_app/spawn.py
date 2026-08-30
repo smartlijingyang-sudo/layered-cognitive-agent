@@ -16,7 +16,7 @@ from lca.contracts.protocols.spec import (
     LeadSpec,
     TeamSpec,
 )
-from lca.layer0_infra.observability import BoundObservability
+from lca.infrastructure.observability import BoundObservability
 from lca.layer3_agent.team_handle import TeamHandle
 from lca.plugins.composer.agent_assembly import PlanBoundAgentAssembler, promote_lead
 from lca.plugins.composer.internal.perceive import build_perceive_hub

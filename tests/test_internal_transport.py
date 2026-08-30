@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.lifecycle import AgentCard
-from lca.layer0_infra.transport.agent_transport import InternalTransport
+from lca.infrastructure.transport.agent_transport import InternalTransport
 
 
 async def _echo_handler(subtask: str) -> Observation:

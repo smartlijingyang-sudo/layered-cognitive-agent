@@ -24,7 +24,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.skills.factory import resolve_skill_store
+    from lca.infrastructure.skills.factory import resolve_skill_store
 
     if "disk" in config.providers:
         ctx.require("skills").register("disk", resolve_skill_store())

@@ -21,7 +21,7 @@ from lca.contracts.models.observability.journal import (
     TeamRunFinished,
 )
 from lca.contracts.observability.ledger import LedgerSealedError, RunLedger
-from lca.layer0_infra.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine import RunStore
 
 
 def test_run_store_satisfies_run_ledger_protocol() -> None:

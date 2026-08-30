@@ -15,10 +15,10 @@ from pydantic import BaseModel, Field, SecretStr
 
 from lca.contracts.protocols import LLMAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer0_infra.llm.config import DEFAULT_CHAT_MODEL
+from lca.infrastructure.llm.config import DEFAULT_CHAT_MODEL
 
 if TYPE_CHECKING:
-    from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
+    from lca.infrastructure.llm_adapter.api_style import LLMApiStyle
 
 
 class FallbackConfig(BaseModel):
@@ -70,7 +70,7 @@ def _secret_value(value: SecretStr | str | None) -> str | None:
 
 
 def _parse_api_style(raw: str | None) -> LLMApiStyle | None:
-    from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
+    from lca.infrastructure.llm_adapter.api_style import LLMApiStyle
 
     if not raw:
         return None
@@ -93,19 +93,19 @@ def _parse_api_style(raw: str | None) -> LLMApiStyle | None:
     test_suite="tests/test_plugin_tree_single_owner.py::test_llm_single_owner_without_key",
 )
 async def setup(ctx: PluginContext, config: BaseModel) -> None:
-    from lca.layer0_infra.llm.config import (
+    from lca.infrastructure.llm.config import (
         LLMProviderSettings,
         normalize_llm_environ,
         prepare_llm_environ,
     )
-    from lca.layer0_infra.llm_adapter.failover import (
+    from lca.infrastructure.llm_adapter.failover import (
         FailoverLLMAdapter,
         LLMFailoverCandidate,
         LLMRetryPolicy,
         RetryingLLMAdapter,
     )
-    from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
-    from lca.layer0_infra.llm_resolver import ProductionLLMResolver, live_credential
+    from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
+    from lca.infrastructure.llm_resolver import ProductionLLMResolver, live_credential
 
     if not isinstance(config, Config):
         raise TypeError("LLM resolver config must be Config")

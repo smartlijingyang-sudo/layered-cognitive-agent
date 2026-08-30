@@ -16,7 +16,7 @@ from gateway.openai_protocol import (
     new_chat_id,
     streaming_chat_response,
 )
-from lca.layer0_infra.openai_compat import (
+from lca.infrastructure.openai_compat import (
     StructuredLLMError,
     build_responses_payload,
     create_simple_completion,

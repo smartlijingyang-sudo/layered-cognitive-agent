@@ -12,9 +12,9 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lca.layer0_infra.observability import AttributePolicy, BoundObservability, RunStore, SpanView
-from lca.layer0_infra.observability.tracer_backend import OtelTracer
-from lca.layer0_infra.observability.view import view_of
+from lca.infrastructure.observability import AttributePolicy, BoundObservability, RunStore, SpanView
+from lca.infrastructure.observability.tracer_backend import OtelTracer
+from lca.infrastructure.observability.view import view_of
 from tests.support.observability_helpers import make_test_bound
 
 
@@ -105,7 +105,7 @@ class LiveCollector(InMemoryObservability):
     def __init__(self, *, live: bool = True, detail: object = None) -> None:
         # detail kept for CLI API compat; console = journal-driven human view
         del detail
-        from lca.layer0_infra.observability.journal.console_projector import (
+        from lca.infrastructure.observability.journal.console_projector import (
             ConsoleJournalProjector,
         )
 

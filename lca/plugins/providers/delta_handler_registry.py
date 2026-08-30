@@ -8,7 +8,7 @@ state-folding behavior stays local and independently navigable.
 from __future__ import annotations
 
 from lca.contracts.protocols.delta_handler import DeltaHandler, DeltaHandlerRegistry
-from lca.layer0_infra.handler_registry import UniqueOperationRegistry
+from lca.infrastructure.handler_registry import UniqueOperationRegistry
 
 
 class InMemoryDeltaHandlerRegistry(UniqueOperationRegistry[DeltaHandler], DeltaHandlerRegistry):

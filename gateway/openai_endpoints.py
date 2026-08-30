@@ -17,7 +17,7 @@ from gateway.openai_housekeeping import (
 )
 from gateway.openai_protocol import error_response, lca_models_payload
 from gateway.runs.execute import llm_status
-from lca.layer0_infra.openai_compat import (
+from lca.infrastructure.openai_compat import (
     StructuredLLMError,
     build_responses_payload,
     create_embeddings,

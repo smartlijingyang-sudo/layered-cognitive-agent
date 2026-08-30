@@ -31,8 +31,8 @@ def _journal_event_types(session: object) -> set[str]:
     from typing import cast
 
     from gateway.runs.session import RunSession
-    from lca.layer0_infra.observability.journal.engine import RunStore
-    from lca.layer0_infra.observability.journal.journal_io import read_journal
+    from lca.infrastructure.observability.journal.engine import RunStore
+    from lca.infrastructure.observability.journal.journal_io import read_journal
 
     assert isinstance(session, RunSession)
     if session.hub is not None and session.hub.journal is not None:
@@ -119,7 +119,7 @@ class TestTeamRunPath(unittest.IsolatedAsyncioTestCase):
         assert session.hub is not None and session.hub.journal is not None
         from typing import cast
 
-        from lca.layer0_infra.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine import RunStore
 
         store = cast("RunStore", getattr(session.hub.journal, "store", session.hub.journal))
         started = next(

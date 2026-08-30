@@ -15,7 +15,7 @@ import pytest
 from lca.contracts.observability.w3c_trace_context import (
     TraceparentParts,
 )
-from lca.layer0_infra.observability.w3c_validator import DefaultW3CValidator
+from lca.infrastructure.observability.w3c_validator import DefaultW3CValidator
 
 
 @pytest.fixture

@@ -27,7 +27,7 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability.w3c_validator import DefaultW3CValidator
+    from lca.infrastructure.observability.w3c_validator import DefaultW3CValidator
 
     del config
     ctx.provide("w3c_trace_context_validator", DefaultW3CValidator())

@@ -374,9 +374,9 @@ class BootedTree:
   group: true
   config:
     - id: web-search
-      name: lca.layer0_infra.plugins.tool_web_search
+      name: lca.infrastructure.plugins.tool_web_search
     - id: ask-user
-      name: lca.layer0_infra.plugins.tool_ask_user
+      name: lca.infrastructure.plugins.tool_ask_user
 ```
 
 #### 5.3.5 Entry 持久化（对齐 Cordis EntryTree.write / Include）
@@ -1175,7 +1175,7 @@ def interpolate_config(value: Any, scope: dict[str, Any]) -> Any:
 ```yaml
 plugins:
   - id: llm
-    name: lca.layer0_infra.plugins.llm
+    name: lca.infrastructure.plugins.llm
     config:
       api_key: !py "ctx.env.LLM_API_KEY"
       model: !py "'gpt-4' if ctx.env.ENV == 'prod' else 'gpt-3.5-turbo'"
@@ -1309,7 +1309,7 @@ MyPlugin(BasePlugin)
 
 ```yaml
 - id: tool-computer          # 稳定，patch 靠它定位
-  name: lca.layer0_infra.plugins.tool_computer
+  name: lca.infrastructure.plugins.tool_computer
   disabled: false
   config: {}
 ```
@@ -1386,7 +1386,7 @@ MyPlugin(BasePlugin)
 | system-prompt | `lca.layer1_cognitive.plugins.system_prompt` | `system_prompt` | `tools` | 组装 **函数/服务**（`render(profile, tools, plane) -> str`），不是一份全局字符串 |
 | agent | `lca.layer3_agent.plugins.agent` | `agents` | `llm`, `memory`, `state_store`, `hooks`, `observability`, `tools`, `transport`, `system_prompt` | Agent 注册表 + `create(spec, run_ctx)`。**内部**用 L1 `SimpleBrainFactory` / `SimpleBody` 和 L2 `CognitiveRuntime` 接线。`ComponentRegistry`（gates、budget）作为该插件的**私有**表，不另开 ctx 键 |
 | loop-cognitive | `lca.layer2_runtime.plugins.cognitive_loop` | — | — | 只把 `CognitiveRuntime` **类/工厂**登记到 L2 可被 L3 import 的既有模块（今天就是 `runtime_loop.py`）。它**不** `provides agent_loop`，也**不** `set_factory` |
-| loop-dsh | `lca.layer0_infra.plugins.dsh_loop` | — | — | 登记 `DshTurnDriver`。默认 `disabled: true`；请求 `execution_target=dsh` 时由 `run-execute` 选用 |
+| loop-dsh | `lca.infrastructure.plugins.dsh_loop` | — | — | 登记 `DshTurnDriver`。默认 `disabled: true`；请求 `execution_target=dsh` 时由 `run-execute` 选用 |
 | agent-loop | `lca.layer3_agent.plugins.agent_loop` | `agent_loop` | `agents` | **L3** 服务：`select(execution_target) -> LoopDriver`。内置 `cognitive`；`dsh` 仅当 `loop-dsh` 已 apply。一次 Run 问一次，**不是**改 profile 行换掉全进程 |
 | team | `lca.layer3_agent.plugins.team` | `teams` | `agents`, `transport` | 今天 `TeamComposer` + orchestration 私有注册表（pipeline/fan-out/lead/…） |
 | role-library | `lca.layer3_agent.plugins.role_library` | `roles` | — | `FileRoleLibrary` |

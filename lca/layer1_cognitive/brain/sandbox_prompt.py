@@ -12,12 +12,12 @@ from collections.abc import Sequence
 
 from lca.contracts.models.core.plane import PlaneKind
 from lca.contracts.protocols import Tool
-from lca.layer0_infra.file_store import FileStore
-from lca.layer0_infra.sandbox.prompt import render_cloud_sandbox_system_role
-from lca.layer0_infra.sandbox.surface import plane_system_role
-from lca.layer0_infra.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM_ID
-from lca.layer0_infra.tools.lca_computer.types import CLOUD_SANDBOX_APIS, MACHINE_APIS
-from lca.layer0_infra.tools.lca_sandbox import IDENTIFIER as _CLOUD_SANDBOX_ID
+from lca.infrastructure.file_store import FileStore
+from lca.infrastructure.sandbox.prompt import render_cloud_sandbox_system_role
+from lca.infrastructure.sandbox.surface import plane_system_role
+from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM_ID
+from lca.infrastructure.tools.lca_computer.types import CLOUD_SANDBOX_APIS, MACHINE_APIS
+from lca.infrastructure.tools.lca_sandbox import IDENTIFIER as _CLOUD_SANDBOX_ID
 from lca.layer1_cognitive.brain.prompts import load_builtin_prompt
 
 _CLOUD_SANDBOX_TOOL_NAME = _CLOUD_SANDBOX_ID
@@ -42,8 +42,8 @@ def build_cloud_sandbox_prompt(tools: Sequence[Tool], store: FileStore | None = 
 
 
 def _machine_role() -> str:
-    from lca.layer0_infra.plane.resolve import ref_of
-    from lca.layer0_infra.plane.scope import current_bindings
+    from lca.infrastructure.plane.resolve import ref_of
+    from lca.infrastructure.plane.scope import current_bindings
 
     bound = current_bindings()
     machine = ref_of(bound, PlaneKind.MACHINE) if bound is not None else None

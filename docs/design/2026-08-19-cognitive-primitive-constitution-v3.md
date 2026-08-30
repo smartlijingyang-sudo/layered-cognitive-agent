@@ -1467,7 +1467,7 @@ JournalSchemaMeta          # catalog 级，非每条事件
   retention_class: default | short | permanent
 ```
 
-发射：`lca.layer0_infra.observability.facade.record(event)`。登记：`JOURNAL_EVENT_CLASSES` + `JOURNAL_CATALOG` + `JOURNAL_CATALOG_META`；一事件一发射点（AST 守卫）。
+发射：`lca.infrastructure.observability.facade.record(event)`。登记：`JOURNAL_EVENT_CLASSES` + `JOURNAL_CATALOG` + `JOURNAL_CATALOG_META`；一事件一发射点（AST 守卫）。
 
 v2 信封字段 **映射到现网**，缺的才加：
 

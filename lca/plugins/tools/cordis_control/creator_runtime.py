@@ -13,7 +13,7 @@ from lca.contracts.harness.artifact import (
 )
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
 from lca.contracts.models.observability.journal import PluginAuthored, PluginInspected
-from lca.layer0_infra.observability import record, record_runtime
+from lca.infrastructure.observability import record, record_runtime
 from lca.plugins.tools.cordis_control.creator_artifacts import (
     AuthoredPlugin,
     require_artifact,

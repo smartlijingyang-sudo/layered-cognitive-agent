@@ -6,7 +6,7 @@ from lca.contracts.atoms.telemetry import ATTR_MAX_ROUNDS, ATTR_ROUND, SpanName
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.protocols import TeamStage, TeamStrategy
-from lca.layer0_infra.observability import span
+from lca.infrastructure.observability import span
 
 
 class SwarmStrategy(TeamStrategy):

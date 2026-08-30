@@ -6,7 +6,7 @@ ReflectService resolves attribute reads through this typing, so:
 - `ctx.inject("llm")` is still valid (untyped fallback)
 
 Constraint: this module is in `lca.contracts/`, which is FORBIDDEN by
-importlinter from importing `lca.layer0_infra` / `lca.harness` / `lca.plugins`.
+importlinter from importing `lca.infrastructure` / `lca.harness` / `lca.plugins`.
 Therefore TypedContext references ONLY Protocol types already declared in
 `lca/contracts/protocols/`. Concrete service classes (`LlmService`,
 `ToolsService`, `CommandGateway`, etc.) are not imported here.

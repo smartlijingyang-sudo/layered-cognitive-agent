@@ -8,9 +8,9 @@ import unittest
 from pathlib import Path
 
 from lca.contracts.models.core.sandbox import SANDBOX_MOUNT_ROOT, SANDBOX_OUTPUT_SUBDIR
-from lca.layer0_infra.computer.runtime import ComputerRuntime
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.sandbox.runtime import RunBoundSandboxRuntime
+from lca.infrastructure.computer.runtime import ComputerRuntime
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.sandbox.runtime import RunBoundSandboxRuntime
 from tests.support.inline_sandbox import InlineSandbox
 
 
@@ -84,11 +84,11 @@ class TestRunTerminalOutputHarvest(unittest.IsolatedAsyncioTestCase):
 
 class TestRunCommandSurfacesFiles(unittest.IsolatedAsyncioTestCase):
     async def test_computer_run_command_state_files(self) -> None:
-        from lca.layer0_infra.sandbox.runtime_scope import (
+        from lca.infrastructure.sandbox.runtime_scope import (
             bind_sandbox_runtime,
             unbind_sandbox_runtime,
         )
-        from lca.layer0_infra.tools.run_finalizer import run_id_scope
+        from lca.infrastructure.tools.run_finalizer import run_id_scope
 
         with tempfile.TemporaryDirectory() as tmp:
             store = LocalFileStore(root=Path(os.path.join(tmp, "files")))

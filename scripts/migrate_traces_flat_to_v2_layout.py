@@ -137,7 +137,7 @@ def _ledger_high_watermark_for(path: Path) -> int:
         return 0
     last_seq = 0
     try:
-        from lca.layer0_infra.observability.journal.journal_io import load_journal_records
+        from lca.infrastructure.observability.journal.journal_io import load_journal_records
 
         for row in load_journal_records(path, strict=False):
             seq = int(row.get("run_seq", row.get("seq", 0)) or 0)
@@ -154,7 +154,7 @@ def _terminal_event_seq_for(path: Path) -> int:
         return 0
     last_seq = 0
     try:
-        from lca.layer0_infra.observability.journal.journal_io import load_journal_records
+        from lca.infrastructure.observability.journal.journal_io import load_journal_records
 
         for row in load_journal_records(path, strict=False):
             et = row.get("event_type", "") or (row.get("descriptor") or {}).get("type", "")
@@ -280,7 +280,7 @@ def _execute_plan(*, root: Path, plan: MigrationPlan) -> dict[str, int]:
 
     # latest.json 原子更新
     if latest_run_id is not None:
-        from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+        from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 
         locator = FilesystemRunLocator(root=root)
         locator.update_latest_pointer(latest_run_id)

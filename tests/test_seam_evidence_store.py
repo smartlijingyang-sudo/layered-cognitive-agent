@@ -9,8 +9,8 @@ from __future__ import annotations
 import asyncio
 
 from lca.contracts.observability.evidence import EvidencePolicy, EvidenceStore
-from lca.layer0_infra.observability.evidence.policy import DefaultEvidencePolicy
-from lca.layer0_infra.observability.evidence.store import FilesystemEvidenceStore
+from lca.infrastructure.observability.evidence.policy import DefaultEvidencePolicy
+from lca.infrastructure.observability.evidence.store import FilesystemEvidenceStore
 
 
 def _invoke_seam_setup() -> dict[str, object]:

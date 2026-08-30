@@ -14,8 +14,8 @@ from lca.harness.skills import (
     SkillSlashActivationPolicy,
     SkillsProjection,
 )
-from lca.layer0_infra.skills.disk_store import DiskSkillPackageStore
-from lca.layer0_infra.skills.settings import SkillSettings
+from lca.infrastructure.skills.disk_store import DiskSkillPackageStore
+from lca.infrastructure.skills.settings import SkillSettings
 
 
 def _store(tmp_path):

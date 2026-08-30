@@ -28,8 +28,8 @@ from lca.contracts.models.observability.journal import (
     TeamRunStarted,
     ToolInvoked,
 )
-from lca.layer0_infra.observability import OtelProjector, SpanView
-from lca.layer0_infra.observability.view import view_of
+from lca.infrastructure.observability import OtelProjector, SpanView
+from lca.infrastructure.observability.view import view_of
 
 _BASE_TS = 1_000_000.0
 

@@ -6,7 +6,7 @@ from typing import Any
 
 from lca.contracts.models.observability.plan_ref import get_current_plan_ref
 from lca.contracts.protocols.command_envelope import CapabilityGrant, CommandEnvelope, mint_envelope
-from lca.layer0_infra.transport.invocation import handoff_task_traced, send_and_wait
+from lca.infrastructure.transport.invocation import handoff_task_traced, send_and_wait
 
 
 def mint_transport_envelope(

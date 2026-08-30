@@ -22,7 +22,7 @@ Agent 需要执行模型生成的代码（数据分析、图表、文件变换�
 ### 一、唯一生产后端：Onlyboxes
 
 - `Sandbox` Protocol + `SandboxResult` / `SandboxFile` 不变（contracts 纯数据）。
-- 实现：`lca.layer0_infra.sandbox.onlyboxes_adapter.OnlyboxesSandboxAdapter`
+- 实现：`lca.infrastructure.sandbox.onlyboxes_adapter.OnlyboxesSandboxAdapter`
 - 工厂：`resolve_sandbox()` 仅在配置齐全时返回 Onlyboxes，否则 `None`（省略工具）。
 
 环境变量：

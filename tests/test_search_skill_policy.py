@@ -8,15 +8,15 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from lca.contracts.protocols.operational_skills import SkillIndexEntry, SkillSearchResult
-from lca.layer0_infra.search.skill_policy import (
+from lca.infrastructure.search.skill_policy import (
     filter_skill_search_result,
     is_redundant_cli_search_skill,
 )
-from lca.layer0_infra.skills.disk_store import DiskSkillPackageStore
-from lca.layer0_infra.skills.http_importer import HttpSkillImporter
-from lca.layer0_infra.skills.settings import SkillSettings
-from lca.layer0_infra.tools.skills.activate_tool import SkillActivateTool
-from lca.layer0_infra.tools.skills.search_tool import SkillSearchTool
+from lca.infrastructure.skills.disk_store import DiskSkillPackageStore
+from lca.infrastructure.skills.http_importer import HttpSkillImporter
+from lca.infrastructure.skills.settings import SkillSettings
+from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
+from lca.infrastructure.tools.skills.search_tool import SkillSearchTool
 
 
 class TestSearchSkillPolicy(unittest.TestCase):
@@ -111,7 +111,7 @@ class TestSearchSkillToolFiltering(unittest.IsolatedAsyncioTestCase):
                 AsyncMock(return_value=market_result),
             ),
             patch(
-                "lca.layer0_infra.tools.skills.search_tool.any_search_provider_available",
+                "lca.infrastructure.tools.skills.search_tool.any_search_provider_available",
                 return_value=True,
             ),
         ):
@@ -140,7 +140,7 @@ class TestActivateSkillBlocksTavilyCli(unittest.IsolatedAsyncioTestCase):
         )
         tool = SkillActivateTool(self.store)
         with patch(
-            "lca.layer0_infra.tools.skills.activate_tool.any_search_provider_available",
+            "lca.infrastructure.tools.skills.activate_tool.any_search_provider_available",
             return_value=True,
         ):
             obs = await tool.execute({"skill_id": "tavily-ai-skills-tavily-search"})

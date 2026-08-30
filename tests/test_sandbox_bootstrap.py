@@ -6,13 +6,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.sandbox.bootstrap import (
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.sandbox.bootstrap import (
     SANDBOX_FILES_INIT_MARKER,
     build_workspace_init_command,
     sandbox_output_path,
 )
-from lca.layer0_infra.sandbox.prompt import format_uploaded_files_prompt, sandbox_uploaded_file_path
+from lca.infrastructure.sandbox.prompt import format_uploaded_files_prompt, sandbox_uploaded_file_path
 
 
 class SandboxBootstrapTests(unittest.TestCase):

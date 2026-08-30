@@ -20,8 +20,8 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
     ToolInvoked,
 )
-from lca.layer0_infra.observability.journal import sse_frames
-from lca.layer0_infra.observability.journal.sse_frames import stamped_to_sse_frame
+from lca.infrastructure.observability.journal import sse_frames
+from lca.infrastructure.observability.journal.sse_frames import stamped_to_sse_frame
 
 
 def _stamped(seq: int, event: object) -> StampedEvent:

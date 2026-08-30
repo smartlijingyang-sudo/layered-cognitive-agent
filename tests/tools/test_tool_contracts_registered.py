@@ -5,16 +5,16 @@ from __future__ import annotations
 import unittest
 
 # Import sandbox_contracts to populate dynamic-tool contracts.
-import lca.layer0_infra.tools.contract.sandbox_contracts
+import lca.infrastructure.tools.contract.sandbox_contracts
 
 # Import skill tool modules — their @contract decorators populate REGISTRY.
-import lca.layer0_infra.tools.skills.activate_tool
-import lca.layer0_infra.tools.skills.exec_tool
-import lca.layer0_infra.tools.skills.import_tool
-import lca.layer0_infra.tools.skills.read_reference_tool
-import lca.layer0_infra.tools.skills.search_tool  # noqa: F401
-from lca.layer0_infra.tools.contract.codegen_ts import render_registry_to_ts
-from lca.layer0_infra.tools.contract.render import REGISTRY, get_contract
+import lca.infrastructure.tools.skills.activate_tool
+import lca.infrastructure.tools.skills.exec_tool
+import lca.infrastructure.tools.skills.import_tool
+import lca.infrastructure.tools.skills.read_reference_tool
+import lca.infrastructure.tools.skills.search_tool  # noqa: F401
+from lca.infrastructure.tools.contract.codegen_ts import render_registry_to_ts
+from lca.infrastructure.tools.contract.render import REGISTRY, get_contract
 
 
 class TestSkillToolContracts(unittest.TestCase):

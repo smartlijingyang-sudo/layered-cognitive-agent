@@ -6,10 +6,10 @@ from collections.abc import Callable
 
 from gateway.device_gateway.hub import DeviceHub
 from lca.contracts.protocols.infra import DshRuntime
-from lca.layer0_infra.dsh.driver import DshTurnSpec
-from lca.layer0_infra.dsh.models import DshNotification, DshTurnResult
-from lca.layer0_infra.dsh.settings import DshSettings
-from lca.layer0_infra.dsh.stream_params import build_turn_config
+from lca.infrastructure.dsh.driver import DshTurnSpec
+from lca.infrastructure.dsh.models import DshNotification, DshTurnResult
+from lca.infrastructure.dsh.settings import DshSettings
+from lca.infrastructure.dsh.stream_params import build_turn_config
 
 
 class StreamingDshRuntime(DshRuntime):

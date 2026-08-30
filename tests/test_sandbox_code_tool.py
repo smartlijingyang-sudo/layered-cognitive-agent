@@ -20,13 +20,13 @@ from lca.contracts.models.observability.journal import (
     run_scope,
 )
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.observability import bind_backends
-from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime, unbind_sandbox_runtime
-from lca.layer0_infra.tools.default_set import build_default_tools
-from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
-from lca.layer0_infra.tools.run_finalizer import finalize_run, run_id_scope
-from lca.layer0_infra.tools.sandbox_runtime_tools import (
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.observability import bind_backends
+from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime, unbind_sandbox_runtime
+from lca.infrastructure.tools.default_set import build_default_tools
+from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope
+from lca.infrastructure.tools.run_finalizer import finalize_run, run_id_scope
+from lca.infrastructure.tools.sandbox_runtime_tools import (
     SANDBOX_EXECUTE_TOOL_NAME,
     SANDBOX_INSPECT_TOOL_NAME,
     SandboxExecuteTool,
@@ -187,8 +187,8 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
             patch.dict(
                 os.environ, {"ONLYBOXES_BASE_URL": "http://x", "ONLYBOXES_ACCESS_TOKEN": "obx_x"}
             ),
-            patch("lca.layer0_infra.sandbox.factory.onlyboxes_base_url", return_value="http://x"),
-            patch("lca.layer0_infra.sandbox.factory.onlyboxes_access_token", return_value="obx_x"),
+            patch("lca.infrastructure.sandbox.factory.onlyboxes_base_url", return_value="http://x"),
+            patch("lca.infrastructure.sandbox.factory.onlyboxes_access_token", return_value="obx_x"),
         ):
             tools = build_default_tools(self.store)
         names = {t.name for t in tools}

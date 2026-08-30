@@ -8,8 +8,8 @@ from gateway.runs.identity import default_agent_ref, parse_agent_ref
 from gateway.runs.session import RunRegistry, RunSession, RunStatus, run_dedup_key
 from lca.contracts.atoms.ids import RunId, TraceId
 from lca.contracts.models.observability.journal import RunScope
-from lca.layer0_infra.observability.journal.live_tail import LiveTail
-from lca.layer0_infra.observability.run_context import (
+from lca.infrastructure.observability.journal.live_tail import LiveTail
+from lca.infrastructure.observability.run_context import (
     TEAM_CONTAINER_ROLE,
     adopt_run_scope,
     run_scope,

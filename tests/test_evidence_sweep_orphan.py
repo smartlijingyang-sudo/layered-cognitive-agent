@@ -14,7 +14,7 @@ from lca.contracts.observability.evidence import (
     Classification,
     RetentionClass,
 )
-from lca.layer0_infra.observability.evidence.store import FilesystemEvidenceStore
+from lca.infrastructure.observability.evidence.store import FilesystemEvidenceStore
 
 
 def test_sweep_keeps_referenced_removes_unreferenced(tmp_path: Path) -> None:

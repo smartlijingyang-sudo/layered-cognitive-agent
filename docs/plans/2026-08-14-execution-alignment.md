@@ -470,7 +470,7 @@ class ToolManifest:
 
 ```python
 # lca/layer0_infra/tools/lca_computer/executor.py
-from lca.layer0_infra.device_gateway.client import GatewayHttpClient
+from lca.infrastructure.device_gateway.client import GatewayHttpClient
 
 
 class LcaComputerExecutor:
@@ -508,8 +508,8 @@ class LcaComputerExecutor:
 
 ```python
 # lca/layer0_infra/tools/default_set.py (重写)
-from lca.layer0_infra.tools.lca_computer import MANIFEST as COMPUTER_MANIFEST
-from lca.layer0_infra.tools.lca_sandbox import MANIFEST as SANDBOX_MANIFEST
+from lca.infrastructure.tools.lca_computer import MANIFEST as COMPUTER_MANIFEST
+from lca.infrastructure.tools.lca_sandbox import MANIFEST as SANDBOX_MANIFEST
 
 
 def build_default_tools(store, bindings):

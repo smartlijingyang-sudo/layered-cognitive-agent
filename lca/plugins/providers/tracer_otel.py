@@ -32,12 +32,12 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.sampling import ALWAYS_ON, ParentBased
 
-    from lca.layer0_infra.observability import (
+    from lca.infrastructure.observability import (
         AttributePolicy,
         NamedRegistry,
         ObservabilitySettings,
     )
-    from lca.layer0_infra.observability.tracer_backend import OtelTracer
+    from lca.infrastructure.observability.tracer_backend import OtelTracer
 
     registry: NamedRegistry = ctx.require("tracer_backends")
 

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 from gateway.runs.query_endpoints import get_run_profile
 from lca.contracts.observability.run_locator import RunLocator
-from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 from lca.plugins.providers.profile_snapshot.run_boot import RunBootSnapshot
 
 

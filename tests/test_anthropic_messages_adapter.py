@@ -10,9 +10,9 @@ from typing import Any
 from unittest import mock
 
 from lca.contracts.atoms.enums import FinishReason, LLMStreamEventType
-from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
-from lca.layer0_infra.llm_adapter.openai_compat import OpenAICompatAdapter
-from lca.layer0_infra.llm_adapter.settings import clear_llm_settings_cache
+from lca.infrastructure.llm_adapter.api_style import LLMApiStyle
+from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
+from lca.infrastructure.llm_adapter.settings import clear_llm_settings_cache
 
 
 @dataclass

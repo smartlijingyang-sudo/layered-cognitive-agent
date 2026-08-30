@@ -38,9 +38,9 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import JournalProjector
 from lca.contracts.protocols.infra import Sandbox
-from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
-from lca.layer0_infra.file_store import FileStore
-from lca.layer0_infra.observability import (
+from lca.infrastructure.attachment import FileStoreAttachmentIdentity
+from lca.infrastructure.file_store import FileStore
+from lca.infrastructure.observability import (
     BoundObservability,
     bind_backends,
     fold_run_state,
@@ -48,23 +48,23 @@ from lca.layer0_infra.observability import (
     record_runtime,
     run_scope,
 )
-from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
-from lca.layer0_infra.observability.journal.reducer import RunStatus as JRunStatus
-from lca.layer0_infra.observability.settings import ObservabilitySettings
-from lca.layer0_infra.plane.machine import resolve_machine, resolve_machine_transport
-from lca.layer0_infra.plane.resolve import (
+from lca.infrastructure.observability.journal.jsonl_projector import JsonlJournalProjector
+from lca.infrastructure.observability.journal.reducer import RunStatus as JRunStatus
+from lca.infrastructure.observability.settings import ObservabilitySettings
+from lca.infrastructure.plane.machine import resolve_machine, resolve_machine_transport
+from lca.infrastructure.plane.resolve import (
     PlaneBindingError,
     PlaneRequest,
     ref_of,
     resolve_plane_bindings,
     sandbox_ref_from,
 )
-from lca.layer0_infra.plane.scope import plane_bindings_scope
-from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime
-from lca.layer0_infra.search.scope import search_run_scope
-from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
-from lca.layer0_infra.tools.run_finalizer import finalize_run, run_id_scope
-from lca.layer0_infra.workspace import run_workspace_scope
+from lca.infrastructure.plane.scope import plane_bindings_scope
+from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime
+from lca.infrastructure.search.scope import search_run_scope
+from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope
+from lca.infrastructure.tools.run_finalizer import finalize_run, run_id_scope
+from lca.infrastructure.workspace import run_workspace_scope
 from lca.plugins.run_loop_driver_registry import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
@@ -187,8 +187,8 @@ def assemble_run_hub(
     except MissingCapabilityError:
         # boot 未挂 observability（极端测试场景）：退回最小可用 bound，
         # 业务事件仍可写到 local store。
-        from lca.layer0_infra.observability.facade import BoundObservability
-        from lca.layer0_infra.observability.policy import AttributePolicy
+        from lca.infrastructure.observability.facade import BoundObservability
+        from lca.infrastructure.observability.policy import AttributePolicy
 
         minimal = make_minimal_bound()
         return BoundObservability(

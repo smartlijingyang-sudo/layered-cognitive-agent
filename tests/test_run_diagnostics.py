@@ -15,17 +15,17 @@ from lca.contracts.models.core.budget import Budget
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
 from lca.contracts.models.observability.journal import RunScope
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     bind_backends,
     record_operation,
     record_runtime,
     run_scope,
 )
-from lca.layer0_infra.observability.facade import RunContext, bind
-from lca.layer0_infra.observability.journal.journal_io import load_journal_records
-from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
-from lca.layer0_infra.observability.policy import Verbosity
-from lca.layer0_infra.ops.cli import app
+from lca.infrastructure.observability.facade import RunContext, bind
+from lca.infrastructure.observability.journal.journal_io import load_journal_records
+from lca.infrastructure.observability.journal.jsonl_projector import JsonlJournalProjector
+from lca.infrastructure.observability.policy import Verbosity
+from lca.infrastructure.ops.cli import app
 from lca.layer1_cognitive.hook_registry import CordisHookRegistry
 from tests.support.observability_helpers import RuntimeCategoryFilter, make_test_bound
 

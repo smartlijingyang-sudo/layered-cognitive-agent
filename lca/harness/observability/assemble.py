@@ -21,11 +21,11 @@ from lca.contracts.observability.ports import (
     ScorerFn,
     TracerBackend,
 )
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     AttributePolicy,
     ObservabilitySettings,
 )
-from lca.layer0_infra.observability.facade import BoundObservability
+from lca.infrastructure.observability.facade import BoundObservability
 
 
 def assemble_observability(

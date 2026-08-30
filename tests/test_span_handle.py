@@ -6,9 +6,9 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lca.layer0_infra.observability import AttributePolicy, Verbosity
-from lca.layer0_infra.observability.handles import NullSpanHandle, SpanHandle
-from lca.layer0_infra.observability.tracer_backend import OtelTracer
+from lca.infrastructure.observability import AttributePolicy, Verbosity
+from lca.infrastructure.observability.handles import NullSpanHandle, SpanHandle
+from lca.infrastructure.observability.tracer_backend import OtelTracer
 from tests.support.observability_helpers import make_test_bound
 
 

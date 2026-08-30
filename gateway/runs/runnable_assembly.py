@@ -17,7 +17,7 @@ from lca.contracts.models.core.plane import PlaneBindings
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.infra import MachineResolver, Tool
 from lca.contracts.protocols.run_mode import RunModeRegistryProtocol
-from lca.layer0_infra.observability import BoundObservability
+from lca.infrastructure.observability import BoundObservability
 from lca.layer4_app.api import Agent, Team
 
 if TYPE_CHECKING:

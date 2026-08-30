@@ -14,7 +14,7 @@ from gateway.runs.session import RunSession
 from gateway.runs.terminal_status import journal_store
 from lca.contracts.observability.run_locator import RunLocator
 from lca.contracts.observability.run_manifest import IntegrityState, ManifestEvidence, RunManifest
-from lca.layer0_infra.observability.journal.journal_io import (
+from lca.infrastructure.observability.journal.journal_io import (
     load_journal_records,
     record_normalize,
 )
@@ -67,7 +67,7 @@ def session_locator(session: RunSession) -> RunLocator:
     """Resolve the configured locator or derive a filesystem fallback for direct tests."""
     if session.locator is not None:
         return session.locator
-    from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+    from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 
     return FilesystemRunLocator(root=session.jsonl_path.parent.parent.parent)
 

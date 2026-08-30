@@ -14,9 +14,9 @@ from lca.contracts.protocols import (
     StopPolicy,
 )
 from lca.contracts.protocols.spec import STATE_STORE_CHOICE_PROFILE_DEFAULT
-from lca.layer0_infra.capability.memory import MemoryService
-from lca.layer0_infra.capability.state_store import StateStoreService
-from lca.layer0_infra.observability.adapters import TelemetryMemoryAdapter
+from lca.infrastructure.capability.memory import MemoryService
+from lca.infrastructure.capability.state_store import StateStoreService
+from lca.infrastructure.observability.adapters import TelemetryMemoryAdapter
 from lca.plugins.composer.internal.skill_store import active_skill_store
 
 

@@ -92,7 +92,7 @@ class JournalSink:
     ) -> ContextManifested:
         journal = self._journal
         if journal is None:
-            from lca.layer0_infra.observability import current_bound
+            from lca.infrastructure.observability import current_bound
 
             bound = current_bound()
             if bound is None or bound.journal is None:

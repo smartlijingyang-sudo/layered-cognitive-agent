@@ -61,14 +61,14 @@ class TestLoadScenario(unittest.TestCase):
 
 class TestBuildTeam(unittest.TestCase):
     def test_build_sequential_team(self) -> None:
-        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 
         spec = load_scenario(_FIXTURES_DIR / "ecommerce_launch.yaml")
         team = build_team(spec, "sequential", MockLLMAdapter())
         self.assertIsNotNone(team)
 
     def test_build_hierarchical_team(self) -> None:
-        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 
         spec = load_scenario(_FIXTURES_DIR / "ecommerce_launch.yaml")
         team = build_team(spec, "hierarchical", MockLLMAdapter())

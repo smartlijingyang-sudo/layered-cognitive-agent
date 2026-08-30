@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from lca.contracts.protocols.artifact_closure import ArtifactClosure
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer0_infra.workspace import get_run_workspace
+from lca.infrastructure.workspace import get_run_workspace
 
 
 class Config(BaseModel):

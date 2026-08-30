@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lca.layer0_infra.skills.bundled import OFFICECLI_SKILL_ID
-from lca.layer0_infra.skills.format_routing import (
+from lca.infrastructure.skills.bundled import OFFICECLI_SKILL_ID
+from lca.infrastructure.skills.format_routing import (
     enrich_inspect_profile,
     format_suggested_skills_prompt,
     skills_for_filename,

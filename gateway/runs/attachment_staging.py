@@ -21,10 +21,10 @@ from lca.contracts.models.observability.journal import (
     AttachmentStagingStarted,
 )
 from lca.contracts.protocols.infra import MachineResolver
-from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
-from lca.layer0_infra.file_store import FileStore
-from lca.layer0_infra.observability import record
-from lca.layer0_infra.plane.resolve import ref_of
+from lca.infrastructure.attachment import FileStoreAttachmentIdentity
+from lca.infrastructure.file_store import FileStore
+from lca.infrastructure.observability import record
+from lca.infrastructure.plane.resolve import ref_of
 
 _log = structlog.get_logger(__name__)
 

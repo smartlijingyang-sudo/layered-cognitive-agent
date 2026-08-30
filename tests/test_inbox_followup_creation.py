@@ -49,7 +49,7 @@ class TestInboxFollowupCreation:
         from gateway.runs.runnable_assembly import CognitiveRunnableAssembler
         from gateway.runs.session import RunSession
         from lca.contracts.models.observability.journal import InboxFollowupCreated, RunScope
-        from lca.layer0_infra.observability import bind_backends, run_scope
+        from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
 
         hub = make_test_bound()
@@ -91,7 +91,7 @@ class TestInboxFollowupCreation:
         from gateway.runs.runnable_assembly import CognitiveRunnableAssembler
         from gateway.runs.session import RunSession
         from lca.contracts.models.observability.journal import InboxFollowupCreated, RunScope
-        from lca.layer0_infra.observability import bind_backends, run_scope
+        from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
 
         question = "帮我总结这份文档的关键点"

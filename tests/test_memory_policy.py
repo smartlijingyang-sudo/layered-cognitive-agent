@@ -363,7 +363,7 @@ class TestSimpleMemorySystemCommit:
     async def test_memory_committed_event_emitted_for_accepted_writes(self) -> None:
         """Direct test: MemoryCommitted is appended to the journal."""
         from lca.contracts.models.observability.journal import RunScope
-        from lca.layer0_infra.observability import bind_backends, run_scope
+        from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
 
         hub = make_test_bound()
@@ -384,7 +384,7 @@ class TestSimpleMemorySystemCommit:
 
     async def test_semantic_compaction_event_exposes_metrics_without_summary_content(self) -> None:
         from lca.contracts.models.observability.journal import RunScope
-        from lca.layer0_infra.observability import bind_backends, run_scope
+        from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
 
         class _AllWorkingRetrieval:
@@ -428,7 +428,7 @@ class TestSimpleMemorySystemCommit:
         """Direct test: ContextCompacted is appended on perceive."""
         from lca.contracts.models.core.memory import MemoryRecord
         from lca.contracts.models.observability.journal import RunScope
-        from lca.layer0_infra.observability import bind_backends, run_scope
+        from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
 
         hub = make_test_bound()

@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.observability.evidence import Classification, RetentionClass
-from lca.layer0_infra.observability.evidence.policy import DefaultEvidencePolicy
+from lca.infrastructure.observability.evidence.policy import DefaultEvidencePolicy
 
 
 @pytest.fixture

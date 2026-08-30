@@ -24,7 +24,7 @@ from lca.contracts.models.observability.journal import (
     PluginMountRejected,
     PluginUnmounted,
 )
-from lca.layer0_infra.observability import record, record_runtime
+from lca.infrastructure.observability import record, record_runtime
 from lca.layer4_app.preset_authoring import PresetAuthoring
 from lca.plugins.tools.cordis_control.creator_artifacts import (
     AuthoredPlugin,

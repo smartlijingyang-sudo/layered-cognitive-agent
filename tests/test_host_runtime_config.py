@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.layer0_infra.host_runtime.config import DEFAULT_YAML, HostRuntimeConfig, UserConfig
+from lca.infrastructure.host_runtime.config import DEFAULT_YAML, HostRuntimeConfig, UserConfig
 
 
 def test_default_yaml_loads() -> None:

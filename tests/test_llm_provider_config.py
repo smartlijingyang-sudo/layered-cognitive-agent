@@ -6,7 +6,7 @@ import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from lca.layer0_infra.llm.config import LLMProviderSettings, normalize_llm_environ
+from lca.infrastructure.llm.config import LLMProviderSettings, normalize_llm_environ
 
 
 @contextmanager

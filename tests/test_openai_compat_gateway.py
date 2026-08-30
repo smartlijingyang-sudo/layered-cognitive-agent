@@ -10,8 +10,8 @@ from starlette.testclient import TestClient
 from gateway.app import create_app
 from gateway.runs.legacy_adapter import RegistryRunAdapter
 from gateway.runs.session import RunRegistry, RunSession, RunStatus, run_dedup_key
-from lca.layer0_infra.observability.journal.live_tail import LiveTail
-from lca.layer0_infra.openai_compat import (
+from lca.infrastructure.observability.journal.live_tail import LiveTail
+from lca.infrastructure.openai_compat import (
     extract_json_schema_format,
     normalize_chat_messages,
     normalize_responses_input,
@@ -259,7 +259,7 @@ class TestOpenAiStructuredHelpers(unittest.TestCase):
         self.assertEqual(resolve_upstream_model("gpt-5.4-mini"), "gpt-5.4-mini")
 
     def test_resolve_embedding_model_does_not_use_chat_id(self) -> None:
-        from lca.layer0_infra.openai_compat import resolve_embedding_model
+        from lca.infrastructure.openai_compat import resolve_embedding_model
 
         self.assertNotEqual(resolve_embedding_model("solo"), resolve_upstream_model("solo"))
         self.assertEqual(resolve_embedding_model("text-embedding-3-small"), "text-embedding-v3")

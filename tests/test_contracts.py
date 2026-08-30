@@ -10,8 +10,8 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
-from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
+from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
+from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
 
 
 class TestBudget(unittest.TestCase):
@@ -102,7 +102,7 @@ class TestLLMStreamEventContract(unittest.TestCase):
 
 class TestEndToEnd(unittest.TestCase):
     def test_single_agent_qa(self):
-        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
         from lca.layer4_app.api import Agent
 
         agent = Agent(

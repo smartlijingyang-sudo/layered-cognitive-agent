@@ -10,12 +10,12 @@ Computer tools split by execution context:
 
 from __future__ import annotations
 
-from lca.layer0_infra.tools.ask_user import IDENTIFIER as _USER_INTERACTION
-from lca.layer0_infra.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM
-from lca.layer0_infra.tools.lca_sandbox import IDENTIFIER as _CLOUD_SANDBOX
-from lca.layer0_infra.tools.skills.manifest import _SKILL_STORE_IDENTIFIER as _SKILL_STORE
-from lca.layer0_infra.tools.skills.manifest import IDENTIFIER as _SKILLS
-from lca.layer0_infra.tools.web_search import IDENTIFIER as _WEB_BROWSING
+from lca.infrastructure.tools.ask_user import IDENTIFIER as _USER_INTERACTION
+from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM
+from lca.infrastructure.tools.lca_sandbox import IDENTIFIER as _CLOUD_SANDBOX
+from lca.infrastructure.tools.skills.manifest import _SKILL_STORE_IDENTIFIER as _SKILL_STORE
+from lca.infrastructure.tools.skills.manifest import IDENTIFIER as _SKILLS
+from lca.infrastructure.tools.web_search import IDENTIFIER as _WEB_BROWSING
 
 # Cloud sandbox computer APIs (non-prefixed tool names).
 _CS = _CLOUD_SANDBOX

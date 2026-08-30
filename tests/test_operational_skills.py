@@ -16,29 +16,29 @@ from lca.contracts.protocols.operational_skills import (
     SkillPackage,
     SkillSearchResult,
 )
-from lca.layer0_infra.capability.skills import SkillsService
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.skills.activation_scope import (
+from lca.infrastructure.capability.skills import SkillsService
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.skills.activation_scope import (
     activated_skills_scope,
     register_activated,
     resolve_skill_for_exec,
 )
-from lca.layer0_infra.skills.disk_store import DiskSkillPackageStore, sanitize_skill_id
-from lca.layer0_infra.skills.http_importer import HttpSkillImporter
-from lca.layer0_infra.skills.market_auth import (
+from lca.infrastructure.skills.disk_store import DiskSkillPackageStore, sanitize_skill_id
+from lca.infrastructure.skills.http_importer import HttpSkillImporter
+from lca.infrastructure.skills.market_auth import (
     clear_market_token_cache,
     create_client_assertion,
     resolve_m2m_credentials,
     resolve_market_access_token,
     token_endpoint_for,
 )
-from lca.layer0_infra.skills.settings import SkillSettings
-from lca.layer0_infra.skills.zip_security import extract_zip_bytes, find_skill_markdown
-from lca.layer0_infra.tools.default_set import build_default_tools
-from lca.layer0_infra.tools.skills.activate_tool import SkillActivateTool
-from lca.layer0_infra.tools.skills.import_tool import SkillImportTool
-from lca.layer0_infra.tools.skills.read_reference_tool import SkillReadReferenceTool
-from lca.layer0_infra.tools.skills.search_tool import SkillSearchTool
+from lca.infrastructure.skills.settings import SkillSettings
+from lca.infrastructure.skills.zip_security import extract_zip_bytes, find_skill_markdown
+from lca.infrastructure.tools.default_set import build_default_tools
+from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
+from lca.infrastructure.tools.skills.import_tool import SkillImportTool
+from lca.infrastructure.tools.skills.read_reference_tool import SkillReadReferenceTool
+from lca.infrastructure.tools.skills.search_tool import SkillSearchTool
 
 
 def _make_zip(files: dict[str, str]) -> bytes:
@@ -313,7 +313,7 @@ class TestDefaultTools(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
 
     def test_build_default_tools_includes_skill_tools(self) -> None:
-        with patch("lca.layer0_infra.tools.default_set.resolve_sandbox", return_value=None):
+        with patch("lca.infrastructure.tools.default_set.resolve_sandbox", return_value=None):
             names = {t.name for t in build_default_tools(self.file_store)}
         self.assertIn("writeFile", names)
         self.assertIn("search_skill", names)
@@ -326,7 +326,7 @@ class TestDefaultTools(unittest.TestCase):
         self.assertNotIn("sandbox_inspect", names)
 
     def test_build_default_tools_includes_run_skill_script_when_sandbox(self) -> None:
-        with patch("lca.layer0_infra.tools.default_set.resolve_sandbox") as mock_sbx:
+        with patch("lca.infrastructure.tools.default_set.resolve_sandbox") as mock_sbx:
             mock_sbx.return_value = object()
             names = {t.name for t in build_default_tools(self.file_store)}
         self.assertIn("run_skill_script", names)

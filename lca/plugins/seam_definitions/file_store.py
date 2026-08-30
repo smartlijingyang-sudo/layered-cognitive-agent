@@ -22,7 +22,7 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.capability.files import FileStoreService
+    from lca.infrastructure.capability.files import FileStoreService
 
     service = FileStoreService()
     ctx.provide("file_store", service)

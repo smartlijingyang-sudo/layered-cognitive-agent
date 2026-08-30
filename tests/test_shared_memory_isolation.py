@@ -237,7 +237,7 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
             Pipeline,
         )
         from lca.harness.profile.boot import boot_profile
-        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
         from lca.layer4_app.spawn import spawn_team
         from tests.support.agent_specs import make_spec
 
@@ -266,7 +266,7 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
             Pipeline,
         )
         from lca.harness.profile.boot import boot_profile
-        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
         from lca.layer4_app.spawn import spawn_team
         from tests.support.agent_specs import make_spec
 

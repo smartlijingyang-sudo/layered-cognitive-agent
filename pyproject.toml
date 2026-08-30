@@ -49,7 +49,7 @@ layers = [
     "lca.layer3_agent",
     "lca.layer2_runtime",
     "lca.layer1_cognitive",
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.contracts",
 ]
 
@@ -60,7 +60,7 @@ name = "L4 组合根: 下层禁止反向依赖"
 type = "forbidden"
 source_modules = [
     "lca.contracts",
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",
@@ -73,7 +73,7 @@ name = "contracts 纯净性: 不得依赖任何具体实现"
 type = "forbidden"
 source_modules = ["lca.contracts"]
 forbidden_modules = [
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",
@@ -214,7 +214,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = "lca.layer0_infra.llm_adapter.openai_compat.*"
+module = "lca.infrastructure.llm_adapter.openai_compat.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -716,7 +716,7 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra"]
+[tool.lca.package_contracts."lca.infrastructure"]
 responsibility = "lca/layer0_infra. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -740,11 +740,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra",
+    "lca.infrastructure",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.attachment"]
+[tool.lca.package_contracts."lca.infrastructure.attachment"]
 responsibility = "lca/layer0_infra/attachment. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -768,11 +768,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.attachment",
+    "lca.infrastructure.attachment",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.capability"]
+[tool.lca.package_contracts."lca.infrastructure.capability"]
 responsibility = "lca/layer0_infra/capability. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -796,11 +796,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.capability",
+    "lca.infrastructure.capability",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.computer"]
+[tool.lca.package_contracts."lca.infrastructure.computer"]
 responsibility = "lca/layer0_infra/computer. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -824,11 +824,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.computer",
+    "lca.infrastructure.computer",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.credentials"]
+[tool.lca.package_contracts."lca.infrastructure.credentials"]
 responsibility = "lca/layer0_infra/credentials. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -852,11 +852,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.credentials",
+    "lca.infrastructure.credentials",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.device_gateway"]
+[tool.lca.package_contracts."lca.infrastructure.device_gateway"]
 responsibility = "lca/layer0_infra/device_gateway. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -880,11 +880,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.device_gateway",
+    "lca.infrastructure.device_gateway",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.dsh"]
+[tool.lca.package_contracts."lca.infrastructure.dsh"]
 responsibility = "lca/layer0_infra/dsh. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -908,11 +908,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.dsh",
+    "lca.infrastructure.dsh",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.host_runtime"]
+[tool.lca.package_contracts."lca.infrastructure.host_runtime"]
 responsibility = "lca/layer0_infra/host_runtime. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -936,11 +936,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.host_runtime",
+    "lca.infrastructure.host_runtime",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.learning"]
+[tool.lca.package_contracts."lca.infrastructure.learning"]
 responsibility = "lca/layer0_infra/learning. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -964,11 +964,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.learning",
+    "lca.infrastructure.learning",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.llm"]
+[tool.lca.package_contracts."lca.infrastructure.llm"]
 responsibility = "lca/layer0_infra/llm. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -992,11 +992,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.llm",
+    "lca.infrastructure.llm",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.llm_adapter"]
+[tool.lca.package_contracts."lca.infrastructure.llm_adapter"]
 responsibility = "lca/layer0_infra/llm_adapter. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1020,11 +1020,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.llm_adapter",
+    "lca.infrastructure.llm_adapter",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.observability"]
+[tool.lca.package_contracts."lca.infrastructure.observability"]
 responsibility = "lca/layer0_infra/observability. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1048,11 +1048,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.observability",
+    "lca.infrastructure.observability",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.ops"]
+[tool.lca.package_contracts."lca.infrastructure.ops"]
 responsibility = "lca/layer0_infra/ops. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1076,11 +1076,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.ops",
+    "lca.infrastructure.ops",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.plane"]
+[tool.lca.package_contracts."lca.infrastructure.plane"]
 responsibility = "lca/layer0_infra/plane. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1104,11 +1104,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.plane",
+    "lca.infrastructure.plane",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.sandbox"]
+[tool.lca.package_contracts."lca.infrastructure.sandbox"]
 responsibility = "lca/layer0_infra/sandbox. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1132,11 +1132,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.sandbox",
+    "lca.infrastructure.sandbox",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.search"]
+[tool.lca.package_contracts."lca.infrastructure.search"]
 responsibility = "lca/layer0_infra/search. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1160,11 +1160,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.search",
+    "lca.infrastructure.search",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.skills"]
+[tool.lca.package_contracts."lca.infrastructure.skills"]
 responsibility = "lca/layer0_infra/skills. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1188,11 +1188,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.skills",
+    "lca.infrastructure.skills",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.state_store"]
+[tool.lca.package_contracts."lca.infrastructure.state_store"]
 responsibility = "lca/layer0_infra/state_store. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1216,11 +1216,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.state_store",
+    "lca.infrastructure.state_store",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.tools"]
+[tool.lca.package_contracts."lca.infrastructure.tools"]
 responsibility = "lca/layer0_infra/tools. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1244,11 +1244,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.tools",
+    "lca.infrastructure.tools",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.transport"]
+[tool.lca.package_contracts."lca.infrastructure.transport"]
 responsibility = "lca/layer0_infra/transport. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1272,11 +1272,11 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.transport",
+    "lca.infrastructure.transport",
 ]
 schema_version = "1.0.0"
 
-[tool.lca.package_contracts."lca.layer0_infra.workspace"]
+[tool.lca.package_contracts."lca.infrastructure.workspace"]
 responsibility = "lca/layer0_infra/workspace. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"
 allowed_dependencies = [
@@ -1300,7 +1300,7 @@ side_effects = [
     "subprocess:spawn",
 ]
 public_api = [
-    "lca.layer0_infra.workspace",
+    "lca.infrastructure.workspace",
 ]
 schema_version = "1.0.0"
 
@@ -2169,7 +2169,7 @@ allowed_dependencies = [
     "lca.contracts",
 ]
 forbidden_dependencies = [
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",
@@ -2194,7 +2194,7 @@ allowed_dependencies = [
     "gateway",
 ]
 forbidden_dependencies = [
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",
@@ -2219,7 +2219,7 @@ allowed_dependencies = [
     "gateway",
 ]
 forbidden_dependencies = [
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",
@@ -2243,7 +2243,7 @@ allowed_dependencies = [
     "gateway",
 ]
 forbidden_dependencies = [
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",
@@ -2261,103 +2261,3 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
-# === PER-PACKAGE FORBIDDEN RULES (auto-generated by scaffold_importlinter_rules.py) ===
-[[tool.importlinter.contracts]]
-name = "Per-package forbidden: lca.contracts.atoms"
-type = "forbidden"
-source_modules = ["lca.contracts.atoms"]
-forbidden_modules = [
-    "lca.layer0_infra.llm",
-    "lca.layer0_infra.tools",
-    "lca.layer0_infra.sandbox",
-]
-
-[[tool.importlinter.contracts]]
-name = "Per-package forbidden: lca.contracts.models"
-type = "forbidden"
-source_modules = ["lca.contracts.models"]
-forbidden_modules = [
-    "lca.layer0_infra.llm",
-    "lca.layer0_infra.tools",
-    "lca.layer0_infra.state_store",
-]
-
-[[tool.importlinter.contracts]]
-name = "Per-package forbidden: lca.contracts.models.core"
-type = "forbidden"
-source_modules = ["lca.contracts.models.core"]
-forbidden_modules = [
-    "lca.layer0_infra.llm",
-    "lca.layer0_infra.tools",
-]
-
-[[tool.importlinter.contracts]]
-name = "Per-package forbidden: lca.contracts.models.observability"
-type = "forbidden"
-source_modules = ["lca.contracts.models.observability"]
-forbidden_modules = [
-    "lca.layer0_infra.llm",
-    "lca.layer0_infra.ops",
-]
-
-[[tool.importlinter.contracts]]
-name = "Per-package forbidden: lca.contracts.models.team"
-type = "forbidden"
-source_modules = ["lca.contracts.models.team"]
-forbidden_modules = [
-    "lca.layer0_infra.llm",
-    "lca.layer0_infra.tools",
-]
-
-[[tool.importlinter.contracts]]
-name = "Per-package forbidden: lca.contracts.observability"
-type = "forbidden"
-source_modules = ["lca.contracts.observability"]
-forbidden_modules = [
-    "lca.layer0_infra.llm",
-    "lca.layer0_infra.tools",
-    "lca.layer0_infra.ops",
-]
-
-[[tool.importlinter.contracts]]
-name = "Per-package forbidden: lca.contracts.observability.schemas"
-type = "forbidden"
-source_modules = ["lca.contracts.observability.schemas"]
-forbidden_modules = [
-    "lca.layer0_infra.llm",
-    "lca.layer0_infra.tools",
-]
-
-[[tool.importlinter.contracts]]
-name = "Per-package forbidden: lca.contracts.protocols"
-type = "forbidden"
-source_modules = ["lca.contracts.protocols"]
-forbidden_modules = [
-    "lca.layer0_infra.llm",
-    "lca.layer0_infra.tools",
-    "lca.layer0_infra.sandbox",
-]
-
-[[tool.importlinter.contracts]]
-name = "Per-package forbidden: lca.contracts.mechanisms"
-type = "forbidden"
-source_modules = ["lca.contracts.mechanisms"]
-forbidden_modules = [
-    "lca.layer0_infra.llm",
-    "lca.layer0_infra.tools",
-]
-
-[[tool.importlinter.contracts]]
-name = "Per-package forbidden: lca.contracts.harness"
-type = "forbidden"
-source_modules = ["lca.contracts.harness"]
-forbidden_modules = [
-    "lca.layer0_infra.llm",
-    "lca.layer0_infra.tools",
-]
-
-[[tool.importlinter.contracts]]
-name = "lca.plugins 子包互不依赖"
-type = "independence"
-modules = []
-# === END PER-PACKAGE ===

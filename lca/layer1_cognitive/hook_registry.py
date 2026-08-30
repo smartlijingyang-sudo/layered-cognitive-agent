@@ -22,7 +22,7 @@ from lca.contracts.atoms.telemetry import ATTR_STEP, HOOK_TO_PHASE_SPAN, SpanNam
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory
 from lca.contracts.protocols import HookRegistry
-from lca.layer0_infra.observability import detached_span, record_runtime, set_actor
+from lca.infrastructure.observability import detached_span, record_runtime, set_actor
 
 _log = structlog.get_logger(__name__)
 

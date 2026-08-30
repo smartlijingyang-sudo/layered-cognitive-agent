@@ -5,8 +5,8 @@ from __future__ import annotations
 import unittest
 
 from lca.contracts.models.observability.journal import ReasoningDelta, TeamRunFinished
-from lca.layer0_infra.observability.journal.engine import RunStore
-from lca.layer0_infra.observability.policy import (
+from lca.infrastructure.observability.journal.engine import RunStore
+from lca.infrastructure.observability.policy import (
     AttributePolicy,
     Verbosity,
     redact_restricted,

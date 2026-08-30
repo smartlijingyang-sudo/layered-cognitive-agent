@@ -15,7 +15,7 @@ import structlog
 from lca.contracts.atoms.ids import RunId, TraceId
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.observability.journal import AgentRunFinished, AgentRunStarted, RunScope
-from lca.layer0_infra.observability import bind_backends, record, run_scope
+from lca.infrastructure.observability import bind_backends, record, run_scope
 
 _log = structlog.get_logger(__name__)
 

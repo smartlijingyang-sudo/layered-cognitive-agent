@@ -29,7 +29,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import InMemoryJournalStore, NamedRegistry
+    from lca.infrastructure.observability import InMemoryJournalStore, NamedRegistry
 
     registry: NamedRegistry = ctx.require("journal_store_factories")
 

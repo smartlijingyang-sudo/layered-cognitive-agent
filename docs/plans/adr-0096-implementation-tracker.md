@@ -123,7 +123,7 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import NamedRegistry
+    from lca.infrastructure.observability import NamedRegistry
     from lca.contracts.observability.schemas import JournalSchemaRegistry
     ctx.provide("journal_schemas", JournalSchemaRegistry())
 ```
@@ -844,7 +844,7 @@ git commit -m "feat(adr-0096-mva-2): identity-stable-ulid provider"
 ```python
 # tests/test_event_identity_integration.py
 from lca.contracts.models.observability.journal import AgentRunStarted, RunScope
-from lca.layer0_infra.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine import RunStore
 
 def test_runstore_append_fills_event_id():
     store = RunStore(run_id="r1")
@@ -1068,7 +1068,7 @@ git commit -m "feat(adr-0096-mva-3): profile-snapshot-boot provider"
 from lca.contracts.models.observability.journal import RuntimeObserved, RunScope
 
 def test_plugin_inventory_event_not_appended_to_journal():
-    from lca.layer0_infra.observability.journal.engine import RunStore
+    from lca.infrastructure.observability.journal.engine import RunStore
     store = RunStore(run_id="r1")
     event = RuntimeObserved(
         scope=RunScope(trace_id="t", run_id="r1"),

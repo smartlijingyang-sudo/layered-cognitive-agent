@@ -34,7 +34,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import (
+    from lca.infrastructure.observability import (
         make_explain_failure_tool,
         make_export_minimal_reproduction_tool,
         make_find_optimization_tool,
@@ -49,7 +49,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         "export-minimal-reproduction": make_export_minimal_reproduction_tool(),
         "plugin-interaction-graph": make_plugin_interaction_graph_tool(),
     }
-    from lca.layer0_infra.observability import NamedRegistry
+    from lca.infrastructure.observability import NamedRegistry
 
     tools_map: NamedRegistry = ctx.require("trace_inspector_tools")
     for name, tool in tools.items():

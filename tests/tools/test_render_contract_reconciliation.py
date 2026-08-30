@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.layer0_infra.tools.contract import REGISTRY, render_registry_to_ts
+from lca.infrastructure.tools.contract import REGISTRY, render_registry_to_ts
 
 _REPO = Path(__file__).resolve().parents[2]
 _RENDERER_DIR = _REPO / "deploy" / "lobehub" / "patches" / "runtime" / "lcaToolRender" / "renderers"

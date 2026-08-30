@@ -19,7 +19,7 @@ from lca.contracts.models.core.decision import DelegationSpec, Observation
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import DelegationCacheHit
 from lca.contracts.models.team.delegation import find_result
-from lca.layer0_infra.observability import record
+from lca.infrastructure.observability import record
 
 
 def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Observation | None:

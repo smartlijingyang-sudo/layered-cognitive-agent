@@ -12,7 +12,7 @@ from lca.contracts.models.core.result import UnregisteredActionError
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import Body, SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.contracts.protocols.action import ActionRegistryProtocol
-from lca.layer0_infra.component_registry import RegistryKeyError
+from lca.infrastructure.component_registry import RegistryKeyError
 from lca.layer1_cognitive.body.action_handlers import record_decision_made
 
 

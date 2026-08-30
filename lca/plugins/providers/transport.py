@@ -24,9 +24,9 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.transport.a2a_transport import A2ATransport
-    from lca.layer0_infra.transport.agent_transport import InternalTransport
-    from lca.layer0_infra.transport.mcp_transport import MCPTransport
+    from lca.infrastructure.transport.a2a_transport import A2ATransport
+    from lca.infrastructure.transport.agent_transport import InternalTransport
+    from lca.infrastructure.transport.mcp_transport import MCPTransport
 
     service = ctx.require("transport")
     if "internal" in config.providers:

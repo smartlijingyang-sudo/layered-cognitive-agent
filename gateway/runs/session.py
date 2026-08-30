@@ -34,7 +34,7 @@ from lca.contracts.observability.run_journal import (
 )
 from lca.contracts.observability.run_locator import RunLocator
 from lca.contracts.protocols import JournalProjector
-from lca.layer0_infra.observability import BoundObservability
+from lca.infrastructure.observability import BoundObservability
 
 _RUNS_ROOT = Path("traces")  # ADR-0065 §七: locator root, runs/ 是其子目录
 
@@ -108,7 +108,7 @@ class RunRegistry:
         terminal_ttl_s: float = DEFAULT_TERMINAL_TTL_S,
     ) -> None:
         if locator is None:
-            from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+            from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 
             locator = FilesystemRunLocator(root=_RUNS_ROOT)
         self._locator: RunLocator = locator

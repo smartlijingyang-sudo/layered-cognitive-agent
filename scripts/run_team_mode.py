@@ -97,7 +97,7 @@ def _pick_mode_interactive() -> list[str]:
 
 
 def _resolve_real_llm() -> LLMAdapter:
-    from lca.layer0_infra.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
+    from lca.infrastructure.llm_adapter import load_dotenv_if_present, resolve_llm_adapter
 
     load_dotenv_if_present()
     if not os.getenv("LLM_API_KEY"):

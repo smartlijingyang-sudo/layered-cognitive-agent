@@ -16,8 +16,8 @@ from lca.contracts.protocols.spec import (
     STATE_STORE_CHOICE_MEMORY,
 )
 from lca.harness.profile.boot import boot_profile
-from lca.layer0_infra.component_registry import ComponentRegistry, RegistryKeyError
-from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
+from lca.infrastructure.component_registry import ComponentRegistry, RegistryKeyError
+from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.layer1_cognitive.gate_service import GateService
 from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
 from lca.layer1_cognitive.memory.temporal_memory import TemporalMemorySystem

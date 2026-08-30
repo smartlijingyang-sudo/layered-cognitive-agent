@@ -18,9 +18,9 @@ from lca.contracts.models.observability.journal import (
     ToolInvoked,
 )
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.observability import bind_backends, run_scope
-from lca.layer0_infra.tools.write_file import build_tools as build_write_file_tools
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.observability import bind_backends, run_scope
+from lca.infrastructure.tools.write_file import build_tools as build_write_file_tools
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.tool_result_preview import tool_files
 from tests.support.observability_helpers import make_test_bound
@@ -154,7 +154,7 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
             for i in range(8)
         )
         with bind_backends(hub), run_scope(RunScope(trace_id="t", run_id="r")):
-            from lca.layer0_infra.observability import record
+            from lca.infrastructure.observability import record
 
             record(
                 ToolInvoked(

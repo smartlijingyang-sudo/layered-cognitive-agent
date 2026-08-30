@@ -28,7 +28,7 @@ from lca.contracts.models.core.perceive_state import PerceiveState
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.core.workspace import ArtifactLedgerSnapshot
 from lca.contracts.protocols import DecisionGate
-from lca.layer0_infra.workspace.artifact_ledger import rewrite_artifact_markdown
+from lca.infrastructure.workspace.artifact_ledger import rewrite_artifact_markdown
 
 _FILE_MD_RE = re.compile(r"\[([^\]]*)\]\((/files/file_[a-f0-9]+)\)")
 _BARE_FILE_URL_RE = re.compile(r"(?<!\w)(/files/file_[a-f0-9]+)\b")
@@ -86,7 +86,7 @@ def _format_closure(artifacts: list[dict[str, object]]) -> str:
     if not artifacts:
         return ""
     snapshot = _ledger_snapshot_from_manifest(artifacts)
-    from lca.layer0_infra.workspace.artifact_ledger import artifact_closure_text
+    from lca.infrastructure.workspace.artifact_ledger import artifact_closure_text
 
     return artifact_closure_text(snapshot)
 

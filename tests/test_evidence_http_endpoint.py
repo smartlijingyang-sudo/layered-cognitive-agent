@@ -29,22 +29,22 @@ from lca.contracts.observability.evidence import (
     EvidenceStore,
     RetentionClass,
 )
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     BoundObservability,
     bind_backends,
     run_scope,
 )
-from lca.layer0_infra.observability.evidence.policy import (
+from lca.infrastructure.observability.evidence.policy import (
     DefaultEvidencePolicy,
 )
-from lca.layer0_infra.observability.evidence.store import (
+from lca.infrastructure.observability.evidence.store import (
     FilesystemEvidenceStore,
 )
-from lca.layer0_infra.observability.journal.jsonl_projector import (
+from lca.infrastructure.observability.journal.jsonl_projector import (
     JsonlJournalProjector,
 )
-from lca.layer0_infra.observability.journal_backend import MemoryJournal
-from lca.layer0_infra.observability.policy import AttributePolicy
+from lca.infrastructure.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.policy import AttributePolicy
 
 
 # A minimal evidence store wrapper that lets tests inject specific failure modes.
@@ -162,7 +162,7 @@ def _drive_run_with_evidence(jsonl_path: Path, ev_root: Path) -> tuple[str, dict
         )
 
     # Find the ToolStarted and capture its arguments_ref
-    from lca.layer0_infra.observability.journal.journal_io import read_journal
+    from lca.infrastructure.observability.journal.journal_io import read_journal
 
     events = read_journal(jsonl_path)
     ts = next(e for e in events if isinstance(e.event, ToolStarted))

@@ -46,7 +46,7 @@ from typing import Any, Protocol
 
 import structlog
 
-from lca.layer0_infra.file_store import FileStore
+from lca.infrastructure.file_store import FileStore
 
 _log = structlog.get_logger("lca.harness.profile.lifespan")
 
@@ -115,7 +115,7 @@ async def starlette_profile_lifespan(
         # capability seams from lca-evidence-store-seam) to app.state so the
         # /runs/{id}/evidence/{ref} endpoint can resolve it. ADR-0065 §四 L5.
         from lca.contracts.mechanisms.capability import require_capability
-        from lca.layer0_infra.observability import BoundObservability
+        from lca.infrastructure.observability import BoundObservability
 
         bound: BoundObservability | None = None
         try:

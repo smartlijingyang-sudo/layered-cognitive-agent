@@ -26,7 +26,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.file_store import LocalFileStore
+    from lca.infrastructure.file_store import LocalFileStore
 
     service = ctx.require("file_store")
     if "local" in config.providers and not service.providers.names():

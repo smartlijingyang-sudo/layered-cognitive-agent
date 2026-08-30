@@ -18,7 +18,7 @@ from lca.contracts.models.core.budget import TERMINAL_RESERVE_STEPS
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import DecisionGate
-from lca.layer0_infra.workspace.office_works import seal_office_works
+from lca.infrastructure.workspace.office_works import seal_office_works
 
 
 class OfficeWorksSealer(DecisionGate):

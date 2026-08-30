@@ -18,8 +18,8 @@ from gateway.runs.session import RunSession
 from lca.contracts.mechanisms.capability import provider_current, require_capability
 from lca.contracts.models.core.plane import PlaneBindings, PlaneKind
 from lca.contracts.protocols.infra import MachineResolver, Sandbox
-from lca.layer0_infra.file_store import FileStore
-from lca.layer0_infra.plane.resolve import (
+from lca.infrastructure.file_store import FileStore
+from lca.infrastructure.plane.resolve import (
     PlaneRequest,
     ref_of,
     resolve_plane_bindings,
@@ -91,7 +91,7 @@ def resolve_descriptor_registry(ctx: Any) -> Any:
     registry = ctx.inject("event_descriptor_registry", default=None)
     if registry is not None:
         return registry
-    from lca.layer0_infra.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+    from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
     return EVENT_DESCRIPTOR_REGISTRY
 

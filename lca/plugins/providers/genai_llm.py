@@ -26,7 +26,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import LlmGenAIMapper, NamedRegistry
+    from lca.infrastructure.observability import LlmGenAIMapper, NamedRegistry
 
     registry: NamedRegistry = ctx.require("genai_semantic_mapper")
     mapper = LlmGenAIMapper()

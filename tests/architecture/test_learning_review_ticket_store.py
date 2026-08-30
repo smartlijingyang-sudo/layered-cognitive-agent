@@ -14,8 +14,8 @@ from lca.contracts.protocols.learning import (
     LearningReviewTicketStatus,
     SkillAcquisitionCandidate,
 )
-from lca.layer0_infra.learning.review_ticket_sqlite import SqliteLearningReviewTicketStore
-from lca.layer0_infra.learning.review_ticket_store import LearningReviewTicketLeaseNotOwnedError
+from lca.infrastructure.learning.review_ticket_sqlite import SqliteLearningReviewTicketStore
+from lca.infrastructure.learning.review_ticket_store import LearningReviewTicketLeaseNotOwnedError
 
 
 def _ticket(ticket_id: str = "ticket-1") -> LearningReviewTicket:

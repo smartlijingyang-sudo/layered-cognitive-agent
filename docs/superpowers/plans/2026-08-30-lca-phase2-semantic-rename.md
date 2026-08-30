@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 一次性切换 `lca.layer0_infra` / `lca.layer1_cognitive` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 到语义名 `lca.infrastructure` / `lca.cognition` / `lca.runtime` / `lca.agent` / `lca.application`，无兼容期。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不变。
+**Goal:** 一次性切换 `lca.infrastructure` / `lca.layer1_cognitive` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 到语义名 `lca.infrastructure` / `lca.cognition` / `lca.runtime` / `lca.agent` / `lca.application`，无兼容期。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不变。
 
 **Architecture:** ADR-0104 先写 → 迁移辅助脚本 dry-run 演练 → 5 个原子 PR（每个映射一个）→ import-linter contracts 更新 → L1/L2 段同步 → 文档/Profile/patches 同步 → CHANGELOG + 外部消费方通知。
 
@@ -65,7 +65,7 @@ PR 合并后，把状态从 `Proposed` 改为 `Accepted`，加 Accepted 时间�
 - [ ] **Step 1: 写测试**
 
 测试覆盖：
-- 单个映射 `lca.layer0_infra` → `lca.infrastructure` 在 import 字符串中
+- 单个映射 `lca.infrastructure` → `lca.infrastructure` 在 import 字符串中
 - `git mv` 命令生成正确
 - dry-run 不实际执行
 - `--execute` 模式实际执行（用 tmp_path）
@@ -90,7 +90,7 @@ import sys
 from dataclasses import dataclass
 
 LAYER_TO_SEMANTIC: dict[str, str] = {
-    "lca.layer0_infra": "lca.infrastructure",
+    "lca.infrastructure": "lca.infrastructure",
     "lca.layer1_cognitive": "lca.cognition",
     "lca.layer2_runtime": "lca.runtime",
     "lca.layer3_agent": "lca.agent",
@@ -193,11 +193,11 @@ git commit -m "feat(migration): add migrate_layer_rename.py with dry-run + execu
 
 ---
 
-## Task 3: 原子切换 lca.layer0_infra → lca.infrastructure
+## Task 3: 原子切换 lca.infrastructure → lca.infrastructure
 
 **Files:**
 - Rename: `lca/layer0_infra/` → `lca/infrastructure/`
-- Modify: 所有引用 `lca.layer0_infra` 的 import
+- Modify: 所有引用 `lca.infrastructure` 的 import
 
 - [ ] **Step 1: 创建分支 `rename/layer0-infrastructure`**
 
@@ -215,11 +215,11 @@ grep -rl "lca\.layer0_infra" lca/ gateway/ tests/ | xargs sed -i 's/lca\.layer0_
 
 - [ ] **Step 3: 更新 import-linter contracts layers**
 
-`pyproject.toml [tool.importlinter.contracts]` 第 1 条 layers 改 `lca.layer0_infra` 为 `lca.infrastructure`。
+`pyproject.toml [tool.importlinter.contracts]` 第 1 条 layers 改 `lca.infrastructure` 为 `lca.infrastructure`。
 
 - [ ] **Step 4: 更新 L1/L2 段**
 
-L1 README 段 5/6、L2 pyproject `forbidden_dependencies` 中所有 `lca.layer0_infra` 改 `lca.infrastructure`。
+L1 README 段 5/6、L2 pyproject `forbidden_dependencies` 中所有 `lca.infrastructure` 改 `lca.infrastructure`。
 
 - [ ] **Step 5: 跑全量 CI**
 
@@ -238,13 +238,13 @@ grep -rn "lca\.layer0_infra" lca/ gateway/ tests/ profiles/ deploy/ docs/
 
 ```bash
 git add -A
-git commit -m "refactor!: rename lca.layer0_infra to lca.infrastructure
+git commit -m "refactor!: rename lca.infrastructure to lca.infrastructure
 
-BREAKING CHANGE: lca.layer0_infra is now lca.infrastructure. Update imports.
+BREAKING CHANGE: lca.infrastructure is now lca.infrastructure. Update imports.
 
 Ref: ADR-0104"
 git push origin rename/layer0-infrastructure
-gh pr create --title "refactor!: rename lca.layer0_infra to lca.infrastructure" --body "ADR-0104"
+gh pr create --title "refactor!: rename lca.infrastructure to lca.infrastructure" --body "ADR-0104"
 ```
 
 - [ ] **Step 8: Review + merge**
@@ -622,7 +622,7 @@ git commit -m "refactor(deploy): update LobeHub patches to semantic layer names 
 ## [Unreleased] - 2026-XX-XX
 
 ### Breaking Changes
-- `lca.layer0_infra` → `lca.infrastructure`
+- `lca.infrastructure` → `lca.infrastructure`
 - `lca.layer1_cognitive` → `lca.cognition`
 - `lca.layer2_runtime` → `lca.runtime`
 - `lca.layer3_agent` → `lca.agent`

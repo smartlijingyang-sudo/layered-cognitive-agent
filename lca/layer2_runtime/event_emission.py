@@ -36,7 +36,7 @@ from lca.contracts.models.observability.journal import (
 # ── journal 发射回调类型 ──
 JournalEmitFn = Callable[[JournalEvent], None]
 """接收已构造的 JournalEvent 并写入 journal 的回调。
-组合根注入 ``lca.layer0_infra.observability.facade.record``。"""
+组合根注入 ``lca.infrastructure.observability.facade.record``。"""
 
 # ── Waterfall 拦截器类型 ──
 JournalEventWaterfallFn = Callable[[JournalEvent, AgentState], JournalEvent | None]

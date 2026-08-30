@@ -12,8 +12,8 @@ from lca.contracts.models.core.decision import (
 )
 from lca.contracts.models.core.result import ToolExecutionError
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.layer0_infra.transport.agent_transport import InternalTransport
-from lca.layer0_infra.transport.transport_registry import (
+from lca.infrastructure.transport.agent_transport import InternalTransport
+from lca.infrastructure.transport.transport_registry import (
     TransportNotFoundError,
     TransportRegistry,
 )

@@ -24,7 +24,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.sandbox.factory import resolve_sandbox
+    from lca.infrastructure.sandbox.factory import resolve_sandbox
 
     if "local" in config.providers:
         resolved = resolve_sandbox()

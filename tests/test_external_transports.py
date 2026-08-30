@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.protocols import AgentTransport
-from lca.layer0_infra.transport.a2a_transport import A2ATransport
-from lca.layer0_infra.transport.mcp_transport import MCPTransport
+from lca.infrastructure.transport.a2a_transport import A2ATransport
+from lca.infrastructure.transport.mcp_transport import MCPTransport
 
 
 class TestA2ATransportProtocol(unittest.TestCase):

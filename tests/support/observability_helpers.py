@@ -20,11 +20,11 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.observability.ports import AttributePolicyBackend
 from lca.contracts.protocols import JournalProjector
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     RunStore,
 )
-from lca.layer0_infra.observability.facade import BoundObservability
-from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
+from lca.infrastructure.observability.facade import BoundObservability
+from lca.infrastructure.observability.policy import AttributePolicy, Verbosity
 
 
 def make_test_bound(
@@ -42,7 +42,7 @@ def make_test_bound(
     the journal projections so journal events produce OTel spans (matching the
     old ``ObservabilityHub`` behavior where ``llm.chat`` etc. were emitted).
     """
-    from lca.layer0_infra.observability.journal.otel_projector import OtelProjector
+    from lca.infrastructure.observability.journal.otel_projector import OtelProjector
 
     policy_obj = AttributePolicy(verbosity=verbosity, redact=redact)
     policy: AttributePolicyBackend = policy_obj

@@ -10,7 +10,7 @@ from gateway.runs.session import RunSession
 from gateway.runs.terminal_status import journal_store
 from lca.contracts.atoms.enums import StreamChannel
 from lca.contracts.models.observability.journal import StepTextDelta
-from lca.layer0_infra.observability import BoundObservability
+from lca.infrastructure.observability import BoundObservability
 
 _log = structlog.get_logger(__name__)
 

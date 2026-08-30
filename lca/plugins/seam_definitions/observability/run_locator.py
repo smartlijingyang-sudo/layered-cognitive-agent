@@ -28,7 +28,7 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+    from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 
     del config
     root = Path("traces")

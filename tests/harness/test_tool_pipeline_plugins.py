@@ -17,7 +17,7 @@ from lca.contracts.protocols.tool_pipeline import (
     ToolPostDecision,
     ToolPreDecision,
 )
-from lca.layer0_infra.tool_pipeline import DefaultToolExecutionPipeline
+from lca.infrastructure.tool_pipeline import DefaultToolExecutionPipeline
 from lca.layer1_cognitive.body.pipeline_safe_executor import PipelineSafeExecutor
 
 

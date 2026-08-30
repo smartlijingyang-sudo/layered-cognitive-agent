@@ -12,7 +12,7 @@ from lca.contracts.models.core.decision import Observation, Reflection
 from lca.contracts.models.core.memory import MemoryRecord, MemoryRelationKind, MemoryTrust
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.protocols import MemorySystem, TemporalMemoryStore
-from lca.layer0_infra.state_store.sqlite_temporal_memory import SqliteTemporalMemoryStore
+from lca.infrastructure.state_store.sqlite_temporal_memory import SqliteTemporalMemoryStore
 from lca.layer1_cognitive.memory.policy import (
     MemoryAuthority,
     MemoryPolicy,

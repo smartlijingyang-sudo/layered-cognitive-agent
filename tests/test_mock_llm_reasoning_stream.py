@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 
 from lca.contracts.atoms.enums import LLMStreamEventType
-from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 
 
 class TestMockLLMReasoningStream(unittest.IsolatedAsyncioTestCase):

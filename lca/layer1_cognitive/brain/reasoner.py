@@ -29,7 +29,7 @@ from lca.contracts.models.team.delegation import DelegationResult
 from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.team_awareness import TeamAwareness
 from lca.contracts.protocols import LLMAdapter, Reasoner, Tool
-from lca.layer0_infra.observability import annotate
+from lca.infrastructure.observability import annotate
 from lca.layer1_cognitive.brain.conversation_prompt import format_prior_conversation
 from lca.layer1_cognitive.brain.llm_turn import execute_llm_turn
 

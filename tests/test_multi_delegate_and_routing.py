@@ -14,8 +14,8 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.team_awareness import ConsultDuty, TeamAwareness
 from lca.contracts.protocols.spec import DEFAULT_DELEGATE_MAX_ATTEMPTS
-from lca.layer0_infra.transport.agent_transport import InternalTransport
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
+from lca.infrastructure.transport.agent_transport import InternalTransport
+from lca.infrastructure.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 from lca.layer1_cognitive.brain.decision_gates.must_consult_all import MustConsultAllMembers
 from lca.layer1_cognitive.member_status import InMemoryMemberStatus

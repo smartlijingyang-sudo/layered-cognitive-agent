@@ -38,7 +38,7 @@ from lca.contracts.models.observability.journal import (
     ToolInvoked,
     ToolStarted,
 )
-from lca.layer0_infra.observability.journal.fact_stream_projector import (
+from lca.infrastructure.observability.journal.fact_stream_projector import (
     FactStreamProjector,
 )
 
@@ -538,7 +538,7 @@ def test_tool_error_counted_in_summary() -> None:
 
 
 def test_format_duration() -> None:
-    from lca.layer0_infra.observability.journal.fact_stream_projector import _format_duration
+    from lca.infrastructure.observability.journal.fact_stream_projector import _format_duration
 
     assert _format_duration(0) == "+0ms"
     assert _format_duration(0.5) == "+0ms"

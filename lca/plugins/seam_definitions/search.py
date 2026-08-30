@@ -22,6 +22,6 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.capability.search import SearchService
+    from lca.infrastructure.capability.search import SearchService
 
     ctx.provide("search", SearchService())

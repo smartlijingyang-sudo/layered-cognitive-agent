@@ -17,12 +17,12 @@ class TestScanDirectCommands:
     """Behavioural tests for the Body audit scanner."""
 
     def test_detects_layer0_transport_import(self, tmp_path: Path) -> None:
-        """``from lca.layer0_infra.transport.X import Y`` is flagged."""
+        """``from lca.infrastructure.transport.X import Y`` is flagged."""
         py_file = tmp_path / "bad_transport_user.py"
         py_file.write_text(
             '"""Module that reaches L0 transport directly."""\n'
             "\n"
-            "from lca.layer0_infra.transport.ssh import connect\n"
+            "from lca.infrastructure.transport.ssh import connect\n"
             "\n"
             "def open_channel(host: str) -> object:\n"
             "    return connect(host)\n",
@@ -37,11 +37,11 @@ class TestScanDirectCommands:
         assert finding.line == 3
         assert finding.col == 0
         assert finding.kind == "direct_layer0_import"
-        assert "lca.layer0_infra.transport.ssh" in finding.message
+        assert "lca.infrastructure.transport.ssh" in finding.message
         assert "connect" in finding.message
 
     def test_detects_layer0_sandbox_import_alias(self, tmp_path: Path) -> None:
-        """``import lca.layer0_infra.sandbox as sb`` is flagged as an import.
+        """``import lca.infrastructure.sandbox as sb`` is flagged as an import.
 
         Aliased calls like ``sb.run(...)`` are not flagged as direct calls
         (only bare ``sandbox.run`` is), but the import itself is caught.
@@ -50,7 +50,7 @@ class TestScanDirectCommands:
         py_file.write_text(
             '"""Module with a bare L0 sandbox import."""\n'
             "\n"
-            "import lca.layer0_infra.sandbox as sb\n"
+            "import lca.infrastructure.sandbox as sb\n"
             "\n"
             "def run_cmd(cmd: str) -> str:\n"
             "    return sb.run(cmd)\n",
@@ -62,7 +62,7 @@ class TestScanDirectCommands:
         assert len(findings) == 1
         (finding,) = findings
         assert finding.kind == "direct_layer0_import"
-        assert "lca.layer0_infra.sandbox" in finding.message
+        assert "lca.infrastructure.sandbox" in finding.message
 
     def test_detects_sandbox_call(self, tmp_path: Path) -> None:
         """``sandbox.run(...)`` is flagged even without a direct import."""
@@ -163,8 +163,8 @@ class TestScanDirectCommands:
         py_file.write_text(
             '"""Multiple violations in one file."""\n'
             "\n"
-            "import lca.layer0_infra.sandbox\n"
-            "from lca.layer0_infra.transport.ssh import connect\n"
+            "import lca.infrastructure.sandbox\n"
+            "from lca.infrastructure.transport.ssh import connect\n"
             "\n"
             "def go() -> None:\n"
             "    sandbox.run('x')\n"

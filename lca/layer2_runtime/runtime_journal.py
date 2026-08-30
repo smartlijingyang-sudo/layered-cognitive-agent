@@ -13,7 +13,7 @@ from typing import Protocol, runtime_checkable
 
 from lca.contracts.protocols.command_envelope import RunFact
 from lca.contracts.protocols.declarative_phase_graph import JournalCommitter
-from lca.layer0_infra.observability import record_runtime
+from lca.infrastructure.observability import record_runtime
 
 
 @runtime_checkable

@@ -5,11 +5,11 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from lca.layer0_infra.search.models import SearchHit, SearchResponse
-from lca.layer0_infra.search.router import is_search_intent, resolve_llm_search_kwargs
-from lca.layer0_infra.search.scope import search_run_scope
-from lca.layer0_infra.search.service import format_search_content
-from lca.layer0_infra.tools.web_search import build_tools as build_web_search_tools
+from lca.infrastructure.search.models import SearchHit, SearchResponse
+from lca.infrastructure.search.router import is_search_intent, resolve_llm_search_kwargs
+from lca.infrastructure.search.scope import search_run_scope
+from lca.infrastructure.search.service import format_search_content
+from lca.infrastructure.tools.web_search import build_tools as build_web_search_tools
 
 
 class TestSearchIntent(unittest.TestCase):
@@ -48,7 +48,7 @@ class TestWebSearchTool(unittest.IsolatedAsyncioTestCase):
             answer="ok",
         )
         with patch(
-            "lca.layer0_infra.tools.web_search.web_search",
+            "lca.infrastructure.tools.web_search.web_search",
             new=AsyncMock(return_value=ok),
         ):
             obs = await tool.execute({"query": "AI news", "topic": "news"})
@@ -62,7 +62,7 @@ class TestLlmFallbackRouting(unittest.TestCase):
         with search_run_scope() as state:
             state.web_search_failed = True
             state.prefer_llm_search = True
-            with patch("lca.layer0_infra.search.router.get_llm_settings") as mock_llm:
+            with patch("lca.infrastructure.search.router.get_llm_settings") as mock_llm:
                 mock_llm.return_value.enable_search = True
                 mock_llm.return_value.forced_search = False
                 kwargs = resolve_llm_search_kwargs(task="今天有什么新闻")

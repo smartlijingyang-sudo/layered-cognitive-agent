@@ -402,7 +402,7 @@ def test_team_seam_factory_produces_complete_seam() -> None:
 
     from lca.contracts.models.team.team_coordination import Pipeline
     from lca.contracts.protocols.spec import TeamSpec
-    from lca.layer0_infra.transport.agent_transport import InternalTransport
+    from lca.infrastructure.transport.agent_transport import InternalTransport
 
     factory = _default_team_seam_factory()
     spec = TeamSpec(

@@ -9,8 +9,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from lca.layer0_infra.llm.openai_client import LLMUnavailableError
-from lca.layer0_infra.llm_adapter.factory import (
+from lca.infrastructure.llm.openai_client import LLMUnavailableError
+from lca.infrastructure.llm_adapter.factory import (
     load_dotenv_if_present,
     resolve_llm_adapter,
 )
@@ -25,7 +25,7 @@ class TestResolveLLMAdapter(unittest.TestCase):
     def test_raises_when_no_api_key(self) -> None:
         with (
             mock.patch(
-                "lca.layer0_infra.llm.config.prepare_llm_environ",
+                "lca.infrastructure.llm.config.prepare_llm_environ",
                 lambda: None,
             ),
             mock.patch.dict(os.environ, {}, clear=True),
@@ -43,7 +43,7 @@ class TestResolveLLMAdapter(unittest.TestCase):
     def test_explicit_api_key_overrides_env(self) -> None:
         with (
             mock.patch(
-                "lca.layer0_infra.llm.config.prepare_llm_environ",
+                "lca.infrastructure.llm.config.prepare_llm_environ",
                 lambda: None,
             ),
             mock.patch.dict(os.environ, {}, clear=True),
@@ -54,7 +54,7 @@ class TestResolveLLMAdapter(unittest.TestCase):
     def test_explicit_none_key_raises(self) -> None:
         with (
             mock.patch(
-                "lca.layer0_infra.llm.config.prepare_llm_environ",
+                "lca.infrastructure.llm.config.prepare_llm_environ",
                 lambda: None,
             ),
             mock.patch.dict(os.environ, {}, clear=True),
@@ -64,12 +64,12 @@ class TestResolveLLMAdapter(unittest.TestCase):
 
     @unittest.skipUnless(_HAS_OPENAI, "openai SDK not installed")
     def test_api_param_forwarded_to_openai_compat(self) -> None:
-        from lca.layer0_infra.llm_adapter.api_style import LLMApiStyle
+        from lca.infrastructure.llm_adapter.api_style import LLMApiStyle
 
         with (
             mock.patch.dict(os.environ, {"LLM_API_KEY": "sk-test-fake-key"}, clear=False),
             mock.patch(
-                "lca.layer0_infra.llm_adapter.openai_compat.OpenAICompatAdapter"
+                "lca.infrastructure.llm_adapter.openai_compat.OpenAICompatAdapter"
             ) as mock_cls,
         ):
             mock_cls.return_value.name = "openai-compat"

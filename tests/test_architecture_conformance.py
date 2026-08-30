@@ -422,14 +422,14 @@ class TestJournalCatalogMeta:
         from lca.contracts.models.observability.journal_catalog import (
             JOURNAL_EVENT_CLASSES,
         )
-        from lca.layer0_infra.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+        from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
         missing = sorted(set(JOURNAL_EVENT_CLASSES) - set(EVENT_DESCRIPTOR_REGISTRY.all_type_names()))
         assert not missing, f"events without EventDescriptor: {missing}"
 
     def test_schema_fields_valid(self) -> None:
         from lca.contracts.models.observability.event import EventAudience, EventDurability
-        from lca.layer0_infra.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+        from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
         # All descriptors must declare durability/audience/sensitivity.
         for descriptor in EVENT_DESCRIPTOR_REGISTRY:

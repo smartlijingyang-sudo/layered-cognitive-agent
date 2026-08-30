@@ -13,11 +13,11 @@ from lca.contracts.models.core.result import Result
 from lca.contracts.models.team.delegation_context import member_invoke_scope
 from lca.contracts.protocols import AgentUnit, MemberInvoker, TeamStage
 from lca.contracts.protocols.infra import AgentTransport
-from lca.layer0_infra.transport.invocation import send_and_wait
+from lca.infrastructure.transport.invocation import send_and_wait
 
 
 def _workspace_handoff_prefix() -> str:
-    from lca.layer0_infra.workspace import get_run_workspace
+    from lca.infrastructure.workspace import get_run_workspace
 
     workspace = get_run_workspace()
     if workspace is None:

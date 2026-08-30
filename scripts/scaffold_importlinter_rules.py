@@ -21,22 +21,22 @@ PYPROJECT = ROOT / "pyproject.toml"
 PACKAGE_FORBIDDEN_RULES: list[tuple[str, list[str]]] = [
     # lca.contracts sub-packages 禁依赖具体 lca.infrastructure 子包
     # （已有"contracts 不得依赖任何实现"基础规则；这里进一步收紧到具体子包）
-    ("lca.contracts.atoms", ["lca.layer0_infra.llm", "lca.layer0_infra.tools", "lca.layer0_infra.sandbox"]),
-    ("lca.contracts.models", ["lca.layer0_infra.llm", "lca.layer0_infra.tools", "lca.layer0_infra.state_store"]),
-    ("lca.contracts.models.core", ["lca.layer0_infra.llm", "lca.layer0_infra.tools"]),
-    ("lca.contracts.models.observability", ["lca.layer0_infra.llm", "lca.layer0_infra.ops"]),
-    ("lca.contracts.models.team", ["lca.layer0_infra.llm", "lca.layer0_infra.tools"]),
-    ("lca.contracts.observability", ["lca.layer0_infra.llm", "lca.layer0_infra.tools", "lca.layer0_infra.ops"]),
-    ("lca.contracts.observability.schemas", ["lca.layer0_infra.llm", "lca.layer0_infra.tools"]),
-    ("lca.contracts.protocols", ["lca.layer0_infra.llm", "lca.layer0_infra.tools", "lca.layer0_infra.sandbox"]),
-    ("lca.contracts.mechanisms", ["lca.layer0_infra.llm", "lca.layer0_infra.tools"]),
-    ("lca.contracts.harness", ["lca.layer0_infra.llm", "lca.layer0_infra.tools"]),
+    ("lca.contracts.atoms", ["lca.infrastructure.llm", "lca.infrastructure.tools", "lca.infrastructure.sandbox"]),
+    ("lca.contracts.models", ["lca.infrastructure.llm", "lca.infrastructure.tools", "lca.infrastructure.state_store"]),
+    ("lca.contracts.models.core", ["lca.infrastructure.llm", "lca.infrastructure.tools"]),
+    ("lca.contracts.models.observability", ["lca.infrastructure.llm", "lca.infrastructure.ops"]),
+    ("lca.contracts.models.team", ["lca.infrastructure.llm", "lca.infrastructure.tools"]),
+    ("lca.contracts.observability", ["lca.infrastructure.llm", "lca.infrastructure.tools", "lca.infrastructure.ops"]),
+    ("lca.contracts.observability.schemas", ["lca.infrastructure.llm", "lca.infrastructure.tools"]),
+    ("lca.contracts.protocols", ["lca.infrastructure.llm", "lca.infrastructure.tools", "lca.infrastructure.sandbox"]),
+    ("lca.contracts.mechanisms", ["lca.infrastructure.llm", "lca.infrastructure.tools"]),
+    ("lca.contracts.harness", ["lca.infrastructure.llm", "lca.infrastructure.tools"]),
     # Phase 2 之后再加 cognition/runtime/agent 反向依赖规则
 ]
 
 # lca.plugins sub-packages 互不依赖
 # NOTE: Phase 1 暂不启用此规则。原因：lca.plugins.providers 是多个 plugin 的
-# 间接依赖中枢（通过 lca.layer0_infra.observability.journal.journal_io），导致
+# 间接依赖中枢（通过 lca.infrastructure.observability.journal.journal_io），导致
 # 几乎所有 lca.plugins 子包都间接依赖 providers，独立性规则会全失败。
 # 计划在 Phase 2/3 治理 providers 依赖后重新启用。
 LCA_PLUGINS_INDEPENDENCE: list[str] = []  # 暂空

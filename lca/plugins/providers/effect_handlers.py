@@ -24,7 +24,7 @@ from lca.contracts.protocols.effect_handler import (
     EffectHandlerRegistry,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer0_infra.handler_registry import UniqueOperationRegistry
+from lca.infrastructure.handler_registry import UniqueOperationRegistry
 
 
 class Config(BaseModel):

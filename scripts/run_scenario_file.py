@@ -25,11 +25,11 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from lca.contracts.protocols import LLMAdapter  # noqa: E402
-from lca.layer0_infra.llm_adapter import (  # noqa: E402
+from lca.infrastructure.llm_adapter import (  # noqa: E402
     load_dotenv_if_present,
     resolve_llm_adapter,
 )
-from lca.layer0_infra.observability import create_observability  # noqa: E402
+from lca.infrastructure.observability import create_observability  # noqa: E402
 from tests.support.scenario_loader import (  # noqa: E402
     CaseSpec,
     ScenarioSpec,

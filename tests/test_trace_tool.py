@@ -10,8 +10,8 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
     ToolInvoked,
 )
-from lca.layer0_infra.observability.trace_inspector import TraceInspector
-from lca.layer0_infra.observability.trace_tool_runner import (
+from lca.infrastructure.observability.trace_inspector import TraceInspector
+from lca.infrastructure.observability.trace_tool_runner import (
     make_explain_failure_tool,
     make_export_minimal_reproduction_tool,
     make_find_optimization_tool,

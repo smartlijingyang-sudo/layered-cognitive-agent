@@ -7,7 +7,7 @@ RuntimeObserved has no ``scope`` / ``payload`` fields; inventory lives in
 from __future__ import annotations
 
 from lca.contracts.models.observability.journal import RuntimeObserved
-from lca.layer0_infra.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine import RunStore
 
 
 def test_plugin_inventory_event_not_appended_to_journal() -> None:

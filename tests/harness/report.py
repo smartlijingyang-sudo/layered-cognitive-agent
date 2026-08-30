@@ -13,8 +13,8 @@ from typing import Any
 
 from lca.contracts.atoms.telemetry import SpanName
 from lca.contracts.models.core.result import Result
-from lca.layer0_infra.observability import SpanView
-from lca.layer0_infra.observability.narrative import is_milestone_span
+from lca.infrastructure.observability import SpanView
+from lca.infrastructure.observability.narrative import is_milestone_span
 from tests.harness.collector import TraceBundle
 
 
@@ -250,7 +250,7 @@ def _render_subtree(bundle: TraceBundle, span: SpanView, depth: int, seen: set[s
 
 def _format_span(span: SpanView, depth: int, *, orphan: bool = False) -> str:
     """Tree line aligned with ConsoleObservability naming."""
-    from lca.layer0_infra.observability.narrative import format_span_line
+    from lca.infrastructure.observability.narrative import format_span_line
 
     line = format_span_line(span, depth=depth)
     if orphan:

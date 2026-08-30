@@ -53,12 +53,12 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
     from gateway.runs.execute import create_run_session
     from gateway.runs.session import RunRegistry
     from lca.contracts.observability.run_journal import RunJournalComponents
-    from lca.layer0_infra.observability.facade import BoundObservability
-    from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
-    from lca.layer0_infra.observability.journal.live_tail import LiveTail
-    from lca.layer0_infra.observability.journal.process import ProcessJournal
-    from lca.layer0_infra.observability.journal_backend import MemoryJournal
-    from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+    from lca.infrastructure.observability.facade import BoundObservability
+    from lca.infrastructure.observability.journal.jsonl_projector import JsonlJournalProjector
+    from lca.infrastructure.observability.journal.live_tail import LiveTail
+    from lca.infrastructure.observability.journal.process import ProcessJournal
+    from lca.infrastructure.observability.journal_backend import MemoryJournal
+    from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 
     class _SpyFactory:
         def __init__(self) -> None:

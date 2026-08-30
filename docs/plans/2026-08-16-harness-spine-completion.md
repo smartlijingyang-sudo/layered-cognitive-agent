@@ -48,7 +48,7 @@ class TestSeamCompleteness:
 
     def test_definition_without_provider_raises(self):
         """有 DEFINITION 但没有 PROVIDER → 报错"""
-        from lca.layer0_infra.plugin.loader._loader import Loader
+        from lca.infrastructure.plugin.loader._loader import Loader
         handles = [_make_handle(PluginManifest(
             id="defn", version="1.0.0", api_version="lca-harness/1",
             kind=PluginKind.DEFINITION, seam_key="llm",
@@ -60,7 +60,7 @@ class TestSeamCompleteness:
 
     def test_provider_without_definition_raises(self):
         """PROVIDER 引用不存在的 DEFINITION → 报错"""
-        from lca.layer0_infra.plugin.loader._loader import Loader
+        from lca.infrastructure.plugin.loader._loader import Loader
         handles = [_make_handle(PluginManifest(
             id="prov", version="1.0.0", api_version="lca-harness/1",
             kind=PluginKind.PROVIDER, seam_key="unknown_seam",
@@ -71,7 +71,7 @@ class TestSeamCompleteness:
 
     def test_complete_triangle_passes(self):
         """DEFINITION + PROVIDER + CONSUMER → 通过"""
-        from lca.layer0_infra.plugin.loader._loader import Loader
+        from lca.infrastructure.plugin.loader._loader import Loader
         handles = [
             _make_handle(PluginManifest(
                 id="defn", version="1.0.0", api_version="lca-harness/1",
@@ -92,7 +92,7 @@ class TestSeamCompleteness:
 
     def test_definition_without_consumer_warns(self):
         """有 DEFINITION + PROVIDER 但无 CONSUMER → warning，不报错"""
-        from lca.layer0_infra.plugin.loader._loader import Loader
+        from lca.infrastructure.plugin.loader._loader import Loader
         handles = [
             _make_handle(PluginManifest(
                 id="defn", version="1.0.0", api_version="lca-harness/1",
@@ -204,7 +204,7 @@ git commit -m "feat(harness): A.7 seam catalog migration to Loader reconcile pas
 - Create: `tests/harness/test_inspect_tree.py`
 
 **Interfaces:**
-- Consumes: `PluginHandle` from kernel, `ProfileLoader` from `lca.layer0_infra.plugin.include`
+- Consumes: `PluginHandle` from kernel, `ProfileLoader` from `lca.infrastructure.plugin.include`
 - Produces: `render_tree(host) -> str` function, `CmdInspectTree` CLI entry
 
 **Context:** 运维需要可视化 plugin tree 的结构——每个 plugin 的状态、提供的服务、依赖、effect 数量。Spec §A.6。
@@ -376,8 +376,8 @@ async def _load_harness_profile(profile_path: str | None = None) -> tuple:
             "No profile found. Set LCA_PROFILE or create profiles/web-standard.yaml"
         )
 
-    from lca.layer0_infra.plugin.include import ProfileLoader
-    from lca.layer0_infra.plugin.loader import Loader
+    from lca.infrastructure.plugin.include import ProfileLoader
+    from lca.infrastructure.plugin.loader import Loader
 
     profile = ProfileLoader.load(resolved_path)
     loader = Loader()

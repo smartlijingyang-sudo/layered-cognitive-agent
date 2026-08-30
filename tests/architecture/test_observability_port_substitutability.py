@@ -11,8 +11,8 @@ from typing import Any
 
 from lca.contracts.models.observability.journal import RuntimeObserved, StampedEvent
 from lca.contracts.observability.ports import AttributePolicyBackend
-from lca.layer0_infra.observability.journal.engine import RunStore
-from lca.layer0_infra.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal_backend import MemoryJournal
 
 
 class _RecordingProjection:

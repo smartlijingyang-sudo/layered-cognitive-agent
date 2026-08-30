@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.layer0_infra.observability.policy import AttributePolicy
+from lca.infrastructure.observability.policy import AttributePolicy
 
 
 def test_credential_named_attributes_are_fully_redacted() -> None:

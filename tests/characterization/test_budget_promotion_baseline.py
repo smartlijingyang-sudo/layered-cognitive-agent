@@ -123,7 +123,7 @@ class TestNoPersistencePath:
 
     def test_memory_record_is_in_memory_only(self) -> None:
         from lca.contracts.atoms.enums import MemoryLayer
-        from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
+        from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
         from lca.layer1_cognitive.memory.simple_memory import SimpleMemorySystem
         from lca.layer1_cognitive.memory.team_shared_memory import TeamSharedMemoryStore
 

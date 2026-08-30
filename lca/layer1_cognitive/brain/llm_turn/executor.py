@@ -17,7 +17,7 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import ToolCallStreaming
 from lca.contracts.models.team.partial_buffer import append_run_partial
 from lca.contracts.protocols import LLMAdapter, Tool
-from lca.layer0_infra.observability import record
+from lca.infrastructure.observability import record
 from lca.layer1_cognitive.brain.llm_turn.mode import LlmTurnMode
 from lca.layer1_cognitive.brain.llm_turn.policy import build_llm_call_kwargs, resolve_llm_turn_mode
 from lca.layer1_cognitive.brain.tool_call_stream import push_tool_call_stream

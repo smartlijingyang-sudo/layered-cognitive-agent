@@ -2,15 +2,15 @@
 
 Bodies and effect-dispatchers should reach world-side effects via
 :class:`~lca.layer1_cognitive.body.safe_executor.SafeExecutor` or via
-seams, not by touching ``lca.layer0_infra.sandbox`` /
-``lca.layer0_infra.transport`` directly.
+seams, not by touching ``lca.infrastructure.sandbox`` /
+``lca.infrastructure.transport`` directly.
 
 This module scans candidate Body sources (pure ``ast.parse`` — never
 imports the scanned code) and reports:
 
 * ``direct_layer0_import`` — an ``import`` / ``from ... import`` whose
-  module path is rooted at ``lca.layer0_infra.sandbox`` or
-  ``lca.layer0_infra.transport``.
+  module path is rooted at ``lca.infrastructure.sandbox`` or
+  ``lca.infrastructure.transport``.
 * ``direct_sandbox_call`` — a call of the form ``sandbox.<name>(...)``.
 * ``direct_transport_call`` — a call of the form ``transport.<name>(...)``.
 
@@ -28,8 +28,8 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 
 #: Module prefixes considered "direct L0 infra" for Bodies.
-_LAYER0_SANDBOX_PREFIX: str = "lca.layer0_infra.sandbox"
-_LAYER0_TRANSPORT_PREFIX: str = "lca.layer0_infra.transport"
+_LAYER0_SANDBOX_PREFIX: str = "lca.infrastructure.sandbox"
+_LAYER0_TRANSPORT_PREFIX: str = "lca.infrastructure.transport"
 _LAYER0_PREFIXES: tuple[str, ...] = (
     _LAYER0_SANDBOX_PREFIX,
     _LAYER0_TRANSPORT_PREFIX,
@@ -60,7 +60,7 @@ class _DirectCommandFinder(ast.NodeVisitor):
     # -- imports -----------------------------------------------------
 
     def visit_Import(self, node: ast.Import) -> None:
-        """``import lca.layer0_infra.sandbox[...]``."""
+        """``import lca.infrastructure.sandbox[...]``."""
         for alias in node.names:
             if _starts_with_layer0_prefix(alias.name):
                 self.findings.append(
@@ -75,7 +75,7 @@ class _DirectCommandFinder(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        """``from lca.layer0_infra.transport.ssh import ...``."""
+        """``from lca.infrastructure.transport.ssh import ...``."""
         if node.level > 0:
             # Relative import — cannot be an L0 infra root reference.
             self.generic_visit(node)

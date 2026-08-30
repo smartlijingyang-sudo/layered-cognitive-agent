@@ -14,7 +14,7 @@ class Config(BaseModel):
 
 
 def _g2a_factory(run: object | None = None) -> list:
-    from lca.layer0_infra.tools.default_set import build_default_tools
+    from lca.infrastructure.tools.default_set import build_default_tools
 
     bind = run if isinstance(run, dict) else {}
     return build_default_tools(

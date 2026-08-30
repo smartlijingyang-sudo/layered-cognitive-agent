@@ -23,6 +23,6 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.capability.transport import TransportService
+    from lca.infrastructure.capability.transport import TransportService
 
     ctx.provide("transport", TransportService())

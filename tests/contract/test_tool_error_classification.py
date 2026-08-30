@@ -13,7 +13,7 @@ from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.core.result import ToolExecutionError, ToolInputError
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.role_team import CacheConfig, RetryPolicy, ToolPermissionManifest
-from lca.layer0_infra.tools.calculator import build_tools as build_calculator_tools
+from lca.infrastructure.tools.calculator import build_tools as build_calculator_tools
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.brain.critic import SimpleCritic
 

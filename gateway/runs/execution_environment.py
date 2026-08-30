@@ -31,14 +31,14 @@ from lca.contracts.models.core.plane import PlaneBindings
 from lca.contracts.models.observability.journal import RunScope
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols.infra import MachineResolver
-from lca.layer0_infra.observability import BoundObservability, bind_backends, run_scope
-from lca.layer0_infra.observability.event_descriptor_env import bind_descriptors
-from lca.layer0_infra.plane.scope import plane_bindings_scope
-from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime
-from lca.layer0_infra.search.scope import search_run_scope
-from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
-from lca.layer0_infra.tools.run_finalizer import run_id_scope
-from lca.layer0_infra.workspace import run_workspace_scope
+from lca.infrastructure.observability import BoundObservability, bind_backends, run_scope
+from lca.infrastructure.observability.event_descriptor_env import bind_descriptors
+from lca.infrastructure.plane.scope import plane_bindings_scope
+from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime
+from lca.infrastructure.search.scope import search_run_scope
+from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope
+from lca.infrastructure.tools.run_finalizer import run_id_scope
+from lca.infrastructure.workspace import run_workspace_scope
 
 
 @dataclass(frozen=True)

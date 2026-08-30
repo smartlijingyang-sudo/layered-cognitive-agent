@@ -61,7 +61,7 @@ class TestHarnessSpineE2E:
         )
 
         # The agent's LLM should NOT be MockLLMAdapter
-        from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+        from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 
         agent = handle.agent
         # Access the internal CognitiveAgent → runtime → brain → llm

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from lca.contracts.models.core.state import StateSnapshot
 from lca.contracts.models.observability.journal import RunResumed
-from lca.layer0_infra.observability import record
+from lca.infrastructure.observability import record
 
 
 def record_run_resumed(snapshot: StateSnapshot) -> None:

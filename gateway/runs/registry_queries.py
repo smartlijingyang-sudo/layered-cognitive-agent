@@ -10,7 +10,7 @@ from typing import Any
 
 from gateway.runs.doctor import DoctorReport, diagnose
 from gateway.runs.session import RunRegistry
-from lca.layer0_infra.observability.journal.live_tail import (
+from lca.infrastructure.observability.journal.live_tail import (
     TEXT_CHANNEL_ALL,
     TEXT_CHANNEL_ANSWER,
     LiveGap,

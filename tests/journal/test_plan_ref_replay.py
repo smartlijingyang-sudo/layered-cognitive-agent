@@ -89,7 +89,7 @@ class TestV5ReplayEveryFactCarriesPlanRef:
 
     def test_run_every_fact_carries_plan_ref(self) -> None:
         """模拟完整 run：10 events append → 全 10 条 plan_ref 同值。"""
-        from lca.layer0_infra.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine import RunStore
 
         store = RunStore(run_id="run_v5_replay_test")
         events = [
@@ -116,7 +116,7 @@ class TestV5ReplayEveryFactCarriesPlanRef:
         plan = _make_test_plan()
         expected_plan_ref = compiled_run_plan_ref(plan)
 
-        from lca.layer0_infra.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine import RunStore
 
         store = RunStore(run_id="run_plan_ref_match_test")
         with plan_ref_scope(expected_plan_ref):
@@ -138,7 +138,7 @@ class TestPlanRefReplayRegistry:
 
     def test_filter_facts_by_plan_ref(self) -> None:
         """ReplayRegistry.filter_by_plan_ref(plan_ref) 返回该 plan 的所有 facts。"""
-        from lca.layer0_infra.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine import RunStore
 
         store = RunStore(run_id="run_filter_test")
         events_a = [
@@ -179,7 +179,7 @@ class TestPlanRefReplayRegistry:
         plan = _make_test_plan()
         expected_plan_ref = compiled_run_plan_ref(plan)
 
-        from lca.layer0_infra.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine import RunStore
 
         store = RunStore(run_id="run_reconstruct_test")
         # Emit facts with plan_ref
@@ -210,7 +210,7 @@ class TestV5PlanRefStability:
 
     def test_property_100_events_same_plan_ref(self) -> None:
         """100 events 同 plan_ref → 全部携带同 plan_ref（V5 性质）。"""
-        from lca.layer0_infra.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine import RunStore
 
         store = RunStore(run_id="run_property_test")
         with plan_ref_scope("stable_plan_ref_xyz"):
@@ -225,7 +225,7 @@ class TestV5PlanRefStability:
 
     def test_plan_ref_change_mid_run_records_each_value(self) -> None:
         """plan_ref 在 run 中变更 → 后续 events 携带新值（不污染旧 events）。"""
-        from lca.layer0_infra.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine import RunStore
 
         store = RunStore(run_id="run_mid_change_test")
         # Phase 1: plan A
@@ -289,8 +289,8 @@ class TestJournalRecordPlanRefV5:
         assert record.plan_ref == "replay_plan_ref_123"
 
     def test_disk_replay_preserves_plan_ref(self, tmp_path: Path) -> None:
-        from lca.layer0_infra.observability.journal.engine import RunStore
-        from lca.layer0_infra.observability.journal.journal_io import (
+        from lca.infrastructure.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.journal_io import (
             read_journal,
             stamped_to_record,
         )

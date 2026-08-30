@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 from lca.contracts.models.core.lifecycle import TaskStatus
-from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
 from lca.layer2_runtime.runtime_loop import CognitiveRuntime
 from lca.layer4_app.api import ensure_default_ctx
 from lca.layer4_app.spawn import spawn_agent

@@ -10,8 +10,8 @@ import pytest
 
 from lca.contracts.mechanisms.composition import ComposerErrorCode
 from lca.contracts.models.observability.journal import PluginMounted, PluginMountRejected
-from lca.layer0_infra.observability.facade import BoundObservability, bind_backends
-from lca.layer0_infra.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.facade import BoundObservability, bind_backends
+from lca.infrastructure.observability.journal_backend import MemoryJournal
 from lca.layer4_app.preset_authoring import PresetAuthoring
 from lca.plugins.providers.composition_composer import (
     CordisComposer,
@@ -31,7 +31,7 @@ def bind_journal():
 
 
 def _dump_journal(journal: MemoryJournal, path: Path) -> None:
-    from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
+    from lca.infrastructure.observability.journal.journal_io import stamped_to_record
 
     path.write_text(
         "\n".join(

@@ -23,6 +23,6 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.capability.state_store import StateStoreService
+    from lca.infrastructure.capability.state_store import StateStoreService
 
     ctx.provide("state_store", StateStoreService())

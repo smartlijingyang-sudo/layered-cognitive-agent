@@ -19,7 +19,7 @@ from lca.contracts.models.observability.journal import (
     RunScope,
     StampedEvent,
 )
-from lca.layer0_infra.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine import RunStore
 
 
 def _has_field(cls: type, name: str) -> bool:

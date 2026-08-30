@@ -11,7 +11,7 @@ from lca.contracts.models.core.decision import Decision, Observation, ToolCall, 
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.role_team import RoleProfile, ToolPermissionManifest
-from lca.layer0_infra.search.constants import WEB_SEARCH_TOOL
+from lca.infrastructure.search.constants import WEB_SEARCH_TOOL
 from lca.layer1_cognitive.brain.reasoner import PromptReasoner
 
 

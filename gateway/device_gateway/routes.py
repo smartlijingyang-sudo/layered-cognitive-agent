@@ -17,7 +17,7 @@ from gateway.device_gateway.hub import DeviceHub, encode_arguments
 from gateway.device_gateway.models import DeviceConnection
 from gateway.device_gateway.registry import DeviceRegistry
 from gateway.device_gateway.settings import DeviceGatewaySettings
-from lca.layer0_infra.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _COMPUTER_IDENTIFIER
+from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _COMPUTER_IDENTIFIER
 
 _log = structlog.get_logger(__name__)
 

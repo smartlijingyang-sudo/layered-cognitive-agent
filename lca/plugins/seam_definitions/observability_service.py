@@ -23,6 +23,6 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.capability.observability import ObservabilityService
+    from lca.infrastructure.capability.observability import ObservabilityService
 
     ctx.provide("observability", ObservabilityService())

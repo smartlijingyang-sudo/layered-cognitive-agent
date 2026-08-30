@@ -37,7 +37,7 @@ _NAME_EXEMPT: dict[str, str] = {
 }
 
 _SCAN_PACKAGES = [
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",
@@ -49,7 +49,7 @@ _SCAN_PACKAGES = [
 # Gateway is a separate concern; its terms are listed in glossary.md
 # under "Gateway 概念" but not required to have bold entries.
 _GLOSSARY_COVERAGE_SCAN_PACKAGES = [
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",
@@ -242,7 +242,7 @@ def _read_glossary_terms() -> set[str]:
 # 反向校验的扫描范围：术语表覆盖 contracts 与 L0-L4 全部层的类名
 _REVERSE_SCAN_PACKAGES = (
     "lca.contracts",
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",

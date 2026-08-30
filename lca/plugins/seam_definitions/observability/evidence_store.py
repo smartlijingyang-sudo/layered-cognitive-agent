@@ -30,9 +30,9 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability.evidence.policy import DefaultEvidencePolicy
-    from lca.layer0_infra.observability.evidence.store import FilesystemEvidenceStore
-    from lca.layer0_infra.observability.settings import ObservabilitySettings
+    from lca.infrastructure.observability.evidence.policy import DefaultEvidencePolicy
+    from lca.infrastructure.observability.evidence.store import FilesystemEvidenceStore
+    from lca.infrastructure.observability.settings import ObservabilitySettings
 
     del config
     settings = ObservabilitySettings()

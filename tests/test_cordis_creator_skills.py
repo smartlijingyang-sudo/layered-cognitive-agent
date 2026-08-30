@@ -17,15 +17,15 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from lca.layer0_infra.skills.activation_scope import activated_skills_scope
-from lca.layer0_infra.skills.bundled import (
+from lca.infrastructure.skills.activation_scope import activated_skills_scope
+from lca.infrastructure.skills.bundled import (
     default_bundled_skills_root,
     ensure_bundled_skills,
 )
-from lca.layer0_infra.skills.disk_store import DiskSkillPackageStore
-from lca.layer0_infra.skills.settings import SkillSettings
-from lca.layer0_infra.tools.skills.activate_tool import SkillActivateTool
-from lca.layer0_infra.tools.skills.read_reference_tool import SkillReadReferenceTool
+from lca.infrastructure.skills.disk_store import DiskSkillPackageStore
+from lca.infrastructure.skills.settings import SkillSettings
+from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
+from lca.infrastructure.tools.skills.read_reference_tool import SkillReadReferenceTool
 
 CORDIS_PLUGIN_DEVELOPMENT_SKILL_ID: str = "cordis-plugin-development"
 EDITING_LCA_COMPOSITIONS_SKILL_ID: str = "editing-lca-compositions"
@@ -527,11 +527,11 @@ class TestCordisCreatorEndToEndAgentStep(unittest.TestCase):
         """Run ``SkillActivateTool.execute(skill_id)`` and return
         (observation, body_text, state_after). state_after is a plain
         dict snapshot of state.activated_skills contents."""
-        from lca.layer0_infra.skills.activation_scope import (
+        from lca.infrastructure.skills.activation_scope import (
             activated_skills_scope,
             register_activated,
         )
-        from lca.layer0_infra.tools.skills.activate_tool import SkillActivateTool
+        from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
 
         with activated_skills_scope(()):
             tool = SkillActivateTool(self.store)
@@ -540,7 +540,7 @@ class TestCordisCreatorEndToEndAgentStep(unittest.TestCase):
             # machinery; here we simulate the resulting state mutation
             # so we can assert what state.activated_skills would look like.
             register_activated(skill_id, skill_id)
-            from lca.layer0_infra.skills.activation_scope import (
+            from lca.infrastructure.skills.activation_scope import (
                 resolve_skill_for_exec,
             )
 
@@ -560,7 +560,7 @@ class TestCordisCreatorEndToEndAgentStep(unittest.TestCase):
     def test_second_step_loads_editing_lca_compositions(self) -> None:
         """After step 1, the model would call activate_skill again for the
         second skill — verify the body and the activated list updates."""
-        from lca.layer0_infra.skills.activation_scope import (
+        from lca.infrastructure.skills.activation_scope import (
             activated_skills_scope,
             register_activated,
         )

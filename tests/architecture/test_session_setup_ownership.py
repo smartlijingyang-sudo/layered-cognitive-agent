@@ -36,4 +36,4 @@ def test_session_builder_does_not_publish_or_emit_diagnostics() -> None:
 
     assert "registry.put" not in source
     assert "record_runtime" not in source
-    assert "lca.layer0_infra.observability" not in imports
+    assert "lca.infrastructure.observability" not in imports

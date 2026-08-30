@@ -8,7 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from gateway.cors import CORS_HEADERS
-from lca.layer0_infra.file_store import LocalFileStore
+from lca.infrastructure.file_store import LocalFileStore
 
 
 def content_disposition(disposition_type: str, filename: str) -> str:

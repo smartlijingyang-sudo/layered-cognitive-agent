@@ -18,8 +18,8 @@ from gateway.runs.message_history import (
 from gateway.runs.message_text import history_plain_text as _history_plain_text
 from gateway.runs.message_text import visible_user_text as _visible_user_text
 from lca.contracts.models.core.conversation import ConversationTurn
-from lca.layer0_infra.attachment import FileStoreAttachmentIdentity
-from lca.layer0_infra.file_store import FileStore
+from lca.infrastructure.attachment import FileStoreAttachmentIdentity
+from lca.infrastructure.file_store import FileStore
 
 
 @dataclass(frozen=True)

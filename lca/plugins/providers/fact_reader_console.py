@@ -29,8 +29,8 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import NamedRegistry, ObservabilitySettings
-    from lca.layer0_infra.observability.journal.console_projector import (
+    from lca.infrastructure.observability import NamedRegistry, ObservabilitySettings
+    from lca.infrastructure.observability.journal.console_projector import (
         ConsoleJournalProjector,
     )
 

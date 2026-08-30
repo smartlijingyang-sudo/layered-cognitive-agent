@@ -9,12 +9,12 @@ from lca.contracts.models.observability.event import (
     EventSensitivity,
 )
 from lca.contracts.models.observability.journal import LlmCallCompleted
-from lca.layer0_infra.observability.event_catalog import (
+from lca.infrastructure.observability.event_catalog import (
     EVENT_DESCRIPTOR_REGISTRY,
     descriptor_for,
     may_export_externally,
 )
-from lca.layer0_infra.observability.event_descriptor_registry import (
+from lca.infrastructure.observability.event_descriptor_registry import (
     DuplicateEventDescriptorError,
     InMemoryEventDescriptorRegistry,
     UnknownEventDescriptorError,

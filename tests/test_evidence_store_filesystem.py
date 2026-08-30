@@ -21,7 +21,7 @@ from lca.contracts.observability.evidence import (
     EvidenceRef,
     RetentionClass,
 )
-from lca.layer0_infra.observability.evidence.store import FilesystemEvidenceStore
+from lca.infrastructure.observability.evidence.store import FilesystemEvidenceStore
 
 
 @pytest.fixture

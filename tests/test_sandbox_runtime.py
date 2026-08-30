@@ -6,16 +6,16 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime, get_sandbox_runtime
-from lca.layer0_infra.tools.run_finalizer import finalize_run, run_id_scope
-from lca.layer0_infra.tools.sandbox_runtime_tools import SandboxExecuteTool
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime, get_sandbox_runtime
+from lca.infrastructure.tools.run_finalizer import finalize_run, run_id_scope
+from lca.infrastructure.tools.sandbox_runtime_tools import SandboxExecuteTool
 from tests.support.inline_sandbox import InlineSandbox
 
 
 class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
     async def test_harvest_flag_controls_artifact_scanner(self) -> None:
-        from lca.layer0_infra.sandbox.onlyboxes_artifacts import ARTIFACT_BEGIN
+        from lca.infrastructure.sandbox.onlyboxes_artifacts import ARTIFACT_BEGIN
 
         tmp = tempfile.TemporaryDirectory()
         store = LocalFileStore(Path(tmp.name))

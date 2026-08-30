@@ -9,8 +9,8 @@ from lca.contracts.models.observability.event import (
     EventSensitivity,
 )
 from lca.contracts.models.observability.journal_catalog import JOURNAL_EVENT_CLASSES
-from lca.layer0_infra.observability.event_descriptors_data import build_default_registry
-from lca.layer0_infra.observability.event_doc import (
+from lca.infrastructure.observability.event_descriptors_data import build_default_registry
+from lca.infrastructure.observability.event_doc import (
     EVENT_DOCS,
     EventDoc,
     doc_for,
@@ -22,7 +22,7 @@ def _infer_layer(emitter: str) -> str:
     """Layer 推导与 ``event_doc.py`` 内置词表保持一致。"""
     if emitter.startswith("gateway."):
         return "gateway"
-    if emitter.startswith("lca.layer0_infra."):
+    if emitter.startswith("lca.infrastructure."):
         return "L0"
     if emitter.startswith("lca.layer1_cognitive."):
         return "L1"

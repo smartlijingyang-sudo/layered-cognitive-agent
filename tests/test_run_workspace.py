@@ -7,14 +7,14 @@ import pytest
 from lca.contracts.models.core.budget import TOOL_LOOP_BREAK_THRESHOLD
 from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.layer0_infra.text.safe_boundary import sanitize_stream_text
-from lca.layer0_infra.workspace.artifact_ledger import (
+from lca.infrastructure.text.safe_boundary import sanitize_stream_text
+from lca.infrastructure.workspace.artifact_ledger import (
     ArtifactLedger,
     artifact_closure_text,
     artifact_handoff_block,
     rewrite_artifact_markdown,
 )
-from lca.layer0_infra.workspace.scope import effective_agent_wall_clock, run_workspace_scope
+from lca.infrastructure.workspace.scope import effective_agent_wall_clock, run_workspace_scope
 from lca.layer1_cognitive.brain.decision_gates.artifact_respond_injector import (
     ArtifactRespondInjector,
 )
@@ -299,7 +299,7 @@ class TestToolLoopBreakerGate:
 class TestArtifactClosure:
     def test_synthesize_from_workspace(self) -> None:
         with run_workspace_scope("run_c", wall_clock_seconds=60):
-            from lca.layer0_infra.workspace import get_run_workspace
+            from lca.infrastructure.workspace import get_run_workspace
 
             workspace = get_run_workspace()
             assert workspace is not None

@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 from lca.contracts.models.core.decision import Observation
-from lca.layer0_infra.idempotency_store import SqliteIdempotencyStore
+from lca.infrastructure.idempotency_store import SqliteIdempotencyStore
 
 
 @pytest.mark.asyncio

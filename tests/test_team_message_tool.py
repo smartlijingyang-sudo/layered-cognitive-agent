@@ -15,7 +15,7 @@ import pytest
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import TeamMessagePublished
-from lca.layer0_infra.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine import RunStore
 from lca.layer1_cognitive.body.team_message_tool import (
     TEAM_MESSAGE_TOOL_NAME,
     build_team_message_publish_tool,

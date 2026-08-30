@@ -234,7 +234,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **LangfuseBridge** | Langfuse 旧版桥接；已退役 — 替代：Layer0 observability 直接 |
 | **LocalMirror** | upstream fork 旧版镜像；已退役 — 替代：Layer0 upstream scan |
 | **MirrorDiff** | upstream 旧版差异报告；已退役 — 替代：Layer0 upstream scan |
-| **ObservabilityHub** | 旧 observability facade 类；改名 — 替代：lca.layer0_infra.observability.facade |
+| **ObservabilityHub** | 旧 observability facade 类；改名 — 替代：lca.infrastructure.observability.facade |
 | **ScorerFn** | 旧版评分函数；已退役 — 替代：observability eval pipeline |
 | **SimpleEventBus** | 本地事件分发兼容实现；已退役 — 替代：由 booted Cordis Context 持有的 `CordisEventBus` |
 | **SimpleHookRegistry** | 本地钩子分发兼容实现；已退役 — 替代：由 booted Cordis Context 持有的 `CordisHookRegistry` |

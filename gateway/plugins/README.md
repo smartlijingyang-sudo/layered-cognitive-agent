@@ -20,7 +20,7 @@ gateway.plugins: Gateway 插件。本 README 由脚手架生成，待包负责�
 lca.contracts,gateway
 
 ## 6. 禁止依赖
-lca.layer0_infra,lca.layer1_cognitive,lca.layer2_runtime,lca.layer3_agent,lca.layer4_app,lca.harness,lca.plugins
+lca.infrastructure,lca.layer1_cognitive,lca.layer2_runtime,lca.layer3_agent,lca.layer4_app,lca.harness,lca.plugins
 
 ## 7. 副作用
 log:emit

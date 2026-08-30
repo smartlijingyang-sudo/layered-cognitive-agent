@@ -23,6 +23,6 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.capability.llm import LlmService
+    from lca.infrastructure.capability.llm import LlmService
 
     ctx.provide("llm", LlmService())

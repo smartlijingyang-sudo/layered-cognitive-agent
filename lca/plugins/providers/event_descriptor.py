@@ -27,7 +27,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import build_default_registry
+    from lca.infrastructure.observability import build_default_registry
 
     registry = ctx.require("event_descriptor_registry")
     bootstrap = build_default_registry()

@@ -12,7 +12,7 @@ import pytest
 
 from lca.contracts.models.core.decision import Observation
 from lca.contracts.models.observability.journal import ToolInvoked
-from lca.layer0_infra.tools.contract import (
+from lca.infrastructure.tools.contract import (
     REGISTRY,
     FieldSpec,
     RenderContract,
@@ -22,7 +22,7 @@ from lca.layer0_infra.tools.contract import (
     project_full,
     project_tool_state,
 )
-from lca.layer0_infra.tools.contract.project import _MISSING, _read_field
+from lca.infrastructure.tools.contract.project import _MISSING, _read_field
 
 # ── fixtures ────────────────────────────────────────────────────────────────
 
@@ -325,9 +325,9 @@ def test_computer_observation_payload_is_flattened() -> None:
     from pathlib import Path
 
     from lca.contracts.models.core.sandbox import SandboxExecResult
-    from lca.layer0_infra.computer.op_result import ComputerOpResult
-    from lca.layer0_infra.file_store import LocalFileStore
-    from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
+    from lca.infrastructure.computer.op_result import ComputerOpResult
+    from lca.infrastructure.file_store import LocalFileStore
+    from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 
     with tempfile.TemporaryDirectory() as tmp:
         store = LocalFileStore(root=Path(os.path.join(tmp, "files")))
@@ -357,9 +357,9 @@ def test_skill_activate_observation_payload_is_flattened() -> None:
     import tempfile
     from pathlib import Path
 
-    from lca.layer0_infra.skills.disk_store import DiskSkillPackageStore
-    from lca.layer0_infra.skills.settings import SkillSettings
-    from lca.layer0_infra.tools.skills.activate_tool import SkillActivateTool
+    from lca.infrastructure.skills.disk_store import DiskSkillPackageStore
+    from lca.infrastructure.skills.settings import SkillSettings
+    from lca.infrastructure.tools.skills.activate_tool import SkillActivateTool
 
     with tempfile.TemporaryDirectory() as tmp:
         settings = SkillSettings(cache_dir=Path(tmp))
@@ -610,7 +610,7 @@ def test_legacy_camelcase_payload_gets_normalised() -> None:
     that forgets to call it would leak camelCase into observation.payload
     and the projection would lose fields; this test pins the rename table.
     """
-    from lca.layer0_infra.computer.runtime_exec import _normalize_guest_state
+    from lca.infrastructure.computer.runtime_exec import _normalize_guest_state
 
     state = {
         "success": True,

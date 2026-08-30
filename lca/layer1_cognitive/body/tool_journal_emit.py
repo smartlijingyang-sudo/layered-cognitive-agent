@@ -33,8 +33,8 @@ from lca.contracts.observability.evidence import (
     EvidenceStore,
 )
 from lca.contracts.protocols.infra import Tool
-from lca.layer0_infra.observability import record, record_runtime
-from lca.layer0_infra.tools.contract.project import project_tool_state
+from lca.infrastructure.observability import record, record_runtime
+from lca.infrastructure.tools.contract.project import project_tool_state
 from lca.layer1_cognitive.body.tool_result_preview import tool_files
 
 _log = logging.getLogger(__name__)

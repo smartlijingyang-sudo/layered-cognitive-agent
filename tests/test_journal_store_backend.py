@@ -10,7 +10,7 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
 )
 from lca.contracts.observability.journal_store import JournalStoreBackend
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     InMemoryJournalStore,
     RunStore,
 )

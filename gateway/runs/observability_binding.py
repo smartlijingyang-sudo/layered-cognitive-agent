@@ -15,8 +15,8 @@ from gateway.runs.session import RunSession
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
 from lca.contracts.observability.run_journal import LiveRunProjection, RunJournalFactory
 from lca.contracts.protocols import JournalProjector
-from lca.layer0_infra.observability import BoundObservability
-from lca.layer0_infra.observability.settings import ObservabilitySettings
+from lca.infrastructure.observability import BoundObservability
+from lca.infrastructure.observability.settings import ObservabilitySettings
 
 
 def assemble_run_hub(
@@ -34,8 +34,8 @@ def assemble_run_hub(
     try:
         base: BoundObservability = require_capability(ctx, "observability")
     except MissingCapabilityError:
-        from lca.layer0_infra.observability.facade import BoundObservability as FacadeBound
-        from lca.layer0_infra.observability.policy import AttributePolicy
+        from lca.infrastructure.observability.facade import BoundObservability as FacadeBound
+        from lca.infrastructure.observability.policy import AttributePolicy
 
         minimal = make_minimal_bound()
         return FacadeBound(

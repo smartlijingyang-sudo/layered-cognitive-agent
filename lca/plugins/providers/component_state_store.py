@@ -30,7 +30,7 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
-    from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
+    from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 
     registry = ctx.require(COMPONENT_REGISTRY.key)
     registry.register(ComponentKind.STATE_STORE, STATE_STORE_CHOICE_MEMORY, InMemoryStateStore)

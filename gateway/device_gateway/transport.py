@@ -14,7 +14,7 @@ from lca.contracts.models.core.sandbox import (
     SessionInfo,
 )
 from lca.contracts.protocols import Sandbox
-from lca.layer0_infra.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _COMPUTER_IDENTIFIER
+from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _COMPUTER_IDENTIFIER
 
 
 class DeviceTransport(Sandbox):

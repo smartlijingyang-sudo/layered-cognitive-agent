@@ -30,7 +30,7 @@ from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.diagnostic import DiagnosticCategory, DiagnosticStatus
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.cognition import SensorDisabledError
-from lca.layer0_infra.observability import record_runtime
+from lca.infrastructure.observability import record_runtime
 from lca.layer1_cognitive.brain.context_manifest import (
     build_manifest_from_items,
     digest_manifest,

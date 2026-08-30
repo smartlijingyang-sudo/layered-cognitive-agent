@@ -10,11 +10,11 @@ from lca.contracts.models.core.preinstall import (
     SANDBOX_PREINSTALLED_PYTHON_PACKAGES,
     python_import_name,
 )
-from lca.layer0_infra.tools.lca_computer.manifest import (
+from lca.infrastructure.tools.lca_computer.manifest import (
     CLOUD_SANDBOX_MANIFEST,
     MACHINE_MANIFEST,
 )
-from lca.layer0_infra.tools.lca_computer.types import SANDBOX_ONLY_APIS
+from lca.infrastructure.tools.lca_computer.types import SANDBOX_ONLY_APIS
 
 
 def _requirements_names(path: Path) -> set[str]:

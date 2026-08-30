@@ -43,7 +43,7 @@ from lca.contracts.models.observability.diagnostic import (
     DiagnosticStatus,
 )
 from lca.contracts.models.observability.journal import PresetPublished
-from lca.layer0_infra.observability import record, record_runtime
+from lca.infrastructure.observability import record, record_runtime
 
 _log = structlog.get_logger("lca.preset_authoring")
 

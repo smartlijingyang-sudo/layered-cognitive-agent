@@ -19,7 +19,7 @@ from gateway.runs.ingest_models import (
     LobeHubBridgeSettings,
     bridge_settings,
 )
-from lca.layer0_infra.file_store import FileStore
+from lca.infrastructure.file_store import FileStore
 
 _log = structlog.get_logger(__name__)
 _LOCAL_FILE_URL_RE = re.compile(r"^/files/([a-z]+_[a-z0-9]+)$", re.IGNORECASE)

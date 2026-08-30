@@ -33,8 +33,8 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
-from lca.layer0_infra.observability.facade import BoundObservability, bind_backends
-from lca.layer0_infra.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.facade import BoundObservability, bind_backends
+from lca.infrastructure.observability.journal_backend import MemoryJournal
 from lca.plugins.providers.composition_composer import (
     CordisComposer,
     build_default_invariant_checker,

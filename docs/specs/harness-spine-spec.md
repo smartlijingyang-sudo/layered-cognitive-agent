@@ -1862,10 +1862,10 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.capability.llm import LlmService
+    from lca.infrastructure.capability.llm import LlmService
     service = LlmService()
     # 注册 default providers
-    from lca.layer0_infra.llm_adapter.mock_llm import MockLLMAdapter
+    from lca.infrastructure.llm_adapter.mock_llm import MockLLMAdapter
     service.register("mock", MockLLMAdapter())
     ctx.provide("llm", service)
 ```
@@ -3076,7 +3076,7 @@ manifest = PluginManifest(
 )
 
 async def apply(ctx: PluginContext, config: dict) -> None:
-    from lca.layer0_infra.llm_adapter.deepseek import DeepSeekAdapter
+    from lca.infrastructure.llm_adapter.deepseek import DeepSeekAdapter
     adapter = DeepSeekAdapter(
         api_key=config["api_key"],
         model=config.get("model", "deepseek-chat"),

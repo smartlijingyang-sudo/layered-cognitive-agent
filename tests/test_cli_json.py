@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import unittest
 
-from lca.layer0_infra.computer.cli_json import cli_json_success
-from lca.layer0_infra.computer.office_plane import normalize_officecli_command
-from lca.layer0_infra.workspace.deliverable import (
+from lca.infrastructure.computer.cli_json import cli_json_success
+from lca.infrastructure.computer.office_plane import normalize_officecli_command
+from lca.infrastructure.workspace.deliverable import (
     is_office_name,
     is_office_publish_intent,
     officecli_verb,

@@ -17,7 +17,7 @@ from lca.contracts.models.core.sandbox import (
     SessionConfig,
     SessionInfo,
 )
-from lca.layer0_infra.sandbox.streaming import SandboxStreamEmitter
+from lca.infrastructure.sandbox.streaming import SandboxStreamEmitter
 
 
 class InlineSandbox:
@@ -43,7 +43,7 @@ class InlineSandbox:
     ) -> SandboxResult:
         del timeout_s
         self.write_files_calls.append(files)
-        from lca.layer0_infra.sandbox.onlyboxes_bootstrap import safe_rel_name
+        from lca.infrastructure.sandbox.onlyboxes_bootstrap import safe_rel_name
 
         vfs = self._sessions[session_id] if session_id and session_id in self._sessions else {}
         for name, source in files.items():
@@ -99,7 +99,7 @@ class InlineSandbox:
         **kwargs: Any,
     ) -> SandboxResult:
         del timeout_s
-        from lca.layer0_infra.computer.guest import build_shell_script
+        from lca.infrastructure.computer.guest import build_shell_script
 
         return await self.run(
             build_shell_script(command=command),

@@ -28,7 +28,7 @@ from lca.harness.profile.lifespan import (
     noop_lifespan,
     profile_lifespan,
 )
-from lca.layer0_infra.file_store import LocalFileStore
+from lca.infrastructure.file_store import LocalFileStore
 
 DEFAULT_PROFILE = Path("profiles/web-standard.yaml")
 

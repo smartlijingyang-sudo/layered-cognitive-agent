@@ -21,7 +21,7 @@ from migrate_layer_rename import (  # noqa: E402
 
 def test_layer_to_semantic_has_all_5_mappings():
     assert len(LAYER_TO_SEMANTIC) == 5
-    assert "lca.layer0_infra" in LAYER_TO_SEMANTIC
+    assert "lca.infrastructure" in LAYER_TO_SEMANTIC
     assert "lca.layer1_cognitive" in LAYER_TO_SEMANTIC
     assert "lca.layer2_runtime" in LAYER_TO_SEMANTIC
     assert "lca.layer3_agent" in LAYER_TO_SEMANTIC
@@ -29,7 +29,7 @@ def test_layer_to_semantic_has_all_5_mappings():
 
 
 def test_layer_to_semantic_values():
-    assert LAYER_TO_SEMANTIC["lca.layer0_infra"] == "lca.infrastructure"
+    assert LAYER_TO_SEMANTIC["lca.infrastructure"] == "lca.infrastructure"
     assert LAYER_TO_SEMANTIC["lca.layer1_cognitive"] == "lca.cognition"
     assert LAYER_TO_SEMANTIC["lca.layer2_runtime"] == "lca.runtime"
     assert LAYER_TO_SEMANTIC["lca.layer3_agent"] == "lca.agent"

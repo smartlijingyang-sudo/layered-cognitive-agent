@@ -20,7 +20,7 @@ from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState
 from lca.contracts.models.observability.journal import ContextCompacted, MemoryCommitted
 from lca.contracts.protocols import MemorySystem, RetrievalPolicy, SharedMemoryStore
-from lca.layer0_infra.observability import record
+from lca.infrastructure.observability import record
 
 # v3 §8 / PR7.D.6/7: the system is wired
 from lca.layer1_cognitive.memory.null_retrieval_policy import NullRetrievalPolicy

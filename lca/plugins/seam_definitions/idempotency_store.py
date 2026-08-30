@@ -26,7 +26,7 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.idempotency_store import SqliteIdempotencyStore
+    from lca.infrastructure.idempotency_store import SqliteIdempotencyStore
 
     ctx.provide("idempotency_store", SqliteIdempotencyStore(config.path))
 

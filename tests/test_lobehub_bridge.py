@@ -19,7 +19,7 @@ from gateway.runs.ingest import (
 )
 from gateway.runs.ingress import compose_run_question, parse_messages, prepare_run_from_messages
 from lca.contracts.atoms.enums import StreamChannel
-from lca.layer0_infra.file_store import LocalFileStore
+from lca.infrastructure.file_store import LocalFileStore
 
 
 class _StubFetcher:
@@ -310,7 +310,7 @@ class TestLiveTailKeepsEveryChannel(unittest.TestCase):
 
     def test_both_channels_stay_on_the_tail(self) -> None:
         from lca.contracts.models.observability.journal import RunScope, StampedEvent, StepTextDelta
-        from lca.layer0_infra.observability.journal.live_tail import LiveTail
+        from lca.infrastructure.observability.journal.live_tail import LiveTail
 
         tail = LiveTail()
         scope = RunScope(trace_id="t", run_id="r")

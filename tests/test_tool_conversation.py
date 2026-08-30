@@ -8,7 +8,7 @@ from lca.contracts.atoms.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.models.core.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.memory import MemoryRecord
 from lca.contracts.models.core.state import AgentState, Budget
-from lca.layer0_infra.llm_adapter.openai_compat._history import (
+from lca.infrastructure.llm_adapter.openai_compat._history import (
     anthropic_messages_with_history,
     openai_messages_with_history,
 )

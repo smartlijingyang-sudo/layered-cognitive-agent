@@ -14,7 +14,7 @@ from gateway.runs.runnable_assembly import (
 from gateway.runs.session import RunSession
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.run_mode import RunModeRegistryProtocol
-from lca.layer0_infra.observability import BoundObservability
+from lca.infrastructure.observability import BoundObservability
 
 
 class _Resolver:

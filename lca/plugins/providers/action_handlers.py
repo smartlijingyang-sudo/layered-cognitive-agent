@@ -23,7 +23,7 @@ from lca.contracts.protocols.action_handler import ActionHandler, ActionHandlerR
 from lca.contracts.protocols.logic_address import LogicAddress
 from lca.contracts.protocols.tool_batch_execution import ToolBatchExecutionPolicy
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.layer0_infra.handler_registry import UniqueOperationRegistry
+from lca.infrastructure.handler_registry import UniqueOperationRegistry
 
 
 class Config(BaseModel):

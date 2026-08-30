@@ -17,20 +17,20 @@ from lca.contracts.models.observability.journal import (
     run_scope,
 )
 from lca.harness.observability import make_minimal_bound
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     AttributePolicy,
     BoundObservability,
     RunStore,
     bind_backends,
     record,
 )
-from lca.layer0_infra.observability.journal.journal_io import (
+from lca.infrastructure.observability.journal.journal_io import (
     JOURNAL_SCHEMA_VERSION,
     load_journal_records,
     read_journal,
 )
-from lca.layer0_infra.observability.journal.jsonl_projector import JsonlJournalProjector
-from lca.layer0_infra.observability.settings import ObservabilitySettings
+from lca.infrastructure.observability.journal.jsonl_projector import JsonlJournalProjector
+from lca.infrastructure.observability.settings import ObservabilitySettings
 
 
 def _journal_hub(tmpdir: str, filename: str = "journal.jsonl") -> tuple[BoundObservability, Path]:
@@ -118,7 +118,7 @@ class TestJsonlJournalProjector(unittest.TestCase):
             self.assertGreaterEqual(len(load_journal_records(output)), 2)
 
     def test_nested_runtime_attributes_stay_json_objects(self) -> None:
-        from lca.layer0_infra.observability import record_runtime
+        from lca.infrastructure.observability import record_runtime
 
         with tempfile.TemporaryDirectory() as tmpdir:
             hub, output = _journal_hub(tmpdir)
@@ -215,14 +215,14 @@ class TestHookSpanAttributes(unittest.TestCase):
 
     def test_sanitize_secrets(self) -> None:
         """Secret-like patterns are redacted."""
-        from lca.layer0_infra.observability.policy import sanitize
+        from lca.infrastructure.observability.policy import sanitize
 
         self.assertNotIn("sk-1234567890abcdef", sanitize("key=sk-1234567890abcdef"))
         self.assertIn("[REDACTED]", sanitize("key=sk-1234567890abcdef"))
 
     def test_truncate_long_text(self) -> None:
         """Long text is truncated."""
-        from lca.layer0_infra.observability.policy import truncate
+        from lca.infrastructure.observability.policy import truncate
 
         long_text = "a" * 500
         result = truncate(long_text, 200)

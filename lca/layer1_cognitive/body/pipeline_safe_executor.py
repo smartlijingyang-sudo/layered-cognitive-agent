@@ -45,8 +45,8 @@ from lca.contracts.protocols.tool_pipeline import (
     ToolPreDecision,
     ToolProvider,
 )
-from lca.layer0_infra.tool_pipeline import DefaultToolExecutionPipeline
-from lca.layer0_infra.tools.tool_invocation_scope import tool_invocation_scope
+from lca.infrastructure.tool_pipeline import DefaultToolExecutionPipeline
+from lca.infrastructure.tools.tool_invocation_scope import tool_invocation_scope
 
 _log = structlog.get_logger("lca.safe_executor")
 
@@ -262,7 +262,7 @@ class PipelineSafeExecutor(SafeExecutor):
             command_envelope_to_dict,
             mint_envelope,
         )
-        from lca.layer0_infra.observability import get_current_run_scope
+        from lca.infrastructure.observability import get_current_run_scope
 
         current_scope = get_current_run_scope()
         scope_ref = (

@@ -7,7 +7,7 @@ import directly from their respective submodules.
 Re-exports removed (deleted in cordis migration):
 - ScopedPluginHost, current_scope (was lca.harness.kernel.scope)
 - PluginContext, PluginHandle, PluginHost, PluginSpec, PluginState,
-  ServiceRecord, reconcile (was lca.layer0_infra.plugin.kernel)
+  ServiceRecord, reconcile (was lca.infrastructure.plugin.kernel)
 - manifest_from_entry, manifest_from_spec (was lca.harness.kernel.compat)
 
 Use cordis.Context directly instead.

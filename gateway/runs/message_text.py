@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from lca.layer0_infra.attachment import get_attachment_policy
+from lca.infrastructure.attachment import get_attachment_policy
 
 AVAILABLE_TOOLS_BEGIN = "<available_tools"
 AVAILABLE_TOOLS_END = "</available_tools>"

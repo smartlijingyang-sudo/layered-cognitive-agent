@@ -10,7 +10,7 @@ import structlog
 
 from lca.contracts.models.observability.journal import ReasoningDelta, RunScope, StampedEvent
 from lca.contracts.protocols import JournalProjector
-from lca.layer0_infra.observability.journal.live_tail import LiveGap, LiveTail
+from lca.infrastructure.observability.journal.live_tail import LiveGap, LiveTail
 
 
 def _stamped(seq: int, text: str = "x") -> StampedEvent:

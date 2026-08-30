@@ -24,7 +24,7 @@ Accepted
 
 - journal 事件的登记机制（`journal_catalog.py`）是「一个 dataclass +
   `JOURNAL_CATALOG` 一行登记 + AST 守卫强制的单一发射模块前缀」；现有
-  `LlmCallCompleted` 的登记发射模块是 `lca.layer0_infra.observability
+  `LlmCallCompleted` 的登记发射模块是 `lca.infrastructure.observability
   .adapters`（即 TelemetryLLMAdapter 所在包），reasoner.py 本身没有、
   也不应该有任何 `record()` 调用——遥测与业务行为分离是既有约定。
 
@@ -71,7 +71,7 @@ reasoner.py 本身不新增任何 telemetry/journal 代码，延续「遥测与�
 RunScope 盖章机制提供；`step` 由调用方经 `stream(..., step=state.step)`
 传入的 kwargs 提取；`text_delta`（`journal_kind: "content"`）即该分片文本；
 `seq` 为同一 step 内的单调序号，供消费方兜底排序。发射模块仍是
-`lca.layer0_infra.observability.adapters`，与 `LlmCallCompleted` 同前缀，
+`lca.infrastructure.observability.adapters`，与 `LlmCallCompleted` 同前缀，
 不新增发射点归属，`JOURNAL_CATALOG` 按同样方式登记一行、`VocabDomain`
 取 RESOURCE（与 `LlmCallCompleted` 同域，二者都描述同一次 LLM 调用的
 不同侧面）。

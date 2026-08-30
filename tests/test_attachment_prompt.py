@@ -7,20 +7,20 @@ import unittest
 from pathlib import Path
 
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
-from lca.layer0_infra.attachment import (
+from lca.infrastructure.attachment import (
     FileStoreAttachmentIdentity,
     format_machine_uploaded_files_prompt,
     format_sandbox_uploaded_files_prompt,
     reset_attachment_settings_for_tests,
     sandbox_attachment_path,
 )
-from lca.layer0_infra.attachment.layout import AttachmentLayout
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.plane.resolve import PlaneBindings
-from lca.layer0_infra.plane.scope import plane_bindings_scope
-from lca.layer0_infra.sandbox.surface import skill_preamble
-from lca.layer0_infra.tools.run_attachment_scope import run_attachment_scope
-from lca.layer0_infra.tools.run_finalizer import run_id_scope
+from lca.infrastructure.attachment.layout import AttachmentLayout
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.plane.resolve import PlaneBindings
+from lca.infrastructure.plane.scope import plane_bindings_scope
+from lca.infrastructure.sandbox.surface import skill_preamble
+from lca.infrastructure.tools.run_attachment_scope import run_attachment_scope
+from lca.infrastructure.tools.run_finalizer import run_id_scope
 
 
 class TestAttachmentPrompt(unittest.TestCase):

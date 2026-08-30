@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from lca.contracts.atoms.enums import ActionType
 from lca.contracts.models.core.state import AgentState
-from lca.layer0_infra.search.constants import WEB_SEARCH_TOOL
-from lca.layer0_infra.search.router import resolve_llm_search_kwargs
+from lca.infrastructure.search.constants import WEB_SEARCH_TOOL
+from lca.infrastructure.search.router import resolve_llm_search_kwargs
 from lca.layer1_cognitive.brain.llm_turn.mode import LlmTurnMode
 
 _POST_SEARCH_TOOL_CHOICE = "none"

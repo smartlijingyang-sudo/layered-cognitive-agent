@@ -11,7 +11,7 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
     StepTextDelta,
 )
-from lca.layer0_infra.observability.journal.event_enrichers import (
+from lca.infrastructure.observability.journal.event_enrichers import (
     CausationEnricher,
     DocumentEnricher,
     EnrichmentContext,
@@ -21,7 +21,7 @@ from lca.layer0_infra.observability.journal.event_enrichers import (
     TimestampEnricher,
     default_enrichers,
 )
-from lca.layer0_infra.observability.journal.jsonl_projector import (
+from lca.infrastructure.observability.journal.jsonl_projector import (
     JsonlJournalProjector,
 )
 

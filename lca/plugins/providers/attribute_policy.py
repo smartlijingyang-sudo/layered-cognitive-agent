@@ -29,7 +29,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import (
+    from lca.infrastructure.observability import (
         AttributePolicy,
         NamedRegistry,
         ObservabilitySettings,

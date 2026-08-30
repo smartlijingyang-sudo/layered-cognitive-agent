@@ -15,18 +15,18 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import IsolatedAsyncioTestCase
 
-from lca.layer0_infra.computer.guest.file_ops import (
+from lca.infrastructure.computer.guest.file_ops import (
     build_edit_file_script,
     build_read_file_script,
     build_write_file_script,
 )
-from lca.layer0_infra.computer.guest.search_ops import build_grep_content_script
-from lca.layer0_infra.computer.parse_result import parse_computer_stdout
-from lca.layer0_infra.computer.runtime import ComputerRuntime
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.sandbox.onlyboxes_artifacts import ARTIFACT_BEGIN
-from lca.layer0_infra.sandbox.runtime_scope import bind_sandbox_runtime, unbind_sandbox_runtime
-from lca.layer0_infra.tools.run_finalizer import run_id_scope
+from lca.infrastructure.computer.guest.search_ops import build_grep_content_script
+from lca.infrastructure.computer.parse_result import parse_computer_stdout
+from lca.infrastructure.computer.runtime import ComputerRuntime
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.sandbox.onlyboxes_artifacts import ARTIFACT_BEGIN
+from lca.infrastructure.sandbox.runtime_scope import bind_sandbox_runtime, unbind_sandbox_runtime
+from lca.infrastructure.tools.run_finalizer import run_id_scope
 from tests.support.inline_sandbox import InlineSandbox
 
 _PY_NULL_ASSIGN = re.compile(r"^\s*\w+\s*=\s*null\s*$", re.MULTILINE)

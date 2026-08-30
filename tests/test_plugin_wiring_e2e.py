@@ -186,7 +186,7 @@ class TestSensorBaseClass:
         from lca.contracts.atoms.ids import new_id
         from lca.contracts.models.core.state import AgentState, Budget
         from lca.contracts.models.observability.journal import InboxFollowupCreated
-        from lca.layer0_infra.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine import RunStore
         from lca.layer1_cognitive.sensors.journal_backed import InboxFactsSensor
 
         store = RunStore()

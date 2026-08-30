@@ -23,6 +23,6 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.capability.sandbox import SandboxService
+    from lca.infrastructure.capability.sandbox import SandboxService
 
     ctx.provide("sandbox", SandboxService())

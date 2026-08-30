@@ -41,27 +41,27 @@
 | 35 | 固定运行技能协议，隔离操作技能生命周期（`lca.contracts.protocols.operational_skills.SkillPackage`） | `pytest tests/test_architecture_iteration_contracts.py` |
 | 36 | 固定技能投影，收拢展示模型转换（`lca.harness.skills.projection.SkillsProjection`） | `pytest tests/test_architecture_iteration_contracts.py` |
 | 37 | 固定技能服务，集中技能读取与编排入口（`lca.harness.skills.service.SkillCatalogService`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 38 | 固定能力技能模型，隔离基础设施能力声明（`lca.layer0_infra.capability.skills.SkillsService`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 39 | 固定检索技能策略，保护搜索决策的局部性（`lca.layer0_infra.search.skill_policy.filter_skill_search_result`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 40 | 固定激活范围模型，收拢作用域判断（`lca.layer0_infra.skills.activation_scope.get_activated_skills`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 41 | 固定内置技能模型，隔离默认资源装配（`lca.layer0_infra.skills.bundled.ensure_bundled_skills`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 42 | 固定技能磁盘存储，保护文件持久化接缝（`lca.layer0_infra.skills.disk_store.DiskSkillPackageStore`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 43 | 固定技能工厂，集中实例化和默认值（`lca.layer0_infra.skills.factory.resolve_skill_store`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 44 | 固定格式路由，隔离输入格式判断（`lca.layer0_infra.skills.format_routing.skills_for_filename`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 45 | 固定 frontmatter 模型，收拢元数据解析结果（`lca.layer0_infra.skills.frontmatter.split_frontmatter`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 46 | 固定 HTTP 导入器，隔离外部来源适配（`lca.layer0_infra.skills.http_importer.HttpSkillImporter`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 47 | 固定市场认证模型，集中凭据决策接缝（`lca.layer0_infra.skills.market_auth.market_auth_setup_hint`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 48 | 固定技能市场模型，隔离目录发现逻辑（`lca.layer0_infra.skills.marketplace.LobeHubMarketClient`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 49 | 固定技能设置模型，保护配置读取局部性（`lca.layer0_infra.skills.settings.SkillSettings`） | `pytest tests/test_architecture_iteration_contracts.py` |
-| 50 | 固定 URL 来源模型，收拢远程来源表示（`lca.layer0_infra.skills.url_sources.ParsedSkillUrl`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 38 | 固定能力技能模型，隔离基础设施能力声明（`lca.infrastructure.capability.skills.SkillsService`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 39 | 固定检索技能策略，保护搜索决策的局部性（`lca.infrastructure.search.skill_policy.filter_skill_search_result`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 40 | 固定激活范围模型，收拢作用域判断（`lca.infrastructure.skills.activation_scope.get_activated_skills`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 41 | 固定内置技能模型，隔离默认资源装配（`lca.infrastructure.skills.bundled.ensure_bundled_skills`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 42 | 固定技能磁盘存储，保护文件持久化接缝（`lca.infrastructure.skills.disk_store.DiskSkillPackageStore`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 43 | 固定技能工厂，集中实例化和默认值（`lca.infrastructure.skills.factory.resolve_skill_store`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 44 | 固定格式路由，隔离输入格式判断（`lca.infrastructure.skills.format_routing.skills_for_filename`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 45 | 固定 frontmatter 模型，收拢元数据解析结果（`lca.infrastructure.skills.frontmatter.split_frontmatter`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 46 | 固定 HTTP 导入器，隔离外部来源适配（`lca.infrastructure.skills.http_importer.HttpSkillImporter`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 47 | 固定市场认证模型，集中凭据决策接缝（`lca.infrastructure.skills.market_auth.market_auth_setup_hint`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 48 | 固定技能市场模型，隔离目录发现逻辑（`lca.infrastructure.skills.marketplace.LobeHubMarketClient`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 49 | 固定技能设置模型，保护配置读取局部性（`lca.infrastructure.skills.settings.SkillSettings`） | `pytest tests/test_architecture_iteration_contracts.py` |
+| 50 | 固定 URL 来源模型，收拢远程来源表示（`lca.infrastructure.skills.url_sources.ParsedSkillUrl`） | `pytest tests/test_architecture_iteration_contracts.py` |
 | 51 | 固定插件依赖读取接缝，移除 `ctx.inject` 兼容别名并统一到 `PluginContext.require` | `pytest tests/architecture/test_plugin_context_single_require.py` |
 | 52 | 固定技能安装接缝，收拢导入与读取的同一存储装配（`lca.contracts.protocols.operational_skills.SkillPackageInstaller`） | `pytest tests/test_architecture_iteration_contracts.py tests/test_operational_skills.py` |
 | 53 | 收窄声明式控制投影输入接缝，移除未参与编译行为的伪配置 | `pytest tests/plan/test_plan_compiler.py` |
 | 54 | 闭合技能安装接缝：让 `SkillsService`、插件声明与磁盘适配器统一以 `SkillPackageInstaller` 为接口，避免写入能力在组合时泄漏 | `pytest tests/test_operational_skills.py tests/test_plugin_alignment.py` |
-| 55 | 固定组件发现注册表，拒绝类别内隐式覆盖并集中独立贡献者的替换性测试表面（`lca.layer0_infra.component_registry.ComponentRegistry`） | `pytest tests/architecture/test_component_registry_seam.py` |
-| 56 | 收紧传输发现注册表的协议所有权，禁止依赖 provider 注册顺序覆盖实现（`lca.layer0_infra.transport.transport_registry.TransportRegistry`） | `pytest tests/test_transport_registry.py` |
+| 55 | 固定组件发现注册表，拒绝类别内隐式覆盖并集中独立贡献者的替换性测试表面（`lca.infrastructure.component_registry.ComponentRegistry`） | `pytest tests/architecture/test_component_registry_seam.py` |
+| 56 | 收紧传输发现注册表的协议所有权，禁止依赖 provider 注册顺序覆盖实现（`lca.infrastructure.transport.transport_registry.TransportRegistry`） | `pytest tests/test_transport_registry.py` |
 | 57 | 修正 Protocol 实现门禁的继承链识别，避免将通过子 Protocol 显式实现的存储接缝误报为隐式实现（`scripts/check_protocol_impl.py`） | `python scripts/check_protocol_impl.py` |
-| 58 | 统一 Action、Effect、Delta 处理器注册表：拒绝 operation 内隐式覆盖，并提供领域专属发现快照以集中启动诊断与覆盖校验（`lca.layer0_infra.handler_registry.UniqueOperationRegistry`） | `pytest tests/architecture/test_handler_substitutability.py tests/contracts/test_new_protocols.py` |
+| 58 | 统一 Action、Effect、Delta 处理器注册表：拒绝 operation 内隐式覆盖，并提供领域专属发现快照以集中启动诊断与覆盖校验（`lca.infrastructure.handler_registry.UniqueOperationRegistry`） | `pytest tests/architecture/test_handler_substitutability.py tests/contracts/test_new_protocols.py` |
 | 59 | 固定 Lead 预算策略解析接缝，收拢组件发现、工厂调用与协议校验，使计划绑定代理仅依赖 `LeadBudgetPolicyResolver` | `pytest tests/architecture/test_component_registry_seam.py tests/test_lead_composition.py` |
 | 60 | 移除 Lead 决策门在 `ComponentRegistry` 与 `GateService` 间的重复发现路径，统一由门服务按领域枚举解析，避免组合模块泄漏组件分类 | `pytest tests/architecture/test_component_registry_seam.py tests/test_lead_composition.py` |
 | 61 | 收拢能力快照所有权接缝，使诊断树直接复用生产 profile 解析结果，并移除“首个 owner + contributor”这一宽松的平行语义 | `pytest tests/architecture/test_capability_snapshot.py` |

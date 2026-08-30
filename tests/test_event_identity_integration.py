@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 
 from lca.contracts.models.observability.journal import AgentRunFinished, AgentRunStarted
-from lca.layer0_infra.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine import RunStore
 
 _ULID_RE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 

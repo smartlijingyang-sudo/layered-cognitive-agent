@@ -23,7 +23,7 @@ from lca.contracts.atoms.semantic_keys import OBS_DEGRADED_FROM
 from lca.contracts.models.core.decision import Decision
 from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.team.role_team import ToolPermissionManifest
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
+from lca.infrastructure.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody

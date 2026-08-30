@@ -18,7 +18,7 @@ class Config(BaseModel):
 
 
 def build_transport_service_compose() -> TransportRegistryProtocol:
-    from lca.layer0_infra.capability.transport import TransportService
+    from lca.infrastructure.capability.transport import TransportService
 
     return TransportService()
 

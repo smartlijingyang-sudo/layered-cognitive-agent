@@ -17,7 +17,7 @@ from lca.contracts.protocols.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.effect_handler import EffectCapabilities, EffectHandlerRegistry
 from lca.contracts.protocols.idempotency import IdempotencyStore
 from lca.contracts.protocols.reducer import Reducer
-from lca.layer0_infra.component_registry import RegistryKeyError
+from lca.infrastructure.component_registry import RegistryKeyError
 
 
 class RegistryEffectGateway(EffectGateway):

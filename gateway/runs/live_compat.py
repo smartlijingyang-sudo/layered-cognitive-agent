@@ -5,7 +5,7 @@ the historical Gateway import path for HTTP handlers and external callers while
 keeping live-tail behavior in the infrastructure implementation.
 """
 
-from lca.layer0_infra.observability.journal.live_tail import (
+from lca.infrastructure.observability.journal.live_tail import (
     TEXT_CHANNEL_ALL,
     TEXT_CHANNEL_ANSWER,
     LiveGap,

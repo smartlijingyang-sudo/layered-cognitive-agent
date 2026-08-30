@@ -29,6 +29,6 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import NamedRegistry
+    from lca.infrastructure.observability import NamedRegistry
 
     ctx.provide("journal_store_factories", NamedRegistry())

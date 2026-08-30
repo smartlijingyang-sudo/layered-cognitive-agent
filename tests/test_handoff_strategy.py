@@ -110,8 +110,8 @@ class TestHandoffActionType(unittest.TestCase):
     def test_handoff_in_action_registry(self) -> None:
         """handoff 应在 ActionRegistry 的已注册集合中。"""
         from lca.contracts.models.team.role_team import ToolPermissionManifest
-        from lca.layer0_infra.transport.agent_transport import InternalTransport
-        from lca.layer0_infra.transport.transport_registry import TransportRegistry
+        from lca.infrastructure.transport.agent_transport import InternalTransport
+        from lca.infrastructure.transport.transport_registry import TransportRegistry
         from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
         from lca.layer1_cognitive.body.tool_registry import SimpleToolRegistry
 

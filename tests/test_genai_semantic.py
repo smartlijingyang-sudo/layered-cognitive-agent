@@ -8,11 +8,11 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
     ToolInvoked,
 )
-from lca.layer0_infra.observability.genai.llm import LlmGenAIMapper
-from lca.layer0_infra.observability.genai.registry import (
+from lca.infrastructure.observability.genai.llm import LlmGenAIMapper
+from lca.infrastructure.observability.genai.registry import (
     build_default_registry,
 )
-from lca.layer0_infra.observability.genai.tool import ToolGenAIMapper
+from lca.infrastructure.observability.genai.tool import ToolGenAIMapper
 
 
 def _scope() -> RunScope:

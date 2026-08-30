@@ -23,5 +23,5 @@ def test_phase_transaction_depends_on_observation_seam_not_tracing_backend() -> 
     imports = _imported_modules(TRANSACTION)
 
     assert "lca.harness.declarative.phase_observation" in imports
-    assert "lca.layer0_infra.observability" not in imports
+    assert "lca.infrastructure.observability" not in imports
     assert "lca.contracts.atoms.telemetry" not in imports

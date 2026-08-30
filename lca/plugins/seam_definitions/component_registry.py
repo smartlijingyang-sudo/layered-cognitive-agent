@@ -30,7 +30,7 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
-    from lca.layer0_infra.component_registry import ComponentRegistry
+    from lca.infrastructure.component_registry import ComponentRegistry
 
     ctx.provide(COMPONENT_REGISTRY.key, ComponentRegistry())
 

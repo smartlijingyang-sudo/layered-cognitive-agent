@@ -25,7 +25,7 @@ class _DebugTraceCommand:
     description = "render run-scoped journal via TraceInspector"
 
     def run(self, **kwargs: Any) -> int:
-        from lca.layer0_infra.observability import TraceInspector, read_journal
+        from lca.infrastructure.observability import TraceInspector, read_journal
 
         from_file: Path | None = kwargs.get("from_file")
         run_id: str | None = kwargs.get("run_id")
@@ -103,7 +103,7 @@ def _render_event(stamped: Any) -> dict[str, Any]:
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import NamedRegistry
+    from lca.infrastructure.observability import NamedRegistry
 
     registry: NamedRegistry = ctx.require("cli_debug_command")
     registry.register("trace", _DebugTraceCommand())

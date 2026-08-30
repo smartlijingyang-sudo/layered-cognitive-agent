@@ -20,8 +20,8 @@ from lca.contracts.protocols.control_verdict import ControlVerdict, ControlVerdi
 from lca.contracts.protocols.declarative_phase_graph import PhaseInput, PhaseResult
 from lca.harness.profile.plan_compiler import compile_plan
 from lca.harness.profile.resolve import resolve_profile
-from lca.layer0_infra.state_store.in_memory_store import InMemoryStateStore
-from lca.layer0_infra.transport.transport_registry import TransportRegistry
+from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
+from lca.infrastructure.transport.transport_registry import TransportRegistry
 from lca.layer1_cognitive.body.action_registry import ActionRegistry
 from lca.layer1_cognitive.body.safe_executor import SimpleSafeExecutor
 from lca.layer1_cognitive.body.simple_body import SimpleBody

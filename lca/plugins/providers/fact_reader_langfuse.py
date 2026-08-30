@@ -44,7 +44,7 @@ class _NoopReader:
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import NamedRegistry, ObservabilitySettings
+    from lca.infrastructure.observability import NamedRegistry, ObservabilitySettings
 
     registry: NamedRegistry = ctx.require("fact_readers")
 

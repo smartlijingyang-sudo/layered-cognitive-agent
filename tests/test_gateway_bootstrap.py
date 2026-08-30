@@ -20,7 +20,7 @@ from gateway.device_gateway.registry import DeviceRegistry
 from gateway.device_gateway.settings import DeviceGatewaySettings
 from lca.contracts.models.core.plane import PlaneRef
 from lca.contracts.protocols.infra import MachineResolver, MachineTransport
-from lca.layer0_infra.file_store import LocalFileStore
+from lca.infrastructure.file_store import LocalFileStore
 
 
 class _EmptyMachineResolver(MachineResolver):

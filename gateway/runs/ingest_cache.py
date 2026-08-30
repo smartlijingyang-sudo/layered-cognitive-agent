@@ -13,7 +13,7 @@ import structlog
 
 from gateway.runs.ingest_integrity import content_hash
 from gateway.runs.ingest_models import FileRef, LobeHubBridgeSettings, bridge_settings
-from lca.layer0_infra.file_store import FileStore
+from lca.infrastructure.file_store import FileStore
 
 _CACHE_VERSION = 1
 _log = structlog.get_logger(__name__)

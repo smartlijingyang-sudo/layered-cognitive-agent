@@ -21,7 +21,7 @@ from gateway.runs.terminal_materialization import (
     record_terminal_materialization as _record_terminal_materialization,
 )
 from gateway.runs.terminal_status import derive_terminal_status as _derive_terminal_status
-from lca.layer0_infra.tools.run_finalizer import finalize_run
+from lca.infrastructure.tools.run_finalizer import finalize_run
 
 _log = structlog.get_logger(__name__)
 

@@ -29,7 +29,7 @@ from lca.contracts.models.observability.journal import (
     InboxFollowupCreated,
     TeamMessagePublished,
 )
-from lca.layer0_infra.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine import RunStore
 from lca.layer1_cognitive.brain.context_manifest import digest_manifest
 from lca.layer1_cognitive.brain.decision_gates import (
     ChainedDecisionGate,

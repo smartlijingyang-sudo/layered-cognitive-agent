@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.layer0_infra.sandbox.host_settings import HostRuntimeSettings
+from lca.infrastructure.sandbox.host_settings import HostRuntimeSettings
 
 
 def test_root_derived_from_user() -> None:

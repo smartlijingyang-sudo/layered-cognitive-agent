@@ -16,11 +16,11 @@ from lca.contracts.observability.cost import (
     CostCalculator,
     ModelPricing,
 )
-from lca.layer0_infra.observability.cost.default_pricing import (
+from lca.infrastructure.observability.cost.default_pricing import (
     _DEFAULT_PRICING_REF,
     DefaultCostPricingTable,
 )
-from lca.layer0_infra.observability.cost.projector import CostProjector
+from lca.infrastructure.observability.cost.projector import CostProjector
 
 
 def _make_event(

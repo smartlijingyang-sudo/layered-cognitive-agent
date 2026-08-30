@@ -14,11 +14,11 @@ from lca.contracts.models.observability.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
 )
 from lca.contracts.models.observability.telemetry_catalog import TELEMETRY_CATALOG
-from lca.layer0_infra.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
+from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _LCA_DIR = _REPO_ROOT / "lca"
-_OBS_PKG = "lca.layer0_infra.observability"
+_OBS_PKG = "lca.infrastructure.observability"
 _EMIT_CALLS = frozenset({"span", "detached_span", "traced"})
 
 
@@ -48,7 +48,7 @@ class TestBoundaryGuard(unittest.TestCase):
                 for name in imported:
                     if name.startswith(_OBS_PKG + ".") and not (
                         name.startswith(_OBS_PKG + ".adapters")
-                        or mod.startswith("lca.layer0_infra.ops")
+                        or mod.startswith("lca.infrastructure.ops")
                         # Plugins are the legitimate adapter boundary — they MUST import
                         # observability internals (ConsoleJournalProjector, OtelTracer, ...)
                         # to register them as plugin factories. The guard's intent is to
@@ -151,10 +151,10 @@ class TestRedactionBackstop(unittest.TestCase):
             InMemorySpanExporter,
         )
 
-        from lca.layer0_infra.observability import bind_backends, span
-        from lca.layer0_infra.observability.policy import AttributePolicy
-        from lca.layer0_infra.observability.tracer_backend import OtelTracer
-        from lca.layer0_infra.observability.view import view_of
+        from lca.infrastructure.observability import bind_backends, span
+        from lca.infrastructure.observability.policy import AttributePolicy
+        from lca.infrastructure.observability.tracer_backend import OtelTracer
+        from lca.infrastructure.observability.view import view_of
         from tests.support.observability_helpers import make_test_bound
 
         exporter = InMemorySpanExporter()
@@ -187,9 +187,9 @@ class TestExporterFaultIsolation(unittest.TestCase):
             InMemorySpanExporter,
         )
 
-        from lca.layer0_infra.observability import bind_backends, span
-        from lca.layer0_infra.observability.handles import _IsolatedExporter
-        from lca.layer0_infra.observability.tracer_backend import OtelTracer
+        from lca.infrastructure.observability import bind_backends, span
+        from lca.infrastructure.observability.handles import _IsolatedExporter
+        from lca.infrastructure.observability.tracer_backend import OtelTracer
         from tests.support.observability_helpers import make_test_bound
 
         class ExplodingExporter(SpanExporter):
@@ -221,10 +221,10 @@ class TestVerbosityLevels(unittest.TestCase):
             InMemorySpanExporter,
         )
 
-        from lca.layer0_infra.observability import bind_backends, span
-        from lca.layer0_infra.observability.policy import AttributePolicy, Verbosity
-        from lca.layer0_infra.observability.tracer_backend import OtelTracer
-        from lca.layer0_infra.observability.view import view_of
+        from lca.infrastructure.observability import bind_backends, span
+        from lca.infrastructure.observability.policy import AttributePolicy, Verbosity
+        from lca.infrastructure.observability.tracer_backend import OtelTracer
+        from lca.infrastructure.observability.view import view_of
         from tests.support.observability_helpers import make_test_bound
 
         exporter = InMemorySpanExporter()

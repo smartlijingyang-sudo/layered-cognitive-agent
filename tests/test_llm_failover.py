@@ -7,7 +7,7 @@ from unittest import IsolatedAsyncioTestCase, mock
 
 from lca.contracts.atoms.enums import LLMStreamEventType
 from lca.contracts.models.core.llm import LLMResponse, LLMStreamEvent
-from lca.layer0_infra.llm_adapter.failover import (
+from lca.infrastructure.llm_adapter.failover import (
     FailoverLLMAdapter,
     LLMFailoverCandidate,
     LLMRetryPolicy,
@@ -325,9 +325,9 @@ class TestFailoverResolverConfiguration(IsolatedAsyncioTestCase):
         )
 
         with (
-            mock.patch("lca.layer0_infra.llm.config.normalize_llm_environ"),
+            mock.patch("lca.infrastructure.llm.config.normalize_llm_environ"),
             mock.patch(
-                "lca.layer0_infra.llm_adapter.openai_compat.OpenAICompatAdapter",
+                "lca.infrastructure.llm_adapter.openai_compat.OpenAICompatAdapter",
                 side_effect=(primary, secondary),
             ) as adapter_factory,
         ):

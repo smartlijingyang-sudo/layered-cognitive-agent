@@ -6,7 +6,7 @@ import os
 import unittest
 from unittest import mock
 
-from lca.layer0_infra.llm_resolver import (
+from lca.infrastructure.llm_resolver import (
     LLMUnavailableError,
     get_async_openai_client,
     llm_openai_credentials,

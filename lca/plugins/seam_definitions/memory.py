@@ -22,6 +22,6 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.capability.memory import MemoryService
+    from lca.infrastructure.capability.memory import MemoryService
 
     ctx.provide("memory", MemoryService())

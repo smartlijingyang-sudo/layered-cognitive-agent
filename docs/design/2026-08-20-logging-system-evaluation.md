@@ -465,7 +465,7 @@ def publish(self, stamped: StampedEvent) -> None:
 
 ### 82. `record()` 在 `team_message_tool` 被 alias 成 `_journal_record`
 
-`from lca.layer0_infra.observability import record as _journal_record` ——靠改名"遮蔽",reader 一眼分不清哪个 record 是 journal。
+`from lca.infrastructure.observability import record as _journal_record` ——靠改名"遮蔽",reader 一眼分不清哪个 record 是 journal。
 
 ### 83. `run_narrative.py` 与 `plan_narrative.py` 在 narrative/ 子包,但前者是 span 诊断后者是 journal 模板
 

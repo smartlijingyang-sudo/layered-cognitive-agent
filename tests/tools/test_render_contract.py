@@ -1,10 +1,10 @@
-"""Tests for lca.layer0_infra.tools.contract."""
+"""Tests for lca.infrastructure.tools.contract."""
 
 from __future__ import annotations
 
 import unittest
 
-from lca.layer0_infra.tools.contract import (
+from lca.infrastructure.tools.contract import (
     COMMON,
     REGISTRY,
     FieldSpec,

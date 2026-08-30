@@ -10,16 +10,16 @@ from gateway.runs.session import RunSession
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.models.observability.journal import AgentRunFinished
 from lca.contracts.protocols import DshRuntime
-from lca.layer0_infra.computer.machine import MachineTransport
-from lca.layer0_infra.dsh.archive import JsonlEventArchive
-from lca.layer0_infra.dsh.models import DshTurnResult
-from lca.layer0_infra.dsh.projector import DshJournalProjector
-from lca.layer0_infra.dsh.run import run_dsh_machine_turn
-from lca.layer0_infra.dsh.runtime import DshUnavailableError
-from lca.layer0_infra.dsh.settings import DshSettings
-from lca.layer0_infra.dsh.sink import HandleJournalSink
-from lca.layer0_infra.plane.machine import resolve_machine_transport
-from lca.layer0_infra.plane.resolve import ref_of
+from lca.infrastructure.computer.machine import MachineTransport
+from lca.infrastructure.dsh.archive import JsonlEventArchive
+from lca.infrastructure.dsh.models import DshTurnResult
+from lca.infrastructure.dsh.projector import DshJournalProjector
+from lca.infrastructure.dsh.run import run_dsh_machine_turn
+from lca.infrastructure.dsh.runtime import DshUnavailableError
+from lca.infrastructure.dsh.settings import DshSettings
+from lca.infrastructure.dsh.sink import HandleJournalSink
+from lca.infrastructure.plane.machine import resolve_machine_transport
+from lca.infrastructure.plane.resolve import ref_of
 
 _log = structlog.get_logger(__name__)
 
@@ -34,7 +34,7 @@ def default_runtime(
     hub = device_hub()
     if hub is not None:
         return StreamingDshRuntime(hub, machine.id, settings)
-    from lca.layer0_infra.dsh.machine_runtime import MachineDshRuntime
+    from lca.infrastructure.dsh.machine_runtime import MachineDshRuntime
 
     return MachineDshRuntime(transport, machine, settings)
 
@@ -48,7 +48,7 @@ async def execute_dsh_session(session: RunSession) -> None:
     终态通过 store.append(AgentRunFinished) 写入，不通过独立状态路径——
     消灭双 owner（ADR-0055 不变量 N3）。
     """
-    from lca.layer0_infra.observability.facade import current_bound
+    from lca.infrastructure.observability.facade import current_bound
 
     hub = current_bound()  # type: ignore[assignment]
     sink = HandleJournalSink(hub=hub)  # type: ignore[call-arg]

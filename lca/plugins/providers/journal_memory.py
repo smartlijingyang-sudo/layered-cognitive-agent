@@ -29,7 +29,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.observability import (
+    from lca.infrastructure.observability import (
         AttributePolicy,
         NamedRegistry,
         ObservabilitySettings,
@@ -51,7 +51,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             if policy is not None
             else AttributePolicy(verbosity=cfg.verbosity, redact=cfg.redact_enabled)
         )
-        from lca.layer0_infra.observability.journal_backend import MemoryJournal
+        from lca.infrastructure.observability.journal_backend import MemoryJournal
 
         return MemoryJournal(
             policy=pol,

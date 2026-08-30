@@ -20,7 +20,7 @@ from gateway.runs.identity import parse_agent_ref
 from gateway.runs.ingress import prepare_run_from_messages
 from gateway.runs.port import RunPort, RunRequest
 from lca.contracts.mechanisms.capability import MissingCapabilityError
-from lca.layer0_infra.file_store import LocalFileStore
+from lca.infrastructure.file_store import LocalFileStore
 
 
 def _file_store_of(request: Request) -> LocalFileStore:

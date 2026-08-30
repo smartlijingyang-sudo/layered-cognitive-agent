@@ -18,8 +18,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
-from lca.layer0_infra.ops.cli import app
+from lca.infrastructure.observability.journal.journal_io import stamped_to_record
+from lca.infrastructure.ops.cli import app
 
 runner = CliRunner()
 

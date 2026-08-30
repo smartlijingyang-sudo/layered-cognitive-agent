@@ -37,7 +37,7 @@ def test_profile_snapshot_seam_provides_registry() -> None:
 
 
 def test_profile_snapshot_registry_is_named_registry() -> None:
-    from lca.layer0_infra.observability import NamedRegistry
+    from lca.infrastructure.observability import NamedRegistry
 
     provided = _invoke_seam_setup()
     registry = provided["profile_snapshots"]

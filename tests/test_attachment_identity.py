@@ -8,15 +8,15 @@ from pathlib import Path
 
 from lca.contracts.models.core.attachment import AttachmentRecord
 from lca.contracts.protocols import AttachmentIdentity
-from lca.layer0_infra.attachment import (
+from lca.infrastructure.attachment import (
     FileStoreAttachmentIdentity,
     get_attachment_policy,
     reset_attachment_settings_for_tests,
 )
-from lca.layer0_infra.attachment.files_info import AttachmentManifest
-from lca.layer0_infra.attachment.layout import AttachmentLayout
-from lca.layer0_infra.attachment.settings import AttachmentPolicyDocument
-from lca.layer0_infra.file_store import LocalFileStore
+from lca.infrastructure.attachment.files_info import AttachmentManifest
+from lca.infrastructure.attachment.layout import AttachmentLayout
+from lca.infrastructure.attachment.settings import AttachmentPolicyDocument
+from lca.infrastructure.file_store import LocalFileStore
 
 
 class TestAttachmentPolicy(unittest.TestCase):

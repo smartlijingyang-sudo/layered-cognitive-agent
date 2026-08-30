@@ -45,7 +45,7 @@ from lca.contracts.protocols import (
 from lca.contracts.protocols.action import Action
 from lca.contracts.protocols.command_envelope import command_envelope_to_dict
 from lca.contracts.protocols.tool_batch_execution import ToolBatchExecutionPolicy
-from lca.layer0_infra.observability import record
+from lca.infrastructure.observability import record
 from lca.layer1_cognitive.body.delegation_cache import (
     cached_delegation_observation,
     tag_delegation_extra,

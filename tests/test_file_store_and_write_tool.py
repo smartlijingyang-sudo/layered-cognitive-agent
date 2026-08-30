@@ -6,8 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.tools.write_file import build_tools as build_write_file_tools
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.tools.write_file import build_tools as build_write_file_tools
 
 
 class LocalFileStoreTests(unittest.IsolatedAsyncioTestCase):

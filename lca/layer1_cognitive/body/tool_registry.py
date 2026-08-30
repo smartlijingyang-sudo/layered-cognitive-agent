@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.protocols import Tool, ToolRegistry
-from lca.layer0_infra.component_registry import NamedRegistry
+from lca.infrastructure.component_registry import NamedRegistry
 
 
 class SimpleToolRegistry(NamedRegistry[Tool], ToolRegistry):

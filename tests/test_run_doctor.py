@@ -7,8 +7,8 @@ from pathlib import Path
 
 from gateway.runs.doctor import diagnose
 from gateway.runs.session import RunSession, RunStatus
-from lca.layer0_infra.observability.journal.journal_io import JOURNAL_SCHEMA_VERSION
-from lca.layer0_infra.observability.journal.live_tail import LiveTail
+from lca.infrastructure.observability.journal.journal_io import JOURNAL_SCHEMA_VERSION
+from lca.infrastructure.observability.journal.live_tail import LiveTail
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:

@@ -39,7 +39,7 @@ from lca.harness.profile.resolve import (
     resolve_profile,
 )
 from lca.harness.profile.source import load_profile_entries
-from lca.layer0_infra.file_store import FileStore
+from lca.infrastructure.file_store import FileStore
 
 __all__ = [
     "ProfileResolveError",
@@ -104,7 +104,7 @@ def _install_observability(ctx: Context) -> None:
     boot ctx 解耦。
     """
     from lca.harness.observability import assemble_observability
-    from lca.layer0_infra.observability import ObservabilitySettings
+    from lca.infrastructure.observability import ObservabilitySettings
 
     assemble_observability(ctx, ObservabilitySettings())
 
@@ -154,7 +154,7 @@ async def _boot_context(
 
 def _bind_bootstrap_file_store(ctx: Context, store: FileStore) -> None:
     """Register the app-owned store before ordinary FileStore providers boot."""
-    from lca.layer0_infra.capability.files import FileStoreService
+    from lca.infrastructure.capability.files import FileStoreService
 
     service = ctx.inject("file_store")
     if not isinstance(service, FileStoreService):

@@ -14,7 +14,7 @@ LCA 现有架构基础较强：五层单向分层（`contracts → layer0_infra 
 但当前状态在三个具体方面没有强约束，导致新贡献者上手成本依然偏高：
 
 1. **包职责不外显**：开发者必须先读 AGENTS.md §3 + 多个 ADR + `docs/specs/lca-structured-cognition-guide.md` 才能判断"这个包能放什么、不能放什么"。每个包没有机器可读的契约。
-2. **层名是编号不是语义**：`lca.layer0_infra` / `lca.layer1_cognitive` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 表达顺序清晰，但表达职责模糊；新人需要"先背 L0–L4 顺序 → 再查 ADR-0001 才知道每个层做什么"。
+2. **层名是编号不是语义**：`lca.infrastructure` / `lca.layer1_cognitive` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 表达顺序清晰，但表达职责模糊；新人需要"先背 L0–L4 顺序 → 再查 ADR-0001 才知道每个层做什么"。
 3. **命名规范只在文档**：`docs/specs/naming-conventions.md` 已经明确禁 `Impl / Manager / Helper / Common`，但仓库仍有历史违规文件（如 `trace_tool.py` 一类的"tool" 后缀），且无 CI 强约束，新代码仍可能继续引入模糊命名。
 
 这三点不是"再增加新层"能解决的；最有效的方向是**把已有架构约束显式化、可机器验证、覆盖老代码**。
@@ -32,7 +32,7 @@ LCA 现有架构基础较强：五层单向分层（`contracts → layer0_infra 
 - **L3 架构边界**：扩展 `import-linter` 的 `forbidden` + `independence` 规则
 - **L4 一致性闸口**：新增 `scripts/check_package_contracts.py`，扫 L1↔L2↔L3↔实际 import 四向一致性
 
-**D3.** Phase 2 采用**一次性切换，无兼容期**：旧名 `lca.layer0_infra` 等在新 PR 完成后立即消失，不留 shim。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不参与重命名（避免冲击外部消费方与已有 ADR）。C1–C7 闭集纪律仍然生效：必须先有 ADR，删除与改名必须原子，CI 绿是切换的前置条件。
+**D3.** Phase 2 采用**一次性切换，无兼容期**：旧名 `lca.infrastructure` 等在新 PR 完成后立即消失，不留 shim。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不参与重命名（避免冲击外部消费方与已有 ADR）。C1–C7 闭集纪律仍然生效：必须先有 ADR，删除与改名必须原子，CI 绿是切换的前置条件。
 
 **D4.** 公共 API 与内部路径**严格区分**：外部可能消费的 `lca.contracts.*` 数据/协议、`lca.harness.plugin_api`、`profiles/*.yaml` schema 在三阶段中严格保留兼容；内部子包（如 `lca.cognition.brain.*`）可自由改名。判断标准：是否在 `docs/AGENTS.md` §2 仓库地图或 ADR 中被列为公共入口。
 
@@ -48,7 +48,7 @@ LCA 现有架构基础较强：五层单向分层（`contracts → layer0_infra 
 
 **I2.** Phase 1 完成后，所有一级 + 二级包都有 `README.md` + `pyproject.toml` 段 + `import-linter` 规则。少一个即不通过 L4 check。
 
-**I3.** Phase 2 完成后，仓库内**不存在** `lca.layer0_infra` / `lca.layer1_cognitive` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 五个旧名（grep 全仓库为零）。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不变。
+**I3.** Phase 2 完成后，仓库内**不存在** `lca.infrastructure` / `lca.layer1_cognitive` / `lca.layer2_runtime` / `lca.layer3_agent` / `lca.layer4_app` 五个旧名（grep 全仓库为零）。`lca.harness` / `lca.plugins` / `lca.contracts` / `gateway` 不变。
 
 **I4.** Phase 3 完成后，新提交的 Python 文件名**不匹配** filename blacklist（`util` / `helper` / `manager` / `impl` / `common` / `misc`）。匹配的文件必须先在对应包 L2 段声明 `filename_whitelist` 或在仓库根 `legacy_blacklist.txt` 中登记。
 
@@ -202,7 +202,7 @@ responsibility = "数据契约层：Protocol、枚举、dataclass、事件"
 not_responsible_for = "实现细节、I/O、配置解析"
 allowed_dependencies = []
 forbidden_dependencies = [
-    "lca.layer0_infra",
+    "lca.infrastructure",
     "lca.layer1_cognitive",
     "lca.layer2_runtime",
     "lca.layer3_agent",
@@ -292,7 +292,7 @@ def main() -> int:  # exit 0 if all pass, 1 otherwise
 
 | 旧 | 新 | 状态 |
 |---|---|---|
-| `lca.layer0_infra` | `lca.infrastructure` | 重命名 |
+| `lca.infrastructure` | `lca.infrastructure` | 重命名 |
 | `lca.layer1_cognitive` | `lca.cognition` | 重命名 |
 | `lca.layer2_runtime` | `lca.runtime` | 重命名 |
 | `lca.layer3_agent` | `lca.agent` | 重命名 |
@@ -361,7 +361,7 @@ Proposed → Accepted（PR 合并后）
 ## [Unreleased] - 2026-XX-XX
 
 ### Breaking Changes
-- `lca.layer0_infra` → `lca.infrastructure`
+- `lca.infrastructure` → `lca.infrastructure`
 - `lca.layer1_cognitive` → `lca.cognition`
 - `lca.layer2_runtime` → `lca.runtime`
 - `lca.layer3_agent` → `lca.agent`

@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.capabilities import LEARNING_REVIEW_TICKET_STORE
 from lca.contracts.protocols.learning import LearningReviewTicketStore
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
-from lca.layer0_infra.learning.review_ticket_sqlite import SqliteLearningReviewTicketStore
+from lca.infrastructure.learning.review_ticket_sqlite import SqliteLearningReviewTicketStore
 
 
 class Config(BaseModel):

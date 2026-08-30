@@ -23,8 +23,8 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
     StepTextDelta,
 )
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.observability.journal.sse_frames import (
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.observability.journal.sse_frames import (
     parse_last_event_id,
     stamped_to_sse_frame,
 )

@@ -18,7 +18,7 @@ class Config(BaseModel):
 
 
 def build_tools_service_compose() -> ToolRegistry:
-    from lca.layer0_infra.capability.tools import ToolsService
+    from lca.infrastructure.capability.tools import ToolsService
 
     return ToolsService()
 

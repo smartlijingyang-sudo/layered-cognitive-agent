@@ -264,7 +264,7 @@ uv run pytest --no-cov tests/test_run_live_ui_sse.py tests/test_tool_event_facts
 
 ```sh
 # 1. SSOT 一致
-uv run python -c "from lca.layer0_infra.tools.contract import REGISTRY, render_registry_to_ts; ts = render_registry_to_ts(); import re; m = re.search(r'\\\"executeCode\\\"', ts); assert m, 'codegen must produce executeCode'"
+uv run python -c "from lca.infrastructure.tools.contract import REGISTRY, render_registry_to_ts; ts = render_registry_to_ts(); import re; m = re.search(r'\\\"executeCode\\\"', ts); assert m, 'codegen must produce executeCode'"
 # 2. jsonl 不带 projected_state
 grep -l "projected_state" traces/runs/*/run.jsonl 2>/dev/null && echo "FAIL: jsonl leak" || echo "OK"
 # 3. SSE 带 projected_state (manual via DevTools)

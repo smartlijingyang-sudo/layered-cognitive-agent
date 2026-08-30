@@ -23,6 +23,6 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.layer0_infra.capability.skills import SkillsService
+    from lca.infrastructure.capability.skills import SkillsService
 
     ctx.provide("skills", SkillsService())

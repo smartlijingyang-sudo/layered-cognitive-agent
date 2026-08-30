@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from lca.contracts.atoms.ids import new_id
 from lca.contracts.models.observability.journal import TeamMessagePublished
-from lca.layer0_infra.observability import record as _journal_record
+from lca.infrastructure.observability import record as _journal_record
 
 
 def publish_team_message(

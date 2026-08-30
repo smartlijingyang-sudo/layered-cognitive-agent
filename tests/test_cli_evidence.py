@@ -17,23 +17,23 @@ import typer.testing
 from lca.contracts.observability.evidence import (
     EvidenceStore,
 )
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     BoundObservability,
     bind_backends,
     run_scope,
 )
-from lca.layer0_infra.observability.evidence.policy import (
+from lca.infrastructure.observability.evidence.policy import (
     DefaultEvidencePolicy,
 )
-from lca.layer0_infra.observability.evidence.store import (
+from lca.infrastructure.observability.evidence.store import (
     FilesystemEvidenceStore,
 )
-from lca.layer0_infra.observability.journal.jsonl_projector import (
+from lca.infrastructure.observability.journal.jsonl_projector import (
     JsonlJournalProjector,
 )
-from lca.layer0_infra.observability.journal_backend import MemoryJournal
-from lca.layer0_infra.observability.policy import AttributePolicy
-from lca.layer0_infra.ops.cli import app
+from lca.infrastructure.observability.journal_backend import MemoryJournal
+from lca.infrastructure.observability.policy import AttributePolicy
+from lca.infrastructure.ops.cli import app
 
 _RUNNER = typer.testing.CliRunner()
 
@@ -109,7 +109,7 @@ def _drive_run(jsonl_path: Path, ev_root: Path) -> tuple[str, dict, str]:
             evidence_store=store,
             evidence_policy=policy,
         )
-    from lca.layer0_infra.observability.journal.journal_io import read_journal
+    from lca.infrastructure.observability.journal.journal_io import read_journal
 
     events = read_journal(jsonl_path)
     ts = next(e for e in events if isinstance(e.event, ToolStarted))
@@ -129,7 +129,7 @@ def test_cli_evidence_happy_path() -> None:
             evidence_policy=DefaultEvidencePolicy(),
         )
         # bind the bound so current_bound() returns it
-        from lca.layer0_infra.observability.facade import bind_backends as _bb
+        from lca.infrastructure.observability.facade import bind_backends as _bb
 
         with _bb(bound):
             result = _RUNNER.invoke(
@@ -152,7 +152,7 @@ def test_cli_evidence_accepts_sha256_prefix() -> None:
             evidence_store=FilesystemEvidenceStore(ev),
             evidence_policy=DefaultEvidencePolicy(),
         )
-        from lca.layer0_infra.observability.facade import bind_backends as _bb
+        from lca.infrastructure.observability.facade import bind_backends as _bb
 
         with _bb(bound):
             result = _RUNNER.invoke(
@@ -173,7 +173,7 @@ def test_cli_evidence_no_ref_found_exit_1() -> None:
             evidence_store=FilesystemEvidenceStore(ev),
             evidence_policy=DefaultEvidencePolicy(),
         )
-        from lca.layer0_infra.observability.facade import bind_backends as _bb
+        from lca.infrastructure.observability.facade import bind_backends as _bb
 
         with _bb(bound):
             result = _RUNNER.invoke(
@@ -208,7 +208,7 @@ def test_cli_evidence_integrity_failure_exit_1() -> None:
             evidence_store=scriptable,
             evidence_policy=DefaultEvidencePolicy(),
         )
-        from lca.layer0_infra.observability.facade import bind_backends as _bb
+        from lca.infrastructure.observability.facade import bind_backends as _bb
 
         with _bb(bound):
             result = _RUNNER.invoke(
@@ -261,7 +261,7 @@ def test_cli_evidence_no_seam_exit_2() -> None:
             locator="",
         ).to_dict()
         from lca.contracts.models.observability.journal import StampedEvent
-        from lca.layer0_infra.observability.journal.journal_io import stamped_to_record
+        from lca.infrastructure.observability.journal.journal_io import stamped_to_record
 
         # Build a ToolStarted with arguments_ref (ADR-0101 PR-2: state_ref → arguments_ref)
         scope = RunScope(trace_id="t", run_id="run_x", agent_role="r")
@@ -271,7 +271,7 @@ def test_cli_evidence_no_seam_exit_2() -> None:
         stamped = StampedEvent(seq=1, ts=1.0, scope=scope, event=tool_evt)
         jsonl.write_text(json.dumps(stamped_to_record(stamped)) + "\n")
 
-        from lca.layer0_infra.observability.facade import bind_backends as _bb
+        from lca.infrastructure.observability.facade import bind_backends as _bb
 
         with _bb(bound_no_seam):
             result = _RUNNER.invoke(app, ["evidence", "run_x", digest, "--jsonl", str(jsonl)])
@@ -300,7 +300,7 @@ def test_cli_evidence_human_readable_default() -> None:
             evidence_store=FilesystemEvidenceStore(ev),
             evidence_policy=DefaultEvidencePolicy(),
         )
-        from lca.layer0_infra.observability.facade import bind_backends as _bb
+        from lca.infrastructure.observability.facade import bind_backends as _bb
 
         with _bb(bound):
             result = _RUNNER.invoke(app, ["evidence", run_id, digest, "--jsonl", str(jsonl)])

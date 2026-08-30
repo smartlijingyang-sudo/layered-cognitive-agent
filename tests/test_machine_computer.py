@@ -11,9 +11,9 @@ import pytest
 
 from lca.contracts.models.core.plane import PlaneKind, PlaneRef
 from lca.contracts.models.core.result import ApprovalPendingError
-from lca.layer0_infra.computer.machine import MachineComputer
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
+from lca.infrastructure.computer.machine import MachineComputer
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 from lca.layer1_cognitive.body.tool_result_preview import tool_files
 
 

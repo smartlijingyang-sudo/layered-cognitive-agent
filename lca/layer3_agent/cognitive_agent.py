@@ -30,7 +30,7 @@ from lca.contracts.models.team.role_team import RoleProfile
 from lca.contracts.models.team.run_context import RunContext
 from lca.contracts.protocols import AgentUnit, Runtime
 from lca.contracts.protocols.capabilities import HasHooks
-from lca.layer0_infra.observability import (
+from lca.infrastructure.observability import (
     BoundObservability,
     adopt_run_scope,
     bind_backends,
@@ -39,7 +39,7 @@ from lca.layer0_infra.observability import (
     run_scope,
     set_session,
 )
-from lca.layer0_infra.workspace import effective_agent_wall_clock, get_run_workspace
+from lca.infrastructure.workspace import effective_agent_wall_clock, get_run_workspace
 from lca.layer2_runtime.runtime_lifecycle import record_run_resumed
 
 _STRATEGY_KEY_SOLO = "solo"

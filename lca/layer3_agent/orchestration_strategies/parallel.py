@@ -9,7 +9,7 @@ from lca.contracts.models.core.budget import create_budget
 from lca.contracts.models.core.lifecycle import TaskStatus
 from lca.contracts.models.core.result import Result
 from lca.contracts.protocols import Synthesizer, TeamStage, TeamStrategy
-from lca.layer0_infra.observability import span
+from lca.infrastructure.observability import span
 
 
 class ParallelStrategy(TeamStrategy):

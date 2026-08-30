@@ -12,7 +12,7 @@ from lca.contracts.models.team.team_coordination import LeadMandate, gate_name_f
 from lca.contracts.protocols import BudgetPolicy, LeadBudgetPolicyResolver, SharedMemoryStore
 from lca.contracts.protocols.infra import AgentTransport
 from lca.contracts.protocols.spec import AgentSpec
-from lca.layer0_infra.observability import BoundObservability
+from lca.infrastructure.observability import BoundObservability
 from lca.layer3_agent.cognitive_agent import CognitiveAgent
 from lca.plugins.composer.internal.team import resolve_decision_gate
 from lca.plugins.composer.plan_binding import bind_agent_from_scope

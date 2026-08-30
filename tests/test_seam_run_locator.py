@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from lca.contracts.observability.run_locator import RunLocator
-from lca.layer0_infra.observability.run_locator_fs import FilesystemRunLocator
+from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 
 
 def _invoke_seam_setup() -> dict[str, object]:

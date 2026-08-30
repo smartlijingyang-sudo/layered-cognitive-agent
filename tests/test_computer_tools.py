@@ -8,15 +8,15 @@ import unittest
 from pathlib import Path
 
 from gateway.runs.wire import WIRE, resolve
-from lca.layer0_infra.computer.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
-from lca.layer0_infra.computer.parse_result import parse_computer_stdout
-from lca.layer0_infra.file_store import LocalFileStore
-from lca.layer0_infra.tools.default_set import build_default_tools
-from lca.layer0_infra.tools.lca_computer import (
+from lca.infrastructure.computer.constants import COMPUTER_RESULT_BEGIN, COMPUTER_RESULT_END
+from lca.infrastructure.computer.parse_result import parse_computer_stdout
+from lca.infrastructure.file_store import LocalFileStore
+from lca.infrastructure.tools.default_set import build_default_tools
+from lca.infrastructure.tools.lca_computer import (
     build_computer_tools,
     build_machine_computer_tools,
 )
-from lca.layer0_infra.tools.lca_computer.types import MACHINE_APIS, SANDBOX_ONLY_APIS, ApiName
+from lca.infrastructure.tools.lca_computer.types import MACHINE_APIS, SANDBOX_ONLY_APIS, ApiName
 from tests.support.inline_sandbox import InlineSandbox
 
 EXECUTE_CODE = ApiName.EXECUTE_CODE
@@ -101,7 +101,7 @@ class TestDefaultToolsComputer(unittest.TestCase):
     def test_default_set_prefers_computer_over_legacy(self) -> None:
         from unittest.mock import patch
 
-        with patch("lca.layer0_infra.tools.default_set.resolve_sandbox") as mock:
+        with patch("lca.infrastructure.tools.default_set.resolve_sandbox") as mock:
             mock.return_value = InlineSandbox()
             names = {t.name for t in build_default_tools(self.store)}
         self.assertIn("listFiles", names)
@@ -126,7 +126,7 @@ class TestDefaultToolsComputer(unittest.TestCase):
         resolver = MagicMock()
         resolver.resolve_machine.return_value = machine
         with patch(
-            "lca.layer0_infra.tools.default_set.resolve_sandbox", return_value=InlineSandbox()
+            "lca.infrastructure.tools.default_set.resolve_sandbox", return_value=InlineSandbox()
         ):
             names = {t.name for t in build_default_tools(self.store, machine_resolver=resolver)}
         self.assertIn("listFiles", names)
@@ -142,9 +142,9 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         from pathlib import Path
 
         from lca.contracts.models.core.sandbox import SandboxFile
-        from lca.layer0_infra.computer.runtime import ComputerOpResult
-        from lca.layer0_infra.file_store import LocalFileStore
-        from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
+        from lca.infrastructure.computer.runtime import ComputerOpResult
+        from lca.infrastructure.file_store import LocalFileStore
+        from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 
         result = ComputerOpResult(
             success=True,
@@ -181,9 +181,9 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         from pathlib import Path
 
         from lca.contracts.models.core.sandbox import SandboxFile
-        from lca.layer0_infra.computer.runtime import ComputerOpResult
-        from lca.layer0_infra.file_store import LocalFileStore
-        from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
+        from lca.infrastructure.computer.runtime import ComputerOpResult
+        from lca.infrastructure.file_store import LocalFileStore
+        from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 
         existing = {
             "name": "loan.pdf",
@@ -215,10 +215,10 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
-        from lca.layer0_infra.computer.runtime import ComputerOpResult
-        from lca.layer0_infra.file_store import LocalFileStore
-        from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
-        from lca.layer0_infra.workspace.scope import run_workspace_scope
+        from lca.infrastructure.computer.runtime import ComputerOpResult
+        from lca.infrastructure.file_store import LocalFileStore
+        from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
+        from lca.infrastructure.workspace.scope import run_workspace_scope
 
         existing = {
             "name": "deck.pptx",
@@ -250,9 +250,9 @@ class TestBuildComputerObservationFiles(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
-        from lca.layer0_infra.computer.runtime import ComputerOpResult
-        from lca.layer0_infra.file_store import LocalFileStore
-        from lca.layer0_infra.tools.lca_computer.observations import build_computer_observation
+        from lca.infrastructure.computer.runtime import ComputerOpResult
+        from lca.infrastructure.file_store import LocalFileStore
+        from lca.infrastructure.tools.lca_computer.observations import build_computer_observation
 
         result = ComputerOpResult(
             success=True,

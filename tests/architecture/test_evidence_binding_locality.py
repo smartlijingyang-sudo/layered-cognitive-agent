@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lca.layer0_infra.observability import BoundObservability, EvidenceBinding
+from lca.infrastructure.observability import BoundObservability, EvidenceBinding
 
 
 class TestEvidenceBindingLocality:

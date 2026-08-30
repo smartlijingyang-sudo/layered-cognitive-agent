@@ -26,6 +26,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     Composer instantiates a RunStore per-run; this plugin only registers
     the class so composition can resolve it without importing layer0.
     """
-    from lca.layer0_infra.observability import RunStore
+    from lca.infrastructure.observability import RunStore
 
     ctx.provide("journal_store", RunStore)

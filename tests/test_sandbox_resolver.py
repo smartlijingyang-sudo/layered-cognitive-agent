@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.layer0_infra.sandbox.factory import resolve_sandbox, set_sandbox_resolver
+from lca.infrastructure.sandbox.factory import resolve_sandbox, set_sandbox_resolver
 from tests.support.inline_sandbox import InlineSandbox
 
 
