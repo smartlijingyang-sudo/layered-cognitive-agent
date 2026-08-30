@@ -105,13 +105,13 @@ def main() -> int:
     # Read existing pyproject.toml
     existing = PYPROJECT.read_text(encoding="utf-8")
 
-    # Remove old [tool.lca.package_contracts] section if present
-    new_content = re.sub(
-        r"\[tool\.lca\.package_contracts\].*?(?=\n\[|\Z)",
-        "",
-        existing,
-        flags=re.DOTALL,
-    ).rstrip() + "\n\n"
+    # Remove old [tool.lca.package_contracts.*] sections (any depth)
+    # Find the position of the FIRST section and cut everything from there to end
+    match = re.search(r"^\[tool\.lca\.package_contracts", existing, re.MULTILINE)
+    if match:
+        new_content = existing[: match.start()].rstrip() + "\n\n"
+    else:
+        new_content = existing.rstrip() + "\n\n"
 
     # Generate new section
     new_section = "[tool.lca.package_contracts]\n\n"

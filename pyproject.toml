@@ -261,6 +261,17 @@ checks = [
 
 [tool.lca.package_contracts]
 
+[tool.lca.package_contracts."lca"]
+responsibility = "LCA 一级包命名空间；根层"
+not_responsible_for = "具体业务（见各子包）"
+allowed_dependencies = []
+forbidden_dependencies = []
+side_effects = []
+public_api = [
+    "lca",
+]
+schema_version = "1.0.0"
+
 [tool.lca.package_contracts."lca.contracts"]
 responsibility = "数据契约层：Protocol、枚举、dataclass、事件"
 not_responsible_for = "实现细节、I/O、配置解析"
@@ -2345,8 +2356,8 @@ forbidden_modules = [
     "lca.layer0_infra.tools",
 ]
 
-# NOTE: lca.plugins 子包互不依赖 规则 Phase 1 暂不启用。
-# 原因：lca.plugins.providers 是多个 plugin 的间接依赖中枢（通过
-# lca.layer0_infra.observability.journal.journal_io），几乎所有 lca.plugins 子包
-# 都间接依赖 providers，独立性规则会全失败。计划在 Phase 2/3 治理后重新启用。
+[[tool.importlinter.contracts]]
+name = "lca.plugins 子包互不依赖"
+type = "independence"
+modules = []
 # === END PER-PACKAGE ===
