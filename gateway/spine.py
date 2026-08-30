@@ -85,9 +85,9 @@ def bind_session_spine(
     sessions_dir: Path,
     ctx_provider: Callable[[], Any | None],
     live_builder_provider: Callable[[], SessionLiveBuilder],
-    persistence_factory_provider: Callable[[], SessionPersistenceFactory],
     projection_registry_factory_provider: Callable[[], SessionProjectionRegistryFactory],
     command_ledger_provider: Callable[[], SessionCommandLedger],
+    persistence_factory_provider: Callable[[], SessionPersistenceFactory] | None = None,
 ) -> tuple[AgentRegistry, CommandGateway, SessionProjectionRegistry]:
     """Bind the session spine with a lazy ctx provider.
 
@@ -115,8 +115,8 @@ def bind_session_spine(
         projections=projections,
         live_builder_provider=live_builder_provider,
         ctx_provider=ctx_provider,
-        persistence_factory_provider=persistence_factory_provider,
         command_ledger_provider=command_ledger_provider,
+        persistence_factory_provider=persistence_factory_provider,
     )
     gateway = CommandGateway(registry, projections)
     return registry, gateway, projections

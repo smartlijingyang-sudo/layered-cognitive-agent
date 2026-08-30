@@ -47,14 +47,22 @@ class SessionActivator:
         projections: SessionProjectionRegistry,
         live_builder_provider: Callable[[], SessionLiveBuilder],
         ctx_provider: Callable[[], Any | None],
-        persistence_factory_provider: Callable[[], SessionPersistenceFactory],
+        persistence_factory_provider: Callable[[], SessionPersistenceFactory] | None = None,
     ) -> None:
         self._sessions_dir = sessions_dir
         self._sessions_dir.mkdir(parents=True, exist_ok=True)
         self._projections = projections
         self._live_builder_provider = live_builder_provider
         self._ctx_provider = ctx_provider
-        self._persistence_factory_provider = persistence_factory_provider
+        # Backwards-compat: if the boot-time provider chain can't resolve
+        # the SessionPersistenceFactory (e.g. legacy bundles without
+        # lca-session-persistence-jsonl-provider activated), fall back to
+        # JsonlSessionPersistenceFactory so soft-locked callers keep working.
+        if persistence_factory_provider is None:
+            from lca.harness.session.persistence import JsonlSessionPersistenceFactory
+            self._persistence_factory_provider = lambda: JsonlSessionPersistenceFactory()
+        else:
+            self._persistence_factory_provider = persistence_factory_provider
         self._live: dict[str, LiveSession] = {}
 
     def get(self, session_id: str) -> LiveAgent | None:

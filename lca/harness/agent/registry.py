@@ -34,8 +34,8 @@ class AgentRegistry:
         projections: SessionProjectionRegistry,
         live_builder_provider: Callable[[], SessionLiveBuilder],
         ctx_provider: Callable[[], Any | None],
-        persistence_factory_provider: Callable[[], SessionPersistenceFactory],
         command_ledger_provider: Callable[[], SessionCommandLedger],
+        persistence_factory_provider: Callable[[], SessionPersistenceFactory] | None = None,
     ) -> None:
         self._activator = SessionActivator(
             sessions_dir=sessions_dir,
