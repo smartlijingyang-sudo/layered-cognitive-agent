@@ -69,8 +69,37 @@ only the naming convention has shifted.
 - 16 import-linter contracts (5 baseline + 10 new forbidden + 1 independence
   rule deferred to Phase 2/3)
 - `scripts/check_package_contracts.py` (L1↔L2↔L3↔actual import 4-way
-  consistency check) with 9 passing unit tests
-- CI step added to `.github/workflows/ci.yml`
+  consistency check) with 13 passing unit tests (after Phase 3 L1↔__all__
+  cross-check)
+- `scripts/check_filename_boundaries.py` (filename blacklist enforcement)
+  with 11 passing unit tests; 16 historical violations tracked in
+  `legacy_blacklist.txt`
+- `scripts/quarterly_legacy_cleanup.py` for stable/active classification
+  with 7 passing unit tests
+- `scripts/sync_l1_public_api.py` to auto-sync L1 段 9 with `__all__`
+- `legacy_blacklist.txt` tracks existing filename violations (warning,
+  quarterly upgrade to error)
+- CI step added to `.github/workflows/ci.yml` (3 new steps: check_package_contracts,
+  check_filename_boundaries, plus import-linter)
 - `docs/architecture/checks.md` with 24+ script index
+
+## Phase 2 (2026-08-30, completed)
+
+Per [ADR-0104](docs/adr/0104-semantic-layer-rename.md), 5 layer renames
+executed as 5 atomic commits, no shim, no deprecation period:
+
+- `lca.layer0_infra` → `lca.infrastructure` (1811 references)
+- `lca.layer1_cognitive` → `lca.cognition` (480 references)
+- `lca.layer2_runtime` → `lca.runtime` (177 references)
+- `lca.layer3_agent` → `lca.agent` (143 references)
+- `lca.layer4_app` → `lca.application` (190 references)
+
+**Unchanged**: `lca.contracts`, `lca.harness`, `lca.plugins`, `gateway`.
+
+Total: 2801 references, ~1074 files. Migration script:
+`scripts/migrate_layer_rename.py` (with `--report` / `--dry-run` / `--execute` /
+`--rollback` modes).
+
+ADR-0001 preserved as historical archive with "Superseded by ADR-0104" note.
 - See [spec](../docs/superpowers/specs/2026-08-30-lca-modularization-design.md)
   and [Phase 1 plan](../docs/superpowers/plans/2026-08-30-lca-phase1-package-contracts.md)

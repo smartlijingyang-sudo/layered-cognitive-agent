@@ -27,7 +27,8 @@
 | `check_evidence_atomic.py` | 证据原子性 | ADR-0065 recoverable evidence | 是 | baseline |
 | `check_patch_integrity.py` | Patch 完整性 | lobehub patches | 是 | baseline |
 | `check_gateway_no_direct_journal_new.py` | Gateway 不直接写 Journal | C3/C7 控制观察分离 | 是 | baseline |
-| `check_filename_boundaries.py` (planned) | filename blacklist（`util`/`helper`/`manager`/`impl`/`common`/`misc`） | [2026-08-30-lca-modularization-design §6](../superpowers/specs/2026-08-30-lca-modularization-design.md) | Phase 3 后 | Phase 3 |
+| `check_filename_boundaries.py` | filename blacklist（`util`/`helper`/`manager`/`impl`/`common`/`misc`） | [2026-08-30-lca-modularization-design §6](../superpowers/specs/2026-08-30-lca-modularization-design.md) | warning 模式（Phase 3） | Phase 3 |
+| `quarterly_legacy_cleanup.py` | legacy_blacklist stable/active 分类 | spec §6.6 | N/A | Phase 3 |
 | `migrate_layer_rename.py` (planned) | Phase 2 layer 名迁移辅助 | ADR-0104 语义化 | N/A | Phase 2 |
 | `quarterly_legacy_cleanup.py` (planned) | legacy_blacklist 季度清理 | Phase 3 §6.6 | N/A | Phase 3 |
 | `lint-imports`（import-linter） | 5 + 10 + 1 contracts: layers + forbidden + independence | ADR-0061 plugin manifest | 是 | baseline + Phase 1 |
