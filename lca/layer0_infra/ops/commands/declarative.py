@@ -134,6 +134,52 @@ def register(app: typer.Typer) -> None:
         if not report["valid"]:
             raise typer.Exit(1)
 
+    @plan_app.command("relations")
+    def plan_relations(
+        plugin: str = typer.Option(..., "--plugin", "-p", help="plugin id"),
+        profile: Path = typer.Option(
+            Path("profiles/web-standard.yaml"),
+            "--profile",
+            help="Profile YAML to compile for relations lookup",
+        ),
+        json_mode: bool = typer.Option(False, "--json", help="输出 JSON"),
+    ) -> None:
+        """编译 Profile 并列出指定 plugin 的出/入关系。"""
+        if not plugin:
+            _fail("plan relations: --plugin <id> required")
+        from lca.contracts.protocols.capability_plan import (
+            relations_from_plugin,
+            relations_to_plugin,
+        )
+
+        try:
+            resolved = resolve_profile(profile)
+            plan = compile_plan(resolved)
+        except (OSError, ValueError) as exc:
+            _fail(f"plan relations: {exc}")
+        outgoing = relations_from_plugin(plan.capability, plugin)
+        incoming = relations_to_plugin(plan.capability, plugin)
+        if json_mode:
+            payload = {
+                "plugin_id": plugin,
+                "profile": str(profile),
+                "outgoing": [
+                    {"kind": r.kind.value, "target": r.target, "weight": r.weight} for r in outgoing
+                ],
+                "incoming": [
+                    {"kind": r.kind.value, "source": r.source, "weight": r.weight} for r in incoming
+                ],
+            }
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+            return
+        typer.echo(f"plan relations: plugin_id={plugin} profile={profile}")
+        typer.echo(f"  outgoing ({len(outgoing)}):")
+        for r in outgoing:
+            typer.echo(f"    {r.kind.value} → {r.target}")
+        typer.echo(f"  incoming ({len(incoming)}):")
+        for r in incoming:
+            typer.echo(f"    {r.source} → {r.kind.value}")
+
     @app.command(name="audit")
     def audit(
         target: str = typer.Argument(..., help="只支持 declarative-boundaries"),
