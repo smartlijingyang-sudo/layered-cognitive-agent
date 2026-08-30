@@ -67,6 +67,14 @@ _GRANDFATHERED_METHODS: dict[str, frozenset[str]] = {
     "PerceiveState": frozenset({"from_agent_state", "commit"}),
     "ContextManifest": frozenset({"by_kind", "has_kind"}),
     "WorkflowProgress": frozenset({"done"}),
+    # C2 port — main 的 composition.py / content_addressable.py 引入的行为
+    # dataclass 方法（MountResult.ok / UnmountResult.ok / InspectResult.mounted_count /
+    # InMemoryContentAddressableStore.{put,get,contains,sweep_orphan}），
+    # main 在 PR-0.5 后保留并显式 grandfather。移植时随 contracts 一起带上。
+    "MountResult": frozenset({"ok"}),
+    "UnmountResult": frozenset({"ok"}),
+    "InspectResult": frozenset({"mounted_count"}),
+    "InMemoryContentAddressableStore": frozenset({"put", "get", "contains", "sweep_orphan"}),
 }
 
 # 已存在的非 dataclass / 非 Protocol / 非异常 / 非枚举类——

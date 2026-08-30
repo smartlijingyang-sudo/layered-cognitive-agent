@@ -1,4 +1,4 @@
-"""Capability context — Definition 拥有的活服务键（DSH ctx 的 Python 形态）。"""
+"""Capability context — Definition 拥有的活服务键。"""
 
 from __future__ import annotations
 
@@ -51,17 +51,22 @@ class MissingCapabilityError(KeyError):
 
 
 def require_capability(ctx: object, key: str) -> Any:
-    """Read ``key`` from a booted cordis Context. Missing → MissingCapabilityError.
+    """Read one declared capability without exposing a second plugin interface.
 
-    Single path (ADR-0062 §3): ``ctx.inject("<key>")``. No ``seam:<key>`` fallback.
+    Manifest plugins run through ``AuditedPluginContext`` and therefore use
+    ``require`` so the interaction is checked against the plugin declaration.
+    A booted Cordis carrier has no such audited method and retains ``inject``
+    as its internal lookup operation.  Neither route permits a legacy
+    ``seam:<key>`` fallback.
     """
     if ctx is None:
         raise MissingCapabilityError(key)
-    inject = getattr(ctx, "inject", None)
-    if not callable(inject):
+    require = getattr(ctx, "require", None)
+    lookup = require if callable(require) else getattr(ctx, "inject", None)
+    if not callable(lookup):
         raise MissingCapabilityError(key)
     try:
-        value = inject(key)
+        value = lookup(key)
     except KeyError as exc:
         raise MissingCapabilityError(key) from exc
     if value is None:
