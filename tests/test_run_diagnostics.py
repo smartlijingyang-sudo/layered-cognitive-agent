@@ -22,8 +22,8 @@ from lca.infrastructure.observability import (
     run_scope,
 )
 from lca.infrastructure.observability.facade import RunContext, bind
-from lca.infrastructure.observability.journal.journal_io import load_journal_records
-from lca.infrastructure.observability.journal.jsonl_projector import JsonlJournalProjector
+from lca.infrastructure.observability.journal.engine.journal_io import load_journal_records
+from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector
 from lca.infrastructure.observability.policy import Verbosity
 from lca.infrastructure.ops.cli import app
 from lca.cognition.hook_registry import CordisHookRegistry

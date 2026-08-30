@@ -48,8 +48,8 @@ def register(app: typer.Typer) -> None:
         from lca.infrastructure.observability.diagnostics import (
             diagnose as run_diagnose,
         )
-        from lca.infrastructure.observability.journal.engine import RunStore
-        from lca.infrastructure.observability.journal.journal_io import read_journal
+        from lca.infrastructure.observability.journal.engine.engine import RunStore
+        from lca.infrastructure.observability.journal.engine.journal_io import read_journal
 
         pattern_key = problem.strip().lower()
         aliases: dict[str, str] = {

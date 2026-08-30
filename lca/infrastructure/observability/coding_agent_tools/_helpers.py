@@ -17,7 +17,7 @@ def _load_inspector_from_jsonl(jsonl_path: Path) -> TraceInspector:
 
     仅依赖公共 file IO + JSON;不涉及 ledger / backend。
     """
-    from lca.infrastructure.observability.journal.journal_io import load_journal_records
+    from lca.infrastructure.observability.journal.engine.journal_io import load_journal_records
 
     events: list[StampedEvent] = []
     if not jsonl_path.exists():

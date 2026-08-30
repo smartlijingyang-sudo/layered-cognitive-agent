@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.models.observability.journal import ReasoningDelta, RunScope, StampedEvent
-from lca.infrastructure.observability.journal.live_tail import LiveTail
+from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
 
 def test_live_tail_does_not_translate() -> None:

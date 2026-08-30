@@ -68,7 +68,7 @@ def test_run_store_uses_injected_registry(
     fresh_registry: InMemoryEventDescriptorRegistry,
 ) -> None:
     """RunStore.__init__ 显式 registry 走 self._descriptor_registry 路径。"""
-    from lca.infrastructure.observability.journal.engine import RunStore
+    from lca.infrastructure.observability.journal.engine.engine import RunStore
 
     fresh_registry.register(_make_descriptor("LlmCallCompleted"), replace=False)
     store = RunStore(descriptor_registry=fresh_registry)
@@ -82,7 +82,7 @@ def test_run_store_uses_injected_registry(
 
 def test_run_store_falls_back_when_no_registry() -> None:
     """不传 registry → 走 descriptor_for()（ambient 或 module 兜底）。"""
-    from lca.infrastructure.observability.journal.engine import RunStore
+    from lca.infrastructure.observability.journal.engine.engine import RunStore
 
     store = RunStore()  # descriptor_registry 默认 None
     assert store._descriptor_registry is None

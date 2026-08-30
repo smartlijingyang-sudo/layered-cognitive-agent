@@ -230,7 +230,7 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """按 LlmCallCompleted 累加成本(ADR-0065 §六 / PR-6 CostProjector)。"""
         from lca.infrastructure.observability.cost.projector import CostProjector
-        from lca.infrastructure.observability.journal.journal_io import (
+        from lca.infrastructure.observability.journal.engine.journal_io import (
             load_journal_records,
             record_to_stamped,
         )
@@ -274,7 +274,7 @@ def register(app: typer.Typer) -> None:
             print(f"ERROR: invalid ref format: {ref!r}", file=sys.stderr)
             raise typer.Exit(1)
 
-        from lca.infrastructure.observability.journal.journal_io import load_journal_records
+        from lca.infrastructure.observability.journal.engine.journal_io import load_journal_records
 
         path = resolve_journal_path(jsonl, run_id)
         full_ref: EvidenceRef | None = None

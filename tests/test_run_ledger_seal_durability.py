@@ -13,7 +13,7 @@ import pytest
 from lca.contracts.models.observability.journal import AgentRunFinished, StampedEvent
 from lca.contracts.observability.journal_store import JournalStoreBackend
 from lca.contracts.observability.ledger import LedgerDurabilityError, LedgerUnregisteredError
-from lca.infrastructure.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 
 @dataclass(frozen=True)

@@ -24,12 +24,12 @@ from lca.infrastructure.observability import (
     bind_backends,
     record,
 )
-from lca.infrastructure.observability.journal.journal_io import (
+from lca.infrastructure.observability.journal.engine.journal_io import (
     JOURNAL_SCHEMA_VERSION,
     load_journal_records,
     read_journal,
 )
-from lca.infrastructure.observability.journal.jsonl_projector import JsonlJournalProjector
+from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector
 from lca.infrastructure.observability.settings import ObservabilitySettings
 
 

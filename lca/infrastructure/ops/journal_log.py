@@ -16,7 +16,7 @@ import json
 from typing import Any
 
 from lca.contracts.models.observability.journal import StampedEvent
-from lca.infrastructure.observability.journal.journal_io import record_to_stamped
+from lca.infrastructure.observability.journal.engine.journal_io import record_to_stamped
 
 # SSE event types that don't map to StampedEvent (transport control signals).
 _SSE_CONTROL_EVENTS = frozenset({"LiveGap"})

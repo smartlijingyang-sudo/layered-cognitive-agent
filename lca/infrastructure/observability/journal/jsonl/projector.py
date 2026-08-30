@@ -41,17 +41,17 @@ from lca.contracts.models.observability.journal import (
     StepTextDelta,
 )
 from lca.contracts.protocols import JournalProjector
-from lca.infrastructure.observability.journal.event_enrichers import (
+from lca.infrastructure.observability.journal.engine.journal_io import (
+    dumps_journal_record,
+    stamped_to_record,
+)
+from lca.infrastructure.observability.journal.enrichment.event_enrichers import (
     EnrichmentContext,
     EnrichmentPipeline,
     RecordEnricher,
     default_enrichers,
 )
-from lca.infrastructure.observability.journal.journal_io import (
-    dumps_journal_record,
-    stamped_to_record,
-)
-from lca.infrastructure.observability.journal.narrative_sidecar import (
+from lca.infrastructure.observability.journal.stream.narrative_sidecar import (
     NarrativeSidecar,
     SidecarHook,
 )

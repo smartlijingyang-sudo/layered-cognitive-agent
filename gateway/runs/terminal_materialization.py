@@ -14,7 +14,7 @@ from gateway.runs.session import RunSession
 from gateway.runs.terminal_status import journal_store
 from lca.contracts.observability.run_locator import RunLocator
 from lca.contracts.observability.run_manifest import IntegrityState, ManifestEvidence, RunManifest
-from lca.infrastructure.observability.journal.journal_io import (
+from lca.infrastructure.observability.journal.engine.journal_io import (
     load_journal_records,
     record_normalize,
 )

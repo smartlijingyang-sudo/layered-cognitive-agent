@@ -26,7 +26,7 @@ from gateway.runs.execute import llm_status
 from gateway.runs.port import RunPort
 from lca.contracts.mechanisms.capability import MissingCapabilityError, require_capability
 from lca.contracts.observability.run_locator import RunLocator
-from lca.infrastructure.observability.journal.sse_frames import parse_last_event_id
+from lca.infrastructure.observability.journal.sse.frames import parse_last_event_id
 
 _PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
 _DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"

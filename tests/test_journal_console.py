@@ -22,7 +22,7 @@ from lca.contracts.models.observability.journal import (
     TeamRunStarted,
     ToolInvoked,
 )
-from lca.infrastructure.observability.journal.console_projector import ConsoleJournalProjector
+from lca.infrastructure.observability.journal.console.projector import ConsoleJournalProjector
 from lca.infrastructure.observability.policy import Verbosity
 
 _BASE_TS = 2_000_000.0

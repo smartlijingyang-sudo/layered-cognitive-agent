@@ -39,7 +39,7 @@ from lca.contracts.models.observability.journal import (
     ContextManifested,
     InboxFollowupCreated,
 )
-from lca.infrastructure.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine.engine import RunStore
 from lca.cognition.brain.decision_gates import (
     ChainedDecisionGate,
     RepeatToolCallGate,

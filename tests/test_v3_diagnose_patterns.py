@@ -18,7 +18,7 @@ from lca.infrastructure.observability.diagnostics import (
     diagnose_memory_poisoned,
     diagnose_model_not_seen,
 )
-from lca.infrastructure.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 
 def _state(store: RunStore, *events):

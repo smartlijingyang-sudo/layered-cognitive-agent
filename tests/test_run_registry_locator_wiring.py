@@ -15,7 +15,7 @@ from pathlib import Path
 from gateway.runs.identity import parse_agent_ref
 from gateway.runs.session import RunRegistry, RunSession
 from lca.contracts.observability.run_locator import RunLocator
-from lca.infrastructure.observability.journal.live_tail import LiveTail
+from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 from lca.infrastructure.observability.run_locator_fs import FilesystemRunLocator
 
 

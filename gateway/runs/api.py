@@ -24,7 +24,7 @@ from lca.contracts.models.observability.journal import (
     StepTextDelta,
 )
 from lca.infrastructure.file_store import LocalFileStore
-from lca.infrastructure.observability.journal.sse_frames import (
+from lca.infrastructure.observability.journal.sse.frames import (
     parse_last_event_id,
     stamped_to_sse_frame,
 )

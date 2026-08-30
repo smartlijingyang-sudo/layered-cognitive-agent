@@ -31,7 +31,7 @@ def bind_journal():
 
 
 def _dump_journal(journal: MemoryJournal, path: Path) -> None:
-    from lca.infrastructure.observability.journal.journal_io import stamped_to_record
+    from lca.infrastructure.observability.journal.engine.journal_io import stamped_to_record
 
     path.write_text(
         "\n".join(

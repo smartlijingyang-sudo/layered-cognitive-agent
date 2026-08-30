@@ -105,7 +105,7 @@ class LiveCollector(InMemoryObservability):
     def __init__(self, *, live: bool = True, detail: object = None) -> None:
         # detail kept for CLI API compat; console = journal-driven human view
         del detail
-        from lca.infrastructure.observability.journal.console_projector import (
+        from lca.infrastructure.observability.journal.console.projector import (
             ConsoleJournalProjector,
         )
 

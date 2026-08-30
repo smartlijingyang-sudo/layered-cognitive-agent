@@ -8,7 +8,7 @@ from typing import Any
 
 from gateway.runs.session import RunSession, RunStatus
 from lca.infrastructure.observability import BoundObservability, fold_run_state
-from lca.infrastructure.observability.journal.reducer import RunStatus as JournalRunStatus
+from lca.infrastructure.observability.journal.engine.reducer import RunStatus as JournalRunStatus
 
 
 def journal_store(hub: BoundObservability | None) -> Any:

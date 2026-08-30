@@ -30,7 +30,7 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
     ToolInvoked,
 )
-from lca.infrastructure.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine.engine import RunStore
 
 
 class DiagnosePattern(str, Enum):

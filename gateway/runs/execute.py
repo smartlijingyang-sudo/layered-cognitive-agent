@@ -48,8 +48,8 @@ from lca.infrastructure.observability import (
     record_runtime,
     run_scope,
 )
-from lca.infrastructure.observability.journal.jsonl_projector import JsonlJournalProjector
-from lca.infrastructure.observability.journal.reducer import RunStatus as JRunStatus
+from lca.infrastructure.observability.journal.jsonl.projector import JsonlJournalProjector
+from lca.infrastructure.observability.journal.engine.reducer import RunStatus as JRunStatus
 from lca.infrastructure.observability.settings import ObservabilitySettings
 from lca.infrastructure.plane.machine import resolve_machine, resolve_machine_transport
 from lca.infrastructure.plane.resolve import (

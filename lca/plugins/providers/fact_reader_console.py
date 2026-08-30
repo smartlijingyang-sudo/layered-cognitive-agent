@@ -30,7 +30,7 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.observability import NamedRegistry, ObservabilitySettings
-    from lca.infrastructure.observability.journal.console_projector import (
+    from lca.infrastructure.observability.journal.console.projector import (
         ConsoleJournalProjector,
     )
 

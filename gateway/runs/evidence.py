@@ -17,7 +17,7 @@ from lca.contracts.observability.evidence import (
     EvidenceRef,
     EvidenceStore,
 )
-from lca.infrastructure.observability.journal.journal_io import (
+from lca.infrastructure.observability.journal.engine.journal_io import (
     load_journal_records,
     record_normalize,
 )

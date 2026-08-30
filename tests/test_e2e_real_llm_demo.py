@@ -373,7 +373,7 @@ class TestObservabilityOutput(unittest.IsolatedAsyncioTestCase):
         trace_path = anyio.Path("traces/lca_journal.jsonl")
         if await trace_path.exists():
             content = await trace_path.read_text(encoding="utf-8")
-            from lca.infrastructure.observability.journal.journal_io import (
+            from lca.infrastructure.observability.journal.engine.journal_io import (
                 iter_journal_records,
             )
 

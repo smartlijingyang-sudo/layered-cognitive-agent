@@ -90,6 +90,20 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/infrastructure/sandbox/runtime.py": (
         "Sandbox Protocol 单模块承载 session/ready/exec 全链路（ADR-0043~0047）"
     ),
+    "lca/infrastructure/observability/journal/engine/engine.py": (
+        "Journal RunStore 单模块承载注册表/订阅/写盘/状态机（ADR-0055 + ADR-0037）；"
+        "Phase B 拆分保留单文件以维持 RunStore 内部一致性"
+    ),
+    "lca/infrastructure/observability/journal/engine/journal_io.py": (
+        "Journal IO 单模块承载序列化/反序列化/批量写盘/校验（ADR-0055）；"
+        "序列化与持久化耦合紧密，未拆分"
+    ),
+    "lca/infrastructure/observability/journal/console/projector.py": (
+        "Journal ConsoleProjector 集中 console + sequence diagram + table 输出渲染"
+    ),
+    "lca/infrastructure/observability/journal/stream/fact_stream.py": (
+        "Journal FactStreamProjector 单模块承载事实流投影 + 富化 + SSE 帧转换"
+    ),
     "lca/contracts/capabilities.py": (
         "L4 组合根 capability 注册中心 — STOP_RULES 由 C6 port 引入（C4 后向兼容 alias），"
         "无法拆到子模块"

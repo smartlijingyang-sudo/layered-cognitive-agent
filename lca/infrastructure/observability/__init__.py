@@ -131,8 +131,8 @@ from lca.infrastructure.observability.journal import (
     fold_run_state,
 )
 from lca.infrastructure.observability.journal.backends import InMemoryJournalStore
-from lca.infrastructure.observability.journal.journal_io import read_journal, stamped_to_record
-from lca.infrastructure.observability.journal.serialization import stamped_to_journal_record
+from lca.infrastructure.observability.journal.engine.journal_io import read_journal, stamped_to_record
+from lca.infrastructure.observability.journal.engine.serialization import stamped_to_journal_record
 from lca.infrastructure.observability.langfuse_conventions import (
     FRAMEWORK_TAG,
     LANGFUSE_ENVIRONMENT,

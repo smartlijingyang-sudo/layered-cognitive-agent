@@ -30,7 +30,7 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.observability import NamedRegistry, ObservabilitySettings
-    from lca.infrastructure.observability.journal.otel_projector import OtelProjector
+    from lca.infrastructure.observability.journal.otel.projector import OtelProjector
 
     registry: NamedRegistry = ctx.require("fact_readers")
 

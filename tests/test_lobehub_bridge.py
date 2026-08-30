@@ -310,7 +310,7 @@ class TestLiveTailKeepsEveryChannel(unittest.TestCase):
 
     def test_both_channels_stay_on_the_tail(self) -> None:
         from lca.contracts.models.observability.journal import RunScope, StampedEvent, StepTextDelta
-        from lca.infrastructure.observability.journal.live_tail import LiveTail
+        from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
         tail = LiveTail()
         scope = RunScope(trace_id="t", run_id="r")

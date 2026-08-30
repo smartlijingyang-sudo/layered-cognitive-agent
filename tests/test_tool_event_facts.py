@@ -30,7 +30,7 @@ from lca.contracts.observability.evidence import (
     EvidenceRef,
     RetentionClass,
 )
-from lca.infrastructure.observability.journal.journal_io import (
+from lca.infrastructure.observability.journal.engine.journal_io import (
     JOURNAL_SCHEMA_VERSION,
     _envelope_v2_to_disk_record,
     stamped_to_record,

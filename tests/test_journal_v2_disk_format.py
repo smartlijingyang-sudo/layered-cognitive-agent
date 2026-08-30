@@ -38,11 +38,11 @@ from lca.infrastructure.observability import (
     record,
     run_scope,
 )
-from lca.infrastructure.observability.journal.journal_io import (
+from lca.infrastructure.observability.journal.engine.journal_io import (
     load_journal_records,
     read_journal,
 )
-from lca.infrastructure.observability.journal.jsonl_projector import (
+from lca.infrastructure.observability.journal.jsonl.projector import (
     JsonlJournalProjector,
 )
 from lca.infrastructure.observability.journal_backend import MemoryJournal

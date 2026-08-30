@@ -40,7 +40,7 @@ from lca.infrastructure.observability.evidence.policy import (
 from lca.infrastructure.observability.evidence.store import (
     FilesystemEvidenceStore,
 )
-from lca.infrastructure.observability.journal.jsonl_projector import (
+from lca.infrastructure.observability.journal.jsonl.projector import (
     JsonlJournalProjector,
 )
 from lca.infrastructure.observability.journal_backend import MemoryJournal
@@ -162,7 +162,7 @@ def _drive_run_with_evidence(jsonl_path: Path, ev_root: Path) -> tuple[str, dict
         )
 
     # Find the ToolStarted and capture its arguments_ref
-    from lca.infrastructure.observability.journal.journal_io import read_journal
+    from lca.infrastructure.observability.journal.engine.journal_io import read_journal
 
     events = read_journal(jsonl_path)
     ts = next(e for e in events if isinstance(e.event, ToolStarted))

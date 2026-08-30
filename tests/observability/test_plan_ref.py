@@ -161,7 +161,7 @@ class TestRunStoreAppendStampsPlanRef:
         from lca.contracts.models.observability.plan_ref import (
             _run_plan_ref,
         )
-        from lca.infrastructure.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine.engine import RunStore
 
         prior = _run_plan_ref.set("__prior__")
         try:
@@ -184,7 +184,7 @@ class TestRunStoreAppendStampsPlanRef:
         from lca.contracts.models.observability.plan_ref import (
             _run_plan_ref,
         )
-        from lca.infrastructure.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine.engine import RunStore
 
         prior = _run_plan_ref.set("__prior__")
         try:
@@ -308,7 +308,7 @@ class TestV5AcceptanceEveryFactCarriesPlanRef:
         from lca.contracts.models.observability.plan_ref import (
             _run_plan_ref,
         )
-        from lca.infrastructure.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine.engine import RunStore
 
         prior = _run_plan_ref.set("__prior__")
         try:
@@ -340,7 +340,7 @@ class TestV5AcceptanceEveryFactCarriesPlanRef:
         from lca.contracts.models.observability.plan_ref import (
             _run_plan_ref,
         )
-        from lca.infrastructure.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine.engine import RunStore
 
         prior = _run_plan_ref.set("__prior__")
         try:
@@ -364,7 +364,7 @@ class TestV5AcceptanceEveryFactCarriesPlanRef:
 
     def test_plan_ref_change_mid_run_records_both(self) -> None:
         """plan_ref 在 run 中变更：先 set A 再 set B → 后续 events 携带 B。"""
-        from lca.infrastructure.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine.engine import RunStore
 
         store = RunStore(run_id="run_mid_change")
         event = RuntimeObserved(

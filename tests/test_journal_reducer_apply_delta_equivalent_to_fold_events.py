@@ -21,7 +21,7 @@ from lca.contracts.models.core.state import AgentState, Budget
 from lca.contracts.models.observability.journal import ContextManifested
 from lca.contracts.protocols import PerceiveHub, Sensor
 from lca.contracts.protocols.cognition import SensorDisabledError
-from lca.infrastructure.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine.engine import RunStore
 from lca.cognition.brain.decision_gates import record_gate_decided
 from lca.cognition.perceive_hub import SequentialPerceiveHub
 from lca.cognition.perceive_sink import JournalSink

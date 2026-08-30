@@ -59,7 +59,7 @@ from lca.contracts.models.observability.journal import (
     ToolStarted,
 )
 from lca.contracts.protocols import JournalProjector
-from lca.infrastructure.observability.journal.table_renderer import truncate as _truncate
+from lca.infrastructure.observability.journal.console.table_renderer import truncate as _truncate
 
 if TYPE_CHECKING:
     from typing import TextIO

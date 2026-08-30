@@ -38,7 +38,7 @@ from lca.contracts.models.observability.journal import (
 from lca.contracts.models.observability.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
 )
-from lca.infrastructure.observability.journal.serialization import (
+from lca.infrastructure.observability.journal.engine.serialization import (
     stamped_to_journal_record,
 )
 from lca.plugins.providers.journal_schema.v2 import EnvelopeV2Schema

@@ -32,7 +32,7 @@ from lca.contracts.models.observability.journal import (
     StampedEvent,
 )
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
-from lca.infrastructure.observability.journal.journal_io import (
+from lca.infrastructure.observability.journal.engine.journal_io import (
     read_journal,
     stamped_to_record,
 )

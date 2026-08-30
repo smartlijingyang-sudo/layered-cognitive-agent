@@ -29,7 +29,7 @@ from lca.contracts.models.observability.journal import (
 )
 from lca.contracts.protocols import Sensor
 from lca.contracts.protocols.cognition import SensorDisabledError
-from lca.infrastructure.observability.journal.engine import RunStore
+from lca.infrastructure.observability.journal.engine.engine import RunStore
 from lca.cognition.brain.context_manifest import digest_manifest
 from lca.cognition.brain.decision_gates import (
     ChainedDecisionGate,

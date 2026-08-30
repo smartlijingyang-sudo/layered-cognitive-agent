@@ -26,7 +26,7 @@ from lca.contracts.models.observability.journal_catalog import (
     JOURNAL_EVENT_CLASSES,
 )
 from lca.infrastructure.observability.event_catalog import EVENT_DESCRIPTOR_REGISTRY
-from lca.infrastructure.observability.journal.reducer import (
+from lca.infrastructure.observability.journal.engine.reducer import (
     RunStatus,
     fold_run_state,
 )
@@ -178,7 +178,7 @@ def test_reasoning_events_are_restricted_audience() -> None:
 
 
 def test_is_sse_visible_filters_restricted() -> None:
-    from lca.infrastructure.observability.journal.sse_frames import is_sse_visible
+    from lca.infrastructure.observability.journal.sse.frames import is_sse_visible
 
     assert is_sse_visible("TeamRunStarted") is True
     assert is_sse_visible("AgentRunFinished") is True

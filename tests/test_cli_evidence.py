@@ -28,7 +28,7 @@ from lca.infrastructure.observability.evidence.policy import (
 from lca.infrastructure.observability.evidence.store import (
     FilesystemEvidenceStore,
 )
-from lca.infrastructure.observability.journal.jsonl_projector import (
+from lca.infrastructure.observability.journal.jsonl.projector import (
     JsonlJournalProjector,
 )
 from lca.infrastructure.observability.journal_backend import MemoryJournal
@@ -109,7 +109,7 @@ def _drive_run(jsonl_path: Path, ev_root: Path) -> tuple[str, dict, str]:
             evidence_store=store,
             evidence_policy=policy,
         )
-    from lca.infrastructure.observability.journal.journal_io import read_journal
+    from lca.infrastructure.observability.journal.engine.journal_io import read_journal
 
     events = read_journal(jsonl_path)
     ts = next(e for e in events if isinstance(e.event, ToolStarted))
@@ -261,7 +261,7 @@ def test_cli_evidence_no_seam_exit_2() -> None:
             locator="",
         ).to_dict()
         from lca.contracts.models.observability.journal import StampedEvent
-        from lca.infrastructure.observability.journal.journal_io import stamped_to_record
+        from lca.infrastructure.observability.journal.engine.journal_io import stamped_to_record
 
         # Build a ToolStarted with arguments_ref (ADR-0101 PR-2: state_ref → arguments_ref)
         scope = RunScope(trace_id="t", run_id="run_x", agent_role="r")

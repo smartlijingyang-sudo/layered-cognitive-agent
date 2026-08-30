@@ -46,7 +46,7 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
         from lca.infrastructure.observability.journal.backends.filesystem import (
             FilesystemJournalStore,
         )
-        from lca.infrastructure.observability.journal.engine import RunStore
+        from lca.infrastructure.observability.journal.engine.engine import RunStore
 
         safe_run_id = run_id.strip() or "unbound"
         if Path(safe_run_id).name != safe_run_id:
@@ -59,10 +59,10 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
 
     def create_run_components(self, *, jsonl_path: Path) -> RunJournalComponents:
         """Create the durable writer and live tail for one resolved run path."""
-        from lca.infrastructure.observability.journal.jsonl_projector import (
+        from lca.infrastructure.observability.journal.jsonl.projector import (
             JsonlJournalProjector,
         )
-        from lca.infrastructure.observability.journal.live_tail import LiveTail
+        from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
         jsonl_path.parent.mkdir(parents=True, exist_ok=True)
         return RunJournalComponents(
@@ -72,7 +72,7 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
 
     def create_process_journal(self) -> ProcessJournalProjection:
         """Create the process-wide live projection owned by the run registry."""
-        from lca.infrastructure.observability.journal.process import ProcessJournal
+        from lca.infrastructure.observability.journal.engine.process import ProcessJournal
 
         return ProcessJournal()
 

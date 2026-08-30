@@ -93,10 +93,10 @@ def _follow_journal(
 
 def _replay_from_jsonl(*, verbose: bool, show_deltas: bool) -> None:
     """Read the durable jsonl journal file and project every event."""
-    from lca.infrastructure.observability.journal.fact_stream_projector import (
+    from lca.infrastructure.observability.journal.stream.fact_stream import (
         FactStreamProjector,
     )
-    from lca.infrastructure.observability.journal.journal_io import (
+    from lca.infrastructure.observability.journal.engine.journal_io import (
         JOURNAL_SCHEMA_VERSION,
         load_journal_records,
         record_to_stamped,
@@ -193,7 +193,7 @@ def _stream_live(
     """
     import time as _time
 
-    from lca.infrastructure.observability.journal.fact_stream_projector import (
+    from lca.infrastructure.observability.journal.stream.fact_stream import (
         FactStreamProjector,
     )
     from lca.infrastructure.ops.journal_log import (

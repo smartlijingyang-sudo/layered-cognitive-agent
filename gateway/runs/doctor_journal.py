@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from gateway.runs.doctor_models import RUN_FINISHED_EVENTS, TOOL_TERMINAL_EVENTS, JsonlScan
-from lca.infrastructure.observability.journal.journal_io import (
+from lca.infrastructure.observability.journal.engine.journal_io import (
     load_journal_records,
     record_normalize,
 )
